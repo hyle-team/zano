@@ -1429,11 +1429,10 @@ void wallet2::rise_on_transfer2(const wallet_public::wallet_transfer_info& wti)
   PROFILE_FUNC("wallet2::rise_on_transfer2");
   if (!m_do_rise_transfer)
     return;
-  uint64_t fake = 0;
-  uint64_t unlocked_balance = 0;
+  std::list<wallet_public::asset_balance_entry> balances;
   uint64_t mined = 0;
-  uint64_t balance = this->balance(unlocked_balance, fake, fake, mined);
-  m_wcallback->on_transfer2(wti, balance, unlocked_balance, mined);
+  this->balance(balances, mined);
+  m_wcallback->on_transfer2(wti, balances, mined);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::handle_money_spent2(const currency::block& b,

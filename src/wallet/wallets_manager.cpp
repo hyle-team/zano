@@ -1417,6 +1417,7 @@ std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_p
         return API_RETURN_CODE_BAD_ARG_WRONG_PAYMENT_ID; // payment id is specified more than once
       payment_id = embedded_payment_id;
     }
+    dsts.back().asset_id = d.asset_id;
   }
 
   if (payment_id.size())
@@ -1854,12 +1855,12 @@ void wallets_manager::on_new_block(size_t wallet_id, uint64_t /*height*/, const 
 
 }
 
-void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined)
+void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
 {  
   view::transfer_event_info tei = AUTO_VAL_INIT(tei);
   tei.ti = wti;
-  tei.balance = balance;
-  tei.unlocked_balance = unlocked_balance;
+  tei.balances = balances;
+  tei.total_mined = total_mined;
   tei.wallet_id = wallet_id;
 
   GET_WALLET_OPTIONS_BY_ID_VOID_RET(wallet_id, w);
@@ -1903,8 +1904,7 @@ void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet
   auto& w = m_wallets[wallet_id].w;
   if (w->get() != nullptr)
   {
-    tei.balance = w->get()->balance();
-    tei.unlocked_balance = w->get()->unlocked_balance();
+    w->get()->balance(tei.balances, tei.total_mined);
     tei.wallet_id = wallet_id;
   }
   else

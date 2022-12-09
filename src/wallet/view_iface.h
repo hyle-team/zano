@@ -377,16 +377,14 @@ public:
   struct transfer_event_info
   {
     tools::wallet_public::wallet_transfer_info ti;
-    uint64_t unlocked_balance;
-    uint64_t balance;
+    std::list<tools::wallet_public::asset_balance_entry> balances; 
 		uint64_t total_mined;
     uint64_t wallet_id;
     bool is_wallet_in_sync_process;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(ti)
-      KV_SERIALIZE(unlocked_balance)
-			KV_SERIALIZE(balance)
+      KV_SERIALIZE(balances)
 			KV_SERIALIZE(total_mined)
       KV_SERIALIZE(wallet_id)
       KV_SERIALIZE(is_wallet_in_sync_process)
