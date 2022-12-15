@@ -3167,25 +3167,27 @@ bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, u
   {
     asset_descriptor_base asset_info = AUTO_VAL_INIT(asset_info);
     //check if asset is whitelisted or customly added
-    auto it = m_whitelisted_assets.find(item.first);
-    if (it == m_whitelisted_assets.end())
+
+    //check if it custom asset
+    auto it_cust = custom_assets_local.find(item.first);
+    if(it_cust == custom_assets_local.end()) 
     {
-      //check if it custom asset
-      auto it_cust = custom_assets_local.find(item.first);
-      if (it_cust == custom_assets_local.end())
+      auto it_local = m_whitelisted_assets.find(item.first);
+      if(it_local == m_whitelisted_assets.end()) 
       {
         continue;
       }
-      else
+      else 
       {
-        asset_info = it_cust->second;
-        custom_assets_local.erase(it_cust);
+        asset_info = it_local->second;
       }
     }
-    else
+    else 
     {
-      asset_info = it->second;
-    }  
+      asset_info = it_cust->second;
+      custom_assets_local.erase(it_cust);
+    }
+ 
     balances.push_back(wallet_public::asset_balance_entry());
     wallet_public::asset_balance_entry& new_item = balances.back();
     static_cast<wallet_public::asset_balance_entry_base&>(new_item) = item.second;
