@@ -3153,8 +3153,12 @@ namespace currency
       VARIANT_CASE_CONST(tx_out_zarcanum, o)
         //@#@      
       VARIANT_SWITCH_END();
-
     }
+#ifdef TESTNET
+    found_alias_reward = 10 * COIN;
+#else
+    @#@ fix it for mainnet bui
+#endif
     return found_alias_reward;
   }
 
