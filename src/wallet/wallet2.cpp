@@ -499,7 +499,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
   uint64_t max_out_unlock_time = 0;
 
   std::vector<wallet_out_info> outs;
-  uint64_t tx_money_got_in_outs = 0;
+  uint64_t tx_money_got_in_outs = 0;   // TODO:  @#@# correctly calculate tx_money_got_in_outs for post-HF4
   crypto::public_key tx_pub_key = null_pkey;
   bool r = parse_and_validate_tx_extra(tx, tx_pub_key);
   THROW_IF_TRUE_WALLET_EX(!r, error::tx_extra_parse_error, tx);
@@ -5021,7 +5021,6 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency
     //size_t real_index = src.outputs.size() ? (rand() % src.outputs.size() ):0;
     tx_output_entry real_oe = AUTO_VAL_INIT(real_oe);
     real_oe.out_reference = td.m_global_output_index; // TODO: use ref_by_id when neccessary
-    //@#@
     VARIANT_SWITCH_BEGIN(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]);
     VARIANT_CASE_CONST(tx_out_bare, o)
     {
@@ -5509,23 +5508,25 @@ bool wallet2::is_transfer_able_to_go(const transfer_details& td, uint64_t fake_o
 {
   if (!td.is_spendable())
     return false;
-  VARIANT_SWITCH_BEGIN(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]);
-  VARIANT_CASE_CONST(tx_out_bare, o);
+
+  const tx_out_v &out_v = td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index];
+
+  uint8_t mix_attr = CURRENCY_TO_KEY_OUT_RELAXED;
+  if (get_mix_attr_from_tx_out_v(out_v, mix_attr))
   {
+    if (!currency::is_mixattr_applicable_for_fake_outs_counter(mix_attr, fake_outputs_count))
+      return false;
+  }
+
+  VARIANT_SWITCH_BEGIN(out_v);
+  VARIANT_CASE_CONST(tx_out_bare, o);
     if (o.target.type() == typeid(txout_htlc))
     {
       if (fake_outputs_count != 0)
         return false;
     }
-    else
-    {
-      if (!currency::is_mixattr_applicable_for_fake_outs_counter(boost::get<currency::txout_to_key>(o.target).mix_attr, fake_outputs_count))
-        return false;
-    }
-  }
-  VARIANT_CASE_CONST(tx_out_zarcanum, o);
-  //@#@      
   VARIANT_SWITCH_END();
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -5758,6 +5759,9 @@ void wallet2::print_source_entry(std::stringstream& output, const currency::tx_s
     << ", real_output: " << src.real_output
     << ", real_output_in_tx_index: " << src.real_output_in_tx_index
     << ", indexes: " << ss.str();
+
+  if (src.asset_id != currency::null_hash)
+    output << ", asset_id: " << print16(src.asset_id);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) const
@@ -5785,15 +5789,25 @@ void wallet2::prepare_tx_destinations(const assets_selection_context& needed_mon
     prepare_tx_destinations(el.second.needed_amount, el.second.found_amount, destination_split_strategy_id, dust_policy, dsts, final_destinations, el.first);    
   }
 
-  if (is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM) && final_destinations.size() < CURRENCY_TX_MIN_ALLOWED_OUTS)
+  if (is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
   {
+    // special case for asset minting destinations
+    for (auto& dst : dsts)
+      if (dst.asset_id == currency::ffff_hash)
+        final_destinations.emplace_back(dst.amount, dst.addr, dst.asset_id);
+
     // if there's not ehough destinations items (i.e. outputs), split the last one
-    tx_destination_entry de = final_destinations.back();
-    final_destinations.pop_back();
-    size_t items_to_be_added = CURRENCY_TX_MIN_ALLOWED_OUTS - final_destinations.size();
-    decompose_amount_randomly(de.amount, [&](uint64_t amount){ de.amount = amount; final_destinations.push_back(de); }, items_to_be_added);
-    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(final_destinations.size() == CURRENCY_TX_MIN_ALLOWED_OUTS,
-      "can't get necessary number of outputs using decompose_amount_randomly(), got " << final_destinations.size() << " while mininum is " << CURRENCY_TX_MIN_ALLOWED_OUTS);
+    if (final_destinations.size() > 0 && final_destinations.size() < CURRENCY_TX_MIN_ALLOWED_OUTS)
+    {
+      tx_destination_entry de = final_destinations.back();
+      final_destinations.pop_back();
+      size_t items_to_be_added = CURRENCY_TX_MIN_ALLOWED_OUTS - final_destinations.size();
+      // TODO: consider allowing to set them somewhere
+      size_t num_digits_to_keep = CURRENCY_TX_OUTS_RND_SPLIT_DIGITS_TO_KEEP;
+      decompose_amount_randomly(de.amount, [&](uint64_t amount){ de.amount = amount; final_destinations.push_back(de); }, items_to_be_added, num_digits_to_keep);
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(final_destinations.size() == CURRENCY_TX_MIN_ALLOWED_OUTS,
+        "can't get necessary number of outputs using decompose_amount_randomly(), got " << final_destinations.size() << " while mininum is " << CURRENCY_TX_MIN_ALLOWED_OUTS);
+    }
   }
 }
 //----------------------------------------------------------------------------------------------------
@@ -5802,34 +5816,39 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
   detail::split_strategy_id_t destination_split_strategy_id,
   const tx_dust_policy& dust_policy,
   const std::vector<currency::tx_destination_entry>& dsts,
-  std::vector<currency::tx_destination_entry>& final_detinations, const crypto::hash& asset_id)
+  std::vector<currency::tx_destination_entry>& final_destinations, const crypto::hash& asset_id)
 {
-  currency::tx_destination_entry change_dts = AUTO_VAL_INIT(change_dts);
-  if (needed_money < found_money)
-  {
-    change_dts.addr.push_back(m_account.get_keys().account_address);
-    change_dts.amount = found_money - needed_money;
-    change_dts.asset_id = asset_id;
-  }
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(found_money >= needed_money, "needed_money==" << needed_money << "  <  found_money==" << found_money);
-  if (asset_id != currency::null_hash)
+
+  if (is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
   {
-    if (change_dts.amount)
+    for(auto& dst : dsts)
     {
-      final_detinations.push_back(change_dts);
+      if (dst.asset_id == asset_id)
+        final_destinations.emplace_back(dst.amount, dst.addr, dst.asset_id);
     }
-    return;
+    if (found_money > needed_money)
+      final_destinations.emplace_back(found_money - needed_money, m_account.get_public_address(), asset_id); // returning back the change
   }
-
-  uint64_t dust = 0;
-  bool r = detail::apply_split_strategy_by_id(destination_split_strategy_id, dsts, change_dts, dust_policy.dust_threshold, final_detinations, dust, WALLET_MAX_ALLOWED_OUTPUT_AMOUNT);
-  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "invalid split strategy id: " << destination_split_strategy_id);
-  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(dust_policy.dust_threshold >= dust, "invalid dust value: dust = " << dust << ", dust_threshold = " << dust_policy.dust_threshold);
-
-  if (0 != dust && !dust_policy.add_to_fee)
+  else
   {
-    final_detinations.push_back(currency::tx_destination_entry(dust, dust_policy.addr_for_dust));
-    final_detinations.back().asset_id = asset_id;
+    // pre-HF4
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(asset_id == currency::null_hash, "assets are not allowed prior to HF4");
+    currency::tx_destination_entry change_dts = AUTO_VAL_INIT(change_dts);
+    if (needed_money < found_money)
+    {
+      change_dts.addr.push_back(m_account.get_keys().account_address);
+      change_dts.amount = found_money - needed_money;
+    }
+    uint64_t dust = 0;
+    bool r = detail::apply_split_strategy_by_id(destination_split_strategy_id, dsts, change_dts, dust_policy.dust_threshold, final_destinations, dust, WALLET_MAX_ALLOWED_OUTPUT_AMOUNT);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "invalid split strategy id: " << destination_split_strategy_id);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(dust_policy.dust_threshold >= dust, "invalid dust value: dust = " << dust << ", dust_threshold = " << dust_policy.dust_threshold);
+
+    if (0 != dust && !dust_policy.add_to_fee)
+    {
+      final_destinations.emplace_back(dust, dust_policy.addr_for_dust);
+    }
   }
 }
 //----------------------------------------------------------------------------------------------------
@@ -6154,7 +6173,7 @@ void wallet2::transfer(construct_tx_param& ctp,
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
-  uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, currency::transaction* p_result_tx /* = nullptr */, std::string* p_filename_or_unsigned_tx_blob_str /* = nullptr */)
+  uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx /* = nullptr */, std::string* p_filename_or_unsigned_tx_blob_str /* = nullptr */)
 {
   static const size_t estimated_bytes_per_input = 78;
   const size_t estimated_max_inputs = static_cast<size_t>(CURRENCY_MAX_TRANSACTION_BLOB_SIZE / (estimated_bytes_per_input * (fake_outs_count + 1.5))); // estimated number of maximum tx inputs under the tx size limit
@@ -6164,6 +6183,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   outs_total = 0;
   amount_total = 0;
   outs_swept = 0;
+  amount_swept = 0;
 
   std::vector<uint64_t> selected_transfers;
   selected_transfers.reserve(m_transfers.size());
@@ -6198,10 +6218,11 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   if (fake_outs_count > 0)
   {
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request req = AUTO_VAL_INIT(req);
+    req.height_upper_limit = m_last_pow_block_h;
     req.use_forced_mix_outs = false;
     req.decoys_count = fake_outs_count + 1;
     for (uint64_t i : selected_transfers)
-      req.amounts.push_back(m_transfers[i].amount());
+      req.amounts.push_back(m_transfers[i].is_zc() ? 0 : m_transfers[i].m_amount);
 
     r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(req, rpc_get_random_outs_resp);
     
@@ -6268,16 +6289,14 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
         {
           if (td.m_global_output_index == daemon_oe.global_amount_index)
             continue;
-          tx_output_entry oe = AUTO_VAL_INIT(oe);
-          oe.out_reference = daemon_oe.global_amount_index;
-          oe.stealth_address = daemon_oe.stealth_address;
-          src.outputs.push_back(oe);
+          src.outputs.emplace_back(daemon_oe.global_amount_index, daemon_oe.stealth_address, daemon_oe.concealing_point, daemon_oe.amount_commitment);
           if (src.outputs.size() >= fake_outs_count)
             break;
         }
       }
 
       // insert real output into src.outputs
+      // TODO: bad design, we need to get rid of code duplicates below -- sowle
       auto it_to_insert = std::find_if(src.outputs.begin(), src.outputs.end(), [&](const tx_output_entry& a)
       {
         if (a.out_reference.type().hash_code() == typeid(uint64_t).hash_code())
@@ -6285,17 +6304,32 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
         return false; // TODO: implement deterministics real output placement in case there're ref_by_id outs
       });
       tx_output_entry real_oe = AUTO_VAL_INIT(real_oe);
-      real_oe.out_reference = td.m_global_output_index;
-      //@#@
-      if(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].type() != typeid(tx_out_bare))
-        continue;
-      const tx_out_bare& out_b = boost::get<tx_out_bare>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]);
-      real_oe.stealth_address = boost::get<txout_to_key>(out_b.target).key;
-      auto inserted_it = src.outputs.insert(it_to_insert, real_oe);
+      txout_ref_v out_reference = td.m_global_output_index; // TODO: use ref_by_id when neccessary
+      std::vector<tx_output_entry>::iterator interted_it  = src.outputs.end();
+      VARIANT_SWITCH_BEGIN(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]);
+      VARIANT_CASE_CONST(tx_out_bare, o)
+      {
+        VARIANT_SWITCH_BEGIN(o.target);
+        VARIANT_CASE_CONST(txout_to_key, o)
+          interted_it = src.outputs.emplace(it_to_insert, out_reference, o.key);
+        VARIANT_CASE_CONST(txout_htlc, htlc)
+          interted_it = src.outputs.emplace(it_to_insert, out_reference, htlc.pkey_refund);
+        VARIANT_CASE_OTHER()
+        {
+          WLT_THROW_IF_FALSE_WITH_CODE(false,
+            "Internal error: unexpected type of target: " << o.target.type().name(),
+            API_RETURN_CODE_INTERNAL_ERROR);
+        }
+        VARIANT_SWITCH_END();
+      }
+      VARIANT_CASE_CONST(tx_out_zarcanum, o);
+        interted_it = src.outputs.emplace(it_to_insert, out_reference, o.stealth_address, o.concealing_point, o.amount_commitment);
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.m_opt_blinding_mask, "m_opt_blinding_mask is null, transfer index: " << tr_index << ", amount: " << print_money_brief(td.amount())); 
+        src.real_out_amount_blinding_mask = *td.m_opt_blinding_mask;
+      VARIANT_SWITCH_END();
       src.real_out_tx_key = get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
-      src.real_output = inserted_it - src.outputs.begin();
+      src.real_output = interted_it - src.outputs.begin();
       src.real_output_in_tx_index = td.m_internal_output_index;
-      //detail::print_source_entry(src);
     }
 
     if (amount_swept <= fee)
@@ -6324,7 +6358,6 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   };
 
   size_t st_index_upper_boundary = std::min(selected_transfers.size(), estimated_max_inputs);
-  uint64_t amount_swept = 0;
   try_construct_result_t res = try_construct_tx(st_index_upper_boundary, ftp, amount_swept);
   
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(res != rc_too_few_outputs, st_index_upper_boundary << " biggest unspent outputs have total amount of " << print_money_brief(amount_swept)

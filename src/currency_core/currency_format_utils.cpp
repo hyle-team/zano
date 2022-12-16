@@ -1988,7 +1988,7 @@ namespace currency
     {
       if (summary_outs_money > summary_inputs_money)
       {
-        LOG_ERROR("Transaction inputs money (" << summary_inputs_money << ") less than outputs money (" << summary_outs_money << ")");
+        LOG_ERROR("Transaction inputs money (" << print_money_brief(summary_inputs_money) << ") is less than outputs money (" << print_money_brief(summary_outs_money) << ")");
         return false;
       }
     }

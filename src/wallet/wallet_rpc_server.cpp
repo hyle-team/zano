@@ -620,9 +620,8 @@ namespace tools
       uint64_t amount_total = 0, amount_swept = 0;
 
       std::string unsigned_tx_blob_str;
-      m_wallet.sweep_below(req.mixin, addr, req.amount, payment_id, req.fee, outs_total, amount_total, outs_swept, &tx, &unsigned_tx_blob_str);
+      m_wallet.sweep_below(req.mixin, addr, req.amount, payment_id, req.fee, outs_total, amount_total, outs_swept, amount_swept, &tx, &unsigned_tx_blob_str);
 
-      get_inputs_money_amount(tx, amount_swept);
       res.amount_swept = amount_swept;
       res.amount_total = amount_total;
       res.outs_swept = outs_swept;

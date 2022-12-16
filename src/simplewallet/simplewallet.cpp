@@ -223,9 +223,9 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("sign_transfer", boost::bind(&simple_wallet::sign_transfer, this,ph::_1), "sign_transfer <unsgined_tx_file> <signed_tx_file> - sign unsigned tx from a watch-only wallet");
   m_cmd_binder.set_handler("submit_transfer", boost::bind(&simple_wallet::submit_transfer, this,ph::_1), "submit_transfer <signed_tx_file> - broadcast signed tx");
   m_cmd_binder.set_handler("export_history", boost::bind(&simple_wallet::submit_transfer, this,ph::_1), "Export transaction history in CSV file");
-  m_cmd_binder.set_handler("tor_enable", boost::bind(&simple_wallet::tor_enable, this, _1), "Enable relaying transactions over TOR network(enabled by default)");
-  m_cmd_binder.set_handler("tor_disable", boost::bind(&simple_wallet::tor_disable, this, _1), "Enable relaying transactions over TOR network(enabled by default)");
-  m_cmd_binder.set_handler("deploy_new_asset", boost::bind(&simple_wallet::deploy_new_asset, this, _1), "Deploys new asset in the network, with current wallet as a maintainer");
+  m_cmd_binder.set_handler("tor_enable", boost::bind(&simple_wallet::tor_enable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
+  m_cmd_binder.set_handler("tor_disable", boost::bind(&simple_wallet::tor_disable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
+  m_cmd_binder.set_handler("deploy_new_asset", boost::bind(&simple_wallet::deploy_new_asset, this, ph::_1), "Deploys new asset in the network, with current wallet as a maintainer");
   m_cmd_binder.set_handler("add_custom_asset_id", boost::bind(&simple_wallet::add_custom_asset_id, this, _1), "Approve asset id to be recognized in the wallet and returned in balances");
   m_cmd_binder.set_handler("remove_custom_asset_id", boost::bind(&simple_wallet::remove_custom_asset_id, this, _1), "Cancel previously made approval for asset id");
 
@@ -1942,9 +1942,7 @@ bool simple_wallet::sweep_below(const std::vector<std::string> &args)
     uint64_t amount_total = 0, amount_swept = 0;
     currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
     std::string filename = "zano_tx_unsigned";
-    m_wallet->sweep_below(fake_outs_count, addr, amount, payment_id, fee, outs_total, amount_total, outs_swept, &result_tx, &filename);
-    if (!get_inputs_money_amount(result_tx, amount_swept))
-      LOG_ERROR("get_inputs_money_amount failed, tx: " << obj_to_json_str(result_tx));
+    m_wallet->sweep_below(fake_outs_count, addr, amount, payment_id, fee, outs_total, amount_total, outs_swept, amount_swept, &result_tx, &filename);
 
     success_msg_writer(false) << outs_swept << " outputs (" << print_money_brief(amount_swept) << " coins) of " << outs_total << " total (" << print_money_brief(amount_total)
       << ") below the specified limit of " << print_money_brief(amount) << " were successfully swept";
