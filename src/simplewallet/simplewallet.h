@@ -89,6 +89,9 @@ namespace currency
     bool tor_enable(const std::vector<std::string> &args);
     bool tor_disable(const std::vector<std::string> &args);
     bool deploy_new_asset(const std::vector<std::string> &args);
+    bool add_custom_asset_id(const std::vector<std::string> &args);
+    bool remove_custom_asset_id(const std::vector<std::string> &args);
+
     bool validate_wrap_status(uint64_t amount);
 
     bool get_alias_from_daemon(const std::string& alias_name, currency::extra_alias_entry_base& ai);
@@ -99,7 +102,7 @@ namespace currency
 
     //----------------- i_wallet2_callback ---------------------
     virtual void on_new_block(uint64_t height, const currency::block& block) override;
-    virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) override;
+    virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) override;
     virtual void on_message(i_wallet2_callback::message_severity severity, const std::string& m) override;
     virtual void on_tor_status_change(const std::string& state) override;
 

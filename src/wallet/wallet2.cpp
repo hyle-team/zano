@@ -1429,11 +1429,10 @@ void wallet2::rise_on_transfer2(const wallet_public::wallet_transfer_info& wti)
   PROFILE_FUNC("wallet2::rise_on_transfer2");
   if (!m_do_rise_transfer)
     return;
-  uint64_t fake = 0;
-  uint64_t unlocked_balance = 0;
+  std::list<wallet_public::asset_balance_entry> balances;
   uint64_t mined = 0;
-  uint64_t balance = this->balance(unlocked_balance, fake, fake, mined);
-  m_wcallback->on_transfer2(wti, balance, unlocked_balance, mined);
+  this->balance(balances, mined);
+  m_wcallback->on_transfer2(wti, balances, mined);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::handle_money_spent2(const currency::block& b,
@@ -2372,7 +2371,7 @@ void wallet2::refresh(size_t & blocks_fetched, bool& received_money, std::atomic
   }
   
 
-  WLT_LOG("Refresh done, blocks received: " << blocks_fetched << ", balance: " << print_money_brief(balance()) << ", unlocked: " << print_money_brief(unlocked_balance()), blocks_fetched > 0 ? LOG_LEVEL_1 : LOG_LEVEL_2);
+  WLT_LOG("Refresh done, blocks received: " << blocks_fetched, blocks_fetched > 0 ? LOG_LEVEL_1 : LOG_LEVEL_2);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::handle_expiration_list(uint64_t tx_expiration_ts_median)
@@ -3145,47 +3144,63 @@ bool wallet2::balance(std::unordered_map<crypto::hash, wallet_public::asset_bala
 bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, uint64_t& mined) const
 {
   load_whitelisted_tokens_if_not_loaded();
+  balances.clear();
   std::unordered_map<crypto::hash, wallet_public::asset_balance_entry_base> balances_map;
   this->balance(balances_map, mined);
+  std::unordered_map<crypto::hash, currency::asset_descriptor_base> custom_assets_local = m_custom_assets;
+
+  for (auto& own_asset : m_own_asset_descriptors)
+  {
+    if (m_whitelisted_assets.find(own_asset.first) == m_whitelisted_assets.end())
+    {
+      custom_assets_local[own_asset.first] = own_asset.second.asset_descriptor;
+    }
+  }
+
+  asset_descriptor_base native_asset_info = AUTO_VAL_INIT(native_asset_info);
+  native_asset_info.full_name = CURRENCY_NAME_SHORT_BASE;
+  native_asset_info.ticker = CURRENCY_NAME_ABR;
+  native_asset_info.decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT;
+  custom_assets_local[currency::null_hash] = native_asset_info;
+
   for (const auto& item : balances_map)
   {
-    asset_descriptor_base native_asset_info = AUTO_VAL_INIT(native_asset_info);
-    native_asset_info.full_name = CURRENCY_NAME_SHORT_BASE;
-    native_asset_info.ticker = CURRENCY_NAME_ABR;
-    native_asset_info.decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT;
-    const asset_descriptor_base* asset_ptr = nullptr;
+    asset_descriptor_base asset_info = AUTO_VAL_INIT(asset_info);
     //check if asset is whitelisted or customly added
-    if (item.first == currency::null_hash)
+
+    //check if it custom asset
+    auto it_cust = custom_assets_local.find(item.first);
+    if(it_cust == custom_assets_local.end()) 
     {
-      asset_ptr = &native_asset_info;
+      auto it_local = m_whitelisted_assets.find(item.first);
+      if(it_local == m_whitelisted_assets.end()) 
+      {
+        continue;
+      }
+      else 
+      {
+        asset_info = it_local->second;
+      }
     }
-    else
+    else 
     {
-      auto it = m_whitelisted_assets.find(item.first);
-      if (it == m_whitelisted_assets.end())
-      {
-        //check if it custom asset
-        auto it_cust = m_custom_assets.find(item.first);
-        if (it_cust == m_custom_assets.end())
-        {
-          continue;
-        }
-        else
-        {
-          asset_ptr = &it_cust->second;
-        }
-      }
-      else
-      {
-        asset_ptr = &it->second;
-      }
-    }    
+      asset_info = it_cust->second;
+      custom_assets_local.erase(it_cust);
+    }
+ 
     balances.push_back(wallet_public::asset_balance_entry());
     wallet_public::asset_balance_entry& new_item = balances.back();
     static_cast<wallet_public::asset_balance_entry_base&>(new_item) = item.second;
     new_item.asset_info.asset_id = item.first;
-    CHECK_AND_ASSERT_THROW_MES(asset_ptr, "Internal error: asset_ptr i nullptr");
-    static_cast<currency::asset_descriptor_base&>(new_item.asset_info) = *asset_ptr;
+    static_cast<currency::asset_descriptor_base&>(new_item.asset_info) = asset_info;
+  }
+  //manually added assets should be always present, at least as zero balanced items
+  for (auto& asset : custom_assets_local)
+  {
+    balances.push_back(wallet_public::asset_balance_entry());
+    wallet_public::asset_balance_entry& new_item = balances.back();
+    new_item.asset_info.asset_id = asset.first;
+    static_cast<currency::asset_descriptor_base&>(new_item.asset_info) = asset.second;
   }
 
   return true;
@@ -3197,15 +3212,17 @@ uint64_t wallet2::balance() const
   return balance(stub, stub, stub, stub);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::add_custom_asset_id(const crypto::hash& asset_id)
+bool wallet2::add_custom_asset_id(const crypto::hash& asset_id, asset_descriptor_base& asset_descriptor)
 {
   currency::COMMAND_RPC_GET_ASSET_INFO::request req = AUTO_VAL_INIT(req);
   currency::COMMAND_RPC_GET_ASSET_INFO::response resp = AUTO_VAL_INIT(resp);
+  req.asset_id = asset_id;
 
   bool r = m_core_proxy->call_COMMAND_RPC_GET_ASSET_INFO(req, resp);
   if (resp.status == API_RETURN_CODE_OK)
   {
     m_custom_assets[asset_id] = resp.asset_descriptor;
+    asset_descriptor = resp.asset_descriptor;
     return true;
   }
   return false;

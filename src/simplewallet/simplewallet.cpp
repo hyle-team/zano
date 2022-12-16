@@ -226,6 +226,8 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("tor_enable", boost::bind(&simple_wallet::tor_enable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
   m_cmd_binder.set_handler("tor_disable", boost::bind(&simple_wallet::tor_disable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
   m_cmd_binder.set_handler("deploy_new_asset", boost::bind(&simple_wallet::deploy_new_asset, this, ph::_1), "Deploys new asset in the network, with current wallet as a maintainer");
+  m_cmd_binder.set_handler("add_custom_asset_id", boost::bind(&simple_wallet::add_custom_asset_id, this, _1), "Approve asset id to be recognized in the wallet and returned in balances");
+  m_cmd_binder.set_handler("remove_custom_asset_id", boost::bind(&simple_wallet::remove_custom_asset_id, this, _1), "Cancel previously made approval for asset id");
 
 }
 //----------------------------------------------------------------------------------------------------
@@ -640,14 +642,13 @@ std::string print_money_trailing_zeros_replaced_with_spaces(uint64_t amount)
   return s;
 }
 //----------------------------------------------------------------------------------------------------
-void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined)
+void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
 {
   epee::log_space::console_colors color = wti.is_income ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
   message_writer(color, false) <<
     "height " << wti.height <<
     ", tx " << wti.tx_hash <<
-    " " << std::right << std::setw(18) << print_money_trailing_zeros_replaced_with_spaces(wti.amount) << (wti.is_income ? " received," : " spent,   ") <<
-    " balance: " << print_money_brief(balance);
+    " " << std::right << std::setw(18) << print_money_trailing_zeros_replaced_with_spaces(wti.amount) << (wti.is_income ? " received," : " spent");
   m_refresh_progress_reporter.update(wti.height, true);
 }
 //----------------------------------------------------------------------------------------------------
@@ -764,7 +765,7 @@ bool simple_wallet::show_balance(const std::vector<std::string>& args/* = std::v
   std::stringstream ss;
   for (const tools::wallet_public::asset_balance_entry& b : balances)
   {
-    ss << std::setw(21) << print_fixed_decimal_point(b.total, b.asset_info.decimal_point) << "\t" << b.asset_info.ticker << ENDL;
+    ss << std::setw(21) << print_fixed_decimal_point(b.total, b.asset_info.decimal_point) << "\t" << b.asset_info.ticker << "\t" << b.asset_info.asset_id << ENDL;
   }
   success_msg_writer() << "Balance: " << ENDL << ss.str();
   return true;
@@ -1790,7 +1791,7 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
   asset_descriptor_base adb = AUTO_VAL_INIT(adb);
   if (!args.size() || args.size() > 1)
   {
-    fail_msg_writer() << "invalid agruments count: " << args.size() << ", expected 1";
+    fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
   }
   bool r = epee::serialization::load_t_from_json_file(adb, args[0]);
   if (!r)
@@ -1815,6 +1816,63 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
     << "Max emission: " << print_fixed_decimal_point(adb.total_max_supply, adb.decimal_point) << ENDL
     ;
 
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::add_custom_asset_id(const std::vector<std::string> &args)
+{
+  if (!args.size() || args.size() > 1)
+  {
+    fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
+  }
+  crypto::hash asset_id =  currency::null_hash;
+  if (!epee::string_tools::parse_tpod_from_hex_string(args[0], asset_id))
+  {
+    fail_msg_writer() << "expected valid asset_id";
+    return true;
+  }
+  asset_descriptor_base asset_descriptor = AUTO_VAL_INIT(asset_descriptor);
+  bool r = m_wallet->add_custom_asset_id(asset_id, asset_descriptor);
+  if(!r)
+  {
+    fail_msg_writer() << "Asset id " << asset_id  << " not found as registered asset";
+    return true;
+  }
+  else
+  {
+    success_msg_writer() << "Added custom asset:" << ENDL 
+      << " Id: " << asset_id << ENDL
+      << " Title: " << asset_descriptor.full_name << ENDL
+      << " Ticker: " << asset_descriptor.ticker << ENDL
+      << " Ticker: " << print_fixed_decimal_point(asset_descriptor.current_supply, asset_descriptor.decimal_point) << ENDL
+      ;
+  }
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::remove_custom_asset_id(const std::vector<std::string> &args)
+{
+  if (!args.size() || args.size() > 1)
+  {
+    fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
+  }
+  crypto::hash asset_id = currency::null_hash;
+  if (!epee::string_tools::parse_tpod_from_hex_string(args[0], asset_id))
+  {
+    fail_msg_writer() << "expected valid asset_id";
+    return true;
+  }
+
+  bool r = m_wallet->delete_custom_asset_id(asset_id);
+  if (!r)
+  {
+    fail_msg_writer() << "Asset id " << asset_id << " not present in this wallet";
+    return true;
+  }
+  else
+  {
+    success_msg_writer() << "Asset id " << asset_id << " removed from wallet custom list" << ENDL;
+  }
   return true;
 }
 //----------------------------------------------------------------------------------------------------
