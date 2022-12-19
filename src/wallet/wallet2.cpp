@@ -6336,8 +6336,11 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
       return rc_too_few_outputs;
 
     // try to construct a transaction
+
+    assets_selection_context needed_money_map;
+    needed_money_map[currency::null_hash] = {};
     std::vector<currency::tx_destination_entry> dsts({ tx_destination_entry(amount_swept - fee, destination_addr) });
-    prepare_tx_destinations(0, 0, get_current_split_strategy(), tools::tx_dust_policy(), dsts, ftp.prepared_destinations, currency::null_hash);
+    prepare_tx_destinations(needed_money_map, get_current_split_strategy(), tools::tx_dust_policy(), dsts, ftp.prepared_destinations);
 
     currency::transaction tx = AUTO_VAL_INIT(tx);
     crypto::secret_key tx_key = AUTO_VAL_INIT(tx_key);
