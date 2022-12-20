@@ -85,6 +85,8 @@ namespace epee
       if(!serialization::store_t_to_binary(out_struct, req_param))
         return false;
 
+      LOG_PRINT_L3("[HTTP_BIN] ---> " << "[" << &req_param << "][" << method << "][" << url << "] REQUEST BODY BASE64: " << ENDL << epee::string_encoding::base64_encode(req_param));
+
       const http::http_response_info* pri = NULL;
       if(!invoke_request(url, transport, timeout, &pri, method, req_param))
       {
@@ -97,6 +99,8 @@ namespace epee
         LOG_PRINT_L1("Failed to invoke http request to  " << url << ", internal error (null response ptr)");
         return false;
       }
+
+      LOG_PRINT_L3("[HTTP_BIN] <--- " << "[" << &req_param << "][" << method << "][" << url << "] RESPONSE(" << pri->m_response_code << ") BODY BASE64: " << ENDL << epee::string_encoding::base64_encode(pri->m_body));
 
       if(pri->m_response_code != 200)
       {
