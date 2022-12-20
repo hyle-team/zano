@@ -2550,7 +2550,6 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
   VARIANT_CASE_CONST(tx_out_bare, o)
   {
     CHECK_AND_ASSERT_MES(amount != 0, false, "unexpected amount == 0 for tx_out_bare");
-
     if (o.target.type() == typeid(txout_htlc))
     {
       //silently return false, it's ok
@@ -2566,7 +2565,6 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
   VARIANT_CASE_CONST(tx_out_zarcanum, toz)
   {
     CHECK_AND_ASSERT_MES(amount == 0, false, "unexpected amount != 0 for tx_out_zarcanum");
-
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen = *result_outs.outs.insert(result_outs.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry());
     oen.global_amount_index = g_index;
     oen.stealth_address     = toz.stealth_address;
