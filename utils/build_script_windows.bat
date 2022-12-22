@@ -168,13 +168,14 @@ IF %ERRORLEVEL% NEQ 0 (
 set installer_file=%ACHIVE_NAME_PREFIX%%version%-installer.exe
 set installer_path=%BUILDS_PATH%\builds\%installer_file%
 
-@echo "   SIGNING ...."
-
-%ZANO_SIGN_CMD% %installer_path%
-IF %ERRORLEVEL% NEQ 0 (
-  @echo "failed to sign installer"
-  goto error
-)
+:: Signing temporary disable
+::@echo "   SIGNING ...."
+::
+::%ZANO_SIGN_CMD% %installer_path%
+::IF %ERRORLEVEL% NEQ 0 (
+::  @echo "failed to sign installer"
+::  goto error
+::)
 
 @echo "   UPLOADING TO SERVER ...."
 
