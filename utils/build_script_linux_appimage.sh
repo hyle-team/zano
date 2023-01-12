@@ -45,7 +45,8 @@ echo "--------------------------------------------------"
 
 echo "Building...." 
 
-rm -rf build; mkdir -p build/release; cd build/release; 
+#rm -rf build; mkdir -p build/release; 
+cd build/release; 
 cmake $testnet_def -D STATIC=true -D ARCH=x86-64 -D BUILD_GUI=TRUE -D OPENSSL_ROOT_DIR="$OPENSSL_ROOT_DIR" -D CMAKE_PREFIX_PATH="$QT_PREFIX_PATH" -D CMAKE_BUILD_TYPE=Release ../..
 if [ $? -ne 0 ]; then
     echo "Failed to run cmake"

@@ -343,7 +343,7 @@ bool wallets_manager::init(view::i_view* pview_handler)
     {
       //app running inside AppImage
       LOG_PRINT_L0("APPDIR SET: " << env_p);
-      path_to_html = std::string(env_p) + "usr/bin/html";
+      path_to_html = std::string(env_p) + "/usr/bin/html";
     }
     else
 #endif
