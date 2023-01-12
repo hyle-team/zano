@@ -41,6 +41,7 @@ prj_root=$(pwd)
 
 if [ "$1" == "skip_build" ]; then
         echo "Skipping build, only packing..."
+	cd build/release;
 else
 echo "---------------- BUILDING PROJECT ----------------"
 echo "--------------------------------------------------"
