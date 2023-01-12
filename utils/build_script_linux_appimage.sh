@@ -39,6 +39,7 @@ fi
 
 prj_root=$(pwd)
 
+
 echo "---------------- BUILDING PROJECT ----------------"
 echo "--------------------------------------------------"
 
@@ -63,10 +64,15 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-
 read version_str <<< $(./src/zanod --version | awk '/^Zano/ { print $2 }')
 version_str=${version_str}
+
+read commit_str <<< $(./src/zanod  --version | grep -m 1 -P -o "(?<=\[)[0-9a-f]{7}")
+commit_str=${commit_str}
+
 echo $version_str
+echo $commit_str
+
 
 rm -rf Zano;
 mkdir -p Zano/usr/bin;
@@ -77,18 +83,26 @@ mkdir -p Zano/usr/share/icons/hicolor/scalable;
 rsync -a ../../src/gui/qt-daemon/layout/html ./Zano/usr/bin --exclude less --exclude package.json --exclude gulpfile.js
 
 cp -Rv src/zanod src/Zano src/simplewallet  src/connectivity_tool ./Zano/usr/bin
-cp -Rv ../../ultils/Zano.desktop ./Zano/usr/share/application/Zano.desktop
+cp -Rv ../../utils/Zano.desktop ./Zano/usr/share/applications/Zano.desktop
 cp -Rv ../../resources/app_icon.svg ./Zano/usr/share/icons/hicolor/scalable/Zano.svg
 
-echo "Exec=$prj_root/build/release/Zano/usr/bin/Zano --deeplink-params=%u" >> ./Zano/usr/share/application/Zano.desktop
+echo "Exec=$prj_root/build/release/Zano/usr/bin/Zano --deeplink-params=%u" >> ./Zano/usr/share/applications/Zano.desktop
+if [ $? -ne 0 ]; then
+    echo "Failed to append deskyop file"
+    exit 1
+fi
 
 $LINUX_DEPLOY_QT ./Zano/usr/share/applications/Zano.desktop  -appimage -qmake=$QT_PREFIX_PATH/bin/qmake
+if [ $? -ne 0 ]; then
+    echo "Failed to run linuxqtdeployment"
+    exit 1
+fi
 
 rm -f ./Zano-x86_64.AppImage
 
 package_filename=${ARCHIVE_NAME_PREFIX}${version_str}.AppImage
 
-mv ./Zano-x86_64.AppImage ./$package_filename
+mv ./Zano-${commit_str}-x86_64.AppImage ./$package_filename
 
 echo "Build success"
 
