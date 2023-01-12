@@ -79,7 +79,7 @@ rm -rf Zano;
 mkdir -p Zano/usr/bin;
 mkdir -p Zano/usr/lib;
 mkdir -p Zano/usr/share/applications;
-mkdir -p Zano/usr/share/icons/hicolor/scalable;
+mkdir -p Zano/usr/share/icons/hicolor/scalable/apps;
 
 rsync -a ../../src/gui/qt-daemon/layout/html ./Zano/usr/bin --exclude less --exclude package.json --exclude gulpfile.js
 
