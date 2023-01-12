@@ -39,13 +39,15 @@ fi
 
 prj_root=$(pwd)
 
-
+if [ "$1" == "skip_build" ]; then
+        echo "Skipping build, only packing..."
+else
 echo "---------------- BUILDING PROJECT ----------------"
 echo "--------------------------------------------------"
 
 echo "Building...." 
 
-#rm -rf build; mkdir -p build/release; 
+rm -rf build; mkdir -p build/release; 
 cd build/release; 
 cmake $testnet_def -D STATIC=true -D ARCH=x86-64 -D BUILD_GUI=TRUE -D OPENSSL_ROOT_DIR="$OPENSSL_ROOT_DIR" -D CMAKE_PREFIX_PATH="$QT_PREFIX_PATH" -D CMAKE_BUILD_TYPE=Release ../..
 if [ $? -ne 0 ]; then
@@ -64,6 +66,10 @@ if [ $? -ne 0 ]; then
     echo "Failed to make!"
     exit 1
 fi
+
+fi
+
+
 
 read version_str <<< $(./src/zanod --version | awk '/^Zano/ { print $2 }')
 version_str=${version_str}
