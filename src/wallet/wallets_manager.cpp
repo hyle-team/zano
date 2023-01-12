@@ -331,11 +331,18 @@ bool wallets_manager::init(view::i_view* pview_handler)
   std::string path_to_html;
   if (!command_line::has_arg(m_vm, arg_html_folder))
   {
+    LOG_PRINT_L0("Detecting APPDIR... ");
 #if defined(__unix__) || defined(__linux__)
     const char* env_p = std::getenv("APPDIR");
+    LOG_PRINT_L0("APPDIR = " << (void*)env_p);
+    if (env_p)
+    {
+      LOG_PRINT_L0("APPDIR: " << env_p);
+    }
     if (env_p && std::strlen(env_p))
     {
       //app running inside AppImage
+      LOG_PRINT_L0("APPDIR SET: " << env_p);
       path_to_html = std::string(env_p) + "usr/bin/html";
     }
     else
