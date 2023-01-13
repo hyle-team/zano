@@ -93,6 +93,8 @@ rsync -a ../../src/gui/qt-daemon/layout/html ./Zano/usr/bin --exclude less --exc
 cp -Rv src/zanod src/Zano src/simplewallet  src/connectivity_tool ./Zano/usr/bin
 cp -Rv ../../utils/Zano.desktop ./Zano/usr/share/applications/Zano.desktop
 cp -Rv ../../resources/app_icon.svg ./Zano/usr/share/icons/hicolor/scalable/apps/Zano.svg
+cp -Rv ../../resources/app_icon_256.png ./Zano/usr/share/icons/hicolor/256x256/apps/Zano.png
+
 
 echo "Exec=$prj_root/build/release/Zano/usr/bin/Zano --deeplink-params=%u" >> ./Zano/usr/share/applications/Zano.desktop
 if [ $? -ne 0 ]; then
