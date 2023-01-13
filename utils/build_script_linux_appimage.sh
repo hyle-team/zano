@@ -114,7 +114,12 @@ rm -f ./Zano-x86_64.AppImage
 
 package_filename=${ARCHIVE_NAME_PREFIX}${version_str}.AppImage
 
-mv ./Zano-${commit_str}-x86_64.AppImage ./$package_filename
+pattern="*.AppImage"
+files=( $pattern )
+app_image_file=${files[0]}
+
+
+mv ./$app_image_file ./$package_filename
 
 echo "Build success"
 
