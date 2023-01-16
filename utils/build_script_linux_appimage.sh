@@ -98,7 +98,7 @@ cp -Rv ../../resources/app_icon.svg ./Zano/usr/share/icons/hicolor/scalable/apps
 cp -Rv ../../resources/app_icon_256.png ./Zano/usr/share/icons/hicolor/256x256/apps/Zano.png
 
 
-echo "Exec=$prj_root/build/release/Zano/usr/bin/Zano --deeplink-params=%u" >> ./Zano/usr/share/applications/Zano.desktop
+echo "Exec=$prj_root/build/release/Zano/usr/bin/Zano --no-sandbox --deeplink-params=%u" >> ./Zano/usr/share/applications/Zano.desktop
 if [ $? -ne 0 ]; then
     echo "Failed to append deskyop file"
     exit 1
