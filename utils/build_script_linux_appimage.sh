@@ -11,6 +11,7 @@
 # export QT_PREFIX_PATH=/home/user/Qt5.10.1/5.10.1/gcc_64
 # export OPENSSL_ROOT_DIR=/home/user/openssl
 # export LINUX_DEPLOY_QT=/home/user/QtDeployment.appimage
+# export LINUX_APPIMAGE_TOOL=/home/user/AppImageTool.appimage
 
 
 ARCHIVE_NAME_PREFIX=zano-linux-x64-
@@ -98,28 +99,38 @@ cp -Rv ../../resources/app_icon.svg ./Zano/usr/share/icons/hicolor/scalable/apps
 cp -Rv ../../resources/app_icon_256.png ./Zano/usr/share/icons/hicolor/256x256/apps/Zano.png
 
 
-echo "Exec=$prj_root/build/release/Zano/usr/bin/Zano --no-sandbox --deeplink-params=%u" >> ./Zano/usr/share/applications/Zano.desktop
+echo "Exec=$prj_root/build/release/Zano/usr/bin/Zano" >> ./Zano/usr/share/applications/Zano.desktop
 if [ $? -ne 0 ]; then
     echo "Failed to append deskyop file"
     exit 1
 fi
 
-$LINUX_DEPLOY_QT ./Zano/usr/share/applications/Zano.desktop  -appimage -qmake=$QT_PREFIX_PATH/bin/qmake
+$LINUX_DEPLOY_QT ./Zano/usr/share/applications/Zano.desktop -qmake=$QT_PREFIX_PATH/bin/qmake
 if [ $? -ne 0 ]; then
     echo "Failed to run linuxqtdeployment"
     exit 1
 fi
 
-rm -f ./Zano-x86_64.AppImage
+rm -f $prj_root/build/release/Zano/AppRun
+cp -Rv ../../utils/Zano_appimage_wrapper.sh $prj_root/build/release/Zano/AppRun
 
 package_filename=${ARCHIVE_NAME_PREFIX}${version_str}.AppImage
 
-pattern="*.AppImage"
-files=( $pattern )
-app_image_file=${files[0]}
+$LINUX_APPIMAGE_TOOL ./Zano ./$package_filename
+if [ $? -ne 0 ]; then
+    echo "Failed to run appimagetool"
+    exit 1
+fi
 
 
-mv ./$app_image_file ./$package_filename
+
+
+#pattern="*.AppImage"
+#files=( $pattern )
+#app_image_file=${files[0]}
+
+
+#mv ./$app_image_file ./$package_filename
 
 echo "Build success"
 
