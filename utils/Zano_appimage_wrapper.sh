@@ -4,6 +4,8 @@ script_dir=$( dirname "$(readlink -f "$0")" )
 out_dir=~/.local/share/applications
 out_file_name="${out_dir}/Zano.desktop"
 
+export QTWEBENGINE_DISABLE_SANDBOX=1
+
 call_app()
 {
   pushd $script_dir
@@ -31,6 +33,7 @@ create_desktop_icon()
     echo Type=Application | tee -a $target_file_name  > /dev/null
     echo "Categories=Qt;Utility;" | tee -a $target_file_name  > /dev/null
     echo "MimeType=x-scheme-handler/zano;" | tee -a $target_file_name  > /dev/null
+    echo "StartupWMClass=Zano" | tee -a $target_file_name  > /dev/null
 }
 
 
