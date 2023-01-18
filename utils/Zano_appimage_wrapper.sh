@@ -21,13 +21,13 @@ create_desktop_icon()
     echo "Generating icon file: $target_file_name..."
     rm -f "${out_dir}/Zano.png"
     rm -f $target_file_name
-    cp -Rv "${APPDIR}/usr/share/icons/hicolor/256x256/apps/Zano.png" "${out_dir}/Zano.png"
+    cp -Rv "${APPDIR}/usr/share/icons/hicolor/scalable/apps/Zano.svg" "${out_dir}/Zano.Svg"
     echo [Desktop Entry] | tee -a $target_file_name  > /dev/null
     echo Version=1.0 | tee -a $target_file_name  > /dev/null
     echo Name=Zano | tee -a $target_file_name > /dev/null
     echo GenericName=Zano | tee -a $target_file_name  > /dev/null
     echo Comment=Privacy blockchain | tee -a $target_file_name > /dev/null
-    echo Icon=${out_dir}/Zano.png | tee -a $target_file_name > /dev/null
+    echo Icon=${out_dir}/Zano.svg | tee -a $target_file_name > /dev/null
     echo Exec=$APPIMAGE --deeplink-params=%u | tee -a $target_file_name  > /dev/null
     echo Terminal=true | tee -a $target_file_name  > /dev/null
     echo Type=Application | tee -a $target_file_name  > /dev/null
