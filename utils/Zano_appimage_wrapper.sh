@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 script_dir=$( dirname "$(readlink -f "$0")" )
 
 out_dir=~/.local/share/applications
