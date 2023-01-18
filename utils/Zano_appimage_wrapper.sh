@@ -10,6 +10,10 @@ call_app()
 {
   pushd $script_dir
   usr/bin/Zano "$@"
+  if [ $? -ne 0 ]; then
+    echo -e "If Zano failed to launch, it might need to install xinerama extension for the X C Binding with this command:\n sudo apt-get install libxcb-xinerama0e"
+  fi
+
   popd
   exit
 }
