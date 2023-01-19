@@ -62,6 +62,8 @@ namespace epee
 	t_pod_type transform_str_to_t_pod(const std::string& a)
 	{
 		t_pod_type res = AUTO_VAL_INIT(res);
+    if (a.empty())
+      return res;
     if (!epee::string_tools::hex_to_pod(a, res))
       throw std::runtime_error(std::string("Unable to transform \"") + a + "\" to pod type " + typeid(t_pod_type).name());
 		return res;

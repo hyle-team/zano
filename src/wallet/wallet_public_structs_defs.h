@@ -97,7 +97,7 @@ namespace wallet_public
     uint32_t      tx_blob_size;
     std::string   payment_id;
     std::vector<std::string> remote_addresses;  //optional
-    std::vector<std::string> recipients_aliases; //optional
+    std::vector<std::string> remote_aliases; //optional, describe only if there only one remote address
     std::string   comment;
     bool          is_income;
     bool          is_service;
@@ -127,7 +127,7 @@ namespace wallet_public
       KV_SERIALIZE(tx_blob_size)
       KV_SERIALIZE_BLOB_AS_HEX_STRING(payment_id)
       KV_SERIALIZE(remote_addresses)      
-      KV_SERIALIZE(recipients_aliases)
+      KV_SERIALIZE(remote_aliases)
       KV_SERIALIZE(comment)
       KV_SERIALIZE(is_income)
       KV_SERIALIZE(timestamp)
@@ -377,7 +377,28 @@ namespace wallet_public
     };
   };
 
+  struct COMMAND_RPC_REGISTER_ALIAS
+  {
+    struct request
+    {
+      currency::alias_rpc_details al;
+      crypto::secret_key authority_key;
 
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(al)
+        KV_SERIALIZE_POD_AS_HEX_STRING(authority_key)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      crypto::hash tx_id;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
 
   
   struct transfer_destination

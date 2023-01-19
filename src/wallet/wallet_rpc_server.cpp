@@ -747,6 +747,31 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_register_alias(const wallet_public::COMMAND_RPC_REGISTER_ALIAS::request& req, wallet_public::COMMAND_RPC_REGISTER_ALIAS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
+    if (!alias_rpc_details_to_alias_info(req.al, ai))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
+      er.message = "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS";
+      return false;
+    }
+    
+    if (!currency::validate_alias_name(ai.m_alias))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
+      er.message = "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS - Wrong alias name";
+      return false;
+    }
+
+    currency::transaction tx = AUTO_VAL_INIT(tx);
+    m_wallet.request_alias_registration(ai, tx, m_wallet.get_default_fee(), 0, req.authority_key);
+    res.tx_id = get_transaction_hash(tx);
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_contracts_send_proposal(const wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL::request& req, wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();       

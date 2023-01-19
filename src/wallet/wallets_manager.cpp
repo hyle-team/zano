@@ -1276,7 +1276,10 @@ std::string wallets_manager::get_alias_info_by_address(const std::string& addr, 
   if (res.status != API_RETURN_CODE_OK)
     return res.status;
 
-  res_details = res.alias_info;
+  if (res.alias_info_list.empty())
+    return API_RETURN_CODE_NOT_FOUND;
+
+  res_details = res.alias_info_list.front();
   return res.status;
 }
 

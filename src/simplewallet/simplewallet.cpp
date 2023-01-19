@@ -774,9 +774,9 @@ bool print_wti(const tools::wallet_public::wallet_transfer_info& wti)
 
   static const std::string separator = ", ";
   std::string remote_side;
-  if (!wti.recipients_aliases.empty())
+  if (!wti.remote_aliases.empty())
   {
-    for (auto it : wti.recipients_aliases)
+    for (auto it : wti.remote_aliases)
       remote_side += remote_side.empty() ? it : (separator + it);
   }
   else

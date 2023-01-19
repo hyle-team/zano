@@ -314,8 +314,8 @@ void wallet2::fetch_tx_global_indixes(const std::list<std::reference_wrapper<con
 //----------------------------------------------------------------------------------------------------
 void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes)
 {
-  std::vector<std::string> recipients, recipients_aliases;
-  process_unconfirmed(tx, recipients, recipients_aliases);
+  std::vector<std::string> recipients, remote_aliases;
+  process_unconfirmed(tx, recipients, remote_aliases);
   std::vector<size_t> outs;
   uint64_t tx_money_got_in_outs = 0;
   crypto::public_key tx_pub_key = null_pkey;
@@ -682,7 +682,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
   {//this actually is transfer transaction, notify about spend
     if (tx_money_spent_in_ins > tx_money_got_in_outs)
     {//usual transfer 
-      handle_money_spent2(b, tx, tx_money_spent_in_ins - (tx_money_got_in_outs+get_tx_fee(tx)), mtd, recipients, recipients_aliases);
+      handle_money_spent2(b, tx, tx_money_spent_in_ins - (tx_money_got_in_outs+get_tx_fee(tx)), mtd, recipients, remote_aliases);
     }
     else
     {//strange transfer, seems that in one transaction have transfers from different wallets.
@@ -705,7 +705,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     else if (mtd.spent_indices.size())
     {
       // multisig spend detected
-      handle_money_spent2(b, tx, 0, mtd, recipients, recipients_aliases);
+      handle_money_spent2(b, tx, 0, mtd, recipients, remote_aliases);
     }
   }
 }
@@ -1314,27 +1314,27 @@ void wallet2::handle_money_spent2(const currency::block& b,
                                   uint64_t amount, 
                                   const money_transfer2_details& td, 
                                   const std::vector<std::string>& recipients, 
-                                  const std::vector<std::string>& recipients_aliases)
+                                  const std::vector<std::string>& remote_aliases)
 {
   m_transfer_history.push_back(AUTO_VAL_INIT(wallet_public::wallet_transfer_info()));
   wallet_public::wallet_transfer_info& wti = m_transfer_history.back();
   wti.is_income = false;
 
   wti.remote_addresses = recipients;
-  wti.recipients_aliases = recipients_aliases;
+  wti.remote_aliases = remote_aliases;
   prepare_wti(wti, get_block_height(b), get_block_datetime(b), in_tx, amount, td);
   WLT_LOG_L1("[MONEY SPENT]: " << epee::serialization::store_t_to_json(wti));
   rise_on_transfer2(wti);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::process_unconfirmed(const currency::transaction& tx, std::vector<std::string>& recipients, std::vector<std::string>& recipients_aliases)
+void wallet2::process_unconfirmed(const currency::transaction& tx, std::vector<std::string>& recipients, std::vector<std::string>& remote_aliases)
 {
   auto unconf_it = m_unconfirmed_txs.find(get_transaction_hash(tx));
   if (unconf_it != m_unconfirmed_txs.end())
   {
     wallet_public::wallet_transfer_info& wti = unconf_it->second;
     recipients = wti.remote_addresses;
-    recipients_aliases = wti.recipients_aliases;
+    remote_aliases = wti.remote_aliases;
 
     m_unconfirmed_txs.erase(unconf_it);
   }
@@ -3234,6 +3234,20 @@ bool enum_container(iterator_t it_begin, iterator_t it_end, callback_t cb)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::is_consolidating_transaction(const wallet_public::wallet_transfer_info& wti)
+{
+  if (!wti.is_income)
+  {
+    uint64_t income = 0;
+    for (uint64_t r : wti.td.rcv){income += r;}
+    uint64_t spend = 0;
+    for (uint64_t s : wti.td.spn) { spend += s; }
+    if (get_tx_fee(wti.tx) + income == spend)
+      return true;
+  }
+  return false;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs, bool start_from_end)
 {
   if (!count || offset >= m_transfer_history.size())
@@ -3243,13 +3257,18 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
   
     if (exclude_mining_txs)
     {
-      if (currency::is_coinbase(wti.tx))
+      if (currency::is_coinbase(wti.tx) || is_consolidating_transaction(wti))
         return true;
     }
     trs.push_back(wti);
     load_wallet_transfer_info_flags(trs.back());
     last_item_index = offset + local_offset;
     trs.back().transfer_internal_index = last_item_index;
+
+    if (wti.remote_addresses.size() == 1)
+    {
+      wti.remote_aliases = get_aliases_for_address(wti.remote_addresses[0]);
+    }
 
     if (trs.size() >= count)
     {
@@ -3281,7 +3300,7 @@ void wallet2::wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_tra
   ss << wti.tx_blob_size << ",";
   ss << epee::string_tools::buff_to_hex_nodelimer(wti.payment_id) << ",";
   ss << "[";
-  std::copy(wti.recipients_aliases.begin(), wti.recipients_aliases.end(), std::ostream_iterator<std::string>(ss, " "));
+  std::copy(wti.remote_aliases.begin(), wti.remote_aliases.end(), std::ostream_iterator<std::string>(ss, " "));
   ss << "]" << ",";
   ss << (wti.is_income ? "in" : "out") << ",";
   ss << (wti.is_service ? "[SERVICE]" : "") << (wti.is_mixing ? "[MIXINS]" : "") << (wti.is_mining ? "[MINING]" : "") << ",";
@@ -3795,11 +3814,54 @@ void wallet2::push_alias_info_to_extra_according_to_hf_status(const currency::ex
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::request_alias_registration(const currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward)
+uint64_t wallet2::get_alias_cost(const std::string& alias)
+{
+  currency::COMMAND_RPC_GET_ALIAS_REWARD::request req = AUTO_VAL_INIT(req);
+  currency::COMMAND_RPC_GET_ALIAS_REWARD::response rsp = AUTO_VAL_INIT(rsp);
+  req.alias = alias;
+  if (!m_core_proxy->call_COMMAND_RPC_GET_ALIAS_REWARD(req, rsp))
+  {
+    throw std::runtime_error(std::string("Failed to get alias cost"));
+  }
+ 
+  return rsp.reward + rsp.reward / 10; //add 10% of price to be sure;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::request_alias_registration(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward, const crypto::secret_key& authority_key)
 {
   if (!validate_alias_name(ai.m_alias))
   {
     throw std::runtime_error(std::string("wrong alias characters: ") + ai.m_alias);
+  }
+
+  if (ai.m_alias.size() < ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED)
+  {
+    if (authority_key == currency::null_skey)
+    {
+      throw std::runtime_error(std::string("Short aliases is not allowed without authority key: ") + ALIAS_SHORT_NAMES_VALIDATION_PUB_KEY);
+    }
+    crypto::public_key authority_pub = AUTO_VAL_INIT(authority_pub);
+    bool r = crypto::secret_key_to_public_key(authority_key, authority_pub);
+    CHECK_AND_ASSERT_THROW_MES(r, "Failed to generate pub key from secrete authority key");
+
+    if (string_tools::pod_to_hex(authority_pub) != ALIAS_SHORT_NAMES_VALIDATION_PUB_KEY)
+    {
+      throw std::runtime_error(std::string("Short aliases is not allowed to register by this authority key"));
+    }
+    r = currency::sign_extra_alias_entry(ai, authority_pub, authority_key);
+    CHECK_AND_ASSERT_THROW_MES(r, "Failed to sign alias update");
+    WLT_LOG_L2("Generated update alias info: " << ENDL
+      << "alias: " << ai.m_alias << ENDL
+      << "signature: " << currency::print_t_array(ai.m_sign) << ENDL
+      << "signed(owner) pub key: " << m_account.get_keys().account_address.spend_public_key << ENDL
+      << "to address: " << get_account_address_as_str(ai.m_address) << ENDL
+      << "sign_buff_hash: " << currency::get_sign_buff_hash_for_alias_update(ai)
+    );
+  }
+
+  if (!reward)
+  {
+    reward = get_alias_cost(ai.m_alias);
   }
 
   std::vector<currency::tx_destination_entry> destinations;
@@ -5019,7 +5081,7 @@ void wallet2::add_sent_unconfirmed_tx(const currency::transaction& tx,
   //unconfirmed_wti.tx = tx;
   unconfirmed_wti.remote_addresses = recipients;
   for (auto addr : recipients)
-    unconfirmed_wti.recipients_aliases.push_back(get_alias_for_address(addr));
+    unconfirmed_wti.remote_aliases.push_back(get_alias_for_address(addr));
   unconfirmed_wti.is_income = false;
   unconfirmed_wti.selected_indicies = selected_indicies;
   /*TODO: add selected_indicies to read_money_transfer2_details_from_tx in case of performance problems*/
@@ -5038,15 +5100,28 @@ void wallet2::add_sent_unconfirmed_tx(const currency::transaction& tx,
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::get_alias_for_address(const std::string& addr)
 {
+  std::vector<std::string> aliases = get_aliases_for_address(addr);
+  if (aliases.size())
+    return aliases.front();
+  return "";
+}
+//----------------------------------------------------------------------------------------------------
+std::vector<std::string> wallet2::get_aliases_for_address(const std::string& addr)
+{
   PROFILE_FUNC("wallet2::get_alias_for_address");
   currency::COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request req = addr;
   currency::COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response res = AUTO_VAL_INIT(res);
+  std::vector<std::string> aliases;
   if (!m_core_proxy->call_COMMAND_RPC_GET_ALIASES_BY_ADDRESS(req, res))
   {
     WLT_LOG_L0("Failed to COMMAND_RPC_GET_ALIASES_BY_ADDRESS");
-    return "";
+    return aliases;
   }
-  return res.alias_info.alias;
+  for (auto& e : res.alias_info_list)
+  {
+    aliases.push_back(e.alias);
+  }
+  return aliases;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts, size_t fake_outputs_count,
