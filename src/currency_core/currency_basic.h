@@ -56,6 +56,7 @@ namespace currency
 
   const static crypto::hash gdefault_genesis = epee::string_tools::hex_to_pod<crypto::hash>("CC608F59F8080E2FBFE3C8C80EB6E6A953D47CF2D6AEBD345BADA3A1CAB99852");
   const static crypto::hash ffff_hash = epee::string_tools::hex_to_pod<crypto::hash>("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+  const static crypto::public_key ffff_pkey = epee::string_tools::hex_to_pod<crypto::public_key>("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
 
   const static wide_difficulty_type global_difficulty_pow_starter = DIFFICULTY_POW_STARTER;
   const static wide_difficulty_type global_difficulty_pos_starter = DIFFICULTY_POS_STARTER;
@@ -214,22 +215,8 @@ namespace currency
     uint32_t n_extras;
   };
 
-  //!!!!this is temporary struct!!! 
-  //needed only to hold asset_id of input/output while zarcanum extension being developed
-  struct open_asset_id
-  {
-    crypto::hash asset_id;
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(asset_id) // referring_input
-    END_SERIALIZE()
 
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(asset_id)
-    END_BOOST_SERIALIZATION()
-  };
-
-
-  typedef boost::variant<signed_parts, extra_attachment_info, open_asset_id> txin_etc_details_v;
+  typedef boost::variant<signed_parts, extra_attachment_info> txin_etc_details_v;
 
 
   struct referring_input
@@ -394,8 +381,6 @@ namespace currency
     END_BOOST_SERIALIZATION()
   };
 
-  typedef boost::variant<open_asset_id> txout_etc_details_v;
-
   struct tx_out_zarcanum
   {
     tx_out_zarcanum() {}
@@ -407,27 +392,26 @@ namespace currency
     crypto::public_key  stealth_address;
     crypto::public_key  concealing_point;  // group element Q, see also Zarcanum paper, premultiplied by 1/8
     crypto::public_key  amount_commitment; // premultiplied by 1/8
-    uint64_t            encrypted_amount;
-    uint8_t             mix_attr;
-    std::vector<txout_etc_details_v> etc_details;
-    //crypto::public_key  token_masked_generator;
+    crypto::public_key  blinded_asset_id; // group element T, premultiplied by 1/8
+    uint64_t            encrypted_amount = 0;
+    uint8_t             mix_attr = 0;
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(stealth_address)
       FIELD(concealing_point)
       FIELD(amount_commitment)
+      FIELD(blinded_asset_id)
       FIELD(encrypted_amount)
       FIELD(mix_attr)
-      FIELD(etc_details)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(stealth_address)
       BOOST_SERIALIZE(concealing_point)
       BOOST_SERIALIZE(amount_commitment)
+      BOOST_SERIALIZE(blinded_asset_id)
       BOOST_SERIALIZE(encrypted_amount)
       BOOST_SERIALIZE(mix_attr)
-      BOOST_SERIALIZE(etc_details)
     END_BOOST_SERIALIZATION()
   };
 
@@ -444,21 +428,45 @@ namespace currency
     END_BOOST_SERIALIZATION()
   };
 
-  // non-consoditated txs must have one of this objects in the attachments (outputs_count == vout.size())
-  // consolidated -- one pre consolidated part (sum(outputs_count) == vout.size())
+  // each output has another amount commitment using generators U and G for range proof aggregation 
+  struct zc_out_range_proof_aggregation_item
+  {
+    crypto::public_key  amount_commitment_for_range_proof; // U = e_j * U + y'_j * G
+    crypto::scalar_t    y0;                                // linear proof scalars 
+    crypto::scalar_t    y1;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(amount_commitment_for_range_proof)
+      FIELD(y0)
+      FIELD(y1)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(amount_commitment_for_range_proof)
+      BOOST_SERIALIZE(y0)
+      BOOST_SERIALIZE(y1)
+    END_BOOST_SERIALIZATION()
+  };
+
+  // non-consoditated txs must have one of this objects in the attachments (aggregation_items.size() == vout.size())
+  // consolidated -- one pre consolidated part (sum(aggregation_items.size()) == vout.size())
   struct zc_outs_range_proof
   {
     crypto::bpp_signature_serialized bpp;
-    uint8_t outputs_count = 0;                // how many outputs are included in the proof
+    //std::vector<zc_out_range_proof_aggregation_item> aggregation_items;   // size = outputs count, per each output
+    crypto::vector_aggregation_proof aggregation_proof;
+    //uint8_t outputs_count = 0;                                            // how many outputs are included in the proof
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(bpp)
-      FIELD(outputs_count)
+      FIELD(aggregation_proof)
+      //FIELD(outputs_count)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(bpp)
-      BOOST_SERIALIZE(outputs_count)
+      BOOST_SERIALIZE(aggregation_proof)
+      //BOOST_SERIALIZE(outputs_count)
     END_BOOST_SERIALIZATION()
   };
 
@@ -466,19 +474,23 @@ namespace currency
   struct ZC_sig
   {
     crypto::public_key pseudo_out_amount_commitment = null_pkey; // premultiplied by 1/8
-    crypto::CLSAG_GG_signature_serialized clsags_gg;
+    crypto::public_key pseudo_out_asset_id         = null_pkey; // premultiplied by 1/8
+    crypto::CLSAG_GGX_signature_serialized clsags_ggx;
     
     BEGIN_SERIALIZE_OBJECT()
       FIELD(pseudo_out_amount_commitment)
-      FIELD(clsags_gg)
+      FIELD(pseudo_out_asset_id)
+      FIELD(clsags_ggx)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(pseudo_out_amount_commitment)
-      BOOST_SERIALIZE(clsags_gg)
+      BOOST_SERIALIZE(pseudo_out_asset_id)
+      BOOST_SERIALIZE(clsags_ggx)
     END_BOOST_SERIALIZATION()
   };
 
+  // only for txs with no ZC inputs (cancels out G component of outputs' amount commitments, asset tags assumed to be H_0 (native coin), non-blinded)
   struct zc_balance_proof
   {
     crypto::signature s = null_sig;
@@ -777,7 +789,7 @@ namespace currency
 
   struct asset_descriptor_with_id: public asset_descriptor_base
   {
-    crypto::hash asset_id = currency::null_hash;
+    crypto::public_key asset_id = currency::null_pkey;
 
     /*
     BEGIN_VERSIONED_SERIALIZE()
@@ -797,6 +809,7 @@ namespace currency
 #define ASSET_DESCRIPTOR_OPERATION_REGISTER      1
 #define ASSET_DESCRIPTOR_OPERATION_EMMIT         2
 #define ASSET_DESCRIPTOR_OPERATION_UPDATE        3
+#define ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN   4
 
 
   struct asset_descriptor_operation
@@ -804,7 +817,7 @@ namespace currency
     uint8_t                         operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
     std::vector<crypto::signature>  proof;
     asset_descriptor_base           descriptor;
-    std::vector<crypto::hash>       asset_id; //questionable regarding form of optional fields
+    std::vector<crypto::public_key> asset_id; //questionable regarding form of optional fields // premultiplied by 1/8
 
 
     BEGIN_VERSIONED_SERIALIZE()
@@ -1215,12 +1228,10 @@ SET_VARIANT_TAGS(currency::NLSAG_sig, 42, "NLSAG_sig");
 SET_VARIANT_TAGS(currency::ZC_sig, 43, "ZC_sig");
 SET_VARIANT_TAGS(currency::void_sig, 44, "void_sig");
 SET_VARIANT_TAGS(currency::zarcanum_sig, 45, "zarcanum_sig");
-SET_VARIANT_TAGS(currency::zc_outs_range_proof, 46, "zc_outs_range_proof");
-SET_VARIANT_TAGS(currency::zc_balance_proof, 47, "zc_balance_proof");
+SET_VARIANT_TAGS(currency::zc_outs_range_proof, 47, "zc_outs_range_proof");
+SET_VARIANT_TAGS(currency::zc_balance_proof, 48, "zc_balance_proof");
 
-SET_VARIANT_TAGS(currency::open_asset_id, 48, "asset_id");
-
-SET_VARIANT_TAGS(currency::asset_descriptor_operation, 48, "asset_descriptor_base");
+SET_VARIANT_TAGS(currency::asset_descriptor_operation, 49, "asset_descriptor_base");
 
 
 

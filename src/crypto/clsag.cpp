@@ -171,7 +171,23 @@ namespace crypto
     return c_prev == sig.c;
   }
 
-  
+
+  //---------------------------------------------------------------
+
+
+  bool generate_CLSAG_GGX(const hash& m, const std::vector<CLSAG_GGX_input_ref_t>& ring, const point_t& pseudo_out_amount_commitment, const point_t& pseudo_out_asset_id, const key_image& ki,
+    const scalar_t& secret_0_xp, const scalar_t& secret_1_f, const scalar_t& secret_2_t, uint64_t secret_index, CLSAG_GGX_signature& sig)
+  {
+    return false;
+  }
+
+  bool verify_CLSAG_GGX(const hash& m, const std::vector<CLSAG_GGX_input_ref_t>& ring, const public_key& pseudo_out_amount_commitment,
+    const public_key& pseudo_out_asset_id, const key_image& ki, const CLSAG_GGX_signature& sig)
+  {
+    return false;
+  }
+
+
   //---------------------------------------------------------------
 
 

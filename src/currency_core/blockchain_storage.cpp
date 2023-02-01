@@ -3528,10 +3528,10 @@ bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx)
 
   if (ei.m_asset_operation.operation_type != ASSET_DESCRIPTOR_OPERATION_UNDEFINED)
   {
-    crypto::hash asset_id = currency::null_hash;
+    crypto::public_key asset_id = currency::null_pkey;
     if (ei.m_asset_operation.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
     {
-      asset_id = get_asset_id_from_descriptor(ei.m_asset_operation.descriptor);
+      calculate_asset_id(ei.m_asset_operation.descriptor, nullptr, &asset_id);
     }
     else
     {
@@ -3565,7 +3565,7 @@ uint64_t blockchain_storage::get_aliases_count() const
   return m_db_aliases.size();
 }
 //------------------------------------------------------------------
-bool blockchain_storage::get_asset_info(const crypto::hash& asset_id, asset_descriptor_base& info)const
+bool blockchain_storage::get_asset_info(const crypto::public_key& asset_id, asset_descriptor_base& result) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   auto as_ptr = m_db_assets.find(asset_id);
@@ -3573,7 +3573,7 @@ bool blockchain_storage::get_asset_info(const crypto::hash& asset_id, asset_desc
   {
     if (as_ptr->size())
     {
-      info = as_ptr->back().descriptor;
+      result = as_ptr->back().descriptor;
       return true;
     }
   }
@@ -3768,7 +3768,7 @@ bool blockchain_storage::put_alias_info(const transaction & tx, extra_alias_entr
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::pop_asset_info(const crypto::hash& asset_id)
+bool blockchain_storage::pop_asset_info(const crypto::public_key& asset_id)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
@@ -3791,7 +3791,8 @@ bool blockchain_storage::put_asset_info(const transaction & tx, asset_descriptor
   CRITICAL_REGION_LOCAL(m_read_lock);
   if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
   {
-    crypto::hash asset_id = get_asset_id_from_descriptor(ado.descriptor);
+    crypto::public_key asset_id{};
+    calculate_asset_id(ado.descriptor, nullptr, &asset_id);
     auto asset_history_ptr = m_db_assets.find(asset_id);
     CHECK_AND_ASSERT_MES(!asset_history_ptr, false, "Asset id already existing");
     assets_container::t_value_type local_asset_history = AUTO_VAL_INIT(local_asset_history);

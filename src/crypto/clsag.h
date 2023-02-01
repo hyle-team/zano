@@ -47,7 +47,44 @@ namespace crypto
   bool verify_CLSAG_GG(const hash& m, const std::vector<CLSAG_GG_input_ref_t>& ring, const public_key& pseudo_out_amount_commitment, const key_image& ki,
     const CLSAG_GG_signature& sig);
 
-  
+
+  //
+  // 3-CLSAG
+  //
+
+
+  // 3-CLSAG signature (with respect to the group element G, G, X -- that's why 'GGX')
+  struct CLSAG_GGX_signature
+  {
+    scalar_t      c;
+    scalar_vec_t  r_g;  // for G-components (layers 0, 1),    size = size of the ring
+    scalar_vec_t  r_x;  // for X-component  (layer 2),        size = size of the ring
+    public_key    K1;   // auxiliary key image for layer 1 (G)
+    public_key    K2;   // auxiliary key image for layer 2 (X)
+  };
+
+  struct CLSAG_GGX_input_ref_t : public CLSAG_GG_input_ref_t
+  {
+    CLSAG_GGX_input_ref_t(const public_key& stealth_address, const public_key& amount_commitment, const public_key& blinded_asset_id)
+      : CLSAG_GG_input_ref_t(stealth_address, amount_commitment)
+      , blinded_asset_id(blinded_asset_id)
+    {}
+
+    const public_key& blinded_asset_id; // T, premultiplied by 1/8
+  };
+
+  // pseudo_out_amount_commitment -- not premultiplied by 1/8
+  // pseudo_out_asset_id         -- not premultiplied by 1/8
+  bool generate_CLSAG_GGX(const hash& m, const std::vector<CLSAG_GGX_input_ref_t>& ring, const point_t& pseudo_out_amount_commitment, const point_t& pseudo_out_asset_id, const key_image& ki,
+    const scalar_t& secret_0_xp, const scalar_t& secret_1_f, const scalar_t& secret_2_t, uint64_t secret_index, CLSAG_GGX_signature& sig);
+
+  // pseudo_out_amount_commitment -- premultiplied by 1/8
+  // pseudo_out_asset_id         -- premultiplied by 1/8
+  // may throw an exception TODO @#@# make sure it's okay
+  bool verify_CLSAG_GGX(const hash& m, const std::vector<CLSAG_GGX_input_ref_t>& ring, const public_key& pseudo_out_amount_commitment,
+    const public_key& pseudo_out_asset_id, const key_image& ki, const CLSAG_GGX_signature& sig);
+
+
   //
   // 4-CLSAG
   //
