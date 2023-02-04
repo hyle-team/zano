@@ -119,7 +119,7 @@ namespace tools
     virtual ~i_wallet2_callback() = default;
 
     virtual void on_new_block(uint64_t /*height*/, const currency::block& /*block*/) {}
-    virtual void on_transfer2(const wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) {}
+    virtual void on_transfer2(const wallet_public::wallet_transfer_info& wti, const std::list<wallet_public::asset_balance_entry>& balances, uint64_t total_mined) {}
     virtual void on_pos_block_found(const currency::block& /*block*/) {}
     virtual void on_sync_progress(const uint64_t& /*percents*/) {}
     virtual void on_transfer_canceled(const wallet_public::wallet_transfer_info& wti) {}
@@ -899,7 +899,7 @@ namespace tools
     uint64_t get_default_fee() {return TX_DEFAULT_FEE;}
     void export_transaction_history(std::ostream& ss, const std::string& format, bool include_pos_transactions = true);
 
-    bool add_custom_asset_id(const crypto::hash& asset_id);
+    bool add_custom_asset_id(const crypto::hash& asset_id, currency::asset_descriptor_base& asset_descriptor);
     bool delete_custom_asset_id(const crypto::hash& asset_id);
     bool load_whitelisted_tokens_if_not_loaded() const;
     bool load_whitelisted_tokens()const;

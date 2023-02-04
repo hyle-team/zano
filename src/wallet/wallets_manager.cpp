@@ -1361,7 +1361,7 @@ std::string wallets_manager::request_alias_update(const currency::alias_rpc_deta
 }
 
 
-std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx)
+std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx)
 {
 
   std::vector<currency::tx_destination_entry> dsts;
@@ -1417,6 +1417,7 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
         return API_RETURN_CODE_BAD_ARG_WRONG_PAYMENT_ID; // payment id is specified more than once
       payment_id = embedded_payment_id;
     }
+    dsts.back().asset_id = d.asset_id;
   }
 
   if (payment_id.size())
@@ -1538,7 +1539,7 @@ std::string wallets_manager::invoke(uint64_t wallet_id, std::string params)
   return response_info.m_body;
 }
 
-std::string wallets_manager::get_wallet_info(size_t wallet_id, view::wallet_info& wi)
+std::string wallets_manager::get_wallet_info(uint64_t wallet_id, view::wallet_info& wi)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   return get_wallet_info(w, wi);
@@ -1674,6 +1675,23 @@ std::string wallets_manager::reset_wallet_password(uint64_t wallet_id, const std
     return API_RETURN_CODE_OK;
   else
     return API_RETURN_CODE_FAIL;
+}
+std::string wallets_manager::add_custom_asset_id(uint64_t wallet_id, const crypto::hash& asset_id, currency::asset_descriptor_base& asset_descriptor)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, w);
+  if(w.w->get()->add_custom_asset_id(asset_id, asset_descriptor))
+    return API_RETURN_CODE_OK;
+  else
+    return API_RETURN_CODE_FAIL;
+}
+std::string wallets_manager::delete_custom_asset_id(uint64_t wallet_id, const crypto::hash& asset_id)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, w);
+  if (w.w->get()->delete_custom_asset_id(asset_id))
+    return API_RETURN_CODE_OK;
+  else
+    return API_RETURN_CODE_FAIL;
+
 }
 std::string wallets_manager::is_wallet_password_valid(uint64_t wallet_id, const std::string& pass)
 {
@@ -1837,12 +1855,12 @@ void wallets_manager::on_new_block(size_t wallet_id, uint64_t /*height*/, const 
 
 }
 
-void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined)
+void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
 {  
   view::transfer_event_info tei = AUTO_VAL_INIT(tei);
   tei.ti = wti;
-  tei.balance = balance;
-  tei.unlocked_balance = unlocked_balance;
+  tei.balances = balances;
+  tei.total_mined = total_mined;
   tei.wallet_id = wallet_id;
 
   GET_WALLET_OPTIONS_BY_ID_VOID_RET(wallet_id, w);
@@ -1886,8 +1904,7 @@ void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet
   auto& w = m_wallets[wallet_id].w;
   if (w->get() != nullptr)
   {
-    tei.balance = w->get()->balance();
-    tei.unlocked_balance = w->get()->unlocked_balance();
+    w->get()->balance(tei.balances, tei.total_mined);
     tei.wallet_id = wallet_id;
   }
   else

@@ -104,7 +104,7 @@ public:
   std::string get_wallet_status(uint64_t wallet_id);
   std::string run_wallet(uint64_t wallet_id);
   std::string get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist, bool exclude_mining_txs = false);
-  std::string get_wallet_info(size_t wallet_id, view::wallet_info& wi);
+  std::string get_wallet_info(uint64_t wallet_id, view::wallet_info& wi);
   std::string get_contracts(size_t wallet_id, std::vector<tools::wallet_public::escrow_contract_details>& contracts);
   std::string create_proposal(const view::create_proposal_param_gui& cpp);
   std::string accept_proposal(size_t wallet_id, const crypto::hash& contract_id);
@@ -148,7 +148,7 @@ public:
     std::vector<uint64_t>& days);
   std::string is_pos_allowed();
   void toggle_pos_mining();
-  std::string transfer(size_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx);
+  std::string transfer(uint64_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx);
   std::string get_config_folder();
   std::string is_valid_brain_restore_data(const std::string& seed_phrase, const std::string& seed_password);
   std::string get_seed_phrase_info(const std::string& seed_phrase, const std::string& seed_password, view::seed_phrase_info& result);
@@ -162,6 +162,9 @@ public:
   std::string get_qt_dev_tools_option() const { return m_qt_dev_tools; }
   void set_use_deffered_global_outputs(bool use) { m_use_deffered_global_outputs = use; }
   bool set_use_tor(bool use_tor);
+  std::string add_custom_asset_id(uint64_t wallet_id, const crypto::hash& asset_id, currency::asset_descriptor_base& asset_descriptor);
+  std::string delete_custom_asset_id(uint64_t wallet_id, const crypto::hash& asset_id);
+
 private:
   void main_worker(const po::variables_map& vm);
   bool init_local_daemon();
@@ -181,7 +184,7 @@ private:
 
   //----- i_backend_wallet_callback ------
   virtual void on_new_block(size_t wallet_id, uint64_t height, const currency::block& block);
-	virtual void on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined);
+  virtual void on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined);
   virtual void on_pos_block_found(size_t wallet_id, const currency::block& /*block*/);
   virtual void on_sync_progress(size_t wallet_id, const uint64_t& /*percents*/);
   virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti);

@@ -2549,6 +2549,7 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
   VARIANT_SWITCH_BEGIN(out_v);
   VARIANT_CASE_CONST(tx_out_bare, o)
   {
+    CHECK_AND_ASSERT_MES(amount != 0, false, "unexpected amount == 0 for tx_out_bare");
     if (o.target.type() == typeid(txout_htlc))
     {
       //silently return false, it's ok
@@ -2563,6 +2564,7 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
   }
   VARIANT_CASE_CONST(tx_out_zarcanum, toz)
   {
+    CHECK_AND_ASSERT_MES(amount == 0, false, "unexpected amount != 0 for tx_out_zarcanum");
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen = *result_outs.outs.insert(result_outs.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry());
     oen.global_amount_index = g_index;
     oen.stealth_address     = toz.stealth_address;
@@ -2597,6 +2599,9 @@ size_t blockchain_storage::find_end_of_allowed_index(uint64_t amount) const
 bool blockchain_storage::get_random_outs_for_amounts(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res)const
 {  
   CRITICAL_REGION_LOCAL(m_read_lock);
+  LOG_PRINT_L3("[get_random_outs_for_amounts] amounts: " << req.amounts.size());
+  std::map<uint64_t, uint64_t> amounts_to_up_index_limit_cache;
+
   for(uint64_t amount : req.amounts)
   {
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs = *res.outs.insert(res.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount());
@@ -2609,7 +2614,18 @@ bool blockchain_storage::get_random_outs_for_amounts(const COMMAND_RPC_GET_RANDO
     }
     //it is not good idea to use top fresh outs, because it increases possibility of transaction canceling on split
     //lets find upper bound of not fresh outs
-    size_t up_index_limit = find_end_of_allowed_index(amount);
+    size_t up_index_limit = 0;
+    auto it_limit = amounts_to_up_index_limit_cache.find(amount);
+    if (it_limit == amounts_to_up_index_limit_cache.end())
+    {
+      up_index_limit = find_end_of_allowed_index(amount);
+      amounts_to_up_index_limit_cache[up_index_limit];
+    }
+    else
+    {
+      up_index_limit = it_limit->second;
+    }
+    
     CHECK_AND_ASSERT_MES(up_index_limit <= outs_container_size, false, "internal error: find_end_of_allowed_index returned wrong index=" << up_index_limit << ", with amount_outs.size = " << outs_container_size);
     if (up_index_limit >= req.decoys_count)
     {
