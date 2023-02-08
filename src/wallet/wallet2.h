@@ -303,7 +303,7 @@ namespace tools
     uint64_t found_amount = 0;
     //std::vector<uint64_t> selected_indicies;
   };
-  typedef std::unordered_map<crypto::hash, selection_for_amount> assets_selection_context;
+  typedef std::unordered_map<crypto::public_key, selection_for_amount> assets_selection_context;
 
   class wallet2: public tools::tor::t_transport_state_notifier
   {
@@ -339,25 +339,43 @@ namespace tools
 
     struct transfer_details_base
     {
+      struct ZC_out_info // TODO: @#@# consider using wallet_out_info instead
+      {
+        ZC_out_info() = default;
+        ZC_out_info(const crypto::scalar_t& amount_blinding_mask, const crypto::scalar_t& asset_id_blinding_mask, const crypto::public_key& asset_id)
+          : amount_blinding_mask(amount_blinding_mask), asset_id_blinding_mask(asset_id_blinding_mask), asset_id(asset_id)
+        {}
+        crypto::scalar_t amount_blinding_mask = 0;
+        crypto::scalar_t asset_id_blinding_mask = 0;
+        crypto::public_key asset_id = currency::null_pkey; // not blinded, not multiplied by 1/8 TODO: @#@# consider changing to point_t, also consider using wallet wallet_out_info
+        BEGIN_KV_SERIALIZE_MAP()
+          KV_SERIALIZE(amount_blinding_mask)
+          KV_SERIALIZE(asset_id_blinding_mask)
+          KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
+        END_KV_SERIALIZE_MAP()
+      };
+
       std::shared_ptr<transaction_wallet_info> m_ptx_wallet_info;
       uint64_t m_internal_output_index = 0;
       uint64_t m_spent_height = 0;
       uint32_t m_flags = 0;
       uint64_t m_amount = 0;
-      boost::shared_ptr<crypto::scalar_t> m_opt_blinding_mask;
-      boost::shared_ptr<crypto::hash> m_asset_id;
+      boost::shared_ptr<ZC_out_info> m_zc_info_ptr;
 
+      uint64_t amount() const { return m_amount; } 
+      
       // @#@ will throw if type is not tx_out_bare, TODO: change according to new model, 
       // need to replace all get_tx_out_bare_from_out_v() to proper code
-      uint64_t amount() const { return m_amount; } 
-      const currency::tx_out_bare& output() const { return currency::get_tx_out_bare_from_out_v(m_ptx_wallet_info->m_tx.vout[m_internal_output_index]); }
-      uint8_t mix_attr() const { return output().target.type() == typeid(currency::txout_to_key) ? boost::get<const currency::txout_to_key&>(output().target).mix_attr : UINT8_MAX; }
+      //const currency::tx_out_bare& output() const { return currency::get_tx_out_bare_from_out_v(m_ptx_wallet_info->m_tx.vout[m_internal_output_index]); }
+      
+      const currency::tx_out_v& output() const { return m_ptx_wallet_info->m_tx.vout[m_internal_output_index]; }
+      uint8_t mix_attr() const { uint8_t result = UINT8_MAX; get_mix_attr_from_tx_out_v(output(), result); return result; }
       crypto::hash tx_hash() const { return get_transaction_hash(m_ptx_wallet_info->m_tx); }
       bool is_spent() const { return m_flags & WALLET_TRANSFER_DETAIL_FLAG_SPENT; }
       bool is_spendable() const { return (m_flags & (WALLET_TRANSFER_DETAIL_FLAG_SPENT | WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION | WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION)) == 0; }
       bool is_reserved_for_escrow() const { return ( (m_flags & WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION) != 0 );  }
-      bool is_zc() const { return m_opt_blinding_mask.get(); }
-      const crypto::hash&  get_asset_id() const { if (m_asset_id.get()) { return *m_asset_id; } else { return currency::null_hash; } }
+      bool is_zc() const { return m_zc_info_ptr.get(); }
+      const crypto::public_key& get_asset_id() const { if (m_zc_info_ptr.get()) { return m_zc_info_ptr->asset_id; } else { return currency::native_coin_asset_id; } }
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_CUSTOM(m_ptx_wallet_info, const transaction_wallet_info&, tools::wallet2::transform_ptr_to_value, tools::wallet2::transform_value_to_ptr)
@@ -365,8 +383,8 @@ namespace tools
         KV_SERIALIZE(m_spent_height)
         KV_SERIALIZE(m_flags)
         KV_SERIALIZE(m_amount)
-        KV_SERIALIZE_N(m_opt_blinding_mask, "blinding_mask")
-        KV_SERIALIZE(m_asset_id)
+        //KV_SERIALIZE_N(m_opt_blinding_mask, "blinding_mask")
+        KV_SERIALIZE_N(m_zc_info_ptr, "zc_out_info")
         KV_SERIALIZE_EPHEMERAL_N(uint64_t, tools::wallet2::transfer_details_base_to_amount, "amount")
         KV_SERIALIZE_EPHEMERAL_N(std::string, tools::wallet2::transfer_details_base_to_tx_hash, "tx_id")
       END_KV_SERIALIZE_MAP()
@@ -446,7 +464,7 @@ namespace tools
     typedef std::unordered_map<crypto::hash, transfer_details_base> multisig_transfer_container;
     typedef std::unordered_map<crypto::hash, tools::wallet_public::escrow_contract_details_basic> escrow_contracts_container;
     typedef std::map<uint64_t, std::set<size_t> > free_amounts_cache_type;
-    typedef std::unordered_map<crypto::hash, free_amounts_cache_type> free_assets_amounts_cache_type;
+    typedef std::unordered_map<crypto::public_key, free_amounts_cache_type> free_assets_amounts_cache_type;
     typedef std::unordered_map<std::pair<uint64_t, uint64_t>, uint64_t> amount_gindex_to_transfer_id_container; // maps [amount; gindex] -> tid
 
 
@@ -557,24 +575,24 @@ namespace tools
     void request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward);
     bool check_available_sources(std::list<uint64_t>& amounts);
 
-    void publish_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::hash& asset_id);
+    void publish_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id);
 
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
     void set_pos_mint_packing_size(uint64_t new_size);
     void set_minimum_height(uint64_t h);
     std::shared_ptr<i_core_proxy> get_core_proxy();
     uint64_t balance() const;
-    uint64_t balance(uint64_t& unloked, uint64_t& awaiting_in, uint64_t& awaiting_out, uint64_t& mined) const;
-    bool balance(std::unordered_map<crypto::hash, wallet_public::asset_balance_entry_base>& balances, uint64_t& mined) const;
+    uint64_t balance(uint64_t& unloked, uint64_t& awaiting_in, uint64_t& awaiting_out, uint64_t& mined, const crypto::public_key& asset_id = currency::native_coin_asset_id) const;
+    bool balance(std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base>& balances, uint64_t& mined) const;
     bool balance(std::list<wallet_public::asset_balance_entry>& balances, uint64_t& mined) const;
 
     uint64_t balance(uint64_t& unloked) const;
 
     uint64_t unlocked_balance() const;
 
-    void transfer(uint64_t amount, const currency::account_public_address& acc, const crypto::hash& asset_id = currency::null_hash);
-    void transfer(uint64_t amount, size_t fake_outs_count, const currency::account_public_address& acc, uint64_t fee = TX_DEFAULT_FEE, const crypto::hash& asset_id = currency::null_hash);
-    void transfer(uint64_t amount, const currency::account_public_address& acc, currency::transaction& result_tx, const crypto::hash& asset_id = currency::null_hash);
+    void transfer(uint64_t amount, const currency::account_public_address& acc, const crypto::public_key& asset_id = currency::native_coin_asset_id);
+    void transfer(uint64_t amount, size_t fake_outs_count, const currency::account_public_address& acc, uint64_t fee = TX_DEFAULT_FEE, const crypto::public_key& asset_id = currency::native_coin_asset_id);
+    void transfer(uint64_t amount, const currency::account_public_address& acc, currency::transaction& result_tx, const crypto::public_key& asset_id = currency::native_coin_asset_id);
 
     void transfer(const std::vector<currency::tx_destination_entry>& dsts,
                   size_t fake_outputs_count, 
@@ -899,10 +917,10 @@ namespace tools
     uint64_t get_default_fee() {return TX_DEFAULT_FEE;}
     void export_transaction_history(std::ostream& ss, const std::string& format, bool include_pos_transactions = true);
 
-    bool add_custom_asset_id(const crypto::hash& asset_id, currency::asset_descriptor_base& asset_descriptor);
-    bool delete_custom_asset_id(const crypto::hash& asset_id);
+    bool add_custom_asset_id(const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_descriptor);
+    bool delete_custom_asset_id(const crypto::public_key& asset_id);
     bool load_whitelisted_tokens_if_not_loaded() const;
-    bool load_whitelisted_tokens()const;
+    bool load_whitelisted_tokens() const;
 
     /*
     create_htlc_proposal: if htlc_hash == null_hash, then this wallet is originator of the atomic process, and 
@@ -939,7 +957,7 @@ private:
     bool prepare_free_transfers_cache(uint64_t fake_outputs_count);
     bool select_transfers(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t dust, std::vector<uint64_t>& selected_indicies);
     void add_transfers_to_transfers_cache(const std::vector<uint64_t>& indexs);
-    void add_transfer_to_transfers_cache(uint64_t amount, uint64_t index, const crypto::hash& asset_id = currency::null_hash);
+    void add_transfer_to_transfers_cache(uint64_t amount, uint64_t index, const crypto::public_key& asset_id = currency::native_coin_asset_id);
     bool prepare_file_names(const std::wstring& file_path);
     void process_unconfirmed(const currency::transaction& tx, std::vector<std::string>& recipients, std::vector<std::string>& recipients_aliases);
     void add_sent_unconfirmed_tx(const currency::transaction& tx,
@@ -991,7 +1009,7 @@ private:
       detail::split_strategy_id_t destination_split_strategy_id,
       const tx_dust_policy& dust_policy,
       const std::vector<currency::tx_destination_entry>& dsts,
-      std::vector<currency::tx_destination_entry>& final_detinations, const crypto::hash& assed_id);
+      std::vector<currency::tx_destination_entry>& final_detinations, const crypto::public_key& asset_id);
     bool handle_contract(wallet_public::wallet_transfer_info& wti, const bc_services::contract_private_details& cntr, const std::vector<currency::payload_items_v>& decrypted_attach);
     bool handle_release_contract(wallet_public::wallet_transfer_info& wti, const std::string& release_instruction);
     bool handle_cancel_proposal(wallet_public::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb, const std::vector<currency::payload_items_v>& decrypted_attach);
@@ -1099,9 +1117,9 @@ private:
     std::unordered_map<crypto::hash, tools::wallet_public::wallet_transfer_info> m_unconfirmed_txs;
     std::unordered_set<crypto::hash> m_unconfirmed_multisig_transfers;
     std::unordered_map<crypto::hash, crypto::secret_key> m_tx_keys;
-    std::unordered_map<crypto::hash, wallet_own_asset_context> m_own_asset_descriptors;
-    std::unordered_map<crypto::hash, currency::asset_descriptor_base> m_custom_assets; //assets that manually added by user
-    mutable std::unordered_map<crypto::hash, currency::asset_descriptor_base> m_whitelisted_assets; //assets that whitelisted
+    std::unordered_map<crypto::public_key, wallet_own_asset_context> m_own_asset_descriptors;
+    std::unordered_map<crypto::public_key, currency::asset_descriptor_base> m_custom_assets; //assets that manually added by user
+    mutable std::unordered_map<crypto::public_key, currency::asset_descriptor_base> m_whitelisted_assets; //assets that whitelisted
 
 
     std::multimap<uint64_t, htlc_expiration_trigger> m_htlcs; //map [expired_if_more_then] -> height of expiration
@@ -1152,6 +1170,14 @@ namespace boost
     }
 
     template <class Archive>
+    inline void serialize(Archive& a, tools::wallet2::transfer_details_base::ZC_out_info& x, const boost::serialization::version_type ver)
+    {
+      a & x.amount_blinding_mask;
+      a & x.asset_id_blinding_mask;
+      a & x.asset_id;
+    }
+
+    template <class Archive>
     inline void serialize(Archive &a, tools::wallet2::transfer_details_base &x, const boost::serialization::version_type ver)
     {
       a & x.m_ptx_wallet_info;
@@ -1160,12 +1186,11 @@ namespace boost
       a & x.m_spent_height;
       if (ver < 2)
       {
-        x.m_amount = currency::get_tx_out_bare_from_out_v(x.m_ptx_wallet_info->m_tx.vout[x.m_internal_output_index]).amount;
+        x.m_amount = get_amount_from_variant(x.output());
         return;
       }
       a & x.m_amount;
-      a & x.m_opt_blinding_mask;
-      a & x.m_asset_id;
+      a & x.m_zc_info_ptr;
     }
 
    

@@ -349,11 +349,12 @@ namespace tools
     //----------------------------------------------------------------------------------------------------
     struct not_enough_money : public transfer_error
     {
-      not_enough_money(std::string&& loc, uint64_t availbable, uint64_t tx_amount, uint64_t fee, const crypto::hash& assset_id)
+      not_enough_money(std::string&& loc, uint64_t availbable, uint64_t tx_amount, uint64_t fee, const crypto::public_key& asset_id)
         : transfer_error(std::move(loc), "NOT_ENOUGH_MONEY")
         , m_available(availbable)
         , m_tx_amount(tx_amount)
         , m_fee(fee)
+        , m_asset_id(asset_id)
       {
       }
 
@@ -368,6 +369,8 @@ namespace tools
           ", available = " << currency::print_money(m_available) <<
           ", tx_amount = " << currency::print_money(m_tx_amount) <<
           ", fee = " << currency::print_money(m_fee);
+        if (m_asset_id != currency::native_coin_asset_id)
+          ss << ", asset_id = " << m_asset_id;
         return ss.str();
       }
 
@@ -375,6 +378,7 @@ namespace tools
       uint64_t m_available;
       uint64_t m_tx_amount;
       uint64_t m_fee;
+      crypto::public_key m_asset_id;
     };
     //----------------------------------------------------------------------------------------------------
     struct not_enough_outs_to_mix : public transfer_error
