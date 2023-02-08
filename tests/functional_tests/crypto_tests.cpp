@@ -12,6 +12,7 @@
 #include "common/crypto_stream_operators.h"
 #include "common/varint.h"
 #include "currency_core/difficulty.h"
+#include "currency_core/currency_basic.h"
 
 #include "crypto/crypto-sugar.h"
 #include "crypto/range_proofs.h"
@@ -499,6 +500,22 @@ struct test_keeper_t
 //
 // Tests
 //
+
+TEST(crypto, basics)
+{
+  ASSERT_EQ(c_point_H,    hash_helper_t::hp(c_point_G));
+  ASSERT_EQ(c_point_H2,   hash_helper_t::hp("h2_generator"));
+  ASSERT_EQ(c_point_U,    hash_helper_t::hp("U_generator"));
+  ASSERT_EQ(c_point_X,    hash_helper_t::hp("X_generator"));
+
+  ASSERT_EQ(currency::native_coin_asset_id, c_point_H.to_public_key());
+
+  LOG_PRINT_L0("c_point_0 = " << c_point_0  << " = { " << c_point_0.to_hex_comma_separated_uint64_str() << " }");
+  LOG_PRINT_L0("Zano G    = " << c_point_G  << " = { " << c_point_G.to_hex_comma_separated_bytes_str() << " }");
+  LOG_PRINT_L0("Zano H    = " << c_point_H  << " = { " << c_point_H.to_hex_comma_separated_uint64_str() << " }");
+  LOG_PRINT_L0("Zano H2   = " << c_point_H2 << " = { " << c_point_H2.to_hex_comma_separated_uint64_str() << " }");
+}
+
 
 #include "crypto_tests_performance.h"
 

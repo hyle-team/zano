@@ -58,17 +58,6 @@ TEST(bpp, basics)
     std::cout << scalar_t::random().to_string_as_secret_key() << ENDL;
   */
 
-  point_t H = hash_helper_t::hp(c_point_G);
-  ASSERT_EQ(H, c_point_H);
-  std::string h2_hash_str("h2_generator");
-  point_t H2 = hash_helper_t::hp(h2_hash_str.c_str(), h2_hash_str.size());
-  ASSERT_EQ(H2, c_point_H2);
-  LOG_PRINT_L0("c_point_0 = " << c_point_0 << " = { " << c_point_0.to_hex_comma_separated_uint64_str() << " }");
-  LOG_PRINT_L0("Zano G =  " << c_point_G << " = { " << c_point_G.to_hex_comma_separated_bytes_str() << " }");
-  LOG_PRINT_L0("Zano H =  " << H << " = { " << H.to_hex_comma_separated_uint64_str() << " }");
-  LOG_PRINT_L0("Zano H2 = " << H2 << " = { " << H2.to_hex_comma_separated_uint64_str() << " }");
-
-
   auto foo = [&](scalar_t v){
     scalar_vec_t values = { v };
     scalar_vec_t masks  = { scalar_t::random() };

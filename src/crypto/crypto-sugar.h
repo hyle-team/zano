@@ -917,6 +917,7 @@ namespace crypto
 
   extern const point_t  c_point_H;
   extern const point_t  c_point_H2;
+  extern const point_t  c_point_U;
   extern const point_t  c_point_X;
   extern const point_t  c_point_0;
   extern const point_t  c_point_H_plus_G;
@@ -1196,6 +1197,13 @@ namespace crypto
     {
       point_t result;
       ge_bytes_hash_to_ec(&result.m_p3, data, size);
+      return result;
+    }
+
+    static point_t hp(const std::string& str)
+    {
+      point_t result;
+      ge_bytes_hash_to_ec(&result.m_p3, str.data(), str.size());
       return result;
     }
 
