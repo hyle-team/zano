@@ -56,7 +56,9 @@ namespace currency
 
   const static crypto::hash gdefault_genesis = epee::string_tools::hex_to_pod<crypto::hash>("CC608F59F8080E2FBFE3C8C80EB6E6A953D47CF2D6AEBD345BADA3A1CAB99852");
   const static crypto::hash ffff_hash = epee::string_tools::hex_to_pod<crypto::hash>("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
-  const static crypto::public_key ffff_pkey = epee::string_tools::hex_to_pod<crypto::public_key>("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+  const static crypto::public_key ffff_pkey = epee::string_tools::hex_to_pod<crypto::public_key>("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // TODO @#@# consider getting rid of this
+
+  extern const crypto::public_key native_coin_asset_id;
 
   const static wide_difficulty_type global_difficulty_pow_starter = DIFFICULTY_POW_STARTER;
   const static wide_difficulty_type global_difficulty_pos_starter = DIFFICULTY_POS_STARTER;

@@ -22,13 +22,14 @@ namespace currency
       output_entry(const output_entry &) = default;
       output_entry(const txout_ref_v& out_reference, const crypto::public_key& stealth_address)
         : out_reference(out_reference), stealth_address(stealth_address), concealing_point(null_pkey), amount_commitment(null_pkey) {}
-      output_entry(const txout_ref_v& out_reference, const crypto::public_key& stealth_address, const crypto::public_key& concealing_point, const crypto::public_key& amount_commitment)
-        : out_reference(out_reference), stealth_address(stealth_address), concealing_point(concealing_point), amount_commitment(amount_commitment) {}
+      output_entry(const txout_ref_v& out_reference, const crypto::public_key& stealth_address, const crypto::public_key& concealing_point, const crypto::public_key& amount_commitment, const crypto::public_key& blinded_asset_id)
+        : out_reference(out_reference), stealth_address(stealth_address), concealing_point(concealing_point), amount_commitment(amount_commitment), blinded_asset_id(blinded_asset_id) {}
 
       txout_ref_v         out_reference;      // either global output index or ref_by_id
       crypto::public_key  stealth_address;    // a.k.a output's one-time public key
-      crypto::public_key  concealing_point;   // only for zarcaum outputs
-      crypto::public_key  amount_commitment;  // only for zarcaum outputs
+      crypto::public_key  concealing_point;   // only for ZC outputs
+      crypto::public_key  amount_commitment;  // only for ZC outputs
+      crypto::public_key  blinded_asset_id;   // only for ZC outputs
 
       bool operator==(const output_entry& rhs) const { return out_reference == rhs.out_reference; } // used in prepare_outputs_entries_for_key_offsets, it's okay to do partially comparison
 
@@ -37,6 +38,7 @@ namespace currency
         FIELD(stealth_address)
         FIELD(concealing_point)
         FIELD(amount_commitment)
+        FIELD(blinded_asset_id)
       END_SERIALIZE()
     };
 
@@ -45,7 +47,8 @@ namespace currency
     std::vector<output_entry> outputs;
     uint64_t real_output = 0;                                 //index in outputs vector of real output_entry
     crypto::public_key real_out_tx_key = currency::null_pkey; //real output's transaction's public key
-    crypto::scalar_t real_out_amount_blinding_mask;           //blinding mask of real out's amount committment (only for zarcanum inputs, otherwise must be 0)
+    crypto::scalar_t real_out_amount_blinding_mask = 0;       //blinding mask of real out's amount committment (only for ZC inputs, otherwise must be 0)
+    crypto::scalar_t real_out_asset_id_blinding_mask = 0;     //blinding mask of real out's asset_od (only for ZC inputs, otherwise must be 0)
     size_t real_output_in_tx_index = 0;                       //index in transaction outputs vector
     uint64_t amount = 0;                                      //money
     uint64_t transfer_index = 0;                              //index in m_transfers
@@ -54,16 +57,18 @@ namespace currency
     size_t ms_keys_count = 0;                                 //if txin_multisig: must be equal to size of output's keys container
     bool separately_signed_tx_complete = false;               //for separately signed tx only: denotes the last source entry in complete tx to explicitly mark the final step of tx creation
     std::string htlc_origin;                                  //for htlc, specify origin
-    crypto::hash asset_id = currency::null_hash;              //asset id
+    crypto::public_key asset_id = currency::native_coin_asset_id; //asset id (not blinded, not premultiplied by 1/8) TODO @#@# consider changing to crypto::point_t
 
-    bool is_multisig() const { return ms_sigs_count > 0; }
-    bool is_zarcanum() const { return !real_out_amount_blinding_mask.is_zero(); }
+    bool is_multisig() const    { return ms_sigs_count > 0; }
+    bool is_zarcanum() const    { return !real_out_amount_blinding_mask.is_zero(); }
+    bool is_native_coin() const { return asset_id == currency::native_coin_asset_id; }
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(outputs)
       FIELD(real_output)
       FIELD(real_out_tx_key)
       FIELD(real_out_amount_blinding_mask)
+      FIELD(real_out_asset_id_blinding_mask)
       FIELD(real_output_in_tx_index)
       FIELD(amount)
       FIELD(transfer_index)
@@ -91,21 +96,23 @@ namespace currency
 
   struct tx_destination_entry
   {
-    uint64_t amount = 0;                                    //money
-    std::list<account_public_address>   addr;           //destination address, in case of 1 address - txout_to_key, in case of more - txout_multisig
-    size_t   minimum_sigs = 0;                              //if txout_multisig: minimum signatures that are required to spend this output (minimum_sigs <= addr.size())  IF txout_to_key - not used
-    uint64_t amount_to_provide = 0;                         //amount money that provided by initial creator of tx, used with partially created transactions
+    uint64_t amount = 0;                                // money
+    std::list<account_public_address>   addr;           // destination address, in case of 1 address - txout_to_key, in case of more - txout_multisig
+    size_t   minimum_sigs = 0;                          // if txout_multisig: minimum signatures that are required to spend this output (minimum_sigs <= addr.size())  IF txout_to_key - not used
+    uint64_t amount_to_provide = 0;                     // amount money that provided by initial creator of tx, used with partially created transactions
     uint64_t unlock_time = 0;
-    destination_option_htlc_out htlc_options;           //htlc options    
-    crypto::hash asset_id = currency::null_hash;
+    destination_option_htlc_out htlc_options;           // htlc options    
+    crypto::public_key asset_id = currency::native_coin_asset_id;
     
     
     tx_destination_entry() = default;
     tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad) {}
-    tx_destination_entry(uint64_t a, const account_public_address& ad, const crypto::hash& aid) : amount(a), addr(1, ad), asset_id(aid) {}
+    tx_destination_entry(uint64_t a, const account_public_address& ad, const crypto::public_key& aid) : amount(a), addr(1, ad), asset_id(aid) {}
     tx_destination_entry(uint64_t a, const account_public_address& ad, uint64_t ut) : amount(a), addr(1, ad), unlock_time(ut) {}
     tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()){}
-    tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr, const crypto::hash& aid) : amount(a), addr(addr), minimum_sigs(addr.size()), asset_id(aid) {}
+    tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr, const crypto::public_key& aid) : amount(a), addr(addr), minimum_sigs(addr.size()), asset_id(aid) {}
+
+    bool is_native_coin() const { return asset_id == currency::native_coin_asset_id; }
 
 
     BEGIN_SERIALIZE_OBJECT()

@@ -205,16 +205,19 @@ namespace currency
       : index(index)
       , amount(amount)
     {}
-    wallet_out_info(size_t index, uint64_t amount, const crypto::scalar_t& blinding_mask)
+    wallet_out_info(size_t index, uint64_t amount, const crypto::scalar_t& amount_blinding_mask, const crypto::scalar_t& asset_id_blinding_mask, const crypto::public_key& asset_id)
       : index(index)
       , amount(amount)
-      , blinding_mask(blinding_mask)
+      , amount_blinding_mask(amount_blinding_mask)
+      , asset_id_blinding_mask(asset_id_blinding_mask)
+      , asset_id(asset_id)
     {}
 
-    size_t      index  = SIZE_MAX;
-    uint64_t    amount = 0;
-    crypto::scalar_t blinding_mask = 0;
-    crypto::hash asset_id = currency::null_hash;
+    size_t            index  = SIZE_MAX;
+    uint64_t          amount = 0;
+    crypto::scalar_t  amount_blinding_mask = 0;
+    crypto::scalar_t  asset_id_blinding_mask = 0;
+    crypto::public_key asset_id = currency::native_coin_asset_id; // use point_t instead as this is for internal use only?
   };
 
 
@@ -249,8 +252,9 @@ namespace currency
                                                              const keypair* tx_one_time_key_to_use = nullptr);
   //---------------------------------------------------------------
   uint64_t get_string_uint64_hash(const std::string& str);
-  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, crypto::scalar_t& out_blinding_mask, finalized_tx& result, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
+  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, crypto::scalar_t& asset_blinding_mask, crypto::scalar_t& amount_blinding_mask, crypto::point_t& blinded_asset_id, crypto::point_t& amount_commitment, finalized_tx& result, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
+
   bool validate_alias_name(const std::string& al);
   bool validate_password(const std::string& password);
   void get_attachment_extra_info_details(const std::vector<attachment_v>& attachment, extra_attachment_info& eai);
@@ -293,7 +297,8 @@ namespace currency
 
   uint64_t get_tx_version(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd); // returns tx version based on the height of the block where the transaction is expected to be
   bool construct_tx(const account_keys& sender_account_keys,  const finalize_tx_param& param, finalized_tx& result);
-  crypto::hash get_asset_id_from_descriptor(const asset_descriptor_base& adb);
+  void calculate_asset_id(const crypto::public_key& asset_owner, crypto::point_t* p_result_point, crypto::public_key* p_result_pub_key);
+
 
 
   bool sign_multisig_input_in_tx(currency::transaction& tx, size_t ms_input_index, const currency::account_keys& keys, const currency::transaction& source_tx, bool *p_is_input_fully_signed = nullptr);
@@ -311,7 +316,7 @@ namespace currency
   crypto::hash get_multisig_out_id(const transaction& tx, size_t n);
   bool is_out_to_acc(const account_public_address& addr, const txout_to_key& out_key, const crypto::key_derivation& derivation, size_t output_index);
   bool is_out_to_acc(const account_public_address& addr, const txout_multisig& out_multisig, const crypto::key_derivation& derivation, size_t output_index);
-  bool is_out_to_acc(const account_public_address& addr, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount, crypto::scalar_t& blinding_mask);
+  bool is_out_to_acc(const account_public_address& addr, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount, crypto::scalar_t& amount_blinding_mask, crypto::scalar_t& asset_id_blinding_mask);
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation);
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation, std::list<htlc_info>& htlc_info_list);
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, std::vector<wallet_out_info>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation);
