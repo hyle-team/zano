@@ -392,7 +392,7 @@ namespace currency
     crypto::public_key  stealth_address;
     crypto::public_key  concealing_point;  // group element Q, see also Zarcanum paper, premultiplied by 1/8
     crypto::public_key  amount_commitment; // premultiplied by 1/8
-    crypto::public_key  blinded_asset_id; // group element T, premultiplied by 1/8
+    crypto::public_key  blinded_asset_id;  // group element T, premultiplied by 1/8
     uint64_t            encrypted_amount = 0;
     uint8_t             mix_attr = 0;
 
@@ -428,6 +428,20 @@ namespace currency
     END_BOOST_SERIALIZATION()
   };
 
+  struct zc_asset_surjection_proof
+  {
+    int stub = 0; // TODO: one-out-of-many Groth-Bootle-Esgin proof here, adapted version of membership Groth-Kohlweis proof with optimisations from Bootle et. al. and Esgin et. al.
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(stub)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(stub)
+    END_BOOST_SERIALIZATION()
+  };
+
+  /*
   // each output has another amount commitment using generators U and G for range proof aggregation 
   struct zc_out_range_proof_aggregation_item
   {
@@ -447,45 +461,42 @@ namespace currency
       BOOST_SERIALIZE(y1)
     END_BOOST_SERIALIZATION()
   };
+  */
 
-  // non-consoditated txs must have one of this objects in the attachments (aggregation_items.size() == vout.size())
-  // consolidated -- one pre consolidated part (sum(aggregation_items.size()) == vout.size())
+  // non-consoditated txs must have one of this objects in the attachments (elements count == vout.size())
+  // consolidated -- one pre consolidated part (sum(elements count) == vout.size())
   struct zc_outs_range_proof
   {
-    crypto::bpp_signature_serialized bpp;
-    //std::vector<zc_out_range_proof_aggregation_item> aggregation_items;   // size = outputs count, per each output
-    crypto::vector_aggregation_proof aggregation_proof;
-    //uint8_t outputs_count = 0;                                            // how many outputs are included in the proof
+    crypto::bpp_signature_serialized bpp; // for commitments in form: amount * U + mask * G
+    crypto::vector_UG_aggregation_proof_serialized aggregation_proof; // E'_j = e_j * U + y'_j * G    +   vector Shnorr
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(bpp)
       FIELD(aggregation_proof)
-      //FIELD(outputs_count)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(bpp)
       BOOST_SERIALIZE(aggregation_proof)
-      //BOOST_SERIALIZE(outputs_count)
     END_BOOST_SERIALIZATION()
   };
 
-  // Zarcanum-aware CLSAG signature
+  // Zarcanum-aware CLSAG signature (one per ZC input)
   struct ZC_sig
   {
     crypto::public_key pseudo_out_amount_commitment = null_pkey; // premultiplied by 1/8
-    crypto::public_key pseudo_out_asset_id         = null_pkey; // premultiplied by 1/8
+    crypto::public_key pseudo_out_blinded_asset_id  = null_pkey; // premultiplied by 1/8
     crypto::CLSAG_GGX_signature_serialized clsags_ggx;
     
     BEGIN_SERIALIZE_OBJECT()
       FIELD(pseudo_out_amount_commitment)
-      FIELD(pseudo_out_asset_id)
+      FIELD(pseudo_out_blinded_asset_id)
       FIELD(clsags_ggx)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(pseudo_out_amount_commitment)
-      BOOST_SERIALIZE(pseudo_out_asset_id)
+      BOOST_SERIALIZE(pseudo_out_blinded_asset_id)
       BOOST_SERIALIZE(clsags_ggx)
     END_BOOST_SERIALIZATION()
   };
@@ -902,10 +913,10 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::mpl::vector25<
+  typedef boost::mpl::vector26<
     tx_service_attachment, tx_comment, tx_payer_old, tx_receiver_old, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time,
     etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry_old, extra_user_data, extra_padding, etc_tx_flags16_t, etc_tx_details_unlock_time2,
-    tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, zc_outs_range_proof, zc_balance_proof, asset_descriptor_operation
+    tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, zc_asset_surjection_proof, zc_outs_range_proof, zc_balance_proof, asset_descriptor_operation
   > all_payload_types;
   
   typedef boost::make_variant_over<all_payload_types>::type payload_items_v;
@@ -1228,6 +1239,7 @@ SET_VARIANT_TAGS(currency::NLSAG_sig, 42, "NLSAG_sig");
 SET_VARIANT_TAGS(currency::ZC_sig, 43, "ZC_sig");
 SET_VARIANT_TAGS(currency::void_sig, 44, "void_sig");
 SET_VARIANT_TAGS(currency::zarcanum_sig, 45, "zarcanum_sig");
+SET_VARIANT_TAGS(currency::zc_asset_surjection_proof, 46, "zc_asset_surjection_proof");
 SET_VARIANT_TAGS(currency::zc_outs_range_proof, 47, "zc_outs_range_proof");
 SET_VARIANT_TAGS(currency::zc_balance_proof, 48, "zc_balance_proof");
 

@@ -55,4 +55,45 @@ namespace crypto
     const mp::uint128_t& pos_difficulty,
     const zarcanum_proof& sig, uint8_t* p_err = nullptr);
 
+
+
+  // TODO: improve this proof using random weightning factor
+  struct vector_UG_aggregation_proof
+  {
+    std::vector<public_key> amount_commitments_for_rp_aggregation; // E' = e * U + y' * G, premultiplied by 1/8
+    scalar_vec_t y0s;
+    scalar_vec_t y1s;
+    scalar_t c; // common challenge
+  };
+
+  bool generate_vector_UG_aggregation_proof(const hash& m, const scalar_vec_t& u_secrets, const scalar_vec_t& g_secrets,
+    const std::vector<crypto::point_t>& amount_commitments,
+    const std::vector<crypto::point_t>& amount_commitments_for_rp_aggregation, 
+    const std::vector<crypto::point_t>& blinded_asset_ids, 
+    vector_UG_aggregation_proof& result, uint8_t* p_err = nullptr)
+  {
+    // proof of knowing e_j and y'' in zero knowledge in the following eq:
+    //   E_j + E'_j = e_j * (T'_j + U) + y'' * G
+    // where:
+    //   e_j   -- output's amount
+    //   T'_j  -- output's blinded asset tag
+    //   E_j   == e_j * T'_j + y_j  * G -- output's amount commitments
+    //   E'_j  == e_j * U    + y'_j * G -- additional commitment to the same amount for range proof aggregation
+
+    // amount_commitments[j] + amount_commitments_for_rp_aggregation[j]
+    //   ==
+    // u_secrets[j] * (blinded_asset_ids[j] + U) + g_secrets[j] * G
+
+
+    return false;
+  }
+
+
+  bool verify_vector_UG_aggregation_proof(const hash& m, const std::vector<const public_key*> amount_commitments, const std::vector<const public_key*> blinded_asset_ids,
+    const vector_UG_aggregation_proof& sig, uint8_t* p_err = nullptr)
+  {
+    return false;
+  }
+
+
 } // namespace crypto

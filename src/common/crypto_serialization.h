@@ -19,6 +19,7 @@
 #include "crypto/hash.h"
 #include "crypto/range_proofs.h"
 #include "crypto/clsag.h"
+#include "crypto/zarcanum.h"
 #include "boost_serialization_maps.h"
 #include "serialization/keyvalue_enable_POD_serialize_as_string.h"
 //
@@ -133,6 +134,24 @@ namespace crypto
       BOOST_SERIALIZE(K3)
     END_BOOST_SERIALIZATION()
   };
+
+  struct vector_UG_aggregation_proof_serialized : public vector_UG_aggregation_proof
+  {
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(amount_commitments_for_rp_aggregation)
+      FIELD((std::vector<scalar_t>&)(y0s))
+      FIELD((std::vector<scalar_t>&)(y1s))
+      FIELD(c)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(amount_commitments_for_rp_aggregation)
+      BOOST_SERIALIZE((std::vector<scalar_t>&)(y0s))
+      BOOST_SERIALIZE((std::vector<scalar_t>&)(y1s))
+      BOOST_SERIALIZE(c)
+    END_BOOST_SERIALIZATION()
+  };
+
 
 } // namespace crypto
 
