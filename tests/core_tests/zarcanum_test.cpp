@@ -643,8 +643,10 @@ bool zarcanum_in_alt_chain::generate(std::vector<test_event_entry>& events) cons
   REWIND_BLOCKS_N_WITH_TIME(events, blk_4r, blk_4, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   // Bob: move all to miner
-  MAKE_TX(events, tx_2, bob_acc, miner_acc, bob_amount - TESTS_DEFAULT_FEE, blk_4r);
-  MAKE_NEXT_BLOCK_TX1(events, blk_5, blk_4r, miner_acc, tx_2);
+  MAKE_TX(events, tx_2a, bob_acc, miner_acc, bob_amount - TESTS_DEFAULT_FEE, blk_4r);
+  // Miner: a little to Alice
+  MAKE_TX(events, tx_2b, miner_acc, alice_acc, COIN, blk_4r);
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_5, blk_4r, miner_acc, std::list<transaction>({ tx_2a, tx_2b }));
 
   // now in the main chain Bob has zero coins
   // check it
@@ -655,7 +657,7 @@ bool zarcanum_in_alt_chain::generate(std::vector<test_event_entry>& events) cons
   // TODO: check PoS mining against already spent key image 
 
   std::list<currency::account_base> bob_stake_sources({ bob_acc });
-  MAKE_NEXT_POS_BLOCK(events, blk_5a, blk_4r, bob_acc, bob_stake_sources);
+  MAKE_NEXT_POS_BLOCK(events, blk_5a, blk_4r, bob_acc, bob_stake_sources); // NOTE: tx_2a and blk_5a spend the same Bob's output 
   MAKE_NEXT_BLOCK(events, blk_6a, blk_5a, miner_acc);
 
   DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(get_block_height(blk_6a), get_block_hash(blk_6a)));
@@ -664,7 +666,10 @@ bool zarcanum_in_alt_chain::generate(std::vector<test_event_entry>& events) cons
 
   DO_CALLBACK(events, "c1");
 
-  //MAKE_NEXT_POS_BLOCK(events, blk_7a, blk_5a, miner_acc, miner_stake_sources);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_5r, blk_5, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  MAKE_NEXT_POS_BLOCK(events, blk_6, blk_5r, alice_acc, alice_stake_sources);
+  MAKE_NEXT_BLOCK(events, blk_7, blk_6, miner_acc);
 
   return true;
 }
@@ -677,7 +682,8 @@ bool zarcanum_in_alt_chain::c1(currency::core& c, size_t ev_index, const std::ve
   std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
   bob_wlt->refresh();
 
-  CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
+  // tx_2a, tx_2b
+  CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   uint64_t stub = 0;
   uint64_t alice_balance_before = alice_wlt->balance(stub);
@@ -688,15 +694,16 @@ bool zarcanum_in_alt_chain::c1(currency::core& c, size_t ev_index, const std::ve
   size_t nmix = 38;
   bob_wlt->transfer(transfer_amount, nmix, m_accounts[ALICE_ACC_IDX].get_public_address(), transfer_fee);
 
-  CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Incorrect txs count in the pool");
+  CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == 3, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
-  CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
+  // tx_2a can't be added as it's ki is spent
+  CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   alice_wlt->refresh();
-  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", alice_balance_before + transfer_amount ), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", alice_balance_before + transfer_amount + COIN), false, ""); // COIN is from tx_2b
 
   bob_wlt->refresh();
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt, "Bob", bob_balance_before - transfer_amount- transfer_fee), false, "");
