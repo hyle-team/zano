@@ -131,13 +131,14 @@ namespace crypto
   }; // struct bpp_crypto_trait_zano
 
   template<size_t N, size_t values_max>
-  const point_t& bpp_crypto_trait_zano<N, values_max>::bpp_G = c_point_H;
+  const point_t& bpp_crypto_trait_zano<N, values_max>::bpp_G = c_point_U;
 
   template<size_t N, size_t values_max>
   const point_t& bpp_crypto_trait_zano<N, values_max>::bpp_H = c_point_G;
 
   template<size_t N, size_t values_max>
   const point_t& bpp_crypto_trait_zano<N, values_max>::bpp_H2 = c_point_X;
+
 
   
   // efficient multiexponentiation (naive stub implementation atm, TODO)

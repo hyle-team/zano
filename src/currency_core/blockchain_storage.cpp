@@ -4961,7 +4961,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 
   //TIME_MEASURE_START_PD(tx_input_check_clsag_gg);
 
-  bool r = crypto::verify_CLSAG_GG(tx_hash_for_signature, ring, sig.pseudo_out_amount_commitment, zc_in.k_image, sig.clsags_gg);
+  bool r = crypto::verify_CLSAG_GG(tx_hash_for_signature, ring, sig.pseudo_out_amount_commitment, zc_in.k_image, sig.);
   CHECK_AND_ASSERT_MES(r, false, "verify_CLSAG_GG failed");
 
   //TIME_MEASURE_FINISH_PD(tx_input_check_clsag_gg);
