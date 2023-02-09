@@ -186,16 +186,16 @@ namespace tools
   {
     try
     {
-      //      res.balance = m_wallet.balance();
-      //      res.unlocked_balance = m_wallet.unlocked_balance();
-      uint64_t mined = 0;
-      m_wallet.balance(res.balances, mined);
-      for (auto it = res.balances.begin(); it != res.balances.end(); it++)
+      uint64_t stub_mined = 0; // unused
+      bool r = m_wallet.balance(res.balances, stub_mined);
+      CHECK_AND_ASSERT_THROW_MES(r, "m_wallet.balance failed");
+      for (auto it = res.balances.begin(); it != res.balances.end(); ++it)
       {
-        if (it->asset_info.asset_id == currency::null_hash)
+        if (it->asset_info.asset_id == currency::native_coin_asset_id)
         {
           res.balance = it->total;
           res.unlocked_balance = it->unlocked;
+          break;
         }
       }
     }

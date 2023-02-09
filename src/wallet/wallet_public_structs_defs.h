@@ -250,6 +250,7 @@ namespace wallet_public
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(balance)
         KV_SERIALIZE(unlocked_balance)
+        KV_SERIALIZE(balances)
       END_KV_SERIALIZE_MAP()
     };
   };

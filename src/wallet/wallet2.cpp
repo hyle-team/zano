@@ -1432,9 +1432,23 @@ void wallet2::rise_on_transfer2(const wallet_public::wallet_transfer_info& wti)
   if (!m_do_rise_transfer)
     return;
   std::list<wallet_public::asset_balance_entry> balances;
-  uint64_t mined = 0;
-  this->balance(balances, mined);
-  m_wcallback->on_transfer2(wti, balances, mined);
+  uint64_t mined_balance = 0;
+  this->balance(balances, mined_balance);
+  m_wcallback->on_transfer2(wti, balances, mined_balance);
+
+  // TODO @#@# bad design, CZ we need to redesign balance() functions regarding getting mined and unlocked balances for the native coin
+  uint64_t unlocked_balance = 0, native_balance = 0;
+  for (auto& el : balances)
+  {
+    if (el.asset_info.asset_id == currency::native_coin_asset_id)
+    {
+      native_balance   = el.total;
+      unlocked_balance = el.unlocked;
+      break;
+    }
+  }
+  // second call for legacy callback handlers
+  m_wcallback->on_transfer2(wti, native_balance, unlocked_balance, mined_balance);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::handle_money_spent2(const currency::block& b,

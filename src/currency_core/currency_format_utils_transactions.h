@@ -102,7 +102,7 @@ namespace currency
     uint64_t amount_to_provide = 0;                     // amount money that provided by initial creator of tx, used with partially created transactions
     uint64_t unlock_time = 0;
     destination_option_htlc_out htlc_options;           // htlc options    
-    crypto::public_key asset_id = currency::native_coin_asset_id;
+    crypto::public_key asset_id = currency::native_coin_asset_id; // not blinded, not premultiplied
     
     
     tx_destination_entry() = default;

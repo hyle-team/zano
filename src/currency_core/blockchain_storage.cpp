@@ -3547,7 +3547,7 @@ bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx)
     crypto::public_key asset_id = currency::null_pkey;
     if (ei.m_asset_operation.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
     {
-      calculate_asset_id(ei.m_asset_operation.descriptor, nullptr, &asset_id);
+      calculate_asset_id(ei.m_asset_operation.descriptor.owner, nullptr, &asset_id);
     }
     else
     {
@@ -3808,7 +3808,7 @@ bool blockchain_storage::put_asset_info(const transaction & tx, asset_descriptor
   if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
   {
     crypto::public_key asset_id{};
-    calculate_asset_id(ado.descriptor, nullptr, &asset_id);
+    calculate_asset_id(ado.descriptor.owner, nullptr, &asset_id);
     auto asset_history_ptr = m_db_assets.find(asset_id);
     CHECK_AND_ASSERT_MES(!asset_history_ptr, false, "Asset id already existing");
     assets_container::t_value_type local_asset_history = AUTO_VAL_INIT(local_asset_history);
@@ -4948,10 +4948,10 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   // TODO: consider additional checks here
 
   // build a ring of references
-  vector<crypto::CLSAG_GG_input_ref_t> ring;
+  vector<crypto::CLSAG_GGX_input_ref_t> ring;
   ring.reserve(scan_contex.zc_outs.size());
   for(auto& zc_out : scan_contex.zc_outs)
-    ring.emplace_back(zc_out.stealth_address, zc_out.amount_commitment);
+    ring.emplace_back(zc_out.stealth_address, zc_out.amount_commitment, zc_out.blinded_asset_id);
 
   // calculate corresponding tx prefix hash
   crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, in_index, tx_prefix_hash);
@@ -4961,8 +4961,8 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 
   //TIME_MEASURE_START_PD(tx_input_check_clsag_gg);
 
-  bool r = crypto::verify_CLSAG_GG(tx_hash_for_signature, ring, sig.pseudo_out_amount_commitment, zc_in.k_image, sig.);
-  CHECK_AND_ASSERT_MES(r, false, "verify_CLSAG_GG failed");
+  bool r = crypto::verify_CLSAG_GGX(tx_hash_for_signature, ring, sig.pseudo_out_amount_commitment, sig.pseudo_out_blinded_asset_id, zc_in.k_image, sig.clsags_ggx);
+  CHECK_AND_ASSERT_MES(r, false, "verify_CLSAG_GGX failed");
 
   //TIME_MEASURE_FINISH_PD(tx_input_check_clsag_gg);
 
@@ -5711,7 +5711,7 @@ bool blockchain_storage::collect_rangeproofs_data_from_tx(std::vector<zc_outs_ra
     return true;
   }
 
-  //@#@ Verify somewhere(maybe here) that all outputs are covered with associated rangeproofs
+  // TODO @#@# Verify somewhere(maybe here) that all outputs are covered with associated rangeproofs
   size_t proofs_count = 0;
   size_t current_output_start = 0; //for Consolidated Transactions we'll have multiple zc_outs_range_proof entries
   for (const auto& a : tx.attachment)
@@ -5720,13 +5720,13 @@ bool blockchain_storage::collect_rangeproofs_data_from_tx(std::vector<zc_outs_ra
     {
       const zc_outs_range_proof& zcrp = boost::get<zc_outs_range_proof>(a);
       agregated_proofs.emplace_back(zcrp);
-      for (uint8_t i = 0; i != zcrp.outputs_count; i++)
-      {
-        CHECK_AND_ASSERT_MES(tx.vout[i + current_output_start].type() == typeid(tx_out_zarcanum), false, "Unexpected type of out in collect_rangeproofs_data_from_tx()");
-        const tx_out_zarcanum& zc_out = boost::get<tx_out_zarcanum>(tx.vout[i + current_output_start]);
-        agregated_proofs.back().amount_commitments.emplace_back(zc_out.amount_commitment);
-      }
-      current_output_start += zcrp.outputs_count;
+
+      // convert amount commitments for aggregation from public_key to point_t form
+      // TODO: consider refactoring this ugly code
+      for (uint8_t i = 0; i != zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size(); i++)
+        agregated_proofs.back().amount_commitments.emplace_back(zcrp.aggregation_proof.amount_commitments_for_rp_aggregation[i]);
+
+      current_output_start += zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size();
       proofs_count++;
     }
   }

@@ -514,6 +514,8 @@ TEST(crypto, basics)
   LOG_PRINT_L0("Zano G    = " << c_point_G  << " = { " << c_point_G.to_hex_comma_separated_bytes_str() << " }");
   LOG_PRINT_L0("Zano H    = " << c_point_H  << " = { " << c_point_H.to_hex_comma_separated_uint64_str() << " }");
   LOG_PRINT_L0("Zano H2   = " << c_point_H2 << " = { " << c_point_H2.to_hex_comma_separated_uint64_str() << " }");
+
+  return true;
 }
 
 
@@ -628,32 +630,32 @@ TEST(crypto, pos)
 
   boost::multiprecision::uint512_t Lv = boost::multiprecision::uint512_t(c_L_w) * amount;
 
-  constexpr uint64_t COIN = 1000000000000;
+  constexpr uint64_t c_coin = 1000000000000;
   const uint64_t amounts[] = {
-    COIN / 100,
-    COIN / 50,
-    COIN / 20,
-    COIN / 10,
-    COIN / 5,
-    COIN / 2,
-    COIN * 1,
-    COIN * 2,
-    COIN * 5,
-    COIN * 10,
-    COIN * 20,
-    COIN * 50,
-    COIN * 100,
-    COIN * 200,
-    COIN * 500,
-    COIN * 1000,
-    COIN * 2000,
-    COIN * 5000,
-    COIN * 10000,
-    COIN * 20000,
-    COIN * 50000,
-    COIN * 100000,
-    COIN * 200000,
-    COIN * 500000
+    c_coin / 100,
+    c_coin / 50,
+    c_coin / 20,
+    c_coin / 10,
+    c_coin / 5,
+    c_coin / 2,
+    c_coin * 1,
+    c_coin * 2,
+    c_coin * 5,
+    c_coin * 10,
+    c_coin * 20,
+    c_coin * 50,
+    c_coin * 100,
+    c_coin * 200,
+    c_coin * 500,
+    c_coin * 1000,
+    c_coin * 2000,
+    c_coin * 5000,
+    c_coin * 10000,
+    c_coin * 20000,
+    c_coin * 50000,
+    c_coin * 100000,
+    c_coin * 200000,
+    c_coin * 500000
   };
 
   uint64_t kernel = 0;

@@ -221,6 +221,7 @@ namespace currency
   };
 
 
+  // TODO @#@# consider refactoring to eliminate redundant coping and to imporve performance 
   struct zc_outs_range_proofs_with_commitments
   {
     zc_outs_range_proofs_with_commitments(const zc_outs_range_proof& range_proof, const std::vector<crypto::point_t>& amount_commitments)

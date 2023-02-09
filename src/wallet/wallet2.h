@@ -119,6 +119,7 @@ namespace tools
     virtual ~i_wallet2_callback() = default;
 
     virtual void on_new_block(uint64_t /*height*/, const currency::block& /*block*/) {}
+    virtual void on_transfer2(const wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) {} // this one is left for compatibility, one day we need to get rid of it 
     virtual void on_transfer2(const wallet_public::wallet_transfer_info& wti, const std::list<wallet_public::asset_balance_entry>& balances, uint64_t total_mined) {}
     virtual void on_pos_block_found(const currency::block& /*block*/) {}
     virtual void on_sync_progress(const uint64_t& /*percents*/) {}

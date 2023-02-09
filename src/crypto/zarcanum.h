@@ -66,7 +66,7 @@ namespace crypto
     scalar_t c; // common challenge
   };
 
-  bool generate_vector_UG_aggregation_proof(const hash& m, const scalar_vec_t& u_secrets, const scalar_vec_t& g_secrets,
+  inline bool generate_vector_UG_aggregation_proof(const hash& m, const scalar_vec_t& u_secrets, const scalar_vec_t& g_secrets,
     const std::vector<crypto::point_t>& amount_commitments,
     const std::vector<crypto::point_t>& amount_commitments_for_rp_aggregation, 
     const std::vector<crypto::point_t>& blinded_asset_ids, 
@@ -89,7 +89,7 @@ namespace crypto
   }
 
 
-  bool verify_vector_UG_aggregation_proof(const hash& m, const std::vector<const public_key*> amount_commitments, const std::vector<const public_key*> blinded_asset_ids,
+  inline bool verify_vector_UG_aggregation_proof(const hash& m, const std::vector<const public_key*> amount_commitments, const std::vector<const public_key*> blinded_asset_ids,
     const vector_UG_aggregation_proof& sig, uint8_t* p_err = nullptr)
   {
     return false;
