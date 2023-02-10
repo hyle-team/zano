@@ -1901,7 +1901,13 @@ void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet
   tei.ti = wti;
 
   SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
-  auto& w = m_wallets[wallet_id].w;
+  auto it = m_wallets.find(wallet_id);
+  if (it == m_wallets.end())
+  {
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "on_transfer_canceled() wallet with id = " << wallet_id << " not found");
+    return;
+  }
+  auto& w = it->second.w;
   if (w->get() != nullptr)
   {
     w->get()->balance(tei.balances, tei.total_mined);
@@ -1909,7 +1915,7 @@ void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet
   }
   else
   {
-    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "on_transfer() wallet with id = " << wallet_id << " not found");
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "on_transfer_canceled() wallet with id = " << wallet_id << "  has nullptr");
   }
   m_pview->money_transfer_cancel(tei);
 }
