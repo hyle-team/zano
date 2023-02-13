@@ -2578,7 +2578,7 @@ namespace currency
     return true;
   }
 
-  bool is_out_to_acc(const account_public_address& addr, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount,
+  bool is_out_to_acc(const account_public_address& addr, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount, crypto::public_key& decoded_asset_id,
     crypto::scalar_t& amount_blinding_mask, crypto::scalar_t& asset_id_blinding_mask)
   {
     crypto::scalar_t h; // = crypto::hash_helper_t::hs(reinterpret_cast<const crypto::public_key&>(derivation), output_index); // h = Hs(8 * r * V, i)
@@ -2604,11 +2604,11 @@ namespace currency
 
     asset_id_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
 
-    // crypto::point_t asset_id = blinded_asset_id - asset_id_blinding_mask * crypto::c_point_X; // H = T - s * X
-    
+    crypto::point_t asset_id = blinded_asset_id - asset_id_blinding_mask * crypto::c_point_X; // H = T - s * X
+    decoded_asset_id = asset_id.to_public_key();
 
     return true;
-  }
+  } 
 
   //---------------------------------------------------------------
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, std::vector<wallet_out_info>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
@@ -2724,14 +2724,17 @@ namespace currency
         VARIANT_SWITCH_END();
       }
       VARIANT_CASE_CONST(tx_out_zarcanum, zo)
+      {
         uint64_t amount = 0;
+        crypto::public_key asset_id{};
         crypto::scalar_t amount_blinding_mask = 0, asset_id_blinding_mask = 0;
-        if (is_out_to_acc(acc.account_address, zo, derivation, output_index, amount, amount_blinding_mask, asset_id_blinding_mask))
+        if (is_out_to_acc(acc.account_address, zo, derivation, output_index, amount, asset_id, amount_blinding_mask, asset_id_blinding_mask))
         {
           crypto::point_t asset_id_pt = crypto::point_t(zo.blinded_asset_id) - asset_id_blinding_mask * crypto::c_point_X;
           outs.emplace_back(output_index, amount, amount_blinding_mask, asset_id_blinding_mask, asset_id_pt.to_public_key());
           money_transfered += amount;
         }
+      }
       VARIANT_SWITCH_END();
       output_index++;
     }

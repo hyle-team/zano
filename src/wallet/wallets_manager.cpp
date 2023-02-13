@@ -1698,7 +1698,7 @@ std::string wallets_manager::reset_wallet_password(uint64_t wallet_id, const std
   else
     return API_RETURN_CODE_FAIL;
 }
-std::string wallets_manager::add_custom_asset_id(uint64_t wallet_id, const crypto::hash& asset_id, currency::asset_descriptor_base& asset_descriptor)
+std::string wallets_manager::add_custom_asset_id(uint64_t wallet_id, const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_descriptor)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   if(w.w->get()->add_custom_asset_id(asset_id, asset_descriptor))
@@ -1706,7 +1706,7 @@ std::string wallets_manager::add_custom_asset_id(uint64_t wallet_id, const crypt
   else
     return API_RETURN_CODE_FAIL;
 }
-std::string wallets_manager::delete_custom_asset_id(uint64_t wallet_id, const crypto::hash& asset_id)
+std::string wallets_manager::delete_custom_asset_id(uint64_t wallet_id, const crypto::public_key& asset_id)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   if (w.w->get()->delete_custom_asset_id(asset_id))
