@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 script_dir=$( dirname "$(readlink -f "$0")" )
 
 out_dir=~/.local/share/applications
@@ -10,6 +10,10 @@ call_app()
 {
   pushd $script_dir
   usr/bin/Zano "$@"
+  if [ $? -ne 0 ]; then
+    echo $'\n\n\x1b[1mIf Zano fails to launch, it might need to install xinerama extension for the X C Binding with this command:\n\x1b[2m   sudo apt-get install libxcb-xinerama0\n\n'
+  fi
+
   popd
   exit
 }
