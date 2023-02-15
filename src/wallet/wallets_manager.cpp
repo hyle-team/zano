@@ -1275,6 +1275,8 @@ std::string wallets_manager::get_alias_info_by_name(const std::string& name, cur
   if (!r)
     return API_RETURN_CODE_FAIL;
 
+  if (res.status == API_RETURN_CODE_NOT_FOUND)
+    return API_RETURN_CODE_NOT_FOUND;
 
   res_details.alias = name;
   res_details.details = res.alias_details;
