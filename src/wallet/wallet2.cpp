@@ -31,11 +31,15 @@ using namespace epee;
 #include "version.h"
 #include "common/encryption_filter.h"
 #include "crypto/bitcoin/sha256_helper.h"
+
+#define DISABLE_TOR
+
 #ifndef DISABLE_TOR
   #include "common/tor_helper.h"
 #endif
 
 #include "storages/levin_abstract_invoke2.h"
+
 
 using namespace currency;
 
