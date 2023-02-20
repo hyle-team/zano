@@ -136,6 +136,7 @@ public:
   std::string backup_wallet(uint64_t wallet_id, const std::wstring& path);
   std::string reset_wallet_password(uint64_t wallet_id, const std::string& pass);
   std::string is_wallet_password_valid(uint64_t wallet_id, const std::string& pass);
+  std::string create_ionic_swap_proposal(uint64_t wallet_id, const view::ionic_swap_proposal_info& proposal);
   std::string get_my_offers(const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers);
   std::string get_fav_offers(const std::list<bc_services::offer_id>& hashes, const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers);
   std::string get_tx_pool_info(currency::COMMAND_RPC_GET_POOL_INFO::response& res);

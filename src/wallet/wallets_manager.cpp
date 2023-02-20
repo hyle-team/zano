@@ -854,6 +854,23 @@ std::string wallets_manager::get_fav_offers(const std::list<bc_services::offer_i
 #endif
 }
 
+std::string wallets_manager::create_ionic_swap_proposal(uint64_t wallet_id, const view::ionic_swap_proposal_info& proposal)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, wo);
+  try {
+    bool r = wo.w->get()->create_ionic_swap_proposal(proposal);
+
+  }
+  catch (...)
+  {
+    return API_RETURN_CODE_FAIL;
+  }
+  return API_RETURN_CODE_OK;
+
+  return true;
+}
+
+
 std::string wallets_manager::get_my_offers(const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers)
 {
   if (m_remote_node_mode)

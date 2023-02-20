@@ -914,6 +914,9 @@ namespace tools
     void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin, currency::transaction& result_tx);
     void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin);
     bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin, crypto::hash& redeem_tx_id);
+
+    // ionic swaps:
+    bool create_ionic_swap_proposal(uint64_t wallet_id, const view::ionic_swap_proposal_info& proposal);
 private:
 
     // -------- t_transport_state_notifier ------------------------------------------------
