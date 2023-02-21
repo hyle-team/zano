@@ -51,7 +51,7 @@ namespace currency
             res += o.amount;
         }
       VARIANT_CASE_CONST(tx_out_zarcanum, o)
-        //@#@
+        //@#@# TODO obtain info about public burn of native coins in ZC outputs
       VARIANT_CASE_THROW_ON_OTHER();        
       VARIANT_SWITCH_END();
     }

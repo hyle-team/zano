@@ -60,7 +60,7 @@ namespace currency
     crypto::public_key asset_id = currency::native_coin_asset_id; //asset id (not blinded, not premultiplied by 1/8) TODO @#@# consider changing to crypto::point_t
 
     bool is_multisig() const    { return ms_sigs_count > 0; }
-    bool is_zarcanum() const    { return !real_out_amount_blinding_mask.is_zero(); }
+    bool is_zc() const          { return !real_out_amount_blinding_mask.is_zero(); }
     bool is_native_coin() const { return asset_id == currency::native_coin_asset_id; }
 
     BEGIN_SERIALIZE_OBJECT()

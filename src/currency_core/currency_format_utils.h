@@ -218,6 +218,8 @@ namespace currency
     crypto::scalar_t  amount_blinding_mask = 0;
     crypto::scalar_t  asset_id_blinding_mask = 0;
     crypto::public_key asset_id = currency::native_coin_asset_id; // use point_t instead as this is for internal use only?
+
+    bool is_native_coin() const { return asset_id == currency::native_coin_asset_id; }
   };
 
 

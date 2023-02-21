@@ -499,7 +499,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
   uint64_t max_out_unlock_time = 0;
 
   std::vector<wallet_out_info> outs;
-  uint64_t tx_money_got_in_outs = 0;   // TODO:  @#@# correctly calculate tx_money_got_in_outs for post-HF4
+  uint64_t sum_of_native_outs = 0;   // TODO:  @#@# correctly calculate tx_money_got_in_outs for post-HF4
   crypto::public_key tx_pub_key = null_pkey;
   bool r = parse_and_validate_tx_extra(tx, tx_pub_key);
   THROW_IF_TRUE_WALLET_EX(!r, error::tx_extra_parse_error, tx);
@@ -507,10 +507,10 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
   //check for transaction income
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
   std::list<htlc_info> htlc_info_list;
-  r = lookup_acc_outs(m_account.get_keys(), tx, tx_pub_key, outs, tx_money_got_in_outs, derivation, htlc_info_list);
+  r = lookup_acc_outs(m_account.get_keys(), tx, tx_pub_key, outs, sum_of_native_outs, derivation, htlc_info_list);
   THROW_IF_TRUE_WALLET_EX(!r, error::acc_outs_lookup_error, tx, tx_pub_key, m_account.get_keys());
 
-  if(!outs.empty() /*&& tx_money_got_in_outs*/)
+  if (!outs.empty())
   {
     //good news - got money! take care about it
     //usually we have only one transfer for user in transaction
@@ -545,16 +545,17 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     {
       const wallet_out_info& out = outs[i_in_outs];
       size_t o = out.index;
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(o < tx.vout.size(), "wrong out in transaction: internal index=" << o << ", total_outs=" << tx.vout.size());
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(o < tx.vout.size(), "wrong out in transaction: internal index: " << o << ", tx.vout.size(): " << tx.vout.size());
       {
         const currency::tx_out_v& out_v = tx.vout[o];
+        bool out_type_zc        = out_is_zc(out_v);
+        bool out_type_to_key    = out_is_to_key(out_v);
+        bool out_type_htlc      = out_is_to_htlc(out_v);
+        bool out_type_multisig  = out_is_multisig(out_v);
 
-        bool out_type_zc = out_is_zc(out_v);
-        bool out_type_to_key = out_is_to_key(out_v);
-        if (out_type_zc || out_type_to_key || out_is_to_htlc(out_v))
+        if (out_type_zc || out_type_to_key || out_type_htlc)
         {
-          crypto::public_key out_key = out_get_pub_key(out_v, htlc_info_list);
-          //const currency::txout_to_key& otk = boost::get<currency::txout_to_key>(out.target);
+          crypto::public_key out_key = out_get_pub_key(out_v, htlc_info_list); // htlc_info_list contains information about which one, redeem or refund key is ours for an htlc output
 
           // obtain key image for this output
           crypto::key_image ki = currency::null_ki;
@@ -600,8 +601,11 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
               WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
               if (m_wcallback)
                 m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
-              WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(tx_money_got_in_outs >= outs[i_in_outs].amount, "tx_money_got_in_outs: " << tx_money_got_in_outs << ", out.amount:" << outs[i_in_outs].amount);
-              tx_money_got_in_outs -= outs[i_in_outs].amount;
+              if (out.is_native_coin())
+              {
+                WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(sum_of_native_outs >= out.amount, "sum_of_native_outs: " << sum_of_native_outs << ", out.amount:" << out.amount);
+                sum_of_native_outs -= out.amount;
+              }
               continue; // skip the output
             }
           }
@@ -611,11 +615,15 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           {
             std::stringstream ss;
             ss << "output #" << o << " from tx " << get_transaction_hash(tx) << " with amount " << print_money_brief(outs[i_in_outs].amount)
-              << " is targeted to this auditable wallet and has INCORRECT mix_attr = " << (uint64_t)out_get_mixin_attr(out_v) << ". Output IGNORED.";
+              << " is targeted to this auditable wallet and has INCORRECT mix_attr = " << (uint64_t)out_get_mixin_attr(out_v) << ". Output is IGNORED.";
             WLT_LOG_RED(ss.str(), LOG_LEVEL_0);
             if (m_wcallback)
               m_wcallback->on_message(i_wallet2_callback::ms_red, ss.str());
-            tx_money_got_in_outs -= out.amount;
+            if (out.is_native_coin())
+            {
+              WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(sum_of_native_outs >= out.amount, "sum_of_native_outs: " << sum_of_native_outs << ", out.amount:" << out.amount);
+              sum_of_native_outs -= out.amount;
+            }
             continue; // skip the output
           }
 
@@ -643,7 +651,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           if (ptc.coin_base_tx)
           {
             //last out in coinbase tx supposed to be change from coinstake
-            if (!(o == tx.vout.size() - 1 && !ptc.is_derived_from_coinbase))
+            if (!(o == tx.vout.size() - 1 && !ptc.is_derived_from_coinbase)) // TODO: @#@# reconsider this condition
             {
               td.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER;
             }
@@ -655,7 +663,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           }
 
           size_t transfer_index = m_transfers.size() - 1;
-          if (out_is_to_htlc(out_v))
+          if (out_type_htlc)
           {
             const currency::txout_htlc& hltc = out_get_htlc(out_v);
             //mark this as spent
@@ -702,8 +710,8 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           if (is_watch_only() && is_auditable())
           {
             WLT_CHECK_AND_ASSERT_MES_NO_RET(td.m_global_output_index != WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED, "td.m_global_output_index != WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED validation failed");
-            auto amount_gindex_pair = std::make_pair(td.m_amount, td.m_global_output_index);
-            WLT_CHECK_AND_ASSERT_MES_NO_RET(m_amount_gindex_to_transfer_id.count(amount_gindex_pair) == 0, "update m_amount_gindex_to_transfer_id: amount " << td.m_amount << ", gindex " << td.m_global_output_index << " already exists");
+            auto amount_gindex_pair = std::make_pair(td.amount_for_global_output_index(), td.m_global_output_index);
+            WLT_CHECK_AND_ASSERT_MES_NO_RET(m_amount_gindex_to_transfer_id.count(amount_gindex_pair) == 0, "update m_amount_gindex_to_transfer_id: amount_for_global_output_index: " << td.amount_for_global_output_index() << ", gindex: " << td.m_global_output_index << " already exists");
             m_amount_gindex_to_transfer_id[amount_gindex_pair] = transfer_index;
           }
 
@@ -712,14 +720,22 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
 
           if (out_type_to_key || out_type_zc)
           {
-            WLT_LOG_L0("Received money, transfer #" << transfer_index << ", amount: " << print_money_brief(td.amount()) << (out_type_zc ? " (hidden)" : "") << ", with tx: " << get_transaction_hash(tx) << ", at height " << height);
+            if (td.is_native_coin())
+            {
+              WLT_LOG_L0("Received native coins, transfer #" << transfer_index << ", amount: " << print_money_brief(td.amount()) << (out_type_zc ? " (hidden)" : "") << ", with tx: " << get_transaction_hash(tx) << ", at height " << height);
+            }
+            else
+            {
+              // TODO @#@# output asset's ticker/name
+              WLT_LOG_L0("Received asset " << print16(td.get_asset_id()) << ", transfer #" << transfer_index << ", amount: " << print_money_brief(td.amount()) << (out_type_zc ? " (hidden)" : "") << ", with tx: " << get_transaction_hash(tx) << ", at height " << height);
+            }
           }
-          else if (out_is_to_htlc(out_v))
+          else if (out_type_htlc)
           {
             WLT_LOG_L0("Detected HTLC[" << (td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM ? "REDEEM" : "REFUND") << "], transfer #" << transfer_index << ", amount: " << print_money(td.amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << height);
           }
         }
-        else if (out_is_multisig(out_v))
+        else if (out_type_multisig)
         {
           crypto::hash multisig_id = currency::get_multisig_out_id(tx, o);
           WLT_CHECK_AND_ASSERT_MES_NO_RET(m_multisig_transfers.count(multisig_id) == 0, "multisig_id = " << multisig_id << " already in multisig container");
@@ -729,15 +745,22 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           tdb.m_amount = outs[i_in_outs].amount;
           WLT_LOG_L0("Received multisig, multisig out id: " << multisig_id << ", amount: " << tdb.amount() << ", with tx: " << get_transaction_hash(tx));
         }
+        else
+        {
+          WLT_LOG_YELLOW("Unexpected output type: " << out_v.type().name() << ", out index: " << o << " in tx " << get_transaction_hash(tx), LOG_LEVEL_0);
+        }
       }
 
     }
   }
   
   std::string payment_id;
-  if (tx_money_got_in_outs && get_payment_id_from_tx(tx.attachment, payment_id))
+  if (sum_of_native_outs != 0 && get_payment_id_from_tx(tx.attachment, payment_id))
   {
-    uint64_t received = (ptc.tx_money_spent_in_ins < tx_money_got_in_outs) ? tx_money_got_in_outs - ptc.tx_money_spent_in_ins : 0;
+    // TODO @#@# this code takes care only of native coins
+    // we need to add assets support
+
+    uint64_t received = (ptc.sum_of_own_native_inputs < sum_of_native_outs) ? sum_of_native_outs - ptc.sum_of_own_native_inputs : 0;
     if (0 < received && payment_id.size())
     {
       payment_details payment;
@@ -750,7 +773,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     }
   }
    
-  if (ptc.tx_money_spent_in_ins)
+  if (ptc.sum_of_own_native_inputs)
   {
     //check if there are asset_registration that belong to this wallet
     asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
@@ -798,25 +821,27 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     }
   }
 
-  if (ptc.tx_money_spent_in_ins)
+  if (ptc.sum_of_own_native_inputs)
   {//this actually is transfer transaction, notify about spend
-    if (ptc.tx_money_spent_in_ins > tx_money_got_in_outs)
+    if (ptc.sum_of_own_native_inputs > sum_of_native_outs)
     {//usual transfer 
-      handle_money_spent2(b, tx, ptc.tx_money_spent_in_ins - (tx_money_got_in_outs+get_tx_fee(tx)), ptc.mtd, recipients, remote_aliases);
+      handle_money_spent2(b, tx, ptc.sum_of_own_native_inputs - (sum_of_native_outs + get_tx_fee(tx)), ptc.mtd, recipients, remote_aliases);
     }
     else
     {//strange transfer, seems that in one transaction have transfers from different wallets.
       if (!is_coinbase(tx))
       {
-        WLT_LOG_RED("Unusual transaction " << currency::get_transaction_hash(tx) << ", tx_money_spent_in_ins: " << ptc.tx_money_spent_in_ins << ", tx_money_got_in_outs: " << tx_money_got_in_outs, LOG_LEVEL_0);
+        WLT_LOG_RED("Unusual transaction " << currency::get_transaction_hash(tx) << ", sum_of_native_inputs: " << ptc.sum_of_own_native_inputs << ", sum_of_native_outs: " << sum_of_native_outs, LOG_LEVEL_0);
       }
-      handle_money_received2(b, tx, (tx_money_got_in_outs - (ptc.tx_money_spent_in_ins - get_tx_fee(tx))), ptc.mtd);
+      handle_money_received2(b, tx, (sum_of_native_outs - (ptc.sum_of_own_native_inputs - get_tx_fee(tx))), ptc.mtd);
     }
   }
   else
   {
-    if(tx_money_got_in_outs)
-      handle_money_received2(b, tx, tx_money_got_in_outs, ptc.mtd);
+    if (sum_of_native_outs != 0)
+    {
+      handle_money_received2(b, tx, sum_of_native_outs, ptc.mtd);
+    }
     else if (currency::is_derivation_used_to_encrypt(tx, derivation))
     {
       //transaction doesn't transfer actually money, bud bring some information
@@ -5777,7 +5802,7 @@ void wallet2::print_source_entry(std::stringstream& output, const currency::tx_s
   for(auto& el : src.outputs)
     ss << el.out_reference << " ";
   
-  output << "amount: " << print_money_brief(src.amount) << (src.is_zarcanum() ? " (hidden)" : "")
+  output << "amount: " << print_money_brief(src.amount) << (src.is_zc() ? " (hidden)" : "")
     << ", real_output: " << src.real_output
     << ", real_output_in_tx_index: " << src.real_output_in_tx_index
     << ", indexes: " << ss.str();

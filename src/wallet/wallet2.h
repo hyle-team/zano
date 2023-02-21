@@ -364,7 +364,8 @@ namespace tools
       boost::shared_ptr<ZC_out_info> m_zc_info_ptr;
 
       uint64_t amount() const { return m_amount; } 
-      
+      uint64_t amount_for_global_output_index() const { return is_zc() ? 0 : m_amount; } // amount value for global outputs index, it's zero for outputs with hidden amounts
+
       // @#@ will throw if type is not tx_out_bare, TODO: change according to new model, 
       // need to replace all get_tx_out_bare_from_out_v() to proper code
       //const currency::tx_out_bare& output() const { return currency::get_tx_out_bare_from_out_v(m_ptx_wallet_info->m_tx.vout[m_internal_output_index]); }
@@ -377,6 +378,7 @@ namespace tools
       bool is_reserved_for_escrow() const { return ( (m_flags & WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION) != 0 );  }
       bool is_zc() const { return m_zc_info_ptr.get(); }
       const crypto::public_key& get_asset_id() const { if (m_zc_info_ptr.get()) { return m_zc_info_ptr->asset_id; } else { return currency::native_coin_asset_id; } }
+      bool is_native_coin() const { return m_zc_info_ptr.get() ? (m_zc_info_ptr->asset_id == currency::native_coin_asset_id) : true; }
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_CUSTOM(m_ptx_wallet_info, const transaction_wallet_info&, tools::wallet2::transform_ptr_to_value, tools::wallet2::transform_value_to_ptr)
@@ -504,7 +506,7 @@ namespace tools
 
     struct process_transaction_context
     {
-      uint64_t tx_money_spent_in_ins = 0;
+      uint64_t sum_of_own_native_inputs = 0; // old-fashioned bare inputs or ZC inputs referring to native coin asset_id 
       // check all outputs for spending (compare key images)
       money_transfer2_details mtd;
       bool is_pos_coinbase = false;
@@ -1330,7 +1332,8 @@ namespace tools
     if (tr_index != UINT64_MAX)
     {
       transfer_details& td = m_transfers[tr_index];
-      ptc.tx_money_spent_in_ins += td.amount();
+      if (td.is_native_coin())
+        ptc.sum_of_own_native_inputs += td.m_amount;
       uint32_t flags_before = td.m_flags;
       td.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_SPENT;
       td.m_spent_height = ptc.height;
@@ -1338,8 +1341,18 @@ namespace tools
         ptc.is_derived_from_coinbase = true;
       else
         ptc.is_derived_from_coinbase = false;
-      WLT_LOG_L0("Spent key out, transfer #" << tr_index << ", amount: " << currency::print_money_brief(td.amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << ptc.height <<
-        "; flags: " << flags_before << " -> " << td.m_flags);
+
+      if (td.is_native_coin())
+      {
+        WLT_LOG_L0("Spent native coins, transfer #" << tr_index << ", amount: " << currency::print_money_brief(td.amount()) << (td.is_zc() ? " (hidden), with tx: " : ", with tx: ") << get_transaction_hash(tx) << ", at height " << ptc.height <<
+          "; flags: " << flags_before << " -> " << td.m_flags);
+      }
+      else
+      {
+        WLT_LOG_L0("Spent asset " << print16(td.get_asset_id()) << " , transfer #" << tr_index << ", amount: " << currency::print_money_brief(td.amount()) << ", with tx: " << get_transaction_hash(tx) << ", at height " << ptc.height <<
+          "; flags: " << flags_before << " -> " << td.m_flags);
+      }
+      
       ptc.mtd.spent_indices.push_back(ptc.i);
       remove_transfer_from_expiration_list(tr_index);
     }
