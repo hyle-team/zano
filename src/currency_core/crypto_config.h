@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Zano Project
+// Copyright (c) 2022-2023 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 //
@@ -26,4 +26,5 @@
 #define CRYPTO_HDS_ZARCANUM_PROOF_HASH        "ZANO_HDS_ZARCANUM_PROOF_HASH___"
 
 #define CRYPTO_HDS_ASSET_CONTROL_KEY          "ZANO_HDS_ASSET_CONTROL_KEY_____"
+#define CRYPTO_HDS_ASSET_CONTROL_ABM          "ZANO_HDS_ASSET_CONTROL_ABM_____"
 #define CRYPTO_HDS_ASSET_ID                   "ZANO_HDS_ASSET_ID______________"

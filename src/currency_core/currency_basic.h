@@ -765,7 +765,8 @@ namespace currency
     std::string         ticker;
     std::string         full_name;
     std::string         meta_info;
-    crypto::public_key  owner = currency::null_pkey;
+    crypto::public_key  owner = currency::null_pkey; // consider premultipling by 1/8
+    bool                hidden_supply = false;
 
     BEGIN_VERSIONED_SERIALIZE()
       FIELD(total_max_supply)
@@ -775,6 +776,7 @@ namespace currency
       FIELD(full_name)
       FIELD(meta_info)
       FIELD(owner)
+      FIELD(hidden_supply)
     END_SERIALIZE()
 
 
@@ -828,23 +830,36 @@ namespace currency
   struct asset_descriptor_operation
   {
     uint8_t                         operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
-    std::vector<crypto::signature>  proof;
     asset_descriptor_base           descriptor;
-    std::vector<crypto::public_key> asset_id; //questionable regarding form of optional fields // premultiplied by 1/8
-
+    boost::optional<crypto::public_key> opt_amount_commitment; // premultiplied by 1/8
 
     BEGIN_VERSIONED_SERIALIZE()
       FIELD(operation_type)
-      FIELD(proof)
       FIELD(descriptor)
-      FIELD(asset_id)
+      //FIELD(opt_amount_commitment)
     END_SERIALIZE()
-
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(operation_type)
-      BOOST_SERIALIZE(proof)
       BOOST_SERIALIZE(descriptor)
+      //BOOST_SERIALIZE(opt_amount_commitment)
+    END_BOOST_SERIALIZATION()
+  };
+
+  struct asset_operation_proof
+  {
+    // linear composition proof for the fact amount_commitment = lin(asset_id, G)
+    boost::optional<crypto::linear_composition_proof_s> opt_amount_commitment_composition_proof; // for hidden supply
+    boost::optional<crypto::signature> opt_amount_commitment_g_proof; // for non-hidden supply, proofs that amount_commitment - supply * asset_id = lin(G)
+
+    BEGIN_VERSIONED_SERIALIZE()
+      //FIELD(opt_amount_commitment_composition_proof)
+      //FIELD(opt_amount_commitment_g_proof)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      //BOOST_SERIALIZE(opt_amount_commitment_composition_proof)
+      //BOOST_SERIALIZE(opt_amount_commitment_g_proof)
     END_BOOST_SERIALIZATION()
   };
 
@@ -915,10 +930,10 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::mpl::vector26<
+  typedef boost::mpl::vector23<
     tx_service_attachment, tx_comment, tx_payer_old, tx_receiver_old, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time,
     etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry_old, extra_user_data, extra_padding, etc_tx_flags16_t, etc_tx_details_unlock_time2,
-    tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, zc_asset_surjection_proof, zc_outs_range_proof, zc_balance_proof, asset_descriptor_operation
+    tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, asset_descriptor_operation
   > all_payload_types;
   
   typedef boost::make_variant_over<all_payload_types>::type payload_items_v;
@@ -969,7 +984,7 @@ namespace currency
 
   typedef boost::variant<NLSAG_sig, void_sig, ZC_sig, zarcanum_sig> signature_v;
 
-
+  typedef boost::variant<zc_asset_surjection_proof, zc_outs_range_proof, zc_balance_proof, asset_operation_proof> proof_v;
 
 
   //include backward compatibility defintions
@@ -978,11 +993,9 @@ namespace currency
   class transaction_prefix
   {
   public:
-    // tx version information
-    uint64_t   version{};
-    //extra
-    std::vector<extra_v> extra;
+    uint64_t version = 0;
     std::vector<txin_v> vin;
+    std::vector<extra_v> extra;
     std::vector<tx_out_v> vout;
 
     BEGIN_SERIALIZE()
@@ -991,12 +1004,9 @@ namespace currency
       CHAIN_TRANSITION_VER(TRANSACTION_VERSION_PRE_HF4, transaction_prefix_v1)
       if(CURRENT_TRANSACTION_VERSION < version) return false;
       FIELD(vin)
-      FIELD(vout)
       FIELD(extra)
+      FIELD(vout)
     END_SERIALIZE()
-
-  protected:
-    transaction_prefix(){}
   };
 
 /*
@@ -1012,53 +1022,21 @@ namespace currency
   class transaction: public transaction_prefix
   {
   public:
-    std::vector<signature_v> signatures;
     std::vector<attachment_v> attachment;
-
-    transaction();
+    std::vector<signature_v> signatures;
+    std::vector<proof_v> proofs;
 
     BEGIN_SERIALIZE_OBJECT()
       FIELDS(*static_cast<transaction_prefix *>(this))
       CHAIN_TRANSITION_VER(TRANSACTION_VERSION_INITAL, transaction_v1)
       CHAIN_TRANSITION_VER(TRANSACTION_VERSION_PRE_HF4, transaction_v1)
-      FIELD(signatures)
       FIELD(attachment)
+      FIELD(signatures)
+      FIELD(proofs)
     END_SERIALIZE()
   };
 
   
-
-
-  inline
-  transaction::transaction()
-  {
-    version = 0;
-    vin.clear();
-    vout.clear();
-    extra.clear();
-    signatures.clear();
-    attachment.clear();
-    
-  }
-  /*
-  inline
-  transaction::~transaction()
-  {
-    //set_null();
-  }
-
-  inline
-  void transaction::set_null()
-  {
-    version = 0;
-    unlock_time = 0;
-    vin.clear();
-    vout.clear();
-    extra.clear();
-    signatures.clear();
-  }
-  */
-
 
 
 
@@ -1122,8 +1100,6 @@ namespace currency
   */
   //-------------------------------------------------------------------------------------------------------------------
 
-  
-
 #pragma pack(push, 1)
   struct stake_modifier_type
   {
@@ -1133,7 +1109,6 @@ namespace currency
 
   struct stake_kernel
   {
-    
     stake_modifier_type stake_modifier;
     uint64_t block_timestamp;             //this block timestamp
     crypto::key_image kimage;
@@ -1246,6 +1221,7 @@ SET_VARIANT_TAGS(currency::zc_outs_range_proof, 47, "zc_outs_range_proof");
 SET_VARIANT_TAGS(currency::zc_balance_proof, 48, "zc_balance_proof");
 
 SET_VARIANT_TAGS(currency::asset_descriptor_operation, 49, "asset_descriptor_base");
+SET_VARIANT_TAGS(currency::asset_operation_proof, 50, "asset_operation_proof");
 
 
 

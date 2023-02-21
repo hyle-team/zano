@@ -1359,7 +1359,8 @@ bool blockchain_storage::validate_miner_transaction(const block& b,
     return false;
   }
 
-  if (!check_tx_balance(b.miner_tx, base_reward + fee))
+  crypto::hash tx_id_for_balance_check = b.miner_tx.version > TRANSACTION_VERSION_PRE_HF4 ? get_transaction_hash(b.miner_tx) : null_hash;
+  if (!check_tx_balance(b.miner_tx, tx_id_for_balance_check, base_reward + fee))
   {
     LOG_ERROR("coinbase transaction balance check failed. Block reward is " << print_money_brief(base_reward + fee) << "(" << print_money(base_reward) << "+" << print_money(fee)
       << ", blocks_size_median = " << blocks_size_median
@@ -3551,8 +3552,7 @@ bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx)
     }
     else
     {
-      CHECK_AND_ASSERT_MES(ei.m_asset_operation.asset_id.size() == 1, false, "Unexpected asset_id in operation");
-      asset_id = ei.m_asset_operation.asset_id.back();
+      CHECK_AND_NO_ASSERT_MES(false, false, "asset operation not implemented");
     }
     r = pop_asset_info(asset_id);
     CHECK_AND_ASSERT_MES(r, false, "failed to pop_alias_info");
@@ -3802,15 +3802,16 @@ bool blockchain_storage::pop_asset_info(const crypto::public_key& asset_id)
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::put_asset_info(const transaction & tx, asset_descriptor_operation & ado)
+bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
   {
     crypto::public_key asset_id{};
-    calculate_asset_id(ado.descriptor.owner, nullptr, &asset_id);
+    CHECK_AND_ASSERT_MES(validate_asset_operation(tx, tx_id, ado, asset_id), false, "asset operation validation failed!");
+
     auto asset_history_ptr = m_db_assets.find(asset_id);
-    CHECK_AND_ASSERT_MES(!asset_history_ptr, false, "Asset id already existing");
+    CHECK_AND_ASSERT_MES(!asset_history_ptr, false, "asset with id " << asset_id << " has already been registered");
     assets_container::t_value_type local_asset_history = AUTO_VAL_INIT(local_asset_history);
     local_asset_history.push_back(ado);
     m_db_assets.set(asset_id, local_asset_history);
@@ -3821,7 +3822,7 @@ bool blockchain_storage::put_asset_info(const transaction & tx, asset_descriptor
   else
   {  
     //TODO: implement other operations
-    CHECK_AND_ASSERT_THROW(false, "not implemented yet");
+    CHECK_AND_ASSERT_THROW(false, "asset operation not implemented yet");
   }
 
   return true;
@@ -3902,7 +3903,7 @@ bool blockchain_storage::prevalidate_alias_info(const transaction& tx, const ext
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx)
+bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx, const crypto::hash& tx_id)
 {
   //check transaction extra
   tx_extra_info ei = AUTO_VAL_INIT(ei);
@@ -3918,7 +3919,7 @@ bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx)
   }
   if (ei.m_asset_operation.operation_type != ASSET_DESCRIPTOR_OPERATION_UNDEFINED)
   {
-    r = put_asset_info(tx, ei.m_asset_operation);
+    r = put_asset_info(tx, tx_id, ei.m_asset_operation);
     CHECK_AND_ASSERT_MES(r, false, "failed to put_asset_info");
   }
 
@@ -4096,7 +4097,7 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   CHECK_AND_ASSERT_MES(validate_tx_for_hardfork_specific_terms(tx, tx_id, bl_height), false, "tx " << tx_id << ": hardfork-specific validation failed");
   
   TIME_MEASURE_START_PD(tx_process_extra);
-  bool r = process_blockchain_tx_extra(tx);
+  bool r = process_blockchain_tx_extra(tx, tx_id);
   CHECK_AND_ASSERT_MES(r, false, "failed to process_blockchain_tx_extra");
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_process_extra);
 
@@ -5351,6 +5352,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       return false;
   }
   
+  // TODO @#@# consider: 1) tx.proofs, 2) new proof data structures
 
   if (var_is_after_hardfork_4_zone)
   {
@@ -5714,7 +5716,7 @@ bool blockchain_storage::collect_rangeproofs_data_from_tx(std::vector<zc_outs_ra
   // TODO @#@# Verify somewhere(maybe here) that all outputs are covered with associated rangeproofs
   size_t proofs_count = 0;
   size_t current_output_start = 0; //for Consolidated Transactions we'll have multiple zc_outs_range_proof entries
-  for (const auto& a : tx.attachment)
+  for (const auto& a : tx.proofs)
   {
     if (a.type() == typeid(zc_outs_range_proof))
     {
@@ -5886,24 +5888,24 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
 
     append_per_block_increments_for_tx(tx, gindices);
     
-    //If we under checkpoints, ring signatures should be pruned    
+    //If we under checkpoints, attachments, ring signatures and proofs should be pruned    
     if(m_is_in_checkpoint_zone)
     {
-      tx.signatures.clear();
       tx.attachment.clear();
+      tx.signatures.clear();
+      tx.proofs.clear();
     }
 
     //std::vector<crypto::point_t&> tx_outs_commitments;
     if (!m_is_in_checkpoint_zone)
     {
-      if (!collect_rangeproofs_data_from_tx(range_proofs_agregated, tx/*, tx_outs_commitments*/))
-      {
-        LOG_PRINT_L0("Block with id: " << id << " has at least one transaction with wrong proofs, tx_id: " << tx_id << ", collect_rangeproofs_data_from_tx failed");
-        purge_block_data_from_blockchain(bl, tx_processed_count);
-        //add_block_as_invalid(bl, id);  
-        bvc.m_verification_failed = true;
-        return false;
-      }
+      auto cleanup = [&](){ purge_block_data_from_blockchain(bl, tx_processed_count); bvc.m_verification_failed = true; };
+
+      CHECK_AND_ASSERT_MES_CUSTOM(collect_rangeproofs_data_from_tx(range_proofs_agregated, tx/*, tx_outs_commitments*/), false, cleanup(),
+        "block " << id << ", tx " << tx_id << ": collect_rangeproofs_data_from_tx failed");
+
+      CHECK_AND_ASSERT_MES_CUSTOM(check_tx_balance(tx, tx_id), false, cleanup(),
+        "block " << id << ", tx " << tx_id << ": check_tx_balance failed");
     }
 
     TIME_MEASURE_START_PD(tx_add_one_tx_time);
@@ -5970,8 +5972,20 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     return false;
   }
 
+  boost::multiprecision::uint128_t already_generated_coins = m_db_blocks.size() ? m_db_blocks.back()->already_generated_coins:0;
+  uint64_t base_reward = get_base_block_reward(is_pos_bl, already_generated_coins, height);
+
   if (!m_is_in_checkpoint_zone)
   {
+    if (!validate_miner_transaction(bl, cumulative_block_size, fee_summary, base_reward, already_generated_coins)) // TODO @#@# base_reward will be calculated once again, consider refactoring
+    {
+      LOG_PRINT_L0("Block with id: " << id
+        << " have wrong miner transaction");
+      purge_block_data_from_blockchain(bl, tx_processed_count);
+      bvc.m_verification_failed = true;
+      return false;
+    }
+
     if (!collect_rangeproofs_data_from_tx(range_proofs_agregated, bl.miner_tx))
     {
       LOG_PRINT_L0("Block with id: " << id
@@ -5980,28 +5994,16 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       bvc.m_verification_failed = true;
       return false;
     }
-  }
 
-  uint64_t base_reward = 0;
-  boost::multiprecision::uint128_t already_generated_coins = m_db_blocks.size() ? m_db_blocks.back()->already_generated_coins:0;
-  if (!validate_miner_transaction(bl, cumulative_block_size, fee_summary, base_reward, already_generated_coins))
-  {
-    LOG_PRINT_L0("Block with id: " << id
-      << " have wrong miner transaction");
-    purge_block_data_from_blockchain(bl, tx_processed_count);
-    bvc.m_verification_failed = true;
-    return false;
-  }
-
-
-  //validate range proofs
-  if (!verify_multiple_zc_outs_range_proofs(range_proofs_agregated))
-  {
-    LOG_PRINT_L0("Block with id: " << id
-      << " have failed to verify multiple rangeproofs");
-    purge_block_data_from_blockchain(bl, tx_processed_count);
-    bvc.m_verification_failed = true;
-    return false;
+    //validate range proofs
+    if (!verify_multiple_zc_outs_range_proofs(range_proofs_agregated))
+    {
+      LOG_PRINT_L0("Block with id: " << id
+        << " have failed to verify multiple rangeproofs");
+      purge_block_data_from_blockchain(bl, tx_processed_count);
+      bvc.m_verification_failed = true;
+      return false;
+    }
   }
 
 
