@@ -56,6 +56,30 @@ namespace crypto
     const zarcanum_proof& sig, uint8_t* p_err = nullptr);
 
 
+  // TODO @#@#: make sure it is used, implement, then move it to an appropriate place
+  struct linear_composition_proof
+  {
+    scalar_t  c;
+    scalar_t  y0;
+    scalar_t  y1;
+  };
+
+  enum generator_tag { generator_tag_void = 0, generator_tag_G = 1, generator_tag_H = 2, generator_tag_H2 = 3, generator_tag_X = 4, generator_tag_U = 5 };
+
+  template<generator_tag gen0 = generator_tag_H, generator_tag gen1 = generator_tag_G>
+  bool generate_linear_composition_proof(const hash& m, const public_key& A, const scalar_t& secret_a, const scalar_t& secret_b, linear_composition_proof& result, uint8_t* p_err = nullptr)
+  {
+    // consider embedding generators' tags into random entropy to distinguish proofs made with different generators during verification
+    return false;
+  }
+
+  template<generator_tag gen0 = generator_tag_H, generator_tag gen1 = generator_tag_G>
+  bool verify_linear_composition_proof(const hash& m, const public_key& A, const linear_composition_proof& sig, uint8_t* p_err = nullptr)
+  {
+    return false;
+  }
+
+
 
   // TODO: improve this proof using random weightning factor
   struct vector_UG_aggregation_proof

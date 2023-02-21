@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2022 Zano Project
+// Copyright (c) 2014-2023 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -149,6 +149,21 @@ namespace crypto
       BOOST_SERIALIZE((std::vector<scalar_t>&)(y0s))
       BOOST_SERIALIZE((std::vector<scalar_t>&)(y1s))
       BOOST_SERIALIZE(c)
+    END_BOOST_SERIALIZATION()
+  };
+
+  struct linear_composition_proof_s : public linear_composition_proof
+  {
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(c)
+      FIELD(y0)
+      FIELD(y1)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(c)
+      BOOST_SERIALIZE(y0)
+      BOOST_SERIALIZE(y1)
     END_BOOST_SERIALIZATION()
   };
 
