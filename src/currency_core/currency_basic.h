@@ -30,6 +30,7 @@
 #include "serialization/stl_containers.h"
 #include "serialization/serialization.h"
 #include "serialization/variant.h"
+#include "serialization/boost_types.h"
 #include "serialization/json_archive.h"
 #include "serialization/debug_archive.h"
 #include "serialization/keyvalue_serialization.h" // epee key-value serialization
@@ -836,13 +837,13 @@ namespace currency
     BEGIN_VERSIONED_SERIALIZE()
       FIELD(operation_type)
       FIELD(descriptor)
-      //FIELD(opt_amount_commitment)
+      FIELD(opt_amount_commitment)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(operation_type)
       BOOST_SERIALIZE(descriptor)
-      //BOOST_SERIALIZE(opt_amount_commitment)
+      BOOST_SERIALIZE(opt_amount_commitment)
     END_BOOST_SERIALIZATION()
   };
 
@@ -853,13 +854,13 @@ namespace currency
     boost::optional<crypto::signature> opt_amount_commitment_g_proof; // for non-hidden supply, proofs that amount_commitment - supply * asset_id = lin(G)
 
     BEGIN_VERSIONED_SERIALIZE()
-      //FIELD(opt_amount_commitment_composition_proof)
-      //FIELD(opt_amount_commitment_g_proof)
+      FIELD(opt_amount_commitment_composition_proof)
+      FIELD(opt_amount_commitment_g_proof)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
-      //BOOST_SERIALIZE(opt_amount_commitment_composition_proof)
-      //BOOST_SERIALIZE(opt_amount_commitment_g_proof)
+      BOOST_SERIALIZE(opt_amount_commitment_composition_proof)
+      BOOST_SERIALIZE(opt_amount_commitment_g_proof)
     END_BOOST_SERIALIZATION()
   };
 
