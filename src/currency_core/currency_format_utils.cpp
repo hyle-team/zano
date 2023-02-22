@@ -1062,7 +1062,7 @@ namespace currency
     {
       // create tx_out_bare, this section can be removed after HF4
       CHECK_AND_ASSERT_MES(de.addr.size() == 1 || (de.addr.size() > 1 && de.minimum_sigs <= de.addr.size()), false, "Invalid destination entry: amount: " << de.amount << " minimum_sigs: " << de.minimum_sigs << " addr.size(): " << de.addr.size());
-      CHECK_AND_ASSERT_MES(de.asset_id == currency::null_pkey, false, "assets are not allowed prior to HF4");
+      CHECK_AND_ASSERT_MES(de.asset_id == currency::native_coin_asset_id, false, "assets are not allowed prior to HF4");
 
       std::vector<crypto::public_key> target_keys;
       target_keys.reserve(de.addr.size());
