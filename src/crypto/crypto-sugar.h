@@ -886,6 +886,19 @@ namespace crypto
 
     scalar_t calc_hs() const;
 
+    void make_random()
+    {
+      for(size_t size = this->size(), i = 0; i < size; ++i)
+        at(i).make_random();
+    }
+
+    void resize_and_make_random(size_t size)
+    {
+      this->resize(size);
+      make_random();
+    }
+
+
   }; // scalar_vec_t
 
 
