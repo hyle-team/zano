@@ -854,12 +854,17 @@ std::string wallets_manager::get_fav_offers(const std::list<bc_services::offer_i
 #endif
 }
 
-std::string wallets_manager::create_ionic_swap_proposal(uint64_t wallet_id, const view::ionic_swap_proposal_info& proposal)
+std::string wallets_manager::create_ionic_swap_proposal(uint64_t wallet_id, const view::create_ionic_swap_proposal_request& proposal, std::string& result_proposal_hex)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
   try {
-    bool r = wo.w->get()->create_ionic_swap_proposal(proposal);
+    currency::account_public_address dest_account = AUTO_VAL_INIT(dest_account);
+    if (!currency::get_account_address_from_str(proposal.destination_add))
+    {
+      return API_RETURN_CODE_BAD_ARG;
+    }
 
+    bool r = wo.w->get()->create_ionic_swap_proposal(proposal, dest_account);
   }
   catch (...)
   {

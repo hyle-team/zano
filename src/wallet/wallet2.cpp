@@ -4877,6 +4877,46 @@ bool wallet2::check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& o
   }
   return false;
 }
+bool wallet2::create_ionic_swap_proposal(uint64_t wallet_id, const view::ionic_swap_proposal_info& proposal_details, const currency::account_public_address& destination_addr)
+{
+  crypto::secret_key one_time_key = AUTO_VAL_INIT(one_time_key);
+  std::vector<uint64_t> selected_transfers_for_template;
+  transaction tx_template;
+  build_ionic_swap_template(proposal_details, destination_addr, tx_template, selected_transfers_for_template, one_time_key);
+
+  const uint32_t mask_to_mark_escrow_template_locked_transfers = WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION;
+  mark_transfers_with_flag(selected_transfers_for_template, mask_to_mark_escrow_template_locked_transfers, "preparing escrow template tx, contract: " + epee::string_tools::pod_to_hex(ms_id));
+
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::build_ionic_swap_template(const view::ionic_swap_proposal_info& proposal_detais, const currency::account_public_address& destination_addr,
+  currency::transaction& template_tx,
+  std::vector<uint64_t>& selected_transfers_for_template,
+  crypto::secret_key& one_time_key)
+{
+  construct_tx_param ctp = get_default_construct_tx_param();
+
+  ctp.fake_outputs_count = proposal_detais.mixins;
+  ctp.fee = 0;
+  ctp.flags = TX_FLAG_SIGNATURE_MODE_SEPARATE;
+  ctp.mark_tx_as_complete = false;
+
+  etc_tx_details_expiration_time t = AUTO_VAL_INIT(t);
+  t.v = proposal_detais.expiration_time;
+  ctp.extra.push_back(t);
+
+  //TODO: 
+
+  currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  ftp.tx_version = this->get_current_tx_version();
+  prepare_transaction(ctp, ftp, tx);
+
+  selected_transfers = ftp.selected_transfers;
+
+  finalize_transaction(ftp, tx, one_time_key, false);
+
+}
+//----------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
 {

@@ -686,13 +686,10 @@ public:
 
   };
 
-
-
   struct wallet_and_contract_id_param
   {
     uint64_t wallet_id;
     crypto::hash contract_id;
-
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
@@ -741,6 +738,50 @@ public:
       KV_CHAIN_BASE(tools::wallet_public::create_proposal_param)
     END_KV_SERIALIZE_MAP()
   };
+
+
+  struct asset_funds
+  {
+    crypto::hash token_id;
+    uint64_t amount;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(token_id)
+      KV_SERIALIZE(amount)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct ionic_swap_proposal_info
+  {
+    std::vector<asset_funds> from;
+    std::vector<asset_funds> to;
+    uint64_t mixins;
+    uint64_t fee;
+    uint64_t expiration_time;
+
+    BEGIN_KV_SERIALIZE_MAP()
+
+      KV_SERIALIZE(from)
+      KV_SERIALIZE(to)
+      KV_SERIALIZE(mixins)
+      KV_SERIALIZE(fee)
+      KV_SERIALIZE(expiration_time)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct create_ionic_swap_proposal_request
+  {
+    uint64_t wallet_id;
+    ionic_swap_proposal_info proposal;
+    std::string destination_add;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wallet_id)
+      KV_SERIALIZE(proposal)
+      KV_SERIALIZE(destination_add)
+    END_KV_SERIALIZE_MAP()
+  };
+
 
   struct address_validation_response
   {
