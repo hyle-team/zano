@@ -1,5 +1,5 @@
-// Copyright (c) 2020-2022 Zano Project
-// Copyright (c) 2020-2022 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2020-2023 Zano Project
+// Copyright (c) 2020-2023 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 //
@@ -307,6 +307,14 @@ namespace crypto
     {
       sc_mul(m_s, m_s, v.m_s);
       return *this;
+    }
+
+    scalar_t operator-() const
+    {
+      static unsigned char zero[32] = { 0 };
+      scalar_t result;
+      sc_sub(&result.m_s[0], zero, &m_s[0]);
+      return result;
     }
 
     // returns this = a * b

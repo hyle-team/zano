@@ -823,12 +823,17 @@ TEST(crypto, keys)
 
 TEST(crypto, scalar_basics)
 {
-  scalar_t zero = 0;
+  const scalar_t zero = 0;
   ASSERT_TRUE(zero.is_zero());
-  scalar_t one = 1;
+  const scalar_t one = 1;
   ASSERT_FALSE(one.is_zero());
   ASSERT_TRUE(one > zero);
   ASSERT_TRUE(one.muladd(zero, zero) == zero);
+
+  ASSERT_EQ(-one, c_scalar_Lm1);
+  ASSERT_EQ(-one, scalar_t(0) - one);
+  ASSERT_EQ(-zero, zero);
+  ASSERT_EQ(-c_scalar_Lm1, one);
 
   scalar_t z = 0;
   for (size_t j = 0; j < 1000; ++j)
