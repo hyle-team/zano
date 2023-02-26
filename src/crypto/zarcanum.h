@@ -53,7 +53,7 @@ namespace crypto
   bool zarcanum_verify_proof(const hash& m, const hash& kernel_hash, const std::vector<crypto::CLSAG_GGXG_input_ref_t>& ring,
     const scalar_t& last_pow_block_id_hashed, const key_image& stake_ki,
     const mp::uint128_t& pos_difficulty,
-    const zarcanum_proof& sig, uint8_t* p_err = nullptr);
+    const zarcanum_proof& sig, uint8_t* p_err = nullptr) noexcept;
 
 
   // TODO @#@#: make sure it is used, implement, then move it to an appropriate place
@@ -90,96 +90,14 @@ namespace crypto
     scalar_t c; // common challenge
   };
 
-  inline bool generate_vector_UG_aggregation_proof(const hash& m, const scalar_vec_t& u_secrets, const scalar_vec_t& g_secrets,
+  bool generate_vector_UG_aggregation_proof(const hash& m, const scalar_vec_t& u_secrets, const scalar_vec_t& g_secrets,
     const std::vector<crypto::point_t>& amount_commitments,
     const std::vector<crypto::point_t>& amount_commitments_for_rp_aggregation, 
     const std::vector<crypto::point_t>& blinded_asset_ids, 
-    vector_UG_aggregation_proof& result, uint8_t* p_err = nullptr)
-  {
-    // proof of knowing e_j and y'' in zero knowledge in the following eq:
-    //   E_j + E'_j = e_j * (T'_j + U) + y'' * G
-    // where:
-    //   e_j   -- output's amount
-    //   T'_j  -- output's blinded asset tag
-    //   E_j   == e_j * T'_j + y_j  * G -- output's amount commitments
-    //   E'_j  == e_j * U    + y'_j * G -- additional commitment to the same amount for range proof aggregation
+    vector_UG_aggregation_proof& result, uint8_t* p_err = nullptr);
 
-    // amount_commitments[j] + amount_commitments_for_rp_aggregation[j]
-    //   ==
-    // u_secrets[j] * (blinded_asset_ids[j] + U) + g_secrets[j] * G
-
-    const size_t n = u_secrets.size();
-    CHECK_AND_ASSERT_MES(n == g_secrets.size(), false, "");
-    CHECK_AND_ASSERT_MES(n == amount_commitments.size(), false, "");
-    CHECK_AND_ASSERT_MES(n == amount_commitments_for_rp_aggregation.size(), false, "");
-    CHECK_AND_ASSERT_MES(n == blinded_asset_ids.size(), false, "");
-
-    result.amount_commitments_for_rp_aggregation.clear();
-    result.y0s.clear();
-    result.y1s.clear();
-
-    crypto::scalar_vec_t r0, r1;
-    r0.resize_and_make_random(n);
-    r1.resize_and_make_random(n);
-
-    std::vector<crypto::point_t> asset_tag_plus_U_vec(n);
-    for(size_t j = 0; j < n; ++j)
-      asset_tag_plus_U_vec[j] = blinded_asset_ids[j] + crypto::c_point_U;
-
-    std::vector<crypto::point_t> R(n);
-    for(size_t j = 0; j < n; ++j)
-      R[j].assign_mul_plus_G(u_secrets[j], asset_tag_plus_U_vec[j], g_secrets[j]);
-
-    crypto::hash_helper_t::hs_t hash_calculator(1 + 3 * n);
-    hash_calculator.add_hash(m);
-    hash_calculator.add_points_array(amount_commitments);
-    hash_calculator.add_points_array(amount_commitments_for_rp_aggregation);
-    hash_calculator.add_points_array(R);
-    result.c = hash_calculator.calc_hash();
-
-    for(size_t j = 0; j < n; ++j)
-    {
-      result.y0s.emplace_back(r0[j] - result.c * u_secrets[j]);
-      result.y1s.emplace_back(r1[j] - result.c * g_secrets[j]);
-      result.amount_commitments_for_rp_aggregation.emplace_back((crypto::c_scalar_1div8 * amount_commitments_for_rp_aggregation[j]).to_public_key());
-    }
-
-    return false;
-  }
-
-
-  inline bool verify_vector_UG_aggregation_proof(const hash& m, const std::vector<const public_key*> amount_commitments_1div8, const std::vector<const public_key*> blinded_asset_ids_1div8,
-    const vector_UG_aggregation_proof& sig, uint8_t* p_err = nullptr)
-  {
-    const size_t n = amount_commitments_1div8.size();
-    CHECK_AND_ASSERT_MES(n > 0, false, "");
-    CHECK_AND_ASSERT_MES(blinded_asset_ids_1div8.size() == n, false, "");
-    CHECK_AND_ASSERT_MES(sig.amount_commitments_for_rp_aggregation.size() == n, false, "");
-    CHECK_AND_ASSERT_MES(sig.y0s.size() == n, false, "");
-    CHECK_AND_ASSERT_MES(sig.y1s.size() == n, false, "");
-
-    std::vector<crypto::point_t> asset_tag_plus_U_vec(n);
-    for(size_t j = 0; j < n; ++j)
-      asset_tag_plus_U_vec[j] = crypto::point_t(*blinded_asset_ids_1div8[j]).modify_mul8() + crypto::c_point_U;
-
-    crypto::hash_helper_t::hs_t hash_calculator(1 + 3 * n);
-    hash_calculator.add_hash(m);
-
-    std::vector<point_t> amount_commitments_pt;
-    for(size_t j = 0; j < n; ++j)
-    {
-      crypto::point_t A = crypto::point_t(*amount_commitments_1div8[j]).modify_mul8();
-      hash_calculator.add_point(A);
-      amount_commitments_pt.emplace_back(A);
-    }
-
-    hash_calculator.add_pub_keys_array(sig.amount_commitments_for_rp_aggregation);
-
-    for(size_t j = 0; j < n; ++j)
-      hash_calculator.add_pub_key(crypto::point_t(sig.y0s[j] * asset_tag_plus_U_vec[j] + sig.y1s[j] * crypto::c_point_G - sig.c * amount_commitments_pt[j]).to_public_key());
-    
-    return sig.c == hash_calculator.calc_hash();
-  }
+  bool verify_vector_UG_aggregation_proof(const hash& m, const std::vector<const public_key*> amount_commitments_1div8, const std::vector<const public_key*> blinded_asset_ids_1div8,
+    const vector_UG_aggregation_proof& sig, uint8_t* p_err = nullptr) noexcept;
 
 
 } // namespace crypto

@@ -174,58 +174,171 @@ namespace crypto
   bool zarcanum_verify_proof(const hash& m, const hash& kernel_hash, const std::vector<CLSAG_GGXG_input_ref_t>& ring,
     const scalar_t& last_pow_block_id_hashed, const key_image& stake_ki,
     const mp::uint128_t& pos_difficulty,
-    const zarcanum_proof& sig, uint8_t* p_err /* = nullptr */)
+    const zarcanum_proof& sig, uint8_t* p_err /* = nullptr */) noexcept
   {
-    DBG_PRINT("zarcanum_verify_proof");
-    bool r = false;
+    TRY_ENTRY()
+    {
+      DBG_PRINT("zarcanum_verify_proof");
+      bool r = false;
 
-    // make sure 0 < d <= l / floor(z * D)
-    const mp::uint256_t l_div_z_D_mp = crypto::zarcanum_precalculate_l_div_z_D(pos_difficulty);
-    const scalar_t l_div_z_D(l_div_z_D_mp);
-    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(!sig.d.is_zero() && sig.d < l_div_z_D, 2);
-    const scalar_t dz = sig.d * c_zarcanum_z_coeff_s;
+      // make sure 0 < d <= l / floor(z * D)
+      const mp::uint256_t l_div_z_D_mp = crypto::zarcanum_precalculate_l_div_z_D(pos_difficulty);
+      const scalar_t l_div_z_D(l_div_z_D_mp);
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(!sig.d.is_zero() && sig.d < l_div_z_D, 2);
+      const scalar_t dz = sig.d * c_zarcanum_z_coeff_s;
 
-    // calculate h
-    const scalar_t h = scalar_t(kernel_hash);
+      // calculate h
+      const scalar_t h = scalar_t(kernel_hash);
 
-    // calculate F
-    point_t C_prime = point_t(sig.C_prime);
-    C_prime.modify_mul8();
-    point_t C = point_t(sig.C);
-    C.modify_mul8();
-    point_t E = point_t(sig.E);
-    E.modify_mul8();
-    point_t F = h * C_prime - dz * C + E + last_pow_block_id_hashed * h * c_point_H;
+      // calculate F
+      point_t C_prime = point_t(sig.C_prime);
+      C_prime.modify_mul8();
+      point_t C = point_t(sig.C);
+      C.modify_mul8();
+      point_t E = point_t(sig.E);
+      E.modify_mul8();
+      point_t F = h * C_prime - dz * C + E + last_pow_block_id_hashed * h * c_point_H;
 
-    DBG_VAL_PRINT(h); DBG_VAL_PRINT(last_pow_block_id_hashed); DBG_VAL_PRINT(dz);
-    DBG_VAL_PRINT(C); DBG_VAL_PRINT(C_prime); DBG_VAL_PRINT(E); DBG_VAL_PRINT(F);
+      DBG_VAL_PRINT(h); DBG_VAL_PRINT(last_pow_block_id_hashed); DBG_VAL_PRINT(dz);
+      DBG_VAL_PRINT(C); DBG_VAL_PRINT(C_prime); DBG_VAL_PRINT(E); DBG_VAL_PRINT(F);
 
-    // check three proofs with a shared Fiat-Shamir challenge c
-    point_t C_plus_C_prime  = C + C_prime;
-    point_t C_minus_C_prime = C - C_prime;
-    hash_helper_t::hs_t hash_calc(7);
-    hash_calc.add_32_chars(CRYPTO_HDS_ZARCANUM_PROOF_HASH);
-    hash_calc.add_point(sig.y0 * c_point_X + sig.y1 * c_point_H_plus_G - sig.c * C_plus_C_prime);             // y_0 * X + y1 (H + G) - c (C + C')
-    hash_calc.add_point(sig.y2 * c_point_X + sig.y3 * c_point_H_minus_G - sig.c * C_minus_C_prime);           // y_2 * X + y3 (H - G) - c (C - C')
-    hash_calc.add_point(sig.y4 * c_point_X - sig.c * F);                                                      // y_4 * X - c * F
-    hash_calc.add_point(C_plus_C_prime);
-    hash_calc.add_point(C_minus_C_prime);
-    hash_calc.add_point(F);
-    scalar_t c_prime = hash_calc.calc_hash();
-    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.c == c_prime, 3);
+      // check three proofs with a shared Fiat-Shamir challenge c
+      point_t C_plus_C_prime  = C + C_prime;
+      point_t C_minus_C_prime = C - C_prime;
+      hash_helper_t::hs_t hash_calc(7);
+      hash_calc.add_32_chars(CRYPTO_HDS_ZARCANUM_PROOF_HASH);
+      hash_calc.add_point(sig.y0 * c_point_X + sig.y1 * c_point_H_plus_G - sig.c * C_plus_C_prime);             // y_0 * X + y1 (H + G) - c (C + C')
+      hash_calc.add_point(sig.y2 * c_point_X + sig.y3 * c_point_H_minus_G - sig.c * C_minus_C_prime);           // y_2 * X + y3 (H - G) - c (C - C')
+      hash_calc.add_point(sig.y4 * c_point_X - sig.c * F);                                                      // y_4 * X - c * F
+      hash_calc.add_point(C_plus_C_prime);
+      hash_calc.add_point(C_minus_C_prime);
+      hash_calc.add_point(F);
+      scalar_t c_prime = hash_calc.calc_hash();
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.c == c_prime, 3);
 
-    // check extended range proof for E
-    std::vector<point_t> E_for_range_proof = { point_t(sig.E) }; // consider changing to 8*sig.E to avoid additional conversion
-    std::vector<bppe_sig_commit_ref_t> range_proofs = { bppe_sig_commit_ref_t(sig.E_range_proof, E_for_range_proof) };
-    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(bppe_verify<bpp_crypto_trait_zano<128>>(range_proofs), 10);
+      // check extended range proof for E
+      std::vector<point_t> E_for_range_proof = { point_t(sig.E) }; // consider changing to 8*sig.E to avoid additional conversion
+      std::vector<bppe_sig_commit_ref_t> range_proofs = { bppe_sig_commit_ref_t(sig.E_range_proof, E_for_range_proof) };
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(bppe_verify<bpp_crypto_trait_zano<128>>(range_proofs), 10);
 
-    // check extended CLSAG-GGXG ring signature
-    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(verify_CLSAG_GGXG(m, ring, sig.pseudo_out_amount_commitment, sig.C, stake_ki, sig.clsag_ggxg), 1);
+      // check extended CLSAG-GGXG ring signature
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(verify_CLSAG_GGXG(m, ring, sig.pseudo_out_amount_commitment, sig.C, stake_ki, sig.clsag_ggxg), 1);
+    }
+    CATCH_ENTRY_CUSTOM2({if (p_err) *p_err = 100;}, false)
 
     return true;
   }
 
   #undef CHECK_AND_FAIL_WITH_ERROR_IF_FALSE
+
+
+#define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
+    if (!(cond)) { LOG_PRINT_RED("generate_vector_UG_aggregation_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << (int)err_code, LOG_LEVEL_3); \
+    if (p_err) { *p_err = err_code; } return false; }
+
+  bool generate_vector_UG_aggregation_proof(const hash& m, const scalar_vec_t& u_secrets, const scalar_vec_t& g_secrets,
+    const std::vector<point_t>& amount_commitments,
+    const std::vector<point_t>& amount_commitments_for_rp_aggregation, 
+    const std::vector<point_t>& blinded_asset_ids, 
+    vector_UG_aggregation_proof& result, uint8_t* p_err /* = nullptr */)
+  {
+    // proof of knowing e_j and y'' in zero knowledge in the following eq:
+    //   E_j + E'_j = e_j * (T'_j + U) + y'' * G
+    // where:
+    //   e_j   -- output's amount
+    //   T'_j  -- output's blinded asset tag
+    //   E_j   == e_j * T'_j + y_j  * G -- output's amount commitments
+    //   E'_j  == e_j * U    + y'_j * G -- additional commitment to the same amount for range proof aggregation
+
+    // amount_commitments[j] + amount_commitments_for_rp_aggregation[j]
+    //   ==
+    // u_secrets[j] * (blinded_asset_ids[j] + U) + g_secrets[j] * G
+
+    const size_t n = u_secrets.size();
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n != 0, 1);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n == g_secrets.size(), 2);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n == amount_commitments.size(), 3);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n == amount_commitments_for_rp_aggregation.size(), 4);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n == blinded_asset_ids.size(), 5);
+
+    result.amount_commitments_for_rp_aggregation.clear();
+    result.y0s.clear();
+    result.y1s.clear();
+
+    crypto::scalar_vec_t r0, r1;
+    r0.resize_and_make_random(n);
+    r1.resize_and_make_random(n);
+
+    std::vector<crypto::point_t> asset_tag_plus_U_vec(n);
+    for(size_t j = 0; j < n; ++j)
+      asset_tag_plus_U_vec[j] = blinded_asset_ids[j] + crypto::c_point_U;
+
+    std::vector<crypto::point_t> R(n);
+    for(size_t j = 0; j < n; ++j)
+      R[j].assign_mul_plus_G(u_secrets[j], asset_tag_plus_U_vec[j], g_secrets[j]);
+
+    crypto::hash_helper_t::hs_t hash_calculator(1 + 3 * n);
+    hash_calculator.add_hash(m);
+    hash_calculator.add_points_array(amount_commitments);
+    hash_calculator.add_points_array(amount_commitments_for_rp_aggregation);
+    hash_calculator.add_points_array(R);
+    result.c = hash_calculator.calc_hash();
+
+    for(size_t j = 0; j < n; ++j)
+    {
+      result.y0s.emplace_back(r0[j] - result.c * u_secrets[j]);
+      result.y1s.emplace_back(r1[j] - result.c * g_secrets[j]);
+      result.amount_commitments_for_rp_aggregation.emplace_back((crypto::c_scalar_1div8 * amount_commitments_for_rp_aggregation[j]).to_public_key());
+    }
+
+    return true;
+  }
+#undef CHECK_AND_FAIL_WITH_ERROR_IF_FALSE
+
+
+#define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
+    if (!(cond)) { LOG_PRINT_RED("verify_vector_UG_aggregation_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << (int)err_code, LOG_LEVEL_3); \
+    if (p_err) { *p_err = err_code; } return false; }
+
+  bool verify_vector_UG_aggregation_proof(const hash& m, const std::vector<const public_key*> amount_commitments_1div8, const std::vector<const public_key*> blinded_asset_ids_1div8,
+    const vector_UG_aggregation_proof& sig, uint8_t* p_err /* = nullptr */) noexcept
+  {
+    TRY_ENTRY()
+    {
+      const size_t n = amount_commitments_1div8.size();
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n > 0, 1);
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(blinded_asset_ids_1div8.size() == n, 2);
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.amount_commitments_for_rp_aggregation.size() == n, 3);
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.y0s.size() == n, 4);
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.y1s.size() == n, 5);
+
+      std::vector<crypto::point_t> asset_tag_plus_U_vec(n);
+      for(size_t j = 0; j < n; ++j)
+        asset_tag_plus_U_vec[j] = crypto::point_t(*blinded_asset_ids_1div8[j]).modify_mul8() + crypto::c_point_U;
+
+      crypto::hash_helper_t::hs_t hash_calculator(1 + 3 * n);
+      hash_calculator.add_hash(m);
+
+      std::vector<point_t> amount_commitments_pt;
+      for(size_t j = 0; j < n; ++j)
+      {
+        crypto::point_t A = crypto::point_t(*amount_commitments_1div8[j]).modify_mul8();
+        hash_calculator.add_point(A);
+        amount_commitments_pt.emplace_back(A);
+      }
+
+      hash_calculator.add_pub_keys_array(sig.amount_commitments_for_rp_aggregation);
+
+      for(size_t j = 0; j < n; ++j)
+        hash_calculator.add_pub_key(crypto::point_t(sig.y0s[j] * asset_tag_plus_U_vec[j] + sig.y1s[j] * crypto::c_point_G - sig.c * amount_commitments_pt[j]).to_public_key());
+
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.c == hash_calculator.calc_hash(), 0);
+    }
+    CATCH_ENTRY_CUSTOM2({if (p_err) *p_err = 100; }, false)
+    
+    return true;
+  }
+#undef CHECK_AND_FAIL_WITH_ERROR_IF_FALSE
 
 
 
