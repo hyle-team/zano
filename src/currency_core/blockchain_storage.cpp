@@ -1324,19 +1324,20 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
   {
     if (pos)
     {
-      CHECK_AND_ASSERT_MES(b.miner_tx.attachment.size() == 1, false, "coinbase transaction has incorrect number of attachments (" << b.miner_tx.attachment.size() << "), expected 2");
-      CHECK_AND_ASSERT_MES(b.miner_tx.attachment[0].type() == typeid(zc_outs_range_proof), false, "coinbase transaction wrong attachment #0 type (expected: zc_outs_range_proof)");
+      CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 1, false, "coinbase transaction has incorrect number of proofs (" << b.miner_tx.proofs.size() << "), expected 2");
+      CHECK_AND_ASSERT_MES(b.miner_tx.proofs[0].type() == typeid(zc_outs_range_proof), false, "coinbase transaction has incorrect type of proof #0 (expected: zc_outs_range_proof)");
     }
     else
     {
-      CHECK_AND_ASSERT_MES(b.miner_tx.attachment.size() == 2, false, "coinbase transaction has incorrect number of attachments (" << b.miner_tx.attachment.size() << "), expected 2");
-      CHECK_AND_ASSERT_MES(b.miner_tx.attachment[0].type() == typeid(zc_outs_range_proof), false, "coinbase transaction wrong attachment #0 type (expected: zc_outs_range_proof)");
-      CHECK_AND_ASSERT_MES(b.miner_tx.attachment[1].type() == typeid(zc_balance_proof), false, "coinbase transaction wrong attachmenttype #1 (expected: zc_balance_proof)");
+      CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 2, false, "coinbase transaction has incorrect number of proofs (" << b.miner_tx.proofs.size() << "), expected 2");
+      CHECK_AND_ASSERT_MES(b.miner_tx.proofs[0].type() == typeid(zc_outs_range_proof), false, "coinbase transaction has incorrect type of proof #0 (expected: zc_outs_range_proof)");
+      CHECK_AND_ASSERT_MES(b.miner_tx.proofs[1].type() == typeid(zc_balance_proof), false, "coinbase transaction has incorrect type of proof #1 (expected: zc_balance_proof)");
     }
   }
   else
   {
     CHECK_AND_ASSERT_MES(b.miner_tx.attachment.empty(), false, "coinbase transaction has attachments; attachments are not allowed for coinbase transactions.");
+    CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 0, false, "pre-HF4 coinbase shoudn't have non-empty proofs containter");
   }
 
   return true;
@@ -5706,21 +5707,32 @@ bool get_tx_from_cache(const crypto::hash& tx_id, transactions_map& tx_cache, tr
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::collect_rangeproofs_data_from_tx(std::vector<zc_outs_range_proofs_with_commitments>& agregated_proofs, const transaction& tx)
+bool blockchain_storage::collect_rangeproofs_data_from_tx(const transaction& tx, const crypto::hash& tx_id, std::vector<zc_outs_range_proofs_with_commitments>& agregated_proofs)
 {
   if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
-  {
     return true;
-  }
 
-  // TODO @#@# Verify somewhere(maybe here) that all outputs are covered with associated rangeproofs
-  size_t proofs_count = 0;
-  size_t current_output_start = 0; //for Consolidated Transactions we'll have multiple zc_outs_range_proof entries
+  size_t range_proofs_count = 0;
+  size_t out_index_offset = 0; //Consolidated Transactions have multiple zc_outs_range_proof entries
   for (const auto& a : tx.proofs)
   {
     if (a.type() == typeid(zc_outs_range_proof))
     {
       const zc_outs_range_proof& zcrp = boost::get<zc_outs_range_proof>(a);
+
+      // validate aggregation proof
+      std::vector<const crypto::public_key*> amount_commitment_ptrs_1div8, blinded_asset_id_ptrs_1div8;
+      for(size_t j = out_index_offset; j < tx.vout.size(); ++j)
+      {
+        CHECKED_GET_SPECIFIC_VARIANT(tx.vout[j], const tx_out_zarcanum, zcout, false);
+        amount_commitment_ptrs_1div8.push_back(&zcout.amount_commitment);
+        blinded_asset_id_ptrs_1div8.push_back(&zcout.blinded_asset_id);
+      }
+      uint8_t err = 0;
+      bool r = crypto::verify_vector_UG_aggregation_proof(tx_id, amount_commitment_ptrs_1div8, blinded_asset_id_ptrs_1div8, zcrp.aggregation_proof, &err);
+      CHECK_AND_ASSERT_MES(r, false, "verify_vector_UG_aggregation_proof failed with err code " << (int)err);
+
+
       agregated_proofs.emplace_back(zcrp);
 
       // convert amount commitments for aggregation from public_key to point_t form
@@ -5728,13 +5740,14 @@ bool blockchain_storage::collect_rangeproofs_data_from_tx(std::vector<zc_outs_ra
       for (uint8_t i = 0; i != zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size(); i++)
         agregated_proofs.back().amount_commitments.emplace_back(zcrp.aggregation_proof.amount_commitments_for_rp_aggregation[i]);
 
-      current_output_start += zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size();
-      proofs_count++;
+      out_index_offset += zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size();
+      range_proofs_count++;
     }
   }
-  CHECK_AND_ASSERT_MES(proofs_count > 0, false, "transaction " << get_transaction_hash(tx) << " don't have range_proofs");
-  CHECK_AND_ASSERT_MES(proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << get_transaction_hash(tx) 
-    << " has TX_FLAG_SIGNATURE_MODE_SEPARATE but proofs_count = " << proofs_count);
+  CHECK_AND_ASSERT_MES(out_index_offset == tx.vout.size(), false, "range proof elements count doesn't match with outputs count: " << out_index_offset << " != " << tx.vout.size());
+  CHECK_AND_ASSERT_MES(range_proofs_count > 0, false, "transaction " << get_transaction_hash(tx) << " doesn't have range proofs");
+  CHECK_AND_ASSERT_MES(range_proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << get_transaction_hash(tx) 
+    << " doesn't have TX_FLAG_SIGNATURE_MODE_SEPARATE but has range_proofs_count = " << range_proofs_count);
 
   return true;
 }
@@ -5901,7 +5914,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     {
       auto cleanup = [&](){ purge_block_data_from_blockchain(bl, tx_processed_count); bvc.m_verification_failed = true; };
 
-      CHECK_AND_ASSERT_MES_CUSTOM(collect_rangeproofs_data_from_tx(range_proofs_agregated, tx/*, tx_outs_commitments*/), false, cleanup(),
+      CHECK_AND_ASSERT_MES_CUSTOM(collect_rangeproofs_data_from_tx(tx, tx_id, range_proofs_agregated), false, cleanup(),
         "block " << id << ", tx " << tx_id << ": collect_rangeproofs_data_from_tx failed");
 
       CHECK_AND_ASSERT_MES_CUSTOM(check_tx_balance(tx, tx_id), false, cleanup(),
@@ -5986,7 +5999,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       return false;
     }
 
-    if (!collect_rangeproofs_data_from_tx(range_proofs_agregated, bl.miner_tx))
+    if (!collect_rangeproofs_data_from_tx(bl.miner_tx, get_transaction_hash(bl.miner_tx), range_proofs_agregated))
     {
       LOG_PRINT_L0("Block with id: " << id
         << " have wrong miner tx, failed to collect_rangeproofs_data_from_tx()");

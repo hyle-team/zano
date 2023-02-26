@@ -33,11 +33,6 @@ namespace currency
     return expiration_time <= expiration_ts_median + TX_EXPIRATION_MEDIAN_SHIFT;
   }
   //---------------------------------------------------------------
-
-
-
-
-
   uint64_t get_burned_amount(const transaction& tx)
   {
     uint64_t res = 0;

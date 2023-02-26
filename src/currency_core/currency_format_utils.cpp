@@ -154,8 +154,24 @@ namespace currency
 
     return true;
   }
-
   //---------------------------------------------------------------
+  bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs)
+  {
+    if (range_proofs.empty())
+      return true;
+
+    std::vector<crypto::bpp_sig_commit_ref_t> sigs;
+    sigs.reserve(range_proofs.size());
+    for(auto& el : range_proofs)
+      sigs.emplace_back(el.range_proof.bpp, el.amount_commitments);
+
+    uint8_t err = 0;
+    bool r = crypto::bpp_verify<>(sigs, &err);
+    CHECK_AND_ASSERT_MES(r, false, "bpp_verify failed with error " << (int)err);
+
+    return true;
+  }
+  //--------------------------------------------------------------------------------
   wide_difficulty_type correct_difficulty_with_sequence_factor(size_t sequence_factor, wide_difficulty_type diff)
   {
     //delta=delta*(0.75^n)
@@ -171,6 +187,7 @@ namespace currency
   {
     CHECK_AND_ASSERT_MES(tx.version > TRANSACTION_VERSION_PRE_HF4, false, "unsupported tx.version: " << tx.version);
     CHECK_AND_ASSERT_MES(count_type_in_variant_container<ZC_sig>(tx.signatures) == 0, false, "ZC_sig is unexpected");
+    CHECK_AND_ASSERT_MES(outs_gen_context.asset_id_blinding_masks_sum.is_zero(), false, "it's expected that all asset ids for this tx are non-blinded"); // because this tx has no ZC inputs => all outs clearly have native asset id
 
     uint64_t bare_inputs_sum = block_reward_for_miner_tx;
     // TODO: condider remove the followin cycle
@@ -200,18 +217,18 @@ namespace currency
     uint64_t fee = 0;
     CHECK_AND_ASSERT_MES(get_tx_fee(tx, fee), false, "unable to get tx fee");
 
-    // sum(bare inputs' amounts) * H + sum(pseudo outs commitments for ZC inputs) + residual * G = sum(outputs' commitments) + fee * H
-    // <=>
-    // (fee - sum(bare inputs' amounts)) * H - sum(pseudo outs commitments for ZC inputs) + sum(outputs' commitments) = residual * G
+    // (sum(bare inputs' amounts) - fee) * H + sum(pseudo outs commitments for ZC inputs) - sum(outputs' commitments) = lin(G)
 
-    // tx doesn't have any zc inputs --> add Schnorr proof for commitment to zero
+    // tx doesn't already have any zc inputs --> add Schnorr proof for commitment to zero
     CHECK_AND_ASSERT_MES(count_type_in_variant_container<zc_balance_proof>(tx.proofs) == 0, false, "");
     zc_balance_proof balance_proof = AUTO_VAL_INIT(balance_proof);
 
-    crypto::point_t commitment_to_zero = outs_commitments_sum + (crypto::scalar_t(fee) - crypto::scalar_t(bare_inputs_sum)) * crypto::c_point_H;
-    //crypto::scalar_t witness = outputs_blinding_masks_sum;
-
-    crypto::generate_signature(tx_id, commitment_to_zero.to_public_key(), outs_gen_context.amount_blinding_masks_sum.as_secret_key(), balance_proof.s);
+    crypto::point_t commitment_to_zero = (crypto::scalar_t(bare_inputs_sum) - crypto::scalar_t(fee)) * crypto::c_point_H - outs_commitments_sum;
+    crypto::scalar_t secret_x = -outs_gen_context.amount_blinding_masks_sum;
+#ifndef NDEBUG
+    CHECK_AND_ASSERT_MES(commitment_to_zero == secret_x * crypto::c_point_G, false, "internal error: commitment_to_zero is malformed");
+#endif
+    crypto::generate_signature(tx_id, commitment_to_zero.to_public_key(), secret_x.as_secret_key(), balance_proof.s);
     tx.proofs.emplace_back(std::move(balance_proof));
 
     return true;
@@ -4132,23 +4149,6 @@ namespace currency
   bool operator ==(const currency::ref_by_id& a, const currency::ref_by_id& b)
   {
     return a.n == b.n && a.tx_id == b.tx_id;
-  }
-  //--------------------------------------------------------------------------------
-  bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs)
-  {
-    if (range_proofs.empty())
-      return true;
-
-    std::vector<crypto::bpp_sig_commit_ref_t> sigs;
-    sigs.reserve(range_proofs.size());
-    for(auto& el : range_proofs)
-      sigs.emplace_back(el.range_proof.bpp, el.amount_commitments);
-
-    uint8_t err = 0;
-    bool r = crypto::bpp_verify<>(sigs, &err);
-    CHECK_AND_ASSERT_MES(r, false, "bpp_verify failed with error " << (int)err);
-
-    return true;
   }
   //--------------------------------------------------------------------------------
  
