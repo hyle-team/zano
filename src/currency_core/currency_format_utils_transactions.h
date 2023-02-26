@@ -103,7 +103,7 @@ namespace currency
     uint64_t unlock_time = 0;
     destination_option_htlc_out htlc_options;           // htlc options    
     crypto::public_key asset_id = currency::native_coin_asset_id; // not blinded, not premultiplied
-    
+    bool explicit_native_asset_id = false;
     
     tx_destination_entry() = default;
     tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad) {}
@@ -123,6 +123,7 @@ namespace currency
       FIELD(unlock_time)
       FIELD(htlc_options)
       FIELD(asset_id)
+      FIELD(explicit_native_asset_id)
     END_SERIALIZE()
   };
 
