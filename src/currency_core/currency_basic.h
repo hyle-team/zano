@@ -60,6 +60,7 @@ namespace currency
   const static crypto::public_key ffff_pkey = epee::string_tools::hex_to_pod<crypto::public_key>("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // TODO @#@# consider getting rid of this
 
   extern const crypto::public_key native_coin_asset_id;
+  extern const crypto::point_t    native_coin_asset_id_pt;
 
   const static wide_difficulty_type global_difficulty_pow_starter = DIFFICULTY_POW_STARTER;
   const static wide_difficulty_type global_difficulty_pos_starter = DIFFICULTY_POS_STARTER;

@@ -508,7 +508,9 @@ TEST(crypto, basics)
   ASSERT_EQ(c_point_U,    hash_helper_t::hp("U_generator"));
   ASSERT_EQ(c_point_X,    hash_helper_t::hp("X_generator"));
 
-  ASSERT_EQ(currency::native_coin_asset_id, c_point_H.to_public_key());
+  ASSERT_EQ(currency::native_coin_asset_id,    c_point_H.to_public_key());
+  ASSERT_EQ(currency::native_coin_asset_id_pt, c_point_H);
+  ASSERT_EQ(currency::native_coin_asset_id_pt.to_public_key(), currency::native_coin_asset_id);
 
   LOG_PRINT_L0("c_point_0 = " << c_point_0  << " = { " << c_point_0.to_hex_comma_separated_uint64_str() << " }");
   LOG_PRINT_L0("Zano G    = " << c_point_G  << " = { " << c_point_G.to_hex_comma_separated_bytes_str() << " }");

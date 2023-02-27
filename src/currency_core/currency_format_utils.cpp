@@ -35,7 +35,8 @@ using namespace epee;
 
 namespace currency
 {
-  const crypto::public_key native_coin_asset_id = crypto::point_t(0x05087c1f5b9b32d6, 0x00547595f445c3b5, 0x764df64578552f2a, 0x8a49a651e0e0da45).to_public_key(); // == crypto::c_point_H, checked in crypto_basics test
+  const crypto::public_key native_coin_asset_id    = crypto::point_t(0x05087c1f5b9b32d6, 0x00547595f445c3b5, 0x764df64578552f2a, 0x8a49a651e0e0da45).to_public_key(); // == crypto::c_point_H, checked in crypto_basics test
+  const crypto::point_t    native_coin_asset_id_pt = crypto::point_t(0x05087c1f5b9b32d6, 0x00547595f445c3b5, 0x764df64578552f2a, 0x8a49a651e0e0da45);                 // == crypto::c_point_H, checked in crypto_basics test
 
   //---------------------------------------------------------------
   bool add_tx_extra_alias(transaction& tx, const extra_alias_entry& alinfo)
