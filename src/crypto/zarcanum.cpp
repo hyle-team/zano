@@ -1,13 +1,14 @@
-// Copyright (c) 2022 Zano Project
-// Copyright (c) 2022 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2022-2023 Zano Project
+// Copyright (c) 2022-2023 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 //
 // Note: This file originates from tests/functional_tests/crypto_tests.cpp 
 #include "epee/include/misc_log_ex.h"
 #include "zarcanum.h"
-#include "crypto/range_proofs.h"
-#include "../currency_core/crypto_config.h" // TODO: move it to the crypto
+#include "range_proofs.h"
+#include "../currency_core/crypto_config.h"    // TODO: move it to the crypto
+#include "../common/crypto_stream_operators.h" // TODO: move it to the crypto
 
 namespace crypto
 {
@@ -17,6 +18,13 @@ namespace crypto
   #define DBG_VAL_PRINT(x) (void(0)) // std::cout << #x ": " << x << std::endl
   #define DBG_PRINT(x)     (void(0)) // std::cout << x << std::endl
 
+  template<typename T>
+  inline std::ostream &operator <<(std::ostream &o, const std::vector<T> &v)
+  {
+    for(size_t i = 0, n = v.size(); i < n; ++i)
+      o << ENDL << "  [" << std::setw(2) << i << "]: " << v[i];
+    return o;
+  }
 
   mp::uint256_t zarcanum_precalculate_l_div_z_D(const mp::uint128_t& pos_difficulty)
   {
@@ -261,6 +269,11 @@ namespace crypto
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n == amount_commitments_for_rp_aggregation.size(), 4);
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n == blinded_asset_ids.size(), 5);
 
+#ifndef NDEBUG
+    for(size_t j = 0; j < n; ++j)
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(amount_commitments[j] + amount_commitments_for_rp_aggregation[j] == u_secrets[j] * (blinded_asset_ids[j] + crypto::c_point_U) + g_secrets[j] * c_point_G, 20);
+#endif
+
     result.amount_commitments_for_rp_aggregation.clear();
     result.y0s.clear();
     result.y1s.clear();
@@ -275,7 +288,7 @@ namespace crypto
 
     std::vector<crypto::point_t> R(n);
     for(size_t j = 0; j < n; ++j)
-      R[j].assign_mul_plus_G(u_secrets[j], asset_tag_plus_U_vec[j], g_secrets[j]);
+      R[j].assign_mul_plus_G(r0[j], asset_tag_plus_U_vec[j], r1[j]);
 
     crypto::hash_helper_t::hs_t hash_calculator(1 + 3 * n);
     hash_calculator.add_hash(m);
@@ -283,6 +296,9 @@ namespace crypto
     hash_calculator.add_points_array(amount_commitments_for_rp_aggregation);
     hash_calculator.add_points_array(R);
     result.c = hash_calculator.calc_hash();
+
+    DBG_VAL_PRINT(asset_tag_plus_U_vec); DBG_VAL_PRINT(m); DBG_VAL_PRINT(amount_commitments); DBG_VAL_PRINT(amount_commitments_for_rp_aggregation); DBG_VAL_PRINT(R);
+    DBG_VAL_PRINT(result.c);
 
     for(size_t j = 0; j < n; ++j)
     {
@@ -315,24 +331,43 @@ namespace crypto
       std::vector<crypto::point_t> asset_tag_plus_U_vec(n);
       for(size_t j = 0; j < n; ++j)
         asset_tag_plus_U_vec[j] = crypto::point_t(*blinded_asset_ids_1div8[j]).modify_mul8() + crypto::c_point_U;
+      DBG_VAL_PRINT(asset_tag_plus_U_vec);
 
       crypto::hash_helper_t::hs_t hash_calculator(1 + 3 * n);
       hash_calculator.add_hash(m);
+      DBG_VAL_PRINT(m);
 
       std::vector<point_t> amount_commitments_pt;
       for(size_t j = 0; j < n; ++j)
       {
-        crypto::point_t A = crypto::point_t(*amount_commitments_1div8[j]).modify_mul8();
+        point_t A = crypto::point_t(*amount_commitments_1div8[j]).modify_mul8();
         hash_calculator.add_point(A);
         amount_commitments_pt.emplace_back(A);
+        DBG_VAL_PRINT(A);
       }
 
-      hash_calculator.add_pub_keys_array(sig.amount_commitments_for_rp_aggregation);
+      std::vector<point_t> amount_commitments_for_rp_aggregation_pt;
+      for(size_t j = 0; j < n; ++j)
+      {
+        point_t Arpa = crypto::point_t(sig.amount_commitments_for_rp_aggregation[j]).modify_mul8();
+        hash_calculator.add_point(Arpa); // TODO @#@ performance: consider adding premultiplied by 1/8 points to the hash
+        amount_commitments_for_rp_aggregation_pt.emplace_back(Arpa);
+        DBG_VAL_PRINT(Arpa);
+      }
 
       for(size_t j = 0; j < n; ++j)
-        hash_calculator.add_pub_key(crypto::point_t(sig.y0s[j] * asset_tag_plus_U_vec[j] + sig.y1s[j] * crypto::c_point_G - sig.c * amount_commitments_pt[j]).to_public_key());
+      {
+        hash_calculator.add_pub_key(crypto::point_t(
+          sig.y0s[j] * asset_tag_plus_U_vec[j] +
+          sig.y1s[j] * crypto::c_point_G +
+          sig.c      * (amount_commitments_pt[j] + amount_commitments_for_rp_aggregation_pt[j])
+        ).to_public_key());
+        DBG_VAL_PRINT(hash_calculator.m_elements.back().pk);
+      }
 
-      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.c == hash_calculator.calc_hash(), 0);
+      crypto::scalar_t c = hash_calculator.calc_hash();
+      DBG_VAL_PRINT(c); DBG_VAL_PRINT(sig.c);
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.c == c, 0);
     }
     CATCH_ENTRY_CUSTOM2({if (p_err) *p_err = 100; }, false)
     
