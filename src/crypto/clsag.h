@@ -1,5 +1,5 @@
-// Copyright (c) 2022 Zano Project
-// Copyright (c) 2022 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2022-2023 Zano Project
+// Copyright (c) 2022-2023 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 //
@@ -46,6 +46,14 @@ namespace crypto
   // pseudo_out_amount_commitment -- premultiplied by 1/8
   bool verify_CLSAG_GG(const hash& m, const std::vector<CLSAG_GG_input_ref_t>& ring, const public_key& pseudo_out_amount_commitment, const key_image& ki,
     const CLSAG_GG_signature& sig);
+
+
+  //
+  // Disclaimer: extensions to the CLSAG implemented below are non-standard and are in proof-of-concept state.
+  // They shouldn't be used in production code until formal security proofs are done and (ideally) the code is peer-reviewed.
+  // -- sowle
+  //
+
 
 
   //
