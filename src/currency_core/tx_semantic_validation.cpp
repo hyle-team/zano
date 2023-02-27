@@ -81,10 +81,13 @@ namespace currency
 
     // inexpensive check for pre-HF4 txs
     // post-HF4 txs balance are being checked in check_tx_balance()
-    if (!check_tx_bare_balance(tx))
+    if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
     {
-      LOG_PRINT_RED_L0("balance check failed for tx " << get_transaction_hash(tx));
-      return false;
+      if (!check_tx_bare_balance(tx))
+      {
+        LOG_PRINT_RED_L0("balance check failed for tx " << get_transaction_hash(tx));
+        return false;
+      }
     }
 
     return true;
