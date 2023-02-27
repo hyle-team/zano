@@ -2671,10 +2671,17 @@ namespace currency
     if (A_prime != crypto::point_t(zo.amount_commitment).modify_mul8())
       return false;
 
-    asset_id_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
-
-    crypto::point_t asset_id = blinded_asset_id - asset_id_blinding_mask * crypto::c_point_X; // H = T - s * X
-    decoded_asset_id = asset_id.to_public_key();
+    if (blinded_asset_id == currency::native_coin_asset_id_pt)
+    {
+      asset_id_blinding_mask = 0;
+      decoded_asset_id = currency::native_coin_asset_id;
+    }
+    else
+    {
+      asset_id_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
+      crypto::point_t asset_id = blinded_asset_id - asset_id_blinding_mask * crypto::c_point_X; // H = T - s * X
+      decoded_asset_id = asset_id.to_public_key();
+    }
 
     return true;
   } 
