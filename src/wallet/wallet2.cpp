@@ -4885,36 +4885,46 @@ bool wallet2::create_ionic_swap_proposal(uint64_t wallet_id, const view::ionic_s
   build_ionic_swap_template(proposal_details, destination_addr, tx_template, selected_transfers_for_template, one_time_key);
 
   const uint32_t mask_to_mark_escrow_template_locked_transfers = WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION;
-  mark_transfers_with_flag(selected_transfers_for_template, mask_to_mark_escrow_template_locked_transfers, "preparing escrow template tx, contract: " + epee::string_tools::pod_to_hex(ms_id));
-
+  mark_transfers_with_flag(selected_transfers_for_template, mask_to_mark_escrow_template_locked_transfers, "preparing ionic_swap");
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::build_ionic_swap_template(const view::ionic_swap_proposal_info& proposal_detais, const currency::account_public_address& destination_addr,
   currency::transaction& template_tx,
-  std::vector<uint64_t>& selected_transfers_for_template,
+  std::vector<uint64_t>& selected_transfers,
   crypto::secret_key& one_time_key)
 {
   construct_tx_param ctp = get_default_construct_tx_param();
-
-  ctp.fake_outputs_count = proposal_detais.mixins;
-  ctp.fee = 0;
-  ctp.flags = TX_FLAG_SIGNATURE_MODE_SEPARATE;
-  ctp.mark_tx_as_complete = false;
-
-  etc_tx_details_expiration_time t = AUTO_VAL_INIT(t);
   t.v = proposal_detais.expiration_time;
   ctp.extra.push_back(t);
 
-  //TODO: 
+  ctp.dsts.resize(proposal_detais.from.size() + proposal_detais.to.size());
+  size_t i = 0;
+  // Here is an proposed for exchange funds
+  for (; i != proposal_detais.from.size(); i++)
+  {
+    ctp.dsts[i].amount = proposal_detais.from[i].amount;
+    ctp.dsts[i].amount_to_provide = proposal_detais.from[i].amount;
+    ctp.dsts[i].addr.push_back(destination_addr);
+    ctp.dsts[i].asset_id = proposal_detais.from[i].asset_id;
+  }
+  // Here is an expected in return funds
+  for (size_t j = 0; j != proposal_detais.to.size(); j++, i++)
+  {
+    ctp.dsts[i].amount = proposal_detais.to[j].amount;
+    ctp.dsts[i].amount_to_provide = 0;
+    ctp.dsts[i].addr.push_back(m_account.get_public_address());
+    ctp.dsts[i].asset_id = proposal_detais.to[j].asset_id;
+  }
 
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   ftp.tx_version = this->get_current_tx_version();
-  prepare_transaction(ctp, ftp, tx);
+  prepare_transaction(ctp, ftp, template_tx);
 
   selected_transfers = ftp.selected_transfers;
 
-  finalize_transaction(ftp, tx, one_time_key, false);
-
+  finalize_transaction(ftp, template_tx, one_time_key, false);
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------

@@ -44,6 +44,7 @@
 #include "wallet_chain_shortener.h"
 #include "tor-connect/torlib/tor_lib_iface.h"
 #include "currency_core/pos_mining.h"
+#include "view_iface.h"
 
 
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               10
