@@ -892,6 +892,13 @@ TEST(crypto, scalar_basics)
   ASSERT_EQ(c_scalar_2p64 - c_scalar_1, scalar_t(UINT64_MAX));
   ASSERT_EQ(c_scalar_2p64, scalar_t(UINT64_MAX) + c_scalar_1);
 
+  p.make_random();
+  z.make_random();
+  ASSERT_EQ(scalar_t().assign_muladd(z, z, p), p + z * z);
+  ASSERT_EQ(scalar_t().assign_muladd(z, p, z), z + z * p);
+  ASSERT_EQ(scalar_t().assign_mulsub(z, z, p), p - z * z);
+  ASSERT_EQ(scalar_t().assign_mulsub(z, p, z), z - z * p);
+
   return true;
 }
 

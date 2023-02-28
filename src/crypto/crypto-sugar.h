@@ -327,7 +327,7 @@ namespace crypto
     /*
     I think it has bad symantic (operator-like), consider rename/reimplement -- sowle
     */
-    // returns this * b + c
+    // returns c + this * b
     scalar_t muladd(const scalar_t& b, const scalar_t& c) const
     {
       scalar_t result;
@@ -335,10 +335,17 @@ namespace crypto
       return result;
     }
 
-    // returns this = a * b + c
+    // returns this = c + a * b
     scalar_t& assign_muladd(const scalar_t& a, const scalar_t& b, const scalar_t& c)
     {
       sc_muladd(m_s, a.m_s, b.m_s, c.m_s);
+      return *this;
+    }
+
+    // returns this = c - a * b
+    scalar_t& assign_mulsub(const scalar_t& a, const scalar_t& b, const scalar_t& c)
+    {
+      sc_mulsub(m_s, a.m_s, b.m_s, c.m_s);
       return *this;
     }
 
