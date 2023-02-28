@@ -1460,6 +1460,56 @@ TEST(crypto, sc_set_bit_clear_bit)
 }
 
 
+TEST(crypto, schnorr_sig)
+{
+  public_key invalid_pk = parse_tpod_from_hex_string<public_key>("0000000000000000000000000000000000000000000000000000000000000001");
+  ASSERT_FALSE(check_key(invalid_pk));
+
+  hash m = *(crypto::hash*)(&scalar_t::random());
+  for(size_t i = 0; i < 1000; ++i)
+  {
+    generic_schnorr_sig ss{};
+    scalar_t a = scalar_t::random();
+    point_t A_pt = a * c_point_G;
+    public_key A = A_pt.to_public_key();
+    ASSERT_FALSE(generate_schnorr_sig<gt_X>(m, A_pt, a, ss));
+    ASSERT_TRUE(generate_schnorr_sig<gt_G>(m, A_pt, a, ss));
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, A, ss));
+    ASSERT_TRUE(verify_schnorr_sig<gt_G>(m, A, ss));
+
+    A_pt = a * c_point_X;
+    A = A_pt.to_public_key();
+    ASSERT_FALSE(generate_schnorr_sig<gt_G>(m, A_pt, a, ss));
+    ASSERT_TRUE(generate_schnorr_sig<gt_X>(m, A_pt, a, ss));
+    ASSERT_FALSE(verify_schnorr_sig<gt_G>(m, A, ss));
+    ASSERT_TRUE(verify_schnorr_sig<gt_X>(m, A, ss));
+
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(currency::null_hash, A, ss));
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, invalid_pk, ss));
+
+    generic_schnorr_sig bad_ss = ss;
+    bad_ss.c = c_scalar_Pm1;
+    ASSERT_FALSE(bad_ss.c.is_reduced());
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, A, bad_ss));
+    bad_ss = ss;
+    bad_ss.y = c_scalar_Pm1;
+    ASSERT_FALSE(bad_ss.y.is_reduced());
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, A, bad_ss));
+
+    bad_ss = ss;
+
+    mp::uint256_t c_mp = bad_ss.c.as_boost_mp_type<mp::uint256_t>();
+    c_mp += c_scalar_L.as_boost_mp_type<mp::uint256_t>();
+    memcpy(bad_ss.c.data(), c_mp.backend().limbs(), sizeof(scalar_t));
+    ASSERT_FALSE(bad_ss.c.is_reduced());
+    scalar_t tmp(bad_ss.c);
+    tmp.reduce();
+    ASSERT_EQ(tmp, ss.c);
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, A, bad_ss));
+
+  }
+}
+
 
 //
 // test's runner

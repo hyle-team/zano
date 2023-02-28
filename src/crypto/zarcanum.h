@@ -64,21 +64,107 @@ namespace crypto
     scalar_t  y1;
   };
 
-  enum generator_tag { generator_tag_void = 0, generator_tag_G = 1, generator_tag_H = 2, generator_tag_H2 = 3, generator_tag_X = 4, generator_tag_U = 5 };
+  enum generator_tag { gt_void = 0, gt_G = 1, gt_H = 2, gt_H2 = 3, gt_X = 4, gt_U = 5 };
 
-  template<generator_tag gen0 = generator_tag_H, generator_tag gen1 = generator_tag_G>
+  template<generator_tag gen0 = gt_H, generator_tag gen1 = gt_G>
   bool generate_linear_composition_proof(const hash& m, const public_key& A, const scalar_t& secret_a, const scalar_t& secret_b, linear_composition_proof& result, uint8_t* p_err = nullptr)
   {
     // consider embedding generators' tags into random entropy to distinguish proofs made with different generators during verification
     return false;
   }
 
-  template<generator_tag gen0 = generator_tag_H, generator_tag gen1 = generator_tag_G>
+  template<generator_tag gen0 = gt_H, generator_tag gen1 = gt_G>
   bool verify_linear_composition_proof(const hash& m, const public_key& A, const linear_composition_proof& sig, uint8_t* p_err = nullptr)
   {
     return false;
   }
 
+  
+  struct generic_schnorr_sig
+  {
+    scalar_t  c;
+    scalar_t  y;
+  };
+
+  template<generator_tag gen>
+  inline bool generate_schnorr_sig(const hash& m, const point_t& A, const scalar_t& secret_a, generic_schnorr_sig& result);
+
+  template<>
+  inline bool generate_schnorr_sig<gt_G>(const hash& m, const point_t& A, const scalar_t& secret_a, generic_schnorr_sig& result)
+  {
+#ifndef NDEBUG
+    if (A != secret_a * c_point_G)
+      return false;
+#endif
+    scalar_t r = scalar_t::random();
+    point_t R = r * c_point_G;
+    hash_helper_t::hs_t hsc(3);
+    hsc.add_hash(m);
+    hsc.add_point(A);
+    hsc.add_point(R);
+    result.c = hsc.calc_hash();
+    result.y.assign_mulsub(result.c, secret_a, r); // y = r - c * secret_a
+    return true;
+  }
+
+  template<>
+  inline bool generate_schnorr_sig<gt_X>(const hash& m, const point_t& A, const scalar_t& secret_a, generic_schnorr_sig& result)
+  {
+#ifndef NDEBUG
+    if (A != secret_a * c_point_X)
+      return false;
+#endif
+    scalar_t r = scalar_t::random();
+    point_t R = r * c_point_X;
+    hash_helper_t::hs_t hsc(3);
+    hsc.add_hash(m);
+    hsc.add_point(A);
+    hsc.add_point(R);
+    result.c = hsc.calc_hash();
+    result.y.assign_mulsub(result.c, secret_a, r); // y = r - c * secret_a
+    return true;
+  }
+
+  template<generator_tag gen>
+  inline bool verify_schnorr_sig(const hash& m, const public_key& A, const generic_schnorr_sig& sig) noexcept;
+
+  template<>
+  inline bool verify_schnorr_sig<gt_G>(const hash& m, const public_key& A, const generic_schnorr_sig& sig) noexcept
+  {
+    try
+    {
+      if (!sig.c.is_reduced() || !sig.y.is_reduced())
+        return false;
+      hash_helper_t::hs_t hsc(3);
+      hsc.add_hash(m);
+      hsc.add_pub_key(A);
+      hsc.add_point(point_t(A).mul_plus_G(sig.c, sig.y)); // sig.y * G + sig.c * A
+      return sig.c == hsc.calc_hash();
+    }
+    catch(...)
+    {
+      return false;
+    }
+  }
+
+  template<>
+  inline bool verify_schnorr_sig<gt_X>(const hash& m, const public_key& A, const generic_schnorr_sig& sig) noexcept
+  {
+    try
+    {
+      if (!sig.c.is_reduced() || !sig.y.is_reduced())
+        return false;
+      hash_helper_t::hs_t hsc(3);
+      hsc.add_hash(m);
+      hsc.add_pub_key(A);
+      hsc.add_point(sig.y * c_point_X + sig.c * point_t(A));
+      return sig.c == hsc.calc_hash();
+    }
+    catch(...)
+    {
+      return false;
+    }
+  }
 
 
   // TODO: improve this proof using random weightning factor
