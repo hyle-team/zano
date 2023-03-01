@@ -100,10 +100,11 @@ namespace currency
     crypto::scalar_vec_t amount_blinding_masks;
 
     // common data
-    crypto::scalar_t asset_id_blinding_masks_sum        = 0;
-    crypto::scalar_t local_asset_id_blinding_masks_sum  = 0;
-    crypto::scalar_t amount_blinding_masks_sum          = 0;
-    crypto::scalar_t local_amount_blinding_masks_sum    = 0;
+    crypto::point_t  amount_commitments_sum                 = crypto::c_point_0;
+    crypto::scalar_t asset_id_blinding_masks_sum            = 0;
+    crypto::scalar_t pseudo_out_asset_id_blinding_masks_sum = 0;
+    crypto::scalar_t amount_blinding_masks_sum              = 0;
+    crypto::scalar_t pseudo_out_amount_blinding_masks_sum   = 0;
 
     // data for ongoing asset operation in tx (if applicable, tx extra should contain asset_descriptor_operation)
     crypto::public_key  ao_asset_id{};
@@ -114,8 +115,8 @@ namespace currency
   //--------------------------------------------------------------------------------
   bool generate_asset_surjection_proof(const crypto::hash& context_hash, zc_asset_surjection_proof& result)
   {
-    // TODO: membership proof here
-    return false;
+    // TODO: @#@# membership proof here
+    return true;
   }
   //--------------------------------------------------------------------------------
   bool generate_zc_outs_range_proof(const crypto::hash& context_hash, size_t out_index_start, size_t outs_count, const outputs_generation_context& outs_gen_context,
@@ -183,15 +184,14 @@ namespace currency
     return diff;
   }
   //------------------------------------------------------------------
-  // for txs with no zc inputs (and thus no zc signatures) but with zc outputs
-  bool generate_tx_balance_proof(transaction &tx, const crypto::hash& tx_id, const outputs_generation_context& outs_gen_context, uint64_t block_reward_for_miner_tx = 0)
+  bool generate_tx_balance_proof(transaction &tx, const crypto::hash& tx_id, const outputs_generation_context& ogc, uint64_t block_reward_for_miner_tx = 0)
   {
     CHECK_AND_ASSERT_MES(tx.version > TRANSACTION_VERSION_PRE_HF4, false, "unsupported tx.version: " << tx.version);
-    CHECK_AND_ASSERT_MES(count_type_in_variant_container<ZC_sig>(tx.signatures) == 0, false, "ZC_sig is unexpected");
-    CHECK_AND_ASSERT_MES(outs_gen_context.asset_id_blinding_masks_sum.is_zero(), false, "it's expected that all asset ids for this tx are non-blinded"); // because this tx has no ZC inputs => all outs clearly have native asset id
+    CHECK_AND_ASSERT_MES(count_type_in_variant_container<zc_balance_proof>(tx.proofs) == 0, false, "zc_balance_proof is already present");
+    bool r = false;
 
     uint64_t bare_inputs_sum = block_reward_for_miner_tx;
-    // TODO: condider remove the followin cycle
+    size_t zc_inputs_count = 0;
     for(auto& vin : tx.vin)
     {
       VARIANT_SWITCH_BEGIN(vin);
@@ -200,37 +200,42 @@ namespace currency
       VARIANT_CASE(txin_htlc, foo);
         CHECK_AND_ASSERT_MES(false, false, "unexpected txin_htlc input");
       VARIANT_CASE(txin_multisig, ms);
-        bare_inputs_sum += ms.amount;
+        //bare_inputs_sum += ms.amount;
+        CHECK_AND_ASSERT_MES(false, false, "unexpected txin_multisig input"); // TODO @#@# check support for multisig inputs
       VARIANT_CASE(txin_zc_input, foo);
-        CHECK_AND_ASSERT_MES(false, false, "unexpected txin_zc_input input");
+        ++zc_inputs_count;
       VARIANT_SWITCH_END();
     }
-
-    crypto::point_t outs_commitments_sum = crypto::c_point_0;
-    for(auto& vout : tx.vout)
-    {
-      CHECK_AND_ASSERT_MES(vout.type() == typeid(tx_out_zarcanum), false, "unexpected type in outs: " << vout.type().name());
-      const tx_out_zarcanum& ozc = boost::get<tx_out_zarcanum>(vout);
-      outs_commitments_sum += crypto::point_t(ozc.amount_commitment); // amount_commitment premultiplied by 1/8
-    }
-    outs_commitments_sum.modify_mul8();
 
     uint64_t fee = 0;
     CHECK_AND_ASSERT_MES(get_tx_fee(tx, fee), false, "unable to get tx fee");
 
-    // (sum(bare inputs' amounts) - fee) * H + sum(pseudo outs commitments for ZC inputs) - sum(outputs' commitments) = lin(G)
+    if (zc_inputs_count == 0)
+    {
+      // no ZC inputs => all inputs are bare inputs; all outputs have explicit asset_id = native_coin_asset_id; in main balance equation we only need to cancel out G-component
+      CHECK_AND_ASSERT_MES(count_type_in_variant_container<ZC_sig>(tx.signatures) == 0, false, "ZC_sig is unexpected");
+      CHECK_AND_ASSERT_MES(ogc.asset_id_blinding_masks_sum.is_zero(), false, "it's expected that all asset ids for this tx are non-blinded"); // because this tx has no ZC inputs => all outs clearly have native asset id
 
-    // tx doesn't already have any zc inputs --> add Schnorr proof for commitment to zero
-    CHECK_AND_ASSERT_MES(count_type_in_variant_container<zc_balance_proof>(tx.proofs) == 0, false, "");
-    zc_balance_proof balance_proof = AUTO_VAL_INIT(balance_proof);
+      // (sum(bare inputs' amounts) - fee) * H + sum(pseudo outs commitments for ZC inputs) - sum(outputs' commitments) = lin(G)
 
-    crypto::point_t commitment_to_zero = (crypto::scalar_t(bare_inputs_sum) - crypto::scalar_t(fee)) * crypto::c_point_H - outs_commitments_sum;
-    crypto::scalar_t secret_x = -outs_gen_context.amount_blinding_masks_sum;
+      // tx doesn't already have any zc inputs --> add Schnorr proof for commitment to zero
+      CHECK_AND_ASSERT_MES(count_type_in_variant_container<zc_balance_proof>(tx.proofs) == 0, false, "");
+      zc_balance_proof balance_proof = AUTO_VAL_INIT(balance_proof);
+
+      crypto::point_t commitment_to_zero = (crypto::scalar_t(bare_inputs_sum) - crypto::scalar_t(fee)) * crypto::c_point_H - ogc.amount_commitments_sum;
+      crypto::scalar_t secret_x = -ogc.amount_blinding_masks_sum;
 #ifndef NDEBUG
-    CHECK_AND_ASSERT_MES(commitment_to_zero == secret_x * crypto::c_point_G, false, "internal error: commitment_to_zero is malformed");
+      CHECK_AND_ASSERT_MES(commitment_to_zero == secret_x * crypto::c_point_G, false, "internal error: commitment_to_zero is malformed");
 #endif
-    crypto::generate_signature(tx_id, commitment_to_zero.to_public_key(), secret_x.as_secret_key(), balance_proof.s);
-    tx.proofs.emplace_back(std::move(balance_proof));
+      r = crypto::generate_schnorr_sig<crypto::gt_G>(tx_id, commitment_to_zero, secret_x, balance_proof.ss);
+      CHECK_AND_ASSERT_MES(r, false, "generate_schnorr_sig failed");
+      tx.proofs.emplace_back(std::move(balance_proof));
+    }
+    else // i.e. zc_inputs_count != 0
+    {
+      // there're ZC inputs => in main balance equation we only need to cancel out X-component, because G-component cancelled out by choosing blinding mask for the last pseudo out amount commitment
+      return false; // TODO @#@#
+    }
 
     return true;
   }
@@ -384,6 +389,7 @@ namespace currency
       outs_gen_context.amounts[output_index] = d.amount;
       outs_gen_context.asset_id_blinding_masks_sum += outs_gen_context.asset_id_blinding_masks[output_index];
       outs_gen_context.amount_blinding_masks_sum += outs_gen_context.amount_blinding_masks[output_index];
+      outs_gen_context.amount_commitments_sum += outs_gen_context.amount_commitments[output_index];
       ++output_index;
     }
     
@@ -2133,6 +2139,7 @@ namespace currency
       outs_gen_context.amounts[j] = dst_entr.amount;
       outs_gen_context.asset_id_blinding_masks_sum += outs_gen_context.asset_id_blinding_masks[j];
       outs_gen_context.amount_blinding_masks_sum += outs_gen_context.amount_blinding_masks[j];
+      outs_gen_context.amount_commitments_sum += outs_gen_context.amount_commitments[j];
       if (dst_entr.is_native_coin())
         native_coins_output_sum += dst_entr.amount;
     }
