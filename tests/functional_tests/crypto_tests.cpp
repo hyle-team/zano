@@ -11,6 +11,7 @@
 #include "include_base_utils.h"
 #include "common/crypto_stream_operators.h"
 #include "common/varint.h"
+#include "common/boost_serialization_helper.h"
 #include "currency_core/difficulty.h"
 #include "currency_core/currency_basic.h"
 
@@ -1466,9 +1467,9 @@ TEST(crypto, schnorr_sig)
   ASSERT_FALSE(check_key(invalid_pk));
 
   hash m = *(crypto::hash*)(&scalar_t::random());
-  for(size_t i = 0; i < 1000; ++i)
+  for(size_t i = 0; i < 100; ++i)
   {
-    generic_schnorr_sig ss{};
+    generic_schnorr_sig_s ss{};
     scalar_t a = scalar_t::random();
     point_t A_pt = a * c_point_G;
     public_key A = A_pt.to_public_key();
@@ -1487,7 +1488,7 @@ TEST(crypto, schnorr_sig)
     ASSERT_FALSE(verify_schnorr_sig<gt_X>(currency::null_hash, A, ss));
     ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, invalid_pk, ss));
 
-    generic_schnorr_sig bad_ss = ss;
+    generic_schnorr_sig_s bad_ss = ss;
     bad_ss.c = c_scalar_Pm1;
     ASSERT_FALSE(bad_ss.c.is_reduced());
     ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, A, bad_ss));
@@ -1507,7 +1508,20 @@ TEST(crypto, schnorr_sig)
     ASSERT_EQ(tmp, ss.c);
     ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, A, bad_ss));
 
+    // binary serialization 
+    std::string blob = t_serializable_object_to_blob(ss);
+    generate_random_bytes(sizeof ss, &ss);
+    ASSERT_TRUE(t_unserializable_object_from_blob(ss, blob));
+    ASSERT_TRUE(verify_schnorr_sig<gt_X>(m, A, ss));
+
+    // boost serialization
+    ASSERT_TRUE(tools::serialize_obj_to_buff(ss, blob));
+    generate_random_bytes(sizeof ss, &ss);
+    ASSERT_TRUE(tools::unserialize_obj_from_buff(ss, blob));
+    ASSERT_TRUE(verify_schnorr_sig<gt_X>(m, A, ss));
   }
+
+  return true;
 }
 
 

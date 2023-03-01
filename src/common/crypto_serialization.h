@@ -167,6 +167,19 @@ namespace crypto
     END_BOOST_SERIALIZATION()
   };
 
+  struct generic_schnorr_sig_s : public generic_schnorr_sig
+  {
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(c)
+      FIELD(y)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(c)
+      BOOST_SERIALIZE(y)
+    END_BOOST_SERIALIZATION()
+  };
+
 
 } // namespace crypto
 
