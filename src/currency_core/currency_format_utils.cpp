@@ -127,19 +127,17 @@ namespace currency
 
     // prepare data for aggregation proof
     std::vector<crypto::point_t> amount_commitments_for_rp_aggregation; // E' = amount * U + y' * G
-    crypto::scalar_vec_t g_secrets; // amount + y'
-    crypto::scalar_vec_t y_primes;  // y'
+    crypto::scalar_vec_t y_primes; // y'
     for (size_t out_index = out_index_start, i = 0; i < outs_count; ++out_index, ++i)
     {
       crypto::scalar_t y_prime = crypto::scalar_t::random();
       amount_commitments_for_rp_aggregation.emplace_back(outs_gen_context.amounts[i] * crypto::c_point_U + y_prime * crypto::c_point_G); // E'_j = e_j * U + y'_j * G
-      g_secrets.emplace_back(outs_gen_context.amount_blinding_masks[i] + y_prime);
       y_primes.emplace_back(std::move(y_prime));
     }
 
     // aggregation proof
     uint8_t err = 0;
-    bool r = crypto::generate_vector_UG_aggregation_proof(context_hash, outs_gen_context.amounts, g_secrets,
+    bool r = crypto::generate_vector_UG_aggregation_proof(context_hash, outs_gen_context.amounts, outs_gen_context.amount_blinding_masks, y_primes,
       outs_gen_context.amount_commitments,
       amount_commitments_for_rp_aggregation,
       outs_gen_context.blinded_asset_ids, result.aggregation_proof, &err);

@@ -244,34 +244,43 @@ namespace crypto
     if (!(cond)) { LOG_PRINT_RED("generate_vector_UG_aggregation_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << (int)err_code, LOG_LEVEL_3); \
     if (p_err) { *p_err = err_code; } return false; }
 
-  bool generate_vector_UG_aggregation_proof(const hash& m, const scalar_vec_t& u_secrets, const scalar_vec_t& g_secrets,
+  bool generate_vector_UG_aggregation_proof(const hash& m, const scalar_vec_t& u_secrets, const scalar_vec_t& g_secrets0, const scalar_vec_t& g_secrets1,
     const std::vector<point_t>& amount_commitments,
     const std::vector<point_t>& amount_commitments_for_rp_aggregation, 
     const std::vector<point_t>& blinded_asset_ids, 
     vector_UG_aggregation_proof& result, uint8_t* p_err /* = nullptr */)
   {
+    // w - public random weighting factor
     // proof of knowing e_j and y'' in zero knowledge in the following eq:
-    //   E_j + E'_j = e_j * (T'_j + U) + y'' * G
+    //   E_j + w * E'_j = e_j * (T'_j + w * U) + (y_j + w * y'_j) * G
     // where:
     //   e_j   -- output's amount
     //   T'_j  -- output's blinded asset tag
     //   E_j   == e_j * T'_j + y_j  * G -- output's amount commitments
     //   E'_j  == e_j * U    + y'_j * G -- additional commitment to the same amount for range proof aggregation
 
-    // amount_commitments[j] + amount_commitments_for_rp_aggregation[j]
+    // amount_commitments[j] + w * amount_commitments_for_rp_aggregation[j]
     //   ==
-    // u_secrets[j] * (blinded_asset_ids[j] + U) + g_secrets[j] * G
+    // u_secrets[j] * (blinded_asset_ids[j] + w * U) + (g_secrets0[j] + w * g_secrets1[j]) * G
 
     const size_t n = u_secrets.size();
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n != 0, 1);
-    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n == g_secrets.size(), 2);
-    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n == amount_commitments.size(), 3);
-    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n == amount_commitments_for_rp_aggregation.size(), 4);
-    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n == blinded_asset_ids.size(), 5);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n == g_secrets0.size(), 2);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n == g_secrets1.size(), 3);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n == amount_commitments.size(), 4);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n == amount_commitments_for_rp_aggregation.size(), 5);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n == blinded_asset_ids.size(), 6);
+
+    crypto::hash_helper_t::hs_t hash_calculator(1 + 3 * n);
+    hash_calculator.add_hash(m);
+    hash_calculator.add_points_array(amount_commitments);
+    hash_calculator.add_points_array(amount_commitments_for_rp_aggregation);
+    scalar_t w = hash_calculator.calc_hash(false); // don't clean the buffer
+    DBG_VAL_PRINT(w);
 
 #ifndef NDEBUG
     for(size_t j = 0; j < n; ++j)
-      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(amount_commitments[j] + amount_commitments_for_rp_aggregation[j] == u_secrets[j] * (blinded_asset_ids[j] + crypto::c_point_U) + g_secrets[j] * c_point_G, 20);
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(amount_commitments[j] + w * amount_commitments_for_rp_aggregation[j] == u_secrets[j] * (blinded_asset_ids[j] + w * crypto::c_point_U) + (g_secrets0[j] + w * g_secrets1[j]) * c_point_G, 20);
 #endif
 
     result.amount_commitments_for_rp_aggregation.clear();
@@ -284,16 +293,12 @@ namespace crypto
 
     std::vector<crypto::point_t> asset_tag_plus_U_vec(n);
     for(size_t j = 0; j < n; ++j)
-      asset_tag_plus_U_vec[j] = blinded_asset_ids[j] + crypto::c_point_U;
+      asset_tag_plus_U_vec[j] = blinded_asset_ids[j] + w * crypto::c_point_U;
 
     std::vector<crypto::point_t> R(n);
     for(size_t j = 0; j < n; ++j)
-      R[j].assign_mul_plus_G(r0[j], asset_tag_plus_U_vec[j], r1[j]);
+      R[j].assign_mul_plus_G(r0[j], asset_tag_plus_U_vec[j], r1[j]); // R[j] = r0[j] * asset_tag_plus_U_vec[j] + r1[j] * G
 
-    crypto::hash_helper_t::hs_t hash_calculator(1 + 3 * n);
-    hash_calculator.add_hash(m);
-    hash_calculator.add_points_array(amount_commitments);
-    hash_calculator.add_points_array(amount_commitments_for_rp_aggregation);
     hash_calculator.add_points_array(R);
     result.c = hash_calculator.calc_hash();
 
@@ -303,7 +308,7 @@ namespace crypto
     for(size_t j = 0; j < n; ++j)
     {
       result.y0s.emplace_back(r0[j] - result.c * u_secrets[j]);
-      result.y1s.emplace_back(r1[j] - result.c * g_secrets[j]);
+      result.y1s.emplace_back(r1[j] - result.c * (g_secrets0[j] + w * g_secrets1[j]));
       result.amount_commitments_for_rp_aggregation.emplace_back((crypto::c_scalar_1div8 * amount_commitments_for_rp_aggregation[j]).to_public_key());
     }
 
@@ -328,11 +333,6 @@ namespace crypto
       CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.y0s.size() == n, 4);
       CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.y1s.size() == n, 5);
 
-      std::vector<crypto::point_t> asset_tag_plus_U_vec(n);
-      for(size_t j = 0; j < n; ++j)
-        asset_tag_plus_U_vec[j] = crypto::point_t(*blinded_asset_ids_1div8[j]).modify_mul8() + crypto::c_point_U;
-      DBG_VAL_PRINT(asset_tag_plus_U_vec);
-
       crypto::hash_helper_t::hs_t hash_calculator(1 + 3 * n);
       hash_calculator.add_hash(m);
       DBG_VAL_PRINT(m);
@@ -355,12 +355,20 @@ namespace crypto
         DBG_VAL_PRINT(Arpa);
       }
 
+      scalar_t w = hash_calculator.calc_hash(false); // don't clear the buffer
+      DBG_VAL_PRINT(w);
+
+      std::vector<crypto::point_t> asset_tag_plus_U_vec(n);
+      for(size_t j = 0; j < n; ++j)
+        asset_tag_plus_U_vec[j] = crypto::point_t(*blinded_asset_ids_1div8[j]).modify_mul8() + w * crypto::c_point_U;
+      DBG_VAL_PRINT(asset_tag_plus_U_vec);
+
       for(size_t j = 0; j < n; ++j)
       {
         hash_calculator.add_pub_key(crypto::point_t(
           sig.y0s[j] * asset_tag_plus_U_vec[j] +
           sig.y1s[j] * crypto::c_point_G +
-          sig.c      * (amount_commitments_pt[j] + amount_commitments_for_rp_aggregation_pt[j])
+          sig.c      * (amount_commitments_pt[j] + w * amount_commitments_for_rp_aggregation_pt[j])
         ).to_public_key());
         DBG_VAL_PRINT(hash_calculator.m_elements.back().pk);
       }
