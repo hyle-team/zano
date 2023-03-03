@@ -865,6 +865,14 @@ std::string wallets_manager::create_ionic_swap_proposal(uint64_t wallet_id, cons
     }
 
     bool r = wo.w->get()->create_ionic_swap_proposal(proposal, dest_account);
+    if (!r)
+    {
+      return API_RETURN_CODE_FAIL;
+    }
+    else
+    {
+      return API_RETURN_CODE_OK;
+    }
   }
   catch (...)
   {
@@ -875,6 +883,28 @@ std::string wallets_manager::create_ionic_swap_proposal(uint64_t wallet_id, cons
   return true;
 }
 
+std::string get_ionic_swap_proposal_info(uint64_t wallet_id, std::string&raw_tx_template_hex, ionic_swap_proposal_info& proposal)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, wo);
+  try {
+    std::string raw_tx_template;
+    bool r = epee::string_tools::parse_hexstr_to_binbuff(raw_tx_template_hex, raw_tx_template);
+    if (!r)
+    {
+      return API_RETURN_CODE_BAD_ARG;
+    }
+
+    if (!wo.w->get()->get_ionic_swap_proposal_info(raw_tx_template, proposal))
+    {
+      return API_RETURN_CODE_FAIL;
+    }
+  }
+  catch (...)
+  {
+    return API_RETURN_CODE_FAIL;
+  }
+  return API_RETURN_CODE_OK;
+}
 
 std::string wallets_manager::get_my_offers(const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers)
 {

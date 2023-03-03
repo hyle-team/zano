@@ -4927,6 +4927,25 @@ bool wallet2::build_ionic_swap_template(const view::ionic_swap_proposal_info& pr
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::get_ionic_swap_proposal_info(std::string&raw_tx_template, ionic_swap_proposal_info& proposal)
+{
+
+  currency::transaction tx;
+  bool r = parse_and_validate_tx_from_blob(tx_blob, tx);
+  THROW_IF_TRUE_WALLET_EX(!r, error::tx_parse_error, tx_blob);
+
+  crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
+  std::vector<wallet_out_info> outs;
+  uint64_t tx_money_got_in_outs = 0;
+  r = lookup_acc_outs(m_account.get_keys(), tx, outs, tx_money_got_in_outs, derivation);
+  THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to lookup_acc_outs for tx: " << get_transaction_hash(tx));
+  for (const auto& o : outs)
+  {
+
+  }
+
+
+}
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
 {
