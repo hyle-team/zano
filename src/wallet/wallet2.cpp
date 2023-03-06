@@ -4924,27 +4924,72 @@ bool wallet2::build_ionic_swap_template(const view::ionic_swap_proposal_info& pr
   selected_transfers = ftp.selected_transfers;
 
   finalize_transaction(ftp, template_tx, one_time_key, false);
+
+  add_transfers_to_expiration_list(selected_transfers, t.v, 0, currency::null_hash);
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::get_ionic_swap_proposal_info(std::string&raw_tx_template, ionic_swap_proposal_info& proposal)
+bool wallet2::get_ionic_swap_proposal_info(std::string&raw_tx_template, view::ionic_swap_proposal_info& proposal)
 {
-
   currency::transaction tx;
-  bool r = parse_and_validate_tx_from_blob(tx_blob, tx);
-  THROW_IF_TRUE_WALLET_EX(!r, error::tx_parse_error, tx_blob);
+  bool r = parse_and_validate_tx_from_blob(raw_tx_template, tx);
+  THROW_IF_TRUE_WALLET_EX(!r, error::tx_parse_error, raw_tx_template);
 
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
   std::vector<wallet_out_info> outs;
   uint64_t tx_money_got_in_outs = 0;
   r = lookup_acc_outs(m_account.get_keys(), tx, outs, tx_money_got_in_outs, derivation);
   THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to lookup_acc_outs for tx: " << get_transaction_hash(tx));
+
+  std::unordered_map<crypto::public_key, uint64_t> ammounts_to;
+  std::unordered_map<crypto::public_key, uint64_t> ammounts_from;
+  std::vector<bool> third_party_outs;
+  size_t i = 0;
   for (const auto& o : outs)
   {
-
+    ammounts_to[o.asset_id] += o.amount;
+    third_party_outs[i] = false;
+    i++;
   }
 
+  for (i = 0; i != tx.vout.size(); i++)
+  {
+    if (!third_party_outs[i])
+      continue;
 
+    crypto::public_key asset_id = AUTO_VAL_INIT(asset_id);
+    uint64_t amount = 0;
+    //TODO decode output info 
+    //get_amout_and_asset_id()
+    ammounts_from[asset_id] += amount;
+  }
+
+  for (const auto& a : ammounts_to)
+    proposal.to.push_back(view::asset_funds{ a.first, a.second });
+
+  for (const auto& a : ammounts_from)
+    proposal.from.push_back(view::asset_funds{ a.first, a.second });
+
+  for (const auto&in : tx.vin)
+  {
+    if (in.type() != typeid(currency::txin_zc_input))
+      return false;
+    size_t mx = boost::get<currency::txin_zc_input>(in).key_offsets.size() - 1;
+    if (proposal.mixins == 0 || proposal.mixins > mx)
+    {
+      proposal.mixins = mx;
+    }
+  }
+
+  proposal.fee = currency::get_tx_fee(tx);
+  etc_tx_details_expiration_time t = AUTO_VAL_INIT(t);
+  if (!get_type_in_variant_container(tx.extra, t))
+  {
+    return false;
+  }
+
+  proposal.expiration_time = t.v;
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)

@@ -922,6 +922,7 @@ namespace tools
       currency::transaction& template_tx,
       std::vector<uint64_t>& selected_transfers_for_template,
       crypto::secret_key& one_time_key);
+    bool get_ionic_swap_proposal_info(std::string& raw_tx_template, view::ionic_swap_proposal_info& proposal);
 private:
 
     // -------- t_transport_state_notifier ------------------------------------------------
