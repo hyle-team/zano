@@ -5090,6 +5090,10 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency
       src.real_out_amount_blinding_mask   = td.m_zc_info_ptr->amount_blinding_mask;
       src.real_out_asset_id_blinding_mask = td.m_zc_info_ptr->asset_id_blinding_mask;
       src.asset_id                        = td.m_zc_info_ptr->asset_id;
+#ifndef NDEBUG
+      WLT_CHECK_AND_ASSERT_MES(crypto::point_t(src.asset_id) + src.real_out_asset_id_blinding_mask * crypto::c_point_X == crypto::point_t(real_oe.blinded_asset_id).modify_mul8(), false, "real_out_asset_id_blinding_mask doesn't match real_oe.blinded_asset_id");
+      WLT_CHECK_AND_ASSERT_MES(td.m_amount * crypto::point_t(real_oe.blinded_asset_id).modify_mul8() + src.real_out_amount_blinding_mask * crypto::c_point_G == crypto::point_t(real_oe.amount_commitment).modify_mul8(), false, "real_out_amount_blinding_mask doesn't match real_oe.amount_commitment");
+#endif
     VARIANT_SWITCH_END();
 
     auto interted_it = src.outputs.insert(it_to_insert, real_oe);

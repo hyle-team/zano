@@ -33,7 +33,7 @@ using namespace epee;
 #include "crypto/bitcoin/sha256_helper.h"
 #include "crypto_config.h"
 
-#define DBG_VAL_PRINT(x) LOG_PRINT_CYAN(std::setw(42) << std::left << #x ":" << x, LOG_LEVEL_0)
+#define DBG_VAL_PRINT(x) ((void)0) // LOG_PRINT_CYAN(std::setw(42) << std::left << #x ":" << x, LOG_LEVEL_0)
 
 namespace currency
 {
@@ -93,9 +93,6 @@ namespace currency
         amount_blinding_masks.size()    == outs_count;
     }
 
-    // per input data
-    std::vector<crypto::point_t> pseudo_out_blinded_asset_ids;
-
     // per output data
     std::vector<crypto::point_t> asset_ids;
     std::vector<crypto::point_t> blinded_asset_ids;
@@ -105,20 +102,20 @@ namespace currency
     crypto::scalar_vec_t amount_blinding_masks;
 
     // common data: inputs
-    crypto::point_t  pseudo_out_amount_commitments_sum      = crypto::c_point_0; // including newly emitted assets
+    crypto::point_t  pseudo_out_amount_commitments_sum      = crypto::c_point_0;
     crypto::scalar_t pseudo_out_amount_blinding_masks_sum   = 0;
-    crypto::scalar_t real_in_asset_id_blinding_mask_x_amount_sum = 0;                 // = sum( blinding_mask[i] * amount[i] )
+    crypto::scalar_t real_in_asset_id_blinding_mask_x_amount_sum = 0;                 // = sum( real_out_blinding_mask[i] * amount[i] )
 
     // common data: outputs
     crypto::point_t  amount_commitments_sum                 = crypto::c_point_0;
     crypto::scalar_t amount_blinding_masks_sum              = 0;
-    crypto::scalar_t asset_id_blinding_masks_sum            = 0;                 // = sum( blinding_mask[j] * amount[j] )
+    crypto::scalar_t asset_id_blinding_mask_x_amount_sum    = 0;                      // = sum( blinding_mask[j] * amount[j] )
 
     // data for ongoing asset operation in tx (if applicable, tx extra should contain asset_descriptor_operation)
-    crypto::public_key  ao_asset_id{};
-    crypto::point_t     ao_asset_id_pt                  = crypto::c_point_0;
-    crypto::point_t     ao_amount_commitment            = crypto::c_point_0;
-    crypto::scalar_t    ao_amount_blinding_mask{};
+    crypto::public_key  ao_asset_id                         {};
+    crypto::point_t     ao_asset_id_pt                      = crypto::c_point_0;
+    crypto::point_t     ao_amount_commitment                = crypto::c_point_0;
+    crypto::scalar_t    ao_amount_blinding_mask             {};
   };
   //--------------------------------------------------------------------------------
   bool generate_asset_surjection_proof(const crypto::hash& context_hash, zc_asset_surjection_proof& result)
@@ -220,7 +217,7 @@ namespace currency
     {
       // no ZC inputs => all inputs are bare inputs; all outputs have explicit asset_id = native_coin_asset_id; in main balance equation we only need to cancel out G-component
       CHECK_AND_ASSERT_MES(count_type_in_variant_container<ZC_sig>(tx.signatures) == 0, false, "ZC_sig is unexpected");
-      CHECK_AND_ASSERT_MES(ogc.asset_id_blinding_masks_sum.is_zero(), false, "it's expected that all asset ids for this tx are obvious and thus explicit"); // because this tx has no ZC inputs => all outs clearly have native asset id
+      CHECK_AND_ASSERT_MES(ogc.asset_id_blinding_mask_x_amount_sum.is_zero(), false, "it's expected that all asset ids for this tx are obvious and thus explicit"); // because this tx has no ZC inputs => all outs clearly have native asset id
       CHECK_AND_ASSERT_MES(ogc.ao_amount_blinding_mask.is_zero(), false, "asset emmission is not allowed for txs without ZC inputs");
 
       // (sum(bare inputs' amounts) - fee) * H + sum(pseudo out amount commitments) - sum(outputs' commitments) = lin(G)
@@ -238,7 +235,7 @@ namespace currency
       // there're ZC inputs => in main balance equation we only need to cancel out X-component, because G-component cancelled out by choosing blinding mask for the last pseudo out amount commitment
 
       crypto::point_t commitment_to_zero = (crypto::scalar_t(bare_inputs_sum) - crypto::scalar_t(fee)) * currency::native_coin_asset_id_pt + ogc.pseudo_out_amount_commitments_sum + ogc.ao_amount_commitment - ogc.amount_commitments_sum;
-      crypto::scalar_t secret_x = ogc.real_in_asset_id_blinding_mask_x_amount_sum - ogc.asset_id_blinding_masks_sum;
+      crypto::scalar_t secret_x = ogc.real_in_asset_id_blinding_mask_x_amount_sum - ogc.asset_id_blinding_mask_x_amount_sum;
 
       DBG_VAL_PRINT(bare_inputs_sum);
       DBG_VAL_PRINT(fee);
@@ -246,7 +243,7 @@ namespace currency
       DBG_VAL_PRINT(ogc.ao_amount_commitment);
       DBG_VAL_PRINT(ogc.amount_commitments_sum);
       DBG_VAL_PRINT(ogc.real_in_asset_id_blinding_mask_x_amount_sum);
-      DBG_VAL_PRINT(ogc.asset_id_blinding_masks_sum);
+      DBG_VAL_PRINT(ogc.asset_id_blinding_mask_x_amount_sum);
       DBG_VAL_PRINT(commitment_to_zero);
       DBG_VAL_PRINT(secret_x);
 
@@ -407,7 +404,7 @@ namespace currency
         outs_gen_context.blinded_asset_ids[output_index], outs_gen_context.amount_commitments[output_index], result, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "construct_tx_out failed, output #" << output_index << ", amount: " << print_money_brief(d.amount));
       outs_gen_context.amounts[output_index] = d.amount;
-      outs_gen_context.asset_id_blinding_masks_sum += outs_gen_context.asset_id_blinding_masks[output_index] * d.amount;
+      outs_gen_context.asset_id_blinding_mask_x_amount_sum += outs_gen_context.asset_id_blinding_masks[output_index] * d.amount;
       outs_gen_context.amount_blinding_masks_sum += outs_gen_context.amount_blinding_masks[output_index];
       outs_gen_context.amount_commitments_sum += outs_gen_context.amount_commitments[output_index];
       ++output_index;
@@ -1779,12 +1776,12 @@ namespace currency
 
     crypto::point_t asset_id_pt(se.asset_id);
     crypto::point_t source_blinded_asset_id = asset_id_pt + se.real_out_asset_id_blinding_mask * crypto::c_point_X; // T_i = H_i + r_i * X
-    CHECK_AND_ASSERT_MES(in_context.outputs[in_context.real_out_index].blinded_asset_id == (crypto::c_scalar_1div8 * source_blinded_asset_id).to_public_key(), false, "real output blinded asset id check failed");
+    CHECK_AND_ASSERT_MES(crypto::point_t(in_context.outputs[in_context.real_out_index].blinded_asset_id).modify_mul8() == source_blinded_asset_id, false, "real output blinded asset id check failed");
 
 #ifndef NDEBUG
     {
-      crypto::point_t source_amount_commitment = se.amount * asset_id_pt + se.real_out_amount_blinding_mask * crypto::c_point_G;
-      CHECK_AND_ASSERT_MES(in_context.outputs[in_context.real_out_index].amount_commitment == (crypto::c_scalar_1div8 * source_amount_commitment).to_public_key(), false, "real output amount commitment check failed");
+      crypto::point_t source_amount_commitment = se.amount * source_blinded_asset_id + se.real_out_amount_blinding_mask * crypto::c_point_G;
+      CHECK_AND_ASSERT_MES(crypto::point_t(in_context.outputs[in_context.real_out_index].amount_commitment).modify_mul8() == source_amount_commitment, false, "real output amount commitment check failed");
     }
 #endif
 
@@ -1794,20 +1791,15 @@ namespace currency
     {
       // either normal tx or the last signature of consolidated tx -- in both cases we need to calculate non-random blinding mask for pseudo output commitment
       pseudo_out_amount_blinding_mask   = outs_gen_context.amount_blinding_masks_sum - outs_gen_context.pseudo_out_amount_blinding_masks_sum - outs_gen_context.ao_amount_blinding_mask;      // A_1 - A^p_0 = (f_1 - f'_1) * G   =>  f'_{i-1} = sum{y_j} - sum{f'_i}
-      //pseudo_out_asset_id_blinding_mask = crypto::scalar_t(se.amount).reciprocal() * (outs_gen_context.asset_id_blinding_masks_sum - outs_gen_context.real_in_asset_id_blinding_mask_x_amount_sum);
-      //pseudo_out_asset_id_blinding_mask.make_random();
-      // @#@ TODO additional check for the last iteration ?
     }
     else
     {
       pseudo_out_amount_blinding_mask.make_random();
-      //pseudo_out_asset_id_blinding_mask.make_random();
-      outs_gen_context.pseudo_out_amount_blinding_masks_sum   += pseudo_out_amount_blinding_mask;     // pseudo out masks are taken into account with negative sign
+      outs_gen_context.pseudo_out_amount_blinding_masks_sum += pseudo_out_amount_blinding_mask;
     }
 
-    crypto::point_t pseudo_out_blinded_asset_id = asset_id_pt + pseudo_out_asset_id_blinding_mask * crypto::c_point_X;                        // T^p_i = T_i + r'_i * X
+    crypto::point_t pseudo_out_blinded_asset_id = source_blinded_asset_id + pseudo_out_asset_id_blinding_mask * crypto::c_point_X;            // T^p_i = T_i + r'_i * X
     sig.pseudo_out_blinded_asset_id = (crypto::c_scalar_1div8 * pseudo_out_blinded_asset_id).to_public_key();
-    outs_gen_context.pseudo_out_blinded_asset_ids.emplace_back(pseudo_out_blinded_asset_id);
     outs_gen_context.real_in_asset_id_blinding_mask_x_amount_sum += se.real_out_asset_id_blinding_mask * se.amount;                           // += r_i * a_i
 
     crypto::point_t pseudo_out_amount_commitment = se.amount * source_blinded_asset_id + pseudo_out_amount_blinding_mask * crypto::c_point_G; // A^p_i = a_i * T_i + f'_i * G
@@ -2150,6 +2142,8 @@ namespace currency
 
         outs_gen_context.ao_amount_commitment = amount_of_emitted_asset * outs_gen_context.ao_asset_id_pt + outs_gen_context.ao_amount_blinding_mask * crypto::c_point_G;
         pado->opt_amount_commitment = (crypto::c_scalar_1div8 * outs_gen_context.ao_amount_commitment).to_public_key();
+        //LOG_PRINT_CYAN("AO    " << ": " << crypto::scalar_t(amount_of_emitted_asset) << " x " << outs_gen_context.ao_asset_id_pt << " + " << outs_gen_context.ao_amount_blinding_mask << " x G", LOG_LEVEL_0);
+        //LOG_PRINT_CYAN("     == " << outs_gen_context.ao_amount_commitment << ", x 1/8 == " << pado->opt_amount_commitment.get(), LOG_LEVEL_0);
       }
     }
 
@@ -2173,7 +2167,7 @@ namespace currency
         outs_gen_context.blinded_asset_ids[j], outs_gen_context.amount_commitments[j], result, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "Failed to construct tx out");
       outs_gen_context.amounts[j] = dst_entr.amount;
-      outs_gen_context.asset_id_blinding_masks_sum += outs_gen_context.asset_id_blinding_masks[j] * dst_entr.amount;
+      outs_gen_context.asset_id_blinding_mask_x_amount_sum += outs_gen_context.asset_id_blinding_masks[j] * dst_entr.amount;
       outs_gen_context.amount_blinding_masks_sum += outs_gen_context.amount_blinding_masks[j];
       outs_gen_context.amount_commitments_sum += outs_gen_context.amount_commitments[j];
       if (dst_entr.is_native_coin())
