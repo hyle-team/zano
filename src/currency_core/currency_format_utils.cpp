@@ -1993,6 +1993,9 @@ namespace currency
     }
 
 
+    //
+    // INs
+    //
     uint64_t native_coins_input_sum = 0;
     std::vector<input_generation_context_data> in_contexts;    
     std::vector<size_t> inputs_mapping;
@@ -2000,7 +2003,7 @@ namespace currency
     inputs_mapping.resize(sources.size());
     size_t input_starter_index = tx.vin.size();
     bool has_zc_inputs = false;
-    //fill inputs NLSAG and Zarcanum 
+    bool all_inputs_are_obviously_native_coins = true;
     for (const tx_source_entry& src_entr : sources)
     {
       inputs_mapping[current_index] = current_index;
@@ -2059,7 +2062,6 @@ namespace currency
         CHECK_AND_ASSERT_MES(in_context.real_out_index < in_context.outputs.size(), false,
           "real_output index (" << in_context.real_out_index << ") greater than or equal to in_context.outputs.size()=" << in_context.outputs.size());
 
-        //key_derivation recv_derivation;
         crypto::key_image img;
         if (!generate_key_image_helper(sender_account_keys, src_entr.real_out_tx_key, src_entr.real_output_in_tx_index, in_context.in_ephemeral, img))
           return false;
@@ -2099,7 +2101,21 @@ namespace currency
       }
 
       if (src_entr.is_native_coin())
+      {
         native_coins_input_sum += src_entr.amount;
+      }
+      else
+      {
+        // if at least one decoy output of a ZC input has a non-explicit asset id, then we can't say that all inputs are obviously native coins 
+        for(const tx_source_entry::output_entry& oe : in_context.outputs)
+        {
+          if (crypto::point_t(oe.blinded_asset_id).modify_mul8() != currency::native_coin_asset_id_pt)
+          {
+            all_inputs_are_obviously_native_coins = false;
+            break;
+          }
+        }
+      }
     }
 
     
@@ -2160,7 +2176,10 @@ namespace currency
     std::set<uint16_t> deriv_cache;
     for(size_t j = 0; j < outputs_to_be_constructed; ++j, ++output_index)
     {
-      const tx_destination_entry& dst_entr = shuffled_dsts[j];
+      tx_destination_entry& dst_entr = shuffled_dsts[j];
+      if (all_inputs_are_obviously_native_coins && outs_gen_context.ao_asset_id == currency::null_pkey)
+        dst_entr.explicit_native_asset_id = true; // all inputs are obviously native coins -- all outputs must have explicit asset ids (unless there's an asset emission)
+
       CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount); // <<--  TODO @#@# consider removing this check
       r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys,
         outs_gen_context.asset_id_blinding_masks[j], outs_gen_context.amount_blinding_masks[j],
@@ -2267,7 +2286,9 @@ namespace currency
       LOG_PRINT2("construct_tx.log", "transaction_created: " << get_transaction_hash(tx) << ENDL << obj_to_json_str(tx) << ENDL << ss_ring_s.str(), LOG_LEVEL_3);
     }
 
+    //
     // proofs (transaction-wise, not pre-input)
+    //
     if (tx.version > TRANSACTION_VERSION_PRE_HF4)
     {
       // asset surjection proof
