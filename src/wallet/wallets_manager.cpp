@@ -906,6 +906,28 @@ std::string get_ionic_swap_proposal_info(uint64_t wallet_id, std::string&raw_tx_
   return API_RETURN_CODE_OK;
 }
 
+std::string wallets_manager::accept_ionic_swap_proposal(uint64_t wallet_id, std::string&raw_tx_template, currency::transaction& result_tx)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, wo);
+  try {
+    std::string raw_tx_template;
+    bool r = epee::string_tools::parse_hexstr_to_binbuff(raw_tx_template_hex, raw_tx_template);
+    if (!r)
+    {
+      return API_RETURN_CODE_BAD_ARG;
+    }
+
+    if (!wo.w->get()->accept_ionic_swap_proposal(raw_tx_template, result_tx))
+    {
+      return API_RETURN_CODE_FAIL;
+    }
+  }
+  catch (...)
+  {
+    return API_RETURN_CODE_FAIL;
+  }
+  return API_RETURN_CODE_OK;
+}
 std::string wallets_manager::get_my_offers(const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers)
 {
   if (m_remote_node_mode)

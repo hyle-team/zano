@@ -297,6 +297,12 @@ namespace tools
     bool perform_packing = false;
   };
 
+  struct mode_separate_context
+  {
+    currency::transaction tx_for_mode_separate;
+    view::ionic_swap_proposal_info proposal;
+  };
+  
 
   struct selection_for_amount
   {
@@ -884,7 +890,7 @@ namespace tools
     const std::list<expiration_entry_info>& get_expiration_entries() const { return m_money_expirations; };
     bool get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) const;
 
-    void prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate = currency::transaction());
+    void prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const mode_separate_context& emode_separate = mode_separate_context());
 
     void finalize_transaction(const currency::finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key = true);
     void finalize_transaction(const currency::finalize_tx_param& ftp, currency::finalized_tx& result, bool broadcast_tx, bool store_tx_secret_key = true );
@@ -922,7 +928,9 @@ namespace tools
       currency::transaction& template_tx,
       std::vector<uint64_t>& selected_transfers_for_template,
       crypto::secret_key& one_time_key);
-    bool get_ionic_swap_proposal_info(std::string& raw_tx_template, view::ionic_swap_proposal_info& proposal);
+    bool get_ionic_swap_proposal_info(const std::string&raw_tx_template, view::ionic_swap_proposal_info& proposal);
+    bool get_ionic_swap_proposal_info(const currency::transaction tx, view::ionic_swap_proposal_info& proposal);
+    bool accept_ionic_swap_proposal(std::string&raw_tx_template, currency::transaction& result_tx);
 private:
 
     // -------- t_transport_state_notifier ------------------------------------------------

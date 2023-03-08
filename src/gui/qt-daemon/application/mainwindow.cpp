@@ -2187,6 +2187,13 @@ QString get_ionic_swap_proposal_info(const QString& param)
 
 QString accept_ionic_swap_proposal(const QString& param)
 {
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::api_request_t<std::string>, tx_raw_hex);
+  PREPARE_RESPONSE(view::api_response_t<std::string>, ar);
+  ar.error_code = m_backend.accept_ionic_swap_proposal(tx_raw_hex.wallet_id, tx_raw_hex.req_data, ar.response_data);
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 QString MainWindow::backup_wallet_keys(const QString& param)
 {
