@@ -180,7 +180,7 @@ namespace crypto
   //---------------------------------------------------------------
 
 
-  bool generate_CLSAG_GGX(const hash& m, const std::vector<CLSAG_GGX_input_ref_t>& ring, const point_t& pseudo_out_amount_commitment, const point_t& pseudo_out_asset_id, const key_image& ki,
+  bool generate_CLSAG_GGX(const hash& m, const std::vector<CLSAG_GGX_input_ref_t>& ring, const point_t& pseudo_out_amount_commitment, const point_t& pseudo_out_blinded_asset_id, const key_image& ki,
     const scalar_t& secret_0_xp, const scalar_t& secret_1_f, const scalar_t& secret_2_t, uint64_t secret_index, CLSAG_GGX_signature& sig)
   {
     DBG_PRINT("== generate_CLSAG_GGX ==");
@@ -196,7 +196,7 @@ namespace crypto
     CRYPTO_CHECK_AND_THROW_MES(key_image == point_t(ki), "key image 0 mismatch");
     CRYPTO_CHECK_AND_THROW_MES((secret_0_xp * c_point_G).to_public_key() == ring[secret_index].stealth_address, "secret_0_xp mismatch");
     CRYPTO_CHECK_AND_THROW_MES( secret_1_f  * c_point_G == 8 * point_t(ring[secret_index].amount_commitment) - pseudo_out_amount_commitment, "secret_1_f mismatch");
-    CRYPTO_CHECK_AND_THROW_MES( secret_2_t  * c_point_X == 8 * point_t(ring[secret_index].blinded_asset_id)  - pseudo_out_asset_id, "secret_2_t mismatch");
+    CRYPTO_CHECK_AND_THROW_MES( secret_2_t  * c_point_X == 8 * point_t(ring[secret_index].blinded_asset_id)  - pseudo_out_blinded_asset_id, "secret_2_t mismatch");
   //CRYPTO_CHECK_AND_THROW_MES( secret_3_q  * c_point_G == 8 * point_t(ring[secret_index].concealing_point), "");
   //CRYPTO_CHECK_AND_THROW_MES( secret_4_x  * c_point_X == extended_amount_commitment - 8 * point_t(ring[secret_index].amount_commitment) - 8 * point_t(ring[secret_index].concealing_point), "");
 #endif
@@ -232,7 +232,7 @@ namespace crypto
       DBG_PRINT("ring[" << i << "]: sa:" << ring[i].stealth_address << ", ac:" << ring[i].amount_commitment << ", baid:" << ring[i].blinded_asset_id);
     }
     hsc.add_point(c_scalar_1div8 * pseudo_out_amount_commitment);
-    hsc.add_point(c_scalar_1div8 * pseudo_out_asset_id);
+    hsc.add_point(c_scalar_1div8 * pseudo_out_blinded_asset_id);
     hsc.add_key_image(ki);
     hash input_hash = hsc.calc_hash_no_reduce();
     DBG_VAL_PRINT(input_hash);
@@ -288,7 +288,7 @@ namespace crypto
     for(size_t i = 0; i < ring_size; ++i)
     {
       W_pub_keys_x.emplace_back(
-        agg_coeff_2 * (Q_i[i] - pseudo_out_asset_id)
+        agg_coeff_2 * (Q_i[i] - pseudo_out_blinded_asset_id)
       );
       DBG_VAL_PRINT(W_pub_keys_x[i]);
     }

@@ -5049,6 +5049,7 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency
         oe.concealing_point   = daemon_oe.concealing_point;
         oe.out_reference      = daemon_oe.global_amount_index;
         oe.stealth_address    = daemon_oe.stealth_address;
+        oe.blinded_asset_id   = daemon_oe.blinded_asset_id;       // TODO @#@# BAD DESING, consider refactoring -- sowle
         src.outputs.push_back(oe);
         if (src.outputs.size() >= fake_outputs_count)
           break;
