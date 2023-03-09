@@ -5069,7 +5069,6 @@ bool wallet2::accept_ionic_swap_proposal(std::string&raw_tx_template, currency::
     throw;
   }
 
-
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -6056,7 +6055,10 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   if (ctp.flags & TX_FLAG_SIGNATURE_MODE_SEPARATE && tx_for_mode_separate.vout.size() )
   {
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(get_tx_flags(tx_for_mode_separate) & TX_FLAG_SIGNATURE_MODE_SEPARATE, "tx_param.flags differs from tx.flags");
-    needed_money_map[currency::null_hash].needed_amount += (currency::get_outs_money_amount(tx_for_mode_separate) - get_inputs_money_amount(tx_for_mode_separate));
+    for (const auto& el : mode_separatemode_separate.proposal.to)
+    {
+      needed_money_map[el.asset_id].needed_amount += el.amount;
+    }
   }
   TIME_MEASURE_FINISH_MS(get_needed_money_time);
 
