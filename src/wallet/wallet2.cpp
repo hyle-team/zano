@@ -3742,8 +3742,14 @@ bool wallet2::get_transfer_address(const std::string& adr_str, currency::account
 //----------------------------------------------------------------------------------------------------
 bool wallet2::is_transfer_okay_for_pos(const transfer_details& tr, bool is_zarcanum_hf, uint64_t& stake_unlock_time) const
 {
-  if (is_zarcanum_hf && !tr.is_zc())
-    return false;
+  if (is_zarcanum_hf)
+  {
+    if (!tr.is_zc())
+      return false;
+
+    if (!tr.is_native_coin())
+      return false;
+  }
 
   if (!tr.is_spendable())
     return false;
