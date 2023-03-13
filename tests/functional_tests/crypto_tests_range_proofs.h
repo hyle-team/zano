@@ -65,7 +65,7 @@ TEST(bpp, basics)
     std::vector<point_t> commitments_1div8;
     uint8_t err = 0;
 
-    bool r = bpp_gen<bpp_crypto_trait_zano<>>(values, masks, bpp_sig, commitments_1div8, &err);
+    bool r = bpp_gen<bpp_crypto_trait_ZC_out>(values, masks, bpp_sig, commitments_1div8, &err);
     if (!r)
     {
       LOG_PRINT_L0("bpp_gen err = " << (uint16_t)err);
@@ -75,7 +75,7 @@ TEST(bpp, basics)
     std::vector<bpp_sig_commit_ref_t> sigs;
     sigs.emplace_back(bpp_sig, commitments_1div8);
 
-    r = bpp_verify<bpp_crypto_trait_zano<>>(sigs, &err);
+    r = bpp_verify<bpp_crypto_trait_ZC_out>(sigs, &err);
     if (!r)
     {
       LOG_PRINT_L0("bpp_verify err = " << (uint16_t)err);
@@ -122,7 +122,7 @@ TEST(bpp, two)
     scalar_vec_t values = { 5 };
     scalar_vec_t masks = { scalar_t(77 + 256 * 77) };
 
-    r = bpp_gen<bpp_crypto_trait_zano<>>(values, masks, bpp_sig, commitments, &err);
+    r = bpp_gen<bpp_crypto_trait_Zarcanum>(values, masks, bpp_sig, commitments, &err);
     ASSERT_TRUE(r);
 
     sigs.emplace_back(bpp_sig, commitments);
@@ -137,13 +137,13 @@ TEST(bpp, two)
     scalar_vec_t values = { 5, 700, 8 };
     scalar_vec_t masks = { scalar_t(77 + 256 * 77), scalar_t(255), scalar_t(17) };
 
-    r = bpp_gen<bpp_crypto_trait_zano<>>(values, masks, bpp_sig, commitments, &err);
+    r = bpp_gen<bpp_crypto_trait_Zarcanum>(values, masks, bpp_sig, commitments, &err);
     ASSERT_TRUE(r);
 
     sigs.emplace_back(bpp_sig, commitments);
   }
 
-  r = bpp_verify<bpp_crypto_trait_zano<>>(sigs, &err);
+  r = bpp_verify<bpp_crypto_trait_Zarcanum>(sigs, &err);
   ASSERT_TRUE(r);
 
 
@@ -172,7 +172,7 @@ TEST(bpp, power_256)
     scalar_vec_t values = { 5 };
     scalar_vec_t masks = { scalar_t(77 + 256 * 77) };
 
-    r = bpp_gen<bpp_crypto_trait_zano<>>(values, masks, bpp_sig, commitments, &err);
+    r = bpp_gen<bpp_crypto_trait_ZC_out>(values, masks, bpp_sig, commitments, &err);
     ASSERT_TRUE(r);
 
     sig_commit_refs.emplace_back(bpp_sig, commitments);
@@ -187,13 +187,13 @@ TEST(bpp, power_256)
     scalar_vec_t values = { 5, 700, 8 };
     scalar_vec_t masks = { scalar_t(77 + 256 * 77), scalar_t(255), scalar_t(17) };
 
-    r = bpp_gen<bpp_crypto_trait_zano<>>(values, masks, bpp_sig, commitments, &err);
+    r = bpp_gen<bpp_crypto_trait_ZC_out>(values, masks, bpp_sig, commitments, &err);
     ASSERT_TRUE(r);
 
     sig_commit_refs.emplace_back(bpp_sig, commitments);
   }
 
-  r = bpp_verify<bpp_crypto_trait_zano<>>(sig_commit_refs, &err);
+  r = bpp_verify<bpp_crypto_trait_ZC_out>(sig_commit_refs, &err);
   ASSERT_TRUE(r);
 
 
@@ -223,7 +223,7 @@ TEST(bppe, basics)
   std::vector<point_t> commitments;
   uint8_t err = 0;
 
-  bool r = bppe_gen<bpp_crypto_trait_zano<>>(values, masks, masks_2, bppe_sig, commitments, &err);
+  bool r = bppe_gen<bpp_crypto_trait_Zarcanum>(values, masks, masks_2, bppe_sig, commitments, &err);
 
   ASSERT_TRUE(r);
 
@@ -251,7 +251,7 @@ TEST(bppe, two)
     scalar_vec_t masks  = { scalar_t(77 + 256 * 77) };
     scalar_vec_t masks2 = { scalar_t(88 + 256 * 88) };
 
-    r = bppe_gen<bpp_crypto_trait_zano<>>(values, masks, masks2, bppe_sig, commitments, &err);
+    r = bppe_gen<bpp_crypto_trait_Zarcanum>(values, masks, masks2, bppe_sig, commitments, &err);
     ASSERT_TRUE(r);
 
     sigs.emplace_back(bppe_sig, commitments);
@@ -267,13 +267,13 @@ TEST(bppe, two)
     scalar_vec_t masks  = { scalar_t(77 + 256 * 77), scalar_t(255), scalar_t(17) };
     scalar_vec_t masks2 = { scalar_t(88 + 256 * 88), scalar_t(1), scalar_t(19) };
 
-    r = bppe_gen<bpp_crypto_trait_zano<>>(values, masks, masks2, bppe_sig, commitments, &err);
+    r = bppe_gen<bpp_crypto_trait_Zarcanum>(values, masks, masks2, bppe_sig, commitments, &err);
     ASSERT_TRUE(r);
 
     sigs.emplace_back(bppe_sig, commitments);
   }
 
-  r = bppe_verify<bpp_crypto_trait_zano<>>(sigs, &err);
+  r = bppe_verify<bpp_crypto_trait_Zarcanum>(sigs, &err);
   ASSERT_TRUE(r);
 
 
@@ -305,7 +305,7 @@ TEST(bppe, power_128)
       masks2.emplace_back(scalar_t::random());
     }
 
-    r = bppe_gen<bpp_crypto_trait_zano<128>>(values, masks, masks2, bppe_sig, commitments, &err);
+    r = bppe_gen<bpp_crypto_trait_Zarcanum>(values, masks, masks2, bppe_sig, commitments, &err);
     ASSERT_TRUE(r);
     sigs.emplace_back(bppe_sig, commitments);
     return true;
@@ -317,38 +317,38 @@ TEST(bppe, power_128)
 
   LOG_PRINT_L0("1");
   ASSERT_TRUE(gen_rp_for_value(s_128_max));
-  ASSERT_TRUE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  ASSERT_TRUE(bppe_verify<bpp_crypto_trait_Zarcanum>(sigs, &err));
   signatures_vector.clear(), commitments_vector.clear(), sigs.clear();
 
   LOG_PRINT_L0("2");
   ASSERT_TRUE(gen_rp_for_value(scalar_t(crypto::rand<uint64_t>(), crypto::rand<uint64_t>(), 0, 0)));
-  ASSERT_TRUE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  ASSERT_TRUE(bppe_verify<bpp_crypto_trait_Zarcanum>(sigs, &err));
   signatures_vector.clear(), commitments_vector.clear(), sigs.clear();
 
   LOG_PRINT_L0("3");
   ASSERT_TRUE(gen_rp_for_value(scalar_t(0, 0, 1, 0)));
-  ASSERT_FALSE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  ASSERT_FALSE(bppe_verify<bpp_crypto_trait_Zarcanum>(sigs, &err));
   signatures_vector.clear(), commitments_vector.clear(), sigs.clear();
 
   LOG_PRINT_L0("4");
   ASSERT_TRUE(gen_rp_for_value(scalar_t(0, 0, crypto::rand<uint64_t>(), 0)));
-  ASSERT_FALSE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  ASSERT_FALSE(bppe_verify<bpp_crypto_trait_Zarcanum>(sigs, &err));
   signatures_vector.clear(), commitments_vector.clear(), sigs.clear();
 
   LOG_PRINT_L0("5");
-  ASSERT_TRUE(gen_rp_for_value(scalar_t(0, 0, 0, crypto::rand<uint64_t>())));
-  ASSERT_FALSE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  ASSERT_TRUE(gen_rp_for_value(scalar_t(0, 0, 0, 1)));
+  ASSERT_FALSE(bppe_verify<bpp_crypto_trait_Zarcanum>(sigs, &err));
   signatures_vector.clear(), commitments_vector.clear(), sigs.clear();
 
   LOG_PRINT_L0("6");
-  ASSERT_TRUE(gen_rp_for_value(scalar_t(0, 0, 0, UINT64_MAX)));
-  ASSERT_FALSE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  ASSERT_TRUE(gen_rp_for_value(c_scalar_Lm1));
+  ASSERT_FALSE(bppe_verify<bpp_crypto_trait_Zarcanum>(sigs, &err));
   signatures_vector.clear(), commitments_vector.clear(), sigs.clear();
 
   LOG_PRINT_L0("7");
   ASSERT_TRUE(gen_rp_for_vec(scalar_vec_t{s_128_max, s_128_max, s_128_max, s_128_max}));
   LOG_PRINT_L0("simple generated");
-  ASSERT_TRUE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  ASSERT_TRUE(bppe_verify<bpp_crypto_trait_Zarcanum>(sigs, &err));
   LOG_PRINT_L0("simple verified");
   for(size_t i = 0; i < 16; ++i)
   {
@@ -359,15 +359,15 @@ TEST(bppe, power_128)
     ASSERT_TRUE(gen_rp_for_vec(vec));
   }
   LOG_PRINT_L0("verification started");
-  ASSERT_TRUE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  ASSERT_TRUE(bppe_verify<bpp_crypto_trait_Zarcanum>(sigs, &err));
   signatures_vector.clear(), commitments_vector.clear(), sigs.clear();
   LOG_PRINT_L0("verification finished" << ENDL);
 
   LOG_PRINT_L0("8");
   ASSERT_TRUE(gen_rp_for_value(s_128_max));
-  ASSERT_TRUE(gen_rp_for_value(scalar_t(0, 0, 0, UINT64_MAX)));
+  ASSERT_TRUE(gen_rp_for_value(c_scalar_Lm1));
   ASSERT_TRUE(gen_rp_for_value(s_128_max));
-  ASSERT_FALSE(bppe_verify<bpp_crypto_trait_zano<128>>(sigs, &err));
+  ASSERT_FALSE(bppe_verify<bpp_crypto_trait_Zarcanum>(sigs, &err));
   signatures_vector.clear(), commitments_vector.clear(), sigs.clear();
 
   return true;
