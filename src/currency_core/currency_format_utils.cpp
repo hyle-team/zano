@@ -154,7 +154,7 @@ namespace currency
       commitments_1div8[i] = &result.aggregation_proof.amount_commitments_for_rp_aggregation[i];
 
     err = 0;
-    r = crypto::bpp_gen<>(outs_gen_context.amounts, y_primes, commitments_1div8, result.bpp, &err);
+    r = crypto::bpp_gen<crypto::bpp_crypto_trait_ZC_out>(outs_gen_context.amounts, y_primes, commitments_1div8, result.bpp, &err);
     CHECK_AND_ASSERT_MES(r, false, "bpp_gen failed with error " << (int)err);
 
     return true;
@@ -171,7 +171,7 @@ namespace currency
       sigs.emplace_back(el.range_proof.bpp, el.amount_commitments);
 
     uint8_t err = 0;
-    bool r = crypto::bpp_verify<>(sigs, &err);
+    bool r = crypto::bpp_verify<crypto::bpp_crypto_trait_ZC_out>(sigs, &err);
     CHECK_AND_ASSERT_MES(r, false, "bpp_verify failed with error " << (int)err);
 
     return true;

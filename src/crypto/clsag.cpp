@@ -14,7 +14,7 @@ DISABLE_GCC_AND_CLANG_WARNING(unused-function)
 namespace crypto
 {
 #if 0
-#  define DBG_VAL_PRINT(x) std::cout << #x ": " << x << std::endl
+#  define DBG_VAL_PRINT(x) std::cout << std::setw(30) << std::left << #x ": " << x << std::endl
 #  define DBG_PRINT(x)     std::cout << x << std::endl
 #else
 #  define DBG_VAL_PRINT(x) (void(0))

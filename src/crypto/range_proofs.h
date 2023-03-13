@@ -56,8 +56,25 @@ namespace crypto
   ////////////////////////////////////////
   // crypto trait for Zano
   ////////////////////////////////////////
-  template<size_t N = 64, size_t values_max = 16>
-  struct bpp_crypto_trait_zano
+  struct bpp_ct_generators_HGX
+  {
+    // NOTE! This notation follows the original BP+ whitepaper, see mapping to Zano's generators below
+    static const point_t& bpp_G;
+    static const point_t& bpp_H;
+    static const point_t& bpp_H2;
+  };
+
+  struct bpp_ct_generators_UGX
+  {
+    // NOTE! This notation follows the original BP+ whitepaper, see mapping to Zano's generators below
+    static const point_t& bpp_G;
+    static const point_t& bpp_H;
+    static const point_t& bpp_H2;
+  };
+
+
+  template<typename gen_trait_t, size_t N = 64, size_t values_max = 16>
+  struct bpp_crypto_trait_zano : gen_trait_t
   {
     static constexpr size_t c_bpp_n           = N;                           // the upper bound for the witness's range
     static constexpr size_t c_bpp_values_max  = values_max;                  // maximum number of elements in BP+ proof, i.e. max allowed BP+ outputs
@@ -98,6 +115,7 @@ namespace crypto
     }
 
     // TODO: refactor with proper OOB handling
+    // TODO: @#@# add domain separation
     static const point_t& get_generator(bool select_H, size_t index)
     {
       if (index >= c_bpp_mn_max)
@@ -125,20 +143,15 @@ namespace crypto
       return result;
     }
 
-    static const point_t& bpp_G; // NOTE! This notation follows original BP+ whitepaper, see mapping to Zano's generators below
-    static const point_t& bpp_H;
-    static const point_t& bpp_H2;
+    using typename gen_trait_t::bpp_G;
+    using typename gen_trait_t::bpp_H;
+    using typename gen_trait_t::bpp_H2;
   }; // struct bpp_crypto_trait_zano
 
-  template<size_t N, size_t values_max>
-  const point_t& bpp_crypto_trait_zano<N, values_max>::bpp_G = c_point_U;
 
-  template<size_t N, size_t values_max>
-  const point_t& bpp_crypto_trait_zano<N, values_max>::bpp_H = c_point_G;
+  typedef bpp_crypto_trait_zano<bpp_ct_generators_UGX, 64,  16> bpp_crypto_trait_ZC_out;
 
-  template<size_t N, size_t values_max>
-  const point_t& bpp_crypto_trait_zano<N, values_max>::bpp_H2 = c_point_X;
-
+  typedef bpp_crypto_trait_zano<bpp_ct_generators_HGX, 128, 16> bpp_crypto_trait_Zarcanum;
 
   
   // efficient multiexponentiation (naive stub implementation atm, TODO)

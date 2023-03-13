@@ -10,13 +10,18 @@
 #include "../currency_core/crypto_config.h"    // TODO: move it to the crypto
 #include "../common/crypto_stream_operators.h" // TODO: move it to the crypto
 
+#if 0
+#  define DBG_VAL_PRINT(x) std::cout << std::setw(30) << std::left << #x ": " << x << std::endl
+#  define DBG_PRINT(x)     std::cout << x << std::endl
+#else
+#  define DBG_VAL_PRINT(x) (void(0))
+#  define DBG_PRINT(x)     (void(0))
+#endif
+
 namespace crypto
 {
   const scalar_t      c_zarcanum_z_coeff_s  = { 0,                  1,                  0,                  0                  }; // c_scalar_2p64
   const mp::uint256_t c_zarcanum_z_coeff_mp = c_zarcanum_z_coeff_s.as_boost_mp_type<mp::uint256_t>();
-
-  #define DBG_VAL_PRINT(x) (void(0)) // std::cout << #x ": " << x << std::endl
-  #define DBG_PRINT(x)     (void(0)) // std::cout << x << std::endl
 
   template<typename T>
   inline std::ostream &operator <<(std::ostream &o, const std::vector<T> &v)
@@ -131,8 +136,8 @@ namespace crypto
     const scalar_vec_t masks  = { bf }; // G component
     const scalar_vec_t masks2 = { bx }; // X component
     const std::vector<const public_key*> E_1div8_vec_ptr = { &result.E };
-    
-    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(bppe_gen<bpp_crypto_trait_zano<128>>(values, masks, masks2, E_1div8_vec_ptr, result.E_range_proof), 10);
+
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(bppe_gen<bpp_crypto_trait_Zarcanum>(values, masks, masks2, E_1div8_vec_ptr, result.E_range_proof), 10);
 
     // = four-layers ring signature data outline =
     // (j in [0, ring_size-1])
@@ -227,7 +232,8 @@ namespace crypto
       // check extended range proof for E
       std::vector<point_t> E_for_range_proof = { point_t(sig.E) }; // consider changing to 8*sig.E to avoid additional conversion
       std::vector<bppe_sig_commit_ref_t> range_proofs = { bppe_sig_commit_ref_t(sig.E_range_proof, E_for_range_proof) };
-      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(bppe_verify<bpp_crypto_trait_zano<128>>(range_proofs), 10);
+
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(bppe_verify<bpp_crypto_trait_Zarcanum>(range_proofs), 10);
 
       // check extended CLSAG-GGXG ring signature
       CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(verify_CLSAG_GGXG(m, ring, sig.pseudo_out_amount_commitment, sig.C, stake_ki, sig.clsag_ggxg), 1);
