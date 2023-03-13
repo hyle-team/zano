@@ -923,7 +923,7 @@ namespace tools
     bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin, crypto::hash& redeem_tx_id);
 
     // ionic swaps:
-    bool create_ionic_swap_proposal(uint64_t wallet_id, const view::ionic_swap_proposal_info& proposal, const currency::account_public_address& destination_addr);
+    bool create_ionic_swap_proposal(const view::ionic_swap_proposal_info& proposal, const currency::account_public_address& destination_addr, transaction& tx_template);
     bool build_ionic_swap_template(const view::ionic_swap_proposal_info& proposal_detais, const currency::account_public_address& destination_addr,
       currency::transaction& template_tx,
       std::vector<uint64_t>& selected_transfers_for_template,
