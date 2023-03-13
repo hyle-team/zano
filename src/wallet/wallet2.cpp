@@ -3978,7 +3978,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
 
   uint8_t err = 0;
   r = crypto::zarcanum_generate_proof(tx_hash_for_sig, cxt.kernel_hash, ring, cxt.last_pow_block_id_hashed, cxt.sk.kimage,
-    secret_x, cxt.secret_q, secret_index, blinding_masks_sum, cxt.stake_amount, cxt.stake_out_blinding_mask,
+    secret_x, cxt.secret_q, secret_index, -blinding_masks_sum, cxt.stake_amount, cxt.stake_out_blinding_mask,
     static_cast<crypto::zarcanum_proof&>(sig), &err);
   WLT_CHECK_AND_ASSERT_MES(r, false, "zarcanum_generate_proof failed, err: " << (int)err);
 
