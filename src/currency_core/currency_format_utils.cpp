@@ -506,6 +506,10 @@ namespace currency
   {
     if (tx.version > TRANSACTION_VERSION_PRE_HF4)
     {
+      zc_balance_proof balance_proof = AUTO_VAL_INIT(balance_proof);
+      bool r = get_type_in_variant_container<zc_balance_proof>(tx.proofs, balance_proof);
+      CHECK_AND_ASSERT_MES(r, false, "zc_balance_proof is missing in tx proofs");
+
       size_t zc_inputs_count = 0;
       uint64_t bare_inputs_sum = additional_inputs_amount_and_fees_for_mining_tx;
       for(auto& vin : tx.vin)
@@ -559,10 +563,6 @@ namespace currency
         VARIANT_SWITCH_END();
       }
       sum_of_pseudo_out_amount_commitments.modify_mul8();
-
-      zc_balance_proof balance_proof = AUTO_VAL_INIT(balance_proof);
-      bool r = get_type_in_variant_container<zc_balance_proof>(tx.proofs, balance_proof);
-      CHECK_AND_ASSERT_MES(r, false, "zc_balance_proof is not found");
 
       // (sum(bare inputs' amounts) - fee) * H + sum(pseudo outs commitments for ZC inputs) - sum(outputs' commitments) = lin(X)  OR  = lin(G)
       crypto::point_t commitment_to_zero = (crypto::scalar_t(bare_inputs_sum) - crypto::scalar_t(fee)) * currency::native_coin_asset_id_pt + sum_of_pseudo_out_amount_commitments - outs_commitments_sum;
