@@ -238,6 +238,7 @@ namespace currency
   };
 
   bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs);
+  bool generate_tx_balance_proof(const transaction &tx, const crypto::hash& tx_id, const outputs_generation_context& ogc, uint64_t block_reward_for_miner_tx, currency::zc_balance_proof& proof);
   bool check_tx_bare_balance(const transaction& tx, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
   bool check_tx_balance(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
   bool validate_asset_operation(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, crypto::public_key& asset_id);
@@ -253,7 +254,7 @@ namespace currency
                                                              size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS, 
                                                              bool pos = false,
                                                              const pos_entry& pe = pos_entry(),
-                                                             crypto::scalar_t* blinding_masks_sum_ptr = nullptr,
+                                                             outputs_generation_context* ogc_ptr = nullptr,
                                                              const keypair* tx_one_time_key_to_use = nullptr);
   //---------------------------------------------------------------
   uint64_t get_string_uint64_hash(const std::string& str);

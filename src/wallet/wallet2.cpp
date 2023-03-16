@@ -3831,7 +3831,7 @@ bool wallet2::is_in_hardfork_zone(uint64_t hardfork_index) const
   return m_core_runtime_config.is_hardfork_active_for_height(hardfork_index, get_blockchain_current_size());
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::block& b, const pos_entry& pe, const crypto::scalar_t& blinding_masks_sum) const
+bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::block& b, const pos_entry& pe, const currency::outputs_generation_context& miner_tx_ogc) const
 {
   bool r = false;
   WLT_CHECK_AND_ASSERT_MES(pe.wallet_index < m_transfers.size(), false, "invalid pe.wallet_index: " << pe.wallet_index);
@@ -3978,7 +3978,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
 
   uint8_t err = 0;
   r = crypto::zarcanum_generate_proof(tx_hash_for_sig, cxt.kernel_hash, ring, cxt.last_pow_block_id_hashed, cxt.sk.kimage,
-    secret_x, cxt.secret_q, secret_index, -blinding_masks_sum, cxt.stake_amount, cxt.stake_out_blinding_mask,
+    secret_x, cxt.secret_q, secret_index, -miner_tx_ogc.amount_blinding_masks_sum, cxt.stake_amount, cxt.stake_out_blinding_mask,
     static_cast<crypto::zarcanum_proof&>(sig), &err);
   WLT_CHECK_AND_ASSERT_MES(r, false, "zarcanum_generate_proof failed, err: " << (int)err);
 
@@ -4139,7 +4139,7 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   //else
   //{
     // old fashioned non-hidden amount PoS scheme
-    res = prepare_and_sign_pos_block(cxt, b, tmpl_req.pe, tmpl_rsp.blinding_masks_sum);
+    res = prepare_and_sign_pos_block(cxt, b, tmpl_req.pe, tmpl_rsp.miner_tx_ogc);
     WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to prepare_and_sign_pos_block");
   //}
 

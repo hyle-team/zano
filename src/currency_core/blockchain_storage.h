@@ -261,7 +261,7 @@ namespace currency
 
     
     bool create_block_template(const account_public_address& miner_address, const blobdata& ex_nonce, block& b, wide_difficulty_type& di, uint64_t& height) const;
-    bool create_block_template(const account_public_address& miner_address, const account_public_address& stakeholder_address, const blobdata& ex_nonce, bool pos, const pos_entry& pe, fill_block_template_func_t custom_fill_block_template_func, block& b, wide_difficulty_type& di, uint64_t& height, crypto::scalar_t* blinding_mask_sum_ptr = nullptr) const;
+    bool create_block_template(const account_public_address& miner_address, const account_public_address& stakeholder_address, const blobdata& ex_nonce, bool pos, const pos_entry& pe, fill_block_template_func_t custom_fill_block_template_func, block& b, wide_difficulty_type& di, uint64_t& height, outputs_generation_context* miner_tx_ogc_ptr = nullptr) const;
     bool create_block_template(const create_block_template_params& params, create_block_template_response& resp) const;
 
     bool have_block(const crypto::hash& id) const;

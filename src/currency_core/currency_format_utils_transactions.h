@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2022 Zano Project
+// Copyright (c) 2018-2023 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -172,4 +172,75 @@ namespace currency
   bool validate_inputs_sorting(const transaction& tx);
 
   std::vector<tx_source_entry::output_entry> prepare_outputs_entries_for_key_offsets(const std::vector<tx_source_entry::output_entry>& outputs, size_t old_real_index, size_t& new_real_index) noexcept;
-}
+
+
+  struct outputs_generation_context
+  {
+    outputs_generation_context() = default;
+
+    outputs_generation_context(size_t outs_count)
+      : asset_ids(outs_count)
+      , blinded_asset_ids(outs_count)
+      , amount_commitments(outs_count)
+      , asset_id_blinding_masks(outs_count)
+      , amounts(outs_count)
+      , amount_blinding_masks(outs_count)
+    {}
+
+    bool check_sizes(size_t outs_count) const
+    {
+      return
+        asset_ids.size()                == outs_count &&
+        blinded_asset_ids.size()        == outs_count &&
+        amount_commitments.size()       == outs_count &&
+        asset_id_blinding_masks.size()  == outs_count &&
+        amounts.size()                  == outs_count &&
+        amount_blinding_masks.size()    == outs_count;
+    }
+
+    // per output data
+    std::vector<crypto::point_t> asset_ids;
+    std::vector<crypto::point_t> blinded_asset_ids;                                   // generate_zc_outs_range_proof
+    std::vector<crypto::point_t> amount_commitments;                                  // generate_zc_outs_range_proof   construct_tx_out
+    crypto::scalar_vec_t asset_id_blinding_masks;                                     //                                construct_tx_out
+    crypto::scalar_vec_t amounts;                                                     // generate_zc_outs_range_proof
+    crypto::scalar_vec_t amount_blinding_masks;                                       // generate_zc_outs_range_proof
+
+    // common data: inputs
+    crypto::point_t  pseudo_out_amount_commitments_sum      = crypto::c_point_0;      //                                                   generate_tx_balance_proof  generate_ZC_sig
+    crypto::scalar_t pseudo_out_amount_blinding_masks_sum   = 0;                      //                                                                              generate_ZC_sig
+    crypto::scalar_t real_in_asset_id_blinding_mask_x_amount_sum = 0;                 // = sum( real_out_blinding_mask[i] * amount[i] )    generate_tx_balance_proof  generate_ZC_sig
+
+    // common data: outputs
+    crypto::point_t  amount_commitments_sum                 = crypto::c_point_0;      //                                                   generate_tx_balance_proof
+    crypto::scalar_t amount_blinding_masks_sum              = 0;                      //                                construct_tx_out   generate_tx_balance_proof  generate_ZC_sig
+    crypto::scalar_t asset_id_blinding_mask_x_amount_sum    = 0;                      // = sum( blinding_mask[j] * amount[j] )             generate_tx_balance_proof
+
+    // data for ongoing asset operation in tx (if applicable, tx extra should contain asset_descriptor_operation)
+    crypto::public_key  ao_asset_id                         {};
+    crypto::point_t     ao_asset_id_pt                      = crypto::c_point_0;
+    crypto::point_t     ao_amount_commitment                = crypto::c_point_0;
+    crypto::scalar_t    ao_amount_blinding_mask             {};                       //                                                   generate_tx_balance_proof  generate_ZC_sig
+
+    // consider redesign
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(asset_ids);
+      KV_SERIALIZE(blinded_asset_ids);
+      KV_SERIALIZE(amount_commitments);
+      KV_SERIALIZE(asset_id_blinding_masks);
+      KV_SERIALIZE(amounts);
+      KV_SERIALIZE(amount_blinding_masks);
+      KV_SERIALIZE(pseudo_out_amount_commitments_sum);
+      KV_SERIALIZE(pseudo_out_amount_blinding_masks_sum);
+      KV_SERIALIZE(real_in_asset_id_blinding_mask_x_amount_sum);
+      KV_SERIALIZE(amount_commitments_sum);
+      KV_SERIALIZE(amount_blinding_masks_sum);
+      KV_SERIALIZE(asset_id_blinding_mask_x_amount_sum);
+      KV_SERIALIZE(ao_asset_id);
+      KV_SERIALIZE(ao_asset_id_pt);
+      KV_SERIALIZE(ao_amount_commitment);
+      KV_SERIALIZE(ao_amount_blinding_mask);
+    END_KV_SERIALIZE_MAP()
+  };
+
+} // namespace currency

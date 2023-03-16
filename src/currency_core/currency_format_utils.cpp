@@ -71,53 +71,6 @@ namespace currency
   }*/
 
   //--------------------------------------------------------------------------------
-  struct outputs_generation_context
-  {
-    outputs_generation_context(size_t outs_count)
-      : asset_ids(outs_count)
-      , blinded_asset_ids(outs_count)
-      , amount_commitments(outs_count)
-      , asset_id_blinding_masks(outs_count)
-      , amounts(outs_count)
-      , amount_blinding_masks(outs_count)
-    {}
-
-    bool check_sizes(size_t outs_count) const
-    {
-      return
-        asset_ids.size()                == outs_count &&
-        blinded_asset_ids.size()        == outs_count &&
-        amount_commitments.size()       == outs_count &&
-        asset_id_blinding_masks.size()  == outs_count &&
-        amounts.size()                  == outs_count &&
-        amount_blinding_masks.size()    == outs_count;
-    }
-
-    // per output data
-    std::vector<crypto::point_t> asset_ids;
-    std::vector<crypto::point_t> blinded_asset_ids;
-    std::vector<crypto::point_t> amount_commitments;
-    crypto::scalar_vec_t asset_id_blinding_masks;
-    crypto::scalar_vec_t amounts;
-    crypto::scalar_vec_t amount_blinding_masks;
-
-    // common data: inputs
-    crypto::point_t  pseudo_out_amount_commitments_sum      = crypto::c_point_0;
-    crypto::scalar_t pseudo_out_amount_blinding_masks_sum   = 0;
-    crypto::scalar_t real_in_asset_id_blinding_mask_x_amount_sum = 0;                 // = sum( real_out_blinding_mask[i] * amount[i] )
-
-    // common data: outputs
-    crypto::point_t  amount_commitments_sum                 = crypto::c_point_0;
-    crypto::scalar_t amount_blinding_masks_sum              = 0;
-    crypto::scalar_t asset_id_blinding_mask_x_amount_sum    = 0;                      // = sum( blinding_mask[j] * amount[j] )
-
-    // data for ongoing asset operation in tx (if applicable, tx extra should contain asset_descriptor_operation)
-    crypto::public_key  ao_asset_id                         {};
-    crypto::point_t     ao_asset_id_pt                      = crypto::c_point_0;
-    crypto::point_t     ao_amount_commitment                = crypto::c_point_0;
-    crypto::scalar_t    ao_amount_blinding_mask             {};
-  };
-  //--------------------------------------------------------------------------------
   bool generate_asset_surjection_proof(const crypto::hash& context_hash, zc_asset_surjection_proof& result)
   {
     // TODO: @#@# membership proof here
@@ -289,7 +242,7 @@ namespace currency
     size_t max_outs                           /* = CURRENCY_MINER_TX_MAX_OUTS */,
     bool pos                                  /* = false */,
     const pos_entry& pe                       /* = pos_entry() */,  // only pe.stake_unlock_time and pe.stake_amount are used now, TODO: consider refactoring -- sowle
-    crypto::scalar_t* blinding_masks_sum_ptr  /* = nullptr */,
+    outputs_generation_context* ogc_ptr       /* = nullptr */,
     const keypair* tx_one_time_key_to_use     /* = nullptr */
   )
   {
@@ -435,17 +388,14 @@ namespace currency
       CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
       tx.proofs.emplace_back(std::move(range_proofs));
 
-      if (!pos)
-      {
-        currency::zc_balance_proof balance_proof{};
-        r = generate_tx_balance_proof(tx, tx_id, outs_gen_context, block_reward, balance_proof);
-        CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
-        tx.proofs.emplace_back(std::move(balance_proof));
-      }
+      currency::zc_balance_proof balance_proof{};
+      r = generate_tx_balance_proof(tx, tx_id, outs_gen_context, block_reward, balance_proof);
+      CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
+      tx.proofs.emplace_back(std::move(balance_proof));
     }
 
-    if (blinding_masks_sum_ptr)
-      *blinding_masks_sum_ptr = outs_gen_context.amount_blinding_masks_sum; // TODO @#@#
+    if (ogc_ptr)
+      *ogc_ptr = outs_gen_context; // TODO @#@# consider refactoring (a lot of copying) -- sowle
 
     return true;
   }

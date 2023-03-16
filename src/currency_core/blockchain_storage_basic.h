@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2023 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -19,6 +19,8 @@
 #include "currency_basic.h"
 #include "difficulty.h"
 #include "currency_protocol/blobdatatype.h"
+#include "currency_format_utils_transactions.h" // only for output_generation_context
+
 namespace currency
 {
 
@@ -144,7 +146,7 @@ namespace currency
     block b;
     wide_difficulty_type diffic;
     uint64_t height;
-    crypto::scalar_t blinding_mask_sum; // sum of all the outputs' blinding masks
+    outputs_generation_context miner_tx_ogc; // bad design, a lot of copying, consider redesign -- sowle
   };
 
   typedef std::unordered_map<crypto::hash, transaction> transactions_map;
@@ -157,4 +159,4 @@ namespace currency
 
 
 
-}
+} // namespace currency
