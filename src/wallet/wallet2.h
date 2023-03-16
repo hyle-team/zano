@@ -930,7 +930,8 @@ namespace tools
       crypto::secret_key& one_time_key);
     bool get_ionic_swap_proposal_info(const std::string&raw_tx_template, view::ionic_swap_proposal_info& proposal);
     bool get_ionic_swap_proposal_info(const currency::transaction tx, view::ionic_swap_proposal_info& proposal);
-    bool accept_ionic_swap_proposal(std::string&raw_tx_template, currency::transaction& result_tx);
+    bool accept_ionic_swap_proposal(const std::string&raw_tx_template, currency::transaction& result_tx);
+    bool accept_ionic_swap_proposal(const currency::transaction& tx_template, currency::transaction& result_tx);
 private:
 
     // -------- t_transport_state_notifier ------------------------------------------------

@@ -4880,11 +4880,11 @@ bool wallet2::check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& o
   return false;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::create_ionic_swap_proposal(const view::ionic_swap_proposal_info& proposal_details, const currency::account_public_address& destination_addr)
+bool wallet2::create_ionic_swap_proposal(const view::ionic_swap_proposal_info& proposal_details, const currency::account_public_address& destination_addr, transaction& tx_template)
 {
   crypto::secret_key one_time_key = AUTO_VAL_INIT(one_time_key);
   std::vector<uint64_t> selected_transfers_for_template;
-  transaction tx_template;
+  
   build_ionic_swap_template(proposal_details, destination_addr, tx_template, selected_transfers_for_template, one_time_key);
 
   const uint32_t mask_to_mark_escrow_template_locked_transfers = WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION;
@@ -5005,14 +5005,22 @@ bool wallet2::get_ionic_swap_proposal_info(const currency::transaction tx, view:
   proposal.expiration_time = t.v;
   return true;
 }
+
 //----------------------------------------------------------------------------------------------------
-bool wallet2::accept_ionic_swap_proposal(std::string&raw_tx_template, currency::transaction& result_tx)
+bool wallet2::accept_ionic_swap_proposal(const std::string& raw_tx_template, currency::transaction& result_tx)
 {
-  mode_separate_context msc = AUTO_VAL_INIT(msc);
-  
-  currency::transaction& tx = msc.tx_for_mode_separate;
+  currency::transaction tx;
   bool r = parse_and_validate_tx_from_blob(raw_tx_template, tx);
   THROW_IF_TRUE_WALLET_EX(!r, error::tx_parse_error, raw_tx_template);
+
+  return accept_ionic_swap_proposal(tx, result_tx);
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::accept_ionic_swap_proposal(const currency::transaction& tx_template, currency::transaction& result_tx)
+{
+  mode_separate_context msc = AUTO_VAL_INIT(msc);
+  msc.tx_for_mode_separate = tx_template;
+
 
   r = get_ionic_swap_proposal_info(tx, msc.proposal);
   THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, "Failed to get info from proposal");
