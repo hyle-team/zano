@@ -92,6 +92,11 @@ namespace currency
     bool add_custom_asset_id(const std::vector<std::string> &args);
     bool remove_custom_asset_id(const std::vector<std::string> &args);
 
+    //----------------------------------------------------------------------------------------------------
+    bool generate_ionic_swap_proposal(const std::vector<std::string> &args);
+    bool get_ionic_swap_proposal_info(const std::vector<std::string> &args);
+    bool accept_ionic_swap_proposal(const std::vector<std::string> &args);
+
     bool validate_wrap_status(uint64_t amount);
 
     bool get_alias_from_daemon(const std::string& alias_name, currency::extra_alias_entry_base& ai);

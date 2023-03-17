@@ -168,8 +168,6 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   CHECK_AND_ASSERT_MES(it_asset != balances.end(), false, "Failed to find needed asset in result balances");
   CHECK_AND_ASSERT_MES(it_native->second.total == mined_balance - native_tokens_to_exchange, false, "Failed to find needed asset in result balances");
   CHECK_AND_ASSERT_MES(it_asset->second.total == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC + assets_to_exchange, false, "Failed to find needed asset in result balances");
-
-
   return true;
 }
 
