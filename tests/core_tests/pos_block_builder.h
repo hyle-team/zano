@@ -78,7 +78,7 @@ struct pos_block_builder
   size_t                  m_height                        = 0;
   size_t                  m_pos_stake_output_gindex       = 0;
   //uint64_t                m_pos_stake_amount              = 0;
-  crypto::scalar_t        m_blinding_masks_sum            {}; // bliding masks of zc outputs of miner tx
+  currency::outputs_generation_context m_miner_tx_ogc     {};
 
   currency::pos_mining_context m_context                  {};
 };

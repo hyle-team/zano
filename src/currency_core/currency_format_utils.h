@@ -53,15 +53,6 @@
 
 namespace currency
 {
-  bool operator ==(const currency::transaction& a, const currency::transaction& b);
-  bool operator ==(const currency::block& a, const currency::block& b);
-  bool operator ==(const currency::extra_attachment_info& a, const currency::extra_attachment_info& b);
-  bool operator ==(const currency::NLSAG_sig& a, const currency::NLSAG_sig& b);
-  bool operator ==(const currency::void_sig& a, const currency::void_sig& b);
-  bool operator ==(const currency::ZC_sig& a, const currency::ZC_sig& b);
-  bool operator ==(const currency::zarcanum_sig& a, const currency::zarcanum_sig& b);
-  bool operator ==(const currency::ref_by_id& a, const currency::ref_by_id& b);
-
   typedef boost::multiprecision::uint128_t uint128_tl;
 
 
@@ -250,12 +241,12 @@ namespace currency
                                                              const account_public_address &stakeholder_address,
                                                              transaction& tx, 
                                                              uint64_t tx_version,
-                                                             const blobdata& extra_nonce = blobdata(), 
-                                                             size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS, 
-                                                             bool pos = false,
-                                                             const pos_entry& pe = pos_entry(),
-                                                             outputs_generation_context* ogc_ptr = nullptr,
-                                                             const keypair* tx_one_time_key_to_use = nullptr);
+                                                             const blobdata& extra_nonce            = blobdata(), 
+                                                             size_t max_outs                        = CURRENCY_MINER_TX_MAX_OUTS, 
+                                                             bool pos                               = false,
+                                                             const pos_entry& pe                    = pos_entry(),
+                                                             outputs_generation_context* ogc_ptr    = nullptr,
+                                                             const keypair* tx_one_time_key_to_use  = nullptr);
   //---------------------------------------------------------------
   uint64_t get_string_uint64_hash(const std::string& str);
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, crypto::scalar_t& asset_blinding_mask, crypto::scalar_t& amount_blinding_mask, crypto::point_t& blinded_asset_id, crypto::point_t& amount_commitment, finalized_tx& result, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
@@ -611,36 +602,6 @@ namespace currency
 //     extra.push_back(extra_t());
 //     return boost::get<extra_t>(extra.back());
     return get_or_add_field_to_variant_vector<extra_t>(extra);
-  }
-  //---------------------------------------------------------------
-  template<class variant_t, class variant_type_t>
-  void update_or_add_field_to_extra(std::vector<variant_t>& variant_container, const variant_type_t& v)
-  {
-    for (auto& ev : variant_container)
-    {
-      if (ev.type() == typeid(variant_type_t))
-      {
-        boost::get<variant_type_t>(ev) = v;
-        return;
-      }
-    }
-    variant_container.push_back(v);
-  }
-  //---------------------------------------------------------------
-  template<class variant_type_t, class variant_t>
-  void remove_field_of_type_from_extra(std::vector<variant_t>& variant_container)
-  {
-    for (size_t i = 0; i != variant_container.size();)
-    {
-      if (variant_container[i].type() == typeid(variant_type_t))
-      {
-        variant_container.erase(variant_container.begin()+i);
-      }
-      else
-      {
-        i++;
-      }
-    }
   }
   //---------------------------------------------------------------
   template<typename t_container>

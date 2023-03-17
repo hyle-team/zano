@@ -4162,18 +4162,21 @@ namespace currency
   bool operator ==(const currency::void_sig& a, const currency::void_sig& b)
   {
     //@#@
+    ASSERT_MES_AND_THROW("not implemented yet");
     return false;
   }
   //--------------------------------------------------------------------------------
   bool operator ==(const currency::ZC_sig& a, const currency::ZC_sig& b)
   {
     //@#@ TODO
+    ASSERT_MES_AND_THROW("not implemented yet");
     return false;
   }
   //--------------------------------------------------------------------------------
   bool operator ==(const currency::zarcanum_sig& a, const currency::zarcanum_sig& b)
   {
     //@#@ TODO
+    ASSERT_MES_AND_THROW("not implemented yet");
     return false;
   }
   //--------------------------------------------------------------------------------

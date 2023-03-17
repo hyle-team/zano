@@ -1144,6 +1144,15 @@ namespace currency
     END_KV_SERIALIZE_MAP()
   };
 
+  bool operator ==(const currency::transaction& a, const currency::transaction& b);
+  bool operator ==(const currency::block& a, const currency::block& b);
+  bool operator ==(const currency::extra_attachment_info& a, const currency::extra_attachment_info& b);
+  bool operator ==(const currency::NLSAG_sig& a, const currency::NLSAG_sig& b);
+  bool operator ==(const currency::void_sig& a, const currency::void_sig& b);
+  bool operator ==(const currency::ZC_sig& a, const currency::ZC_sig& b);
+  bool operator ==(const currency::zarcanum_sig& a, const currency::zarcanum_sig& b);
+  bool operator ==(const currency::ref_by_id& a, const currency::ref_by_id& b);
+
 } // namespace currency
 
 POD_MAKE_HASHABLE(currency, account_public_address);

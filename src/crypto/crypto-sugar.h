@@ -491,9 +491,7 @@ namespace crypto
     // with x = X / Z, y = Y / Z, x * y = T / Z.
     ge_p3 m_p3;
 
-    point_t()
-    {
-    }
+    point_t() = default;
 
     explicit point_t(const crypto::public_key& pk) // can throw std::runtime_error
     {

@@ -126,7 +126,37 @@ namespace currency
       FIELD(explicit_native_asset_id)
     END_SERIALIZE()
   };
-
+  //---------------------------------------------------------------
+  template<class variant_t, class variant_type_t>
+  void update_or_add_field_to_extra(std::vector<variant_t>& variant_container, const variant_type_t& v)
+  {
+    for (auto& ev : variant_container)
+    {
+      if (ev.type() == typeid(variant_type_t))
+      {
+        boost::get<variant_type_t>(ev) = v;
+        return;
+      }
+    }
+    variant_container.push_back(v);
+  }
+  //---------------------------------------------------------------
+  template<class variant_type_t, class variant_t>
+  void remove_field_of_type_from_extra(std::vector<variant_t>& variant_container)
+  {
+    for (size_t i = 0; i != variant_container.size();)
+    {
+      if (variant_container[i].type() == typeid(variant_type_t))
+      {
+        variant_container.erase(variant_container.begin()+i);
+      }
+      else
+      {
+        i++;
+      }
+    }
+  }
+  //---------------------------------------------------------------
   template<class extra_type_t>
   uint64_t get_tx_x_detail(const transaction& tx)
   {
@@ -134,6 +164,7 @@ namespace currency
     get_type_in_variant_container(tx.extra, e);
     return e.v;
   }
+  //---------------------------------------------------------------
   template<class extra_type_t>
   void set_tx_x_detail(transaction& tx, uint64_t v)
   {
@@ -141,7 +172,7 @@ namespace currency
     e.v = v;
     update_or_add_field_to_extra(tx.extra, e);
   }
-
+  //---------------------------------------------------------------
   uint64_t get_tx_unlock_time(const transaction& tx, uint64_t o_i);
   uint64_t get_tx_max_unlock_time(const transaction& tx);
   bool get_tx_max_min_unlock_time(const transaction& tx, uint64_t& max_unlock_time, uint64_t& min_unlock_time);
@@ -224,22 +255,22 @@ namespace currency
 
     // consider redesign
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(asset_ids);
-      KV_SERIALIZE(blinded_asset_ids);
-      KV_SERIALIZE(amount_commitments);
-      KV_SERIALIZE(asset_id_blinding_masks);
-      KV_SERIALIZE(amounts);
-      KV_SERIALIZE(amount_blinding_masks);
-      KV_SERIALIZE(pseudo_out_amount_commitments_sum);
-      KV_SERIALIZE(pseudo_out_amount_blinding_masks_sum);
-      KV_SERIALIZE(real_in_asset_id_blinding_mask_x_amount_sum);
-      KV_SERIALIZE(amount_commitments_sum);
-      KV_SERIALIZE(amount_blinding_masks_sum);
-      KV_SERIALIZE(asset_id_blinding_mask_x_amount_sum);
-      KV_SERIALIZE(ao_asset_id);
-      KV_SERIALIZE(ao_asset_id_pt);
-      KV_SERIALIZE(ao_amount_commitment);
-      KV_SERIALIZE(ao_amount_blinding_mask);
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(asset_ids);
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(blinded_asset_ids);
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amount_commitments);
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(asset_id_blinding_masks);
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amounts);
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amount_blinding_masks);
+      KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_commitments_sum);
+      KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_blinding_masks_sum);
+      KV_SERIALIZE_POD_AS_HEX_STRING(real_in_asset_id_blinding_mask_x_amount_sum);
+      KV_SERIALIZE_POD_AS_HEX_STRING(amount_commitments_sum);
+      KV_SERIALIZE_POD_AS_HEX_STRING(amount_blinding_masks_sum);
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id_blinding_mask_x_amount_sum);
+      KV_SERIALIZE_POD_AS_HEX_STRING(ao_asset_id);
+      KV_SERIALIZE_POD_AS_HEX_STRING(ao_asset_id_pt);
+      KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_commitment);
+      KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_blinding_mask);
     END_KV_SERIALIZE_MAP()
   };
 
