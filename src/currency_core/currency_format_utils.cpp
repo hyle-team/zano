@@ -77,9 +77,10 @@ namespace currency
     return true;
   }
   //--------------------------------------------------------------------------------
-  bool generate_zc_outs_range_proof(const crypto::hash& context_hash, size_t out_index_start, size_t outs_count, const outputs_generation_context& outs_gen_context,
+  bool generate_zc_outs_range_proof(const crypto::hash& context_hash, size_t out_index_start, const outputs_generation_context& outs_gen_context,
     const std::vector<tx_out_v>& vouts, zc_outs_range_proof& result)
   {
+    size_t outs_count = outs_gen_context.amounts.size();
     CHECK_AND_ASSERT_MES(outs_gen_context.check_sizes(outs_count), false, "");
     CHECK_AND_ASSERT_MES(out_index_start + outs_count == vouts.size(), false, "");
 
@@ -370,28 +371,6 @@ namespace currency
     {
       //if stake unlock time was not set, then we can use simple "whole transaction" lock scheme 
       set_tx_unlock_time(tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
-    }
-
-    //
-    // The tx prefix should be sealed by now, and the tx hash should be defined.
-    // Any changes made below should only affect the signatures/proofs and should not impact the prefix hash calculation.   
-    //
-
-    // TODO: @#@# move to prepare_and_sign_pos_block()
-    if (tx.version > TRANSACTION_VERSION_PRE_HF4)
-    {
-      crypto::hash tx_id = get_transaction_hash(tx);
-
-      //add range proofs
-      currency::zc_outs_range_proof range_proofs = AUTO_VAL_INIT(range_proofs);
-      bool r = generate_zc_outs_range_proof(tx_id, 0, destinations.size(), outs_gen_context, tx.vout, range_proofs);
-      CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
-      tx.proofs.emplace_back(std::move(range_proofs));
-
-      currency::zc_balance_proof balance_proof{};
-      r = generate_tx_balance_proof(tx, tx_id, outs_gen_context, block_reward, balance_proof);
-      CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
-      tx.proofs.emplace_back(std::move(balance_proof));
     }
 
     if (ogc_ptr)
@@ -2249,7 +2228,7 @@ namespace currency
 
       // add range proofs
       currency::zc_outs_range_proof range_proofs = AUTO_VAL_INIT(range_proofs);
-      r = generate_zc_outs_range_proof(tx_prefix_hash, range_proof_start_index, outputs_to_be_constructed, outs_gen_context, tx.vout, range_proofs);
+      r = generate_zc_outs_range_proof(tx_prefix_hash, range_proof_start_index, outs_gen_context, tx.vout, range_proofs);
       CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
       tx.proofs.emplace_back(std::move(range_proofs));
 

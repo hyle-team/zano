@@ -3974,13 +3974,32 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
   }
   #endif
 
-  crypto::hash tx_hash_for_sig = get_block_hash(b);
+  crypto::hash hash_for_zarcanum_sig = get_block_hash(b);
 
   uint8_t err = 0;
-  r = crypto::zarcanum_generate_proof(tx_hash_for_sig, cxt.kernel_hash, ring, cxt.last_pow_block_id_hashed, cxt.sk.kimage,
+  r = crypto::zarcanum_generate_proof(hash_for_zarcanum_sig, cxt.kernel_hash, ring, cxt.last_pow_block_id_hashed, cxt.sk.kimage,
     secret_x, cxt.secret_q, secret_index, -miner_tx_ogc.amount_blinding_masks_sum, cxt.stake_amount, cxt.stake_out_blinding_mask,
     static_cast<crypto::zarcanum_proof&>(sig), &err);
   WLT_CHECK_AND_ASSERT_MES(r, false, "zarcanum_generate_proof failed, err: " << (int)err);
+
+  //
+  // The miner tx prefix should be sealed by now, and the tx hash should be defined.
+  // Any changes made below should only affect the signatures/proofs and should not impact the prefix hash calculation.   
+  //
+  crypto::hash miner_tx_id = get_transaction_hash(b.miner_tx);
+
+  // proofs for miner_tx
+  currency::zc_outs_range_proof range_proofs = AUTO_VAL_INIT(range_proofs);
+  r = generate_zc_outs_range_proof(miner_tx_id, 0, miner_tx_ogc, b.miner_tx.vout, range_proofs);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
+  b.miner_tx.proofs.emplace_back(std::move(range_proofs));
+
+  uint64_t block_reward = COIN;
+  
+  currency::zc_balance_proof balance_proof{};
+  r = generate_tx_balance_proof(b.miner_tx, miner_tx_id, miner_tx_ogc, block_reward, balance_proof);
+  CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
+  b.miner_tx.proofs.emplace_back(std::move(balance_proof));
 
   return true;
 }
