@@ -135,6 +135,29 @@ namespace crypto
     END_BOOST_SERIALIZATION()
   };
 
+  struct CLSAG_GGXXG_signature_serialized : public CLSAG_GGXXG_signature
+  {
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(c)
+      FIELD_N("r_g", (std::vector<scalar_t>&)(r_g))
+      FIELD_N("r_x", (std::vector<scalar_t>&)(r_x))
+      FIELD(K1)
+      FIELD(K2)
+      FIELD(K3)
+      FIELD(K4)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(c)
+      BOOST_SERIALIZE((std::vector<scalar_t>&)(r_g))
+      BOOST_SERIALIZE((std::vector<scalar_t>&)(r_x))
+      BOOST_SERIALIZE(K1)
+      BOOST_SERIALIZE(K2)
+      BOOST_SERIALIZE(K3)
+      BOOST_SERIALIZE(K4)
+    END_BOOST_SERIALIZATION()
+  };
+
   struct vector_UG_aggregation_proof_serialized : public vector_UG_aggregation_proof
   {
     BEGIN_SERIALIZE_OBJECT()

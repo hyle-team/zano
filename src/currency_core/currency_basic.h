@@ -534,9 +534,9 @@ namespace currency
       FIELD(y2);
       FIELD(y3);
       FIELD(y4);
-      FIELD((crypto::bppe_signature_serialized&)E_range_proof);
+      FIELD_N("E_range_proof", (crypto::bppe_signature_serialized&)E_range_proof);
       FIELD(pseudo_out_amount_commitment);
-      FIELD((crypto::CLSAG_GGXG_signature_serialized&)clsag_ggxg);
+      FIELD_N("clsag_ggxxg", (crypto::CLSAG_GGXXG_signature_serialized&)clsag_ggxxg);
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
@@ -552,7 +552,7 @@ namespace currency
       BOOST_SERIALIZE(y4);
       BOOST_SERIALIZE((crypto::bppe_signature_serialized&)E_range_proof);
       BOOST_SERIALIZE(pseudo_out_amount_commitment);
-      BOOST_SERIALIZE((crypto::CLSAG_GGXG_signature_serialized&)clsag_ggxg);
+      BOOST_SERIALIZE((crypto::CLSAG_GGXXG_signature_serialized&)clsag_ggxxg);
     END_BOOST_SERIALIZATION()
   };
 

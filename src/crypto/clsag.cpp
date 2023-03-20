@@ -801,4 +801,22 @@ namespace crypto
     return c_prev == sig.c;
   }
 
+
+  //---------------------------------------------------------------
+
+
+  bool generate_CLSAG_GGXXG(const hash& m, const std::vector<CLSAG_GGXXG_input_ref_t>& ring, const point_t& pseudo_out_amount_commitment, const point_t& pseudo_out_asset_id, const point_t& extended_amount_commitment, const key_image& ki,
+    const scalar_t& secret_0_xp, const scalar_t& secret_1_f, const scalar_t& secret_2_t, const scalar_t& secret_2_x, const scalar_t& secret_3_q, uint64_t secret_index, CLSAG_GGXXG_signature& sig)
+  {
+    return true;
+  }
+
+  bool verify_CLSAG_GGXXG(const hash& m, const std::vector<CLSAG_GGXXG_input_ref_t>& ring, const public_key& pseudo_out_amount_commitment, const public_key& pseudo_out_asset_id, const public_key& extended_amount_commitment, const key_image& ki,
+    const CLSAG_GGXXG_signature& sig)
+  {
+    return false;
+  }
+
+
+
 } // namespace crypto

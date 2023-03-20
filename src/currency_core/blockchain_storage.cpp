@@ -5486,10 +5486,10 @@ bool blockchain_storage::validate_pos_block(const block& b,
     CHECK_AND_ASSERT_MES(max_related_block_height <= last_pow_block_height, false, "stake input refs' max related block height is " << max_related_block_height << " while last PoW block height is " << last_pow_block_height);    
 
     // build a ring of references
-    vector<crypto::CLSAG_GGXG_input_ref_t> ring;
+    vector<crypto::CLSAG_GGXXG_input_ref_t> ring;
     ring.reserve(scan_contex.zc_outs.size());
     for(auto& zc_out : scan_contex.zc_outs)
-      ring.emplace_back(zc_out.stealth_address, zc_out.amount_commitment, zc_out.concealing_point);
+      ring.emplace_back(zc_out.stealth_address, zc_out.amount_commitment, zc_out.blinded_asset_id, zc_out.concealing_point);
 
     crypto::scalar_t last_pow_block_id_hashed = crypto::hash_helper_t::hs(CRYPTO_HDS_ZARCANUM_LAST_POW_HASH, sm.last_pow_id);
 
