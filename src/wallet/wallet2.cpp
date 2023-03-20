@@ -3899,7 +3899,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
   const tx_out_zarcanum& stake_out = boost::get<tx_out_zarcanum>(stake_out_v);
 
   COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response decoys_resp = AUTO_VAL_INIT(decoys_resp);
-  std::vector<crypto::CLSAG_GGXG_input_ref_t> ring;
+  std::vector<crypto::CLSAG_GGXXG_input_ref_t> ring;
   uint64_t secret_index = 0; // index of the real stake output
 
   // get decoys outputs and construct miner tx
@@ -3952,7 +3952,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
       if (gindex == td.m_global_output_index)
         secret_index = i;
       ++i;
-      ring.emplace_back(el.stealth_address, el.amount_commitment, el.concealing_point);
+      ring.emplace_back(el.stealth_address, el.amount_commitment, el.blinded_asset_id, el.concealing_point);
       stake_input.key_offsets.push_back(el.global_amount_index);
     }
     r = absolute_sorted_output_offsets_to_relative_in_place(stake_input.key_offsets);
@@ -3961,7 +3961,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
   else
   {
     // no decoys, the ring consist of one element -- the real stake output
-    ring.emplace_back(stake_out.stealth_address, stake_out.amount_commitment, stake_out.concealing_point);
+    ring.emplace_back(stake_out.stealth_address, stake_out.amount_commitment, stake_out.blinded_asset_id, stake_out.concealing_point);
     stake_input.key_offsets.push_back(td.m_global_output_index);
   }
   stake_input.k_image = pe.keyimage;
@@ -3969,16 +3969,21 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
   #ifndef NDEBUG
   {
     crypto::point_t source_amount_commitment = crypto::c_scalar_1div8 * td.m_amount * crypto::c_point_H + crypto::c_scalar_1div8 * td.m_zc_info_ptr->amount_blinding_mask * crypto::c_point_G;
-    CHECK_AND_ASSERT_MES(stake_out.amount_commitment == source_amount_commitment.to_public_key(), false, "real output amount commitment check failed");
-    CHECK_AND_ASSERT_MES(ring[secret_index].amount_commitment == stake_out.amount_commitment, false, "ring secret member doesn't match with the stake output");
+    WLT_CHECK_AND_ASSERT_MES(stake_out.amount_commitment == source_amount_commitment.to_public_key(), false, "real output amount commitment check failed");
+    WLT_CHECK_AND_ASSERT_MES(ring[secret_index].amount_commitment == stake_out.amount_commitment, false, "ring secret member doesn't match with the stake output");
+    WLT_CHECK_AND_ASSERT_MES(cxt.stake_amount == td.m_amount, false, "stake_amount missmatch");
+    //WLT_CHECK_AND_ASSERT_MES(source_amount_commitment == cxt.stake_amount * cxt.stake_out_blinded_asset_id + cxt.stake_out_amount_blinding_mask * crypto::c_point_G, false, "source_amount_commitment missmatch");
   }
   #endif
 
   crypto::hash hash_for_zarcanum_sig = get_block_hash(b);
 
+  WLT_CHECK_AND_ASSERT_MES(miner_tx_ogc.pseudo_out_amount_blinding_masks_sum.is_zero(), false, "pseudo_out_amount_blinding_masks_sum is nonzero"); // it should be zero because there's only one input (stake), and thus one pseudo out
+  crypto::scalar_t pseudo_out_amount_blinding_mask = miner_tx_ogc.amount_blinding_masks_sum; // sum of outputs' amount blinding masks
+
   uint8_t err = 0;
   r = crypto::zarcanum_generate_proof(hash_for_zarcanum_sig, cxt.kernel_hash, ring, cxt.last_pow_block_id_hashed, cxt.sk.kimage,
-    secret_x, cxt.secret_q, secret_index, -miner_tx_ogc.amount_blinding_masks_sum, cxt.stake_amount, cxt.stake_out_blinding_mask,
+    secret_x, cxt.secret_q, secret_index, td.m_zc_info_ptr->asset_id_blinding_mask, pseudo_out_amount_blinding_mask, cxt.stake_amount, cxt.stake_out_amount_blinding_mask,
     static_cast<crypto::zarcanum_proof&>(sig), &err);
   WLT_CHECK_AND_ASSERT_MES(r, false, "zarcanum_generate_proof failed, err: " << (int)err);
 
@@ -3991,14 +3996,14 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
   // proofs for miner_tx
   currency::zc_outs_range_proof range_proofs = AUTO_VAL_INIT(range_proofs);
   r = generate_zc_outs_range_proof(miner_tx_id, 0, miner_tx_ogc, b.miner_tx.vout, range_proofs);
-  CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
+  WLT_CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
   b.miner_tx.proofs.emplace_back(std::move(range_proofs));
 
   uint64_t block_reward = COIN;
   
   currency::zc_balance_proof balance_proof{};
   r = generate_tx_balance_proof(b.miner_tx, miner_tx_id, miner_tx_ogc, block_reward, balance_proof);
-  CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
+  WLT_CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
   b.miner_tx.proofs.emplace_back(std::move(balance_proof));
 
   return true;

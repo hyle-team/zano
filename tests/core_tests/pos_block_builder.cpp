@@ -221,18 +221,18 @@ void pos_block_builder::step5_sign(const currency::tx_source_entry& se, const cu
     size_t prepared_real_out_index = 0;
     std::vector<tx_source_entry::output_entry> prepared_outputs = prepare_outputs_entries_for_key_offsets(se.outputs, se.real_output, prepared_real_out_index);
 
-    std::vector<crypto::CLSAG_GGXG_input_ref_t> ring;
+    std::vector<crypto::CLSAG_GGXXG_input_ref_t> ring;
     for(const auto& el : prepared_outputs)
     {
       stake_input.key_offsets.push_back(el.out_reference);
-      ring.emplace_back(el.stealth_address, el.amount_commitment, el.concealing_point);
+      ring.emplace_back(el.stealth_address, el.amount_commitment, el.blinded_asset_id, el.concealing_point);
     }
 
     crypto::hash tx_hash_for_sig = get_block_hash(m_block);
 
     uint8_t err = 0;
     r = crypto::zarcanum_generate_proof(tx_hash_for_sig, m_context.kernel_hash, ring, m_context.last_pow_block_id_hashed, m_context.sk.kimage,
-      secret_x, m_context.secret_q, prepared_real_out_index, -m_miner_tx_ogc.amount_blinding_masks_sum, m_context.stake_amount, m_context.stake_out_blinding_mask,
+      secret_x, m_context.secret_q, prepared_real_out_index, se.real_out_asset_id_blinding_mask, -m_miner_tx_ogc.amount_blinding_masks_sum, m_context.stake_amount, m_context.stake_out_amount_blinding_mask,
       static_cast<crypto::zarcanum_proof&>(sig), &err);
     CHECK_AND_ASSERT_THROW_MES(r, "zarcanum_generate_proof failed, err: " << (int)err);
   }

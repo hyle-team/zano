@@ -376,6 +376,28 @@ namespace currency
     if (ogc_ptr)
       *ogc_ptr = outs_gen_context; // TODO @#@# consider refactoring (a lot of copying) -- sowle
 
+
+    if (tx.version > TRANSACTION_VERSION_PRE_HF4 && !pos)
+    {
+      // This is for PoW blocks only, because PoS blocks proofs are handled in wallet2::prepare_and_sign_pos_block() due to the necessity of making Zarcanum proofs first
+      // 
+      // tx hash should be sealed by now
+      crypto::hash tx_id = get_transaction_hash(tx);
+
+      //add range proofs
+      currency::zc_outs_range_proof range_proofs = AUTO_VAL_INIT(range_proofs);
+      bool r = generate_zc_outs_range_proof(tx_id, 0, outs_gen_context, tx.vout, range_proofs);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
+      tx.proofs.emplace_back(std::move(range_proofs));
+
+      currency::zc_balance_proof balance_proof{};
+      r = generate_tx_balance_proof(tx, tx_id, outs_gen_context, block_reward, balance_proof);
+      CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
+      tx.proofs.emplace_back(std::move(balance_proof));
+    }
+
+
+
     return true;
   }
   //------------------------------------------------------------------

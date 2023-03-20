@@ -19,7 +19,7 @@ using namespace currency;
 //------------------------------------------------------------------------------
 // helpers
 
-void invalidate_CLSAG_GGXG_sig(crypto::CLSAG_GGXG_signature& sig)
+void invalidate_CLSAG_GGXXG_sig(crypto::CLSAG_GGXXG_signature& sig)
 {
   sig.c = 7;
 }
@@ -41,7 +41,7 @@ bool invalidate_zarcanum_sig(size_t n, zarcanum_sig& sig)
   case 0:                                                         break;
   case 1:  invalidate_pub_key(sig.C);                             break;
   case 2:  sig.c.make_random();                                   break;
-  case 3:  invalidate_CLSAG_GGXG_sig(sig.clsag_ggxg);             break;
+  case 3:  invalidate_CLSAG_GGXXG_sig(sig.clsag_ggxxg);           break;
   case 4:  invalidate_pub_key(sig.C_prime);                       break;
   case 5:  sig.d.make_random();                                   break;
   case 6:  invalidate_pub_key(sig.E);                             break;
