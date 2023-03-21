@@ -362,7 +362,7 @@ bool test_generator::construct_block(currency::block& blk,
 bool test_generator::sign_block(const tools::wallet2::mining_context& mining_context,
                                 const pos_entry& pe,
                                 const tools::wallet2& w,
-                                const outputs_generation_context& miner_tx_ogc,
+                                outputs_generation_context& miner_tx_ogc,
                                 currency::block& b)
 {
   bool r = w.prepare_and_sign_pos_block(mining_context, b, pe, miner_tx_ogc);

@@ -3831,7 +3831,7 @@ bool wallet2::is_in_hardfork_zone(uint64_t hardfork_index) const
   return m_core_runtime_config.is_hardfork_active_for_height(hardfork_index, get_blockchain_current_size());
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::block& b, const pos_entry& pe, const currency::outputs_generation_context& miner_tx_ogc) const
+bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::block& b, const pos_entry& pe, currency::outputs_generation_context& miner_tx_ogc) const
 {
   bool r = false;
   WLT_CHECK_AND_ASSERT_MES(pe.wallet_index < m_transfers.size(), false, "invalid pe.wallet_index: " << pe.wallet_index);
@@ -3986,6 +3986,9 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
     secret_x, cxt.secret_q, secret_index, td.m_zc_info_ptr->asset_id_blinding_mask, pseudo_out_amount_blinding_mask, cxt.stake_amount, cxt.stake_out_amount_blinding_mask,
     static_cast<crypto::zarcanum_proof&>(sig), &err);
   WLT_CHECK_AND_ASSERT_MES(r, false, "zarcanum_generate_proof failed, err: " << (int)err);
+
+  // TODO @#@# [architecture] the same value is calculated in zarcanum_generate_proof(), consider an impovement 
+  miner_tx_ogc.pseudo_out_amount_commitments_sum += cxt.stake_amount * currency::native_coin_asset_id_pt + pseudo_out_amount_blinding_mask * crypto::c_point_G;
 
   //
   // The miner tx prefix should be sealed by now, and the tx hash should be defined.

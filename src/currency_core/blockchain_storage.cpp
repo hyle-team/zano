@@ -1322,17 +1322,10 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
 
   if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
   {
-    if (pos)
-    {
-      CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 1, false, "coinbase transaction has incorrect number of proofs (" << b.miner_tx.proofs.size() << "), expected 2");
-      CHECK_AND_ASSERT_MES(b.miner_tx.proofs[0].type() == typeid(zc_outs_range_proof), false, "coinbase transaction has incorrect type of proof #0 (expected: zc_outs_range_proof)");
-    }
-    else
-    {
-      CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 2, false, "coinbase transaction has incorrect number of proofs (" << b.miner_tx.proofs.size() << "), expected 2");
-      CHECK_AND_ASSERT_MES(b.miner_tx.proofs[0].type() == typeid(zc_outs_range_proof), false, "coinbase transaction has incorrect type of proof #0 (expected: zc_outs_range_proof)");
-      CHECK_AND_ASSERT_MES(b.miner_tx.proofs[1].type() == typeid(zc_balance_proof), false, "coinbase transaction has incorrect type of proof #1 (expected: zc_balance_proof)");
-    }
+    CHECK_AND_ASSERT_MES(b.miner_tx.attachment.empty(), false, "coinbase transaction has attachments; attachments are not allowed for coinbase transactions.");
+    CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 2, false, "coinbase transaction has incorrect number of proofs (" << b.miner_tx.proofs.size() << "), expected 2");
+    CHECK_AND_ASSERT_MES(b.miner_tx.proofs[0].type() == typeid(zc_outs_range_proof), false, "coinbase transaction has incorrect type of proof #0 (expected: zc_outs_range_proof)");
+    CHECK_AND_ASSERT_MES(b.miner_tx.proofs[1].type() == typeid(zc_balance_proof), false, "coinbase transaction has incorrect type of proof #1 (expected: zc_balance_proof)");
   }
   else
   {

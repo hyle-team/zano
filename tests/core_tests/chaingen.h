@@ -467,7 +467,7 @@ public:
   bool sign_block(const tools::wallet2::mining_context& mining_context,
                   const currency::pos_entry& pe,
                   const tools::wallet2& w,
-                  const currency::outputs_generation_context& miner_tx_ogc,
+                  currency::outputs_generation_context& miner_tx_ogc,
                   currency::block& b);
   
   /*bool get_output_details_by_global_index(const test_generator::blockchain_vector& blck_chain,
