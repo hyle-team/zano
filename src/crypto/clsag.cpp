@@ -998,7 +998,7 @@ namespace crypto
       hsc.add_point(sig.r_x[i] * c_point_X + c_prev * W_pub_keys_x[i]);
       hsc.add_point(sig.r_x[i] * hash_helper_t::hp(ring[i].stealth_address) + c_prev * W_key_image_x);
       c_prev = hsc.calc_hash(); // c_{i + 1}
-      DBG_PRINT("c[" << i + 1 << "] = Hs(ih, " << sig.r_g[i] * c_point_G + c_prev * W_pub_keys_g[i] << ", " << sig.r_g[i] * hash_helper_t::hp(ring[i].stealth_address) + c_prev * W_key_image_g << ", " << sig.r_x[i] * c_point_X + c_prev * W_pub_keys_x[i] << ", " << sig.r_x[i] * hash_helper_t::hp(ring[i].stealth_address) + c_prev * W_key_image_x << ")");
+      //DBG_PRINT("c[" << i + 1 << "] = Hs(ih, " << sig.r_g[i] * c_point_G + c_prev * W_pub_keys_g[i] << ", " << sig.r_g[i] * hash_helper_t::hp(ring[i].stealth_address) + c_prev * W_key_image_g << ", " << sig.r_x[i] * c_point_X + c_prev * W_pub_keys_x[i] << ", " << sig.r_x[i] * hash_helper_t::hp(ring[i].stealth_address) + c_prev * W_key_image_x << ")");
     }
     DBG_PRINT("c[" << secret_index << "] = " << c_prev);
 
@@ -1141,7 +1141,7 @@ namespace crypto
     DBG_PRINT("c[0] = " << c_prev);
     for(size_t i = 0; i < ring_size; ++i)
     {
-      hsc.add_32_chars(CRYPTO_HDS_CLSAG_GGXG_CHALLENGE);
+      hsc.add_32_chars(CRYPTO_HDS_CLSAG_GGXXG_CHALLENGE);
       hsc.add_hash(input_hash);
       hsc.add_point(sig.r_g[i] * c_point_G + c_prev * W_pub_keys_g[i]);
       hsc.add_point(sig.r_g[i] * hash_helper_t::hp(ring[i].stealth_address) + c_prev * W_key_image_g);
@@ -1149,7 +1149,7 @@ namespace crypto
       hsc.add_point(sig.r_x[i] * hash_helper_t::hp(ring[i].stealth_address) + c_prev * W_key_image_x);
       c_prev = hsc.calc_hash(); // c_{i + 1}
       DBG_PRINT("c[" << i + 1 << "] = " << c_prev);
-      DBG_PRINT("c[" << i + 1 << "] = Hs(ih, " << sig.r_g[i] * c_point_G + c_prev * W_pub_keys_g[i] << ", " << sig.r_g[i] * hash_helper_t::hp(ring[i].stealth_address) + c_prev * W_key_image_g << ", " << sig.r_x[i] * c_point_X + c_prev * W_pub_keys_x[i] << ", " << sig.r_x[i] * hash_helper_t::hp(ring[i].stealth_address) + c_prev * W_key_image_x << ")");
+      //DBG_PRINT("c[" << i + 1 << "] = Hs(ih, " << sig.r_g[i] * c_point_G + c_prev * W_pub_keys_g[i] << ", " << sig.r_g[i] * hash_helper_t::hp(ring[i].stealth_address) + c_prev * W_key_image_g << ", " << sig.r_x[i] * c_point_X + c_prev * W_pub_keys_x[i] << ", " << sig.r_x[i] * hash_helper_t::hp(ring[i].stealth_address) + c_prev * W_key_image_x << ")");
     }
 
     return c_prev == sig.c;
