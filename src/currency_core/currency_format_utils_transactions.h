@@ -209,8 +209,9 @@ namespace currency
   {
     outputs_generation_context() = default;
 
-    outputs_generation_context(size_t outs_count)
-      : asset_ids(outs_count)
+    outputs_generation_context(size_t zc_ins_count, size_t outs_count)
+      : /*pseudo_outs_blinded_asset_ids(zc_ins_count)
+      , */asset_ids(outs_count)
       , blinded_asset_ids(outs_count)
       , amount_commitments(outs_count)
       , asset_id_blinding_masks(outs_count)
@@ -218,15 +219,17 @@ namespace currency
       , amount_blinding_masks(outs_count)
     {}
 
-    bool check_sizes(size_t outs_count) const
+    // TODO @#@# reconsider this check -- sowle
+    bool check_sizes(size_t zc_ins_count, size_t outs_count) const
     {
       return
-        asset_ids.size()                == outs_count &&
-        blinded_asset_ids.size()        == outs_count &&
-        amount_commitments.size()       == outs_count &&
-        asset_id_blinding_masks.size()  == outs_count &&
-        amounts.size()                  == outs_count &&
-        amount_blinding_masks.size()    == outs_count;
+        pseudo_outs_blinded_asset_ids.size()  == zc_ins_count &&
+        asset_ids.size()                      == outs_count &&
+        blinded_asset_ids.size()              == outs_count &&
+        amount_commitments.size()             == outs_count &&
+        asset_id_blinding_masks.size()        == outs_count &&
+        amounts.size()                        == outs_count &&
+        amount_blinding_masks.size()          == outs_count;
     }
 
     // per output data
@@ -236,6 +239,11 @@ namespace currency
     crypto::scalar_vec_t asset_id_blinding_masks;                                     //                                construct_tx_out
     crypto::scalar_vec_t amounts;                                                     // generate_zc_outs_range_proof
     crypto::scalar_vec_t amount_blinding_masks;                                       // generate_zc_outs_range_proof
+
+    // per zc input data
+    std::vector<crypto::point_t> pseudo_outs_blinded_asset_ids;
+    crypto::scalar_vec_t pseudo_outs_plus_real_out_blinding_masks; // r_pi + r'_j
+    std::vector<crypto::point_t> real_zc_ins_asset_ids;            // H_i
 
     // common data: inputs
     crypto::point_t  pseudo_out_amount_commitments_sum      = crypto::c_point_0;      //                                                   generate_tx_balance_proof  generate_ZC_sig
@@ -253,7 +261,7 @@ namespace currency
     crypto::point_t     ao_amount_commitment                = crypto::c_point_0;
     crypto::scalar_t    ao_amount_blinding_mask             {};                       //                                                   generate_tx_balance_proof  generate_ZC_sig
 
-    // consider redesign
+    // consider redesign, some data may possibly be excluded from kv serialization -- sowle
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE_CONTAINER_POD_AS_BLOB(asset_ids);
       KV_SERIALIZE_CONTAINER_POD_AS_BLOB(blinded_asset_ids);

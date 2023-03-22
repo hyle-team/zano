@@ -20,6 +20,7 @@
 #include "crypto/range_proofs.h"
 #include "crypto/clsag.h"
 #include "crypto/zarcanum.h"
+#include "crypto/one_out_of_many_proofs.h"
 #include "boost_serialization_maps.h"
 #include "serialization/keyvalue_enable_POD_serialize_as_string.h"
 //

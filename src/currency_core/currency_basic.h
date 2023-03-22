@@ -434,14 +434,12 @@ namespace currency
 
   struct zc_asset_surjection_proof
   {
-    int stub = 0; // TODO: one-out-of-many Groth-Bootle-Esgin proof here, adapted version of membership Groth-Kohlweis proof with optimisations from Bootle et. al. and Esgin et. al.
+    std::vector<crypto::BGE_proof> bge_proofs; // one per output, non-aggregated version of Groth-Bootle-Esgin yet, need to be upgraded later -- sowle
 
     BEGIN_SERIALIZE_OBJECT()
-      FIELD(stub)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(stub)
     END_BOOST_SERIALIZATION()
   };
 
