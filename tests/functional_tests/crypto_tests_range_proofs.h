@@ -25,17 +25,57 @@ bool wip_vandermonde(const scalar_vec_t& av, const scalar_vec_t& bv, const scala
 }
 
 
-static_assert(constexpr_floor_log2(0) == 0, "");
-static_assert(constexpr_floor_log2(1) == 0, "");
-static_assert(constexpr_floor_log2(2) == 1, "");
-static_assert(constexpr_floor_log2(3) == 1, "");
-static_assert(constexpr_floor_log2(4) == 2, "");
-static_assert(constexpr_floor_log2(5) == 2, "");
-static_assert(constexpr_floor_log2(64) == 6, "");
-static_assert(constexpr_floor_log2(100) == 6, "");
-static_assert(constexpr_floor_log2(100000000) == 26, "");
-static_assert(constexpr_floor_log2(0x7fffffffffffffff) == 62, "");
-static_assert(constexpr_floor_log2(SIZE_MAX) == 63, "");
+static_assert(constexpr_floor_log_n(0, 2) == 0, "");
+static_assert(constexpr_floor_log_n(1, 2) == 0, "");
+static_assert(constexpr_floor_log_n(2, 2) == 1, "");
+static_assert(constexpr_floor_log_n(3, 2) == 1, "");
+static_assert(constexpr_floor_log_n(4, 2) == 2, "");
+static_assert(constexpr_floor_log_n(5, 2) == 2, "");
+static_assert(constexpr_floor_log_n(64, 2) == 6, "");
+static_assert(constexpr_floor_log_n(100, 2) == 6, "");
+static_assert(constexpr_floor_log_n(100000000, 2) == 26, "");
+static_assert(constexpr_floor_log_n(0x7fffffffffffffff, 2) == 62, "");
+static_assert(constexpr_floor_log_n(SIZE_MAX, 2) == 63, "");
+
+static_assert(constexpr_floor_log_n(0, 0) == 0, "");
+static_assert(constexpr_floor_log_n(1, 0) == 0, "");
+static_assert(constexpr_floor_log_n(2, 0) == 0, "");
+static_assert(constexpr_floor_log_n(100, 0) == 0, "");
+
+static_assert(constexpr_floor_log_n(1, 3) == 0, "");
+static_assert(constexpr_floor_log_n(2, 3) == 0, "");
+static_assert(constexpr_floor_log_n(3, 3) == 1, "");
+static_assert(constexpr_floor_log_n(8, 3) == 1, "");
+static_assert(constexpr_floor_log_n(9, 3) == 2, "");
+static_assert(constexpr_floor_log_n(26, 3) == 2, "");
+static_assert(constexpr_floor_log_n(27, 3) == 3, "");
+static_assert(constexpr_floor_log_n(100, 3) == 4, "");
+static_assert(constexpr_floor_log_n(531441, 3) == 12, "");
+static_assert(constexpr_floor_log_n(0x7fffffffffffffff, 3) == 39, "");
+static_assert(constexpr_floor_log_n(SIZE_MAX, 3) == 40, "");
+
+static_assert(constexpr_ceil_log_n(0, 0) == 0, "");
+static_assert(constexpr_ceil_log_n(0, 1) == 0, "");
+static_assert(constexpr_ceil_log_n(0, 2) == 0, "");
+static_assert(constexpr_ceil_log_n(1, 0) == 0, "");
+static_assert(constexpr_ceil_log_n(2, 0) == 0, "");
+static_assert(constexpr_ceil_log_n(1, 1) == 0, "");
+static_assert(constexpr_ceil_log_n(1, 2) == 0, "");
+static_assert(constexpr_ceil_log_n(2, 1) == 0, "");
+
+static_assert(constexpr_ceil_log_n(0, 5) == 0, "");
+static_assert(constexpr_ceil_log_n(1, 5) == 0, "");
+static_assert(constexpr_ceil_log_n(4, 5) == 1, "");
+static_assert(constexpr_ceil_log_n(5, 5) == 1, "");
+static_assert(constexpr_ceil_log_n(6, 5) == 2, "");
+static_assert(constexpr_ceil_log_n(25, 5) == 2, "");
+static_assert(constexpr_ceil_log_n(100, 5) == 3, "");
+static_assert(constexpr_ceil_log_n(624, 5) == 4, "");
+static_assert(constexpr_ceil_log_n(625, 5) == 4, "");
+static_assert(constexpr_ceil_log_n(626, 5) == 5, "");
+static_assert(constexpr_ceil_log_n(100000000, 5) == 12, "");
+static_assert(constexpr_ceil_log_n(0x7fffffffffffffff, 5) == 28, "");
+static_assert(constexpr_ceil_log_n(SIZE_MAX, 5) == 28, "");
 
 static_assert(constexpr_ceil_log2(0) == 0, "");
 static_assert(constexpr_ceil_log2(1) == 0, "");

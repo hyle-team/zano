@@ -24,18 +24,25 @@ namespace crypto
   }
 
 
-  // returns greatest k, s.t. 2**k <= v
+  // returns greatest k, s.t. n**k <= v
   // tests in crypto_tests_range_proofs.h
-  constexpr size_t constexpr_floor_log2(size_t v)
+  constexpr size_t constexpr_floor_log_n(size_t v, size_t n)
   {
-    return v <= 1 ? 0 : constexpr_floor_log2(v >> 1) + 1;
+    return (v < n || n <= 1) ? 0 : constexpr_floor_log_n(v / n, n) + 1;
+  }
+
+  // returns smallest k, s.t. v <= n**k
+  // tests in crypto_tests_range_proofs.h
+  constexpr size_t constexpr_ceil_log_n(size_t v, size_t n)
+  {
+    return (v <= 1 || n <= 1) ? 0 : constexpr_floor_log_n(v - 1, n) + 1;
   }
 
   // returns smallest k, s.t. v <= 2**k
   // tests in crypto_tests_range_proofs.h
   constexpr size_t constexpr_ceil_log2(size_t v)
   {
-    return v <= 1 ? 0 : constexpr_floor_log2(v - 1) + 1;
+    return constexpr_ceil_log_n(v, 2);
   }
 
 
