@@ -1178,6 +1178,74 @@ namespace wallet_public
     };
   };
 
+  struct COMMAND_IONIC_SWAP_GENERATE_PROPOSAL
+  {
+    struct request
+    {
+      view::ionic_swap_proposal_info proposal;
+      std::string destination_address;
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(proposal)
+        KV_SERIALIZE(destination_address)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      std::string hex_raw_proposal;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(hex_raw_proposal)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO
+  {
+    struct request
+    {
+      std::string hex_raw_proposal;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(hex_raw_proposal)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      view::ionic_swap_proposal_info proposal;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(proposal)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL
+  {
+    struct request
+    {
+      std::string hex_raw_proposal;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(hex_raw_proposal)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      crypto::hash result_tx_id;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx_id)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+
   struct assets_whitelist
   {
     std::vector<currency::asset_descriptor_with_id> assets;

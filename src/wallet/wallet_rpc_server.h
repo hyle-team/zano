@@ -73,6 +73,10 @@ namespace tools
         MAP_JON_RPC_WE("atomics_redeem_htlc", on_redeem_htlc,                           wallet_public::COMMAND_REDEEM_HTLC)
         MAP_JON_RPC_WE("atomics_check_htlc_redeemed", on_check_htlc_redeemed,           wallet_public::COMMAND_CHECK_HTLC_REDEEMED)
 
+        //IONIC_SWAPS API
+        MAP_JON_RPC_WE("ionic_swap_generate_proposal", on_ionic_swap_generate_proposal, wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL)
+        MAP_JON_RPC_WE("ionic_swap_get_proposal_info", on_ionic_swap_get_proposal_info, wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO)
+        MAP_JON_RPC_WE("ionic_swap_accept_proposal", on_ionic_swap_accept_proposal,     wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL)
       END_JSON_RPC_MAP()
     END_URI_MAP2()
 
@@ -113,6 +117,10 @@ namespace tools
       bool on_get_list_of_active_htlc(const wallet_public::COMMAND_GET_LIST_OF_ACTIVE_HTLC::request& req, wallet_public::COMMAND_GET_LIST_OF_ACTIVE_HTLC::response& res, epee::json_rpc::error& er, connection_context& cntx);
       bool on_redeem_htlc(const wallet_public::COMMAND_REDEEM_HTLC::request& req, wallet_public::COMMAND_REDEEM_HTLC::response& res, epee::json_rpc::error& er, connection_context& cntx);
       bool on_check_htlc_redeemed(const wallet_public::COMMAND_CHECK_HTLC_REDEEMED::request& req, wallet_public::COMMAND_CHECK_HTLC_REDEEMED::response& res, epee::json_rpc::error& er, connection_context& cntx);
+
+      bool on_ionic_swap_generate_proposal(const wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL& req, wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_ionic_swap_get_proposal_info(const wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO& req, wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_ionic_swap_accept_proposal(const wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL& req, wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
 
       bool handle_command_line(const boost::program_options::variables_map& vm);
