@@ -24,7 +24,7 @@ namespace crypto
     if (!(cond)) { LOG_PRINT_RED("generate_BGE_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << (int)err_code, LOG_LEVEL_3); \
     if (p_err) { *p_err = err_code; } return false; }
 
-  bool generate_BGE_proof(const std::vector<point_t>& ring, const scalar_t& secret, const size_t secret_index, BGE_proof& result, uint8_t* p_err /* = nullptr */)
+  bool generate_BGE_proof(const hash& m, const std::vector<point_t>& ring, const scalar_t& secret, const size_t secret_index, BGE_proof& result, uint8_t* p_err /* = nullptr */)
   {
     DBG_PRINT(" - - - generate_BGE_proof - - -");
     size_t N = ring.size();
@@ -39,7 +39,7 @@ namespace crypto
   }
 
 
-  bool verify_BGE_proof(const std::vector<const public_key*>& ring, BGE_proof& result, uint8_t* p_err /* = nullptr */)
+  bool verify_BGE_proof(const hash& m, const std::vector<const public_key*>& ring, BGE_proof& result, uint8_t* p_err /* = nullptr */)
   {
     return false;
   }

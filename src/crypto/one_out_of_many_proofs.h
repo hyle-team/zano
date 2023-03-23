@@ -30,10 +30,10 @@ namespace crypto
     scalar_t z;
   };
 
-  bool generate_BGE_proof(const std::vector<point_t>& ring, const scalar_t& secret, const size_t secret_index, BGE_proof& result, uint8_t* p_err = nullptr);
+  bool generate_BGE_proof(const hash& m, const std::vector<point_t>& ring, const scalar_t& secret, const size_t secret_index, BGE_proof& result, uint8_t* p_err = nullptr);
 
 
-  bool verify_BGE_proof(const std::vector<const public_key*>& ring, BGE_proof& result, uint8_t* p_err = nullptr);
+  bool verify_BGE_proof(const hash& m, const std::vector<const public_key*>& ring, BGE_proof& result, uint8_t* p_err = nullptr);
 
 
 } // namespace crypto

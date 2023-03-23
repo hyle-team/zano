@@ -71,7 +71,7 @@ namespace currency
   }*/
 
   //--------------------------------------------------------------------------------
-  bool generate_asset_surjection_proof(const crypto::hash& context_hash, outputs_generation_context& ogc, zc_asset_surjection_proof& result)
+  bool generate_asset_surjection_proof(const crypto::hash& context_hash, bool has_non_zc_inputs, outputs_generation_context& ogc, zc_asset_surjection_proof& result)
   {
     bool r = false;
     size_t outs_count = ogc.blinded_asset_ids.size();
@@ -117,10 +117,13 @@ namespace currency
           secret_index = i;
       }
       CHECK_AND_ASSERT_MES(secret_index != SIZE_MAX, false, "");
-      crypto::scalar_t secret = ogc.pseudo_outs_plus_real_out_blinding_masks[j] - ogc.asset_id_blinding_masks[j];
+      if (has_non_zc_inputs)
+        ring.emplace_back(currency::native_coin_asset_id_pt); // additional ring member for txs with non-zc inputs
+
+      crypto::scalar_t secret = ogc.pseudo_outs_plus_real_out_blinding_masks[secret_index] - ogc.asset_id_blinding_masks[j];
 
       result.bge_proofs.emplace_back(crypto::BGE_proof{});
-      r = crypto::generate_BGE_proof(ring, secret, secret_index,  result.bge_proofs.back());
+      r = crypto::generate_BGE_proof(context_hash, ring, secret, secret_index,  result.bge_proofs.back());
       CHECK_AND_ASSERT_MES(r, false, "");
     }
 
@@ -411,6 +414,7 @@ namespace currency
         outs_gen_context.blinded_asset_ids[output_index], outs_gen_context.amount_commitments[output_index], result, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "construct_tx_out failed, output #" << output_index << ", amount: " << print_money_brief(d.amount));
       outs_gen_context.amounts[output_index] = d.amount;
+      outs_gen_context.asset_ids[output_index] = crypto::point_t(d.asset_id);
       outs_gen_context.asset_id_blinding_mask_x_amount_sum += outs_gen_context.asset_id_blinding_masks[output_index] * d.amount;
       outs_gen_context.amount_blinding_masks_sum += outs_gen_context.amount_blinding_masks[output_index];
       outs_gen_context.amount_commitments_sum += outs_gen_context.amount_commitments[output_index];
@@ -2124,7 +2128,7 @@ namespace currency
         }
       }
     }
-
+    bool has_non_zc_inputs = zc_inputs_count != sources.size(); // TODO @#@# reconsider this for consilidated txs
     
     //
     // OUTs
@@ -2193,6 +2197,7 @@ namespace currency
         outs_gen_context.blinded_asset_ids[j], outs_gen_context.amount_commitments[j], result, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "Failed to construct tx out");
       outs_gen_context.amounts[j] = dst_entr.amount;
+      outs_gen_context.asset_ids[j] = crypto::point_t(dst_entr.asset_id);
       outs_gen_context.asset_id_blinding_mask_x_amount_sum += outs_gen_context.asset_id_blinding_masks[j] * dst_entr.amount;
       outs_gen_context.amount_blinding_masks_sum += outs_gen_context.amount_blinding_masks[j];
       outs_gen_context.amount_commitments_sum += outs_gen_context.amount_commitments[j];
@@ -2300,7 +2305,7 @@ namespace currency
     {
       // asset surjection proof
       currency::zc_asset_surjection_proof asp{};
-      bool r = generate_asset_surjection_proof(tx_prefix_hash, outs_gen_context, asp);
+      bool r = generate_asset_surjection_proof(tx_prefix_hash, has_non_zc_inputs, outs_gen_context, asp);
       CHECK_AND_ASSERT_MES(r, false, "generete_asset_surjection_proof failed");
       tx.proofs.emplace_back(std::move(asp));
 
