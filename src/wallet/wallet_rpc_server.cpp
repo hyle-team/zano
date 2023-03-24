@@ -928,17 +928,75 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_ionic_swap_generate_proposal(const wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL& req, wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
+    currency::account_public_address destination_addr = AUTO_VAL_INIT(destination_addr);
+    currency::payment_id_t integrated_payment_id;
+    if (!m_wallet.get_transfer_address(req.destination_address, destination_addr, integrated_payment_id))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
+      er.message = "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS";
+      return false;
+    }
+    if (integrated_payment_id.size())
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
+      er.message = "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS - integrated address is noit supported yet";
+      return false;
+    }
 
+    currency::transaction tx_template = AUTO_VAL_INIT(tx_template);
+    bool r = m_wallet.create_ionic_swap_proposal(req.proposal, destination_addr, tx_template);
+    if (!r)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT - Error creating proposal";
+      return false;
+    }
+    res.hex_raw_proposal = epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(tx_template));
+    return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_ionic_swap_get_proposal_info(const wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO& req, wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
+    std::string raw_tx_template;
+    bool r = epee::string_tools::parse_hexstr_to_binbuff(req.hex_raw_proposal, raw_tx_template);
+    if (!r)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT - failed to parse template from hex";
+      return false;
+    }
 
+    if (!m_wallet.get_ionic_swap_proposal_info(raw_tx_template, res.proposal))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT - get_ionic_swap_proposal_info";
+      return false;
+    }
+    return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_ionic_swap_accept_proposal(const wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL& req, wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
 
+    std::string raw_tx_template;
+    bool r = epee::string_tools::parse_hexstr_to_binbuff(req.hex_raw_proposal, raw_tx_template);
+    if (!r)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT - failed to parse template from hex";
+      return false;
+    }
+
+    currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
+    if (!m_wallet.accept_ionic_swap_proposal(raw_tx_template, result_tx))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT - failed to accept_ionic_swap_proposal()";
+      return false;
+    }
+
+    res.result_tx_id = currency::get_transaction_hash(result_tx);
+    return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
 
