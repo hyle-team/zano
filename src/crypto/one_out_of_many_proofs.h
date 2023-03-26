@@ -22,18 +22,18 @@ namespace crypto
 
   struct BGE_proof
   {
-    point_t A;
-    point_t B;
-    std::vector<point_t> Pk;
+    public_key A;                  // premultiplied by 1/8
+    public_key B;                  // premultiplied by 1/8
+    std::vector<public_key> Pk;    // premultiplied by 1/8
     scalar_vec_t f;
     scalar_t y;
     scalar_t z;
   };
 
-  bool generate_BGE_proof(const hash& m, const std::vector<point_t>& ring, const scalar_t& secret, const size_t secret_index, BGE_proof& result, uint8_t* p_err = nullptr);
+  bool generate_BGE_proof(const hash& context_hash, const std::vector<point_t>& ring, const scalar_t& secret, const size_t secret_index, BGE_proof& result, uint8_t* p_err = nullptr);
 
 
-  bool verify_BGE_proof(const hash& m, const std::vector<const public_key*>& ring, BGE_proof& result, uint8_t* p_err = nullptr);
+  bool verify_BGE_proof(const hash& context_hash, const std::vector<const public_key*>& ring, BGE_proof& result, uint8_t* p_err = nullptr);
 
 
 } // namespace crypto
