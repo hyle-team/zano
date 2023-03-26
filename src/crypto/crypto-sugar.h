@@ -20,6 +20,34 @@ namespace crypto
   // Helpers
   //
 
+  // returns greatest k, s.t. n**k <= v
+  // tests in crypto_tests_range_proofs.h
+  constexpr uint64_t constexpr_floor_log_n(uint64_t v, uint64_t n)
+  {
+    return (v < n || n <= 1) ? 0 : constexpr_floor_log_n(v / n, n) + 1;
+  }
+
+  // returns smallest k, s.t. v <= n**k
+  // tests in crypto_tests_range_proofs.h
+  constexpr uint64_t constexpr_ceil_log_n(uint64_t v, uint64_t n)
+  {
+    return (v <= 1 || n <= 1) ? 0 : constexpr_floor_log_n(v - 1, n) + 1;
+  }
+
+  // returns smallest k, s.t. v <= 2**k
+  // tests in crypto_tests_range_proofs.h
+  constexpr uint64_t constexpr_ceil_log2(uint64_t v)
+  {
+    return constexpr_ceil_log_n(v, 2);
+  }
+
+  // returns base ** k
+  constexpr uint64_t constexpr_pow(uint64_t k, uint64_t base)
+  {
+    return k == 0 ? 1 : base * constexpr_pow(k - 1, base);
+  }
+
+
   template<class pod_t>
   std::string pod_to_hex_reversed(const pod_t &h)
   {

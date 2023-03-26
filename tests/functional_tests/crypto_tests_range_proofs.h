@@ -89,6 +89,19 @@ static_assert(constexpr_ceil_log2(100000000) == 27, "");
 static_assert(constexpr_ceil_log2(0x7fffffffffffffff) == 63, "");
 static_assert(constexpr_ceil_log2(SIZE_MAX) == 64, "");
 
+static_assert(constexpr_pow(0, 0) == 1, "");
+static_assert(constexpr_pow(0, 1) == 1, "");
+static_assert(constexpr_pow(1, 1) == 1, "");
+
+static_assert(constexpr_pow(1, 0) == 0, "");
+static_assert(constexpr_pow(0, 2) == 1, "");
+static_assert(constexpr_pow(1, 2) == 2, "");
+static_assert(constexpr_pow(10, 2) == 1024, "");
+static_assert(constexpr_pow(63, 2) == 1ull << 63, "");
+static_assert(constexpr_pow(3, 3) == 27, "");
+static_assert(constexpr_pow(33, 3) == 5559060566555523ull, "");
+
+
 
 TEST(bpp, basics)
 {
