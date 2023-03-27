@@ -494,6 +494,7 @@ struct test_keeper_t
 #include "crypto_tests_ml2s.h"
 #include "crypto_tests_range_proofs.h"
 #include "crypto_tests_clsag.h"
+#include "crypto_tests_one_out_of_many_proofs.h"
 ////////////////////////////////////////////////////////////////////////////////
 
 

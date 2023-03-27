@@ -34,7 +34,7 @@ namespace crypto
   bool generate_BGE_proof(const hash& context_hash, const std::vector<point_t>& ring, const scalar_t& secret, const size_t secret_index, BGE_proof& result, uint8_t* p_err = nullptr);
 
 
-  bool verify_BGE_proof(const hash& context_hash, const std::vector<const public_key*>& ring, BGE_proof& result, uint8_t* p_err = nullptr);
+  bool verify_BGE_proof(const hash& context_hash, const std::vector<const public_key*>& ring, const BGE_proof& sig, uint8_t* p_err = nullptr);
 
 
 } // namespace crypto

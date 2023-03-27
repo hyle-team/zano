@@ -9,7 +9,7 @@
 
 //DISABLE_GCC_AND_CLANG_WARNING(unused-function)
 
-#if 0
+#if 1
 #  define DBG_VAL_PRINT(x) std::cout << std::setw(30) << std::left << #x ": " << x << std::endl
 #  define DBG_PRINT(x)     std::cout << x << std::endl
 #else
@@ -188,6 +188,7 @@ namespace crypto
     hsc.add_pub_key(result.B);
     hsc.add_pub_keys_array(result.Pk);
     scalar_t x = hsc.calc_hash();
+    DBG_VAL_PRINT(x);
 
     result.f.resize(m * (n - 1));
     for(size_t j = 0; j < m; ++j)
@@ -213,12 +214,105 @@ namespace crypto
 
     return true;
   }
+#undef CHECK_AND_FAIL_WITH_ERROR_IF_FALSE
+
+  //---------------------------------------------------------------
 
 
-  bool verify_BGE_proof(const hash& context_hash, const std::vector<const public_key*>& ring, BGE_proof& result, uint8_t* p_err /* = nullptr */)
+#define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
+    if (!(cond)) { LOG_PRINT_RED("generate_BGE_proof: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << (int)err_code, LOG_LEVEL_3); \
+    if (p_err) { *p_err = err_code; } return false; }
+
+  bool verify_BGE_proof(const hash& context_hash, const std::vector<const public_key*>& ring, const BGE_proof& sig, uint8_t* p_err /* = nullptr */)
   {
-    return false;
+    static constexpr size_t n = 4; // TODO: @#@# move it out
+
+    DBG_PRINT(" - - - verify_BGE_proof - - -");
+    size_t ring_size = ring.size();
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(ring_size > 0, 0);
+
+    const size_t m = std::max(1ull, constexpr_ceil_log_n(ring_size, n));
+    const size_t N = constexpr_pow(m, n);
+    const size_t mn = m * n;
+
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.Pk.size() == m, 1);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.f.size() == m * (n - 1), 2);
+
+    hash_helper_t::hs_t hsc(1 + ring_size + 2 + m);
+    hsc.add_hash(context_hash);
+    for(const public_key* ppk : ring)
+      hsc.add_pub_key(*ppk);
+    hsc.add_pub_key(sig.A);
+    hsc.add_pub_key(sig.B);
+    hsc.add_pub_keys_array(sig.Pk);
+    scalar_t x = hsc.calc_hash();
+    DBG_VAL_PRINT(x);
+
+    scalar_vec_t f0(m); // the first column  f_{i,0} = x - sum{j=1}{n-1}( f_{i,j} )
+    for(size_t j = 0; j < m; ++j)
+    {
+      f0[j] = x;
+      for(size_t i = 1; i < n; ++i)
+        f0[j] -= sig.f[j * (n - 1) + i - 1];
+    }
+
+    //
+    // 1
+    //
+    point_t A = point_t(sig.A).modify_mul8();
+    point_t B = point_t(sig.B).modify_mul8();
+
+    point_t Z = A + x * B;
+
+    bool r = false, r2 = false;
+    for(size_t j = 0; j < m; ++j)
+    {
+      for(size_t i = 0; i < n; ++i)
+      {
+        const point_t& gen_1 = get_BGE_generator((j * n + i) * 2 + 0, r);
+        const point_t& gen_2 = get_BGE_generator((j * n + i) * 2 + 1, r2);
+        CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(r && r2, 5);
+        const scalar_t& f_ji = (i == 0) ? f0[j] : sig.f[j * (n - 1) + i - 1];
+        
+        Z -= f_ji * gen_1 + f_ji * (x - f_ji) * gen_2;
+      }
+    }
+    Z -= sig.y * c_point_X;
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(Z.is_zero(), 100);
+
+    //
+    // 2
+    //
+    scalar_vec_t p_vec(N);
+    for(size_t i = 0; i < N; ++i)
+    {
+      p_vec[i] = c_scalar_1;
+      for(size_t j = 0; j < m; ++j)
+      {
+        const scalar_t& f_ji = (i == 0) ? f0[j] : sig.f[j * (n - 1) + i - 1];
+        p_vec[i] *= f_ji;
+      }
+    }
+
+    for(size_t i = 0; i < ring_size; ++i)
+      Z += p_vec[i] * point_t(*ring[i]).modify_mul8();
+    for(size_t i = ring_size; i < N; ++i)
+      Z += p_vec[i] * point_t(*ring[ring_size - 1]).modify_mul8();
+
+    scalar_t x_power = c_scalar_1;
+    for(size_t k = 0; k < m; ++k)
+    {
+      Z -= x_power * point_t(sig.Pk[k]).modify_mul8();
+      x_power *= x;
+    }
+
+    Z -= sig.z * c_point_X;
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(Z.is_zero(), 101);
+
+    return true;
   }
+
+#undef CHECK_AND_FAIL_WITH_ERROR_IF_FALSE
 
 
 } // namespace crypto
