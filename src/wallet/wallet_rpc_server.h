@@ -77,6 +77,11 @@ namespace tools
         MAP_JON_RPC_WE("ionic_swap_generate_proposal", on_ionic_swap_generate_proposal, wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL)
         MAP_JON_RPC_WE("ionic_swap_get_proposal_info", on_ionic_swap_get_proposal_info, wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO)
         MAP_JON_RPC_WE("ionic_swap_accept_proposal", on_ionic_swap_accept_proposal,     wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL)
+
+        //MULTIWALLET APIs
+        MAP_JON_RPC_WE("mw_get_wallets",   on_mw_get_wallets,       wallet_public::COMMAND_MW_GET_WALLETS)
+        MAP_JON_RPC_WE("mw_select_wallet", on_mw_select_wallet,     wallet_public::COMMAND_MW_SELECT_WALLET)
+
       END_JSON_RPC_MAP()
     END_URI_MAP2()
 
@@ -121,6 +126,9 @@ namespace tools
       bool on_ionic_swap_generate_proposal(const wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL& req, wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx);
       bool on_ionic_swap_get_proposal_info(const wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO& req, wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx);
       bool on_ionic_swap_accept_proposal(const wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL& req, wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx);
+
+      bool on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_mw_select_wallet(const wallet_public::COMMAND_MW_SELECT_WALLET& req, wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
 
       bool handle_command_line(const boost::program_options::variables_map& vm);

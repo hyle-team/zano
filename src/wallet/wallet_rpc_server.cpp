@@ -999,6 +999,30 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-
-
+  bool wallet_rpc_server::on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    i_wallet2_callback* pcallback = m_wallet.get_callback();
+    if (!pcallback)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR";
+      return false;
+    }
+    pcallback->on_mw_get_wallets(res.wallets);
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_mw_select_wallet(const wallet_public::COMMAND_MW_SELECT_WALLET& req, wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    i_wallet2_callback* pcallback = m_wallet.get_callback();
+    if (!pcallback)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR";
+      return false;
+    }
+    pcallback->on_mw_select_wallet(req.wallet_id);
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
 } // namespace tools

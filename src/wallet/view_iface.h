@@ -209,40 +209,9 @@ public:
     END_KV_SERIALIZE_MAP()
   };  
   
-  struct wallet_info
-  {
-    std::list<tools::wallet_public::asset_balance_entry> balances;
-		uint64_t mined_total;
-    std::string address;
-    std::string view_sec_key;
-    std::string path;
-    bool is_auditable;
-    bool is_watch_only;
+  typedef wallet_public::wallet_info wallet_info;
 
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(balances)
-			KV_SERIALIZE(mined_total)			
-      KV_SERIALIZE(address)
-      KV_SERIALIZE(view_sec_key)
-      KV_SERIALIZE(path)
-      KV_SERIALIZE(is_auditable);
-      KV_SERIALIZE(is_watch_only);
-    END_KV_SERIALIZE_MAP()
-  };
-
-
-
-  struct wallet_entry_info
-  {
-    wallet_info wi;
-    uint64_t    wallet_id;
-
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(wi)
-      KV_SERIALIZE(wallet_id)
-    END_KV_SERIALIZE_MAP()
-
-  };
+  typedef wallet_public::wallet_entry_info wallet_entry_info;
 
 
 

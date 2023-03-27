@@ -126,6 +126,10 @@ namespace tools
     virtual void on_transfer_canceled(const wallet_public::wallet_transfer_info& wti) {}
     virtual void on_message(message_severity /*severity*/, const std::string& /*m*/) {}
     virtual void on_tor_status_change(const std::string& state) {}
+
+    //mw api
+    virtual void on_mw_get_wallets(std::vector<wallet_public::wallet_entry_info>& wallets) {}
+    virtual void on_mw_select_wallet(uint64_t wallet_id) {}
   };
 
   struct tx_dust_policy
@@ -546,6 +550,7 @@ namespace tools
     //i_wallet2_callback* callback() const { return m_wcallback; }
     //void callback(i_wallet2_callback* callback) { m_callback = callback; }
     void callback(std::shared_ptr<i_wallet2_callback> callback) { m_wcallback = callback; m_do_rise_transfer = (callback != nullptr); }
+    i_wallet2_callback* get_callback() { return m_wcallback; }
     void set_do_rise_transfer(bool do_rise) { m_do_rise_transfer = do_rise; }
 
     bool has_related_alias_entry_unconfirmed(const currency::transaction& tx);
