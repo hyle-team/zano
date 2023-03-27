@@ -20,12 +20,13 @@ namespace crypto
   // Disclaimer: shouldn't be used in production code until the security proofs and the code are peer-reviewed.
   //
 
+  // m+2 group elements, m(n-1)+2 field elements
   struct BGE_proof
   {
     public_key A;                  // premultiplied by 1/8
     public_key B;                  // premultiplied by 1/8
-    std::vector<public_key> Pk;    // premultiplied by 1/8
-    scalar_vec_t f;
+    std::vector<public_key> Pk;    // premultiplied by 1/8, size = m
+    scalar_vec_t f;                // size = m * (n - 1)
     scalar_t y;
     scalar_t z;
   };

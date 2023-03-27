@@ -57,14 +57,159 @@ namespace crypto
 
   bool generate_BGE_proof(const hash& context_hash, const std::vector<point_t>& ring, const scalar_t& secret, const size_t secret_index, BGE_proof& result, uint8_t* p_err /* = nullptr */)
   {
+    static constexpr size_t n = 4; // TODO: @#@# move it out
+
     DBG_PRINT(" - - - generate_BGE_proof - - -");
-    size_t N = ring.size();
-    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(N > 0, 0);
-    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(secret_index < N, 1);
+    size_t ring_size = ring.size();
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(ring_size > 0, 0);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(secret_index < ring_size, 1);
 
 #ifndef NDEBUG
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(ring[secret_index] == secret * crypto::c_point_X, 2);
 #endif
+
+
+    const size_t m = std::max(1ull, constexpr_ceil_log_n(ring_size, n));
+    const size_t N = constexpr_pow(m, n);
+    const size_t mn = m * n;
+
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(N <= N_max, 3);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(mn < mn_max, 4);
+
+    scalar_mat_t<n> a_mat(mn);       // m x n matrix
+    a_mat.zero();
+    std::vector<size_t> l_digits(m); // l => n-ary gidits
+    size_t l = secret_index;
+    for(size_t j = 0; j < m; ++j)
+    {
+      for(size_t i = n - 1; i != 0; --i) // [n - 1; 1]
+      {
+        a_mat(j, i).make_random();
+        a_mat(j, 0) -= a_mat(j, i); // a[j; 0] = -sum( a[j; i] ), i in [1; n-1]
+      }
+
+      size_t digit = l % n;         // j-th digit of secret_index
+      l_digits[j] = digit;
+      l = l / n;
+    }
+
+#ifndef NDEBUG
+    for(size_t j = 0; j < m; ++j)
+    {
+      scalar_t a_sum{};
+      for(size_t i = 0; i != n; ++i)
+        a_sum += a_mat(j, i);
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(a_sum.is_zero(), 230);
+    }
+#endif
+
+    //
+    // coeffs calculation (naive implementation, consider optimization in future)
+    //
+    scalar_vec_t coeffs(N * m);                     // m x N matrix
+    coeffs.zero();
+    for(size_t i = 0; i < N; ++i)
+    {
+      coeffs[i] = c_scalar_1;                       // first row is (1, ..., 1)
+      size_t i_tmp = i;
+      size_t m_bound = 1;
+      for(size_t j = 0; j < m; ++j)
+      {
+        size_t i_j = i_tmp % n;                     // j-th digit of i
+        i_tmp /= n;
+
+        if (i_j == l_digits[j])                     // true if j-th digits of i and l matches
+        {
+          scalar_t carry{};
+          for(size_t k = 0; k < m_bound; ++k)
+          {
+            scalar_t old = coeffs[k * N + i];
+            coeffs[k * N + i] *= a_mat(j, l_digits[j]);
+            coeffs[k * N + i] += carry;
+            carry = old;
+          }
+          if (m_bound < m)
+            coeffs[m_bound * N + i] += carry;
+          ++m_bound;
+        }
+        else
+        {
+          for(size_t k = 0; k < m_bound; ++k)
+            coeffs[k * N + i] *= a_mat(j, l_digits[j]);
+        }
+      }
+    }
+
+    scalar_t r_A = scalar_t::random();
+    scalar_t r_B = scalar_t::random();
+    scalar_vec_t ro(m);
+    ro.make_random();
+
+    point_t A = c_point_0;
+    point_t B = c_point_0;
+
+    result.Pk.clear();
+
+    bool r = false, r2 = false;
+    for(size_t j = 0; j < m; ++j)
+    {
+      for(size_t i = 0; i < n; ++i)
+      {
+        const point_t& gen_1 = get_BGE_generator((j * n + i) * 2 + 0, r);
+        const point_t& gen_2 = get_BGE_generator((j * n + i) * 2 + 1, r2);
+        CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(r && r2, 5);
+        const scalar_t& a = a_mat(j, i);
+        A += a * gen_1 - a * a * gen_2;
+        if (l_digits[j] == i)
+          B += gen_1 - a * gen_2;
+        else
+          B += a * gen_2;
+      }
+
+      point_t Pk = c_point_0;
+      for(size_t i = 0; i < ring_size; ++i)
+        Pk += coeffs[j * N + i] * ring[i];
+      for(size_t i = ring_size; i < N; ++i)
+        Pk += coeffs[j * N + i] * ring[ring_size - 1];
+
+      Pk += ro[j] * c_point_X;
+      result.Pk.emplace_back(std::move((c_scalar_1div8 * Pk).to_public_key()));
+    }
+    
+    A += r_A * c_point_X;
+    result.A = (c_scalar_1div8 * A).to_public_key();
+    B += r_B * c_point_X;
+    result.B = (c_scalar_1div8 * B).to_public_key();
+
+    hash_helper_t::hs_t hsc(1 + ring_size + 2 + m);
+    hsc.add_hash(context_hash);
+    hsc.add_points_array(ring);
+    hsc.add_pub_key(result.A);
+    hsc.add_pub_key(result.B);
+    hsc.add_pub_keys_array(result.Pk);
+    scalar_t x = hsc.calc_hash();
+
+    result.f.resize(m * (n - 1));
+    for(size_t j = 0; j < m; ++j)
+    {
+      for(size_t i = 1; i < n; ++i)
+      {
+        result.f[j * (n - 1) + i - 1] = a_mat(j, i);
+        if (l_digits[j] == i)
+          result.f[j * (n - 1) + i - 1] += x;
+      }
+    }
+
+    result.y = r_A + x * r_B;
+    
+    result.z = 0;
+    scalar_t x_power = c_scalar_1;
+    for(size_t k = 0; k < m; ++k)
+    {
+      result.z -= x_power * ro[k];
+      x_power *= x;
+    }
+    result.z += secret * x_power;
 
     return true;
   }
