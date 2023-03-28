@@ -9,7 +9,7 @@
 
 //DISABLE_GCC_AND_CLANG_WARNING(unused-function)
 
-#if 1
+#if 0
 #  define DBG_VAL_PRINT(x) std::cout << std::setw(30) << std::left << #x ": " << x << std::endl
 #  define DBG_PRINT(x)     std::cout << x << std::endl
 #else
@@ -74,7 +74,7 @@ namespace crypto
     const size_t mn = m * n;
 
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(N <= N_max, 3);
-    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(mn < mn_max, 4);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(mn <= mn_max, 4);
 
     scalar_mat_t<n> a_mat(mn);       // m x n matrix
     a_mat.zero();
@@ -124,7 +124,7 @@ namespace crypto
           for(size_t k = 0; k < m_bound; ++k)
           {
             scalar_t old = coeffs[k * N + i];
-            coeffs[k * N + i] *= a_mat(j, l_digits[j]);
+            coeffs[k * N + i] *= a_mat(j, i_j);
             coeffs[k * N + i] += carry;
             carry = old;
           }
@@ -135,7 +135,7 @@ namespace crypto
         else
         {
           for(size_t k = 0; k < m_bound; ++k)
-            coeffs[k * N + i] *= a_mat(j, l_digits[j]);
+            coeffs[k * N + i] *= a_mat(j, i_j);
         }
       }
     }
@@ -183,7 +183,8 @@ namespace crypto
 
     hash_helper_t::hs_t hsc(1 + ring_size + 2 + m);
     hsc.add_hash(context_hash);
-    hsc.add_points_array(ring);
+    for(auto& ring_el : ring)
+      hsc.add_point(c_scalar_1div8 * ring_el);
     hsc.add_pub_key(result.A);
     hsc.add_pub_key(result.B);
     hsc.add_pub_keys_array(result.Pk);
@@ -287,10 +288,13 @@ namespace crypto
     for(size_t i = 0; i < N; ++i)
     {
       p_vec[i] = c_scalar_1;
+      size_t i_tmp = i;
       for(size_t j = 0; j < m; ++j)
       {
-        const scalar_t& f_ji = (i == 0) ? f0[j] : sig.f[j * (n - 1) + i - 1];
-        p_vec[i] *= f_ji;
+        size_t i_j = i_tmp % n;                     // j-th digit of i
+        i_tmp /= n;
+        const scalar_t& f_jij = (i_j == 0) ? f0[j] : sig.f[j * (n - 1) + i_j - 1];
+        p_vec[i] *= f_jij;
       }
     }
 

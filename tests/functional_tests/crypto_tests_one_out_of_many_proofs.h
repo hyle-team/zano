@@ -66,13 +66,69 @@ struct BGE_proff_check_t
 
 
 
-TEST(BGE_proof, basics)
+TEST(BGE_proof, positive)
 {
   BGE_proff_check_t cc;
-  cc.prepare_random_data(1);
-  ASSERT_TRUE(cc.generate());
-  ASSERT_TRUE(cc.verify());
+  
+  for(size_t N = 1; N <= 256; ++N)
+  {
+    cc.prepare_random_data(N);
+    ASSERT_TRUE(cc.generate());
+    std::cout << "N = " << N << ", size = " << (cc.sig.Pk.size() + cc.sig.f.size() + 4)  * 32 << " bytes" << ENDL;
+    ASSERT_TRUE(cc.verify());
+  }
 
+  return true;
+}
+
+bool invalidate_BGE_proof(size_t index, BGE_proof& s)
+{
+  static point_t te{};
+  static bool te_init = te.from_string(canonical_torsion_elements[0].string);
+  if (!te_init)
+    throw std::runtime_error("te_init");
+
+  switch(index)
+  {
+  case 0:  s.A = (point_t(s.A) + te).to_public_key(); return true;
+  case 1:  s.B = (point_t(s.B) + te).to_public_key(); return true;
+  case 2:  s.Pk[0] = (point_t(s.Pk[0]) + te).to_public_key(); return true;
+  case 3:  s.Pk.back() = (point_t(s.Pk.back()) + te).to_public_key(); return true;
+  case 4:  s.f[0] = 0; return true;
+  case 5:  s.f[0] = c_scalar_256m1; return true;
+  case 6:  s.f.back() = 0; return true;
+  case 7:  s.f.back() = c_scalar_256m1; return true;
+  case 8:  s.y = 0; return true;
+  case 9:  s.y = c_scalar_256m1; return true;
+  case 10: s.z = 0; return true;
+  case 11: s.z = c_scalar_256m1; return true;
+  default:
+    return false;
+  }
+}
+
+TEST(BGE_proof, negative)
+{
+  BGE_proff_check_t cc;
+
+  for(size_t N = 1; N <= 13; ++N)
+  {
+    cc.prepare_random_data(13);
+    ASSERT_TRUE(cc.generate());
+    BGE_proff_check_t cc_good = cc;
+    ASSERT_TRUE(cc_good.verify());
+
+    for(size_t i = 0; true; ++i)
+    {
+      cc = cc_good;
+      if (!invalidate_BGE_proof(i, cc.sig))
+      {
+        ASSERT_TRUE(i != 0);
+        break;
+      }
+      ASSERT_FALSE(cc.verify());
+    }
+  }
 
   return true;
 }
