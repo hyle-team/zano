@@ -179,14 +179,14 @@ set installer_path=%BUILDS_PATH%\builds\%installer_file%
 
 @echo "   UPLOADING TO SERVER ...."
 
-pscp -load zano_build_server %installer_path% build.zano.org:/var/www/html/builds
+pscp %installer_path% zano_build_server:/var/www/html/builds
 IF %ERRORLEVEL% NEQ 0 (
   @echo "FAILED TO UPLOAD EXE TO SERVER"
   goto error
 )
 call :sha256 %installer_path% installer_checksum
 
-pscp -load zano_build_server %build_zip_path% build.zano.org:/var/www/html/builds
+pscp %build_zip_path% zano_build_server:/var/www/html/builds
 IF %ERRORLEVEL% NEQ 0 (
   @echo "FAILED TO UPLOAD ZIP TO SERVER"
   goto error
