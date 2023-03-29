@@ -129,12 +129,14 @@ namespace tools
 
       bool on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx);
       bool on_mw_select_wallet(const wallet_public::COMMAND_MW_SELECT_WALLET& req, wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, connection_context& cntx);
-
+      
+      
+      bool reset_active_wallet(wallet2& w);
 
       bool handle_command_line(const boost::program_options::variables_map& vm);
 
   private:
-      wallet2& m_wallet;
+      wallet2* m_pwallet;
       std::string m_port;
       std::string m_bind_ip;
       bool m_do_mint;

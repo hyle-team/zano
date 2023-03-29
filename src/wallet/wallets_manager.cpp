@@ -2002,6 +2002,30 @@ void wallets_manager::on_tor_status_change(size_t wallet_id, const std::string& 
   m_pview->update_tor_status(tsu);
 }
 
+void wallets_manager::on_mw_get_wallets(std::vector<wallet_public::wallet_entry_info>& wallets)
+{
+  std::list<view::open_wallet_response> opened_wallets;
+  this->get_opened_wallets(opened_wallets);
+  wallets.resize(opened_wallets.size());
+  size_t i = 0;
+  for (const auto& item : opened_wallets)
+  {
+    wallets[i].wi = item.wi;
+    wallets[i].wallet_id = item.wallet_id;
+    i++;
+  }
+}
+bool wallets_manager::on_mw_select_wallet(uint64_t wallet_id)
+{
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);    
+  auto it = m_wallets.find(wallet_id);      
+  if (it == m_wallets.end())                
+    return false; 
+  auto& wo = it->second;
+  m_wallet_rpc_server.reset_active_wallet(wo.w);
+}
+
+
 void wallets_manager::wallet_vs_options::worker_func()
 {
   LOG_PRINT_GREEN("[WALLET_HANDLER] Wallet handler thread started, addr: " << w->get()->get_account().get_public_address_str(), LOG_LEVEL_0);

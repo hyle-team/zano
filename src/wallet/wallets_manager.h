@@ -193,6 +193,10 @@ private:
   virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti);
   virtual void on_tor_status_change(size_t wallet_id, const std::string& state);
 
+  virtual void on_mw_get_wallets(std::vector<wallet_public::wallet_entry_info>& wallets) override;
+  virtual bool on_mw_select_wallet(uint64_t wallet_id) override;
+  
+  //--------
 
   std::thread m_main_worker_thread;
   
@@ -224,6 +228,7 @@ private:
   currency::t_currency_protocol_handler<currency::core> m_cprotocol;
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > m_p2psrv;
   currency::core_rpc_server m_rpc_server;
+  tools::wallet_rpc_server m_wallet_rpc_server; //optional initialization
 #endif
 
   bool m_remote_node_mode;

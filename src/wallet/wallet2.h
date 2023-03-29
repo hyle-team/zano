@@ -129,7 +129,7 @@ namespace tools
 
     //mw api
     virtual void on_mw_get_wallets(std::vector<wallet_public::wallet_entry_info>& wallets) {}
-    virtual void on_mw_select_wallet(uint64_t wallet_id) {}
+    virtual bool on_mw_select_wallet(uint64_t wallet_id) {}
   };
 
   struct tx_dust_policy

@@ -695,6 +695,17 @@ void simple_wallet::on_tor_status_change(const std::string& state)
   message_writer(epee::log_space::console_color_yellow, true, std::string("[TOR]: ")) << human_message;
 }
 //----------------------------------------------------------------------------------------------------
+void simple_wallet::on_mw_get_wallets(std::vector<wallet_public::wallet_entry_info>& wallets)
+{
+  wallets.resize(1);
+  tools::get_wallet_info(*m_wallet, wallets[0].wi);
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::on_mw_select_wallet(uint64_t wallet_id)
+{
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 bool simple_wallet::refresh(const std::vector<std::string>& args)
 {
   if (m_offline_mode)
