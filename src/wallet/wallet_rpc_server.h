@@ -22,7 +22,7 @@ namespace tools
   public:
     typedef epee::net_utils::connection_context_base connection_context;
 
-    wallet_rpc_server(wallet2& cr);
+    wallet_rpc_server(std::shared_ptr<wallet2*> wptr);
 
     const static command_line::arg_descriptor<std::string> arg_rpc_bind_port;
     const static command_line::arg_descriptor<std::string> arg_rpc_bind_ip;
@@ -136,7 +136,7 @@ namespace tools
       bool handle_command_line(const boost::program_options::variables_map& vm);
 
   private:
-      wallet2* m_pwallet;
+      std::weak_ptr<wallet2> m_pwallet;
       std::string m_port;
       std::string m_bind_ip;
       bool m_do_mint;
