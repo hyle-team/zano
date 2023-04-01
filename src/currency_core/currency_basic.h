@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2019 Zano Project
+// Copyright (c) 2014-2023 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2014-2015 The Boolberry developers
@@ -434,36 +434,16 @@ namespace currency
 
   struct zc_asset_surjection_proof
   {
-    std::vector<crypto::BGE_proof> bge_proofs; // one per output, non-aggregated version of Groth-Bootle-Esgin yet, need to be upgraded later -- sowle
+    std::vector<crypto::BGE_proof_s> bge_proofs; // one per output, non-aggregated version of Groth-Bootle-Esgin yet, need to be upgraded later -- sowle
 
     BEGIN_SERIALIZE_OBJECT()
+      FIELD(bge_proofs)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(bge_proofs)
     END_BOOST_SERIALIZATION()
   };
-
-  /*
-  // each output has another amount commitment using generators U and G for range proof aggregation 
-  struct zc_out_range_proof_aggregation_item
-  {
-    crypto::public_key  amount_commitment_for_range_proof; // U = e_j * U + y'_j * G
-    crypto::scalar_t    y0;                                // linear proof scalars 
-    crypto::scalar_t    y1;
-
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(amount_commitment_for_range_proof)
-      FIELD(y0)
-      FIELD(y1)
-    END_SERIALIZE()
-
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(amount_commitment_for_range_proof)
-      BOOST_SERIALIZE(y0)
-      BOOST_SERIALIZE(y1)
-    END_BOOST_SERIALIZATION()
-  };
-  */
 
   // non-consoditated txs must have one of this objects in the attachments (elements count == vout.size())
   // consolidated -- one pre consolidated part (sum(elements count) == vout.size())

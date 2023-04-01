@@ -204,6 +204,26 @@ namespace crypto
     END_BOOST_SERIALIZATION()
   };
 
+  struct BGE_proof_s : public BGE_proof
+  {
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(A)
+      FIELD(B)
+      FIELD(Pk)
+      FIELD_N("f", (std::vector<scalar_t>&)(f))
+      FIELD(y)
+      FIELD(z)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(A)
+      BOOST_SERIALIZE(B)
+      BOOST_SERIALIZE(Pk)
+      BOOST_SERIALIZE(f)
+      BOOST_SERIALIZE(y)
+      BOOST_SERIALIZE(z)
+    END_BOOST_SERIALIZATION()
+  };
 
 } // namespace crypto
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2023 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -122,8 +122,8 @@ namespace currency
 
       crypto::scalar_t secret = ogc.pseudo_outs_plus_real_out_blinding_masks[secret_index] - ogc.asset_id_blinding_masks[j];
 
-      result.bge_proofs.emplace_back(crypto::BGE_proof{});
-      r = crypto::generate_BGE_proof(context_hash, ring, secret, secret_index,  result.bge_proofs.back());
+      result.bge_proofs.emplace_back(crypto::BGE_proof_s{});
+      r = crypto::generate_BGE_proof(context_hash, ring, secret, secret_index, result.bge_proofs.back());
       CHECK_AND_ASSERT_MES(r, false, "");
     }
 
@@ -441,12 +441,19 @@ namespace currency
       // tx hash should be sealed by now
       crypto::hash tx_id = get_transaction_hash(tx);
 
-      //add range proofs
-      currency::zc_outs_range_proof range_proofs = AUTO_VAL_INIT(range_proofs);
-      bool r = generate_zc_outs_range_proof(tx_id, 0, outs_gen_context, tx.vout, range_proofs);
+      // asset surjection proof
+      currency::zc_asset_surjection_proof asp{};
+      bool r = generate_asset_surjection_proof(tx_id, true, outs_gen_context, asp);
+      CHECK_AND_ASSERT_MES(r, false, "generete_asset_surjection_proof failed");
+      tx.proofs.emplace_back(std::move(asp));
+
+      // range proofs
+      currency::zc_outs_range_proof range_proofs{};
+      r = generate_zc_outs_range_proof(tx_id, 0, outs_gen_context, tx.vout, range_proofs);
       CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
       tx.proofs.emplace_back(std::move(range_proofs));
 
+      // balance proof
       currency::zc_balance_proof balance_proof{};
       r = generate_tx_balance_proof(tx, tx_id, outs_gen_context, block_reward, balance_proof);
       CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
@@ -2309,8 +2316,8 @@ namespace currency
       CHECK_AND_ASSERT_MES(r, false, "generete_asset_surjection_proof failed");
       tx.proofs.emplace_back(std::move(asp));
 
-      // add range proofs
-      currency::zc_outs_range_proof range_proofs = AUTO_VAL_INIT(range_proofs);
+      // range proofs
+      currency::zc_outs_range_proof range_proofs{};
       r = generate_zc_outs_range_proof(tx_prefix_hash, range_proof_start_index, outs_gen_context, tx.vout, range_proofs);
       CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
       tx.proofs.emplace_back(std::move(range_proofs));

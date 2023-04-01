@@ -4000,12 +4000,12 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
   
   // asset surjection proof
   currency::zc_asset_surjection_proof asp{};
-  //r = generate_asset_surjection_proof(miner_tx_id, miner_tx_ogc, asp);
-  //CHECK_AND_ASSERT_MES(r, false, "generete_asset_surjection_proof failed");
+  r = generate_asset_surjection_proof(miner_tx_id, false, miner_tx_ogc, asp);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs 
+  WLT_CHECK_AND_ASSERT_MES(r, false, "generete_asset_surjection_proof failed");
   b.miner_tx.proofs.emplace_back(std::move(asp));
 
   // range proofs
-  currency::zc_outs_range_proof range_proofs = AUTO_VAL_INIT(range_proofs);
+  currency::zc_outs_range_proof range_proofs{};
   r = generate_zc_outs_range_proof(miner_tx_id, 0, miner_tx_ogc, b.miner_tx.vout, range_proofs);
   WLT_CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
   b.miner_tx.proofs.emplace_back(std::move(range_proofs));
