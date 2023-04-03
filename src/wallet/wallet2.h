@@ -937,6 +937,13 @@ namespace tools
     bool get_ionic_swap_proposal_info(const currency::transaction tx, view::ionic_swap_proposal_info& proposal);
     bool accept_ionic_swap_proposal(const std::string&raw_tx_template, currency::transaction& result_tx);
     bool accept_ionic_swap_proposal(const currency::transaction& tx_template, currency::transaction& result_tx);
+
+    // Signing and auth
+    bool sign_buffer(const std::string& buff, crypto::signature& sig);
+    bool validate_sign(const std::string& buff, const crypto::signature& sig, const crypto::public_key& pkey);
+    bool encrypt_buffer(const std::string& buff, std::string& res_buff);
+    bool decrypt_buffer(const std::string& buff, std::string& res_buff);
+
 private:
 
     // -------- t_transport_state_notifier ------------------------------------------------

@@ -5081,6 +5081,35 @@ bool wallet2::accept_ionic_swap_proposal(const currency::transaction& tx_templat
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+
+// Signing and auth
+bool wallet2::sign_buffer(const std::string& buff, crypto::signature& sig)
+{
+  crypto::hash h = crypto::cn_fast_hash(buff.data(), buff.size());
+  crypto::generate_signature(h, m_account.get_public_address().spend_public_key, m_account.get_keys().spend_secret_key, sig);
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::validate_sign(const std::string& buff, const crypto::signature& sig, const crypto::public_key& pkey)
+{
+  crypto::hash h = crypto::cn_fast_hash(buff.data(), buff.size());
+  return crypto::check_signature(h, sig, pkey);
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::encrypt_buffer(const std::string& buff, std::string& res_buff)
+{
+  res_buff = buff;
+  crypto::chacha_crypt(res_buff, m_account.get_keys().view_secret_key);
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::decrypt_buffer(const std::string& buff, std::string& res_buff)
+{
+  res_buff = buff;
+  crypto::chacha_crypt(res_buff, m_account.get_keys().view_secret_key);
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
 {
   prepare_free_transfers_cache(fake_outputs_count);
