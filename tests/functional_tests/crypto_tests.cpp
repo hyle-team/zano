@@ -1,5 +1,5 @@
-// Copyright (c) 2020-2021 Zano Project
-// Copyright (c) 2020-2021 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2020-2023 Zano Project
+// Copyright (c) 2020-2023 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -514,10 +514,16 @@ TEST(crypto, basics)
   ASSERT_EQ(currency::native_coin_asset_id_pt, c_point_H);
   ASSERT_EQ(currency::native_coin_asset_id_pt.to_public_key(), currency::native_coin_asset_id);
 
+  const point_t с_1_div_8_H = c_scalar_1div8 * c_point_H;
+  LOG_PRINT_L0("1/8 * H   = " << с_1_div_8_H << " = { " << с_1_div_8_H.to_hex_comma_separated_uint64_str() << " }");
+  ASSERT_EQ(currency::native_coin_asset_id_1div8, (c_scalar_1div8 * c_point_H).to_public_key());
+
   LOG_PRINT_L0("c_point_0 = " << c_point_0  << " = { " << c_point_0.to_hex_comma_separated_uint64_str() << " }");
   LOG_PRINT_L0("Zano G    = " << c_point_G  << " = { " << c_point_G.to_hex_comma_separated_bytes_str() << " }");
   LOG_PRINT_L0("Zano H    = " << c_point_H  << " = { " << c_point_H.to_hex_comma_separated_uint64_str() << " }");
   LOG_PRINT_L0("Zano H2   = " << c_point_H2 << " = { " << c_point_H2.to_hex_comma_separated_uint64_str() << " }");
+  LOG_PRINT_L0("Zano U    = " << c_point_U  << " = { " << c_point_U.to_hex_comma_separated_uint64_str() << " }");
+  LOG_PRINT_L0("Zano X    = " << c_point_X  << " = { " << c_point_X.to_hex_comma_separated_uint64_str() << " }");
 
   return true;
 }

@@ -23,7 +23,7 @@ namespace crypto
 
   const point_t  c_point_H        = { 0x05087c1f5b9b32d6, 0x00547595f445c3b5, 0x764df64578552f2a, 0x8a49a651e0e0da45 };  // == Hp(G), this is being checked in bpp_basics
   const point_t  c_point_H2       = { 0x70c8d1ab9dbf1cc0, 0xc561bb12639a8516, 0x3cfff1def9e5b268, 0xe0936386f3bcce1a };  // == Hp("h2_generator"), checked in bpp_basics
-  const point_t  c_point_U        = { 0xc9d2f543dbbc253a, 0x87099e9ac33d06dd, 0x76bcf12dcf6ffcba, 0x20384a4a88752d32 };  // == Hp("U_generator"), checked in 
+  const point_t  c_point_U        = { 0x5b17569f418e26d0, 0xd45af23bdf43c291, 0xe380f518f0a7432f, 0xa1c94a907d0bc61c };  // == Hp("U_generator"), checked in bpp_basics
   const point_t  c_point_X        = { 0xc9d2f543dbbc253a, 0x87099e9ac33d06dd, 0x76bcf12dcf6ffcba, 0x20384a4a88752d32 };  // == Hp("X_generator"), checked in clsag_ggxg_basics
 
   const point_t  c_point_0        = point_t(point_t::tag_zero());

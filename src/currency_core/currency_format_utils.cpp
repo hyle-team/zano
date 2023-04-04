@@ -37,8 +37,9 @@ using namespace epee;
 
 namespace currency
 {
-  const crypto::public_key native_coin_asset_id    = crypto::point_t(0x05087c1f5b9b32d6, 0x00547595f445c3b5, 0x764df64578552f2a, 0x8a49a651e0e0da45).to_public_key(); // == crypto::c_point_H, checked in crypto_basics test
-  const crypto::point_t    native_coin_asset_id_pt = crypto::point_t(0x05087c1f5b9b32d6, 0x00547595f445c3b5, 0x764df64578552f2a, 0x8a49a651e0e0da45);                 // == crypto::c_point_H, checked in crypto_basics test
+  const crypto::point_t    native_coin_asset_id_pt    = crypto::point_t(0x05087c1f5b9b32d6, 0x00547595f445c3b5, 0x764df64578552f2a, 0x8a49a651e0e0da45);                      // == crypto::c_point_H, checked in crypto_basics test
+  const crypto::public_key native_coin_asset_id       = native_coin_asset_id_pt.to_public_key();                                                                              // == crypto::c_point_H, checked in crypto_basics test
+  const crypto::public_key native_coin_asset_id_1div8 = crypto::point_t(0x62fcfaaa3e2dc374, 0x8b2ed458e883f43b, 0xe3a2ad64f07decf4, 0x68626bff9c463449).to_public_key();      // == 1/8 * crypto::c_point_H, checked in crypto_basics test
 
   //---------------------------------------------------------------
   bool add_tx_extra_alias(transaction& tx, const extra_alias_entry& alinfo)
@@ -46,30 +47,6 @@ namespace currency
     tx.extra.push_back(alinfo);
     return true;
   }
-
-  //---------------------------------------------------------------
-  /*
-  bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins,
-  size_t current_block_size,
-  uint64_t fee,
-  const account_public_address &miner_address,
-  transaction& tx,
-  const blobdata& extra_nonce,
-  size_t max_outs)
-  {
-
-  alias_info alias = AUTO_VAL_INIT(alias);
-  return construct_miner_tx(height, median_size, already_generated_coins, current_block_size,
-  fee,
-  miner_address,
-  tx,
-  extra_nonce,
-  max_outs,
-  alias,
-  false,
-  pos_entry());
-  }*/
-
   //--------------------------------------------------------------------------------
   bool generate_asset_surjection_proof(const crypto::hash& context_hash, bool has_non_zc_inputs, outputs_generation_context& ogc, zc_asset_surjection_proof& result)
   {
