@@ -355,6 +355,7 @@ namespace currency
       if (pe.stake_unlock_time && pe.stake_unlock_time > height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
         stake_lock_time = pe.stake_unlock_time;
       destinations.push_back(tx_destination_entry(pe.amount, stakeholder_address, stake_lock_time));
+      destinations.back().explicit_native_asset_id = true; // don't use asset id blinding as it's obvious which asset it is
     }
 
     CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS || height == 0, false, "Too many outs (" << destinations.size() << ")! Miner tx can't be constructed.");
