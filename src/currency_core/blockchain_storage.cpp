@@ -1354,10 +1354,12 @@ bool blockchain_storage::validate_miner_transaction(const block& b,
     return false;
   }
 
-  crypto::hash tx_id_for_balance_check = b.miner_tx.version > TRANSACTION_VERSION_PRE_HF4 ? get_transaction_hash(b.miner_tx) : null_hash;
-  if (!check_tx_balance(b.miner_tx, tx_id_for_balance_check, base_reward + fee))
+  uint64_t block_reward = base_reward + fee;
+
+  crypto::hash tx_id_for_post_hf4_era = b.miner_tx.version > TRANSACTION_VERSION_PRE_HF4 ? get_transaction_hash(b.miner_tx) : null_hash;
+  if (!check_tx_balance(b.miner_tx, tx_id_for_post_hf4_era, block_reward))
   {
-    LOG_ERROR("coinbase transaction balance check failed. Block reward is " << print_money_brief(base_reward + fee) << "(" << print_money(base_reward) << "+" << print_money(fee)
+    LOG_ERROR("coinbase transaction balance check failed. Block reward is " << print_money_brief(block_reward) << "(" << print_money(base_reward) << "+" << print_money(fee)
       << ", blocks_size_median = " << blocks_size_median
       << ", cumulative_block_size = " << cumulative_block_size
       << ", fee = " << fee
@@ -1365,6 +1367,15 @@ bool blockchain_storage::validate_miner_transaction(const block& b,
       << "), tx:");
     LOG_PRINT_L0(currency::obj_to_json_str(b.miner_tx));
     return false;
+  }
+
+  if (b.miner_tx.version > TRANSACTION_VERSION_PRE_HF4)
+  {
+    if (!verify_asset_surjection_proof(b.miner_tx, tx_id_for_post_hf4_era))
+    {
+      LOG_ERROR("asset surjection proof verification failed for miner tx");
+      return false;
+    }
   }
 
   LOG_PRINT_MAGENTA("Mining tx verification ok, blocks_size_median = " << blocks_size_median, LOG_LEVEL_2);
@@ -5914,6 +5925,9 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
 
       CHECK_AND_ASSERT_MES_CUSTOM(check_tx_balance(tx, tx_id), false, cleanup(),
         "block " << id << ", tx " << tx_id << ": check_tx_balance failed");
+
+      CHECK_AND_ASSERT_MES_CUSTOM(verify_asset_surjection_proof(tx, tx_id), false, cleanup(),
+        "block " << id << ", tx " << tx_id << ": verify_asset_surjection_proof failed");
     }
 
     TIME_MEASURE_START_PD(tx_add_one_tx_time);

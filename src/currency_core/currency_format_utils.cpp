@@ -107,6 +107,69 @@ namespace currency
     return true;
   }
   //--------------------------------------------------------------------------------
+  bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id)
+  {
+    bool r = false;
+    if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
+      return true;
+
+    size_t outs_count = tx.vout.size();
+
+    bool has_ZC_inputs = false;
+    bool has_non_ZC_inputs = false;
+    for(const auto& in : tx.vin)
+    {
+      if (in.type() == typeid(txin_zc_input))
+        has_ZC_inputs = true;
+      else
+        has_non_ZC_inputs = true;
+    }
+
+    if (!has_ZC_inputs)
+    {
+      // no ZC ins -- just make sure there's only native outputs with explicit asset ids
+      for(size_t j = 0; j < outs_count; ++j)
+      {
+        CHECK_AND_ASSERT_MES(boost::get<tx_out_zarcanum>(tx.vout[j]).blinded_asset_id == native_coin_asset_id_1div8, false, "output #" << j << " has a non explicitly native asset id");
+      }
+      return true;
+    }
+
+    // tx has ZC inputs
+    const zc_asset_surjection_proof& sig = get_type_in_variant_container_by_ref<const zc_asset_surjection_proof>(tx.proofs); // order of proofs and uniqueness of zc_asset_surjection_proof should be check before on prevalidation
+    CHECK_AND_ASSERT_MES(sig.bge_proofs.size() == outs_count, false, "ASP count: " << sig.bge_proofs.size() << ", outputs: " << outs_count << " => missmatch");
+
+    // make a ring
+    std::vector<crypto::point_t> pseudo_outs_blinded_asset_ids;
+    for(const auto& sig : tx.signatures)
+    {
+      if (sig.type() == typeid(ZC_sig))
+        pseudo_outs_blinded_asset_ids.emplace_back(crypto::point_t(boost::get<ZC_sig>(sig).pseudo_out_blinded_asset_id).modify_mul8());
+    }
+    if (has_non_ZC_inputs)
+      pseudo_outs_blinded_asset_ids.emplace_back(currency::native_coin_asset_id_pt); // additional ring member for txs with non-zc inputs
+
+    for(size_t j = 0; j < outs_count; ++j)
+    {
+      crypto::point_t blinded_asset_id(boost::get<tx_out_zarcanum>(tx.vout[j]).blinded_asset_id);
+      blinded_asset_id.modify_mul8();
+
+      // TODO @#@# remove this redundant conversion to pubkey and back
+      std::vector<crypto::public_key> ring(pseudo_outs_blinded_asset_ids.size());
+      std::vector<const crypto::public_key*> ring_pointers(pseudo_outs_blinded_asset_ids.size());
+      for(size_t i = 0, n = pseudo_outs_blinded_asset_ids.size(); i < n; ++i)
+      {
+        ring[i] = ((crypto::c_scalar_1div8 * (pseudo_outs_blinded_asset_ids[i] - blinded_asset_id)).to_public_key());
+        ring_pointers[i] = &ring[i];
+      }
+
+      uint8_t err = 0;
+      CHECK_AND_ASSERT_MES(crypto::verify_BGE_proof(tx_id, ring_pointers, sig.bge_proofs[j], &err), false, "verify_BGE_proof failed, err = " << (int)err);
+    }
+
+    return true;
+  }
+  //--------------------------------------------------------------------------------
   bool generate_zc_outs_range_proof(const crypto::hash& context_hash, size_t out_index_start, const outputs_generation_context& outs_gen_context,
     const std::vector<tx_out_v>& vouts, zc_outs_range_proof& result)
   {
