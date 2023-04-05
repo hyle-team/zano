@@ -3990,6 +3990,10 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
   WLT_CHECK_AND_ASSERT_MES(miner_tx_ogc.pseudo_out_amount_blinding_masks_sum.is_zero(), false, "pseudo_out_amount_blinding_masks_sum is nonzero"); // it should be zero because there's only one input (stake), and thus one pseudo out
   crypto::scalar_t pseudo_out_amount_blinding_mask = miner_tx_ogc.amount_blinding_masks_sum; // sum of outputs' amount blinding masks
 
+  miner_tx_ogc.pseudo_outs_blinded_asset_ids.emplace_back(currency::native_coin_asset_id_pt);
+  miner_tx_ogc.pseudo_outs_plus_real_out_blinding_masks.emplace_back(0);
+  miner_tx_ogc.real_zc_ins_asset_ids.emplace_back(td.m_zc_info_ptr->asset_id);
+
   uint8_t err = 0;
   r = crypto::zarcanum_generate_proof(hash_for_zarcanum_sig, cxt.kernel_hash, ring, cxt.last_pow_block_id_hashed, cxt.sk.kimage,
     secret_x, cxt.secret_q, secret_index, td.m_zc_info_ptr->asset_id_blinding_mask, pseudo_out_amount_blinding_mask, cxt.stake_amount, cxt.stake_out_amount_blinding_mask,
@@ -4174,18 +4178,8 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   set_block_datetime(current_timestamp, b);
   WLT_LOG_MAGENTA("Applying actual timestamp: " << current_timestamp, LOG_LEVEL_0);
 
-  //const currency::tx_out_v& stake_out_v = td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index];
-  //if (cxt.zarcanum && td.is_zc())
-  //{
-  //  // Zarcanum
-  //  return false;
-  //}
-  //else
-  //{
-    // old fashioned non-hidden amount PoS scheme
-    res = prepare_and_sign_pos_block(cxt, b, tmpl_req.pe, tmpl_rsp.miner_tx_ogc);
-    WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to prepare_and_sign_pos_block");
-  //}
+  res = prepare_and_sign_pos_block(cxt, b, tmpl_req.pe, tmpl_rsp.miner_tx_ogc);
+  WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to prepare_and_sign_pos_block");
 
   crypto::hash block_hash = get_block_hash(b);
   WLT_LOG_GREEN("Block " << print16(block_hash) << " has been constructed, sending to core...", LOG_LEVEL_0);
