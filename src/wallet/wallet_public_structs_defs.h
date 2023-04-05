@@ -1318,6 +1318,95 @@ namespace wallet_public
     };
   };
 
+  struct COMMAND_SIGN_MESSAGE
+  {
+    struct request
+    {
+      std::string buff; //base64 encoded data
+      
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(buff)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      crypto::signature sig;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(sig)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_VALIDATE_SIGNATURE
+  {
+    struct request
+    {
+      std::string buff; //base64 encoded data
+      crypto::signature sig;
+      crypto::public_key pkey;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(buff)
+        KV_SERIALIZE_POD_AS_HEX_STRING(sig)
+        KV_SERIALIZE_POD_AS_HEX_STRING(pkey)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      BEGIN_KV_SERIALIZE_MAP()
+      END_KV_SERIALIZE_MAP()
+    };
+  };  
+  
+  struct COMMAND_ENCRYPT_DATA
+  {
+    struct request
+    {
+      std::string buff; //base64 encoded data
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(buff)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      std::string res_buff; //base64 encoded encrypted data
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(res_buff)
+      END_KV_SERIALIZE_MAP()
+    };
+  }; 
+  
+  struct COMMAND_DECRYPT_DATA
+  {
+    struct request
+    {
+      std::string buff; //base64 encoded encrypted data
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(buff)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      std::string res_buff; //base64 encoded data
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(res_buff)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
 
   struct assets_whitelist
   {

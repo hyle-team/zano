@@ -82,6 +82,11 @@ namespace tools
         MAP_JON_RPC_WE("mw_get_wallets",   on_mw_get_wallets,       wallet_public::COMMAND_MW_GET_WALLETS)
         MAP_JON_RPC_WE("mw_select_wallet", on_mw_select_wallet,     wallet_public::COMMAND_MW_SELECT_WALLET)
 
+        //basic crypto operations
+        MAP_JON_RPC_WE("sign_message",       on_sign_message,         wallet_public::COMMAND_SIGN_MESSAGE)
+        MAP_JON_RPC_WE("validate_signature", on_validate_signature,   wallet_public::COMMAND_VALIDATE_SIGNATURE)
+        MAP_JON_RPC_WE("encrypt_data",       on_encrypt_data,         wallet_public::COMMAND_ENCRYPT_DATA)
+        MAP_JON_RPC_WE("decrypt_data",       on_decrypt_data,         wallet_public::COMMAND_DECRYPT_DATA)
       END_JSON_RPC_MAP()
     END_URI_MAP2()
 
@@ -129,9 +134,17 @@ namespace tools
 
       bool on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx);
       bool on_mw_select_wallet(const wallet_public::COMMAND_MW_SELECT_WALLET& req, wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, connection_context& cntx);
+
+      bool on_sign_message(const wallet_public::COMMAND_SIGN_MESSAGE& req, wallet_public::COMMAND_SIGN_MESSAGE::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_validate_signature(const wallet_public::COMMAND_VALIDATE_SIGNATURE& req, wallet_public::COMMAND_VALIDATE_SIGNATURE::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_encrypt_data(const wallet_public::COMMAND_ENCRYPT_DATA& req, wallet_public::COMMAND_ENCRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_decrypt_data(const wallet_public::COMMAND_DECRYPT_DATA& req, wallet_public::COMMAND_DECRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx);
+
+
+
+      std::shared_ptr<wallet2*> get_wallet();
       
-      
-      bool reset_active_wallet(wallet2& w);
+      bool reset_active_wallet(std::shared_ptr<wallet2*> w);
 
       bool handle_command_line(const boost::program_options::variables_map& vm);
 

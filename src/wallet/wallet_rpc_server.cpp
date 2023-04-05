@@ -1030,9 +1030,45 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::reset_active_wallet(wallet2& w)
+  bool on_sign_message(const wallet_public::COMMAND_SIGN_MESSAGE& req, wallet_public::COMMAND_SIGN_MESSAGE::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
-    m_pwallet = &w;
+    std::string buff = epee::string_encoding::base64_decode(req.buff);
+    get_wallet()->sign_buffer(buff, res.sig);
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool on_validate_signature(const wallet_public::COMMAND_VALIDATE_SIGNATURE& req, wallet_public::COMMAND_VALIDATE_SIGNATURE::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    std::string buff = epee::string_encoding::base64_decode(req.buff);
+    bool r = get_wallet()->validate_sign(buff, req.sig, req.pkey);
+    if (!r)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT";
+      return false;
+    }
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool on_encrypt_data(const wallet_public::COMMAND_ENCRYPT_DATA& req, wallet_public::COMMAND_ENCRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    std::string buff = epee::string_encoding::base64_decode(req.buff);
+    bool r = get_wallet()->encrypt_buffer(buff, res.res_buff);
+    res.res_buff = epee::string_encoding::base64_encode(res.res_buff);
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool on_decrypt_data(const wallet_public::COMMAND_DECRYPT_DATA& req, wallet_public::COMMAND_DECRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    std::string buff = epee::string_encoding::base64_decode(req.buff);
+    bool r = get_wallet()->encrypt_buffer(buff, res.res_buff);
+    res.res_buff = epee::string_encoding::base64_encode(res.res_buff);
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::reset_active_wallet(std::shared_ptr<wallet2*> w)
+  {
+    m_pwallet = w;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
