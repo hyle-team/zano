@@ -99,6 +99,22 @@ namespace crypto
   }
 
   template<class pod_t>
+  std::string pod_to_comma_separated_chars(const pod_t &h)
+  {
+    std::stringstream ss;
+    ss << std::hex << std::setfill('0');
+    size_t len = sizeof h;
+    const unsigned char* p = (const unsigned char*)&h;
+    for (size_t i = 0; i < len; ++i)
+    {
+      ss << "'\\x" << std::setw(2) << static_cast<unsigned int>(p[i]) << "'";
+      if (i + 1 != len)
+        ss << ", ";
+    }
+    return ss.str();
+  }
+
+  template<class pod_t>
   std::string pod_to_hex_comma_separated_uint64(const pod_t &h)
   {
     static_assert((sizeof h) % 8 == 0, "size of h should be a multiple of 64 bit");
@@ -109,6 +125,22 @@ namespace crypto
     for (size_t i = 0; i < len; ++i)
     {
       ss << "0x" << std::setw(16) << static_cast<uint64_t>(p[i]);
+      if (i + 1 != len)
+        ss << ", ";
+    }
+    return ss.str();
+  }
+
+  template<class pod_t>
+  std::string pod_to_comma_separated_int32(const pod_t &h)
+  {
+    static_assert((sizeof h) % 4 == 0, "size of h should be a multiple of 32 bit");
+    size_t len = (sizeof h) / 4;
+    std::stringstream ss;
+    const int32_t* p = (const int32_t*)&h;
+    for (size_t i = 0; i < len; ++i)
+    {
+      ss << static_cast<int32_t>(p[i]);
       if (i + 1 != len)
         ss << ", ";
     }
@@ -172,12 +204,9 @@ namespace crypto
     scalar_t() = default;
 
     // won't check scalar range validity (< L)
-    scalar_t(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3)
+    constexpr scalar_t(uint64_t a0, uint64_t a1, uint64_t a2, uint64_t a3) noexcept
+      : m_u64{a0, a1, a2, a3}
     {
-      m_u64[0] = a0;
-      m_u64[1] = a1;
-      m_u64[2] = a2;
-      m_u64[3] = a3;
     }
 
     // won't check scalar range validity (< L)
@@ -486,6 +515,7 @@ namespace crypto
       m_u64[bit_index >> 6] &= ~(1ull << (bit_index & 63));
     }
 
+    // does not reduce
     static scalar_t power_of_2(uint8_t exponent)
     {
       scalar_t result = 0;
@@ -496,17 +526,20 @@ namespace crypto
   }; // struct scalar_t
 
   //
-  // Global constants
+  // Global constants (checked in crypto_constants)
   //
 
-  extern const scalar_t c_scalar_1;
-  extern const scalar_t c_scalar_2p64;
-  extern const scalar_t c_scalar_L;
-  extern const scalar_t c_scalar_Lm1;
-  extern const scalar_t c_scalar_P;
-  extern const scalar_t c_scalar_Pm1;
-  extern const scalar_t c_scalar_256m1;
-  extern const scalar_t c_scalar_1div8;
+  static constexpr scalar_t c_scalar_0       = { 0,                  0,                  0,                  0                  };
+  static constexpr scalar_t c_scalar_1       = { 1,                  0,                  0,                  0                  };
+  static constexpr scalar_t c_scalar_2p64    = { 0,                  1,                  0,                  0                  };
+  static constexpr scalar_t c_scalar_L       = { 0x5812631a5cf5d3ed, 0x14def9dea2f79cd6, 0x0,                0x1000000000000000 };
+  static constexpr scalar_t c_scalar_Lm1     = { 0x5812631a5cf5d3ec, 0x14def9dea2f79cd6, 0x0,                0x1000000000000000 };
+  static constexpr scalar_t c_scalar_P       = { 0xffffffffffffffed, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff };
+  static constexpr scalar_t c_scalar_Pm1     = { 0xffffffffffffffec, 0xffffffffffffffff, 0xffffffffffffffff, 0x7fffffffffffffff };
+  static constexpr scalar_t c_scalar_256m1   = { 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff, 0xffffffffffffffff };
+  static constexpr scalar_t c_scalar_1div8   = { 0x6106e529e2dc2f79, 0x07d39db37d1cdad0, 0x0,                0x0600000000000000 };
+
+  static_assert(sizeof(scalar_t::m_sk) == sizeof(scalar_t::m_u64) && sizeof(scalar_t::m_u64) == sizeof(scalar_t::m_s), "size missmatch");
 
   //
   //
@@ -557,6 +590,53 @@ namespace crypto
     explicit point_t(const key_image& ki) // can throw std::runtime_error
       : point_t(static_cast<const public_key&>(static_cast<const ec_point&>(ki)))
     {
+    }
+
+    explicit constexpr point_t(const int32_t(&v)[40]) noexcept
+    {
+      m_p3.X[0] = v[0];
+      m_p3.X[1] = v[1];
+      m_p3.X[2] = v[2];
+      m_p3.X[3] = v[3];
+      m_p3.X[4] = v[4];
+      m_p3.X[5] = v[5];
+      m_p3.X[6] = v[6];
+      m_p3.X[7] = v[7];
+      m_p3.X[8] = v[8];
+      m_p3.X[9] = v[9];
+
+      m_p3.Y[0] = v[10];
+      m_p3.Y[1] = v[11];
+      m_p3.Y[2] = v[12];
+      m_p3.Y[3] = v[13];
+      m_p3.Y[4] = v[14];
+      m_p3.Y[5] = v[15];
+      m_p3.Y[6] = v[16];
+      m_p3.Y[7] = v[17];
+      m_p3.Y[8] = v[18];
+      m_p3.Y[9] = v[19];
+
+      m_p3.Z[0] = v[20];
+      m_p3.Z[1] = v[21];
+      m_p3.Z[2] = v[22];
+      m_p3.Z[3] = v[23];
+      m_p3.Z[4] = v[24];
+      m_p3.Z[5] = v[25];
+      m_p3.Z[6] = v[26];
+      m_p3.Z[7] = v[27];
+      m_p3.Z[8] = v[28];
+      m_p3.Z[9] = v[29];
+
+      m_p3.T[0] = v[30];
+      m_p3.T[1] = v[31];
+      m_p3.T[2] = v[32];
+      m_p3.T[3] = v[33];
+      m_p3.T[4] = v[34];
+      m_p3.T[5] = v[35];
+      m_p3.T[6] = v[36];
+      m_p3.T[7] = v[37];
+      m_p3.T[8] = v[38];
+      m_p3.T[9] = v[39];
     }
 
     // as we're using additive notation, zero means identity group element (EC point (0, 1)) here and after
@@ -772,6 +852,11 @@ namespace crypto
       return pod_to_hex_comma_separated_uint64(pk);
     }
 
+    std::string to_comma_separated_int32_str() const
+    {
+      return pod_to_comma_separated_int32(m_p3);
+    }
+
   }; // struct point_t
 
 
@@ -780,10 +865,9 @@ namespace crypto
   //
   struct point_g_t : public point_t
   {
-    point_g_t()
+    explicit constexpr point_g_t(const int32_t(&v)[40]) noexcept
+      : point_t(v)
     {
-      scalar_t one(1);
-      ge_scalarmult_base(&m_p3, &one.m_s[0]);
     }
 
     friend point_t operator*(const scalar_t& lhs, const point_g_t&)
@@ -964,19 +1048,18 @@ namespace crypto
 
 
   //
-  // Global constants
+  // Global constants (checked in crypto_constants test)
   //
 
-  extern const point_g_t c_point_G;
-
-  extern const point_t  c_point_H;
-  extern const point_t  c_point_H2;
-  extern const point_t  c_point_U;
-  extern const point_t  c_point_X;
-  extern const point_t  c_point_0;
-  extern const point_t  c_point_H_plus_G;
-  extern const point_t  c_point_H_minus_G;
-
+  static constexpr point_t    c_point_0         {{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }};
+  static constexpr point_g_t  c_point_G         {{ 25485296, 5318399, 8791791, -8299916, -14349720, 6939349, -3324311, -7717049, 7287234, -6577708, -758052, -1832720, 13046421, -4857925, 6576754, 14371947, -13139572, 6845540, -2198883, -4003719, -947565, 6097708, -469190, 10704810, -8556274, -15589498, -16424464, -16608899, 14028613, -5004649, 6966464, -2456167, 7033433, 6781840, 28785542, 12262365, -2659449, 13959020, -21013759, -5262166 }};
+  static constexpr point_t    c_point_H         {{ 20574939, 16670001, -29137604, 14614582, 24883426, 3503293, 2667523, 420631, 2267646, -4769165, -11764015, -12206428, -14187565, -2328122, -16242653, -788308, -12595746, -8251557, -10110987, 853396, -4982135, 6035602, -21214320, 16156349, 977218, 2807645, 31002271, 5694305, -16054128, 5644146, -15047429, -568775, -22568195, -8089957, -27721961, -10101877, -29459620, -13359100, -31515170, -6994674 }};
+  static constexpr point_t    c_point_H2        {{ 1318371, 14804112, 12545972, -13482561, -12089798, -16020744, -21221907, -8410994, -33080606, 11275578, 3807637, 11185450, -23227561, -12892068, 1356866, -1025012, -8022738, -8139671, -20315029, -13916324, -6475650, -7025596, 12403179, -5139984, -12068178, 10445584, -14826705, -4927780, 13964546, 12525942, -2314107, -10566315, 32243863, 15603849, 5154154, 4276633, -20918372, -15718796, -26386151, 8434696 }};
+  static constexpr point_t    c_point_U         {{ 30807552, 984924, 23426137, -5598760, 7545909, 16325843, 993742, 2594106, -31962071, -959867, 16454190, -4091093, 1197656, 13586872, -9269020, -14133290, 1869274, 13360979, -24627258, -10663086, 2212027, 1198856, 20515811, 15870563, -23833732, 9839517, -19416306, 11567295, -4212053, 348531, -2671541, 484270, -19128078, 1236698, -16002690, 9321345, 9776066, 10711838, 11187722, -16371275 }};
+  static constexpr point_t    c_point_X         {{ 25635916, -5459446, 5768861, 5666160, -6357364, -12939311, 29490001, -4543704, -31266450, -2582476, 23705213, 9562626, -716512, 16560168, 7947407, 2039790, -2752711, 4742449, 3356761, 16338966, 17303421, -5790717, -5684800, 12062431, -3307947, 8139265, -26544839, 12058874, 3452748, 3359034, 26514848, -6060876, 31255039, 11154418, -21741975, -3782423, -19871841, 5729859, 21754676, -12454027 }};
+  static constexpr point_t    c_point_H_plus_G  {{ 12291435, 3330843, -3390294, 13894858, -1099584, -6848191, 12040668, -15950068, -7494633, 12566672, -5526901, -16645799, -31081168, -1095427, -13082463, 4573480, -11255691, 4344628, 33477173, 11137213, -3837023, -12436594, -8471924, -814016, 10785607, 9492721, 10992667, 7406385, -5687296, -127915, -6229107, -9324867, 558657, 6493750, 4895261, 12642545, 9549220, 696086, 21894285, -10521807 }};
+  static constexpr point_t    c_point_H_minus_G {{ -28347682, 3523701, -3380175, -14453727, 4238027, -6032522, 20235758, 4091609, 12557126, -8064113, 4212476, -13419094, -114185, -7650727, -24238, 16663404, 23676363, -6819610, 18286466, 8714527, -3837023, -12436594, -8471924, -814016, 10785607, 9492721, 10992667, 7406385, -5687296, -127915, -20450317, 13815641, -11604061, -447489, 27380225, 9400847, -8551293, -1173627, -28110171, 14241295 }};
+  
   //
   // hash functions' helper
   //

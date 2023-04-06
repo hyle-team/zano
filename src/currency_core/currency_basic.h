@@ -59,9 +59,9 @@ namespace currency
   const static crypto::hash ffff_hash = epee::string_tools::hex_to_pod<crypto::hash>("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
   const static crypto::public_key ffff_pkey = epee::string_tools::hex_to_pod<crypto::public_key>("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // TODO @#@# consider getting rid of this
 
-  extern const crypto::public_key native_coin_asset_id;
-  extern const crypto::point_t    native_coin_asset_id_pt;
-  extern const crypto::public_key native_coin_asset_id_1div8;
+  const static crypto::point_t    native_coin_asset_id_pt    = crypto::c_point_H;
+  const static crypto::public_key native_coin_asset_id       = reinterpret_cast<crypto::public_key&>(crypto::ec_scalar{'\xd6', '\x32', '\x9b', '\x5b', '\x1f', '\x7c', '\x08', '\x05', '\xb5', '\xc3', '\x45', '\xf4', '\x95', '\x75', '\x54', '\x00', '\x2a', '\x2f', '\x55', '\x78', '\x45', '\xf6', '\x4d', '\x76', '\x45', '\xda', '\xe0', '\xe0', '\x51', '\xa6', '\x49', '\x8a'}); // == crypto::c_point_H, checked in crypto_constants
+  const static crypto::public_key native_coin_asset_id_1div8 = reinterpret_cast<crypto::public_key&>(crypto::ec_scalar{'\x74', '\xc3', '\x2d', '\x3e', '\xaa', '\xfa', '\xfc', '\x62', '\x3b', '\xf4', '\x83', '\xe8', '\x58', '\xd4', '\x2e', '\x8b', '\xf4', '\xec', '\x7d', '\xf0', '\x64', '\xad', '\xa2', '\xe3', '\x49', '\x34', '\x46', '\x9c', '\xff', '\x6b', '\x62', '\x68'}); // == 1/8 * crypto::c_point_H, checked in crypto_constants
 
   const static wide_difficulty_type global_difficulty_pow_starter = DIFFICULTY_POW_STARTER;
   const static wide_difficulty_type global_difficulty_pos_starter = DIFFICULTY_POS_STARTER;
