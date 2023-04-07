@@ -319,6 +319,25 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
+  bool is_asset_emitting_transaction(const transaction& tx, asset_descriptor_operation* p_ado /* = nullptr */)
+  {
+    if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
+      return false;
+
+    asset_descriptor_operation local_ado{};
+    if (p_ado == nullptr)
+      p_ado = &local_ado;
+
+    if (!get_type_in_variant_container(tx.extra, *p_ado))
+      return false;
+    
+    // TODO @#@# change to ASSET_DESCRIPTOR_OPERATION_EMMIT !
+    if (p_ado->operation_type != ASSET_DESCRIPTOR_OPERATION_REGISTER)
+      return false;
+
+    return true;
+  }
+  //---------------------------------------------------------------
   // Prepapres vector of output_entry to be used in key_offsets in a transaction input:
   // 1) sort all entries by gindex (while moving all ref_by_id to the end, keeping they relative order)
   // 2) convert absolute global indices to relative key_offsets 

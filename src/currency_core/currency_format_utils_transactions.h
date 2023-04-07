@@ -201,6 +201,7 @@ namespace currency
   bool tx_to_blob(const transaction& b, blobdata& b_blob);
   bool read_keyimages_from_tx(const transaction& tx, std::list<crypto::key_image>& kil);
   bool validate_inputs_sorting(const transaction& tx);
+  bool is_asset_emitting_transaction(const transaction& tx, asset_descriptor_operation* p_ado = nullptr);
 
   std::vector<tx_source_entry::output_entry> prepare_outputs_entries_for_key_offsets(const std::vector<tx_source_entry::output_entry>& outputs, size_t old_real_index, size_t& new_real_index) noexcept;
 
