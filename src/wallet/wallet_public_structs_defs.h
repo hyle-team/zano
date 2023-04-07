@@ -1178,11 +1178,56 @@ namespace wallet_public
     };
   };
 
+
+
+  struct asset_funds
+  {
+    crypto::hash asset_id;
+    uint64_t amount;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(asset_id)
+      KV_SERIALIZE(amount)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct ionic_swap_proposal_info
+  {
+    std::vector<asset_funds> from;
+    std::vector<asset_funds> to;
+    uint64_t mixins;
+    uint64_t fee;
+    uint64_t expiration_time;
+
+    BEGIN_KV_SERIALIZE_MAP()
+
+      KV_SERIALIZE(from)
+      KV_SERIALIZE(to)
+      KV_SERIALIZE(mixins)
+      KV_SERIALIZE(fee)
+      KV_SERIALIZE(expiration_time)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct create_ionic_swap_proposal_request
+  {
+    uint64_t wallet_id;
+    ionic_swap_proposal_info proposal;
+    std::string destination_add;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wallet_id)
+      KV_SERIALIZE(proposal)
+      KV_SERIALIZE(destination_add)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
   struct COMMAND_IONIC_SWAP_GENERATE_PROPOSAL
   {
     struct request
     {
-      view::ionic_swap_proposal_info proposal;
+      ionic_swap_proposal_info proposal;
       std::string destination_address;
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(proposal)
@@ -1215,7 +1260,7 @@ namespace wallet_public
 
     struct response
     {
-      view::ionic_swap_proposal_info proposal;
+      ionic_swap_proposal_info proposal;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(proposal)
@@ -1291,7 +1336,7 @@ namespace wallet_public
 
     struct response
     {
-      std::vector<view::wallet_entry_info> wallets;
+      std::vector<wallet_entry_info> wallets;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(wallets)
@@ -1373,11 +1418,10 @@ namespace wallet_public
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(buff)
       END_KV_SERIALIZE_MAP()
-    };
-
+    };     
 
     struct response
-    {
+    { 
       std::string res_buff; //base64 encoded encrypted data
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(res_buff)

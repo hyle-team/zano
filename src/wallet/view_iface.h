@@ -209,9 +209,9 @@ public:
     END_KV_SERIALIZE_MAP()
   };  
   
-  typedef wallet_public::wallet_info wallet_info;
+  typedef tools::wallet_public::wallet_info wallet_info;
 
-  typedef wallet_public::wallet_entry_info wallet_entry_info;
+  typedef tools::wallet_public::wallet_entry_info wallet_entry_info;
 
 
 
@@ -709,48 +709,9 @@ public:
   };
 
 
-  struct asset_funds
-  {
-    crypto::public_key asset_id;
-    uint64_t amount;
-
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(asset_id)
-      KV_SERIALIZE(amount)
-    END_KV_SERIALIZE_MAP()
-  };
-
-  struct ionic_swap_proposal_info
-  {
-    std::vector<asset_funds> from;
-    std::vector<asset_funds> to;
-    uint64_t mixins;
-    uint64_t fee;
-    uint64_t expiration_time;
-
-    BEGIN_KV_SERIALIZE_MAP()
-
-      KV_SERIALIZE(from)
-      KV_SERIALIZE(to)
-      KV_SERIALIZE(mixins)
-      KV_SERIALIZE(fee)
-      KV_SERIALIZE(expiration_time)
-    END_KV_SERIALIZE_MAP()
-  };
-
-  struct create_ionic_swap_proposal_request
-  {
-    uint64_t wallet_id;
-    ionic_swap_proposal_info proposal;
-    std::string destination_add;
-
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(wallet_id)
-      KV_SERIALIZE(proposal)
-      KV_SERIALIZE(destination_add)
-    END_KV_SERIALIZE_MAP()
-  };
-
+  typedef tools::wallet_public::asset_funds asset_funds;
+  typedef tools::wallet_public::ionic_swap_proposal_info ionic_swap_proposal_info;
+  typedef tools::wallet_public::create_ionic_swap_proposal_request create_ionic_swap_proposal_request;
 
   struct address_validation_response
   {

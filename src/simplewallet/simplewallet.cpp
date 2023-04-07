@@ -4,6 +4,10 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <cstdlib>
+#if defined(WIN32)
+  #include <crtdbg.h>
+#endif
 #include <thread>
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
@@ -22,11 +26,10 @@
 #include "string_coding.h"
 #include "wallet/wrap_service.h"
 #include "common/general_purpose_commands_defs.h"
-#include <cstdlib>
 
-#if defined(WIN32)
-#include <crtdbg.h>
-#endif
+#include "wallet/wallet_helpers.h"
+
+
 
 using namespace std;
 using namespace epee;
@@ -695,7 +698,7 @@ void simple_wallet::on_tor_status_change(const std::string& state)
   message_writer(epee::log_space::console_color_yellow, true, std::string("[TOR]: ")) << human_message;
 }
 //----------------------------------------------------------------------------------------------------
-void simple_wallet::on_mw_get_wallets(std::vector<wallet_public::wallet_entry_info>& wallets)
+void simple_wallet::on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets)
 {
   wallets.resize(1);
   tools::get_wallet_info(*m_wallet, wallets[0].wi);
@@ -1893,7 +1896,7 @@ bool simple_wallet::generate_ionic_swap_proposal(const std::vector<std::string> 
   }
 
   transaction tx_template = AUTO_VAL_INIT(tx_template);
-  bool r = m_wallet->create_ionic_swap_proposal(proposal, destination_addr, tx_template);
+  r = m_wallet->create_ionic_swap_proposal(proposal, destination_addr, tx_template);
   if (!r)
   {
     fail_msg_writer() << "Failed to create ionic_swap proposal";
@@ -2352,7 +2355,8 @@ int main(int argc, char* argv[])
     if (daemon_address.empty())
       daemon_address = std::string("http://") + daemon_host + ":" + std::to_string(daemon_port);
 
-    tools::wallet2 wal;
+    std::shared_ptr<tools::wallet2> wallet_ptr(new tools::wallet2());
+    tools::wallet2& wal = *wallet_ptr;
     //try to open it
     while (true)
     {
@@ -2408,7 +2412,7 @@ int main(int argc, char* argv[])
       }
     }
 
-    tools::wallet_rpc_server wrpc(wal);
+    tools::wallet_rpc_server wrpc(wallet_ptr);
     bool r = wrpc.init(vm);
     CHECK_AND_ASSERT_MES(r, EXIT_FAILURE, "Failed to initialize wallet rpc server");
 

@@ -136,8 +136,8 @@ public:
   std::string backup_wallet(uint64_t wallet_id, const std::wstring& path);
   std::string reset_wallet_password(uint64_t wallet_id, const std::string& pass);
   std::string is_wallet_password_valid(uint64_t wallet_id, const std::string& pass);
-  std::string create_ionic_swap_proposal(uint64_t wallet_id, const view::create_ionic_swap_proposal_request& proposal, std::string& result_proposal_hex);
-  std::string get_ionic_swap_proposal_info(uint64_t wallet_id, std::string&raw_tx_template_hex, ionic_swap_proposal_info& proposal);
+  std::string create_ionic_swap_proposal(uint64_t wallet_id, const tools::wallet_public::create_ionic_swap_proposal_request& proposal, std::string& result_proposal_hex);
+  std::string get_ionic_swap_proposal_info(uint64_t wallet_id, std::string&raw_tx_template_hex, tools::wallet_public::ionic_swap_proposal_info& proposal);
   std::string accept_ionic_swap_proposal(uint64_t wallet_id, std::string&raw_tx_template_hex, currency::transaction& result_tx);
   std::string get_my_offers(const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers);
   std::string get_fav_offers(const std::list<bc_services::offer_id>& hashes, const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers);
@@ -193,7 +193,7 @@ private:
   virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti);
   virtual void on_tor_status_change(size_t wallet_id, const std::string& state);
 
-  virtual void on_mw_get_wallets(std::vector<wallet_public::wallet_entry_info>& wallets) override;
+  virtual void on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets) override;
   virtual bool on_mw_select_wallet(uint64_t wallet_id) override;
   
   //--------
@@ -228,7 +228,6 @@ private:
   currency::t_currency_protocol_handler<currency::core> m_cprotocol;
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > m_p2psrv;
   currency::core_rpc_server m_rpc_server;
-  tools::wallet_rpc_server m_wallet_rpc_server; //optional initialization
 #endif
 
   bool m_remote_node_mode;

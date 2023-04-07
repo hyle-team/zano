@@ -780,7 +780,7 @@ void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
   wo.m_pproxy_diagnostig_info = m_rpc_proxy->get_proxy_diagnostic_info();
   wo.pview = m_pview;  
   wo.has_related_alias_in_unconfirmed = false;
-  wo.rpc_wrapper.reset(new tools::wallet_rpc_server(*wo.w.unlocked_get().get()));
+  wo.rpc_wrapper.reset(new tools::wallet_rpc_server(wo.w.unlocked_get()));
   if (m_remote_node_mode)
     wo.core_conf = currency::get_default_core_runtime_config();
   else
@@ -854,23 +854,24 @@ std::string wallets_manager::get_fav_offers(const std::list<bc_services::offer_i
 #endif
 }
 
-std::string wallets_manager::create_ionic_swap_proposal(uint64_t wallet_id, const view::create_ionic_swap_proposal_request& proposal, std::string& result_proposal_hex)
+std::string wallets_manager::create_ionic_swap_proposal(uint64_t wallet_id, const tools::wallet_public::create_ionic_swap_proposal_request& proposal, std::string& result_proposal_hex)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
   try {
     currency::account_public_address dest_account = AUTO_VAL_INIT(dest_account);
-    if (!currency::get_account_address_from_str(proposal.destination_add))
+    if (!currency::get_account_address_from_str(dest_account, proposal.destination_add))
     {
       return API_RETURN_CODE_BAD_ARG;
     }
-
-    bool r = wo.w->get()->create_ionic_swap_proposal(proposal, dest_account);
+    currency::transaction tx_template = AUTO_VAL_INIT(tx_template);
+    bool r = wo.w->get()->create_ionic_swap_proposal(proposal.proposal, dest_account, tx_template);
     if (!r)
     {
       return API_RETURN_CODE_FAIL;
     }
     else
     {
+      result_proposal_hex = epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(tx_template));
       return API_RETURN_CODE_OK;
     }
   }
@@ -879,11 +880,9 @@ std::string wallets_manager::create_ionic_swap_proposal(uint64_t wallet_id, cons
     return API_RETURN_CODE_FAIL;
   }
   return API_RETURN_CODE_OK;
-
-  return true;
 }
 
-std::string get_ionic_swap_proposal_info(uint64_t wallet_id, std::string&raw_tx_template_hex, ionic_swap_proposal_info& proposal)
+std::string wallets_manager::get_ionic_swap_proposal_info(uint64_t wallet_id, std::string&raw_tx_template_hex, tools::wallet_public::ionic_swap_proposal_info& proposal)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
   try {
@@ -906,7 +905,7 @@ std::string get_ionic_swap_proposal_info(uint64_t wallet_id, std::string&raw_tx_
   return API_RETURN_CODE_OK;
 }
 
-std::string wallets_manager::accept_ionic_swap_proposal(uint64_t wallet_id, std::string&raw_tx_template, currency::transaction& result_tx)
+std::string wallets_manager::accept_ionic_swap_proposal(uint64_t wallet_id, std::string&raw_tx_template_hex, currency::transaction& result_tx)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
   try {
@@ -2002,7 +2001,7 @@ void wallets_manager::on_tor_status_change(size_t wallet_id, const std::string& 
   m_pview->update_tor_status(tsu);
 }
 
-void wallets_manager::on_mw_get_wallets(std::vector<wallet_public::wallet_entry_info>& wallets)
+void wallets_manager::on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets)
 {
   std::list<view::open_wallet_response> opened_wallets;
   this->get_opened_wallets(opened_wallets);
@@ -2022,7 +2021,8 @@ bool wallets_manager::on_mw_select_wallet(uint64_t wallet_id)
   if (it == m_wallets.end())                
     return false; 
   auto& wo = it->second;
-  m_wallet_rpc_server.reset_active_wallet(wo.w);
+  //m_wallet_rpc_server.reset_active_wallet(wo.w);
+  return false;
 }
 
 

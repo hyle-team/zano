@@ -111,7 +111,7 @@ namespace currency
     virtual void on_message(i_wallet2_callback::message_severity severity, const std::string& m) override;
     virtual void on_tor_status_change(const std::string& state) override;
 
-    virtual void on_mw_get_wallets(std::vector<wallet_public::wallet_entry_info>& wallets) override;
+    virtual void on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets) override;
     virtual bool on_mw_select_wallet(uint64_t wallet_id) override;
     //----------------------------------------------------------
 

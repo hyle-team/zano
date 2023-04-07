@@ -56,16 +56,16 @@ namespace tools
     command_line::add_arg(desc, arg_deaf_mode);
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  wallet_rpc_server::wallet_rpc_server(std::shared_ptr<wallet2*> wptr)
+  wallet_rpc_server::wallet_rpc_server(std::shared_ptr<wallet2> wptr)
     : m_pwallet(wptr)
     , m_do_mint(false)
     , m_deaf(false)
     , m_last_wallet_store_height(0)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
-  std::shared_ptr<wallet2*> wallet_rpc_server::get_wallet()
+  std::shared_ptr<wallet2> wallet_rpc_server::get_wallet()
   {
-    return std::shared_ptr<wallet2*>(m_pwallet);
+    return std::shared_ptr<wallet2>(m_pwallet);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::run(bool do_mint, bool offline_mode, const currency::account_public_address& miner_address)
@@ -931,7 +931,7 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_ionic_swap_generate_proposal(const wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL& req, wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_ionic_swap_generate_proposal(const wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL::request& req, wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     currency::account_public_address destination_addr = AUTO_VAL_INIT(destination_addr);
     currency::payment_id_t integrated_payment_id;
@@ -960,7 +960,7 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_ionic_swap_get_proposal_info(const wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO& req, wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_ionic_swap_get_proposal_info(const wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO::request& req, wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     std::string raw_tx_template;
     bool r = epee::string_tools::parse_hexstr_to_binbuff(req.hex_raw_proposal, raw_tx_template);
@@ -980,7 +980,7 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_ionic_swap_accept_proposal(const wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL& req, wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_ionic_swap_accept_proposal(const wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL::request& req, wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
 
     std::string raw_tx_template;
@@ -1004,7 +1004,7 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS::request& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     i_wallet2_callback* pcallback = get_wallet()->get_callback();
     if (!pcallback)
@@ -1017,7 +1017,7 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_mw_select_wallet(const wallet_public::COMMAND_MW_SELECT_WALLET& req, wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_mw_select_wallet(const wallet_public::COMMAND_MW_SELECT_WALLET::request& req, wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     i_wallet2_callback* pcallback = get_wallet()->get_callback();
     if (!pcallback)
@@ -1030,14 +1030,14 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool on_sign_message(const wallet_public::COMMAND_SIGN_MESSAGE& req, wallet_public::COMMAND_SIGN_MESSAGE::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_sign_message(const wallet_public::COMMAND_SIGN_MESSAGE::request& req, wallet_public::COMMAND_SIGN_MESSAGE::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     std::string buff = epee::string_encoding::base64_decode(req.buff);
     get_wallet()->sign_buffer(buff, res.sig);
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool on_validate_signature(const wallet_public::COMMAND_VALIDATE_SIGNATURE& req, wallet_public::COMMAND_VALIDATE_SIGNATURE::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_validate_signature(const wallet_public::COMMAND_VALIDATE_SIGNATURE::request& req, wallet_public::COMMAND_VALIDATE_SIGNATURE::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     std::string buff = epee::string_encoding::base64_decode(req.buff);
     bool r = get_wallet()->validate_sign(buff, req.sig, req.pkey);
@@ -1050,7 +1050,7 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool on_encrypt_data(const wallet_public::COMMAND_ENCRYPT_DATA& req, wallet_public::COMMAND_ENCRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_encrypt_data(const wallet_public::COMMAND_ENCRYPT_DATA::request& req, wallet_public::COMMAND_ENCRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     std::string buff = epee::string_encoding::base64_decode(req.buff);
     bool r = get_wallet()->encrypt_buffer(buff, res.res_buff);
@@ -1058,7 +1058,7 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool on_decrypt_data(const wallet_public::COMMAND_DECRYPT_DATA& req, wallet_public::COMMAND_DECRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_decrypt_data(const wallet_public::COMMAND_DECRYPT_DATA::request& req, wallet_public::COMMAND_DECRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     std::string buff = epee::string_encoding::base64_decode(req.buff);
     bool r = get_wallet()->encrypt_buffer(buff, res.res_buff);
@@ -1066,7 +1066,7 @@ namespace tools
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::reset_active_wallet(std::shared_ptr<wallet2*> w)
+  bool wallet_rpc_server::reset_active_wallet(std::shared_ptr<wallet2> w)
   {
     m_pwallet = w;
     return true;

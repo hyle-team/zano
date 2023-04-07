@@ -129,7 +129,7 @@ namespace tools
 
     //mw api
     virtual void on_mw_get_wallets(std::vector<wallet_public::wallet_entry_info>& wallets) {}
-    virtual bool on_mw_select_wallet(uint64_t wallet_id) {}
+    virtual bool on_mw_select_wallet(uint64_t wallet_id) { return true; }
   };
 
   struct tx_dust_policy
@@ -550,7 +550,7 @@ namespace tools
     //i_wallet2_callback* callback() const { return m_wcallback; }
     //void callback(i_wallet2_callback* callback) { m_callback = callback; }
     void callback(std::shared_ptr<i_wallet2_callback> callback) { m_wcallback = callback; m_do_rise_transfer = (callback != nullptr); }
-    i_wallet2_callback* get_callback() { return m_wcallback; }
+    i_wallet2_callback* get_callback() { return m_wcallback.get(); }
     void set_do_rise_transfer(bool do_rise) { m_do_rise_transfer = do_rise; }
 
     bool has_related_alias_entry_unconfirmed(const currency::transaction& tx);
@@ -928,13 +928,13 @@ namespace tools
     bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin, crypto::hash& redeem_tx_id);
 
     // ionic swaps:
-    bool create_ionic_swap_proposal(const view::ionic_swap_proposal_info& proposal, const currency::account_public_address& destination_addr, transaction& tx_template);
-    bool build_ionic_swap_template(const view::ionic_swap_proposal_info& proposal_detais, const currency::account_public_address& destination_addr,
+    bool create_ionic_swap_proposal(const wallet_public::ionic_swap_proposal_info& proposal, const currency::account_public_address& destination_addr, currency::transaction& tx_template);
+    bool build_ionic_swap_template(const wallet_public::ionic_swap_proposal_info& proposal_detais, const currency::account_public_address& destination_addr,
       currency::transaction& template_tx,
       std::vector<uint64_t>& selected_transfers_for_template,
       crypto::secret_key& one_time_key);
-    bool get_ionic_swap_proposal_info(const std::string&raw_tx_template, view::ionic_swap_proposal_info& proposal);
-    bool get_ionic_swap_proposal_info(const currency::transaction tx, view::ionic_swap_proposal_info& proposal);
+    bool get_ionic_swap_proposal_info(const std::string&raw_tx_template, wallet_public::ionic_swap_proposal_info& proposal);
+    bool get_ionic_swap_proposal_info(const currency::transaction tx, wallet_public::ionic_swap_proposal_info& proposal);
     bool accept_ionic_swap_proposal(const std::string&raw_tx_template, currency::transaction& result_tx);
     bool accept_ionic_swap_proposal(const currency::transaction& tx_template, currency::transaction& result_tx);
 
