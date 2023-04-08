@@ -593,50 +593,13 @@ namespace crypto
     }
 
     explicit constexpr point_t(const int32_t(&v)[40]) noexcept
+      : m_p3{
+        {v[ 0], v[ 1], v[ 2], v[ 3], v[ 4], v[ 5], v[ 6], v[ 7], v[ 8], v[9]},
+        {v[10], v[11], v[12], v[13], v[14], v[15], v[16], v[17], v[18], v[19]},
+        {v[20], v[21], v[22], v[23], v[24], v[25], v[26], v[27], v[28], v[29]},
+        {v[30], v[31], v[32], v[33], v[34], v[35], v[36], v[37], v[38], v[39]}
+      }
     {
-      m_p3.X[0] = v[0];
-      m_p3.X[1] = v[1];
-      m_p3.X[2] = v[2];
-      m_p3.X[3] = v[3];
-      m_p3.X[4] = v[4];
-      m_p3.X[5] = v[5];
-      m_p3.X[6] = v[6];
-      m_p3.X[7] = v[7];
-      m_p3.X[8] = v[8];
-      m_p3.X[9] = v[9];
-
-      m_p3.Y[0] = v[10];
-      m_p3.Y[1] = v[11];
-      m_p3.Y[2] = v[12];
-      m_p3.Y[3] = v[13];
-      m_p3.Y[4] = v[14];
-      m_p3.Y[5] = v[15];
-      m_p3.Y[6] = v[16];
-      m_p3.Y[7] = v[17];
-      m_p3.Y[8] = v[18];
-      m_p3.Y[9] = v[19];
-
-      m_p3.Z[0] = v[20];
-      m_p3.Z[1] = v[21];
-      m_p3.Z[2] = v[22];
-      m_p3.Z[3] = v[23];
-      m_p3.Z[4] = v[24];
-      m_p3.Z[5] = v[25];
-      m_p3.Z[6] = v[26];
-      m_p3.Z[7] = v[27];
-      m_p3.Z[8] = v[28];
-      m_p3.Z[9] = v[29];
-
-      m_p3.T[0] = v[30];
-      m_p3.T[1] = v[31];
-      m_p3.T[2] = v[32];
-      m_p3.T[3] = v[33];
-      m_p3.T[4] = v[34];
-      m_p3.T[5] = v[35];
-      m_p3.T[6] = v[36];
-      m_p3.T[7] = v[37];
-      m_p3.T[8] = v[38];
-      m_p3.T[9] = v[39];
     }
 
     // as we're using additive notation, zero means identity group element (EC point (0, 1)) here and after
