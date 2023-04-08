@@ -14,6 +14,7 @@ using namespace epee;
 
 #include "print_fixed_point_helper.h"
 #include "currency_format_utils.h"
+#include "currency_format_utils_transactions.h"
 #include "serialization/binary_utils.h"
 #include "serialization/stl_containers.h"
 #include "currency_core/currency_config.h"
@@ -49,8 +50,8 @@ namespace currency
   {
     bool r = false;
     size_t outs_count = ogc.blinded_asset_ids.size();
-    CHECK_AND_ASSERT_MES(outs_count > 0, false, "");
-    CHECK_AND_ASSERT_MES(outs_count == ogc.asset_id_blinding_masks.size(), false, "");
+    CHECK_AND_ASSERT_MES(outs_count > 0, false, "blinded_asset_ids shouldn't be empty");
+    CHECK_AND_ASSERT_MES(outs_count == ogc.asset_id_blinding_masks.size(), false, "asset_id_blinding_masks != outs_count");
 
     size_t zc_ins_count = ogc.pseudo_outs_blinded_asset_ids.size();
     if (zc_ins_count == 0)
@@ -58,16 +59,16 @@ namespace currency
       // if there's no ZC inputs all the outputs must be native coins with explicit asset ids
       for(size_t j = 0; j < ogc.blinded_asset_ids.size(); ++j)
       {
-        CHECK_AND_ASSERT_MES(ogc.blinded_asset_ids[j] == currency::native_coin_asset_id_pt, false, "");
-        CHECK_AND_ASSERT_MES(ogc.asset_id_blinding_masks[j] == 0, false, "");
+        CHECK_AND_ASSERT_MES(ogc.blinded_asset_ids[j] == currency::native_coin_asset_id_pt, false, "no ZC ins: out #" << j << " has a non-explicit asset id");
+        CHECK_AND_ASSERT_MES(ogc.asset_id_blinding_masks[j] == 0, false, "no ZC ins: out #" << j << " has non-zero asset id blinding mask");
       }
       return true;
     }
     
     // okay, have some ZC inputs
 
-    CHECK_AND_ASSERT_MES(zc_ins_count == ogc.pseudo_outs_plus_real_out_blinding_masks.size(), false, "");
-    CHECK_AND_ASSERT_MES(zc_ins_count == ogc.real_zc_ins_asset_ids.size(), false, "");
+    CHECK_AND_ASSERT_MES(zc_ins_count == ogc.pseudo_outs_plus_real_out_blinding_masks.size(), false, "zc_ins_count != pseudo_outs_plus_real_out_blinding_masks");
+    CHECK_AND_ASSERT_MES(zc_ins_count == ogc.real_zc_ins_asset_ids.size(), false, "zc_ins_count != real_zc_ins_asset_ids");
 
     // ins
     //ogc.pseudo_outs_blinded_asset_ids;             // T^p_i = T_real + r'_i * X
@@ -81,24 +82,44 @@ namespace currency
     {
       const crypto::public_key H = ogc.asset_ids[j].to_public_key();
       const crypto::point_t& T = ogc.blinded_asset_ids[j];
+      
       std::vector<crypto::point_t> ring;
       ring.reserve(zc_ins_count);
       size_t secret_index = SIZE_MAX;
+      crypto::scalar_t secret = -ogc.asset_id_blinding_masks[j];
+
       for(size_t i = 0; i < zc_ins_count; ++i)
       {
         ring.emplace_back(ogc.pseudo_outs_blinded_asset_ids[i] - T);
-        if (secret_index == SIZE_MAX && ogc.real_zc_ins_asset_ids[i].to_public_key() == H)
+        if (secret_index == SIZE_MAX && ogc.real_zc_ins_asset_ids[i] == H)
+        {
           secret_index = i;
+          secret += ogc.pseudo_outs_plus_real_out_blinding_masks[secret_index];
+        }
       }
-      CHECK_AND_ASSERT_MES(secret_index != SIZE_MAX, false, "");
-      if (has_non_zc_inputs)
-        ring.emplace_back(currency::native_coin_asset_id_pt); // additional ring member for txs with non-zc inputs
 
-      crypto::scalar_t secret = ogc.pseudo_outs_plus_real_out_blinding_masks[secret_index] - ogc.asset_id_blinding_masks[j];
+      // additional ring member for native coins in txs with non-zc inputs
+      if (has_non_zc_inputs)
+      {
+        ring.emplace_back(currency::native_coin_asset_id_pt - T);
+        if (secret_index == SIZE_MAX && H == native_coin_asset_id)
+          secret_index = ring.size() - 1;
+      }
+
+      // additional ring member for asset emitting operation
+      if (!ogc.ao_amount_blinding_mask.is_zero())
+      {
+        ring.emplace_back(ogc.ao_asset_id_pt - T);
+        if (secret_index == SIZE_MAX && H == ogc.ao_asset_id)
+          secret_index = ring.size() - 1;
+      }
+
+      CHECK_AND_ASSERT_MES(secret_index != SIZE_MAX, false, "out #" << j << ": can't find a corresponding asset id in inputs");
 
       result.bge_proofs.emplace_back(crypto::BGE_proof_s{});
-      r = crypto::generate_BGE_proof(context_hash, ring, secret, secret_index, result.bge_proofs.back());
-      CHECK_AND_ASSERT_MES(r, false, "");
+      uint8_t err = 0;
+      r = crypto::generate_BGE_proof(context_hash, ring, secret, secret_index, result.bge_proofs.back(), &err);
+      CHECK_AND_ASSERT_MES(r, false, "out #" << j << ": generate_BGE_proof failed with err=" << (int)err);
     }
 
     return true;
@@ -145,6 +166,14 @@ namespace currency
     }
     if (has_non_ZC_inputs)
       pseudo_outs_blinded_asset_ids.emplace_back(currency::native_coin_asset_id_pt); // additional ring member for txs with non-zc inputs
+
+    asset_descriptor_operation ado{};
+    if (is_asset_emitting_transaction(tx, &ado))
+    {
+      crypto::point_t asset_id_pt = crypto::c_point_0;
+      calculate_asset_id(ado.descriptor.owner, &asset_id_pt, nullptr); // TODO @#@# optimization: this expensive calculation should be done only once
+      pseudo_outs_blinded_asset_ids.emplace_back(asset_id_pt); // additional ring member for asset emitting tx
+    }
 
     for(size_t j = 0; j < outs_count; ++j)
     {
