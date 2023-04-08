@@ -815,12 +815,32 @@ namespace crypto
         return false;
 
       return true;
-    };
+    }
 
     friend bool operator!=(const point_t& lhs, const point_t& rhs)
     {
       return !(lhs == rhs);
-    };
+    }
+
+    friend bool operator==(const point_t& lhs, const public_key& rhs)
+    {
+      return lhs.to_public_key() == rhs;
+    }
+
+    friend bool operator!=(const point_t& lhs, const public_key& rhs)
+    {
+      return !(lhs == rhs);
+    }
+
+    friend bool operator==(const public_key& lhs, const point_t& rhs)
+    {
+      return lhs == rhs.to_public_key();
+    }
+
+    friend bool operator!=(const public_key& lhs, const point_t& rhs)
+    {
+      return !(lhs == rhs);
+    }
 
     friend std::ostream& operator<<(std::ostream& ss, const point_t &v)
     {
