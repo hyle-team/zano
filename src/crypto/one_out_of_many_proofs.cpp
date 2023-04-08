@@ -69,7 +69,7 @@ namespace crypto
 #endif
 
 
-    const size_t m = std::max(1ull, constexpr_ceil_log_n(ring_size, n));
+    const size_t m = std::max(static_cast<uint64_t>(1), constexpr_ceil_log_n(ring_size, n));
     const size_t N = constexpr_pow(m, n);
     const size_t mn = m * n;
 
@@ -232,7 +232,7 @@ namespace crypto
     size_t ring_size = ring.size();
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(ring_size > 0, 0);
 
-    const size_t m = std::max(1ull, constexpr_ceil_log_n(ring_size, n));
+    const size_t m = std::max(static_cast<uint64_t>(1), constexpr_ceil_log_n(ring_size, n));
     const size_t N = constexpr_pow(m, n);
     const size_t mn = m * n;
 
