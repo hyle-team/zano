@@ -1,5 +1,5 @@
-// Copyright (c) 2021-2022 Zano Project (https://zano.org/)
-// Copyright (c) 2021-2022 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2021-2023 Zano Project (https://zano.org/)
+// Copyright (c) 2021-2023 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #pragma once
@@ -66,12 +66,14 @@ namespace crypto
 
     static void calc_pedersen_commitment(const scalar_t& value, const scalar_t& mask, point_t& commitment)
     {
-      commitment = value * bpp_G + mask * bpp_H;
+      // commitment = value * bpp_G + mask * bpp_H
+      commitment = operator*(value, bpp_G) + mask * bpp_H;
     }
 
     static void calc_pedersen_commitment_2(const scalar_t& value, const scalar_t& mask1, const scalar_t& mask2, point_t& commitment)
     {
-      commitment = value * bpp_G + mask1 * bpp_H + mask2 * bpp_H2;
+      // commitment = value * bpp_G + mask1 * bpp_H * mask2 * bpp_H2
+      commitment = operator*(value, bpp_G) + mask1 * bpp_H + mask2 * bpp_H2;
     }
 
     static const scalar_t& get_initial_transcript()
@@ -126,9 +128,9 @@ namespace crypto
       return result;
     }
 
-    using typename gen_trait_t::bpp_G;
-    using typename gen_trait_t::bpp_H;
-    using typename gen_trait_t::bpp_H2;
+    using gen_trait_t::bpp_G;
+    using gen_trait_t::bpp_H;
+    using gen_trait_t::bpp_H2;
   }; // struct bpp_crypto_trait_zano
 
 
