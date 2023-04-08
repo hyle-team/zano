@@ -45,7 +45,7 @@ Recommended OS version: Ubuntu 18.04 LTS.
 2. Download and build Boost
 
        curl -OL https://boostorg.jfrog.io/artifactory/main/release/1.70.0/source/boost_1_70_0.tar.bz2
-       tar -xjf boost_1_70_0.tar.bz2
+       echo "430ae8354789de4fd19ee52f3b1f739e1fba576f0aded0897c3c2bc00fb38778  boost_1_70_0.tar.bz2" | shasum -c && tar -xjf boost_1_70_0.tar.bz2
        cd boost_1_70_0
        ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
        ./b2
@@ -66,7 +66,7 @@ Recommended OS version: Ubuntu 18.04 LTS.
    We recommend installing OpenSSL v1.1.1n locally unless you would like to use the same version system-wide.
 
        curl -OL https://www.openssl.org/source/openssl-1.1.1n.tar.gz
-       tar xaf openssl-1.1.1n.tar.gz 
+       echo "40dceb51a4f6a5275bde0e6bf20ef4b91bfc32ed57c0552e2e8e15463372b17a  openssl-1.1.1n.tar.gz" | shasum -c && tar xaf openssl-1.1.1n.tar.gz 
        cd openssl-1.1.1n/
        ./config --prefix=/home/user/openssl --openssldir=/home/user/openssl shared zlib
        make
