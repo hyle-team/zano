@@ -363,10 +363,12 @@ namespace currency
     }
 
     res.status = API_RETURN_CODE_OK;
+
+    /*
     std::stringstream ss;
     typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount outs_for_amount;
     typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry out_entry;
-    /*std::for_each(res.outs.begin(), res.outs.end(), [&](outs_for_amount& ofa)
+    std::for_each(res.outs.begin(), res.outs.end(), [&](outs_for_amount& ofa)
     {
       ss << "[" << ofa.amount << "]:";
       CHECK_AND_ASSERT_MES(ofa.outs.size(), ;, "internal error: ofa.outs.size() is empty for amount " << ofa.amount);
@@ -379,7 +381,7 @@ namespace currency
     std::string s = ss.str();
     LOG_PRINT_L2("COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS: " << ENDL << s);
     */
-    res.status = API_RETURN_CODE_OK;
+
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
