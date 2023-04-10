@@ -23,8 +23,6 @@
 
 using namespace crypto;
 
-namespace mp = boost::multiprecision;
-
 // out = z ^ s (mod l)
 void sc_exp(unsigned char* out, const unsigned char* z, const unsigned char* s)
 {

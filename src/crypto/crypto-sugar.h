@@ -11,6 +11,8 @@
 
 namespace crypto
 {
+  namespace mp = boost::multiprecision;
+
   extern "C"
   {
 #include "crypto/crypto-ops.h"

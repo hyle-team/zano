@@ -8,12 +8,9 @@
 #include "crypto-sugar.h"
 #include "range_proofs.h"
 #include "clsag.h"
-#include <boost/multiprecision/cpp_int.hpp>
 
 namespace crypto
 {
-  namespace mp = boost::multiprecision;
-
   extern const mp::uint256_t c_zarcanum_z_coeff_mp;
   extern const scalar_t      c_zarcanum_z_coeff_s;
 
