@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2022 Zano Project
+// Copyright (c) 2014-2023 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -19,6 +19,8 @@
 #include "crypto/hash.h"
 #include "crypto/range_proofs.h"
 #include "crypto/clsag.h"
+#include "crypto/zarcanum.h"
+#include "crypto/one_out_of_many_proofs.h"
 #include "boost_serialization_maps.h"
 #include "serialization/keyvalue_enable_POD_serialize_as_string.h"
 //
@@ -94,6 +96,25 @@ namespace crypto
     END_BOOST_SERIALIZATION()
   };
 
+  struct CLSAG_GGX_signature_serialized : public CLSAG_GGX_signature
+  {
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(c)
+      FIELD((std::vector<scalar_t>&)(r_g))
+      FIELD((std::vector<scalar_t>&)(r_x))
+      FIELD(K1)
+      FIELD(K2)
+      END_SERIALIZE()
+
+      BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(c)
+      BOOST_SERIALIZE((std::vector<scalar_t>&)(r_g))
+      BOOST_SERIALIZE((std::vector<scalar_t>&)(r_x))
+      BOOST_SERIALIZE(K1)
+      BOOST_SERIALIZE(K2)
+      END_BOOST_SERIALIZATION()
+  };
+
   struct CLSAG_GGXG_signature_serialized : public CLSAG_GGXG_signature
   {
     BEGIN_SERIALIZE_OBJECT()
@@ -112,6 +133,95 @@ namespace crypto
       BOOST_SERIALIZE(K1)
       BOOST_SERIALIZE(K2)
       BOOST_SERIALIZE(K3)
+    END_BOOST_SERIALIZATION()
+  };
+
+  struct CLSAG_GGXXG_signature_serialized : public CLSAG_GGXXG_signature
+  {
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(c)
+      FIELD_N("r_g", (std::vector<scalar_t>&)(r_g))
+      FIELD_N("r_x", (std::vector<scalar_t>&)(r_x))
+      FIELD(K1)
+      FIELD(K2)
+      FIELD(K3)
+      FIELD(K4)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(c)
+      BOOST_SERIALIZE((std::vector<scalar_t>&)(r_g))
+      BOOST_SERIALIZE((std::vector<scalar_t>&)(r_x))
+      BOOST_SERIALIZE(K1)
+      BOOST_SERIALIZE(K2)
+      BOOST_SERIALIZE(K3)
+      BOOST_SERIALIZE(K4)
+    END_BOOST_SERIALIZATION()
+  };
+
+  struct vector_UG_aggregation_proof_serialized : public vector_UG_aggregation_proof
+  {
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(amount_commitments_for_rp_aggregation)
+      FIELD((std::vector<scalar_t>&)(y0s))
+      FIELD((std::vector<scalar_t>&)(y1s))
+      FIELD(c)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(amount_commitments_for_rp_aggregation)
+      BOOST_SERIALIZE((std::vector<scalar_t>&)(y0s))
+      BOOST_SERIALIZE((std::vector<scalar_t>&)(y1s))
+      BOOST_SERIALIZE(c)
+    END_BOOST_SERIALIZATION()
+  };
+
+  struct linear_composition_proof_s : public linear_composition_proof
+  {
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(c)
+      FIELD(y0)
+      FIELD(y1)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(c)
+      BOOST_SERIALIZE(y0)
+      BOOST_SERIALIZE(y1)
+    END_BOOST_SERIALIZATION()
+  };
+
+  struct generic_schnorr_sig_s : public generic_schnorr_sig
+  {
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(c)
+      FIELD(y)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(c)
+      BOOST_SERIALIZE(y)
+    END_BOOST_SERIALIZATION()
+  };
+
+  struct BGE_proof_s : public BGE_proof
+  {
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(A)
+      FIELD(B)
+      FIELD(Pk)
+      FIELD_N("f", (std::vector<scalar_t>&)(f))
+      FIELD(y)
+      FIELD(z)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(A)
+      BOOST_SERIALIZE(B)
+      BOOST_SERIALIZE(Pk)
+      BOOST_SERIALIZE(f)
+      BOOST_SERIALIZE(y)
+      BOOST_SERIALIZE(z)
     END_BOOST_SERIALIZATION()
   };
 

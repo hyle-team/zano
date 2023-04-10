@@ -261,7 +261,7 @@ namespace currency
 
     
     bool create_block_template(const account_public_address& miner_address, const blobdata& ex_nonce, block& b, wide_difficulty_type& di, uint64_t& height) const;
-    bool create_block_template(const account_public_address& miner_address, const account_public_address& stakeholder_address, const blobdata& ex_nonce, bool pos, const pos_entry& pe, fill_block_template_func_t custom_fill_block_template_func, block& b, wide_difficulty_type& di, uint64_t& height, crypto::scalar_t* blinding_mask_sum_ptr = nullptr) const;
+    bool create_block_template(const account_public_address& miner_address, const account_public_address& stakeholder_address, const blobdata& ex_nonce, bool pos, const pos_entry& pe, fill_block_template_func_t custom_fill_block_template_func, block& b, wide_difficulty_type& di, uint64_t& height, outputs_generation_context* miner_tx_ogc_ptr = nullptr) const;
     bool create_block_template(const create_block_template_params& params, create_block_template_response& resp) const;
 
     bool have_block(const crypto::hash& id) const;
@@ -288,12 +288,12 @@ namespace currency
     uint64_t get_aliases_count()const;
     uint64_t get_block_h_older_then(uint64_t timestamp) const;
     bool validate_tx_service_attachmens_in_services(const tx_service_attachment& a, size_t i, const transaction& tx)const;
-    bool get_asset_info(const crypto::hash& asset_id, asset_descriptor_base& info)const;
+    bool get_asset_info(const crypto::public_key& asset_id, asset_descriptor_base& info)const;
     uint64_t get_assets_count() const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_htlc& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
-    bool check_tx_input(const transaction& tx, size_t in_index, const txin_zc_input& zc_in, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height) const;
+    bool check_tx_input(const transaction& tx, size_t in_index, const txin_zc_input& zc_in, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, bool& tx_has_explicit_asset_ids_in_all_ins) const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height)const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash) const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height, crypto::hash& max_used_block_id)const;
@@ -492,7 +492,7 @@ namespace currency
     typedef tools::db::cached_key_value_accessor<uint64_t, uint64_t, false, true> solo_options_container;
     typedef tools::db::basic_key_value_accessor<uint32_t, block_gindex_increments, true> per_block_gindex_increments_container; // height => [(amount, gindex_increment), ...]
     
-    typedef tools::db::cached_key_value_accessor<crypto::hash, std::list<asset_descriptor_operation>, true, false> assets_container;
+    typedef tools::db::cached_key_value_accessor<crypto::public_key, std::list<asset_descriptor_operation>, true, false> assets_container; // TODO @#@# consider storing tx_id as well for reference -- sowle 
 
 
     //-----------------------------------------
@@ -593,7 +593,7 @@ namespace currency
     wide_difficulty_type get_next_difficulty_for_alternative_chain(const alt_chain_type& alt_chain, block_extended_info& bei, bool pos) const;
     bool handle_block_to_main_chain(const block& bl, block_verification_context& bvc);
     bool handle_block_to_main_chain(const block& bl, const crypto::hash& id, block_verification_context& bvc);
-    bool collect_rangeproofs_data_from_tx(std::vector<zc_outs_range_proofs_with_commitments>& agregated_proofs, const transaction& tx);
+    bool collect_rangeproofs_data_from_tx(const transaction& tx, const crypto::hash& tx_id, std::vector<zc_outs_range_proofs_with_commitments>& agregated_proofs);
     std::string print_alt_chain(alt_chain_type alt_chain);
     bool handle_alternative_block(const block& b, const crypto::hash& id, block_verification_context& bvc);
     bool is_reorganize_required(const block_extended_info& main_chain_bei, const alt_chain_type& alt_chain, const crypto::hash& proof_alt);
@@ -648,14 +648,14 @@ namespace currency
     uint64_t get_adjusted_time()const;
     bool complete_timestamps_vector(uint64_t start_height, std::vector<uint64_t>& timestamps);
     bool update_next_comulative_size_limit();
-    bool process_blockchain_tx_extra(const transaction& tx);
+    bool process_blockchain_tx_extra(const transaction& tx, const crypto::hash& tx_id);
     bool unprocess_blockchain_tx_extra(const transaction& tx);
     bool process_blockchain_tx_attachments(const transaction& tx, uint64_t h, const crypto::hash& bl_id, uint64_t timestamp);
     bool unprocess_blockchain_tx_attachments(const transaction& tx, uint64_t h, uint64_t timestamp);
     bool pop_alias_info(const extra_alias_entry& ai);
     bool put_alias_info(const transaction& tx, extra_alias_entry& ai);
-    bool pop_asset_info(const crypto::hash& asset_id);
-    bool put_asset_info(const transaction & tx, asset_descriptor_operation & ado);
+    bool pop_asset_info(const crypto::public_key& asset_id);
+    bool put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado);
     void fill_addr_to_alias_dict();
     //bool resync_spent_tx_flags();
     bool prune_ring_signatures_and_attachments_if_need();

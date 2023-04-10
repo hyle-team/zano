@@ -1,5 +1,5 @@
-// Copyright (c) 2021-2022 Zano Project (https://zano.org/)
-// Copyright (c) 2021-2022 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2021-2023 Zano Project (https://zano.org/)
+// Copyright (c) 2021-2023 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #pragma once
@@ -23,23 +23,6 @@ namespace crypto
     return result;
   }
 
-
-  // returns greatest k, s.t. 2**k <= v
-  // tests in crypto_tests_range_proofs.h
-  constexpr size_t constexpr_floor_log2(size_t v)
-  {
-    return v <= 1 ? 0 : constexpr_floor_log2(v >> 1) + 1;
-  }
-
-  // returns smallest k, s.t. v <= 2**k
-  // tests in crypto_tests_range_proofs.h
-  constexpr size_t constexpr_ceil_log2(size_t v)
-  {
-    return v <= 1 ? 0 : constexpr_floor_log2(v - 1) + 1;
-  }
-
-
-
   // returns least significant bit uing de Bruijn sequence
   // http://graphics.stanford.edu/~seander/bithacks.html
   inline uint8_t calc_lsb_32(uint32_t v)
@@ -56,8 +39,25 @@ namespace crypto
   ////////////////////////////////////////
   // crypto trait for Zano
   ////////////////////////////////////////
-  template<size_t N = 64, size_t values_max = 16>
-  struct bpp_crypto_trait_zano
+  struct bpp_ct_generators_HGX
+  {
+    // NOTE! This notation follows the original BP+ whitepaper, see mapping to Zano's generators below
+    static const point_t& bpp_G;
+    static const point_t& bpp_H;
+    static const point_t& bpp_H2;
+  };
+
+  struct bpp_ct_generators_UGX
+  {
+    // NOTE! This notation follows the original BP+ whitepaper, see mapping to Zano's generators below
+    static const point_t& bpp_G;
+    static const point_t& bpp_H;
+    static const point_t& bpp_H2;
+  };
+
+
+  template<typename gen_trait_t, size_t N = 64, size_t values_max = 16>
+  struct bpp_crypto_trait_zano : gen_trait_t
   {
     static constexpr size_t c_bpp_n           = N;                           // the upper bound for the witness's range
     static constexpr size_t c_bpp_values_max  = values_max;                  // maximum number of elements in BP+ proof, i.e. max allowed BP+ outputs
@@ -66,12 +66,14 @@ namespace crypto
 
     static void calc_pedersen_commitment(const scalar_t& value, const scalar_t& mask, point_t& commitment)
     {
-      commitment = value * bpp_G + mask * bpp_H;
+      // commitment = value * bpp_G + mask * bpp_H
+      commitment = operator*(value, bpp_G) + mask * bpp_H;
     }
 
     static void calc_pedersen_commitment_2(const scalar_t& value, const scalar_t& mask1, const scalar_t& mask2, point_t& commitment)
     {
-      commitment = value * bpp_G + mask1 * bpp_H + mask2 * bpp_H2;
+      // commitment = value * bpp_G + mask1 * bpp_H * mask2 * bpp_H2
+      commitment = operator*(value, bpp_G) + mask1 * bpp_H + mask2 * bpp_H2;
     }
 
     static const scalar_t& get_initial_transcript()
@@ -98,6 +100,7 @@ namespace crypto
     }
 
     // TODO: refactor with proper OOB handling
+    // TODO: @#@# add domain separation
     static const point_t& get_generator(bool select_H, size_t index)
     {
       if (index >= c_bpp_mn_max)
@@ -125,19 +128,15 @@ namespace crypto
       return result;
     }
 
-    static const point_t& bpp_G; // NOTE! This notation follows original BP+ whitepaper, see mapping to Zano's generators below
-    static const point_t& bpp_H;
-    static const point_t& bpp_H2;
+    using gen_trait_t::bpp_G;
+    using gen_trait_t::bpp_H;
+    using gen_trait_t::bpp_H2;
   }; // struct bpp_crypto_trait_zano
 
-  template<size_t N, size_t values_max>
-  const point_t& bpp_crypto_trait_zano<N, values_max>::bpp_G = c_point_H;
 
-  template<size_t N, size_t values_max>
-  const point_t& bpp_crypto_trait_zano<N, values_max>::bpp_H = c_point_G;
+  typedef bpp_crypto_trait_zano<bpp_ct_generators_UGX, 64,  16> bpp_crypto_trait_ZC_out;
 
-  template<size_t N, size_t values_max>
-  const point_t& bpp_crypto_trait_zano<N, values_max>::bpp_H2 = c_point_X;
+  typedef bpp_crypto_trait_zano<bpp_ct_generators_HGX, 128, 16> bpp_crypto_trait_Zarcanum;
 
   
   // efficient multiexponentiation (naive stub implementation atm, TODO)

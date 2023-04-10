@@ -53,7 +53,6 @@
 
 const command_line::arg_descriptor<bool> arg_alloc_win_console  ( "alloc-win-console", "Allocates debug console with GUI", false );
 const command_line::arg_descriptor<std::string> arg_html_folder  ( "html-path", "Manually set GUI html folder path");
-const command_line::arg_descriptor<std::string> arg_xcode_stub  ( "-NSDocumentRevisionsDebugMode", "Substitute for xcode bug");
 const command_line::arg_descriptor<bool> arg_enable_gui_debug_mode  ( "gui-debug-mode", "Enable debug options in GUI");
 const command_line::arg_descriptor<uint32_t> arg_qt_remote_debugging_port  ( "remote-debugging-port", "Specify port for Qt remote debugging");
 const command_line::arg_descriptor<std::string> arg_remote_node  ( "remote-node", "Switch GUI to work with remote node instead of local daemon");
@@ -61,6 +60,9 @@ const command_line::arg_descriptor<bool> arg_enable_qt_logs  ( "enable-qt-logs",
 const command_line::arg_descriptor<bool> arg_disable_logs_init("disable-logs-init", "Disable log initialization in GUI");
 const command_line::arg_descriptor<std::string> arg_qt_dev_tools  ( "qt-dev-tools", "Enable main web page inspection with Chromium DevTools, <vertical|horizontal>[,scale], e.g. \"horizontal,1.3\"", "");
 const command_line::arg_descriptor<bool> arg_disable_price_fetch("gui-disable-price-fetch", "Disable price fetching in UI(for privacy matter)");
+
+const command_line::arg_descriptor<std::string> arg_xcode_stub("-NSDocumentRevisionsDebugMode", "Substitute for xcode bug");
+const command_line::arg_descriptor<std::string> arg_sandbox_disable("no-sandbox", "Substitute for ubuntu/linux rendering problem");
 
 wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_stop_singal_sent(false),
@@ -172,7 +174,9 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_level);
   command_line::add_arg(desc_cmd_sett, command_line::arg_console);
   command_line::add_arg(desc_cmd_only, command_line::arg_show_details);
+  
   command_line::add_arg(desc_cmd_sett, arg_alloc_win_console);
+  command_line::add_arg(desc_cmd_sett, arg_sandbox_disable);
   command_line::add_arg(desc_cmd_sett, arg_html_folder);
   command_line::add_arg(desc_cmd_only, arg_xcode_stub);
   command_line::add_arg(desc_cmd_sett, arg_enable_gui_debug_mode);
@@ -331,7 +335,25 @@ bool wallets_manager::init(view::i_view* pview_handler)
   std::string path_to_html;
   if (!command_line::has_arg(m_vm, arg_html_folder))
   {
-    path_to_html = string_tools::get_current_module_folder() + "/html";
+    LOG_PRINT_L0("Detecting APPDIR... ");
+#if defined(__unix__) || defined(__linux__)
+    const char* env_p = std::getenv("APPDIR");
+    LOG_PRINT_L0("APPDIR = " << (void*)env_p);
+    if (env_p)
+    {
+      LOG_PRINT_L0("APPDIR: " << env_p);
+    }
+    if (env_p && std::strlen(env_p))
+    {
+      //app running inside AppImage
+      LOG_PRINT_L0("APPDIR SET: " << env_p);
+      path_to_html = std::string(env_p) + "/usr/bin/html";
+    }
+    else
+#endif
+    {
+      path_to_html = string_tools::get_current_module_folder() + "/html";
+    }
   }
   else
   {
@@ -1751,7 +1773,7 @@ std::string wallets_manager::reset_wallet_password(uint64_t wallet_id, const std
   else
     return API_RETURN_CODE_FAIL;
 }
-std::string wallets_manager::add_custom_asset_id(uint64_t wallet_id, const crypto::hash& asset_id, currency::asset_descriptor_base& asset_descriptor)
+std::string wallets_manager::add_custom_asset_id(uint64_t wallet_id, const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_descriptor)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   if(w.w->get()->add_custom_asset_id(asset_id, asset_descriptor))
@@ -1759,7 +1781,7 @@ std::string wallets_manager::add_custom_asset_id(uint64_t wallet_id, const crypt
   else
     return API_RETURN_CODE_FAIL;
 }
-std::string wallets_manager::delete_custom_asset_id(uint64_t wallet_id, const crypto::hash& asset_id)
+std::string wallets_manager::delete_custom_asset_id(uint64_t wallet_id, const crypto::public_key& asset_id)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   if (w.w->get()->delete_custom_asset_id(asset_id))

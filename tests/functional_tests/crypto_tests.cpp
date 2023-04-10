@@ -1,17 +1,20 @@
-// Copyright (c) 2020-2021 Zano Project
-// Copyright (c) 2020-2021 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2020-2023 Zano Project
+// Copyright (c) 2020-2023 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #define USE_INSECURE_RANDOM_RPNG_ROUTINES // turns on random manupulation for tests
 #include <utility>
+#include <boost/multiprecision/cpp_int.hpp>
 #include "crypto/crypto.h"
 #include "epee/include/misc_log_ex.h"
 #include "epee/include/profile_tools.h"
 #include "include_base_utils.h"
 #include "common/crypto_stream_operators.h"
 #include "common/varint.h"
+#include "common/boost_serialization_helper.h"
 #include "currency_core/difficulty.h"
+#include "currency_core/currency_basic.h"
 
 #include "crypto/crypto-sugar.h"
 #include "crypto/range_proofs.h"
@@ -489,9 +492,10 @@ struct test_keeper_t
 
 
 ////////////////////////////////////////////////////////////////////////////////
-#include "crypto_tests_ml2s.h"
+// #include "crypto_tests_ml2s.h"
 #include "crypto_tests_range_proofs.h"
 #include "crypto_tests_clsag.h"
+#include "crypto_tests_one_out_of_many_proofs.h"
 ////////////////////////////////////////////////////////////////////////////////
 
 
@@ -499,6 +503,112 @@ struct test_keeper_t
 //
 // Tests
 //
+
+TEST(crypto, constants)
+{
+  //
+  // field elements
+  //
+  scalar_t zero = {0, 0, 0, 0};
+  scalar_t one  = {1, 0, 0, 0};
+  ASSERT_TRUE(zero.is_zero());
+  ASSERT_FALSE(one.is_zero());
+  ASSERT_TRUE(one > zero);
+  scalar_t r = scalar_t::random();
+  ASSERT_EQ(r * zero, zero);
+  ASSERT_EQ(r * one, r);
+  ASSERT_EQ(c_scalar_0, zero);
+  ASSERT_EQ(c_scalar_1, one);
+
+  ASSERT_EQ(c_scalar_2p64 - c_scalar_1, scalar_t(UINT64_MAX));
+  ASSERT_EQ(c_scalar_2p64, scalar_t(UINT64_MAX) + c_scalar_1);
+  ASSERT_EQ(c_scalar_2p64, scalar_t::power_of_2(64));
+
+  ASSERT_EQ(zero + c_scalar_L, zero);
+  ASSERT_EQ(c_scalar_L + zero, zero);
+  ASSERT_EQ(r + c_scalar_L, r);
+  ASSERT_EQ(c_scalar_L + r, r);
+
+  ASSERT_EQ(c_scalar_Lm1 + c_scalar_1, c_scalar_0);
+  ASSERT_EQ(c_scalar_0 - c_scalar_1, c_scalar_Lm1);
+
+  ASSERT_EQ(c_scalar_P.as_boost_mp_type<mp::uint256_t>(), scalar_t::power_of_2(255).as_boost_mp_type<mp::uint256_t>() - 19);
+
+  ASSERT_EQ(c_scalar_P.as_boost_mp_type<mp::uint256_t>() - c_scalar_Pm1.as_boost_mp_type<mp::uint256_t>(), mp::uint256_t(1));
+  ASSERT_EQ(c_scalar_Pm1 + r, c_scalar_P - c_scalar_1 + r);
+
+  ASSERT_EQ(c_scalar_256m1.as_boost_mp_type<mp::uint256_t>(), scalar_t::power_of_2(255).as_boost_mp_type<mp::uint512_t>() * 2 - 1);
+
+  ASSERT_EQ(c_scalar_1div8 * scalar_t(8), c_scalar_1);
+  ASSERT_NEQ(c_scalar_1div8, c_scalar_1);
+  ASSERT_NEQ(c_scalar_1div8 * scalar_t(2), c_scalar_1);
+  ASSERT_NEQ(c_scalar_1div8 * scalar_t(4), c_scalar_1);
+
+  LOG_PRINT_L0("0         = " << c_scalar_0       << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_0) << " }");
+  LOG_PRINT_L0("1         = " << c_scalar_1       << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_1) << " }");
+  LOG_PRINT_L0("2^64      = " << c_scalar_2p64    << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_2p64) << " }");
+  LOG_PRINT_L0("L         = " << c_scalar_L       << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_L) << " }");
+  LOG_PRINT_L0("L - 1     = " << c_scalar_Lm1     << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_Lm1) << " }");
+  LOG_PRINT_L0("P         = " << c_scalar_P       << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_P) << " }");
+  LOG_PRINT_L0("P - 1     = " << c_scalar_Pm1     << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_Pm1) << " }");
+  LOG_PRINT_L0("2^256 - 1 = " << c_scalar_256m1   << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_256m1) << " }");
+  LOG_PRINT_L0("1/8       = " << c_scalar_1div8   << " = { " << pod_to_hex_comma_separated_uint64(c_scalar_1div8) << " }");
+  LOG_PRINT_L0(ENDL);
+
+
+  //
+  // group elements
+  //
+
+  // calculate all generators manually using on external constants
+  point_t p_0{};
+  ge_p3_0(&p_0.m_p3);
+
+  point_t G{};
+  ge_scalarmult_base(&G.m_p3, c_scalar_1.data());
+
+  point_t H   = hash_helper_t::hp(G);
+  point_t H2  = hash_helper_t::hp("H2_generator");
+  point_t U   = hash_helper_t::hp("U_generator");
+  point_t X   = hash_helper_t::hp("X_generator");
+  point_t HpG = H + G;
+  point_t HmG = H - G;
+  point_t Hd8 = c_scalar_1div8 * H;
+  
+  ASSERT_EQ(scalar_t(8) * Hd8, H);
+
+  // print them
+  LOG_PRINT_L0("0     = " << p_0  << " = { " << p_0.to_comma_separated_int32_str() << " }");
+  LOG_PRINT_L0("G     = " << G    << " = { " << G.to_comma_separated_int32_str() << " }");
+  LOG_PRINT_L0("H     = " << H    << " = { " << H.to_comma_separated_int32_str() << " }");
+  LOG_PRINT_L0("      = { " << pod_to_comma_separated_chars(H.to_public_key()) << " }");
+  LOG_PRINT_L0("H2    = " << H2   << " = { " << H2.to_comma_separated_int32_str() << " }");
+  LOG_PRINT_L0("U     = " << U    << " = { " << U.to_comma_separated_int32_str() << " }");
+  LOG_PRINT_L0("X     = " << X    << " = { " << X.to_comma_separated_int32_str() << " }");
+  LOG_PRINT_L0("H+G   = " << HpG  << " = { " << HpG.to_comma_separated_int32_str() << " }");
+  LOG_PRINT_L0("H-G   = " << HmG  << " = { " << HmG.to_comma_separated_int32_str() << " }");
+  LOG_PRINT_L0("H / 8 = " << Hd8  << " = { " << pod_to_hex_comma_separated_bytes(Hd8.to_public_key()) << " }");
+  LOG_PRINT_L0("      = { " << pod_to_comma_separated_chars(Hd8.to_public_key()) << " }");
+
+  // check constants
+  ASSERT_EQ(p_0,    c_point_0);
+  ASSERT_EQ(G,      c_point_G);
+  ASSERT_EQ(H,      c_point_H);
+  ASSERT_EQ(H2,     c_point_H2);
+  ASSERT_EQ(U,      c_point_U);
+  ASSERT_EQ(X,      c_point_X);
+  ASSERT_EQ(HpG,    c_point_H_plus_G);
+  ASSERT_EQ(HmG,    c_point_H_minus_G);
+
+  ASSERT_EQ(currency::native_coin_asset_id,    c_point_H.to_public_key());
+  ASSERT_EQ(currency::native_coin_asset_id_pt, c_point_H);
+  ASSERT_EQ(currency::native_coin_asset_id_pt.to_public_key(), currency::native_coin_asset_id);
+  ASSERT_EQ(currency::native_coin_asset_id_1div8, Hd8.to_public_key());
+
+  return true;
+}
+
+
 
 #include "crypto_tests_performance.h"
 
@@ -611,32 +721,32 @@ TEST(crypto, pos)
 
   boost::multiprecision::uint512_t Lv = boost::multiprecision::uint512_t(c_L_w) * amount;
 
-  constexpr uint64_t COIN = 1000000000000;
+  constexpr uint64_t c_coin = 1000000000000;
   const uint64_t amounts[] = {
-    COIN / 100,
-    COIN / 50,
-    COIN / 20,
-    COIN / 10,
-    COIN / 5,
-    COIN / 2,
-    COIN * 1,
-    COIN * 2,
-    COIN * 5,
-    COIN * 10,
-    COIN * 20,
-    COIN * 50,
-    COIN * 100,
-    COIN * 200,
-    COIN * 500,
-    COIN * 1000,
-    COIN * 2000,
-    COIN * 5000,
-    COIN * 10000,
-    COIN * 20000,
-    COIN * 50000,
-    COIN * 100000,
-    COIN * 200000,
-    COIN * 500000
+    c_coin / 100,
+    c_coin / 50,
+    c_coin / 20,
+    c_coin / 10,
+    c_coin / 5,
+    c_coin / 2,
+    c_coin * 1,
+    c_coin * 2,
+    c_coin * 5,
+    c_coin * 10,
+    c_coin * 20,
+    c_coin * 50,
+    c_coin * 100,
+    c_coin * 200,
+    c_coin * 500,
+    c_coin * 1000,
+    c_coin * 2000,
+    c_coin * 5000,
+    c_coin * 10000,
+    c_coin * 20000,
+    c_coin * 50000,
+    c_coin * 100000,
+    c_coin * 200000,
+    c_coin * 500000
   };
 
   uint64_t kernel = 0;
@@ -804,12 +914,12 @@ TEST(crypto, keys)
 
 TEST(crypto, scalar_basics)
 {
-  scalar_t zero = 0;
-  ASSERT_TRUE(zero.is_zero());
-  scalar_t one = 1;
-  ASSERT_FALSE(one.is_zero());
-  ASSERT_TRUE(one > zero);
-  ASSERT_TRUE(one.muladd(zero, zero) == zero);
+  ASSERT_EQ(c_scalar_1.muladd(c_scalar_0, c_scalar_0), c_scalar_0);
+
+  ASSERT_EQ(-c_scalar_1, c_scalar_Lm1);
+  ASSERT_EQ(-c_scalar_1, scalar_t(0) - c_scalar_1);
+  ASSERT_EQ(-c_scalar_0, c_scalar_0);
+  ASSERT_EQ(-c_scalar_Lm1, c_scalar_1);
 
   scalar_t z = 0;
   for (size_t j = 0; j < 1000; ++j)
@@ -819,8 +929,8 @@ TEST(crypto, scalar_basics)
     ASSERT_TRUE(z.is_reduced());
     ASSERT_TRUE(z > z - 1);
     ASSERT_TRUE(z < z + 1);
-    ASSERT_TRUE(z.muladd(one, zero) == z);
-    ASSERT_TRUE(z.muladd(zero, one) == one);
+    ASSERT_TRUE(z.muladd(c_scalar_1, c_scalar_0) == z);
+    ASSERT_TRUE(z.muladd(c_scalar_0, c_scalar_1) == c_scalar_1);
     ASSERT_TRUE(z.muladd(z, z) == z * z + z);
   }
 
@@ -831,17 +941,7 @@ TEST(crypto, scalar_basics)
   ASSERT_TRUE(c_scalar_P > c_scalar_Pm1);
   ASSERT_FALSE(c_scalar_P < c_scalar_Pm1);
 
-  std::cout << "0   = " << zero << std::endl;
-  std::cout << "1   = " << one << std::endl;
-  std::cout << "L   = " << c_scalar_L << std::endl;
-  std::cout << "L-1 = " << c_scalar_Lm1 << std::endl;
-  std::cout << "P   = " << c_scalar_P << std::endl;
-  std::cout << "P-1 = " << c_scalar_Pm1 << std::endl;
-  std::cout << std::endl;
-
   // check rolling over L for scalars arithmetics
-  ASSERT_EQ(c_scalar_Lm1 + 1, 0);
-  ASSERT_EQ(scalar_t(0) - 1, c_scalar_Lm1);
   ASSERT_EQ(c_scalar_Lm1 * 2, c_scalar_Lm1 - 1); // (L - 1) * 2 = L + L - 2 = (L - 1) - 1  (mod L)
   ASSERT_EQ(c_scalar_Lm1 * 100, c_scalar_Lm1 - 99);
   ASSERT_EQ(c_scalar_Lm1 * c_scalar_Lm1, 1);     // (L - 1) * (L - 1) = L*L - 2L + 1 = 1 (mod L)
@@ -862,9 +962,17 @@ TEST(crypto, scalar_basics)
   ASSERT_TRUE(p.is_reduced());
   mp::uint256_t mp_p_mod_l = c_scalar_P.as_boost_mp_type<mp::uint256_t>() % c_scalar_L.as_boost_mp_type<mp::uint256_t>();
   ASSERT_EQ(p, scalar_t(mp_p_mod_l));
+  ASSERT_FALSE(c_scalar_P.is_reduced());
+  ASSERT_FALSE(c_scalar_Pm1.is_reduced());
+  ASSERT_FALSE(c_scalar_256m1.is_reduced());
 
-  ASSERT_EQ(c_scalar_2p64 - c_scalar_1, scalar_t(UINT64_MAX));
-  ASSERT_EQ(c_scalar_2p64, scalar_t(UINT64_MAX) + c_scalar_1);
+
+  p.make_random();
+  z.make_random();
+  ASSERT_EQ(scalar_t().assign_muladd(z, z, p), p + z * z);
+  ASSERT_EQ(scalar_t().assign_muladd(z, p, z), z + z * p);
+  ASSERT_EQ(scalar_t().assign_mulsub(z, z, p), p - z * z);
+  ASSERT_EQ(scalar_t().assign_mulsub(z, p, z), z - z * p);
 
   return true;
 }
@@ -1114,14 +1222,6 @@ TEST(crypto, scalar_arithmetic_assignment)
   }
   ASSERT_EQ(mm, 1);
   ASSERT_EQ(sum, 0);
-
-  return true;
-}
-
-TEST(crypto, constants)
-{
-  ASSERT_EQ(c_point_H_plus_G, c_point_H + c_point_G);
-  ASSERT_EQ(c_point_H_minus_G, c_point_H - c_point_G);
 
   return true;
 }
@@ -1426,6 +1526,69 @@ TEST(crypto, sc_set_bit_clear_bit)
   return true;
 }
 
+
+TEST(crypto, schnorr_sig)
+{
+  public_key invalid_pk = parse_tpod_from_hex_string<public_key>("0000000000000000000000000000000000000000000000000000000000000001");
+  ASSERT_FALSE(check_key(invalid_pk));
+
+  hash m = *(crypto::hash*)(&scalar_t::random());
+  for(size_t i = 0; i < 100; ++i)
+  {
+    generic_schnorr_sig_s ss{};
+    scalar_t a = scalar_t::random();
+    point_t A_pt = a * c_point_G;
+    public_key A = A_pt.to_public_key();
+    ASSERT_FALSE(generate_schnorr_sig<gt_X>(m, A_pt, a, ss));
+    ASSERT_TRUE(generate_schnorr_sig<gt_G>(m, A_pt, a, ss));
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, A, ss));
+    ASSERT_TRUE(verify_schnorr_sig<gt_G>(m, A, ss));
+
+    A_pt = a * c_point_X;
+    A = A_pt.to_public_key();
+    ASSERT_FALSE(generate_schnorr_sig<gt_G>(m, A_pt, a, ss));
+    ASSERT_TRUE(generate_schnorr_sig<gt_X>(m, A_pt, a, ss));
+    ASSERT_FALSE(verify_schnorr_sig<gt_G>(m, A, ss));
+    ASSERT_TRUE(verify_schnorr_sig<gt_X>(m, A, ss));
+
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(currency::null_hash, A, ss));
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, invalid_pk, ss));
+
+    generic_schnorr_sig_s bad_ss = ss;
+    bad_ss.c = c_scalar_Pm1;
+    ASSERT_FALSE(bad_ss.c.is_reduced());
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, A, bad_ss));
+    bad_ss = ss;
+    bad_ss.y = c_scalar_Pm1;
+    ASSERT_FALSE(bad_ss.y.is_reduced());
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, A, bad_ss));
+
+    bad_ss = ss;
+
+    mp::uint256_t c_mp = bad_ss.c.as_boost_mp_type<mp::uint256_t>();
+    c_mp += c_scalar_L.as_boost_mp_type<mp::uint256_t>();
+    memcpy(bad_ss.c.data(), c_mp.backend().limbs(), sizeof(scalar_t));
+    ASSERT_FALSE(bad_ss.c.is_reduced());
+    scalar_t tmp(bad_ss.c);
+    tmp.reduce();
+    ASSERT_EQ(tmp, ss.c);
+    ASSERT_FALSE(verify_schnorr_sig<gt_X>(m, A, bad_ss));
+
+    // binary serialization 
+    std::string blob = t_serializable_object_to_blob(ss);
+    generate_random_bytes(sizeof ss, &ss);
+    ASSERT_TRUE(t_unserializable_object_from_blob(ss, blob));
+    ASSERT_TRUE(verify_schnorr_sig<gt_X>(m, A, ss));
+
+    // boost serialization
+    ASSERT_TRUE(tools::serialize_obj_to_buff(ss, blob));
+    generate_random_bytes(sizeof ss, &ss);
+    ASSERT_TRUE(tools::unserialize_obj_from_buff(ss, blob));
+    ASSERT_TRUE(verify_schnorr_sig<gt_X>(m, A, ss));
+  }
+
+  return true;
+}
 
 
 //

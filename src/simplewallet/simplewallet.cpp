@@ -229,8 +229,8 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("tor_enable", boost::bind(&simple_wallet::tor_enable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
   m_cmd_binder.set_handler("tor_disable", boost::bind(&simple_wallet::tor_disable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
   m_cmd_binder.set_handler("deploy_new_asset", boost::bind(&simple_wallet::deploy_new_asset, this, ph::_1), "Deploys new asset in the network, with current wallet as a maintainer");
-  m_cmd_binder.set_handler("add_custom_asset_id", boost::bind(&simple_wallet::add_custom_asset_id, this, _1), "Approve asset id to be recognized in the wallet and returned in balances");
-  m_cmd_binder.set_handler("remove_custom_asset_id", boost::bind(&simple_wallet::remove_custom_asset_id, this, _1), "Cancel previously made approval for asset id");
+  m_cmd_binder.set_handler("add_custom_asset_id", boost::bind(&simple_wallet::add_custom_asset_id, this, ph::_1), "Approve asset id to be recognized in the wallet and returned in balances");
+  m_cmd_binder.set_handler("remove_custom_asset_id", boost::bind(&simple_wallet::remove_custom_asset_id, this, ph::_1), "Cancel previously made approval for asset id");
 
   m_cmd_binder.set_handler("generate_ionic_swap_proposal", boost::bind(&simple_wallet::generate_ionic_swap_proposal, this, _1), "generate_ionic_swap_proposal <proposal_config.json> <destination_addr>- Generates ionic_swap proposal with given conditions");
   m_cmd_binder.set_handler("get_ionic_swap_proposal_info", boost::bind(&simple_wallet::get_ionic_swap_proposal_info, this, _1), "get_ionic_swap_proposal_info <hex_encoded_raw_proposal> - Extracts and display information from ionic_swap proposal raw data");
@@ -1256,7 +1256,7 @@ bool simple_wallet::validate_wrap_status(uint64_t amount)
   }
 }
 //----------------------------------------------------------------------------------------------------
-bool preprocess_asset_id(std::string& address_arg, crypto::hash& asset_id)
+bool preprocess_asset_id(std::string& address_arg, crypto::public_key& asset_id)
 {
   auto p = address_arg.find(':');
   if (p == std::string::npos)
@@ -1819,18 +1819,18 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
   tx_destination_entry td = AUTO_VAL_INIT(td);
   td.addr.push_back(m_wallet->get_account().get_public_address());
   td.amount = adb.current_supply;
-  td.asset_id = currency::ffff_hash;
+  td.asset_id = currency::ffff_pkey;
   std::vector<currency::tx_destination_entry> destinations;
   destinations.push_back(td);
   currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
-  crypto::hash result_asset_id = currency::null_hash;
+  crypto::public_key result_asset_id = currency::null_pkey;
   m_wallet->publish_new_asset(adb, destinations, result_tx, result_asset_id);
 
   success_msg_writer(true) << "New asset deployed: " << ENDL 
-    << "Asset ID: "<< result_asset_id << ENDL 
-    << "Title: " << adb.full_name << ENDL
-    << "Ticker: " << adb.ticker << ENDL
-    << "Emitted: " << print_fixed_decimal_point(adb.current_supply, adb.decimal_point) << ENDL
+    << "Asset ID:     " << result_asset_id << ENDL 
+    << "Title:        " << adb.full_name << ENDL
+    << "Ticker:       " << adb.ticker << ENDL
+    << "Emitted:      " << print_fixed_decimal_point(adb.current_supply, adb.decimal_point) << ENDL
     << "Max emission: " << print_fixed_decimal_point(adb.total_max_supply, adb.decimal_point) << ENDL
     ;
 
@@ -1843,7 +1843,7 @@ bool simple_wallet::add_custom_asset_id(const std::vector<std::string> &args)
   {
     fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
   }
-  crypto::hash asset_id =  currency::null_hash;
+  crypto::public_key asset_id = currency::null_pkey;
   if (!epee::string_tools::parse_tpod_from_hex_string(args[0], asset_id))
   {
     fail_msg_writer() << "expected valid asset_id";
@@ -1858,11 +1858,11 @@ bool simple_wallet::add_custom_asset_id(const std::vector<std::string> &args)
   }
   else
   {
-    success_msg_writer() << "Added custom asset:" << ENDL 
-      << " Id: " << asset_id << ENDL
-      << " Title: " << asset_descriptor.full_name << ENDL
-      << " Ticker: " << asset_descriptor.ticker << ENDL
-      << " Ticker: " << print_fixed_decimal_point(asset_descriptor.current_supply, asset_descriptor.decimal_point) << ENDL
+    success_msg_writer() << "The following custom asset was successfully added to the wallet:" << ENDL 
+      << " id:     " << asset_id << ENDL
+      << " title:  " << asset_descriptor.full_name << ENDL
+      << " ticker: " << asset_descriptor.ticker << ENDL
+      << " supply: " << print_fixed_decimal_point(asset_descriptor.current_supply, asset_descriptor.decimal_point) << ENDL
       ;
   }
   return true;
@@ -1972,7 +1972,7 @@ bool simple_wallet::remove_custom_asset_id(const std::vector<std::string> &args)
   {
     fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
   }
-  crypto::hash asset_id = currency::null_hash;
+  crypto::public_key asset_id = currency::null_pkey;
   if (!epee::string_tools::parse_tpod_from_hex_string(args[0], asset_id))
   {
     fail_msg_writer() << "expected valid asset_id";

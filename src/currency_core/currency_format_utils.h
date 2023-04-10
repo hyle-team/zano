@@ -53,15 +53,6 @@
 
 namespace currency
 {
-  bool operator ==(const currency::transaction& a, const currency::transaction& b);
-  bool operator ==(const currency::block& a, const currency::block& b);
-  bool operator ==(const currency::extra_attachment_info& a, const currency::extra_attachment_info& b);
-  bool operator ==(const currency::NLSAG_sig& a, const currency::NLSAG_sig& b);
-  bool operator ==(const currency::void_sig& a, const currency::void_sig& b);
-  bool operator ==(const currency::ZC_sig& a, const currency::ZC_sig& b);
-  bool operator ==(const currency::zarcanum_sig& a, const currency::zarcanum_sig& b);
-  bool operator ==(const currency::ref_by_id& a, const currency::ref_by_id& b);
-
   typedef boost::multiprecision::uint128_t uint128_tl;
 
 
@@ -205,19 +196,25 @@ namespace currency
       : index(index)
       , amount(amount)
     {}
-    wallet_out_info(size_t index, uint64_t amount, const crypto::scalar_t& blinding_mask)
+    wallet_out_info(size_t index, uint64_t amount, const crypto::scalar_t& amount_blinding_mask, const crypto::scalar_t& asset_id_blinding_mask, const crypto::public_key& asset_id)
       : index(index)
       , amount(amount)
-      , blinding_mask(blinding_mask)
+      , amount_blinding_mask(amount_blinding_mask)
+      , asset_id_blinding_mask(asset_id_blinding_mask)
+      , asset_id(asset_id)
     {}
 
-    size_t      index  = SIZE_MAX;
-    uint64_t    amount = 0;
-    crypto::scalar_t blinding_mask = 0;
-    crypto::hash asset_id = currency::null_hash;
+    size_t            index  = SIZE_MAX;
+    uint64_t          amount = 0;
+    crypto::scalar_t  amount_blinding_mask = 0;
+    crypto::scalar_t  asset_id_blinding_mask = 0;
+    crypto::public_key asset_id = currency::native_coin_asset_id; // use point_t instead as this is for internal use only?
+
+    bool is_native_coin() const { return asset_id == currency::native_coin_asset_id; }
   };
 
 
+  // TODO @#@# consider refactoring to eliminate redundant coping and to imporve performance 
   struct zc_outs_range_proofs_with_commitments
   {
     zc_outs_range_proofs_with_commitments(const zc_outs_range_proof& range_proof, const std::vector<crypto::point_t>& amount_commitments)
@@ -232,7 +229,14 @@ namespace currency
   };
 
   bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs);
-  bool check_tx_balance(const transaction& tx, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
+  bool generate_asset_surjection_proof(const crypto::hash& context_hash, bool has_non_zc_inputs, outputs_generation_context& ogc, zc_asset_surjection_proof& result);
+  bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id);
+  bool generate_tx_balance_proof(const transaction &tx, const crypto::hash& tx_id, const outputs_generation_context& ogc, uint64_t block_reward_for_miner_tx, zc_balance_proof& proof);
+  bool generate_zc_outs_range_proof(const crypto::hash& context_hash, size_t out_index_start, const outputs_generation_context& outs_gen_context,
+    const std::vector<tx_out_v>& vouts, zc_outs_range_proof& result);
+  bool check_tx_bare_balance(const transaction& tx, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
+  bool check_tx_balance(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
+  bool validate_asset_operation(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, crypto::public_key& asset_id);
   //---------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 
                                                              size_t current_block_size, 
@@ -241,16 +245,17 @@ namespace currency
                                                              const account_public_address &stakeholder_address,
                                                              transaction& tx, 
                                                              uint64_t tx_version,
-                                                             const blobdata& extra_nonce = blobdata(), 
-                                                             size_t max_outs = CURRENCY_MINER_TX_MAX_OUTS, 
-                                                             bool pos = false,
-                                                             const pos_entry& pe = pos_entry(),
-                                                             crypto::scalar_t* blinding_masks_sum_ptr = nullptr,
-                                                             const keypair* tx_one_time_key_to_use = nullptr);
+                                                             const blobdata& extra_nonce            = blobdata(), 
+                                                             size_t max_outs                        = CURRENCY_MINER_TX_MAX_OUTS, 
+                                                             bool pos                               = false,
+                                                             const pos_entry& pe                    = pos_entry(),
+                                                             outputs_generation_context* ogc_ptr    = nullptr,
+                                                             const keypair* tx_one_time_key_to_use  = nullptr);
   //---------------------------------------------------------------
   uint64_t get_string_uint64_hash(const std::string& str);
-  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, crypto::scalar_t& out_blinding_mask, finalized_tx& result, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
+  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, crypto::scalar_t& asset_blinding_mask, crypto::scalar_t& amount_blinding_mask, crypto::point_t& blinded_asset_id, crypto::point_t& amount_commitment, finalized_tx& result, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
+
   bool validate_alias_name(const std::string& al);
   bool validate_password(const std::string& password);
   void get_attachment_extra_info_details(const std::vector<attachment_v>& attachment, extra_attachment_info& eai);
@@ -293,7 +298,8 @@ namespace currency
 
   uint64_t get_tx_version(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd); // returns tx version based on the height of the block where the transaction is expected to be
   bool construct_tx(const account_keys& sender_account_keys,  const finalize_tx_param& param, finalized_tx& result);
-  crypto::hash get_asset_id_from_descriptor(const asset_descriptor_base& adb);
+  void calculate_asset_id(const crypto::public_key& asset_owner, crypto::point_t* p_result_point, crypto::public_key* p_result_pub_key);
+
 
 
   bool sign_multisig_input_in_tx(currency::transaction& tx, size_t ms_input_index, const currency::account_keys& keys, const currency::transaction& source_tx, bool *p_is_input_fully_signed = nullptr);
@@ -311,10 +317,10 @@ namespace currency
   crypto::hash get_multisig_out_id(const transaction& tx, size_t n);
   bool is_out_to_acc(const account_public_address& addr, const txout_to_key& out_key, const crypto::key_derivation& derivation, size_t output_index);
   bool is_out_to_acc(const account_public_address& addr, const txout_multisig& out_multisig, const crypto::key_derivation& derivation, size_t output_index);
-  bool is_out_to_acc(const account_public_address& addr, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount, crypto::scalar_t& blinding_mask);
-  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation);
-  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation, std::list<htlc_info>& htlc_info_list);
-  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, std::vector<wallet_out_info>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation);
+  bool is_out_to_acc(const account_public_address& addr, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount, crypto::public_key& decoded_asset_id, crypto::scalar_t& amount_blinding_mask, crypto::scalar_t& asset_id_blinding_mask);
+  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, uint64_t& sum_of_native_outs, crypto::key_derivation& derivation);
+  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, uint64_t& sum_of_native_outs, crypto::key_derivation& derivation, std::list<htlc_info>& htlc_info_list);
+  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, std::vector<wallet_out_info>& outs, uint64_t& sum_of_native_outs, crypto::key_derivation& derivation);
   bool get_tx_fee(const transaction& tx, uint64_t & fee);
   uint64_t get_tx_fee(const transaction& tx);
   bool derive_ephemeral_key_helper(const account_keys& ack, const crypto::public_key& tx_public_key, size_t real_output_index, keypair& in_ephemeral);
@@ -600,36 +606,6 @@ namespace currency
 //     extra.push_back(extra_t());
 //     return boost::get<extra_t>(extra.back());
     return get_or_add_field_to_variant_vector<extra_t>(extra);
-  }
-  //---------------------------------------------------------------
-  template<class variant_t, class variant_type_t>
-  void update_or_add_field_to_extra(std::vector<variant_t>& variant_container, const variant_type_t& v)
-  {
-    for (auto& ev : variant_container)
-    {
-      if (ev.type() == typeid(variant_type_t))
-      {
-        boost::get<variant_type_t>(ev) = v;
-        return;
-      }
-    }
-    variant_container.push_back(v);
-  }
-  //---------------------------------------------------------------
-  template<class variant_type_t, class variant_t>
-  void remove_field_of_type_from_extra(std::vector<variant_t>& variant_container)
-  {
-    for (size_t i = 0; i != variant_container.size();)
-    {
-      if (variant_container[i].type() == typeid(variant_type_t))
-      {
-        variant_container.erase(variant_container.begin()+i);
-      }
-      else
-      {
-        i++;
-      }
-    }
   }
   //---------------------------------------------------------------
   template<typename t_container>

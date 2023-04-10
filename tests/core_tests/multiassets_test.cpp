@@ -28,10 +28,7 @@ multiassets_basic_test::multiassets_basic_test()
   REGISTER_CALLBACK_METHOD(multiassets_basic_test, configure_core);
   REGISTER_CALLBACK_METHOD(multiassets_basic_test, c1);
 
-  m_hardforks.set_hardfork_height(1, 1);
-  m_hardforks.set_hardfork_height(2, 1);
-  m_hardforks.set_hardfork_height(3, 1);
-  m_hardforks.set_hardfork_height(4, 1);
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 1);
 }
 
 bool multiassets_basic_test::generate(std::vector<test_event_entry>& events) const
@@ -73,17 +70,17 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   std::vector<currency::tx_destination_entry> destinations(2);
   destinations[0].addr.push_back(miner_wlt->get_account().get_public_address());
   destinations[0].amount = AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC;
-  destinations[0].asset_id = currency::ffff_hash;
+  destinations[0].asset_id = currency::ffff_pkey;
   destinations[1].addr.push_back(alice_wlt->get_account().get_public_address());
   destinations[1].amount = AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC;
-  destinations[1].asset_id = currency::ffff_hash;
+  destinations[1].asset_id = currency::ffff_pkey;
   
   LOG_PRINT_MAGENTA("destinations[0].asset_id:" << destinations[0].asset_id, LOG_LEVEL_0);
   LOG_PRINT_MAGENTA("destinations[1].asset_id:" << destinations[1].asset_id, LOG_LEVEL_0);
-  LOG_PRINT_MAGENTA("currency::ffff_hash:" << currency::ffff_hash, LOG_LEVEL_0);
+  LOG_PRINT_MAGENTA("currency::ffff_pkey:     " << currency::ffff_pkey, LOG_LEVEL_0);
 
   currency::transaction tx = AUTO_VAL_INIT(tx);
-  crypto::hash asset_id = currency::null_hash;
+  crypto::public_key asset_id = currency::null_pkey;
   miner_wlt->publish_new_asset(adb, destinations, tx, asset_id);
   LOG_PRINT_L0("Published new asset: " << asset_id << ", tx_id: " << currency::get_transaction_hash(tx));
 
@@ -95,11 +92,11 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   miner_wlt->refresh();
   alice_wlt->refresh();
   uint64_t mined = 0;
-  std::unordered_map<crypto::hash,  tools::wallet_public::asset_balance_entry_base> balances;
+  std::unordered_map<crypto::public_key,  tools::wallet_public::asset_balance_entry_base> balances;
   miner_wlt->balance(balances, mined);
 
   auto it_asset = balances.find(asset_id);
-  auto it_native = balances.find(currency::null_hash);
+  auto it_native = balances.find(currency::native_coin_asset_id);
 
 
   CHECK_AND_ASSERT_MES(it_asset != balances.end() && it_native != balances.end(), false, "Failed to find needed asset in result balances");
@@ -111,7 +108,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   alice_wlt->balance(balances, mined);
 
   it_asset = balances.find(asset_id);
-  it_native = balances.find(currency::null_hash);
+  it_native = balances.find(currency::native_coin_asset_id);
 
   CHECK_AND_ASSERT_MES(it_asset != balances.end(), false, "Failed to find needed asset in result balances");
   CHECK_AND_ASSERT_MES(it_native == balances.end(), false, "Failed to find needed asset in result balances");

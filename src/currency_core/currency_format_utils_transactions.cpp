@@ -33,11 +33,6 @@ namespace currency
     return expiration_time <= expiration_ts_median + TX_EXPIRATION_MEDIAN_SHIFT;
   }
   //---------------------------------------------------------------
-
-
-
-
-
   uint64_t get_burned_amount(const transaction& tx)
   {
     uint64_t res = 0;
@@ -51,7 +46,7 @@ namespace currency
             res += o.amount;
         }
       VARIANT_CASE_CONST(tx_out_zarcanum, o)
-        //@#@
+        //@#@# TODO obtain info about public burn of native coins in ZC outputs
       VARIANT_CASE_THROW_ON_OTHER();        
       VARIANT_SWITCH_END();
     }
@@ -321,6 +316,25 @@ namespace currency
         return false;
       }
     }
+    return true;
+  }
+  //---------------------------------------------------------------
+  bool is_asset_emitting_transaction(const transaction& tx, asset_descriptor_operation* p_ado /* = nullptr */)
+  {
+    if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
+      return false;
+
+    asset_descriptor_operation local_ado{};
+    if (p_ado == nullptr)
+      p_ado = &local_ado;
+
+    if (!get_type_in_variant_container(tx.extra, *p_ado))
+      return false;
+    
+    // TODO @#@# change to ASSET_DESCRIPTOR_OPERATION_EMMIT !
+    if (p_ado->operation_type != ASSET_DESCRIPTOR_OPERATION_REGISTER)
+      return false;
+
     return true;
   }
   //---------------------------------------------------------------

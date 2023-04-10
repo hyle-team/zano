@@ -114,7 +114,7 @@ namespace wallet_public
     std::vector<escrow_contract_details> contract;
     uint16_t      extra_flags; 
     uint64_t      transfer_internal_index;
-    crypto::hash  asset_id;
+    crypto::public_key asset_id; // not blinded, not premultiplied by 1/8
     
     
     //not included in kv serialization map
@@ -144,7 +144,7 @@ namespace wallet_public
       KV_SERIALIZE(contract)
       KV_SERIALIZE(service_entries)
       KV_SERIALIZE(transfer_internal_index)
-      KV_SERIALIZE(asset_id)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -250,6 +250,7 @@ namespace wallet_public
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(balance)
         KV_SERIALIZE(unlocked_balance)
+        KV_SERIALIZE(balances)
       END_KV_SERIALIZE_MAP()
     };
   };

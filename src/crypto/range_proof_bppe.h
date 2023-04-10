@@ -24,12 +24,17 @@ namespace crypto
     scalar_t delta_2;
   };
 
-#define DBG_VAL_PRINT(x) (void(0)) // std::cout << #x ": " << x << ENDL
-#define DBG_PRINT(x)     (void(0)) // std::cout << x << ENDL
+#if 0
+#  define DBG_VAL_PRINT(x) std::cout << std::setw(30) << std::left << #x ": " << x << std::endl
+#  define DBG_PRINT(x)     std::cout << x << std::endl
+#else
+#  define DBG_VAL_PRINT(x) (void(0))
+#  define DBG_PRINT(x)     (void(0))
+#endif
 
 #define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
-    if (!(cond)) { LOG_PRINT_RED("bppe_gen: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << (int)err_code, LOG_LEVEL_3); \
-    if (p_err) { *p_err = err_code; } return false; }
+  if (!(cond)) { LOG_PRINT_RED("bppe_gen: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << (int)err_code, LOG_LEVEL_3); \
+  if (p_err) { *p_err = err_code; } return false; }
 
 
   template<typename CT>
@@ -44,6 +49,15 @@ namespace crypto
     const size_t c_bpp_m = 1ull << c_bpp_log2_m;
     const size_t c_bpp_mn = c_bpp_m * CT::c_bpp_n;
     const size_t c_bpp_log2_mn = c_bpp_log2_m + CT::c_bpp_log2_n;
+
+#ifndef NDEBUG
+    for(size_t i = 0; i < values.size(); ++i)
+    {
+      point_t V{};
+      CT::calc_pedersen_commitment_2(values[i], masks[i], masks2[i], V);
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(point_t(*commitments_1div8[i]).modify_mul8() == V, 4);
+    }
+#endif
 
     // s.a. BP+ paper, page 15, eq. 11
     // decompose v into aL and aR:

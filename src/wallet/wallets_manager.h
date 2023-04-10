@@ -165,8 +165,8 @@ public:
   std::string get_qt_dev_tools_option() const { return m_qt_dev_tools; }
   void set_use_deffered_global_outputs(bool use) { m_use_deffered_global_outputs = use; }
   bool set_use_tor(bool use_tor);
-  std::string add_custom_asset_id(uint64_t wallet_id, const crypto::hash& asset_id, currency::asset_descriptor_base& asset_descriptor);
-  std::string delete_custom_asset_id(uint64_t wallet_id, const crypto::hash& asset_id);
+  std::string add_custom_asset_id(uint64_t wallet_id, const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_descriptor);
+  std::string delete_custom_asset_id(uint64_t wallet_id, const crypto::public_key& asset_id);
 
 private:
   void main_worker(const po::variables_map& vm);

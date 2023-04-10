@@ -84,7 +84,7 @@ namespace currency
 
   struct asset_id_kv
   {
-    crypto::hash asset_id;
+    crypto::public_key asset_id;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
@@ -359,16 +359,17 @@ namespace currency
     struct out_entry
     {
       out_entry() = default;
-      out_entry(uint64_t global_amount_index, const crypto::public_key& stealth_address, const crypto::public_key& amount_commitment, const crypto::public_key& concealing_point)
-        : global_amount_index(global_amount_index), stealth_address(stealth_address), amount_commitment(amount_commitment), concealing_point(concealing_point)
-      {}
       out_entry(uint64_t global_amount_index, const crypto::public_key& stealth_address)
-        : global_amount_index(global_amount_index), stealth_address(stealth_address), amount_commitment{}, concealing_point{}
+        : global_amount_index(global_amount_index), stealth_address(stealth_address), concealing_point{}, amount_commitment{}, blinded_asset_id{}
+      {}
+      out_entry(uint64_t global_amount_index, const crypto::public_key& stealth_address, const crypto::public_key& amount_commitment, const crypto::public_key& concealing_point, const crypto::public_key& blinded_asset_id)
+        : global_amount_index(global_amount_index), stealth_address(stealth_address), concealing_point(concealing_point), amount_commitment(amount_commitment), blinded_asset_id(blinded_asset_id)
       {}
       uint64_t global_amount_index;
       crypto::public_key stealth_address;
-      crypto::public_key concealing_point;
-      crypto::public_key amount_commitment;
+      crypto::public_key concealing_point;  // premultiplied by 1/8
+      crypto::public_key amount_commitment; // premultiplied by 1/8
+      crypto::public_key blinded_asset_id;  // premultiplied by 1/8
     };
 #pragma pack(pop)
 
@@ -859,7 +860,7 @@ namespace currency
       crypto::hash seed;
       blobdata blocktemplate_blob;
       std::string prev_hash;
-      crypto::scalar_t blinding_masks_sum; // sum of outputs' blinding masks (for zc outs)
+      outputs_generation_context miner_tx_ogc;
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -868,7 +869,7 @@ namespace currency
         KV_SERIALIZE_POD_AS_HEX_STRING(seed)
         KV_SERIALIZE(blocktemplate_blob)
         KV_SERIALIZE(prev_hash)
-        KV_SERIALIZE(blinding_masks_sum)
+        KV_SERIALIZE(miner_tx_ogc)
         KV_SERIALIZE(status)
       END_KV_SERIALIZE_MAP()
     };

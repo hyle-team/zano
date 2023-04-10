@@ -25,7 +25,7 @@ namespace currency
   }
 
   void pos_mining_context::prepare_entry(uint64_t stake_amount, const crypto::key_image& stake_out_ki, const crypto::public_key& stake_source_tx_pub_key, uint64_t stake_out_in_tx_index,
-    const crypto::scalar_t& stake_out_blinding_mask, const crypto::secret_key& view_secret)
+    const crypto::scalar_t& stake_out_amount_blinding_mask, const crypto::secret_key& view_secret)
   {
     this->stake_amount = stake_amount;
     this->sk.kimage = stake_out_ki;
@@ -41,7 +41,7 @@ namespace currency
 
       // q = Hs(domain_sep, Hs(8 * v * R, i) ) * 8 * v
       this->secret_q = v * 8 * crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h);
-      this->stake_out_blinding_mask = stake_out_blinding_mask;
+      this->stake_out_amount_blinding_mask = stake_out_amount_blinding_mask;
     }
   }
 
@@ -62,7 +62,7 @@ namespace currency
       crypto::mp::uint512_t rhs;
       {
         PROFILE_FUNC("check_zarcanum");
-        found = crypto::zarcanum_check_main_pos_inequality(this->kernel_hash, this->stake_out_blinding_mask, this->secret_q, this->last_pow_block_id_hashed, this->z_l_div_z_D, this->stake_amount, lhs, rhs);
+        found = crypto::zarcanum_check_main_pos_inequality(this->kernel_hash, this->stake_out_amount_blinding_mask, this->secret_q, this->last_pow_block_id_hashed, this->z_l_div_z_D, this->stake_amount, lhs, rhs);
       }
       if (found)
       {

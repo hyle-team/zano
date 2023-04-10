@@ -77,6 +77,9 @@ if(TESTNET)
   add_definitions(-DTESTNET)  
 endif()
 
+set(OPENSSL_USE_STATIC_LIBS TRUE) # link statically
+find_package(OpenSSL REQUIRED)
+
 if(DISABLE_TOR)
   message("NOTICE: Building with disabled TOR support!")  
   add_definitions(-DDISABLE_TOR)  

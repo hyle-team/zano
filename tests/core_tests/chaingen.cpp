@@ -286,7 +286,7 @@ bool test_generator::construct_block(currency::block& blk,
 
   blk.miner_tx = AUTO_VAL_INIT(blk.miner_tx);
   size_t target_block_size = txs_size + 0; // zero means no cost for ordinary coinbase
-  crypto::scalar_t blinding_masks_sum = 0;
+  outputs_generation_context miner_tx_ogc{};
   while (true)
   {
     r = construct_miner_tx(height, misc_utils::median(block_sizes),
@@ -301,7 +301,7 @@ bool test_generator::construct_block(currency::block& blk,
                                     test_generator::get_test_gentime_settings().miner_tx_max_outs,
                                     static_cast<bool>(coin_stake_sources.size()),
                                     pe,
-                                    &blinding_masks_sum);
+                                    &miner_tx_ogc);
     CHECK_AND_ASSERT_MES(r, false, "construct_miner_tx failed");
 
     size_t coinbase_size = get_object_blobsize(blk.miner_tx);
@@ -342,7 +342,7 @@ bool test_generator::construct_block(currency::block& blk,
   else
   {
     //need to build pos block
-    r = sign_block(wallets[won_walled_index].mining_context, pe, *wallets[won_walled_index].wallet, blinding_masks_sum, blk);
+    r = sign_block(wallets[won_walled_index].mining_context, pe, *wallets[won_walled_index].wallet, miner_tx_ogc, blk);
     CHECK_AND_ASSERT_MES(r, false, "Failed to find_kernel_and_sign()");
   }
 
@@ -362,10 +362,10 @@ bool test_generator::construct_block(currency::block& blk,
 bool test_generator::sign_block(const tools::wallet2::mining_context& mining_context,
                                 const pos_entry& pe,
                                 const tools::wallet2& w,
-                                const crypto::scalar_t& blinding_masks_sum,
+                                outputs_generation_context& miner_tx_ogc,
                                 currency::block& b)
 {
-  bool r = w.prepare_and_sign_pos_block(mining_context, b, pe, blinding_masks_sum);
+  bool r = w.prepare_and_sign_pos_block(mining_context, b, pe, miner_tx_ogc);
   CHECK_AND_ASSERT_MES(r, false, "prepare_and_sign_pos_block failed");
   return true;
 }
@@ -463,7 +463,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
           if (amount == 0 && out_v.type() == typeid(tx_out_zarcanum))
           {
             const tx_out_zarcanum& out_zc = boost::get<tx_out_zarcanum>(out_v);
-            rsp_entry.outs.emplace_back(gindex, out_zc.stealth_address, out_zc.amount_commitment, out_zc.concealing_point);
+            rsp_entry.outs.emplace_back(gindex, out_zc.stealth_address, out_zc.amount_commitment, out_zc.concealing_point, out_zc.blinded_asset_id);
           }
           else if (amount != 0 && out_v.type() == typeid(tx_out_bare))
           {
@@ -1040,18 +1040,20 @@ bool test_generator::construct_pow_block_with_alias_info_in_coinbase(const accou
 struct output_index
 {
   const currency::tx_out_v out_v;
-  uint64_t amount;    // actual amount (decoded, cannot be zero)
-  size_t tx_no;       // index of transaction in block
-  size_t out_no;      // index of out in transaction
-  size_t idx;         // global index
-  bool spent;         // was it spent?
-  bool zc_out;        // is it a ZC output?
-  const currency::block *p_blk;
-  const currency::transaction *p_tx;
-  crypto::scalar_t blinding_mask; // zc outs only
+  uint64_t amount = 0;    // actual amount (decoded, cannot be zero)
+  size_t tx_no = 0;       // index of transaction in block
+  size_t out_no = 0;      // index of out in transaction
+  size_t idx = 0;         // global index
+  bool spent = false;     // was it spent?
+  bool zc_out = false;    // is it a ZC output?
+  const currency::block *p_blk = 0;
+  const currency::transaction *p_tx = 0;
+  crypto::scalar_t amount_blinding_mask = 0;   // zc outs only
+  crypto::scalar_t asset_id_blinding_mask = 0; // zc outs only
+  crypto::public_key asset_id = currency::native_coin_asset_id;
 
   output_index(const currency::tx_out_v &_out_v, uint64_t _a, size_t tno, size_t ono, const currency::block *_pb, const currency::transaction *_pt)
-    : out_v(_out_v), amount(_a), tx_no(tno), out_no(ono), idx(0), spent(false), zc_out(false), p_blk(_pb), p_tx(_pt), blinding_mask(0)
+    : out_v(_out_v), amount(_a), tx_no(tno), out_no(ono), p_blk(_pb), p_tx(_pt)
   {}
 
   output_index(const output_index &other) = default;
@@ -1062,10 +1064,11 @@ struct output_index
     ss << "output_index{"
       << " tx_no=" << tx_no
       << " out_no=" << out_no
-      << " amount=" << amount
+      << " amount=" << currency::print_money_brief(amount)
       << " idx=" << idx
       << " spent=" << spent
       << " zc_out=" << zc_out
+      << " asset=" << (asset_id == currency::native_coin_asset_id ? std::string("native") : print16(asset_id))
       << "}";
     return ss.str();
   }
@@ -1144,11 +1147,14 @@ bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const 
           outs_vec.emplace_back(std::move(oi));
 
           uint64_t decoded_amount = 0;
-          crypto::scalar_t decoded_blinding_mask{};
-          if (is_out_to_acc(acc_keys.account_address, out, derivation, j, decoded_amount, decoded_blinding_mask))
+          crypto::public_key decoded_asset_id{};
+          crypto::scalar_t decoded_amount_blinding_mask{}, decoded_asset_id_blinding_mask{};
+          if (is_out_to_acc(acc_keys.account_address, out, derivation, j, decoded_amount, decoded_asset_id, decoded_amount_blinding_mask, decoded_asset_id_blinding_mask))
           {
-            outs_vec.back().amount = decoded_amount;
-            outs_vec.back().blinding_mask = decoded_blinding_mask;
+            outs_vec.back().amount                  = decoded_amount;
+            outs_vec.back().amount_blinding_mask    = decoded_amount_blinding_mask;
+            outs_vec.back().asset_id                = decoded_asset_id;
+            outs_vec.back().asset_id_blinding_mask  = decoded_asset_id_blinding_mask;
             outs_mine[0].push_back(out_global_idx);
           }
         VARIANT_SWITCH_END()
@@ -1282,7 +1288,7 @@ bool fill_output_entries(const std::vector<output_index>& out_indices, size_t re
           output_entries.emplace_back(out_ref_v, otk.key);
         VARIANT_SWITCH_END()
       VARIANT_CASE_CONST(tx_out_zarcanum, ozc)
-        output_entries.emplace_back(out_ref_v, ozc.stealth_address, ozc.concealing_point, ozc.amount_commitment);
+        output_entries.emplace_back(out_ref_v, ozc.stealth_address, ozc.concealing_point, ozc.amount_commitment, ozc.blinded_asset_id);
       VARIANT_SWITCH_END()
     }
   }
@@ -1392,8 +1398,10 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
 
 
       currency::tx_source_entry ts = AUTO_VAL_INIT(ts);
+      ts.asset_id = oi.asset_id;
       ts.amount = oi.amount;
-      ts.real_out_amount_blinding_mask = oi.blinding_mask;
+      ts.real_out_asset_id_blinding_mask = oi.asset_id_blinding_mask;
+      ts.real_out_amount_blinding_mask = oi.amount_blinding_mask;
       ts.real_output_in_tx_index = oi.out_no;
       ts.real_out_tx_key = get_tx_pub_key_from_extra(*oi.p_tx); // source tx public key
       if (!fill_output_entries(outs[o.first], sender_out, nmix, check_for_unlocktime, use_ref_by_id, next_block_height, head_block_ts, ts.real_output, ts.outputs))

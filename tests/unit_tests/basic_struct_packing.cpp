@@ -113,6 +113,9 @@ TEST(tx_signatures_packing, 1)
     ASSERT_EQ(82178, get_object_blobsize(sigs));
   }
 
+  // the following tests cases should be redone
+  // TODO @#@#
+
   {
     // empty ZC_sig
     // v(1) + (1 + 32 + 32 + (1 + 10*32) + 32) = 99
@@ -136,7 +139,7 @@ TEST(tx_signatures_packing, 1)
     // 128 10-ring ZC_sigs
     // v(128) + 128 * (1 + 32 + 32 + (v(10) + 10*32) + 32) = 53506   (97 + (v(10) + 10*32))
     ZC_sig zc = AUTO_VAL_INIT(zc);
-    zc.clsags_gg.r.resize(10);
+    //zc.clsags_gg.r.resize(10);
     sigs.clear();
     for(size_t i = 0; i < 128; ++i)
       sigs.emplace_back(zc);

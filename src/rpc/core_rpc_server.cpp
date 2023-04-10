@@ -363,10 +363,12 @@ namespace currency
     }
 
     res.status = API_RETURN_CODE_OK;
+
+    /*
     std::stringstream ss;
     typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount outs_for_amount;
     typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry out_entry;
-    /*std::for_each(res.outs.begin(), res.outs.end(), [&](outs_for_amount& ofa)
+    std::for_each(res.outs.begin(), res.outs.end(), [&](outs_for_amount& ofa)
     {
       ss << "[" << ofa.amount << "]:";
       CHECK_AND_ASSERT_MES(ofa.outs.size(), ;, "internal error: ofa.outs.size() is empty for amount " << ofa.amount);
@@ -379,7 +381,7 @@ namespace currency
     std::string s = ss.str();
     LOG_PRINT_L2("COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS: " << ENDL << s);
     */
-    res.status = API_RETURN_CODE_OK;
+
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -875,7 +877,7 @@ namespace currency
     blobdata block_blob = t_serializable_object_to_blob(resp.b);
     res.blocktemplate_blob = string_tools::buff_to_hex_nodelimer(block_blob);
     res.prev_hash = string_tools::pod_to_hex(resp.b.prev_id);
-    res.blinding_masks_sum = resp.blinding_mask_sum;
+    res.miner_tx_ogc = resp.miner_tx_ogc;
     res.height = resp.height;
     //calculate epoch seed
     res.seed = currency::ethash_epoch_to_seed(currency::ethash_height_to_epoch(res.height));
