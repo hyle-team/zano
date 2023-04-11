@@ -1183,11 +1183,11 @@ namespace wallet_public
 
   struct asset_funds
   {
-    crypto::hash asset_id;
+    crypto::public_key asset_id;
     uint64_t amount;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(asset_id)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
       KV_SERIALIZE(amount)
     END_KV_SERIALIZE_MAP()
   };

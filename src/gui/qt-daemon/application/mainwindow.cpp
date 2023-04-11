@@ -2162,35 +2162,35 @@ QString MainWindow::get_wallet_info(const QString& param)
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
-QString create_ionic_swap_proposal(const QString& param)
+QString MainWindow::create_ionic_swap_proposal(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
   PREPARE_ARG_FROM_JSON(view::create_ionic_swap_proposal_request, cispr);
-  PREPARE_RESPONSE(view::api_response_t<std::string>, ar);
+  PREPARE_RESPONSE(std::string, ar);
   ar.error_code = m_backend.create_ionic_swap_proposal(cispr.wallet_id, cispr, ar.response_data);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString get_ionic_swap_proposal_info(const QString& param)
+QString MainWindow::get_ionic_swap_proposal_info(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
   PREPARE_ARG_FROM_JSON(view::api_request_t<std::string>, tx_raw_hex);
-  PREPARE_RESPONSE(view::api_response_t<std::string>, ar);
+  PREPARE_RESPONSE(tools::wallet_public::ionic_swap_proposal_info, ar);
   ar.error_code = m_backend.get_ionic_swap_proposal_info(tx_raw_hex.wallet_id, tx_raw_hex.req_data, ar.response_data);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 
 }
 
-QString accept_ionic_swap_proposal(const QString& param)
+QString MainWindow::accept_ionic_swap_proposal(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
   PREPARE_ARG_FROM_JSON(view::api_request_t<std::string>, tx_raw_hex);
-  PREPARE_RESPONSE(view::api_response_t<std::string>, ar);
+  PREPARE_RESPONSE(std::string, ar);
   ar.error_code = m_backend.accept_ionic_swap_proposal(tx_raw_hex.wallet_id, tx_raw_hex.req_data, ar.response_data);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();

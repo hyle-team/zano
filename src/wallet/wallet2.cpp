@@ -5040,8 +5040,8 @@ bool wallet2::get_ionic_swap_proposal_info(const currency::transaction tx, walle
   bool r = lookup_acc_outs(m_account.get_keys(), tx, outs, tx_money_got_in_outs, derivation);
   THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to lookup_acc_outs for tx: " << get_transaction_hash(tx));
 
-  std::unordered_map<crypto::hash, uint64_t> ammounts_to;
-  std::unordered_map<crypto::hash, uint64_t> ammounts_from;
+  std::unordered_map<crypto::public_key, uint64_t> ammounts_to;
+  std::unordered_map<crypto::public_key, uint64_t> ammounts_from;
   std::vector<bool> third_party_outs;
   size_t i = 0;
   for (const auto& o : outs)
@@ -5060,7 +5060,7 @@ bool wallet2::get_ionic_swap_proposal_info(const currency::transaction tx, walle
     uint64_t amount = 0;
     //TODO decode output info 
     //get_amout_and_asset_id()
-    ammounts_from[asset_id] += amount;
+    //ammounts_from[asset_id] += amount;
   }
 
   for (const auto& a : ammounts_to)
@@ -5110,7 +5110,7 @@ bool wallet2::accept_ionic_swap_proposal(const currency::transaction& tx_templat
   bool r = get_ionic_swap_proposal_info(tx_template, msc.proposal);
   THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, "Failed to get info from proposal");
 
-  std::unordered_map<crypto::hash, wallet_public::asset_balance_entry_base> balances;
+  std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base> balances;
   uint64_t mined = 0;
   this->balance(balances, mined);
   //validate balances needed 
@@ -5121,7 +5121,7 @@ bool wallet2::accept_ionic_swap_proposal(const currency::transaction& tx_templat
     {
       return false;
     }
-    if (item.asset_id == currency::null_hash)
+    if (item.asset_id == currency::native_coin_asset_id)
     {
       native_amount_required = item.amount;
     }
@@ -5132,7 +5132,7 @@ bool wallet2::accept_ionic_swap_proposal(const currency::transaction& tx_templat
   if (msc.proposal.fee < m_core_runtime_config.tx_default_fee)
   {
     additional_fee = m_core_runtime_config.tx_default_fee - msc.proposal.fee;
-    if (balances[currency::null_hash].unlocked < additional_fee + native_amount_required)
+    if (balances[currency::native_coin_asset_id].unlocked < additional_fee + native_amount_required)
     {
       return false;
     }

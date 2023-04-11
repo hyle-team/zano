@@ -409,7 +409,7 @@ public:
   struct wallet_and_asset_id
   {
     uint64_t wallet_id = 0;
-    crypto::hash asset_id = currency::null_hash;
+    crypto::public_key asset_id = currency::null_pkey;
     
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)

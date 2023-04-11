@@ -927,7 +927,7 @@ std::string wallets_manager::get_ionic_swap_proposal_info(uint64_t wallet_id, st
   return API_RETURN_CODE_OK;
 }
 
-std::string wallets_manager::accept_ionic_swap_proposal(uint64_t wallet_id, std::string&raw_tx_template_hex, currency::transaction& result_tx)
+std::string wallets_manager::accept_ionic_swap_proposal(uint64_t wallet_id, std::string&raw_tx_template_hex, std::string& result_raw_tx_hex)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
   try {
@@ -937,11 +937,12 @@ std::string wallets_manager::accept_ionic_swap_proposal(uint64_t wallet_id, std:
     {
       return API_RETURN_CODE_BAD_ARG;
     }
-
+    currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
     if (!wo.w->get()->accept_ionic_swap_proposal(raw_tx_template, result_tx))
     {
       return API_RETURN_CODE_FAIL;
     }
+    result_raw_tx_hex = epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(result_tx));
   }
   catch (...)
   {
