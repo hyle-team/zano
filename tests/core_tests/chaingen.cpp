@@ -50,6 +50,7 @@ test_generator::test_generator()
   : m_wallet_test_core_proxy(new wallet_test_core_proxy())
   , m_ignore_last_pow_in_wallets(false)
 {
+  m_hardforks = get_default_core_runtime_config().hard_forks; // set default hardforks for tests (will be overriden by test if necessary)
 }
 
 
