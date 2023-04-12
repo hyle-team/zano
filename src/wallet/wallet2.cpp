@@ -1446,6 +1446,8 @@ void wallet2::handle_money_received2(const currency::block& b, const currency::t
   m_transfer_history.push_back(AUTO_VAL_INIT(wallet_public::wallet_transfer_info()));
   wallet_public::wallet_transfer_info& wti = m_transfer_history.back();
   wti.is_income = true;
+  // TODO @#@# this function is only able to handle native coins atm, consider changing -- sowle
+  wti.asset_id = native_coin_asset_id;
   prepare_wti(wti, get_block_height(b), get_block_datetime(b), tx, amount, td);
   WLT_LOG_L1("[MONEY RECEIVED]: " << epee::serialization::store_t_to_json(wti));
   rise_on_transfer2(wti);
