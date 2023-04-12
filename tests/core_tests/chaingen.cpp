@@ -2286,6 +2286,8 @@ test_chain_unit_enchanced::test_chain_unit_enchanced()
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_offers_count);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_hardfork_active);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_hardfork_inactive);
+
+  m_hardforks = get_default_core_runtime_config().hard_forks; // set default hardforks for tests (will be overriden by test if necessary)
 }
 
 bool test_chain_unit_enchanced::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
