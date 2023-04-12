@@ -856,7 +856,7 @@ namespace tools
     //next functions in public area only becausce of test_generator
     //TODO: Need refactoring - remove it back to private zone 
     void set_genesis(const crypto::hash& genesis_hash);
-    bool prepare_and_sign_pos_block(const mining_context& cxt, currency::block& b, const currency::pos_entry& pe, currency::outputs_generation_context& miner_tx_ogc) const;
+    bool prepare_and_sign_pos_block(const mining_context& cxt, currency::block& b, const currency::pos_entry& pe, currency::tx_generation_context& miner_tx_tgc) const;
     void process_new_blockchain_entry(const currency::block& b, 
       const currency::block_direct_data_entry& bche, 
       const crypto::hash& bl_id,

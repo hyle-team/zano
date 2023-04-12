@@ -154,6 +154,8 @@ namespace currency
     crypto::public_key spend_pub_key;  // only for validations
     uint64_t tx_version;
 
+    tx_generation_context gen_context{}; // solely for consolidated txs
+
     BEGIN_SERIALIZE_OBJECT()
       FIELD(unlock_time)
       FIELD(extra)
@@ -169,6 +171,8 @@ namespace currency
       FIELD(expiration_time)
       FIELD(spend_pub_key)
       FIELD(tx_version)
+      if (flags & TX_FLAG_SIGNATURE_MODE_SEPARATE)
+        FIELD(gen_context);
     END_SERIALIZE()
   };
 
@@ -229,10 +233,10 @@ namespace currency
   };
 
   bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs);
-  bool generate_asset_surjection_proof(const crypto::hash& context_hash, bool has_non_zc_inputs, outputs_generation_context& ogc, zc_asset_surjection_proof& result);
+  bool generate_asset_surjection_proof(const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, zc_asset_surjection_proof& result);
   bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id);
-  bool generate_tx_balance_proof(const transaction &tx, const crypto::hash& tx_id, const outputs_generation_context& ogc, uint64_t block_reward_for_miner_tx, zc_balance_proof& proof);
-  bool generate_zc_outs_range_proof(const crypto::hash& context_hash, size_t out_index_start, const outputs_generation_context& outs_gen_context,
+  bool generate_tx_balance_proof(const transaction &tx, const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, zc_balance_proof& proof);
+  bool generate_zc_outs_range_proof(const crypto::hash& context_hash, size_t out_index_start, const tx_generation_context& outs_gen_context,
     const std::vector<tx_out_v>& vouts, zc_outs_range_proof& result);
   bool check_tx_bare_balance(const transaction& tx, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
   bool check_tx_balance(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
@@ -249,7 +253,7 @@ namespace currency
                                                              size_t max_outs                        = CURRENCY_MINER_TX_MAX_OUTS, 
                                                              bool pos                               = false,
                                                              const pos_entry& pe                    = pos_entry(),
-                                                             outputs_generation_context* ogc_ptr    = nullptr,
+                                                             tx_generation_context* ogc_ptr    = nullptr,
                                                              const keypair* tx_one_time_key_to_use  = nullptr);
   //---------------------------------------------------------------
   uint64_t get_string_uint64_hash(const std::string& str);

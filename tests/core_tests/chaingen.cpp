@@ -287,7 +287,7 @@ bool test_generator::construct_block(currency::block& blk,
 
   blk.miner_tx = AUTO_VAL_INIT(blk.miner_tx);
   size_t target_block_size = txs_size + 0; // zero means no cost for ordinary coinbase
-  outputs_generation_context miner_tx_ogc{};
+  tx_generation_context miner_tx_tgc{};
   while (true)
   {
     r = construct_miner_tx(height, misc_utils::median(block_sizes),
@@ -302,7 +302,7 @@ bool test_generator::construct_block(currency::block& blk,
                                     test_generator::get_test_gentime_settings().miner_tx_max_outs,
                                     static_cast<bool>(coin_stake_sources.size()),
                                     pe,
-                                    &miner_tx_ogc);
+                                    &miner_tx_tgc);
     CHECK_AND_ASSERT_MES(r, false, "construct_miner_tx failed");
 
     size_t coinbase_size = get_object_blobsize(blk.miner_tx);
@@ -343,7 +343,7 @@ bool test_generator::construct_block(currency::block& blk,
   else
   {
     //need to build pos block
-    r = sign_block(wallets[won_walled_index].mining_context, pe, *wallets[won_walled_index].wallet, miner_tx_ogc, blk);
+    r = sign_block(wallets[won_walled_index].mining_context, pe, *wallets[won_walled_index].wallet, miner_tx_tgc, blk);
     CHECK_AND_ASSERT_MES(r, false, "Failed to find_kernel_and_sign()");
   }
 
@@ -363,10 +363,10 @@ bool test_generator::construct_block(currency::block& blk,
 bool test_generator::sign_block(const tools::wallet2::mining_context& mining_context,
                                 const pos_entry& pe,
                                 const tools::wallet2& w,
-                                outputs_generation_context& miner_tx_ogc,
+                                tx_generation_context& miner_tx_tgc,
                                 currency::block& b)
 {
-  bool r = w.prepare_and_sign_pos_block(mining_context, b, pe, miner_tx_ogc);
+  bool r = w.prepare_and_sign_pos_block(mining_context, b, pe, miner_tx_tgc);
   CHECK_AND_ASSERT_MES(r, false, "prepare_and_sign_pos_block failed");
   return true;
 }
