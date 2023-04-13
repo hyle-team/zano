@@ -2804,20 +2804,16 @@ namespace currency
       return false;
     return true;
   }
-
-  bool is_out_to_acc(const account_public_address& addr, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount, crypto::public_key& decoded_asset_id,
-    crypto::scalar_t& amount_blinding_mask, crypto::scalar_t& asset_id_blinding_mask)
+  //---------------------------------------------------------------
+  bool decode_output_amount_and_asset_id(const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, const size_t output_index, uint64_t& decoded_amount, crypto::public_key& decoded_asset_id,
+    crypto::scalar_t& amount_blinding_mask, crypto::scalar_t& asset_id_blinding_mask, crypto::scalar_t* derived_h_ptr /* = nullptr */)
   {
-    crypto::scalar_t h; // = crypto::hash_helper_t::hs(reinterpret_cast<const crypto::public_key&>(derivation), output_index); // h = Hs(8 * r * V, i)
-    crypto::derivation_to_scalar(derivation, output_index, h.as_secret_key()); // h = Hs(8 * r * V, i)
+    crypto::scalar_t local_h{};
+    if (derived_h_ptr == nullptr)
+      derived_h_ptr = &local_h;
+    crypto::scalar_t& h = *derived_h_ptr;
 
-    crypto::point_t P_prime = h * crypto::c_point_G + crypto::point_t(addr.spend_public_key); // P =? Hs(8rV, i) * G + S
-    if (P_prime.to_public_key() != zo.stealth_address)
-      return false;
-    
-    crypto::point_t Q_prime = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * 8 * crypto::point_t(addr.view_public_key); // Q' * 8 =? Hs(domain_sep, Hs(8 * r * V, i) ) * 8 * V
-    if (Q_prime != crypto::point_t(zo.concealing_point).modify_mul8())
-      return false;
+    crypto::derivation_to_scalar(derivation, output_index, h.as_secret_key()); // h = Hs(8 * r * V, i)
 
     crypto::scalar_t amount_mask   = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
     decoded_amount = zo.encrypted_amount ^ amount_mask.m_u64[0];
@@ -2842,8 +2838,25 @@ namespace currency
     }
 
     return true;
-  } 
+  }
+  //---------------------------------------------------------------
+  bool is_out_to_acc(const account_public_address& addr, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount, crypto::public_key& decoded_asset_id,
+    crypto::scalar_t& amount_blinding_mask, crypto::scalar_t& asset_id_blinding_mask)
+  {
+    crypto::scalar_t h{};
+    if (!decode_output_amount_and_asset_id(zo, derivation, output_index, decoded_amount, decoded_asset_id, amount_blinding_mask, asset_id_blinding_mask, &h))
+      return false;
 
+    crypto::point_t P_prime = h * crypto::c_point_G + crypto::point_t(addr.spend_public_key); // P =? Hs(8rV, i) * G + S
+    if (P_prime.to_public_key() != zo.stealth_address)
+      return false;
+
+    crypto::point_t Q_prime = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * 8 * crypto::point_t(addr.view_public_key); // Q' * 8 =? Hs(domain_sep, Hs(8 * r * V, i) ) * 8 * V
+    if (Q_prime != crypto::point_t(zo.concealing_point).modify_mul8())
+      return false;
+
+    return true;
+  } 
   //---------------------------------------------------------------
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, std::vector<wallet_out_info>& outs, uint64_t& sum_of_native_outs, crypto::key_derivation& derivation)
   {
