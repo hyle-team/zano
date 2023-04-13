@@ -4967,12 +4967,11 @@ bool wallet2::check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& o
   return false;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::create_ionic_swap_proposal(const wallet_public::ionic_swap_proposal_info& proposal_details, const currency::account_public_address& destination_addr, currency::transaction& tx_template)
+bool wallet2::create_ionic_swap_proposal(const wallet_public::ionic_swap_proposal_info& proposal_details, const currency::account_public_address& destination_addr, ionic_swap_proposal& proposal)
 {
-  crypto::secret_key one_time_key = AUTO_VAL_INIT(one_time_key);
   std::vector<uint64_t> selected_transfers_for_template;
   
-  build_ionic_swap_template(proposal_details, destination_addr, tx_template, selected_transfers_for_template, one_time_key);
+  build_ionic_swap_template(proposal_details, destination_addr, proposal, selected_transfers_for_template);
 
   const uint32_t mask_to_mark_escrow_template_locked_transfers = WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION;
   mark_transfers_with_flag(selected_transfers_for_template, mask_to_mark_escrow_template_locked_transfers, "preparing ionic_swap");
@@ -4980,10 +4979,10 @@ bool wallet2::create_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal_info& proposal_detais, const currency::account_public_address& destination_addr,
-  currency::transaction& template_tx,
-  std::vector<uint64_t>& selected_transfers,
-  crypto::secret_key& one_time_key)
+  ionic_swap_proposal& proposal,
+  std::vector<uint64_t>& selected_transfers)
 {
+  ionic_swap_proposal& proposal.tx_template;
   construct_tx_param ctp = get_default_construct_tx_param();
   
   ctp.fake_outputs_count = proposal_detais.mixins;
@@ -5019,28 +5018,53 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
   prepare_transaction(ctp, ftp);
 
   selected_transfers = ftp.selected_transfers;
+  currency::finalized_tx finalize_result = AUTO_VAL_INIT(finalize_result);
+  finalize_transaction(ftp, finalize_result, false);
+  add_transfers_to_expiration_list(selected_transfers, finalize_result, 0, currency::null_hash);
 
-  finalize_transaction(ftp, template_tx, one_time_key, false);
-
-  add_transfers_to_expiration_list(selected_transfers, t.v, 0, currency::null_hash);
+  //wrap it all 
+  proposal.tx_template = finalize_result.tx;
+  ionic_swap_proposal_context ispc = AUTO_VAL_INIT(ispc);
+  ispc.gen_context = finalize_result.ftp.gen_context;
+  ispc.one_time_skey = finalize_result.one_time_key;
+  std::string proposal_context_blob = t_serializable_object_to_blob(ispc);
+  proposal.encrypted_context = crypto::chacha_crypt(proposal_context_blob, finalize_result.derivation); 
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::get_ionic_swap_proposal_info(const std::string&raw_tx_template, wallet_public::ionic_swap_proposal_info& proposal)
+bool wallet2::get_ionic_swap_proposal_info(const std::string&raw_proposal, wallet_public::ionic_swap_proposal_info& proposal_info)
 {
-  currency::transaction tx;
-  bool r = parse_and_validate_tx_from_blob(raw_tx_template, tx);
-  THROW_IF_TRUE_WALLET_EX(!r, error::tx_parse_error, raw_tx_template);
-  return get_ionic_swap_proposal_info(tx, proposal);
+  wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
+  bool r = t_unserializable_object_from_blob(raw_proposal, proposal);
+  THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, "Failed to parse proposal");
+  return get_ionic_swap_proposal_info(proposal, proposal_info);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::get_ionic_swap_proposal_info(const currency::transaction tx, wallet_public::ionic_swap_proposal_info& proposal)
+bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_proposal& proposal, wallet_public::ionic_swap_proposal_info& proposal_info)
 {
+  wallet_public::ionic_swap_proposal_context ionic_context = AUTO_VAL_INIT(ionic_context);
+  return get_ionic_swap_proposal_info(proposal, proposal_info, ionic_context);
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_proposal& proposal, wallet_public::ionic_swap_proposal_info& proposal_info, wallet_public::ionic_swap_proposal_context& ionic_context)
+{
+  const transaction& tx = proposal.tx_template;
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
   std::vector<wallet_out_info> outs;
   uint64_t tx_money_got_in_outs = 0;
   bool r = lookup_acc_outs(m_account.get_keys(), tx, outs, tx_money_got_in_outs, derivation);
   THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to lookup_acc_outs for tx: " << get_transaction_hash(tx));
+
+  if (!outs.size())
+  {
+    return false;
+  }
+
+  //decrypt context
+  std::string decrypted_raw_context = crypto::chacha_crypt(proposal.encrypted_context, derivation);
+  r = t_unserializable_object_from_blob(ionic_context, decrypted_raw_context);
+  THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to unserialize decrypted ionic_context");
+
 
   std::unordered_map<crypto::public_key, uint64_t> ammounts_to;
   std::unordered_map<crypto::public_key, uint64_t> ammounts_from;
@@ -5066,50 +5090,50 @@ bool wallet2::get_ionic_swap_proposal_info(const currency::transaction tx, walle
   }
 
   for (const auto& a : ammounts_to)
-    proposal.to.push_back(view::asset_funds{ a.first, a.second });
+    proposal_info.to.push_back(view::asset_funds{ a.first, a.second });
 
   for (const auto& a : ammounts_from)
-    proposal.from.push_back(view::asset_funds{ a.first, a.second });
+    proposal_info.from.push_back(view::asset_funds{ a.first, a.second });
 
   for (const auto&in : tx.vin)
   {
     if (in.type() != typeid(currency::txin_zc_input))
       return false;
     size_t mx = boost::get<currency::txin_zc_input>(in).key_offsets.size() - 1;
-    if (proposal.mixins == 0 || proposal.mixins > mx)
+    if (proposal_info.mixins == 0 || proposal_info.mixins > mx)
     {
-      proposal.mixins = mx;
+      proposal_info.mixins = mx;
     }
   }
 
-  proposal.fee = currency::get_tx_fee(tx);
+  proposal_info.fee = currency::get_tx_fee(tx);
   etc_tx_details_expiration_time t = AUTO_VAL_INIT(t);
   if (!get_type_in_variant_container(tx.extra, t))
   {
     return false;
   }
 
-  proposal.expiration_time = t.v;
+  proposal_info.expiration_time = t.v;
   return true;
 }
 
 //----------------------------------------------------------------------------------------------------
-bool wallet2::accept_ionic_swap_proposal(const std::string& raw_tx_template, currency::transaction& result_tx)
+bool wallet2::accept_ionic_swap_proposal(const std::string& raw_proposal, currency::transaction& result_tx)
 {
-  currency::transaction tx;
-  bool r = parse_and_validate_tx_from_blob(raw_tx_template, tx);
-  THROW_IF_TRUE_WALLET_EX(!r, error::tx_parse_error, raw_tx_template);
+  const wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
+  bool r = parse_and_validate_tx_from_blob(raw_proposal, proposal);
+  THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, "Failed to parse proposal info");
 
-  return accept_ionic_swap_proposal(tx, result_tx);
+  return accept_ionic_swap_proposal(proposal, result_tx);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::accept_ionic_swap_proposal(const currency::transaction& tx_template, currency::transaction& result_tx)
+bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposal& proposal, currency::transaction& result_tx)
 {
   mode_separate_context msc = AUTO_VAL_INIT(msc);
   msc.tx_for_mode_separate = tx_template;
 
-
-  bool r = get_ionic_swap_proposal_info(tx_template, msc.proposal);
+  wallet_public::ionic_swap_proposal_context ionic_context = AUTO_VAL_INIT(ionic_context);
+  bool r = get_ionic_swap_proposal_info(proposal, msc.proposal_info, ionic_context);
   THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, "Failed to get info from proposal");
 
   std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base> balances;
@@ -5117,7 +5141,7 @@ bool wallet2::accept_ionic_swap_proposal(const currency::transaction& tx_templat
   this->balance(balances, mined);
   //validate balances needed 
   uint64_t native_amount_required = 0;
-  for (const auto& item : msc.proposal.to)
+  for (const auto& item : msc.proposal_info.to)
   {
     if (balances[item.asset_id].unlocked < item.amount)
     {
@@ -5131,9 +5155,9 @@ bool wallet2::accept_ionic_swap_proposal(const currency::transaction& tx_templat
 
   // balances is ok, check if fee is added to tx
   uint64_t additional_fee = 0;
-  if (msc.proposal.fee < m_core_runtime_config.tx_default_fee)
+  if (msc.proposal_info.fee < m_core_runtime_config.tx_default_fee)
   {
-    additional_fee = m_core_runtime_config.tx_default_fee - msc.proposal.fee;
+    additional_fee = m_core_runtime_config.tx_default_fee - msc.proposal_info.fee;
     if (balances[currency::native_coin_asset_id].unlocked < additional_fee + native_amount_required)
     {
       return false;
@@ -5145,7 +5169,7 @@ bool wallet2::accept_ionic_swap_proposal(const currency::transaction& tx_templat
   construct_tx_param construct_param = get_default_construct_tx_param();
   construct_param.fee = additional_fee;
   
-  assert(0); crypto::secret_key one_time_key = currency::null_skey; //TODO: add transfer of secrete onetime key to proposal
+  assert(0); crypto::secret_key one_time_key = ionic_context.one_time_skey;
   construct_param.crypt_address = m_account.get_public_address();
   construct_param.flags = TX_FLAG_SIGNATURE_MODE_SEPARATE;
   construct_param.mark_tx_as_complete = true;
@@ -5153,6 +5177,7 @@ bool wallet2::accept_ionic_swap_proposal(const currency::transaction& tx_templat
   //build transaction
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   ftp.tx_version = this->get_current_tx_version();
+  ftp.gen_context = ionic_context.gen_context;  
   prepare_transaction(construct_param, ftp, msc);
 
   try
@@ -5165,8 +5190,6 @@ bool wallet2::accept_ionic_swap_proposal(const currency::transaction& tx_templat
     throw;
   }
   mark_transfers_as_spent(ftp.selected_transfers, std::string("Proposal has been accepted with tx <" + epee::string_tools::pod_to_hex(get_transaction_hash(result_tx))) + ">");
-
-
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -6197,7 +6220,7 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   if (ctp.flags & TX_FLAG_SIGNATURE_MODE_SEPARATE && tx_for_mode_separate.vout.size() )
   {
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(get_tx_flags(tx_for_mode_separate) & TX_FLAG_SIGNATURE_MODE_SEPARATE, "tx_param.flags differs from tx.flags");
-    for (const auto& el : mode_separatemode_separate.proposal.to)
+    for (const auto& el : mode_separatemode_separate.proposal_info.to)
     {
       needed_money_map[el.asset_id].needed_amount += el.amount;
     }

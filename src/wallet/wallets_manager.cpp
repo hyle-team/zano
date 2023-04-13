@@ -885,15 +885,15 @@ std::string wallets_manager::create_ionic_swap_proposal(uint64_t wallet_id, cons
     {
       return API_RETURN_CODE_BAD_ARG;
     }
-    currency::transaction tx_template = AUTO_VAL_INIT(tx_template);
-    bool r = wo.w->get()->create_ionic_swap_proposal(proposal.proposal, dest_account, tx_template);
+    tools::wallet_public ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
+    bool r = wo.w->get()->create_ionic_swap_proposal(proposal.proposal, dest_account, proposal);
     if (!r)
     {
       return API_RETURN_CODE_FAIL;
     }
     else
     {
-      result_proposal_hex = epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(tx_template));
+      result_proposal_hex = epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(proposal));
       return API_RETURN_CODE_OK;
     }
   }

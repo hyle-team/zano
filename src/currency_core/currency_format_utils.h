@@ -183,6 +183,7 @@ namespace currency
     finalize_tx_param     ftp;
     std::string           htlc_origin;
     std::vector<serializable_pair<uint64_t, crypto::key_image>> outs_key_images; // pairs (out_index, key_image) for each change output
+    crypto::key_derivation derivation;
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(tx)
@@ -190,6 +191,7 @@ namespace currency
       FIELD(ftp)
       FIELD(htlc_origin)
       FIELD(outs_key_images)
+      FIELD(derivation)
     END_SERIALIZE()
   };
 
@@ -338,6 +340,7 @@ namespace currency
   bool is_tx_spendtime_unlocked(uint64_t unlock_time, uint64_t current_blockchain_size, uint64_t current_time);
   crypto::key_derivation get_encryption_key_derivation(bool is_income, const transaction& tx, const account_keys& acc_keys);
   bool decrypt_payload_items(bool is_income, const transaction& tx, const account_keys& acc_keys, std::vector<payload_items_v>& decrypted_items);
+  void encrypt_attachments(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key, crypto::key_derivation& derivation);
   void encrypt_attachments(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key);
   bool is_derivation_used_to_encrypt(const transaction& tx, const crypto::key_derivation& derivation);
   bool is_address_like_wrapped(const std::string& addr);

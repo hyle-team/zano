@@ -949,15 +949,16 @@ namespace tools
     bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin, crypto::hash& redeem_tx_id);
 
     // ionic swaps:
-    bool create_ionic_swap_proposal(const wallet_public::ionic_swap_proposal_info& proposal, const currency::account_public_address& destination_addr, currency::transaction& tx_template);
+    bool create_ionic_swap_proposal(const wallet_public::ionic_swap_proposal_info& proposal, const currency::account_public_address& destination_addr, ionic_swap_proposal& proposal);
     bool build_ionic_swap_template(const wallet_public::ionic_swap_proposal_info& proposal_detais, const currency::account_public_address& destination_addr,
-      currency::transaction& template_tx,
+      ionic_swap_proposal& proposal,
       std::vector<uint64_t>& selected_transfers_for_template,
       crypto::secret_key& one_time_key);
-    bool get_ionic_swap_proposal_info(const std::string&raw_tx_template, wallet_public::ionic_swap_proposal_info& proposal);
-    bool get_ionic_swap_proposal_info(const currency::transaction tx, wallet_public::ionic_swap_proposal_info& proposal);
-    bool accept_ionic_swap_proposal(const std::string&raw_tx_template, currency::transaction& result_tx);
-    bool accept_ionic_swap_proposal(const currency::transaction& tx_template, currency::transaction& result_tx);
+    bool get_ionic_swap_proposal_info(const std::string&raw_proposal, wallet_public::ionic_swap_proposal_info& proposal_info);
+    bool get_ionic_swap_proposal_info(const wallet_public::ionic_swap_proposal& proposal, wallet_public::ionic_swap_proposal_info& proposal_info);
+    bool get_ionic_swap_proposal_info(const wallet_public::ionic_swap_proposal& proposal, wallet_public::ionic_swap_proposal_info& proposal_info, wallet_public::ionic_swap_proposal_context& ionic_context);
+    bool accept_ionic_swap_proposal(const std::string& raw_proposal, currency::transaction& result_tx);
+    bool accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposal& proposal, currency::transaction& result_tx);
 
     // Signing and auth
     bool sign_buffer(const std::string& buff, crypto::signature& sig);
@@ -970,8 +971,6 @@ private:
     // -------- t_transport_state_notifier ------------------------------------------------
     virtual void notify_state_change(const std::string& state_code, const std::string& details = std::string());
     // ------------------------------------------------------------------------------------
-
-
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
     void load_keys(const std::string& keys_file_name, const std::string& password, uint64_t file_signature, keys_file_data& kf_data);

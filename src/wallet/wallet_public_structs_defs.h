@@ -1210,6 +1210,34 @@ namespace wallet_public
     END_KV_SERIALIZE_MAP()
   };
 
+
+  struct ionic_swap_proposal_context
+  {
+    currency::tx_generation_context gen_context;
+    crypto::secret_key one_time_skey;
+    
+    BEGIN_SERIALIZE_OBJECT()
+      VERSION()
+      CURRENT_VERSION(0)
+      FIELD(gen_context)
+      FIELD(one_time_skey)
+    END_SERIALIZE()
+  };
+
+  struct ionic_swap_proposal
+  {
+    currency::transaction tx_template;
+    std::string encrypted_context;          //ionic_swap_proposal_context encrypted with derivation
+
+
+    BEGIN_SERIALIZE_OBJECT()
+      VERSION()
+      CURRENT_VERSION(0)
+      FIELD(tx_template)
+      FIELD(encrypted_context)
+    END_SERIALIZE()
+  };
+
   struct create_ionic_swap_proposal_request
   {
     uint64_t wallet_id;

@@ -1612,9 +1612,8 @@ namespace currency
   }
 
   //---------------------------------------------------------------
-  void encrypt_attachments(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key)
+  void encrypt_attachments(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key, crypto::key_derivation& derivation)
   {
-    crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
     bool r = crypto::generate_key_derivation(destination_addr.view_public_key, tx_random_key.sec, derivation);
     CHECK_AND_ASSERT_MES(r, void(), "failed to generate_key_derivation");
     bool was_attachment_crypted_entries = false;
@@ -1643,6 +1642,12 @@ namespace currency
       else
         tx.attachment.push_back(chs);
     }
+  }
+  //---------------------------------------------------------------
+  void encrypt_attachments(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key)
+  {
+    crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
+    return encrypt_attachments(tx, sender_keys, destination_addr, tx_random_key, derivation);
   }
   //---------------------------------------------------------------
   void load_wallet_transfer_info_flags(tools::wallet_public::wallet_transfer_info& x)
@@ -2052,7 +2057,7 @@ namespace currency
 
       //include offers if need
       tx.attachment = attachments;
-      encrypt_attachments(tx, sender_account_keys, crypt_destination_addr, txkey);
+      encrypt_attachments(tx, sender_account_keys, crypt_destination_addr, txkey, result.derivation);
     }
     else
     {
@@ -2061,7 +2066,8 @@ namespace currency
       CHECK_AND_ASSERT_MES(txkey.pub != null_pkey && txkey.sec != null_skey, false, "In append mode both public and secret keys must be provided");
 
       //separately encrypt attachments without putting extra
-      crypto::key_derivation derivation = get_encryption_key_derivation(true, tx, sender_account_keys);
+      result.derivation = get_encryption_key_derivation(true, tx, sender_account_keys); 
+      crypto::key_derivation& derivation = result.derivation;
       CHECK_AND_ASSERT_MES(derivation != null_derivation, false, "failed to generate_key_derivation");
       bool was_attachment_crypted_entries = false;
       std::vector<extra_v> extra_local = extra;

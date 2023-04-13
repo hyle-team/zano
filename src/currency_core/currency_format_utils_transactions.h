@@ -264,44 +264,46 @@ namespace currency
 
     // consider redesign, some data may possibly be excluded from kv serialization -- sowle
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(asset_ids);
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(blinded_asset_ids);
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amount_commitments);
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(asset_id_blinding_masks);
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amounts);
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amount_blinding_masks);
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(pseudo_outs_blinded_asset_ids);
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(pseudo_outs_plus_real_out_blinding_masks);
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(real_zc_ins_asset_ids);
-      KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_commitments_sum);
-      KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_blinding_masks_sum);
-      KV_SERIALIZE_POD_AS_HEX_STRING(real_in_asset_id_blinding_mask_x_amount_sum);
-      KV_SERIALIZE_POD_AS_HEX_STRING(amount_commitments_sum);
-      KV_SERIALIZE_POD_AS_HEX_STRING(amount_blinding_masks_sum);
-      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id_blinding_mask_x_amount_sum);
-      KV_SERIALIZE_POD_AS_HEX_STRING(ao_asset_id);
-      KV_SERIALIZE_POD_AS_HEX_STRING(ao_asset_id_pt);
-      KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_commitment);
-      KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_blinding_mask);
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(asset_ids)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(blinded_asset_ids)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amount_commitments)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(asset_id_blinding_masks)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amounts)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amount_blinding_masks)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(pseudo_outs_blinded_asset_ids)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(pseudo_outs_plus_real_out_blinding_masks)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(real_zc_ins_asset_ids)
+      KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_commitments_sum)
+      KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_blinding_masks_sum)
+      KV_SERIALIZE_POD_AS_HEX_STRING(real_in_asset_id_blinding_mask_x_amount_sum)
+      KV_SERIALIZE_POD_AS_HEX_STRING(amount_commitments_sum)
+      KV_SERIALIZE_POD_AS_HEX_STRING(amount_blinding_masks_sum)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id_blinding_mask_x_amount_sum)
+      KV_SERIALIZE_POD_AS_HEX_STRING(ao_asset_id)
+      KV_SERIALIZE_POD_AS_HEX_STRING(ao_asset_id_pt)
+      KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_commitment)
+      KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_blinding_mask)
     END_KV_SERIALIZE_MAP()
   
     // solely for consolidated txs, asset opration fields are not serialized
     BEGIN_SERIALIZE_OBJECT()
-      FIELD(asset_ids);
-      FIELD(blinded_asset_ids);
-      FIELD(amount_commitments);
-      FIELD((std::vector<crypto::scalar_t>&)(asset_id_blinding_masks));
-      FIELD((std::vector<crypto::scalar_t>&)(amounts));
-      FIELD((std::vector<crypto::scalar_t>&)(amount_blinding_masks));
-      FIELD(pseudo_outs_blinded_asset_ids);
-      FIELD((std::vector<crypto::scalar_t>&)(pseudo_outs_plus_real_out_blinding_masks));
-      FIELD(real_zc_ins_asset_ids);
-      FIELD(pseudo_out_amount_commitments_sum);
-      FIELD(pseudo_out_amount_blinding_masks_sum);
-      FIELD(real_in_asset_id_blinding_mask_x_amount_sum);
-      FIELD(amount_commitments_sum);
-      FIELD(amount_blinding_masks_sum);
-      FIELD(asset_id_blinding_mask_x_amount_sum);
+      VERSION()
+      CURRENT_VERSION(0)
+      FIELD(asset_ids)
+      FIELD(blinded_asset_ids)
+      FIELD(amount_commitments)
+      FIELD((std::vector<crypto::scalar_t>&)(asset_id_blinding_masks))
+      FIELD((std::vector<crypto::scalar_t>&)(amounts))
+      FIELD((std::vector<crypto::scalar_t>&)(amount_blinding_masks))
+      FIELD(pseudo_outs_blinded_asset_ids)
+      FIELD((std::vector<crypto::scalar_t>&)(pseudo_outs_plus_real_out_blinding_masks))
+      FIELD(real_zc_ins_asset_ids)
+      FIELD(pseudo_out_amount_commitments_sum)
+      FIELD(pseudo_out_amount_blinding_masks_sum)
+      FIELD(real_in_asset_id_blinding_mask_x_amount_sum)
+      FIELD(amount_commitments_sum)
+      FIELD(amount_blinding_masks_sum)
+      FIELD(asset_id_blinding_mask_x_amount_sum)
 
       // no asset operation fields here
       //ao_asset_id
