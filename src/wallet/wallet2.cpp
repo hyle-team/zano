@@ -2107,13 +2107,13 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
 
     // read extra
     std::vector<wallet_out_info> outs;
-    uint64_t tx_money_got_in_outs = 0;
+    uint64_t sum_of_received_native_outs = 0;
     crypto::public_key tx_pub_key = null_pkey;
     r = parse_and_validate_tx_extra(tx, tx_pub_key);
     THROW_IF_TRUE_WALLET_EX(!r, error::tx_extra_parse_error, tx);
     //check if we have money
     crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-    r = lookup_acc_outs(m_account.get_keys(), tx, tx_pub_key, outs, tx_money_got_in_outs, derivation);
+    r = lookup_acc_outs(m_account.get_keys(), tx, tx_pub_key, outs, sum_of_received_native_outs, derivation);
     THROW_IF_TRUE_WALLET_EX(!r, error::acc_outs_lookup_error, tx, tx_pub_key, m_account.get_keys());
 
     //collect incomes
@@ -2122,7 +2122,7 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
 
     bool new_multisig_spend_detected = false;
     //check if we have spendings
-    uint64_t tx_money_spent_in_ins = 0;
+    uint64_t sum_of_spent_native_coin = 0;
     std::list<size_t> spend_transfers;
     // check all outputs for spending (compare key images)
     for (size_t i = 0; i != tx.vin.size(); i++)
@@ -2150,7 +2150,33 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
         if (tid != UINT64_MAX)
         {
           // own output is being spent by this input
-          tx_money_spent_in_ins += intk.amount;
+          sum_of_spent_native_coin += intk.amount;
+          td.spent_indices.push_back(i);
+          spend_transfers.push_back(tid);
+        }
+      }
+      else if (in.type() == typeid(currency::txin_zc_input))
+      {
+        // bad design -- remove redundancy like using wallet2::process_input_t()
+        const currency::txin_zc_input& zc = boost::get<currency::txin_zc_input>(in);
+        uint64_t tid = UINT64_MAX;
+        if (is_auditable() && is_watch_only())
+        {
+          // tracking wallet, assuming all outputs are spent directly because of mix_attr = 1
+          tid = get_directly_spent_transfer_index_by_input_in_tracking_wallet(zc);
+        }
+        else
+        {
+          // wallet with spend secret key -- we can calculate own key images and then search among them
+          auto it = m_key_images.find(zc.k_image);
+          if (it != m_key_images.end())
+          {
+            tid = it->second;
+          }
+        }
+
+        if (tid != UINT64_MAX)
+        {
           td.spent_indices.push_back(i);
           spend_transfers.push_back(tid);
         }
@@ -2182,7 +2208,7 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
     }
     
 
-    if (((!tx_money_spent_in_ins && tx_money_got_in_outs) || (currency::is_derivation_used_to_encrypt(tx, derivation) && !tx_money_spent_in_ins)) && !is_tx_expired(tx, tx_expiration_ts_median))
+    if (((!sum_of_spent_native_coin && sum_of_received_native_outs) || (currency::is_derivation_used_to_encrypt(tx, derivation) && !sum_of_spent_native_coin)) && !is_tx_expired(tx, tx_expiration_ts_median))
     {
       m_unconfirmed_in_transfers[tx_hash] = tx;
       if (m_unconfirmed_txs.count(tx_hash))
@@ -2190,22 +2216,22 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
 
       //prepare notification about pending transaction
       wallet_public::wallet_transfer_info& unconfirmed_wti = misc_utils::get_or_insert_value_initialized(m_unconfirmed_txs, tx_hash);
-
+      unconfirmed_wti.asset_id = native_coin_asset_id; // <-- TODO @#@#
       unconfirmed_wti.is_income = true;
-      prepare_wti(unconfirmed_wti, 0, m_core_runtime_config.get_core_time(), tx, tx_money_got_in_outs, td);
+      prepare_wti(unconfirmed_wti, 0, m_core_runtime_config.get_core_time(), tx, sum_of_received_native_outs, td);
       rise_on_transfer2(unconfirmed_wti);
     }
-    else if (tx_money_spent_in_ins || new_multisig_spend_detected)
+    else if (sum_of_spent_native_coin || new_multisig_spend_detected)
     {
       m_unconfirmed_in_transfers[tx_hash] = tx;
       if (m_unconfirmed_txs.count(tx_hash))
         continue;
       //outgoing tx that was sent somehow not from this application instance
       uint64_t amount = 0;
-      /*if (!new_multisig_spend_detected && tx_money_spent_in_ins < tx_money_got_in_outs+get_tx_fee(tx))
+      /*if (!new_multisig_spend_detected && tx_money_spent_in_ins < sum_of_received_native_outs+get_tx_fee(tx))
       {
         WLT_LOG_ERROR("Transaction that get more then send: tx_money_spent_in_ins=" << tx_money_spent_in_ins
-          << ", tx_money_got_in_outs=" << tx_money_got_in_outs << ", tx_id=" << tx_hash);
+          << ", sum_of_received_native_outs=" << sum_of_received_native_outs << ", tx_id=" << tx_hash);
       }
       else*/ if (new_multisig_spend_detected)
       {
@@ -2213,12 +2239,12 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
       }
       else
       {
-        amount = tx_money_spent_in_ins - (tx_money_got_in_outs + get_tx_fee(tx));
+        amount = sum_of_spent_native_coin - (sum_of_received_native_outs + get_tx_fee(tx));
       }
 
       //prepare notification about pending transaction
       wallet_public::wallet_transfer_info& unconfirmed_wti = misc_utils::get_or_insert_value_initialized(m_unconfirmed_txs, tx_hash);
-
+      unconfirmed_wti.asset_id = native_coin_asset_id; // <-- TODO @#@#
       unconfirmed_wti.is_income = false;
       prepare_wti(unconfirmed_wti, 0, m_core_runtime_config.get_core_time(), tx, amount, td);
       //mark transfers as spend to get correct balance
