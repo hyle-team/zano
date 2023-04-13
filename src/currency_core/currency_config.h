@@ -254,9 +254,9 @@
 #else
 /////// Zarcanum Testnet Pre-Alpha //////////////////////////////
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   1
-#define ZANO_HARDFORK_02_AFTER_HEIGHT                   2
-#define ZANO_HARDFORK_03_AFTER_HEIGHT                   3
-#define ZANO_HARDFORK_04_AFTER_HEIGHT                   4
+#define ZANO_HARDFORK_02_AFTER_HEIGHT                   1
+#define ZANO_HARDFORK_03_AFTER_HEIGHT                   1
+#define ZANO_HARDFORK_04_AFTER_HEIGHT                   CURRENCY_MAX_BLOCK_NUMBER
 #endif
 
 

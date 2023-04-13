@@ -146,7 +146,7 @@ namespace currency
     block b;
     wide_difficulty_type diffic;
     uint64_t height;
-    outputs_generation_context miner_tx_ogc; // bad design, a lot of copying, consider redesign -- sowle
+    tx_generation_context miner_tx_tgc; // bad design, a lot of copying, consider redesign -- sowle
   };
 
   typedef std::unordered_map<crypto::hash, transaction> transactions_map;

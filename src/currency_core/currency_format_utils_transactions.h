@@ -206,19 +206,19 @@ namespace currency
   std::vector<tx_source_entry::output_entry> prepare_outputs_entries_for_key_offsets(const std::vector<tx_source_entry::output_entry>& outputs, size_t old_real_index, size_t& new_real_index) noexcept;
 
 
-  struct outputs_generation_context
+  struct tx_generation_context
   {
-    outputs_generation_context() = default;
+    tx_generation_context() = default;
 
-    outputs_generation_context(size_t zc_ins_count, size_t outs_count)
-      : /*pseudo_outs_blinded_asset_ids(zc_ins_count)
-      , */asset_ids(outs_count)
-      , blinded_asset_ids(outs_count)
-      , amount_commitments(outs_count)
-      , asset_id_blinding_masks(outs_count)
-      , amounts(outs_count)
-      , amount_blinding_masks(outs_count)
-    {}
+    void resize(size_t zc_ins_count, size_t outs_count)
+    {
+      asset_ids.resize(outs_count);
+      blinded_asset_ids.resize(outs_count);
+      amount_commitments.resize(outs_count);
+      asset_id_blinding_masks.resize(outs_count);
+      amounts.resize(outs_count);
+      amount_blinding_masks.resize(outs_count);
+    }
 
     // TODO @#@# reconsider this check -- sowle
     bool check_sizes(size_t zc_ins_count, size_t outs_count) const
@@ -242,9 +242,9 @@ namespace currency
     crypto::scalar_vec_t amount_blinding_masks;                                       // generate_zc_outs_range_proof
 
     // per zc input data
-    std::vector<crypto::point_t> pseudo_outs_blinded_asset_ids;
-    crypto::scalar_vec_t pseudo_outs_plus_real_out_blinding_masks; // r_pi + r'_j
-    std::vector<crypto::point_t> real_zc_ins_asset_ids;            // H_i
+    std::vector<crypto::point_t> pseudo_outs_blinded_asset_ids;                       // generate_asset_surjection_proof
+    crypto::scalar_vec_t pseudo_outs_plus_real_out_blinding_masks; // r_pi + r'_j     // generate_asset_surjection_proof
+    std::vector<crypto::point_t> real_zc_ins_asset_ids;            // H_i             // generate_asset_surjection_proof
 
     // common data: inputs
     crypto::point_t  pseudo_out_amount_commitments_sum      = crypto::c_point_0;      //                                                   generate_tx_balance_proof  generate_ZC_sig
@@ -270,6 +270,9 @@ namespace currency
       KV_SERIALIZE_CONTAINER_POD_AS_BLOB(asset_id_blinding_masks);
       KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amounts);
       KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amount_blinding_masks);
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(pseudo_outs_blinded_asset_ids);
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(pseudo_outs_plus_real_out_blinding_masks);
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(real_zc_ins_asset_ids);
       KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_commitments_sum);
       KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_blinding_masks_sum);
       KV_SERIALIZE_POD_AS_HEX_STRING(real_in_asset_id_blinding_mask_x_amount_sum);
@@ -281,6 +284,31 @@ namespace currency
       KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_commitment);
       KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_blinding_mask);
     END_KV_SERIALIZE_MAP()
-  };
+  
+    // solely for consolidated txs, asset opration fields are not serialized
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(asset_ids);
+      FIELD(blinded_asset_ids);
+      FIELD(amount_commitments);
+      FIELD((std::vector<crypto::scalar_t>&)(asset_id_blinding_masks));
+      FIELD((std::vector<crypto::scalar_t>&)(amounts));
+      FIELD((std::vector<crypto::scalar_t>&)(amount_blinding_masks));
+      FIELD(pseudo_outs_blinded_asset_ids);
+      FIELD((std::vector<crypto::scalar_t>&)(pseudo_outs_plus_real_out_blinding_masks));
+      FIELD(real_zc_ins_asset_ids);
+      FIELD(pseudo_out_amount_commitments_sum);
+      FIELD(pseudo_out_amount_blinding_masks_sum);
+      FIELD(real_in_asset_id_blinding_mask_x_amount_sum);
+      FIELD(amount_commitments_sum);
+      FIELD(amount_blinding_masks_sum);
+      FIELD(asset_id_blinding_mask_x_amount_sum);
+
+      // no asset operation fields here
+      //ao_asset_id
+      //ao_asset_id_pt
+      //ao_amount_commitment
+      //ao_amount_blinding_mask
+    END_SERIALIZE()
+  }; // struct tx_generation_context
 
 } // namespace currency

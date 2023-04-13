@@ -168,7 +168,7 @@ void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
   // generate miner tx using incorrect current_block_size only for size estimation
   size_t estimated_block_size = m_txs_total_size;
   bool r = construct_miner_tx(m_height, median_size, already_generated_coins, estimated_block_size, m_total_fee,
-    reward_receiver_address, stakeholder_address, m_block.miner_tx, tx_version, extra_nonce, max_outs, true, pe, &m_miner_tx_ogc, tx_one_time_key_to_use);
+    reward_receiver_address, stakeholder_address, m_block.miner_tx, tx_version, extra_nonce, max_outs, true, pe, &m_miner_tx_tgc, tx_one_time_key_to_use);
   CHECK_AND_ASSERT_THROW_MES(r, "construct_miner_tx failed");
 
   estimated_block_size = m_txs_total_size + get_object_blobsize(m_block.miner_tx);
@@ -176,7 +176,7 @@ void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
   for (size_t try_count = 0; try_count != 10; ++try_count)
   {
     r = construct_miner_tx(m_height, median_size, already_generated_coins, estimated_block_size, m_total_fee,
-    reward_receiver_address, stakeholder_address, m_block.miner_tx, tx_version, extra_nonce, max_outs, true, pe, &m_miner_tx_ogc, tx_one_time_key_to_use);
+    reward_receiver_address, stakeholder_address, m_block.miner_tx, tx_version, extra_nonce, max_outs, true, pe, &m_miner_tx_tgc, tx_one_time_key_to_use);
     CHECK_AND_ASSERT_THROW_MES(r, "construct_homemade_pos_miner_tx failed");
 
     cumulative_size = m_txs_total_size + get_object_blobsize(m_block.miner_tx);
@@ -232,7 +232,7 @@ void pos_block_builder::step5_sign(const currency::tx_source_entry& se, const cu
 
     uint8_t err = 0;
     r = crypto::zarcanum_generate_proof(tx_hash_for_sig, m_context.kernel_hash, ring, m_context.last_pow_block_id_hashed, m_context.sk.kimage,
-      secret_x, m_context.secret_q, prepared_real_out_index, se.real_out_asset_id_blinding_mask, -m_miner_tx_ogc.amount_blinding_masks_sum, m_context.stake_amount, m_context.stake_out_amount_blinding_mask,
+      secret_x, m_context.secret_q, prepared_real_out_index, se.real_out_asset_id_blinding_mask, -m_miner_tx_tgc.amount_blinding_masks_sum, m_context.stake_amount, m_context.stake_out_amount_blinding_mask,
       static_cast<crypto::zarcanum_proof&>(sig), &err);
     CHECK_AND_ASSERT_THROW_MES(r, "zarcanum_generate_proof failed, err: " << (int)err);
   }

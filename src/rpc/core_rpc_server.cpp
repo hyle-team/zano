@@ -877,7 +877,7 @@ namespace currency
     blobdata block_blob = t_serializable_object_to_blob(resp.b);
     res.blocktemplate_blob = string_tools::buff_to_hex_nodelimer(block_blob);
     res.prev_hash = string_tools::pod_to_hex(resp.b.prev_id);
-    res.miner_tx_ogc = resp.miner_tx_ogc;
+    res.miner_tx_tgc = resp.miner_tx_tgc;
     res.height = resp.height;
     //calculate epoch seed
     res.seed = currency::ethash_epoch_to_seed(currency::ethash_height_to_epoch(res.height));

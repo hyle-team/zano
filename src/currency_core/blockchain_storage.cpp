@@ -1432,7 +1432,7 @@ bool blockchain_storage::create_block_template(const account_public_address& min
                                                block& b,
                                                wide_difficulty_type& diffic,
                                                uint64_t& height,
-                                               outputs_generation_context* miner_tx_ogc_ptr /* = nullptr */) const
+                                               tx_generation_context* miner_tx_tgc_ptr /* = nullptr */) const
 {
   create_block_template_params params = AUTO_VAL_INIT(params);
   params.miner_address = miner_address;
@@ -1447,8 +1447,8 @@ bool blockchain_storage::create_block_template(const account_public_address& min
   b = resp.b;
   diffic = resp.diffic;
   height = resp.height;
-  if (miner_tx_ogc_ptr)
-    *miner_tx_ogc_ptr = resp.miner_tx_ogc;
+  if (miner_tx_tgc_ptr)
+    *miner_tx_tgc_ptr = resp.miner_tx_tgc;
   return r;
 }
 
@@ -1533,7 +1533,7 @@ bool blockchain_storage::create_block_template(const create_block_template_param
                                                    CURRENCY_MINER_TX_MAX_OUTS, 
                                                    pos,
                                                    pe,
-                                                   &resp.miner_tx_ogc);
+                                                   &resp.miner_tx_tgc);
   CHECK_AND_ASSERT_MES(r, false, "Failed to construc miner tx, first chance");
   uint64_t coinbase_size = get_object_blobsize(b.miner_tx);
   // "- 100" - to reserve room for PoS additions into miner tx

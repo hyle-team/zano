@@ -860,7 +860,7 @@ namespace currency
       crypto::hash seed;
       blobdata blocktemplate_blob;
       std::string prev_hash;
-      outputs_generation_context miner_tx_ogc;
+      tx_generation_context miner_tx_tgc;
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -869,7 +869,7 @@ namespace currency
         KV_SERIALIZE_POD_AS_HEX_STRING(seed)
         KV_SERIALIZE(blocktemplate_blob)
         KV_SERIALIZE(prev_hash)
-        KV_SERIALIZE(miner_tx_ogc)
+        KV_SERIALIZE(miner_tx_tgc)
         KV_SERIALIZE(status)
       END_KV_SERIALIZE_MAP()
     };
