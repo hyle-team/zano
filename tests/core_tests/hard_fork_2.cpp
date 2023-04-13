@@ -20,7 +20,10 @@ hard_fork_2_base_test::hard_fork_2_base_test(size_t hardfork_01_height, size_t h
   , m_hardfork_02_height(hardfork_02_height)
   , m_hardfork_03_height(CURRENCY_MAX_BLOCK_NUMBER)
 {
-  
+  m_hardforks.clear();
+  m_hardforks.set_hardfork_height(1, m_hardfork_01_height);
+  m_hardforks.set_hardfork_height(2, m_hardfork_02_height);
+  m_hardforks.set_hardfork_height(3, m_hardfork_03_height);
   REGISTER_CALLBACK_METHOD(hard_fork_2_base_test, configure_core);
 }
 
@@ -29,17 +32,9 @@ bool hard_fork_2_base_test::configure_core(currency::core& c, size_t ev_index, c
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
-  pc.hard_forks.set_hardfork_height(1, m_hardfork_01_height);
-  pc.hard_forks.set_hardfork_height(2, m_hardfork_02_height);
-  pc.hard_forks.set_hardfork_height(3, m_hardfork_03_height);
+  pc.hard_forks = m_hardforks;
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
-}
-
-void hard_fork_2_base_test::set_hard_fork_heights_to_generator(test_generator& generator) const
-{
-  generator.set_hardfork_height(1, m_hardfork_01_height);
-  generator.set_hardfork_height(2, m_hardfork_02_height);
 }
 
 //------------------------------------------------------------------------------
