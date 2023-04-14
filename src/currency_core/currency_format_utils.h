@@ -396,7 +396,8 @@ namespace currency
   bool is_service_tx(const transaction& tx);
   bool does_tx_have_only_mixin_inputs(const transaction& tx);
   bool is_showing_sender_addres(const transaction& tx);
-  uint64_t get_amount_for_zero_pubkeys(const transaction& tx);
+  bool check_native_coins_amount_burnt_in_outs(const transaction& tx, const uint64_t amount, uint64_t* p_amount_burnt = nullptr);
+  [[deprecated("Use check_native_coins_amount_burnt_in_outs instead")]] uint64_t get_amount_for_zero_pubkeys(const transaction& tx);
   //std::string get_comment_from_tx(const transaction& tx);
   std::string print_stake_kernel_info(const stake_kernel& sk);
   std::string dump_ring_sig_data(const crypto::hash& hash_for_sig, const crypto::key_image& k_image, const std::vector<const crypto::public_key*>& output_keys_ptrs, const std::vector<crypto::signature>& sig);

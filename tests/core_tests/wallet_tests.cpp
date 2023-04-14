@@ -1670,8 +1670,7 @@ bool gen_wallet_alias_and_unconfirmed_txs::c1(currency::core& c, size_t ev_index
   std::vector<test_event_entry> stub_events_vec;
   MAKE_TEST_WALLET_TX_EXTRA(stub_events_vec, tx, bob_wlt, alias_reward, null_account, std::vector<currency::extra_v>({ ai }));
   
-  uint64_t found_alias_reward = get_amount_for_zero_pubkeys(tx);
-  CHECK_AND_ASSERT_MES(found_alias_reward == alias_reward, false, "Generated tx has invalid alias reward");
+  CHECK_AND_ASSERT_MES(check_native_coins_amount_burnt_in_outs(tx, alias_reward), false, "Generated tx has invalid alias reward");
 
   bool has_relates_alias_in_unconfirmed = false;
   bob_wlt->scan_tx_pool(has_relates_alias_in_unconfirmed);
@@ -1707,8 +1706,7 @@ bool gen_wallet_alias_and_unconfirmed_txs::c2(currency::core& c, size_t ev_index
   std::vector<test_event_entry> stub_events_vec;
   MAKE_TEST_WALLET_TX_EXTRA(stub_events_vec, tx, bob_wlt, alias_reward, null_account, std::vector<currency::extra_v>({ ai }));
 
-  uint64_t found_alias_reward = get_amount_for_zero_pubkeys(tx);
-  CHECK_AND_ASSERT_MES(found_alias_reward == alias_reward, false, "Generated tx has invalid alias reward");
+  CHECK_AND_ASSERT_MES(check_native_coins_amount_burnt_in_outs(tx, alias_reward), false, "Generated tx has invalid alias reward");
 
   bool has_relates_alias_in_unconfirmed = false;
   bob_wlt->scan_tx_pool(has_relates_alias_in_unconfirmed);

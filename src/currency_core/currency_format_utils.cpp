@@ -3484,6 +3484,42 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
+  bool check_native_coins_amount_burnt_in_outs(const transaction& tx, const uint64_t amount, uint64_t* p_amount_burnt /* = nullptr */)
+  {
+    if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
+    {
+      uint64_t sum_of_bare_outs_burnt = 0;
+      for (const auto& out : tx.vout)
+      {
+        VARIANT_SWITCH_BEGIN(out);
+        VARIANT_CASE_CONST(tx_out_bare, out)
+          if (out.target.type() != typeid(txout_to_key))
+            continue;
+        const txout_to_key& o = boost::get<txout_to_key>(out.target);
+        if (o.key == null_pkey)
+          sum_of_bare_outs_burnt += out.amount;
+        VARIANT_SWITCH_END();
+      }
+      if (p_amount_burnt)
+        *p_amount_burnt = sum_of_bare_outs_burnt;
+      return sum_of_bare_outs_burnt == amount;
+    }
+
+    // post HF-4 txs
+    // assuming: zero out pubkey, explicit asset_id, zero amount blinding mask
+    crypto::point_t sum_of_amount_commitments = crypto::c_point_0;
+    for (const auto& out : tx.vout)
+    {
+      VARIANT_SWITCH_BEGIN(out);
+      VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
+        if (out_zc.stealth_address == null_pkey && out_zc.blinded_asset_id == native_coin_asset_id_1div8)
+          sum_of_amount_commitments += crypto::point_t(out_zc.amount_commitment).modify_mul8();
+      VARIANT_SWITCH_END();
+    }
+    return sum_of_amount_commitments == amount * native_coin_asset_id_pt;
+  }
+  //---------------------------------------------------------------
+  // DEPRECATED, don't use -- sowle
   uint64_t get_amount_for_zero_pubkeys(const transaction& tx)
   {
     uint64_t found_alias_reward = 0;
