@@ -3857,17 +3857,12 @@ i_core_event_handler* blockchain_storage::get_event_handler() const
 //------------------------------------------------------------------
 uint64_t blockchain_storage::validate_alias_reward(const transaction& tx, const std::string& alias) const
 {
-
-  //validate alias coast
   uint64_t fee_for_alias = get_alias_coast(alias);
-  
-  //validate the price had been paid
-  uint64_t found_alias_reward = get_amount_for_zero_pubkeys(tx);
-
-  CHECK_AND_ASSERT_MES(found_alias_reward >= fee_for_alias, false, "registration of alias '" 
-    << alias << "' goes with a reward of " << print_money(found_alias_reward) << " which is less than expected: " << print_money(fee_for_alias) 
-    <<"(fee median: " << get_tx_fee_median() << ")"
-    << ", tx: " << get_transaction_hash(tx));
+  uint64_t burnt_amount = 0;
+  CHECK_AND_ASSERT_MES(check_native_coins_amount_burnt_in_outs(tx, fee_for_alias, &burnt_amount), false,
+    "registration of alias '" << alias << "' failed due to incorrect reward; expected reward: " << print_money_brief(fee_for_alias)
+    << "; burnt amount: " << (tx.version <= TRANSACTION_VERSION_PRE_HF4 ? print_money_brief(burnt_amount) : std::string("hidden"))
+    << "; tx: " << get_transaction_hash(tx));
 
   return true;
 }
@@ -4332,12 +4327,12 @@ bool blockchain_storage::validate_all_aliases_for_new_median_mode()
         uint64_t fee_for_alias =  get_alias_coast_from_fee(tei.m_alias.m_alias, median_fee);
         
         //validate the price had been paid
-        uint64_t found_alias_reward = get_amount_for_zero_pubkeys(tx_ptr->tx);
-        if (found_alias_reward < fee_for_alias)
+        uint64_t burnt_amount = 0;
+        if (!check_native_coins_amount_burnt_in_outs(tx_ptr->tx, fee_for_alias, &burnt_amount))
         {
-          LOG_PRINT_RED_L0("[" << i <<  "]Found collision on alias: " << tei.m_alias.m_alias 
-            << ", expected fee: " << print_money(fee_for_alias) << "(median:" << print_money(median_fee) << ")"
-            <<" found reward: " << print_money(found_alias_reward) <<". tx_id: " << tx_id);
+          LOG_PRINT_RED_L0("[" << i <<  "]Detected collision on alias: " << tei.m_alias.m_alias 
+            << ", expected fee: " << print_money_brief(fee_for_alias) << " (median: " << print_money_brief(median_fee) << ")"
+            << " found reward: " << (tx_ptr->tx.version <= TRANSACTION_VERSION_PRE_HF4 ? print_money_brief(burnt_amount) : std::string("hidden")) << "; tx_id: " << tx_id);
         }
       }
     }

@@ -1842,7 +1842,7 @@ bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name,
 
   bool r = true;
 
-#define _CHECK_BAL(v) if (!(expected_##v == INVALID_BALANCE_VAL || v == expected_##v)) { r = false; LOG_PRINT_RED_L0("invalid " #v " balance, expected: " << print_money(expected_##v)); }
+#define _CHECK_BAL(v) if (!(expected_##v == INVALID_BALANCE_VAL || v == expected_##v)) { r = false; LOG_PRINT_RED_L0("invalid " #v " balance, expected: " << print_money_brief(expected_##v)); }
   _CHECK_BAL(unlocked)
   _CHECK_BAL(awaiting_in)
   _CHECK_BAL(awaiting_out)

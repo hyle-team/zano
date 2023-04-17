@@ -288,14 +288,17 @@ inline bool put_alias_via_tx_to_list(const currency::hard_forks_descriptor& hf, 
   currency::account_keys& ak = const_cast<currency::account_keys&>(reward_acc.get_keys());
   currency::get_aliases_reward_account(ak.account_address, ak.view_secret_key);
 
-  uint64_t fee_median = generator.get_last_n_blocks_fee_median(get_block_hash(head_block));
-  uint64_t reward = currency::get_alias_coast_from_fee(ae.m_alias, fee_median);
+  uint64_t alias_reward = 0;
+  if (get_block_height(head_block) < ALIAS_MEDIAN_RECALC_INTERWAL)
+    alias_reward = get_alias_coast_from_fee(ae.m_alias, ALIAS_VERY_INITAL_COAST); // don't ask why
+  else
+    LOCAL_ASSERT(false); // not implemented yet, see also all the mess around blockchain_storage::get_tx_fee_median(), get_tx_fee_median_effective_index() etc.
 
   MAKE_TX_MIX_LIST_EXTRA_MIX_ATTR(events, 
     tx_set,
     miner_acc,
     reward_acc,
-    reward,
+    alias_reward,
     0,
     head_block,
     CURRENCY_TO_KEY_OUT_RELAXED,
@@ -303,12 +306,11 @@ inline bool put_alias_via_tx_to_list(const currency::hard_forks_descriptor& hf, 
     std::vector<currency::attachment_v>());
   
 
-  uint64_t found_alias_reward = get_amount_for_zero_pubkeys(tx_set.back());
-  if (found_alias_reward != reward)
+  uint64_t burnt_amount = 0;
+  if (!check_native_coins_amount_burnt_in_outs(tx_set.back(), alias_reward, &burnt_amount))
   {
-    LOCAL_ASSERT(false);
-    CHECK_AND_ASSERT_MES(false, false, "wrong transaction constructed, first input value not match alias amount or account");
-    return false;
+    CHECK_AND_ASSERT_MES(false, false, "alias reward was not found, expected: " << print_money_brief(alias_reward)
+      << "; burnt: " << (tx_set.back().version <= TRANSACTION_VERSION_PRE_HF4 ? print_money_brief(burnt_amount) : "hidden") << "; tx: " << get_transaction_hash(tx_set.back()));
   }
 
   return true;

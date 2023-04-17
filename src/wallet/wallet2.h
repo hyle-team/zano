@@ -397,7 +397,6 @@ namespace tools
         KV_SERIALIZE(m_spent_height)
         KV_SERIALIZE(m_flags)
         KV_SERIALIZE(m_amount)
-        //KV_SERIALIZE_N(m_opt_blinding_mask, "blinding_mask")
         KV_SERIALIZE_N(m_zc_info_ptr, "zc_out_info")
         KV_SERIALIZE_EPHEMERAL_N(uint64_t, tools::wallet2::transfer_details_base_to_amount, "amount")
         KV_SERIALIZE_EPHEMERAL_N(std::string, tools::wallet2::transfer_details_base_to_tx_hash, "tx_id")
