@@ -305,7 +305,7 @@ namespace tools
   struct mode_separate_context
   {
     currency::transaction tx_for_mode_separate;
-    view::ionic_swap_proposal_info proposal;
+    view::ionic_swap_proposal_info proposal_info;
   };
   
 
@@ -949,11 +949,10 @@ namespace tools
     bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin, crypto::hash& redeem_tx_id);
 
     // ionic swaps:
-    bool create_ionic_swap_proposal(const wallet_public::ionic_swap_proposal_info& proposal, const currency::account_public_address& destination_addr, ionic_swap_proposal& proposal);
+    bool create_ionic_swap_proposal(const wallet_public::ionic_swap_proposal_info& proposal_details, const currency::account_public_address& destination_addr, wallet_public::ionic_swap_proposal& proposal);
     bool build_ionic_swap_template(const wallet_public::ionic_swap_proposal_info& proposal_detais, const currency::account_public_address& destination_addr,
-      ionic_swap_proposal& proposal,
-      std::vector<uint64_t>& selected_transfers_for_template,
-      crypto::secret_key& one_time_key);
+      wallet_public::ionic_swap_proposal& proposal,
+      std::vector<uint64_t>& selected_transfers_for_template);
     bool get_ionic_swap_proposal_info(const std::string&raw_proposal, wallet_public::ionic_swap_proposal_info& proposal_info);
     bool get_ionic_swap_proposal_info(const wallet_public::ionic_swap_proposal& proposal, wallet_public::ionic_swap_proposal_info& proposal_info);
     bool get_ionic_swap_proposal_info(const wallet_public::ionic_swap_proposal& proposal, wallet_public::ionic_swap_proposal_info& proposal_info, wallet_public::ionic_swap_proposal_context& ionic_context);

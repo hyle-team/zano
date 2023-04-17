@@ -397,5 +397,14 @@ namespace currency
     CATCH_ENTRY2(std::vector<tx_source_entry::output_entry>{});
   }
   //---------------------------------------------------------------
+  bool validate_tx_output_details_againt_tx_generation_context(const transaction& tx, const tx_generation_context& gen_context, const crypto::secret_key& onet_time_key)
+  {
+    //TODO: Implement this function before mainnet
+#ifdef TESTNET
+    return true;
+#else
+    return false;
+#endif
+  }
 
 }

@@ -63,8 +63,8 @@ inline bool do_serialize(Archive &ar, T &v)
 #define BEGIN_SERIALIZE() \
   template <bool W, template <bool> class Archive> bool do_serialize(Archive<W> &_ser_ar) {uint8_t s_current_version ATTRIBUTE_UNUSED = 0; uint8_t s_version ATTRIBUTE_UNUSED = 0;
 #define BEGIN_SERIALIZE_OBJECT() \
-  template <bool W, template <bool> class Archive> bool do_serialize(Archive<W> &_ser_ar) { _ser_ar.begin_object(); bool _ser_res = do_serialize_object(_ser_ar); _ser_ar.end_object(); return _ser_res; } \
-  template <bool W, template <bool> class Archive> bool do_serialize_object(Archive<W> &_ser_ar){
+  template <bool W, template <bool> class Archive> bool do_serialize(Archive<W> &_ser_ar) {_ser_ar.begin_object(); bool _ser_res = do_serialize_object(_ser_ar); _ser_ar.end_object(); return _ser_res; } \
+  template <bool W, template <bool> class Archive> bool do_serialize_object(Archive<W> &_ser_ar){ uint8_t s_current_version ATTRIBUTE_UNUSED = 0; uint8_t s_version ATTRIBUTE_UNUSED = 0; 
 #define PREPARE_CUSTOM_VECTOR_SERIALIZATION(size, vec) ::serialization::detail::prepare_custom_vector_serialization(size, vec, typename Archive<W>::is_saving())
 
 #define END_SERIALIZE() return true;}

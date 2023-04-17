@@ -4967,7 +4967,7 @@ bool wallet2::check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& o
   return false;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::create_ionic_swap_proposal(const wallet_public::ionic_swap_proposal_info& proposal_details, const currency::account_public_address& destination_addr, ionic_swap_proposal& proposal)
+bool wallet2::create_ionic_swap_proposal(const wallet_public::ionic_swap_proposal_info& proposal_details, const currency::account_public_address& destination_addr, wallet_public::ionic_swap_proposal& proposal)
 {
   std::vector<uint64_t> selected_transfers_for_template;
   
@@ -4979,10 +4979,9 @@ bool wallet2::create_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal_info& proposal_detais, const currency::account_public_address& destination_addr,
-  ionic_swap_proposal& proposal,
+  wallet_public::ionic_swap_proposal& proposal,
   std::vector<uint64_t>& selected_transfers)
 {
-  ionic_swap_proposal& proposal.tx_template;
   construct_tx_param ctp = get_default_construct_tx_param();
   
   ctp.fake_outputs_count = proposal_detais.mixins;
@@ -5020,11 +5019,11 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
   selected_transfers = ftp.selected_transfers;
   currency::finalized_tx finalize_result = AUTO_VAL_INIT(finalize_result);
   finalize_transaction(ftp, finalize_result, false);
-  add_transfers_to_expiration_list(selected_transfers, finalize_result, 0, currency::null_hash);
+  add_transfers_to_expiration_list(selected_transfers, proposal_detais.expiration_time, 0, currency::null_hash);
 
   //wrap it all 
   proposal.tx_template = finalize_result.tx;
-  ionic_swap_proposal_context ispc = AUTO_VAL_INIT(ispc);
+  wallet_public::ionic_swap_proposal_context ispc = AUTO_VAL_INIT(ispc);
   ispc.gen_context = finalize_result.ftp.gen_context;
   ispc.one_time_skey = finalize_result.one_time_key;
   std::string proposal_context_blob = t_serializable_object_to_blob(ispc);
@@ -5035,7 +5034,7 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
 bool wallet2::get_ionic_swap_proposal_info(const std::string&raw_proposal, wallet_public::ionic_swap_proposal_info& proposal_info)
 {
   wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
-  bool r = t_unserializable_object_from_blob(raw_proposal, proposal);
+  bool r = t_unserializable_object_from_blob(proposal, raw_proposal);
   THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, "Failed to parse proposal");
   return get_ionic_swap_proposal_info(proposal, proposal_info);
 }
@@ -5065,6 +5064,8 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
   r = t_unserializable_object_from_blob(ionic_context, decrypted_raw_context);
   THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to unserialize decrypted ionic_context");
 
+  r = validate_tx_output_details_againt_tx_generation_context(tx, ionic_context.gen_context, ionic_context.one_time_skey);
+  THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to validate decrypted ionic_context");
 
   std::unordered_map<crypto::public_key, uint64_t> ammounts_to;
   std::unordered_map<crypto::public_key, uint64_t> ammounts_from;
@@ -5072,21 +5073,27 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
   size_t i = 0;
   for (const auto& o : outs)
   {
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.asset_ids.size() > i, "Tx gen context has mismatch with tx(asset_ids) ");
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.asset_ids[i].to_public_key() == o.asset_id, "Tx gen context has mismatch with tx(asset_id != asset_id) ");
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.amounts[i].m_u64[0] == o.amount, "Tx gen context has mismatch with tx(amount != amount)");
+
     ammounts_to[o.asset_id] += o.amount;
     third_party_outs[i] = false;
     i++;
   }
 
+  //validate outputs against decrypted tx generation context
   for (i = 0; i != tx.vout.size(); i++)
   {
-    if (!third_party_outs[i])
-      continue;
 
-    crypto::hash asset_id = AUTO_VAL_INIT(asset_id);
-    uint64_t amount = 0;
-    //TODO decode output info 
-    //get_amout_and_asset_id()
-    //ammounts_from[asset_id] += amount;
+    if (!third_party_outs[i])
+    {
+      continue;
+    }
+
+    crypto::public_key asset_id = ionic_context.gen_context.asset_ids[i].to_public_key();
+    uint64_t amount = ionic_context.gen_context.amounts[i].m_u64[0];
+    ammounts_from[asset_id] += amount;
   }
 
   for (const auto& a : ammounts_to)
@@ -5120,8 +5127,8 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
 //----------------------------------------------------------------------------------------------------
 bool wallet2::accept_ionic_swap_proposal(const std::string& raw_proposal, currency::transaction& result_tx)
 {
-  const wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
-  bool r = parse_and_validate_tx_from_blob(raw_proposal, proposal);
+  wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
+  bool r = t_unserializable_object_from_blob(proposal, raw_proposal);
   THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, "Failed to parse proposal info");
 
   return accept_ionic_swap_proposal(proposal, result_tx);
@@ -5130,7 +5137,7 @@ bool wallet2::accept_ionic_swap_proposal(const std::string& raw_proposal, curren
 bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposal& proposal, currency::transaction& result_tx)
 {
   mode_separate_context msc = AUTO_VAL_INIT(msc);
-  msc.tx_for_mode_separate = tx_template;
+  msc.tx_for_mode_separate = proposal.tx_template;
 
   wallet_public::ionic_swap_proposal_context ionic_context = AUTO_VAL_INIT(ionic_context);
   bool r = get_ionic_swap_proposal_info(proposal, msc.proposal_info, ionic_context);

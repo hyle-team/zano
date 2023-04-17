@@ -1208,6 +1208,7 @@ namespace wallet_public
       KV_SERIALIZE(fee)
       KV_SERIALIZE(expiration_time)
     END_KV_SERIALIZE_MAP()
+
   };
 
 

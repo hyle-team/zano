@@ -201,7 +201,7 @@ namespace currency
   bool tx_to_blob(const transaction& b, blobdata& b_blob);
   bool read_keyimages_from_tx(const transaction& tx, std::list<crypto::key_image>& kil);
   bool validate_inputs_sorting(const transaction& tx);
-  bool is_asset_emitting_transaction(const transaction& tx, asset_descriptor_operation* p_ado = nullptr);
+  bool is_asset_emitting_transaction(const transaction& tx, asset_descriptor_operation* p_ado = nullptr);  
 
   std::vector<tx_source_entry::output_entry> prepare_outputs_entries_for_key_offsets(const std::vector<tx_source_entry::output_entry>& outputs, size_t old_real_index, size_t& new_real_index) noexcept;
 
@@ -312,5 +312,7 @@ namespace currency
       //ao_amount_blinding_mask
     END_SERIALIZE()
   }; // struct tx_generation_context
+
+  bool validate_tx_output_details_againt_tx_generation_context(const transaction& tx, const tx_generation_context& gen_context, const crypto::secret_key& onet_time_key);
 
 } // namespace currency
