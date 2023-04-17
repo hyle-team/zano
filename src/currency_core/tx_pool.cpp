@@ -516,7 +516,7 @@ namespace currency
       txs.push_back(tx_rpc_extended_info());
       tx_rpc_extended_info& trei = txs.back();
       trei.blob_size = tx_entry.blob_size;
-      fill_tx_rpc_details(trei, tx_entry.tx, nullptr, h, tx_entry.receive_time, true);
+      m_blockchain.fill_tx_rpc_details(trei, tx_entry.tx, nullptr, h, tx_entry.receive_time, true);
       return true;
     });
 
@@ -568,7 +568,7 @@ namespace currency
       txs.push_back(tx_rpc_extended_info());
       tx_rpc_extended_info& trei = txs.back();
       trei.blob_size = ptei->blob_size;
-      fill_tx_rpc_details(trei, ptei->tx, nullptr, id, ptei->receive_time, false);
+      m_blockchain.fill_tx_rpc_details(trei, ptei->tx, nullptr, id, ptei->receive_time, false);
     }
     return true;
   }
@@ -605,7 +605,7 @@ namespace currency
     if (!ptei)
       return false;
 
-    fill_tx_rpc_details(trei, ptei->tx, nullptr, id, ptei->receive_time, false);
+    m_blockchain.fill_tx_rpc_details(trei, ptei->tx, nullptr, id, ptei->receive_time, false);
     return true;
   }  
   //---------------------------------------------------------------------------------

@@ -29,6 +29,9 @@
 #include "currency_format_utils_transactions.h"
 #include "core_runtime_config.h"
 #include "wallet/wallet_public_structs_defs.h"
+#include "bc_attachments_helpers.h"
+#include "bc_payments_id_service.h"
+#include "bc_offers_service_basic.h"
 
 
 // ------ get_tx_type_definition -------------
@@ -417,8 +420,7 @@ namespace currency
   update_alias_rpc_details alias_info_to_rpc_update_alias_info(const currency::extra_alias_entry& ai, const std::string& old_address);
   size_t get_service_attachments_count_in_tx(const transaction& tx);
   bool fill_tx_rpc_outputs(tx_rpc_extended_info& tei, const transaction& tx, const transaction_chain_entry* ptce);
-  bool fill_tx_rpc_inputs(tx_rpc_extended_info& tei, const transaction& tx);
-  bool fill_tx_rpc_details(tx_rpc_extended_info& tei, const transaction& tx, const transaction_chain_entry* ptce, const crypto::hash& h, uint64_t timestamp, bool is_short = false);
+
   bool fill_block_rpc_details(block_rpc_extended_info& pei_rpc, const block_extended_info& bei_chain, const crypto::hash& h);
   void append_per_block_increments_for_tx(const transaction& tx, std::unordered_map<uint64_t, uint32_t>& gindices);
   std::string get_word_from_timstamp(uint64_t timestamp, bool use_password);
@@ -894,5 +896,211 @@ namespace currency
     const difficulties& b_diff
   );
 
+  struct rpc_tx_payload_handler : public boost::static_visitor<bool>
+  {
+    tx_extra_rpc_entry& tv;
+    rpc_tx_payload_handler(tx_extra_rpc_entry& t) : tv(t)
+    {}
+
+    bool operator()(const tx_service_attachment& ee)
+    {
+      tv.type = "service";
+      tv.short_view = ee.service_id + ":" + ee.instruction;
+      if (ee.flags&TX_SERVICE_ATTACHMENT_ENCRYPT_BODY)
+        tv.short_view += "(encrypted)";
+      else
+      {
+        std::string deflated_buff;
+        const std::string* pfinalbuff = &ee.body;
+        if (ee.flags&TX_SERVICE_ATTACHMENT_DEFLATE_BODY)
+        {
+          bool r = epee::zlib_helper::unpack(ee.body, deflated_buff);
+          CHECK_AND_ASSERT_MES(r, false, "Failed to unpack");
+          pfinalbuff = &deflated_buff;
+        }
+        if (ee.service_id == BC_PAYMENT_ID_SERVICE_ID || ee.service_id == BC_OFFERS_SERVICE_ID)
+          tv.datails_view = *pfinalbuff;
+        else
+          tv.datails_view = "BINARY DATA";
+      }
+      return true;
+    }
+    bool operator()(const tx_crypto_checksum& ee)
+    {
+      tv.type = "crypto_checksum";
+      tv.short_view = std::string("derivation_hash: ") + epee::string_tools::pod_to_hex(ee.derivation_hash);
+      tv.datails_view = std::string("derivation_hash: ") + epee::string_tools::pod_to_hex(ee.derivation_hash) + "\n"
+        + "encrypted_key_derivation: " + epee::string_tools::pod_to_hex(ee.encrypted_key_derivation);
+
+      return true;
+    }
+    bool operator()(const etc_tx_time& ee)
+    {
+      tv.type = "pos_time";
+      tv.short_view = std::string("timestamp: ") + std::to_string(ee.v) + " " + epee::misc_utils::get_internet_time_str(ee.v);
+      return true;
+    }
+    bool operator()(const etc_tx_details_unlock_time& ee)
+    {
+      tv.type = "unlock_time";
+      if (ee.v < CURRENCY_MAX_BLOCK_NUMBER)
+        tv.short_view = std::string("height: ") + std::to_string(ee.v);
+      else
+        tv.short_view = std::string("timestamp: ") + std::to_string(ee.v) + " " + epee::misc_utils::get_internet_time_str(ee.v);
+
+      return true;
+    }
+    bool operator()(const etc_tx_details_unlock_time2& ee)
+    {
+      tv.type = "unlock_time";
+      std::stringstream ss;
+      ss << "[";
+      for (auto v : ee.unlock_time_array)
+      {
+        ss << " " << v;
+      }
+      ss << "]";
+      tv.short_view = ss.str();
+
+      return true;
+    }
+    bool operator()(const etc_tx_details_expiration_time& ee)
+    {
+      tv.type = "expiration_time";
+      if (ee.v < CURRENCY_MAX_BLOCK_NUMBER)
+        tv.short_view = std::string("height: ") + std::to_string(ee.v);
+      else
+        tv.short_view = std::string("timestamp: ") + std::to_string(ee.v) + " " + epee::misc_utils::get_internet_time_str(ee.v);
+
+      return true;
+    }
+    bool operator()(const etc_tx_details_flags& ee)
+    {
+      tv.type = "details_flags";
+      tv.short_view = epee::string_tools::pod_to_hex(ee.v);
+      return true;
+    }
+    bool operator()(const crypto::public_key& ee)
+    {
+      tv.type = "pub_key";
+      tv.short_view = epee::string_tools::pod_to_hex(ee);
+      return true;
+    }
+    bool operator()(const extra_attachment_info& ee)
+    {
+      tv.type = "attachment_info";
+      tv.short_view = std::to_string(ee.sz) + " bytes";
+      tv.datails_view = currency::obj_to_json_str(ee);
+      return true;
+    }
+    bool operator()(const extra_alias_entry& ee)
+    {
+      tv.type = "alias_info";
+      tv.short_view = ee.m_alias + "-->" + get_account_address_as_str(ee.m_address);
+      tv.datails_view = currency::obj_to_json_str(ee);
+
+      return true;
+    }
+    bool operator()(const extra_alias_entry_old& ee)
+    {
+      return operator()(static_cast<const extra_alias_entry&>(ee));
+    }
+    bool operator()(const extra_user_data& ee)
+    {
+      tv.type = "user_data";
+      tv.short_view = std::to_string(ee.buff.size()) + " bytes";
+      tv.datails_view = epee::string_tools::buff_to_hex_nodelimer(ee.buff);
+
+      return true;
+    }
+    bool operator()(const extra_padding& ee)
+    {
+      tv.type = "extra_padding";
+      tv.short_view = std::to_string(ee.buff.size()) + " bytes";
+      if (!ee.buff.empty())
+        tv.datails_view = epee::string_tools::buff_to_hex_nodelimer(std::string(reinterpret_cast<const char*>(&ee.buff[0]), ee.buff.size()));
+
+      return true;
+    }
+    bool operator()(const tx_comment& ee)
+    {
+      tv.type = "comment";
+      tv.short_view = std::to_string(ee.comment.size()) + " bytes(encrypted)";
+      tv.datails_view = epee::string_tools::buff_to_hex_nodelimer(ee.comment);
+
+      return true;
+    }
+    bool operator()(const tx_payer& ee)
+    {
+      //const tx_payer& ee = boost::get<tx_payer>(extra);
+      tv.type = "payer";
+      tv.short_view = "(encrypted)";
+
+      return true;
+    }
+    bool operator()(const tx_payer_old&)
+    {
+      tv.type = "payer_old";
+      tv.short_view = "(encrypted)";
+
+      return true;
+    }
+    bool operator()(const tx_receiver& ee)
+    {
+      //const tx_payer& ee = boost::get<tx_payer>(extra);
+      tv.type = "receiver";
+      tv.short_view = "(encrypted)";
+
+      return true;
+    }
+    bool operator()(const tx_receiver_old& ee)
+    {
+      tv.type = "receiver_old";
+      tv.short_view = "(encrypted)";
+
+      return true;
+    }
+    bool operator()(const tx_derivation_hint& ee)
+    {
+      tv.type = "derivation_hint";
+      tv.short_view = std::to_string(ee.msg.size()) + " bytes";
+      tv.datails_view = epee::string_tools::buff_to_hex_nodelimer(ee.msg);
+
+      return true;
+    }
+    bool operator()(const std::string& ee)
+    {
+      tv.type = "string";
+      tv.short_view = std::to_string(ee.size()) + " bytes";
+      tv.datails_view = epee::string_tools::buff_to_hex_nodelimer(ee);
+
+      return true;
+    }
+    bool operator()(const etc_tx_flags16_t& dh)
+    {
+      tv.type = "FLAGS16";
+      tv.short_view = epee::string_tools::pod_to_hex(dh);
+      tv.datails_view = epee::string_tools::pod_to_hex(dh);
+
+      return true;
+    }
+  };
+  //------------------------------------------------------------------
+
+
+  template<class t_container>
+  bool fill_tx_rpc_payload_items(std::vector<tx_extra_rpc_entry>& target_vector, const t_container& tc)
+  {
+    //handle extra
+    for (auto& extra : tc)
+    {
+      target_vector.push_back(tx_extra_rpc_entry());
+      tx_extra_rpc_entry& tv = target_vector.back();
+
+      rpc_tx_payload_handler vstr(tv);
+      boost::apply_visitor(vstr, extra);
+    }
+    return true;
+  }
 
 } // namespace currency
