@@ -499,23 +499,24 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::add_new_block(const block& b, block_verification_context& bvc)
   {
+    uint64_t h = m_blockchain_storage.get_top_block_height();
+    if (h >= m_stop_after_height)
+    {
+      LOG_PRINT_YELLOW("Blockchain top block height is " << h << ", the daemon will now stop as requested", LOG_LEVEL_0);
+      if (m_critical_error_handler)
+        return m_critical_error_handler->on_immediate_stop_requested();
+      return false;
+    }
+
     bool r = m_blockchain_storage.add_new_block(b, bvc);
     if (r && bvc.m_added_to_main_chain)
     {
-      uint64_t h = get_block_height(b);
+      h = get_block_height(b);
       auto& crc = m_blockchain_storage.get_core_runtime_config();
       if (h == crc.hard_fork_01_starts_after_height + 1)
       { LOG_PRINT_GREEN("Hardfork 1 activated at height " << h, LOG_LEVEL_0); }
       else if (h == crc.hard_fork_02_starts_after_height + 1)
       { LOG_PRINT_GREEN("Hardfork 2 activated at height " << h, LOG_LEVEL_0); }
-
-      if (h == m_stop_after_height)
-      {
-        LOG_PRINT_YELLOW("Reached block " << h << ", the daemon will now stop as requested", LOG_LEVEL_0);
-        if (m_critical_error_handler)
-          return m_critical_error_handler->on_immediate_stop_requested();
-        return false;
-      }
     }
     return r;
   }
