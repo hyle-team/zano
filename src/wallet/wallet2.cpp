@@ -5535,7 +5535,7 @@ assets_selection_context wallet2::get_needed_money(uint64_t fee, const std::vect
   amounts_map[currency::native_coin_asset_id].needed_amount = fee;
   for(auto& dt : dsts)
   {
-    if(dt.asset_id == currency::ffff_pkey)
+    if(dt.asset_id == currency::null_pkey)
       continue;     //this destination for emmition only
 
     THROW_IF_TRUE_WALLET_EX(0 == dt.amount, error::zero_destination);
@@ -6181,7 +6181,7 @@ void wallet2::prepare_tx_destinations(const assets_selection_context& needed_mon
   {
     // special case for asset minting destinations
     for (auto& dst : dsts)
-      if (dst.asset_id == currency::ffff_pkey)
+      if (dst.asset_id == currency::null_pkey)
         final_destinations.emplace_back(dst.amount, dst.addr, dst.asset_id);
 
     // if there's not ehough destinations items (i.e. outputs), split the last one

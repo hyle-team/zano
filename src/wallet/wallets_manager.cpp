@@ -876,17 +876,17 @@ std::string wallets_manager::get_fav_offers(const std::list<bc_services::offer_i
 #endif
 }
 
-std::string wallets_manager::create_ionic_swap_proposal(uint64_t wallet_id, const tools::wallet_public::create_ionic_swap_proposal_request& proposal, std::string& result_proposal_hex)
+std::string wallets_manager::create_ionic_swap_proposal(uint64_t wallet_id, const tools::wallet_public::create_ionic_swap_proposal_request& proposal_req, std::string& result_proposal_hex)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
   try {
     currency::account_public_address dest_account = AUTO_VAL_INIT(dest_account);
-    if (!currency::get_account_address_from_str(dest_account, proposal.destination_add))
+    if (!currency::get_account_address_from_str(dest_account, proposal_req.destination_add))
     {
       return API_RETURN_CODE_BAD_ARG;
     }
-    tools::wallet_public ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
-    bool r = wo.w->get()->create_ionic_swap_proposal(proposal.proposal, dest_account, proposal);
+    tools::wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
+    bool r = wo.w->get()->create_ionic_swap_proposal(proposal_req.proposal_info, dest_account, proposal);
     if (!r)
     {
       return API_RETURN_CODE_FAIL;

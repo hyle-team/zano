@@ -1819,7 +1819,7 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
   tx_destination_entry td = AUTO_VAL_INIT(td);
   td.addr.push_back(m_wallet->get_account().get_public_address());
   td.amount = adb.current_supply;
-  td.asset_id = currency::ffff_pkey;
+  td.asset_id = currency::null_pkey;
   std::vector<currency::tx_destination_entry> destinations;
   destinations.push_back(td);
   currency::transaction result_tx = AUTO_VAL_INIT(result_tx);

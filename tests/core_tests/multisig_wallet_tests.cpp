@@ -66,8 +66,9 @@ void transfer_multisig(tools::wallet2& w,
     
     
     ftp.tx_version = tx_version;
-
-    w.prepare_transaction(ctp, ftp, tx);
+    tools::mode_separate_context emode_separate = AUTO_VAL_INIT(emode_separate);
+    emode_separate.tx_for_mode_separate = tx;
+    w.prepare_transaction(ctp, ftp, emode_separate);
     crypto::secret_key sk = AUTO_VAL_INIT(sk);
     w.finalize_transaction(ftp, tx, sk, false);
 

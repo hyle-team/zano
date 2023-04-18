@@ -2241,7 +2241,7 @@ namespace currency
         uint64_t amount_of_emitted_asset = 0;
         for (auto& item : shuffled_dsts)
         {
-          if (item.asset_id == currency::ffff_pkey)
+          if (item.asset_id == currency::null_pkey)
           {
             item.asset_id = gen_context.ao_asset_id; // set calculated asset_id to the asset's outputs, if this asset is being emitted within this tx
             amount_of_emitted_asset += item.amount;

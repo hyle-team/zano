@@ -81,7 +81,7 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, MK_TEST_COINS(12)), false, "");
 
   // wallet RPC server
-  tools::wallet_rpc_server miner_wlt_rpc(*miner_wlt);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
 
@@ -161,7 +161,7 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
   bob_wlt->callback(std::make_shared<tools::i_wallet2_callback>()); // clear callback
 
   // Before HF2: Bob (auditable address) -> Alice with payer info requested (should NOT put tx_payer or tx_payer_old)
-  tools::wallet_rpc_server bob_wlt_rpc(*bob_wlt);
+  tools::wallet_rpc_server bob_wlt_rpc(bob_wlt);
   tools::wallet_public::COMMAND_RPC_TRANSFER::request req_c = AUTO_VAL_INIT(req_c);
   req_c.destinations.push_back(tools::wallet_public::transfer_destination{ MK_TEST_COINS(1), m_accounts[ALICE_ACC_IDX].get_public_address_str() });
   req_c.fee = TESTS_DEFAULT_FEE;
@@ -328,7 +328,7 @@ bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, c
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, 0), false, "");
 
   // wallet RPC server
-  tools::wallet_rpc_server alice_wlt_rpc(*alice_wlt);
+  tools::wallet_rpc_server alice_wlt_rpc(alice_wlt);
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
 

@@ -948,15 +948,15 @@ namespace tools
       return false;
     }
 
-    currency::transaction tx_template = AUTO_VAL_INIT(tx_template);
-    bool r = get_wallet()->create_ionic_swap_proposal(req.proposal, destination_addr, tx_template);
+    wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
+    bool r = get_wallet()->create_ionic_swap_proposal(req.proposal, destination_addr, proposal);
     if (!r)
     {
       er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
       er.message = "WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT - Error creating proposal";
       return false;
     }
-    res.hex_raw_proposal = epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(tx_template));
+    res.hex_raw_proposal = epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(proposal));
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------

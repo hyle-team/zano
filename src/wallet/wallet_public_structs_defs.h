@@ -1192,6 +1192,7 @@ namespace wallet_public
     END_KV_SERIALIZE_MAP()
   };
 
+
   struct ionic_swap_proposal_info
   {
     std::vector<asset_funds> from;
@@ -1242,12 +1243,12 @@ namespace wallet_public
   struct create_ionic_swap_proposal_request
   {
     uint64_t wallet_id;
-    ionic_swap_proposal_info proposal;
+    ionic_swap_proposal_info proposal_info;
     std::string destination_add;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
-      KV_SERIALIZE(proposal)
+      KV_SERIALIZE(proposal_info)
       KV_SERIALIZE(destination_add)
     END_KV_SERIALIZE_MAP()
   };
@@ -1515,6 +1516,10 @@ namespace wallet_public
     }
   }
 
+  bool operator==(const asset_funds& lhs, const asset_funds& rhs)
+  {
+    return lhs.amount == rhs.amount && lhs.asset_id == rhs.asset_id;
+  }
 
 } // namespace wallet_rpc
 } // namespace tools
