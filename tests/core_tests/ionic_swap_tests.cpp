@@ -55,7 +55,7 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
   //std::shared_ptr<tools::wallet2> bob_wlt   = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
 
   // check passing over the hardfork
-  CHECK_AND_ASSERT_MES(!c.get_blockchain_storage().is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM), false, "ZANO_HARDFORK_04_ZARCANUM is active");
+  CHECK_AND_ASSERT_MES(c.get_blockchain_storage().is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM), false, "ZANO_HARDFORK_04_ZARCANUM is active");
 
 
   currency::account_base alice_acc;
@@ -87,6 +87,9 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
   miner_wlt->publish_new_asset(adb, destinations, tx, asset_id);
   LOG_PRINT_L0("Published new asset: " << asset_id << ", tx_id: " << currency::get_transaction_hash(tx));
 
+  currency::transaction res_tx = AUTO_VAL_INIT(res_tx);
+  miner_wlt->transfer(COIN, alice_wlt->get_account().get_public_address(), res_tx);
+
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
@@ -103,7 +106,7 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
 
   CHECK_AND_ASSERT_MES(it_asset != balances.end() && it_native != balances.end(), false, "Failed to find needed asset in result balances");
   CHECK_AND_ASSERT_MES(it_asset->second.total == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC, false, "Failed to find needed asset in result balances");
-  CHECK_AND_ASSERT_MES(it_native->second.total == uint64_t(17517226)*COIN, false, "Failed to find needed asset in result balances");
+  CHECK_AND_ASSERT_MES(it_native->second.total == uint64_t(17517226)*COIN - COIN, false, "Failed to find needed asset in result balances");
 
   uint64_t mined_balance = it_native->second.total;
 
@@ -113,8 +116,8 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
   it_asset = balances.find(asset_id);
   it_native = balances.find(currency::native_coin_asset_id);
 
-  CHECK_AND_ASSERT_MES(it_asset != balances.end(), false, "Failed to find needed asset in result balances");
-  CHECK_AND_ASSERT_MES(it_native == balances.end(), false, "Failed to find needed asset in result balances");
+  CHECK_AND_ASSERT_MES(it_asset != balances.end() && it_native != balances.end(), false, "Failed to find needed asset in result balances");
+  CHECK_AND_ASSERT_MES(it_native->second.total == COIN, false, "Failed to find needed asset in result balances");
   CHECK_AND_ASSERT_MES(it_asset->second.total == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC, false, "Failed to find needed asset in result balances");
 
   const uint64_t assets_to_exchange = 10 * COIN;
@@ -126,7 +129,7 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
   proposal_details.fee = TESTS_DEFAULT_FEE;
   proposal_details.mixins = 10;
   proposal_details.from.push_back(view::asset_funds{ asset_id , assets_to_exchange });
-  proposal_details.to.push_back(view::asset_funds{ currency::null_pkey , native_tokens_to_exchange });
+  proposal_details.to.push_back(view::asset_funds{ currency::native_coin_asset_id , native_tokens_to_exchange });
 
   tools::wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
   alice_wlt->create_ionic_swap_proposal(proposal_details, miner_wlt->get_account().get_public_address(), proposal);
@@ -140,8 +143,8 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
     CHECK_AND_ASSERT_MES(false, false, "proposal actual and proposals decoded mismatch");
   }
 
-  currency::transaction res_tx = AUTO_VAL_INIT(res_tx);
-  r = miner_wlt->accept_ionic_swap_proposal(proposal, res_tx);
+  currency::transaction res_tx2 = AUTO_VAL_INIT(res_tx2);
+  r = miner_wlt->accept_ionic_swap_proposal(proposal, res_tx2);
   CHECK_AND_ASSERT_MES(r, false, "Failed to accept ionic proposal");
 
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);

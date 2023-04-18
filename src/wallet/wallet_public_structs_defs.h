@@ -1516,7 +1516,7 @@ namespace wallet_public
     }
   }
 
-  bool operator==(const asset_funds& lhs, const asset_funds& rhs)
+  inline bool operator==(const asset_funds& lhs, const asset_funds& rhs)
   {
     return lhs.amount == rhs.amount && lhs.asset_id == rhs.asset_id;
   }

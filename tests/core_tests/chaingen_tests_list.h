@@ -42,3 +42,4 @@
 #include "isolate_auditable_and_proof.h"
 #include "zarcanum_test.h"
 #include "multiassets_test.h"
+#include "ionic_swap_tests.h"

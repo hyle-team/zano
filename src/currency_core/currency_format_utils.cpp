@@ -2383,7 +2383,8 @@ namespace currency
     //
     // proofs (transaction-wise, not pre-input)
     //
-    if (tx.version > TRANSACTION_VERSION_PRE_HF4)
+    if (tx.version > TRANSACTION_VERSION_PRE_HF4 &&
+      (append_mode || (flags & TX_FLAG_SIGNATURE_MODE_SEPARATE) == 0))
     {
       // asset surjection proof
       currency::zc_asset_surjection_proof asp{};

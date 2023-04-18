@@ -5175,27 +5175,29 @@ bool blockchain_storage::fill_tx_rpc_details(tx_rpc_extended_info& tei, const tr
 //------------------------------------------------------------------
 bool blockchain_storage::fill_tx_rpc_inputs(tx_rpc_extended_info& tei, const transaction& tx) const
 {
+
   //handle inputs
   for (auto in : tx.vin)
   {
     tei.ins.push_back(tx_in_rpc_entry());
+    tx_in_rpc_entry& entry_to_fill = tei.ins.back();
     if (in.type() == typeid(txin_gen))
     {
-      tei.ins.back().amount = 0;
+      entry_to_fill.amount = 0;
     }
-    else if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc))
+    else if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc) || in.type() == typeid(txin_zc_input))
     {
       //TODO: add htlc info
-      const txin_to_key& tk = get_to_key_input_from_txin_v(in);
-      tei.ins.back().amount = tk.amount;
-      tei.ins.back().kimage_or_ms_id = epee::string_tools::pod_to_hex(tk.k_image);
-      std::vector<txout_ref_v> absolute_offsets = relative_output_offsets_to_absolute(tk.key_offsets);
+      entry_to_fill.amount = get_amount_from_variant(in);
+      entry_to_fill.kimage_or_ms_id = epee::string_tools::pod_to_hex(get_key_image_from_txin_v(in));
+      const std::vector<txout_ref_v>& key_offsets = get_key_offsets_from_txin_v(in);
+      std::vector<txout_ref_v> absolute_offsets = relative_output_offsets_to_absolute(key_offsets);
       for (auto& ao : absolute_offsets)
       {
-        tei.ins.back().global_indexes.push_back(0);
+        entry_to_fill.global_indexes.push_back(0);
         if (ao.type() == typeid(uint64_t))
         {
-          tei.ins.back().global_indexes.back() = boost::get<uint64_t>(ao);
+          entry_to_fill.global_indexes.back() = boost::get<uint64_t>(ao);
         }
         else if (ao.type() == typeid(ref_by_id))
         {
@@ -5211,17 +5213,21 @@ bool blockchain_storage::fill_tx_rpc_inputs(tx_rpc_extended_info& tei, const tra
       }
       if (in.type() == typeid(txin_htlc))
       {
-        tei.ins.back().htlc_origin = epee::string_tools::buff_to_hex_nodelimer(boost::get<txin_htlc>(in).hltc_origin);
+        entry_to_fill.htlc_origin = epee::string_tools::buff_to_hex_nodelimer(boost::get<txin_htlc>(in).hltc_origin);
       }
       //tk.etc_details -> visualize it may be later
     }
     else if (in.type() == typeid(txin_multisig))
     {
       txin_multisig& tms = boost::get<txin_multisig>(in);
-      tei.ins.back().amount = tms.amount;
-      tei.ins.back().kimage_or_ms_id = epee::string_tools::pod_to_hex(tms.multisig_out_id);
-      if (tx.signatures.size() >= tei.ins.size())
-        tei.ins.back().multisig_count = tx.signatures[tei.ins.size() - 1].size();
+      entry_to_fill.amount = tms.amount;
+      entry_to_fill.kimage_or_ms_id = epee::string_tools::pod_to_hex(tms.multisig_out_id);
+      if (tx.signatures.size() >= tei.ins.size() &&
+        tx.signatures[tei.ins.size() - 1].type() == typeid(NLSAG_sig))
+      {
+        entry_to_fill.multisig_count = boost::get<NLSAG_sig>(tx.signatures[tei.ins.size() - 1]).s.size();
+      }
+
     }
   }
   return true;
