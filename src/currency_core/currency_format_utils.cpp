@@ -406,7 +406,7 @@ namespace currency
       tx_destination_entry de = AUTO_VAL_INIT(de);
       de.addr.push_back(miner_address);
       de.amount = a;
-      de.explicit_native_asset_id = true; // don't use asset id blinding as it's obvious which asset it is
+      de.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // don't use asset id blinding as it's obvious which asset it is
       if (pe.stake_unlock_time && pe.stake_unlock_time > height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
       {
         //this means that block is creating after hardfork_1 and unlock_time is needed to set for every destination separately
@@ -421,7 +421,7 @@ namespace currency
       if (pe.stake_unlock_time && pe.stake_unlock_time > height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
         stake_lock_time = pe.stake_unlock_time;
       destinations.push_back(tx_destination_entry(pe.amount, stakeholder_address, stake_lock_time));
-      destinations.back().explicit_native_asset_id = true; // don't use asset id blinding as it's obvious which asset it is
+      destinations.back().flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // don't use asset id blinding as it's obvious which asset it is
     }
 
     CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS || height == 0, false, "Too many outs (" << destinations.size() << ")! Miner tx can't be constructed.");
@@ -1143,8 +1143,8 @@ namespace currency
         blinded_asset_id = crypto::point_t(de.asset_id) + asset_blinding_mask * crypto::c_point_X;
         out.blinded_asset_id = (crypto::c_scalar_1div8 * blinded_asset_id).to_public_key(); // T = 1/8 * (H_asset + s * X)
         
-        CHECK_AND_ASSERT_MES(!de.explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
-        asset_blinding_mask = de.explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
+        CHECK_AND_ASSERT_MES(!de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
+        asset_blinding_mask = de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
         amount_commitment = de.amount * blinded_asset_id + amount_blinding_mask * crypto::c_point_G;
         out.amount_commitment = (crypto::c_scalar_1div8 * amount_commitment).to_public_key(); // E = 1/8 * e * T + 1/8 * y * G
 
@@ -1163,8 +1163,8 @@ namespace currency
         crypto::scalar_t amount_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
         out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
       
-        CHECK_AND_ASSERT_MES(!de.explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
-        asset_blinding_mask = de.explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
+        CHECK_AND_ASSERT_MES(!de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
+        asset_blinding_mask = de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
         blinded_asset_id = crypto::point_t(de.asset_id) + asset_blinding_mask * crypto::c_point_X;
         out.blinded_asset_id = (crypto::c_scalar_1div8 * blinded_asset_id).to_public_key(); // T = 1/8 * (H_asset + s * X)
 
@@ -2271,7 +2271,7 @@ namespace currency
     {
       tx_destination_entry& dst_entr = shuffled_dsts[j];
       if (all_inputs_are_obviously_native_coins && gen_context.ao_asset_id == currency::null_pkey)
-        dst_entr.explicit_native_asset_id = true; // all inputs are obviously native coins -- all outputs must have explicit asset ids (unless there's an asset emission)
+        dst_entr.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // all inputs are obviously native coins -- all outputs must have explicit asset ids (unless there's an asset emission)
 
       CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount); // <<--  TODO @#@# consider removing this check
       r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys,
@@ -2317,8 +2317,16 @@ namespace currency
       std::sort(tx.vin.begin() + input_starter_index, tx.vin.end(), less_txin_v);
 
       // add explicit fee info
-      r = add_tx_fee_amount_to_extra(tx, native_coins_input_sum - native_coins_output_sum);
-      CHECK_AND_ASSERT_MES(r, false, "add_tx_fee_amount_to_extra failed");
+      uint64_t fee_to_declare = native_coins_input_sum - native_coins_output_sum;
+      if (flags & TX_FLAG_SIGNATURE_MODE_SEPARATE)
+      {
+        fee_to_declare = ftp.mode_separate_fee;
+      }
+      if (fee_to_declare)
+      {
+        r = add_tx_fee_amount_to_extra(tx, fee_to_declare);
+        CHECK_AND_ASSERT_MES(r, false, "add_tx_fee_amount_to_extra failed");
+      }
     }
 
     // attachments container should be sealed by now
@@ -2357,10 +2365,9 @@ namespace currency
     for (size_t i_ = 0; i_ != sources.size(); i_++)
     {
       size_t i_mapped = inputs_mapping[i_];
-
       const tx_source_entry& source_entry = sources[i_mapped];
       crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, i_ + input_starter_index, tx_prefix_hash);
-      CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "prepare_prefix_hash_for_sign failed");
+      CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "prepare_prefix_hash_for_sign failed");      
       std::stringstream ss_ring_s;
 
       if (source_entry.is_zc())
@@ -2369,6 +2376,7 @@ namespace currency
         // blinding_masks_sum is supposed to be sum(mask of all tx output) - sum(masks of all pseudo out commitments) 
         r = generate_ZC_sig(tx_hash_for_signature, i_ + input_starter_index, source_entry, in_contexts[i_mapped], sender_account_keys, flags, gen_context, tx, i_ + 1 == sources.size());
         CHECK_AND_ASSERT_MES(r, false, "generate_ZC_sigs failed");
+        gen_context.input_amounts[i_ + input_starter_index] = source_entry.amount;
       }
       else
       {

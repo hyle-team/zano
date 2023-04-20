@@ -142,6 +142,7 @@ namespace currency
 
   struct finalize_tx_param
   {
+
     uint64_t unlock_time;
     std::vector<currency::extra_v> extra;
     std::vector<currency::attachment_v> attachments;
@@ -156,6 +157,7 @@ namespace currency
     uint64_t expiration_time;
     crypto::public_key spend_pub_key;  // only for validations
     uint64_t tx_version;
+    uint64_t mode_separate_fee = 0;
 
     tx_generation_context gen_context{}; // solely for consolidated txs
 
@@ -174,6 +176,7 @@ namespace currency
       FIELD(expiration_time)
       FIELD(spend_pub_key)
       FIELD(tx_version)
+      FIELD(mode_separate_fee)
       if (flags & TX_FLAG_SIGNATURE_MODE_SEPARATE)
         FIELD(gen_context);
     END_SERIALIZE()

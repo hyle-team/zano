@@ -94,6 +94,13 @@ namespace currency
   };
 
 
+  enum tx_destination_entry_flags
+  {
+    tdef_none = 0,
+    tdef_explicit_native_asset_id =     0x0001,
+    tdef_explicit_amount_to_provide =   0x0002
+  };
+
   struct tx_destination_entry
   {
     uint64_t amount = 0;                                // money
@@ -103,7 +110,7 @@ namespace currency
     uint64_t unlock_time = 0;
     destination_option_htlc_out htlc_options;           // htlc options    
     crypto::public_key asset_id = currency::native_coin_asset_id; // not blinded, not premultiplied
-    bool explicit_native_asset_id = false;
+    uint64_t flags = 0;                                 // set of flags (see tx_destination_entry_flags)
     
     tx_destination_entry() = default;
     tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad) {}
@@ -123,7 +130,7 @@ namespace currency
       FIELD(unlock_time)
       FIELD(htlc_options)
       FIELD(asset_id)
-      FIELD(explicit_native_asset_id)
+      FIELD(flags)
     END_SERIALIZE()
   };
   //---------------------------------------------------------------
@@ -218,6 +225,7 @@ namespace currency
       asset_id_blinding_masks.resize(outs_count);
       amounts.resize(outs_count);
       amount_blinding_masks.resize(outs_count);
+      input_amounts.resize(zc_ins_count);
     }
 
     // TODO @#@# reconsider this check -- sowle
@@ -245,6 +253,7 @@ namespace currency
     std::vector<crypto::point_t> pseudo_outs_blinded_asset_ids;                       // generate_asset_surjection_proof
     crypto::scalar_vec_t pseudo_outs_plus_real_out_blinding_masks; // r_pi + r'_j     // generate_asset_surjection_proof
     std::vector<crypto::point_t> real_zc_ins_asset_ids;            // H_i             // generate_asset_surjection_proof
+    std::vector<uint64_t> input_amounts;  // all inputs, including non ZC
 
     // common data: inputs
     crypto::point_t  pseudo_out_amount_commitments_sum      = crypto::c_point_0;      //                                                   generate_tx_balance_proof  generate_ZC_sig
@@ -273,6 +282,7 @@ namespace currency
       KV_SERIALIZE_CONTAINER_POD_AS_BLOB(pseudo_outs_blinded_asset_ids)
       KV_SERIALIZE_CONTAINER_POD_AS_BLOB(pseudo_outs_plus_real_out_blinding_masks)
       KV_SERIALIZE_CONTAINER_POD_AS_BLOB(real_zc_ins_asset_ids)
+      KV_SERIALIZE(input_amounts)
       KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_commitments_sum)
       KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_blinding_masks_sum)
       KV_SERIALIZE_POD_AS_HEX_STRING(real_in_asset_id_blinding_mask_x_amount_sum)
@@ -298,6 +308,7 @@ namespace currency
       FIELD(pseudo_outs_blinded_asset_ids)
       FIELD((std::vector<crypto::scalar_t>&)(pseudo_outs_plus_real_out_blinding_masks))
       FIELD(real_zc_ins_asset_ids)
+      FIELD(input_amounts)
       FIELD(pseudo_out_amount_commitments_sum)
       FIELD(pseudo_out_amount_blinding_masks_sum)
       FIELD(real_in_asset_id_blinding_mask_x_amount_sum)

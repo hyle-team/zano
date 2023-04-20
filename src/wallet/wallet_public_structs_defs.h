@@ -1195,18 +1195,18 @@ namespace wallet_public
 
   struct ionic_swap_proposal_info
   {
-    std::vector<asset_funds> from;
-    std::vector<asset_funds> to;
+    std::vector<asset_funds> to_bob;     //assets that funded by side that making proposal(Alice) and addressed to receiver of proposal (Bob)
+    std::vector<asset_funds> to_alice;   //assets expected to be funded by the side that receiving proposal (Bob) and addressed to Alice
     uint64_t mixins;
-    uint64_t fee;
+    uint64_t fee_paid_by_a;
     uint64_t expiration_time;
 
     BEGIN_KV_SERIALIZE_MAP()
 
-      KV_SERIALIZE(from)
-      KV_SERIALIZE(to)
+      KV_SERIALIZE(to_bob)
+      KV_SERIALIZE(to_alice)
       KV_SERIALIZE(mixins)
-      KV_SERIALIZE(fee)
+      KV_SERIALIZE(fee_paid_by_a)
       KV_SERIALIZE(expiration_time)
     END_KV_SERIALIZE_MAP()
 

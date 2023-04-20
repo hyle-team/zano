@@ -5011,34 +5011,38 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
   construct_tx_param ctp = get_default_construct_tx_param();
   
   ctp.fake_outputs_count = proposal_detais.mixins;
-  ctp.fee = 0;
+  ctp.fee = proposal_detais.fee_paid_by_a;
   ctp.flags = TX_FLAG_SIGNATURE_MODE_SEPARATE;
   ctp.mark_tx_as_complete = false;
+  ctp.crypt_address = destination_addr;
   
   etc_tx_details_expiration_time t = AUTO_VAL_INIT(t);
   t.v = proposal_detais.expiration_time;
   ctp.extra.push_back(t);
 
-  ctp.dsts.resize(proposal_detais.from.size() + proposal_detais.to.size());
+  ctp.dsts.resize(proposal_detais.to_bob.size() + proposal_detais.to_alice.size());
   size_t i = 0;
   // Here is an proposed for exchange funds
-  for (; i != proposal_detais.from.size(); i++)
+  for (; i != proposal_detais.to_bob.size(); i++)
   {
-    ctp.dsts[i].amount = proposal_detais.from[i].amount;
-    ctp.dsts[i].amount_to_provide = proposal_detais.from[i].amount;
+    ctp.dsts[i].amount = proposal_detais.to_bob[i].amount;
+    ctp.dsts[i].amount_to_provide = proposal_detais.to_bob[i].amount;
+    ctp.dsts[i].flags |= tx_destination_entry_flags::tdef_explicit_amount_to_provide;
     ctp.dsts[i].addr.push_back(destination_addr);
-    ctp.dsts[i].asset_id = proposal_detais.from[i].asset_id;
+    ctp.dsts[i].asset_id = proposal_detais.to_bob[i].asset_id;
   }
   // Here is an expected in return funds
-  for (size_t j = 0; j != proposal_detais.to.size(); j++, i++)
+  for (size_t j = 0; j != proposal_detais.to_alice.size(); j++, i++)
   {
-    ctp.dsts[i].amount = proposal_detais.to[j].amount;
+    ctp.dsts[i].amount = proposal_detais.to_alice[j].amount;
     ctp.dsts[i].amount_to_provide = 0;
+    ctp.dsts[i].flags |= tx_destination_entry_flags::tdef_explicit_amount_to_provide;
     ctp.dsts[i].addr.push_back(m_account.get_public_address());
-    ctp.dsts[i].asset_id = proposal_detais.to[j].asset_id;
+    ctp.dsts[i].asset_id = proposal_detais.to_alice[j].asset_id;
   }
 
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  ftp.mode_separate_fee = ctp.fee;
   ftp.tx_version = this->get_current_tx_version();
   prepare_transaction(ctp, ftp);
 
@@ -5053,7 +5057,7 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
   ispc.gen_context = finalize_result.ftp.gen_context;
   ispc.one_time_skey = finalize_result.one_time_key;
   std::string proposal_context_blob = t_serializable_object_to_blob(ispc);
-  proposal.encrypted_context = crypto::chacha_crypt(proposal_context_blob, finalize_result.derivation); 
+  proposal.encrypted_context = crypto::chacha_crypt(static_cast<const std::string&>(proposal_context_blob), finalize_result.derivation); 
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -5093,53 +5097,115 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
   r = validate_tx_output_details_againt_tx_generation_context(tx, ionic_context.gen_context, ionic_context.one_time_skey);
   THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to validate decrypted ionic_context");
 
-  std::unordered_map<crypto::public_key, uint64_t> ammounts_to;
-  std::unordered_map<crypto::public_key, uint64_t> ammounts_from;
-  std::vector<bool> third_party_outs;
-  size_t i = 0;
+  std::unordered_map<crypto::public_key, uint64_t> amounts_provided_by_a;
+
+  std::unordered_map<crypto::public_key, uint64_t> ammounts_to_a; //amounts to Alice (the one who created proposal), should be NOT funded
+  std::unordered_map<crypto::public_key, uint64_t> ammounts_to_b; //amounts to Bob (the one who received proposal), should BE funded
+  std::vector<bool> bob_outs;
+  bob_outs.resize(proposal.tx_template.vout.size());
+ 
   for (const auto& o : outs)
   {
-    THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.asset_ids.size() > i, "Tx gen context has mismatch with tx(asset_ids) ");
-    THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.asset_ids[i].to_public_key() == o.asset_id, "Tx gen context has mismatch with tx(asset_id != asset_id) ");
-    THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.amounts[i].m_u64[0] == o.amount, "Tx gen context has mismatch with tx(amount != amount)");
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.asset_ids.size() > o.index, "Tx gen context has mismatch with tx(asset_ids) ");
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.asset_ids[o.index].to_public_key() == o.asset_id, "Tx gen context has mismatch with tx(asset_id != asset_id) ");
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.amounts[o.index].m_u64[0] == o.amount, "Tx gen context has mismatch with tx(amount != amount)");
 
-    ammounts_to[o.asset_id] += o.amount;
-    third_party_outs[i] = false;
-    i++;
+    ammounts_to_b[o.asset_id] += o.amount;
+    bob_outs[o.index] = true;
   }
-
+  size_t i = 0;
   //validate outputs against decrypted tx generation context
   for (i = 0; i != tx.vout.size(); i++)
   {
 
-    if (!third_party_outs[i])
+    if (bob_outs[i])
     {
       continue;
     }
 
     crypto::public_key asset_id = ionic_context.gen_context.asset_ids[i].to_public_key();
     uint64_t amount = ionic_context.gen_context.amounts[i].m_u64[0];
-    ammounts_from[asset_id] += amount;
+    ammounts_to_a[asset_id] += amount;
   }
 
-  for (const auto& a : ammounts_to)
-    proposal_info.to.push_back(view::asset_funds{ a.first, a.second });
-
-  for (const auto& a : ammounts_from)
-    proposal_info.from.push_back(view::asset_funds{ a.first, a.second });
-
-  for (const auto&in : tx.vin)
+  //read amounts already provided by third party
+  size_t zc_current_index = 0; //some inputs might be old ones, so it's asset id assumed as native and there is no entry for it in real_zc_ins_asset_ids
+  //THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.input_amounts.size() == tx.vin.size(), "Tx gen context has mismatch with tx(amount != amount)");
+  for (i = 0; i != tx.vin.size(); i++)
   {
-    if (in.type() != typeid(currency::txin_zc_input))
+    size_t mx = 0;
+    uint64_t amount = 0;
+    crypto::public_key in_asset_id = currency::native_coin_asset_id;
+    if (tx.vin[i].type() == typeid(txin_zc_input))
+    {
+      in_asset_id = ionic_context.gen_context.real_zc_ins_asset_ids[zc_current_index].to_public_key();
+      amount = ionic_context.gen_context.input_amounts[zc_current_index];
+      zc_current_index++;
+      mx = boost::get<currency::txin_zc_input>(tx.vin[i]).key_offsets.size() - 1;
+    }
+    else if (tx.vin[i].type() == typeid(txin_to_key))
+    {
+      amount = boost::get<txin_to_key>(tx.vin[i]).amount;
+      mx = boost::get<currency::txin_to_key>(tx.vin[i]).key_offsets.size() - 1;
+    }
+    else
+    {
+      WLT_LOG_RED("Unexpected type of input in ionic_swap tx: " << tx.vin[i].type().name(), LOG_LEVEL_0);
       return false;
-    size_t mx = boost::get<currency::txin_zc_input>(in).key_offsets.size() - 1;
+    }
+    amounts_provided_by_a[in_asset_id] += amount;
+    
     if (proposal_info.mixins == 0 || proposal_info.mixins > mx)
     {
       proposal_info.mixins = mx;
     }
+
   }
 
-  proposal_info.fee = currency::get_tx_fee(tx);
+  //this might be 0, if Alice don't want to pay fee herself
+  proposal_info.fee_paid_by_a = currency::get_tx_fee(tx);
+  if (proposal_info.fee_paid_by_a)
+  {
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(amounts_provided_by_a[currency::native_coin_asset_id] >= proposal_info.fee_paid_by_a, "Fee mentioned as specified but not provided by A");
+    amounts_provided_by_a[currency::native_coin_asset_id] -= proposal_info.fee_paid_by_a;
+  }
+
+  //proposal_info.fee = currency::get_tx_fee(tx);
+  //need to make sure that funds for Bob properly funded
+  for (const auto& a : ammounts_to_b)
+  {
+    uint64_t amount_sent_back_to_alice = ammounts_to_a[a.first];
+
+    if (amounts_provided_by_a[a.first] < (a.second + amount_sent_back_to_alice) )
+    {
+      WLT_LOG_RED("Amount[" << a.first << "] provided by Alice(" << amounts_provided_by_a[a.first] << ") is less then transfered to Bob(" << a.second <<")", LOG_LEVEL_0);
+      return false;
+    }
+    amounts_provided_by_a[a.first] -= (amount_sent_back_to_alice + a.second);
+    proposal_info.to_bob.push_back(view::asset_funds{ a.first, a.second });
+    //clean accounted assets
+    ammounts_to_a.erase(ammounts_to_a.find(a.first));
+    if (amounts_provided_by_a[a.first] > 0)
+    {
+      WLT_LOG_RED("Amount[" << a.first << "] provided by Alice has unused leftovers: " << amounts_provided_by_a[a.first], LOG_LEVEL_0);
+      return false;
+    }
+  }
+
+  //need to see what Alice actually expect in return
+  for (const auto& a : ammounts_to_a)
+  {
+    //now amount provided by A should be less or equal to what we have in a.second 
+    if (amounts_provided_by_a[a.first] > a.second)
+    {
+      //could be fee
+      WLT_LOG_RED("Amount[" << a.first << "] provided by Alice has unused leftovers: " << amounts_provided_by_a[a.first], LOG_LEVEL_0);
+      return false;
+    }
+
+    proposal_info.to_alice.push_back(view::asset_funds{ a.first, a.second - amounts_provided_by_a[a.first] });
+  }
+    
   etc_tx_details_expiration_time t = AUTO_VAL_INIT(t);
   if (!get_type_in_variant_container(tx.extra, t))
   {
@@ -5174,7 +5240,7 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
   this->balance(balances, mined);
   //validate balances needed 
   uint64_t native_amount_required = 0;
-  for (const auto& item : msc.proposal_info.to)
+  for (const auto& item : msc.proposal_info.to_alice)
   {
     if (balances[item.asset_id].unlocked < item.amount)
     {
@@ -5188,9 +5254,9 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
 
   // balances is ok, check if fee is added to tx
   uint64_t additional_fee = 0;
-  if (msc.proposal_info.fee < m_core_runtime_config.tx_default_fee)
+  if (msc.proposal_info.fee_paid_by_a < m_core_runtime_config.tx_default_fee)
   {
-    additional_fee = m_core_runtime_config.tx_default_fee - msc.proposal_info.fee;
+    additional_fee = m_core_runtime_config.tx_default_fee - msc.proposal_info.fee_paid_by_a;
     if (balances[currency::native_coin_asset_id].unlocked < additional_fee + native_amount_required)
     {
       return false;
@@ -5540,11 +5606,16 @@ assets_selection_context wallet2::get_needed_money(uint64_t fee, const std::vect
 
     THROW_IF_TRUE_WALLET_EX(0 == dt.amount, error::zero_destination);
     uint64_t money_to_add = dt.amount;
-    if (dt.amount_to_provide)
+    if (dt.amount_to_provide || dt.flags & tx_destination_entry_flags::tdef_explicit_amount_to_provide)
       money_to_add = dt.amount_to_provide;
   
     amounts_map[dt.asset_id].needed_amount += money_to_add;
     THROW_IF_TRUE_WALLET_EX(amounts_map[dt.asset_id].needed_amount < money_to_add, error::tx_sum_overflow, dsts, fee);
+    //clean up empty entries
+    if (amounts_map[dt.asset_id].needed_amount == 0)
+    {
+      amounts_map.erase(amounts_map.find(dt.asset_id));
+    }
   }
   return std::move(amounts_map);
 }
@@ -6253,7 +6324,7 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   if (ctp.flags & TX_FLAG_SIGNATURE_MODE_SEPARATE && tx_for_mode_separate.vout.size() )
   {
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(get_tx_flags(tx_for_mode_separate) & TX_FLAG_SIGNATURE_MODE_SEPARATE, "tx_param.flags differs from tx.flags");
-    for (const auto& el : mode_separatemode_separate.proposal_info.to)
+    for (const auto& el : mode_separatemode_separate.proposal_info.to_alice)
     {
       needed_money_map[el.asset_id].needed_amount += el.amount;
     }
