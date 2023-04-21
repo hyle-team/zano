@@ -5230,6 +5230,7 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
 {
   mode_separate_context msc = AUTO_VAL_INIT(msc);
   msc.tx_for_mode_separate = proposal.tx_template;
+  result_tx = msc.tx_for_mode_separate;
 
   wallet_public::ionic_swap_proposal_context ionic_context = AUTO_VAL_INIT(ionic_context);
   bool r = get_ionic_swap_proposal_info(proposal, msc.proposal_info, ionic_context);
@@ -5268,7 +5269,7 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
   construct_tx_param construct_param = get_default_construct_tx_param();
   construct_param.fee = additional_fee;
   
-  assert(0); crypto::secret_key one_time_key = ionic_context.one_time_skey;
+  crypto::secret_key one_time_key = ionic_context.one_time_skey;
   construct_param.crypt_address = m_account.get_public_address();
   construct_param.flags = TX_FLAG_SIGNATURE_MODE_SEPARATE;
   construct_param.mark_tx_as_complete = true;

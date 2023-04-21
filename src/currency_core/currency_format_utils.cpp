@@ -1549,13 +1549,6 @@ namespace currency
   crypto::key_derivation get_encryption_key_derivation(bool is_income, const transaction& tx, const account_keys& acc_keys)
   {
     crypto::key_derivation derivation = null_derivation;
-    tx_crypto_checksum crypto_info = AUTO_VAL_INIT(crypto_info);
-    if (!get_type_in_variant_container(tx.extra, crypto_info) && !get_type_in_variant_container(tx.attachment, crypto_info))
-    {
-      //no crypt info in tx
-      return null_derivation;
-    }
-
     if (is_income)
     {
       crypto::public_key tx_pub_key = currency::get_tx_pub_key_from_extra(tx);
@@ -1563,18 +1556,25 @@ namespace currency
       bool r = crypto::generate_key_derivation(tx_pub_key, acc_keys.view_secret_key, derivation);
       CHECK_AND_ASSERT_MES(r, null_derivation, "failed to generate_key_derivation");
       LOG_PRINT_GREEN("DECRYPTING ON KEY: " << epee::string_tools::pod_to_hex(derivation) << ", key derived from destination addr: " << currency::get_account_address_as_str(acc_keys.account_address), LOG_LEVEL_0);
+      return derivation;
     }
     else
     {
+      tx_crypto_checksum crypto_info = AUTO_VAL_INIT(crypto_info);
+      if (!get_type_in_variant_container(tx.extra, crypto_info) && !get_type_in_variant_container(tx.attachment, crypto_info))
+      {
+        //no crypt info in tx
+        return null_derivation;
+      }
+
       derivation = crypto_info.encrypted_key_derivation;
       crypto::chacha_crypt(derivation, acc_keys.spend_secret_key);
       LOG_PRINT_GREEN("DECRYPTING ON KEY: " << epee::string_tools::pod_to_hex(derivation) << ", key decrypted from sender address: " << currency::get_account_address_as_str(acc_keys.account_address), LOG_LEVEL_0);
+      //validate derivation we here. Yoda style
+      crypto::hash hash_for_check_sum = crypto::cn_fast_hash(&derivation, sizeof(derivation));
+      CHECK_AND_ASSERT_MES(*(uint32_t*)&hash_for_check_sum == crypto_info.derivation_hash, null_derivation, "Derivation hash missmatched in tx id " << currency::get_transaction_hash(tx));
+      return derivation;
     }
-
-    //validate derivation we here. Yoda style
-    crypto::hash hash_for_check_sum = crypto::cn_fast_hash(&derivation, sizeof(derivation));
-    CHECK_AND_ASSERT_MES(*(uint32_t*)&hash_for_check_sum == crypto_info.derivation_hash, null_derivation, "Derivation hash missmatched in tx id " << currency::get_transaction_hash(tx));
-    return derivation;
   }
   //---------------------------------------------------------------
   template<class total_t_container>
@@ -2027,7 +2027,8 @@ namespace currency
       append_mode = true;
 
     keypair txkey = AUTO_VAL_INIT(txkey);
-
+    size_t zc_inputs_count = 0;
+    bool has_non_zc_inputs = false;
 
     if (!append_mode)
     {
@@ -2082,6 +2083,17 @@ namespace currency
 
       tx.attachment.insert(tx.attachment.end(), attachments_local.begin(), attachments_local.end());
       tx.extra.insert(tx.extra.end(), extra_local.begin(), extra_local.end());
+
+      for (const auto in : tx.vin)
+      {
+        if (in.type() == typeid(txin_zc_input))
+        {
+          zc_inputs_count++;
+        }
+        else {
+          has_non_zc_inputs = true;
+        }
+      }
     }
 
 
@@ -2094,7 +2106,6 @@ namespace currency
     size_t current_index = 0;
     inputs_mapping.resize(sources.size());
     size_t input_starter_index = tx.vin.size();
-    size_t zc_inputs_count = 0;
     bool all_inputs_are_obviously_native_coins = true;
     for (const tx_source_entry& src_entr : sources)
     {
@@ -2113,6 +2124,7 @@ namespace currency
         input_multisig.multisig_out_id = src_entr.multisig_id;
         input_multisig.sigs_count = src_entr.ms_sigs_count;
         tx.vin.push_back(input_multisig);
+        has_non_zc_inputs = true;
       }
       else if (src_entr.htlc_origin.size())
       {
@@ -2147,6 +2159,7 @@ namespace currency
         input_to_key.key_offsets.push_back(src_entr.outputs.front().out_reference);
 
         tx.vin.push_back(input_to_key);
+        has_non_zc_inputs = true;
       }
       else
       {
@@ -2189,6 +2202,7 @@ namespace currency
           input_to_key.k_image = img;
           input_to_key.key_offsets = std::move(key_offsets);
           tx.vin.push_back(input_to_key);
+          has_non_zc_inputs = true;
         }        
       }
 
@@ -2209,15 +2223,15 @@ namespace currency
         }
       }
     }
-    bool has_non_zc_inputs = zc_inputs_count != sources.size(); // TODO @#@# reconsider this for consilidated txs
+
     
     //
     // OUTs
     //
     std::vector<tx_destination_entry> shuffled_dsts(destinations);
-    size_t outputs_to_be_constructed = shuffled_dsts.size();
+    //size_t outputs_to_be_constructed = shuffled_dsts.size();
     tx_generation_context& gen_context = result.ftp.gen_context;
-    gen_context.resize(zc_inputs_count, outputs_to_be_constructed);
+    gen_context.resize(zc_inputs_count, tx.vout.size() + shuffled_dsts.size());
 
     // ASSET oprations handling
     if (tx.version > TRANSACTION_VERSION_PRE_HF4)
@@ -2265,24 +2279,24 @@ namespace currency
     // construct outputs
     uint64_t native_coins_output_sum = 0;
     size_t output_index = tx.vout.size(); // in case of append mode we need to start output indexing from the last one + 1
-    uint64_t range_proof_start_index = output_index;
+    uint64_t range_proof_start_index = 0;
     std::set<uint16_t> deriv_cache;
-    for(size_t j = 0; j < outputs_to_be_constructed; ++j, ++output_index)
+    for(size_t destination_index = 0; destination_index < shuffled_dsts.size(); ++destination_index, ++output_index)
     {
-      tx_destination_entry& dst_entr = shuffled_dsts[j];
+      tx_destination_entry& dst_entr = shuffled_dsts[destination_index];
       if (all_inputs_are_obviously_native_coins && gen_context.ao_asset_id == currency::null_pkey)
         dst_entr.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // all inputs are obviously native coins -- all outputs must have explicit asset ids (unless there's an asset emission)
 
       CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount); // <<--  TODO @#@# consider removing this check
       r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys,
-        gen_context.asset_id_blinding_masks[j], gen_context.amount_blinding_masks[j],
-        gen_context.blinded_asset_ids[j], gen_context.amount_commitments[j], result, tx_outs_attr);
+        gen_context.asset_id_blinding_masks[output_index], gen_context.amount_blinding_masks[output_index],
+        gen_context.blinded_asset_ids[output_index], gen_context.amount_commitments[output_index], result, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "Failed to construct tx out");
-      gen_context.amounts[j] = dst_entr.amount;
-      gen_context.asset_ids[j] = crypto::point_t(dst_entr.asset_id);
-      gen_context.asset_id_blinding_mask_x_amount_sum += gen_context.asset_id_blinding_masks[j] * dst_entr.amount;
-      gen_context.amount_blinding_masks_sum += gen_context.amount_blinding_masks[j];
-      gen_context.amount_commitments_sum += gen_context.amount_commitments[j];
+      gen_context.amounts[output_index] = dst_entr.amount;
+      gen_context.asset_ids[output_index] = crypto::point_t(dst_entr.asset_id);
+      gen_context.asset_id_blinding_mask_x_amount_sum += gen_context.asset_id_blinding_masks[output_index] * dst_entr.amount;
+      gen_context.amount_blinding_masks_sum += gen_context.amount_blinding_masks[output_index];
+      gen_context.amount_commitments_sum += gen_context.amount_commitments[output_index];
       if (dst_entr.is_native_coin())
         native_coins_output_sum += dst_entr.amount;
     }
