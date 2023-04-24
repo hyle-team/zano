@@ -225,7 +225,7 @@ namespace currency
       asset_id_blinding_masks.resize(outs_count);
       amounts.resize(outs_count);
       amount_blinding_masks.resize(outs_count);
-      input_amounts.resize(zc_ins_count);
+      zc_input_amounts.resize(zc_ins_count);
     }
 
     // TODO @#@# reconsider this check -- sowle
@@ -253,7 +253,7 @@ namespace currency
     std::vector<crypto::point_t> pseudo_outs_blinded_asset_ids;                       // generate_asset_surjection_proof
     crypto::scalar_vec_t pseudo_outs_plus_real_out_blinding_masks; // r_pi + r'_j     // generate_asset_surjection_proof
     std::vector<crypto::point_t> real_zc_ins_asset_ids;            // H_i             // generate_asset_surjection_proof
-    std::vector<uint64_t> input_amounts;  // all inputs, including non ZC
+    std::vector<uint64_t> zc_input_amounts;                        // ZC only input amounts
 
     // common data: inputs
     crypto::point_t  pseudo_out_amount_commitments_sum      = crypto::c_point_0;      //                                                   generate_tx_balance_proof  generate_ZC_sig
@@ -282,7 +282,7 @@ namespace currency
       KV_SERIALIZE_CONTAINER_POD_AS_BLOB(pseudo_outs_blinded_asset_ids)
       KV_SERIALIZE_CONTAINER_POD_AS_BLOB(pseudo_outs_plus_real_out_blinding_masks)
       KV_SERIALIZE_CONTAINER_POD_AS_BLOB(real_zc_ins_asset_ids)
-      KV_SERIALIZE(input_amounts)
+      KV_SERIALIZE(zc_input_amounts)
       KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_commitments_sum)
       KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_blinding_masks_sum)
       KV_SERIALIZE_POD_AS_HEX_STRING(real_in_asset_id_blinding_mask_x_amount_sum)
@@ -308,7 +308,7 @@ namespace currency
       FIELD(pseudo_outs_blinded_asset_ids)
       FIELD((std::vector<crypto::scalar_t>&)(pseudo_outs_plus_real_out_blinding_masks))
       FIELD(real_zc_ins_asset_ids)
-      FIELD(input_amounts)
+      FIELD(zc_input_amounts)
       FIELD(pseudo_out_amount_commitments_sum)
       FIELD(pseudo_out_amount_blinding_masks_sum)
       FIELD(real_in_asset_id_blinding_mask_x_amount_sum)

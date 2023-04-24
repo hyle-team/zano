@@ -300,6 +300,7 @@ namespace tools
     uint8_t tx_outs_attr = 0;
     bool shuffle = false;
     bool perform_packing = false;
+    bool need_at_least_1_zc = false;
   };
 
   struct mode_separate_context
@@ -469,6 +470,21 @@ namespace tools
       crypto::hash related_tx_id = currency::null_hash; // tx id which caused money lock, if any (ex: escrow proposal transport tx)
     };
 
+    /*
+      This might be not the best solution so far, but after discussion with @sowle we came up to conclusion 
+      that passing great variety of arguments through the long call stack of different member functions of the wallet will
+      only complicate codebase and make it harder to understand. 
+      current_operation_context will keep pointers to some useful data, and every function that use it, should 
+      make sure(!!!) that pointer got nulled before pointed object got destroyed, likely by using SET_CONTEXT_OBJ_FOR_SCOPE macro
+
+    */
+    struct current_operation_context
+    {
+      construct_tx_param* pconstruct_tx_param = nullptr;
+      currency::finalize_tx_param* pfinalize_tx_param = nullptr;
+      const mode_separate_context* pmode_separate_context = nullptr;
+    };
+    
 
 
     typedef std::unordered_multimap<std::string, payment_details> payment_container;
@@ -1109,7 +1125,7 @@ private:
     bool is_in_hardfork_zone(uint64_t hardfork_index) const;
     uint8_t out_get_mixin_attr(const currency::tx_out_v& out_t);
     const crypto::public_key& out_get_pub_key(const currency::tx_out_v& out_t, std::list<currency::htlc_info>& htlc_info_list);
-
+    bool expand_selection_with_zc_input(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes);
 
     void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
     void remove_transfer_from_amount_gindex_map(uint64_t tid);
@@ -1174,6 +1190,8 @@ private:
     mutable uint64_t m_current_wallet_file_size;
     bool m_use_deffered_global_outputs;
     bool m_disable_tor_relay;
+
+    mutable current_operation_context m_current_context;
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;
  

@@ -67,6 +67,14 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
   alice_acc.generate();
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, alice_acc);
   alice_wlt->get_account().set_createtime(0);
+
+
+  currency::account_base bob_acc;
+  bob_acc.generate();
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, bob_acc);
+  bob_wlt->get_account().set_createtime(0);
+
+
   miner_wlt->refresh();
 
   currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
@@ -76,7 +84,7 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
   adb.decimal_point = 12;
 
   std::vector<currency::tx_destination_entry> destinations(2);
-  destinations[0].addr.push_back(miner_wlt->get_account().get_public_address());
+  destinations[0].addr.push_back(bob_wlt->get_account().get_public_address());
   destinations[0].amount = AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC;
   destinations[0].asset_id = currency::null_pkey;
   destinations[1].addr.push_back(alice_wlt->get_account().get_public_address());
@@ -94,16 +102,17 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
 
   currency::transaction res_tx = AUTO_VAL_INIT(res_tx);
   miner_wlt->transfer(COIN, alice_wlt->get_account().get_public_address(), res_tx);
+  miner_wlt->transfer(COIN, bob_wlt->get_account().get_public_address(), res_tx);
 
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
 
-  miner_wlt->refresh();
+  bob_wlt->refresh();
   alice_wlt->refresh();
   uint64_t mined = 0;
   std::unordered_map<crypto::public_key, tools::wallet_public::asset_balance_entry_base> balances;
-  miner_wlt->balance(balances, mined);
+  bob_wlt->balance(balances, mined);
 
   auto it_asset = balances.find(asset_id);
   auto it_native = balances.find(currency::native_coin_asset_id);
@@ -111,7 +120,7 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
 
   CHECK_AND_ASSERT_MES(it_asset != balances.end() && it_native != balances.end(), false, "Failed to find needed asset in result balances");
   CHECK_AND_ASSERT_MES(it_asset->second.total == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC, false, "Failed to find needed asset in result balances");
-  CHECK_AND_ASSERT_MES(it_native->second.total == uint64_t(17517226)*COIN - COIN, false, "Failed to find needed asset in result balances");
+  CHECK_AND_ASSERT_MES(it_native->second.total == COIN, false, "Failed to find needed asset in result balances");
 
   uint64_t mined_balance = it_native->second.total;
 
@@ -126,9 +135,9 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
   CHECK_AND_ASSERT_MES(it_asset->second.total == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC, false, "Failed to find needed asset in result balances");
 
   const uint64_t assets_to_exchange = 10 * COIN;
-  const uint64_t native_tokens_to_exchange = 1 * COIN;
+  const uint64_t native_tokens_to_exchange = COIN/2;
 
-  //alice_wlt want to trade with miner_wlt, to exchange 10.0 TCT to 1.0 ZANO 
+  //alice_wlt want to trade with bob_wlt, to exchange 10.0 TCT to 1.0 ZANO 
   view::ionic_swap_proposal_info proposal_details = AUTO_VAL_INIT(proposal_details);
   proposal_details.expiration_time = alice_wlt->get_core_runtime_config().get_core_time() + 10 * 60;
   proposal_details.fee_paid_by_a = TESTS_DEFAULT_FEE;
@@ -137,10 +146,10 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
   proposal_details.to_alice.push_back(view::asset_funds{ currency::native_coin_asset_id , native_tokens_to_exchange });
 
   tools::wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
-  alice_wlt->create_ionic_swap_proposal(proposal_details, miner_wlt->get_account().get_public_address(), proposal);
+  alice_wlt->create_ionic_swap_proposal(proposal_details, bob_wlt->get_account().get_public_address(), proposal);
 
   view::ionic_swap_proposal_info proposal_decoded_info = AUTO_VAL_INIT(proposal_decoded_info);
-  miner_wlt->get_ionic_swap_proposal_info(proposal, proposal_decoded_info);
+  bob_wlt->get_ionic_swap_proposal_info(proposal, proposal_decoded_info);
 
   //Validate proposal
   if (proposal_decoded_info.to_bob != proposal_details.to_bob 
@@ -153,13 +162,13 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
   }
 
   currency::transaction res_tx2 = AUTO_VAL_INIT(res_tx2);
-  r = miner_wlt->accept_ionic_swap_proposal(proposal, res_tx2);
+  r = bob_wlt->accept_ionic_swap_proposal(proposal, res_tx2);
   CHECK_AND_ASSERT_MES(r, false, "Failed to accept ionic proposal");
 
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
-  miner_wlt->refresh();
+  bob_wlt->refresh();
   alice_wlt->refresh();
 
 
@@ -170,15 +179,18 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
   it_native = balances.find(currency::native_coin_asset_id);
 
   CHECK_AND_ASSERT_MES(it_asset != balances.end(), false, "Failed to find needed asset in result balances");
-  CHECK_AND_ASSERT_MES(it_native->second.total == native_tokens_to_exchange, false, "Failed to find needed asset in result balances");
+  CHECK_AND_ASSERT_MES(it_native->second.total == native_tokens_to_exchange + COIN - TESTS_DEFAULT_FEE, false, "Failed to find needed asset in result balances");
   CHECK_AND_ASSERT_MES(it_asset->second.total == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC - assets_to_exchange, false, "Failed to find needed asset in result balances");
 
 
   balances.clear();
-  miner_wlt->balance(balances, mined);
+  bob_wlt->balance(balances, mined);
+  it_asset = balances.find(asset_id);
+  it_native = balances.find(currency::native_coin_asset_id);
+
 
   CHECK_AND_ASSERT_MES(it_asset != balances.end(), false, "Failed to find needed asset in result balances");
-  CHECK_AND_ASSERT_MES(it_native->second.total == mined_balance - native_tokens_to_exchange, false, "Failed to find needed asset in result balances");
+  CHECK_AND_ASSERT_MES(it_native->second.total == COIN - native_tokens_to_exchange, false, "Failed to find needed asset in result balances");
   CHECK_AND_ASSERT_MES(it_asset->second.total == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC + assets_to_exchange, false, "Failed to find needed asset in result balances");
 
 

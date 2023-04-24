@@ -380,6 +380,17 @@ namespace tools
       uint64_t m_fee;
       crypto::public_key m_asset_id;
     };
+
+    struct no_zc_inputs : public transfer_error
+    {
+      no_zc_inputs(const std::string& /*v*/): transfer_error(std::string(""), API_RETURN_CODE_MISSING_ZC_INPUTS)
+      {}      
+
+      virtual const char* what() const noexcept
+      {
+        return API_RETURN_CODE_MISSING_ZC_INPUTS;
+      }
+    };
     //----------------------------------------------------------------------------------------------------
     struct not_enough_outs_to_mix : public transfer_error
     {

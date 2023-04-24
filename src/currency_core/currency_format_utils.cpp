@@ -2096,7 +2096,7 @@ namespace currency
       }
     }
 
-
+    size_t thirdparty_zc_inputs_count = zc_inputs_count;
     //
     // INs
     //
@@ -2284,7 +2284,7 @@ namespace currency
     for(size_t destination_index = 0; destination_index < shuffled_dsts.size(); ++destination_index, ++output_index)
     {
       tx_destination_entry& dst_entr = shuffled_dsts[destination_index];
-      if (all_inputs_are_obviously_native_coins && gen_context.ao_asset_id == currency::null_pkey)
+      if (!append_mode && all_inputs_are_obviously_native_coins && gen_context.ao_asset_id == currency::null_pkey)
         dst_entr.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // all inputs are obviously native coins -- all outputs must have explicit asset ids (unless there's an asset emission)
 
       CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount); // <<--  TODO @#@# consider removing this check
@@ -2376,6 +2376,7 @@ namespace currency
 
     // ring signatures (per-input proofs)
     r = false;
+    size_t curren_zc_index = thirdparty_zc_inputs_count;
     for (size_t i_ = 0; i_ != sources.size(); i_++)
     {
       size_t i_mapped = inputs_mapping[i_];
@@ -2390,7 +2391,8 @@ namespace currency
         // blinding_masks_sum is supposed to be sum(mask of all tx output) - sum(masks of all pseudo out commitments) 
         r = generate_ZC_sig(tx_hash_for_signature, i_ + input_starter_index, source_entry, in_contexts[i_mapped], sender_account_keys, flags, gen_context, tx, i_ + 1 == sources.size());
         CHECK_AND_ASSERT_MES(r, false, "generate_ZC_sigs failed");
-        gen_context.input_amounts[i_ + input_starter_index] = source_entry.amount;
+        gen_context.zc_input_amounts[curren_zc_index] = source_entry.amount;
+        curren_zc_index++;
       }
       else
       {

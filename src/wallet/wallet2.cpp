@@ -42,6 +42,8 @@ using namespace epee;
 
 using namespace currency;
 
+#define SET_CONTEXT_OBJ_FOR_SCOPE(name, obj)  m_current_context.name = &obj; \
+    auto COMBINE(auto_scope_var_, __LINE__) = epee::misc_utils::create_scope_leave_handler([&]() { m_current_context.name = nullptr; });
 
 
 #define MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES (100*1024*1024) // 100 MB
@@ -5139,7 +5141,7 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
     if (tx.vin[i].type() == typeid(txin_zc_input))
     {
       in_asset_id = ionic_context.gen_context.real_zc_ins_asset_ids[zc_current_index].to_public_key();
-      amount = ionic_context.gen_context.input_amounts[zc_current_index];
+      amount = ionic_context.gen_context.zc_input_amounts[zc_current_index];
       zc_current_index++;
       mx = boost::get<currency::txin_zc_input>(tx.vin[i]).key_offsets.size() - 1;
     }
@@ -5279,6 +5281,8 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
   ftp.tx_version = this->get_current_tx_version();
   ftp.gen_context = ionic_context.gen_context;  
   prepare_transaction(construct_param, ftp, msc);
+
+
 
   try
   {
@@ -5895,6 +5899,38 @@ bool wallet2::get_actual_offers(std::list<bc_services::offer_details_ex>& offers
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::expand_selection_with_zc_input(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes)
+{
+
+    free_amounts_cache_type& found_free_amounts = m_found_free_amounts[currency::native_coin_asset_id];
+    auto& asset_needed_money_item = needed_money_map[currency::native_coin_asset_id];
+    //need to add ZC input
+    for (auto it = found_free_amounts.begin(); it != found_free_amounts.end(); it++)
+    {
+      for (auto it_in_amount = it->second.begin(); it_in_amount != it->second.end(); it_in_amount++)
+      {
+        if (!m_transfers[*it_in_amount].is_zc())
+        {
+          continue;
+        }
+
+        if (is_transfer_ready_to_go(m_transfers[*it->second.begin()], fake_outputs_count))
+        {
+          asset_needed_money_item.found_amount += it->first;
+          selected_indexes.push_back(*it_in_amount);
+          it->second.erase(it_in_amount);
+          if (!it->second.size())
+          {
+            found_free_amounts.erase(it);
+          }
+          return true;
+        }
+      }
+    }
+    WLT_THROW_IF_FALSE_WALLET_EX_MES(false , error::no_zc_inputs, "Missing ZC inputs for TX_FLAG_SIGNATURE_MODE_SEPARATE operation");
+    return true;
+}
+//----------------------------------------------------------------------------------------------------
 bool wallet2::select_indices_for_transfer(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes)
 {
   bool res = true;
@@ -5906,6 +5942,24 @@ bool wallet2::select_indices_for_transfer(assets_selection_context& needed_money
     item.second.found_amount = select_indices_for_transfer(selected_indexes, asset_cashe_it->second, item.second.needed_amount, fake_outputs_count);
     WLT_THROW_IF_FALSE_WALLET_EX_MES(item.second.found_amount >= item.second.needed_amount, error::not_enough_money, "", item.second.found_amount, item.second.needed_amount, 0, item.first);
   }
+  if (m_current_context.pconstruct_tx_param && m_current_context.pconstruct_tx_param->need_at_least_1_zc)
+  {
+    bool found_zc_input = false;
+    for (auto i : selected_indexes)
+    {
+      if (m_transfers[i].is_zc())
+      {
+        found_zc_input = true;
+        break;
+      }
+    }
+    if (!found_zc_input)
+    {
+      expand_selection_with_zc_input(needed_money_map, fake_outputs_count, selected_indexes);
+    }
+  }
+
+
   return res;
 }
 //----------------------------------------------------------------------------------------------------
@@ -5913,6 +5967,7 @@ uint64_t wallet2::select_indices_for_transfer(std::vector<uint64_t>& selected_in
 {
   WLT_LOG_GREEN("Selecting indices for transfer of " << print_money_brief(needed_money) << " with " << fake_outputs_count << " fake outs, found_free_amounts.size()=" << found_free_amounts.size() << "...", LOG_LEVEL_0);
   uint64_t found_money = 0;
+  //uint64_t found_zc_input = false;
   std::string selected_amounts_str;
   while (found_money < needed_money && found_free_amounts.size())
   {
@@ -5934,6 +5989,7 @@ uint64_t wallet2::select_indices_for_transfer(std::vector<uint64_t>& selected_in
       found_free_amounts.erase(it);
 
   }
+  
   WLT_LOG_GREEN("Found " << print_money_brief(found_money) << " as " << selected_indexes.size() << " out(s): " << selected_amounts_str << ", found_free_amounts.size()=" << found_free_amounts.size(), LOG_LEVEL_0);
   return found_money;
 }
@@ -6057,11 +6113,16 @@ bool wallet2::read_money_transfer2_details_from_tx(const transaction& tx, const 
     else if (i.type() == typeid(currency::txin_zc_input))
     {
       const currency::txin_zc_input& in_zc = boost::get<currency::txin_zc_input>(i);
-      auto it = m_key_images.find(in_zc.k_image);
       //should we panic if image not found?
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_key_images.end(), "[read_money_transfer2_details_from_tx]Unknown key image in tx: " << get_transaction_hash(tx));
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second < m_transfers.size(), "[read_money_transfer2_details_from_tx]Index out of range for key image in tx: " << get_transaction_hash(tx));
-      wtd.spn.push_back(m_transfers[it->second].amount());
+      //@zoidberg: nope!
+      if (m_key_images.count(in_zc.k_image))
+      {
+        auto it = m_key_images.find(in_zc.k_image);
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_key_images.end(), "[read_money_transfer2_details_from_tx]Unknown key image in tx: " << get_transaction_hash(tx));
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second < m_transfers.size(), "[read_money_transfer2_details_from_tx]Index out of range for key image in tx: " << get_transaction_hash(tx));
+        wtd.spn.push_back(m_transfers[it->second].amount());
+      }
+
     }
   }
   return true;
@@ -6314,14 +6375,19 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
 //----------------------------------------------------------------------------------------------------
 void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const mode_separate_context& mode_separatemode_separate)
 {
+
+  SET_CONTEXT_OBJ_FOR_SCOPE(pconstruct_tx_param, ctp);
+  SET_CONTEXT_OBJ_FOR_SCOPE(pfinalize_tx_param, ftp);
+  SET_CONTEXT_OBJ_FOR_SCOPE(pmode_separate_context, mode_separatemode_separate);
+
   TIME_MEASURE_START_MS(get_needed_money_time);
+
   const currency::transaction& tx_for_mode_separate = mode_separatemode_separate.tx_for_mode_separate;
   assets_selection_context needed_money_map = get_needed_money(ctp.fee, ctp.dsts);
 
   //
   // TODO @#@# need to do refactoring over this part to support hidden amounts and asset_id
   //
-
   if (ctp.flags & TX_FLAG_SIGNATURE_MODE_SEPARATE && tx_for_mode_separate.vout.size() )
   {
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(get_tx_flags(tx_for_mode_separate) & TX_FLAG_SIGNATURE_MODE_SEPARATE, "tx_param.flags differs from tx.flags");
@@ -6329,6 +6395,7 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
     {
       needed_money_map[el.asset_id].needed_amount += el.amount;
     }
+    ctp.need_at_least_1_zc = true;
   }
   TIME_MEASURE_FINISH_MS(get_needed_money_time);
 
