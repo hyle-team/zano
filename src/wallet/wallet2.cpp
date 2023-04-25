@@ -6410,15 +6410,15 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   {
     //htlc
     //@#@ need to do refactoring over this part to support hidden amounts and asset_id
-    prepare_tx_sources_htlc(ctp.htlc_tx_id, ctp.htlc_origin, ftp.sources, needed_money_map[currency::null_pkey].found_amount);
+    prepare_tx_sources_htlc(ctp.htlc_tx_id, ctp.htlc_origin, ftp.sources, needed_money_map[currency::native_coin_asset_id].found_amount);
     WLT_THROW_IF_FALSE_WITH_CODE(ctp.dsts.size() == 1,
       "htlc: unexpected ctp.dsts.size() =" << ctp.dsts.size(), API_RETURN_CODE_INTERNAL_ERROR);
 
-    WLT_THROW_IF_FALSE_WITH_CODE(needed_money_map[currency::null_pkey].found_amount > ctp.fee,
+    WLT_THROW_IF_FALSE_WITH_CODE(needed_money_map[currency::native_coin_asset_id].found_amount > ctp.fee,
       "htlc: found money less then fee", API_RETURN_CODE_INTERNAL_ERROR);
 
     //fill amount
-    ctp.dsts.begin()->amount = needed_money_map[currency::null_pkey].found_amount - ctp.fee;
+    ctp.dsts.begin()->amount = needed_money_map[currency::native_coin_asset_id].found_amount - ctp.fee;
     
   }
   else if (ctp.multisig_id != currency::null_hash)
