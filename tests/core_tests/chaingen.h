@@ -230,6 +230,8 @@ class test_generator;
 class test_chain_unit_base
 {
 public:
+  test_chain_unit_base();
+
   typedef boost::function<bool(currency::core& c, size_t ev_index, const std::vector<test_event_entry> &events)> verify_callback;
   typedef std::map<std::string, verify_callback> callbacks_map;
 

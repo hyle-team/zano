@@ -6409,15 +6409,7 @@ bool blockchain_storage::prevalidate_block(const block& bl)
     return true;
   }
 
-  // HF3
-  if ( m_core_runtime_config.is_hardfork_active_for_height(3, block_height) &&
-      !m_core_runtime_config.is_hardfork_active_for_height(4, block_height))
-  {
-    CHECK_AND_ASSERT_MES(bl.major_version == HF3_BLOCK_MAJOR_VERSION, false, "HF3, incorrect block major version: " << (int)bl.major_version);
-  }
-
-
-  //after hard_fork3
+  // >= HF3
   if (bl.major_version > CURRENT_BLOCK_MAJOR_VERSION)
   {
     LOG_ERROR("prevalidation failed for block " << get_block_hash(bl) << ": major block version " << static_cast<size_t>(bl.major_version) << " is incorrect, " << CURRENT_BLOCK_MAJOR_VERSION << " is expected" << ENDL

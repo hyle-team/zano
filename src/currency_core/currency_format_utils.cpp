@@ -3533,7 +3533,7 @@ namespace currency
       }
       if (p_amount_burnt)
         *p_amount_burnt = sum_of_bare_outs_burnt;
-      return sum_of_bare_outs_burnt == amount;
+      return sum_of_bare_outs_burnt >= amount;
     }
 
     // post HF-4 txs
