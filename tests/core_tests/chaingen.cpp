@@ -1653,7 +1653,8 @@ bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
   if (!fill_tx_sources(sources, events, blk_head, from.get_keys(), spending_amount, nmix, check_for_spends, check_for_unlocktime, use_ref_by_id))
     return false;
 
-  uint64_t tx_version = currency::get_tx_version(get_block_height(blk_head), hf);
+  uint64_t tx_expected_block_height = get_block_height(blk_head) + 1;
+  uint64_t tx_version = currency::get_tx_version(tx_expected_block_height, hf);
   boost::multiprecision::int128_t change = get_sources_total_amount(sources);
   change -= spending_amount;
   if (change < 0)
