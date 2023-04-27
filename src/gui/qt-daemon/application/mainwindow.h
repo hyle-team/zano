@@ -172,6 +172,9 @@ public:
   QString remove_custom_asset_id(const QString& param);
   QString get_wallet_info(const QString& param);
 
+  QString create_ionic_swap_proposal(const QString& param);
+  QString get_ionic_swap_proposal_info(const QString& param);
+  QString accept_ionic_swap_proposal(const QString& param);
 
   bool    get_is_disabled_notifications();
   bool    set_is_disabled_notifications(const bool& param);

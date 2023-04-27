@@ -209,40 +209,9 @@ public:
     END_KV_SERIALIZE_MAP()
   };  
   
-  struct wallet_info
-  {
-    std::list<tools::wallet_public::asset_balance_entry> balances;
-		uint64_t mined_total;
-    std::string address;
-    std::string view_sec_key;
-    std::string path;
-    bool is_auditable;
-    bool is_watch_only;
+  typedef tools::wallet_public::wallet_info wallet_info;
 
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(balances)
-			KV_SERIALIZE(mined_total)			
-      KV_SERIALIZE(address)
-      KV_SERIALIZE(view_sec_key)
-      KV_SERIALIZE(path)
-      KV_SERIALIZE(is_auditable);
-      KV_SERIALIZE(is_watch_only);
-    END_KV_SERIALIZE_MAP()
-  };
-
-
-
-  struct wallet_entry_info
-  {
-    wallet_info wi;
-    uint64_t    wallet_id;
-
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(wi)
-      KV_SERIALIZE(wallet_id)
-    END_KV_SERIALIZE_MAP()
-
-  };
+  typedef tools::wallet_public::wallet_entry_info wallet_entry_info;
 
 
 
@@ -440,7 +409,7 @@ public:
   struct wallet_and_asset_id
   {
     uint64_t wallet_id = 0;
-    crypto::hash asset_id = currency::null_hash;
+    crypto::public_key asset_id = currency::null_pkey;
     
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
@@ -686,13 +655,10 @@ public:
 
   };
 
-
-
   struct wallet_and_contract_id_param
   {
     uint64_t wallet_id;
     crypto::hash contract_id;
-
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
@@ -741,6 +707,11 @@ public:
       KV_CHAIN_BASE(tools::wallet_public::create_proposal_param)
     END_KV_SERIALIZE_MAP()
   };
+
+
+  typedef tools::wallet_public::asset_funds asset_funds;
+  typedef tools::wallet_public::ionic_swap_proposal_info ionic_swap_proposal_info;
+  typedef tools::wallet_public::create_ionic_swap_proposal_request create_ionic_swap_proposal_request;
 
   struct address_validation_response
   {

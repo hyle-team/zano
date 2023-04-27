@@ -5150,6 +5150,88 @@ std::shared_ptr<const transaction_chain_entry> blockchain_storage::find_key_imag
 
   return std::shared_ptr<const transaction_chain_entry>();
 }
+//---------------------------------------------------------------
+bool blockchain_storage::fill_tx_rpc_details(tx_rpc_extended_info& tei, const transaction& tx, const transaction_chain_entry* ptce, const crypto::hash& h, uint64_t timestamp, bool is_short) const
+{
+  //tei.blob = tx_ptr->tx
+  tei.id = epee::string_tools::pod_to_hex(h);
+  if (!tei.blob_size)
+    tei.blob_size = get_object_blobsize(tx);
+
+  tei.fee = get_tx_fee(tx);
+  tei.pub_key = epee::string_tools::pod_to_hex(get_tx_pub_key_from_extra(tx));
+  tei.timestamp = timestamp;
+  tei.amount = get_outs_money_amount(tx);
+
+  if (is_short)
+    return true;
+
+  fill_tx_rpc_inputs(tei, tx);
+  fill_tx_rpc_outputs(tei, tx, ptce);
+  fill_tx_rpc_payload_items(tei.extra, tx.extra);
+  fill_tx_rpc_payload_items(tei.attachments, tx.attachment);
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::fill_tx_rpc_inputs(tx_rpc_extended_info& tei, const transaction& tx) const
+{
+
+  //handle inputs
+  for (auto in : tx.vin)
+  {
+    tei.ins.push_back(tx_in_rpc_entry());
+    tx_in_rpc_entry& entry_to_fill = tei.ins.back();
+    if (in.type() == typeid(txin_gen))
+    {
+      entry_to_fill.amount = 0;
+    }
+    else if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc) || in.type() == typeid(txin_zc_input))
+    {
+      //TODO: add htlc info
+      entry_to_fill.amount = get_amount_from_variant(in);
+      entry_to_fill.kimage_or_ms_id = epee::string_tools::pod_to_hex(get_key_image_from_txin_v(in));
+      const std::vector<txout_ref_v>& key_offsets = get_key_offsets_from_txin_v(in);
+      std::vector<txout_ref_v> absolute_offsets = relative_output_offsets_to_absolute(key_offsets);
+      for (auto& ao : absolute_offsets)
+      {
+        entry_to_fill.global_indexes.push_back(0);
+        if (ao.type() == typeid(uint64_t))
+        {
+          entry_to_fill.global_indexes.back() = boost::get<uint64_t>(ao);
+        }
+        else if (ao.type() == typeid(ref_by_id))
+        {
+          //disable for the reset at the moment 
+          auto tx_ptr = get_tx_chain_entry(boost::get<ref_by_id>(ao).tx_id);
+          if (!tx_ptr || tx_ptr->m_global_output_indexes.size() <= boost::get<ref_by_id>(ao).n)
+          {
+            tei.ins.back().global_indexes.back() = std::numeric_limits<uint64_t>::max();
+            return false;
+          }
+          tei.ins.back().global_indexes.back() = tx_ptr->m_global_output_indexes[boost::get<ref_by_id>(ao).n];
+        }
+      }
+      if (in.type() == typeid(txin_htlc))
+      {
+        entry_to_fill.htlc_origin = epee::string_tools::buff_to_hex_nodelimer(boost::get<txin_htlc>(in).hltc_origin);
+      }
+      //tk.etc_details -> visualize it may be later
+    }
+    else if (in.type() == typeid(txin_multisig))
+    {
+      txin_multisig& tms = boost::get<txin_multisig>(in);
+      entry_to_fill.amount = tms.amount;
+      entry_to_fill.kimage_or_ms_id = epee::string_tools::pod_to_hex(tms.multisig_out_id);
+      if (tx.signatures.size() >= tei.ins.size() &&
+        tx.signatures[tei.ins.size() - 1].type() == typeid(NLSAG_sig))
+      {
+        entry_to_fill.multisig_count = boost::get<NLSAG_sig>(tx.signatures[tei.ins.size() - 1]).s.size();
+      }
+
+    }
+  }
+  return true;
+}
 //------------------------------------------------------------------
 bool blockchain_storage::prune_aged_alt_blocks()
 {
@@ -6327,15 +6409,7 @@ bool blockchain_storage::prevalidate_block(const block& bl)
     return true;
   }
 
-  // HF3
-  if ( m_core_runtime_config.is_hardfork_active_for_height(3, block_height) &&
-      !m_core_runtime_config.is_hardfork_active_for_height(4, block_height))
-  {
-    CHECK_AND_ASSERT_MES(bl.major_version == HF3_BLOCK_MAJOR_VERSION, false, "HF3, incorrect block major version: " << (int)bl.major_version);
-  }
-
-
-  //after hard_fork3
+  // >= HF3
   if (bl.major_version > CURRENT_BLOCK_MAJOR_VERSION)
   {
     LOG_ERROR("prevalidation failed for block " << get_block_hash(bl) << ": major block version " << static_cast<size_t>(bl.major_version) << " is incorrect, " << CURRENT_BLOCK_MAJOR_VERSION << " is expected" << ENDL

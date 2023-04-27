@@ -4,6 +4,10 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <cstdlib>
+#if defined(WIN32)
+  #include <crtdbg.h>
+#endif
 #include <thread>
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
@@ -22,11 +26,10 @@
 #include "string_coding.h"
 #include "wallet/wrap_service.h"
 #include "common/general_purpose_commands_defs.h"
-#include <cstdlib>
 
-#if defined(WIN32)
-#include <crtdbg.h>
-#endif
+#include "wallet/wallet_helpers.h"
+
+
 
 using namespace std;
 using namespace epee;
@@ -228,6 +231,10 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("deploy_new_asset", boost::bind(&simple_wallet::deploy_new_asset, this, ph::_1), "Deploys new asset in the network, with current wallet as a maintainer");
   m_cmd_binder.set_handler("add_custom_asset_id", boost::bind(&simple_wallet::add_custom_asset_id, this, ph::_1), "Approve asset id to be recognized in the wallet and returned in balances");
   m_cmd_binder.set_handler("remove_custom_asset_id", boost::bind(&simple_wallet::remove_custom_asset_id, this, ph::_1), "Cancel previously made approval for asset id");
+
+  m_cmd_binder.set_handler("generate_ionic_swap_proposal", boost::bind(&simple_wallet::generate_ionic_swap_proposal, this, _1), "generate_ionic_swap_proposal <proposal_config.json> <destination_addr>- Generates ionic_swap proposal with given conditions");
+  m_cmd_binder.set_handler("get_ionic_swap_proposal_info", boost::bind(&simple_wallet::get_ionic_swap_proposal_info, this, _1), "get_ionic_swap_proposal_info <hex_encoded_raw_proposal> - Extracts and display information from ionic_swap proposal raw data");
+  m_cmd_binder.set_handler("accept_ionic_swap_proposal", boost::bind(&simple_wallet::accept_ionic_swap_proposal, this, _1), "accept_ionic_swap_proposal <hex_encoded_raw_proposal> - Accept ionic_swap proposal and generates exchange transaction");
 
 }
 //----------------------------------------------------------------------------------------------------
@@ -689,6 +696,17 @@ void simple_wallet::on_tor_status_change(const std::string& state)
 
 
   message_writer(epee::log_space::console_color_yellow, true, std::string("[TOR]: ")) << human_message;
+}
+//----------------------------------------------------------------------------------------------------
+void simple_wallet::on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets)
+{
+  wallets.resize(1);
+  tools::get_wallet_info(*m_wallet, wallets[0].wi);
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::on_mw_select_wallet(uint64_t wallet_id)
+{
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::refresh(const std::vector<std::string>& args)
@@ -1801,7 +1819,7 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
   tx_destination_entry td = AUTO_VAL_INIT(td);
   td.addr.push_back(m_wallet->get_account().get_public_address());
   td.amount = adb.current_supply;
-  td.asset_id = currency::ffff_pkey;
+  td.asset_id = currency::null_pkey;
   std::vector<currency::tx_destination_entry> destinations;
   destinations.push_back(td);
   currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
@@ -1849,6 +1867,104 @@ bool simple_wallet::add_custom_asset_id(const std::vector<std::string> &args)
   }
   return true;
 }
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::generate_ionic_swap_proposal(const std::vector<std::string> &args)
+{
+
+  if (args.size() != 2)
+  {
+    fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
+  }
+
+  view::ionic_swap_proposal_info proposal = AUTO_VAL_INIT(proposal);
+  bool r = epee::serialization::load_t_from_json_file(proposal, args[0]);
+  if (!r)
+  {
+    fail_msg_writer() << "Failed to load json file with asset specification: " << args[0];
+  }
+  currency::account_public_address destination_addr = AUTO_VAL_INIT(destination_addr);
+  currency::payment_id_t integrated_payment_id;
+  if (!m_wallet->get_transfer_address(args[1], destination_addr, integrated_payment_id))
+  {
+    fail_msg_writer() << "wrong address: " << args[1];
+    return true;
+  }
+  if (integrated_payment_id.size())
+  {
+    fail_msg_writer() << "Integrated addresses not supported yet";
+    return true;
+  }
+
+  transaction tx_template = AUTO_VAL_INIT(tx_template);
+  r = m_wallet->create_ionic_swap_proposal(proposal, destination_addr, tx_template);
+  if (!r)
+  {
+    fail_msg_writer() << "Failed to create ionic_swap proposal";
+    return true;
+  }
+  else
+  {    
+    success_msg_writer() << "Generated proposal: " << ENDL << epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(tx_template));
+  }
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::get_ionic_swap_proposal_info(const std::vector<std::string> &args)
+{
+  if (args.size() != 1)
+  {
+    fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
+  }
+
+  std::string raw_tx_template;
+  bool r = epee::string_tools::parse_hexstr_to_binbuff(args[0], raw_tx_template);
+  if (!r)
+  {
+    fail_msg_writer() << "Failed to parse proposal hex to raw data";
+    return true;
+  }
+
+  view::ionic_swap_proposal_info proposal = AUTO_VAL_INIT(proposal);
+  if (!m_wallet->get_ionic_swap_proposal_info(raw_tx_template, proposal))
+  {
+    fail_msg_writer() << "Failed to decode proposal info";
+    return true;
+  }
+  std::string json_proposal = epee::serialization::store_t_to_json(proposal);
+
+
+  success_msg_writer() << "Proposal details: " << ENDL << json_proposal;
+
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::accept_ionic_swap_proposal(const std::vector<std::string> &args)
+{
+  if (args.size() != 1)
+  {
+    fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
+  }
+
+  std::string raw_tx_template;
+  bool r = epee::string_tools::parse_hexstr_to_binbuff(args[0], raw_tx_template);
+  if (!r)
+  {
+    fail_msg_writer() << "Failed to parse proposal hex to raw data";
+    return true;
+  }
+
+  currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
+  if (!m_wallet->accept_ionic_swap_proposal(raw_tx_template, result_tx))
+  {
+    fail_msg_writer() << "Failed accept ionic_swap proposal";
+    return true;
+  }
+
+  success_msg_writer() << "Proposal accepted and executed, tx_id : " << currency::get_transaction_hash(result_tx);
+
+  return true;
+}
+
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::remove_custom_asset_id(const std::vector<std::string> &args)
 {
@@ -2239,7 +2355,8 @@ int main(int argc, char* argv[])
     if (daemon_address.empty())
       daemon_address = std::string("http://") + daemon_host + ":" + std::to_string(daemon_port);
 
-    tools::wallet2 wal;
+    std::shared_ptr<tools::wallet2> wallet_ptr(new tools::wallet2());
+    tools::wallet2& wal = *wallet_ptr;
     //try to open it
     while (true)
     {
@@ -2295,7 +2412,7 @@ int main(int argc, char* argv[])
       }
     }
 
-    tools::wallet_rpc_server wrpc(wal);
+    tools::wallet_rpc_server wrpc(wallet_ptr);
     bool r = wrpc.init(vm);
     CHECK_AND_ASSERT_MES(r, EXIT_FAILURE, "Failed to initialize wallet rpc server");
 

@@ -334,6 +334,8 @@ namespace currency
 
     // returns true as soon as the hardfork is active for the NEXT upcoming block (not for the top block in the blockchain storage)
     bool is_hardfork_active(size_t hardfork_id) const;
+    bool fill_tx_rpc_inputs(tx_rpc_extended_info& tei, const transaction& tx) const;
+    bool fill_tx_rpc_details(tx_rpc_extended_info& tei, const transaction& tx, const transaction_chain_entry* ptce, const crypto::hash& h, uint64_t timestamp, bool is_short = false) const;
 
     wide_difficulty_type block_difficulty(size_t i)const;
     bool forecast_difficulty(std::vector<std::pair<uint64_t, wide_difficulty_type>> &out_height_2_diff_vector, bool pos) const;

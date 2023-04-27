@@ -44,6 +44,7 @@
 #include "wallet_chain_shortener.h"
 #include "tor-connect/torlib/tor_lib_iface.h"
 #include "currency_core/pos_mining.h"
+#include "view_iface.h"
 
 
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               10
@@ -126,6 +127,10 @@ namespace tools
     virtual void on_transfer_canceled(const wallet_public::wallet_transfer_info& wti) {}
     virtual void on_message(message_severity /*severity*/, const std::string& /*m*/) {}
     virtual void on_tor_status_change(const std::string& state) {}
+
+    //mw api
+    virtual void on_mw_get_wallets(std::vector<wallet_public::wallet_entry_info>& wallets) {}
+    virtual bool on_mw_select_wallet(uint64_t wallet_id) { return true; }
   };
 
   struct tx_dust_policy
@@ -295,8 +300,15 @@ namespace tools
     uint8_t tx_outs_attr = 0;
     bool shuffle = false;
     bool perform_packing = false;
+    bool need_at_least_1_zc = false;
   };
 
+  struct mode_separate_context
+  {
+    currency::transaction tx_for_mode_separate;
+    view::ionic_swap_proposal_info proposal_info;
+  };
+  
 
   struct selection_for_amount
   {
@@ -458,6 +470,21 @@ namespace tools
       crypto::hash related_tx_id = currency::null_hash; // tx id which caused money lock, if any (ex: escrow proposal transport tx)
     };
 
+    /*
+      This might be not the best solution so far, but after discussion with @sowle we came up to conclusion 
+      that passing great variety of arguments through the long call stack of different member functions of the wallet will
+      only complicate codebase and make it harder to understand. 
+      current_operation_context will keep pointers to some useful data, and every function that use it, should 
+      make sure(!!!) that pointer got nulled before pointed object got destroyed, likely by using SET_CONTEXT_OBJ_FOR_SCOPE macro
+
+    */
+    struct current_operation_context
+    {
+      construct_tx_param* pconstruct_tx_param = nullptr;
+      currency::finalize_tx_param* pfinalize_tx_param = nullptr;
+      const mode_separate_context* pmode_separate_context = nullptr;
+    };
+    
 
 
     typedef std::unordered_multimap<std::string, payment_details> payment_container;
@@ -559,6 +586,7 @@ namespace tools
     //i_wallet2_callback* callback() const { return m_wcallback; }
     //void callback(i_wallet2_callback* callback) { m_callback = callback; }
     void callback(std::shared_ptr<i_wallet2_callback> callback) { m_wcallback = callback; m_do_rise_transfer = (callback != nullptr); }
+    i_wallet2_callback* get_callback() { return m_wcallback.get(); }
     void set_do_rise_transfer(bool do_rise) { m_do_rise_transfer = do_rise; }
 
     bool has_related_alias_entry_unconfirmed(const currency::transaction& tx);
@@ -903,7 +931,7 @@ namespace tools
     const std::list<expiration_entry_info>& get_expiration_entries() const { return m_money_expirations; };
     bool get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) const;
 
-    void prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate = currency::transaction());
+    void prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const mode_separate_context& emode_separate = mode_separate_context());
 
     void finalize_transaction(const currency::finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key = true);
     void finalize_transaction(const currency::finalize_tx_param& ftp, currency::finalized_tx& result, bool broadcast_tx, bool store_tx_secret_key = true );
@@ -934,13 +962,29 @@ namespace tools
     void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin, currency::transaction& result_tx);
     void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin);
     bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin, crypto::hash& redeem_tx_id);
+
+    // ionic swaps:
+    bool create_ionic_swap_proposal(const wallet_public::ionic_swap_proposal_info& proposal_details, const currency::account_public_address& destination_addr, wallet_public::ionic_swap_proposal& proposal);
+    bool build_ionic_swap_template(const wallet_public::ionic_swap_proposal_info& proposal_detais, const currency::account_public_address& destination_addr,
+      wallet_public::ionic_swap_proposal& proposal,
+      std::vector<uint64_t>& selected_transfers_for_template);
+    bool get_ionic_swap_proposal_info(const std::string&raw_proposal, wallet_public::ionic_swap_proposal_info& proposal_info);
+    bool get_ionic_swap_proposal_info(const wallet_public::ionic_swap_proposal& proposal, wallet_public::ionic_swap_proposal_info& proposal_info);
+    bool get_ionic_swap_proposal_info(const wallet_public::ionic_swap_proposal& proposal, wallet_public::ionic_swap_proposal_info& proposal_info, wallet_public::ionic_swap_proposal_context& ionic_context);
+    bool accept_ionic_swap_proposal(const std::string& raw_proposal, currency::transaction& result_tx);
+    bool accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposal& proposal, currency::transaction& result_tx);
+
+    // Signing and auth
+    bool sign_buffer(const std::string& buff, crypto::signature& sig);
+    bool validate_sign(const std::string& buff, const crypto::signature& sig, const crypto::public_key& pkey);
+    bool encrypt_buffer(const std::string& buff, std::string& res_buff);
+    bool decrypt_buffer(const std::string& buff, std::string& res_buff);
+
 private:
 
     // -------- t_transport_state_notifier ------------------------------------------------
     virtual void notify_state_change(const std::string& state_code, const std::string& details = std::string());
     // ------------------------------------------------------------------------------------
-
-
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, uint64_t change_amount, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
     void load_keys(const std::string& keys_file_name, const std::string& password, uint64_t file_signature, keys_file_data& kf_data);
@@ -1081,7 +1125,7 @@ private:
     bool is_in_hardfork_zone(uint64_t hardfork_index) const;
     uint8_t out_get_mixin_attr(const currency::tx_out_v& out_t);
     const crypto::public_key& out_get_pub_key(const currency::tx_out_v& out_t, std::list<currency::htlc_info>& htlc_info_list);
-
+    bool expand_selection_with_zc_input(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes);
 
     void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
     void remove_transfer_from_amount_gindex_map(uint64_t tid);
@@ -1146,6 +1190,8 @@ private:
     mutable uint64_t m_current_wallet_file_size;
     bool m_use_deffered_global_outputs;
     bool m_disable_tor_relay;
+
+    mutable current_operation_context m_current_context;
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;
  

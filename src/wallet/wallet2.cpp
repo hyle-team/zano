@@ -42,6 +42,8 @@ using namespace epee;
 
 using namespace currency;
 
+#define SET_CONTEXT_OBJ_FOR_SCOPE(name, obj)  m_current_context.name = &obj; \
+    auto COMBINE(auto_scope_var_, __LINE__) = epee::misc_utils::create_scope_leave_handler([&]() { m_current_context.name = nullptr; });
 
 
 #define MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES (100*1024*1024) // 100 MB
@@ -934,7 +936,9 @@ void wallet2::accept_proposal(const crypto::hash& contract_id, uint64_t b_accept
 
   construct_tx_param construct_param = AUTO_VAL_INIT(construct_param);
   construct_param.fee = b_acceptance_fee;
-  currency::transaction tx = contr_it->second.proposal.tx_template;
+  mode_separate_context msc = AUTO_VAL_INIT(msc);
+  msc.tx_for_mode_separate = contr_it->second.proposal.tx_template;
+  currency::transaction& tx = msc.tx_for_mode_separate;
   crypto::secret_key one_time_key = contr_it->second.proposal.tx_onetime_secret_key;
   construct_param.crypt_address = m_account.get_public_address();
   construct_param.flags = TX_FLAG_SIGNATURE_MODE_SEPARATE;
@@ -992,7 +996,7 @@ void wallet2::accept_proposal(const crypto::hash& contract_id, uint64_t b_accept
   //build transaction
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   ftp.tx_version = this->get_current_tx_version();
-  prepare_transaction(construct_param, ftp, tx);
+  prepare_transaction(construct_param, ftp, msc);
   mark_transfers_as_spent(ftp.selected_transfers, std::string("contract <") + epee::string_tools::pod_to_hex(contract_id) + "> has been accepted with tx <" + epee::string_tools::pod_to_hex(get_transaction_hash(tx)) + ">");
 
   try
@@ -4739,7 +4743,7 @@ void wallet2::build_escrow_template(const bc_services::contract_private_details&
 
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   ftp.tx_version = this->get_current_tx_version();
-  prepare_transaction(ctp, ftp, tx);
+  prepare_transaction(ctp, ftp);
 
   selected_transfers = ftp.selected_transfers;
 
@@ -4989,6 +4993,337 @@ bool wallet2::check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& o
     return true;
   }
   return false;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::create_ionic_swap_proposal(const wallet_public::ionic_swap_proposal_info& proposal_details, const currency::account_public_address& destination_addr, wallet_public::ionic_swap_proposal& proposal)
+{
+  std::vector<uint64_t> selected_transfers_for_template;
+  
+  build_ionic_swap_template(proposal_details, destination_addr, proposal, selected_transfers_for_template);
+
+  const uint32_t mask_to_mark_escrow_template_locked_transfers = WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION;
+  mark_transfers_with_flag(selected_transfers_for_template, mask_to_mark_escrow_template_locked_transfers, "preparing ionic_swap");
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal_info& proposal_detais, const currency::account_public_address& destination_addr,
+  wallet_public::ionic_swap_proposal& proposal,
+  std::vector<uint64_t>& selected_transfers)
+{
+  construct_tx_param ctp = get_default_construct_tx_param();
+  
+  ctp.fake_outputs_count = proposal_detais.mixins;
+  ctp.fee = proposal_detais.fee_paid_by_a;
+  ctp.flags = TX_FLAG_SIGNATURE_MODE_SEPARATE;
+  ctp.mark_tx_as_complete = false;
+  ctp.crypt_address = destination_addr;
+  
+  etc_tx_details_expiration_time t = AUTO_VAL_INIT(t);
+  t.v = proposal_detais.expiration_time;
+  ctp.extra.push_back(t);
+
+  ctp.dsts.resize(proposal_detais.to_bob.size() + proposal_detais.to_alice.size());
+  size_t i = 0;
+  // Here is an proposed for exchange funds
+  for (; i != proposal_detais.to_bob.size(); i++)
+  {
+    ctp.dsts[i].amount = proposal_detais.to_bob[i].amount;
+    ctp.dsts[i].amount_to_provide = proposal_detais.to_bob[i].amount;
+    ctp.dsts[i].flags |= tx_destination_entry_flags::tdef_explicit_amount_to_provide;
+    ctp.dsts[i].addr.push_back(destination_addr);
+    ctp.dsts[i].asset_id = proposal_detais.to_bob[i].asset_id;
+  }
+  // Here is an expected in return funds
+  for (size_t j = 0; j != proposal_detais.to_alice.size(); j++, i++)
+  {
+    ctp.dsts[i].amount = proposal_detais.to_alice[j].amount;
+    ctp.dsts[i].amount_to_provide = 0;
+    ctp.dsts[i].flags |= tx_destination_entry_flags::tdef_explicit_amount_to_provide;
+    ctp.dsts[i].addr.push_back(m_account.get_public_address());
+    ctp.dsts[i].asset_id = proposal_detais.to_alice[j].asset_id;
+  }
+
+  currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  ftp.mode_separate_fee = ctp.fee;
+  ftp.tx_version = this->get_current_tx_version();
+  prepare_transaction(ctp, ftp);
+
+  selected_transfers = ftp.selected_transfers;
+  currency::finalized_tx finalize_result = AUTO_VAL_INIT(finalize_result);
+  finalize_transaction(ftp, finalize_result, false);
+  add_transfers_to_expiration_list(selected_transfers, proposal_detais.expiration_time, 0, currency::null_hash);
+
+  //wrap it all 
+  proposal.tx_template = finalize_result.tx;
+  wallet_public::ionic_swap_proposal_context ispc = AUTO_VAL_INIT(ispc);
+  ispc.gen_context = finalize_result.ftp.gen_context;
+  ispc.one_time_skey = finalize_result.one_time_key;
+  std::string proposal_context_blob = t_serializable_object_to_blob(ispc);
+  proposal.encrypted_context = crypto::chacha_crypt(static_cast<const std::string&>(proposal_context_blob), finalize_result.derivation); 
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::get_ionic_swap_proposal_info(const std::string&raw_proposal, wallet_public::ionic_swap_proposal_info& proposal_info)
+{
+  wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
+  bool r = t_unserializable_object_from_blob(proposal, raw_proposal);
+  THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, "Failed to parse proposal");
+  return get_ionic_swap_proposal_info(proposal, proposal_info);
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_proposal& proposal, wallet_public::ionic_swap_proposal_info& proposal_info)
+{
+  wallet_public::ionic_swap_proposal_context ionic_context = AUTO_VAL_INIT(ionic_context);
+  return get_ionic_swap_proposal_info(proposal, proposal_info, ionic_context);
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_proposal& proposal, wallet_public::ionic_swap_proposal_info& proposal_info, wallet_public::ionic_swap_proposal_context& ionic_context)
+{
+  const transaction& tx = proposal.tx_template;
+  crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
+  std::vector<wallet_out_info> outs;
+  uint64_t tx_money_got_in_outs = 0;
+  bool r = lookup_acc_outs(m_account.get_keys(), tx, outs, tx_money_got_in_outs, derivation);
+  THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to lookup_acc_outs for tx: " << get_transaction_hash(tx));
+
+  if (!outs.size())
+  {
+    return false;
+  }
+
+  //decrypt context
+  std::string decrypted_raw_context = crypto::chacha_crypt(proposal.encrypted_context, derivation);
+  r = t_unserializable_object_from_blob(ionic_context, decrypted_raw_context);
+  THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to unserialize decrypted ionic_context");
+
+  r = validate_tx_output_details_againt_tx_generation_context(tx, ionic_context.gen_context, ionic_context.one_time_skey);
+  THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to validate decrypted ionic_context");
+
+  std::unordered_map<crypto::public_key, uint64_t> amounts_provided_by_a;
+
+  std::unordered_map<crypto::public_key, uint64_t> ammounts_to_a; //amounts to Alice (the one who created proposal), should be NOT funded
+  std::unordered_map<crypto::public_key, uint64_t> ammounts_to_b; //amounts to Bob (the one who received proposal), should BE funded
+  std::vector<bool> bob_outs;
+  bob_outs.resize(proposal.tx_template.vout.size());
+ 
+  for (const auto& o : outs)
+  {
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.asset_ids.size() > o.index, "Tx gen context has mismatch with tx(asset_ids) ");
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.asset_ids[o.index].to_public_key() == o.asset_id, "Tx gen context has mismatch with tx(asset_id != asset_id) ");
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.amounts[o.index].m_u64[0] == o.amount, "Tx gen context has mismatch with tx(amount != amount)");
+
+    ammounts_to_b[o.asset_id] += o.amount;
+    bob_outs[o.index] = true;
+  }
+  size_t i = 0;
+  //validate outputs against decrypted tx generation context
+  for (i = 0; i != tx.vout.size(); i++)
+  {
+
+    if (bob_outs[i])
+    {
+      continue;
+    }
+
+    crypto::public_key asset_id = ionic_context.gen_context.asset_ids[i].to_public_key();
+    uint64_t amount = ionic_context.gen_context.amounts[i].m_u64[0];
+    ammounts_to_a[asset_id] += amount;
+  }
+
+  //read amounts already provided by third party
+  size_t zc_current_index = 0; //some inputs might be old ones, so it's asset id assumed as native and there is no entry for it in real_zc_ins_asset_ids
+  //THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.input_amounts.size() == tx.vin.size(), "Tx gen context has mismatch with tx(amount != amount)");
+  for (i = 0; i != tx.vin.size(); i++)
+  {
+    size_t mx = 0;
+    uint64_t amount = 0;
+    crypto::public_key in_asset_id = currency::native_coin_asset_id;
+    if (tx.vin[i].type() == typeid(txin_zc_input))
+    {
+      in_asset_id = ionic_context.gen_context.real_zc_ins_asset_ids[zc_current_index].to_public_key();
+      amount = ionic_context.gen_context.zc_input_amounts[zc_current_index];
+      zc_current_index++;
+      mx = boost::get<currency::txin_zc_input>(tx.vin[i]).key_offsets.size() - 1;
+    }
+    else if (tx.vin[i].type() == typeid(txin_to_key))
+    {
+      amount = boost::get<txin_to_key>(tx.vin[i]).amount;
+      mx = boost::get<currency::txin_to_key>(tx.vin[i]).key_offsets.size() - 1;
+    }
+    else
+    {
+      WLT_LOG_RED("Unexpected type of input in ionic_swap tx: " << tx.vin[i].type().name(), LOG_LEVEL_0);
+      return false;
+    }
+    amounts_provided_by_a[in_asset_id] += amount;
+    
+    if (proposal_info.mixins == 0 || proposal_info.mixins > mx)
+    {
+      proposal_info.mixins = mx;
+    }
+
+  }
+
+  //this might be 0, if Alice don't want to pay fee herself
+  proposal_info.fee_paid_by_a = currency::get_tx_fee(tx);
+  if (proposal_info.fee_paid_by_a)
+  {
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(amounts_provided_by_a[currency::native_coin_asset_id] >= proposal_info.fee_paid_by_a, "Fee mentioned as specified but not provided by A");
+    amounts_provided_by_a[currency::native_coin_asset_id] -= proposal_info.fee_paid_by_a;
+  }
+
+  //proposal_info.fee = currency::get_tx_fee(tx);
+  //need to make sure that funds for Bob properly funded
+  for (const auto& a : ammounts_to_b)
+  {
+    uint64_t amount_sent_back_to_alice = ammounts_to_a[a.first];
+
+    if (amounts_provided_by_a[a.first] < (a.second + amount_sent_back_to_alice) )
+    {
+      WLT_LOG_RED("Amount[" << a.first << "] provided by Alice(" << amounts_provided_by_a[a.first] << ") is less then transfered to Bob(" << a.second <<")", LOG_LEVEL_0);
+      return false;
+    }
+    amounts_provided_by_a[a.first] -= (amount_sent_back_to_alice + a.second);
+    proposal_info.to_bob.push_back(view::asset_funds{ a.first, a.second });
+    //clean accounted assets
+    ammounts_to_a.erase(ammounts_to_a.find(a.first));
+    if (amounts_provided_by_a[a.first] > 0)
+    {
+      WLT_LOG_RED("Amount[" << a.first << "] provided by Alice has unused leftovers: " << amounts_provided_by_a[a.first], LOG_LEVEL_0);
+      return false;
+    }
+  }
+
+  //need to see what Alice actually expect in return
+  for (const auto& a : ammounts_to_a)
+  {
+    //now amount provided by A should be less or equal to what we have in a.second 
+    if (amounts_provided_by_a[a.first] > a.second)
+    {
+      //could be fee
+      WLT_LOG_RED("Amount[" << a.first << "] provided by Alice has unused leftovers: " << amounts_provided_by_a[a.first], LOG_LEVEL_0);
+      return false;
+    }
+
+    proposal_info.to_alice.push_back(view::asset_funds{ a.first, a.second - amounts_provided_by_a[a.first] });
+  }
+    
+  etc_tx_details_expiration_time t = AUTO_VAL_INIT(t);
+  if (!get_type_in_variant_container(tx.extra, t))
+  {
+    return false;
+  }
+
+  proposal_info.expiration_time = t.v;
+  return true;
+}
+
+//----------------------------------------------------------------------------------------------------
+bool wallet2::accept_ionic_swap_proposal(const std::string& raw_proposal, currency::transaction& result_tx)
+{
+  wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
+  bool r = t_unserializable_object_from_blob(proposal, raw_proposal);
+  THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, "Failed to parse proposal info");
+
+  return accept_ionic_swap_proposal(proposal, result_tx);
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposal& proposal, currency::transaction& result_tx)
+{
+  mode_separate_context msc = AUTO_VAL_INIT(msc);
+  msc.tx_for_mode_separate = proposal.tx_template;
+  result_tx = msc.tx_for_mode_separate;
+
+  wallet_public::ionic_swap_proposal_context ionic_context = AUTO_VAL_INIT(ionic_context);
+  bool r = get_ionic_swap_proposal_info(proposal, msc.proposal_info, ionic_context);
+  THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, "Failed to get info from proposal");
+
+  std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base> balances;
+  uint64_t mined = 0;
+  this->balance(balances, mined);
+  //validate balances needed 
+  uint64_t native_amount_required = 0;
+  for (const auto& item : msc.proposal_info.to_alice)
+  {
+    if (balances[item.asset_id].unlocked < item.amount)
+    {
+      return false;
+    }
+    if (item.asset_id == currency::native_coin_asset_id)
+    {
+      native_amount_required = item.amount;
+    }
+  }
+
+  // balances is ok, check if fee is added to tx
+  uint64_t additional_fee = 0;
+  if (msc.proposal_info.fee_paid_by_a < m_core_runtime_config.tx_default_fee)
+  {
+    additional_fee = m_core_runtime_config.tx_default_fee - msc.proposal_info.fee_paid_by_a;
+    if (balances[currency::native_coin_asset_id].unlocked < additional_fee + native_amount_required)
+    {
+      return false;
+    }
+  }
+
+  //everything is seemed to be ok
+
+  construct_tx_param construct_param = get_default_construct_tx_param();
+  construct_param.fee = additional_fee;
+  
+  crypto::secret_key one_time_key = ionic_context.one_time_skey;
+  construct_param.crypt_address = m_account.get_public_address();
+  construct_param.flags = TX_FLAG_SIGNATURE_MODE_SEPARATE;
+  construct_param.mark_tx_as_complete = true;
+
+  //build transaction
+  currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  ftp.tx_version = this->get_current_tx_version();
+  ftp.gen_context = ionic_context.gen_context;  
+  prepare_transaction(construct_param, ftp, msc);
+
+
+
+  try
+  {
+    finalize_transaction(ftp, result_tx, one_time_key, true);
+  }
+  catch (...)
+  {
+    clear_transfers_from_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_SPENT, std::string("exception in finalize_transaction, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(result_tx)));
+    throw;
+  }
+  mark_transfers_as_spent(ftp.selected_transfers, std::string("Proposal has been accepted with tx <" + epee::string_tools::pod_to_hex(get_transaction_hash(result_tx))) + ">");
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+
+// Signing and auth
+bool wallet2::sign_buffer(const std::string& buff, crypto::signature& sig)
+{
+  crypto::hash h = crypto::cn_fast_hash(buff.data(), buff.size());
+  crypto::generate_signature(h, m_account.get_public_address().spend_public_key, m_account.get_keys().spend_secret_key, sig);
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::validate_sign(const std::string& buff, const crypto::signature& sig, const crypto::public_key& pkey)
+{
+  crypto::hash h = crypto::cn_fast_hash(buff.data(), buff.size());
+  return crypto::check_signature(h, pkey, sig);
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::encrypt_buffer(const std::string& buff, std::string& res_buff)
+{
+  res_buff = buff;
+  crypto::chacha_crypt(res_buff, m_account.get_keys().view_secret_key);
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::decrypt_buffer(const std::string& buff, std::string& res_buff)
+{
+  res_buff = buff;
+  crypto::chacha_crypt(res_buff, m_account.get_keys().view_secret_key);
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
@@ -5271,16 +5606,21 @@ assets_selection_context wallet2::get_needed_money(uint64_t fee, const std::vect
   amounts_map[currency::native_coin_asset_id].needed_amount = fee;
   for(auto& dt : dsts)
   {
-    if(dt.asset_id == currency::ffff_pkey)
+    if(dt.asset_id == currency::null_pkey)
       continue;     //this destination for emmition only
 
     THROW_IF_TRUE_WALLET_EX(0 == dt.amount, error::zero_destination);
     uint64_t money_to_add = dt.amount;
-    if (dt.amount_to_provide)
+    if (dt.amount_to_provide || dt.flags & tx_destination_entry_flags::tdef_explicit_amount_to_provide)
       money_to_add = dt.amount_to_provide;
   
     amounts_map[dt.asset_id].needed_amount += money_to_add;
     THROW_IF_TRUE_WALLET_EX(amounts_map[dt.asset_id].needed_amount < money_to_add, error::tx_sum_overflow, dsts, fee);
+    //clean up empty entries
+    if (amounts_map[dt.asset_id].needed_amount == 0)
+    {
+      amounts_map.erase(amounts_map.find(dt.asset_id));
+    }
   }
   return std::move(amounts_map);
 }
@@ -5559,6 +5899,38 @@ bool wallet2::get_actual_offers(std::list<bc_services::offer_details_ex>& offers
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::expand_selection_with_zc_input(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes)
+{
+
+    free_amounts_cache_type& found_free_amounts = m_found_free_amounts[currency::native_coin_asset_id];
+    auto& asset_needed_money_item = needed_money_map[currency::native_coin_asset_id];
+    //need to add ZC input
+    for (auto it = found_free_amounts.begin(); it != found_free_amounts.end(); it++)
+    {
+      for (auto it_in_amount = it->second.begin(); it_in_amount != it->second.end(); it_in_amount++)
+      {
+        if (!m_transfers[*it_in_amount].is_zc())
+        {
+          continue;
+        }
+
+        if (is_transfer_ready_to_go(m_transfers[*it->second.begin()], fake_outputs_count))
+        {
+          asset_needed_money_item.found_amount += it->first;
+          selected_indexes.push_back(*it_in_amount);
+          it->second.erase(it_in_amount);
+          if (!it->second.size())
+          {
+            found_free_amounts.erase(it);
+          }
+          return true;
+        }
+      }
+    }
+    WLT_THROW_IF_FALSE_WALLET_EX_MES(false , error::no_zc_inputs, "Missing ZC inputs for TX_FLAG_SIGNATURE_MODE_SEPARATE operation");
+    return true;
+}
+//----------------------------------------------------------------------------------------------------
 bool wallet2::select_indices_for_transfer(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes)
 {
   bool res = true;
@@ -5570,6 +5942,24 @@ bool wallet2::select_indices_for_transfer(assets_selection_context& needed_money
     item.second.found_amount = select_indices_for_transfer(selected_indexes, asset_cashe_it->second, item.second.needed_amount, fake_outputs_count);
     WLT_THROW_IF_FALSE_WALLET_EX_MES(item.second.found_amount >= item.second.needed_amount, error::not_enough_money, "", item.second.found_amount, item.second.needed_amount, 0, item.first);
   }
+  if (m_current_context.pconstruct_tx_param && m_current_context.pconstruct_tx_param->need_at_least_1_zc)
+  {
+    bool found_zc_input = false;
+    for (auto i : selected_indexes)
+    {
+      if (m_transfers[i].is_zc())
+      {
+        found_zc_input = true;
+        break;
+      }
+    }
+    if (!found_zc_input)
+    {
+      expand_selection_with_zc_input(needed_money_map, fake_outputs_count, selected_indexes);
+    }
+  }
+
+
   return res;
 }
 //----------------------------------------------------------------------------------------------------
@@ -5577,6 +5967,7 @@ uint64_t wallet2::select_indices_for_transfer(std::vector<uint64_t>& selected_in
 {
   WLT_LOG_GREEN("Selecting indices for transfer of " << print_money_brief(needed_money) << " with " << fake_outputs_count << " fake outs, found_free_amounts.size()=" << found_free_amounts.size() << "...", LOG_LEVEL_0);
   uint64_t found_money = 0;
+  //uint64_t found_zc_input = false;
   std::string selected_amounts_str;
   while (found_money < needed_money && found_free_amounts.size())
   {
@@ -5598,6 +5989,7 @@ uint64_t wallet2::select_indices_for_transfer(std::vector<uint64_t>& selected_in
       found_free_amounts.erase(it);
 
   }
+  
   WLT_LOG_GREEN("Found " << print_money_brief(found_money) << " as " << selected_indexes.size() << " out(s): " << selected_amounts_str << ", found_free_amounts.size()=" << found_free_amounts.size(), LOG_LEVEL_0);
   return found_money;
 }
@@ -5721,11 +6113,16 @@ bool wallet2::read_money_transfer2_details_from_tx(const transaction& tx, const 
     else if (i.type() == typeid(currency::txin_zc_input))
     {
       const currency::txin_zc_input& in_zc = boost::get<currency::txin_zc_input>(i);
-      auto it = m_key_images.find(in_zc.k_image);
       //should we panic if image not found?
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_key_images.end(), "[read_money_transfer2_details_from_tx]Unknown key image in tx: " << get_transaction_hash(tx));
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second < m_transfers.size(), "[read_money_transfer2_details_from_tx]Index out of range for key image in tx: " << get_transaction_hash(tx));
-      wtd.spn.push_back(m_transfers[it->second].amount());
+      //@zoidberg: nope!
+      if (m_key_images.count(in_zc.k_image))
+      {
+        auto it = m_key_images.find(in_zc.k_image);
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_key_images.end(), "[read_money_transfer2_details_from_tx]Unknown key image in tx: " << get_transaction_hash(tx));
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second < m_transfers.size(), "[read_money_transfer2_details_from_tx]Index out of range for key image in tx: " << get_transaction_hash(tx));
+        wtd.spn.push_back(m_transfers[it->second].amount());
+      }
+
     }
   }
   return true;
@@ -5917,7 +6314,7 @@ void wallet2::prepare_tx_destinations(const assets_selection_context& needed_mon
   {
     // special case for asset minting destinations
     for (auto& dst : dsts)
-      if (dst.asset_id == currency::ffff_pkey)
+      if (dst.asset_id == currency::null_pkey)
         final_destinations.emplace_back(dst.amount, dst.addr, dst.asset_id);
 
     // if there's not ehough destinations items (i.e. outputs), split the last one
@@ -5976,20 +6373,29 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const currency::transaction& tx_for_mode_separate /* = currency::transaction() */)
+void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const mode_separate_context& mode_separatemode_separate)
 {
+
+  SET_CONTEXT_OBJ_FOR_SCOPE(pconstruct_tx_param, ctp);
+  SET_CONTEXT_OBJ_FOR_SCOPE(pfinalize_tx_param, ftp);
+  SET_CONTEXT_OBJ_FOR_SCOPE(pmode_separate_context, mode_separatemode_separate);
+
   TIME_MEASURE_START_MS(get_needed_money_time);
 
+  const currency::transaction& tx_for_mode_separate = mode_separatemode_separate.tx_for_mode_separate;
   assets_selection_context needed_money_map = get_needed_money(ctp.fee, ctp.dsts);
 
   //
   // TODO @#@# need to do refactoring over this part to support hidden amounts and asset_id
   //
-
   if (ctp.flags & TX_FLAG_SIGNATURE_MODE_SEPARATE && tx_for_mode_separate.vout.size() )
   {
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(get_tx_flags(tx_for_mode_separate) & TX_FLAG_SIGNATURE_MODE_SEPARATE, "tx_param.flags differs from tx.flags");
-    needed_money_map[currency::null_pkey].needed_amount += (currency::get_outs_money_amount(tx_for_mode_separate) - get_inputs_money_amount(tx_for_mode_separate));
+    for (const auto& el : mode_separatemode_separate.proposal_info.to_alice)
+    {
+      needed_money_map[el.asset_id].needed_amount += el.amount;
+    }
+    ctp.need_at_least_1_zc = true;
   }
   TIME_MEASURE_FINISH_MS(get_needed_money_time);
 
@@ -6004,15 +6410,15 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   {
     //htlc
     //@#@ need to do refactoring over this part to support hidden amounts and asset_id
-    prepare_tx_sources_htlc(ctp.htlc_tx_id, ctp.htlc_origin, ftp.sources, needed_money_map[currency::null_pkey].found_amount);
+    prepare_tx_sources_htlc(ctp.htlc_tx_id, ctp.htlc_origin, ftp.sources, needed_money_map[currency::native_coin_asset_id].found_amount);
     WLT_THROW_IF_FALSE_WITH_CODE(ctp.dsts.size() == 1,
       "htlc: unexpected ctp.dsts.size() =" << ctp.dsts.size(), API_RETURN_CODE_INTERNAL_ERROR);
 
-    WLT_THROW_IF_FALSE_WITH_CODE(needed_money_map[currency::null_pkey].found_amount > ctp.fee,
+    WLT_THROW_IF_FALSE_WITH_CODE(needed_money_map[currency::native_coin_asset_id].found_amount > ctp.fee,
       "htlc: found money less then fee", API_RETURN_CODE_INTERNAL_ERROR);
 
     //fill amount
-    ctp.dsts.begin()->amount = needed_money_map[currency::null_pkey].found_amount - ctp.fee;
+    ctp.dsts.begin()->amount = needed_money_map[currency::native_coin_asset_id].found_amount - ctp.fee;
     
   }
   else if (ctp.multisig_id != currency::null_hash)

@@ -802,7 +802,7 @@ void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
   wo.m_pproxy_diagnostig_info = m_rpc_proxy->get_proxy_diagnostic_info();
   wo.pview = m_pview;  
   wo.has_related_alias_in_unconfirmed = false;
-  wo.rpc_wrapper.reset(new tools::wallet_rpc_server(*wo.w.unlocked_get().get()));
+  wo.rpc_wrapper.reset(new tools::wallet_rpc_server(wo.w.unlocked_get()));
   if (m_remote_node_mode)
     wo.core_conf = currency::get_default_core_runtime_config();
   else
@@ -876,6 +876,80 @@ std::string wallets_manager::get_fav_offers(const std::list<bc_services::offer_i
 #endif
 }
 
+std::string wallets_manager::create_ionic_swap_proposal(uint64_t wallet_id, const tools::wallet_public::create_ionic_swap_proposal_request& proposal_req, std::string& result_proposal_hex)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, wo);
+  try {
+    currency::account_public_address dest_account = AUTO_VAL_INIT(dest_account);
+    if (!currency::get_account_address_from_str(dest_account, proposal_req.destination_add))
+    {
+      return API_RETURN_CODE_BAD_ARG;
+    }
+    tools::wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
+    bool r = wo.w->get()->create_ionic_swap_proposal(proposal_req.proposal_info, dest_account, proposal);
+    if (!r)
+    {
+      return API_RETURN_CODE_FAIL;
+    }
+    else
+    {
+      result_proposal_hex = epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(proposal));
+      return API_RETURN_CODE_OK;
+    }
+  }
+  catch (...)
+  {
+    return API_RETURN_CODE_FAIL;
+  }
+  return API_RETURN_CODE_OK;
+}
+
+std::string wallets_manager::get_ionic_swap_proposal_info(uint64_t wallet_id, std::string&raw_tx_template_hex, tools::wallet_public::ionic_swap_proposal_info& proposal)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, wo);
+  try {
+    std::string raw_tx_template;
+    bool r = epee::string_tools::parse_hexstr_to_binbuff(raw_tx_template_hex, raw_tx_template);
+    if (!r)
+    {
+      return API_RETURN_CODE_BAD_ARG;
+    }
+
+    if (!wo.w->get()->get_ionic_swap_proposal_info(raw_tx_template, proposal))
+    {
+      return API_RETURN_CODE_FAIL;
+    }
+  }
+  catch (...)
+  {
+    return API_RETURN_CODE_FAIL;
+  }
+  return API_RETURN_CODE_OK;
+}
+
+std::string wallets_manager::accept_ionic_swap_proposal(uint64_t wallet_id, std::string&raw_tx_template_hex, std::string& result_raw_tx_hex)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, wo);
+  try {
+    std::string raw_tx_template;
+    bool r = epee::string_tools::parse_hexstr_to_binbuff(raw_tx_template_hex, raw_tx_template);
+    if (!r)
+    {
+      return API_RETURN_CODE_BAD_ARG;
+    }
+    currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
+    if (!wo.w->get()->accept_ionic_swap_proposal(raw_tx_template, result_tx))
+    {
+      return API_RETURN_CODE_FAIL;
+    }
+    result_raw_tx_hex = epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(result_tx));
+  }
+  catch (...)
+  {
+    return API_RETURN_CODE_FAIL;
+  }
+  return API_RETURN_CODE_OK;
+}
 std::string wallets_manager::get_my_offers(const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers)
 {
   if (m_remote_node_mode)
@@ -1297,6 +1371,8 @@ std::string wallets_manager::get_alias_info_by_name(const std::string& name, cur
   if (!r)
     return API_RETURN_CODE_FAIL;
 
+  if (res.status == API_RETURN_CODE_NOT_FOUND)
+    return API_RETURN_CODE_NOT_FOUND;
 
   res_details.alias = name;
   res_details.details = res.alias_details;
@@ -1923,7 +1999,13 @@ void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet
   tei.ti = wti;
 
   SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
-  auto& w = m_wallets[wallet_id].w;
+  auto it = m_wallets.find(wallet_id);
+  if (it == m_wallets.end())
+  {
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "on_transfer_canceled() wallet with id = " << wallet_id << " not found");
+    return;
+  }
+  auto& w = it->second.w;
   if (w->get() != nullptr)
   {
     w->get()->balance(tei.balances, tei.total_mined);
@@ -1931,7 +2013,7 @@ void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet
   }
   else
   {
-    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "on_transfer() wallet with id = " << wallet_id << " not found");
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "on_transfer_canceled() wallet with id = " << wallet_id << "  has nullptr");
   }
   m_pview->money_transfer_cancel(tei);
 }
@@ -1941,6 +2023,31 @@ void wallets_manager::on_tor_status_change(size_t wallet_id, const std::string& 
   view::current_action_status tsu = { wallet_id , state };
   m_pview->update_tor_status(tsu);
 }
+
+void wallets_manager::on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets)
+{
+  std::list<view::open_wallet_response> opened_wallets;
+  this->get_opened_wallets(opened_wallets);
+  wallets.resize(opened_wallets.size());
+  size_t i = 0;
+  for (const auto& item : opened_wallets)
+  {
+    wallets[i].wi = item.wi;
+    wallets[i].wallet_id = item.wallet_id;
+    i++;
+  }
+}
+bool wallets_manager::on_mw_select_wallet(uint64_t wallet_id)
+{
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);    
+  auto it = m_wallets.find(wallet_id);      
+  if (it == m_wallets.end())                
+    return false; 
+  auto& wo = it->second;
+  //m_wallet_rpc_server.reset_active_wallet(wo.w);
+  return false;
+}
+
 
 void wallets_manager::wallet_vs_options::worker_func()
 {

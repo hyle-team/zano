@@ -111,7 +111,7 @@ bool isolate_auditable_and_proof::c1(currency::core& c, size_t ev_index, const s
 
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
-  tools::wallet_rpc_server miner_wlt_rpc(*auditable_test_instance);
+  tools::wallet_rpc_server miner_wlt_rpc(auditable_test_instance);
   tools::wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::request req = AUTO_VAL_INIT(req);
   tools::wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::response res = AUTO_VAL_INIT(res);
   req.count = 100;

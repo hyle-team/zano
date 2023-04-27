@@ -22,7 +22,7 @@ namespace tools
   public:
     typedef epee::net_utils::connection_context_base connection_context;
 
-    wallet_rpc_server(wallet2& cr);
+    wallet_rpc_server(std::shared_ptr<wallet2> wptr);
 
     const static command_line::arg_descriptor<std::string> arg_rpc_bind_port;
     const static command_line::arg_descriptor<std::string> arg_rpc_bind_ip;
@@ -73,6 +73,20 @@ namespace tools
         MAP_JON_RPC_WE("atomics_redeem_htlc", on_redeem_htlc,                           wallet_public::COMMAND_REDEEM_HTLC)
         MAP_JON_RPC_WE("atomics_check_htlc_redeemed", on_check_htlc_redeemed,           wallet_public::COMMAND_CHECK_HTLC_REDEEMED)
 
+        //IONIC_SWAPS API
+        MAP_JON_RPC_WE("ionic_swap_generate_proposal", on_ionic_swap_generate_proposal, wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL)
+        MAP_JON_RPC_WE("ionic_swap_get_proposal_info", on_ionic_swap_get_proposal_info, wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO)
+        MAP_JON_RPC_WE("ionic_swap_accept_proposal", on_ionic_swap_accept_proposal,     wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL)
+
+        //MULTIWALLET APIs
+        MAP_JON_RPC_WE("mw_get_wallets",   on_mw_get_wallets,       wallet_public::COMMAND_MW_GET_WALLETS)
+        MAP_JON_RPC_WE("mw_select_wallet", on_mw_select_wallet,     wallet_public::COMMAND_MW_SELECT_WALLET)
+
+        //basic crypto operations
+        MAP_JON_RPC_WE("sign_message",       on_sign_message,         wallet_public::COMMAND_SIGN_MESSAGE)
+        MAP_JON_RPC_WE("validate_signature", on_validate_signature,   wallet_public::COMMAND_VALIDATE_SIGNATURE)
+        MAP_JON_RPC_WE("encrypt_data",       on_encrypt_data,         wallet_public::COMMAND_ENCRYPT_DATA)
+        MAP_JON_RPC_WE("decrypt_data",       on_decrypt_data,         wallet_public::COMMAND_DECRYPT_DATA)
       END_JSON_RPC_MAP()
     END_URI_MAP2()
 
@@ -114,11 +128,28 @@ namespace tools
       bool on_redeem_htlc(const wallet_public::COMMAND_REDEEM_HTLC::request& req, wallet_public::COMMAND_REDEEM_HTLC::response& res, epee::json_rpc::error& er, connection_context& cntx);
       bool on_check_htlc_redeemed(const wallet_public::COMMAND_CHECK_HTLC_REDEEMED::request& req, wallet_public::COMMAND_CHECK_HTLC_REDEEMED::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
+      bool on_ionic_swap_generate_proposal(const wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL::request& req, wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_ionic_swap_get_proposal_info(const wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO::request& req, wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_ionic_swap_accept_proposal(const wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL::request& req, wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx);
+
+      bool on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS::request& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_mw_select_wallet(const wallet_public::COMMAND_MW_SELECT_WALLET::request& req, wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, connection_context& cntx);
+
+      bool on_sign_message(const wallet_public::COMMAND_SIGN_MESSAGE::request& req, wallet_public::COMMAND_SIGN_MESSAGE::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_validate_signature(const wallet_public::COMMAND_VALIDATE_SIGNATURE::request& req, wallet_public::COMMAND_VALIDATE_SIGNATURE::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_encrypt_data(const wallet_public::COMMAND_ENCRYPT_DATA::request& req, wallet_public::COMMAND_ENCRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx);
+      bool on_decrypt_data(const wallet_public::COMMAND_DECRYPT_DATA::request& req, wallet_public::COMMAND_DECRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx);
+
+
+
+      std::shared_ptr<wallet2> get_wallet();
+      
+      bool reset_active_wallet(std::shared_ptr<wallet2> w);
 
       bool handle_command_line(const boost::program_options::variables_map& vm);
 
   private:
-      wallet2& m_wallet;
+      std::weak_ptr<wallet2> m_pwallet;
       std::string m_port;
       std::string m_bind_ip;
       bool m_do_mint;

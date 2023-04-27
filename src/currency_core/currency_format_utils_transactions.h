@@ -94,6 +94,13 @@ namespace currency
   };
 
 
+  enum tx_destination_entry_flags
+  {
+    tdef_none = 0,
+    tdef_explicit_native_asset_id =     0x0001,
+    tdef_explicit_amount_to_provide =   0x0002
+  };
+
   struct tx_destination_entry
   {
     uint64_t amount = 0;                                // money
@@ -103,7 +110,7 @@ namespace currency
     uint64_t unlock_time = 0;
     destination_option_htlc_out htlc_options;           // htlc options    
     crypto::public_key asset_id = currency::native_coin_asset_id; // not blinded, not premultiplied
-    bool explicit_native_asset_id = false;
+    uint64_t flags = 0;                                 // set of flags (see tx_destination_entry_flags)
     
     tx_destination_entry() = default;
     tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad) {}
@@ -123,7 +130,7 @@ namespace currency
       FIELD(unlock_time)
       FIELD(htlc_options)
       FIELD(asset_id)
-      FIELD(explicit_native_asset_id)
+      FIELD(flags)
     END_SERIALIZE()
   };
   //---------------------------------------------------------------
@@ -201,7 +208,7 @@ namespace currency
   bool tx_to_blob(const transaction& b, blobdata& b_blob);
   bool read_keyimages_from_tx(const transaction& tx, std::list<crypto::key_image>& kil);
   bool validate_inputs_sorting(const transaction& tx);
-  bool is_asset_emitting_transaction(const transaction& tx, asset_descriptor_operation* p_ado = nullptr);
+  bool is_asset_emitting_transaction(const transaction& tx, asset_descriptor_operation* p_ado = nullptr);  
 
   std::vector<tx_source_entry::output_entry> prepare_outputs_entries_for_key_offsets(const std::vector<tx_source_entry::output_entry>& outputs, size_t old_real_index, size_t& new_real_index) noexcept;
 
@@ -218,6 +225,7 @@ namespace currency
       asset_id_blinding_masks.resize(outs_count);
       amounts.resize(outs_count);
       amount_blinding_masks.resize(outs_count);
+      zc_input_amounts.resize(zc_ins_count);
     }
 
     // TODO @#@# reconsider this check -- sowle
@@ -245,6 +253,7 @@ namespace currency
     std::vector<crypto::point_t> pseudo_outs_blinded_asset_ids;                       // generate_asset_surjection_proof
     crypto::scalar_vec_t pseudo_outs_plus_real_out_blinding_masks; // r_pi + r'_j     // generate_asset_surjection_proof
     std::vector<crypto::point_t> real_zc_ins_asset_ids;            // H_i             // generate_asset_surjection_proof
+    std::vector<uint64_t> zc_input_amounts;                        // ZC only input amounts
 
     // common data: inputs
     crypto::point_t  pseudo_out_amount_commitments_sum      = crypto::c_point_0;      //                                                   generate_tx_balance_proof  generate_ZC_sig
@@ -264,44 +273,48 @@ namespace currency
 
     // consider redesign, some data may possibly be excluded from kv serialization -- sowle
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(asset_ids);
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(blinded_asset_ids);
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amount_commitments);
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(asset_id_blinding_masks);
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amounts);
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amount_blinding_masks);
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(pseudo_outs_blinded_asset_ids);
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(pseudo_outs_plus_real_out_blinding_masks);
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(real_zc_ins_asset_ids);
-      KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_commitments_sum);
-      KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_blinding_masks_sum);
-      KV_SERIALIZE_POD_AS_HEX_STRING(real_in_asset_id_blinding_mask_x_amount_sum);
-      KV_SERIALIZE_POD_AS_HEX_STRING(amount_commitments_sum);
-      KV_SERIALIZE_POD_AS_HEX_STRING(amount_blinding_masks_sum);
-      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id_blinding_mask_x_amount_sum);
-      KV_SERIALIZE_POD_AS_HEX_STRING(ao_asset_id);
-      KV_SERIALIZE_POD_AS_HEX_STRING(ao_asset_id_pt);
-      KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_commitment);
-      KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_blinding_mask);
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(asset_ids)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(blinded_asset_ids)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amount_commitments)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(asset_id_blinding_masks)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amounts)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amount_blinding_masks)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(pseudo_outs_blinded_asset_ids)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(pseudo_outs_plus_real_out_blinding_masks)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(real_zc_ins_asset_ids)
+      KV_SERIALIZE(zc_input_amounts)
+      KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_commitments_sum)
+      KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_blinding_masks_sum)
+      KV_SERIALIZE_POD_AS_HEX_STRING(real_in_asset_id_blinding_mask_x_amount_sum)
+      KV_SERIALIZE_POD_AS_HEX_STRING(amount_commitments_sum)
+      KV_SERIALIZE_POD_AS_HEX_STRING(amount_blinding_masks_sum)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id_blinding_mask_x_amount_sum)
+      KV_SERIALIZE_POD_AS_HEX_STRING(ao_asset_id)
+      KV_SERIALIZE_POD_AS_HEX_STRING(ao_asset_id_pt)
+      KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_commitment)
+      KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_blinding_mask)
     END_KV_SERIALIZE_MAP()
   
     // solely for consolidated txs, asset opration fields are not serialized
     BEGIN_SERIALIZE_OBJECT()
-      FIELD(asset_ids);
-      FIELD(blinded_asset_ids);
-      FIELD(amount_commitments);
-      FIELD((std::vector<crypto::scalar_t>&)(asset_id_blinding_masks));
-      FIELD((std::vector<crypto::scalar_t>&)(amounts));
-      FIELD((std::vector<crypto::scalar_t>&)(amount_blinding_masks));
-      FIELD(pseudo_outs_blinded_asset_ids);
-      FIELD((std::vector<crypto::scalar_t>&)(pseudo_outs_plus_real_out_blinding_masks));
-      FIELD(real_zc_ins_asset_ids);
-      FIELD(pseudo_out_amount_commitments_sum);
-      FIELD(pseudo_out_amount_blinding_masks_sum);
-      FIELD(real_in_asset_id_blinding_mask_x_amount_sum);
-      FIELD(amount_commitments_sum);
-      FIELD(amount_blinding_masks_sum);
-      FIELD(asset_id_blinding_mask_x_amount_sum);
+      VERSION()
+      CURRENT_VERSION(0)
+      FIELD(asset_ids)
+      FIELD(blinded_asset_ids)
+      FIELD(amount_commitments)
+      FIELD((std::vector<crypto::scalar_t>&)(asset_id_blinding_masks))
+      FIELD((std::vector<crypto::scalar_t>&)(amounts))
+      FIELD((std::vector<crypto::scalar_t>&)(amount_blinding_masks))
+      FIELD(pseudo_outs_blinded_asset_ids)
+      FIELD((std::vector<crypto::scalar_t>&)(pseudo_outs_plus_real_out_blinding_masks))
+      FIELD(real_zc_ins_asset_ids)
+      FIELD(zc_input_amounts)
+      FIELD(pseudo_out_amount_commitments_sum)
+      FIELD(pseudo_out_amount_blinding_masks_sum)
+      FIELD(real_in_asset_id_blinding_mask_x_amount_sum)
+      FIELD(amount_commitments_sum)
+      FIELD(amount_blinding_masks_sum)
+      FIELD(asset_id_blinding_mask_x_amount_sum)
 
       // no asset operation fields here
       //ao_asset_id
@@ -310,5 +323,7 @@ namespace currency
       //ao_amount_blinding_mask
     END_SERIALIZE()
   }; // struct tx_generation_context
+
+  bool validate_tx_output_details_againt_tx_generation_context(const transaction& tx, const tx_generation_context& gen_context, const crypto::secret_key& onet_time_key);
 
 } // namespace currency

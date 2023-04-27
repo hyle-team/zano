@@ -92,6 +92,11 @@ namespace currency
     bool add_custom_asset_id(const std::vector<std::string> &args);
     bool remove_custom_asset_id(const std::vector<std::string> &args);
 
+    //----------------------------------------------------------------------------------------------------
+    bool generate_ionic_swap_proposal(const std::vector<std::string> &args);
+    bool get_ionic_swap_proposal_info(const std::vector<std::string> &args);
+    bool accept_ionic_swap_proposal(const std::vector<std::string> &args);
+
     bool validate_wrap_status(uint64_t amount);
 
     bool get_alias_from_daemon(const std::string& alias_name, currency::extra_alias_entry_base& ai);
@@ -106,6 +111,8 @@ namespace currency
     virtual void on_message(i_wallet2_callback::message_severity severity, const std::string& m) override;
     virtual void on_tor_status_change(const std::string& state) override;
 
+    virtual void on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets) override;
+    virtual bool on_mw_select_wallet(uint64_t wallet_id) override;
     //----------------------------------------------------------
 
     friend class refresh_progress_reporter_t;
@@ -178,7 +185,7 @@ namespace currency
 
     epee::console_handlers_binder m_cmd_binder;
 
-    std::unique_ptr<tools::wallet2> m_wallet;
+    std::shared_ptr<tools::wallet2> m_wallet;
     net_utils::http::http_simple_client m_http_client;
     refresh_progress_reporter_t m_refresh_progress_reporter;
   };

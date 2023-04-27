@@ -28,7 +28,7 @@ bool wallet_rpc_integrated_address::generate(std::vector<test_event_entry>& even
   CREATE_TEST_WALLET(miner_wlt, miner_acc, blk_0);
 
   // wallet RPC server
-  tools::wallet_rpc_server miner_wlt_rpc(*miner_wlt);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
 
@@ -110,7 +110,7 @@ bool wallet_rpc_integrated_address_transfer::c1(currency::core& c, size_t ev_ind
   std::string alice_integrated_address = get_account_address_and_payment_id_as_str(m_accounts[ALICE_ACC_IDX].get_public_address(), payment_id);
 
   // wallet RPC server
-  tools::wallet_rpc_server miner_wlt_rpc(*miner_wlt);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
 
@@ -226,7 +226,7 @@ bool wallet_rpc_transfer::c1(currency::core& c, size_t ev_index, const std::vect
   miner_wlt->refresh();
 
   // wallet RPC server
-  tools::wallet_rpc_server miner_wlt_rpc(*miner_wlt);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
 

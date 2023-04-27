@@ -70,14 +70,14 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   std::vector<currency::tx_destination_entry> destinations(2);
   destinations[0].addr.push_back(miner_wlt->get_account().get_public_address());
   destinations[0].amount = AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC;
-  destinations[0].asset_id = currency::ffff_pkey;
+  destinations[0].asset_id = currency::null_pkey;
   destinations[1].addr.push_back(alice_wlt->get_account().get_public_address());
   destinations[1].amount = AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC;
-  destinations[1].asset_id = currency::ffff_pkey;
+  destinations[1].asset_id = currency::null_pkey;
   
   LOG_PRINT_MAGENTA("destinations[0].asset_id:" << destinations[0].asset_id, LOG_LEVEL_0);
   LOG_PRINT_MAGENTA("destinations[1].asset_id:" << destinations[1].asset_id, LOG_LEVEL_0);
-  LOG_PRINT_MAGENTA("currency::ffff_pkey:     " << currency::ffff_pkey, LOG_LEVEL_0);
+  LOG_PRINT_MAGENTA("currency::null_pkey:     " << currency::null_pkey, LOG_LEVEL_0);
 
   currency::transaction tx = AUTO_VAL_INIT(tx);
   crypto::public_key asset_id = currency::null_pkey;

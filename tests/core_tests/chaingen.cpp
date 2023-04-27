@@ -2229,7 +2229,10 @@ bool shuffle_source_entries(std::vector<tx_source_entry>& sources)
 
 
 //------------------------------------------------------------------------------
-
+test_chain_unit_base::test_chain_unit_base()
+{
+  m_hardforks = get_default_core_runtime_config().hard_forks; // set default hardforks for tests (will be overriden by test if necessary)
+}
 void test_chain_unit_base::register_callback(const std::string& cb_name, verify_callback cb)
 {
   m_callbacks[cb_name] = cb;
@@ -2287,8 +2290,6 @@ test_chain_unit_enchanced::test_chain_unit_enchanced()
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_offers_count);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_hardfork_active);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_hardfork_inactive);
-
-  m_hardforks = get_default_core_runtime_config().hard_forks; // set default hardforks for tests (will be overriden by test if necessary)
 }
 
 bool test_chain_unit_enchanced::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
