@@ -3264,7 +3264,7 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
       //we moved too much forward
       
       current_height_boundary = calculated_estimated_height;
-      CHECK_AND_ASSERT_MES(current_height_boundary > current_low_boundary, true, 
+      CHECK_AND_ASSERT_MES(current_height_boundary >= current_low_boundary, true, 
         "Internal error: current_hight_boundary(" << current_height_boundary << ") > current_low_boundary("<< current_low_boundary << ")");
       uint64_t offset = (current_height_boundary - current_low_boundary)/2;
       if (offset <= 2)
@@ -3282,7 +3282,7 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
     {
       //we too much in past
       current_low_boundary = calculated_estimated_height;
-      CHECK_AND_ASSERT_MES(current_height_boundary > current_low_boundary, true,
+      CHECK_AND_ASSERT_MES(current_height_boundary >= current_low_boundary, true,
         "Internal error: current_hight_boundary(" << current_height_boundary << ") > current_low_boundary(" << current_low_boundary << ")");
       uint64_t offset = (current_height_boundary - current_low_boundary) / 2;
       if (offset <= 2)
