@@ -307,6 +307,7 @@ namespace tools
   {
     currency::transaction tx_for_mode_separate;
     view::ionic_swap_proposal_info proposal_info;
+    bool escrow = false;
   };
   
 

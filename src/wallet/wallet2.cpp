@@ -937,6 +937,7 @@ void wallet2::accept_proposal(const crypto::hash& contract_id, uint64_t b_accept
   construct_tx_param construct_param = AUTO_VAL_INIT(construct_param);
   construct_param.fee = b_acceptance_fee;
   mode_separate_context msc = AUTO_VAL_INIT(msc);
+  msc.escrow = true;
   msc.tx_for_mode_separate = contr_it->second.proposal.tx_template;
   currency::transaction& tx = msc.tx_for_mode_separate;
   crypto::secret_key one_time_key = contr_it->second.proposal.tx_onetime_secret_key;
@@ -5275,6 +5276,7 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
   construct_param.crypt_address = m_account.get_public_address();
   construct_param.flags = TX_FLAG_SIGNATURE_MODE_SEPARATE;
   construct_param.mark_tx_as_complete = true;
+  construct_param.need_at_least_1_zc = true;
 
   //build transaction
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
@@ -6373,16 +6375,16 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const mode_separate_context& mode_separatemode_separate)
+void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const mode_separate_context& msc)
 {
 
   SET_CONTEXT_OBJ_FOR_SCOPE(pconstruct_tx_param, ctp);
   SET_CONTEXT_OBJ_FOR_SCOPE(pfinalize_tx_param, ftp);
-  SET_CONTEXT_OBJ_FOR_SCOPE(pmode_separate_context, mode_separatemode_separate);
+  SET_CONTEXT_OBJ_FOR_SCOPE(pmode_separate_context, msc);
 
   TIME_MEASURE_START_MS(get_needed_money_time);
 
-  const currency::transaction& tx_for_mode_separate = mode_separatemode_separate.tx_for_mode_separate;
+  const currency::transaction& tx_for_mode_separate = msc.tx_for_mode_separate;
   assets_selection_context needed_money_map = get_needed_money(ctp.fee, ctp.dsts);
 
   //
@@ -6391,11 +6393,14 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   if (ctp.flags & TX_FLAG_SIGNATURE_MODE_SEPARATE && tx_for_mode_separate.vout.size() )
   {
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(get_tx_flags(tx_for_mode_separate) & TX_FLAG_SIGNATURE_MODE_SEPARATE, "tx_param.flags differs from tx.flags");
-    for (const auto& el : mode_separatemode_separate.proposal_info.to_alice)
+    if (ftp.tx_version > TRANSACTION_VERSION_PRE_HF4)
     {
+      for (const auto& el : msc.proposal_info.to_alice)
       needed_money_map[el.asset_id].needed_amount += el.amount;
     }
-    ctp.need_at_least_1_zc = true;
+    
+    if (msc.escrow)
+      needed_money_map[currency::native_coin_asset_id].needed_amount += (currency::get_outs_money_amount(tx_for_mode_separate) - get_inputs_money_amount(tx_for_mode_separate));
   }
   TIME_MEASURE_FINISH_MS(get_needed_money_time);
 
@@ -6425,7 +6430,7 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   {
     //multisig
     //@#@ need to do refactoring over this part to support hidden amounts and asset_id
-    prepare_tx_sources(ctp.multisig_id, ftp.sources, needed_money_map[currency::null_pkey].found_amount);
+    prepare_tx_sources(ctp.multisig_id, ftp.sources, needed_money_map[currency::native_coin_asset_id].found_amount);
   }
   else
   {
