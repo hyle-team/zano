@@ -5,6 +5,7 @@
 
 #pragma once
 #include "currency_core/currency_core.h"
+#include "curency_core/currency_format_utils.h"
 #include "currency_core/miner.h"
 #include "wallet/wallet2.h"
 #include "test_core_time.h"
