@@ -526,6 +526,20 @@ public:
     return true;
   }
 
+  bool operator()(const core_hardforks_config& e) const
+  {
+    currency::core_runtime_config crc = m_c.get_blockchain_storage().get_core_runtime_config();
+    crc.hard_forks.m_height_the_hardfork_n_active_after = e.hardforks;
+    m_c.get_blockchain_storage().set_core_runtime_config(crc);
+    std::stringstream ss; ss << "core_hardforks updated:" << ENDL;
+    for (size_t i = 0; i != crc.hard_forks.m_height_the_hardfork_n_active_after.size(); i++)
+    {
+      ss << i << ": " << crc.hard_forks.m_height_the_hardfork_n_active_after[i] << ENDL;
+    }
+    log_event(ss.str());
+    return true;
+  }
+
 private:
   void log_event(const std::string& event_type) const
   {
@@ -790,6 +804,7 @@ int main(int argc, char* argv[])
 
 
     // TODO // GENERATE_AND_PLAY(wallet_spend_form_auditable_and_track);
+    GENERATE_AND_PLAY(gen_block_big_major_version);
 
     GENERATE_AND_PLAY(pos_minting_tx_packing);
 

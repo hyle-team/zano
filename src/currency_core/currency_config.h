@@ -33,6 +33,7 @@
 #define TRANSACTION_VERSION_POST_HF4                    2 
 #define HF1_BLOCK_MAJOR_VERSION                         1
 #define HF3_BLOCK_MAJOR_VERSION                         2
+#define HF3_BLOCK_MINOR_VERSION                         0
 #define CURRENT_BLOCK_MAJOR_VERSION                     3
 
 #define CURRENT_BLOCK_MINOR_VERSION                     0
@@ -253,9 +254,9 @@
 #define ZANO_HARDFORK_04_AFTER_HEIGHT                   999999999
 #else
 /////// Zarcanum Testnet Pre-Alpha //////////////////////////////
-#define ZANO_HARDFORK_01_AFTER_HEIGHT                   1
-#define ZANO_HARDFORK_02_AFTER_HEIGHT                   1
-#define ZANO_HARDFORK_03_AFTER_HEIGHT                   1
+#define ZANO_HARDFORK_01_AFTER_HEIGHT                   0
+#define ZANO_HARDFORK_02_AFTER_HEIGHT                   0
+#define ZANO_HARDFORK_03_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_04_AFTER_HEIGHT                   CURRENCY_MAX_BLOCK_NUMBER
 #endif
 

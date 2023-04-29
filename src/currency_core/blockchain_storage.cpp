@@ -6392,7 +6392,13 @@ bool blockchain_storage::is_hardfork_active(size_t hardfork_id) const
 //------------------------------------------------------------------
 bool blockchain_storage::prevalidate_block(const block& bl)
 {
+
   uint64_t block_height = get_block_height(bl);
+
+
+  //before hard_fork1
+  if (bl.major_version == BLOCK_MAJOR_VERSION_INITIAL && m_core_runtime_config.is_hardfork_active_for_height(1, block_height))
+    return true;
 
   // HF0
   if (!m_core_runtime_config.is_hardfork_active_for_height(1, block_height))
@@ -6409,7 +6415,16 @@ bool blockchain_storage::prevalidate_block(const block& bl)
     return true;
   }
 
-  // >= HF3
+  // HF3 and !HF4
+  if (m_core_runtime_config.is_hardfork_active_for_height(3, block_height) &&
+    !m_core_runtime_config.is_hardfork_active_for_height(4, block_height))
+  {
+    CHECK_AND_ASSERT_MES(bl.major_version == HF3_BLOCK_MAJOR_VERSION, false, "HF3 incorrect block major version: " << (int)bl.major_version);
+    CHECK_AND_ASSERT_MES(bl.minor_version <= HF3_BLOCK_MINOR_VERSION, false, "HF3 incorrect block minor version: " << (int)bl.minor_version);
+    return true;
+  }
+
+  // rule for unknown versions
   if (bl.major_version > CURRENT_BLOCK_MAJOR_VERSION)
   {
     LOG_ERROR("prevalidation failed for block " << get_block_hash(bl) << ": major block version " << static_cast<size_t>(bl.major_version) << " is incorrect, " << CURRENT_BLOCK_MAJOR_VERSION << " is expected" << ENDL
