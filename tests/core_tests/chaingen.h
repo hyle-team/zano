@@ -256,6 +256,8 @@ public:
   uint64_t get_tx_version_from_events(const std::vector<test_event_entry> &events) const;
 
   void on_test_generator_created(test_generator& generator) const; // tests can override this for special initialization
+  
+  currency::core_runtime_config get_runtime_info_for_core() const; // tests can override this for special initialization
 
 private:
   callbacks_map m_callbacks;

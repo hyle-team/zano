@@ -54,7 +54,6 @@ namespace
 bool gen_block_big_major_version::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
 
   block blk_1;
   generator.construct_block_manually(blk_1, blk_0, miner_account, test_generator::bf_major_ver, CURRENT_BLOCK_MAJOR_VERSION + 1);
@@ -68,7 +67,6 @@ bool gen_block_big_major_version::generate(std::vector<test_event_entry>& events
 bool gen_block_big_minor_version::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
 
   block blk_1;
   generator.construct_block_manually(blk_1, blk_0, miner_account, test_generator::bf_minor_ver, 0, CURRENT_BLOCK_MINOR_VERSION + 1);
@@ -82,7 +80,6 @@ bool gen_block_big_minor_version::generate(std::vector<test_event_entry>& events
 bool gen_block_ts_not_checked::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_account, BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW - 2);
 
   block blk_1;
@@ -97,7 +94,6 @@ bool gen_block_ts_not_checked::generate(std::vector<test_event_entry>& events) c
 bool gen_block_ts_in_past::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_account, BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW - 1);
 
   uint64_t ts_below_median = boost::get<block>(events[BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW / 2 - 1]).timestamp;
@@ -113,7 +109,6 @@ bool gen_block_ts_in_past::generate(std::vector<test_event_entry>& events) const
 bool gen_block_ts_in_future::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   block blk_1;
   generator.construct_block_manually(blk_1, blk_0, miner_account, test_generator::bf_timestamp, 0, 0, time(NULL) + 60*60 + CURRENCY_BLOCK_FUTURE_TIME_LIMIT);
   events.push_back(blk_1);
@@ -126,7 +121,6 @@ bool gen_block_ts_in_future::generate(std::vector<test_event_entry>& events) con
 bool gen_block_invalid_prev_id::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   block blk_1;
   crypto::hash prev_id = get_block_hash(blk_0);
   reinterpret_cast<char &>(prev_id) ^= 1;
@@ -149,7 +143,6 @@ bool gen_block_invalid_prev_id::check_block_verification_context(const currency:
 bool gen_block_invalid_nonce::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   std::vector<uint64_t> timestamps;
   std::vector<wide_difficulty_type> commulative_difficulties;
   if (!lift_up_difficulty(events, timestamps, commulative_difficulties, generator, 2, blk_0, miner_account))
@@ -179,7 +172,6 @@ bool gen_block_invalid_nonce::generate(std::vector<test_event_entry>& events) co
 bool gen_block_no_miner_tx::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   transaction miner_tx;
   miner_tx = AUTO_VAL_INIT(miner_tx);
 
@@ -211,7 +203,6 @@ bool gen_block_unlock_time_is_low::generate(std::vector<test_event_entry>& event
 bool gen_block_unlock_time_is_high::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
   set_tx_unlock_time(miner_tx, get_tx_max_unlock_time(miner_tx) + 1);
 
@@ -243,7 +234,6 @@ bool gen_block_unlock_time_is_timestamp_in_past::generate(std::vector<test_event
 bool gen_block_unlock_time_is_timestamp_in_future::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
   set_tx_unlock_time(miner_tx, blk_0.timestamp + 3 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW * DIFFICULTY_BLOCKS_ESTIMATE_TIMESPAN);
 
@@ -259,7 +249,6 @@ bool gen_block_unlock_time_is_timestamp_in_future::generate(std::vector<test_eve
 bool gen_block_height_is_low::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
   boost::get<txin_gen>(miner_tx.vin[0]).height--;
 
@@ -275,7 +264,6 @@ bool gen_block_height_is_low::generate(std::vector<test_event_entry>& events) co
 bool gen_block_height_is_high::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
   boost::get<txin_gen>(miner_tx.vin[0]).height++;
 
@@ -291,7 +279,6 @@ bool gen_block_height_is_high::generate(std::vector<test_event_entry>& events) c
 bool gen_block_miner_tx_has_2_tx_gen_in::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
 
   txin_gen in;
@@ -310,7 +297,6 @@ bool gen_block_miner_tx_has_2_tx_gen_in::generate(std::vector<test_event_entry>&
 bool gen_block_miner_tx_has_2_in::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   REWIND_BLOCKS(events, blk_0r, blk_0, miner_account);
 
   GENERATE_ACCOUNT(alice);
@@ -355,7 +341,6 @@ bool gen_block_miner_tx_has_2_in::generate(std::vector<test_event_entry>& events
 bool gen_block_miner_tx_with_txin_to_key::generate(std::vector<test_event_entry>& events) const
 {  
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
 
   // This block has only one output
   block blk_1 = AUTO_VAL_INIT(blk_1);
@@ -403,7 +388,6 @@ bool gen_block_miner_tx_with_txin_to_key::generate(std::vector<test_event_entry>
 bool gen_block_miner_tx_out_is_small::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
 boost::get<currency::tx_out_bare>(  miner_tx.vout[0]).amount /= 2;
 
@@ -419,7 +403,6 @@ boost::get<currency::tx_out_bare>(  miner_tx.vout[0]).amount /= 2;
 bool gen_block_miner_tx_out_is_big::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
 boost::get<currency::tx_out_bare>(  miner_tx.vout[0]).amount *= 2;
 
@@ -435,7 +418,6 @@ boost::get<currency::tx_out_bare>(  miner_tx.vout[0]).amount *= 2;
 bool gen_block_miner_tx_has_no_out::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
   miner_tx.vout.clear();
 
@@ -451,7 +433,6 @@ bool gen_block_miner_tx_has_no_out::generate(std::vector<test_event_entry>& even
 bool gen_block_miner_tx_has_out_to_alice::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   GENERATE_ACCOUNT(alice);
 
   keypair txkey;
@@ -480,7 +461,6 @@ boost::get<currency::tx_out_bare>(  miner_tx.vout[0]).amount -= out_to_alice.amo
 bool gen_block_has_invalid_tx::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   std::vector<crypto::hash> tx_hashes;
   tx_hashes.push_back(crypto::hash());
 
@@ -496,7 +476,6 @@ bool gen_block_has_invalid_tx::generate(std::vector<test_event_entry>& events) c
 bool gen_block_is_too_big::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   // Creating a huge miner_tx, it will have a lot of outs
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
   static const size_t tx_out_count = CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE / 2;
@@ -543,7 +522,6 @@ gen_block_invalid_binary_format::gen_block_invalid_binary_format()
 bool gen_block_invalid_binary_format::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   //wide_difficulty_type cummulative_diff = 1;
 
   // Unlock blk_0 outputs
@@ -711,7 +689,6 @@ bool gen_block_wrong_version_agains_hardfork::c1(currency::core& c, size_t ev_in
 bool gen_block_wrong_version_agains_hardfork::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
-  SET_HARDFORKS_TO_OLD_TESTS();
   DO_CALLBACK(events, "c1");
   return true;
 }

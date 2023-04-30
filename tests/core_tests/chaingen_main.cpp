@@ -627,11 +627,7 @@ inline bool do_replay_events(const std::vector<test_event_entry>& events, t_test
   bc_services::bc_offers_service offers_service(nullptr);
   c.get_blockchain_storage().get_attachment_services_manager().add_service(&offers_service);
 
-  currency::core_runtime_config crc = c.get_blockchain_storage().get_core_runtime_config();
-  crc.get_core_time = &test_core_time::get_time;
-  crc.tx_pool_min_fee = TESTS_DEFAULT_FEE;
-  crc.tx_default_fee = TESTS_DEFAULT_FEE;
-  c.get_blockchain_storage().set_core_runtime_config(crc);
+  c.get_blockchain_storage().set_core_runtime_config(validator.get_runtime_info_for_core());
 
   if (validator.need_core_proxy())
   {

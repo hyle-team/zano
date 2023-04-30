@@ -13,7 +13,10 @@ class gen_block_verification_base : public test_chain_unit_base
 public:
   gen_block_verification_base()
   {
-    m_hardforks.m_height_the_hardfork_n_active_after.fill(0);
+    m_hardforks.m_height_the_hardfork_n_active_after[1] = 1440;                                                                                            \
+    m_hardforks.m_height_the_hardfork_n_active_after[2] = 1800;                                                                                            \
+    m_hardforks.m_height_the_hardfork_n_active_after[3] = 1801;
+    m_hardforks.m_height_the_hardfork_n_active_after[4] = 50000000000;
 
     REGISTER_CALLBACK("check_block_purged", gen_block_verification_base<invalid_block_idx>::check_block_purged);
   }
@@ -26,6 +29,12 @@ public:
       return !bvc.m_verification_failed;
   }
 
+//   currency::core_runtime_config get_runtime_info_for_core() const
+//   {
+//     currency::core_runtime_config res = test_chain_unit_base::get_runtime_info_for_core();
+// 
+//   }
+
   bool check_block_purged(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
   {
 
@@ -35,7 +44,7 @@ public:
 
     return true;
   }
-  mutable currency::hard_forks_descriptor m_hardforks;
+  //mutable currency::hard_forks_descriptor m_hardforks;
 };
 
 template<size_t expected_blockchain_height>
@@ -56,7 +65,7 @@ struct gen_block_accepted_base : public test_chain_unit_base
   }
 };
 
-struct gen_block_big_major_version : public gen_block_verification_base<2>
+struct gen_block_big_major_version : public gen_block_verification_base<1>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
@@ -76,83 +85,83 @@ struct gen_block_ts_in_past : public gen_block_verification_base<BLOCKCHAIN_TIME
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_ts_in_future : public gen_block_verification_base<2>
+struct gen_block_ts_in_future : public gen_block_verification_base<1>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_invalid_prev_id : public gen_block_verification_base<2>
+struct gen_block_invalid_prev_id : public gen_block_verification_base<1>
 {
   bool generate(std::vector<test_event_entry>& events) const;
   bool check_block_verification_context(const currency::block_verification_context& bvc, size_t event_idx, const currency::block& /*blk*/);
 };
 
-struct gen_block_invalid_nonce : public gen_block_verification_base<4>
+struct gen_block_invalid_nonce : public gen_block_verification_base<3>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_no_miner_tx : public gen_block_verification_base<2>
+struct gen_block_no_miner_tx : public gen_block_verification_base<1>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_unlock_time_is_low : public gen_block_verification_base<2>
+struct gen_block_unlock_time_is_low : public gen_block_verification_base<1>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_unlock_time_is_high : public gen_block_verification_base<2>
+struct gen_block_unlock_time_is_high : public gen_block_verification_base<1>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_unlock_time_is_timestamp_in_past : public gen_block_verification_base<2>
+struct gen_block_unlock_time_is_timestamp_in_past : public gen_block_verification_base<1>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_unlock_time_is_timestamp_in_future : public gen_block_verification_base<2>
+struct gen_block_unlock_time_is_timestamp_in_future : public gen_block_verification_base<1>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_height_is_low : public gen_block_verification_base<2>
+struct gen_block_height_is_low : public gen_block_verification_base<1>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_height_is_high : public gen_block_verification_base<2>
+struct gen_block_height_is_high : public gen_block_verification_base<1>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_miner_tx_has_2_tx_gen_in : public gen_block_verification_base<2>
+struct gen_block_miner_tx_has_2_tx_gen_in : public gen_block_verification_base<1>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_miner_tx_has_2_in : public gen_block_verification_base<CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2>
+struct gen_block_miner_tx_has_2_in : public gen_block_verification_base<CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_miner_tx_with_txin_to_key : public gen_block_verification_base<CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3>
+struct gen_block_miner_tx_with_txin_to_key : public gen_block_verification_base<CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_miner_tx_out_is_small : public gen_block_verification_base<2>
+struct gen_block_miner_tx_out_is_small : public gen_block_verification_base<1>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_miner_tx_out_is_big : public gen_block_verification_base<2>
+struct gen_block_miner_tx_out_is_big : public gen_block_verification_base<1>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_miner_tx_has_no_out : public gen_block_verification_base<2>
+struct gen_block_miner_tx_has_no_out : public gen_block_verification_base<1>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
@@ -162,17 +171,17 @@ struct gen_block_miner_tx_has_out_to_alice : public gen_block_accepted_base<2>
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_has_invalid_tx : public gen_block_verification_base<2>
+struct gen_block_has_invalid_tx : public gen_block_verification_base<1>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_is_too_big : public gen_block_verification_base<2>
+struct gen_block_is_too_big : public gen_block_verification_base<1>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_wrong_version_agains_hardfork : public gen_block_verification_base<2>
+struct gen_block_wrong_version_agains_hardfork : public gen_block_verification_base<1>
 {
 public:
   gen_block_wrong_version_agains_hardfork();

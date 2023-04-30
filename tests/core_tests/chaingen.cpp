@@ -2266,6 +2266,15 @@ void test_chain_unit_base::on_test_generator_created(test_generator& gen) const
   gen.set_hardforks(m_hardforks);
 }
 
+currency::core_runtime_config test_chain_unit_base::get_runtime_info_for_core() const
+{
+  currency::core_runtime_config crc = currency::get_default_core_runtime_config();
+  crc.get_core_time = &test_core_time::get_time;
+  crc.tx_pool_min_fee = TESTS_DEFAULT_FEE;
+  crc.tx_default_fee = TESTS_DEFAULT_FEE;
+  crc.hard_forks = m_hardforks;
+  return crc;
+}
 //------------------------------------------------------------------------------
 
 test_chain_unit_enchanced::test_chain_unit_enchanced()
