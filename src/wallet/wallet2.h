@@ -1011,9 +1011,6 @@ private:
                                  const std::vector<std::string>& recipients, 
                                  const std::vector<uint64_t>& selected_indicies, 
                                  const std::vector<currency::tx_destination_entry>& splitted_dsts);
-    bool read_money_transfer2_details_from_tx(const currency::transaction& tx,
-                                                        const std::vector<currency::tx_destination_entry>& splitted_dsts, 
-                                                        wallet_public::wallet_transfer_info_details& wtd);
 
     void update_current_tx_limit();
     void prepare_wti(wallet_public::wallet_transfer_info& wti, uint64_t height, uint64_t timestamp, const currency::transaction& tx, uint64_t amount, const money_transfer2_details& td);

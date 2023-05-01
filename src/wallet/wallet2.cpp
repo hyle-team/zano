@@ -3249,6 +3249,7 @@ bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, u
       auto it_local = m_whitelisted_assets.find(item.first);
       if(it_local == m_whitelisted_assets.end()) 
       {
+        WLT_LOG_YELLOW("WARNING: unknown asset " << item.first << " found and skipped; it's NOT included in balance", LOG_LEVEL_0);
         continue;
       }
       else 
@@ -6090,46 +6091,6 @@ bool wallet2::select_transfers(assets_selection_context& needed_money_map, size_
   return select_indices_for_transfer(needed_money_map, fake_outputs_count, selected_indicies);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::read_money_transfer2_details_from_tx(const transaction& tx, const std::vector<currency::tx_destination_entry>& splitted_dsts,
-                                                             wallet_public::wallet_transfer_info_details& wtd)
-{
-  PROFILE_FUNC("wallet2::read_money_transfer2_details_from_tx");
-  for (auto& d : splitted_dsts)
-  {
-    if (d.addr.size() && d.addr.back().spend_public_key == m_account.get_keys().account_address.spend_public_key &&
-      d.addr.back().view_public_key == m_account.get_keys().account_address.view_public_key)
-      wtd.rcv.push_back(d.amount);
-  }
-
-  //scan key images
-  for (auto& i : tx.vin)
-  {
-    if (i.type() == typeid(currency::txin_to_key))
-    {
-      const currency::txin_to_key& in_to_key = boost::get<currency::txin_to_key>(i);
-      if (m_key_images.count(in_to_key.k_image))
-      {
-        wtd.spn.push_back(in_to_key.amount);
-      }
-    }
-    else if (i.type() == typeid(currency::txin_zc_input))
-    {
-      const currency::txin_zc_input& in_zc = boost::get<currency::txin_zc_input>(i);
-      //should we panic if image not found?
-      //@zoidberg: nope!
-      if (m_key_images.count(in_zc.k_image))
-      {
-        auto it = m_key_images.find(in_zc.k_image);
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_key_images.end(), "[read_money_transfer2_details_from_tx]Unknown key image in tx: " << get_transaction_hash(tx));
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second < m_transfers.size(), "[read_money_transfer2_details_from_tx]Index out of range for key image in tx: " << get_transaction_hash(tx));
-        wtd.spn.push_back(m_transfers[it->second].amount());
-      }
-
-    }
-  }
-  return true;
-}
-//----------------------------------------------------------------------------------------------------
 void wallet2::add_sent_unconfirmed_tx(const currency::transaction& tx,  
                                       const std::vector<std::string>& recipients, 
                                       const std::vector<uint64_t>& selected_indicies, 
@@ -6144,17 +6105,50 @@ void wallet2::add_sent_unconfirmed_tx(const currency::transaction& tx,
     unconfirmed_wti.remote_aliases.push_back(get_alias_for_address(addr));
   unconfirmed_wti.is_income = false;
   unconfirmed_wti.selected_indicies = selected_indicies;
-  /*TODO: add selected_indicies to read_money_transfer2_details_from_tx in case of performance problems*/
-  read_money_transfer2_details_from_tx(tx, splitted_dsts,  unconfirmed_wti.td);
-  
-  uint64_t change_amount = 0;
-  uint64_t inputs_amount = 0;
-  for (auto i : unconfirmed_wti.td.rcv)
-    change_amount += i;
-  for (auto i : unconfirmed_wti.td.spn)
-    inputs_amount += i;
+  unconfirmed_wti.asset_id = null_pkey;
 
-  prepare_wti(unconfirmed_wti, 0, m_core_runtime_config.get_core_time(), tx, inputs_amount - (change_amount + get_tx_fee(tx)), money_transfer2_details());
+  uint64_t native_coin_change_amount = 0;
+  uint64_t native_coin_inputs_amount = 0;
+
+  // TODO @#@# potential issue: one tx may have different asset_id's in INs or OUTs
+  // but only one asset_id is associated with a transfer atm
+  // possible solution: make a transfer item for each asset_id in tx -- sowle
+  for (auto& d : splitted_dsts)
+  {
+    if (d.addr.size() &&
+        d.addr.back().spend_public_key == m_account.get_keys().account_address.spend_public_key &&
+        d.addr.back().view_public_key == m_account.get_keys().account_address.view_public_key)
+    {
+      unconfirmed_wti.td.rcv.push_back(d.amount);
+      WLT_CHECK_AND_ASSERT_MES(unconfirmed_wti.asset_id == null_pkey || unconfirmed_wti.asset_id == d.asset_id, (void)0, "TODO: BAD case with asset_id");
+      unconfirmed_wti.asset_id = d.asset_id;
+      if (d.asset_id == native_coin_asset_id)
+        native_coin_change_amount += d.amount;
+    }
+  }
+
+  //scan key images
+  for (auto& i : tx.vin)
+  {
+    crypto::key_image ki{};
+    if (get_key_image_from_txin_v(i, ki))
+    {
+      if (m_key_images.count(ki))
+      {
+        auto it = m_key_images.find(ki);
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_key_images.end(), "[read_money_transfer2_details_from_tx]Unknown key image in tx: " << get_transaction_hash(tx));
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second < m_transfers.size(), "[read_money_transfer2_details_from_tx]Index out of range for key image in tx: " << get_transaction_hash(tx));
+        unconfirmed_wti.td.spn.push_back(m_transfers[it->second].amount());
+
+        WLT_CHECK_AND_ASSERT_MES(unconfirmed_wti.asset_id == null_pkey || unconfirmed_wti.asset_id == m_transfers[it->second].get_asset_id(), (void)0, "TODO: BAD case with asset_id");
+        unconfirmed_wti.asset_id = m_transfers[it->second].get_asset_id();
+        if (unconfirmed_wti.asset_id == native_coin_asset_id)
+          native_coin_inputs_amount += m_transfers[it->second].amount();
+      }
+    }
+  }
+
+  prepare_wti(unconfirmed_wti, 0, m_core_runtime_config.get_core_time(), tx, native_coin_inputs_amount - (native_coin_change_amount + get_tx_fee(tx)), money_transfer2_details());
   rise_on_transfer2(unconfirmed_wti);
 }
 //----------------------------------------------------------------------------------------------------
@@ -6396,7 +6390,7 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
     if (ftp.tx_version > TRANSACTION_VERSION_PRE_HF4)
     {
       for (const auto& el : msc.proposal_info.to_alice)
-      needed_money_map[el.asset_id].needed_amount += el.amount;
+        needed_money_map[el.asset_id].needed_amount += el.amount;
     }
     
     if (msc.escrow)
