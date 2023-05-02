@@ -13,8 +13,8 @@ class gen_block_verification_base : public test_chain_unit_base
 public:
   gen_block_verification_base()
   {
-    m_hardforks.m_height_the_hardfork_n_active_after[1] = 1440;                                                                                            \
-    m_hardforks.m_height_the_hardfork_n_active_after[2] = 1800;                                                                                            \
+    m_hardforks.m_height_the_hardfork_n_active_after[1] = 1440; 
+    m_hardforks.m_height_the_hardfork_n_active_after[2] = 1800; 
     m_hardforks.m_height_the_hardfork_n_active_after[3] = 1801;
     m_hardforks.m_height_the_hardfork_n_active_after[4] = 50000000000;
 

@@ -15,6 +15,11 @@ gen_chain_switch_pow_pos::gen_chain_switch_pow_pos()
   : m_enormous_fee(0)
   , m_invalid_block_index(std::numeric_limits<decltype(m_invalid_block_index)>::max())
 {
+  m_hardforks.m_height_the_hardfork_n_active_after[1] = 1440;
+  m_hardforks.m_height_the_hardfork_n_active_after[2] = 1800;
+  m_hardforks.m_height_the_hardfork_n_active_after[3] = 1801;
+  m_hardforks.m_height_the_hardfork_n_active_after[4] = 50000000000;
+
   REGISTER_CALLBACK_METHOD(gen_chain_switch_pow_pos, configure_core);
   REGISTER_CALLBACK_METHOD(gen_chain_switch_pow_pos, check_height1);
   REGISTER_CALLBACK_METHOD(gen_chain_switch_pow_pos, check_chains_1);

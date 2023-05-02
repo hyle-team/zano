@@ -472,9 +472,9 @@ namespace currency
     tx_generation_context tx_gen_context{};
     tx_gen_context.resize(zc_ins_count, destinations.size()); // auxiliary data for each output
     uint64_t output_index = 0;
+    std::set<uint16_t> deriv_cache;
     for (auto& d : destinations)
     {
-      std::set<uint16_t> deriv_cache;
       finalized_tx result = AUTO_VAL_INIT(result);
       uint8_t tx_outs_attr = 0;
       r = construct_tx_out(d, txkey.sec, output_index, tx, deriv_cache, account_keys(),

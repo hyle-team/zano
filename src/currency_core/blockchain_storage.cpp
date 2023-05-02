@@ -6397,7 +6397,7 @@ bool blockchain_storage::prevalidate_block(const block& bl)
 
 
   //before hard_fork1
-  if (bl.major_version == BLOCK_MAJOR_VERSION_INITIAL && m_core_runtime_config.is_hardfork_active_for_height(1, block_height))
+  if (bl.major_version == BLOCK_MAJOR_VERSION_INITIAL && get_block_height(bl) <= m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[1])
     return true;
 
   // HF0
