@@ -201,6 +201,17 @@ private:
   }
 };
 
+struct core_hardforks_config
+{
+  std::array<uint64_t, currency::hard_forks_descriptor::m_total_count> hardforks;
+
+  template<class Archive>
+  void serialize(Archive & ar, const unsigned int /*version*/)
+  {
+    ar & hardforks;
+  }
+};
+
 VARIANT_TAG(binary_archive, callback_entry, 0xcb);
 VARIANT_TAG(binary_archive, currency::account_base, 0xcc);
 VARIANT_TAG(binary_archive, serialized_block, 0xcd);
@@ -208,8 +219,10 @@ VARIANT_TAG(binary_archive, serialized_transaction, 0xce);
 VARIANT_TAG(binary_archive, event_visitor_settings, 0xcf);
 VARIANT_TAG(binary_archive, event_special_block, 0xd0);
 VARIANT_TAG(binary_archive, event_core_time, 0xd1);
+VARIANT_TAG(binary_archive, core_hardforks_config, 0xd2);
 
-typedef boost::variant<currency::block, currency::transaction, currency::account_base, callback_entry, serialized_block, serialized_transaction, event_visitor_settings, event_special_block, event_core_time> test_event_entry;
+
+typedef boost::variant<currency::block, currency::transaction, currency::account_base, callback_entry, serialized_block, serialized_transaction, event_visitor_settings, event_special_block, event_core_time, core_hardforks_config> test_event_entry;
 typedef std::unordered_map<crypto::hash, const currency::transaction*> map_hash2tx_t;
 
 enum test_tx_split_strategy { tests_void_split_strategy, tests_null_split_strategy, tests_digits_split_strategy, tests_random_split_strategy };
@@ -243,12 +256,14 @@ public:
   uint64_t get_tx_version_from_events(const std::vector<test_event_entry> &events) const;
 
   void on_test_generator_created(test_generator& generator) const; // tests can override this for special initialization
+  
+  currency::core_runtime_config get_runtime_info_for_core() const; // tests can override this for special initialization
 
 private:
   callbacks_map m_callbacks;
 
 protected: 
-  currency::hard_forks_descriptor m_hardforks;
+  mutable currency::hard_forks_descriptor m_hardforks;
 };
 
 struct offers_count_param
@@ -568,7 +583,7 @@ public:
 private:
   bool m_ignore_last_pow_in_wallets;
   
-  currency::hard_forks_descriptor m_hardforks;
+  mutable currency::hard_forks_descriptor m_hardforks;
 
   std::unordered_map<crypto::hash, block_info> m_blocks_info;
   static test_gentime_settings m_test_gentime_settings;
@@ -938,7 +953,11 @@ bool test_generator::construct_block_gentime_with_coinbase_cb(const currency::bl
     return false;
 
   currency::wide_difficulty_type diff = get_difficulty_for_next_block(prev_id, true);
-  r = construct_block_manually(b, prev_block, acc, test_generator::block_fields::bf_miner_tx, 0, 0, 0, prev_id, diff, miner_tx);
+  r = construct_block_manually(b, prev_block, acc, 
+    test_generator::block_fields::bf_miner_tx| test_generator::block_fields::bf_major_ver | test_generator::block_fields::bf_minor_ver,
+    m_hardforks.get_block_major_version_by_height(height),
+    m_hardforks.get_block_minor_version_by_height(height),
+    0, prev_id, diff, miner_tx);
   CHECK_AND_ASSERT_MES(r, false, "construct_block_manually failed");
 
   return true;
@@ -1237,6 +1256,19 @@ void append_vector_by_another_vector(U& dst, const V& src)
 #define ADD_CUSTOM_EVENT_CODE(VEC_EVENTS, CODE) PRINT_EVENT_N_TEXT(VEC_EVENTS, #CODE); CODE
 
 #define ADD_CUSTOM_EVENT(VEC_EVENTS, EVENT_OBJ) PRINT_EVENT_N_TEXT(VEC_EVENTS, #EVENT_OBJ); VEC_EVENTS.push_back(EVENT_OBJ)
+
+
+#define SET_HARDFORKS_TO_OLD_TESTS()                                                                                               \
+  core_hardforks_config hardforks_update = AUTO_VAL_INIT(hardforks_update);                                                        \
+  hardforks_update.hardforks = get_default_core_runtime_config().hard_forks.m_height_the_hardfork_n_active_after;                  \
+  hardforks_update.hardforks[1] = 1440;                                                                                            \
+  hardforks_update.hardforks[2] = 1800;                                                                                            \
+  hardforks_update.hardforks[3] = 1801;                                                                                            \
+  currency::hard_forks_descriptor hardforks_desc = AUTO_VAL_INIT(hardforks_desc);                                                  \
+  hardforks_desc.m_height_the_hardfork_n_active_after = hardforks_update.hardforks;                                                \
+  generator.set_hardforks(hardforks_desc);                                                                                         \
+  m_hardforks.m_height_the_hardfork_n_active_after = hardforks_desc.m_height_the_hardfork_n_active_after;                          \
+  events.push_back(hardforks_update);
 
 // --- gentime wallet helpers -----------------------------------------------------------------------
 

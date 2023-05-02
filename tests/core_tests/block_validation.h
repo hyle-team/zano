@@ -13,7 +13,10 @@ class gen_block_verification_base : public test_chain_unit_base
 public:
   gen_block_verification_base()
   {
-    m_hardforks.m_height_the_hardfork_n_active_after.fill(0);
+    m_hardforks.m_height_the_hardfork_n_active_after[1] = 1440; 
+    m_hardforks.m_height_the_hardfork_n_active_after[2] = 1800; 
+    m_hardforks.m_height_the_hardfork_n_active_after[3] = 1801;
+    m_hardforks.m_height_the_hardfork_n_active_after[4] = 50000000000;
 
     REGISTER_CALLBACK("check_block_purged", gen_block_verification_base<invalid_block_idx>::check_block_purged);
   }
@@ -26,6 +29,12 @@ public:
       return !bvc.m_verification_failed;
   }
 
+//   currency::core_runtime_config get_runtime_info_for_core() const
+//   {
+//     currency::core_runtime_config res = test_chain_unit_base::get_runtime_info_for_core();
+// 
+//   }
+
   bool check_block_purged(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
   {
 
@@ -35,7 +44,7 @@ public:
 
     return true;
   }
-  currency::hard_forks_descriptor m_hardforks;
+  //mutable currency::hard_forks_descriptor m_hardforks;
 };
 
 template<size_t expected_blockchain_height>

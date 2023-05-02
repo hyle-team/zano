@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once 
+#include "boost/serialization/array.hpp"
 #include "misc_language.h"
 #include "string_tools.h"
 
@@ -74,6 +75,11 @@ namespace currency
         return HF3_BLOCK_MAJOR_VERSION;
       else
         return CURRENT_BLOCK_MAJOR_VERSION;
+    }
+
+    uint8_t get_block_minor_version_by_height(uint64_t height) const
+    {
+       return HF3_BLOCK_MINOR_VERSION;
     }
   };
 

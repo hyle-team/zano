@@ -47,7 +47,9 @@ bool mine_next_pos_block_in_playtime_sign_cb(currency::core& c, const currency::
   pb.step1_init_header(bcs.get_core_runtime_config().hard_forks, height, prev_id);
   pb.step2_set_txs(std::vector<transaction>());
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, difficulty, prev_id, null_hash, prev_block.timestamp);
-  pb.step4_generate_coinbase_tx(block_size_median, bei.already_generated_coins, acc.get_public_address());
+  keypair tx_onetime_kp;
+  tx_onetime_kp = keypair::generate();
+  pb.step4_generate_coinbase_tx(block_size_median, bei.already_generated_coins, acc.get_public_address(), currency::blobdata(), CURRENCY_MINER_TX_MAX_OUTS, &tx_onetime_kp);
 
   if (!before_sign_cb(pb.m_block))
     return false;
@@ -667,6 +669,11 @@ bool gen_checkpoints_pos_validation_on_altchain::init_runtime_config(currency::c
 
 gen_no_attchments_in_coinbase::gen_no_attchments_in_coinbase()
 {
+  m_hardforks.m_height_the_hardfork_n_active_after[1] = 1440;
+  m_hardforks.m_height_the_hardfork_n_active_after[2] = 1800;
+  m_hardforks.m_height_the_hardfork_n_active_after[3] = 1801;
+  m_hardforks.m_height_the_hardfork_n_active_after[4] = 50000000000;
+  generator.set_hardforks(m_hardforks);
   // NOTE: This test is made deterministic to be able to correctly set up checkpoint.
   random_state_test_restorer::reset_random(); // random generator's state was previously stored, will be restore on dtor (see also m_random_state_test_restorer)
 
@@ -701,7 +708,7 @@ bool gen_no_attchments_in_coinbase::init_config_set_cp(currency::core& c, size_t
   crc.pos_minimum_heigh = 1;
   c.get_blockchain_storage().set_core_runtime_config(crc);
 
-  m_checkpoints.add_checkpoint(12, "ac57db2582acdd076f92aa8dfcb88d216f60e35b805c16b6256ca26e023bfc3c");
+  m_checkpoints.add_checkpoint(12, "2a6e13df811eccce121c0de4dbdcc640de1d37c8459c2c8ea02af39717779836");
   c.set_checkpoints(currency::checkpoints(m_checkpoints));
 
   return true;
