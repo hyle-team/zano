@@ -58,8 +58,12 @@ bool wallet2::validate_escrow_proposal(const wallet_public::wallet_transfer_info
   bool r = decrypt_payload_items(wti.is_income, prop.tx_template, m_account.get_keys(), decrypted_items);
   LOC_CHK(r, "failed to decrypt payload items in proposal tx");
 
-  r = bc_services::get_service_attachment_json_by_id(decrypted_items, BC_ESCROW_SERVICE_ID, BC_ESCROW_SERVICE_INSTRUCTION_PRIVATE_DETAILS, cpd);
+  currency::tx_service_attachment tsa = AUTO_VAL_INIT(tsa);
+  r = bc_services::get_first_service_attachment_by_id(decrypted_items, BC_ESCROW_SERVICE_ID, BC_ESCROW_SERVICE_INSTRUCTION_PRIVATE_DETAILS, tsa);
   LOC_CHK(r, "BC_ESCROW_SERVICE_INSTRUCTION_PRIVATE_DETAILS not found in proposal template");
+  LOC_CHK((tsa.flags & TX_SERVICE_ATTACHMENT_ENCRYPT_BODY) != 0, "tx_service_attachment was not encrypted, tsa.flags: " << static_cast<size_t>(tsa.flags));
+  r = epee::serialization::load_t_from_json(cpd, tsa.body);
+  LOC_CHK(r, "proposal template couldn't be loaded from json");
 
   uint64_t flags = get_tx_flags(prop.tx_template);
   LOC_CHK(flags == TX_FLAG_SIGNATURE_MODE_SEPARATE, "template has invalid tx flags: " << flags);
