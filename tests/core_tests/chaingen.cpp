@@ -164,10 +164,18 @@ void test_generator::add_block_info(const block_info& bi)
   m_blocks_info[block_hash] = bi;
 
   std::stringstream ss_tx_hashes;
+  auto it = bi.m_transactions.begin();
   for (auto& h : bi.b.tx_hashes)
   {
     ss_tx_hashes << "    [tx]: " << h << ENDL;
+
+    if (it != bi.m_transactions.end())
+    {
+      ss_tx_hashes << obj_to_json_str(*it) << ENDL;
+      it++;
+    }
   }
+
   LOG_PRINT_MAGENTA("ADDED_BLOCK[" << block_hash << "][" << (is_pos_block(bi.b)? "PoS":"PoW") <<"][" << get_block_height(bi.b) << "][cumul_diff:" << bi.cumul_difficulty << "]" << ENDL << ss_tx_hashes.str(), LOG_LEVEL_0);
 }
 
