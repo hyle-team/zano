@@ -2287,6 +2287,13 @@ currency::core_runtime_config test_chain_unit_base::get_runtime_info_for_core() 
   crc.hard_forks = m_hardforks;
   return crc;
 }
+
+void test_chain_unit_base::set_hardforks_for_old_tests()
+{
+  m_hardforks.set_hardfork_height(1, 1440);
+  m_hardforks.set_hardfork_height(2, 1800);
+  m_hardforks.set_hardfork_height(3, 1801);
+}
 //------------------------------------------------------------------------------
 
 test_chain_unit_enchanced::test_chain_unit_enchanced()

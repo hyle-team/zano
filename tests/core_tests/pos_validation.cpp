@@ -849,6 +849,7 @@ bool pos_wallet_big_block_test::c1(currency::core& c, size_t ev_index, const std
 
 pos_altblocks_validation::pos_altblocks_validation()
 {
+  test_chain_unit_base::set_hardforks_for_old_tests();
 }
 
 bool pos_altblocks_validation::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)

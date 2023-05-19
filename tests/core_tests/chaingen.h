@@ -259,6 +259,8 @@ public:
   
   currency::core_runtime_config get_runtime_info_for_core() const; // tests can override this for special initialization
 
+  void set_hardforks_for_old_tests();
+
 private:
   callbacks_map m_callbacks;
 
