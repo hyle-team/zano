@@ -171,7 +171,10 @@ void test_generator::add_block_info(const block_info& bi)
 
     if (it != bi.m_transactions.end())
     {
-      ss_tx_hashes << obj_to_json_str(*it) << ENDL;
+      if (log_space::get_set_log_detalisation_level() >= LOG_LEVEL_1)
+      {
+        ss_tx_hashes << obj_to_json_str(*it) << ENDL;
+      }
       it++;
     }
   }
