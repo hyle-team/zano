@@ -6403,7 +6403,7 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   TIME_MEASURE_START_MS(prepare_tx_sources_time);
   if (ctp.perform_packing)
   {
-    prepare_tx_sources_for_packing(WALLET_DEFAULT_POS_MINT_PACKING_SIZE, 0, ftp.sources, ftp.selected_transfers, needed_money_map[currency::null_pkey].found_amount);
+    prepare_tx_sources_for_packing(WALLET_DEFAULT_POS_MINT_PACKING_SIZE, 0, ftp.sources, ftp.selected_transfers, needed_money_map[currency::native_coin_asset_id].found_amount);
   }
   else if (ctp.htlc_tx_id != currency::null_hash)
   {
