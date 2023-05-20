@@ -1642,7 +1642,7 @@ multisig_and_checkpoints::multisig_and_checkpoints()
 bool multisig_and_checkpoints::set_cp(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   currency::checkpoints checkpoints;
-  checkpoints.add_checkpoint(15, "10521273decd310d17be7216c4bd1c0bb55d9adf70e068943d216878276dbe5a");
+  checkpoints.add_checkpoint(15, "6f9194c144afd73077478e7f04e947c50160b5673558e6f696a4f662a3ca261e");
   c.set_checkpoints(std::move(checkpoints));
 
   return true;
@@ -1692,7 +1692,7 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), to_addrs, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, currency::get_tx_version(get_block_height(blk_0r), m_hardforks), 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx");
 
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // tx_1 goes with the block blk_1
@@ -1713,7 +1713,7 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   tx_destination_entry de(amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address());
 
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
-  r = construct_tx(alice_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ de }), empty_attachment, tx_2, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  r = construct_tx(alice_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ de }), empty_attachment, tx_2, currency::get_tx_version(get_block_height(blk_1), m_hardforks), 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   bool tx_fully_signed = false;
   r = sign_multisig_input_in_tx(tx_2, 0, alice_acc.get_keys(), tx_1, &tx_fully_signed);
@@ -1731,7 +1731,7 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   r = fill_tx_sources_and_destinations(events, blk_2, miner_acc.get_keys(), to_addrs, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_3 = AUTO_VAL_INIT(tx_3);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_3, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_3, currency::get_tx_version(get_block_height(blk_2), m_hardforks), 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx");
 
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // tx_3 goes with the block blk_3
@@ -1756,7 +1756,7 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   de = tx_destination_entry(amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address());
 
   transaction tx_4 = AUTO_VAL_INIT(tx_4);
-  r = construct_tx(alice_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ de }), empty_attachment, tx_4, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  r = construct_tx(alice_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ de }), empty_attachment, tx_4, currency::get_tx_version(get_block_height(blk_3), m_hardforks), 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   r = sign_multisig_input_in_tx(tx_4, 0, alice_acc.get_keys(), tx_3, &tx_fully_signed);
   CHECK_AND_ASSERT_MES(r & tx_fully_signed, false, "sign_multisig_input_in_tx failed, tx_fully_signed: " << tx_fully_signed);
@@ -1769,7 +1769,7 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   r = fill_tx_sources_and_destinations(events, blk_4, miner_acc.get_keys(), to_addrs, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, true, 1);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_5 = AUTO_VAL_INIT(tx_5);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_5, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_5, currency::get_tx_version(get_block_height(blk_4), m_hardforks), 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx");
   events.push_back(tx_5);
 
@@ -1787,7 +1787,7 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   de = tx_destination_entry(amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address());
 
   transaction tx_6 = AUTO_VAL_INIT(tx_6);
-  r = construct_tx(alice_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ de }), empty_attachment, tx_6, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  r = construct_tx(alice_acc.get_keys(), std::vector<tx_source_entry>({ se }), std::vector<tx_destination_entry>({ de }), empty_attachment, tx_6, currency::get_tx_version(get_block_height(blk_5), m_hardforks), 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   r = sign_multisig_input_in_tx(tx_6, 0, alice_acc.get_keys(), tx_5, &tx_fully_signed);
   CHECK_AND_ASSERT_MES(r & tx_fully_signed, false, "sign_multisig_input_in_tx failed, tx_fully_signed: " << tx_fully_signed);
