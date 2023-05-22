@@ -10,7 +10,7 @@
 #ifndef TESTNET
 #define CURRENCY_FORMATION_VERSION                      84
 #else
-#define CURRENCY_FORMATION_VERSION                      88
+#define CURRENCY_FORMATION_VERSION                      89
 #endif
 
 #define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121) //bender's nightmare
@@ -238,7 +238,7 @@
 #ifndef TESTNET
 #define WALLET_FILE_SERIALIZATION_VERSION               154
 #else 
-#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+69)
+#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+70)
 #endif
 
 #define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)
@@ -257,7 +257,7 @@
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   0
-#define ZANO_HARDFORK_04_AFTER_HEIGHT                   CURRENCY_MAX_BLOCK_NUMBER
+#define ZANO_HARDFORK_04_AFTER_HEIGHT                   1440  
 #endif
 
 
@@ -275,6 +275,11 @@ static_assert(PREMINE_AMOUNT / WALLET_MAX_ALLOWED_OUTPUT_AMOUNT < CURRENCY_MINER
 
 #define CURRENCY_RELAY_TXS_MAX_COUNT                    5
 
+#ifndef TESTNET
+  #define WALLET_ASSETS_WHITELIST_URL                     "https://zano.org/assets_whitelist.json"
+#else
+  #define WALLET_ASSETS_WHITELIST_URL                     "https://zano.org/assets_whitelist_testnet.json"
+#endif
 
-#define WALLET_ASSETS_WHITELIST_URL                     "https://zano.org/assets_whitelist.json"
+
 #define WALLET_ASSETS_WHITELIST_VALIDATION_PUBLIC_KEY   "" //TODO@#@
