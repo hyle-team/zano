@@ -52,6 +52,10 @@ struct gen_block_accepted_base : public test_chain_unit_base
 {
   gen_block_accepted_base()
   {
+    m_hardforks.m_height_the_hardfork_n_active_after[1] = 1440;
+    m_hardforks.m_height_the_hardfork_n_active_after[2] = 1800;
+    m_hardforks.m_height_the_hardfork_n_active_after[3] = 1801;
+    m_hardforks.m_height_the_hardfork_n_active_after[4] = 50000000000;
     REGISTER_CALLBACK("check_block_accepted", gen_block_accepted_base::check_block_accepted);
   }
 

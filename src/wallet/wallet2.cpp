@@ -4064,6 +4064,11 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
   WLT_CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
   b.miner_tx.proofs.emplace_back(std::move(balance_proof));
 
+  // the following line are for debugging when necessary -- sowle
+  //err = 0;
+  //r = crypto::zarcanum_verify_proof(hash_for_zarcanum_sig, cxt.kernel_hash, ring, cxt.last_pow_block_id_hashed, cxt.sk.kimage, cxt.basic_diff, sig, &err);
+  //WLT_CHECK_AND_ASSERT_MES(r, false, "zarcanum_verify_proof failed with code " << (int)err);
+
   return true;
 }
 //------------------------------------------------------------------
@@ -6403,7 +6408,7 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   TIME_MEASURE_START_MS(prepare_tx_sources_time);
   if (ctp.perform_packing)
   {
-    prepare_tx_sources_for_packing(WALLET_DEFAULT_POS_MINT_PACKING_SIZE, 0, ftp.sources, ftp.selected_transfers, needed_money_map[currency::null_pkey].found_amount);
+    prepare_tx_sources_for_packing(WALLET_DEFAULT_POS_MINT_PACKING_SIZE, 0, ftp.sources, ftp.selected_transfers, needed_money_map[currency::native_coin_asset_id].found_amount);
   }
   else if (ctp.htlc_tx_id != currency::null_hash)
   {

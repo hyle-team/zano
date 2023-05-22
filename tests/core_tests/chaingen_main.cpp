@@ -1069,8 +1069,6 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(hard_fork_1_checkpoint_basic_test);
     GENERATE_AND_PLAY(hard_fork_1_pos_locked_height_vs_time);
     GENERATE_AND_PLAY(hard_fork_1_pos_and_locked_coins);
-    
-
 
     // Hardfork 2 tests
     GENERATE_AND_PLAY(hard_fork_2_tx_payer_in_wallet);

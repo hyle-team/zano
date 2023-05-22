@@ -27,6 +27,10 @@ void remove_unlock_v2_entries_from_extra(extra_t& extra)
 hard_fork_1_base_test::hard_fork_1_base_test(size_t hardfork_height)
   : m_hardfork_height(hardfork_height)
 {
+  m_hardforks.m_height_the_hardfork_n_active_after[1] = 1440;
+  m_hardforks.m_height_the_hardfork_n_active_after[2] = 1800;
+  m_hardforks.m_height_the_hardfork_n_active_after[3] = 1801;
+  m_hardforks.m_height_the_hardfork_n_active_after[4] = 50000000000;
   REGISTER_CALLBACK_METHOD(hard_fork_1_base_test, configure_core);
 }
 
@@ -475,11 +479,12 @@ hard_fork_1_pos_and_locked_coins::hard_fork_1_pos_and_locked_coins()
 
 bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& events) const
 {
+  random_state_test_restorer::reset_random();
   bool r = false;
   GENERATE_ACCOUNT(miner_acc);
   GENERATE_ACCOUNT(alice_acc);
   GENERATE_ACCOUNT(bob_acc);
-  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, starter_timestamp);
   generator.set_hardfork_height(1, m_hardfork_height);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);

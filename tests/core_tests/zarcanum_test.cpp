@@ -636,7 +636,8 @@ bool zarcanum_in_alt_chain::generate(std::vector<test_event_entry>& events) cons
   //                                    |
   //  0     10    11    21    22    23  | 24    34    35    36   <- blockchain height
   // (0 )..(0r)- (1 )..(1r)- !2 !- (3 )- (4 )..(4r)- (5 )        <- main chain
-  //             tx_0                    tx_1      \ tx_2
+  //             tx_0                    tx_1    \   tx_2a
+  //                                              \  tx_2b
   //                                                -!5a!- (6a)  <- alt chain
 
   REWIND_BLOCKS_N_WITH_TIME(events, blk_4r, blk_4, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
@@ -648,27 +649,50 @@ bool zarcanum_in_alt_chain::generate(std::vector<test_event_entry>& events) cons
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_5, blk_4r, miner_acc, std::list<transaction>({ tx_2a, tx_2b }));
 
   // now in the main chain Bob has zero coins
-  // check it
+  // check it in gen time ...
   CREATE_TEST_WALLET(bob_wlt, bob_acc, blk_0);
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, bob_wlt, blk_5, 3 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
   CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(bob_wlt, 0);
+  // ... and in play time
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, 0));
 
   // TODO: check PoS mining against already spent key image 
+
+  //                                   HF4
+  //                                    |
+  //  0  .. 10    11    21    22    23  | 24 .. 34    35    36 .. 45    46    47   <- blockchain height
+  // (0 )..(0r)- (1 )..(1r)- !2 !- (3 )- (4 )..(4r)- (5 )-                         <- alt chain
+  //             tx_0                    tx_1    \   tx_2a
+  //                                              \  tx_2b
+  //                                               \                       c1
+  //                                                -!5a!- (6a)- . . . (6ar)|(c1)  <- main chain
 
   std::list<currency::account_base> bob_stake_sources({ bob_acc });
   MAKE_NEXT_POS_BLOCK(events, blk_5a, blk_4r, bob_acc, bob_stake_sources); // NOTE: tx_2a and blk_5a spend the same Bob's output 
   MAKE_NEXT_BLOCK(events, blk_6a, blk_5a, miner_acc);
 
-  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(get_block_height(blk_6a), get_block_hash(blk_6a)));
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_6a));
 
   REWIND_BLOCKS_N_WITH_TIME(events, blk_6ar, blk_6a, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   DO_CALLBACK(events, "c1");
 
+  //                                   HF4
+  //                                    |
+  //  0  .. 10    11    21    22    23  | 24 .. 34    35    36 .. 45    46    47   <- blockchain height
+  // (0 )..(0r)- (1 )..(1r)- !2 !- (3 )- (4 )..(4r)- (5 )- . . . (5r)- !6 !- (7 )  <- main chain
+  //             tx_0                    tx_1    \   tx_2a
+  //                                              \  tx_2b
+  //                                               \                        c1
+  //                                                -!5a!- (6a)- . . . (6ar)|(c1)  <- alt chain
+
   REWIND_BLOCKS_N_WITH_TIME(events, blk_5r, blk_5, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   MAKE_NEXT_POS_BLOCK(events, blk_6, blk_5r, alice_acc, alice_stake_sources);
   MAKE_NEXT_BLOCK(events, blk_7, blk_6, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_8, blk_7, miner_acc);
+
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_8));
 
   return true;
 }

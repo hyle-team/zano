@@ -164,10 +164,21 @@ void test_generator::add_block_info(const block_info& bi)
   m_blocks_info[block_hash] = bi;
 
   std::stringstream ss_tx_hashes;
+  auto it = bi.m_transactions.begin();
   for (auto& h : bi.b.tx_hashes)
   {
     ss_tx_hashes << "    [tx]: " << h << ENDL;
+
+    if (it != bi.m_transactions.end())
+    {
+      if (log_space::get_set_log_detalisation_level() >= LOG_LEVEL_1)
+      {
+        ss_tx_hashes << obj_to_json_str(*it) << ENDL;
+      }
+      it++;
+    }
   }
+
   LOG_PRINT_MAGENTA("ADDED_BLOCK[" << block_hash << "][" << (is_pos_block(bi.b)? "PoS":"PoW") <<"][" << get_block_height(bi.b) << "][cumul_diff:" << bi.cumul_difficulty << "]" << ENDL << ss_tx_hashes.str(), LOG_LEVEL_0);
 }
 
@@ -631,10 +642,10 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
       pe.tx_out_index       = td.m_internal_output_index;
       pe.wallet_index       = context.index;
 
-      LOG_PRINT_GREEN("Found kernel: amount=" << print_money_brief(pe.amount)
-        << ", gindex=" << pe.g_index
-        << ", key_image=" << pe.keyimage
-        /*<< ", diff: " << this_coin_diff*/, LOG_LEVEL_1);
+      LOG_PRINT_GREEN("Additional kernel info: source tx id: " << pe.tx_id
+        << ", key_image: " << pe.keyimage
+        << ", gindex: " << pe.g_index
+        << ", out's height: " << td.m_ptx_wallet_info->m_block_height, LOG_LEVEL_1);
 
       return true;
     }
@@ -2275,6 +2286,13 @@ currency::core_runtime_config test_chain_unit_base::get_runtime_info_for_core() 
   crc.tx_default_fee = TESTS_DEFAULT_FEE;
   crc.hard_forks = m_hardforks;
   return crc;
+}
+
+void test_chain_unit_base::set_hardforks_for_old_tests()
+{
+  m_hardforks.set_hardfork_height(1, 1440);
+  m_hardforks.set_hardfork_height(2, 1800);
+  m_hardforks.set_hardfork_height(3, 1801);
 }
 //------------------------------------------------------------------------------
 
