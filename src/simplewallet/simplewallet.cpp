@@ -1876,8 +1876,8 @@ bool simple_wallet::generate_ionic_swap_proposal(const std::vector<std::string> 
     fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
   }
 
-  view::ionic_swap_proposal_info proposal = AUTO_VAL_INIT(proposal);
-  bool r = epee::serialization::load_t_from_json_file(proposal, args[0]);
+  view::ionic_swap_proposal_info proposal_info = AUTO_VAL_INIT(proposal_info);
+  bool r = epee::serialization::load_t_from_json_file(proposal_info, args[0]);
   if (!r)
   {
     fail_msg_writer() << "Failed to load json file with asset specification: " << args[0];
@@ -1895,8 +1895,8 @@ bool simple_wallet::generate_ionic_swap_proposal(const std::vector<std::string> 
     return true;
   }
 
-  transaction tx_template = AUTO_VAL_INIT(tx_template);
-  r = m_wallet->create_ionic_swap_proposal(proposal, destination_addr, tx_template);
+  tools::wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
+  r = m_wallet->create_ionic_swap_proposal(proposal_info, destination_addr, proposal);
   if (!r)
   {
     fail_msg_writer() << "Failed to create ionic_swap proposal";
@@ -1904,7 +1904,7 @@ bool simple_wallet::generate_ionic_swap_proposal(const std::vector<std::string> 
   }
   else
   {    
-    success_msg_writer() << "Generated proposal: " << ENDL << epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(tx_template));
+    success_msg_writer() << "Generated proposal: " << ENDL << epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(proposal));
   }
   return true;
 }
@@ -1916,24 +1916,24 @@ bool simple_wallet::get_ionic_swap_proposal_info(const std::vector<std::string> 
     fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
   }
 
-  std::string raw_tx_template;
-  bool r = epee::string_tools::parse_hexstr_to_binbuff(args[0], raw_tx_template);
+  std::string raw_proposal;
+  bool r = epee::string_tools::parse_hexstr_to_binbuff(args[0], raw_proposal);
   if (!r)
   {
     fail_msg_writer() << "Failed to parse proposal hex to raw data";
     return true;
   }
 
-  view::ionic_swap_proposal_info proposal = AUTO_VAL_INIT(proposal);
-  if (!m_wallet->get_ionic_swap_proposal_info(raw_tx_template, proposal))
+  view::ionic_swap_proposal_info proposal_info = AUTO_VAL_INIT(proposal_info);
+  if (!m_wallet->get_ionic_swap_proposal_info(raw_proposal, proposal_info))
   {
     fail_msg_writer() << "Failed to decode proposal info";
     return true;
   }
-  std::string json_proposal = epee::serialization::store_t_to_json(proposal);
+  std::string json_proposal_info = epee::serialization::store_t_to_json(proposal_info);
 
 
-  success_msg_writer() << "Proposal details: " << ENDL << json_proposal;
+  success_msg_writer() << "Proposal details: " << ENDL << json_proposal_info;
 
   return true;
 }
@@ -1945,8 +1945,8 @@ bool simple_wallet::accept_ionic_swap_proposal(const std::vector<std::string> &a
     fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
   }
 
-  std::string raw_tx_template;
-  bool r = epee::string_tools::parse_hexstr_to_binbuff(args[0], raw_tx_template);
+  std::string raw_proposal;
+  bool r = epee::string_tools::parse_hexstr_to_binbuff(args[0], raw_proposal);
   if (!r)
   {
     fail_msg_writer() << "Failed to parse proposal hex to raw data";
@@ -1954,7 +1954,7 @@ bool simple_wallet::accept_ionic_swap_proposal(const std::vector<std::string> &a
   }
 
   currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
-  if (!m_wallet->accept_ionic_swap_proposal(raw_tx_template, result_tx))
+  if (!m_wallet->accept_ionic_swap_proposal(raw_proposal, result_tx))
   {
     fail_msg_writer() << "Failed accept ionic_swap proposal";
     return true;
