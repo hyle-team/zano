@@ -204,6 +204,22 @@ namespace crypto
       DBG_PRINT("zarcanum_verify_proof");
       bool r = false;
 
+      //std::cout << "===== zarcanum_verify_proof =====" << ENDL
+      //          << "m:                        " << m << ENDL
+      //          << "kernel_hash:              " << kernel_hash << ENDL
+      //          << "last_pow_block_id_hashed: " << last_pow_block_id_hashed << ENDL
+      //          << "stake_ki:                 " << stake_ki << ENDL
+      //          << "pos_difficulty:           " << pos_difficulty << ENDL;
+      //size_t ii = 0;
+      //for(const auto& el : ring)
+      //{
+      //  std::cout << "[" << ii << "]" << ENDL
+      //            << "  amount_commitment: " << el.amount_commitment << ENDL
+      //            << "  blinded_asset_id:  " << el.blinded_asset_id << ENDL
+      //            << "  concealing_point:  " << el.concealing_point << ENDL
+      //            << "  stealth_address:   " << el.stealth_address << ENDL;
+      //}
+
       // make sure 0 < d <= l / floor(z * D)
       const mp::uint256_t l_div_z_D_mp = crypto::zarcanum_precalculate_l_div_z_D(pos_difficulty);
       const scalar_t l_div_z_D(l_div_z_D_mp);

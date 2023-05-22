@@ -5591,30 +5591,35 @@ bool blockchain_storage::validate_pos_block(const block& b,
     const txin_zc_input& stake_input = boost::get<txin_zc_input>(b.miner_tx.vin[1]);
     CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1, false, "incorrect number of stake input signatures: " << b.miner_tx.signatures.size());
     CHECK_AND_ASSERT_MES(b.miner_tx.signatures[0].type() == typeid(zarcanum_sig), false, "incorrect sig 0 type: " << b.miner_tx.signatures[0].type().name());
-    const zarcanum_sig& sig = boost::get<zarcanum_sig>(b.miner_tx.signatures[0]);
+    
+    if (!for_altchain)
+    {
+      // do general input check for main chain blocks only
+      // TODO @#@#: txs in alternative PoS blocks (including miner_tx) must be validated by validate_alt_block_txs()
+      const zarcanum_sig& sig = boost::get<zarcanum_sig>(b.miner_tx.signatures[0]);
+      uint64_t max_related_block_height = 0;
+      std::vector<crypto::public_key> dummy_output_keys; // won't be used
+      uint64_t dummy_source_max_unlock_time_for_pos_coinbase_dummy = 0; // won't be used
+      scan_for_keys_context scan_contex = AUTO_VAL_INIT(scan_contex);
+      r = get_output_keys_for_input_with_checks(b.miner_tx, stake_input, dummy_output_keys, max_related_block_height, dummy_source_max_unlock_time_for_pos_coinbase_dummy, scan_contex);
+      CHECK_AND_ASSERT_MES(r, false, "get_output_keys_for_input_with_checks failed for stake input");
+      CHECK_AND_ASSERT_MES(scan_contex.zc_outs.size() == stake_input.key_offsets.size(), false, "incorrect number of referenced outputs found: " << scan_contex.zc_outs.size() << ", while " << stake_input.key_offsets.size() << " is expected.");
+      // make sure that all referring inputs are either older then, or the same age as, the most resent PoW block.
+      CHECK_AND_ASSERT_MES(max_related_block_height <= last_pow_block_height, false, "stake input refs' max related block height is " << max_related_block_height << " while last PoW block height is " << last_pow_block_height);    
 
-    // TODO @#@# do general input check for main chain blocks only?
-    uint64_t max_related_block_height = 0;
-    std::vector<crypto::public_key> dummy_output_keys; // won't be used
-    uint64_t dummy_source_max_unlock_time_for_pos_coinbase_dummy = 0; // won't be used
-    scan_for_keys_context scan_contex = AUTO_VAL_INIT(scan_contex);
-    r = get_output_keys_for_input_with_checks(b.miner_tx, stake_input, dummy_output_keys, max_related_block_height, dummy_source_max_unlock_time_for_pos_coinbase_dummy, scan_contex);
-    CHECK_AND_ASSERT_MES(r, false, "get_output_keys_for_input_with_checks failed for stake input");
-    CHECK_AND_ASSERT_MES(scan_contex.zc_outs.size() == stake_input.key_offsets.size(), false, "incorrect number of referenced outputs found: " << scan_contex.zc_outs.size() << ", while " << stake_input.key_offsets.size() << " is expected.");
-    // make sure that all referring inputs are either older then, or the same age as, the most resent PoW block.
-    CHECK_AND_ASSERT_MES(max_related_block_height <= last_pow_block_height, false, "stake input refs' max related block height is " << max_related_block_height << " while last PoW block height is " << last_pow_block_height);    
+      // build a ring of references
+      vector<crypto::CLSAG_GGXXG_input_ref_t> ring;
+      ring.reserve(scan_contex.zc_outs.size());
+      for(auto& zc_out : scan_contex.zc_outs)
+        ring.emplace_back(zc_out.stealth_address, zc_out.amount_commitment, zc_out.blinded_asset_id, zc_out.concealing_point);
 
-    // build a ring of references
-    vector<crypto::CLSAG_GGXXG_input_ref_t> ring;
-    ring.reserve(scan_contex.zc_outs.size());
-    for(auto& zc_out : scan_contex.zc_outs)
-      ring.emplace_back(zc_out.stealth_address, zc_out.amount_commitment, zc_out.blinded_asset_id, zc_out.concealing_point);
+      crypto::scalar_t last_pow_block_id_hashed = crypto::hash_helper_t::hs(CRYPTO_HDS_ZARCANUM_LAST_POW_HASH, sm.last_pow_id);
 
-    crypto::scalar_t last_pow_block_id_hashed = crypto::hash_helper_t::hs(CRYPTO_HDS_ZARCANUM_LAST_POW_HASH, sm.last_pow_id);
+      uint8_t err = 0;
+      r = crypto::zarcanum_verify_proof(id, kernel_hash, ring, last_pow_block_id_hashed, stake_input.k_image, basic_diff, sig, &err);
+      CHECK_AND_ASSERT_MES(r, false, "zarcanum_verify_proof failed with code " << (int)err);
+    }
 
-    uint8_t err = 0;
-    r = crypto::zarcanum_verify_proof(id, kernel_hash, ring, last_pow_block_id_hashed, stake_input.k_image, basic_diff, sig, &err);
-    CHECK_AND_ASSERT_MES(r, false, "zarcanum_verify_proof failed with code " << (int)err);
     return true;
   }
   else
@@ -7155,10 +7160,13 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
     }
     else
     {
+      // TODO @#@# properly handle ZC inputs! check_tx_input below isn't working because of incorrectly assembled ring 
+      /*
       uint64_t max_related_block_height = 0;
       bool all_tx_ins_have_explicit_asset_ids = true; // stub for now, TODO @#@#
       r = check_tx_input(input_tx, input_index, input_zc, input_tx_hash, max_related_block_height, all_tx_ins_have_explicit_asset_ids);
       CHECK_AND_ASSERT_MES(r, false, "check_tx_input failed");
+      */
     }
   VARIANT_CASE_OTHER()
     LOG_ERROR("unexpected input type: " << input_v.type().name());

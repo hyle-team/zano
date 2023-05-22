@@ -642,10 +642,10 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
       pe.tx_out_index       = td.m_internal_output_index;
       pe.wallet_index       = context.index;
 
-      LOG_PRINT_GREEN("Found kernel: amount=" << print_money_brief(pe.amount)
-        << ", gindex=" << pe.g_index
-        << ", key_image=" << pe.keyimage
-        /*<< ", diff: " << this_coin_diff*/, LOG_LEVEL_1);
+      LOG_PRINT_GREEN("Additional kernel info: source tx id: " << pe.tx_id
+        << ", key_image: " << pe.keyimage
+        << ", gindex: " << pe.g_index
+        << ", out's height: " << td.m_ptx_wallet_info->m_block_height, LOG_LEVEL_1);
 
       return true;
     }
