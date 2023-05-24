@@ -73,6 +73,7 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_rpc_server(m_ccore, m_p2psrv, m_offers_service),
                                  m_rpc_proxy(new tools::core_fast_rpc_proxy(m_rpc_server)),
                                  m_offers_service(nullptr),
+                                 m_wallet_rpc_server(this),
 #else 
                                  m_rpc_proxy(new tools::default_http_core_proxy()),
 #endif                            
@@ -544,6 +545,11 @@ bool wallets_manager::init_local_daemon()
   res = m_rpc_server.init(m_vm);
   CHECK_AND_ASSERT_AND_SET_GUI(res, "Failed to initialize core rpc server.");
   LOG_PRINT_GREEN("Core rpc server initialized OK on port: " << m_rpc_server.get_binded_port(), LOG_LEVEL_0);
+
+  //chain calls to rpc server
+  m_prpc_chain_handler = &m_wallet_rpc_server;
+  m_rpc_server.set_rpc_chain_handler(this);
+
 
   LOG_PRINT_L0("Starting core rpc server...");
   //dsi.text_state = "Starting core rpc server";
@@ -2043,11 +2049,50 @@ bool wallets_manager::on_mw_select_wallet(uint64_t wallet_id)
   auto it = m_wallets.find(wallet_id);      
   if (it == m_wallets.end())                
     return false; 
-  auto& wo = it->second;
-  //m_wallet_rpc_server.reset_active_wallet(wo.w);
+ 
+  m_rpc_selected_wallet_id = wallet_id;
   return false;
 }
 
+
+bool wallets_manager::on_mw_get_wallets(const tools::wallet_public::COMMAND_MW_GET_WALLETS::request& req, tools::wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, epee::net_utils::connection_context_base& cntx)
+{
+  this->on_mw_get_wallets(res.wallets);
+  return true;
+}
+bool wallets_manager::on_mw_select_wallet(const tools::wallet_public::COMMAND_MW_SELECT_WALLET::request& req, tools::wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, epee::net_utils::connection_context_base& cntx)
+{
+  this->on_mw_select_wallet(req.wallet_id);
+  return true;
+}
+
+
+void wallets_manager::lock() 
+{
+  {
+    SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
+    auto it = m_wallets.find(m_rpc_selected_wallet_id);
+    if (it == m_wallets.end())
+    {
+      throw std::runtime_error("Wallet not selected");
+    }
+    m_current_wallet_locked_object = it->second.w.lock();
+  }
+}
+
+void wallets_manager::unlock() 
+{
+  m_current_wallet_locked_object.reset();
+}
+
+std::shared_ptr<tools::wallet2> wallets_manager::get_wallet()
+{
+  if (!m_current_wallet_locked_object.get())
+  {
+    throw std::runtime_error("Wallet is not locked for get_wallet() call");
+  }
+  return **m_current_wallet_locked_object;
+}
 
 void wallets_manager::wallet_vs_options::worker_func()
 {

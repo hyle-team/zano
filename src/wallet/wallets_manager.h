@@ -47,7 +47,7 @@ struct wallet_lock_time_watching_policy
 };
 
 
-class wallets_manager : public i_backend_wallet_callback
+class wallets_manager : public i_backend_wallet_callback, public tools::i_wallet_provider, epee::net_utils::http::i_chain_handler
 {
 
 public:
@@ -55,6 +55,7 @@ public:
   {
     currency::core_runtime_config core_conf;
     epee::locked_object<std::shared_ptr<tools::wallet2>, wallet_lock_time_watching_policy> w;
+    typedef epee::locked_object<std::shared_ptr<tools::wallet2>, wallet_lock_time_watching_policy>::lock_shared_ptr wallet_lock_object;
     std::shared_ptr<tools::wallet_rpc_server> rpc_wrapper; //500 bytes of extra data, we can afford it, to have rpc-like invoke map
     std::atomic<bool> do_mining;
     std::atomic<bool> major_stop;
@@ -196,8 +197,27 @@ private:
   virtual void on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets) override;
   virtual bool on_mw_select_wallet(uint64_t wallet_id) override;
   
+  //----- i_wallet_provider ------
+  virtual void lock();
+  virtual void unlock();
+  virtual std::shared_ptr<tools::wallet2> get_wallet();
   //--------
 
+  BEGIN_URI_MAP2_VIRTUAL()
+    BEGIN_JSON_RPC_MAP("/json_rpc")
+      //MULTIWALLET APIs
+      MAP_JON_RPC_WE("mw_get_wallets", on_mw_get_wallets, tools::wallet_public::COMMAND_MW_GET_WALLETS)
+      MAP_JON_RPC_WE("mw_select_wallet", on_mw_select_wallet, tools::wallet_public::COMMAND_MW_SELECT_WALLET)
+      CHAIN_TO_PHANDLER(m_prpc_chain_handler)
+    END_JSON_RPC_MAP()
+    CHAIN_TO_PHANDLER(m_prpc_chain_handler)
+  END_URI_MAP2()
+
+  bool on_mw_get_wallets(const tools::wallet_public::COMMAND_MW_GET_WALLETS::request& req, tools::wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, epee::net_utils::connection_context_base& cntx);
+  bool on_mw_select_wallet(const tools::wallet_public::COMMAND_MW_SELECT_WALLET::request& req, tools::wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, epee::net_utils::connection_context_base& cntx);
+
+
+  epee::net_utils::http::i_chain_handler* m_prpc_chain_handler = nullptr;
   std::thread m_main_worker_thread;
   
   std::atomic<bool> m_stop_singal_sent;
@@ -228,6 +248,10 @@ private:
   currency::t_currency_protocol_handler<currency::core> m_cprotocol;
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > m_p2psrv;
   currency::core_rpc_server m_rpc_server;
+
+  tools::wallet_rpc_server m_wallet_rpc_server;
+  wallet_vs_options::wallet_lock_object m_current_wallet_locked_object;
+  uint64_t m_rpc_selected_wallet_id = 0;
 #endif
 
   bool m_remote_node_mode;

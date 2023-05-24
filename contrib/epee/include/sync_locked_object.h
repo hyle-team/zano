@@ -84,6 +84,8 @@ namespace epee
     template<typename t_proxy_object, typename t_proxy_lock_time_watching_policy>
     friend class locked_object_proxy;
   public:
+    typedef std::shared_ptr<locked_object_proxy<t_object, lock_time_watching_policy>> lock_shared_ptr;
+
     std::shared_ptr<locked_object_proxy<t_object, lock_time_watching_policy>> lock()
     {
       std::shared_ptr<locked_object_proxy<t_object, lock_time_watching_policy>> res;

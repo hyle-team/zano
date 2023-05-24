@@ -26,14 +26,15 @@ namespace tools
 
   struct wallet_rpc_locker
   {
-    wallet_rpc_locker(std::shared_ptr<i_wallet_provider> wallet_provider) :m_pwallet_provider(wallet_provider)
+    wallet_rpc_locker(i_wallet_provider* wallet_provider) :m_pwallet_provider(wallet_provider)
     {
-      m_wallet_ptr = get_wallet();
+      m_pwallet_provider->lock();
+
+      m_wallet_ptr = m_pwallet_provider->get_wallet();
       if (!m_wallet_ptr.get())
       {
         throw std::runtime_error("Wallet object closed");
       }
-      m_pwallet_provider->lock();
     }
 
     std::shared_ptr<wallet2> get_wallet() { return m_wallet_ptr; }
@@ -45,7 +46,7 @@ namespace tools
 
   private:
     std::shared_ptr<wallet2> m_wallet_ptr;
-    std::shared_ptr<i_wallet_provider> m_pwallet_provider;
+    i_wallet_provider* m_pwallet_provider;
   };
 
 
@@ -66,13 +67,13 @@ namespace tools
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
-  class wallet_rpc_server : public epee::http_server_impl_base<wallet_rpc_server>
+  class wallet_rpc_server : public epee::http_server_impl_base<wallet_rpc_server>, public epee::net_utils::http::i_chain_handler
   {
   public:
     typedef epee::net_utils::connection_context_base connection_context;
 
     wallet_rpc_server(std::shared_ptr<wallet2> wptr);
-    wallet_rpc_server(std::shared_ptr<i_wallet_provider> provider_ptr);
+    wallet_rpc_server(i_wallet_provider* provider_ptr);
 
     const static command_line::arg_descriptor<std::string> arg_rpc_bind_port;
     const static command_line::arg_descriptor<std::string> arg_rpc_bind_ip;
@@ -85,7 +86,7 @@ namespace tools
     bool run(bool do_mint, bool offline_mode, const currency::account_public_address& miner_address);
     bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context);
 
-    BEGIN_URI_MAP2()
+    BEGIN_URI_MAP2_VIRTUAL()
     BEGIN_JSON_RPC_MAP("/json_rpc")
       MAP_JON_RPC_WE("getbalance", on_getbalance, wallet_public::COMMAND_RPC_GET_BALANCE)
       MAP_JON_RPC_WE("getaddress", on_getaddress, wallet_public::COMMAND_RPC_GET_ADDRESS)
@@ -199,7 +200,8 @@ namespace tools
     bool handle_command_line(const boost::program_options::variables_map& vm);
 
   private:
-    std::shared_ptr<i_wallet_provider> m_pwallet_provider;
+    std::shared_ptr<i_wallet_provider> m_pwallet_provider_sh_ptr;
+    i_wallet_provider* m_pwallet_provider;
     std::string m_port;
     std::string m_bind_ip;
     bool m_do_mint;

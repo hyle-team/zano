@@ -37,6 +37,7 @@ namespace currency
     static void init_options(boost::program_options::options_description& desc);
     bool init(const boost::program_options::variables_map& vm);
     
+    void set_rpc_chain_handler(epee::net_utils::http::i_chain_handler* prpc_chain_handler) { m_prpc_chain_handler = prpc_chain_handler; }
     bool on_get_blocks_direct(const COMMAND_RPC_GET_BLOCKS_DIRECT::request& req, COMMAND_RPC_GET_BLOCKS_DIRECT::response& res, connection_context& cntx);
     
 
@@ -149,7 +150,9 @@ namespace currency
         MAP_JON_RPC   ("get_current_core_tx_expiration_median", on_get_current_core_tx_expiration_median, COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN)
         //
         MAP_JON_RPC_WE("marketplace_global_get_offers_ex",               on_get_offers_ex,               COMMAND_RPC_GET_OFFERS_EX)
+        CHAIN_TO_PHANDLER(m_prpc_chain_handler)
       END_JSON_RPC_MAP()
+      CHAIN_TO_PHANDLER(m_prpc_chain_handler)
     END_URI_MAP2()
   
   private:
@@ -170,6 +173,7 @@ namespace currency
     std::string m_port;
     std::string m_bind_ip;
     bool m_ignore_status;
+    epee::net_utils::http::i_chain_handler* m_prpc_chain_handler = nullptr;
   };
 }
 

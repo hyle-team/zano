@@ -59,13 +59,14 @@ namespace tools
   }
   //------------------------------------------------------------------------------------------------------------------------------
   wallet_rpc_server::wallet_rpc_server(std::shared_ptr<wallet2> wptr):
-    m_pwallet_provider(new wallet_provider_simple(wptr))
+    m_pwallet_provider_sh_ptr(new wallet_provider_simple(wptr))
+    , m_pwallet_provider(m_pwallet_provider_sh_ptr.get())
     , m_do_mint(false)
     , m_deaf(false)
     , m_last_wallet_store_height(0)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
-  wallet_rpc_server::wallet_rpc_server(std::shared_ptr<i_wallet_provider> provider_ptr):
+  wallet_rpc_server::wallet_rpc_server(i_wallet_provider* provider_ptr):
     m_pwallet_provider(provider_ptr)
     , m_do_mint(false)
     , m_deaf(false)
