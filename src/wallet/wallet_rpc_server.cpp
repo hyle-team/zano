@@ -28,6 +28,12 @@ using namespace epee;
           er.message = e.error_code(); \
           return false; \
         } \
+        catch (const tools::error::daemon_busy& e) \
+        { \
+          er.code = WALLET_RPC_ERROR_CODE_DAEMON_IS_BUSY; \
+          er.message = e.what(); \
+          return false; \
+        } \
         catch (const std::exception& e) \
         { \
           er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR; \
@@ -40,7 +46,6 @@ using namespace epee;
           er.message = "WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR"; \
           return false; \
         } 
-
 
 namespace tools
 {

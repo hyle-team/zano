@@ -2051,7 +2051,7 @@ bool wallets_manager::on_mw_select_wallet(uint64_t wallet_id)
     return false; 
  
   m_rpc_selected_wallet_id = wallet_id;
-  return false;
+  return true;
 }
 
 
