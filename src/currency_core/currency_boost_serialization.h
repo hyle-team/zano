@@ -116,6 +116,7 @@ namespace boost
       a & x.stealth_address;
       a & x.concealing_point;
       a & x.amount_commitment;
+      a & x.blinded_asset_id;
       a & x.encrypted_amount;
       a & x.mix_attr;
     }
