@@ -89,7 +89,7 @@ namespace currency
     bool on_get_alt_block_details(const COMMAND_RPC_GET_BLOCK_DETAILS::request& req, COMMAND_RPC_GET_BLOCK_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_get_alt_blocks_details(const COMMAND_RPC_GET_ALT_BLOCKS_DETAILS::request& req, COMMAND_RPC_GET_ALT_BLOCKS_DETAILS::response& res, connection_context& cntx);
     bool on_get_est_height_from_date(const COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::request& req, COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::response& res, connection_context& cntx);
-    
+    bool on_validate_signature(const COMMAND_VALIDATE_SIGNATURE::request& req, COMMAND_VALIDATE_SIGNATURE::response& res, epee::json_rpc::error& er, connection_context& cntx);
     
     
     
@@ -149,7 +149,8 @@ namespace currency
         MAP_JON_RPC   ("reset_transaction_pool",      on_reset_transaction_pool,      COMMAND_RPC_RESET_TX_POOL)
         MAP_JON_RPC   ("get_current_core_tx_expiration_median", on_get_current_core_tx_expiration_median, COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN)
         //
-        MAP_JON_RPC_WE("marketplace_global_get_offers_ex",               on_get_offers_ex,               COMMAND_RPC_GET_OFFERS_EX)
+        MAP_JON_RPC_WE("marketplace_global_get_offers_ex", on_get_offers_ex,          COMMAND_RPC_GET_OFFERS_EX)        
+        MAP_JON_RPC_WE("validate_signature",          on_validate_signature,          COMMAND_VALIDATE_SIGNATURE)
         CHAIN_TO_PHANDLER(m_prpc_chain_handler)
       END_JSON_RPC_MAP()
       CHAIN_TO_PHANDLER(m_prpc_chain_handler)

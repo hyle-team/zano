@@ -1584,6 +1584,34 @@ namespace currency
     };
   };
 
+
+  struct COMMAND_VALIDATE_SIGNATURE
+  {
+    struct request
+    {
+      std::string buff; //base64 encoded data
+      crypto::signature sig = currency::null_sig;
+      crypto::public_key pkey = currency::null_pkey;
+      std::string alias;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(buff)
+        KV_SERIALIZE_POD_AS_HEX_STRING(sig)
+        KV_SERIALIZE_POD_AS_HEX_STRING(pkey)
+        KV_SERIALIZE(alias)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      std::string status;
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
   struct void_struct
   {
     BEGIN_KV_SERIALIZE_MAP()

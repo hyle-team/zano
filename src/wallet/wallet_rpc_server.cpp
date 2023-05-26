@@ -22,16 +22,16 @@ using namespace epee;
 
 #define WALLET_RPC_BEGIN_TRY_ENTRY()     try { GET_WALLET();
 #define WALLET_RPC_CATCH_TRY_ENTRY()     } \
-        catch (const tools::error::wallet_error& e) \
-        { \
-          er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR; \
-          er.message = e.error_code(); \
-          return false; \
-        } \
         catch (const tools::error::daemon_busy& e) \
         { \
           er.code = WALLET_RPC_ERROR_CODE_DAEMON_IS_BUSY; \
           er.message = e.what(); \
+          return false; \
+        } \
+        catch (const tools::error::wallet_error& e) \
+        { \
+          er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR; \
+          er.message = e.error_code(); \
           return false; \
         } \
         catch (const std::exception& e) \
@@ -1001,21 +1001,7 @@ namespace tools
     WALLET_RPC_BEGIN_TRY_ENTRY();    
     std::string buff = epee::string_encoding::base64_decode(req.buff);
     w.get_wallet()->sign_buffer(buff, res.sig);
-    return true;
-    WALLET_RPC_CATCH_TRY_ENTRY();
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_validate_signature(const wallet_public::COMMAND_VALIDATE_SIGNATURE::request& req, wallet_public::COMMAND_VALIDATE_SIGNATURE::response& res, epee::json_rpc::error& er, connection_context& cntx)
-  {
-    WALLET_RPC_BEGIN_TRY_ENTRY();
-    std::string buff = epee::string_encoding::base64_decode(req.buff);
-    bool r = w.get_wallet()->validate_sign(buff, req.sig, req.pkey);
-    if (!r)
-    {
-      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
-      er.message = "WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT";
-      return false;
-    }
+    res.pkey = w.get_wallet()->get_account().get_public_address().spend_public_key;
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }

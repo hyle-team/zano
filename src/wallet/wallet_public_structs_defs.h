@@ -1389,7 +1389,9 @@ namespace wallet_public
 
     struct response
     {
+      std::string status;
       BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -1400,7 +1402,6 @@ namespace wallet_public
     {
       std::string buff; //base64 encoded data
       
-
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(buff)
       END_KV_SERIALIZE_MAP()
@@ -1409,37 +1410,16 @@ namespace wallet_public
 
     struct response
     {
-      crypto::signature sig;
+      crypto::signature sig = currency::null_sig;
+      crypto::public_key pkey = currency::null_pkey;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(sig)
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-
-  struct COMMAND_VALIDATE_SIGNATURE
-  {
-    struct request
-    {
-      std::string buff; //base64 encoded data
-      crypto::signature sig;
-      crypto::public_key pkey;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(buff)
         KV_SERIALIZE_POD_AS_HEX_STRING(sig)
         KV_SERIALIZE_POD_AS_HEX_STRING(pkey)
       END_KV_SERIALIZE_MAP()
     };
-
-
-    struct response
-    {
-      BEGIN_KV_SERIALIZE_MAP()
-      END_KV_SERIALIZE_MAP()
-    };
-  };  
-  
+  };
+   
   struct COMMAND_ENCRYPT_DATA
   {
     struct request

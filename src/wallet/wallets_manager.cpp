@@ -2063,6 +2063,7 @@ bool wallets_manager::on_mw_get_wallets(const tools::wallet_public::COMMAND_MW_G
 bool wallets_manager::on_mw_select_wallet(const tools::wallet_public::COMMAND_MW_SELECT_WALLET::request& req, tools::wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, epee::net_utils::connection_context_base& cntx)
 {
   this->on_mw_select_wallet(req.wallet_id);
+  res.status = API_RETURN_CODE_OK;
   return true;
 }
 
