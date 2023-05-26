@@ -3521,6 +3521,7 @@ bool wallet2::try_mint_pos()
 //------------------------------------------------------------------
 bool wallet2::try_mint_pos(const currency::account_public_address& miner_address)
 {
+  TIME_MEASURE_START_MS(mining_duration_ms);
   mining_context ctx = AUTO_VAL_INIT(ctx);
   WLT_LOG_L1("Starting PoS mining iteration");
   fill_mining_context(ctx);
@@ -3550,8 +3551,9 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
   {
     build_minted_block(ctx.sp, ctx.rsp, miner_address);
   }
+  TIME_MEASURE_FINISH_MS(mining_duration_ms);
 
-  WLT_LOG_L0("PoS mining: " << ctx.rsp.iterations_processed << " iterations finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << print_money_brief(pos_entries_amount));
+  WLT_LOG_L0("PoS mining: " << ctx.rsp.iterations_processed << " iterations finished (" << std::fixed << std::setprecision(2) << (mining_duration_ms / 1000.0f) << "s), status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << print_money_brief(pos_entries_amount));
 
   return true;
 }
