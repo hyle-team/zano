@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2022 Zano Project
+// Copyright (c) 2014-2023 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -53,22 +53,27 @@ using namespace currency;
 ENABLE_CHANNEL_BY_DEFAULT("wallet")
 namespace tools
 {
-  wallet2::wallet2() :  m_stop(false),
-                        m_wcallback(new i_wallet2_callback()), //stub
-                        m_core_proxy(new default_http_core_proxy()),
-                        m_upper_transaction_size_limit(0),
-                        m_height_of_start_sync(0),
-                        m_last_sync_percent(0),
-                        m_fake_outputs_count(0),
-                        m_do_rise_transfer(false),
-                        m_log_prefix("???"),
-                        m_watch_only(false),
-                        m_last_pow_block_h(0),
-                        m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
-                        m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE),
-                        m_current_wallet_file_size(0),
-                        m_use_deffered_global_outputs(false), 
-                        m_disable_tor_relay(false)
+  wallet2::wallet2()
+    : m_stop(false)
+    , m_wcallback(new i_wallet2_callback()) //stub
+    , m_core_proxy(new default_http_core_proxy())
+    , m_upper_transaction_size_limit(0)
+    , m_height_of_start_sync(0)
+    , m_last_sync_percent(0)
+    , m_fake_outputs_count(0)
+    , m_do_rise_transfer(false)
+    , m_log_prefix("???")
+    , m_watch_only(false)
+    , m_last_pow_block_h(0)
+    , m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST)
+    , m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE)
+    , m_current_wallet_file_size(0)
+    , m_use_deffered_global_outputs(false)
+#ifdef DISABLE_TOR
+    , m_disable_tor_relay(true)
+#else
+    , m_disable_tor_relay(false)
+#endif
   {
     m_core_runtime_config = currency::get_default_core_runtime_config();
   }
@@ -3410,6 +3415,33 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
   }
 
   ss << "printed " << count << " outputs of " << m_transfers.size() << " total" << ENDL;
+  return ss.str();
+}
+//----------------------------------------------------------------------------------------------------
+std::string wallet2::get_balance_str() const
+{
+  // balance unlocked     / [balance total]       ticker   asset id
+  // 1391306.970000000000 / 1391306.970000000000  ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
+  // 1391306.97                                   ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
+  //     106.971          /     206.4             ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
+
+  static const char* header = " balance unlocked     / [balance total]       ticker   asset id";
+  std::stringstream ss;
+  ss << header << ENDL;
+
+  std::list<tools::wallet_public::asset_balance_entry> balances;
+  uint64_t mined = 0;
+  balance(balances, mined);
+  for (const tools::wallet_public::asset_balance_entry& b : balances)
+  {
+    ss << " " << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(b.unlocked, b.asset_info.decimal_point);
+    if (b.total == b.unlocked)
+      ss << "                       ";
+    else
+      ss << " / " << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(b.total, b.asset_info.decimal_point);
+    ss << "  " << std::setw(8) << std::left << b.asset_info.ticker << " " << b.asset_info.asset_id << ENDL;
+  }
+
   return ss.str();
 }
 //----------------------------------------------------------------------------------------------------

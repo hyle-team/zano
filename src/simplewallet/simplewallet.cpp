@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2019 Zano Project
+// Copyright (c) 2014-2023 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -857,15 +857,7 @@ bool simple_wallet::refresh(const std::vector<std::string>& args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::show_balance(const std::vector<std::string>& args/* = std::vector<std::string>()*/)
 {
-  std::list<tools::wallet_public::asset_balance_entry> balances;
-  uint64_t mined = 0;
-  m_wallet->balance(balances, mined);
-  std::stringstream ss;
-  for (const tools::wallet_public::asset_balance_entry& b : balances)
-  {
-    ss << std::setw(21) << print_fixed_decimal_point(b.total, b.asset_info.decimal_point) << "\t" << b.asset_info.ticker << "\t" << b.asset_info.asset_id << ENDL;
-  }
-  success_msg_writer() << "Balance: " << ENDL << ss.str();
+  success_msg_writer() << m_wallet->get_balance_str();
   return true;
 }
 //----------------------------------------------------------------------------------------------------

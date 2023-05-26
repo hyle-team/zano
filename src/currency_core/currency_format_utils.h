@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2023 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -556,10 +556,21 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
+  // outputs "1391306.970000000000"
   template<typename t_number>
   std::string print_fixed_decimal_point(t_number amount, size_t decimal_point)
   {
     return epee::string_tools::print_fixed_decimal_point(amount, decimal_point);
+  }
+  //---------------------------------------------------------------
+  // outputs "1391306.97          "
+  template<typename t_number>
+  std::string print_fixed_decimal_point_with_trailing_spaces(t_number amount, size_t decimal_point)
+  {
+    std::string s = epee::string_tools::print_fixed_decimal_point(amount, decimal_point);
+    for(size_t n = s.size() - 1; n != 0 && s[n] == '0'; --n)
+      s[n] = ' ';
+    return s;
   }
   //---------------------------------------------------------------
   template<typename t_number>
