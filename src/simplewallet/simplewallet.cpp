@@ -277,7 +277,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("payments", boost::bind(&simple_wallet::show_payments, this, ph::_1), "payments <payment_id_1> [<payment_id_2> ... <payment_id_N>] - Show payments <payment_id_1>, ... <payment_id_N>");
   m_cmd_binder.set_handler("bc_height", boost::bind(&simple_wallet::show_blockchain_height, this,ph::_1), "Show blockchain height");
   m_cmd_binder.set_handler("wallet_bc_height", boost::bind(&simple_wallet::show_wallet_bcheight, this,ph::_1), "Show blockchain height");
-  m_cmd_binder.set_handler("transfer", boost::bind(&simple_wallet::transfer, this,ph::_1), "transfer <mixin_count> <addr_1> <amount_1> [<addr_2> <amount_2> ... <addr_N> <amount_N>] [payment_id] - Transfer <amount_1>,... <amount_N> to <address_1>,... <address_N>, respectively. <mixin_count> is the number of transactions yours is indistinguishable from (from 0 to maximum available), <payment_id> is an optional HEX-encoded string");
+  m_cmd_binder.set_handler("transfer", boost::bind(&simple_wallet::transfer, this,ph::_1), "transfer <mixin_count> [asset_id_1:]<addr_1> <amount_1> [ [asset_id_2:]<addr_2> <amount_2> ... [asset_id_N:]<addr_N> <amount_N>] [payment_id] - Transfer <amount_1>,... <amount_N> to <address_1>,... <address_N>, respectively. <mixin_count> is the number of transactions yours is indistinguishable from (from 0 to maximum available), <payment_id> is an optional HEX-encoded string");
   m_cmd_binder.set_handler("set_log", boost::bind(&simple_wallet::set_log, this,ph::_1), "set_log <level> - Change current log detalisation level, <level> is a number 0-4");
   m_cmd_binder.set_handler("enable_console_logger", boost::bind(&simple_wallet::enable_console_logger, this,ph::_1), "Enables console logging");
   m_cmd_binder.set_handler("resync", boost::bind(&simple_wallet::resync_wallet, this,ph::_1), "Causes wallet to reset all transfers and re-synchronize wallet");
@@ -308,7 +308,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("export_history", boost::bind(&simple_wallet::submit_transfer, this,ph::_1), "Export transaction history in CSV file");
   m_cmd_binder.set_handler("tor_enable", boost::bind(&simple_wallet::tor_enable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
   m_cmd_binder.set_handler("tor_disable", boost::bind(&simple_wallet::tor_disable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
-  m_cmd_binder.set_handler("deploy_new_asset", boost::bind(&simple_wallet::deploy_new_asset, this, ph::_1), "Deploys new asset in the network, with current wallet as a maintainer");
+  m_cmd_binder.set_handler("deploy_new_asset", boost::bind(&simple_wallet::deploy_new_asset, this, ph::_1), "deploy_new_asset <json_filename> - Deploys new asset in the network, with current wallet as a maintainer");
   m_cmd_binder.set_handler("add_custom_asset_id", boost::bind(&simple_wallet::add_custom_asset_id, this, ph::_1), "Approve asset id to be recognized in the wallet and returned in balances");
   m_cmd_binder.set_handler("remove_custom_asset_id", boost::bind(&simple_wallet::remove_custom_asset_id, this, ph::_1), "Cancel previously made approval for asset id");
 
@@ -1822,9 +1822,9 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
   destinations.push_back(td);
   currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
   crypto::public_key result_asset_id = currency::null_pkey;
-  m_wallet->publish_new_asset(adb, destinations, result_tx, result_asset_id);
+  m_wallet->deploy_new_asset(adb, destinations, result_tx, result_asset_id);
 
-  success_msg_writer(true) << "New asset deployed: " << ENDL
+  success_msg_writer(true) << "New asset successfully deployed with tx " << get_transaction_hash(result_tx) << " (unconfirmed) : " << ENDL
     << "Asset ID:     " << result_asset_id << ENDL
     << "Title:        " << adb.full_name << ENDL
     << "Ticker:       " << adb.ticker << ENDL

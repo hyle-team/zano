@@ -2696,6 +2696,7 @@ bool wallet2::reset_all()
   m_last_sync_percent = 0;
   m_last_pow_block_h = 0;
   m_current_wallet_file_size = 0;
+  m_custom_assets.clear();
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -4481,7 +4482,7 @@ void wallet2::request_alias_registration(currency::extra_alias_entry& ai, curren
   transfer(destinations, 0, 0, fee, extra, attachments, get_current_split_strategy(), tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx, CURRENCY_TO_KEY_OUT_RELAXED, false);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::publish_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id)
+void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id)
 {
   asset_descriptor_operation asset_reg_info = AUTO_VAL_INIT(asset_reg_info);
   asset_reg_info.descriptor = asset_info;
@@ -4498,6 +4499,8 @@ void wallet2::publish_new_asset(const currency::asset_descriptor_base& asset_inf
   bool r = get_type_in_variant_container(result_tx.extra, ado);
   CHECK_AND_ASSERT_THROW_MES(r, "Failed find asset info in tx");
   calculate_asset_id(ado.descriptor.owner, nullptr, &new_asset_id);
+
+  m_custom_assets[new_asset_id] = ado.descriptor;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward)

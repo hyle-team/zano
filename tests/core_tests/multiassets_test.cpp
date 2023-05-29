@@ -81,8 +81,8 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
   currency::transaction tx = AUTO_VAL_INIT(tx);
   crypto::public_key asset_id = currency::null_pkey;
-  miner_wlt->publish_new_asset(adb, destinations, tx, asset_id);
-  LOG_PRINT_L0("Published new asset: " << asset_id << ", tx_id: " << currency::get_transaction_hash(tx));
+  miner_wlt->deploy_new_asset(adb, destinations, tx, asset_id);
+  LOG_PRINT_L0("Deployed new asset: " << asset_id << ", tx_id: " << currency::get_transaction_hash(tx));
 
   //pass over hardfork
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
