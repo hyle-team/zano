@@ -568,7 +568,7 @@ namespace currency
   std::string print_fixed_decimal_point_with_trailing_spaces(t_number amount, size_t decimal_point)
   {
     std::string s = epee::string_tools::print_fixed_decimal_point(amount, decimal_point);
-    for(size_t n = s.size() - 1; n != 0 && s[n] == '0'; --n)
+    for(size_t n = s.size() - 1; n != 0 && s[n] == '0' && s[n-1] != '.'; --n)
       s[n] = ' ';
     return s;
   }
