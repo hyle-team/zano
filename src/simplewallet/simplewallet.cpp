@@ -1468,9 +1468,9 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
   if (!m_wallet->is_watch_only())
   {
     if(wrapped_transaction)
-      success_msg_writer(true) << "Money successfully sent to wZano custody wallet, transaction " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
+      success_msg_writer(true) << "Transaction successfully sent to wZano custody wallet, id: " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
     else
-      success_msg_writer(true) << "Money successfully sent, transaction " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
+      success_msg_writer(true) << "Transaction successfully sent, id: " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
   }
   else
   {
