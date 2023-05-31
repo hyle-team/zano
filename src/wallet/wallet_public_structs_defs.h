@@ -89,50 +89,60 @@ namespace wallet_public
 #define WALLET_TRANSFER_INFO_FLAGS_HTLC_DEPOSIT   static_cast<uint16_t>(1 << 0)
 
 
+  struct wallet_sub_transfer_info
+  {
+    std::vector<std::string> remote_addresses;  //optional
+    std::vector<std::string> remote_aliases; //optional, describe only if there only one remote address
+    uint64_t      amount;
+    bool          is_income;
+    crypto::public_key asset_id; // not blinded, not premultiplied by 1/8
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(remote_addresses)
+      KV_SERIALIZE(remote_aliases)
+      KV_SERIALIZE(amount)
+      KV_SERIALIZE(is_income)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
+    END_KV_SERIALIZE_MAP()
+
+  };
+
   struct wallet_transfer_info
   {
-    uint64_t      amount;
     uint64_t      timestamp;
     crypto::hash  tx_hash;
     uint64_t      height;          //if height == 0 then tx is unconfirmed
     uint64_t      unlock_time;
     uint32_t      tx_blob_size;
     std::string   payment_id;
-    std::vector<std::string> remote_addresses;  //optional
-    std::vector<std::string> remote_aliases; //optional, describe only if there only one remote address
     std::string   comment;
-    bool          is_income;
     bool          is_service;
     bool          is_mixing;
     bool          is_mining;
     uint64_t      tx_type;
     wallet_transfer_info_details td;
     std::vector<currency::tx_service_attachment> service_entries;
+    std::vector<wallet_sub_transfer_info> subtransfers;
+
     //not included in streaming serialization
     uint64_t      fee;
     bool          show_sender;
     std::vector<escrow_contract_details> contract;
-    uint16_t      extra_flags; 
+    uint16_t      extra_flags;
     uint64_t      transfer_internal_index;
-    crypto::public_key asset_id; // not blinded, not premultiplied by 1/8
-    
-    
+   
     //not included in kv serialization map
     currency::transaction tx;
     std::vector<uint64_t> selected_indicies;
     std::list<bc_services::offers_attachment_t> marketplace_entries;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(amount)
       KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash)
       KV_SERIALIZE(height)
       KV_SERIALIZE(unlock_time)
       KV_SERIALIZE(tx_blob_size)
       KV_SERIALIZE_BLOB_AS_HEX_STRING(payment_id)
-      KV_SERIALIZE(remote_addresses)      
-      KV_SERIALIZE(remote_aliases)
       KV_SERIALIZE(comment)
-      KV_SERIALIZE(is_income)
       KV_SERIALIZE(timestamp)
       KV_SERIALIZE(td)
       KV_SERIALIZE(fee)
@@ -144,8 +154,32 @@ namespace wallet_public
       KV_SERIALIZE(contract)
       KV_SERIALIZE(service_entries)
       KV_SERIALIZE(transfer_internal_index)
-      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
+      KV_SERIALIZE(subtransfers)
     END_KV_SERIALIZE_MAP()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(key_offsets) // referring_input
+      BOOST_SERIALIZE(k_image)
+      BOOST_SERIALIZE(etc_details)
+      BOOST_SERIALIZE(tx_hash)
+      BOOST_SERIALIZE(height)
+      BOOST_SERIALIZE(unlock_time)
+      BOOST_SERIALIZE(tx_blob_size)
+      BOOST_SERIALIZE(payment_id)
+      BOOST_SERIALIZE(comment)
+      BOOST_SERIALIZE(timestamp)
+      BOOST_SERIALIZE(td)
+      BOOST_SERIALIZE(fee)
+      BOOST_SERIALIZE(is_service)
+      BOOST_SERIALIZE(is_mixing)
+      BOOST_SERIALIZE(is_mining)
+      BOOST_SERIALIZE(tx_type)
+      BOOST_SERIALIZE(show_sender)
+      BOOST_SERIALIZE(contract)
+      BOOST_SERIALIZE(service_entries)
+      BOOST_SERIALIZE(transfer_internal_index)
+      BOOST_SERIALIZE(subtransfers)
+    END_BOOST_SERIALIZATION()
   };
 
   struct asset_balance_entry_base

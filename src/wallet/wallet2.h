@@ -1200,7 +1200,7 @@ private:
 
 BOOST_CLASS_VERSION(tools::wallet2, WALLET_FILE_SERIALIZATION_VERSION)
 
-BOOST_CLASS_VERSION(tools::wallet_public::wallet_transfer_info, 11)
+BOOST_CLASS_VERSION(tools::wallet_public::wallet_transfer_info, 12)
 BOOST_CLASS_VERSION(tools::wallet2::transfer_details, 3)
 BOOST_CLASS_VERSION(tools::wallet2::transfer_details_base, 2)
 
@@ -1280,34 +1280,6 @@ namespace boost
     {
       a & x.rcv;
       a & x.spn;
-    }
-
-    template <class Archive>
-    inline void serialize(Archive& a, tools::wallet_public::wallet_transfer_info& x, const boost::serialization::version_type ver)
-    {      
-
-      a & x.amount;
-      a & x.timestamp;
-      a & x.tx_hash;
-      a & x.height;
-      a & x.tx_blob_size;
-      a & x.payment_id;
-      a & x.remote_addresses; 
-      a & x.is_income;
-      a & x.td;
-      a & x.tx;
-      a & x.remote_aliases;
-      a & x.comment;
-      a & x.contract;
-      a & x.selected_indicies;
-      a & x.marketplace_entries;
-      a & x.unlock_time;
-      if (ver < 10)
-        return;
-      a & x.service_entries;
-      if (ver < 11)
-        return;
-      a & x.asset_id;
     }
 
     template <class Archive>
