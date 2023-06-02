@@ -1021,6 +1021,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
 
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
+  w->set_use_assets_whitelisting(true);
   owr.wallet_id = m_wallet_id_counter++;
 
   w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
