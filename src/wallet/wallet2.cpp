@@ -3102,6 +3102,12 @@ void wallet2::set_use_deffered_global_outputs(bool use)
   m_use_deffered_global_outputs = use;
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::set_use_assets_whitelisting(bool use)
+{
+  LOG_PRINT_L0("[ASSET_WHITELISTING_MODE]: " << use);
+  m_use_assets_whitelisting = use;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::store_watch_only(const std::wstring& path_to_save, const std::string& password) const
 {
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(path_to_save != m_wallet_file, "trying to save watch-only wallet to the same wallet file!");
@@ -3325,13 +3331,10 @@ bool wallet2::delete_custom_asset_id(const crypto::public_key& asset_id)
 //----------------------------------------------------------------------------------------------------
 bool wallet2::load_whitelisted_tokens() const
 {
-  // Temporary disable by sowle:
-  // 1. seems to be not working due to cloudflare issues
-  // 2. this should not access web when the tests are running
+  if(!m_use_assets_whitelisting)
+    return true;
 
-  return true;
-
-  /*
+  
 
   m_whitelisted_assets.clear();
   std::string body;
@@ -3344,7 +3347,6 @@ bool wallet2::load_whitelisted_tokens() const
     }    
   }
   return true;
-  */
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::load_whitelisted_tokens_if_not_loaded() const

@@ -276,9 +276,9 @@ static_assert(PREMINE_AMOUNT / WALLET_MAX_ALLOWED_OUTPUT_AMOUNT < CURRENCY_MINER
 #define CURRENCY_RELAY_TXS_MAX_COUNT                    5
 
 #ifndef TESTNET
-  #define WALLET_ASSETS_WHITELIST_URL                     "https://zano.org/assets_whitelist.json"
+  #define WALLET_ASSETS_WHITELIST_URL                     "https://api.zano.org/assets_whitelist.json"
 #else
-  #define WALLET_ASSETS_WHITELIST_URL                     "https://zano.org/assets_whitelist_testnet.json"
+  #define WALLET_ASSETS_WHITELIST_URL                     "https://api.zano.org/assets_whitelist_testnet.json"
 #endif
 
 

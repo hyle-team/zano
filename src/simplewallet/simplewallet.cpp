@@ -2394,6 +2394,8 @@ int main(int argc, char* argv[])
         if (command_line::get_arg(vm, arg_generate_new_wallet).size() || command_line::get_arg(vm, arg_generate_new_auditable_wallet).size())
           return EXIT_FAILURE;
 
+        wal.m_use_assets_whitelisting(true);
+
         if (!offline_mode)
           wal.refresh();
         LOG_PRINT_GREEN("Loaded ok", LOG_LEVEL_0);
