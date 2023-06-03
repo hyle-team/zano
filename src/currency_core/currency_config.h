@@ -266,6 +266,7 @@
 #define ZANO_HARDFORK_02                                2
 #define ZANO_HARDFORK_03                                3
 #define ZANO_HARDFORK_04_ZARCANUM                       4
+#define ZANO_HARDFORKS_TOTAL                            5
 
 
 
