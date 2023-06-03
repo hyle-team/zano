@@ -94,10 +94,11 @@ bool transition_convert(const transaction_current_t& from, transaction_v1& to)
   {
     if (s.type() == typeid(NLSAG_sig))
     {
-      to.signatures.push_back(boost::get<NLSAG_sig>(s).s);      ;
-    }else
+      to.signatures.push_back(boost::get<NLSAG_sig>(s).s);
+    }
+    else
     {
-      throw std::runtime_error("Unexpected type in signature_v");
+      throw std::runtime_error(std::string("Unexpected type in tx.signatures during transition_convert: ") + s.type().name());
     }
   }
   return true;

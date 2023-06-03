@@ -2224,6 +2224,10 @@ namespace currency
       }
     }
 
+    if (zc_inputs_count != 0 && tx.version <= TRANSACTION_VERSION_PRE_HF4)
+    {
+      LOG_PRINT_YELLOW("WARNING: tx v1 should not use ZC inputs", LOG_LEVEL_0);
+    }
     
     //
     // OUTs
