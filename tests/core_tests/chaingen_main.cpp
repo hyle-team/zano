@@ -39,6 +39,7 @@ namespace
     test_generator::set_test_gentime_settings_default(); \
     std::vector<test_event_entry> events; \
     genclass g; \
+    g.on_test_constructed(); \
     g.generate(events); \
     if (!tools::serialize_obj_to_file(events, filename)) \
     { \
@@ -53,6 +54,95 @@ namespace
     std::cout << concolor::magenta << "Failed to pass test : " << #genclass << concolor::normal << std::endl; \
     return 1; \
   }
+
+
+std::vector<size_t> parse_hardfork_str_mask(std::string s /* intentionally passing by value */)
+{
+  // "*"        -> 0, 1, 2, ..., ZANO_HARDFORKS_TOTAL-1
+  // "2-4,0"    -> 2, 3, 4, 0
+  // "1, 3-*"   -> 1, 3, 4, ..., ZANO_HARDFORKS_TOTAL-1
+
+  std::vector<size_t> result;
+
+  auto error_result =  []() -> std::vector<size_t> { return std::vector<size_t>(); };
+  auto all_hardforks = []() -> std::vector<size_t> { std::vector<size_t> r; for(size_t i = 0; i < ZANO_HARDFORKS_TOTAL; ++i) r.push_back(i); return r; };
+
+  // remove all spaces
+  s.erase(std::remove_if(s.begin(), s.end(), [](char c){ return std::isspace(static_cast<unsigned char>(c)); }), s.end());
+  std::vector<std::string> ranges;
+  boost::split(ranges, s, boost::is_any_of(","));
+  for(auto& range : ranges)
+  {
+    std::vector<std::string> segments;
+    boost::split(segments, range, boost::is_any_of("-"));
+    if (segments.size() == 1)
+    {
+      if (segments.front() == "*")
+        return all_hardforks();
+      size_t hfid = SIZE_MAX;
+      if (!epee::string_tools::string_to_num_fast(segments.front(), (int64_t&)hfid) || hfid == SIZE_MAX || hfid >= ZANO_HARDFORKS_TOTAL)
+        return error_result();
+      result.push_back(hfid);
+    }
+    else if (segments.size() == 2)
+    {
+      if (segments.front() == "*")
+        return all_hardforks();
+
+      size_t hfid_a = SIZE_MAX;
+      if (!epee::string_tools::string_to_num_fast(segments.front(), (int64_t&)hfid_a) || hfid_a == SIZE_MAX || hfid_a >= ZANO_HARDFORKS_TOTAL)
+        return error_result();
+
+      size_t hfid_b = SIZE_MAX;
+      if (segments.back() == "*")
+        hfid_b = ZANO_HARDFORKS_TOTAL - 1;
+      else
+      {
+        if (!epee::string_tools::string_to_num_fast(segments.back(), (int64_t&)hfid_b))
+          hfid_b = SIZE_MAX;
+      }
+      if (hfid_b == SIZE_MAX || hfid_b >= ZANO_HARDFORKS_TOTAL || hfid_b < hfid_a)
+        return error_result();
+      for(size_t i = hfid_a; i <= hfid_b; ++i)
+        result.push_back(i);
+      if (segments.back() == "*")
+        return result; // don't keep parsing if the last range was ?-*
+    }
+    else // i.e. segments.size() == 0 || segments.size() > 2
+      return error_result();
+  }
+  return result;
+}
+
+bool test_parse_hardfork_str_mask()
+{
+  static_assert(ZANO_HARDFORKS_TOTAL >= 5, "this test was made in assumption that this condition holds");
+  auto v_range = [](size_t a, size_t b) -> std::vector<size_t> { std::vector<size_t> r; for(size_t i = a; i <= b; ++i) r.push_back(i); return r; };
+  auto v_concat = [](const std::vector<size_t>& a, const std::vector<size_t>& b) -> std::vector<size_t> { std::vector<size_t> r = a; r.insert(r.end(), b.begin(), b.end()); };
+  const std::vector<size_t> res_empty;
+  const std::vector<size_t> res_all_hf = v_range(0, ZANO_HARDFORKS_TOTAL - 1);
+  std::string hf_total_num_str_m_1 = epee::string_tools::num_to_string_fast(ZANO_HARDFORKS_TOTAL - 1);
+  std::string hf_total_num_str = epee::string_tools::num_to_string_fast(ZANO_HARDFORKS_TOTAL);
+
+  CHECK_AND_ASSERT_MES(parse_hardfork_str_mask("")          == res_empty, false, "");
+  CHECK_AND_ASSERT_MES(parse_hardfork_str_mask("*")         == res_all_hf, false, "");
+  CHECK_AND_ASSERT_MES(parse_hardfork_str_mask("1,2")       == v_range(1, 2), false, "");
+  CHECK_AND_ASSERT_MES(parse_hardfork_str_mask("0,*, 3")    == res_all_hf, false, "");
+  CHECK_AND_ASSERT_MES(parse_hardfork_str_mask("1-4")       == v_range(1, 4), false, "");
+  CHECK_AND_ASSERT_MES(parse_hardfork_str_mask("4-1")       == res_empty, false, "");
+  CHECK_AND_ASSERT_MES(parse_hardfork_str_mask("3-1,2")     == res_empty, false, "");
+  CHECK_AND_ASSERT_MES(parse_hardfork_str_mask("1,2-1")     == res_empty, false, "");
+  CHECK_AND_ASSERT_MES(parse_hardfork_str_mask("0, 2 - 2")  == std::vector<size_t>({0, 2}), false, "");
+  CHECK_AND_ASSERT_MES(parse_hardfork_str_mask("2-*")       == v_range(2, ZANO_HARDFORKS_TOTAL - 1), false, "");
+  CHECK_AND_ASSERT_MES(parse_hardfork_str_mask(" 2-*, 1")   == v_range(2, ZANO_HARDFORKS_TOTAL - 1), false, "");
+  CHECK_AND_ASSERT_MES(parse_hardfork_str_mask("2- *,3")    == v_range(2, ZANO_HARDFORKS_TOTAL - 1), false, "");
+  CHECK_AND_ASSERT_MES(parse_hardfork_str_mask("1,3,2")     == std::vector<size_t>({1, 3, 2}), false, "");
+
+  CHECK_AND_ASSERT_MES(parse_hardfork_str_mask(hf_total_num_str_m_1)                  == std::vector<size_t>({ZANO_HARDFORKS_TOTAL - 1}), false, "");
+  CHECK_AND_ASSERT_MES(parse_hardfork_str_mask(hf_total_num_str)                      == res_empty, false, "");
+  CHECK_AND_ASSERT_MES(parse_hardfork_str_mask(std::string("2-") + hf_total_num_str)  == res_empty, false, "");
+  return true;
+}
 
 bool clean_data_directory()
 {
@@ -102,7 +192,7 @@ bool clean_data_directory()
 }
 
 template<class genclass>
-bool generate_and_play(const char* const genclass_name)
+bool generate_and_play(const char* const genclass_name, size_t hardfork_id = SIZE_MAX)
 {
   std::vector<test_event_entry> events;
   bool generated = false;
@@ -117,11 +207,37 @@ bool generate_and_play(const char* const genclass_name)
   test_core_time::init();
   test_generator::set_test_gentime_settings_default();
   genclass g;
+
+  static const test_chain_unit_base tcub;
+  bool has_non_default_hardforks = g.get_hardforks() != tcub.get_hardforks(); // compare with the defaults
+  currency::hard_forks_descriptor hfd_local{};
+  if (hardfork_id != SIZE_MAX)
+  {
+    static test_chain_unit_base tcub;
+    if (has_non_default_hardforks) // compare with the defaults
+    {
+      LOG_ERROR(ENDL << "hardforks setting have been changed in ctor of " << genclass_name << " test" << ENDL << ENDL);
+      return false;
+    }
+    g.get_hardforks().clear();
+    g.get_hardforks().set_hardfork_height(hardfork_id, 1 /* <- height_the_hardfork_is_active_after */);
+  }
+  hfd_local = g.get_hardforks(); // save a copy for the safety checking at the end
+
+  g.on_test_constructed();
+
   try
   {
     generated = g.generate(events);
     if (generated)
     {
+      std::cout << concolor::normal << events.size() << " events generated successfully" << std::endl; 
+      if (has_non_default_hardforks || g.get_hardforks() != tcub.get_hardforks())
+      {
+        size_t configure_core_events_count = std::count_if(events.begin(), events.end(), [](auto& ev){ return ev.type() == typeid(callback_entry) && boost::get<callback_entry>(ev).callback_name == "configure_core"; });  
+        CHECK_AND_ASSERT_THROW_MES(configure_core_events_count != 0, "Test " << genclass_name << " has non-default hardfork settings and therefore must use 'configure_core' callback");
+      }
+
       std::cout << concolor::bright_white << std::string(100, '=') << std::endl <<
         "#TEST# >>>> " << genclass_name << " <<<< start replaying events" << std::endl <<
         std::string(100, '=') << concolor::normal << std::endl;
@@ -131,11 +247,18 @@ bool generate_and_play(const char* const genclass_name)
   }
   catch (const std::exception& ex)
   {
-    LOG_ERROR("got an exception during " << genclass_name << (generated ? " replaying: " : " generation: ") << ex.what());
+    LOG_ERROR(">>>>>  got an exception during " << genclass_name << (generated ? " replaying: " : " generation: ") << ex.what());
   }
   catch (...)
   {
-    LOG_ERROR("got an unknown exception during " << genclass_name << (generated ? " replaying" : " generation"));
+    LOG_ERROR(">>>>>  got an unknown exception during " << genclass_name << (generated ? " replaying" : " generation"));
+  }
+
+  if (hardfork_id != SIZE_MAX && g.get_hardforks() != hfd_local)
+  {
+    // conflict detected: hardfork settings are either controlled by the test itself or by the chaingen
+    LOG_ERROR("hardforks setting have been changed during generation or execution of test " << genclass_name);
+    result = false;
   }
 
   if (result)
@@ -181,6 +304,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
   test_core_time::init();
   test_generator::set_test_gentime_settings_default();
   genclass g;
+  g.on_test_constructed();
   try
   {
     r = g.generate(events);
@@ -293,6 +417,34 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
     TIME_MEASURE_FINISH_MS(t);                                                                             \
     tests_running_time.push_back(std::make_pair(testname, t));                                             \
   }
+
+
+
+#define GENERATE_AND_PLAY_HF(genclass, hardfork_str_mask)                                                  \
+  if((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string::npos != std::string(#genclass).find(run_single_test))) \
+  {                                                                                                        \
+    std::vector<size_t> hardforks = parse_hardfork_str_mask(hardfork_str_mask);                            \
+    CHECK_AND_ASSERT_MES(!hardforks.empty(), false, "invalid hardforks mask: " << hardfork_str_mask);      \
+    for(size_t hfid : hardforks)                                                                           \
+    {                                                                                                      \
+      std::string tns = std::string(#genclass) + " @ HF " + epee::string_tools::num_to_string_fast(hfid);  \
+      const char* testname = tns.c_str();                                                                  \
+      TIME_MEASURE_START_MS(t);                                                                            \
+      ++tests_count;                                                                                       \
+      if (!generate_and_play<genclass>(testname, hfid))                                                    \
+      {                                                                                                    \
+        failed_tests.insert(testname);                                                                     \
+        LOCAL_ASSERT(false);                                                                               \
+        if (stop_on_first_fail)                                                                            \
+          return 1;                                                                                        \
+      }                                                                                                    \
+      TIME_MEASURE_FINISH_MS(t);                                                                           \
+      tests_running_time.push_back(std::make_pair(testname, t));                                           \
+    }                                                                                                      \
+    ++unique_tests_count;                                                                                  \
+  }
+
+
 
 //#define GENERATE_AND_PLAY(genclass) GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(genclass)
 
@@ -738,6 +890,7 @@ int main(int argc, char* argv[])
   }
 
   size_t tests_count = 0;
+  size_t unique_tests_count = 0;
   size_t serious_failures_count = 0;
   std::set<std::string> failed_tests;
   std::string tests_folder = command_line::get_arg(g_vm, arg_test_data_path);
@@ -774,6 +927,7 @@ int main(int argc, char* argv[])
       CALL_TEST("check_allowed_types_in_variant_container() test", check_allowed_types_in_variant_container_test);
       CALL_TEST("check_u8_str_case_funcs", check_u8_str_case_funcs);
       CALL_TEST("chec_u8_str_matching", chec_u8_str_matching);
+      CALL_TEST("test_parse_hardfork_str_mask", test_parse_hardfork_str_mask);
     }
 
     //CALL_TEST("check_hash_and_difficulty_monte_carlo_test", check_hash_and_difficulty_monte_carlo_test); // it's rather an experiment with unclean results than a solid test, for further research...
@@ -1134,10 +1288,12 @@ int main(int argc, char* argv[])
     
     std::cout << (serious_failures_count == 0 ? concolor::green : concolor::magenta);
     std::cout << "\nREPORT:\n";
-    std::cout << "  Test run:   " << tests_count << std::endl;
-    std::cout << "  Failures:   " << serious_failures_count << " (postponed failures: " << failed_postponed_tests_count << ")" << std::endl;
-    std::cout << "  Postponed:  " << postponed_tests.size() << std::endl;
-    std::cout << "  Total time: " << total_time / 1000 << " s. (" << (tests_count > 0 ? total_time / tests_count : 0) << " ms per test in average)" << std::endl;
+    std::cout << "  Unique tests run: " << unique_tests_count << std::endl;
+    std::cout << "  Total tests run:  " << tests_count << std::endl;
+    
+    std::cout << "  Failures:         " << serious_failures_count << " (postponed failures: " << failed_postponed_tests_count << ")" << std::endl;
+    std::cout << "  Postponed:        " << postponed_tests.size() << std::endl;
+    std::cout << "  Total time:       " << total_time / 1000 << " s. (" << (tests_count > 0 ? total_time / tests_count : 0) << " ms per test in average)" << std::endl;
     if (!failed_tests.empty())
     {
       std::cout << "FAILED/POSTPONED TESTS:\n";
