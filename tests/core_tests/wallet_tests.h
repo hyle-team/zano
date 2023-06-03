@@ -34,7 +34,7 @@ struct gen_wallet_save_load_and_balance : public wallet_test
 
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1_check_balance_and_store(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
-  bool c2_load_refresh_check_balance(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool c3_load_refresh_check_balance(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
