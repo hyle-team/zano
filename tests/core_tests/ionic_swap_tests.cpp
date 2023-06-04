@@ -97,8 +97,8 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
 
   currency::transaction tx = AUTO_VAL_INIT(tx);
   crypto::public_key asset_id = currency::null_pkey;
-  miner_wlt->publish_new_asset(adb, destinations, tx, asset_id);
-  LOG_PRINT_L0("Published new asset: " << asset_id << ", tx_id: " << currency::get_transaction_hash(tx));
+  miner_wlt->deploy_new_asset(adb, destinations, tx, asset_id);
+  LOG_PRINT_L0("Deployed new asset: " << asset_id << ", tx_id: " << currency::get_transaction_hash(tx));
 
   currency::transaction res_tx = AUTO_VAL_INIT(res_tx);
   miner_wlt->transfer(COIN, alice_wlt->get_account().get_public_address(), res_tx);

@@ -494,6 +494,39 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_validate_signature(const COMMAND_VALIDATE_SIGNATURE::request& req, COMMAND_VALIDATE_SIGNATURE::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    if (!m_p2p.get_connections_count())
+    {
+      res.status = API_RETURN_CODE_DISCONNECTED;
+      return true;
+    }
+    std::string buff = epee::string_encoding::base64_decode(req.buff);    
+    crypto::public_key pkey = req.pkey;
+
+    if(pkey == currency::null_pkey)
+    {
+      //need to load pkey from alias
+      extra_alias_entry_base eaeb = AUTO_VAL_INIT(eaeb);
+      if (!m_core.get_blockchain_storage().get_alias_info(req.alias, eaeb))
+      {
+        res.status = API_RETURN_CODE_NOT_FOUND;
+        return true;
+      }
+      pkey = eaeb.m_address.spend_public_key;
+    }
+
+    crypto::hash h = crypto::cn_fast_hash(buff.data(), buff.size());
+    bool sig_check_res = crypto::check_signature(h, pkey, req.sig);
+    if (!sig_check_res)
+    {
+      res.status = API_RETURN_CODE_FAIL;
+      return true;
+    }
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_pos_mining_details(const COMMAND_RPC_GET_POS_MINING_DETAILS::request& req, COMMAND_RPC_GET_POS_MINING_DETAILS::response& res, connection_context& cntx)
   {
     if (!m_p2p.get_connections_count())

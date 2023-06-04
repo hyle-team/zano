@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2022 Zano Project
+// Copyright (c) 2014-2023 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -31,6 +31,9 @@ using namespace epee;
 #include "version.h"
 #include "common/encryption_filter.h"
 #include "crypto/bitcoin/sha256_helper.h"
+
+#define DISABLE_TOR
+
 #ifndef DISABLE_TOR
   #include "common/tor_helper.h"
 #endif
@@ -53,22 +56,27 @@ using namespace currency;
 ENABLE_CHANNEL_BY_DEFAULT("wallet")
 namespace tools
 {
-  wallet2::wallet2() :  m_stop(false),
-                        m_wcallback(new i_wallet2_callback()), //stub
-                        m_core_proxy(new default_http_core_proxy()),
-                        m_upper_transaction_size_limit(0),
-                        m_height_of_start_sync(0),
-                        m_last_sync_percent(0),
-                        m_fake_outputs_count(0),
-                        m_do_rise_transfer(false),
-                        m_log_prefix("???"),
-                        m_watch_only(false),
-                        m_last_pow_block_h(0),
-                        m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
-                        m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE),
-                        m_current_wallet_file_size(0),
-                        m_use_deffered_global_outputs(false), 
-                        m_disable_tor_relay(false)
+  wallet2::wallet2()
+    : m_stop(false)
+    , m_wcallback(new i_wallet2_callback()) //stub
+    , m_core_proxy(new default_http_core_proxy())
+    , m_upper_transaction_size_limit(0)
+    , m_height_of_start_sync(0)
+    , m_last_sync_percent(0)
+    , m_fake_outputs_count(0)
+    , m_do_rise_transfer(false)
+    , m_log_prefix("???")
+    , m_watch_only(false)
+    , m_last_pow_block_h(0)
+    , m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST)
+    , m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE)
+    , m_current_wallet_file_size(0)
+    , m_use_deffered_global_outputs(false)
+#ifdef DISABLE_TOR
+    , m_disable_tor_relay(true)
+#else
+    , m_disable_tor_relay(false)
+#endif
   {
     m_core_runtime_config = currency::get_default_core_runtime_config();
   }
@@ -2688,6 +2696,7 @@ bool wallet2::reset_all()
   m_last_sync_percent = 0;
   m_last_pow_block_h = 0;
   m_current_wallet_file_size = 0;
+  m_custom_assets.clear();
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -3413,6 +3422,33 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
   return ss.str();
 }
 //----------------------------------------------------------------------------------------------------
+std::string wallet2::get_balance_str() const
+{
+  // balance unlocked     / [balance total]       ticker   asset id
+  // 1391306.970000000000 / 1391306.970000000000  ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
+  // 1391306.97                                   ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
+  //     106.971          /     206.4             ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
+
+  static const char* header = " balance unlocked     / [balance total]       ticker   asset id";
+  std::stringstream ss;
+  ss << header << ENDL;
+
+  std::list<tools::wallet_public::asset_balance_entry> balances;
+  uint64_t mined = 0;
+  balance(balances, mined);
+  for (const tools::wallet_public::asset_balance_entry& b : balances)
+  {
+    ss << " " << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(b.unlocked, b.asset_info.decimal_point);
+    if (b.total == b.unlocked)
+      ss << "                       ";
+    else
+      ss << " / " << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(b.total, b.asset_info.decimal_point);
+    ss << "  " << std::setw(8) << std::left << b.asset_info.ticker << " " << b.asset_info.asset_id << ENDL;
+  }
+
+  return ss.str();
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::get_payments(const std::string& payment_id, std::list<wallet2::payment_details>& payments, uint64_t min_height) const
 {
   auto range = m_payments.equal_range(payment_id);
@@ -4097,6 +4133,7 @@ bool wallet2::try_mint_pos()
 //------------------------------------------------------------------
 bool wallet2::try_mint_pos(const currency::account_public_address& miner_address)
 {
+  TIME_MEASURE_START_MS(mining_duration_ms);
   mining_context ctx = AUTO_VAL_INIT(ctx);
   WLT_LOG_L1("Starting PoS mining iteration");
   fill_mining_context(ctx);
@@ -4122,8 +4159,9 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
   {
     build_minted_block(ctx, miner_address);
   }
+  TIME_MEASURE_FINISH_MS(mining_duration_ms);
 
-  WLT_LOG_L0("PoS mining: " << ctx.iterations_processed << " iterations finished, status: " << ctx.status << ", " << ctx.total_items_checked << "  entries with total amount: " << print_money_brief(ctx.total_amount_checked));
+  WLT_LOG_L0("PoS mining: " << ctx.iterations_processed << " iterations finished (" << std::fixed << std::setprecision(2) << (mining_duration_ms / 1000.0f) << "s), status: " << ctx.status << ", " << ctx.total_items_checked << " entries with total amount: " << print_money_brief(ctx.total_amount_checked));
 
   return true;
 }
@@ -4444,7 +4482,7 @@ void wallet2::request_alias_registration(currency::extra_alias_entry& ai, curren
   transfer(destinations, 0, 0, fee, extra, attachments, get_current_split_strategy(), tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx, CURRENCY_TO_KEY_OUT_RELAXED, false);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::publish_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id)
+void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id)
 {
   asset_descriptor_operation asset_reg_info = AUTO_VAL_INIT(asset_reg_info);
   asset_reg_info.descriptor = asset_info;
@@ -4461,6 +4499,8 @@ void wallet2::publish_new_asset(const currency::asset_descriptor_base& asset_inf
   bool r = get_type_in_variant_container(result_tx.extra, ado);
   CHECK_AND_ASSERT_THROW_MES(r, "Failed find asset info in tx");
   calculate_asset_id(ado.descriptor.owner, nullptr, &new_asset_id);
+
+  m_custom_assets[new_asset_id] = ado.descriptor;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward)

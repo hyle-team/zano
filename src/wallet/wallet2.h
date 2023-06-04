@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2022 Zano Project
+// Copyright (c) 2014-2023 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -606,7 +606,7 @@ namespace tools
     void request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward);
     bool check_available_sources(std::list<uint64_t>& amounts);
 
-    void publish_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id);
+    void deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id);
 
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
     void set_pos_mint_packing_size(uint64_t new_size);
@@ -743,6 +743,7 @@ namespace tools
     
     void get_transfers(wallet2::transfer_container& incoming_transfers) const;
     std::string get_transfers_str(bool include_spent = true, bool include_unspent = true) const;
+    std::string get_balance_str() const;
 
     // Returns all payments by given id in unspecified order
     void get_payments(const std::string& payment_id, std::list<payment_details>& payments, uint64_t min_height = 0) const;

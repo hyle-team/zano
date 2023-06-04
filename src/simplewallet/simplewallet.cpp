@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2019 Zano Project
+// Copyright (c) 2014-2023 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -39,6 +39,86 @@ namespace po = boost::program_options;
 namespace ph = boost::placeholders;
 
 #define EXTENDED_LOGS_FILE "wallet_details.log"
+
+
+#define SIMPLE_WALLET_BEGIN_TRY_ENTRY()     try {
+#define SIMPLE_WALLET_CATCH_TRY_ENTRY()     } \
+          catch (const tools::error::daemon_busy&) \
+          { \
+            fail_msg_writer() << "daemon is busy. Please try later"; \
+          } \
+          catch (const tools::error::no_connection_to_daemon&) \
+          { \
+            fail_msg_writer() << "no connection to daemon. Please, make sure daemon is running."; \
+          } \
+          catch (const tools::error::wallet_rpc_error& e) \
+          { \
+            LOG_ERROR("Unknown RPC error: " << e.to_string()); \
+            fail_msg_writer() << "RPC error \"" << e.what() << '"'; \
+          } \
+          catch (const tools::error::get_random_outs_error&) \
+          { \
+            fail_msg_writer() << "failed to get random outputs to mix"; \
+          } \
+          catch (const tools::error::not_enough_money& e) \
+          { \
+            fail_msg_writer() << "not enough money to transfer, available only " << print_money(e.available()) << \
+              ", transaction amount " << print_money(e.tx_amount() + e.fee()) << " = " << print_money(e.tx_amount()) << \
+              " + " << print_money(e.fee()) << " (fee)"; \
+          } \
+          catch (const tools::error::not_enough_outs_to_mix& e) \
+          { \
+            auto writer = fail_msg_writer(); \
+            writer << "not enough outputs for specified mixin_count = " << e.mixin_count() << ":"; \
+            for (const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& outs_for_amount : e.scanty_outs()) \
+            { \
+              writer << "\noutput amount = " << print_money(outs_for_amount.amount) << ", fount outputs to mix = " << outs_for_amount.outs.size(); \
+            } \
+          } \
+          catch (const tools::error::tx_not_constructed&) \
+          { \
+            fail_msg_writer() << "transaction was not constructed"; \
+          } \
+          catch (const tools::error::tx_rejected& e) \
+          { \
+            fail_msg_writer() << "transaction " << get_transaction_hash(e.tx()) << " was rejected by daemon with status \"" << e.status() << '"'; \
+          } \
+          catch (const tools::error::tx_sum_overflow& e) \
+          { \
+            fail_msg_writer() << e.what(); \
+          } \
+          catch (const tools::error::tx_too_big& e) \
+          { \
+            currency::transaction tx = e.tx(); \
+            fail_msg_writer() << "transaction " << get_transaction_hash(e.tx()) << " is too big. Transaction size: " << \
+              get_object_blobsize(e.tx()) << " bytes, transaction size limit: " << e.tx_size_limit() << " bytes. Try to separate this payment into few smaller transfers."; \
+          } \
+          catch (const tools::error::zero_destination&) \
+          { \
+            fail_msg_writer() << "one of destinations is zero"; \
+          } \
+          catch (const tools::error::transfer_error& e) \
+          { \
+            LOG_ERROR("unknown transfer error: " << e.to_string()); \
+            fail_msg_writer() << "unknown transfer error: " << e.what(); \
+          } \
+          catch (const tools::error::wallet_internal_error& e) \
+          { \
+            LOG_ERROR("internal error: " << e.to_string()); \
+            fail_msg_writer() << "internal error: " << e.what(); \
+          } \
+          catch (const std::exception& e) \
+          { \
+            LOG_ERROR("unexpected error: " << e.what()); \
+            fail_msg_writer() << "unexpected error: " << e.what(); \
+          } \
+          catch (...) \
+          { \
+            LOG_ERROR("Unknown error"); \
+            fail_msg_writer() << "unknown error"; \
+          } \
+
+
 
 
 namespace
@@ -197,7 +277,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("payments", boost::bind(&simple_wallet::show_payments, this, ph::_1), "payments <payment_id_1> [<payment_id_2> ... <payment_id_N>] - Show payments <payment_id_1>, ... <payment_id_N>");
   m_cmd_binder.set_handler("bc_height", boost::bind(&simple_wallet::show_blockchain_height, this,ph::_1), "Show blockchain height");
   m_cmd_binder.set_handler("wallet_bc_height", boost::bind(&simple_wallet::show_wallet_bcheight, this,ph::_1), "Show blockchain height");
-  m_cmd_binder.set_handler("transfer", boost::bind(&simple_wallet::transfer, this,ph::_1), "transfer <mixin_count> <addr_1> <amount_1> [<addr_2> <amount_2> ... <addr_N> <amount_N>] [payment_id] - Transfer <amount_1>,... <amount_N> to <address_1>,... <address_N>, respectively. <mixin_count> is the number of transactions yours is indistinguishable from (from 0 to maximum available), <payment_id> is an optional HEX-encoded string");
+  m_cmd_binder.set_handler("transfer", boost::bind(&simple_wallet::transfer, this,ph::_1), "transfer <mixin_count> [asset_id_1:]<addr_1> <amount_1> [ [asset_id_2:]<addr_2> <amount_2> ... [asset_id_N:]<addr_N> <amount_N>] [payment_id] - Transfer <amount_1>,... <amount_N> to <address_1>,... <address_N>, respectively. <mixin_count> is the number of transactions yours is indistinguishable from (from 0 to maximum available), <payment_id> is an optional HEX-encoded string");
   m_cmd_binder.set_handler("set_log", boost::bind(&simple_wallet::set_log, this,ph::_1), "set_log <level> - Change current log detalisation level, <level> is a number 0-4");
   m_cmd_binder.set_handler("enable_console_logger", boost::bind(&simple_wallet::enable_console_logger, this,ph::_1), "Enables console logging");
   m_cmd_binder.set_handler("resync", boost::bind(&simple_wallet::resync_wallet, this,ph::_1), "Causes wallet to reset all transfers and re-synchronize wallet");
@@ -228,13 +308,13 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("export_history", boost::bind(&simple_wallet::submit_transfer, this,ph::_1), "Export transaction history in CSV file");
   m_cmd_binder.set_handler("tor_enable", boost::bind(&simple_wallet::tor_enable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
   m_cmd_binder.set_handler("tor_disable", boost::bind(&simple_wallet::tor_disable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
-  m_cmd_binder.set_handler("deploy_new_asset", boost::bind(&simple_wallet::deploy_new_asset, this, ph::_1), "Deploys new asset in the network, with current wallet as a maintainer");
+  m_cmd_binder.set_handler("deploy_new_asset", boost::bind(&simple_wallet::deploy_new_asset, this, ph::_1), "deploy_new_asset <json_filename> - Deploys new asset in the network, with current wallet as a maintainer");
   m_cmd_binder.set_handler("add_custom_asset_id", boost::bind(&simple_wallet::add_custom_asset_id, this, ph::_1), "Approve asset id to be recognized in the wallet and returned in balances");
   m_cmd_binder.set_handler("remove_custom_asset_id", boost::bind(&simple_wallet::remove_custom_asset_id, this, ph::_1), "Cancel previously made approval for asset id");
 
-  m_cmd_binder.set_handler("generate_ionic_swap_proposal", boost::bind(&simple_wallet::generate_ionic_swap_proposal, this, _1), "generate_ionic_swap_proposal <proposal_config.json> <destination_addr>- Generates ionic_swap proposal with given conditions");
-  m_cmd_binder.set_handler("get_ionic_swap_proposal_info", boost::bind(&simple_wallet::get_ionic_swap_proposal_info, this, _1), "get_ionic_swap_proposal_info <hex_encoded_raw_proposal> - Extracts and display information from ionic_swap proposal raw data");
-  m_cmd_binder.set_handler("accept_ionic_swap_proposal", boost::bind(&simple_wallet::accept_ionic_swap_proposal, this, _1), "accept_ionic_swap_proposal <hex_encoded_raw_proposal> - Accept ionic_swap proposal and generates exchange transaction");
+  m_cmd_binder.set_handler("generate_ionic_swap_proposal", boost::bind(&simple_wallet::generate_ionic_swap_proposal, this, ph::_1), "generate_ionic_swap_proposal <proposal_config.json> <destination_addr>- Generates ionic_swap proposal with given conditions");
+  m_cmd_binder.set_handler("get_ionic_swap_proposal_info", boost::bind(&simple_wallet::get_ionic_swap_proposal_info, this, ph::_1), "get_ionic_swap_proposal_info <hex_encoded_raw_proposal> - Extracts and display information from ionic_swap proposal raw data");
+  m_cmd_binder.set_handler("accept_ionic_swap_proposal", boost::bind(&simple_wallet::accept_ionic_swap_proposal, this, ph::_1), "accept_ionic_swap_proposal <hex_encoded_raw_proposal> - Accept ionic_swap proposal and generates exchange transaction");
 
 }
 //----------------------------------------------------------------------------------------------------
@@ -777,15 +857,7 @@ bool simple_wallet::refresh(const std::vector<std::string>& args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::show_balance(const std::vector<std::string>& args/* = std::vector<std::string>()*/)
 {
-  std::list<tools::wallet_public::asset_balance_entry> balances;
-  uint64_t mined = 0;
-  m_wallet->balance(balances, mined);
-  std::stringstream ss;
-  for (const tools::wallet_public::asset_balance_entry& b : balances)
-  {
-    ss << std::setw(21) << print_fixed_decimal_point(b.total, b.asset_info.decimal_point) << "\t" << b.asset_info.ticker << "\t" << b.asset_info.asset_id << ENDL;
-  }
-  success_msg_writer() << "Balance: " << ENDL << ss.str();
+  success_msg_writer() << m_wallet->get_balance_str();
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -1271,6 +1343,7 @@ bool preprocess_asset_id(std::string& address_arg, crypto::public_key& asset_id)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::transfer(const std::vector<std::string> &args_)
 {
+  SIMPLE_WALLET_BEGIN_TRY_ENTRY();
   if (!try_connect_to_daemon())
     return true;
 
@@ -1389,97 +1462,21 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
     return true;
   }
 
-  try
-  {
-    currency::transaction tx;
-    m_wallet->transfer(dsts, fake_outs_count, 0, m_wallet->get_core_runtime_config().tx_default_fee, extra, attachments, tx);
+  currency::transaction tx;
+  m_wallet->transfer(dsts, fake_outs_count, 0, m_wallet->get_core_runtime_config().tx_default_fee, extra, attachments, tx);
 
-    if (!m_wallet->is_watch_only())
-    {
-      if(wrapped_transaction)
-        success_msg_writer(true) << "Money successfully sent to wZano custody wallet, transaction " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
-      else
-        success_msg_writer(true) << "Money successfully sent, transaction " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
-    }
+  if (!m_wallet->is_watch_only())
+  {
+    if(wrapped_transaction)
+      success_msg_writer(true) << "Money successfully sent to wZano custody wallet, transaction " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
     else
-    {
-      success_msg_writer(true) << "Transaction prepared for signing and saved into \"zano_tx_unsigned\" file, use full wallet to sign transfer and then use \"submit_transfer\" on this wallet to broadcast the transaction to the network";
-    }
+      success_msg_writer(true) << "Money successfully sent, transaction " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
   }
-  catch (const tools::error::daemon_busy&)
+  else
   {
-    fail_msg_writer() << "daemon is busy. Please try later";
-  }
-  catch (const tools::error::no_connection_to_daemon&)
-  {
-    fail_msg_writer() << "no connection to daemon. Please, make sure daemon is running.";
-  }
-  catch (const tools::error::wallet_rpc_error& e)
-  {
-    LOG_ERROR("Unknown RPC error: " << e.to_string());
-    fail_msg_writer() << "RPC error \"" << e.what() << '"';
-  }
-  catch (const tools::error::get_random_outs_error&)
-  {
-    fail_msg_writer() << "failed to get random outputs to mix";
-  }
-  catch (const tools::error::not_enough_money& e)
-  {
-    fail_msg_writer() << "not enough money to transfer, available only " << print_money(e.available()) <<
-      ", transaction amount " << print_money(e.tx_amount() + e.fee()) << " = " << print_money(e.tx_amount()) <<
-      " + " << print_money(e.fee()) << " (fee)";
-  }
-  catch (const tools::error::not_enough_outs_to_mix& e)
-  {
-    auto writer = fail_msg_writer();
-    writer << "not enough outputs for specified mixin_count = " << e.mixin_count() << ":";
-    for (const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& outs_for_amount : e.scanty_outs())
-    {
-      writer << "\noutput amount = " << print_money(outs_for_amount.amount) << ", fount outputs to mix = " << outs_for_amount.outs.size();
-    }
-  }
-  catch (const tools::error::tx_not_constructed&)
-  {
-    fail_msg_writer() << "transaction was not constructed";
-  }
-  catch (const tools::error::tx_rejected& e)
-  {
-    fail_msg_writer() << "transaction " << get_transaction_hash(e.tx()) << " was rejected by daemon with status \"" << e.status() << '"';
-  }
-  catch (const tools::error::tx_sum_overflow& e)
-  {
-    fail_msg_writer() << e.what();
-  }
-  catch (const tools::error::tx_too_big& e)
-  {
-    currency::transaction tx = e.tx();
-    fail_msg_writer() << "transaction " << get_transaction_hash(e.tx()) << " is too big. Transaction size: " <<
-      get_object_blobsize(e.tx()) << " bytes, transaction size limit: " << e.tx_size_limit() << " bytes. Try to separate this payment into few smaller transfers.";
-  }
-  catch (const tools::error::zero_destination&)
-  {
-    fail_msg_writer() << "one of destinations is zero";
-  }
-  catch (const tools::error::transfer_error& e)
-  {
-    LOG_ERROR("unknown transfer error: " << e.to_string());
-    fail_msg_writer() << "unknown transfer error: " << e.what();
-  }
-  catch (const tools::error::wallet_internal_error& e)
-  {
-    LOG_ERROR("internal error: " << e.to_string());
-    fail_msg_writer() << "internal error: " << e.what();
-  }
-  catch (const std::exception& e)
-  {
-    LOG_ERROR("unexpected error: " << e.what());
-    fail_msg_writer() << "unexpected error: " << e.what();
-  }
-  catch (...)
-  {
-    LOG_ERROR("Unknown error");
-    fail_msg_writer() << "unknown error";
-  }
+    success_msg_writer(true) << "Transaction prepared for signing and saved into \"zano_tx_unsigned\" file, use full wallet to sign transfer and then use \"submit_transfer\" on this wallet to broadcast the transaction to the network";
+  }  
+  SIMPLE_WALLET_CATCH_TRY_ENTRY()
 
   return true;
 }
@@ -1806,6 +1803,7 @@ bool simple_wallet::tor_disable(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
 {
+  SIMPLE_WALLET_BEGIN_TRY_ENTRY();
   asset_descriptor_base adb = AUTO_VAL_INIT(adb);
   if (!args.size() || args.size() > 1)
   {
@@ -1824,21 +1822,23 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
   destinations.push_back(td);
   currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
   crypto::public_key result_asset_id = currency::null_pkey;
-  m_wallet->publish_new_asset(adb, destinations, result_tx, result_asset_id);
+  m_wallet->deploy_new_asset(adb, destinations, result_tx, result_asset_id);
 
-  success_msg_writer(true) << "New asset deployed: " << ENDL 
-    << "Asset ID:     " << result_asset_id << ENDL 
+  success_msg_writer(true) << "New asset successfully deployed with tx " << get_transaction_hash(result_tx) << " (unconfirmed) : " << ENDL
+    << "Asset ID:     " << result_asset_id << ENDL
     << "Title:        " << adb.full_name << ENDL
     << "Ticker:       " << adb.ticker << ENDL
     << "Emitted:      " << print_fixed_decimal_point(adb.current_supply, adb.decimal_point) << ENDL
     << "Max emission: " << print_fixed_decimal_point(adb.total_max_supply, adb.decimal_point) << ENDL
     ;
-
+  
+  SIMPLE_WALLET_CATCH_TRY_ENTRY();
   return true;
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::add_custom_asset_id(const std::vector<std::string> &args)
 {
+  SIMPLE_WALLET_BEGIN_TRY_ENTRY();
   if (!args.size() || args.size() > 1)
   {
     fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
@@ -1865,19 +1865,22 @@ bool simple_wallet::add_custom_asset_id(const std::vector<std::string> &args)
       << " supply: " << print_fixed_decimal_point(asset_descriptor.current_supply, asset_descriptor.decimal_point) << ENDL
       ;
   }
+  SIMPLE_WALLET_CATCH_TRY_ENTRY();
   return true;
+
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::generate_ionic_swap_proposal(const std::vector<std::string> &args)
 {
+  SIMPLE_WALLET_BEGIN_TRY_ENTRY();
 
   if (args.size() != 2)
   {
     fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
   }
 
-  view::ionic_swap_proposal_info proposal = AUTO_VAL_INIT(proposal);
-  bool r = epee::serialization::load_t_from_json_file(proposal, args[0]);
+  view::ionic_swap_proposal_info proposal_info = AUTO_VAL_INIT(proposal_info);
+  bool r = epee::serialization::load_t_from_json_file(proposal_info, args[0]);
   if (!r)
   {
     fail_msg_writer() << "Failed to load json file with asset specification: " << args[0];
@@ -1895,8 +1898,8 @@ bool simple_wallet::generate_ionic_swap_proposal(const std::vector<std::string> 
     return true;
   }
 
-  transaction tx_template = AUTO_VAL_INIT(tx_template);
-  r = m_wallet->create_ionic_swap_proposal(proposal, destination_addr, tx_template);
+  tools::wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
+  r = m_wallet->create_ionic_swap_proposal(proposal_info, destination_addr, proposal);
   if (!r)
   {
     fail_msg_writer() << "Failed to create ionic_swap proposal";
@@ -1904,49 +1907,56 @@ bool simple_wallet::generate_ionic_swap_proposal(const std::vector<std::string> 
   }
   else
   {    
-    success_msg_writer() << "Generated proposal: " << ENDL << epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(tx_template));
+    success_msg_writer() << "Generated proposal: " << ENDL << epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(proposal));
   }
+  SIMPLE_WALLET_CATCH_TRY_ENTRY();
   return true;
+
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::get_ionic_swap_proposal_info(const std::vector<std::string> &args)
 {
+  SIMPLE_WALLET_BEGIN_TRY_ENTRY();
+
   if (args.size() != 1)
   {
     fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
   }
 
-  std::string raw_tx_template;
-  bool r = epee::string_tools::parse_hexstr_to_binbuff(args[0], raw_tx_template);
+  std::string raw_proposal;
+  bool r = epee::string_tools::parse_hexstr_to_binbuff(args[0], raw_proposal);
   if (!r)
   {
     fail_msg_writer() << "Failed to parse proposal hex to raw data";
     return true;
   }
 
-  view::ionic_swap_proposal_info proposal = AUTO_VAL_INIT(proposal);
-  if (!m_wallet->get_ionic_swap_proposal_info(raw_tx_template, proposal))
+  view::ionic_swap_proposal_info proposal_info = AUTO_VAL_INIT(proposal_info);
+  if (!m_wallet->get_ionic_swap_proposal_info(raw_proposal, proposal_info))
   {
     fail_msg_writer() << "Failed to decode proposal info";
     return true;
   }
-  std::string json_proposal = epee::serialization::store_t_to_json(proposal);
+  std::string json_proposal_info = epee::serialization::store_t_to_json(proposal_info);
 
 
-  success_msg_writer() << "Proposal details: " << ENDL << json_proposal;
+  success_msg_writer() << "Proposal details: " << ENDL << json_proposal_info;
 
+  SIMPLE_WALLET_CATCH_TRY_ENTRY();
   return true;
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::accept_ionic_swap_proposal(const std::vector<std::string> &args)
 {
+  SIMPLE_WALLET_BEGIN_TRY_ENTRY();
+
   if (args.size() != 1)
   {
     fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
   }
 
-  std::string raw_tx_template;
-  bool r = epee::string_tools::parse_hexstr_to_binbuff(args[0], raw_tx_template);
+  std::string raw_proposal;
+  bool r = epee::string_tools::parse_hexstr_to_binbuff(args[0], raw_proposal);
   if (!r)
   {
     fail_msg_writer() << "Failed to parse proposal hex to raw data";
@@ -1954,7 +1964,7 @@ bool simple_wallet::accept_ionic_swap_proposal(const std::vector<std::string> &a
   }
 
   currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
-  if (!m_wallet->accept_ionic_swap_proposal(raw_tx_template, result_tx))
+  if (!m_wallet->accept_ionic_swap_proposal(raw_proposal, result_tx))
   {
     fail_msg_writer() << "Failed accept ionic_swap proposal";
     return true;
@@ -1962,12 +1972,14 @@ bool simple_wallet::accept_ionic_swap_proposal(const std::vector<std::string> &a
 
   success_msg_writer() << "Proposal accepted and executed, tx_id : " << currency::get_transaction_hash(result_tx);
 
+  SIMPLE_WALLET_CATCH_TRY_ENTRY();
   return true;
 }
 
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::remove_custom_asset_id(const std::vector<std::string> &args)
 {
+  SIMPLE_WALLET_BEGIN_TRY_ENTRY();
   if (!args.size() || args.size() > 1)
   {
     fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
@@ -1989,11 +2001,14 @@ bool simple_wallet::remove_custom_asset_id(const std::vector<std::string> &args)
   {
     success_msg_writer() << "Asset id " << asset_id << " removed from wallet custom list" << ENDL;
   }
+
+  SIMPLE_WALLET_CATCH_TRY_ENTRY();
   return true;
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::sweep_below(const std::vector<std::string> &args)
 {
+  SIMPLE_WALLET_BEGIN_TRY_ENTRY();
   bool r = false;
   if (args.size() < 3 || args.size() > 4)
   {
@@ -2051,30 +2066,23 @@ bool simple_wallet::sweep_below(const std::vector<std::string> &args)
     return true;
   }
 
-  try
-  {
-    uint64_t fee = m_wallet->get_core_runtime_config().tx_default_fee;
-    size_t outs_total = 0, outs_swept = 0;
-    uint64_t amount_total = 0, amount_swept = 0;
-    currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
-    std::string filename = "zano_tx_unsigned";
-    m_wallet->sweep_below(fake_outs_count, addr, amount, payment_id, fee, outs_total, amount_total, outs_swept, amount_swept, &result_tx, &filename);
 
-    success_msg_writer(false) << outs_swept << " outputs (" << print_money_brief(amount_swept) << " coins) of " << outs_total << " total (" << print_money_brief(amount_total)
-      << ") below the specified limit of " << print_money_brief(amount) << " were successfully swept";
+  uint64_t fee = m_wallet->get_core_runtime_config().tx_default_fee;
+  size_t outs_total = 0, outs_swept = 0;
+  uint64_t amount_total = 0, amount_swept = 0;
+  currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
+  std::string filename = "zano_tx_unsigned";
+  m_wallet->sweep_below(fake_outs_count, addr, amount, payment_id, fee, outs_total, amount_total, outs_swept, amount_swept, &result_tx, &filename);
 
-    if (m_wallet->is_watch_only())
-      success_msg_writer(true) << "Transaction prepared for signing and saved into \"" << filename << "\" file, use full wallet to sign transfer and then use \"submit_transfer\" on this wallet to broadcast the transaction to the network";
-    else
-      success_msg_writer(true) << "tx: " << get_transaction_hash(result_tx) << " size: " << get_object_blobsize(result_tx) << " bytes";
-  }
-  catch (const std::exception& e)
-  {
-    LOG_ERROR(e.what());
-    fail_msg_writer() << e.what();
-    return true;
-  }
+  success_msg_writer(false) << outs_swept << " outputs (" << print_money_brief(amount_swept) << " coins) of " << outs_total << " total (" << print_money_brief(amount_total)
+    << ") below the specified limit of " << print_money_brief(amount) << " were successfully swept";
 
+  if (m_wallet->is_watch_only())
+    success_msg_writer(true) << "Transaction prepared for signing and saved into \"" << filename << "\" file, use full wallet to sign transfer and then use \"submit_transfer\" on this wallet to broadcast the transaction to the network";
+  else
+    success_msg_writer(true) << "tx: " << get_transaction_hash(result_tx) << " size: " << get_object_blobsize(result_tx) << " bytes";
+
+  SIMPLE_WALLET_CATCH_TRY_ENTRY();
   return true;
 }
 
