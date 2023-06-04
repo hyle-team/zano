@@ -390,6 +390,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
   {                                                                                                        \
     TIME_MEASURE_START_MS(t);                                                                              \
     ++tests_count;                                                                                         \
+    ++unique_tests_count;                                                                                  \
     if (!generate_and_play<genclass>(#genclass))                                                           \
     {                                                                                                      \
       failed_tests.insert(#genclass);                                                                      \
@@ -407,6 +408,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
     const char* testname = #genclass " (BC saveload)";                                                     \
     TIME_MEASURE_START_MS(t);                                                                              \
     ++tests_count;                                                                                         \
+    ++unique_tests_count;                                                                                  \
     if (!gen_and_play_intermitted_by_blockchain_saveload<genclass>(testname))                              \
     {                                                                                                      \
       failed_tests.insert(testname);                                                                       \
@@ -417,8 +419,6 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
     TIME_MEASURE_FINISH_MS(t);                                                                             \
     tests_running_time.push_back(std::make_pair(testname, t));                                             \
   }
-
-
 
 #define GENERATE_AND_PLAY_HF(genclass, hardfork_str_mask)                                                  \
   if((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string::npos != std::string(#genclass).find(run_single_test))) \
