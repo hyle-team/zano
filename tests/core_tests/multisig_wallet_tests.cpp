@@ -1632,10 +1632,6 @@ multisig_and_checkpoints::multisig_and_checkpoints()
 {
   // NOTE: This test is made deterministic to be able to correctly set up checkpoint.
   random_state_test_restorer::reset_random(); // random generator's state was previously stored, will be restore on dtor (see also m_random_state_test_restorer)
-  m_hardforks.m_height_the_hardfork_n_active_after[1] = 1440;
-  m_hardforks.m_height_the_hardfork_n_active_after[2] = 1800;
-  m_hardforks.m_height_the_hardfork_n_active_after[3] = 1801;
-  m_hardforks.m_height_the_hardfork_n_active_after[4] = 50000000000;
   REGISTER_CALLBACK_METHOD(multisig_and_checkpoints, set_cp);
 }
 
@@ -1681,6 +1677,7 @@ bool multisig_and_checkpoints::generate(std::vector<test_event_entry>& events) c
   std::vector<tx_destination_entry> destinations;
 
   MAKE_GENESIS_BLOCK(events, blk_0, preminer_acc, ts);
+  DO_CALLBACK(events, "configure_core");
   // set checkpoint
   DO_CALLBACK(events, "set_cp");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2);

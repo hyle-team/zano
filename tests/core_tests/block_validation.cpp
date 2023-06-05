@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2023 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -46,7 +46,8 @@ namespace
 
 #define BLOCK_VALIDATION_INIT_GENERATE()                                                \
   GENERATE_ACCOUNT(miner_account);                                                      \
-  MAKE_GENESIS_BLOCK(events, blk_0, miner_account, 1338224400);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_account, 1338224400);                         \
+  DO_CALLBACK(events, "configure_core");
 
 //----------------------------------------------------------------------------------------------------------------------
 // Tests

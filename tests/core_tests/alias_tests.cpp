@@ -96,9 +96,6 @@ gen_alias_tests::gen_alias_tests()
   REGISTER_CALLBACK_METHOD(gen_alias_tests, check_height_not_changed);
   REGISTER_CALLBACK_METHOD(gen_alias_tests, check_height_changed);
   REGISTER_CALLBACK_METHOD(gen_alias_tests, check_too_many_aliases_registration);
-
-  m_hardforks.set_hardfork_height(1, 0);
-  m_hardforks.set_hardfork_height(2, 0);
 }
 
 bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
@@ -107,7 +104,6 @@ bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
   GENERATE_ACCOUNT(miner_account);                                                                                     // event index
   m_accounts.push_back(miner_account);
   MAKE_GENESIS_BLOCK(events, blk_0, preminer_account, test_core_time::get_time());                                     // 0
-  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");                                                                               // 1
   MAKE_ACCOUNT(events, first_acc);                                                                                     // 2
   MAKE_ACCOUNT(events, second_acc);                                                                                    // 3
@@ -874,6 +870,7 @@ bool gen_alias_reg_with_locked_money::generate(std::vector<test_event_entry>& ev
   GENERATE_ACCOUNT(alice);
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
 
   currency::block& prev_block = blk_0;
 
@@ -1155,6 +1152,7 @@ bool gen_alias_tx_no_outs::generate(std::vector<test_event_entry>& events) const
   uint64_t ts = test_core_time::get_time();
   GENERATE_ACCOUNT(miner_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
   events.push_back(miner_acc);
 
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);

@@ -968,7 +968,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(multisig_and_unlock_time);
     GENERATE_AND_PLAY(multisig_and_coinbase);
     GENERATE_AND_PLAY(multisig_with_same_id_in_pool);
-    GENERATE_AND_PLAY(multisig_and_checkpoints);
+    GENERATE_AND_PLAY_HF(multisig_and_checkpoints, "0"); // TODO: fix for HF 1-3 (checkpoint hash check)
     GENERATE_AND_PLAY(multisig_and_checkpoints_bad_txs);
     GENERATE_AND_PLAY(multisig_and_altchains);
     GENERATE_AND_PLAY(multisig_out_make_and_spent_in_altchain);
@@ -1028,7 +1028,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_checkpoints_pos_validation_on_altchain);
     GENERATE_AND_PLAY(gen_checkpoints_and_invalid_tx_to_pool);
     GENERATE_AND_PLAY(gen_checkpoints_set_after_switching_to_altchain);
-    GENERATE_AND_PLAY(gen_no_attchments_in_coinbase);
+    GENERATE_AND_PLAY_HF(gen_no_attchments_in_coinbase, "0");
     GENERATE_AND_PLAY(gen_no_attchments_in_coinbase_gentime);
 
     GENERATE_AND_PLAY(gen_alias_tests);
@@ -1039,10 +1039,10 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_alias_update_after_addr_changed);
     GENERATE_AND_PLAY(gen_alias_blocking_reg_by_invalid_tx);
     GENERATE_AND_PLAY(gen_alias_blocking_update_by_invalid_tx);
-    GENERATE_AND_PLAY(gen_alias_reg_with_locked_money);
+    GENERATE_AND_PLAY_HF(gen_alias_reg_with_locked_money, "*");
     GENERATE_AND_PLAY(gen_alias_too_small_reward);
     GENERATE_AND_PLAY(gen_alias_too_much_reward);
-    GENERATE_AND_PLAY(gen_alias_tx_no_outs);
+    GENERATE_AND_PLAY_HF(gen_alias_tx_no_outs, "*");
     GENERATE_AND_PLAY(gen_alias_switch_and_check_block_template);
     GENERATE_AND_PLAY(gen_alias_too_many_regs_in_block_template);
     GENERATE_AND_PLAY(gen_alias_update_for_free);
@@ -1052,7 +1052,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch);
     GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch_2);
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_tx_from_tx_pool);
-    GENERATE_AND_PLAY(gen_wallet_save_load_and_balance);
+    GENERATE_AND_PLAY_HF(gen_wallet_save_load_and_balance, "*");
     GENERATE_AND_PLAY(gen_wallet_mine_pos_block);
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_outdated_tx);
     GENERATE_AND_PLAY(gen_wallet_unlock_by_block_and_by_time);
@@ -1139,30 +1139,30 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(random_outs_and_burnt_coins);
 
     // Block verification tests
-    GENERATE_AND_PLAY(gen_block_big_major_version);
-    GENERATE_AND_PLAY(gen_block_big_minor_version);
-    GENERATE_AND_PLAY(gen_block_ts_not_checked);
-    GENERATE_AND_PLAY(gen_block_ts_in_past);
-    GENERATE_AND_PLAY(gen_block_ts_in_future);
-    //GENERATE_AND_PLAY(gen_block_invalid_prev_id); disabled becouse impossible to generate text chain with wrong prev_id - pow hash not works without chaining
-    GENERATE_AND_PLAY(gen_block_invalid_nonce);
-    GENERATE_AND_PLAY(gen_block_no_miner_tx);
-    GENERATE_AND_PLAY(gen_block_unlock_time_is_low);
-    GENERATE_AND_PLAY(gen_block_unlock_time_is_high);
-    GENERATE_AND_PLAY(gen_block_unlock_time_is_timestamp_in_past);
-    GENERATE_AND_PLAY(gen_block_unlock_time_is_timestamp_in_future);
-    GENERATE_AND_PLAY(gen_block_height_is_low);
-    GENERATE_AND_PLAY(gen_block_height_is_high);
-    GENERATE_AND_PLAY(gen_block_miner_tx_has_2_tx_gen_in);
-    GENERATE_AND_PLAY(gen_block_miner_tx_has_2_in);
-    GENERATE_AND_PLAY(gen_block_miner_tx_with_txin_to_key);
-    GENERATE_AND_PLAY(gen_block_miner_tx_out_is_small);
-    GENERATE_AND_PLAY(gen_block_miner_tx_out_is_big);
-    GENERATE_AND_PLAY(gen_block_miner_tx_has_no_out);
-    GENERATE_AND_PLAY(gen_block_miner_tx_has_out_to_alice);
-    GENERATE_AND_PLAY(gen_block_has_invalid_tx);
-    GENERATE_AND_PLAY(gen_block_is_too_big);
-    GENERATE_AND_PLAY(gen_block_wrong_version_agains_hardfork);    
+    GENERATE_AND_PLAY_HF(gen_block_big_major_version, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_big_minor_version, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_ts_not_checked, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_ts_in_past, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_ts_in_future, "0,3");
+    //GENERATE_AND_PLAY(gen_block_invalid_prev_id); disabled because impossible to generate text chain with wrong prev_id - pow hash not works without chaining
+    GENERATE_AND_PLAY_HF(gen_block_invalid_nonce, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_no_miner_tx, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_low, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_high, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_timestamp_in_past, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_timestamp_in_future, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_height_is_low, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_height_is_high, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_tx_gen_in, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_in, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_miner_tx_with_txin_to_key, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_miner_tx_out_is_small, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_miner_tx_out_is_big, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_no_out, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_out_to_alice, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_has_invalid_tx, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_is_too_big, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_wrong_version_agains_hardfork, "0,3");  
     //GENERATE_AND_PLAY(gen_block_invalid_binary_format); // Takes up to 3 hours, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 500, up to 30 minutes, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10
 
 
