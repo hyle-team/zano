@@ -1028,7 +1028,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_checkpoints_pos_validation_on_altchain);
     GENERATE_AND_PLAY(gen_checkpoints_and_invalid_tx_to_pool);
     GENERATE_AND_PLAY(gen_checkpoints_set_after_switching_to_altchain);
-    GENERATE_AND_PLAY_HF(gen_no_attchments_in_coinbase, "0");
+    GENERATE_AND_PLAY_HF(gen_no_attchments_in_coinbase, "3");
     GENERATE_AND_PLAY(gen_no_attchments_in_coinbase_gentime);
 
     GENERATE_AND_PLAY(gen_alias_tests);
@@ -1053,7 +1053,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch_2);
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_tx_from_tx_pool);
     GENERATE_AND_PLAY_HF(gen_wallet_save_load_and_balance, "*");
-    GENERATE_AND_PLAY(gen_wallet_mine_pos_block);
+    GENERATE_AND_PLAY_HF(gen_wallet_mine_pos_block, "3");
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_outdated_tx);
     GENERATE_AND_PLAY(gen_wallet_unlock_by_block_and_by_time);
     GENERATE_AND_PLAY(gen_wallet_payment_id);
@@ -1076,7 +1076,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(wallet_outputs_with_same_key_image);
     GENERATE_AND_PLAY(wallet_unconfirmed_tx_expiration);
     GENERATE_AND_PLAY(wallet_unconfimed_tx_balance);
-    GENERATE_AND_PLAY(packing_outputs_on_pos_minting_wallet);
+    GENERATE_AND_PLAY_HF(packing_outputs_on_pos_minting_wallet, "3");
     GENERATE_AND_PLAY(wallet_watch_only_and_chain_switch);
 
     GENERATE_AND_PLAY(wallet_rpc_integrated_address);
