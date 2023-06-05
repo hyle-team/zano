@@ -71,6 +71,37 @@ namespace epee
         // Create a context that uses the default paths for
         // finding CA certificates.
         m_ssl_context.set_default_verify_paths();
+        /*m_socket.set_verify_mode(boost::asio::ssl::verify_peer);
+        m_socket.set_verify_callback(
+          boost::bind(&socket_backend::verify_certificate, this, _1, _2));*/
+
+      }
+
+      /*
+      bool verify_certificate(bool preverified,
+        boost::asio::ssl::verify_context& ctx)
+      {
+        std::cout << "verify_certificate (preverified " << preverified << " ) ...\n";
+        // The verify callback can be used to check whether the certificate that is
+        // being presented is valid for the peer. For example, RFC 2818 describes
+        // the steps involved in doing this for HTTPS. Consult the OpenSSL
+        // documentation for more details. Note that the callback is called once
+        // for each certificate in the certificate chain, starting from the root
+        // certificate authority.
+
+        // In this example we will simply print the certificate's subject name.
+        char subject_name[256];
+        X509* cert = X509_STORE_CTX_get_current_cert(ctx.native_handle());
+        X509_NAME_oneline(X509_get_subject_name(cert), subject_name, 256);
+        std::cout << "Verifying " << subject_name << "\n";
+
+        // dummy verification
+        return true;
+      }*/
+
+      void set_domain(const std::string& domain_name)
+      {
+        SSL_set_tlsext_host_name(m_socket.native_handle(), domain_name.c_str());
       }
 
       boost::asio::ip::tcp::socket& get_socket()
@@ -102,6 +133,11 @@ namespace epee
       boost::asio::ip::tcp::socket& get_socket()
       {
         return m_socket;
+      }
+
+      void set_domain(const std::string& domain_name)
+      {
+        
       }
 
       boost::asio::ip::tcp::socket& get_stream()
@@ -216,7 +252,7 @@ namespace epee
           }
 
           //////////////////////////////////////////////////////////////////////////
-
+          m_sct_back.set_domain(addr);
 
           //boost::asio::ip::tcp::endpoint remote_endpoint(boost::asio::ip::address::from_string(addr.c_str()), port);
           boost::asio::ip::tcp::endpoint remote_endpoint(*iterator);
