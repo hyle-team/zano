@@ -143,3 +143,197 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+assets_and_explicit_native_coins_in_outs::assets_and_explicit_native_coins_in_outs()
+{
+  REGISTER_CALLBACK_METHOD(assets_and_explicit_native_coins_in_outs, c1_alice_cannot_deploy_asset);
+  REGISTER_CALLBACK_METHOD(assets_and_explicit_native_coins_in_outs, c2_alice_deploys_asset);
+
+  m_hardforks.clear();
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+}
+
+bool assets_and_explicit_native_coins_in_outs::generate(std::vector<test_event_entry>& events) const
+{
+  /* Test idea:
+  *    1) make sure an asset cannot be deployed if there's no ZC outputs available;
+  *    2) make sure an asset emission transaction has hidden asset ids in all outputs;
+  *    3) (NOT DONE YET) make sure tx with at least one input with at least one reference to non-explicit native asset id has non-explicit asset ids in outs (TODO: move to separate test)
+  */
+
+  bool r = false;
+
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
+
+  // HF4 requires tests_random_split_strategy (for 2 outputs minimum)
+  test_gentime_settings tgts = generator.get_test_gentime_settings();
+  tgts.split_strategy = tests_random_split_strategy;
+  generator.set_test_gentime_settings(tgts);
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK_PARAMS(events, "check_hardfork_inactive", static_cast<size_t>(ZANO_HARDFORK_04_ZARCANUM));
+
+  // tx_0: miner -> Alice
+  // make tx_0 before HF4, so Alice will have only bare outs
+  m_alice_initial_balance = MK_TEST_COINS(1000) + TESTS_DEFAULT_FEE;
+  transaction tx_0{};
+  std::vector<tx_source_entry> sources;
+  std::vector<tx_destination_entry> destinations;
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc, alice_acc, m_alice_initial_balance, TESTS_DEFAULT_FEE, 0, sources, destinations, true /* spends */, false /* unlock time */);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  
+  ADD_CUSTOM_EVENT(events, tx_0);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+
+  // make sure HF4 has been activated
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_04_ZARCANUM));
+
+  // rewind blocks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // check Alice's balance and make sure she cannot deploy an asset
+  DO_CALLBACK(events, "c1_alice_cannot_deploy_asset");
+
+  // tx_1: Alice -> Alice (all coins) : this will convert two Alice's outputs to ZC outs (since we're at post-HF4 zone)
+  MAKE_TX(events, tx_1, alice_acc, alice_acc, m_alice_initial_balance - TESTS_DEFAULT_FEE, blk_1r);
+  CHECK_AND_ASSERT_MES(tx_1.vout.size() == 2, false, "unexpected tx_1.vout.size : " << tx_1.vout.size());
+
+  // make sure that all tx_1 outputs have explicit hative coin asset id
+  for(auto& out : tx_1.vout)
+  {
+    CHECK_AND_ASSERT_MES(out.type() == typeid(tx_out_zarcanum), false, "invalid out type");
+    const tx_out_zarcanum& out_zc = boost::get<tx_out_zarcanum>(out);
+    CHECK_AND_ASSERT_MES(out_zc.blinded_asset_id == native_coin_asset_id_1div8, false, "tx_1 has non-explicit asset id in outputs");
+  }
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_1);
+
+  // rewind blocks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_2r, blk_2, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // check Alice's balance and make sure she CAN deploy an asset now
+  DO_CALLBACK(events, "c2_alice_deploys_asset");
+
+  return true;
+}
+
+bool assets_and_explicit_native_coins_in_outs::c1_alice_cannot_deploy_asset(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
+  alice_wlt->refresh();
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", m_alice_initial_balance, 0, m_alice_initial_balance, 0, 0), false, "");
+
+  asset_descriptor_base adb{};
+  adb.total_max_supply = 10;
+  adb.full_name = "it doesn't matter";
+  adb.ticker = "really";
+  adb.decimal_point = 12;
+
+  std::vector<tx_destination_entry> destinations;
+  destinations.emplace_back(adb.total_max_supply, m_accounts[MINER_ACC_IDX].get_public_address(), null_pkey);
+
+  transaction asset_emission_tx{};
+  crypto::public_key asset_id = null_pkey;
+  bool r = false;
+  try
+  {
+    alice_wlt->deploy_new_asset(adb, destinations, asset_emission_tx, asset_id);
+  }
+  catch(...)
+  {
+    r = true;
+  }
+
+  CHECK_AND_ASSERT_MES(r, false, "Alice successfully deployed an asset, which is unexpected (she has no ZC outs available)");
+
+  return true;
+}
+
+bool assets_and_explicit_native_coins_in_outs::c2_alice_deploys_asset(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
+  alice_wlt->refresh();
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", m_alice_initial_balance - TESTS_DEFAULT_FEE, 0, m_alice_initial_balance - TESTS_DEFAULT_FEE, 0, 0), false, "");
+
+  // make sure Alice has two UTXO now
+  tools::wallet2::transfer_container transfers{};
+  alice_wlt->get_transfers(transfers);
+  size_t unspent_transfers = std::count_if(transfers.begin(), transfers.end(), [](const tools::wallet2::transfer_details& tr){ return !tr.is_spent(); });
+  CHECK_AND_ASSERT_MES(unspent_transfers == 2, false, "unexpected number of Alice's unspent transfers: " << unspent_transfers);
+
+  asset_descriptor_base adb{};
+  adb.total_max_supply = 100 * 1000000000000;
+  adb.full_name = "very confidential asset";
+  adb.ticker = "VCA";
+  adb.decimal_point = 12;
+
+  std::vector<tx_destination_entry> destinations;
+  destinations.emplace_back(adb.total_max_supply / 2, m_accounts[MINER_ACC_IDX].get_public_address(), null_pkey);
+  destinations.emplace_back(adb.total_max_supply / 2, m_accounts[MINER_ACC_IDX].get_public_address(), null_pkey);
+
+  transaction asset_emission_tx{};
+  crypto::public_key asset_id = null_pkey;
+
+  alice_wlt->deploy_new_asset(adb, destinations, asset_emission_tx, asset_id);
+
+
+  // make sure the emission tx is correct
+  CHECK_AND_ASSERT_MES(asset_emission_tx.vout.size() > 2, false, "Unexpected vout size: " << asset_emission_tx.vout.size());
+  for(auto& out : asset_emission_tx.vout)
+  {
+    CHECK_AND_ASSERT_MES(out.type() == typeid(tx_out_zarcanum), false, "invalid out type");
+    const tx_out_zarcanum& out_zc = boost::get<tx_out_zarcanum>(out);
+    // as soon as this is the asset emmiting transaction, no output has an obvious asset id
+    // make sure it is so
+    CHECK_AND_ASSERT_MES(out_zc.blinded_asset_id != native_coin_asset_id_1div8, false, "One of outputs has explicit native asset id, which is unexpected");
+  }
+
+  // get this tx confirmed
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // check Alice balance, make sure all native coins are unlocked
+  alice_wlt->refresh();
+  uint64_t alice_balance = m_alice_initial_balance - TESTS_DEFAULT_FEE * 2;
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", alice_balance, 0, alice_balance, 0, 0), false, "");
+
+  // now Alice only has UTXO with non explicit asset id
+  // Transfer all of them back to miner and check asset ids of outputs
+  transaction tx_2{};
+  alice_wlt->transfer(alice_balance - TESTS_DEFAULT_FEE, m_accounts[MINER_ACC_IDX].get_public_address(), tx_2, native_coin_asset_id);
+
+  CHECK_AND_ASSERT_MES(tx_2.vout.size() == 2, false, "unexpected tx_2.vout.size : " << tx_2.vout.size());
+  for(auto& out : tx_2.vout)
+  {
+    CHECK_AND_ASSERT_MES(out.type() == typeid(tx_out_zarcanum), false, "invalid out type");
+    const tx_out_zarcanum& out_zc = boost::get<tx_out_zarcanum>(out);
+    CHECK_AND_ASSERT_MES(out_zc.blinded_asset_id != native_coin_asset_id_1div8, false, "One of outputs has explicit native asset id, which is unexpected");
+  }
+
+  // finally, get this tx confirmed
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  return true;
+}
