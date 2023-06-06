@@ -310,8 +310,8 @@ inline bool put_alias_via_tx_to_list(const currency::hard_forks_descriptor& hf, 
   uint64_t burnt_amount = 0;
   if (!check_native_coins_amount_burnt_in_outs(tx_set.back(), alias_reward, &burnt_amount))
   {
-    CHECK_AND_ASSERT_MES(false, false, "alias reward was not found, expected: " << print_money_brief(alias_reward)
-      << "; burnt: " << (tx_set.back().version <= TRANSACTION_VERSION_PRE_HF4 ? print_money_brief(burnt_amount) : "hidden") << "; tx: " << get_transaction_hash(tx_set.back()));
+    CHECK_AND_ASSERT_MES(false, false, "alias reward was not found, expected: " << currency::print_money_brief(alias_reward)
+      << "; burnt: " << (tx_set.back().version <= TRANSACTION_VERSION_PRE_HF4 ? currency::print_money_brief(burnt_amount) : "hidden") << "; tx: " << get_transaction_hash(tx_set.back()));
   }
 
   return true;
