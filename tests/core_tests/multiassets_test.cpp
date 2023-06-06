@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2023 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -9,15 +9,14 @@
 
 #include "random_helper.h"
 
-#define  AMOUNT_TO_TRANSFER_MULTIASSETS_BASIC (TESTS_DEFAULT_FEE)
+using namespace currency;
 
+//------------------------------------------------------------------------------
+
+#define  AMOUNT_TO_TRANSFER_MULTIASSETS_BASIC (TESTS_DEFAULT_FEE)
 #define  AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC  500000000000000000
 
-
-
-using namespace currency;
 uint64_t multiassets_basic_test::ts_starter = 0;
-//------------------------------------------------------------------------------
 multiassets_basic_test::multiassets_basic_test()
 {
   // TODO: remove the following line
@@ -25,10 +24,7 @@ multiassets_basic_test::multiassets_basic_test()
   LOG_PRINT_MAGENTA("STARTER TS: " << ts_starter, LOG_LEVEL_0);
   random_state_test_restorer::reset_random(ts_starter);
 
-  REGISTER_CALLBACK_METHOD(multiassets_basic_test, configure_core);
   REGISTER_CALLBACK_METHOD(multiassets_basic_test, c1);
-
-  m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 1);
 }
 
 bool multiassets_basic_test::generate(std::vector<test_event_entry>& events) const
@@ -40,7 +36,6 @@ bool multiassets_basic_test::generate(std::vector<test_event_entry>& events) con
   uint64_t ts = 145000000;
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
   DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
-  set_hard_fork_heights_to_generator(generator);
   //TODO: Need to make sure REWIND_BLOCKS_N and other coretests codebase are capable of following hardfork4 rules
   //in this test hardfork4 moment moved to runtime section
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
