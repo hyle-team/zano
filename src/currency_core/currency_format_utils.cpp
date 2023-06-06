@@ -2207,10 +2207,9 @@ namespace currency
       }
 
       if (src_entr.is_native_coin())
-      {
         native_coins_input_sum += src_entr.amount;
-      }
-      else
+
+      if (src_entr.is_zc())
       {
         // if at least one decoy output of a ZC input has a non-explicit asset id, then we can't say that all inputs are obviously native coins 
         for(const tx_source_entry::output_entry& oe : in_context.outputs)
