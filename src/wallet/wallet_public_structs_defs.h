@@ -91,19 +91,21 @@ namespace wallet_public
 
   struct wallet_sub_transfer_info
   {
-    std::vector<std::string> remote_addresses;  //optional
-    std::vector<std::string> remote_aliases; //optional, describe only if there only one remote address
     uint64_t      amount;
     bool          is_income;
     crypto::public_key asset_id; // not blinded, not premultiplied by 1/8
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(remote_addresses)
-      KV_SERIALIZE(remote_aliases)
       KV_SERIALIZE(amount)
       KV_SERIALIZE(is_income)
       KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
     END_KV_SERIALIZE_MAP()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(amount) 
+      BOOST_SERIALIZE(is_income)
+      BOOST_SERIALIZE(asset_id)
+    END_BOOST_SERIALIZATION()
 
   };
 
@@ -122,6 +124,9 @@ namespace wallet_public
     uint64_t      tx_type;
     wallet_transfer_info_details td;
     std::vector<currency::tx_service_attachment> service_entries;
+    std::vector<std::string> remote_addresses;  //optional
+    std::vector<std::string> remote_aliases; //optional, describe only if there only one remote address
+
     std::vector<wallet_sub_transfer_info> subtransfers;
 
     //not included in streaming serialization
@@ -154,6 +159,8 @@ namespace wallet_public
       KV_SERIALIZE(contract)
       KV_SERIALIZE(service_entries)
       KV_SERIALIZE(transfer_internal_index)
+      KV_SERIALIZE(remote_addresses)
+      KV_SERIALIZE(remote_aliases)
       KV_SERIALIZE(subtransfers)
     END_KV_SERIALIZE_MAP()
 
@@ -178,8 +185,20 @@ namespace wallet_public
       BOOST_SERIALIZE(contract)
       BOOST_SERIALIZE(service_entries)
       BOOST_SERIALIZE(transfer_internal_index)
+      BOOST_SERIALIZE(remote_addresses)
+      BOOST_SERIALIZE(remote_aliases)
       BOOST_SERIALIZE(subtransfers)
     END_BOOST_SERIALIZATION()
+
+    bool is_income_mode_encryption() 
+    {
+      for (const auto& st : subtransfers)
+      {
+        if (st.asset_id == currency::native_coin_asset_id)
+          return st.is_income;
+      }
+      return true;
+    }
   };
 
   struct asset_balance_entry_base

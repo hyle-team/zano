@@ -111,7 +111,7 @@ struct gen_wallet_decrypted_attachments : public wallet_test, virtual public too
   bool generate(std::vector<test_event_entry>& events) const;
 
   // intrface tools::i_wallet2_callback
-  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) override;
+  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<wallet_public::asset_balance_entry>& balances, uint64_t total_mined) override;
 
 private:
   mutable bool          m_on_transfer2_called;

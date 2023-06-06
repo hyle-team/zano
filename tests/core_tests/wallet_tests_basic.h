@@ -60,7 +60,7 @@ struct wallet_callback_balance_checker : public tools::i_wallet2_callback
     m_called = false;
   }
 
-  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) override
+  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<wallet_public::asset_balance_entry>& balances, uint64_t total_mined) override
   {
     m_called = true;
     m_result = false;
@@ -92,9 +92,9 @@ struct wallet_callback_balance_checker : public tools::i_wallet2_callback
 
 struct wlt_lambda_on_transfer2_wrapper : public tools::i_wallet2_callback
 {
-  typedef std::function<bool(const tools::wallet_public::wallet_transfer_info&, uint64_t, uint64_t, uint64_t)> Func;
+  typedef std::function<bool(const tools::wallet_public::wallet_transfer_info&, const std::list<wallet_public::asset_balance_entry>&, uint64_t)> Func;
   wlt_lambda_on_transfer2_wrapper(Func callback) : m_result(false), m_callback(callback) {}
-  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) override
+  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<wallet_public::asset_balance_entry>& balances, uint64_t total_mined) override
   {
     m_result = m_callback(wti, balance, unlocked_balance, total_mined);
   }

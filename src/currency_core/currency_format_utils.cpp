@@ -2889,12 +2889,12 @@ namespace currency
     return true;
   } 
   //---------------------------------------------------------------
-  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, std::vector<wallet_out_info>& outs, uint64_t& sum_of_native_outs, crypto::key_derivation& derivation)
+  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, std::vector<wallet_out_info>& outs, crypto::key_derivation& derivation)
   {
     crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(tx);
     if (null_pkey == tx_pub_key)
       return false;
-    return lookup_acc_outs(acc, tx, get_tx_pub_key_from_extra(tx), outs, sum_of_native_outs, derivation);
+    return lookup_acc_outs(acc, tx, get_tx_pub_key_from_extra(tx), outs, derivation);
   }
   //---------------------------------------------------------------
   bool check_tx_derivation_hint(const transaction& tx, const crypto::key_derivation& derivation)
@@ -2922,7 +2922,7 @@ namespace currency
     return false;
   }
   //---------------------------------------------------------------
-  bool lookup_acc_outs_genesis(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, uint64_t& money_transfered, crypto::key_derivation& derivation)
+  bool lookup_acc_outs_genesis(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, crypto::key_derivation& derivation)
   {
     uint64_t offset = 0;
     bool r = get_account_genesis_offset_by_address(get_account_address_as_str(acc.account_address), offset);
@@ -2943,22 +2943,21 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
-  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, uint64_t& sum_of_native_outs, crypto::key_derivation& derivation)
+  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, crypto::key_derivation& derivation)
   {
     std::list<htlc_info> htlc_info_list;
-    return lookup_acc_outs(acc, tx, tx_pub_key, outs, sum_of_native_outs, derivation, htlc_info_list);
+    return lookup_acc_outs(acc, tx, tx_pub_key, outs, derivation, htlc_info_list);
   }
   //---------------------------------------------------------------
-  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, uint64_t& sum_of_native_outs, crypto::key_derivation& derivation, std::list<htlc_info>& htlc_info_list)
+  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, crypto::key_derivation& derivation, std::list<htlc_info>& htlc_info_list)
   {
-    sum_of_native_outs = 0;
     bool r = generate_key_derivation(tx_pub_key, acc.view_secret_key, derivation);
     CHECK_AND_ASSERT_MES(r, false, "unable to generate derivation from tx_pub = " << tx_pub_key << " * view_sec, invalid tx_pub?");
 
     if (is_coinbase(tx) && get_block_height(tx) == 0 &&  tx_pub_key == ggenesis_tx_pub_key)
     {
       //genesis coinbase
-      return lookup_acc_outs_genesis(acc, tx, tx_pub_key, outs, sum_of_native_outs, derivation);
+      return lookup_acc_outs_genesis(acc, tx, tx_pub_key, outs, derivation);
     }
 
     if (!check_tx_derivation_hint(tx, derivation))
@@ -2975,7 +2974,6 @@ namespace currency
           if (is_out_to_acc(acc.account_address, t, derivation, output_index))
           {
             outs.emplace_back(output_index, o.amount);
-            sum_of_native_outs += o.amount;
           }
         VARIANT_CASE_CONST(txout_multisig, t)
           if (is_out_to_acc(acc.account_address, t, derivation, output_index))
@@ -3016,8 +3014,6 @@ namespace currency
           crypto::point_t asset_id_pt = crypto::point_t(zo.blinded_asset_id).modify_mul8() - asset_id_blinding_mask * crypto::c_point_X;
           crypto::public_key asset_id = asset_id_pt.to_public_key();
           outs.emplace_back(output_index, amount, amount_blinding_mask, asset_id_blinding_mask, asset_id);
-          if (asset_id == currency::native_coin_asset_id)
-            sum_of_native_outs += amount;
         }
       }
       VARIANT_SWITCH_END();

@@ -1586,7 +1586,7 @@ bool gen_wallet_decrypted_attachments::generate(std::vector<test_event_entry>& e
   return true;
 }
 
-void gen_wallet_decrypted_attachments::on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined)
+void gen_wallet_decrypted_attachments::on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
 {
   m_on_transfer2_called = true;
   //try {
@@ -1819,7 +1819,7 @@ bool gen_wallet_alias_via_special_wallet_funcs::c1(currency::core& c, size_t ev_
 
   uint64_t biggest_alias_reward = get_alias_coast_from_fee("a", TESTS_DEFAULT_FEE);
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
-    [biggest_alias_reward](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
+    [biggest_alias_reward](const tools::wallet_public::wallet_transfer_info& wti, const std::list<wallet_public::asset_balance_entry>& balances, uint64_t total_mined) -> bool {
       return std::count(wti.remote_aliases.begin(), wti.remote_aliases.end(), "minerminer") == 1 &&
         wti.amount == biggest_alias_reward;
     }
@@ -3295,7 +3295,7 @@ bool wallet_unconfimed_tx_balance::c1(currency::core& c, size_t ev_index, const 
   bool callback_is_ok = false;
   // this callback will ba called from within wallet2::transfer() below
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
-    [&callback_is_ok](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool
+    [&callback_is_ok](const tools::wallet_public::wallet_transfer_info& wti, const std::list<wallet_public::asset_balance_entry>& balances, uint64_t total_mined) -> bool
     {
       CHECK_AND_ASSERT_MES(balance == MK_TEST_COINS(70), false, "invalid balance: " << print_money_brief(balance));
       CHECK_AND_ASSERT_MES(unlocked_balance == MK_TEST_COINS(50), false, "invalid unlocked_balance: " << print_money_brief(unlocked_balance));
@@ -3444,7 +3444,7 @@ bool wallet_sending_to_integrated_address::c1(currency::core& c, size_t ev_index
 
   bool callback_succeded = false;
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
-    [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
+    [&](const tools::wallet_public::wallet_transfer_info& wti, const std::list<wallet_public::asset_balance_entry>& balances, uint64_t total_mined) -> bool {
     LOG_PRINT_YELLOW("on_transfer: " << print_money_brief(wti.amount) << " pid len: " << wti.payment_id.size() << " remote addr: " << (wti.remote_addresses.size() > 0 ? wti.remote_addresses[0] : ""), LOG_LEVEL_0);
     if (wti.payment_id.empty())
       return true; // skip another outputs

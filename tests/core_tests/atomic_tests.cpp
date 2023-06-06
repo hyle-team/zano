@@ -24,7 +24,7 @@ using namespace currency;
 
 struct wallet_tests_callback_handler : public tools::i_wallet2_callback
 {
-  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) 
+  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
   {
     all_wtis.push_back(wti);
   }
