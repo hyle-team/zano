@@ -1476,7 +1476,7 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, const proces
 
 
   decrypt_payload_items(decrypt_attachment_as_income, wti.tx, m_account.get_keys(), decrypted_att);
-  if ((is_watch_only() && !decrypt_attachment_as_income)|| (height > 638000 && !have_type_in_variant_container<etc_tx_flags16_t>(decrypted_att)))
+  if ((is_watch_only() && !decrypt_attachment_as_income)|| (wti.height > 638000 && !have_type_in_variant_container<etc_tx_flags16_t>(decrypted_att)))
   {
     remove_field_of_type_from_extra<tx_receiver_old>(decrypted_att);
     remove_field_of_type_from_extra<tx_payer_old>(decrypted_att);
@@ -1534,16 +1534,14 @@ void wallet2::handle_money_received2(const currency::block& b, const currency::t
   rise_on_transfer2(wti);
 }
 */
-//----------------------------------------------------------------------------------------------------
-void wallet2::handle_money(const currency::block& b, const process_transaction_context& tx_process_context)
+ //----------------------------------------------------------------------------------------------------
+void wallet2::make_wti_from_process_transaction_context(wallet_public::wallet_transfer_info& wti, const process_transaction_context& tx_process_context)
 {
-  m_transfer_history.push_back(AUTO_VAL_INIT(wallet_public::wallet_transfer_info()));
-  wallet_public::wallet_transfer_info& wti = m_transfer_history.back();
   wti.remote_addresses = tx_process_context.recipients;
   wti.remote_aliases = tx_process_context.remote_aliases;
   for (const auto bce : tx_process_context.total_balance_change)
   {
-    wallet_sub_transfer_info wsti = AUTO_VAL_INIT(wsti);
+    wallet_public::wallet_sub_transfer_info wsti = AUTO_VAL_INIT(wsti);
     wsti.asset_id = bce.first;
     if (bce.second == 0)
     {
@@ -1561,10 +1559,17 @@ void wallet2::handle_money(const currency::block& b, const process_transaction_c
       wsti.is_income = false;
       wsti.amount = static_cast<uint64_t>(bce.second * (-1));
     }
-    wti.push_back(wsti);
+    wti.subtransfers.push_back(wsti);
   }
 
   prepare_wti(wti, tx_process_context);
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::handle_money(const currency::block& b, const process_transaction_context& tx_process_context)
+{
+  m_transfer_history.push_back(AUTO_VAL_INIT(wallet_public::wallet_transfer_info()));
+  wallet_public::wallet_transfer_info& wti = m_transfer_history.back();
+  make_wti_from_process_transaction_context(wti, tx_process_context);
   WLT_LOG_L1("[MONEY SPENT]: " << epee::serialization::store_t_to_json(wti));
   rise_on_transfer2(wti);
 }
@@ -2165,13 +2170,14 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
   for (const auto &tx_blob : res.txs)
   {
     currency::transaction tx;
-    money_transfer2_details td;
+    //money_transfer2_details td;
+    process_transaction_context ptc(tx);
     bool r = parse_and_validate_tx_from_blob(tx_blob, tx);
     THROW_IF_TRUE_WALLET_EX(!r, error::tx_parse_error, tx_blob);
     has_related_alias_in_unconfirmed |= has_related_alias_entry_unconfirmed(tx);
 
-    crypto::hash tx_hash = currency::get_transaction_hash(tx);
-    auto it = unconfirmed_in_transfers_local.find(tx_hash);
+    //crypto::hash tx_hash = currency::get_transaction_hash(tx);
+    auto it = unconfirmed_in_transfers_local.find(ptc.tx_hash());
     if (it != unconfirmed_in_transfers_local.end())
     {
       m_unconfirmed_in_transfers.insert(*it);
@@ -2180,22 +2186,26 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
 
     // read extra
     std::vector<wallet_out_info> outs;
-    uint64_t sum_of_received_native_outs = 0;
+    //uint64_t sum_of_received_native_outs = 0;
     crypto::public_key tx_pub_key = null_pkey;
     r = parse_and_validate_tx_extra(tx, tx_pub_key);
     THROW_IF_TRUE_WALLET_EX(!r, error::tx_extra_parse_error, tx);
     //check if we have money
     crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-    r = lookup_acc_outs(m_account.get_keys(), tx, tx_pub_key, outs, sum_of_received_native_outs, derivation);
+    r = lookup_acc_outs(m_account.get_keys(), tx, tx_pub_key, outs, derivation);
     THROW_IF_TRUE_WALLET_EX(!r, error::acc_outs_lookup_error, tx, tx_pub_key, m_account.get_keys());
 
     //collect incomes
     for (auto& o : outs)
-      td.receive_indices.push_back(o.index);
+    {
+      ptc.total_balance_change[o.asset_id] += o.amount;
+      ptc.mtd.receive_indices.push_back(o.index);
+    }
+
 
     bool new_multisig_spend_detected = false;
     //check if we have spendings
-    uint64_t sum_of_spent_native_coin = 0;
+    //uint64_t sum_of_spent_native_coin = 0;
     std::list<size_t> spend_transfers;
     // check all outputs for spending (compare key images)
     for (size_t i = 0; i != tx.vin.size(); i++)
@@ -2223,9 +2233,11 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
         if (tid != UINT64_MAX)
         {
           // own output is being spent by this input
-          sum_of_spent_native_coin += intk.amount;
-          td.spent_indices.push_back(i);
+          //sum_of_spent_native_coin += intk.amount;
+          ptc.mtd.spent_indices.push_back(i);
           spend_transfers.push_back(tid);
+          ptc.total_balance_change[currency::native_coin_asset_id] -= m_transfers[tid].amount();
+          CHECK_AND_ASSERT_THROW_MES(m_transfers[tid].get_asset_id() == currency::native_coin_asset_id, "Unexpected asset id for native txin_to_key");
         }
       }
       else if (in.type() == typeid(currency::txin_zc_input))
@@ -2250,8 +2262,9 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
 
         if (tid != UINT64_MAX)
         {
-          td.spent_indices.push_back(i);
+          ptc.mtd.spent_indices.push_back(i);
           spend_transfers.push_back(tid);
+          ptc.total_balance_change[m_transfers[tid].asset_id] -= m_transfers[tid].amount();
         }
       }
       else if (in.type() == typeid(currency::txin_multisig))
@@ -2280,47 +2293,29 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
       }
     }
     
-
-    if (((!sum_of_spent_native_coin && sum_of_received_native_outs) || (currency::is_derivation_used_to_encrypt(tx, derivation) && !sum_of_spent_native_coin)) && !is_tx_expired(tx, tx_expiration_ts_median))
+    //do final calculations
+    bool has_in_transfers = false;
+    bool has_out_transfers = false;
+    for (const auto& bce : ptc.total_balance_change)
     {
-      m_unconfirmed_in_transfers[tx_hash] = tx;
-      if (m_unconfirmed_txs.count(tx_hash))
-        continue;
-
-      //prepare notification about pending transaction
-      wallet_public::wallet_transfer_info& unconfirmed_wti = misc_utils::get_or_insert_value_initialized(m_unconfirmed_txs, tx_hash);
-      unconfirmed_wti.asset_id = native_coin_asset_id; // <-- TODO @#@#
-      unconfirmed_wti.is_income = true;
-      prepare_wti(unconfirmed_wti, 0, m_core_runtime_config.get_core_time(), tx, sum_of_received_native_outs, td);
-      rise_on_transfer2(unconfirmed_wti);
+      if (bce.second > 0)
+      {
+        has_in_transfers = true;
+      }
+      else if (bce.second < 0)
+      {
+        has_out_transfers = true;
+      }
     }
-    else if (sum_of_spent_native_coin || new_multisig_spend_detected)
+    if (!is_tx_expired(tx, tx_expiration_ts_median) && (has_in_transfers || has_out_transfers || (currency::is_derivation_used_to_encrypt(tx, derivation))))
     {
       m_unconfirmed_in_transfers[tx_hash] = tx;
       if (m_unconfirmed_txs.count(tx_hash))
         continue;
-      //outgoing tx that was sent somehow not from this application instance
-      uint64_t amount = 0;
-      /*if (!new_multisig_spend_detected && tx_money_spent_in_ins < sum_of_received_native_outs+get_tx_fee(tx))
-      {
-        WLT_LOG_ERROR("Transaction that get more then send: tx_money_spent_in_ins=" << tx_money_spent_in_ins
-          << ", sum_of_received_native_outs=" << sum_of_received_native_outs << ", tx_id=" << tx_hash);
-      }
-      else*/ if (new_multisig_spend_detected)
-      {
-        amount = 0;
-      }
-      else
-      {
-        amount = sum_of_spent_native_coin - (sum_of_received_native_outs + get_tx_fee(tx));
-      }
 
       //prepare notification about pending transaction
       wallet_public::wallet_transfer_info& unconfirmed_wti = misc_utils::get_or_insert_value_initialized(m_unconfirmed_txs, tx_hash);
-      unconfirmed_wti.asset_id = native_coin_asset_id; // <-- TODO @#@#
-      unconfirmed_wti.is_income = false;
-      prepare_wti(unconfirmed_wti, 0, m_core_runtime_config.get_core_time(), tx, amount, td);
-      //mark transfers as spend to get correct balance
+      make_wti_from_process_transaction_context(unconfirmed_wti, ptc);
       for (auto tr_index : spend_transfers)
       {
         if (tr_index > m_transfers.size())
