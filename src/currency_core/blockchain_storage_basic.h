@@ -147,6 +147,8 @@ namespace currency
     wide_difficulty_type diffic;
     uint64_t height;
     tx_generation_context miner_tx_tgc; // bad design, a lot of copying, consider redesign -- sowle
+    uint64_t block_reward_without_fee;
+    uint64_t txs_fee; // sum of transactions' fee if any
   };
 
   typedef std::unordered_map<crypto::hash, transaction> transactions_map;

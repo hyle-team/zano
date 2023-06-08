@@ -807,7 +807,7 @@ bool zarcanum_block_with_txs::generate(std::vector<test_event_entry>& events) co
 
   // make sure Alice received both block reward and the fee
   uint64_t mined_amount_2 = COIN + fee;
-  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, m_alice_balance + mined_amount_2, 0, mined_amount + mined_amount_2, 0, 0));
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, m_alice_balance + mined_amount_2, UINT64_MAX, mined_amount + mined_amount_2, 0, 0));
   m_alice_balance += mined_amount_2;
 
 

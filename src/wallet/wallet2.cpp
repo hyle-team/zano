@@ -3898,7 +3898,7 @@ bool wallet2::is_in_hardfork_zone(uint64_t hardfork_index) const
   return m_core_runtime_config.is_hardfork_active_for_height(hardfork_index, get_blockchain_current_size());
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::block& b, const pos_entry& pe, currency::tx_generation_context& miner_tx_tgc) const
+bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t full_block_reward, const currency::pos_entry& pe, currency::tx_generation_context& miner_tx_tgc, currency::block& b) const
 {
   bool r = false;
   WLT_CHECK_AND_ASSERT_MES(pe.wallet_index < m_transfers.size(), false, "invalid pe.wallet_index: " << pe.wallet_index);
@@ -4082,9 +4082,8 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
   b.miner_tx.proofs.emplace_back(std::move(range_proofs));
 
   // balance proof
-  uint64_t block_reward = COIN; // TODO @#@# move it somewhere -- sowle
   currency::zc_balance_proof balance_proof{};
-  r = generate_tx_balance_proof(b.miner_tx, miner_tx_id, miner_tx_tgc, block_reward, balance_proof);
+  r = generate_tx_balance_proof(b.miner_tx, miner_tx_id, miner_tx_tgc, full_block_reward, balance_proof);
   WLT_CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
   b.miner_tx.proofs.emplace_back(std::move(balance_proof));
 
@@ -4243,7 +4242,8 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   set_block_datetime(current_timestamp, b);
   WLT_LOG_MAGENTA("Applying actual timestamp: " << current_timestamp, LOG_LEVEL_0);
 
-  res = prepare_and_sign_pos_block(cxt, b, tmpl_req.pe, tmpl_rsp.miner_tx_tgc);
+  uint64_t full_block_reward = tmpl_rsp.block_reward_without_fee + tmpl_rsp.txs_fee;
+  res = prepare_and_sign_pos_block(cxt, full_block_reward, tmpl_req.pe, tmpl_rsp.miner_tx_tgc, b);
   WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to prepare_and_sign_pos_block");
 
   crypto::hash block_hash = get_block_hash(b);

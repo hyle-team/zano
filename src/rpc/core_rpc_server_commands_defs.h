@@ -861,6 +861,8 @@ namespace currency
       blobdata blocktemplate_blob;
       std::string prev_hash;
       tx_generation_context miner_tx_tgc;
+      uint64_t block_reward_without_fee;
+      uint64_t txs_fee;
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -870,6 +872,8 @@ namespace currency
         KV_SERIALIZE(blocktemplate_blob)
         KV_SERIALIZE(prev_hash)
         KV_SERIALIZE(miner_tx_tgc)
+        KV_SERIALIZE(block_reward_without_fee)
+        KV_SERIALIZE(txs_fee)
         KV_SERIALIZE(status)
       END_KV_SERIALIZE_MAP()
     };
