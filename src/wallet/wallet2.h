@@ -391,6 +391,13 @@ namespace tools
       bool is_zc() const { return m_zc_info_ptr.get(); }
       const crypto::public_key& get_asset_id() const { if (m_zc_info_ptr.get()) { return m_zc_info_ptr->asset_id; } else { return currency::native_coin_asset_id; } }
       bool is_native_coin() const { return m_zc_info_ptr.get() ? (m_zc_info_ptr->asset_id == currency::native_coin_asset_id) : true; }
+      bool is_htlc() const { 
+      
+        if (m_ptx_wallet_info->m_tx.vout[m_internal_output_index].type() == typeid(currency::tx_out_bare) &&
+          boost::get<currency::tx_out_bare>(m_ptx_wallet_info->m_tx.vout[m_internal_output_index]).target.type() == typeid(currency::txout_htlc))
+          return true;
+        return false;      
+      }
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_CUSTOM(m_ptx_wallet_info, const transaction_wallet_info&, tools::wallet2::transform_ptr_to_value, tools::wallet2::transform_value_to_ptr)

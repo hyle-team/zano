@@ -199,6 +199,15 @@ namespace wallet_public
       }
       return true;
     }
+    bool has_outgoing_entries()
+    {
+      for (const auto& st : subtransfers)
+      {
+        if (!st.is_income)
+          return true;
+      }
+      return false;
+    }
   };
 
   struct asset_balance_entry_base

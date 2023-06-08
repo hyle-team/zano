@@ -2264,7 +2264,7 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
         {
           ptc.mtd.spent_indices.push_back(i);
           spend_transfers.push_back(tid);
-          ptc.total_balance_change[m_transfers[tid].asset_id] -= m_transfers[tid].amount();
+          ptc.total_balance_change[m_transfers[tid].get_asset_id()] -= m_transfers[tid].amount();
         }
       }
       else if (in.type() == typeid(currency::txin_multisig))
@@ -2273,8 +2273,8 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
         auto it = m_multisig_transfers.find(multisig_id);
         if (it != m_multisig_transfers.end())
         {
-          td.spent_indices.push_back(i);
-          r = unconfirmed_multisig_transfers_from_tx_pool.insert(std::make_pair(multisig_id, std::make_pair(tx, td))).second;
+          ptc.mtd.spent_indices.push_back(i);
+          r = unconfirmed_multisig_transfers_from_tx_pool.insert(std::make_pair(multisig_id, std::make_pair(tx, ptc.mtd))).second;
           if (!r)
           {
             WLT_LOG_RED("Warning: Receiving the same multisig out id from tx pool more then once: " << multisig_id, LOG_LEVEL_0);
@@ -2309,12 +2309,12 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
     }
     if (!is_tx_expired(tx, tx_expiration_ts_median) && (has_in_transfers || has_out_transfers || (currency::is_derivation_used_to_encrypt(tx, derivation))))
     {
-      m_unconfirmed_in_transfers[tx_hash] = tx;
-      if (m_unconfirmed_txs.count(tx_hash))
+      m_unconfirmed_in_transfers[ptc.tx_hash()] = tx;
+      if (m_unconfirmed_txs.count(ptc.tx_hash()))
         continue;
 
       //prepare notification about pending transaction
-      wallet_public::wallet_transfer_info& unconfirmed_wti = misc_utils::get_or_insert_value_initialized(m_unconfirmed_txs, tx_hash);
+      wallet_public::wallet_transfer_info& unconfirmed_wti = misc_utils::get_or_insert_value_initialized(m_unconfirmed_txs, ptc.tx_hash());
       make_wti_from_process_transaction_context(unconfirmed_wti, ptc);
       for (auto tr_index : spend_transfers)
       {
@@ -2325,7 +2325,7 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
         }
         uint32_t flags_before = m_transfers[tr_index].m_flags;
         m_transfers[tr_index].m_flags |= WALLET_TRANSFER_DETAIL_FLAG_SPENT;
-        WLT_LOG_L1("wallet transfer #" << tr_index << " is marked as spent, flags: " << flags_before << " -> " << m_transfers[tr_index].m_flags << ", reason: UNCONFIRMED tx: " << tx_hash);
+        WLT_LOG_L1("wallet transfer #" << tr_index << " is marked as spent, flags: " << flags_before << " -> " << m_transfers[tr_index].m_flags << ", reason: UNCONFIRMED tx: " << ptc.tx_hash());
         unconfirmed_wti.selected_indicies.push_back(tr_index);
       }
       rise_on_transfer2(unconfirmed_wti);
@@ -2415,7 +2415,7 @@ bool wallet2::scan_unconfirmed_outdate_tx()
   std::unordered_set<crypto::key_image> ki_in_unconfirmed;
   for (auto it = m_unconfirmed_txs.begin(); it != m_unconfirmed_txs.end(); it++)
   {
-    if (it->second.is_income)
+    if (!it->second.has_outgoing_entries())
       continue;
 
     for (auto& in : it->second.tx.vin)
@@ -2424,6 +2424,10 @@ bool wallet2::scan_unconfirmed_outdate_tx()
       {
         ki_in_unconfirmed.insert(boost::get<txin_to_key>(in).k_image);
       }
+      else if (in.type() == typeid(txin_zc_input))
+      {
+        ki_in_unconfirmed.insert(boost::get<txin_zc_input>(in).k_image);
+      }
     }
   }
 
@@ -2431,13 +2435,9 @@ bool wallet2::scan_unconfirmed_outdate_tx()
   for (size_t i = 0; i != sz; i++)
   {
     auto& t = m_transfers[i];
-
-    if (t.m_flags&WALLET_TRANSFER_DETAIL_FLAG_SPENT 
-      && !t.m_spent_height 
-      && !static_cast<bool>(t.m_flags&WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION)
-      && t.m_ptx_wallet_info->m_tx.vout[t.m_internal_output_index].type() == typeid(tx_out_bare)
-      && boost::get<tx_out_bare>(t.m_ptx_wallet_info->m_tx.vout[t.m_internal_output_index]).target.type() != typeid(txout_htlc)
-      )
+  
+    if (t.m_flags&WALLET_TRANSFER_DETAIL_FLAG_SPENT  && !t.m_spent_height && !static_cast<bool>(t.m_flags&WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION)
+          && !t.is_htlc())
     {
       //check if there is unconfirmed for this transfer is no longer exist?
       if (!ki_in_unconfirmed.count((t.m_key_image)))
@@ -2447,7 +2447,6 @@ bool wallet2::scan_unconfirmed_outdate_tx()
         WLT_LOG_BLUE("Transfer [" << i << "] marked as unspent, flags: " << flags_before << " -> " << t.m_flags << ", reason: there is no unconfirmed tx relataed to this key image", LOG_LEVEL_0);
       }
     }
-
   }
   
   return true;
@@ -3266,19 +3265,22 @@ bool wallet2::balance(std::unordered_map<crypto::public_key, wallet_public::asse
 
   for(auto& utx : m_unconfirmed_txs)
   {
-    wallet_public::asset_balance_entry_base& e = balances[utx.second.asset_id];
-    if (utx.second.is_income)
+    for (auto& subtransfer : utx.second.subtransfers)
     {
-      e.total += utx.second.amount;
-      e.awaiting_in += utx.second.amount;
-    }
-    else
-    {
-      //collect change in unconfirmed outgoing transactions
-      for (auto r : utx.second.td.rcv)
-        e.total += r;
+      wallet_public::asset_balance_entry_base& e = balances[subtransfer.asset_id];
+      if (subtransfer.is_income)
+      {
+        e.total += subtransfer.amount;
+        e.awaiting_in += subtransfer.amount;
+      }
+      else
+      {
+        //collect change in unconfirmed outgoing transactions
+        for (auto r : utx.second.td.rcv)
+          e.total += r;
 
-      e.awaiting_out += utx.second.amount;
+        e.awaiting_out += subtransfer.amount;
+      }
     }
   }
 
