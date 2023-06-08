@@ -11,8 +11,6 @@
 #include "pos_block_builder.h"
 
 
-#define  AMOUNT_TO_TRANSFER_ZARCANUM_BASIC (TESTS_DEFAULT_FEE*10)
-
 using namespace currency;
 
 //------------------------------------------------------------------------------
@@ -53,6 +51,48 @@ bool invalidate_zarcanum_sig(size_t n, zarcanum_sig& sig)
   case 13: sig.y4.make_random();                                  break;
   default:                                                        return false;
   }
+  return true;
+}
+
+bool make_next_pos_block(test_generator& generator, std::vector<test_event_entry>& events, const block& prev_block, const account_base& stake_acc,
+  uint64_t amount_to_find, size_t nmix, const std::vector<transaction>& transactions, block& result)
+{
+  bool r = false;
+  std::vector<tx_source_entry> sources;
+
+  size_t height = get_block_height(prev_block) + 1;
+  crypto::hash prev_id = get_block_hash(prev_block);
+  r = fill_tx_sources(sources, events, prev_block, stake_acc.get_keys(), amount_to_find, nmix, true, true, false);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
+  CHECK_AND_ASSERT_MES(shuffle_source_entries(sources), false, "");
+  auto it = std::max_element(sources.begin(), sources.end(), [&](const tx_source_entry& lhs, const tx_source_entry& rhs){ return lhs.amount < rhs.amount; });
+  const tx_source_entry& se = *it;
+  const tx_source_entry::output_entry& oe = se.outputs[se.real_output];
+
+  crypto::key_image stake_output_key_image  {};
+  currency::keypair ephemeral_keys          {};
+  r = generate_key_image_helper(stake_acc.get_keys(), se.real_out_tx_key, se.real_output_in_tx_index, ephemeral_keys, stake_output_key_image);
+  CHECK_AND_ASSERT_MES(r, false, "generate_key_image_helper failed");
+  uint64_t stake_output_gindex = boost::get<uint64_t>(oe.out_reference);
+
+  currency::wide_difficulty_type pos_diff{};
+  crypto::hash last_pow_block_hash{}, last_pos_block_kernel_hash{};
+  r = generator.get_params_for_next_pos_block(prev_id, pos_diff, last_pow_block_hash, last_pos_block_kernel_hash);
+  CHECK_AND_ASSERT_MES(r, false, "get_params_for_next_pos_block failed");
+
+  pos_block_builder pb;
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
+  pb.step2_set_txs(transactions);
+
+  pb.step3a(pos_diff, last_pow_block_hash, last_pos_block_kernel_hash);
+
+  pb.step3b(se.amount, stake_output_key_image, se.real_out_tx_key, se.real_output_in_tx_index, se.real_out_amount_blinding_mask, stake_acc.get_keys().view_secret_key,
+    stake_output_gindex, prev_block.timestamp, POS_SCAN_WINDOW, POS_SCAN_STEP);
+
+  pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), stake_acc.get_public_address());
+
+  pb.step5_sign(se, stake_acc.get_keys());
+  result = pb.m_block;
   return true;
 }
 
@@ -110,7 +150,7 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
   //create transfer from pre-zarcanum inputs to post-zarcanum inputs
-  uint64_t transfer_amount = AMOUNT_TO_TRANSFER_ZARCANUM_BASIC + TESTS_DEFAULT_FEE;
+  uint64_t transfer_amount = TESTS_DEFAULT_FEE*10 + TESTS_DEFAULT_FEE;
   const size_t batches_to_Alice_count = 4;
   for(size_t i = 0; i < batches_to_Alice_count; ++i)
   {
@@ -131,7 +171,7 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", transfer_amount * batches_to_Alice_count, UINT64_MAX, transfer_amount * batches_to_Alice_count), false, "");
 
   //create transfer from post-zarcanum inputs to post-zarcanum inputs with mixins
-  uint64_t transfer_amount2 = AMOUNT_TO_TRANSFER_ZARCANUM_BASIC;
+  uint64_t transfer_amount2 = TESTS_DEFAULT_FEE*10;
   size_t nmix = 10;
   alice_wlt->transfer(transfer_amount2, nmix, m_accounts[BOB_ACC_IDX].get_public_address());
   LOG_PRINT_MAGENTA("Zarcanum-2-zarcanum transaction sent from Alice to Bob " << print_money_brief(transfer_amount2), LOG_LEVEL_0);
@@ -380,48 +420,6 @@ zarcanum_pos_block_math::zarcanum_pos_block_math()
   m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 0);
 }
 
-bool make_next_pos_block(test_generator& generator, std::vector<test_event_entry>& events, const block& prev_block, const account_base& stake_acc,
-  uint64_t amount_to_find, size_t nmix, block& result)
-{
-  bool r = false;
-  std::vector<tx_source_entry> sources;
-
-  size_t height = get_block_height(prev_block) + 1;
-  crypto::hash prev_id = get_block_hash(prev_block);
-  r = fill_tx_sources(sources, events, prev_block, stake_acc.get_keys(), amount_to_find, nmix, true, true, false);
-  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
-  CHECK_AND_ASSERT_MES(shuffle_source_entries(sources), false, "");
-  auto it = std::max_element(sources.begin(), sources.end(), [&](const tx_source_entry& lhs, const tx_source_entry& rhs){ return lhs.amount < rhs.amount; });
-  const tx_source_entry& se = *it;
-  const tx_source_entry::output_entry& oe = se.outputs[se.real_output];
-
-  crypto::key_image stake_output_key_image  {};
-  currency::keypair ephemeral_keys          {};
-  r = generate_key_image_helper(stake_acc.get_keys(), se.real_out_tx_key, se.real_output_in_tx_index, ephemeral_keys, stake_output_key_image);
-  CHECK_AND_ASSERT_MES(r, false, "generate_key_image_helper failed");
-  uint64_t stake_output_gindex = boost::get<uint64_t>(oe.out_reference);
-
-  currency::wide_difficulty_type pos_diff{};
-  crypto::hash last_pow_block_hash{}, last_pos_block_kernel_hash{};
-  r = generator.get_params_for_next_pos_block(prev_id, pos_diff, last_pow_block_hash, last_pos_block_kernel_hash);
-  CHECK_AND_ASSERT_MES(r, false, "get_params_for_next_pos_block failed");
-
-  pos_block_builder pb;
-  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
-  pb.step2_set_txs(std::vector<transaction>());
-
-  pb.step3a(pos_diff, last_pow_block_hash, last_pos_block_kernel_hash);
-
-  pb.step3b(se.amount, stake_output_key_image, se.real_out_tx_key, se.real_output_in_tx_index, se.real_out_amount_blinding_mask, stake_acc.get_keys().view_secret_key,
-    stake_output_gindex, prev_block.timestamp, POS_SCAN_WINDOW, POS_SCAN_STEP);
-
-  pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), stake_acc.get_public_address());
-    
-  pb.step5_sign(se, stake_acc.get_keys());
-  result = pb.m_block;
-  return true;
-}
-
 bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) const
 {
   bool r = false;
@@ -439,7 +437,7 @@ bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) co
   for(size_t i = 1; ; ++i)
   {
     block blk_1_pos_bad;
-    CHECK_AND_ASSERT_MES(make_next_pos_block(generator, events, blk_1r, miner_acc, COIN, 10, blk_1_pos_bad), false, "");
+    CHECK_AND_ASSERT_MES(make_next_pos_block(generator, events, blk_1r, miner_acc, COIN, 10, std::vector<transaction>(), blk_1_pos_bad), false, "");
     LOG_PRINT_CYAN("i = " << i, LOG_LEVEL_0);
     if (!invalidate_zarcanum_sig(i, boost::get<zarcanum_sig>(blk_1_pos_bad.miner_tx.signatures[0])))
       break;
@@ -734,3 +732,90 @@ bool zarcanum_in_alt_chain::c1(currency::core& c, size_t ev_index, const std::ve
   return true;
 }
 
+//------------------------------------------------------------------------------
+
+zarcanum_block_with_txs::zarcanum_block_with_txs()
+{
+  REGISTER_CALLBACK_METHOD(zarcanum_block_with_txs, c1);
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_03,           0);
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 23);
+}
+
+bool zarcanum_block_with_txs::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure Zarcanum PoS block can have txs and the sum of fees is correctly added to the block reward
+
+  bool r = false;
+
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc =   m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  //
+  // before HF4
+  //
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active",   static_cast<size_t>(ZANO_HARDFORK_03));
+  DO_CALLBACK_PARAMS(events, "check_hardfork_inactive", static_cast<size_t>(ZANO_HARDFORK_04_ZARCANUM));
+
+  // transfer few coins to Alice (one UTXO)
+  m_alice_balance = MK_TEST_COINS(100);
+  MAKE_TX(events, tx_0, miner_acc, alice_acc, m_alice_balance, blk_0r);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+
+  // rewind blocks and make sure Alice has received the coins
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, m_alice_balance, m_alice_balance, 0, 0, 0));
+
+  // then miner sends few coins to Bob via a tx with a big fee amount
+  std::list<currency::account_base> alice_stake_sources({ alice_acc });
+  uint64_t fee = MK_TEST_COINS(123);
+  MAKE_TX_FEE(events, tx_1, miner_acc, bob_acc, MK_TEST_COINS(1000), fee, blk_1r);
+
+  // and Alice mines a PoS block with this tx -- so Alice is expected to receive the fee
+  MAKE_NEXT_POS_BLOCK_TX1(events, blk_2, blk_1r, alice_acc, alice_stake_sources, tx_1);
+
+  // make sure Alice received both block reward and the fee
+  uint64_t mined_amount = COIN + fee;
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, m_alice_balance + mined_amount, 0, mined_amount, 0, 0));
+  m_alice_balance += mined_amount;
+
+  //
+  // after HF4
+  //
+  MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_04_ZARCANUM));
+
+  MAKE_TX(events, tx_2, miner_acc, alice_acc, MK_TEST_COINS(200), blk_3);
+  MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_2);
+  m_alice_balance += MK_TEST_COINS(200);
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_4r, blk_4, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, m_alice_balance, m_alice_balance, mined_amount, 0, 0));
+
+  // then miner sends few coins to Bob via a tx with a big fee amount
+  fee = MK_TEST_COINS(456);
+  MAKE_TX_FEE(events, tx_3, miner_acc, bob_acc, MK_TEST_COINS(1000), fee, blk_4r);
+
+  // and Alice mines a PoS block with this tx -- so Alice is expected to receive the fee
+  MAKE_NEXT_POS_BLOCK_TX1(events, blk_5, blk_4r, alice_acc, alice_stake_sources, tx_3);
+
+  // make sure Alice received both block reward and the fee
+  uint64_t mined_amount_2 = COIN + fee;
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, m_alice_balance + mined_amount_2, 0, mined_amount + mined_amount_2, 0, 0));
+  m_alice_balance += mined_amount_2;
+
+
+
+  return true;
+}
+
+bool zarcanum_block_with_txs::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  return true;
+}

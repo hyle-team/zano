@@ -44,3 +44,12 @@ struct zarcanum_in_alt_chain : public wallet_test
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
+struct zarcanum_block_with_txs : public wallet_test
+{
+  zarcanum_block_with_txs();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  mutable uint64_t m_alice_balance = 0;
+};
+
