@@ -17,6 +17,8 @@ struct wallet_test : virtual public test_chain_unit_enchanced
   bool check_balance_via_build_wallets(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_balance(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
+  void on_test_constructed() override { on_test_generator_created(this->generator); }
+
   static std::string get_test_account_name_by_id(size_t acc_id);
 
 protected:

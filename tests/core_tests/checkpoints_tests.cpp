@@ -669,11 +669,6 @@ bool gen_checkpoints_pos_validation_on_altchain::init_runtime_config(currency::c
 
 gen_no_attchments_in_coinbase::gen_no_attchments_in_coinbase()
 {
-  m_hardforks.m_height_the_hardfork_n_active_after[1] = 1440;
-  m_hardforks.m_height_the_hardfork_n_active_after[2] = 1800;
-  m_hardforks.m_height_the_hardfork_n_active_after[3] = 1801;
-  m_hardforks.m_height_the_hardfork_n_active_after[4] = 50000000000;
-  generator.set_hardforks(m_hardforks);
   // NOTE: This test is made deterministic to be able to correctly set up checkpoint.
   random_state_test_restorer::reset_random(); // random generator's state was previously stored, will be restore on dtor (see also m_random_state_test_restorer)
 
@@ -692,6 +687,7 @@ bool gen_no_attchments_in_coinbase::generate(std::vector<test_event_entry>& even
   block blk_0 = AUTO_VAL_INIT(blk_0);
   generator.construct_genesis_block(blk_0, m_miner_acc, ts);
   events.push_back(blk_0);
+  DO_CALLBACK(events, "configure_core");
 
   DO_CALLBACK(events, "check_not_being_in_cp_zone");
   DO_CALLBACK(events, "init_config_set_cp");
@@ -708,7 +704,7 @@ bool gen_no_attchments_in_coinbase::init_config_set_cp(currency::core& c, size_t
   crc.pos_minimum_heigh = 1;
   c.get_blockchain_storage().set_core_runtime_config(crc);
 
-  m_checkpoints.add_checkpoint(12, "2a6e13df811eccce121c0de4dbdcc640de1d37c8459c2c8ea02af39717779836");
+  m_checkpoints.add_checkpoint(12, "475331fb4a325e722ddbc2d087d32687a58392e5a9314001120de0f2ce7737f2");
   c.set_checkpoints(currency::checkpoints(m_checkpoints));
 
   return true;
