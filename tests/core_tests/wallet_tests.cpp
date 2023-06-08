@@ -3402,7 +3402,7 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
   miner_wlt->refresh(blocks_fetched, received_money, atomic_false);
   CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5, false, "Incorrect numbers of blocks fetched");
   
-  miner_wlt->set_pos_mint_packing_size(4);
+  miner_wlt->set_pos_min_utxo_count_for_defragmentation_tx(4);
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*miner_wlt.get(), "miner_wlt", m_premine_amount + m_mined_amount, uint64_max, uint64_max, 0, 0), false, "");
 
   miner_wlt->try_mint_pos();
