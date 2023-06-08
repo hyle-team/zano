@@ -965,6 +965,7 @@ bool test_generator::init_test_wallet(const currency::account_base& account, con
   crc.get_core_time = test_core_time::get_time;
   crc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
   crc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
+  crc.hard_forks        = m_hardforks;
 
   std::shared_ptr<tools::wallet2> w(new tools::wallet2);
   w->set_core_runtime_config(crc);
@@ -1460,21 +1461,21 @@ bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& event
 
   uint64_t inputs_amount = get_inputs_amount(sources);
   CHECK_AND_ASSERT_MES(inputs_amount >= amount + fee, false, "Pre-condition fail: inputs_amount is less than amount + fee");
-  uint64_t cache_back = inputs_amount - (amount + fee);
+  uint64_t change_amount = inputs_amount - (amount + fee);
 
   if (b_multisig)
   {
     destinations.push_back(tx_destination_entry(amount, to));
     if (minimum_sigs != SIZE_MAX)
       destinations.back().minimum_sigs = minimum_sigs; // set custom minimum_sigs only if != SIZE_MAX, use default in tx_destination_entry::ctor() otherwise
-    if (cache_back > 0)
-      destinations.push_back(tx_destination_entry(cache_back, from.account_address));
+    if (change_amount > 0)
+      destinations.push_back(tx_destination_entry(change_amount, from.account_address));
   }
   else
   {
     tx_destination_entry change_dst = AUTO_VAL_INIT(change_dst);
-    if (cache_back > 0)
-      change_dst = tx_destination_entry(cache_back, from.account_address);
+    if (change_amount > 0)
+      change_dst = tx_destination_entry(change_amount, from.account_address);
     std::vector<tx_destination_entry> dsts(1, tx_destination_entry(amount, to.back()));
     uint64_t dust = 0;
     const test_gentime_settings& tgs = test_generator::get_test_gentime_settings();
@@ -1491,13 +1492,19 @@ bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& event
       break;
     case tests_random_split_strategy:
       {
-        size_t outs_count = cache_back > 0 ? 2 : 1;
+        size_t outs_count = change_amount > 0 ? 2 : 1;
         if (outs_count < tgs.rss_min_number_of_outputs)
         {
-          // decompose both target and cache back amounts
+          // decompose both target and change amounts
           // TODO: support tgs.tx_max_out_amount
-          decompose_amount_randomly(amount,     [&](uint64_t a){ destinations.emplace_back(a, to.back()); },            tgs.rss_min_number_of_outputs, tgs.rss_num_digits_to_keep);
-          decompose_amount_randomly(cache_back, [&](uint64_t a){ destinations.emplace_back(a, from.account_address); }, tgs.rss_min_number_of_outputs, tgs.rss_num_digits_to_keep);
+          decompose_amount_randomly(amount,        [&](uint64_t a){ destinations.emplace_back(a, to.back()); },            tgs.rss_min_number_of_outputs, tgs.rss_num_digits_to_keep);
+          decompose_amount_randomly(change_amount, [&](uint64_t a){ destinations.emplace_back(a, from.account_address); }, tgs.rss_min_number_of_outputs, tgs.rss_num_digits_to_keep);
+        }
+        else
+        {
+          CHECK_AND_ASSERT_MES(change_amount > 0, false, "internal error: change_amount is zero");
+          destinations = dsts;
+          destinations.push_back(change_dst);
         }
       }
       break;

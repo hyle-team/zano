@@ -13,7 +13,7 @@ namespace currency
 {
   struct hard_forks_descriptor
   {
-    constexpr static size_t m_total_count = 5;
+    constexpr static size_t m_total_count = ZANO_HARDFORKS_TOTAL;
     std::array<uint64_t, m_total_count> m_height_the_hardfork_n_active_after;
 
     hard_forks_descriptor()
@@ -80,6 +80,16 @@ namespace currency
     uint8_t get_block_minor_version_by_height(uint64_t height) const
     {
        return HF3_BLOCK_MINOR_VERSION;
+    }
+
+    bool operator==(const hard_forks_descriptor& rhs) const
+    {
+      return m_height_the_hardfork_n_active_after == rhs.m_height_the_hardfork_n_active_after;
+    }
+
+    bool operator!=(const hard_forks_descriptor& rhs) const
+    {
+      return ! operator==(rhs);
     }
   };
 

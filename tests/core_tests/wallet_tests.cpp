@@ -432,7 +432,7 @@ bool gen_wallet_unconfirmed_tx_from_tx_pool::generate(std::vector<test_event_ent
 gen_wallet_save_load_and_balance::gen_wallet_save_load_and_balance()
 {
   REGISTER_CALLBACK_METHOD(gen_wallet_save_load_and_balance, c1_check_balance_and_store);
-  REGISTER_CALLBACK_METHOD(gen_wallet_save_load_and_balance, c2_load_refresh_check_balance);
+  REGISTER_CALLBACK_METHOD(gen_wallet_save_load_and_balance, c2);
   REGISTER_CALLBACK_METHOD(gen_wallet_save_load_and_balance, c3_load_refresh_check_balance);
 }
 
@@ -450,6 +450,8 @@ bool gen_wallet_save_load_and_balance::generate(std::vector<test_event_entry>& e
   currency::block blk_0 = AUTO_VAL_INIT(blk_0);
   generator.construct_genesis_block(blk_0, miner_acc, test_core_time::get_time());
   events.push_back(blk_0);
+
+  DO_CALLBACK(events, "configure_core");
 
   // create gen-time test wallets for accounts
   CREATE_TEST_WALLET(miner_wlt, miner_acc, blk_0);
@@ -473,7 +475,7 @@ bool gen_wallet_save_load_and_balance::generate(std::vector<test_event_entry>& e
   // put the transaction into a block
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
 
-  //  0       10      11      21     22    <- blockchain height (assuming CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10)
+  //  0       10      11      21     23    <- blockchain height (assuming CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10)
   // (0 )... (0r)-   (1 )... (1r)-         <- main chain
   //                 tx_0                  <- txs
   //            \-   (2 )...........(2r)   <- alt chain
@@ -487,12 +489,12 @@ bool gen_wallet_save_load_and_balance::generate(std::vector<test_event_entry>& e
   if (!check_balance_via_wallet(*alice_wlt.get(), "alice", MK_TEST_COINS(2000), 0, MK_TEST_COINS(2000), 0, 0))
     return false;
 
-  // load wallet from file and re-chech the balance
-  DO_CALLBACK(events, "c2_load_refresh_check_balance");
+  // load wallet from file, re-chech the balance, store, load again, re-reck again, make tx, make block, check balance, store wallet
+  DO_CALLBACK(events, "c2");
 
   // switch the chain, reload and re-check the wallet
-  REWIND_BLOCKS_N_WITH_TIME(events, blk_2r, blk_0r, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE + 2);
-  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_2r, WALLET_DEFAULT_TX_SPENDABLE_AGE + 2);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_2r, blk_0r, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE + 3);
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_2r, WALLET_DEFAULT_TX_SPENDABLE_AGE + 3);
   alice_wlt->scan_tx_pool(has_aliases);
   if (!check_balance_via_wallet(*alice_wlt.get(), "alice", MK_TEST_COINS(2000), 0, 0, MK_TEST_COINS(2000), 0)) // tx_0 moved to the pool, so its money in "awaiting_in" bucket
     return false;
@@ -513,7 +515,7 @@ bool gen_wallet_save_load_and_balance::c1_check_balance_and_store(currency::core
   bool has_alias;
   alice_wlt->scan_tx_pool(has_alias);
 
-  check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(2000), 0, 0, MK_TEST_COINS(2000), 0);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(2000), 0, 0, MK_TEST_COINS(2000), 0), false, "");
 
   alice_wlt->reset_password(g_wallet_password);
   alice_wlt->store(g_wallet_filename);
@@ -521,11 +523,12 @@ bool gen_wallet_save_load_and_balance::c1_check_balance_and_store(currency::core
   return true;
 }
 
-bool gen_wallet_save_load_and_balance::c2_load_refresh_check_balance(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+bool gen_wallet_save_load_and_balance::c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   std::shared_ptr<tools::wallet2> alice_wlt(new tools::wallet2);
   alice_wlt->load(g_wallet_filename, g_wallet_password);
   alice_wlt->set_core_proxy(m_core_proxy);
+  alice_wlt->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
 
   size_t blocks_fetched = 0;
   bool received_money;
@@ -533,7 +536,25 @@ bool gen_wallet_save_load_and_balance::c2_load_refresh_check_balance(currency::c
   alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
   CHECK_AND_ASSERT_MES(blocks_fetched == WALLET_DEFAULT_TX_SPENDABLE_AGE + 1, false, "Incorrect numbers of blocks fetched");
 
-  check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(2000), 0, MK_TEST_COINS(2000), 0, 0);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(2000), 0, MK_TEST_COINS(2000), 0, 0), false, "");
+  alice_wlt->store(g_wallet_filename);
+
+  ////// save - load ////////
+
+  alice_wlt.reset(new tools::wallet2);
+  alice_wlt->load(g_wallet_filename, g_wallet_password);
+  alice_wlt->set_core_proxy(m_core_proxy);
+  alice_wlt->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(2000), 0, MK_TEST_COINS(2000), 0, 0), false, "");
+
+  alice_wlt->transfer(MK_TEST_COINS(1000) - TESTS_DEFAULT_FEE, m_accounts[MINER_ACC_IDX].get_public_address());
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(1000), 0, 0, 0, MK_TEST_COINS(1000) - TESTS_DEFAULT_FEE), false, "");
+
+  bool r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool is not empty: " << c.get_pool_transactions_count());
 
   alice_wlt->store(g_wallet_filename);
 
@@ -545,17 +566,18 @@ bool gen_wallet_save_load_and_balance::c3_load_refresh_check_balance(currency::c
   std::shared_ptr<tools::wallet2> alice_wlt(new tools::wallet2);
   alice_wlt->load(g_wallet_filename, g_wallet_password);
   alice_wlt->set_core_proxy(m_core_proxy);
+  alice_wlt->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
 
   size_t blocks_fetched = 0;
   bool received_money;
   std::atomic<bool> atomic_false = ATOMIC_VAR_INIT(false);
   alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
-  CHECK_AND_ASSERT_MES(blocks_fetched == WALLET_DEFAULT_TX_SPENDABLE_AGE + 2, false, "Incorrect numbers of blocks fetched");
+  CHECK_AND_ASSERT_MES(blocks_fetched == WALLET_DEFAULT_TX_SPENDABLE_AGE + 3, false, "Incorrect numbers of blocks fetched");
 
   bool has_alias;
   alice_wlt->scan_tx_pool(has_alias);
 
-  check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(2000), 0, 0, MK_TEST_COINS(2000), 0);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(3000), 0, 0, MK_TEST_COINS(2000), MK_TEST_COINS(1000) - TESTS_DEFAULT_FEE), false, "");
 
   return true;
 }
@@ -565,7 +587,6 @@ bool gen_wallet_save_load_and_balance::c3_load_refresh_check_balance(currency::c
 gen_wallet_mine_pos_block::gen_wallet_mine_pos_block()
 {
   REGISTER_CALLBACK_METHOD(gen_wallet_mine_pos_block, c1);
-  REGISTER_CALLBACK_METHOD(gen_wallet_mine_pos_block, set_core_config);
 }
 
 bool gen_wallet_mine_pos_block::generate(std::vector<test_event_entry>& events) const
@@ -585,7 +606,7 @@ bool gen_wallet_mine_pos_block::generate(std::vector<test_event_entry>& events) 
   generator.construct_genesis_block(blk_0, miner_acc, test_core_time::get_time());
   events.push_back(blk_0);
 
-  DO_CALLBACK(events, "set_core_config");
+  DO_CALLBACK(events, "configure_core");
 
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
@@ -598,15 +619,6 @@ bool gen_wallet_mine_pos_block::generate(std::vector<test_event_entry>& events) 
   return true;
 }
 
-bool gen_wallet_mine_pos_block::set_core_config(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
-  core_runtime_config crc = c.get_blockchain_storage().get_core_runtime_config();
-  crc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
-  crc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
-  c.get_blockchain_storage().set_core_runtime_config(crc);
-  return true;
-}
-
 bool gen_wallet_mine_pos_block::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
@@ -616,7 +628,7 @@ bool gen_wallet_mine_pos_block::c1(currency::core& c, size_t ev_index, const std
   alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
   CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + WALLET_DEFAULT_TX_SPENDABLE_AGE + 1, false, "Incorrect numbers of blocks fetched");
 
-  check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(2000), 0, MK_TEST_COINS(2000), 0, 0);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(2000), 0, MK_TEST_COINS(2000), 0, 0), false, "");
 
   alice_wlt->try_mint_pos();
 
@@ -628,7 +640,7 @@ bool gen_wallet_mine_pos_block::c1(currency::core& c, size_t ev_index, const std
   bool r = c.get_blockchain_storage().get_top_block(top_block);
   CHECK_AND_ASSERT_MES(r && is_pos_block(top_block), false, "get_top_block failed or smth goes wrong");
   uint64_t top_block_reward = get_outs_money_amount(top_block.miner_tx);
-  check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", uint64_max, MK_TEST_COINS(2000) + top_block_reward, 0, 0, 0);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", top_block_reward, top_block_reward - MK_TEST_COINS(2000), 0, 0, 0), false, "");
 
   alice_wlt->reset_password(g_wallet_password);
   alice_wlt->store(g_wallet_filename);
@@ -3339,8 +3351,8 @@ bool wallet_unconfimed_tx_balance::c1(currency::core& c, size_t ev_index, const 
 packing_outputs_on_pos_minting_wallet::packing_outputs_on_pos_minting_wallet()
 {
   REGISTER_CALLBACK_METHOD(packing_outputs_on_pos_minting_wallet, c1);
-  REGISTER_CALLBACK_METHOD(packing_outputs_on_pos_minting_wallet, set_core_config);
 }
+
 bool packing_outputs_on_pos_minting_wallet::generate(std::vector<test_event_entry>& events) const
 {
 
@@ -3358,9 +3370,19 @@ bool packing_outputs_on_pos_minting_wallet::generate(std::vector<test_event_entr
   generator.construct_genesis_block(blk_0, miner_acc, test_core_time::get_time());
   events.push_back(blk_0);
 
-  DO_CALLBACK(events, "set_core_config");
+  DO_CALLBACK(events, "configure_core");
 
-  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW+5);
+  CREATE_TEST_WALLET(miner_wlt, miner_acc, blk_0);
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, miner_wlt, blk_0, 0);
+  uint64_t unlocked, awaiting_in, awaiting_out, mined;
+  m_premine_amount = miner_wlt->balance(unlocked, awaiting_in, awaiting_out, mined);
+
+  size_t n_blocks = CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5;
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, n_blocks);
+  m_mined_amount = n_blocks * COIN;
+
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, miner_wlt, blk_0r, n_blocks);
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(miner_wlt, m_premine_amount + m_mined_amount);
 
   //MAKE_TX_FEE(events, tx_0, miner_acc, alice_acc, MK_TEST_COINS(2000), TESTS_DEFAULT_FEE, blk_0r);
   //MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
@@ -3368,15 +3390,6 @@ bool packing_outputs_on_pos_minting_wallet::generate(std::vector<test_event_entr
 
   DO_CALLBACK(events, "c1");
 
-  return true;
-}
-
-bool packing_outputs_on_pos_minting_wallet::set_core_config(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
-  core_runtime_config crc = c.get_blockchain_storage().get_core_runtime_config();
-  crc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
-  crc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
-  c.get_blockchain_storage().set_core_runtime_config(crc);
   return true;
 }
 
@@ -3390,7 +3403,7 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
   CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5, false, "Incorrect numbers of blocks fetched");
   
   miner_wlt->set_pos_mint_packing_size(4);
-  check_balance_via_wallet(*miner_wlt.get(), "miner_wlt", MK_TEST_COINS(2000), 0, MK_TEST_COINS(2000), 0, 0);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*miner_wlt.get(), "miner_wlt", m_premine_amount + m_mined_amount, uint64_max, uint64_max, 0, 0), false, "");
 
   miner_wlt->try_mint_pos();
 
@@ -3402,7 +3415,7 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
   bool r = c.get_blockchain_storage().get_top_block(top_block);
   CHECK_AND_ASSERT_MES(r && is_pos_block(top_block), false, "get_top_block failed or smth goes wrong");
   uint64_t top_block_reward = get_outs_money_amount(top_block.miner_tx);
-  check_balance_via_wallet(*miner_wlt.get(), "miner_wlt", uint64_max, MK_TEST_COINS(2000) + top_block_reward, 0, 0, 0);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*miner_wlt.get(), "miner_wlt", m_premine_amount + m_mined_amount + COIN), false, "");
 
   miner_wlt->reset_password(g_wallet_password);
   miner_wlt->store(g_wallet_filename);

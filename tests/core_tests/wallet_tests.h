@@ -34,7 +34,7 @@ struct gen_wallet_save_load_and_balance : public wallet_test
 
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1_check_balance_and_store(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
-  bool c2_load_refresh_check_balance(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool c3_load_refresh_check_balance(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
@@ -44,7 +44,6 @@ struct gen_wallet_mine_pos_block : public wallet_test
   gen_wallet_mine_pos_block();
 
   bool generate(std::vector<test_event_entry>& events) const;
-  bool set_core_config(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
@@ -256,8 +255,10 @@ struct packing_outputs_on_pos_minting_wallet : public wallet_test
 {
   packing_outputs_on_pos_minting_wallet();
   bool generate(std::vector<test_event_entry>& events) const;
-  bool set_core_config(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  mutable uint64_t m_premine_amount = 0;
+  mutable uint64_t m_mined_amount = 0;
 };
 
 struct wallet_sending_to_integrated_address : public wallet_test

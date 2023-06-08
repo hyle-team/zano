@@ -225,7 +225,7 @@ VARIANT_TAG(binary_archive, core_hardforks_config, 0xd2);
 typedef boost::variant<currency::block, currency::transaction, currency::account_base, callback_entry, serialized_block, serialized_transaction, event_visitor_settings, event_special_block, event_core_time, core_hardforks_config> test_event_entry;
 typedef std::unordered_map<crypto::hash, const currency::transaction*> map_hash2tx_t;
 
-enum test_tx_split_strategy { tests_void_split_strategy, tests_null_split_strategy, tests_digits_split_strategy, tests_random_split_strategy };
+enum test_tx_split_strategy { tests_default_split_strategy /*height-based, TODO*/, tests_void_split_strategy, tests_null_split_strategy, tests_digits_split_strategy, tests_random_split_strategy };
 struct test_gentime_settings
 {
   test_tx_split_strategy  split_strategy            = tests_digits_split_strategy;
@@ -255,11 +255,14 @@ public:
   void set_core_proxy(std::shared_ptr<tools::i_core_proxy>) { /* do nothing */ }
   uint64_t get_tx_version_from_events(const std::vector<test_event_entry> &events) const;
 
+  virtual void on_test_constructed() {} // called right after test class is constructed by the chaingen 
   void on_test_generator_created(test_generator& generator) const; // tests can override this for special initialization
   
   currency::core_runtime_config get_runtime_info_for_core() const; // tests can override this for special initialization
 
   void set_hardforks_for_old_tests();
+  currency::hard_forks_descriptor& get_hardforks() { return m_hardforks; }
+  const currency::hard_forks_descriptor& get_hardforks() const { return m_hardforks; }
 
 private:
   callbacks_map m_callbacks;
