@@ -51,8 +51,9 @@ using namespace currency;
 
 #define MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES (100*1024*1024) // 100 MB
 
-#define WALLET_DEFAULT_DECOYS_COUNT_FOR_DEFRAGMENTATION_TX            10 // TODO @#@# change to default decoy set number
+#define WALLET_DEFAULT_DECOYS_COUNT_FOR_DEFRAGMENTATION_TX            10  // TODO @#@# change to default decoy set number
 #define WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX                  100 // TODO: @#@# consider descreasing to mimic normal tx
+#define WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX                  100 // TODO: @#@# consider descreasing to mimic normal tx
 
 #undef LOG_DEFAULT_CHANNEL
 #define LOG_DEFAULT_CHANNEL "wallet"
@@ -73,6 +74,7 @@ namespace tools
     , m_last_pow_block_h(0)
     , m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST)
     , m_min_utxo_count_for_defragmentation_tx(WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX)
+    , m_max_utxo_count_for_defragmentation_tx(WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX)
     , m_decoys_count_for_defragmentation_tx(WALLET_DEFAULT_DECOYS_COUNT_FOR_DEFRAGMENTATION_TX)
     , m_current_wallet_file_size(0)
     , m_use_deffered_global_outputs(false)
@@ -3372,8 +3374,16 @@ bool wallet2::generate_utxo_defragmentation_transaction_if_needed(currency::tran
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.create_utxo_defragmentation_tx = true;
    
-  TRY_ENTRY();
-  transfer(ctp, tx, false, nullptr);
+  try
+  {
+    transfer(ctp, tx, false, nullptr);
+  }
+  catch(error::wallet_error& we)
+  {
+    if (we.error_code() == API_RETURN_CODE_NOT_ENOUGH_OUTPUTS_FOR_OPERATION)
+      return false;
+    WLT_LOG_ERROR("generate_utxo_defragmentation_transaction_if_needed: transfer failed with: " << we.what());
+  //} <-- this brace is inside CATCH_ENTRY2
   CATCH_ENTRY2(false);
 
   return true;
@@ -5367,7 +5377,10 @@ bool wallet2::prepare_tx_sources_for_defragmentation_tx(std::vector<currency::tx
   //prepare_free_transfers_cache(fake_outputs_count);
   //free_amounts_cache_type& free_amounts_for_native_coin = m_found_free_amounts[currency::native_coin_asset_id];
 
-  for (size_t i = 0, size = m_transfers.size(); i < size && selected_indicies.size() < m_min_utxo_count_for_defragmentation_tx; ++i)
+  std::stringstream ss;
+  if (epee::log_space::log_singletone::get_log_detalisation_level() >= LOG_LEVEL_2)
+    ss << "preparing sources for utxo defragmentation tx:";
+  for (size_t i = 0, size = m_transfers.size(); i < size && selected_indicies.size() < m_max_utxo_count_for_defragmentation_tx; ++i)
   {
     const auto& td = m_transfers[i];
     if (!td.is_native_coin() || td.m_amount > CURRENCY_BLOCK_REWARD)
@@ -5377,9 +5390,20 @@ bool wallet2::prepare_tx_sources_for_defragmentation_tx(std::vector<currency::tx
     {
       found_money += td.m_amount;
       selected_indicies.push_back(i);
-      WLT_LOG_L2("prepare_tx_sources_for_defragmentation_tx: selected index: " << i << ", transfer_details: " << ENDL << epee::serialization::store_t_to_json(m_transfers[i]));
+      if (epee::log_space::log_singletone::get_log_detalisation_level() >= LOG_LEVEL_2)
+        ss << "    selected transfer #" << i << ", amount: " << print_money_brief(td.m_amount) << ", height: " << td.m_ptx_wallet_info->m_block_height << ", " << (td.is_zc() ? "ZC" : "  ");
     }
   }
+
+  if (selected_indicies.size() < m_min_utxo_count_for_defragmentation_tx)
+  {
+    // too few outputs were found, hence don't create a defragmentation tx
+    selected_indicies.clear();
+    found_money = 0;
+    return false;
+  }
+
+  WLT_LOG(ss.str(), LOG_LEVEL_2);
 
   return prepare_tx_sources(m_decoys_count_for_defragmentation_tx, sources, selected_indicies);
 }
@@ -6429,8 +6453,8 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   TIME_MEASURE_START_MS(prepare_tx_sources_time);
   if (ctp.create_utxo_defragmentation_tx)
   {
-    bool r = prepare_tx_sources_for_defragmentation_tx(ftp.sources, ftp.selected_transfers, needed_money_map[currency::native_coin_asset_id].found_amount);
-    WLT_THROW_IF_FALSE_WITH_CODE(r, "utxo defragmentation tx was not prepared (not an error)", API_RETURN_CODE_NOT_ENOUGH_OUTPUTS_FOR_OPERATION);
+    if (!prepare_tx_sources_for_defragmentation_tx(ftp.sources, ftp.selected_transfers, needed_money_map[currency::native_coin_asset_id].found_amount))
+      throw error::wallet_error(LOCATION_STR, "", API_RETURN_CODE_NOT_ENOUGH_OUTPUTS_FOR_OPERATION);
   }
   else if (ctp.htlc_tx_id != currency::null_hash)
   {
