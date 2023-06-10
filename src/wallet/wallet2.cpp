@@ -3741,7 +3741,7 @@ bool enum_container(iterator_t it_begin, iterator_t it_end, callback_t cb)
 //----------------------------------------------------------------------------------------------------
 bool wallet2::is_consolidating_transaction(const wallet_public::wallet_transfer_info& wti)
 {
-  if (!wti.is_income)
+  if (wti.has_outgoing_entries())
   {
     uint64_t income = 0;
     for (uint64_t r : wti.td.rcv){income += r;}
@@ -3791,36 +3791,46 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
 
 }
 
-void wallet2::wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) {
-  ss << index << ",";
-  ss << epee::misc_utils::get_time_str(wti.timestamp) << ",";
-  ss << print_money(wti.amount) << ",";
-  ss << "\"" << wti.comment << "\",";
-  ss << "[";
-  std::copy(wti.remote_addresses.begin(), wti.remote_addresses.end(), std::ostream_iterator<std::string>(ss, " "));
-  ss << "]" << ",";
-  ss << wti.tx_hash << ",";
-  ss << wti.height << ",";
-  ss << wti.unlock_time << ",";
-  ss << wti.tx_blob_size << ",";
-  ss << epee::string_tools::buff_to_hex_nodelimer(wti.payment_id) << ",";
-  ss << "[";
-  std::copy(wti.remote_aliases.begin(), wti.remote_aliases.end(), std::ostream_iterator<std::string>(ss, " "));
-  ss << "]" << ",";
-  ss << (wti.is_income ? "in" : "out") << ",";
-  ss << (wti.is_service ? "[SERVICE]" : "") << (wti.is_mixing ? "[MIXINS]" : "") << (wti.is_mining ? "[MINING]" : "") << ",";
-  ss << wti.tx_type << ",";
-  ss << print_money(wti.fee) << ENDL;
+void wallet2::wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) 
+{
+  for(auto& subtr: wti.subtransfers)
+  {
+    ss << index << ",";
+    ss << epee::misc_utils::get_time_str(wti.timestamp) << ",";
+    ss << print_money(subtr.amount) << ",";
+    ss << subtr.asset_id << ",";
+    ss << "\"" << wti.comment << "\",";
+    ss << "[";
+    std::copy(wti.remote_addresses.begin(), wti.remote_addresses.end(), std::ostream_iterator<std::string>(ss, " "));
+    ss << "]" << ",";
+    ss << wti.tx_hash << ",";
+    ss << wti.height << ",";
+    ss << wti.unlock_time << ",";
+    ss << wti.tx_blob_size << ",";
+    ss << epee::string_tools::buff_to_hex_nodelimer(wti.payment_id) << ",";
+    ss << "[";
+    std::copy(wti.remote_aliases.begin(), wti.remote_aliases.end(), std::ostream_iterator<std::string>(ss, " "));
+    ss << "]" << ",";
+    ss << (subtr.is_income ? "in" : "out") << ",";
+    ss << (wti.is_service ? "[SERVICE]" : "") << (wti.is_mixing ? "[MIXINS]" : "") << (wti.is_mining ? "[MINING]" : "") << ",";
+    ss << wti.tx_type << ",";
+    ss << print_money(wti.fee) << ENDL;
+  }
+
 };
 
 void wallet2::wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) 
 {
-  ss << (wti.is_income ? "[INC]" : "[OUT]") << "\t"
-    << epee::misc_utils::get_time_str(wti.timestamp) << "\t"
-    << print_money(wti.amount) << "\t"
-    << print_money(wti.fee) << "\t"
-    << wti.remote_addresses << "\t"
-    << wti.comment << ENDL;
+  for (auto& subtr : wti.subtransfers)
+  {
+    ss << (subtr.is_income ? "[INC]" : "[OUT]") << "\t"
+      << epee::misc_utils::get_time_str(wti.timestamp) << "\t"
+      << print_money(subtr.amount) << "\t"
+      << subtr.asset_id << "\t"
+      << print_money(wti.fee) << "\t"
+      << wti.remote_addresses << "\t"
+      << wti.comment << ENDL;
+  }
 };
 
 void wallet2::wti_to_json_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) 
@@ -3851,7 +3861,7 @@ void wallet2::export_transaction_history(std::ostream& ss, const std::string& fo
   else
   {
     //csv by default
-    ss << "N, Date, Amount, Comment, Address, ID, Height, Unlock timestamp, Tx size, Alias, PaymentID, In/Out, Flags, Type, Fee" << ENDL;
+    ss << "N, Date, Amount, AssetID, Comment, Address, ID, Height, Unlock timestamp, Tx size, Alias, PaymentID, In/Out, Flags, Type, Fee" << ENDL;
   }
 
 
@@ -3913,7 +3923,7 @@ void wallet2::get_mining_history(wallet_public::mining_history& hist, uint64_t t
     if (currency::is_coinbase(tr.tx) && tr.tx.vin.size() == 2 && tr.timestamp > timestamp_from)
     {
       tools::wallet_public::mining_history_entry mhe = AUTO_VAL_INIT(mhe);
-      mhe.a = tr.amount;
+      mhe.a = tr.get_native_income_amount();
       mhe.t = tr.timestamp;
       mhe.h = tr.height;
       hist.mined_entries.push_back(mhe);
@@ -4893,8 +4903,7 @@ void wallet2::add_transfers_to_expiration_list(const std::vector<uint64_t>& sele
   }
   WLT_LOG_GREEN(m_money_expirations.back().selected_transfers.size() << " transfer(s) added to expiration list:" << ENDL <<
     "index                 amount  flags     tx hash" << ENDL <<
-    ss.str() <<
-    "change_amount: " << print_money_brief(change_amount) << ", expire(s) at: " << expiration, LOG_LEVEL_0);
+    ss.str() << ", expire(s) at: " << expiration, LOG_LEVEL_0);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::remove_transfer_from_expiration_list(uint64_t transfer_index)
@@ -5156,7 +5165,7 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
   selected_transfers = ftp.selected_transfers;
   currency::finalized_tx finalize_result = AUTO_VAL_INIT(finalize_result);
   finalize_transaction(ftp, finalize_result, false);
-  add_transfers_to_expiration_list(selected_transfers, proposal_detais.expiration_time, 0, currency::null_hash);
+  add_transfers_to_expiration_list(selected_transfers, proposal_detais.expiration_time, currency::null_hash);
 
   //wrap it all 
   proposal.tx_template = finalize_result.tx;
@@ -5187,8 +5196,7 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
   const transaction& tx = proposal.tx_template;
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
   std::vector<wallet_out_info> outs;
-  uint64_t tx_money_got_in_outs = 0;
-  bool r = lookup_acc_outs(m_account.get_keys(), tx, outs, tx_money_got_in_outs, derivation);
+  bool r = lookup_acc_outs(m_account.get_keys(), tx, outs, derivation);
   THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to lookup_acc_outs for tx: " << get_transaction_hash(tx));
 
   if (!outs.size())
@@ -6109,23 +6117,6 @@ bool wallet2::is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_
   return false;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::wipeout_extra_if_needed(std::vector<wallet_public::wallet_transfer_info>& transfer_history)
-{
-  WLT_LOG_L0("Processing [wipeout_extra_if_needed]...");
-  for (auto it = transfer_history.begin(); it != transfer_history.end(); it++ )
-  {
-    if (it->height > 638000)
-    {
-      it->remote_addresses.clear();
-      if (is_watch_only() && !it->is_income)
-      {
-        it->comment.clear();
-      }
-    }
-  }
-  WLT_LOG_L0("Processing [wipeout_extra_if_needed] DONE");
-}
-//----------------------------------------------------------------------------------------------------
 bool wallet2::is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count)
 {
   if (!td.is_spendable())
@@ -6202,34 +6193,44 @@ void wallet2::add_sent_unconfirmed_tx(const currency::transaction& tx,
   PROFILE_FUNC("wallet2::add_sent_unconfirmed_tx");
   wallet_public::wallet_transfer_info& unconfirmed_wti = misc_utils::get_or_insert_value_initialized(m_unconfirmed_txs, currency::get_transaction_hash(tx));
 
-  //unconfirmed_wti.tx = tx;
+  unconfirmed_wti.tx = tx;
   unconfirmed_wti.remote_addresses = recipients;
   for (auto addr : recipients)
     unconfirmed_wti.remote_aliases.push_back(get_alias_for_address(addr));
-  unconfirmed_wti.is_income = false;
-  unconfirmed_wti.selected_indicies = selected_indicies;
-  unconfirmed_wti.asset_id = null_pkey;
 
-  uint64_t native_coin_change_amount = 0;
-  uint64_t native_coin_inputs_amount = 0;
+  process_transaction_context tx_process_context(tx);
+
+//   for (const auto& sel_i : selected_indicies)
+//   {
+//     crypto::public_key asset_id = m_transfers[sel_i].get_asset_id();
+//     if (asset_id == currency::native_coin_asset_id)
+//     {
+//       tx_process_context.spent_own_native_inputs = true;
+//     }
+//     tx_process_context.total_balance_change[asset_id] -= m_transfers[sel_i].amount();
+//   }
+
+
+  for (auto& d : splitted_dsts)
+  {
+    if (d.addr.size() &&
+      d.addr.back().spend_public_key == m_account.get_keys().account_address.spend_public_key &&
+      d.addr.back().view_public_key == m_account.get_keys().account_address.view_public_key)
+    {
+      unconfirmed_wti.td.rcv.push_back(d.amount);
+      tx_process_context.total_balance_change[d.asset_id] += d.amount;
+    }
+  }
+
+  unconfirmed_wti.selected_indicies = selected_indicies;
+
 
   // TODO @#@# potential issue: one tx may have different asset_id's in INs or OUTs
   // but only one asset_id is associated with a transfer atm
   // possible solution: make a transfer item for each asset_id in tx -- sowle
-  for (auto& d : splitted_dsts)
-  {
-    if (d.addr.size() &&
-        d.addr.back().spend_public_key == m_account.get_keys().account_address.spend_public_key &&
-        d.addr.back().view_public_key == m_account.get_keys().account_address.view_public_key)
-    {
-      unconfirmed_wti.td.rcv.push_back(d.amount);
-      WLT_CHECK_AND_ASSERT_MES(unconfirmed_wti.asset_id == null_pkey || unconfirmed_wti.asset_id == d.asset_id, (void)0, "TODO: BAD case with asset_id");
-      unconfirmed_wti.asset_id = d.asset_id;
-      if (d.asset_id == native_coin_asset_id)
-        native_coin_change_amount += d.amount;
-    }
-  }
+  // RE: TODO - discuss with @sowl  -- zoidberg
 
+  // check all inputs for spending (compare key images)
   //scan key images
   for (auto& i : tx.vin)
   {
@@ -6243,15 +6244,18 @@ void wallet2::add_sent_unconfirmed_tx(const currency::transaction& tx,
         WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second < m_transfers.size(), "[read_money_transfer2_details_from_tx]Index out of range for key image in tx: " << get_transaction_hash(tx));
         unconfirmed_wti.td.spn.push_back(m_transfers[it->second].amount());
 
-        WLT_CHECK_AND_ASSERT_MES(unconfirmed_wti.asset_id == null_pkey || unconfirmed_wti.asset_id == m_transfers[it->second].get_asset_id(), (void)0, "TODO: BAD case with asset_id");
-        unconfirmed_wti.asset_id = m_transfers[it->second].get_asset_id();
-        if (unconfirmed_wti.asset_id == native_coin_asset_id)
-          native_coin_inputs_amount += m_transfers[it->second].amount();
+        
+        crypto::public_key asset_id = m_transfers[it->second].get_asset_id();
+        if (asset_id == currency::native_coin_asset_id)
+        {
+          tx_process_context.spent_own_native_inputs = true;
+        }
+        tx_process_context.total_balance_change[asset_id] -= m_transfers[it->second].amount();
       }
     }
   }
 
-  prepare_wti(unconfirmed_wti, 0, m_core_runtime_config.get_core_time(), tx, native_coin_inputs_amount - (native_coin_change_amount + get_tx_fee(tx)), money_transfer2_details());
+  prepare_wti(unconfirmed_wti, tx_process_context);
   rise_on_transfer2(unconfirmed_wti);
 }
 //----------------------------------------------------------------------------------------------------

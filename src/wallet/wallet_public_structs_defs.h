@@ -165,32 +165,25 @@ namespace wallet_public
     END_KV_SERIALIZE_MAP()
 
     BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(key_offsets) // referring_input
-      BOOST_SERIALIZE(k_image)
-      BOOST_SERIALIZE(etc_details)
+      BOOST_SERIALIZE(timestamp)
       BOOST_SERIALIZE(tx_hash)
       BOOST_SERIALIZE(height)
-      BOOST_SERIALIZE(unlock_time)
       BOOST_SERIALIZE(tx_blob_size)
       BOOST_SERIALIZE(payment_id)
-      BOOST_SERIALIZE(comment)
-      BOOST_SERIALIZE(timestamp)
-      BOOST_SERIALIZE(td)
-      BOOST_SERIALIZE(fee)
-      BOOST_SERIALIZE(is_service)
-      BOOST_SERIALIZE(is_mixing)
-      BOOST_SERIALIZE(is_mining)
-      BOOST_SERIALIZE(tx_type)
-      BOOST_SERIALIZE(show_sender)
-      BOOST_SERIALIZE(contract)
-      BOOST_SERIALIZE(service_entries)
-      BOOST_SERIALIZE(transfer_internal_index)
       BOOST_SERIALIZE(remote_addresses)
+      BOOST_SERIALIZE(td)
+      BOOST_SERIALIZE(tx)
       BOOST_SERIALIZE(remote_aliases)
+      BOOST_SERIALIZE(comment)
+      BOOST_SERIALIZE(contract)
+      BOOST_SERIALIZE(selected_indicies)
+      BOOST_SERIALIZE(marketplace_entries)
+      BOOST_SERIALIZE(unlock_time)
+      BOOST_SERIALIZE(service_entries)
       BOOST_SERIALIZE(subtransfers)
     END_BOOST_SERIALIZATION()
 
-    bool is_income_mode_encryption() 
+    bool is_income_mode_encryption() const 
     {
       for (const auto& st : subtransfers)
       {
@@ -199,7 +192,7 @@ namespace wallet_public
       }
       return true;
     }
-    bool has_outgoing_entries()
+    bool has_outgoing_entries() const
     {
       for (const auto& st : subtransfers)
       {
@@ -208,7 +201,17 @@ namespace wallet_public
       }
       return false;
     }
+    uint64_t get_native_income_amount() const
+    {
+      for (const auto& st : subtransfers)
+      {
+        if (st.asset_id == currency::native_coin_asset_id && st.is_income)
+          return st.amount;
+      }
+      return 0;
+    }
   };
+
 
   struct asset_balance_entry_base
   {

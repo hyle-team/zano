@@ -571,7 +571,7 @@ namespace tools
       size_t sub_i = 0;
       uint64_t height = 0;
       uint64_t timestamp = 0;
-      std::map<crypto::public_key, boost::multiprecision::int128_t> total_balance_change;
+      std::unordered_map<crypto::public_key, boost::multiprecision::int128_t> total_balance_change;
       std::vector<std::string> recipients;
       std::vector<std::string> remote_aliases;
 
@@ -831,10 +831,9 @@ namespace tools
         WLT_LOG_MAGENTA("Wallet file truncated due to WALLET_FILE_SERIALIZATION_VERSION is more then curren build", LOG_LEVEL_0);
         return;
       }
-
-      if (ver < 149)
+      if(ver < WALLET_FILE_LAST_SUPPORTED_VERSION)
       {
-        WLT_LOG_MAGENTA("Wallet file truncated due to old version. ver: " << ver << ", WALLET_FILE_SERIALIZATION_VERSION=" << WALLET_FILE_SERIALIZATION_VERSION, LOG_LEVEL_0);
+        WLT_LOG_MAGENTA("Wallet file truncated due to ver(" << ver << ") is less then WALLET_FILE_LAST_SUPPORTED_VERSION", LOG_LEVEL_0);
         return;
       }
 
@@ -854,29 +853,9 @@ namespace tools
         }
       }
       //convert from old version
-      if (ver < 150)
-      {
-        WLT_LOG_MAGENTA("Converting blockchain into a short form...", LOG_LEVEL_0);
-        std::vector<crypto::hash> old_blockchain;
-        a & old_blockchain;
-        uint64_t count = 0;
-        for (auto& h : old_blockchain)
-        {
-          m_chain.push_new_block_id(h, count);
-          count++;
-        }
-        WLT_LOG_MAGENTA("Converting done", LOG_LEVEL_0);
-      }
-      else
-      {
-        a & m_chain;
-        a & m_minimum_height;
-      }
-
-      // v151: m_amount_gindex_to_transfer_id added
-      if (ver >= 151)
-        a & m_amount_gindex_to_transfer_id;
-
+      a & m_chain;
+      a & m_minimum_height;
+      a & m_amount_gindex_to_transfer_id;
       a & m_transfers;
       a & m_multisig_transfers;
       a & m_key_images;      
@@ -890,28 +869,13 @@ namespace tools
       a & m_pending_key_images;
       a & m_tx_keys;
       a & m_last_pow_block_h;
-
-      //after processing
-      if (ver < 152)
-      {
-        wipeout_extra_if_needed(m_transfer_history);
-      }
-      
-      if (ver < 153)
-        return;
-      
       a & m_htlcs;
       a & m_active_htlcs;
       a & m_active_htlcs_txid;
-
-      if (ver < 154)
-        return;
-      
       a & m_own_asset_descriptors;
       a & m_custom_assets;
     }
 
-    void wipeout_extra_if_needed(std::vector<wallet_public::wallet_transfer_info>& transfer_history);
     bool is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_outputs_count);
     bool is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count);
     uint64_t select_indices_for_transfer(std::vector<uint64_t>& ind, free_amounts_cache_type& found_free_amounts, uint64_t needed_money, uint64_t fake_outputs_count);
@@ -1339,7 +1303,6 @@ namespace boost
     inline void serialize(Archive& a, tools::wallet2::expiration_entry_info& x, const boost::serialization::version_type ver)
     {
       a & x.expiration_time;
-      a & x.change_amount;
       a & x.selected_transfers;
       a & x.related_tx_id;
     }
