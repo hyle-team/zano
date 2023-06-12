@@ -6720,7 +6720,7 @@ void wallet2::transfer(construct_tx_param& ctp,
   TIME_MEASURE_START(prepare_transaction_time);
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   ftp.tx_version = this->get_current_tx_version();
-  if (prepare_transaction(ctp, ftp))
+  if (!prepare_transaction(ctp, ftp))
   {
     result.was_not_prepared = true;
     return;
