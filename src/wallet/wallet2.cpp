@@ -209,9 +209,15 @@ bool wallet2::set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::set_pos_min_utxo_count_for_defragmentation_tx(uint64_t new_size)
+void wallet2::set_pos_utxo_count_limits_for_defragmentation_tx(uint64_t min_outs, uint64_t max_outs)
 {
-  m_min_utxo_count_for_defragmentation_tx = new_size;
+  m_min_utxo_count_for_defragmentation_tx = min_outs;
+  m_max_utxo_count_for_defragmentation_tx = max_outs;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::set_pos_decoys_count_for_defragmentation_tx(size_t decoys_count)
+{
+  m_decoys_count_for_defragmentation_tx = decoys_count;
 }
 //----------------------------------------------------------------------------------------------------
 std::shared_ptr<i_core_proxy> wallet2::get_core_proxy()
@@ -3373,19 +3379,14 @@ bool wallet2::generate_utxo_defragmentation_transaction_if_needed(currency::tran
 {
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.create_utxo_defragmentation_tx = true;
-   
-  try
-  {
-    transfer(ctp, tx, false, nullptr);
-  }
-  catch(error::wallet_error& we)
-  {
-    if (we.error_code() == API_RETURN_CODE_NOT_ENOUGH_OUTPUTS_FOR_OPERATION)
-      return false;
-    WLT_LOG_ERROR("generate_utxo_defragmentation_transaction_if_needed: transfer failed with: " << we.what());
-  //} <-- this brace is inside CATCH_ENTRY2
-  CATCH_ENTRY2(false);
+  finalized_tx ftp{};
 
+  transfer(ctp, ftp, false, nullptr);
+
+  if (ftp.was_not_prepared)
+      return false; // no such UTXO were found, not an error
+
+  tx = ftp.tx;
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -6419,7 +6420,7 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const mode_separate_context& msc)
+bool wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const mode_separate_context& msc)
 {
 
   SET_CONTEXT_OBJ_FOR_SCOPE(pconstruct_tx_param, ctp);
@@ -6454,7 +6455,7 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   if (ctp.create_utxo_defragmentation_tx)
   {
     if (!prepare_tx_sources_for_defragmentation_tx(ftp.sources, ftp.selected_transfers, needed_money_map[currency::native_coin_asset_id].found_amount))
-      throw error::wallet_error(LOCATION_STR, "", API_RETURN_CODE_NOT_ENOUGH_OUTPUTS_FOR_OPERATION);
+      return false;
   }
   else if (ctp.htlc_tx_id != currency::null_hash)
   {
@@ -6510,6 +6511,7 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
     << ", construct_tx_time: " << construct_tx_time << " ms"
     << ", sign_ms_input_time: " << sign_ms_input_time << " ms",
     LOG_LEVEL_0);*/
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::finalize_transaction(const currency::finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key /* = true */)
@@ -6718,7 +6720,11 @@ void wallet2::transfer(construct_tx_param& ctp,
   TIME_MEASURE_START(prepare_transaction_time);
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   ftp.tx_version = this->get_current_tx_version();
-  prepare_transaction(ctp, ftp);
+  if (prepare_transaction(ctp, ftp))
+  {
+    result.was_not_prepared = true;
+    return;
+  }
   TIME_MEASURE_FINISH(prepare_transaction_time);
 
   if (m_watch_only)

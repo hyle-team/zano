@@ -190,6 +190,7 @@ namespace currency
     std::string           htlc_origin;
     std::vector<serializable_pair<uint64_t, crypto::key_image>> outs_key_images; // pairs (out_index, key_image) for each change output
     crypto::key_derivation derivation;
+    bool                  was_not_prepared = false; // true if tx was not prepared/created for some good reason (e.g. not enough outs for UTXO defragmentation tx). Because we decided not to throw exceptions for non-error cases. -- sowle
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(tx)
@@ -198,6 +199,7 @@ namespace currency
       FIELD(htlc_origin)
       FIELD(outs_key_images)
       FIELD(derivation)
+      FIELD(was_not_prepared)
     END_SERIALIZE()
   };
 

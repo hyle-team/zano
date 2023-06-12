@@ -607,7 +607,8 @@ namespace tools
     void deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id);
 
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
-    void set_pos_min_utxo_count_for_defragmentation_tx(uint64_t new_size);
+    void set_pos_utxo_count_limits_for_defragmentation_tx(uint64_t min_outs, uint64_t max_outs); // don't create UTXO defrag. tx if there are less than 'min_outs' outs; don't put more than 'max_outs' outs
+    void set_pos_decoys_count_for_defragmentation_tx(size_t decoys_count);
     void set_minimum_height(uint64_t h);
     std::shared_ptr<i_core_proxy> get_core_proxy();
     uint64_t balance() const;
@@ -931,7 +932,7 @@ namespace tools
     const std::list<expiration_entry_info>& get_expiration_entries() const { return m_money_expirations; };
     bool get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) const;
 
-    void prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const mode_separate_context& emode_separate = mode_separate_context());
+    bool prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const mode_separate_context& emode_separate = mode_separate_context());
 
     void finalize_transaction(const currency::finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key = true);
     void finalize_transaction(const currency::finalize_tx_param& ftp, currency::finalized_tx& result, bool broadcast_tx, bool store_tx_secret_key = true );
