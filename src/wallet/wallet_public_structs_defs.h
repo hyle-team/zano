@@ -91,9 +91,9 @@ namespace wallet_public
 
   struct wallet_sub_transfer_info
   {
-    uint64_t      amount;
-    bool          is_income;
-    crypto::public_key asset_id; // not blinded, not premultiplied by 1/8
+    uint64_t      amount = 0;
+    bool          is_income = false;
+    crypto::public_key asset_id = currency::native_coin_asset_id; // not blinded, not premultiplied by 1/8
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(amount)
@@ -209,6 +209,24 @@ namespace wallet_public
           return st.amount;
       }
       return 0;
+    }
+    uint64_t& get_native_income_amount()
+    {
+      for (auto& st : subtransfers)
+      {
+        if (st.asset_id == currency::native_coin_asset_id)
+          if (st.is_income)
+          {
+            return st.amount;
+          }
+          else
+          {
+            throw std::runtime_error("Unexpected wallet_transfer_info: native is not income type");
+          }          
+      }
+      subtransfers.push_back(wallet_sub_transfer_info());
+      subtransfers.back().is_income = true;
+      return subtransfers.back().amount;
     }
   };
 

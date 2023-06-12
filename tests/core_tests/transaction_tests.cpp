@@ -10,7 +10,7 @@
 #include "currency_core/account.h"
 #include "currency_core/currency_format_utils.h"
 #include "misc_language.h"
-
+#include "chaingen_helpers.h"
 using namespace currency;
 
 

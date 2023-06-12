@@ -6224,12 +6224,6 @@ void wallet2::add_sent_unconfirmed_tx(const currency::transaction& tx,
 
   unconfirmed_wti.selected_indicies = selected_indicies;
 
-
-  // TODO @#@# potential issue: one tx may have different asset_id's in INs or OUTs
-  // but only one asset_id is associated with a transfer atm
-  // possible solution: make a transfer item for each asset_id in tx -- sowle
-  // RE: TODO - discuss with @sowl  -- zoidberg
-
   // check all inputs for spending (compare key images)
   //scan key images
   for (auto& i : tx.vin)

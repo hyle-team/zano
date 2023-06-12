@@ -1664,10 +1664,10 @@ namespace currency
     txin_htlc htlc_in = AUTO_VAL_INIT(htlc_in);
 
     x.tx_type = get_tx_type_ex(x.tx, htlc_out, htlc_in);
-    if(x.tx_type == GUI_TX_TYPE_HTLC_DEPOSIT && x.is_income == true)
+    if(x.tx_type == GUI_TX_TYPE_HTLC_DEPOSIT && !x.has_outgoing_entries())
     {
       //need to override amount
-      x.amount = htlc_out.amount;
+      x.get_native_income_amount() = htlc_out.amount;
     }
   }
 
@@ -2941,7 +2941,6 @@ namespace currency
     if (is_out_to_acc(acc.account_address, boost::get<txout_to_key>(o.target), derivation, offset))
     {
       outs.emplace_back(offset, o.amount);
-      money_transfered += o.amount;
     }
     return true;
   }

@@ -55,7 +55,7 @@ bool wallet2::validate_escrow_proposal(const wallet_public::wallet_transfer_info
 
   // (2/5) extra
   decrypted_items.clear();
-  bool r = decrypt_payload_items(wti.is_income, prop.tx_template, m_account.get_keys(), decrypted_items);
+  bool r = decrypt_payload_items(wti.is_income_mode_encryption(), prop.tx_template, m_account.get_keys(), decrypted_items);
   LOC_CHK(r, "failed to decrypt payload items in proposal tx");
 
   currency::tx_service_attachment tsa = AUTO_VAL_INIT(tsa);

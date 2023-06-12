@@ -12,7 +12,7 @@ class i_backend_wallet_callback
 {
 public:
   virtual void on_new_block(size_t wallet_id, uint64_t /*height*/, const currency::block& /*block*/) {}
-	virtual void on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<wallet_public::asset_balance_entry>& balances, uint64_t total_mined) {}
+	virtual void on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) {}
   virtual void on_pos_block_found(size_t wallet_id, const currency::block& /*block*/) {}
   virtual void on_sync_progress(size_t wallet_id, const uint64_t& /*percents*/) {}
   virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti) {}
@@ -32,7 +32,7 @@ struct i_wallet_to_i_backend_adapter: public tools::i_wallet2_callback
   virtual void on_new_block(uint64_t height, const currency::block& block) {
     m_pbackend->on_new_block(m_wallet_id, height, block);
   }
-	virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<wallet_public::asset_balance_entry>& balances, uint64_t total_mined) {
+	virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) {
 		m_pbackend->on_transfer2(m_wallet_id, wti, balances, total_mined);
   }
   virtual void on_pos_block_found(const currency::block& wti) {
