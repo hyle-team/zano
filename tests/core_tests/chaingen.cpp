@@ -2067,7 +2067,7 @@ bool make_tx_multisig_to_key(const currency::transaction& source_tx,
   return true;
 }
 
-bool estimate_wallet_balance_blocked_for_escrow(const tools::wallet2& w, uint64_t& result, bool substruct_change_from_result /* = true */, uint64_t* p_change /* = nullptr */)
+bool estimate_wallet_balance_blocked_for_escrow(const tools::wallet2& w, uint64_t& result)
 {
   std::deque<tools::wallet2::transfer_details> transfers;
   w.get_transfers(transfers);
@@ -2077,18 +2077,6 @@ bool estimate_wallet_balance_blocked_for_escrow(const tools::wallet2& w, uint64_
   {
     if (td.m_flags == (WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION))
       result += td.amount();
-  }
-  if (substruct_change_from_result || p_change != nullptr)
-  {
-    const std::list<tools::wallet2::expiration_entry_info>& ee = w.get_expiration_entries();
-    for (auto &e : ee)
-    {
-      CHECK_AND_ASSERT_MES(result >= e.change_amount, false, "wrong transfers: result: " << print_money(result) << " is expected to be NOT LESS than change_amount: " << print_money(e.change_amount));
-      if (substruct_change_from_result)
-        result -= e.change_amount;
-      if (p_change != nullptr)
-        *p_change += e.change_amount;
-    }
   }
   return true;
 }

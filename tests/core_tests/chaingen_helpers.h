@@ -323,6 +323,7 @@ namespace currency
   //this lookup_acc_outs overload is mostly for backward compatibility for tests, ineffective from performance perspective, should not be used in wallet
   inline bool lookup_acc_outs(const currency::account_keys& acc, const currency::transaction& tx, std::vector<currency::wallet_out_info>& outs, uint64_t& sum_of_native_outs, crypto::key_derivation& derivation)
   {
+    outs.clear();
     sum_of_native_outs = 0;
     bool res = currency::lookup_acc_outs(acc, tx, outs, derivation);
     for (const auto& o : outs)
@@ -334,4 +335,21 @@ namespace currency
     }
     return res;
   }
+
+  //this lookup_acc_outs overload is mostly for backward compatibility for tests, ineffective from performance perspective, should not be used in wallet
+  inline bool lookup_acc_outs(const currency::account_keys& acc, const currency::transaction& tx, const crypto::public_key& /*tx_onetime_pubkey*/, std::vector<currency::wallet_out_info>& outs, uint64_t& sum_of_native_outs, crypto::key_derivation& derivation)
+  {
+    sum_of_native_outs = 0;
+    bool res = currency::lookup_acc_outs(acc, tx, outs, derivation);
+    for (const auto& o : outs)
+    {
+      if (o.asset_id == currency::native_coin_asset_id)
+      {
+        sum_of_native_outs += o.amount;
+      }
+    }
+    return res;
+  }
+ 
+
 }

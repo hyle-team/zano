@@ -49,7 +49,7 @@ protected:
 };
 
 
-const tools::wallet_public::asset_balance_entry get_native_balance_entry(const std::list<tools::wallet_public::asset_balance_entry>& balances)
+inline const tools::wallet_public::asset_balance_entry get_native_balance_entry(const std::list<tools::wallet_public::asset_balance_entry>& balances)
 {
   for (const auto& b : balances)
   {

@@ -210,6 +210,24 @@ namespace wallet_public
       }
       return 0;
     }
+    uint64_t get_native_amount() const
+    {
+      for (const auto& st : subtransfers)
+      {
+        if (st.asset_id == currency::native_coin_asset_id )
+          return st.amount;
+      }
+      return 0;
+    }
+    bool get_native_is_income() const
+    {
+      for (const auto& st : subtransfers)
+      {
+        if (st.asset_id == currency::native_coin_asset_id)
+          return st.is_income;
+      }
+      return false;
+    }
     uint64_t& get_native_income_amount()
     {
       for (auto& st : subtransfers)
