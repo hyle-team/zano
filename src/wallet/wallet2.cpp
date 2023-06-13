@@ -6712,6 +6712,10 @@ void wallet2::transfer(construct_tx_param& ctp,
 
   check_and_throw_if_self_directed_tx_with_payment_id_requested(ctp);
 
+  bool asset_operation_requested = count_type_in_variant_container<asset_descriptor_operation>(ctp.extra) != 0;
+  bool dont_have_zero_asset_ids_in_destinations = std::count_if(ctp.dsts.begin(), ctp.dsts.end(), [](const tx_destination_entry& de) { return de.asset_id == null_pkey; }) == 0;
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(asset_operation_requested || dont_have_zero_asset_ids_in_destinations, "zero asset id is used errounesly (no asset operation was requested)");
+
   if (ctp.crypt_address.spend_public_key == currency::null_pkey)
   {
     ctp.crypt_address = currency::get_crypt_address_from_destinations(m_account.get_keys(), ctp.dsts);
