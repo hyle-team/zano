@@ -6454,8 +6454,12 @@ bool wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   TIME_MEASURE_START_MS(prepare_tx_sources_time);
   if (ctp.create_utxo_defragmentation_tx)
   {
-    if (!prepare_tx_sources_for_defragmentation_tx(ftp.sources, ftp.selected_transfers, needed_money_map[currency::native_coin_asset_id].found_amount))
-      return false;
+    try
+    {
+      if (!prepare_tx_sources_for_defragmentation_tx(ftp.sources, ftp.selected_transfers, needed_money_map[currency::native_coin_asset_id].found_amount))
+        return false;
+    }
+    catch(const error::not_enough_outs_to_mix&) { return false; } // if there's not enough decoys, return false to indicate minor non-fatal error
   }
   else if (ctp.htlc_tx_id != currency::null_hash)
   {
