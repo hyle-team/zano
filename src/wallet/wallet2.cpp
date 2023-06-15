@@ -52,8 +52,8 @@ using namespace currency;
 #define MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES (100*1024*1024) // 100 MB
 
 #define WALLET_DEFAULT_DECOYS_COUNT_FOR_DEFRAGMENTATION_TX            10  // TODO @#@# change to default decoy set number
-#define WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX                  100 // TODO: @#@# consider descreasing to mimic normal tx
-#define WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX                  100 // TODO: @#@# consider descreasing to mimic normal tx
+#define WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX                  3   // TODO: @#@# consider descreasing to mimic normal tx
+#define WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX                  10  // TODO: @#@# consider descreasing to mimic normal tx
 
 #undef LOG_DEFAULT_CHANNEL
 #define LOG_DEFAULT_CHANNEL "wallet"
