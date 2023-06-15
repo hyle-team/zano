@@ -4224,6 +4224,15 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   tmpl_req.pe.tx_out_index        = td.m_internal_output_index;
   tmpl_req.pe.wallet_index        = cxt.index;
 
+  // mark stake source as spent and make sure it will be restored in case of error
+  const std::vector<uint64_t> stake_transfer_idx_vec{ cxt.index };
+  mark_transfers_as_spent(stake_transfer_idx_vec, "stake source");
+  bool gracefull_leaving = false;
+  auto stake_transfer_spent_flag_restorer = epee::misc_utils::create_scope_leave_handler([&](){
+    if (!gracefull_leaving)
+      clear_transfers_from_flag(stake_transfer_idx_vec, WALLET_TRANSFER_DETAIL_FLAG_SPENT, "stake source");
+  });
+
   // generate UTXO Defragmentation Transaction - to reduce the UTXO set size
   transaction udtx{};
   if (generate_utxo_defragmentation_transaction_if_needed(udtx))
@@ -4258,7 +4267,7 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to prepare_and_sign_pos_block");
 
   crypto::hash block_hash = get_block_hash(b);
-  WLT_LOG_GREEN("Block " << print16(block_hash) << " has been constructed, sending to core...", LOG_LEVEL_0);
+  WLT_LOG_GREEN("Block " << print16(block_hash) << " @ " << get_block_height(b) << " has been constructed, sending to core...", LOG_LEVEL_0);
 
   currency::COMMAND_RPC_SUBMITBLOCK2::request subm_req = AUTO_VAL_INIT(subm_req);
   currency::COMMAND_RPC_SUBMITBLOCK2::response subm_rsp = AUTO_VAL_INIT(subm_rsp);
@@ -4275,6 +4284,7 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   WLT_LOG_GREEN("PoS block " << print16(block_hash) << " generated and accepted, congrats!", LOG_LEVEL_0);
   m_wcallback->on_pos_block_found(b);
 
+  gracefull_leaving = true; // to prevent source transfer flags be cleared in scope leave handler
   return true;
 }
 //----------------------------------------------------------------------------------------------------
