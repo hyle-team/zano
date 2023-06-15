@@ -24,16 +24,39 @@ namespace wallet_public
 #define WALLET_RPC_STATUS_BUSY    "BUSY"
 
 
-  struct wallet_transfer_info_details
-  {
-    std::list<uint64_t> rcv;
-    std::list<uint64_t> spn;
+  struct employed_tx_entry {
+    uint64_t index = 0;
+    uint64_t amount = 0;
+    crypto::public_key asset_id = currency::native_coin_asset_id;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(rcv)
-      KV_SERIALIZE(spn)
+      KV_SERIALIZE(index)
+      KV_SERIALIZE(amount)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
     END_KV_SERIALIZE_MAP()
 
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(index)
+      BOOST_SERIALIZE(amount)
+      BOOST_SERIALIZE(asset_id)
+    END_BOOST_SERIALIZATION()
+
+  };
+
+  struct employed_tx_entries
+  {
+    std::vector<employed_tx_entry> receive;
+    std::vector<employed_tx_entry> spent;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(receive)
+      KV_SERIALIZE(spent)
+    END_KV_SERIALIZE_MAP()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(receive)
+      BOOST_SERIALIZE(spent)
+    END_BOOST_SERIALIZATION()
   };
 
   struct escrow_contract_details_basic
@@ -122,7 +145,7 @@ namespace wallet_public
     bool          is_mixing;
     bool          is_mining;
     uint64_t      tx_type;
-    wallet_transfer_info_details td;
+    employed_tx_entries employed_entries;
     std::vector<currency::tx_service_attachment> service_entries;
     std::vector<std::string> remote_addresses;  //optional
     std::vector<std::string> remote_aliases; //optional, describe only if there only one remote address
@@ -149,7 +172,7 @@ namespace wallet_public
       KV_SERIALIZE_BLOB_AS_HEX_STRING(payment_id)
       KV_SERIALIZE(comment)
       KV_SERIALIZE(timestamp)
-      KV_SERIALIZE(td)
+      KV_SERIALIZE(employed_entries)
       KV_SERIALIZE(fee)
       KV_SERIALIZE(is_service)
       KV_SERIALIZE(is_mixing)
@@ -171,7 +194,7 @@ namespace wallet_public
       BOOST_SERIALIZE(tx_blob_size)
       BOOST_SERIALIZE(payment_id)
       BOOST_SERIALIZE(remote_addresses)
-      BOOST_SERIALIZE(td)
+      BOOST_SERIALIZE(employed_entries)
       BOOST_SERIALIZE(tx)
       BOOST_SERIALIZE(remote_aliases)
       BOOST_SERIALIZE(comment)

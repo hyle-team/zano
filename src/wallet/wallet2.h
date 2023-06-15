@@ -105,12 +105,6 @@ namespace tools
 #pragma pack (pop)
 
 
-  struct money_transfer2_details
-  {
-    std::vector<size_t> receive_indices;
-    std::vector<size_t> spent_indices;
-  };
-
 
   class i_wallet2_callback
   {
@@ -556,13 +550,15 @@ namespace tools
       END_SERIALIZE()
     };
 
+    typedef std::unordered_map<crypto::hash, std::pair<currency::transaction, wallet_public::employed_tx_entries>> multisig_entries_map;
+
     struct process_transaction_context
     {
       process_transaction_context(const currency::transaction& t) : tx(t) {}
       const currency::transaction& tx;
       bool spent_own_native_inputs = false; 
       // check all outputs for spending (compare key images)
-      money_transfer2_details mtd;
+      wallet_public::employed_tx_entries employed_entries;
       bool is_pos_coinbase = false;
       bool coin_base_tx = false;
       //PoW block don't have change, so all outs supposed to be marked as "mined"
@@ -574,6 +570,8 @@ namespace tools
       std::unordered_map<crypto::public_key, boost::multiprecision::int128_t> total_balance_change;
       std::vector<std::string> recipients;
       std::vector<std::string> remote_aliases;
+      multisig_entries_map* pmultisig_entries = nullptr;
+      uint64_t tx_expiration_ts_median = 0;
 
       const crypto::hash& tx_hash() const
       {
@@ -633,6 +631,7 @@ namespace tools
     void set_do_rise_transfer(bool do_rise) { m_do_rise_transfer = do_rise; }
 
     bool has_related_alias_entry_unconfirmed(const currency::transaction& tx);
+    void handle_unconfirmed_tx(process_transaction_context& ptc);
     void scan_tx_pool(bool& has_related_alias_in_unconfirmed);
     void refresh();
     void refresh(size_t & blocks_fetched);
@@ -945,7 +944,7 @@ namespace tools
     void finalize_transaction(const currency::finalize_tx_param& ftp, currency::finalized_tx& result, bool broadcast_tx, bool store_tx_secret_key = true );
 
     std::string get_log_prefix() const { return m_log_prefix; }
-    static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const money_transfer2_details& td);
+    static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const wallet_public::employed_tx_entries& td);
     bool get_utxo_distribution(std::map<uint64_t, uint64_t>& distribution);
     uint64_t get_sync_progress();
     uint64_t get_wallet_file_size()const;
@@ -1024,7 +1023,7 @@ private:
     void prepare_wti(wallet_public::wallet_transfer_info& wti, const process_transaction_context& tx_process_context);
     void prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_att);    
     void handle_money(const currency::block& b, const process_transaction_context& tx_process_context);
-    void make_wti_from_process_transaction_context(wallet_public::wallet_transfer_info& wti, const process_transaction_context& tx_process_context);
+    void load_wti_from_process_transaction_context(wallet_public::wallet_transfer_info& wti, const process_transaction_context& tx_process_context);
 
     void handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop,
       currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& blocks);
@@ -1091,8 +1090,6 @@ private:
       const std::vector<currency::payload_items_v>& decrypted_items, crypto::hash& ms_id, bc_services::contract_private_details& cpd,
       const currency::transaction& proposal_template_tx);
 
-    
-    void fill_transfer_details(const currency::transaction& tx, const tools::money_transfer2_details& td, tools::wallet_public::wallet_transfer_info_details& res_td) const;
     void print_source_entry(std::stringstream& output, const currency::tx_source_entry& src) const;
 
 
@@ -1268,13 +1265,6 @@ namespace boost
     }
     
     template <class Archive>
-    inline void serialize(Archive& a, tools::wallet_public::wallet_transfer_info_details& x, const boost::serialization::version_type ver)
-    {
-      a & x.rcv;
-      a & x.spn;
-    }
-
-    template <class Archive>
     inline void serialize(Archive& a, tools::wallet_public::escrow_contract_details_basic& x, const boost::serialization::version_type ver)
     {
       a & x.state;
@@ -1363,7 +1353,7 @@ namespace tools
           "; flags: " << flags_before << " -> " << td.m_flags);
       }
       
-      ptc.mtd.spent_indices.push_back(ptc.i);
+      ptc.employed_entries.spent.push_back(wallet_public::employed_tx_entry{ ptc.i, td.amount(), td.get_asset_id()});
       remove_transfer_from_expiration_list(tr_index);
     }
     return true;
