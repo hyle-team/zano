@@ -4499,6 +4499,7 @@ void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.dsts = destinations;
   ctp.extra.push_back(asset_reg_info);
+  ctp.need_at_least_1_zc = true;
 
   finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
