@@ -724,7 +724,7 @@ bool make_tx_multisig_to_key(const currency::transaction& source_tx,
                              const std::vector<currency::attachment_v>& attachments = empty_attachment,
                              const std::vector<currency::extra_v>& extra = empty_extra);
 
-bool estimate_wallet_balance_blocked_for_escrow(const tools::wallet2& w, uint64_t& result);
+bool estimate_wallet_balance_blocked_for_escrow(const tools::wallet2& w, uint64_t& result, bool substruct_change_from_result = true);
 bool check_wallet_balance_blocked_for_escrow(const tools::wallet2& w, const char* wallet_name, uint64_t expected_amount);
 bool refresh_wallet_and_check_balance(const char* intro_log_message, const char* wallet_name, std::shared_ptr<tools::wallet2> wallet, uint64_t expected_total,
                                       bool print_transfers = false,

@@ -834,7 +834,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     }
   }
 
-  if (has_in_transfers || has_out_transfers)
+  if (has_in_transfers || has_out_transfers || is_derivation_used_to_encrypt(tx, derivation))
   {
     ptc.timestamp = get_block_datetime(b);
     handle_money(b, ptc);
@@ -1202,6 +1202,15 @@ void wallet2::change_contract_state(wallet_public::escrow_contract_details_basic
   contract.state = new_state;
 }
 //-----------------------------------------------------------------------------------------------------
+void from_outs_to_received_items(const std::vector<currency::wallet_out_info>& outs, std::vector<tools::wallet2::payment_details_subtransfer>& received, const currency::transaction& tx)
+{
+  for (const auto& item : outs)
+  {
+    if(!out_is_multisig(tx.vout[item.index]))
+      received.push_back(tools::wallet2::payment_details_subtransfer{ item.asset_id, item.amount});
+  }
+}
+//-----------------------------------------------------------------------------------------------------
 bool wallet2::handle_proposal(wallet_public::wallet_transfer_info& wti, const bc_services::proposal_body& prop)
 {
   PROFILE_FUNC("wallet2::handle_proposal");
@@ -1237,8 +1246,9 @@ bool wallet2::handle_proposal(wallet_public::wallet_transfer_info& wti, const bc
     std::vector<wallet_out_info> outs;
     bool r = lookup_acc_outs(m_account.get_keys(), prop.tx_template, outs, derivation);
     THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to lookup_acc_outs for tx: " << get_transaction_hash(prop.tx_template));
-
-    add_transfers_to_expiration_list(found_transfers, ed.expiration_time, wti.tx_hash);
+    std::vector<payment_details_subtransfer> received;
+    from_outs_to_received_items(outs, received, prop.tx_template);
+    add_transfers_to_expiration_list(found_transfers, received, ed.expiration_time, wti.tx_hash);
     WLT_LOG_GREEN("Locked " << found_transfers.size() << " transfers due to proposal " << ms_id, LOG_LEVEL_0);
   }
 
@@ -2129,6 +2139,9 @@ void wallet2::handle_unconfirmed_tx(process_transaction_context& ptc)
   //collect incomes
   for (auto& o : outs)
   {
+    if(out_is_multisig(tx.vout[o.index]))
+      continue;
+
     ptc.total_balance_change[o.asset_id] += o.amount;
     ptc.employed_entries.receive.push_back(wallet_public::employed_tx_entry{ o.index, o.amount, o.asset_id });
   }
@@ -4876,7 +4889,7 @@ void wallet2::build_escrow_template(const bc_services::contract_private_details&
   finalize_transaction(ftp, tx, one_time_key, false);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, const crypto::hash& related_tx_id)
+void wallet2::add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, const std::vector<payment_details_subtransfer>& received, uint64_t expiration, const crypto::hash& related_tx_id)
 {
   // check all elements in selected_transfers for being already mentioned in m_money_expirations
   std::vector<uint64_t> selected_transfers_local;
@@ -4899,6 +4912,7 @@ void wallet2::add_transfers_to_expiration_list(const std::vector<uint64_t>& sele
   m_money_expirations.back().expiration_time = expiration;
   m_money_expirations.back().selected_transfers = selected_transfers_local;
   m_money_expirations.back().related_tx_id = related_tx_id;
+  m_money_expirations.back().receved = received;
 
   std::stringstream ss;
   for (auto tr_ind : m_money_expirations.back().selected_transfers)
@@ -5158,6 +5172,7 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
     ctp.dsts[i].asset_id = proposal_detais.to_bob[i].asset_id;
   }
   // Here is an expected in return funds
+  std::vector<payment_details_subtransfer> for_expiration_list;
   for (size_t j = 0; j != proposal_detais.to_alice.size(); j++, i++)
   {
     ctp.dsts[i].amount = proposal_detais.to_alice[j].amount;
@@ -5165,6 +5180,7 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
     ctp.dsts[i].flags |= tx_destination_entry_flags::tdef_explicit_amount_to_provide;
     ctp.dsts[i].addr.push_back(m_account.get_public_address());
     ctp.dsts[i].asset_id = proposal_detais.to_alice[j].asset_id;
+    for_expiration_list.push_back(payment_details_subtransfer{ ctp.dsts[i].asset_id, ctp.dsts[i].amount});
   }
 
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
@@ -5175,7 +5191,7 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
   selected_transfers = ftp.selected_transfers;
   currency::finalized_tx finalize_result = AUTO_VAL_INIT(finalize_result);
   finalize_transaction(ftp, finalize_result, false);
-  add_transfers_to_expiration_list(selected_transfers, proposal_detais.expiration_time, currency::null_hash);
+  add_transfers_to_expiration_list(selected_transfers, for_expiration_list, proposal_detais.expiration_time, currency::null_hash);
 
   //wrap it all 
   proposal.tx_template = finalize_result.tx;

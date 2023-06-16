@@ -488,6 +488,14 @@ namespace tools
       std::vector<uint64_t> selected_transfers;
       uint64_t expiration_time = 0;
       crypto::hash related_tx_id = currency::null_hash; // tx id which caused money lock, if any (ex: escrow proposal transport tx)
+      std::vector<payment_details_subtransfer> receved;
+
+      BEGIN_BOOST_SERIALIZATION_SV(104)
+        BOOST_SERIALIZE(selected_transfers)
+        BOOST_SERIALIZE(expiration_time)
+        BOOST_SERIALIZE(related_tx_id)
+        BOOST_SERIALIZE(receved)
+      END_BOOST_SERIALIZATION()
     };
 
     /*
@@ -993,7 +1001,7 @@ private:
     // -------- t_transport_state_notifier ------------------------------------------------
     virtual void notify_state_change(const std::string& state_code, const std::string& details = std::string());
     // ------------------------------------------------------------------------------------
-    void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, uint64_t expiration, const crypto::hash& related_tx_id);
+    void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, const std::vector<payment_details_subtransfer>& received, uint64_t expiration, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
     void load_keys(const std::string& keys_file_name, const std::string& password, uint64_t file_signature, keys_file_data& kf_data);
     void process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes);
@@ -1287,18 +1295,6 @@ namespace boost
       a & static_cast<tools::wallet_public::escrow_contract_details_basic&>(x);
       a & x.contract_id;
     }
-
-
-    template <class Archive>
-    inline void serialize(Archive& a, tools::wallet2::expiration_entry_info& x, const boost::serialization::version_type ver)
-    {
-      a & x.expiration_time;
-      a & x.selected_transfers;
-      a & x.related_tx_id;
-    }
-
-    
-
 
   }
 }
