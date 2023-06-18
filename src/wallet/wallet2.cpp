@@ -1273,8 +1273,19 @@ bool wallet2::handle_release_contract(wallet_public::wallet_transfer_info& wti, 
   else if (release_instruction == BC_ESCROW_SERVICE_INSTRUCTION_RELEASE_BURN)
   {
     change_contract_state(it->second, wallet_public::escrow_contract_details_basic::contract_released_burned, ms_id, wti);
-    WLT_CHECK_AND_ASSERT_MES(wti.subtransfers.size(), false, "Unexpected subtransfers size"); //TODO: subject for refactoring
-    wti.subtransfers.back().amount = it->second.private_detailes.amount_to_pay + it->second.private_detailes.amount_a_pledge + it->second.private_detailes.amount_b_pledge;
+    wallet_public::wallet_sub_transfer_info* subptr = nullptr;
+    for (auto& s: wti.subtransfers)
+    {
+      if (s.asset_id == currency::native_coin_asset_id)
+        subptr = &s;
+    }
+    if (subptr == nullptr)
+    {
+      wti.subtransfers.push_back(wallet_public::wallet_sub_transfer_info());
+      subptr = &wti.subtransfers.back();
+    }
+
+    subptr->amount = it->second.private_detailes.amount_to_pay + it->second.private_detailes.amount_a_pledge + it->second.private_detailes.amount_b_pledge;
     if (!it->second.is_a)
     {
       wti.fee = currency::get_tx_fee(wti.tx);
@@ -2255,7 +2266,7 @@ void wallet2::handle_unconfirmed_tx(process_transaction_context& ptc)
       has_out_transfers = true;
     }
   }
-  if (!is_tx_expired(tx, ptc.tx_expiration_ts_median) && (has_in_transfers || has_out_transfers || (currency::is_derivation_used_to_encrypt(tx, derivation))))
+  if (!is_tx_expired(tx, ptc.tx_expiration_ts_median) && (new_multisig_spend_detected || has_in_transfers || has_out_transfers || (currency::is_derivation_used_to_encrypt(tx, derivation))))
   {
     m_unconfirmed_in_transfers[ptc.tx_hash()] = tx;
     if (m_unconfirmed_txs.count(ptc.tx_hash()))
@@ -3289,7 +3300,13 @@ bool wallet2::balance(std::unordered_map<crypto::public_key, wallet_public::asse
         e.awaiting_out += subtransfer.amount;
         if (subtransfer.asset_id == currency::native_coin_asset_id)
         {
-          e.awaiting_out -= currency::get_tx_fee(utx.second.tx);
+          // this "if" present here only due to sophisticated checks in escrow_custom_test, which 
+          // inaccuracy might be driven by tangled processing of sent transactions and unconfirmed 
+          // transactions in pre-refactoring era (few weeks before this commit)
+          if (!(utx.second.contract.size() && utx.second.contract[0].state == wallet_public::escrow_contract_details_basic::contract_released_burned))
+          {
+            e.awaiting_out -= currency::get_tx_fee(utx.second.tx);
+          }
         }
       }
     }

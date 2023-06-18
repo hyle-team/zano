@@ -1627,6 +1627,7 @@ bool escrow_custom_test::generate(std::vector<test_event_entry>& events) const
     test_details.push_back(cd);
   }
 
+  
   for(auto cd : test_details)
   {
     DO_CALLBACK_PARAMS_STR(events, "check", epee::serialization::store_t_to_json(cd));
@@ -1637,7 +1638,7 @@ bool escrow_custom_test::generate(std::vector<test_event_entry>& events) const
 
     prev_block = blk_n;
   }
-
+  
   return true;
 }
 
