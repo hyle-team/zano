@@ -1833,7 +1833,7 @@ bool gen_wallet_alias_via_special_wallet_funcs::c1(currency::core& c, size_t ev_
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
     [biggest_alias_reward](const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) -> bool {
       return std::count(wti.remote_aliases.begin(), wti.remote_aliases.end(), "minerminer") == 1 &&
-        wti.get_native_amount() == biggest_alias_reward;
+        wti.get_native_amount() == biggest_alias_reward + get_tx_fee(wti.tx);
     }
   ));
   alice_wlt->callback(l);

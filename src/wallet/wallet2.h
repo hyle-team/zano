@@ -490,7 +490,7 @@ namespace tools
       crypto::hash related_tx_id = currency::null_hash; // tx id which caused money lock, if any (ex: escrow proposal transport tx)
       std::vector<payment_details_subtransfer> receved;
 
-      BEGIN_BOOST_SERIALIZATION_SV(104)
+      BEGIN_BOOST_SERIALIZATION()
         BOOST_SERIALIZE(selected_transfers)
         BOOST_SERIALIZE(expiration_time)
         BOOST_SERIALIZE(related_tx_id)

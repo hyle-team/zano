@@ -834,7 +834,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     }
   }
 
-  if (has_in_transfers || has_out_transfers || is_derivation_used_to_encrypt(tx, derivation))
+  if (has_in_transfers || has_out_transfers || is_derivation_used_to_encrypt(tx, derivation) || ptc.employed_entries.spent.size())
   {
     ptc.timestamp = get_block_datetime(b);
     handle_money(b, ptc);
@@ -898,7 +898,8 @@ void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_i
     account_public_address sender_address = AUTO_VAL_INIT(sender_address);
     wti.show_sender = handle_2_alternative_types_in_variant_container<tx_payer, tx_payer_old>(decrypted_att, [&](const tx_payer& p) { sender_address = p.acc_addr; return false; /* <- continue? */ });
     if (wti.show_sender)
-      wti.remote_addresses.push_back(currency::get_account_address_as_str(sender_address));
+      if(!wti.remote_addresses.size()) 
+        wti.remote_addresses.push_back(currency::get_account_address_as_str(sender_address));
   }
   else
   {
@@ -2136,6 +2137,7 @@ uint64_t wallet2::get_directly_spent_transfer_index_by_input_in_tracking_wallet(
 void wallet2::handle_unconfirmed_tx(process_transaction_context& ptc)
 {
   const transaction& tx = ptc.tx;
+  ptc.timestamp = m_core_runtime_config.get_core_time();
   // read extra
   std::vector<wallet_out_info> outs;
   //uint64_t sum_of_received_native_outs = 0;
