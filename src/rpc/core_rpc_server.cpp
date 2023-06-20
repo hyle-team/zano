@@ -912,6 +912,8 @@ namespace currency
     res.prev_hash = string_tools::pod_to_hex(resp.b.prev_id);
     res.miner_tx_tgc = resp.miner_tx_tgc;
     res.height = resp.height;
+    res.block_reward_without_fee = resp.block_reward_without_fee;
+    res.txs_fee = resp.txs_fee;
     //calculate epoch seed
     res.seed = currency::ethash_epoch_to_seed(currency::ethash_height_to_epoch(res.height));
 

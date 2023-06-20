@@ -1085,7 +1085,7 @@ bool pos_minting_tx_packing::c1(currency::core& c, size_t ev_index, const std::v
     m_alice_start_amount + CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size // unlocked
   ), false, "");
 
-  alice_wlt->set_pos_mint_packing_size(m_pos_mint_packing_size);
+  alice_wlt->set_pos_utxo_count_limits_for_defragmentation_tx(m_pos_mint_packing_size + 1, m_pos_mint_packing_size + 1); // +1 because previous implementation () had an error with this limit 
 
   // no coinbase tx outputs should be packed
   r = alice_wlt->try_mint_pos();

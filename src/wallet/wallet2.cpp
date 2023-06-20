@@ -51,6 +51,10 @@ using namespace currency;
 
 #define MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES (100*1024*1024) // 100 MB
 
+#define WALLET_DEFAULT_DECOYS_COUNT_FOR_DEFRAGMENTATION_TX            10  // TODO @#@# change to default decoy set number
+#define WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX                  3   // TODO: @#@# consider descreasing to mimic normal tx
+#define WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX                  10  // TODO: @#@# consider descreasing to mimic normal tx
+
 #undef LOG_DEFAULT_CHANNEL
 #define LOG_DEFAULT_CHANNEL "wallet"
 ENABLE_CHANNEL_BY_DEFAULT("wallet")
@@ -69,7 +73,9 @@ namespace tools
     , m_watch_only(false)
     , m_last_pow_block_h(0)
     , m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST)
-    , m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE)
+    , m_min_utxo_count_for_defragmentation_tx(WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX)
+    , m_max_utxo_count_for_defragmentation_tx(WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX)
+    , m_decoys_count_for_defragmentation_tx(WALLET_DEFAULT_DECOYS_COUNT_FOR_DEFRAGMENTATION_TX)
     , m_current_wallet_file_size(0)
     , m_use_deffered_global_outputs(false)
 #ifdef DISABLE_TOR
@@ -178,9 +184,15 @@ bool wallet2::set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::set_pos_mint_packing_size(uint64_t new_size)
+void wallet2::set_pos_utxo_count_limits_for_defragmentation_tx(uint64_t min_outs, uint64_t max_outs)
 {
-  m_pos_mint_packing_size = new_size;
+  m_min_utxo_count_for_defragmentation_tx = min_outs;
+  m_max_utxo_count_for_defragmentation_tx = max_outs;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::set_pos_decoys_count_for_defragmentation_tx(size_t decoys_count)
+{
+  m_decoys_count_for_defragmentation_tx = decoys_count;
 }
 //----------------------------------------------------------------------------------------------------
 std::shared_ptr<i_core_proxy> wallet2::get_core_proxy()
@@ -3460,33 +3472,18 @@ void wallet2::get_transfers(wallet2::transfer_container& incoming_transfers) con
   incoming_transfers = m_transfers;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::generate_packing_transaction_if_needed(currency::transaction& tx, uint64_t fake_outputs_number)
+bool wallet2::generate_utxo_defragmentation_transaction_if_needed(currency::transaction& tx)
 {
-  prepare_free_transfers_cache(0);
-  auto it = m_found_free_amounts[currency::native_coin_asset_id].find(CURRENCY_BLOCK_REWARD);
-  if (it == m_found_free_amounts[currency::native_coin_asset_id].end() || it->second.size() <= m_pos_mint_packing_size)
-    return false;
-  
-  //let's check if we have at least WALLET_POS_MINT_PACKING_SIZE transactions which is ready to go
-  size_t count = 0;
-  for (auto it_ind = it->second.begin(); it_ind != it->second.end() && count <= m_pos_mint_packing_size; it_ind++)
-  {
-    if (is_transfer_ready_to_go(m_transfers[*it_ind], fake_outputs_number))
-      ++count;
-  }
-  if (count <= m_pos_mint_packing_size)
-    return false;
   construct_tx_param ctp = get_default_construct_tx_param();
-  currency::tx_destination_entry de = AUTO_VAL_INIT(de);
-  de.addr.push_back(m_account.get_public_address());
-  de.amount = m_pos_mint_packing_size*CURRENCY_BLOCK_REWARD;
-  ctp.dsts.push_back(de);
-  ctp.perform_packing = true;
-  
-  TRY_ENTRY();
-  transfer(ctp, tx, false, nullptr);
-  CATCH_ENTRY2(false);
+  ctp.create_utxo_defragmentation_tx = true;
+  finalized_tx ftp{};
 
+  transfer(ctp, ftp, false, nullptr);
+
+  if (ftp.was_not_prepared)
+      return false; // no such UTXO were found, not an error
+
+  tx = ftp.tx;
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -3779,7 +3776,7 @@ bool enum_container(iterator_t it_begin, iterator_t it_end, callback_t cb)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::is_consolidating_transaction(const wallet_public::wallet_transfer_info& wti)
+bool wallet2::is_defragmentation_transaction(const wallet_public::wallet_transfer_info& wti)
 {
   if (wti.employed_entries.receive.size() && wti.employed_entries.spent.size())
   {
@@ -3804,7 +3801,7 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
   
     if (exclude_mining_txs)
     {
-      if (currency::is_coinbase(wti.tx) || is_consolidating_transaction(wti))
+      if (currency::is_coinbase(wti.tx) || is_defragmentation_transaction(wti))
         return true;
     }
     trs.push_back(wti);
@@ -4021,7 +4018,7 @@ bool wallet2::is_in_hardfork_zone(uint64_t hardfork_index) const
   return m_core_runtime_config.is_hardfork_active_for_height(hardfork_index, get_blockchain_current_size());
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::block& b, const pos_entry& pe, currency::tx_generation_context& miner_tx_tgc) const
+bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t full_block_reward, const currency::pos_entry& pe, currency::tx_generation_context& miner_tx_tgc, currency::block& b) const
 {
   bool r = false;
   WLT_CHECK_AND_ASSERT_MES(pe.wallet_index < m_transfers.size(), false, "invalid pe.wallet_index: " << pe.wallet_index);
@@ -4205,9 +4202,8 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, currency::bl
   b.miner_tx.proofs.emplace_back(std::move(range_proofs));
 
   // balance proof
-  uint64_t block_reward = COIN; // TODO @#@# move it somewhere -- sowle
   currency::zc_balance_proof balance_proof{};
-  r = generate_tx_balance_proof(b.miner_tx, miner_tx_id, miner_tx_tgc, block_reward, balance_proof);
+  r = generate_tx_balance_proof(b.miner_tx, miner_tx_id, miner_tx_tgc, full_block_reward, balance_proof);
   WLT_CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
   b.miner_tx.proofs.emplace_back(std::move(balance_proof));
 
@@ -4337,12 +4333,21 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   tmpl_req.pe.tx_out_index        = td.m_internal_output_index;
   tmpl_req.pe.wallet_index        = cxt.index;
 
-  //generate packing tx
-  transaction pack_tx = AUTO_VAL_INIT(pack_tx);
-  if (generate_packing_transaction_if_needed(pack_tx, 0))
+  // mark stake source as spent and make sure it will be restored in case of error
+  const std::vector<uint64_t> stake_transfer_idx_vec{ cxt.index };
+  mark_transfers_as_spent(stake_transfer_idx_vec, "stake source");
+  bool gracefull_leaving = false;
+  auto stake_transfer_spent_flag_restorer = epee::misc_utils::create_scope_leave_handler([&](){
+    if (!gracefull_leaving)
+      clear_transfers_from_flag(stake_transfer_idx_vec, WALLET_TRANSFER_DETAIL_FLAG_SPENT, "stake source");
+  });
+
+  // generate UTXO Defragmentation Transaction - to reduce the UTXO set size
+  transaction udtx{};
+  if (generate_utxo_defragmentation_transaction_if_needed(udtx))
   {
-    tx_to_blob(pack_tx, tmpl_req.explicit_transaction);
-    WLT_LOG_GREEN("Packing inputs: " << pack_tx.vin.size() << " inputs consolidated in tx " << get_transaction_hash(pack_tx), LOG_LEVEL_0);
+    tx_to_blob(udtx, tmpl_req.explicit_transaction);
+    WLT_LOG_GREEN("Note: " << udtx.vin.size() << " inputs were aggregated into UTXO defragmentation tx " << get_transaction_hash(udtx), LOG_LEVEL_0);
   }
   m_core_proxy->call_COMMAND_RPC_GETBLOCKTEMPLATE(tmpl_req, tmpl_rsp);
   WLT_CHECK_AND_ASSERT_MES(tmpl_rsp.status == API_RETURN_CODE_OK, false, "Failed to create block template after kernel hash found!");
@@ -4366,11 +4371,12 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   set_block_datetime(current_timestamp, b);
   WLT_LOG_MAGENTA("Applying actual timestamp: " << current_timestamp, LOG_LEVEL_0);
 
-  res = prepare_and_sign_pos_block(cxt, b, tmpl_req.pe, tmpl_rsp.miner_tx_tgc);
+  uint64_t full_block_reward = tmpl_rsp.block_reward_without_fee + tmpl_rsp.txs_fee;
+  res = prepare_and_sign_pos_block(cxt, full_block_reward, tmpl_req.pe, tmpl_rsp.miner_tx_tgc, b);
   WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to prepare_and_sign_pos_block");
 
   crypto::hash block_hash = get_block_hash(b);
-  WLT_LOG_GREEN("Block " << print16(block_hash) << " has been constructed, sending to core...", LOG_LEVEL_0);
+  WLT_LOG_GREEN("Block " << print16(block_hash) << " @ " << get_block_height(b) << " has been constructed, sending to core...", LOG_LEVEL_0);
 
   currency::COMMAND_RPC_SUBMITBLOCK2::request subm_req = AUTO_VAL_INIT(subm_req);
   currency::COMMAND_RPC_SUBMITBLOCK2::response subm_rsp = AUTO_VAL_INIT(subm_rsp);
@@ -4387,6 +4393,7 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   WLT_LOG_GREEN("PoS block " << print16(block_hash) << " generated and accepted, congrats!", LOG_LEVEL_0);
   m_wcallback->on_pos_block_found(b);
 
+  gracefull_leaving = true; // to prevent source transfer flags be cleared in scope leave handler
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -4601,6 +4608,7 @@ void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.dsts = destinations;
   ctp.extra.push_back(asset_reg_info);
+  ctp.need_at_least_1_zc = true;
 
   finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
@@ -5485,33 +5493,40 @@ bool wallet2::decrypt_buffer(const std::string& buff, std::string& res_buff)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
+bool wallet2::prepare_tx_sources_for_defragmentation_tx(std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
 {
-  prepare_free_transfers_cache(fake_outputs_count);
+  //prepare_free_transfers_cache(fake_outputs_count);
+  //free_amounts_cache_type& free_amounts_for_native_coin = m_found_free_amounts[currency::native_coin_asset_id];
 
-  free_amounts_cache_type& free_amounts_for_native_coin = m_found_free_amounts[currency::native_coin_asset_id];
-
-  auto it = free_amounts_for_native_coin.find(CURRENCY_BLOCK_REWARD);
-  if (it == free_amounts_for_native_coin.end() || it->second.size() < m_pos_mint_packing_size)
-    return false;
-
-  for (auto set_it = it->second.begin(); set_it != it->second.end() && selected_indicies.size() <= m_pos_mint_packing_size; )
+  std::stringstream ss;
+  if (epee::log_space::log_singletone::get_log_detalisation_level() >= LOG_LEVEL_2)
+    ss << "preparing sources for utxo defragmentation tx:";
+  for (size_t i = 0, size = m_transfers.size(); i < size && selected_indicies.size() < m_max_utxo_count_for_defragmentation_tx; ++i)
   {
-    if (is_transfer_ready_to_go(m_transfers[*set_it], fake_outputs_count))
-    {
-      found_money += it->first;
-      selected_indicies.push_back(*set_it);
-      WLT_LOG_L2("Selected index: " << *set_it << ", transfer_details: " << ENDL << epee::serialization::store_t_to_json(m_transfers[*set_it]));
-      
-      it->second.erase(set_it++);
-    }
-    else
-      set_it++;
-  }
-  if (!it->second.size())
-    free_amounts_for_native_coin.erase(it);
+    const auto& td = m_transfers[i];
+    if (!td.is_native_coin() || td.m_amount > CURRENCY_BLOCK_REWARD)
+      continue;
 
-  return prepare_tx_sources(fake_outputs_count, sources, selected_indicies);
+    if (is_transfer_ready_to_go(td, m_decoys_count_for_defragmentation_tx))
+    {
+      found_money += td.m_amount;
+      selected_indicies.push_back(i);
+      if (epee::log_space::log_singletone::get_log_detalisation_level() >= LOG_LEVEL_2)
+        ss << "    selected transfer #" << i << ", amount: " << print_money_brief(td.m_amount) << ", height: " << td.m_ptx_wallet_info->m_block_height << ", " << (td.is_zc() ? "ZC" : "  ");
+    }
+  }
+
+  if (selected_indicies.size() < m_min_utxo_count_for_defragmentation_tx)
+  {
+    // too few outputs were found, hence don't create a defragmentation tx
+    selected_indicies.clear();
+    found_money = 0;
+    return false;
+  }
+
+  WLT_LOG(ss.str(), LOG_LEVEL_2);
+
+  return prepare_tx_sources(m_decoys_count_for_defragmentation_tx, sources, selected_indicies);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies)
@@ -6464,7 +6479,7 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const mode_separate_context& msc)
+bool wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const mode_separate_context& msc)
 {
 
   SET_CONTEXT_OBJ_FOR_SCOPE(pconstruct_tx_param, ctp);
@@ -6496,9 +6511,14 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   //uint64_t found_money = 0;
 
   TIME_MEASURE_START_MS(prepare_tx_sources_time);
-  if (ctp.perform_packing)
+  if (ctp.create_utxo_defragmentation_tx)
   {
-    prepare_tx_sources_for_packing(WALLET_DEFAULT_POS_MINT_PACKING_SIZE, 0, ftp.sources, ftp.selected_transfers, needed_money_map[currency::native_coin_asset_id].found_amount);
+    try
+    {
+      if (!prepare_tx_sources_for_defragmentation_tx(ftp.sources, ftp.selected_transfers, needed_money_map[currency::native_coin_asset_id].found_amount))
+        return false;
+    }
+    catch(const error::not_enough_outs_to_mix&) { return false; } // if there's not enough decoys, return false to indicate minor non-fatal error
   }
   else if (ctp.htlc_tx_id != currency::null_hash)
   {
@@ -6554,6 +6574,7 @@ void wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
     << ", construct_tx_time: " << construct_tx_time << " ms"
     << ", sign_ms_input_time: " << sign_ms_input_time << " ms",
     LOG_LEVEL_0);*/
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::finalize_transaction(const currency::finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key /* = true */)
@@ -6754,6 +6775,10 @@ void wallet2::transfer(construct_tx_param& ctp,
 
   check_and_throw_if_self_directed_tx_with_payment_id_requested(ctp);
 
+  bool asset_operation_requested = count_type_in_variant_container<asset_descriptor_operation>(ctp.extra) != 0;
+  bool dont_have_zero_asset_ids_in_destinations = std::count_if(ctp.dsts.begin(), ctp.dsts.end(), [](const tx_destination_entry& de) { return de.asset_id == null_pkey; }) == 0;
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(asset_operation_requested || dont_have_zero_asset_ids_in_destinations, "zero asset id is used errounesly (no asset operation was requested)");
+
   if (ctp.crypt_address.spend_public_key == currency::null_pkey)
   {
     ctp.crypt_address = currency::get_crypt_address_from_destinations(m_account.get_keys(), ctp.dsts);
@@ -6762,7 +6787,11 @@ void wallet2::transfer(construct_tx_param& ctp,
   TIME_MEASURE_START(prepare_transaction_time);
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   ftp.tx_version = this->get_current_tx_version();
-  prepare_transaction(ctp, ftp);
+  if (!prepare_transaction(ctp, ftp))
+  {
+    result.was_not_prepared = true;
+    return;
+  }
   TIME_MEASURE_FINISH(prepare_transaction_time);
 
   if (m_watch_only)

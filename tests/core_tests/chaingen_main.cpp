@@ -1076,7 +1076,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(wallet_outputs_with_same_key_image);
     GENERATE_AND_PLAY(wallet_unconfirmed_tx_expiration);
     GENERATE_AND_PLAY(wallet_unconfimed_tx_balance);
-    GENERATE_AND_PLAY_HF(packing_outputs_on_pos_minting_wallet, "3");
+    GENERATE_AND_PLAY_HF(packing_outputs_on_pos_minting_wallet, "3-*");
     GENERATE_AND_PLAY(wallet_watch_only_and_chain_switch);
 
     GENERATE_AND_PLAY(wallet_rpc_integrated_address);
@@ -1256,6 +1256,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(zarcanum_in_alt_chain);
     GENERATE_AND_PLAY(assets_and_explicit_native_coins_in_outs);
     GENERATE_AND_PLAY(zarcanum_block_with_txs);
+    GENERATE_AND_PLAY(asset_depoyment_and_few_zc_utxos);
 
 
     // GENERATE_AND_PLAY(gen_block_reward);

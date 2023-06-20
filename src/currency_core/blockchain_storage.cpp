@@ -1323,7 +1323,7 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
   if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
   {
     CHECK_AND_ASSERT_MES(b.miner_tx.attachment.empty(), false, "coinbase transaction has attachments; attachments are not allowed for coinbase transactions.");
-    CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 3, false, "coinbase transaction has incorrect number of proofs (" << b.miner_tx.proofs.size() << "), expected 2");
+    CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 3, false, "coinbase transaction has incorrect number of proofs (" << b.miner_tx.proofs.size() << "), expected 3");
     CHECK_AND_ASSERT_MES(b.miner_tx.proofs[0].type() == typeid(zc_asset_surjection_proof), false, "coinbase transaction has incorrect type of proof #0 (expected: zc_asset_surjection_proof)");
     CHECK_AND_ASSERT_MES(b.miner_tx.proofs[1].type() == typeid(zc_outs_range_proof), false, "coinbase transaction has incorrect type of proof #1 (expected: zc_outs_range_proof)");
     CHECK_AND_ASSERT_MES(b.miner_tx.proofs[2].type() == typeid(zc_balance_proof), false, "coinbase transaction has incorrect type of proof #2 (expected: zc_balance_proof)");
@@ -1518,6 +1518,8 @@ bool blockchain_storage::create_block_template(const create_block_template_param
   if (!block_filled)
     return false;
 
+  resp.txs_fee = fee;
+
   /* 
       instead of complicated two-phase template construction and adjustment of cumulative size with block reward we
       use CURRENCY_COINBASE_BLOB_RESERVED_SIZE as penalty-free coinbase transaction reservation.
@@ -1528,6 +1530,7 @@ bool blockchain_storage::create_block_template(const create_block_template_param
                                                    miner_address, 
                                                    stakeholder_address,
                                                    b.miner_tx,
+                                                   resp.block_reward_without_fee,
                                                    get_tx_version(height, m_core_runtime_config.hard_forks),
                                                    ex_nonce, 
                                                    CURRENCY_MINER_TX_MAX_OUTS, 

@@ -357,24 +357,24 @@ namespace currency
     const account_public_address &miner_address,
     const account_public_address &stakeholder_address,
     transaction& tx,
+    uint64_t& block_reward_without_fee,
     uint64_t tx_version,
     const blobdata& extra_nonce               /* = blobdata() */,
     size_t max_outs                           /* = CURRENCY_MINER_TX_MAX_OUTS */,
     bool pos                                  /* = false */,
     const pos_entry& pe                       /* = pos_entry() */,  // only pe.stake_unlock_time and pe.stake_amount are used now, TODO: consider refactoring -- sowle
-    tx_generation_context* ogc_ptr       /* = nullptr */,
+    tx_generation_context* ogc_ptr            /* = nullptr */,
     const keypair* tx_one_time_key_to_use     /* = nullptr */
   )
   {
     bool r = false;
 
-    uint64_t block_reward = 0;
-    if (!get_block_reward(pos, median_size, current_block_size, already_generated_coins, block_reward, height))
+    if (!get_block_reward(pos, median_size, current_block_size, already_generated_coins, block_reward_without_fee, height))
     {
       LOG_ERROR("Block is too big");
       return false;
     }
-    block_reward += fee;
+    uint64_t block_reward = block_reward_without_fee + fee;
       
     //
     // prepare destinations

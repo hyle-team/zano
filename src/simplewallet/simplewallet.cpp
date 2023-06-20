@@ -1808,11 +1808,13 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
   if (!args.size() || args.size() > 1)
   {
     fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
+    return true;
   }
   bool r = epee::serialization::load_t_from_json_file(adb, args[0]);
   if (!r)
   {
     fail_msg_writer() << "Failed to load json file with asset specification: " << args[0];
+    return true;
   }
   tx_destination_entry td = AUTO_VAL_INIT(td);
   td.addr.push_back(m_wallet->get_account().get_public_address());
@@ -1842,6 +1844,7 @@ bool simple_wallet::add_custom_asset_id(const std::vector<std::string> &args)
   if (!args.size() || args.size() > 1)
   {
     fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
+    return true;
   }
   crypto::public_key asset_id = currency::null_pkey;
   if (!epee::string_tools::parse_tpod_from_hex_string(args[0], asset_id))
@@ -1877,6 +1880,7 @@ bool simple_wallet::generate_ionic_swap_proposal(const std::vector<std::string> 
   if (args.size() != 2)
   {
     fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
+    return true;
   }
 
   view::ionic_swap_proposal_info proposal_info = AUTO_VAL_INIT(proposal_info);
@@ -1884,6 +1888,7 @@ bool simple_wallet::generate_ionic_swap_proposal(const std::vector<std::string> 
   if (!r)
   {
     fail_msg_writer() << "Failed to load json file with asset specification: " << args[0];
+    return true;
   }
   currency::account_public_address destination_addr = AUTO_VAL_INIT(destination_addr);
   currency::payment_id_t integrated_payment_id;
@@ -1921,6 +1926,7 @@ bool simple_wallet::get_ionic_swap_proposal_info(const std::vector<std::string> 
   if (args.size() != 1)
   {
     fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
+    return true;
   }
 
   std::string raw_proposal;
@@ -1953,6 +1959,7 @@ bool simple_wallet::accept_ionic_swap_proposal(const std::vector<std::string> &a
   if (args.size() != 1)
   {
     fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
+    return true;
   }
 
   std::string raw_proposal;
@@ -1983,6 +1990,7 @@ bool simple_wallet::remove_custom_asset_id(const std::vector<std::string> &args)
   if (!args.size() || args.size() > 1)
   {
     fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1";
+    return true;
   }
   crypto::public_key asset_id = currency::null_pkey;
   if (!epee::string_tools::parse_tpod_from_hex_string(args[0], asset_id))
