@@ -26,3 +26,12 @@ struct assets_and_explicit_native_coins_in_outs : public wallet_test
   mutable uint64_t m_alice_initial_balance = 0;
 };
 
+struct asset_depoyment_and_few_zc_utxos : public wallet_test
+{
+  asset_depoyment_and_few_zc_utxos();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  mutable uint64_t m_alice_initial_balance = 0;
+};
+

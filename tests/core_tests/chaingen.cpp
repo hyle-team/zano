@@ -299,6 +299,7 @@ bool test_generator::construct_block(currency::block& blk,
   blk.miner_tx = AUTO_VAL_INIT(blk.miner_tx);
   size_t target_block_size = txs_size + 0; // zero means no cost for ordinary coinbase
   tx_generation_context miner_tx_tgc{};
+  uint64_t block_reward_without_fee = 0;
   while (true)
   {
     r = construct_miner_tx(height, misc_utils::median(block_sizes),
@@ -308,6 +309,7 @@ bool test_generator::construct_block(currency::block& blk,
                                     miner_acc.get_keys().account_address,
                                     miner_acc.get_keys().account_address,
                                     blk.miner_tx,
+                                    block_reward_without_fee,
                                     get_tx_version(height, m_hardforks),
                                     blobdata(),
                                     test_generator::get_test_gentime_settings().miner_tx_max_outs,
@@ -354,7 +356,7 @@ bool test_generator::construct_block(currency::block& blk,
   else
   {
     //need to build pos block
-    r = sign_block(wallets[won_walled_index].mining_context, pe, *wallets[won_walled_index].wallet, miner_tx_tgc, blk);
+    r = sign_block(wallets[won_walled_index].mining_context, pe, block_reward_without_fee + total_fee, *wallets[won_walled_index].wallet, miner_tx_tgc, blk);
     CHECK_AND_ASSERT_MES(r, false, "Failed to find_kernel_and_sign()");
   }
 
@@ -373,11 +375,12 @@ bool test_generator::construct_block(currency::block& blk,
 
 bool test_generator::sign_block(const tools::wallet2::mining_context& mining_context,
                                 const pos_entry& pe,
+                                uint64_t full_block_reward,
                                 const tools::wallet2& w,
                                 tx_generation_context& miner_tx_tgc,
                                 currency::block& b)
 {
-  bool r = w.prepare_and_sign_pos_block(mining_context, b, pe, miner_tx_tgc);
+  bool r = w.prepare_and_sign_pos_block(mining_context, full_block_reward, pe, miner_tx_tgc, b);
   CHECK_AND_ASSERT_MES(r, false, "prepare_and_sign_pos_block failed");
   return true;
 }
@@ -933,9 +936,10 @@ bool test_generator::construct_block(int64_t manual_timestamp_adjustment,
   }
   else
   {
+    uint64_t base_block_reward = 0;
     size_t current_block_size = txs_sizes + get_object_blobsize(blk.miner_tx);
     // TODO: This will work, until size of constructed block is less then CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE
-    if (!construct_miner_tx(height, misc_utils::median(block_sizes), already_generated_coins, current_block_size, 0, miner_acc.get_public_address(), miner_acc.get_public_address(), blk.miner_tx, get_tx_version(height, m_hardforks), blobdata(), 1))
+    if (!construct_miner_tx(height, misc_utils::median(block_sizes), already_generated_coins, current_block_size, 0, miner_acc.get_public_address(), miner_acc.get_public_address(), blk.miner_tx, base_block_reward, get_tx_version(height, m_hardforks), blobdata(), 1))
       return false;
   }
 

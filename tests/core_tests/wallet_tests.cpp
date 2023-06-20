@@ -3355,15 +3355,15 @@ packing_outputs_on_pos_minting_wallet::packing_outputs_on_pos_minting_wallet()
 
 bool packing_outputs_on_pos_minting_wallet::generate(std::vector<test_event_entry>& events) const
 {
+  // Test ideas:
+  // 1) UTXO defragmentation tx cannot select stake output by accident;
+  // 2) if UTXO defragmentation tx cannot be constructed because of too few decoy outputs, PoS can still be created;
+  // 3) UTXO defragmentation tx limits works as expected.
 
-  //  0       10      11      21     22    <- blockchain height (assuming CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10)
-  // (0 )... (0r)-   (1 )... (1r)-         <- main chain
-  //                 tx_0                  <- txs
-
-  GENERATE_ACCOUNT(miner_acc);
-  m_accounts.push_back(miner_acc);
-  //GENERATE_ACCOUNT(alice_acc);
-  //m_accounts.push_back(alice_acc);
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
 
   // don't use MAKE_GENESIS_BLOCK here because it will mask 'generator'
   currency::block blk_0 = AUTO_VAL_INIT(blk_0);
@@ -3372,21 +3372,32 @@ bool packing_outputs_on_pos_minting_wallet::generate(std::vector<test_event_entr
 
   DO_CALLBACK(events, "configure_core");
 
-  CREATE_TEST_WALLET(miner_wlt, miner_acc, blk_0);
-  REFRESH_TEST_WALLET_AT_GEN_TIME(events, miner_wlt, blk_0, 0);
-  uint64_t unlocked, awaiting_in, awaiting_out, mined;
-  m_premine_amount = miner_wlt->balance(unlocked, awaiting_in, awaiting_out, mined);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
-  size_t n_blocks = CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5;
-  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, n_blocks);
-  m_mined_amount = n_blocks * COIN;
+  m_single_amount = TESTS_DEFAULT_FEE * 5;
 
-  REFRESH_TEST_WALLET_AT_GEN_TIME(events, miner_wlt, blk_0r, n_blocks);
-  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(miner_wlt, m_premine_amount + m_mined_amount);
+  MAKE_TX(events, tx_0, miner_acc, alice_acc, m_single_amount, blk_0r);
+  MAKE_TX(events, tx_1, miner_acc, alice_acc, m_single_amount, blk_0r);
+  MAKE_TX(events, tx_2, miner_acc, alice_acc, m_single_amount, blk_0r);
+  MAKE_TX(events, tx_3, miner_acc, alice_acc, m_single_amount, blk_0r);
+  MAKE_TX(events, tx_4, miner_acc, alice_acc, m_single_amount, blk_0r);
+  MAKE_TX(events, tx_5, miner_acc, bob_acc,   m_single_amount, blk_0r);
+  MAKE_TX(events, tx_6, miner_acc, bob_acc,   m_single_amount, blk_0r);
 
-  //MAKE_TX_FEE(events, tx_0, miner_acc, alice_acc, MK_TEST_COINS(2000), TESTS_DEFAULT_FEE, blk_0r);
-  //MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
-  //REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
+  m_alice_initial_balance = m_single_amount * 5;
+  m_bob_initial_balance   = m_single_amount * 2;
+
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({tx_0, tx_1, tx_2, tx_3, tx_4, tx_5, tx_6}));
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  CREATE_TEST_WALLET(alice_wlt, alice_acc, blk_0);
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_1r, CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2 + 1);
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, m_alice_initial_balance);
+
+  CREATE_TEST_WALLET(bob_wlt, bob_acc, blk_0);
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, bob_wlt, blk_1r, CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2 + 1);
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(bob_wlt, m_bob_initial_balance);
 
   DO_CALLBACK(events, "c1");
 
@@ -3395,30 +3406,72 @@ bool packing_outputs_on_pos_minting_wallet::generate(std::vector<test_event_entr
 
 bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
   size_t blocks_fetched = 0;
   bool received_money;
   std::atomic<bool> atomic_false = ATOMIC_VAR_INIT(false);
-  miner_wlt->refresh(blocks_fetched, received_money, atomic_false);
-  CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5, false, "Incorrect numbers of blocks fetched");
+
+  alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
+  CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2 + 1, false, "Incorrect numbers of blocks fetched: " << blocks_fetched);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", m_alice_initial_balance, 0, m_alice_initial_balance, 0, 0), false, "");
+
+  bob_wlt->refresh(blocks_fetched, received_money, atomic_false);
+  CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2 + 1, false, "Incorrect numbers of blocks fetched: " << blocks_fetched);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "bob_wlt", m_bob_initial_balance, 0, m_bob_initial_balance, 0, 0), false, "");
+
+  // 1. Try to defragment the same UTXO that is used for staking
+  // (Bob has two: one UTXO is for staking, other is being defragmented)
+  bob_wlt->set_pos_utxo_count_limits_for_defragmentation_tx(1, 10);
+  bob_wlt->set_pos_decoys_count_for_defragmentation_tx(0);
+  bob_wlt->try_mint_pos();
+
+  CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2 + 3, false, "Incorrect blockchain height:" << c.get_current_blockchain_size());
+  bob_wlt->refresh(blocks_fetched, received_money, atomic_false);
+  CHECK_AND_ASSERT_MES(blocks_fetched == 1, false, "Incorrect numbers of blocks fetched: " << blocks_fetched);
+
+  // (also make sure that unlocked balance is zero)
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "bob_wlt", m_bob_initial_balance + CURRENCY_BLOCK_REWARD, CURRENCY_BLOCK_REWARD + TESTS_DEFAULT_FEE, 0), false, "");
+
   
-  miner_wlt->set_pos_mint_packing_size(4);
-  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*miner_wlt.get(), "miner_wlt", m_premine_amount + m_mined_amount, uint64_max, uint64_max, 0, 0), false, "");
+  // 2. Try to mine a PoS block and defragment some of UTXO
+  alice_wlt->set_pos_utxo_count_limits_for_defragmentation_tx(2, 2);
+  alice_wlt->set_pos_decoys_count_for_defragmentation_tx(0);
+  alice_wlt->try_mint_pos();
 
-  miner_wlt->try_mint_pos();
+  CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2 + 4, false, "Incorrect blockchain height:" << c.get_current_blockchain_size());
+  alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
+  CHECK_AND_ASSERT_MES(blocks_fetched == 2, false, "Incorrect numbers of blocks fetched: " << blocks_fetched);
 
-  CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 7, false, "Incorrect blockchain height:" << c.get_current_blockchain_size());
-  miner_wlt->refresh(blocks_fetched, received_money, atomic_false);
-  CHECK_AND_ASSERT_MES(blocks_fetched == 1, false, "Incorrect numbers of blocks fetched");
+  // (also make sure that only two UTXOs is unlocked)
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", m_alice_initial_balance + CURRENCY_BLOCK_REWARD, CURRENCY_BLOCK_REWARD + TESTS_DEFAULT_FEE, m_single_amount * 2), false, "");
 
-  block top_block = AUTO_VAL_INIT(top_block);
-  bool r = c.get_blockchain_storage().get_top_block(top_block);
-  CHECK_AND_ASSERT_MES(r && is_pos_block(top_block), false, "get_top_block failed or smth goes wrong");
-  uint64_t top_block_reward = get_outs_money_amount(top_block.miner_tx);
-  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*miner_wlt.get(), "miner_wlt", m_premine_amount + m_mined_amount + COIN), false, "");
 
-  miner_wlt->reset_password(g_wallet_password);
-  miner_wlt->store(g_wallet_filename);
+  // 3. Try to mine a PoS block and defragment with huge decoy set. Make sure block is mined successfully without a defragmentation tx
+  // Alice has one UTXO
+  alice_wlt->set_pos_utxo_count_limits_for_defragmentation_tx(1, 1);
+  alice_wlt->set_pos_decoys_count_for_defragmentation_tx(80);
+  alice_wlt->try_mint_pos();
+
+  CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2 + 5, false, "Incorrect blockchain height:" << c.get_current_blockchain_size());
+  alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
+  CHECK_AND_ASSERT_MES(blocks_fetched == 1, false, "Incorrect numbers of blocks fetched: " << blocks_fetched);
+
+  // Alice's unlocked balance should consist only of one UTXO
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", m_alice_initial_balance + CURRENCY_BLOCK_REWARD * 2, CURRENCY_BLOCK_REWARD * 2 + TESTS_DEFAULT_FEE, m_single_amount), false, "");
+
+
+  // 4. Finally mine a PoS and defragment the last one unlocked UTXO
+  alice_wlt->set_pos_utxo_count_limits_for_defragmentation_tx(1, 1);
+  alice_wlt->set_pos_decoys_count_for_defragmentation_tx(0);
+  alice_wlt->try_mint_pos();
+
+  CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2 + 6, false, "Incorrect blockchain height:" << c.get_current_blockchain_size());
+  alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
+  CHECK_AND_ASSERT_MES(blocks_fetched == 1, false, "Incorrect numbers of blocks fetched: " << blocks_fetched);
+
+  // Alice's unlocked balance should be zero
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", m_alice_initial_balance + CURRENCY_BLOCK_REWARD * 3, CURRENCY_BLOCK_REWARD * 3 + TESTS_DEFAULT_FEE, 0), false, "");
 
   return true;
 }

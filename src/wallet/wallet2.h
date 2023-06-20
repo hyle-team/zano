@@ -50,8 +50,6 @@
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               10
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
 
-#define WALLET_DEFAULT_POS_MINT_PACKING_SIZE                          100
-
 #define   WALLET_TRANSFER_DETAIL_FLAG_SPENT                            uint32_t(1 << 0)
 #define   WALLET_TRANSFER_DETAIL_FLAG_BLOCKED                          uint32_t(1 << 1)       
 #define   WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION      uint32_t(1 << 2)
@@ -299,7 +297,7 @@ namespace tools
     currency::account_public_address crypt_address;
     uint8_t tx_outs_attr = 0;
     bool shuffle = false;
-    bool perform_packing = false;
+    bool create_utxo_defragmentation_tx = false;
     bool need_at_least_1_zc = false;
   };
 
@@ -574,7 +572,7 @@ namespace tools
     const currency::account_base& get_account() const { return m_account; }
 
     void get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs = false, bool start_from_end = true);
-    bool is_consolidating_transaction(const wallet_public::wallet_transfer_info& wti);
+    bool is_defragmentation_transaction(const wallet_public::wallet_transfer_info& wti);
     uint64_t get_recent_transfers_total_count();
     uint64_t get_transfer_entries_count();
     void get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs, bool exclude_mining_txs = false);
@@ -609,7 +607,8 @@ namespace tools
     void deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id);
 
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
-    void set_pos_mint_packing_size(uint64_t new_size);
+    void set_pos_utxo_count_limits_for_defragmentation_tx(uint64_t min_outs, uint64_t max_outs); // don't create UTXO defrag. tx if there are less than 'min_outs' outs; don't put more than 'max_outs' outs
+    void set_pos_decoys_count_for_defragmentation_tx(size_t decoys_count);
     void set_minimum_height(uint64_t h);
     std::shared_ptr<i_core_proxy> get_core_proxy();
     uint64_t balance() const;
@@ -885,7 +884,7 @@ namespace tools
     //next functions in public area only becausce of test_generator
     //TODO: Need refactoring - remove it back to private zone 
     void set_genesis(const crypto::hash& genesis_hash);
-    bool prepare_and_sign_pos_block(const mining_context& cxt, currency::block& b, const currency::pos_entry& pe, currency::tx_generation_context& miner_tx_tgc) const;
+    bool prepare_and_sign_pos_block(const mining_context& cxt, uint64_t full_block_reward, const currency::pos_entry& pe, currency::tx_generation_context& miner_tx_tgc, currency::block& b) const;
     void process_new_blockchain_entry(const currency::block& b, 
       const currency::block_direct_data_entry& bche, 
       const crypto::hash& bl_id,
@@ -933,7 +932,7 @@ namespace tools
     const std::list<expiration_entry_info>& get_expiration_entries() const { return m_money_expirations; };
     bool get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) const;
 
-    void prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const mode_separate_context& emode_separate = mode_separate_context());
+    bool prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const mode_separate_context& emode_separate = mode_separate_context());
 
     void finalize_transaction(const currency::finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key = true);
     void finalize_transaction(const currency::finalize_tx_param& ftp, currency::finalized_tx& result, bool broadcast_tx, bool store_tx_secret_key = true );
@@ -1042,7 +1041,7 @@ private:
     bool prepare_tx_sources(size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, const std::vector<uint64_t>& selected_indicies);
     bool prepare_tx_sources(crypto::hash multisig_id, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
     bool prepare_tx_sources_htlc(crypto::hash htlc_tx_id, const std::string& origin, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
-    bool prepare_tx_sources_for_packing(uint64_t items_to_pack, size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
+    bool prepare_tx_sources_for_defragmentation_tx(std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
     void prefetch_global_indicies_if_needed(const std::vector<uint64_t>& selected_indicies);
     assets_selection_context get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts);
     void prepare_tx_destinations(const assets_selection_context& needed_money_map,
@@ -1110,7 +1109,7 @@ private:
     void exception_handler();
     void exception_handler() const;
     uint64_t get_minimum_allowed_fee_for_contract(const crypto::hash& ms_id);
-    bool generate_packing_transaction_if_needed(currency::transaction& tx, uint64_t fake_outputs_number);
+    bool generate_utxo_defragmentation_transaction_if_needed(currency::transaction& tx);
     bool store_unsigned_tx_to_file_and_reserve_transfers(const currency::finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str = nullptr);
     void check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp);
     void push_new_block_id(const crypto::hash& id, uint64_t height);
@@ -1146,7 +1145,9 @@ private:
 
     std::atomic<uint64_t> m_last_bc_timestamp; 
     bool m_do_rise_transfer;
-    uint64_t m_pos_mint_packing_size;
+    uint64_t m_min_utxo_count_for_defragmentation_tx;
+    uint64_t m_max_utxo_count_for_defragmentation_tx;
+    size_t m_decoys_count_for_defragmentation_tx;
 
     transfer_container m_transfers;
     multisig_transfer_container m_multisig_transfers;
