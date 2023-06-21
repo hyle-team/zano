@@ -25,6 +25,8 @@ namespace currency
   //------------------------------------------------------------------
   bool is_tx_expired(const transaction& tx, uint64_t expiration_ts_median)
   {
+    if (expiration_ts_median == 0)
+      return false;
     /// tx expiration condition (tx is ok if the following is true)
     /// tx_expiration_time - TX_EXPIRATION_MEDIAN_SHIFT > get_last_n_blocks_timestamps_median(TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW)
     uint64_t expiration_time = get_tx_expiration_time(tx);

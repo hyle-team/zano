@@ -10,7 +10,7 @@
 #include "currency_core/account.h"
 #include "currency_core/currency_format_utils.h"
 #include "misc_language.h"
-
+#include "chaingen_helpers.h"
 using namespace currency;
 
 
@@ -117,12 +117,12 @@ bool test_transaction_generation_and_ring_signature()
   std::vector<wallet_out_info> outs;
   uint64_t money = 0;
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-  r = lookup_acc_outs(rv_acc.get_keys(), tx_rc1, get_tx_pub_key_from_extra(tx_rc1), outs,  money, derivation);
+  r = lookup_acc_outs(rv_acc.get_keys(), tx_rc1, outs,  money, derivation);
   CHECK_AND_ASSERT_MES(r, false, "failed to lookup_acc_outs");
   CHECK_AND_ASSERT_MES(td.amount == money, false, "wrong money amount in new transaction");
   money = 0;
   derivation = AUTO_VAL_INIT(derivation);
-  r = lookup_acc_outs(rv_acc2.get_keys(), tx_rc1, get_tx_pub_key_from_extra(tx_rc1), outs,  money, derivation);
+  r = lookup_acc_outs(rv_acc2.get_keys(), tx_rc1, outs,  money, derivation);
   CHECK_AND_ASSERT_MES(r, false, "failed to lookup_acc_outs");
   CHECK_AND_ASSERT_MES(0 == money, false, "wrong money amount in new transaction");
   return true;

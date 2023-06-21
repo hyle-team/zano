@@ -6,6 +6,17 @@
 
 #define BEGIN_BOOST_SERIALIZATION()     template <class t_archive> inline void serialize(t_archive &_arch, const unsigned int ver) {
 
+template<size_t A, size_t B> struct TAssertEquality {
+  static_assert(A == B, "Serialization map is not updated, sizeof() missmatch");
+  static constexpr bool _cResult = (A == B);
+};
+
+//experemental feature: self-validated serialization map, needed to not forget add new members to serialization maps
+#define BEGIN_BOOST_SERIALIZATION_SV(sz)  BEGIN_BOOST_SERIALIZATION()  \
+              static constexpr bool _cIsEqual = TAssertEquality<sz, sizeof(*this)>::_cResult;
+
+
+
 #define BOOST_SERIALIZE(x)    _arch & x;
 
 #define END_BOOST_SERIALIZATION()       }

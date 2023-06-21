@@ -366,6 +366,7 @@ namespace tools
         payment_id = embedded_payment_id;
       }
       de.amount = it->amount;
+      de.asset_id = (it->asset_id == currency::null_pkey ? currency::native_coin_asset_id : it->asset_id);
       dsts.push_back(de);
     }
 
@@ -688,10 +689,11 @@ namespace tools
         }
       }
     
-      if (wti.is_income && req.in)
+      bool has_outgoing = wti.has_outgoing_entries();
+      if (!has_outgoing && req.in)
         res.in.push_back(wti);
 
-      if (!wti.is_income && req.out)
+      if (has_outgoing && req.out)
         res.out.push_back(wti);   
 
       return true; // continue
@@ -701,7 +703,7 @@ namespace tools
     if (req.pool)
     {
       w.get_wallet()->enumerate_unconfirmed_transfers([&](const wallet_public::wallet_transfer_info& wti) -> bool {
-        if ((wti.is_income && req.in) || (!wti.is_income && req.out))
+        if ((!wti.has_outgoing_entries() && req.in) || (wti.has_outgoing_entries() && req.out))
           res.pool.push_back(wti);
         return true; // continue
       });

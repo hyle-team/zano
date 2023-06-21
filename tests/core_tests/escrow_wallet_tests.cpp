@@ -17,7 +17,7 @@ using namespace currency;
 
 struct wallet_tests_callback_handler : public tools::i_wallet2_callback
 {
-  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) 
+  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
   {
     all_wtis.push_back(wti);
   }
@@ -1627,6 +1627,7 @@ bool escrow_custom_test::generate(std::vector<test_event_entry>& events) const
     test_details.push_back(cd);
   }
 
+  
   for(auto cd : test_details)
   {
     DO_CALLBACK_PARAMS_STR(events, "check", epee::serialization::store_t_to_json(cd));
@@ -1637,7 +1638,7 @@ bool escrow_custom_test::generate(std::vector<test_event_entry>& events) const
 
     prev_block = blk_n;
   }
-
+  
   return true;
 }
 
@@ -2601,7 +2602,7 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   crypto::hash contract_id = contracts.begin()->first;
 
   uint64_t alice_blocked_transfers_sum = 0;
-  CHECK_AND_ASSERT_MES(estimate_wallet_balance_blocked_for_escrow(*alice_wlt.get(), alice_blocked_transfers_sum, false), false, "");
+  CHECK_AND_ASSERT_MES(estimate_wallet_balance_blocked_for_escrow(*alice_wlt.get(), alice_blocked_transfers_sum), false, "");
 
   // mine a block, containing escrow proposal tx
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
@@ -2622,7 +2623,7 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   bob_wlt->accept_proposal(contract_id, TESTS_DEFAULT_FEE);
 
   uint64_t bob_blocked_transfers_sum = 0;
-  CHECK_AND_ASSERT_MES(estimate_wallet_balance_blocked_for_escrow(*bob_wlt.get(), bob_blocked_transfers_sum, false), false, "");
+  CHECK_AND_ASSERT_MES(estimate_wallet_balance_blocked_for_escrow(*bob_wlt.get(), bob_blocked_transfers_sum), false, "");
   
   // mine a block containing contract acceptance
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());

@@ -24,16 +24,39 @@ namespace wallet_public
 #define WALLET_RPC_STATUS_BUSY    "BUSY"
 
 
-  struct wallet_transfer_info_details
-  {
-    std::list<uint64_t> rcv;
-    std::list<uint64_t> spn;
+  struct employed_tx_entry {
+    uint64_t index = 0;
+    uint64_t amount = 0;
+    crypto::public_key asset_id = currency::native_coin_asset_id;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(rcv)
-      KV_SERIALIZE(spn)
+      KV_SERIALIZE(index)
+      KV_SERIALIZE(amount)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
     END_KV_SERIALIZE_MAP()
 
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(index)
+      BOOST_SERIALIZE(amount)
+      BOOST_SERIALIZE(asset_id)
+    END_BOOST_SERIALIZATION()
+
+  };
+
+  struct employed_tx_entries
+  {
+    std::vector<employed_tx_entry> receive;
+    std::vector<employed_tx_entry> spent;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(receive)
+      KV_SERIALIZE(spent)
+    END_KV_SERIALIZE_MAP()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(receive)
+      BOOST_SERIALIZE(spent)
+    END_BOOST_SERIALIZATION()
   };
 
   struct escrow_contract_details_basic
@@ -89,52 +112,67 @@ namespace wallet_public
 #define WALLET_TRANSFER_INFO_FLAGS_HTLC_DEPOSIT   static_cast<uint16_t>(1 << 0)
 
 
+  struct wallet_sub_transfer_info
+  {
+    uint64_t      amount = 0;
+    bool          is_income = false;
+    crypto::public_key asset_id = currency::native_coin_asset_id; // not blinded, not premultiplied by 1/8
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(amount)
+      KV_SERIALIZE(is_income)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
+    END_KV_SERIALIZE_MAP()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(amount) 
+      BOOST_SERIALIZE(is_income)
+      BOOST_SERIALIZE(asset_id)
+    END_BOOST_SERIALIZATION()
+
+  };
+
   struct wallet_transfer_info
   {
-    uint64_t      amount;
     uint64_t      timestamp;
     crypto::hash  tx_hash;
     uint64_t      height;          //if height == 0 then tx is unconfirmed
     uint64_t      unlock_time;
     uint32_t      tx_blob_size;
     std::string   payment_id;
-    std::vector<std::string> remote_addresses;  //optional
-    std::vector<std::string> remote_aliases; //optional, describe only if there only one remote address
     std::string   comment;
-    bool          is_income;
     bool          is_service;
     bool          is_mixing;
     bool          is_mining;
     uint64_t      tx_type;
-    wallet_transfer_info_details td;
+    employed_tx_entries employed_entries;
     std::vector<currency::tx_service_attachment> service_entries;
+    std::vector<std::string> remote_addresses;  //optional
+    std::vector<std::string> remote_aliases; //optional, describe only if there only one remote address
+
+    std::vector<wallet_sub_transfer_info> subtransfers;
+
     //not included in streaming serialization
     uint64_t      fee;
     bool          show_sender;
     std::vector<escrow_contract_details> contract;
-    uint16_t      extra_flags; 
+    uint16_t      extra_flags;
     uint64_t      transfer_internal_index;
-    crypto::public_key asset_id; // not blinded, not premultiplied by 1/8
-    
-    
+   
     //not included in kv serialization map
     currency::transaction tx;
     std::vector<uint64_t> selected_indicies;
     std::list<bc_services::offers_attachment_t> marketplace_entries;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(amount)
       KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash)
       KV_SERIALIZE(height)
       KV_SERIALIZE(unlock_time)
       KV_SERIALIZE(tx_blob_size)
       KV_SERIALIZE_BLOB_AS_HEX_STRING(payment_id)
-      KV_SERIALIZE(remote_addresses)      
-      KV_SERIALIZE(remote_aliases)
       KV_SERIALIZE(comment)
-      KV_SERIALIZE(is_income)
       KV_SERIALIZE(timestamp)
-      KV_SERIALIZE(td)
+      KV_SERIALIZE(employed_entries)
       KV_SERIALIZE(fee)
       KV_SERIALIZE(is_service)
       KV_SERIALIZE(is_mixing)
@@ -144,9 +182,95 @@ namespace wallet_public
       KV_SERIALIZE(contract)
       KV_SERIALIZE(service_entries)
       KV_SERIALIZE(transfer_internal_index)
-      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
+      KV_SERIALIZE(remote_addresses)
+      KV_SERIALIZE(remote_aliases)
+      KV_SERIALIZE(subtransfers)
     END_KV_SERIALIZE_MAP()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(timestamp)
+      BOOST_SERIALIZE(tx_hash)
+      BOOST_SERIALIZE(height)
+      BOOST_SERIALIZE(tx_blob_size)
+      BOOST_SERIALIZE(payment_id)
+      BOOST_SERIALIZE(remote_addresses)
+      BOOST_SERIALIZE(employed_entries)
+      BOOST_SERIALIZE(tx)
+      BOOST_SERIALIZE(remote_aliases)
+      BOOST_SERIALIZE(comment)
+      BOOST_SERIALIZE(contract)
+      BOOST_SERIALIZE(selected_indicies)
+      BOOST_SERIALIZE(marketplace_entries)
+      BOOST_SERIALIZE(unlock_time)
+      BOOST_SERIALIZE(service_entries)
+      BOOST_SERIALIZE(subtransfers)
+    END_BOOST_SERIALIZATION()
+
+    bool is_income_mode_encryption() const 
+    {
+      for (const auto& st : subtransfers)
+      {
+        if (st.asset_id == currency::native_coin_asset_id)
+          return st.is_income;
+      }
+      return true;
+    }
+    bool has_outgoing_entries() const
+    {
+      for (const auto& st : subtransfers)
+      {
+        if (!st.is_income)
+          return true;
+      }
+      return false;
+    }
+    uint64_t get_native_income_amount() const
+    {
+      for (const auto& st : subtransfers)
+      {
+        if (st.asset_id == currency::native_coin_asset_id && st.is_income)
+          return st.amount;
+      }
+      return 0;
+    }
+    uint64_t get_native_amount() const
+    {
+      for (const auto& st : subtransfers)
+      {
+        if (st.asset_id == currency::native_coin_asset_id )
+          return st.amount;
+      }
+      return 0;
+    }
+    bool get_native_is_income() const
+    {
+      for (const auto& st : subtransfers)
+      {
+        if (st.asset_id == currency::native_coin_asset_id)
+          return st.is_income;
+      }
+      return false;
+    }
+    uint64_t& get_native_income_amount()
+    {
+      for (auto& st : subtransfers)
+      {
+        if (st.asset_id == currency::native_coin_asset_id)
+          if (st.is_income)
+          {
+            return st.amount;
+          }
+          else
+          {
+            throw std::runtime_error("Unexpected wallet_transfer_info: native is not income type");
+          }          
+      }
+      subtransfers.push_back(wallet_sub_transfer_info());
+      subtransfers.back().is_income = true;
+      return subtransfers.back().amount;
+    }
   };
+
 
   struct asset_balance_entry_base
   {
@@ -437,9 +561,11 @@ namespace wallet_public
   {
     uint64_t amount;
     std::string address;
+    crypto::public_key asset_id;
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(amount)
       KV_SERIALIZE(address)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
     END_KV_SERIALIZE_MAP()
   };
 

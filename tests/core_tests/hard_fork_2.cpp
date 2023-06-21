@@ -140,7 +140,7 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
 
   size_t callback_counter = 0;
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
-    [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
+    [&](const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) -> bool {
       CHECK_AND_ASSERT_THROW_MES(wti.show_sender, "show_sender is false");
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.size() == 1, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), "wti.remote_addresses.front is incorrect");
@@ -234,8 +234,8 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l2(new wlt_lambda_on_transfer2_wrapper(
-    [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
-      CHECK_AND_ASSERT_THROW_MES(wti.amount == MK_TEST_COINS(2), "incorrect wti.amount = " << print_money_brief(wti.amount));
+    [&](const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) -> bool {
+      CHECK_AND_ASSERT_THROW_MES(wti.get_native_amount() == MK_TEST_COINS(2), "incorrect wti.amount = " << print_money_brief(wti.get_native_amount()));
       CHECK_AND_ASSERT_THROW_MES(wti.show_sender, "show_sender is false");
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.size() == 1, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), "wti.remote_addresses.front is incorrect");
@@ -367,8 +367,8 @@ bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, c
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
-    [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
-      CHECK_AND_ASSERT_THROW_MES(!wti.is_income, "wti.is_income is " << wti.is_income);
+    [&](const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) -> bool {
+      CHECK_AND_ASSERT_THROW_MES(!wti.get_native_is_income(), "wti.is_income is " << wti.get_native_is_income());
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.size() == 2, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), "wti.remote_addresses.front is incorrect");
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.back() == m_accounts[BOB_ACC_IDX].get_public_address_str(), "wti.remote_addresses.back is incorrect");
@@ -409,9 +409,9 @@ bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, c
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l2(new wlt_lambda_on_transfer2_wrapper(
-    [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
-      CHECK_AND_ASSERT_THROW_MES(!wti.is_income, "wti.is_income is " << wti.is_income);
-      CHECK_AND_ASSERT_THROW_MES(wti.amount == MK_TEST_COINS(4), "incorrect wti.amount = " << print_money_brief(wti.amount));
+    [&](const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) -> bool {
+      CHECK_AND_ASSERT_THROW_MES(!wti.get_native_is_income(), "wti.is_income is " << wti.get_native_is_income());
+      CHECK_AND_ASSERT_THROW_MES(wti.get_native_amount() == MK_TEST_COINS(4), "incorrect wti.amount = " << print_money_brief(wti.get_native_amount()));
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.size() == 2, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), "wti.remote_addresses.front is incorrect");
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.back() == m_accounts[BOB_ACC_IDX].get_public_address_str(), "wti.remote_addresses.back is incorrect");
@@ -1003,7 +1003,7 @@ bool hard_fork_2_awo_wallets_basic_test<before_hf_2>::c1(currency::core& c, size
 
   bool callback_called = false;
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
-    [&callback_called](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
+    [&callback_called](const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) -> bool {
       callback_called = true;
       return true;
     }
