@@ -577,9 +577,9 @@ namespace currency
   }
   //---------------------------------------------------------------
   template<typename t_number>
-  std::string print_money(t_number amount)
+  std::string print_money(t_number amount, uint64_t decimals = CURRENCY_DISPLAY_DECIMAL_POINT)
   {
-    return print_fixed_decimal_point(amount, CURRENCY_DISPLAY_DECIMAL_POINT);
+    return print_fixed_decimal_point(amount, decimals);
   }
   //---------------------------------------------------------------
 

@@ -1059,9 +1059,9 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
 
   if (!m_tray_icon)
     return true;
-  if (!tei.ti.is_income)
+  if (tei.ti.has_outgoing_entries())
     return true;
-  if (!tei.ti.amount)
+  if (!tei.ti.get_native_amount())
     return true;
 //  if (tei.ti.is_mining && m_wallet_states->operator [](tei.wallet_id) != view::wallet_status_info::wallet_state_ready)
 //    return true;
@@ -1075,9 +1075,9 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
     return true;
   }
 
-  auto amount_str = currency::print_money_brief(tei.ti.amount);
+  auto amount_str = currency::print_money_brief(tei.ti.get_native_amount()); //@#@ add handling of assets
   std::string title, msg;
-  if (tei.ti.height == 0) // unconfirmed trx
+  if (tei.ti.height == 0) // unconfirmed tx
   {
     msg = amount_str + " " + CURRENCY_NAME_ABR + " " + m_localization[localization_id_is_received];
     title = m_localization[localization_id_income_transfer_unconfirmed];

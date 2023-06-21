@@ -366,6 +366,7 @@ namespace tools
         payment_id = embedded_payment_id;
       }
       de.amount = it->amount;
+      de.asset_id = (it->asset_id == currency::null_pkey ? currency::native_coin_asset_id : it->asset_id);
       dsts.push_back(de);
     }
 

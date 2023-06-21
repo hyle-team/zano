@@ -715,7 +715,7 @@ void simple_wallet::on_new_block(uint64_t height, const currency::block& block)
   m_refresh_progress_reporter.update(height, false);
 }
 //----------------------------------------------------------------------------------------------------
-std::string print_money_trailing_zeros_replaced_with_spaces(uint64_t amount)
+std::string print_money_trailing_zeros_replaced_with_spaces(uint64_t amount, size_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT)
 {
   std::string s = print_money(amount);
   size_t p = s.find_last_not_of('0');
@@ -729,13 +729,64 @@ std::string print_money_trailing_zeros_replaced_with_spaces(uint64_t amount)
   return s;
 }
 //----------------------------------------------------------------------------------------------------
+std::string simple_wallet::get_tocken_info_string(const crypto::public_key& asset_id, uint64_t& decimal_points)
+{
+  std::string token_info = "ZANO";
+  decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
+  if (asset_id != currency::native_coin_asset_id)
+  {
+    currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
+    bool whitelisted = false;
+    if (!m_wallet->get_asset_id_info(asset_id, adb, whitelisted))
+    {
+      token_info = "!UNKNOWN!";
+    }
+    else {
+      decimal_points = adb.decimal_point;
+      token_info = adb.ticker;
+
+      if (whitelisted)
+      {
+        token_info += "[*]";
+      }
+      else
+      {
+        token_info += std::string("[") + epee::string_tools::pod_to_hex(asset_id) + "]";
+      }
+    }
+  }
+  return token_info;
+}
+//----------------------------------------------------------------------------------------------------
 void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
 {
-  epee::log_space::console_colors color = wti.is_income ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
-  message_writer(color, false) <<
-    "height " << wti.height <<
-    ", tx " << wti.tx_hash <<
-    " " << std::right << std::setw(18) << print_money_trailing_zeros_replaced_with_spaces(wti.amount) << (wti.is_income ? " received," : " spent");
+
+  if (wti.subtransfers.size() == 1)
+  {
+    epee::log_space::console_colors color = !wti.has_outgoing_entries() ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
+    uint64_t decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
+    std::string token_info = get_tocken_info_string(wti.subtransfers[0].asset_id, decimal_points);
+    message_writer(color, false) <<
+      "height " << wti.height <<
+      ", tx " << wti.tx_hash <<
+      " " << std::right << std::setw(18) << print_money_trailing_zeros_replaced_with_spaces(wti.subtransfers[0].amount, decimal_points) << (wti.subtransfers[0].is_income ? " received," : " spent") << " " << token_info;
+  }
+  else
+  {
+    message_writer(epee::log_space::console_color_cyan, false) <<
+      "height " << wti.height <<
+      ", tx " << wti.tx_hash;
+    for (const auto& st : wti.subtransfers)
+    {
+      epee::log_space::console_colors color = st.is_income ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
+      uint64_t decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
+      std::string token_info = get_tocken_info_string(st.asset_id, decimal_points);
+
+      message_writer(epee::log_space::console_color_cyan, false) << "       " 
+        << std::right << std::setw(18) << print_money_trailing_zeros_replaced_with_spaces(st.amount, decimal_points) << (st.is_income ? " received," : " spent") << " " << token_info;
+    }
+  }
+
   m_refresh_progress_reporter.update(wti.height, true);
 }
 //----------------------------------------------------------------------------------------------------
@@ -861,10 +912,10 @@ bool simple_wallet::show_balance(const std::vector<std::string>& args/* = std::v
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool print_wti(const tools::wallet_public::wallet_transfer_info& wti)
+bool simple_wallet::print_wti(const tools::wallet_public::wallet_transfer_info& wti)
 {
   epee::log_space::console_colors cl;
-  if (wti.is_income)
+  if (!wti.has_outgoing_entries())
     cl = epee::log_space::console_color_green;
   else
     cl = epee::log_space::console_color_magenta;
@@ -886,11 +937,30 @@ bool print_wti(const tools::wallet_public::wallet_transfer_info& wti)
       remote_side += remote_side.empty() ? it : (separator + it);
   }
 
-  success_msg_writer(cl) << "[" << wti.transfer_internal_index << "]" << epee::misc_utils::get_time_str_v2(wti.timestamp) << " "
-    << (wti.is_income ? "Received " : "Sent    ")
-    << print_money(wti.amount) << "(fee:" << print_money(wti.fee) << ")  "
-    << remote_side
-    << " " << wti.tx_hash << payment_id_placeholder;
+  if (wti.subtransfers.size() == 1)
+  {
+    success_msg_writer(cl) << "[" << wti.transfer_internal_index << "]" << epee::misc_utils::get_time_str_v2(wti.timestamp) << " "
+      << (wti.subtransfers[0].is_income ? "Received " : "Sent    ")
+      << print_money(wti.subtransfers[0].amount) << "(fee:" << print_money(wti.fee) << ")  "
+      << remote_side
+      << " " << wti.tx_hash << payment_id_placeholder;
+  }else
+  {
+    success_msg_writer(cl) << "[" << wti.transfer_internal_index << "]" << epee::misc_utils::get_time_str_v2(wti.timestamp) << " (fee:" << print_money(wti.fee) << ")  "
+      << remote_side
+      << " " << wti.tx_hash << payment_id_placeholder;
+    for (auto& st: wti.subtransfers)
+    {
+      epee::log_space::console_colors cl = st.is_income ? epee::log_space::console_color_green: epee::log_space::console_color_magenta;
+      uint64_t decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
+      std::string token_info = get_tocken_info_string(st.asset_id, decimal_points);
+
+      success_msg_writer(cl) 
+        << (st.is_income ? "Received " : "Sent    ")
+        << print_money(st.amount, decimal_points) << token_info;
+    }
+  
+  }
   return true;
 }
 //----------------------------------------------------------------------------------------------------

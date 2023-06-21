@@ -668,7 +668,7 @@ namespace tools
     uint64_t balance(uint64_t& unloked) const;
 
     uint64_t unlocked_balance() const;
-
+    bool get_asset_id_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_info, bool& whitelist_) const;
     void transfer(uint64_t amount, const currency::account_public_address& acc, const crypto::public_key& asset_id = currency::native_coin_asset_id);
     void transfer(uint64_t amount, size_t fake_outs_count, const currency::account_public_address& acc, uint64_t fee = TX_DEFAULT_FEE, const crypto::public_key& asset_id = currency::native_coin_asset_id);
     void transfer(uint64_t amount, const currency::account_public_address& acc, currency::transaction& result_tx, const crypto::public_key& asset_id = currency::native_coin_asset_id);
@@ -1195,7 +1195,7 @@ private:
     mutable uint64_t m_current_wallet_file_size;
     bool m_use_deffered_global_outputs;
     bool m_disable_tor_relay;
-    bool m_use_assets_whitelisting = false;
+    bool m_use_assets_whitelisting = true;
 
     mutable current_operation_context m_current_context;
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions

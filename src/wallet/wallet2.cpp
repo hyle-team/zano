@@ -3405,6 +3405,38 @@ bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, u
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::get_asset_id_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_info, bool& whitelist_) const
+{
+  if (asset_id == currency::native_coin_asset_id)
+  {
+    return CURRENCY_NAME_ABR;
+  }
+  //check if asset is whitelisted or customly added
+  whitelist_ = false;
+  auto it_white = m_whitelisted_assets.find(asset_id);
+  if (it_white == m_whitelisted_assets.end())
+  {
+    //check if it custom asset
+    auto it_cust = m_custom_assets.find(asset_id);
+    if (it_cust == m_custom_assets.end())
+    {
+      return false;
+    }
+    else
+    {
+      asset_info = it_cust->second;
+    }
+  }
+  else
+  {
+    asset_info = it_white->second;
+    whitelist_ = true;
+  }
+
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+
 uint64_t wallet2::balance() const
 {
   uint64_t stub = 0;

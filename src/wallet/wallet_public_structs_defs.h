@@ -561,9 +561,11 @@ namespace wallet_public
   {
     uint64_t amount;
     std::string address;
+    crypto::public_key asset_id;
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(amount)
       KV_SERIALIZE(address)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
     END_KV_SERIALIZE_MAP()
   };
 
