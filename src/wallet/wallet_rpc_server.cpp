@@ -28,6 +28,12 @@ using namespace epee;
           er.message = e.what(); \
           return false; \
         } \
+        catch (const tools::error::not_enough_money& e) \
+        { \
+          er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR; \
+          er.message = e.error_code(); \
+          return false; \
+        } \
         catch (const tools::error::wallet_error& e) \
         { \
           er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR; \

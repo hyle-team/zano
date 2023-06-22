@@ -3810,16 +3810,10 @@ bool enum_container(iterator_t it_begin, iterator_t it_end, callback_t cb)
 //----------------------------------------------------------------------------------------------------
 bool wallet2::is_defragmentation_transaction(const wallet_public::wallet_transfer_info& wti)
 {
-  if (wti.employed_entries.receive.size() && wti.employed_entries.spent.size())
+  if (wti.employed_entries.receive.size() && wti.employed_entries.spent.size() && wti.subtransfers.size() == 1)
   {
-    for (const auto& st : wti.subtransfers)
-    {
-      if (st.asset_id == currency::native_coin_asset_id)
-      {
-        if (!st.is_income && st.amount == get_tx_fee(wti.tx))
-          return true;
-      }
-    }
+    if (wti.subtransfers[0].asset_id == currency::native_coin_asset_id && !wti.subtransfers[0].is_income && wti.subtransfers[0].amount == get_tx_fee(wti.tx))
+      return true;
   }
   return false;
 }
