@@ -1,0 +1,21 @@
+{
+  "jsonrpc": "2.0",
+  "id": "0",
+  "method": "ionic_swap_generate_proposal",
+  "params": {
+    "proposal": {
+      "to_bob": [{
+        "asset_id": "e03a140b8447d2895290022b25c06bdabea514e2475ae56ce5bcbc554ab9865c",
+        "amount": 2000000000000
+      }],
+      "to_alice": [{
+        "asset_id": "d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a",
+        "amount": 10000000000000
+      }],
+      "mixins": 10,
+      "fee_paid_by_a": 10000000000,
+      "expiration_time": 0
+    },
+    "destination_address": "ZxDAcbaxXkyWRgYbeARBpngfmFat5TjDjjQA5NAbouB9eytwGWJqA5shAVYeCAHWPo254DF2o2X1td79PNvRr2Yc1b9Ep67ff"
+  }
+}

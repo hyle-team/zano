@@ -1960,6 +1960,10 @@ bool simple_wallet::generate_ionic_swap_proposal(const std::vector<std::string> 
     fail_msg_writer() << "Failed to load json file with asset specification: " << args[0];
     return true;
   }
+  if (proposal_info.expiration_time == 0)
+  {
+    proposal_info.expiration_time = m_wallet->get_core_runtime_config().get_core_time() + 10 * 60;
+  }
   currency::account_public_address destination_addr = AUTO_VAL_INIT(destination_addr);
   currency::payment_id_t integrated_payment_id;
   if (!m_wallet->get_transfer_address(args[1], destination_addr, integrated_payment_id))

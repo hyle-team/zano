@@ -256,6 +256,7 @@ namespace wallet_public
       for (auto& st : subtransfers)
       {
         if (st.asset_id == currency::native_coin_asset_id)
+        {
           if (st.is_income)
           {
             return st.amount;
@@ -263,7 +264,8 @@ namespace wallet_public
           else
           {
             throw std::runtime_error("Unexpected wallet_transfer_info: native is not income type");
-          }          
+          }
+        }
       }
       subtransfers.push_back(wallet_sub_transfer_info());
       subtransfers.back().is_income = true;
