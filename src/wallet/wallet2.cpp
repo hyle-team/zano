@@ -3596,6 +3596,16 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     tmpl_req.pos_index = req.pos_entries[rsp.index].index;
     tmpl_req.extra_text = m_miner_text_info;
     tmpl_req.stake_unlock_time = req.pos_entries[rsp.index].stake_unlock_time;
+
+    // mark stake source as spent and make sure it will be restored in case of error
+    const std::vector<uint64_t> stake_transfer_idx_vec{ req.pos_entries[rsp.index].wallet_index };
+    mark_transfers_as_spent(stake_transfer_idx_vec, "stake source");
+    bool gracefull_leaving = false;
+    auto stake_transfer_spent_flag_restorer = epee::misc_utils::create_scope_leave_handler([&](){
+      if (!gracefull_leaving)
+        clear_transfers_from_flag(stake_transfer_idx_vec, WALLET_TRANSFER_DETAIL_FLAG_SPENT, "stake source");
+      });
+
     //generate packing tx
     transaction pack_tx = AUTO_VAL_INIT(pack_tx);
     if (generate_packing_transaction_if_needed(pack_tx, 0))
@@ -3643,7 +3653,7 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
       keys_ptrs);
     WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to prepare_and_sign_pos_block");
     
-    WLT_LOG_GREEN("Block constructed <" << get_block_hash(b) << ">, sending to core...", LOG_LEVEL_0);
+    WLT_LOG_GREEN("Block " << get_block_hash(b) << " @ " << get_block_height(b) << " has been constructed, sending to core...", LOG_LEVEL_0);
 
     currency::COMMAND_RPC_SUBMITBLOCK2::request subm_req = AUTO_VAL_INIT(subm_req);
     currency::COMMAND_RPC_SUBMITBLOCK2::response subm_rsp = AUTO_VAL_INIT(subm_rsp);
@@ -3660,6 +3670,7 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     WLT_LOG_GREEN("POS block generated and accepted, congrats!", LOG_LEVEL_0);
     m_wcallback->on_pos_block_found(b);
 
+    gracefull_leaving = true; // to prevent source transfer flags be cleared in scope leave handler
     return true;
 }
 //----------------------------------------------------------------------------------------------------
