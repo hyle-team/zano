@@ -191,8 +191,7 @@ set mail_msg="New %build_prefix% %TESTNET_LABEL%build for win-x64:<br>INST: <a h
 
 echo %mail_msg%
 
-python build_mail.py "Zano win-x64 %build_prefix% %TESTNET_LABEL%build %version%" "%emails%" "%mail_msg%"
-
+python ../utils/build_mail.py "Zano win-x64 %build_prefix% %TESTNET_LABEL%build %version%" "%emails%" %mail_msg%
 
 goto success
 
