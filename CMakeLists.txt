@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.6)
+cmake_minimum_required(VERSION 3.1)
 
 PROJECT(Zano)
 
@@ -13,10 +13,9 @@ if(POLICY CMP0043)
 endif()
 
 
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-#  if(POLICY CMP0020)
-#    cmake_policy(SET CMP0020 OLD)
-#  endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "Android")
   add_definitions(-DMOBILE_WALLET_BUILD)
