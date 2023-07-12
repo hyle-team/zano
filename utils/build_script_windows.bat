@@ -1,5 +1,8 @@
 call configure_local_paths.cmd
 
+;; MSVC version-specific paths
+SET QT_MSVC_PATH=%QT_PREFIX_PATH%\msvc2017_64
+
 SET ACHIVE_NAME_PREFIX=zano-win-x64-
 SET MY_PATH=%~dp0
 SET SOURCES_PATH=%MY_PATH:~0,-7%
@@ -41,7 +44,7 @@ rmdir build /s /q
 mkdir build
 cd build
 
-cmake %TESTNET_DEF% -D OPENSSL_ROOT_DIR="%OPENSSL_ROOT_DIR%" -D CMAKE_PREFIX_PATH="%QT_PREFIX_PATH%"\msvc2017_64 -D BUILD_GUI=TRUE -D STATIC=FALSE -DBOOST_ROOT="%BOOST_ROOT%" -DBOOST_LIBRARYDIR="%BOOST_ROOT%\lib64-msvc-14.1" -G "Visual Studio 16 2019" -A x64 -T host=x64 ..
+cmake %TESTNET_DEF% -D OPENSSL_ROOT_DIR="%OPENSSL_ROOT_DIR%" -D CMAKE_PREFIX_PATH="%QT_MSVC_PATH%" -D BUILD_GUI=TRUE -D STATIC=FALSE -DBOOST_ROOT="%BOOST_ROOT%" -DBOOST_LIBRARYDIR="%BOOST_ROOT%\lib64-msvc-14.1" -G "Visual Studio 16 2019" -A x64 -T host=x64 ..
 IF %ERRORLEVEL% NEQ 0 (
   goto error
 )
@@ -107,7 +110,7 @@ copy /Y zanod.exe bunch
 copy /Y simplewallet.exe bunch
 copy /Y *.pdb bunch
 
-%QT_MSVC_PATH%\bin\windeployqt.exe bunch\Zano.exe
+%QT_MSVC_PATH%\bin\windeployqt.exe bunch\Zano.exe || goto error
 
 cd bunch
 
@@ -224,7 +227,8 @@ EXIT /B %ERRORLEVEL%
 
 
 :sign_file
-%ZANO_SIGN_CMD% %1
+@echo Signing %1...
+@call %ZANO_SIGN_CMD% %1
 @if %ERRORLEVEL% neq 0 (
   @echo ERROR: failed to sign %1
   @exit /B 1
