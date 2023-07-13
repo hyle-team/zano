@@ -17,3 +17,4 @@ bool transactions_flow_test(
   std::string& daemon_addr_b,
   size_t mix_in_factor, size_t action = TRANSACTIONS_FLOW_TESTACTION_DEFAULT, uint64_t max_tx_in_pool = 10000);
 bool test_serialization();
+bool test_serialization2();

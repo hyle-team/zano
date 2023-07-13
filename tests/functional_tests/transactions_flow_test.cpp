@@ -386,6 +386,26 @@ bool test_serialization()
   return true;
 }
 
+
+struct test_serialization_2
+{
+  uint64_t var1;
+  uint64_t var2;
+  BEGIN_KV_SERIALIZE_MAP()
+    KV_SERIALIZE(var1)
+    KV_SERIALIZE(var2)
+  END_KV_SERIALIZE_MAP()
+};
+
+bool test_serialization2()
+{
+  test_serialization_2 ee = {};
+  std::string json_buf = "{\"var1\": 111, \"var2\": \"222\"}";
+  epee::serialization::load_t_from_json(ee, json_buf);
+  std::string json_buf2 = epee::serialization::store_t_to_json(ee);
+  return true;
+}
+
 bool transactions_flow_test(
   std::wstring path_source_wallet, std::string source_wallet_pass,
   std::wstring path_terget_wallet, std::string target_wallet_pass,
