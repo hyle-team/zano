@@ -129,7 +129,7 @@ POP_VS_WARNINGS
     template<typename from_type, typename to_type>
     struct convert_to_integral<from_type, to_type, false>
     {
-      static void convert(const const std::string& from, uint64_t& to)
+      static void convert(const std::string& from, uint64_t& to)
       {
         //attempt to convert string to unsigned int
         try
