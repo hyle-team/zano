@@ -165,7 +165,7 @@ sha256: $checksum"
 
 echo "$mail_msg"
 
-echo "$mail_msg" | mail -s "Zano macOS-x64 ${build_prefix_label}${testnet_label}build $version_str" ${emails}
+python3 ../../../utils/build_mail.py "Zano linux-x64 ${build_prefix_label}${testnet_label}build $version_str" "${emails}" "$mail_msg"
 
 
 ######################
