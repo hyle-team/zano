@@ -43,3 +43,4 @@
 #include "zarcanum_test.h"
 #include "multiassets_test.h"
 #include "ionic_swap_tests.h"
+#include "attachment_isolation_encryption_test.h"
