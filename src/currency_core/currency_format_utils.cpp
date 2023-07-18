@@ -1345,6 +1345,43 @@ namespace currency
     return construct_tx(sender_account_keys, sources, destinations, std::vector<extra_v>(), attachments, tx, tx_version, one_time_secret_key, unlock_time, tx_outs_attr, shuffle);
   }
   //---------------------------------------------------------------
+
+  void deterministic_generate_tx_onetime_key(std::list<crypto::key_image>& images, const account_keys& acc, keypair& res_keypair, uint64_t height = 0)
+  {
+    images.sort([](const crypto::key_image& a, const crypto::key_image& b) {return memcmp(&a, &b, sizeof(a)); });
+    std::string hashing_buff;
+    for (const auto& im : images)
+      epee::string_tools::append_pod_to_strbuff(hashing_buff, im);
+    epee::string_tools::append_pod_to_strbuff(hashing_buff, acc.spend_secret_key);
+    hashing_buff.append(CRYPTO_HDS_DETERMINISTIC_TX_KEY);
+    crypto::scalar_t sec_key = crypto::hash_helper_t::hs(hashing_buff.data(), hashing_buff.length());
+    sec_key *= 8;
+    res_keypair.sec = sec_key.as_secret_key();
+    crypto::secret_key_to_public_key(res_keypair.sec, res_keypair.pub);
+  }
+  //---------------------------------------------------------------
+  void deterministic_generate_tx_onetime_key(const transaction& tx, const account_keys& acc, keypair& res_keypair)
+  {
+    uint64_t h = 0;
+    std::list<crypto::key_image> images;
+    for (const auto& in : tx.vin)
+    {
+      crypto::key_image ki = AUTO_VAL_INIT(ki);
+      if (get_key_image_from_txin_v(in, ki))
+      {
+        images.push_back(ki);
+      }
+      if (in.type() == typeid(txin_gen))
+      {
+        h = boost::get<txin_gen>(in).height;
+        continue;
+      }
+    }
+    deterministic_generate_tx_onetime_key(images, acc, res_keypair, h);
+  }
+
+  //---------------------------------------------------------------
+
   struct encrypt_attach_visitor : public boost::static_visitor<void>
   {
     bool& m_was_crypted_entries;
@@ -1423,15 +1460,21 @@ namespace currency
 
   struct decrypt_attach_visitor : public boost::static_visitor<void>
   {
+    const bool m_is_income;
+    const transaction& m_tx;
     const account_keys& m_acc_keys;
     const crypto::public_key& m_tx_onetime_pubkey;
     const crypto::key_derivation& rkey;
     std::vector<payload_items_v>& rdecrypted_att;
     decrypt_attach_visitor(const crypto::key_derivation& key,
       std::vector<payload_items_v>& decrypted_att, 
-      const account_keys& acc_keys = null_acc_keys,
+      const account_keys& acc_keys,
+      bool is_income,
+      const transaction& tx,
       const crypto::public_key& tx_onetime_pubkey = null_pkey) :
       rkey(key),
+      m_tx(tx),
+      m_is_income(is_income),
       rdecrypted_att(decrypted_att), 
       m_acc_keys(acc_keys), 
       m_tx_onetime_pubkey(tx_onetime_pubkey)
@@ -1451,16 +1494,21 @@ namespace currency
       {
         if (sa.flags&TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE)
         {
-          if (m_acc_keys.spend_secret_key == null_skey)
+          if (!m_is_income)
           {
-            //this watch only wallet, decrypting supposed to be impossible
-            return;
+            //restore deterministic onetime tx secret key
+            keypair onetime_tx_keys = AUTO_VAL_INIT(onetime_tx_keys);
+            deterministic_generate_tx_onetime_key(m_tx, m_acc_keys, onetime_tx_keys);
+            CHECK_AND_ASSERT_THROW_MES(m_tx_onetime_pubkey == onetime_tx_keys.pub, "tx_service_attachment with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: determinitic key derivation failed");
+            bool r = crypto::generate_key_derivation(m_acc_keys.account_address.spend_public_key, onetime_tx_keys.sec, derivation_local);
+            CHECK_AND_ASSERT_THROW_MES(r, "Failed to generate_key_derivation at TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE");
           }
-          CHECK_AND_ASSERT_THROW_MES(m_acc_keys.spend_secret_key != currency::null_skey && m_tx_onetime_pubkey != currency::null_pkey, "tx_service_attachment with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: keys uninitialized");
-          bool r = crypto::generate_key_derivation(m_tx_onetime_pubkey, m_acc_keys.spend_secret_key, derivation_local);
-          CHECK_AND_ASSERT_THROW_MES(r, "Failed to generate_key_derivation at TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE");
+          else {
+            CHECK_AND_ASSERT_THROW_MES(m_acc_keys.spend_secret_key != currency::null_skey && m_tx_onetime_pubkey != currency::null_pkey, "tx_service_attachment with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: keys uninitialized");
+            bool r = crypto::generate_key_derivation(m_tx_onetime_pubkey, m_acc_keys.spend_secret_key, derivation_local);
+            CHECK_AND_ASSERT_THROW_MES(r, "Failed to generate_key_derivation at TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE");
+          }
           crypto::chacha_crypt(local_sa.body, derivation_local);
-
         }
         else
         {
@@ -1520,10 +1568,10 @@ namespace currency
 
   //---------------------------------------------------------------
   template<class items_container_t>
-  bool decrypt_payload_items(const crypto::key_derivation& derivation, const items_container_t& items_to_decrypt, std::vector<payload_items_v>& decrypted_att, const account_keys& acc_keys = null_acc_keys,
+  bool decrypt_payload_items(const crypto::key_derivation& derivation, const items_container_t& items_to_decrypt, std::vector<payload_items_v>& decrypted_att, bool is_income, const transaction& tx, const account_keys& acc_keys = null_acc_keys,
     const crypto::public_key& tx_onetime_pubkey = null_pkey)
   {
-    decrypt_attach_visitor v(derivation, decrypted_att, acc_keys, tx_onetime_pubkey);
+    decrypt_attach_visitor v(derivation, decrypted_att, acc_keys, is_income, tx, tx_onetime_pubkey);
     for (auto& a : items_to_decrypt)
       boost::apply_visitor(v, a);
 
@@ -1605,9 +1653,10 @@ namespace currency
       
       return true;
     }
+    const crypto::public_key onetime_pub = get_tx_pub_key_from_extra(tx);
     
-    decrypt_payload_items(derivation, tx.extra, decrypted_items, is_income ? acc_keys: account_keys(), get_tx_pub_key_from_extra(tx));
-    decrypt_payload_items(derivation, tx.attachment, decrypted_items, is_income ? acc_keys : account_keys(), get_tx_pub_key_from_extra(tx));
+    decrypt_payload_items(derivation, tx.extra, decrypted_items, is_income, tx, acc_keys, onetime_pub);
+    decrypt_payload_items(derivation, tx.attachment, decrypted_items, is_income, tx, acc_keys, onetime_pub);
     return true;
   }
 
@@ -2001,7 +2050,6 @@ namespace currency
       p_result_point->to_public_key(*p_result_pub_key);
   }
 
-
   bool construct_tx(const account_keys& sender_account_keys, const finalize_tx_param& ftp, finalized_tx& result)
   {
     const std::vector<tx_source_entry>& sources = ftp.sources;
@@ -2026,10 +2074,6 @@ namespace currency
     if (flags&TX_FLAG_SIGNATURE_MODE_SEPARATE && tx.vin.size())
       append_mode = true;
 
-    keypair txkey = AUTO_VAL_INIT(txkey);
-    size_t zc_inputs_count = 0;
-    bool has_non_zc_inputs = false;
-
     if (!append_mode)
     {
       tx.vin.clear();
@@ -2046,8 +2090,154 @@ namespace currency
       //generate key pair  
       if (expiration_time != 0)
         set_tx_expiration_time(tx, expiration_time);
+    }
 
-      txkey = keypair::generate();
+    size_t zc_inputs_count = 0;
+    bool has_non_zc_inputs = false;
+
+    std::list<crypto::key_image> key_images_total;
+    size_t thirdparty_zc_inputs_count = zc_inputs_count;
+    //
+    // INs
+    //
+    uint64_t native_coins_input_sum = 0;
+    std::vector<input_generation_context_data> in_contexts;
+    std::vector<size_t> inputs_mapping;
+    size_t current_index = 0;
+    inputs_mapping.resize(sources.size());
+    size_t input_starter_index = tx.vin.size();
+    bool all_inputs_are_obviously_native_coins = true;
+    for (const tx_source_entry& src_entr : sources)
+    {
+      inputs_mapping[current_index] = current_index;
+      current_index++;
+      in_contexts.push_back(input_generation_context_data{});
+      input_generation_context_data& in_context = in_contexts.back();
+
+      // sort src_entr.outputs entries by global out index, put it to in_context.outputs, convert to relative gindices, and put new real out index into in_context.real_out_index
+      in_context.outputs = prepare_outputs_entries_for_key_offsets(src_entr.outputs, src_entr.real_output, in_context.real_out_index);
+
+      if (src_entr.is_multisig())
+      {//multisig input
+        txin_multisig input_multisig = AUTO_VAL_INIT(input_multisig);
+        input_multisig.amount = src_entr.amount;
+        input_multisig.multisig_out_id = src_entr.multisig_id;
+        input_multisig.sigs_count = src_entr.ms_sigs_count;
+        tx.vin.push_back(input_multisig);
+        has_non_zc_inputs = true;
+      }
+      else if (src_entr.htlc_origin.size())
+      {
+        //htlc redeem
+        keypair& in_ephemeral = in_context.in_ephemeral;
+        //txin_to_key
+        if (src_entr.outputs.size() != 1)
+        {
+          LOG_ERROR("htlc in: wrong output src_entr.outputs.size() = " << src_entr.outputs.size());
+          return false;
+        }
+
+        //key_derivation recv_derivation;
+        crypto::key_image img;
+        if (!generate_key_image_helper(sender_account_keys, src_entr.real_out_tx_key, src_entr.real_output_in_tx_index, in_ephemeral, img))
+          return false;
+
+        //check that derivated key is equal with real output key
+        if (!(in_ephemeral.pub == src_entr.outputs.front().stealth_address))
+        {
+          LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
+            << string_tools::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
+            << string_tools::pod_to_hex(src_entr.outputs.front().stealth_address));
+          return false;
+        }
+        key_images_total.push_back(img);
+
+        //put key image into tx input
+        txin_htlc input_to_key;
+        input_to_key.amount = src_entr.amount;
+        input_to_key.k_image = img;
+        input_to_key.hltc_origin = src_entr.htlc_origin;
+        input_to_key.key_offsets.push_back(src_entr.outputs.front().out_reference);
+
+        tx.vin.push_back(input_to_key);
+        has_non_zc_inputs = true;
+      }
+      else
+      {
+        // txin_to_key or txin_zc_input
+        CHECK_AND_ASSERT_MES(in_context.real_out_index < in_context.outputs.size(), false,
+          "real_output index (" << in_context.real_out_index << ") greater than or equal to in_context.outputs.size()=" << in_context.outputs.size());
+
+        crypto::key_image img;
+        if (!generate_key_image_helper(sender_account_keys, src_entr.real_out_tx_key, src_entr.real_output_in_tx_index, in_context.in_ephemeral, img))
+          return false;
+
+        //check that derivated key is equal with real output key
+        if (!(in_context.in_ephemeral.pub == in_context.outputs[in_context.real_out_index].stealth_address))
+        {
+          LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
+            << string_tools::pod_to_hex(in_context.in_ephemeral.pub) << ENDL << "real output_public_key:"
+            << string_tools::pod_to_hex(in_context.outputs[in_context.real_out_index].stealth_address));
+          return false;
+        }
+
+
+        key_images_total.push_back(img);
+        //fill key_offsets array with relative offsets
+        std::vector<txout_ref_v> key_offsets;
+        for (const tx_source_entry::output_entry& out_entry : in_context.outputs)
+          key_offsets.push_back(out_entry.out_reference);
+
+        //TODO: Might need some refactoring since this scheme is not the clearest one(did it this way for now to keep less changes to not broke anything)
+        //potentially this approach might help to support htlc and multisig without making to complicated code
+        if (src_entr.is_zc())
+        {
+          ++zc_inputs_count;
+          txin_zc_input zc_in = AUTO_VAL_INIT(zc_in);
+          zc_in.k_image = img;
+          zc_in.key_offsets = std::move(key_offsets);
+          tx.vin.push_back(zc_in);
+        }
+        else
+        {
+          txin_to_key input_to_key = AUTO_VAL_INIT(input_to_key);
+          input_to_key.amount = src_entr.amount;
+          input_to_key.k_image = img;
+          input_to_key.key_offsets = std::move(key_offsets);
+          tx.vin.push_back(input_to_key);
+          has_non_zc_inputs = true;
+        }
+      }
+
+      if (src_entr.is_native_coin())
+        native_coins_input_sum += src_entr.amount;
+
+      if (src_entr.is_zc())
+      {
+        // if at least one decoy output of a ZC input has a non-explicit asset id, then we can't say that all inputs are obviously native coins 
+        for (const tx_source_entry::output_entry& oe : in_context.outputs)
+        {
+          if (crypto::point_t(oe.blinded_asset_id).modify_mul8() != currency::native_coin_asset_id_pt)
+          {
+            all_inputs_are_obviously_native_coins = false;
+            break;
+          }
+        }
+      }
+    }
+
+    if (zc_inputs_count != 0 && tx.version <= TRANSACTION_VERSION_PRE_HF4)
+    {
+      LOG_PRINT_YELLOW("WARNING: tx v1 should not use ZC inputs", LOG_LEVEL_0);
+    }
+
+
+
+    keypair txkey = AUTO_VAL_INIT(txkey);
+    if (!append_mode)
+    {
+      txkey = AUTO_VAL_INIT(txkey);
+      deterministic_generate_tx_onetime_key(key_images_total, sender_account_keys, txkey);
       add_tx_pub_key_to_extra(tx, txkey.pub);
       one_time_tx_secret_key = txkey.sec;
 
@@ -2096,137 +2286,7 @@ namespace currency
       }
     }
 
-    size_t thirdparty_zc_inputs_count = zc_inputs_count;
-    //
-    // INs
-    //
-    uint64_t native_coins_input_sum = 0;
-    std::vector<input_generation_context_data> in_contexts;    
-    std::vector<size_t> inputs_mapping;
-    size_t current_index = 0;
-    inputs_mapping.resize(sources.size());
-    size_t input_starter_index = tx.vin.size();
-    bool all_inputs_are_obviously_native_coins = true;
-    for (const tx_source_entry& src_entr : sources)
-    {
-      inputs_mapping[current_index] = current_index;
-      current_index++;
-      in_contexts.push_back(input_generation_context_data{});
-      input_generation_context_data& in_context = in_contexts.back();
 
-      // sort src_entr.outputs entries by global out index, put it to in_context.outputs, convert to relative gindices, and put new real out index into in_context.real_out_index
-      in_context.outputs = prepare_outputs_entries_for_key_offsets(src_entr.outputs, src_entr.real_output, in_context.real_out_index);
-
-      if(src_entr.is_multisig())
-      {//multisig input
-        txin_multisig input_multisig = AUTO_VAL_INIT(input_multisig);
-        input_multisig.amount = src_entr.amount;
-        input_multisig.multisig_out_id = src_entr.multisig_id;
-        input_multisig.sigs_count = src_entr.ms_sigs_count;
-        tx.vin.push_back(input_multisig);
-        has_non_zc_inputs = true;
-      }
-      else if (src_entr.htlc_origin.size())
-      {
-        //htlc redeem
-        keypair& in_ephemeral = in_context.in_ephemeral;
-        //txin_to_key
-        if(src_entr.outputs.size() != 1)
-        {
-          LOG_ERROR("htlc in: wrong output src_entr.outputs.size() = " << src_entr.outputs.size());
-          return false;
-        }
-
-        //key_derivation recv_derivation;
-        crypto::key_image img;
-        if (!generate_key_image_helper(sender_account_keys, src_entr.real_out_tx_key, src_entr.real_output_in_tx_index, in_ephemeral, img))
-          return false;
-
-        //check that derivated key is equal with real output key
-        if (!(in_ephemeral.pub == src_entr.outputs.front().stealth_address))
-        {
-          LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
-            << string_tools::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
-            << string_tools::pod_to_hex(src_entr.outputs.front().stealth_address));
-          return false;
-        }
-
-        //put key image into tx input
-        txin_htlc input_to_key;
-        input_to_key.amount = src_entr.amount;
-        input_to_key.k_image = img;
-        input_to_key.hltc_origin = src_entr.htlc_origin;
-        input_to_key.key_offsets.push_back(src_entr.outputs.front().out_reference);
-
-        tx.vin.push_back(input_to_key);
-        has_non_zc_inputs = true;
-      }
-      else
-      {
-        // txin_to_key or txin_zc_input
-        CHECK_AND_ASSERT_MES(in_context.real_out_index < in_context.outputs.size(), false,
-          "real_output index (" << in_context.real_out_index << ") greater than or equal to in_context.outputs.size()=" << in_context.outputs.size());
-
-        crypto::key_image img;
-        if (!generate_key_image_helper(sender_account_keys, src_entr.real_out_tx_key, src_entr.real_output_in_tx_index, in_context.in_ephemeral, img))
-          return false;
-
-        //check that derivated key is equal with real output key
-        if (!(in_context.in_ephemeral.pub == in_context.outputs[in_context.real_out_index].stealth_address))
-        {
-          LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
-            << string_tools::pod_to_hex(in_context.in_ephemeral.pub) << ENDL << "real output_public_key:"
-            << string_tools::pod_to_hex(in_context.outputs[in_context.real_out_index].stealth_address));
-          return false;
-        }
-
-        //fill key_offsets array with relative offsets
-        std::vector<txout_ref_v> key_offsets;
-        for(const tx_source_entry::output_entry& out_entry : in_context.outputs)
-          key_offsets.push_back(out_entry.out_reference);
-
-        //TODO: Might need some refactoring since this scheme is not the clearest one(did it this way for now to keep less changes to not broke anything)
-        //potentially this approach might help to support htlc and multisig without making to complicated code
-        if (src_entr.is_zc())
-        {
-          ++zc_inputs_count;
-          txin_zc_input zc_in = AUTO_VAL_INIT(zc_in);
-          zc_in.k_image = img;
-          zc_in.key_offsets = std::move(key_offsets);
-          tx.vin.push_back(zc_in);
-        }
-        else 
-        {
-          txin_to_key input_to_key = AUTO_VAL_INIT(input_to_key);
-          input_to_key.amount = src_entr.amount;
-          input_to_key.k_image = img;
-          input_to_key.key_offsets = std::move(key_offsets);
-          tx.vin.push_back(input_to_key);
-          has_non_zc_inputs = true;
-        }        
-      }
-
-      if (src_entr.is_native_coin())
-        native_coins_input_sum += src_entr.amount;
-
-      if (src_entr.is_zc())
-      {
-        // if at least one decoy output of a ZC input has a non-explicit asset id, then we can't say that all inputs are obviously native coins 
-        for(const tx_source_entry::output_entry& oe : in_context.outputs)
-        {
-          if (crypto::point_t(oe.blinded_asset_id).modify_mul8() != currency::native_coin_asset_id_pt)
-          {
-            all_inputs_are_obviously_native_coins = false;
-            break;
-          }
-        }
-      }
-    }
-
-    if (zc_inputs_count != 0 && tx.version <= TRANSACTION_VERSION_PRE_HF4)
-    {
-      LOG_PRINT_YELLOW("WARNING: tx v1 should not use ZC inputs", LOG_LEVEL_0);
-    }
     
     //
     // OUTs
