@@ -1388,9 +1388,10 @@ namespace currency
     const keypair& m_onetime_keypair;
     const account_public_address& m_destination_addr;
     const crypto::key_derivation& m_key;
+    const account_keys& m_sender_account_keys;
 
-    encrypt_attach_visitor(bool& was_crypted_entries, const crypto::key_derivation& key, const  keypair& onetime_keypair = null_keypair, const account_public_address& destination_addr = null_pub_addr) :
-      m_was_crypted_entries(was_crypted_entries), m_key(key), m_onetime_keypair(onetime_keypair), m_destination_addr(destination_addr)
+    encrypt_attach_visitor(bool& was_crypted_entries, const crypto::key_derivation& key, const  keypair& onetime_keypair, const account_public_address& destination_addr, const account_keys& sender_account_keys) :
+      m_was_crypted_entries(was_crypted_entries), m_key(key), m_onetime_keypair(onetime_keypair), m_destination_addr(destination_addr), m_sender_account_keys(sender_account_keys)
     {}
     void operator()(tx_comment& comment)
     {
@@ -1435,6 +1436,9 @@ namespace currency
           bool r = crypto::generate_key_derivation(m_destination_addr.spend_public_key, m_onetime_keypair.sec, derivation_local);
           CHECK_AND_ASSERT_THROW_MES(r, "tx_service_attachment with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: Failed to make derivation");
           crypto::chacha_crypt(sa.body, derivation_local);
+          //we add derivation encrypted with sender spend key, so sender can derive information later if the wallet got restored from seed
+          sa.security.push_back(*(crypto::public_key*)&derivation_local);
+          crypto::chacha_crypt(sa.security.back(), m_sender_account_keys.spend_secret_key);
         }
         else
         {
@@ -1496,12 +1500,14 @@ namespace currency
         {
           if (!m_is_income)
           {
-            //restore deterministic onetime tx secret key
-            keypair onetime_tx_keys = AUTO_VAL_INIT(onetime_tx_keys);
-            deterministic_generate_tx_onetime_key(m_tx, m_acc_keys, onetime_tx_keys);
-            CHECK_AND_ASSERT_THROW_MES(m_tx_onetime_pubkey == onetime_tx_keys.pub, "tx_service_attachment with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: determinitic key derivation failed");
-            bool r = crypto::generate_key_derivation(m_acc_keys.account_address.spend_public_key, onetime_tx_keys.sec, derivation_local);
-            CHECK_AND_ASSERT_THROW_MES(r, "Failed to generate_key_derivation at TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE");
+            //check if we have key for decrypting body for sender
+            if (sa.security.size() < 1)
+            {
+              return; // this field invisible for sender
+            }
+            //decrypting derivation 
+            derivation_local = *(crypto::key_derivation*)&sa.security[0];
+            crypto::chacha_crypt(derivation_local, m_acc_keys.spend_secret_key);
           }
           else {
             CHECK_AND_ASSERT_THROW_MES(m_acc_keys.spend_secret_key != currency::null_skey && m_tx_onetime_pubkey != currency::null_pkey, "tx_service_attachment with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: keys uninitialized");
@@ -1668,11 +1674,11 @@ namespace currency
     bool was_attachment_crypted_entries = false;
     bool was_extra_crypted_entries = false;
 
-    encrypt_attach_visitor v(was_attachment_crypted_entries, derivation, tx_random_key, destination_addr);
+    encrypt_attach_visitor v(was_attachment_crypted_entries, derivation, tx_random_key, destination_addr, sender_keys);
     for (auto& a : tx.attachment)
       boost::apply_visitor(v, a);
 
-    encrypt_attach_visitor v2(was_extra_crypted_entries, derivation, tx_random_key, destination_addr);
+    encrypt_attach_visitor v2(was_extra_crypted_entries, derivation, tx_random_key, destination_addr, sender_keys);
     for (auto& a : tx.extra)
       boost::apply_visitor(v2, a);
 
@@ -2264,7 +2270,7 @@ namespace currency
       std::vector<extra_v> extra_local = extra;
       std::vector<attachment_v> attachments_local = attachments;
 
-      encrypt_attach_visitor v(was_attachment_crypted_entries, derivation);
+      encrypt_attach_visitor v(was_attachment_crypted_entries, derivation,  txkey, account_public_address(), sender_account_keys);
       for (auto& a : attachments_local)
         boost::apply_visitor(v, a);
       for (auto& a : extra_local)

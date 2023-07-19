@@ -1258,7 +1258,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(zarcanum_block_with_txs);
     GENERATE_AND_PLAY(asset_depoyment_and_few_zc_utxos);
 
-    GENERATE_AND_PLAY(attachment_isolation_test);
+    GENERATE_AND_PLAY_HF(attachment_isolation_test, "4-*");
     
 
     // GENERATE_AND_PLAY(gen_block_reward);

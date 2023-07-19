@@ -16,10 +16,10 @@ attachment_isolation_test::attachment_isolation_test()
   REGISTER_CALLBACK_METHOD(attachment_isolation_test, configure_core);
   REGISTER_CALLBACK_METHOD(attachment_isolation_test, c1);
 
-  m_hardforks.set_hardfork_height(1, 1);
-  m_hardforks.set_hardfork_height(2, 1);
-  m_hardforks.set_hardfork_height(3, 1);
-  m_hardforks.set_hardfork_height(4, 14);
+//  m_hardforks.set_hardfork_height(1, 1);
+//  m_hardforks.set_hardfork_height(2, 1);
+//  m_hardforks.set_hardfork_height(3, 1);
+//  m_hardforks.set_hardfork_height(4, 14);
 }
 
 bool attachment_isolation_test::generate(std::vector<test_event_entry>& events) const
@@ -48,7 +48,7 @@ bool attachment_isolation_test::c1(currency::core& c, size_t ev_index, const std
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, alic_acc);
 
   // check passing over the hardfork
-  CHECK_AND_ASSERT_MES(!c.get_blockchain_storage().is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM), false, "ZANO_HARDFORK_04_ZARCANUM is active");
+  //CHECK_AND_ASSERT_MES(!c.get_blockchain_storage().is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM), false, "ZANO_HARDFORK_04_ZARCANUM is active");
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 2);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_blockchain_storage().is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM), false, "ZANO_HARDFORK_04_ZARCANUM is not active");
