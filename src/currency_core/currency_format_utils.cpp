@@ -2242,8 +2242,8 @@ namespace currency
     keypair txkey = AUTO_VAL_INIT(txkey);
     if (!append_mode)
     {
-      txkey = AUTO_VAL_INIT(txkey);
-      deterministic_generate_tx_onetime_key(key_images_total, sender_account_keys, txkey);
+      txkey = keypair::generate();
+      //deterministic_generate_tx_onetime_key(key_images_total, sender_account_keys, txkey);
       add_tx_pub_key_to_extra(tx, txkey.pub);
       one_time_tx_secret_key = txkey.sec;
 
