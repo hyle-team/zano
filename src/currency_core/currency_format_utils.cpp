@@ -1529,13 +1529,13 @@ namespace currency
 
       if (sa.flags&TX_SERVICE_ATTACHMENT_ENCRYPT_BODY && sa.flags&TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF)
       {
-        CHECK_AND_ASSERT_MES(sa.security.size() == 1, void(), "Unexpected key in tx_service_attachment with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE");
+        CHECK_AND_ASSERT_MES(sa.security.size() >= 1, void(), "Unexpected key in tx_service_attachment with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE");
         //take hash from derivation and use it as a salt
         crypto::hash derivation_hash = crypto::cn_fast_hash(&derivation_local, sizeof(derivation_local));
         std::string salted_body = local_sa.body;
         string_tools::append_pod_to_strbuff(salted_body, derivation_hash);
         crypto::hash proof_hash = crypto::cn_fast_hash(salted_body.data(), salted_body.size()); // proof_hash = Hs(local_sa.body || Hs(s * R)), s - spend secret, R - tx pub
-        CHECK_AND_ASSERT_MES(*(crypto::public_key*)&proof_hash == sa.security.front(), void(), "Proof hash missmatch on decrypting with TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF");
+        CHECK_AND_ASSERT_MES(*(crypto::public_key*)&proof_hash == sa.security.back(), void(), "Proof hash missmatch on decrypting with TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF");
       }
 
       rdecrypted_att.push_back(local_sa);
