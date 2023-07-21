@@ -150,7 +150,9 @@ echo "############### Uploading... ################"
 
 package_filepath=$package_filename
 
-scp $package_filepath zano_build_server:/var/www/html/builds/
+#scp $package_filepath zano_build_server:/var/www/html/builds/
+source macosx_build_uploader.sh
+upload_build $package_filepath
 if [ $? -ne 0 ]; then
     echo "Failed to upload to remote server"
     exit 1
