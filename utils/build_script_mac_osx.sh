@@ -151,7 +151,7 @@ echo "############### Uploading... ################"
 package_filepath="$(pwd)/$package_filename"
 
 #scp $package_filepath zano_build_server:/var/www/html/builds/
-source ../../../macosx_build_uploader.sh
+source ../../../utils/macosx_build_uploader.sh
 pushd .
 upload_build $package_filepath
 if [ $? -ne 0 ]; then
