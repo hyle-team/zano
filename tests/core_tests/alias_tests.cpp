@@ -1432,18 +1432,28 @@ bool gen_alias_update_for_free::generate(std::vector<test_event_entry>& events) 
   for (auto se : sources)
     input_amount += se.amount;
   if (input_amount > TESTS_DEFAULT_FEE)
-    destinations.push_back(tx_destination_entry(input_amount - TESTS_DEFAULT_FEE, miner_acc.get_public_address()));
+  {
+    uint64_t d = input_amount - TESTS_DEFAULT_FEE;
+    destinations.push_back(tx_destination_entry(d / 2, miner_acc.get_public_address()));
+    d -= d / 2;
+    destinations.push_back(tx_destination_entry(d, miner_acc.get_public_address()));
+  }
 
-  tx_builder tb;
+  transaction tx{};
+  uint64_t tx_version = currency::get_tx_version(get_block_height(blk_0r) + 1, generator.get_hardforks());
+  crypto::secret_key sk{};
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<extra_v>({ ai }), empty_attachment, tx, tx_version, sk, 0);
+
+  /*tx_builder tb;
   tb.step1_init();
   tb.step2_fill_inputs(miner_acc.get_keys(), sources);
   tb.step3_fill_outputs(destinations);
   tb.m_tx.extra.push_back(ai);
   tb.step4_calc_hash();
-  tb.step5_sign(sources);
+  tb.step5_sign(sources);*/
 
-  events.push_back(tb.m_tx);
-  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1, miner_acc, tb.m_tx);
+  ADD_CUSTOM_EVENT(events, tx);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1, miner_acc, tx);
 
   return true;
 }

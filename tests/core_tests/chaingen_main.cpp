@@ -1045,7 +1045,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(gen_alias_tx_no_outs, "*");
     GENERATE_AND_PLAY(gen_alias_switch_and_check_block_template);
     GENERATE_AND_PLAY(gen_alias_too_many_regs_in_block_template);
-    GENERATE_AND_PLAY(gen_alias_update_for_free);
+    GENERATE_AND_PLAY_HF(gen_alias_update_for_free, "3-*");
     GENERATE_AND_PLAY(gen_alias_in_coinbase);
 
     GENERATE_AND_PLAY(gen_wallet_basic_transfer);
