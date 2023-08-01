@@ -1,7 +1,6 @@
 call configure_local_paths.cmd
 
 ;; MSVC version-specific paths
-SET LOCAL_BOOST_LIB_PATH=%LOCAL_BOOST_PATH%\lib64-msvc-14.1
 SET QT_MSVC_PATH=%QT_PREFIX_PATH%\msvc2017_64
 
 SET ACHIVE_NAME_PREFIX=zano-win-x64-
@@ -44,12 +43,13 @@ cd %SOURCES_PATH%
 rmdir build /s /q
 mkdir build
 cd build
-cmake %TESTNET_DEF% -D OPENSSL_ROOT_DIR="%OPENSSL_ROOT_DIR%" -D CMAKE_PREFIX_PATH="%QT_MSVC_PATH%" -D BUILD_GUI=TRUE -D STATIC=FALSE -G "Visual Studio 15 2017 Win64" -T host=x64 ..
+
+cmake %TESTNET_DEF% -D OPENSSL_ROOT_DIR="%OPENSSL_ROOT_DIR%" -D CMAKE_PREFIX_PATH="%QT_MSVC_PATH%" -D BUILD_GUI=TRUE -D STATIC=FALSE -DBOOST_ROOT="%BOOST_ROOT%" -DBOOST_LIBRARYDIR="%BOOST_ROOT%\lib64-msvc-14.1" -G "Visual Studio 16 2019" -A x64 -T host=x64 ..
 IF %ERRORLEVEL% NEQ 0 (
   goto error
 )
 
-call "C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\VC\Auxiliary\Build\vcvars64.bat" x86_amd64
+call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvars64.bat" x86_amd64
 echo on
 cd %SOURCES_PATH%\build
 
@@ -96,7 +96,9 @@ del /F /Q %build_zip_path%
 
 cd src\release
 
-
+call :sign_file Zano.exe || goto error
+call :sign_file zanod.exe || goto error
+call :sign_file simplewallet.exe || goto error
 
 @echo on
 
@@ -108,7 +110,7 @@ copy /Y zanod.exe bunch
 copy /Y simplewallet.exe bunch
 copy /Y *.pdb bunch
 
-%QT_MSVC_PATH%\bin\windeployqt.exe bunch\Zano.exe
+%QT_MSVC_PATH%\bin\windeployqt.exe bunch\Zano.exe || goto error
 
 cd bunch
 
@@ -168,37 +170,31 @@ IF %ERRORLEVEL% NEQ 0 (
 set installer_file=%ACHIVE_NAME_PREFIX%%version%-installer.exe
 set installer_path=%BUILDS_PATH%\builds\%installer_file%
 
-:: Signing temporary disable
-::@echo "   SIGNING ...."
-::
-::%ZANO_SIGN_CMD% %installer_path%
-::IF %ERRORLEVEL% NEQ 0 (
-::  @echo "failed to sign installer"
-::  goto error
-::)
+@echo "   SIGNING the installer ...."
+
+call :sign_file %installer_path% || goto error
 
 @echo "   UPLOADING TO SERVER ...."
 
-pscp -load zano_build_server %installer_path% build.zano.org:/var/www/html/builds
+pscp -load zano_build_server %installer_path% %ZANO_BUILDS_HOST%:/var/www/html/builds
 IF %ERRORLEVEL% NEQ 0 (
   @echo "FAILED TO UPLOAD EXE TO SERVER"
   goto error
 )
 call :sha256 %installer_path% installer_checksum
 
-pscp -load zano_build_server %build_zip_path% build.zano.org:/var/www/html/builds
+pscp -load zano_build_server %build_zip_path% %ZANO_BUILDS_HOST%:/var/www/html/builds
 IF %ERRORLEVEL% NEQ 0 (
   @echo "FAILED TO UPLOAD ZIP TO SERVER"
   goto error
 )
 call :sha256 %build_zip_path% build_zip_checksum
 
-set mail_msg="New %build_prefix% %TESTNET_LABEL%build for win-x64:<br>INST: https://build.zano.org/builds/%installer_file% <br>sha256: %installer_checksum%<br><br>ZIP:  https://build.zano.org/builds/%build_zip_filename% <br>sha256: %build_zip_checksum%<br>"
+set mail_msg="New %build_prefix% %TESTNET_LABEL%build for win-x64:<br>INST: <a href='https://build.zano.org/builds/%installer_file%'>https://build.zano.org/builds/%installer_file%</a> <br>sha256: %installer_checksum%<br><br>ZIP:  <a href='https://build.zano.org/builds/%build_zip_filename%'>https://build.zano.org/builds/%build_zip_filename%</a> <br>sha256: %build_zip_checksum%<br>"
 
 echo %mail_msg%
 
-senditquiet.exe  -t %emails% -subject "Zano win-x64 %build_prefix% %TESTNET_LABEL%build %version%" -body %mail_msg%
-
+python ../utils/build_mail.py "Zano win-x64 %build_prefix% %TESTNET_LABEL%build %version%" "%emails%" %mail_msg%
 
 goto success
 
@@ -226,5 +222,15 @@ EXIT /B %ERRORLEVEL%
 @(
  @endlocal
  @set "%2=%hash: =%
+)
+@exit /B 0
+
+
+:sign_file
+@echo Signing %1...
+@call %ZANO_SIGN_CMD% %1
+@if %ERRORLEVEL% neq 0 (
+  @echo ERROR: failed to sign %1
+  @exit /B 1
 )
 @exit /B 0
