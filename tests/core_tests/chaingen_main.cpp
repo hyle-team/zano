@@ -386,7 +386,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
 
 
 #define GENERATE_AND_PLAY(genclass)                                                                        \
-  if((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string::npos != std::string(#genclass).find(run_single_test))) \
+  if (!skip_all_till_the_end && ((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string::npos != std::string(#genclass).find(run_single_test)))) \
   {                                                                                                        \
     TIME_MEASURE_START_MS(t);                                                                              \
     ++tests_count;                                                                                         \
@@ -396,14 +396,14 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
       failed_tests.insert(#genclass);                                                                      \
       LOCAL_ASSERT(false);                                                                                 \
       if (stop_on_first_fail)                                                                              \
-        return 1;                                                                                          \
+        skip_all_till_the_end = true;                                                                      \
     }                                                                                                      \
     TIME_MEASURE_FINISH_MS(t);                                                                             \
     tests_running_time.push_back(std::make_pair(#genclass, t));                                            \
   }
 
 #define GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(genclass)                                     \
-  if(run_single_test.empty() || run_single_test == #genclass)                                              \
+  if (!skip_all_till_the_end && (run_single_test.empty() || run_single_test == #genclass))                 \
   {                                                                                                        \
     const char* testname = #genclass " (BC saveload)";                                                     \
     TIME_MEASURE_START_MS(t);                                                                              \
@@ -414,29 +414,29 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
       failed_tests.insert(testname);                                                                       \
       LOCAL_ASSERT(false);                                                                                 \
       if (stop_on_first_fail)                                                                              \
-        return 1;                                                                                          \
+        skip_all_till_the_end = true;                                                                      \
     }                                                                                                      \
     TIME_MEASURE_FINISH_MS(t);                                                                             \
     tests_running_time.push_back(std::make_pair(testname, t));                                             \
   }
 
 #define GENERATE_AND_PLAY_HF(genclass, hardfork_str_mask)                                                  \
-  if((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string::npos != std::string(#genclass).find(run_single_test))) \
+  if (!skip_all_till_the_end && ((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string::npos != std::string(#genclass).find(run_single_test)))) \
   {                                                                                                        \
     std::vector<size_t> hardforks = parse_hardfork_str_mask(hardfork_str_mask);                            \
     CHECK_AND_ASSERT_MES(!hardforks.empty(), false, "invalid hardforks mask: " << hardfork_str_mask);      \
-    for(size_t hfid : hardforks)                                                                           \
+    for(size_t i = 0; i < hardforks.size() && !skip_all_till_the_end; ++i)                                 \
     {                                                                                                      \
-      std::string tns = std::string(#genclass) + " @ HF " + epee::string_tools::num_to_string_fast(hfid);  \
+      std::string tns = std::string(#genclass) + " @ HF " + epee::string_tools::num_to_string_fast(hardforks[i]);  \
       const char* testname = tns.c_str();                                                                  \
       TIME_MEASURE_START_MS(t);                                                                            \
       ++tests_count;                                                                                       \
-      if (!generate_and_play<genclass>(testname, hfid))                                                    \
+      if (!generate_and_play<genclass>(testname, hardforks[i]))                                            \
       {                                                                                                    \
         failed_tests.insert(testname);                                                                     \
         LOCAL_ASSERT(false);                                                                               \
         if (stop_on_first_fail)                                                                            \
-          return 1;                                                                                        \
+          skip_all_till_the_end = true;                                                                    \
       }                                                                                                    \
       TIME_MEASURE_FINISH_MS(t);                                                                           \
       tests_running_time.push_back(std::make_pair(testname, t));                                           \
@@ -889,6 +889,8 @@ int main(int argc, char* argv[])
     stop_on_first_fail = command_line::get_arg(g_vm, arg_stop_on_fail);
   }
 
+  
+  bool skip_all_till_the_end = false;
   size_t tests_count = 0;
   size_t unique_tests_count = 0;
   size_t serious_failures_count = 0;
@@ -1282,6 +1284,9 @@ int main(int argc, char* argv[])
         total_time += i.second;
       }
     }
+
+    if (skip_all_till_the_end)
+      std::cout << ENDL << concolor::yellow << "(execution interrupted at the first failure; not all tests were run)" << ENDL; 
 
     serious_failures_count = failed_tests.size() - failed_postponed_tests_count;
 
