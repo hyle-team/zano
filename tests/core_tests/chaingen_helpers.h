@@ -291,19 +291,23 @@ inline bool put_alias_via_tx_to_list(const currency::hard_forks_descriptor& hf, 
 
   uint64_t alias_reward = 0;
   if (get_block_height(head_block) < ALIAS_MEDIAN_RECALC_INTERWAL)
+  {
     alias_reward = get_alias_coast_from_fee(ae.m_alias, ALIAS_VERY_INITAL_COAST); // don't ask why
+  }
   else
+  {
     LOCAL_ASSERT(false); // not implemented yet, see also all the mess around blockchain_storage::get_tx_fee_median(), get_tx_fee_median_effective_index() etc.
+  }
 
-  std::vector<tx_source_entry> sources;
-  std::vector<tx_destination_entry> destinations;
+  std::vector<currency::tx_source_entry> sources;
+  std::vector<currency::tx_destination_entry> destinations;
   bool r = fill_tx_sources_and_destinations(events, head_block, miner_acc, reward_acc, alias_reward, TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "alias: fill_tx_sources_and_destinations failed");
 
   for(auto& el : destinations)
   {
     if (el.addr.front() == reward_acc.get_public_address())
-      el.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // all alias-burn outputs must have explicit native asset id 
+      el.flags |= currency::tx_destination_entry_flags::tdef_explicit_native_asset_id; // all alias-burn outputs must have explicit native asset id 
   }
 
   uint64_t tx_version = currency::get_tx_version(get_block_height(head_block) + 1, generator.get_hardforks()); // assuming the tx will be in the next block (head_block + 1)
