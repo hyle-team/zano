@@ -1351,7 +1351,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
       if (sout.type().hash_code() == typeid(uint64_t).hash_code())       // output by global index
       {
         uint64_t gindex = boost::get<uint64_t>(sout);
-        auto& outs_by_amount = outs[s.amount];
+        auto& outs_by_amount = outs[s.amount_for_global_output_index()];
         if (gindex >= outs_by_amount.size())
           return false;
         outs_by_amount[gindex].spent = true;
