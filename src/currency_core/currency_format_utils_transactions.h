@@ -62,6 +62,7 @@ namespace currency
     bool is_multisig() const    { return ms_sigs_count > 0; }
     bool is_zc() const          { return !real_out_amount_blinding_mask.is_zero(); }
     bool is_native_coin() const { return asset_id == currency::native_coin_asset_id; }
+    uint64_t amount_for_global_output_index() const { return is_zc() ? 0 : amount; } // amount value for global outputs index, it's zero for outputs with hidden amounts
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(outputs)
