@@ -2863,17 +2863,41 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
-  uint64_t get_outs_money_amount(const transaction& tx)
+  uint64_t get_outs_money_amount(const transaction& tx, const currency::account_keys& keys /* = currency::null_acc_keys */)
   {
     uint64_t outputs_amount = 0;
-    for (const auto& o : tx.vout)
+
+    bool process_hidden_amounts = false;
+    crypto::key_derivation derivation = null_derivation;
+    if (keys.spend_secret_key != null_skey && keys.view_secret_key != null_skey)
     {
+      process_hidden_amounts = true;
+      bool r = crypto::generate_key_derivation(get_tx_pub_key_from_extra(tx), keys.view_secret_key, derivation);
+      if (!r)
+        LOG_PRINT_YELLOW("generate_key_derivation failed in get_outs_money_amount", LOG_LEVEL_0);
+    }
+
+    for (size_t output_index = 0; output_index < tx.vout.size(); ++output_index)
+    {
+      const auto& o = tx.vout[output_index];
       VARIANT_SWITCH_BEGIN(o);
-      VARIANT_CASE_CONST(tx_out_bare, o)
-        outputs_amount += o.amount;
-      // ignore outputs with hidden amounts
+      VARIANT_CASE_CONST(tx_out_bare, bo)
+        outputs_amount += bo.amount;
+      VARIANT_CASE_CONST(tx_out_zarcanum, zo)
+        if (process_hidden_amounts)
+        {
+          uint64_t decoded_amount = 0;
+          crypto::public_key decoded_asset_id{};
+          crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
+          if (is_out_to_acc(keys.account_address, zo, derivation, output_index, decoded_amount, decoded_asset_id, amount_blinding_mask, asset_id_blinding_mask))
+          {
+            if (decoded_asset_id == currency::native_coin_asset_id)
+              outputs_amount += decoded_amount;
+          }
+        }
       VARIANT_SWITCH_END();
     }
+
     return outputs_amount;
   }
   //---------------------------------------------------------------
