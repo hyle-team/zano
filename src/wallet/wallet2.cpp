@@ -4648,6 +4648,34 @@ void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info
   m_custom_assets[new_asset_id] = ado.descriptor;
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::update_emmit_asset(const crypto::public_key asset_id, std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx)
+{
+
+  auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
+  CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
+
+  asset_descriptor_operation asset_reg_info = AUTO_VAL_INIT(asset_reg_info);
+  asset_reg_info.descriptor = asset_info;
+  asset_reg_info.operation_type = ASSET_DESCRIPTOR_OPERATION_EMMIT;
+  asset_reg_info.asset_id = asset_id;
+  construct_tx_param ctp = get_default_construct_tx_param();
+  ctp.dsts = destinations;
+  ctp.extra.push_back(asset_reg_info);
+  ctp.need_at_least_1_zc = true;
+  ctp.control_key = own_asset_entry_it->second.control_key;
+
+  finalized_tx ft = AUTO_VAL_INIT(ft);
+  this->transfer(ctp, ft, true, nullptr);
+  result_tx = ft.tx;
+  //get generated asset id
+  currency::asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
+  bool r = get_type_in_variant_container(result_tx.extra, ado);
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed find asset info in tx");
+  calculate_asset_id(ado.descriptor.owner, nullptr, &new_asset_id);
+
+  m_custom_assets[new_asset_id] = ado.descriptor;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward)
 {
   if (!validate_alias_name(ai.m_alias))

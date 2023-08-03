@@ -242,6 +242,17 @@ namespace currency
     std::vector<crypto::point_t>  amount_commitments;
   };
 
+  struct asset_op_verification_context
+  {
+    const transaction& tx;
+    const crypto::hash& tx_id;
+    const asset_descriptor_operation& ado;
+    crypto::public_key asset_id = currency::null_pkey;
+    crypto::point_t asset_id_pt = crypto::c_point_0;
+    uint64_t amout_to_validate = 0;
+    std::shared_ptr< const std::list<asset_descriptor_operation> > asset_op_history;
+  };
+
   bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs);
   bool generate_asset_surjection_proof(const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, zc_asset_surjection_proof& result);
   bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id);
@@ -250,7 +261,7 @@ namespace currency
     const std::vector<tx_out_v>& vouts, zc_outs_range_proof& result);
   bool check_tx_bare_balance(const transaction& tx, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
   bool check_tx_balance(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
-  bool validate_asset_operation(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, crypto::public_key& asset_id);
+  bool validate_asset_operation_balance_proof(asset_op_verification_context& context);
   //---------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 
                                                              size_t current_block_size, 
@@ -432,6 +443,8 @@ namespace currency
   std::string get_word_from_timstamp(uint64_t timestamp, bool use_password);
   uint64_t get_timstamp_from_word(std::string word, bool& password_used);
   std::string generate_origin_for_htlc(const txout_htlc& htlc, const account_keys& acc_keys);
+
+  void normalize_asset_operation_for_hashing(asset_descriptor_operation& op);
 
   template<class t_txin_v>
   typename std::conditional<std::is_const<t_txin_v>::value, const std::vector<txin_etc_details_v>, std::vector<txin_etc_details_v> >::type& get_txin_etc_options(t_txin_v& in)

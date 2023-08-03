@@ -113,6 +113,8 @@ do {                                                    \
   if (_ser_ar.is_saving_arch()) { s_version = v; }      \
 } while (0);
 
+#define END_VERSION_UNDER(x)                            \
+  if(s_version < x ) {return true;}
 
 
 #define BEGIN_VERSIONED_SERIALIZE() \

@@ -1031,7 +1031,8 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(gen_no_attchments_in_coinbase, "3");
     GENERATE_AND_PLAY(gen_no_attchments_in_coinbase_gentime);
 
-    GENERATE_AND_PLAY(gen_alias_tests);
+    //GENERATE_AND_PLAY(gen_alias_tests);
+    GENERATE_AND_PLAY_HF(gen_alias_tests, "4,1");
     GENERATE_AND_PLAY(gen_alias_strange_data);
     GENERATE_AND_PLAY(gen_alias_concurrency_with_switch);
     GENERATE_AND_PLAY(gen_alias_same_alias_in_tx_pool);   

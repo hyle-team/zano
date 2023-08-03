@@ -813,17 +813,26 @@ namespace currency
     uint8_t                         operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
     asset_descriptor_base           descriptor;
     boost::optional<crypto::public_key> opt_amount_commitment; // premultiplied by 1/8
+    boost::optional<crypto::signature> opt_proof; // operation proof - for update/emit
+    boost::optional<crypto::public_key> opt_asset_id; // target asset_id - for update/emit
 
     BEGIN_VERSIONED_SERIALIZE()
+      CURRENT_VERSION(1)
       FIELD(operation_type)
       FIELD(descriptor)
       FIELD(opt_amount_commitment)
+      END_VERSION_UNDER(1)
+      FIELD(opt_proof)
+      FIELD(opt_asset_id)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(operation_type)
       BOOST_SERIALIZE(descriptor)
       BOOST_SERIALIZE(opt_amount_commitment)
+      BOOST_END_VERSION_UNDER(1)
+      BOOST_SERIALIZE(opt_proof)
+      BOOST_SERIALIZE(opt_asset_id)
     END_BOOST_SERIALIZATION()
   };
 

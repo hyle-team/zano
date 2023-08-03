@@ -292,6 +292,7 @@ namespace tools
     bool shuffle = false;
     bool create_utxo_defragmentation_tx = false;
     bool need_at_least_1_zc = false;
+    crypto::secret_key control_key = currency::null_pkey;
   };
 
   struct mode_separate_context

@@ -3812,27 +3812,90 @@ bool blockchain_storage::pop_asset_info(const crypto::public_key& asset_id)
   return true;
 }
 //------------------------------------------------------------------
+bool blockchain_storage::validate_ado_ownership(asset_op_verification_context& avc)
+{
+//  asset_id = AUTO_VAL_INIT(asset_id);
+//  CHECK_AND_ASSERT_MES(validate_asset_operation_balance_proof(tx, tx_id, ado, asset_id), false, "asset operation validation failed!");
+  CHECK_AND_ASSERT_MES(ado.op_proof.has_value(), false, "Ownership validation failed - missing signature"); 
+
+
+  CHECK_AND_ASSERT_MES(avc.asset_op_history->size() != 0, false, "asset with id " << asset_id << " has invalid history size() == 0");
+
+  crypto::public_key owner_key = avc.asset_op_history->back().descriptor.owner;
+  asset_descriptor_operation ado_local = ado;
+  normalize_asset_operation_for_hashing(ado_local);
+  std::string buff = t_serializable_object_to_blob(ado_local);
+  crypto::hash h = crypto::cn_fast_hash(buff.data(), buff.size());
+  return crypto::check_signature(h, owner_key, *ado.op_proof);
+}
+//------------------------------------------------------------------
 bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
+
+  asset_op_verification_context avc = { tx , tx_id, ado };
+
   if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
   {
-    crypto::public_key asset_id{};
-    CHECK_AND_ASSERT_MES(validate_asset_operation(tx, tx_id, ado, asset_id), false, "asset operation validation failed!");
 
-    auto asset_history_ptr = m_db_assets.find(asset_id);
-    CHECK_AND_ASSERT_MES(!asset_history_ptr, false, "asset with id " << asset_id << " has already been registered");
+    calculate_asset_id(avc.ado.descriptor.owner, &avc.asset_id_pt, &avc.asset_id);
+    avc.asset_op_history = m_db_assets.find(avc.asset_id);
+    CHECK_AND_ASSERT_MES(!avc.asset_op_history, false, "asset with id " << asset_id << " has already been registered");
+
+    avc.amout_to_validate = ado.descriptor.current_supply;
+    CHECK_AND_ASSERT_MES(validate_asset_operation_balance_proof(avc), false, "asset operation validation failed!");
+
     assets_container::t_value_type local_asset_history = AUTO_VAL_INIT(local_asset_history);
     local_asset_history.push_back(ado);
     m_db_assets.set(asset_id, local_asset_history);
     LOG_PRINT_MAGENTA("[ASSET_REGISTERED]: " << asset_id << ": " << ado.descriptor.full_name, LOG_LEVEL_1);
     //TODO:
     //rise_core_event(CORE_EVENT_ADD_ASSET, alias_info_to_rpc_alias_info(ai));
-  }
-  else
-  {  
-    //TODO: implement other operations
-    CHECK_AND_ASSERT_THROW(false, "asset operation not implemented yet");
+  }else 
+  {
+    CHECK_AND_ASSERT_MES(avc.ado.opt_asset_id, false, "asset_id not provided for asset altering operation");
+    avc.asset_op_history = m_db_assets.find(*avc.ado.opt_asset_id);
+
+    CHECK_AND_ASSERT_MES(avc.asset_op_history && avc.asset_op_history->size(), false, "asset with id " << asset_id << " has not been registered");
+    // check ownership permission
+    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+    {
+      bool r = validate_ado_ownership(avc);
+      CHECK_AND_ASSERT_MES(r, false, "Faild to validate ownership of asset_descriptor_operation, rejecting");
+    }
+
+    avc.amout_to_validate = 0;
+    //validate balance proof
+    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
+    {
+      //check that total current_supply haven't changed
+      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply != avc.asset_op_history->back().descriptor.current_supply);
+    }
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT)
+    {
+      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > avc.asset_op_history->back().descriptor.current_supply);
+      avc.amout_to_validate = ado.descriptor.current_supply - avc.asset_op_history->back().descriptor.current_supply;
+    }
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+    {
+      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply < avc.asset_op_history->back().descriptor.current_supply);
+      avc.amout_to_validate =  avc.asset_op_history->back().descriptor.current_supply - ado.descriptor.current_supply;
+    }
+    else
+    {
+      LOG_ERROR("Unknown operation type: " << ado.operation_type);
+      return false;
+    }
+    bool r = validate_asset_operation_balance_proof(avc);
+    CHECK_AND_ASSERT(r, false, "Balance proof validation failed for asset_descriptor_operation");
+    assets_container::t_value_type local_asset_history = *avc.asset_op_history;
+
+    local_asset_history.push_back(ado);
+    m_db_assets.set(asset_id, local_asset_history);
+    LOG_PRINT_MAGENTA("[ASSET_UPDATED]: " << asset_id << ": " << ado.descriptor.full_name, LOG_LEVEL_1);
+
+    //TODO:
+    //rise_core_event(CORE_EVENT_ADD_ASSET, alias_info_to_rpc_alias_info(ai));
   }
 
   return true;

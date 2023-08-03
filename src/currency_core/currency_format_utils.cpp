@@ -557,15 +557,19 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------------------------------------
-  bool validate_asset_operation(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, crypto::public_key& asset_id)
+  bool validate_asset_operation_balance_proof(asset_op_verification_context& context)// const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, crypto::public_key& asset_id)
   {
-    crypto::point_t asset_id_pt = crypto::c_point_0;
-    calculate_asset_id(ado.descriptor.owner, &asset_id_pt, &asset_id);
 
-    CHECK_AND_ASSERT_MES(count_type_in_variant_container<asset_operation_proof>(tx.proofs) == 1, false, "asset_operation_proof not present or present more than once");
-    const asset_operation_proof& aop = get_type_in_variant_container_by_ref<const asset_operation_proof>(tx.proofs);
+    CHECK_AND_ASSERT_MES(count_type_in_variant_container<asset_operation_proof>(context.tx.proofs) == 1, false, "asset_operation_proof not present or present more than once");
+    const asset_operation_proof& aop = get_type_in_variant_container_by_ref<const asset_operation_proof>(context.tx.proofs);
 
-    if (ado.descriptor.hidden_supply)
+    bool is_burn = false;
+    if (context.ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+    {
+      is_burn = true;
+    }
+
+    if (context.ado.descriptor.hidden_supply)
     {
       CHECK_AND_ASSERT_MES(aop.opt_amount_commitment_composition_proof.has_value(), false, "opt_amount_commitment_composition_proof is absent");
       // TODO @#@# if asset is hidden -- theck composition proof
@@ -574,11 +578,15 @@ namespace currency
     else
     {
       // make sure that amount commitment corresponds to opt_amount_commitment_g_proof
-      CHECK_AND_ASSERT_MES(ado.opt_amount_commitment.has_value(), false, "opt_amount_commitment is absent");
+      CHECK_AND_ASSERT_MES(context.ado.opt_amount_commitment.has_value(), false, "opt_amount_commitment is absent");
       CHECK_AND_ASSERT_MES(aop.opt_amount_commitment_g_proof.has_value(), false, "opt_amount_commitment_g_proof is absent");
-      crypto::point_t A = crypto::point_t(ado.opt_amount_commitment.get()).modify_mul8() - ado.descriptor.current_supply * asset_id_pt;
+      crypto::point_t A = is_burn ? 
+        crypto::point_t(context.ado.opt_amount_commitment.get()).modify_mul8() + context.amount * asset_id_pt 
+        :
+        crypto::point_t(context.ado.opt_amount_commitment.get()).modify_mul8() - context.amount * asset_id_pt
+        ;
 
-      bool r = crypto::check_signature(tx_id, A.to_public_key(), aop.opt_amount_commitment_g_proof.get());
+      bool r = crypto::check_signature(context.tx_id, A.to_public_key(), aop.opt_amount_commitment_g_proof.get());
       CHECK_AND_ASSERT_MES(r, false, "opt_amount_commitment_g_proof check failed");
     }
 
@@ -1105,6 +1113,14 @@ namespace currency
     string_tools::append_pod_to_strbuff(origin_blob, origin_hs);
     return origin_blob;
   }
+
+  //---------------------------------------------------------------
+
+  void normalize_asset_operation_for_hashing(asset_descriptor_operation& op)
+  {
+    op.op_proof = boost::none;
+  }
+
   //---------------------------------------------------------------
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, uint8_t tx_outs_attr /*  = CURRENCY_TO_KEY_OUT_RELAXED */)
   {
@@ -2309,31 +2325,34 @@ namespace currency
       pado = get_type_in_variant_container<asset_descriptor_operation>(tx.extra);
       if (pado)
       {
-        // only operation register is supported atm
-        CHECK_AND_ASSERT_MES(pado->operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER, false, "unsupported asset operation: " << (int)pado->operation_type);
-        crypto::secret_key asset_control_key{};
-        bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, one_time_tx_secret_key, asset_control_key, pado->descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
-        CHECK_AND_ASSERT_MES(r, false, "derive_key_pair_from_key_pair failed");
-
-        calculate_asset_id(pado->descriptor.owner, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id);
-
-        // calculate amount blinding mask
-        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, asset_control_key);
-
-        // set correct asset_id to the corresponding destination entries
-        uint64_t amount_of_emitted_asset = 0;
-        for (auto& item : shuffled_dsts)
+        if (pado->operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
         {
-          if (item.asset_id == currency::null_pkey)
-          {
-            item.asset_id = gen_context.ao_asset_id; // set calculated asset_id to the asset's outputs, if this asset is being emitted within this tx
-            amount_of_emitted_asset += item.amount;
-          }
-        }
-        pado->descriptor.current_supply = amount_of_emitted_asset; // TODO: consider setting current_supply beforehand, not setting it hear in ad-hoc manner -- sowle
+          CHECK_AND_ASSERT_MES(pado->operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER, false, "unsupported asset operation: " << (int)pado->operation_type);
+          crypto::secret_key asset_control_key{};
+          bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, one_time_tx_secret_key, asset_control_key, pado->descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
+          CHECK_AND_ASSERT_MES(r, false, "derive_key_pair_from_key_pair failed");
 
-        gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
-        pado->opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
+          calculate_asset_id(pado->descriptor.owner, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id);
+
+          // calculate amount blinding mask
+          gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, asset_control_key);
+
+          // set correct asset_id to the corresponding destination entries
+          uint64_t amount_of_emitted_asset = 0;
+          for (auto& item : shuffled_dsts)
+          {
+            if (item.asset_id == currency::null_pkey)
+            {
+              item.asset_id = gen_context.ao_asset_id; // set calculated asset_id to the asset's outputs, if this asset is being emitted within this tx
+              amount_of_emitted_asset += item.amount;
+            }
+          }
+          pado->descriptor.current_supply = amount_of_emitted_asset; // TODO: consider setting current_supply beforehand, not setting it hear in ad-hoc manner -- sowle
+
+          gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
+          pado->opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
+
+        }
         //LOG_PRINT_CYAN("AO    " << ": " << crypto::scalar_t(amount_of_emitted_asset) << " x " << gen_context.ao_asset_id_pt << " + " << gen_context.ao_amount_blinding_mask << " x G", LOG_LEVEL_0);
         //LOG_PRINT_CYAN("     == " << gen_context.ao_amount_commitment << ", x 1/8 == " << pado->opt_amount_commitment.get(), LOG_LEVEL_0);
       }
