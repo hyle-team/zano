@@ -97,9 +97,10 @@ namespace currency
 
   enum tx_destination_entry_flags
   {
-    tdef_none = 0,
-    tdef_explicit_native_asset_id =     0x0001,
-    tdef_explicit_amount_to_provide =   0x0002
+    tdef_none                         = 0,
+    tdef_explicit_native_asset_id     = 0x0001,
+    tdef_explicit_amount_to_provide   = 0x0002,
+    tdef_zero_amount_blinding_mask    = 0x0004  // currently it's only used for burning native coins
   };
 
   struct tx_destination_entry
