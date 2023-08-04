@@ -954,10 +954,13 @@ bool test_generator::construct_block_gentime_with_coinbase_cb(const currency::bl
 
   uint64_t block_reward_without_fee = 0;
 
-  r = construct_miner_tx(height, epee::misc_utils::median(block_sizes), already_generated_coins, 0 /* current_block_size !HACK! */, 0, acc.get_public_address(), acc.get_public_address(), miner_tx, block_reward_without_fee, get_tx_version(height, m_hardforks), currency::blobdata(), 1);
+  keypair tx_sec_key = keypair::generate();
+  r = construct_miner_tx(height, epee::misc_utils::median(block_sizes), already_generated_coins, 0 /* current_block_size !HACK! */, 0,
+    acc.get_public_address(), acc.get_public_address(), miner_tx, block_reward_without_fee, get_tx_version(height, m_hardforks), currency::blobdata(), /* max outs: */ 1,
+    /* pos: */ false, currency::pos_entry(), /* ogc_ptr: */ nullptr, &tx_sec_key);
   CHECK_AND_ASSERT_MES(r, false, "construct_miner_tx failed");
 
-  if (!cb(miner_tx))
+  if (!cb(miner_tx, tx_sec_key))
     return false;
 
   currency::wide_difficulty_type diff = get_difficulty_for_next_block(prev_id, true);
