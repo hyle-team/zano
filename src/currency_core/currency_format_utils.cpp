@@ -4242,7 +4242,50 @@ namespace currency
     return a.n == b.n && a.tx_id == b.tx_id;
   }
   //--------------------------------------------------------------------------------
- 
+  bool operator ==(const currency::signed_parts& a, const currency::signed_parts& b)
+  {
+    return
+      a.n_extras  == b.n_extras &&
+      a.n_outs    == b.n_outs;
+  }
+  bool operator ==(const currency::txin_gen& a, const currency::txin_gen& b)
+  {
+    return a.height == b.height;
+  }
+  bool operator ==(const currency::txin_to_key& a, const currency::txin_to_key& b)
+  {
+    return
+      a.amount      == b.amount &&
+      a.etc_details == b.etc_details &&
+      a.key_offsets == b.key_offsets &&
+      a.k_image     == b.k_image;
+  }
+  bool operator ==(const currency::txin_multisig& a, const currency::txin_multisig& b)
+  {
+    return
+      a.amount          == b.amount &&
+      a.etc_details     == b.etc_details &&
+      a.multisig_out_id == b.multisig_out_id &&
+      a.sigs_count      == b.sigs_count;
+  }
+  bool operator ==(const currency::txin_htlc& a, const currency::txin_htlc& b)
+  {
+    return
+      a.amount      == b.amount &&
+      a.etc_details == b.etc_details &&
+      a.hltc_origin == b.hltc_origin &&
+      a.key_offsets == b.key_offsets &&
+      a.k_image     == b.k_image;
+  }
+  bool operator ==(const currency::txin_zc_input& a, const currency::txin_zc_input& b)
+  {
+    return
+      a.etc_details == b.etc_details &&
+      a.key_offsets == b.key_offsets &&
+      a.k_image     == b.k_image;
+  }
+  //--------------------------------------------------------------------------------
+
 
   boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,
     const wide_difficulty_type& difficulty_pow_at_split_point,
