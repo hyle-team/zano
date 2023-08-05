@@ -745,6 +745,9 @@ bool check_mixin_value_for_each_input(size_t mixin, const crypto::hash& tx_id, c
 bool shuffle_source_entry(currency::tx_source_entry& se);
 bool shuffle_source_entries(std::vector<currency::tx_source_entry>& sources);
 
+// one output will be created for each destination entry and one additional output to add up to old coinbase total amount
+bool replace_coinbase_in_genesis_block(const std::vector<currency::tx_destination_entry>& destinations, test_generator& generator, std::vector<test_event_entry>& events, currency::block& genesis_block);
+
 //--------------------------------------------------------------------------
 template<class t_test_class>
 auto do_check_tx_verification_context(const currency::tx_verification_context& tvc, bool tx_added, size_t event_index, const currency::transaction& tx, t_test_class& validator, int)

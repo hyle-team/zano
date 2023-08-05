@@ -2327,6 +2327,53 @@ bool shuffle_source_entries(std::vector<tx_source_entry>& sources)
   return true;
 }
 
+bool replace_coinbase_in_genesis_block(const std::vector<currency::tx_destination_entry>& destinations, test_generator& generator, std::vector<test_event_entry>& events, currency::block& genesis_block)
+{
+  bool r = false;
+  generator.remove_block_info(genesis_block);
+  events.pop_back();
+
+  // remember premine amount
+  uint64_t premine_amount = get_outs_money_amount(genesis_block.miner_tx);
+
+  // replace tx key
+  keypair tx_key = keypair::generate();
+  for(auto& el : genesis_block.miner_tx.extra)
+  {
+    if (el.type() == typeid(crypto::public_key))
+    {
+      boost::get<crypto::public_key>(el) = tx_key.pub;
+      break;
+    }
+  }
+  uint64_t total_amount = 0;
+
+  // replace outputs
+  genesis_block.miner_tx.vout.clear();
+
+  for(size_t output_index = 0; output_index < destinations.size() + 1; ++output_index)
+  {
+    uint64_t amount = output_index < destinations.size() ? destinations[output_index].amount : premine_amount - total_amount;
+    const account_public_address& addr = output_index < destinations.size() ? destinations[output_index].addr.back() : destinations.back().addr.back();
+
+    crypto::key_derivation derivation{};
+    bool r = crypto::generate_key_derivation(addr.view_public_key, tx_key.sec, derivation);
+    CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed");
+
+    txout_to_key target{};
+    r = crypto::derive_public_key(derivation, output_index, addr.spend_public_key, target.key);
+    CHECK_AND_ASSERT_MES(r, false, "derive_public_key failed");
+    genesis_block.miner_tx.vout.emplace_back(tx_out_bare{amount, target});
+    total_amount += amount;
+    CHECK_AND_ASSERT_MES(total_amount <= premine_amount, false, "total amount is greater than premine amount");
+  }
+
+  events.push_back(genesis_block);
+  std::vector<size_t> block_sizes;
+  generator.add_block(genesis_block, 0, block_sizes, 0, 0, std::list<transaction>{}, null_hash);
+  return true;
+}
+
 
 //------------------------------------------------------------------------------
 test_chain_unit_base::test_chain_unit_base()
