@@ -1113,12 +1113,19 @@ namespace currency
     string_tools::append_pod_to_strbuff(origin_blob, origin_hs);
     return origin_blob;
   }
+  //---------------------------------------------------------------
+  crypto::hash get_signature_hash_for_asset_operation(const asset_descriptor_operation& ado)
+  {
+    asset_descriptor_operation ado_local = ado;
+    normalize_asset_operation_for_hashing(ado_local);
+    std::string buff = t_serializable_object_to_blob(ado_local);
+    return crypto::cn_fast_hash(buff.data(), buff.size());
+  }
 
   //---------------------------------------------------------------
-
   void normalize_asset_operation_for_hashing(asset_descriptor_operation& op)
   {
-    op.op_proof = boost::none;
+    op.opt_proof = boost::none;
   }
 
   //---------------------------------------------------------------
@@ -2072,6 +2079,110 @@ namespace currency
       p_result_point->to_public_key(*p_result_pub_key);
   }
 
+  bool construct_tx_handle_ado(const account_keys& sender_account_keys, const finalize_tx_param& ftp, asset_descriptor_operation* pado, tx_generation_context& gen_context)
+  {
+    if (pado->operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
+    {
+      //CHECK_AND_ASSERT_MES(pado->operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER, false, "unsupported asset operation: " << (int)pado->operation_type);
+      crypto::secret_key asset_control_key{};
+      bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, one_time_tx_secret_key, asset_control_key, pado->descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
+      CHECK_AND_ASSERT_MES(r, false, "derive_key_pair_from_key_pair failed");
+
+      calculate_asset_id(pado->descriptor.owner, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id);
+
+      // calculate amount blinding mask
+      gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, asset_control_key);
+
+      // set correct asset_id to the corresponding destination entries
+      uint64_t amount_of_emitted_asset = 0;
+      for (auto& item : shuffled_dsts)
+      {
+        if (item.asset_id == currency::null_pkey)
+        {
+          item.asset_id = gen_context.ao_asset_id; // set calculated asset_id to the asset's outputs, if this asset is being emitted within this tx
+          amount_of_emitted_asset += item.amount;
+        }
+      }
+      pado->descriptor.current_supply = amount_of_emitted_asset; // TODO: consider setting current_supply beforehand, not setting it hear in ad-hoc manner -- sowle
+
+      gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
+      pado->opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
+
+    }
+    else {
+      if (pado->operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT)
+      {
+
+        //bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, one_time_tx_secret_key, asset_control_key, pado->descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
+        //CHECK_AND_ASSERT_MES(r, false, "derive_key_pair_from_key_pair failed");
+
+        //calculate_asset_id(pado->descriptor.owner, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id);
+        CHECK_AND_ASSERT_MES(pado->opt_asset_id, false, "pado->opt_asset_id is not found at pado->operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT/UPDATE");
+
+        gen_context.ao_asset_id = *pado->opt_asset_id;
+        gen_context.ao_asset_id_pt.from_public_key(gen_context.ao_asset_id);
+        // calculate amount blinding mask
+        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, ftp.asset_control_key);
+
+        // set correct asset_id to the corresponding destination entries
+        uint64_t amount_of_emitted_asset = 0;
+        for (auto& item : shuffled_dsts)
+        {
+          if (item.asset_id == gen_context.ao_asset_id)
+          {
+            amount_of_emitted_asset += item.amount;
+          }
+        }
+        pado->descriptor.current_supply += amount_of_emitted_asset; // TODO: consider setting current_supply beforehand, not setting it hear in ad-hoc manner -- sowle
+
+        gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
+        pado->opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
+
+      }
+      else if (pado->operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
+      {
+        CHECK_AND_ASSERT_MES(pado->opt_asset_id, false, "pado->opt_asset_id is not found at pado->operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT/UPDATE");
+        CHECK_AND_ASSERT_MES(pado->opt_proof, false, "pado->opt_asset_id is not found at pado->operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT/UPDATE");
+        CHECK_AND_ASSERT_MES(!pado->opt_amount_commitment, false, "pado->opt_asset_id is not found at pado->operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT/UPDATE");
+
+        //fields that not supposed to be changed?
+      }
+      else if (pado->operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+      {
+
+        //calculate_asset_id(pado->descriptor.owner, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id);
+        CHECK_AND_ASSERT_MES(pado->opt_asset_id, false, "pado->opt_asset_id is not found at pado->operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT/UPDATE");
+
+        gen_context.ao_asset_id = *pado->opt_asset_id;
+        gen_context.ao_asset_id_pt.from_public_key(gen_context.ao_asset_id);
+        // calculate amount blinding mask
+        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, ftp.asset_control_key);
+
+        // set correct asset_id to the corresponding destination entries
+        uint64_t amount_of_burned_assets = 0;
+        for (auto& item : ftp.sources)
+        {
+          if (item.asset_id == gen_context.ao_asset_id)
+          {
+            amount_of_burned_assets += item.amount;
+          }
+        }
+        pado->descriptor.current_supply -= amount_of_burned_assets; // TODO: consider setting current_supply beforehand, not setting it hear in ad-hoc manner -- sowle
+
+        gen_context.ao_amount_commitment = amount_of_burned_assets * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
+        pado->opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
+      }
+
+      //seal it with owners signature
+      crypto::signature sig = currency::null_sig;
+      crypto::public_key pub_k = currency::null_pkey;
+      crypto::secret_key_to_public_key(ftp.asset_control_key, pub_k);
+      crypto::generate_signature(get_signature_hash_for_asset_operation(ado), ftp.asset_control_key, sig);
+      pado->opt_proof = sig;
+    }
+    return true;
+  }
+
   bool construct_tx(const account_keys& sender_account_keys, const finalize_tx_param& ftp, finalized_tx& result)
   {
     const std::vector<tx_source_entry>& sources = ftp.sources;
@@ -2325,36 +2436,8 @@ namespace currency
       pado = get_type_in_variant_container<asset_descriptor_operation>(tx.extra);
       if (pado)
       {
-        if (pado->operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
-        {
-          CHECK_AND_ASSERT_MES(pado->operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER, false, "unsupported asset operation: " << (int)pado->operation_type);
-          crypto::secret_key asset_control_key{};
-          bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, one_time_tx_secret_key, asset_control_key, pado->descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
-          CHECK_AND_ASSERT_MES(r, false, "derive_key_pair_from_key_pair failed");
-
-          calculate_asset_id(pado->descriptor.owner, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id);
-
-          // calculate amount blinding mask
-          gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, asset_control_key);
-
-          // set correct asset_id to the corresponding destination entries
-          uint64_t amount_of_emitted_asset = 0;
-          for (auto& item : shuffled_dsts)
-          {
-            if (item.asset_id == currency::null_pkey)
-            {
-              item.asset_id = gen_context.ao_asset_id; // set calculated asset_id to the asset's outputs, if this asset is being emitted within this tx
-              amount_of_emitted_asset += item.amount;
-            }
-          }
-          pado->descriptor.current_supply = amount_of_emitted_asset; // TODO: consider setting current_supply beforehand, not setting it hear in ad-hoc manner -- sowle
-
-          gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
-          pado->opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
-
-        }
-        //LOG_PRINT_CYAN("AO    " << ": " << crypto::scalar_t(amount_of_emitted_asset) << " x " << gen_context.ao_asset_id_pt << " + " << gen_context.ao_amount_blinding_mask << " x G", LOG_LEVEL_0);
-        //LOG_PRINT_CYAN("     == " << gen_context.ao_amount_commitment << ", x 1/8 == " << pado->opt_amount_commitment.get(), LOG_LEVEL_0);
+        bool r = construct_tx_handle_ado(sender_account_keys, ftp, pado, gen_context);
+        CHECK_AND_ASSERT_MES(r, false, "Failed to construct_tx_handle_ado()");
       }
     }
 

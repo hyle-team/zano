@@ -158,6 +158,7 @@ namespace currency
     crypto::public_key spend_pub_key;  // only for validations
     uint64_t tx_version;
     uint64_t mode_separate_fee = 0;
+    crypto::secret_key asset_control_key = currency::null_pkey;
 
     tx_generation_context gen_context{}; // solely for consolidated txs
 
@@ -445,6 +446,7 @@ namespace currency
   std::string generate_origin_for_htlc(const txout_htlc& htlc, const account_keys& acc_keys);
 
   void normalize_asset_operation_for_hashing(asset_descriptor_operation& op);
+  crypto::hash get_signature_hash_for_asset_operation(const asset_descriptor_operation& ado);
 
   template<class t_txin_v>
   typename std::conditional<std::is_const<t_txin_v>::value, const std::vector<txin_etc_details_v>, std::vector<txin_etc_details_v> >::type& get_txin_etc_options(t_txin_v& in)

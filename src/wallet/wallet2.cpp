@@ -416,6 +416,54 @@ const crypto::public_key& wallet2::out_get_pub_key(const currency::tx_out_v& out
   }
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::process_ado_in_new_transaction(const asset_descriptor_operation& ado)
+{
+  do
+  {
+    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
+    {
+      crypto::public_key self_check = AUTO_VAL_INIT(self_check);
+      crypto::secret_key asset_control_key = AUTO_VAL_INIT(asset_control_key);
+      bool r = derive_key_pair_from_key_pair(tx_pub_key, m_account.get_keys().spend_secret_key, asset_control_key, self_check, CRYPTO_HDS_ASSET_CONTROL_KEY);
+      if (!r)
+      {
+        //not critical error, continue to work 
+        LOG_ERROR("Failed to derive_key_pair_from_key_pair for asset_descriptor_operation in tx " << ptc.tx_hash());
+        break;
+      }
+
+      if (self_check != ado.descriptor.owner)
+      {
+        //still not critical error
+        LOG_ERROR("Public key from asset_descriptor_operation(" << ado.descriptor.owner << ") not much with derived public key(" << self_check << "), for tx" << ptc.tx_hash());
+        break;
+      }
+      crypto::public_key asset_id{};
+      calculate_asset_id(ado.descriptor.owner, nullptr, &asset_id);
+      WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(m_own_asset_descriptors.count(asset_id) == 0, "asset with asset_id " << asset_id << " has already been registered in the wallet as own asset");
+      wallet_own_asset_context& asset_context = m_own_asset_descriptors[asset_id];
+      asset_context.asset_descriptor = ado.descriptor;
+      asset_context.height = height;
+      std::stringstream ss;
+      ss << "New Asset Registered:"
+        << ENDL << "asset id:         " << asset_id
+        << ENDL << "Name:             " << asset_context.asset_descriptor.full_name
+        << ENDL << "Ticker:           " << asset_context.asset_descriptor.ticker
+        << ENDL << "Total Max Supply: " << print_asset_money(asset_context.asset_descriptor.total_max_supply, asset_context.asset_descriptor.decimal_point)
+        << ENDL << "Current Supply:   " << print_asset_money(asset_context.asset_descriptor.current_supply, asset_context.asset_descriptor.decimal_point)
+        << ENDL << "Decimal Point:    " << asset_context.asset_descriptor.decimal_point;
+
+      WLT_LOG_MAGENTA(ss.str(), LOG_LEVEL_0);
+      if (m_wcallback)
+        m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
+    }
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
+    {
+      if (ado.opt_asset_id)
+    }
+  } while (false);
+}
+
 void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes)
 {
   //check for transaction spends
@@ -804,45 +852,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
     if (get_type_in_variant_container(tx.extra, ado))
     {
-      if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
-      {
-        crypto::public_key self_check = AUTO_VAL_INIT(self_check);
-        crypto::secret_key asset_control_key = AUTO_VAL_INIT(asset_control_key);
-        bool r = derive_key_pair_from_key_pair(tx_pub_key, m_account.get_keys().spend_secret_key, asset_control_key, self_check, CRYPTO_HDS_ASSET_CONTROL_KEY);
-        if (!r)
-        {
-          //not critical error, continue to work 
-          LOG_ERROR("Failed to derive_key_pair_from_key_pair for asset_descriptor_operation in tx " << ptc.tx_hash());
-        }else
-        {
-          if (self_check != ado.descriptor.owner)
-          {
-            //still not critical error
-            LOG_ERROR("Public key from asset_descriptor_operation(" << ado.descriptor.owner << ") not much with derived public key(" << self_check << "), for tx" << ptc.tx_hash());
-          }
-          else 
-          {
-            crypto::public_key asset_id{};
-            calculate_asset_id(ado.descriptor.owner, nullptr, &asset_id);
-            WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(m_own_asset_descriptors.count(asset_id) == 0, "asset with asset_id " << asset_id << " has already been registered in the wallet as own asset");
-            wallet_own_asset_context& asset_context = m_own_asset_descriptors[asset_id];
-            asset_context.asset_descriptor = ado.descriptor;
-            asset_context.height = height;
-            std::stringstream ss;
-            ss << "New Asset Registered:"
-              << ENDL << "asset id:         " << asset_id
-              << ENDL << "Name:             " << asset_context.asset_descriptor.full_name 
-              << ENDL << "Ticker:           " << asset_context.asset_descriptor.ticker
-              << ENDL << "Total Max Supply: " << print_asset_money(asset_context.asset_descriptor.total_max_supply, asset_context.asset_descriptor.decimal_point)
-              << ENDL << "Current Supply:   " << print_asset_money(asset_context.asset_descriptor.current_supply, asset_context.asset_descriptor.decimal_point)
-              << ENDL << "Decimal Point:    " << asset_context.asset_descriptor.decimal_point;
-
-            WLT_LOG_MAGENTA(ss.str(), LOG_LEVEL_0);
-            if (m_wcallback)
-              m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
-          }
-        }
-      }
+      process_ado_in_new_transaction(ado);
     }
   }
 
@@ -4636,7 +4646,7 @@ void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info
   ctp.extra.push_back(asset_reg_info);
   ctp.need_at_least_1_zc = true;
 
-  finalized_tx ft = AUTO_VAL_INIT(ft);
+  finalized_tx ft = AUTO_VAL_INIT(ft);6++
   this->transfer(ctp, ft, true, nullptr);
   result_tx = ft.tx;
   //get generated asset id
@@ -4648,16 +4658,16 @@ void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info
   m_custom_assets[new_asset_id] = ado.descriptor;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::update_emmit_asset(const crypto::public_key asset_id, std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx)
+void wallet2::emmit_asset(const crypto::public_key asset_id, std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx)
 {
 
   auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
   CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
 
-  asset_descriptor_operation asset_reg_info = AUTO_VAL_INIT(asset_reg_info);
-  asset_reg_info.descriptor = asset_info;
-  asset_reg_info.operation_type = ASSET_DESCRIPTOR_OPERATION_EMMIT;
-  asset_reg_info.asset_id = asset_id;
+  asset_descriptor_operation asset_emmit_info = AUTO_VAL_INIT(asset_emmit_info);
+  asset_emmit_info.descriptor = own_asset_entry_it->second.asset_descriptor;
+  asset_emmit_info.operation_type = ASSET_DESCRIPTOR_OPERATION_EMMIT;
+  asset_emmit_info.asset_id = asset_id;
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.dsts = destinations;
   ctp.extra.push_back(asset_reg_info);
@@ -4667,13 +4677,6 @@ void wallet2::update_emmit_asset(const crypto::public_key asset_id, std::vector<
   finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
   result_tx = ft.tx;
-  //get generated asset id
-  currency::asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
-  bool r = get_type_in_variant_container(result_tx.extra, ado);
-  CHECK_AND_ASSERT_THROW_MES(r, "Failed find asset info in tx");
-  calculate_asset_id(ado.descriptor.owner, nullptr, &new_asset_id);
-
-  m_custom_assets[new_asset_id] = ado.descriptor;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward)
@@ -6544,7 +6547,7 @@ bool wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
 
   const currency::transaction& tx_for_mode_separate = msc.tx_for_mode_separate;
   assets_selection_context needed_money_map = get_needed_money(ctp.fee, ctp.dsts);
-
+  ftp.asset_control_key = ctp.control_key;
   //
   // TODO @#@# need to do refactoring over this part to support hidden amounts and asset_id
   //

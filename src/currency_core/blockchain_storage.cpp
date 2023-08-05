@@ -3816,7 +3816,7 @@ bool blockchain_storage::validate_ado_ownership(asset_op_verification_context& a
 {
 //  asset_id = AUTO_VAL_INIT(asset_id);
 //  CHECK_AND_ASSERT_MES(validate_asset_operation_balance_proof(tx, tx_id, ado, asset_id), false, "asset operation validation failed!");
-  CHECK_AND_ASSERT_MES(ado.op_proof.has_value(), false, "Ownership validation failed - missing signature"); 
+  CHECK_AND_ASSERT_MES(ado.opt_proof.has_value(), false, "Ownership validation failed - missing signature"); 
 
 
   CHECK_AND_ASSERT_MES(avc.asset_op_history->size() != 0, false, "asset with id " << asset_id << " has invalid history size() == 0");
@@ -3826,7 +3826,7 @@ bool blockchain_storage::validate_ado_ownership(asset_op_verification_context& a
   normalize_asset_operation_for_hashing(ado_local);
   std::string buff = t_serializable_object_to_blob(ado_local);
   crypto::hash h = crypto::cn_fast_hash(buff.data(), buff.size());
-  return crypto::check_signature(h, owner_key, *ado.op_proof);
+  return crypto::check_signature(get_signature_hash_for_asset_operation(ado), owner_key, *ado.opt_proof);
 }
 //------------------------------------------------------------------
 bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado)
