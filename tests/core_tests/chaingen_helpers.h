@@ -307,7 +307,7 @@ inline bool put_alias_via_tx_to_list(const currency::hard_forks_descriptor& hf, 
   for(auto& el : destinations)
   {
     if (el.addr.front() == reward_acc.get_public_address())
-      el.flags |= currency::tx_destination_entry_flags::tdef_explicit_native_asset_id; // all alias-burn outputs must have explicit native asset id 
+      el.flags |= currency::tx_destination_entry_flags::tdef_explicit_native_asset_id | currency::tx_destination_entry_flags::tdef_zero_amount_blinding_mask; // all alias-burn outputs must have explicit native asset id and zero amount mask
   }
 
   uint64_t tx_version = currency::get_tx_version(get_block_height(head_block) + 1, generator.get_hardforks()); // assuming the tx will be in the next block (head_block + 1)

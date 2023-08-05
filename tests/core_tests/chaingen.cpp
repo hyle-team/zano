@@ -1775,7 +1775,7 @@ bool construct_tx_with_many_outputs(const currency::hard_forks_descriptor& hf, s
   uint64_t total_amount, size_t outputs_count, uint64_t fee, currency::transaction& tx, bool use_ref_by_id /* = false */)
 {
   std::vector<currency::tx_source_entry> sources;
-  bool r = fill_tx_sources(sources, events, blk_head, keys_from, total_amount + fee, 0, true, false, use_ref_by_id);
+  bool r = fill_tx_sources(sources, events, blk_head, keys_from, total_amount + fee, 0, true, true, use_ref_by_id);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
 
   std::vector<currency::tx_destination_entry> destinations;
