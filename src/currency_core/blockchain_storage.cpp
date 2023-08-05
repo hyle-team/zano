@@ -4642,7 +4642,8 @@ struct outputs_visitor
     {
       if (!m_bch.is_tx_spendtime_unlocked(source_out_unlock_time))
       {
-        LOG_PRINT_L0("One of outputs for one of inputs have wrong tx.unlock_time = " << get_tx_unlock_time(source_tx, out_i));
+        uint64_t limit = source_out_unlock_time < CURRENCY_MAX_BLOCK_NUMBER ? m_bch.get_current_blockchain_size() - 1 + CURRENCY_LOCKED_TX_ALLOWED_DELTA_BLOCKS : m_bch.get_core_runtime_config().get_core_time() + CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS;
+        LOG_PRINT_L0("An output has unlock time value of " << get_tx_unlock_time(source_tx, out_i) << " while the current limit is " << limit);
         return false;
       }
     }

@@ -828,7 +828,8 @@ namespace currency
 
         if (!vis.handle_output(tx_ptr->tx, validated_tx, o, n))
         {
-          LOG_PRINT_RED_L0("handle_output failed for output #" << n << " in " << tx_id);
+          size_t verified_input_index = std::find(validated_tx.vin.begin(), validated_tx.vin.end(), verified_input) - validated_tx.vin.begin();
+          LOG_PRINT_RED_L0("handle_output failed for output #" << n << " in " << tx_id << " referenced by input #" << verified_input_index << " in tx " << get_transaction_hash(validated_tx));
           return false;
         }
         TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
@@ -843,7 +844,8 @@ namespace currency
         TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
         if (!vis.handle_output(tx_ptr->tx, validated_tx, out_zc, n))
         {
-          LOG_PRINT_RED_L0("handle_output failed for output #" << n << " in " << tx_id);
+          size_t verified_input_index = std::find(validated_tx.vin.begin(), validated_tx.vin.end(), verified_input) - validated_tx.vin.begin();
+          LOG_PRINT_RED_L0("handle_output failed for output #" << n << " in " << tx_id << " referenced by input #" << verified_input_index << " in tx " << get_transaction_hash(validated_tx));
           return false;
         }
         TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
