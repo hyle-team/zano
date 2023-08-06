@@ -2356,7 +2356,6 @@ namespace currency
       if (!append_mode && all_inputs_are_obviously_native_coins && gen_context.ao_asset_id == currency::null_pkey)
         dst_entr.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // all inputs are obviously native coins -- all outputs must have explicit asset ids (unless there's an asset emission)
 
-      CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount); // <<--  TODO @#@# consider removing this check
       r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys,
         gen_context.asset_id_blinding_masks[output_index], gen_context.amount_blinding_masks[output_index],
         gen_context.blinded_asset_ids[output_index], gen_context.amount_commitments[output_index], result, tx_outs_attr);
