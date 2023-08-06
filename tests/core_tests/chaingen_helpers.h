@@ -292,7 +292,7 @@ inline bool put_alias_via_tx_to_list(const currency::hard_forks_descriptor& hf, 
   uint64_t alias_reward = 0;
   if (get_block_height(head_block) < ALIAS_MEDIAN_RECALC_INTERWAL)
   {
-    alias_reward = get_alias_coast_from_fee(ae.m_alias, ALIAS_VERY_INITAL_COAST); // don't ask why
+    alias_reward = currency::get_alias_coast_from_fee(ae.m_alias, ALIAS_VERY_INITAL_COAST); // don't ask why
   }
   else
   {
