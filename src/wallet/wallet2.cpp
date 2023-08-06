@@ -4621,6 +4621,7 @@ void wallet2::request_alias_registration(currency::extra_alias_entry& ai, curren
   tx_dest_alias_reward.addr.resize(1);
   get_aliases_reward_account(tx_dest_alias_reward.addr.back());
   tx_dest_alias_reward.amount = reward;
+  tx_dest_alias_reward.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask;
   destinations.push_back(tx_dest_alias_reward);
 
   transfer(destinations, 0, 0, fee, extra, attachments, get_current_split_strategy(), tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx, CURRENCY_TO_KEY_OUT_RELAXED, false);
@@ -6484,7 +6485,7 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
     for(auto& dst : dsts)
     {
       if (dst.asset_id == asset_id)
-        final_destinations.emplace_back(dst.amount, dst.addr, dst.asset_id);
+        final_destinations.emplace_back(dst);
     }
     if (found_money > needed_money)
       final_destinations.emplace_back(found_money - needed_money, m_account.get_public_address(), asset_id); // returning back the change
