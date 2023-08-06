@@ -966,9 +966,32 @@ bool gen_alias_too_much_reward::generate(std::vector<test_event_entry>& events) 
   bool r = get_aliases_reward_account(const_cast<currency::account_public_address&>(reward_acc.get_public_address()));
   CHECK_AND_ASSERT_MES(r, false, "get_aliases_reward_account failed");
 
-  MAKE_TX_FEE_MIX_ATTR_EXTRA(events, tx_0, miner_acc, reward_acc, premine, TESTS_DEFAULT_FEE, 0, blk_0r, CURRENCY_TO_KEY_OUT_RELAXED, extra, false);
-  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
-  DO_CALLBACK(events, "check_alias");
+  std::vector<tx_source_entry> sources;
+  std::vector<tx_destination_entry> destinations;
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc, reward_acc, premine, TESTS_DEFAULT_FEE, 0, sources, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
+  for(auto& d : destinations)
+    if (d.addr.back() == null_pub_addr)
+      d.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask;
+  transaction tx_0{};
+  crypto::secret_key sk{};
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<currency::extra_v>({ ai }), empty_attachment, tx_0, get_tx_version_from_events(events), sk, 0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  
+  if (tx_0.version <= TRANSACTION_VERSION_PRE_HF4)
+  {
+    ADD_CUSTOM_EVENT(events, tx_0);
+    MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+    DO_CALLBACK(events, "check_alias");
+  }
+  else
+  {
+    // post HF4: alias reward must be precise
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx_0);
+    DO_CALLBACK(events, "mark_invalid_block");
+    MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+  }
 
   return true;
 }
