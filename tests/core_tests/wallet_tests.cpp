@@ -1616,9 +1616,6 @@ void gen_wallet_decrypted_attachments::on_transfer2(const tools::wallet_public::
 
 gen_wallet_alias_and_unconfirmed_txs::gen_wallet_alias_and_unconfirmed_txs()
 {
-  m_hardforks.set_hardfork_height(1, 0);
-  m_hardforks.set_hardfork_height(2, 0);
-
   REGISTER_CALLBACK_METHOD(gen_wallet_alias_and_unconfirmed_txs, c1);
   REGISTER_CALLBACK_METHOD(gen_wallet_alias_and_unconfirmed_txs, c2);
   REGISTER_CALLBACK_METHOD(gen_wallet_alias_and_unconfirmed_txs, c3);
@@ -1636,17 +1633,29 @@ bool gen_wallet_alias_and_unconfirmed_txs::generate(std::vector<test_event_entry
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
 
 
-  // miner registers an alias for alice
+  // miner registers an alias for Alice
   extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = "alicealice";
   ai.m_address = alice_acc.get_public_address();
-  MAKE_TX_FEE_MIX_ATTR_EXTRA(events, tx_alice_alias, miner_acc, null_account, get_alias_coast_from_fee(ai.m_alias, TESTS_DEFAULT_FEE), TESTS_DEFAULT_FEE, 0, blk_0r, 0, std::vector<currency::extra_v>({ ai }), true);
 
-  uint64_t amount = get_alias_coast_from_fee(std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'a'), TESTS_DEFAULT_FEE);
-  MAKE_TX(events, tx_0, miner_acc, alice_acc, amount, blk_0r);
-  MAKE_TX(events, tx_1, miner_acc, alice_acc, amount, blk_0r);
-  MAKE_TX(events, tx_2, miner_acc, bob_acc, amount, blk_0r);
-  MAKE_TX(events, tx_3, miner_acc, bob_acc, amount, blk_0r);
+  std::vector<tx_source_entry> sources;
+  std::vector<tx_destination_entry> destinations;
+  bool r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc, null_account, get_alias_coast_from_fee(ai.m_alias, ALIAS_VERY_INITAL_COAST), TESTS_DEFAULT_FEE, 0, sources, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
+  for(auto& d : destinations)
+    if (d.addr.back() == null_pub_addr)
+      d.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask;
+  transaction tx_alice_alias{};
+  crypto::secret_key sk{};
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<currency::extra_v>({ ai }), empty_attachment, tx_alice_alias, get_tx_version_from_events(events), sk, 0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  ADD_CUSTOM_EVENT(events, tx_alice_alias);
+
+  uint64_t alias_cost = get_alias_coast_from_fee(std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'a'), ALIAS_VERY_INITAL_COAST);
+  MAKE_TX(events, tx_0, miner_acc, alice_acc, alias_cost, blk_0r);
+  MAKE_TX(events, tx_1, miner_acc, alice_acc, TESTS_DEFAULT_FEE, blk_0r);
+  MAKE_TX(events, tx_2, miner_acc, bob_acc, alias_cost, blk_0r);
+  MAKE_TX(events, tx_3, miner_acc, bob_acc, TESTS_DEFAULT_FEE, blk_0r);
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({ tx_0, tx_1, tx_2, tx_3, tx_alice_alias }));
 
   REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
@@ -1675,12 +1684,14 @@ bool gen_wallet_alias_and_unconfirmed_txs::c1(currency::core& c, size_t ev_index
   ai.m_address = m_accounts[BOB_ACC_IDX].get_public_address();
   ai.m_view_key.push_back(m_accounts[BOB_ACC_IDX].get_keys().view_secret_key);
 
-  uint64_t alias_reward = get_alias_coast_from_fee(ai.m_alias, TESTS_DEFAULT_FEE);
-  bool r = check_balance_via_wallet(*bob_wlt.get(), "bob_wlt", alias_reward * 2);
+  uint64_t alias_reward = get_alias_coast_from_fee(ai.m_alias, ALIAS_VERY_INITAL_COAST);
+  bool r = check_balance_via_wallet(*bob_wlt.get(), "bob_wlt", alias_reward + TESTS_DEFAULT_FEE);
   CHECK_AND_ASSERT_MES(r, false, "Incorrect wallet balance");
 
-  std::vector<test_event_entry> stub_events_vec;
-  MAKE_TEST_WALLET_TX_EXTRA(stub_events_vec, tx, bob_wlt, alias_reward, null_account, std::vector<currency::extra_v>({ ai }));
+  transaction tx{};
+  std::vector<tx_destination_entry> destinations({tx_destination_entry(alias_reward, null_pub_addr)});
+  destinations.back().flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask;
+  bob_wlt->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>({ ai }), empty_attachment, tx);
   
   CHECK_AND_ASSERT_MES(check_native_coins_amount_burnt_in_outs(tx, alias_reward), false, "Generated tx has invalid alias reward");
 
@@ -1711,12 +1722,14 @@ bool gen_wallet_alias_and_unconfirmed_txs::c2(currency::core& c, size_t ev_index
   ai.m_address = someone.get_public_address();
   ai.m_view_key.push_back(someone.get_keys().view_secret_key);
   
-  uint64_t alias_reward = get_alias_coast_from_fee(ai.m_alias, TESTS_DEFAULT_FEE);
-  bool r = check_balance_via_wallet(*bob_wlt.get(), "bob_wlt", alias_reward * 2);
+  uint64_t alias_reward = get_alias_coast_from_fee(ai.m_alias, ALIAS_VERY_INITAL_COAST);
+  bool r = check_balance_via_wallet(*bob_wlt.get(), "bob_wlt", alias_reward + TESTS_DEFAULT_FEE);
   CHECK_AND_ASSERT_MES(r, false, "Incorrect wallet balance");
 
-  std::vector<test_event_entry> stub_events_vec;
-  MAKE_TEST_WALLET_TX_EXTRA(stub_events_vec, tx, bob_wlt, alias_reward, null_account, std::vector<currency::extra_v>({ ai }));
+  transaction tx{};
+  std::vector<tx_destination_entry> destinations({tx_destination_entry(alias_reward, null_pub_addr)});
+  destinations.back().flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask;
+  bob_wlt->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>({ ai }), empty_attachment, tx);
 
   CHECK_AND_ASSERT_MES(check_native_coins_amount_burnt_in_outs(tx, alias_reward), false, "Generated tx has invalid alias reward");
 
@@ -1748,8 +1761,11 @@ bool gen_wallet_alias_and_unconfirmed_txs::c3(currency::core& c, size_t ev_index
   bool r = sign_extra_alias_entry(ai, m_accounts[ALICE_ACC_IDX].get_keys().account_address.spend_public_key, m_accounts[ALICE_ACC_IDX].get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
 
-  std::vector<test_event_entry> stub_events_vec;
-  MAKE_TEST_WALLET_TX_EXTRA(stub_events_vec, tx, alice_wlt, 1, null_account, std::vector<currency::extra_v>({ ai }));
+  transaction tx{};
+  std::vector<tx_destination_entry> destinations({tx_destination_entry(1, null_pub_addr)});
+  destinations.back().flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask;
+  alice_wlt->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, std::vector<currency::extra_v>({ ai }), empty_attachment, tx);
+
 
   bool has_relates_alias_in_unconfirmed = false;
   alice_wlt->scan_tx_pool(has_relates_alias_in_unconfirmed);
@@ -1781,24 +1797,26 @@ bool gen_wallet_alias_via_special_wallet_funcs::generate(std::vector<test_event_
   set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
 
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
+
   extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = "minerminer";
   ai.m_address = miner_acc.get_public_address();
-  block blk_00 = AUTO_VAL_INIT(blk_00);
-  bool r = generator.construct_pow_block_with_alias_info_in_coinbase(miner_acc, blk_0, ai, blk_00);
+  block blk_2{};
+  bool r = generator.construct_pow_block_with_alias_info_in_coinbase(miner_acc, blk_1, ai, blk_2);
   CHECK_AND_ASSERT_MES(r, false, "construct_pow_block_with_alias_info_in_coinbase failed");
-  events.push_back(blk_00);
+  ADD_CUSTOM_EVENT(events, blk_2);
 
-  REWIND_BLOCKS_N(events, blk_0r, blk_00, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
-  uint64_t biggest_alias_reward = get_alias_coast_from_fee("a", TESTS_DEFAULT_FEE);
-  MAKE_TX(events, tx_0, miner_acc, alice_acc, biggest_alias_reward + TESTS_DEFAULT_FEE, blk_0r);
-  MAKE_TX(events, tx_1, miner_acc, alice_acc, biggest_alias_reward + TESTS_DEFAULT_FEE, blk_0r);
-  MAKE_TX(events, tx_2, miner_acc, alice_acc, biggest_alias_reward + TESTS_DEFAULT_FEE, blk_0r);
+  uint64_t biggest_alias_reward = get_alias_coast_from_fee("a", ALIAS_VERY_INITAL_COAST);
+  MAKE_TX(events, tx_0, miner_acc, alice_acc, biggest_alias_reward + TESTS_DEFAULT_FEE, blk_2r);
+  MAKE_TX(events, tx_1, miner_acc, alice_acc, biggest_alias_reward + TESTS_DEFAULT_FEE, blk_2r);
+  MAKE_TX(events, tx_2, miner_acc, alice_acc, biggest_alias_reward + TESTS_DEFAULT_FEE, blk_2r);
 
-  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({ tx_0, tx_1, tx_2 }));
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_3, blk_2r, miner_acc, std::list<transaction>({ tx_0, tx_1, tx_2 }));
 
-  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
+  REWIND_BLOCKS_N(events, blk_3r, blk_3, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
 
   DO_CALLBACK(events, "c1");
 
@@ -1812,12 +1830,12 @@ bool gen_wallet_alias_via_special_wallet_funcs::c1(currency::core& c, size_t ev_
   bool received_money;
   std::atomic<bool> atomic_false = ATOMIC_VAR_INIT(false);
   alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
-  CHECK_AND_ASSERT_MES(blocks_fetched == 1 + CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE, false, "Incorrect numbers of blocks fetched");
+  CHECK_AND_ASSERT_MES(blocks_fetched == 2 + CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE, false, "Incorrect numbers of blocks fetched");
 
   extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = "alicealice";
   ai.m_address = m_accounts[ALICE_ACC_IDX].get_public_address();
-  uint64_t alias_reward = get_alias_coast_from_fee(ai.m_alias, TESTS_DEFAULT_FEE);
+  uint64_t alias_reward = get_alias_coast_from_fee(ai.m_alias, ALIAS_VERY_INITAL_COAST);
   transaction res_tx = AUTO_VAL_INIT(res_tx);
   alice_wlt->request_alias_registration(ai, res_tx, TESTS_DEFAULT_FEE, alias_reward);
 
@@ -1827,9 +1845,9 @@ bool gen_wallet_alias_via_special_wallet_funcs::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
-  CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == 2 + CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE + 1, false, "Incorrect blockchain size");
+  CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == 3 + CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE + 1, false, "Incorrect blockchain size");
 
-  uint64_t biggest_alias_reward = get_alias_coast_from_fee("a", TESTS_DEFAULT_FEE);
+  uint64_t biggest_alias_reward = get_alias_coast_from_fee("a", ALIAS_VERY_INITAL_COAST);
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
     [biggest_alias_reward](const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) -> bool {
       return std::count(wti.remote_aliases.begin(), wti.remote_aliases.end(), "minerminer") == 1 &&
@@ -1847,7 +1865,7 @@ bool gen_wallet_alias_via_special_wallet_funcs::c1(currency::core& c, size_t ev_
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
-  CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == 2 + CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE + 2, false, "Incorrect blockchain size");
+  CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == 3 + CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE + 2, false, "Incorrect blockchain size");
 
   alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
   CHECK_AND_ASSERT_MES(blocks_fetched == 2, false, "Incorrect numbers of blocks fetched");
@@ -1860,7 +1878,7 @@ bool gen_wallet_alias_via_special_wallet_funcs::c1(currency::core& c, size_t ev_
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
-  CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == 2 + CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE + 3, false, "Incorrect blockchain size");
+  CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == 3 + CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE + 3, false, "Incorrect blockchain size");
 
   extra_alias_entry ai2 = AUTO_VAL_INIT(ai2);
   r = c.get_blockchain_storage().get_alias_info(ai.m_alias, ai2);
