@@ -1835,9 +1835,8 @@ bool gen_wallet_alias_via_special_wallet_funcs::c1(currency::core& c, size_t ev_
   extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = "alicealice";
   ai.m_address = m_accounts[ALICE_ACC_IDX].get_public_address();
-  uint64_t alias_reward = get_alias_coast_from_fee(ai.m_alias, ALIAS_VERY_INITAL_COAST);
   transaction res_tx = AUTO_VAL_INIT(res_tx);
-  alice_wlt->request_alias_registration(ai, res_tx, TESTS_DEFAULT_FEE, alias_reward);
+  alice_wlt->request_alias_registration(ai, res_tx, TESTS_DEFAULT_FEE); // use 0 reward for alias so wallet calculate the correct reward by its own
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
 
