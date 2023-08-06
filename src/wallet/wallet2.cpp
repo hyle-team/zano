@@ -6449,9 +6449,15 @@ void wallet2::prepare_tx_destinations(const assets_selection_context& needed_mon
       if (dst.asset_id == currency::null_pkey)
         final_destinations.emplace_back(dst.amount, dst.addr, dst.asset_id);
 
-    // if there's not ehough destinations items (i.e. outputs), split the last one
-    if (final_destinations.size() > 0 && final_destinations.size() < CURRENCY_TX_MIN_ALLOWED_OUTS)
+    if (final_destinations.empty())
     {
+      // if there's no destinations -- make CURRENCY_TX_MIN_ALLOWED_OUTS empty destinations
+      for(size_t i = 0; i < CURRENCY_TX_MIN_ALLOWED_OUTS; ++i)
+        final_destinations.emplace_back(0, m_account.get_public_address());
+    }
+    else if (final_destinations.size() < CURRENCY_TX_MIN_ALLOWED_OUTS)
+    {
+      // if there's not ehough destinations items (i.e. outputs), split the last one
       tx_destination_entry de = final_destinations.back();
       final_destinations.pop_back();
       size_t items_to_be_added = CURRENCY_TX_MIN_ALLOWED_OUTS - final_destinations.size();
