@@ -3203,7 +3203,7 @@ namespace currency
   }
   //---------------------------------------------------------------
   // NOTE: this function is obsolete and depricated
-  // PoS block real timestamp is set using a service attachment in mining tx extra since 2021-10 
+  [[deprecated("PoS block real timestamp is set using a service attachment in mining tx extra since 2021-10")]]
   uint64_t get_actual_timestamp(const block& b)
   {
     uint64_t tes_ts = b.timestamp;
