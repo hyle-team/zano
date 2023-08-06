@@ -1208,16 +1208,8 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_alias_reward(const COMMAND_RPC_GET_ALIAS_REWARD::request& req, COMMAND_RPC_GET_ALIAS_REWARD::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
-
-    uint64_t default_tx_fee = m_core.get_blockchain_storage().get_core_runtime_config().tx_default_fee;
-    uint64_t current_median_fee = m_core.get_blockchain_storage().get_tx_fee_median();
-
-    res.reward = get_alias_coast_from_fee(req.alias, std::max(default_tx_fee, current_median_fee));
-
-    if (res.reward)
-      res.status = API_RETURN_CODE_OK;
-    else
-      res.status = API_RETURN_CODE_NOT_FOUND;
+    res.reward = m_core.get_blockchain_storage().get_alias_coast(req.alias);
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------

@@ -4571,7 +4571,7 @@ uint64_t wallet2::get_alias_cost(const std::string& alias)
     throw std::runtime_error(std::string("Failed to get alias cost"));
   }
  
-  return rsp.reward + rsp.reward / 10; //add 10% of price to be sure;
+  return rsp.reward;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::request_alias_registration(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward, const crypto::secret_key& authority_key)
