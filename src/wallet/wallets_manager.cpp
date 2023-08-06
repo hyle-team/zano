@@ -1394,9 +1394,8 @@ std::string wallets_manager::get_alias_coast(const std::string& a, uint64_t& coa
   if (!m_rpc_proxy->call_COMMAND_RPC_GET_ALIAS_REWARD(req, rsp))
     return API_RETURN_CODE_BAD_ARG;
 
-  coast = rsp.reward + rsp.reward/10; //add 10% of price to be sure
+  coast = rsp.reward;
   return rsp.status;
-
 }
 
 std::string wallets_manager::request_alias_registration(const currency::alias_rpc_details& al, uint64_t wallet_id, uint64_t fee, currency::transaction& res_tx, uint64_t reward)
