@@ -1033,22 +1033,22 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(gen_no_attchments_in_coinbase, "3");
     GENERATE_AND_PLAY(gen_no_attchments_in_coinbase_gentime);
 
-    GENERATE_AND_PLAY(gen_alias_tests);
-    GENERATE_AND_PLAY(gen_alias_strange_data);
-    GENERATE_AND_PLAY(gen_alias_concurrency_with_switch);
-    GENERATE_AND_PLAY(gen_alias_same_alias_in_tx_pool);   
-    GENERATE_AND_PLAY(gen_alias_switch_and_tx_pool);
-    GENERATE_AND_PLAY(gen_alias_update_after_addr_changed);
-    GENERATE_AND_PLAY(gen_alias_blocking_reg_by_invalid_tx);
-    GENERATE_AND_PLAY(gen_alias_blocking_update_by_invalid_tx);
+    GENERATE_AND_PLAY_HF(gen_alias_tests, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_strange_data, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_concurrency_with_switch, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_same_alias_in_tx_pool, "3-*");   
+    GENERATE_AND_PLAY_HF(gen_alias_switch_and_tx_pool, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_update_after_addr_changed, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_blocking_reg_by_invalid_tx, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_blocking_update_by_invalid_tx, "3-*");
     GENERATE_AND_PLAY_HF(gen_alias_reg_with_locked_money, "*");
-    GENERATE_AND_PLAY(gen_alias_too_small_reward);
-    GENERATE_AND_PLAY(gen_alias_too_much_reward);
+    GENERATE_AND_PLAY_HF(gen_alias_too_small_reward, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_too_much_reward, "3-*");
     GENERATE_AND_PLAY_HF(gen_alias_tx_no_outs, "*");
-    GENERATE_AND_PLAY(gen_alias_switch_and_check_block_template);
-    GENERATE_AND_PLAY(gen_alias_too_many_regs_in_block_template);
+    GENERATE_AND_PLAY_HF(gen_alias_switch_and_check_block_template, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_too_many_regs_in_block_template, "3"); // disabled in HF4 due to tx outputs count limitation
     GENERATE_AND_PLAY_HF(gen_alias_update_for_free, "3-*");
-    GENERATE_AND_PLAY(gen_alias_in_coinbase);
+    GENERATE_AND_PLAY_HF(gen_alias_in_coinbase, "3-*");
 
     GENERATE_AND_PLAY(gen_wallet_basic_transfer);
     GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch);
@@ -1063,8 +1063,8 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_wallet_transfers_and_outdated_unconfirmed_txs);
     GENERATE_AND_PLAY(gen_wallet_transfers_and_chain_switch);
     GENERATE_AND_PLAY(gen_wallet_decrypted_attachments);
-    GENERATE_AND_PLAY(gen_wallet_alias_and_unconfirmed_txs);
-    GENERATE_AND_PLAY(gen_wallet_alias_via_special_wallet_funcs);
+    GENERATE_AND_PLAY_HF(gen_wallet_alias_and_unconfirmed_txs, "3-*");
+    GENERATE_AND_PLAY_HF(gen_wallet_alias_via_special_wallet_funcs, "3-*");
     GENERATE_AND_PLAY(gen_wallet_fake_outputs_randomness);
     GENERATE_AND_PLAY(gen_wallet_fake_outputs_not_enough);
     GENERATE_AND_PLAY(gen_wallet_offers_basic);
