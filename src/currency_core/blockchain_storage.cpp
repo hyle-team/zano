@@ -4440,11 +4440,12 @@ bool check_tx_explicit_asset_id_rules(const transaction& tx, bool all_tx_ins_hav
       CHECK_AND_ASSERT_MES(r, false, "output #" << j << " has a non-explicit asset id");
     }
   }
-  else // otherwise all outputs must have hidden asset id
+  else // otherwise all outputs must have hidden asset id (unless they burn money by sending them to null pubkey) 
   {
     for(size_t j = 0, k = tx.vout.size(); j < k; ++j)
     {
-      r = crypto::point_t(boost::get<tx_out_zarcanum>(tx.vout[j]).blinded_asset_id).modify_mul8().to_public_key() != native_coin_asset_id;
+      const tx_out_zarcanum& zo = boost::get<tx_out_zarcanum>(tx.vout[j]);
+      r = zo.stealth_address == null_pkey || crypto::point_t(zo.blinded_asset_id).modify_mul8().to_public_key() != native_coin_asset_id;
       CHECK_AND_ASSERT_MES(r, false, "output #" << j << " has an explicit asset id");
     }
   }
