@@ -827,7 +827,7 @@ bool gen_no_attchments_in_coinbase_gentime::generate(std::vector<test_event_entr
 
   // basic check - add to main chain
   block blk_a = AUTO_VAL_INIT(blk_a);
-  r = generator.construct_block_gentime_with_coinbase_cb(blk_0, miner_acc, [&od](transaction& tx){
+  r = generator.construct_block_gentime_with_coinbase_cb(blk_0, miner_acc, [&od](transaction& tx, [[maybe_unused]] keypair&){
     bc_services::put_offer_into_attachment(od, tx.attachment);
     bool r = add_attachments_info_to_extra(tx.extra, tx.attachment);
     CHECK_AND_ASSERT_MES(r, false, "add_attachments_info_to_extra failed");
@@ -843,7 +843,7 @@ bool gen_no_attchments_in_coinbase_gentime::generate(std::vector<test_event_entr
 
   // make sure we can't add PoW block with tx to altchain
   block blk_b = AUTO_VAL_INIT(blk_b);
-  r = generator.construct_block_gentime_with_coinbase_cb(blk_0, miner_acc, [&od](transaction& tx){
+  r = generator.construct_block_gentime_with_coinbase_cb(blk_0, miner_acc, [&od](transaction& tx, [[maybe_unused]] keypair&){
     bc_services::put_offer_into_attachment(od, tx.attachment);
     bool r = add_attachments_info_to_extra(tx.extra, tx.attachment);
     CHECK_AND_ASSERT_MES(r, false, "add_attachments_info_to_extra failed");
@@ -862,7 +862,7 @@ bool gen_no_attchments_in_coinbase_gentime::generate(std::vector<test_event_entr
 
   // try to add to main chain
   block blk_c = AUTO_VAL_INIT(blk_c);
-  r = generator.construct_block_gentime_with_coinbase_cb(blk_3, miner_acc, [&od](transaction& tx){
+  r = generator.construct_block_gentime_with_coinbase_cb(blk_3, miner_acc, [&od](transaction& tx, [[maybe_unused]] keypair&){
     bc_services::put_offer_into_attachment(od, tx.attachment);
     bool r = add_attachments_info_to_extra(tx.extra, tx.attachment);
     CHECK_AND_ASSERT_MES(r, false, "add_attachments_info_to_extra failed");
@@ -877,7 +877,7 @@ bool gen_no_attchments_in_coinbase_gentime::generate(std::vector<test_event_entr
 
   // .. and to alt chain
   block blk_d = AUTO_VAL_INIT(blk_d);
-  r = generator.construct_block_gentime_with_coinbase_cb(blk_3, miner_acc, [&od](transaction& tx){
+  r = generator.construct_block_gentime_with_coinbase_cb(blk_3, miner_acc, [&od](transaction& tx, [[maybe_unused]] keypair&){
     bc_services::put_offer_into_attachment(od, tx.attachment);
     bool r = add_attachments_info_to_extra(tx.extra, tx.attachment);
     CHECK_AND_ASSERT_MES(r, false, "add_attachments_info_to_extra failed");

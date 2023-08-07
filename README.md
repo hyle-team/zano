@@ -13,14 +13,14 @@ Be sure to clone the repository properly:\
 ### Dependencies
 | component / version | minimum <br>(not recommended but may work) | recommended | most recent of what we have ever tested |
 |--|--|--|--|
-| gcc (Linux) | 5.4.0 | 7.5.0 | 8.3.0 |
+| gcc (Linux) | 7.5.0 | 7.5.0 | 8.3.0 |
 | llvm/clang (Linux) | UNKNOWN | 7.0.1 | 8.0.0 |
-| [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2015 (14.0 update 1) | 2017 (15.9.0) | 2022 (17.4.2) |
-| [XCode](https://developer.apple.com/downloads/) (macOS) | 9.2 | 12.3 | 12.3 |
-| [CMake](https://cmake.org/download/) | 2.8.6 | 3.15.5 | 3.26.3 |
+| [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2017 (15.9.30) | 2017 (15.9.30) | 2022 (17.6.1) |
+| [XCode](https://developer.apple.com/downloads/) (macOS) | 12.3 | 14.3 | 14.3 |
+| [CMake](https://cmake.org/download/) | 3.1.6 | 3.15.5 | 3.26.3 |
 | [Boost](https://www.boost.org/users/download/) | 1.70 | 1.70 | 1.76 |
 | [OpenSSL](https://www.openssl.org/source/) [(win)](https://slproweb.com/products/Win32OpenSSL.html) | - | 1.1.1n | 1.1.1n | 
-| [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.11.2 | 5.15.2 |
+| [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.12.12 | 5.15.2 |
 
 Note:\
 [*server version*] denotes steps required for building command-line tools (daemon, simplewallet, etc.).\

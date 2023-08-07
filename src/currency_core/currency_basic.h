@@ -1140,6 +1140,13 @@ namespace currency
   bool operator ==(const currency::zarcanum_sig& a, const currency::zarcanum_sig& b);
   bool operator ==(const currency::ref_by_id& a, const currency::ref_by_id& b);
 
+  // TODO: REPLACE all of the following operators to "bool operator==(..) const = default" once we moved to C++20 -- sowle
+  bool operator ==(const currency::signed_parts& a, const currency::signed_parts& b);
+  bool operator ==(const currency::txin_gen& a, const currency::txin_gen& b);
+  bool operator ==(const currency::txin_to_key& a, const currency::txin_to_key& b);
+  bool operator ==(const currency::txin_multisig& a, const currency::txin_multisig& b);
+  bool operator ==(const currency::txin_htlc& a, const currency::txin_htlc& b);
+  bool operator ==(const currency::txin_zc_input& a, const currency::txin_zc_input& b);
 } // namespace currency
 
 POD_MAKE_HASHABLE(currency, account_public_address);

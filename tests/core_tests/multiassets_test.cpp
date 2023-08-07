@@ -156,6 +156,7 @@ bool assets_and_explicit_native_coins_in_outs::generate(std::vector<test_event_e
   *    1) make sure an asset cannot be deployed if there's no ZC outputs available;
   *    2) make sure an asset emission transaction has hidden asset ids in all outputs;
   *    3) (NOT DONE YET) make sure tx with at least one input with at least one reference to non-explicit native asset id has non-explicit asset ids in outs (TODO: move to separate test)
+  *    4) Bob get coins with non-explicit asset id and then tries to register an alias with them (some will be burnt with explicit asset id)
   */
 
   bool r = false;
@@ -164,6 +165,7 @@ bool assets_and_explicit_native_coins_in_outs::generate(std::vector<test_event_e
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
   DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
 
@@ -310,9 +312,9 @@ bool assets_and_explicit_native_coins_in_outs::c2_alice_deploys_asset(currency::
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", alice_balance, 0, alice_balance, 0, 0), false, "");
 
   // now Alice only has UTXO with non explicit asset id
-  // Transfer all of them back to miner and check asset ids of outputs
+  // Transfer all of them to Bob and check asset ids of outputs
   transaction tx_2{};
-  alice_wlt->transfer(alice_balance - TESTS_DEFAULT_FEE, m_accounts[MINER_ACC_IDX].get_public_address(), tx_2, native_coin_asset_id);
+  alice_wlt->transfer(alice_balance - TESTS_DEFAULT_FEE, m_accounts[BOB_ACC_IDX].get_public_address(), tx_2, native_coin_asset_id);
 
   CHECK_AND_ASSERT_MES(tx_2.vout.size() == 2, false, "unexpected tx_2.vout.size : " << tx_2.vout.size());
   for(auto& out : tx_2.vout)
@@ -325,9 +327,26 @@ bool assets_and_explicit_native_coins_in_outs::c2_alice_deploys_asset(currency::
   // finally, get this tx confirmed
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
 
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, m_accounts[BOB_ACC_IDX]);
+  bob_wlt->refresh();
+  uint64_t bob_balance = alice_balance - TESTS_DEFAULT_FEE;
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt, "Bob", bob_balance, 0, bob_balance, 0, 0), false, "");
+
+  extra_alias_entry ae{};
+  ae.m_alias = "kris.kelvin";
+  ae.m_address = m_accounts[BOB_ACC_IDX].get_public_address();
+  transaction tx_3{};
+  bob_wlt->request_alias_registration(ae, tx_3, TESTS_DEFAULT_FEE);
+
+  // finally, get this tx confirmed
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
 
   return true;

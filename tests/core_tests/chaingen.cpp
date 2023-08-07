@@ -1023,18 +1023,90 @@ uint64_t test_generator::get_last_n_blocks_fee_median(const crypto::hash& head_b
 
 bool test_generator::construct_pow_block_with_alias_info_in_coinbase(const account_base& acc, const block& prev_block, const extra_alias_entry& ai, block& b)
 {
-  return construct_block_gentime_with_coinbase_cb(prev_block, acc, [&acc, &ai](transaction& miner_tx){
+  return construct_block_gentime_with_coinbase_cb(prev_block, acc, [&acc, &ai](transaction& miner_tx, const currency::keypair& tx_key){
+    bool r = false;
     miner_tx.extra.push_back(ai);
-    if (ai.m_sign.empty())
+
+    uint64_t alias_cost = ai.m_sign.empty() ? get_alias_coast_from_fee(ai.m_alias, ALIAS_VERY_INITAL_COAST) : 0;
+    uint64_t block_reward = get_outs_money_amount(miner_tx, acc.get_keys());
+    CHECK_AND_ASSERT_MES(alias_cost < block_reward, false, "Alias '" << ai.m_alias << "' can't be registered via block coinbase, because it's price: " << print_money(alias_cost) << " is greater than block reward: " << print_money(block_reward));
+    uint64_t new_block_reward = block_reward - alias_cost;
+    if (miner_tx.version > TRANSACTION_VERSION_PRE_HF4)
     {
-      // if no alias update - reduce block reward by alias cost
-      uint64_t alias_cost = get_alias_coast_from_fee(ai.m_alias, TESTS_DEFAULT_FEE);
-      uint64_t block_reward = get_outs_money_amount(miner_tx);
-      CHECK_AND_ASSERT_MES(alias_cost <= block_reward, false, "Alias '" << ai.m_alias << "' can't be registered via block coinbase, because it's price: " << print_money(alias_cost) << " is greater than block reward: " << print_money(block_reward));
-      block_reward -= alias_cost;
+      // ZC outs
       miner_tx.vout.clear();
-      if (block_reward > 0)
+
+      tx_generation_context tx_gen_context{};
+      tx_gen_context.resize(/* ZC ins: */ 0, /* OUTS: */ alias_cost != 0 ? 3 : 2);
+      std::set<unsigned short> deriv_cache;
+      finalized_tx fin_tx_stub{};
+      size_t output_index = 0;
+
+      // outputs 0, 1: block reward splitted into two
+      tx_destination_entry de{new_block_reward / 2, acc.get_public_address()};
+      de.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id;
+      r = construct_tx_out(de, tx_key.sec, output_index, miner_tx, deriv_cache, account_keys(),
+        tx_gen_context.asset_id_blinding_masks[output_index], tx_gen_context.amount_blinding_masks[output_index],
+        tx_gen_context.blinded_asset_ids[output_index], tx_gen_context.amount_commitments[output_index], fin_tx_stub);
+      CHECK_AND_ASSERT_MES(r, false, "construct_tx_out failed for output " << output_index);
+      tx_gen_context.amounts[output_index] = de.amount;
+      tx_gen_context.asset_ids[output_index] = crypto::point_t(de.asset_id);
+      tx_gen_context.asset_id_blinding_mask_x_amount_sum += tx_gen_context.asset_id_blinding_masks[output_index] * de.amount;
+      tx_gen_context.amount_blinding_masks_sum += tx_gen_context.amount_blinding_masks[output_index];
+      tx_gen_context.amount_commitments_sum += tx_gen_context.amount_commitments[output_index];
+
+      ++output_index;
+      de = tx_destination_entry{new_block_reward - new_block_reward / 2, acc.get_public_address()};
+      de.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id;
+      r = construct_tx_out(de, tx_key.sec, output_index, miner_tx, deriv_cache, account_keys(),
+        tx_gen_context.asset_id_blinding_masks[output_index], tx_gen_context.amount_blinding_masks[output_index],
+        tx_gen_context.blinded_asset_ids[output_index], tx_gen_context.amount_commitments[output_index], fin_tx_stub);
+      CHECK_AND_ASSERT_MES(r, false, "construct_tx_out failed for output " << output_index);
+      tx_gen_context.amounts[output_index] = de.amount;
+      tx_gen_context.asset_ids[output_index] = crypto::point_t(de.asset_id);
+      tx_gen_context.asset_id_blinding_mask_x_amount_sum += tx_gen_context.asset_id_blinding_masks[output_index] * de.amount;
+      tx_gen_context.amount_blinding_masks_sum += tx_gen_context.amount_blinding_masks[output_index];
+      tx_gen_context.amount_commitments_sum += tx_gen_context.amount_commitments[output_index];
+
+      if (alias_cost != 0)
       {
+        // output 2: alias reward
+        ++output_index;
+        de = tx_destination_entry{alias_cost, null_pub_addr};
+        de.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask;
+        r = construct_tx_out(de, tx_key.sec, output_index, miner_tx, deriv_cache, account_keys(),
+          tx_gen_context.asset_id_blinding_masks[output_index], tx_gen_context.amount_blinding_masks[output_index],
+          tx_gen_context.blinded_asset_ids[output_index], tx_gen_context.amount_commitments[output_index], fin_tx_stub);
+        CHECK_AND_ASSERT_MES(r, false, "construct_tx_out failed for output " << output_index);
+        tx_gen_context.amounts[output_index] = de.amount;
+        tx_gen_context.asset_ids[output_index] = crypto::point_t(de.asset_id);
+        tx_gen_context.asset_id_blinding_mask_x_amount_sum += tx_gen_context.asset_id_blinding_masks[output_index] * de.amount;
+        tx_gen_context.amount_blinding_masks_sum += tx_gen_context.amount_blinding_masks[output_index];
+        tx_gen_context.amount_commitments_sum += tx_gen_context.amount_commitments[output_index];
+      }
+
+      // reconstruct all proofs
+      crypto::hash tx_id = get_transaction_hash(miner_tx);
+      miner_tx.proofs.clear();
+      // empty asset surjection proof
+      miner_tx.proofs.emplace_back(std::move(currency::zc_asset_surjection_proof{}));
+      // range proofs
+      currency::zc_outs_range_proof range_proofs{};
+      r = generate_zc_outs_range_proof(tx_id, 0, tx_gen_context, miner_tx.vout, range_proofs);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
+      miner_tx.proofs.emplace_back(std::move(range_proofs));
+      // balance proof
+      currency::zc_balance_proof balance_proof{};
+      r = generate_tx_balance_proof(miner_tx, tx_id, tx_gen_context, block_reward, balance_proof);
+      CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
+      miner_tx.proofs.emplace_back(std::move(balance_proof));
+    }
+    else
+    {
+      // old behaviour, bare non-hidden outs
+      if (ai.m_sign.empty())
+      {
+        miner_tx.vout.clear();
         bool null_out_key = false;
         auto f = [&acc, &miner_tx, &null_out_key](uint64_t amount){
           keypair kp = AUTO_VAL_INIT(kp);
@@ -1043,7 +1115,7 @@ bool test_generator::construct_pow_block_with_alias_info_in_coinbase(const accou
           otk.key = null_out_key ? null_pkey : kp.pub;
           miner_tx.vout.push_back(tx_out_bare({ amount, otk }));
         };
-        decompose_amount_into_digits(block_reward, DEFAULT_DUST_THRESHOLD, f, f);
+        decompose_amount_into_digits(new_block_reward, DEFAULT_DUST_THRESHOLD, f, f);
         null_out_key = true;
         f(alias_cost); // add an output for burning alias cost into ashes
       }
@@ -1351,7 +1423,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
       if (sout.type().hash_code() == typeid(uint64_t).hash_code())       // output by global index
       {
         uint64_t gindex = boost::get<uint64_t>(sout);
-        auto& outs_by_amount = outs[s.amount];
+        auto& outs_by_amount = outs[s.amount_for_global_output_index()];
         if (gindex >= outs_by_amount.size())
           return false;
         outs_by_amount[gindex].spent = true;
@@ -1703,7 +1775,7 @@ bool construct_tx_with_many_outputs(const currency::hard_forks_descriptor& hf, s
   uint64_t total_amount, size_t outputs_count, uint64_t fee, currency::transaction& tx, bool use_ref_by_id /* = false */)
 {
   std::vector<currency::tx_source_entry> sources;
-  bool r = fill_tx_sources(sources, events, blk_head, keys_from, total_amount + fee, 0, true, false, use_ref_by_id);
+  bool r = fill_tx_sources(sources, events, blk_head, keys_from, total_amount + fee, 0, true, true, use_ref_by_id);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
 
   std::vector<currency::tx_destination_entry> destinations;
@@ -2252,6 +2324,53 @@ bool shuffle_source_entries(std::vector<tx_source_entry>& sources)
   for(auto& se : sources)
     if (!shuffle_source_entry(se))
       return false;
+  return true;
+}
+
+bool replace_coinbase_in_genesis_block(const std::vector<currency::tx_destination_entry>& destinations, test_generator& generator, std::vector<test_event_entry>& events, currency::block& genesis_block)
+{
+  bool r = false;
+  generator.remove_block_info(genesis_block);
+  events.pop_back();
+
+  // remember premine amount
+  uint64_t premine_amount = get_outs_money_amount(genesis_block.miner_tx);
+
+  // replace tx key
+  keypair tx_key = keypair::generate();
+  for(auto& el : genesis_block.miner_tx.extra)
+  {
+    if (el.type() == typeid(crypto::public_key))
+    {
+      boost::get<crypto::public_key>(el) = tx_key.pub;
+      break;
+    }
+  }
+  uint64_t total_amount = 0;
+
+  // replace outputs
+  genesis_block.miner_tx.vout.clear();
+
+  for(size_t output_index = 0; output_index < destinations.size() + 1; ++output_index)
+  {
+    uint64_t amount = output_index < destinations.size() ? destinations[output_index].amount : premine_amount - total_amount;
+    const account_public_address& addr = output_index < destinations.size() ? destinations[output_index].addr.back() : destinations.back().addr.back();
+
+    crypto::key_derivation derivation{};
+    bool r = crypto::generate_key_derivation(addr.view_public_key, tx_key.sec, derivation);
+    CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed");
+
+    txout_to_key target{};
+    r = crypto::derive_public_key(derivation, output_index, addr.spend_public_key, target.key);
+    CHECK_AND_ASSERT_MES(r, false, "derive_public_key failed");
+    genesis_block.miner_tx.vout.emplace_back(tx_out_bare{amount, target});
+    total_amount += amount;
+    CHECK_AND_ASSERT_MES(total_amount <= premine_amount, false, "total amount is greater than premine amount");
+  }
+
+  events.push_back(genesis_block);
+  std::vector<size_t> block_sizes;
+  generator.add_block(genesis_block, 0, block_sizes, 0, 0, std::list<transaction>{}, null_hash);
   return true;
 }
 

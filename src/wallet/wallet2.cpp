@@ -4581,7 +4581,7 @@ uint64_t wallet2::get_alias_cost(const std::string& alias)
     throw std::runtime_error(std::string("Failed to get alias cost"));
   }
  
-  return rsp.reward + rsp.reward / 10; //add 10% of price to be sure;
+  return rsp.reward;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::request_alias_registration(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward, const crypto::secret_key& authority_key)
@@ -4631,6 +4631,7 @@ void wallet2::request_alias_registration(currency::extra_alias_entry& ai, curren
   tx_dest_alias_reward.addr.resize(1);
   get_aliases_reward_account(tx_dest_alias_reward.addr.back());
   tx_dest_alias_reward.amount = reward;
+  tx_dest_alias_reward.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask;
   destinations.push_back(tx_dest_alias_reward);
 
   transfer(destinations, 0, 0, fee, extra, attachments, get_current_split_strategy(), tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx, CURRENCY_TO_KEY_OUT_RELAXED, false);
@@ -6480,9 +6481,15 @@ void wallet2::prepare_tx_destinations(const assets_selection_context& needed_mon
       if (dst.asset_id == currency::null_pkey)
         final_destinations.emplace_back(dst.amount, dst.addr, dst.asset_id);
 
-    // if there's not ehough destinations items (i.e. outputs), split the last one
-    if (final_destinations.size() > 0 && final_destinations.size() < CURRENCY_TX_MIN_ALLOWED_OUTS)
+    if (final_destinations.empty())
     {
+      // if there's no destinations -- make CURRENCY_TX_MIN_ALLOWED_OUTS empty destinations
+      for(size_t i = 0; i < CURRENCY_TX_MIN_ALLOWED_OUTS; ++i)
+        final_destinations.emplace_back(0, m_account.get_public_address());
+    }
+    else if (final_destinations.size() < CURRENCY_TX_MIN_ALLOWED_OUTS)
+    {
+      // if there's not ehough destinations items (i.e. outputs), split the last one
       tx_destination_entry de = final_destinations.back();
       final_destinations.pop_back();
       size_t items_to_be_added = CURRENCY_TX_MIN_ALLOWED_OUTS - final_destinations.size();
@@ -6509,7 +6516,7 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
     for(auto& dst : dsts)
     {
       if (dst.asset_id == asset_id)
-        final_destinations.emplace_back(dst.amount, dst.addr, dst.asset_id);
+        final_destinations.emplace_back(dst);
     }
     if (found_money > needed_money)
       final_destinations.emplace_back(found_money - needed_money, m_account.get_public_address(), asset_id); // returning back the change

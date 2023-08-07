@@ -118,7 +118,7 @@ bool test_parse_hardfork_str_mask()
 {
   static_assert(ZANO_HARDFORKS_TOTAL >= 5, "this test was made in assumption that this condition holds");
   auto v_range = [](size_t a, size_t b) -> std::vector<size_t> { std::vector<size_t> r; for(size_t i = a; i <= b; ++i) r.push_back(i); return r; };
-  auto v_concat = [](const std::vector<size_t>& a, const std::vector<size_t>& b) -> std::vector<size_t> { std::vector<size_t> r = a; r.insert(r.end(), b.begin(), b.end()); };
+  auto v_concat = [](const std::vector<size_t>& a, const std::vector<size_t>& b) -> std::vector<size_t> { std::vector<size_t> r = a; r.insert(r.end(), b.begin(), b.end()); return r; };
   const std::vector<size_t> res_empty;
   const std::vector<size_t> res_all_hf = v_range(0, ZANO_HARDFORKS_TOTAL - 1);
   std::string hf_total_num_str_m_1 = epee::string_tools::num_to_string_fast(ZANO_HARDFORKS_TOTAL - 1);
@@ -386,7 +386,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
 
 
 #define GENERATE_AND_PLAY(genclass)                                                                        \
-  if((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string::npos != std::string(#genclass).find(run_single_test))) \
+  if (!skip_all_till_the_end && ((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string::npos != std::string(#genclass).find(run_single_test)))) \
   {                                                                                                        \
     TIME_MEASURE_START_MS(t);                                                                              \
     ++tests_count;                                                                                         \
@@ -396,14 +396,14 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
       failed_tests.insert(#genclass);                                                                      \
       LOCAL_ASSERT(false);                                                                                 \
       if (stop_on_first_fail)                                                                              \
-        return 1;                                                                                          \
+        skip_all_till_the_end = true;                                                                      \
     }                                                                                                      \
     TIME_MEASURE_FINISH_MS(t);                                                                             \
     tests_running_time.push_back(std::make_pair(#genclass, t));                                            \
   }
 
 #define GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(genclass)                                     \
-  if(run_single_test.empty() || run_single_test == #genclass)                                              \
+  if (!skip_all_till_the_end && (run_single_test.empty() || run_single_test == #genclass))                 \
   {                                                                                                        \
     const char* testname = #genclass " (BC saveload)";                                                     \
     TIME_MEASURE_START_MS(t);                                                                              \
@@ -414,29 +414,29 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
       failed_tests.insert(testname);                                                                       \
       LOCAL_ASSERT(false);                                                                                 \
       if (stop_on_first_fail)                                                                              \
-        return 1;                                                                                          \
+        skip_all_till_the_end = true;                                                                      \
     }                                                                                                      \
     TIME_MEASURE_FINISH_MS(t);                                                                             \
     tests_running_time.push_back(std::make_pair(testname, t));                                             \
   }
 
 #define GENERATE_AND_PLAY_HF(genclass, hardfork_str_mask)                                                  \
-  if((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string::npos != std::string(#genclass).find(run_single_test))) \
+  if (!skip_all_till_the_end && ((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string::npos != std::string(#genclass).find(run_single_test)))) \
   {                                                                                                        \
     std::vector<size_t> hardforks = parse_hardfork_str_mask(hardfork_str_mask);                            \
     CHECK_AND_ASSERT_MES(!hardforks.empty(), false, "invalid hardforks mask: " << hardfork_str_mask);      \
-    for(size_t hfid : hardforks)                                                                           \
+    for(size_t i = 0; i < hardforks.size() && !skip_all_till_the_end; ++i)                                 \
     {                                                                                                      \
-      std::string tns = std::string(#genclass) + " @ HF " + epee::string_tools::num_to_string_fast(hfid);  \
+      std::string tns = std::string(#genclass) + " @ HF " + epee::string_tools::num_to_string_fast(hardforks[i]);  \
       const char* testname = tns.c_str();                                                                  \
       TIME_MEASURE_START_MS(t);                                                                            \
       ++tests_count;                                                                                       \
-      if (!generate_and_play<genclass>(testname, hfid))                                                    \
+      if (!generate_and_play<genclass>(testname, hardforks[i]))                                            \
       {                                                                                                    \
         failed_tests.insert(testname);                                                                     \
         LOCAL_ASSERT(false);                                                                               \
         if (stop_on_first_fail)                                                                            \
-          return 1;                                                                                        \
+          skip_all_till_the_end = true;                                                                    \
       }                                                                                                    \
       TIME_MEASURE_FINISH_MS(t);                                                                           \
       tests_running_time.push_back(std::make_pair(testname, t));                                           \
@@ -889,6 +889,8 @@ int main(int argc, char* argv[])
     stop_on_first_fail = command_line::get_arg(g_vm, arg_stop_on_fail);
   }
 
+  
+  bool skip_all_till_the_end = false;
   size_t tests_count = 0;
   size_t unique_tests_count = 0;
   size_t serious_failures_count = 0;
@@ -1031,23 +1033,22 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(gen_no_attchments_in_coinbase, "3");
     GENERATE_AND_PLAY(gen_no_attchments_in_coinbase_gentime);
 
-    //GENERATE_AND_PLAY(gen_alias_tests);
-    GENERATE_AND_PLAY_HF(gen_alias_tests, "4,1");
-    GENERATE_AND_PLAY(gen_alias_strange_data);
-    GENERATE_AND_PLAY(gen_alias_concurrency_with_switch);
-    GENERATE_AND_PLAY(gen_alias_same_alias_in_tx_pool);   
-    GENERATE_AND_PLAY(gen_alias_switch_and_tx_pool);
-    GENERATE_AND_PLAY(gen_alias_update_after_addr_changed);
-    GENERATE_AND_PLAY(gen_alias_blocking_reg_by_invalid_tx);
-    GENERATE_AND_PLAY(gen_alias_blocking_update_by_invalid_tx);
+    GENERATE_AND_PLAY_HF(gen_alias_tests, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_strange_data, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_concurrency_with_switch, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_same_alias_in_tx_pool, "3-*");   
+    GENERATE_AND_PLAY_HF(gen_alias_switch_and_tx_pool, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_update_after_addr_changed, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_blocking_reg_by_invalid_tx, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_blocking_update_by_invalid_tx, "3-*");
     GENERATE_AND_PLAY_HF(gen_alias_reg_with_locked_money, "*");
-    GENERATE_AND_PLAY(gen_alias_too_small_reward);
-    GENERATE_AND_PLAY(gen_alias_too_much_reward);
+    GENERATE_AND_PLAY_HF(gen_alias_too_small_reward, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_too_much_reward, "3-*");
     GENERATE_AND_PLAY_HF(gen_alias_tx_no_outs, "*");
-    GENERATE_AND_PLAY(gen_alias_switch_and_check_block_template);
-    GENERATE_AND_PLAY(gen_alias_too_many_regs_in_block_template);
-    GENERATE_AND_PLAY(gen_alias_update_for_free);
-    GENERATE_AND_PLAY(gen_alias_in_coinbase);
+    GENERATE_AND_PLAY_HF(gen_alias_switch_and_check_block_template, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_too_many_regs_in_block_template, "3"); // disabled in HF4 due to tx outputs count limitation
+    GENERATE_AND_PLAY_HF(gen_alias_update_for_free, "3-*");
+    GENERATE_AND_PLAY_HF(gen_alias_in_coinbase, "3-*");
 
     GENERATE_AND_PLAY(gen_wallet_basic_transfer);
     GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch);
@@ -1062,8 +1063,8 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_wallet_transfers_and_outdated_unconfirmed_txs);
     GENERATE_AND_PLAY(gen_wallet_transfers_and_chain_switch);
     GENERATE_AND_PLAY(gen_wallet_decrypted_attachments);
-    GENERATE_AND_PLAY(gen_wallet_alias_and_unconfirmed_txs);
-    GENERATE_AND_PLAY(gen_wallet_alias_via_special_wallet_funcs);
+    GENERATE_AND_PLAY_HF(gen_wallet_alias_and_unconfirmed_txs, "3-*");
+    GENERATE_AND_PLAY_HF(gen_wallet_alias_via_special_wallet_funcs, "3-*");
     GENERATE_AND_PLAY(gen_wallet_fake_outputs_randomness);
     GENERATE_AND_PLAY(gen_wallet_fake_outputs_not_enough);
     GENERATE_AND_PLAY(gen_wallet_offers_basic);
@@ -1283,6 +1284,9 @@ int main(int argc, char* argv[])
         total_time += i.second;
       }
     }
+
+    if (skip_all_till_the_end)
+      std::cout << ENDL << concolor::yellow << "(execution interrupted at the first failure; not all tests were run)" << ENDL; 
 
     serious_failures_count = failed_tests.size() - failed_postponed_tests_count;
 

@@ -1162,12 +1162,12 @@ namespace currency
         crypto::scalar_t amount_mask   = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
         out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
       
-        asset_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
+        CHECK_AND_ASSERT_MES(~de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
+        asset_blinding_mask = de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
         blinded_asset_id = crypto::point_t(de.asset_id) + asset_blinding_mask * crypto::c_point_X;
         out.blinded_asset_id = (crypto::c_scalar_1div8 * blinded_asset_id).to_public_key(); // T = 1/8 * (H_asset + s * X)
         
-        CHECK_AND_ASSERT_MES(~de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
-        asset_blinding_mask = de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
+        amount_blinding_mask = de.flags & tx_destination_entry_flags::tdef_zero_amount_blinding_mask ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
         amount_commitment = de.amount * blinded_asset_id + amount_blinding_mask * crypto::c_point_G;
         out.amount_commitment = (crypto::c_scalar_1div8 * amount_commitment).to_public_key(); // E = 1/8 * e * T + 1/8 * y * G
 
@@ -2458,7 +2458,6 @@ namespace currency
       if (!append_mode && all_inputs_are_obviously_native_coins && gen_context.ao_asset_id == currency::null_pkey)
         dst_entr.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // all inputs are obviously native coins -- all outputs must have explicit asset ids (unless there's an asset emission)
 
-      CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount); // <<--  TODO @#@# consider removing this check
       r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys,
         gen_context.asset_id_blinding_masks[output_index], gen_context.amount_blinding_masks[output_index],
         gen_context.blinded_asset_ids[output_index], gen_context.amount_commitments[output_index], result, tx_outs_attr);
@@ -2964,17 +2963,41 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
-  uint64_t get_outs_money_amount(const transaction& tx)
+  uint64_t get_outs_money_amount(const transaction& tx, const currency::account_keys& keys /* = currency::null_acc_keys */)
   {
     uint64_t outputs_amount = 0;
-    for (const auto& o : tx.vout)
+
+    bool process_hidden_amounts = false;
+    crypto::key_derivation derivation = null_derivation;
+    if (keys.spend_secret_key != null_skey && keys.view_secret_key != null_skey)
     {
+      process_hidden_amounts = true;
+      bool r = crypto::generate_key_derivation(get_tx_pub_key_from_extra(tx), keys.view_secret_key, derivation);
+      if (!r)
+        LOG_PRINT_YELLOW("generate_key_derivation failed in get_outs_money_amount", LOG_LEVEL_0);
+    }
+
+    for (size_t output_index = 0; output_index < tx.vout.size(); ++output_index)
+    {
+      const auto& o = tx.vout[output_index];
       VARIANT_SWITCH_BEGIN(o);
-      VARIANT_CASE_CONST(tx_out_bare, o)
-        outputs_amount += o.amount;
-      // ignore outputs with hidden amounts
+      VARIANT_CASE_CONST(tx_out_bare, bo)
+        outputs_amount += bo.amount;
+      VARIANT_CASE_CONST(tx_out_zarcanum, zo)
+        if (process_hidden_amounts)
+        {
+          uint64_t decoded_amount = 0;
+          crypto::public_key decoded_asset_id{};
+          crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
+          if (is_out_to_acc(keys.account_address, zo, derivation, output_index, decoded_amount, decoded_asset_id, amount_blinding_mask, asset_id_blinding_mask))
+          {
+            if (decoded_asset_id == currency::native_coin_asset_id)
+              outputs_amount += decoded_amount;
+          }
+        }
       VARIANT_SWITCH_END();
     }
+
     return outputs_amount;
   }
   //---------------------------------------------------------------
@@ -3282,7 +3305,7 @@ namespace currency
   }
   //---------------------------------------------------------------
   // NOTE: this function is obsolete and depricated
-  // PoS block real timestamp is set using a service attachment in mining tx extra since 2021-10 
+  [[deprecated("PoS block real timestamp is set using a service attachment in mining tx extra since 2021-10")]]
   uint64_t get_actual_timestamp(const block& b)
   {
     uint64_t tes_ts = b.timestamp;
@@ -4320,7 +4343,50 @@ namespace currency
     return a.n == b.n && a.tx_id == b.tx_id;
   }
   //--------------------------------------------------------------------------------
- 
+  bool operator ==(const currency::signed_parts& a, const currency::signed_parts& b)
+  {
+    return
+      a.n_extras  == b.n_extras &&
+      a.n_outs    == b.n_outs;
+  }
+  bool operator ==(const currency::txin_gen& a, const currency::txin_gen& b)
+  {
+    return a.height == b.height;
+  }
+  bool operator ==(const currency::txin_to_key& a, const currency::txin_to_key& b)
+  {
+    return
+      a.amount      == b.amount &&
+      a.etc_details == b.etc_details &&
+      a.key_offsets == b.key_offsets &&
+      a.k_image     == b.k_image;
+  }
+  bool operator ==(const currency::txin_multisig& a, const currency::txin_multisig& b)
+  {
+    return
+      a.amount          == b.amount &&
+      a.etc_details     == b.etc_details &&
+      a.multisig_out_id == b.multisig_out_id &&
+      a.sigs_count      == b.sigs_count;
+  }
+  bool operator ==(const currency::txin_htlc& a, const currency::txin_htlc& b)
+  {
+    return
+      a.amount      == b.amount &&
+      a.etc_details == b.etc_details &&
+      a.hltc_origin == b.hltc_origin &&
+      a.key_offsets == b.key_offsets &&
+      a.k_image     == b.k_image;
+  }
+  bool operator ==(const currency::txin_zc_input& a, const currency::txin_zc_input& b)
+  {
+    return
+      a.etc_details == b.etc_details &&
+      a.key_offsets == b.key_offsets &&
+      a.k_image     == b.k_image;
+  }
+  //--------------------------------------------------------------------------------
+
 
   boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,
     const wide_difficulty_type& difficulty_pow_at_split_point,

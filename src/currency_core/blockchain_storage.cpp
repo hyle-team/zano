@@ -4503,11 +4503,12 @@ bool check_tx_explicit_asset_id_rules(const transaction& tx, bool all_tx_ins_hav
       CHECK_AND_ASSERT_MES(r, false, "output #" << j << " has a non-explicit asset id");
     }
   }
-  else // otherwise all outputs must have hidden asset id
+  else // otherwise all outputs must have hidden asset id (unless they burn money by sending them to null pubkey) 
   {
     for(size_t j = 0, k = tx.vout.size(); j < k; ++j)
     {
-      r = crypto::point_t(boost::get<tx_out_zarcanum>(tx.vout[j]).blinded_asset_id).modify_mul8().to_public_key() != native_coin_asset_id;
+      const tx_out_zarcanum& zo = boost::get<tx_out_zarcanum>(tx.vout[j]);
+      r = zo.stealth_address == null_pkey || crypto::point_t(zo.blinded_asset_id).modify_mul8().to_public_key() != native_coin_asset_id;
       CHECK_AND_ASSERT_MES(r, false, "output #" << j << " has an explicit asset id");
     }
   }
@@ -4705,7 +4706,8 @@ struct outputs_visitor
     {
       if (!m_bch.is_tx_spendtime_unlocked(source_out_unlock_time))
       {
-        LOG_PRINT_L0("One of outputs for one of inputs have wrong tx.unlock_time = " << get_tx_unlock_time(source_tx, out_i));
+        uint64_t limit = source_out_unlock_time < CURRENCY_MAX_BLOCK_NUMBER ? m_bch.get_current_blockchain_size() - 1 + CURRENCY_LOCKED_TX_ALLOWED_DELTA_BLOCKS : m_bch.get_core_runtime_config().get_core_time() + CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS;
+        LOG_PRINT_L0("An output has unlock time value of " << get_tx_unlock_time(source_tx, out_i) << " while the current limit is " << limit);
         return false;
       }
     }

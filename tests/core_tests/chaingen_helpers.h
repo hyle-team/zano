@@ -283,30 +283,40 @@ inline bool put_alias_via_tx_to_list(const currency::hard_forks_descriptor& hf, 
     const alias_entry_t& ae,
     test_generator& generator)
 {
-  std::vector<currency::extra_v> ex;
-  ex.push_back(ae);
+  std::vector<currency::extra_v> extra;
+  extra.push_back(ae);
   currency::account_base reward_acc;
   currency::account_keys& ak = const_cast<currency::account_keys&>(reward_acc.get_keys());
   currency::get_aliases_reward_account(ak.account_address, ak.view_secret_key);
 
   uint64_t alias_reward = 0;
   if (get_block_height(head_block) < ALIAS_MEDIAN_RECALC_INTERWAL)
-    alias_reward = get_alias_coast_from_fee(ae.m_alias, ALIAS_VERY_INITAL_COAST); // don't ask why
+  {
+    alias_reward = currency::get_alias_coast_from_fee(ae.m_alias, ALIAS_VERY_INITAL_COAST); // don't ask why
+  }
   else
+  {
     LOCAL_ASSERT(false); // not implemented yet, see also all the mess around blockchain_storage::get_tx_fee_median(), get_tx_fee_median_effective_index() etc.
+  }
 
-  MAKE_TX_MIX_LIST_EXTRA_MIX_ATTR(events, 
-    tx_set,
-    miner_acc,
-    reward_acc,
-    alias_reward,
-    0,
-    head_block,
-    CURRENCY_TO_KEY_OUT_RELAXED,
-    ex,
-    std::vector<currency::attachment_v>());
-  
+  std::vector<currency::tx_source_entry> sources;
+  std::vector<currency::tx_destination_entry> destinations;
+  bool r = fill_tx_sources_and_destinations(events, head_block, miner_acc, reward_acc, alias_reward, TESTS_DEFAULT_FEE, 0, sources, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "alias: fill_tx_sources_and_destinations failed");
 
+  for(auto& el : destinations)
+  {
+    if (el.addr.front() == reward_acc.get_public_address())
+      el.flags |= currency::tx_destination_entry_flags::tdef_explicit_native_asset_id | currency::tx_destination_entry_flags::tdef_zero_amount_blinding_mask; // all alias-burn outputs must have explicit native asset id and zero amount mask
+  }
+
+  uint64_t tx_version = currency::get_tx_version(get_block_height(head_block) + 1, generator.get_hardforks()); // assuming the tx will be in the next block (head_block + 1)
+  tx_set.emplace_back();
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_set.back(), tx_version, generator.last_tx_generated_secret_key, 0);
+  PRINT_EVENT_N_TEXT(events, "put_alias_via_tx_to_list()");
+  events.push_back(tx_set.back());
+
+  // make sure the tx's amount commitments balance each other correctly 
   uint64_t burnt_amount = 0;
   if (!check_native_coins_amount_burnt_in_outs(tx_set.back(), alias_reward, &burnt_amount))
   {

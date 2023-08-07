@@ -100,24 +100,41 @@ gen_alias_tests::gen_alias_tests()
 
 bool gen_alias_tests::generate(std::vector<test_event_entry>& events) const
 {
+  bool r = false;
   GENERATE_ACCOUNT(preminer_account);
-  GENERATE_ACCOUNT(miner_account);                                                                                     // event index
+  GENERATE_ACCOUNT(miner_account);
   m_accounts.push_back(miner_account);
-  MAKE_GENESIS_BLOCK(events, blk_0, preminer_account, test_core_time::get_time());                                     // 0
-  DO_CALLBACK(events, "configure_core");                                                                               // 1
-  MAKE_ACCOUNT(events, first_acc);                                                                                     // 2
-  MAKE_ACCOUNT(events, second_acc);                                                                                    // 3
-  MAKE_ACCOUNT(events, third_acc);                                                                                     // 4
-  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_account, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);                 // 2N+4 (N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+  MAKE_GENESIS_BLOCK(events, blk_0, preminer_account, test_core_time::get_time());
 
   size_t small_outs_to_transfer = MAX_ALIAS_PER_BLOCK + 10;
-  transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_0, preminer_account.get_keys(), miner_account.get_public_address(), small_outs_to_transfer * TESTS_DEFAULT_FEE * 11, small_outs_to_transfer, TESTS_DEFAULT_FEE, tx_1);
-  CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
-  events.push_back(tx_1);                                                                                              // 2N+5
-  MAKE_NEXT_BLOCK_TX1(events, blk_a, blk_0r, miner_account, tx_1);                                                     // 2N+6
 
-  REWIND_BLOCKS_N_WITH_TIME(events, blk_ar, blk_a, miner_account, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);                 // 4N+6
+  // rebuild genesis miner tx
+  std::vector<tx_destination_entry> destinations(small_outs_to_transfer, tx_destination_entry(TESTS_DEFAULT_FEE * 11, preminer_account.get_public_address()));
+  CHECK_AND_ASSERT_MES(replace_coinbase_in_genesis_block(destinations, generator, events, blk_0), false, "");
+
+  DO_CALLBACK(events, "configure_core");
+  MAKE_ACCOUNT(events, first_acc);
+  MAKE_ACCOUNT(events, second_acc);
+  MAKE_ACCOUNT(events, third_acc);
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, preminer_account, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  size_t outs_in_a_tx = 32 /* <-- TODO change to some constant, meaning max outputs in post HF4 txs */ - 1;
+  std::vector<transaction> txs;
+  while(small_outs_to_transfer > 0)
+  {
+    size_t outs_count = std::min(outs_in_a_tx, small_outs_to_transfer);
+    small_outs_to_transfer -= outs_count;
+    txs.push_back(transaction{});
+    r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, preminer_account.get_keys(), miner_account.get_public_address(), outs_count * TESTS_DEFAULT_FEE * 11, outs_count, TESTS_DEFAULT_FEE, txs.back());
+    CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
+    ADD_CUSTOM_EVENT(events, txs.back());
+  }
+  // split into two blocks because they won't fit into one
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_a, blk_0r, miner_account, std::list<transaction>(txs.begin(),                  txs.begin() + txs.size() / 2));
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_a2, blk_a, miner_account, std::list<transaction>(txs.begin() + txs.size() / 2, txs.end()));
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_ar, blk_a2, miner_account, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   MAKE_NEXT_BLOCK(events, blk_1, blk_ar, miner_account);                                                               // 4N+7
   currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
@@ -926,6 +943,7 @@ gen_alias_too_much_reward::gen_alias_too_much_reward()
 bool gen_alias_too_much_reward::generate(std::vector<test_event_entry>& events) const
 {
   // pay for alias far too much and see, if it's ok
+  // UPDATE: since HF4 it's not ok, the reward must be precise
 
   uint64_t ts = test_core_time::get_time();
 
@@ -948,9 +966,32 @@ bool gen_alias_too_much_reward::generate(std::vector<test_event_entry>& events) 
   bool r = get_aliases_reward_account(const_cast<currency::account_public_address&>(reward_acc.get_public_address()));
   CHECK_AND_ASSERT_MES(r, false, "get_aliases_reward_account failed");
 
-  MAKE_TX_FEE_MIX_ATTR_EXTRA(events, tx_0, miner_acc, reward_acc, premine, TESTS_DEFAULT_FEE, 0, blk_0r, CURRENCY_TO_KEY_OUT_RELAXED, extra, false);
-  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
-  DO_CALLBACK(events, "check_alias");
+  std::vector<tx_source_entry> sources;
+  std::vector<tx_destination_entry> destinations;
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc, reward_acc, premine, TESTS_DEFAULT_FEE, 0, sources, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
+  for(auto& d : destinations)
+    if (d.addr.back() == null_pub_addr)
+      d.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask;
+  transaction tx_0{};
+  crypto::secret_key sk{};
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<currency::extra_v>({ ai }), empty_attachment, tx_0, get_tx_version_from_events(events), sk, 0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  
+  if (tx_0.version <= TRANSACTION_VERSION_PRE_HF4)
+  {
+    ADD_CUSTOM_EVENT(events, tx_0);
+    MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+    DO_CALLBACK(events, "check_alias");
+  }
+  else
+  {
+    // post HF4: alias reward must be precise
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx_0);
+    DO_CALLBACK(events, "mark_invalid_block");
+    MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+  }
 
   return true;
 }
@@ -1039,12 +1080,12 @@ bool gen_alias_too_small_reward::generate(std::vector<test_event_entry>& events)
   std::list<transaction> txs;
   for (size_t i = 0; i < aliases_count; ++i)
   {
-    uint64_t alias_reward = get_alias_coast_from_fee(aliases[i].name, TESTS_DEFAULT_FEE);
+    uint64_t alias_reward = get_alias_coast_from_fee(aliases[i].name, ALIAS_VERY_INITAL_COAST);
 
     transaction tx = AUTO_VAL_INIT(tx);
-    DO_CALLBACK(events, "mark_invalid_tx"); // should be rejected, because it's paid TX_POOL_MINIMUM_FEE / 10
-    if (!make_tx_reg_alias(events, generator, blk_1, aliases[i].name, aliases[i].addr, ALIAS_VERY_INITAL_COAST / 10, miner_acc, tx, used_sources))
-      return false;
+    DO_CALLBACK(events, "mark_invalid_tx"); // should be rejected, because it's paid ALIAS_VERY_INITAL_COAST / 10
+    r = make_tx_reg_alias(events, generator, blk_1, aliases[i].name, aliases[i].addr, ALIAS_VERY_INITAL_COAST / 10, miner_acc, tx, used_sources);
+    CHECK_AND_ASSERT_MES(r, false, "make_tx_reg_alias failed, i: " << i);
 
 //     this block commented due to new fee median rules, TODO: review
 //     DO_CALLBACK(events, "mark_invalid_tx"); // should be rejected, because it's paid TX_POOL_MINIMUM_FEE / 10 less then required
@@ -1052,8 +1093,15 @@ bool gen_alias_too_small_reward::generate(std::vector<test_event_entry>& events)
 //       return false;
 
     // should be accepted
-    if (!make_tx_reg_alias(events, generator, blk_1, aliases[i].name, aliases[i].addr, alias_reward, miner_acc, tx, used_sources))
-      return false;
+    tx = transaction{};
+    r = make_tx_reg_alias(events, generator, blk_1, aliases[i].name, aliases[i].addr, alias_reward, miner_acc, tx, used_sources);
+    CHECK_AND_ASSERT_MES(r, false, "make_tx_reg_alias failed, i: " << i);
+
+    uint64_t burnt_amount = 0;
+    CHECK_AND_ASSERT_MES(check_native_coins_amount_burnt_in_outs(tx, alias_reward, &burnt_amount), false,
+      "registration of alias '" << aliases[i].name << "' failed due to incorrect reward; expected reward: " << print_money_brief(alias_reward)
+      << "; burnt amount: " << (tx.version <= TRANSACTION_VERSION_PRE_HF4 ? print_money_brief(burnt_amount) : std::string("hidden"))
+      << "; tx: " << get_transaction_hash(tx));
 
     txs.push_back(tx);
   }
@@ -1106,11 +1154,13 @@ bool gen_alias_too_small_reward::make_tx_reg_alias(std::vector<test_event_entry>
 
   std::vector<tx_source_entry> sources;
   uint64_t amount = alias_reward + TESTS_DEFAULT_FEE;
-  r = fill_tx_sources(sources, events, prev_block, miner_acc.get_keys(), amount, 0, used_sources);
+  r = fill_tx_sources(sources, events, prev_block, miner_acc.get_keys(), amount, 0, used_sources, /* check for spends: */ true, /* check for unlock time: */ true);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed, requested money: " << print_money_brief(amount));
 
   std::vector<tx_destination_entry> destinations;
-  destinations.push_back(tx_destination_entry(alias_reward, reward_acc.get_public_address()));
+  tx_destination_entry burn_dst(alias_reward, reward_acc.get_public_address());
+  burn_dst.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask; // burning outs need to have this flags to facilitate balance check 
+  destinations.push_back(burn_dst);
   uint64_t sources_amount = get_sources_total_amount(sources);
   if (sources_amount > alias_reward + TESTS_DEFAULT_FEE)
     destinations.push_back(tx_destination_entry(sources_amount - (alias_reward + TESTS_DEFAULT_FEE), miner_acc.get_public_address())); // change
@@ -1119,6 +1169,7 @@ bool gen_alias_too_small_reward::make_tx_reg_alias(std::vector<test_event_entry>
   uint64_t tx_version = get_tx_version(get_block_height(prev_block), m_hardforks);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx, tx_version, stub, uint64_t(0));
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  PRINT_EVENT_N_TEXT(events, "make_tx_reg_alias -> construct_tx()");
   events.push_back(tx);
 
   append_vector_by_another_vector(used_sources, sources);
@@ -1217,7 +1268,7 @@ bool gen_alias_switch_and_check_block_template::generate(std::vector<test_event_
   DO_CALLBACK(events, "configure_core");                                                                     // 1
   events.push_back(alice);                                                                                   // 2
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 4);       // 2N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2
-  uint64_t miner_amount = get_outs_money_amount(blk_0r.miner_tx) * 4;
+  uint64_t miner_amount = get_outs_money_amount(blk_0r.miner_tx, miner_acc.get_keys()) * 4;
   // alice get some money
   MAKE_TX_LIST(events, tx_list, miner_acc, alice, miner_amount / 2, blk_0r);                                 // 2N+3
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, tx_list);                                        // 2N+4
@@ -1227,7 +1278,7 @@ bool gen_alias_switch_and_check_block_template::generate(std::vector<test_event_
   extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = std::string(ALIAS_MINIMUM_PUBLIC_SHORT_NAME_ALLOWED, 'x');
   ai.m_address = alice.get_public_address();
-  bool r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_1, alice, ai, generator);                           // 2N+5
+  bool r = put_alias_via_tx_to_list(m_hardforks, events, tx_list, blk_1, alice, ai, generator);              // 2N+5
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");                                         
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1, miner_acc, tx_list);                                         // 2N+6
   tx_list.clear();
@@ -1307,6 +1358,8 @@ bool gen_alias_too_many_regs_in_block_template::generate(std::vector<test_event_
   GENERATE_ACCOUNT(alice_acc); m_accounts[ALICE_ACC_IDX] = alice_acc;
 
   MAKE_GENESIS_BLOCK(events, blk_0, preminer_acc, ts);                                                          // 0
+  set_hard_fork_heights_to_generator(generator);
+  DO_CALLBACK(events, "configure_core");                                                                        // 1
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   uint64_t fee_median = generator.get_last_n_blocks_fee_median(get_block_hash(blk_0r));
@@ -1432,18 +1485,28 @@ bool gen_alias_update_for_free::generate(std::vector<test_event_entry>& events) 
   for (auto se : sources)
     input_amount += se.amount;
   if (input_amount > TESTS_DEFAULT_FEE)
-    destinations.push_back(tx_destination_entry(input_amount - TESTS_DEFAULT_FEE, miner_acc.get_public_address()));
+  {
+    uint64_t d = input_amount - TESTS_DEFAULT_FEE;
+    destinations.push_back(tx_destination_entry(d / 2, miner_acc.get_public_address()));
+    d -= d / 2;
+    destinations.push_back(tx_destination_entry(d, miner_acc.get_public_address()));
+  }
 
-  tx_builder tb;
+  transaction tx{};
+  uint64_t tx_version = currency::get_tx_version(get_block_height(blk_0r) + 1, generator.get_hardforks());
+  crypto::secret_key sk{};
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<extra_v>({ ai }), empty_attachment, tx, tx_version, sk, 0);
+
+  /*tx_builder tb;
   tb.step1_init();
   tb.step2_fill_inputs(miner_acc.get_keys(), sources);
   tb.step3_fill_outputs(destinations);
   tb.m_tx.extra.push_back(ai);
   tb.step4_calc_hash();
-  tb.step5_sign(sources);
+  tb.step5_sign(sources);*/
 
-  events.push_back(tb.m_tx);
-  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1, miner_acc, tb.m_tx);
+  ADD_CUSTOM_EVENT(events, tx);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1, miner_acc, tx);
 
   return true;
 }
@@ -1466,16 +1529,18 @@ bool gen_alias_in_coinbase::generate(std::vector<test_event_entry>& events) cons
   set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
 
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
+
   // reg an alias using coinbase
 
   extra_alias_entry ai = AUTO_VAL_INIT(ai);
   ai.m_alias = "emmanuel.goldstein"; // long enough alias to minimize it's cost
   ai.m_address = miner_acc.get_public_address();
-  block blk_1 = AUTO_VAL_INIT(blk_1);
-  bool r = generator.construct_pow_block_with_alias_info_in_coinbase(miner_acc, blk_0, ai, blk_1);
+  block blk_2 = AUTO_VAL_INIT(blk_2);
+  bool r = generator.construct_pow_block_with_alias_info_in_coinbase(miner_acc, blk_1, ai, blk_2);
   CHECK_AND_ASSERT_MES(r, false, "construct_block_gentime_with_coinbase_cb failed");
 
-  events.push_back(blk_1);
+  events.push_back(blk_2);
 
   DO_CALLBACK_PARAMS_STR(events, "check", t_serializable_object_to_blob(ai));
 
@@ -1487,11 +1552,11 @@ bool gen_alias_in_coinbase::generate(std::vector<test_event_entry>& events) cons
   r = sign_extra_alias_entry(ai, miner_acc.get_public_address().spend_public_key, miner_acc.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_MES(r, false, "sign_extra_alias_entry failed");
 
-  block blk_2 = AUTO_VAL_INIT(blk_2);
-  r = generator.construct_pow_block_with_alias_info_in_coinbase(miner_acc, blk_1, ai, blk_2);
+  block blk_3 = AUTO_VAL_INIT(blk_3);
+  r = generator.construct_pow_block_with_alias_info_in_coinbase(miner_acc, blk_2, ai, blk_3);
   CHECK_AND_ASSERT_MES(r, false, "construct_block_gentime_with_coinbase_cb failed");
 
-  events.push_back(blk_2);
+  events.push_back(blk_3);
 
   DO_CALLBACK_PARAMS_STR(events, "check", t_serializable_object_to_blob(ai));
 

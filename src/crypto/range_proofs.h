@@ -56,7 +56,7 @@ namespace crypto
   };
 
 
-  template<typename gen_trait_t, size_t N = 64, size_t values_max = 16>
+  template<typename gen_trait_t, size_t N = 64, size_t values_max = 32>
   struct bpp_crypto_trait_zano : gen_trait_t
   {
     static constexpr size_t c_bpp_n           = N;                           // the upper bound for the witness's range
@@ -134,7 +134,7 @@ namespace crypto
   }; // struct bpp_crypto_trait_zano
 
 
-  typedef bpp_crypto_trait_zano<bpp_ct_generators_UGX, 64,  16> bpp_crypto_trait_ZC_out;
+  typedef bpp_crypto_trait_zano<bpp_ct_generators_UGX, 64,  32> bpp_crypto_trait_ZC_out;
 
   typedef bpp_crypto_trait_zano<bpp_ct_generators_HGX, 128, 16> bpp_crypto_trait_Zarcanum;
 

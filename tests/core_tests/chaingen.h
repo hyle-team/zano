@@ -745,6 +745,9 @@ bool check_mixin_value_for_each_input(size_t mixin, const crypto::hash& tx_id, c
 bool shuffle_source_entry(currency::tx_source_entry& se);
 bool shuffle_source_entries(std::vector<currency::tx_source_entry>& sources);
 
+// one output will be created for each destination entry and one additional output to add up to old coinbase total amount
+bool replace_coinbase_in_genesis_block(const std::vector<currency::tx_destination_entry>& destinations, test_generator& generator, std::vector<test_event_entry>& events, currency::block& genesis_block);
+
 //--------------------------------------------------------------------------
 template<class t_test_class>
 auto do_check_tx_verification_context(const currency::tx_verification_context& tvc, bool tx_added, size_t event_index, const currency::transaction& tx, t_test_class& validator, int)
@@ -954,10 +957,13 @@ bool test_generator::construct_block_gentime_with_coinbase_cb(const currency::bl
 
   uint64_t block_reward_without_fee = 0;
 
-  r = construct_miner_tx(height, epee::misc_utils::median(block_sizes), already_generated_coins, 0 /* current_block_size !HACK! */, 0, acc.get_public_address(), acc.get_public_address(), miner_tx, block_reward_without_fee, get_tx_version(height, m_hardforks), currency::blobdata(), 1);
+  currency::keypair tx_sec_key = currency::keypair::generate();
+  r = construct_miner_tx(height, epee::misc_utils::median(block_sizes), already_generated_coins, 0 /* current_block_size !HACK! */, 0,
+    acc.get_public_address(), acc.get_public_address(), miner_tx, block_reward_without_fee, get_tx_version(height, m_hardforks), currency::blobdata(), /* max outs: */ 1,
+    /* pos: */ false, currency::pos_entry(), /* ogc_ptr: */ nullptr, &tx_sec_key);
   CHECK_AND_ASSERT_MES(r, false, "construct_miner_tx failed");
 
-  if (!cb(miner_tx))
+  if (!cb(miner_tx, tx_sec_key))
     return false;
 
   currency::wide_difficulty_type diff = get_difficulty_for_next_block(prev_id, true);
