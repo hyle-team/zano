@@ -4396,7 +4396,7 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   b.timestamp = cxt.sk.block_timestamp;
   uint64_t current_timestamp = m_core_runtime_config.get_core_time();
   set_block_datetime(current_timestamp, b);
-  WLT_LOG_MAGENTA("Applying actual timestamp: " << current_timestamp, LOG_LEVEL_0);
+  WLT_LOG_MAGENTA("Applying actual timestamp: " << current_timestamp, LOG_LEVEL_2);
 
   uint64_t full_block_reward = tmpl_rsp.block_reward_without_fee + tmpl_rsp.txs_fee;
   res = prepare_and_sign_pos_block(cxt, full_block_reward, tmpl_req.pe, tmpl_rsp.miner_tx_tgc, b);
@@ -5009,7 +5009,10 @@ void wallet2::remove_transfer_from_expiration_list(uint64_t transfer_index)
   uint32_t flags_before = m_transfers[transfer_index].m_flags;
   m_transfers[transfer_index].m_flags &= ~WALLET_TRANSFER_DETAIL_FLAG_BLOCKED;
   m_transfers[transfer_index].m_flags &= ~WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION;
-  WLT_LOG_BLUE("Transfer [" << transfer_index << "] was cleared from escrow proposal reservation, flags: " << flags_before << " -> " << m_transfers[transfer_index].m_flags << ", reason: intentional removing from expiration list", LOG_LEVEL_0);
+  if (flags_before != m_transfers[transfer_index].m_flags)
+  {
+    WLT_LOG_BLUE("Transfer [" << transfer_index << "] was cleared from escrow proposal reservation, flags: " << flags_before << " -> " << m_transfers[transfer_index].m_flags << ", reason: intentional removing from expiration list", LOG_LEVEL_0);
+  }
   
   // (don't change m_spent flag, because transfer status is unclear - the caller should take care of it)
 }
