@@ -37,17 +37,18 @@ namespace crypto
     
     bppe_signature E_range_proof;
 
-    crypto::public_key pseudo_out_amount_commitment; // premultiplied by 1/8
+    public_key pseudo_out_amount_commitment; // premultiplied by 1/8
     CLSAG_GGXXG_signature clsag_ggxxg;
   };
 
-  bool zarcanum_generate_proof(const hash& m, const hash& kernel_hash, const std::vector<crypto::CLSAG_GGXXG_input_ref_t>& ring,
+  bool zarcanum_generate_proof(const hash& m, const hash& kernel_hash, const std::vector<CLSAG_GGXXG_input_ref_t>& ring,
     const scalar_t& last_pow_block_id_hashed, const key_image& stake_ki,
-    const scalar_t& secret_x, const scalar_t& secret_q, uint64_t secret_index, const crypto::scalar_t& stake_out_asset_id_blinding_mask, const scalar_t& pseudo_out_blinding_mask, uint64_t stake_amount, const scalar_t& stake_blinding_mask,
+    const scalar_t& secret_x, const scalar_t& secret_q, uint64_t secret_index, uint64_t stake_amount,
+    const scalar_t& stake_out_asset_id_blinding_mask, const scalar_t& stake_out_amount_blinding_mask, const scalar_t& pseudo_out_amount_blinding_mask,
     zarcanum_proof& result, uint8_t* p_err = nullptr);
   
 
-  bool zarcanum_verify_proof(const hash& m, const hash& kernel_hash, const std::vector<crypto::CLSAG_GGXXG_input_ref_t>& ring,
+  bool zarcanum_verify_proof(const hash& m, const hash& kernel_hash, const std::vector<CLSAG_GGXXG_input_ref_t>& ring,
     const scalar_t& last_pow_block_id_hashed, const key_image& stake_ki,
     const mp::uint128_t& pos_difficulty,
     const zarcanum_proof& sig, uint8_t* p_err = nullptr) noexcept;
@@ -174,9 +175,9 @@ namespace crypto
   };
 
   bool generate_vector_UG_aggregation_proof(const hash& m, const scalar_vec_t& u_secrets, const scalar_vec_t& g_secrets0, const scalar_vec_t& g_secrets1,
-    const std::vector<crypto::point_t>& amount_commitments,
-    const std::vector<crypto::point_t>& amount_commitments_for_rp_aggregation, 
-    const std::vector<crypto::point_t>& blinded_asset_ids, 
+    const std::vector<point_t>& amount_commitments,
+    const std::vector<point_t>& amount_commitments_for_rp_aggregation, 
+    const std::vector<point_t>& blinded_asset_ids, 
     vector_UG_aggregation_proof& result, uint8_t* p_err = nullptr);
 
   bool verify_vector_UG_aggregation_proof(const hash& m, const std::vector<const public_key*> amount_commitments_1div8, const std::vector<const public_key*> blinded_asset_ids_1div8,

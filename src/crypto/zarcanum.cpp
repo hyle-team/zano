@@ -65,13 +65,14 @@ namespace crypto
   
   bool zarcanum_generate_proof(const hash& m, const hash& kernel_hash, const std::vector<CLSAG_GGXXG_input_ref_t>& ring,
     const scalar_t& last_pow_block_id_hashed, const key_image& stake_ki,
-    const scalar_t& secret_x, const scalar_t& secret_q, uint64_t secret_index, const crypto::scalar_t& stake_out_asset_id_blinding_mask, const scalar_t& pseudo_out_blinding_mask, uint64_t stake_amount, const scalar_t& stake_blinding_mask,
+    const scalar_t& secret_x, const scalar_t& secret_q, uint64_t secret_index, uint64_t stake_amount,
+    const scalar_t& stake_out_asset_id_blinding_mask, const scalar_t& stake_out_amount_blinding_mask, const scalar_t& pseudo_out_amount_blinding_mask,
     zarcanum_proof& result, uint8_t* p_err /* = nullptr */)
   {
     DBG_PRINT("zarcanum_generate_proof");
     const scalar_t a = stake_amount;
     const scalar_t h = scalar_t(kernel_hash);
-    const scalar_t f_plus_q = stake_blinding_mask + secret_q;
+    const scalar_t f_plus_q = stake_out_amount_blinding_mask + secret_q;
     const scalar_t f_plus_q_plus_fp = f_plus_q + last_pow_block_id_hashed;
     const scalar_t lhs = h * f_plus_q_plus_fp;                                                                // == h * (f + q + f') mod l
     const mp::uint256_t d_mp = lhs.as_boost_mp_type<mp::uint256_t>() / (c_zarcanum_z_coeff_mp * stake_amount) + 1;
@@ -151,7 +152,7 @@ namespace crypto
     // layer 1 ring
     //     ring[j].amount_commitment - pseudo_out_amount_commitment
     // layer 1 secret (with respect to G)
-    //     stake_blinding_mask - pseudo_out_blinding_mask
+    //     stake_out_amount_blinding_mask - pseudo_out_amount_blinding_mask ( = f_i - f'_i )
     //
     // additional layer for confidential assets:
     //
@@ -165,22 +166,24 @@ namespace crypto
     // layer 3 ring
     //     C - A[j] - Q[j]
     // layer 3 secret (with respect to X)
-    //     x0
+    //     x0 - a * stake_out_asset_id_blinding_mask  ( = x - a * r_i )
     //
     // layer 4 ring
     //     Q[j]
     // layer 4 secret (with respect to G)
     //     secret_q
 
-    // such pseudo_out_asset_id_blinding_mask effectively makes pseudo_out_blinded_asset_id == currency::native_coin_asset_id_pt == crypto::point_H
-    scalar_t pseudo_out_asset_id_blinding_mask = -stake_out_asset_id_blinding_mask;                                                     // T^p_i = T_i + (-r_i) * X = H_i
+    // such pseudo_out_asset_id_blinding_mask effectively makes pseudo_out_blinded_asset_id == currency::native_coin_asset_id_pt == point_H
+    scalar_t pseudo_out_asset_id_blinding_mask = -stake_out_asset_id_blinding_mask;                                                     // T^p_i = T_i + (-r_i) * X = H
 
-    point_t pseudo_out_amount_commitment = a * crypto::c_point_H + pseudo_out_blinding_mask * crypto::c_point_G;                        // A^p_i = a_i * H_i + f'_i * G
-    result.pseudo_out_amount_commitment = (crypto::c_scalar_1div8 * pseudo_out_amount_commitment).to_public_key();
+    point_t stake_out_asset_id = c_point_H + stake_out_asset_id_blinding_mask * c_point_X;                                      // T_i   = H + r_i * X
+
+    point_t pseudo_out_amount_commitment = a * stake_out_asset_id + pseudo_out_amount_blinding_mask * c_point_G;                // A^p_i = a_i * T_i + f'_i * G
+    result.pseudo_out_amount_commitment = (c_scalar_1div8 * pseudo_out_amount_commitment).to_public_key();
 
     TRY_ENTRY()
-    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(generate_CLSAG_GGXXG(m, ring, pseudo_out_amount_commitment, crypto::c_point_H, C, stake_ki,
-      secret_x, stake_blinding_mask - pseudo_out_blinding_mask, -pseudo_out_asset_id_blinding_mask, x0, secret_q, secret_index,
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(generate_CLSAG_GGXXG(m, ring, pseudo_out_amount_commitment, c_point_H, C, stake_ki,
+      secret_x, stake_out_amount_blinding_mask - pseudo_out_amount_blinding_mask, -pseudo_out_asset_id_blinding_mask, x0 - a * stake_out_asset_id_blinding_mask, secret_q, secret_index,
       result.clsag_ggxxg), 20);
     CATCH_ENTRY2(false);
 
@@ -221,7 +224,7 @@ namespace crypto
       //}
 
       // make sure 0 < d <= l / floor(z * D)
-      const mp::uint256_t l_div_z_D_mp = crypto::zarcanum_precalculate_l_div_z_D(pos_difficulty);
+      const mp::uint256_t l_div_z_D_mp = zarcanum_precalculate_l_div_z_D(pos_difficulty);
       const scalar_t l_div_z_D(l_div_z_D_mp);
       CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(!sig.d.is_zero() && sig.d < l_div_z_D, 2);
       const scalar_t dz = sig.d * c_zarcanum_z_coeff_s;
@@ -261,7 +264,7 @@ namespace crypto
 
       CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(bppe_verify<bpp_crypto_trait_Zarcanum>(range_proofs), 10);
 
-      static public_key native_coin_asset_id = (crypto::c_scalar_1div8 * crypto::c_point_H).to_public_key(); // consider making it less ugly -- sowle
+      static public_key native_coin_asset_id = (c_scalar_1div8 * c_point_H).to_public_key(); // consider making it less ugly -- sowle
 
       // check extended CLSAG-GGXG ring signature
       CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(verify_CLSAG_GGXXG(m, ring, sig.pseudo_out_amount_commitment, native_coin_asset_id, sig.C, stake_ki, sig.clsag_ggxxg), 1);
@@ -305,7 +308,7 @@ namespace crypto
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n == amount_commitments_for_rp_aggregation.size(), 5);
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(n == blinded_asset_ids.size(), 6);
 
-    crypto::hash_helper_t::hs_t hash_calculator(1 + 3 * n);
+    hash_helper_t::hs_t hash_calculator(1 + 3 * n);
     hash_calculator.add_hash(m);
     hash_calculator.add_points_array(amount_commitments);
     hash_calculator.add_points_array(amount_commitments_for_rp_aggregation);
@@ -314,22 +317,22 @@ namespace crypto
 
 #ifndef NDEBUG
     for(size_t j = 0; j < n; ++j)
-      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(amount_commitments[j] + w * amount_commitments_for_rp_aggregation[j] == u_secrets[j] * (blinded_asset_ids[j] + w * crypto::c_point_U) + (g_secrets0[j] + w * g_secrets1[j]) * c_point_G, 20);
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(amount_commitments[j] + w * amount_commitments_for_rp_aggregation[j] == u_secrets[j] * (blinded_asset_ids[j] + w * c_point_U) + (g_secrets0[j] + w * g_secrets1[j]) * c_point_G, 20);
 #endif
 
     result.amount_commitments_for_rp_aggregation.clear();
     result.y0s.clear();
     result.y1s.clear();
 
-    crypto::scalar_vec_t r0, r1;
+    scalar_vec_t r0, r1;
     r0.resize_and_make_random(n);
     r1.resize_and_make_random(n);
 
-    std::vector<crypto::point_t> asset_tag_plus_U_vec(n);
+    std::vector<point_t> asset_tag_plus_U_vec(n);
     for(size_t j = 0; j < n; ++j)
-      asset_tag_plus_U_vec[j] = blinded_asset_ids[j] + w * crypto::c_point_U;
+      asset_tag_plus_U_vec[j] = blinded_asset_ids[j] + w * c_point_U;
 
-    std::vector<crypto::point_t> R(n);
+    std::vector<point_t> R(n);
     for(size_t j = 0; j < n; ++j)
       R[j].assign_mul_plus_G(r0[j], asset_tag_plus_U_vec[j], r1[j]); // R[j] = r0[j] * asset_tag_plus_U_vec[j] + r1[j] * G
 
@@ -343,7 +346,7 @@ namespace crypto
     {
       result.y0s.emplace_back(r0[j] - result.c * u_secrets[j]);
       result.y1s.emplace_back(r1[j] - result.c * (g_secrets0[j] + w * g_secrets1[j]));
-      result.amount_commitments_for_rp_aggregation.emplace_back((crypto::c_scalar_1div8 * amount_commitments_for_rp_aggregation[j]).to_public_key());
+      result.amount_commitments_for_rp_aggregation.emplace_back((c_scalar_1div8 * amount_commitments_for_rp_aggregation[j]).to_public_key());
     }
 
     return true;
@@ -367,14 +370,14 @@ namespace crypto
       CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.y0s.size() == n, 4);
       CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.y1s.size() == n, 5);
 
-      crypto::hash_helper_t::hs_t hash_calculator(1 + 3 * n);
+      hash_helper_t::hs_t hash_calculator(1 + 3 * n);
       hash_calculator.add_hash(m);
       DBG_VAL_PRINT(m);
 
       std::vector<point_t> amount_commitments_pt;
       for(size_t j = 0; j < n; ++j)
       {
-        point_t A = crypto::point_t(*amount_commitments_1div8[j]).modify_mul8();
+        point_t A = point_t(*amount_commitments_1div8[j]).modify_mul8();
         hash_calculator.add_point(A);
         amount_commitments_pt.emplace_back(A);
         DBG_VAL_PRINT(A);
@@ -383,7 +386,7 @@ namespace crypto
       std::vector<point_t> amount_commitments_for_rp_aggregation_pt;
       for(size_t j = 0; j < n; ++j)
       {
-        point_t Arpa = crypto::point_t(sig.amount_commitments_for_rp_aggregation[j]).modify_mul8();
+        point_t Arpa = point_t(sig.amount_commitments_for_rp_aggregation[j]).modify_mul8();
         hash_calculator.add_point(Arpa); // TODO @#@ performance: consider adding premultiplied by 1/8 points to the hash
         amount_commitments_for_rp_aggregation_pt.emplace_back(Arpa);
         DBG_VAL_PRINT(Arpa);
@@ -392,22 +395,22 @@ namespace crypto
       scalar_t w = hash_calculator.calc_hash(false); // don't clear the buffer
       DBG_VAL_PRINT(w);
 
-      std::vector<crypto::point_t> asset_tag_plus_U_vec(n);
+      std::vector<point_t> asset_tag_plus_U_vec(n);
       for(size_t j = 0; j < n; ++j)
-        asset_tag_plus_U_vec[j] = crypto::point_t(*blinded_asset_ids_1div8[j]).modify_mul8() + w * crypto::c_point_U;
+        asset_tag_plus_U_vec[j] = point_t(*blinded_asset_ids_1div8[j]).modify_mul8() + w * c_point_U;
       DBG_VAL_PRINT(asset_tag_plus_U_vec);
 
       for(size_t j = 0; j < n; ++j)
       {
-        hash_calculator.add_pub_key(crypto::point_t(
+        hash_calculator.add_pub_key(point_t(
           sig.y0s[j] * asset_tag_plus_U_vec[j] +
-          sig.y1s[j] * crypto::c_point_G +
+          sig.y1s[j] * c_point_G +
           sig.c      * (amount_commitments_pt[j] + w * amount_commitments_for_rp_aggregation_pt[j])
         ).to_public_key());
         DBG_VAL_PRINT(hash_calculator.m_elements.back().pk);
       }
 
-      crypto::scalar_t c = hash_calculator.calc_hash();
+      scalar_t c = hash_calculator.calc_hash();
       DBG_VAL_PRINT(c); DBG_VAL_PRINT(sig.c);
       CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.c == c, 0);
     }

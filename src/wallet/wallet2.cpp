@@ -4106,6 +4106,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
   WLT_CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(currency::txin_zc_input), false, "Wrong input 1 type in transaction: " << b.miner_tx.vin[1].type().name());
   WLT_CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1 && b.miner_tx.signatures[0].type() == typeid(zarcanum_sig), false, "wrong sig prepared in a PoS block");
   WLT_CHECK_AND_ASSERT_MES(stake_out_v.type() == typeid(tx_out_zarcanum), false, "unexpected stake output type: " << stake_out_v.type().name() << ", expected: tx_out_zarcanum");
+  WLT_CHECK_AND_ASSERT_MES(td.m_zc_info_ptr->asset_id == currency::native_coin_asset_id, false, "attempted to stake an output with a non-native asset id");
 
   zarcanum_sig& sig = boost::get<zarcanum_sig>(b.miner_tx.signatures[0]);
   txin_zc_input& stake_input = boost::get<txin_zc_input>(b.miner_tx.vin[1]);
@@ -4179,13 +4180,13 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
   }
   stake_input.k_image = pe.keyimage;
 
-  #ifndef NDEBUG
+  crypto::point_t stake_out_blinded_asset_id_pt = currency::native_coin_asset_id_pt + td.m_zc_info_ptr->asset_id_blinding_mask * crypto::c_point_X; 
+#ifndef NDEBUG
   {
-    crypto::point_t source_amount_commitment = crypto::c_scalar_1div8 * td.m_amount * crypto::c_point_H + crypto::c_scalar_1div8 * td.m_zc_info_ptr->amount_blinding_mask * crypto::c_point_G;
+    crypto::point_t source_amount_commitment = crypto::c_scalar_1div8 * td.m_amount * stake_out_blinded_asset_id_pt + crypto::c_scalar_1div8 * td.m_zc_info_ptr->amount_blinding_mask * crypto::c_point_G;
     WLT_CHECK_AND_ASSERT_MES(stake_out.amount_commitment == source_amount_commitment.to_public_key(), false, "real output amount commitment check failed");
     WLT_CHECK_AND_ASSERT_MES(ring[secret_index].amount_commitment == stake_out.amount_commitment, false, "ring secret member doesn't match with the stake output");
     WLT_CHECK_AND_ASSERT_MES(cxt.stake_amount == td.m_amount, false, "stake_amount missmatch");
-    //WLT_CHECK_AND_ASSERT_MES(source_amount_commitment == cxt.stake_amount * cxt.stake_out_blinded_asset_id + cxt.stake_out_amount_blinding_mask * crypto::c_point_G, false, "source_amount_commitment missmatch");
   }
   #endif
 
@@ -4194,18 +4195,18 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
   WLT_CHECK_AND_ASSERT_MES(miner_tx_tgc.pseudo_out_amount_blinding_masks_sum.is_zero(), false, "pseudo_out_amount_blinding_masks_sum is nonzero"); // it should be zero because there's only one input (stake), and thus one pseudo out
   crypto::scalar_t pseudo_out_amount_blinding_mask = miner_tx_tgc.amount_blinding_masks_sum; // sum of outputs' amount blinding masks
 
-  miner_tx_tgc.pseudo_outs_blinded_asset_ids.emplace_back(currency::native_coin_asset_id_pt);
+  miner_tx_tgc.pseudo_outs_blinded_asset_ids.emplace_back(currency::native_coin_asset_id_pt); // for Zarcanum stake inputs pseudo outputs commitments has explicit native asset id
   miner_tx_tgc.pseudo_outs_plus_real_out_blinding_masks.emplace_back(0);
   miner_tx_tgc.real_zc_ins_asset_ids.emplace_back(td.m_zc_info_ptr->asset_id);
+  // TODO @#@# [architecture] the same value is calculated in zarcanum_generate_proof(), consider an impovement 
+  miner_tx_tgc.pseudo_out_amount_commitments_sum += cxt.stake_amount * stake_out_blinded_asset_id_pt + pseudo_out_amount_blinding_mask * crypto::c_point_G;
+  miner_tx_tgc.real_in_asset_id_blinding_mask_x_amount_sum += td.m_zc_info_ptr->asset_id_blinding_mask * cxt.stake_amount;
 
   uint8_t err = 0;
   r = crypto::zarcanum_generate_proof(hash_for_zarcanum_sig, cxt.kernel_hash, ring, cxt.last_pow_block_id_hashed, cxt.sk.kimage,
-    secret_x, cxt.secret_q, secret_index, td.m_zc_info_ptr->asset_id_blinding_mask, pseudo_out_amount_blinding_mask, cxt.stake_amount, cxt.stake_out_amount_blinding_mask,
+    secret_x, cxt.secret_q, secret_index, cxt.stake_amount, td.m_zc_info_ptr->asset_id_blinding_mask, cxt.stake_out_amount_blinding_mask, pseudo_out_amount_blinding_mask, 
     static_cast<crypto::zarcanum_proof&>(sig), &err);
   WLT_CHECK_AND_ASSERT_MES(r, false, "zarcanum_generate_proof failed, err: " << (int)err);
-
-  // TODO @#@# [architecture] the same value is calculated in zarcanum_generate_proof(), consider an impovement 
-  miner_tx_tgc.pseudo_out_amount_commitments_sum += cxt.stake_amount * currency::native_coin_asset_id_pt + pseudo_out_amount_blinding_mask * crypto::c_point_G;
 
   //
   // The miner tx prefix should be sealed by now, and the tx hash should be defined.
@@ -5823,7 +5824,7 @@ assets_selection_context wallet2::get_needed_money(uint64_t fee, const std::vect
       amounts_map.erase(amounts_map.find(dt.asset_id));
     }
   }
-  return std::move(amounts_map);
+  return amounts_map;
 }
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::set_disable_tor_relay(bool disable)
@@ -6102,34 +6103,33 @@ bool wallet2::get_actual_offers(std::list<bc_services::offer_details_ex>& offers
 //----------------------------------------------------------------------------------------------------
 bool wallet2::expand_selection_with_zc_input(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes)
 {
-
-    free_amounts_cache_type& found_free_amounts = m_found_free_amounts[currency::native_coin_asset_id];
-    auto& asset_needed_money_item = needed_money_map[currency::native_coin_asset_id];
-    //need to add ZC input
-    for (auto it = found_free_amounts.begin(); it != found_free_amounts.end(); it++)
+  free_amounts_cache_type& found_free_amounts = m_found_free_amounts[currency::native_coin_asset_id];
+  auto& asset_needed_money_item = needed_money_map[currency::native_coin_asset_id];
+  //need to add ZC input
+  for (auto it = found_free_amounts.begin(); it != found_free_amounts.end(); it++)
+  {
+    for (auto it_in_amount = it->second.begin(); it_in_amount != it->second.end(); it_in_amount++)
     {
-      for (auto it_in_amount = it->second.begin(); it_in_amount != it->second.end(); it_in_amount++)
+      if (!m_transfers[*it_in_amount].is_zc())
       {
-        if (!m_transfers[*it_in_amount].is_zc())
-        {
-          continue;
-        }
+        continue;
+      }
 
-        if (is_transfer_ready_to_go(m_transfers[*it->second.begin()], fake_outputs_count))
+      if (is_transfer_ready_to_go(m_transfers[*it->second.begin()], fake_outputs_count))
+      {
+        asset_needed_money_item.found_amount += it->first;
+        selected_indexes.push_back(*it_in_amount);
+        it->second.erase(it_in_amount);
+        if (!it->second.size())
         {
-          asset_needed_money_item.found_amount += it->first;
-          selected_indexes.push_back(*it_in_amount);
-          it->second.erase(it_in_amount);
-          if (!it->second.size())
-          {
-            found_free_amounts.erase(it);
-          }
-          return true;
+          found_free_amounts.erase(it);
         }
+        return true;
       }
     }
-    WLT_THROW_IF_FALSE_WALLET_EX_MES(false , error::no_zc_inputs, "Missing ZC inputs for TX_FLAG_SIGNATURE_MODE_SEPARATE operation");
-    return true;
+  }
+  WLT_THROW_IF_FALSE_WALLET_EX_MES(false, error::no_zc_inputs, "At least one ZC is required for the operation, but none were found");
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::select_indices_for_transfer(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes)
