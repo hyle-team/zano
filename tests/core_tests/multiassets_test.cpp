@@ -50,11 +50,10 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   bool r = false;
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
   miner_wlt->get_account().set_createtime(0);
-  account_base alice_acc;
-  alice_acc.generate();
-  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, alice_acc);
-  alice_wlt->get_account().set_createtime(0);
   miner_wlt->refresh();
+
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  alice_wlt->get_account().set_createtime(0);
 
   asset_descriptor_base adb = AUTO_VAL_INIT(adb);
   adb.total_max_supply = 1000000000000000000; //1M coins
@@ -474,6 +473,89 @@ bool asset_depoyment_and_few_zc_utxos::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+assets_and_pos_mining::assets_and_pos_mining()
+{
+  REGISTER_CALLBACK_METHOD(assets_and_pos_mining, c1);
+}
+
+bool assets_and_pos_mining::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: ensure that post-HF4 Zarcanum staking functions correctly with outputs that have a nonzero asset id blinding mask (i.e., outputs with a non-explicit asset id)
+
+  bool r = false;
+
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_04_ZARCANUM));
+
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool assets_and_pos_mining::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  miner_wlt->refresh();
+
+  asset_descriptor_base adb{};
+  adb.total_max_supply = 10*COIN;
+  adb.full_name = "test";
+  adb.ticker = "TEST";
+
+  std::vector<currency::tx_destination_entry> destinations;
+  destinations.emplace_back(adb.total_max_supply, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey);
+  destinations.emplace_back(MK_TEST_COINS(2), m_accounts[ALICE_ACC_IDX].get_public_address());
+  destinations.emplace_back(MK_TEST_COINS(2), m_accounts[ALICE_ACC_IDX].get_public_address());
+
+  currency::transaction tx{};
+  crypto::public_key asset_id = currency::null_pkey;
+  miner_wlt->deploy_new_asset(adb, destinations, tx, asset_id);
+  LOG_PRINT_L0("Deployed new asset: " << asset_id << ", tx_id: " << currency::get_transaction_hash(tx));
+
+  CHECK_AND_ASSERT_MES(tx.vout.size() >= 3, false, "Unexpected vout size: " << tx.vout.size());
+  for(auto& out : tx.vout)
+  {
+    CHECK_AND_ASSERT_MES(out.type() == typeid(tx_out_zarcanum), false, "invalid out type");
+    CHECK_AND_ASSERT_MES(boost::get<tx_out_zarcanum>(out).blinded_asset_id != native_coin_asset_id_1div8, false, "One of outputs has explicit native asset id, which is unexpected");
+  }
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", MK_TEST_COINS(4), 0, MK_TEST_COINS(4), 0, 0), false, "");
+
+  size_t current_blockchain_size = c.get_current_blockchain_size();
+
+  r = alice_wlt->try_mint_pos();
+  CHECK_AND_ASSERT_MES(r, false, "try_mint_pos failed");
+  CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == current_blockchain_size + 1, false, "incorrect blockchain size: " << c.get_current_blockchain_size());
+
+  r = alice_wlt->try_mint_pos();
+  CHECK_AND_ASSERT_MES(r, false, "try_mint_pos failed");
+  CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == current_blockchain_size + 2, false, "incorrect blockchain size: " << c.get_current_blockchain_size());
+
+  // the following attempt should fail because Alice has only two outputs eligiable for staking
+  r = alice_wlt->try_mint_pos();
+  CHECK_AND_ASSERT_MES(r, false, "try_mint_pos failed");
+  CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == current_blockchain_size + 2, false, "incorrect blockchain size: " << c.get_current_blockchain_size()); // the same height
 
   return true;
 }
