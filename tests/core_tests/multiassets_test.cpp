@@ -20,20 +20,20 @@ uint64_t multiassets_basic_test::ts_starter = 0;
 multiassets_basic_test::multiassets_basic_test()
 {
   // TODO: remove the following line
-
-  LOG_PRINT_MAGENTA("STARTER TS: " << ts_starter, LOG_LEVEL_0);
-  random_state_test_restorer::reset_random(ts_starter);
+  //LOG_PRINT_MAGENTA("STARTER TS: " << ts_starter, LOG_LEVEL_0);
+  //random_state_test_restorer::reset_random(ts_starter);
 
   REGISTER_CALLBACK_METHOD(multiassets_basic_test, c1);
 }
 
 bool multiassets_basic_test::generate(std::vector<test_event_entry>& events) const
 {
-  m_accounts.resize(MINER_ACC_IDX+1);
-  account_base& miner_acc = m_accounts[MINER_ACC_IDX];
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(ALICE_ACC_IDX+1);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
   miner_acc.generate();
 
-  uint64_t ts = 145000000;
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
   DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
   //TODO: Need to make sure REWIND_BLOCKS_N and other coretests codebase are capable of following hardfork4 rules
