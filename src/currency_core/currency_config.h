@@ -154,6 +154,13 @@
 #define POS_WALLET_MINING_SCAN_INTERVAL                 POS_SCAN_STEP  //seconds
 #define POS_MINIMUM_COINSTAKE_AGE                       10 // blocks count
 
+#ifndef TESTNET
+#  define BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION 57000
+#else
+#  define BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION 18000
+#endif
+#define BLOCK_POS_STRICT_SEQUENCE_LIMIT                 20
+
 
 #define WALLET_FILE_SIGNATURE_OLD                       0x1111012101101011LL  // Bender's nightmare
 #define WALLET_FILE_SIGNATURE_V2                        0x1111011201101011LL  // another Bender's nightmare

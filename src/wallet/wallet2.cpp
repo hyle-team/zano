@@ -4253,9 +4253,10 @@ bool wallet2::fill_mining_context(mining_context& ctx)
   ctx = mining_context{};
   ctx.init(wide_difficulty_type(pos_details_resp.pos_basic_difficulty), pos_details_resp.sm, is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM));
 
-  ctx.last_block_hash = pos_details_resp.last_block_hash;
-  ctx.is_pos_allowed = pos_details_resp.pos_mining_allowed;
-  ctx.starter_timestamp = pos_details_resp.starter_timestamp;
+  ctx.last_block_hash             = pos_details_resp.last_block_hash;
+  ctx.is_pos_allowed              = pos_details_resp.pos_mining_allowed;
+  ctx.is_pos_sequence_factor_good = pos_details_resp.pos_sequence_factor_is_good;
+  ctx.starter_timestamp           = pos_details_resp.starter_timestamp;
   ctx.status = API_RETURN_CODE_NOT_FOUND;
   return true;
 }
@@ -4271,9 +4272,16 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
   mining_context ctx = AUTO_VAL_INIT(ctx);
   WLT_LOG_L1("Starting PoS mining iteration");
   fill_mining_context(ctx);
+  
   if (!ctx.is_pos_allowed)
   {
     WLT_LOG_YELLOW("POS MINING NOT ALLOWED YET", LOG_LEVEL_0);
+    return true;
+  }
+
+  if (!ctx.is_pos_sequence_factor_good)
+  {
+    WLT_LOG_YELLOW("PoS sequence factor is too big, waiting for a PoW block...", LOG_LEVEL_0);
     return true;
   }
 

@@ -430,6 +430,8 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
         return true;
       }
 
+      rsp.pos_sequence_factor_is_good = true;
+
       build_stake_modifier(rsp.sm, m_blockchain);
     
       uint64_t median_timestamp = get_timestamps_median(m_blockchain);

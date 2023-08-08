@@ -469,6 +469,7 @@ namespace tools
       std::string   status;
 
       bool          is_pos_allowed = false;
+      bool          is_pos_sequence_factor_good = false;
 
       uint64_t      index = 0; // index in m_transfers 
       uint64_t      stake_unlock_time = 0;

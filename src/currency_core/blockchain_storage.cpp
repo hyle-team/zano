@@ -70,15 +70,6 @@ using namespace currency;
 
 #define TARGETDATA_CACHE_SIZE                          DIFFICULTY_WINDOW + 10
 
-#ifndef TESTNET
-#define BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION          57000
-#else
-#define BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION          18000
-#endif
-#define BLOCK_POS_STRICT_SEQUENCE_LIMIT                               20
-
-
-
 DISABLE_VS_WARNINGS(4267)
 
 namespace 

@@ -541,6 +541,12 @@ namespace currency
       return true;
     }
 
+    res.pos_sequence_factor_is_good = true;
+    uint64_t new_block_expected_height = m_core.get_blockchain_storage().get_top_block_height() + 1;
+    size_t new_block_expected_sequence_factor = m_core.get_blockchain_storage().get_current_sequence_factor(true) + 1;
+    if (new_block_expected_height > BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION && new_block_expected_sequence_factor > BLOCK_POS_STRICT_SEQUENCE_LIMIT)
+      res.pos_sequence_factor_is_good = false;
+
     res.pos_basic_difficulty = m_core.get_blockchain_storage().get_next_diff_conditional(true).convert_to<std::string>();
     m_core.get_blockchain_storage().build_stake_modifier(res.sm, blockchain_storage::alt_chain_type(), 0, &res.last_block_hash);// , &res.height);
     

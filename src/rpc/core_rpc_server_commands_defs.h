@@ -1154,12 +1154,14 @@ namespace currency
       std::string status;
       crypto::hash last_block_hash;
       bool pos_mining_allowed;
+      bool pos_sequence_factor_is_good;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_VAL_POD_AS_BLOB(sm)
         KV_SERIALIZE(pos_basic_difficulty)
         KV_SERIALIZE(starter_timestamp)
         KV_SERIALIZE(pos_mining_allowed)
+        KV_SERIALIZE(pos_sequence_factor_is_good)
         KV_SERIALIZE(status)
         KV_SERIALIZE_VAL_POD_AS_BLOB(last_block_hash)
       END_KV_SERIALIZE_MAP()
