@@ -159,7 +159,7 @@
 #else
 #  define BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION 18000
 #endif
-#define BLOCK_POS_STRICT_SEQUENCE_LIMIT                 20
+#define BLOCK_POS_STRICT_SEQUENCE_LIMIT                 20  // the highest allowed sequence factor for a PoS block (i.e., the max total number of sequential PoS blocks is BLOCK_POS_STRICT_SEQUENCE_LIMIT + 1)
 
 
 #define WALLET_FILE_SIGNATURE_OLD                       0x1111012101101011LL  // Bender's nightmare

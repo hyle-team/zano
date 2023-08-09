@@ -543,7 +543,7 @@ namespace currency
 
     res.pos_sequence_factor_is_good = true;
     uint64_t new_block_expected_height = m_core.get_blockchain_storage().get_top_block_height() + 1;
-    size_t new_block_expected_sequence_factor = m_core.get_blockchain_storage().get_current_sequence_factor(true) + 1;
+    size_t new_block_expected_sequence_factor = m_core.get_blockchain_storage().get_current_sequence_factor(true);
     if (new_block_expected_height > BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION && new_block_expected_sequence_factor > BLOCK_POS_STRICT_SEQUENCE_LIMIT)
       res.pos_sequence_factor_is_good = false;
 

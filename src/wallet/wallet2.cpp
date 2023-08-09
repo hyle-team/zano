@@ -4281,7 +4281,7 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
 
   if (!ctx.is_pos_sequence_factor_good)
   {
-    WLT_LOG_YELLOW("PoS sequence factor is too big, waiting for a PoW block...", LOG_LEVEL_0);
+    WLT_LOG_YELLOW("PoS sequence factor is too high, waiting for a PoW block...", LOG_LEVEL_0);
     return true;
   }
 
