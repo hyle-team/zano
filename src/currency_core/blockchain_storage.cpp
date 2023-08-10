@@ -5211,7 +5211,6 @@ bool blockchain_storage::fill_tx_rpc_inputs(tx_rpc_extended_info& tei, const tra
       {
         entry_to_fill.htlc_origin = epee::string_tools::buff_to_hex_nodelimer(boost::get<txin_htlc>(in).hltc_origin);
       }
-      //tk.etc_details -> visualize it may be later
     }
     else if (in.type() == typeid(txin_multisig))
     {
@@ -5223,8 +5222,30 @@ bool blockchain_storage::fill_tx_rpc_inputs(tx_rpc_extended_info& tei, const tra
       {
         entry_to_fill.multisig_count = boost::get<NLSAG_sig>(tx.signatures[tei.ins.size() - 1]).s.size();
       }
-
     }
+
+    const std::vector<txin_etc_details_v>& etc_options = get_txin_etc_options(in);
+    for (size_t i = 0; i < etc_options.size(); ++i)
+    {
+      std::stringstream ss;
+      if (etc_options[i].type() == typeid(signed_parts))
+      {
+        const auto& sp = boost::get<signed_parts>(etc_options[i]);
+        ss << "n_outs: " << sp.n_outs << ", n_extras: " << sp.n_extras;
+        entry_to_fill.etc_options.push_back(ss.str());
+      }
+      else if (etc_options[i].type() == typeid(extra_attachment_info))
+      {
+        const auto& eai = boost::get<extra_attachment_info>(etc_options[i]);
+        ss << "cnt: " << eai.cnt << ", sz: " << eai.sz << ", hsh: " << eai.hsh;
+        entry_to_fill.etc_options.push_back(ss.str());
+      }
+      else
+      {
+        entry_to_fill.etc_options.push_back("unknown type");
+      }
+    }
+
   }
   return true;
 }

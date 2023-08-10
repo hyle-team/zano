@@ -1191,12 +1191,14 @@ namespace currency
     std::string htlc_origin;
     std::string kimage_or_ms_id;
     std::vector<uint64_t> global_indexes;
+    std::vector<std::string> etc_options;
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(amount)
       KV_SERIALIZE(htlc_origin)
       KV_SERIALIZE(kimage_or_ms_id)
       KV_SERIALIZE(global_indexes)
       KV_SERIALIZE(multisig_count)
+      KV_SERIALIZE(etc_options)
     END_KV_SERIALIZE_MAP()
   };
 

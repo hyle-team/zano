@@ -636,7 +636,6 @@ namespace currency
     bool check_block_timestamp_main(const block& b)const;
     bool check_block_timestamp(std::vector<uint64_t> timestamps, const block& b)const;
     std::vector<uint64_t> get_last_n_blocks_timestamps(size_t n)const;
-    const std::vector<txin_etc_details_v>& get_txin_etc_options(const txin_v& in)const;
     void on_block_added(const block_extended_info& bei, const crypto::hash& id, const std::list<crypto::key_image>& bsk);
     void on_block_removed(const block_extended_info& bei);
     void update_targetdata_cache_on_block_added(const block_extended_info& bei);
