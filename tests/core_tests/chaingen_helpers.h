@@ -327,6 +327,44 @@ inline bool put_alias_via_tx_to_list(const currency::hard_forks_descriptor& hf, 
   return true;
 }
 
+namespace details
+{
+  template<typename C, typename R>
+  void print_tx_size_breakdown_processor(C& container, R& result)
+  {
+    for(auto& el : container)
+      result.emplace_back(el.type().name(), t_serializable_object_to_blob(el).size());
+  }
+}
+
+inline std::string print_tx_size_breakdown(const currency::transaction& tx)
+{
+  std::vector<std::pair<std::string, size_t>> sizes;
+
+  details::print_tx_size_breakdown_processor(tx.vin, sizes);
+  details::print_tx_size_breakdown_processor(tx.signatures, sizes);
+  details::print_tx_size_breakdown_processor(tx.extra, sizes);
+  details::print_tx_size_breakdown_processor(tx.vout, sizes);
+  details::print_tx_size_breakdown_processor(tx.attachment, sizes);
+  details::print_tx_size_breakdown_processor(tx.proofs, sizes);
+
+  size_t len_max = 0;
+  for(auto& el : sizes)
+  {
+    boost::ireplace_all(el.first, "struct ", "");
+    boost::ireplace_all(el.first, "currency::", "");
+    boost::ireplace_all(el.first, "crypto::", "");
+    len_max = std::max(len_max, el.first.size());
+  }
+
+  std::stringstream ss;
+  ss << "total tx size: " << t_serializable_object_to_blob(tx).size() << ENDL;
+  for(auto& el : sizes)
+    ss << el.first << std::string(len_max - el.first.size() + 4, ' ') << el.second << ENDL;
+
+  return ss.str();
+}
+
 //---------------------------------------------------------------
 namespace currency
 {
