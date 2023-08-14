@@ -134,7 +134,17 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
     return true;
   }
 
+  asset_descriptor_base asset_info = AUTO_VAL_INIT(asset_info);
+  /*
+    adb.total_max_supply = 1000000000000000000; //1M coins
+    adb.full_name = "Test coins";
+    adb.ticker = "TCT";
+    adb.decimal_point = 12 
+  */
+  bool r = c.get_blockchain_storage().get_asset_info(asset_id);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to get_asset_info");
 
+  CHECK_AND_ASSERT_MES(asset_info.current_supply = AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC*2, false, "Failed to find needed asset in result balances");
 
   return true;
 }

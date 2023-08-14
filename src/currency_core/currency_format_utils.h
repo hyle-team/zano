@@ -158,7 +158,8 @@ namespace currency
     crypto::public_key spend_pub_key;  // only for validations
     uint64_t tx_version;
     uint64_t mode_separate_fee = 0;
-    crypto::secret_key asset_control_key = currency::null_pkey;
+    crypto::secret_key asset_control_key = currency::null_skey;
+    
 
     tx_generation_context gen_context{}; // solely for consolidated txs
 
@@ -178,6 +179,7 @@ namespace currency
       FIELD(spend_pub_key)
       FIELD(tx_version)
       FIELD(mode_separate_fee)
+      FIELD(asset_control_key)      
       if (flags & TX_FLAG_SIGNATURE_MODE_SEPARATE)
         FIELD(gen_context);
     END_SERIALIZE()
