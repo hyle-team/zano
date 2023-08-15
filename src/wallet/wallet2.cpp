@@ -416,7 +416,7 @@ const crypto::public_key& wallet2::out_get_pub_key(const currency::tx_out_v& out
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::process_ado_in_new_transaction(const asset_descriptor_operation& ado, uint64_t height)
+void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_operation& ado, process_transaction_context& ptc)
 {
   do
   {
@@ -424,7 +424,7 @@ void wallet2::process_ado_in_new_transaction(const asset_descriptor_operation& a
     {
       crypto::public_key self_check = AUTO_VAL_INIT(self_check);
       crypto::secret_key asset_control_key = AUTO_VAL_INIT(asset_control_key);
-      bool r = derive_key_pair_from_key_pair(tx_pub_key, m_account.get_keys().spend_secret_key, asset_control_key, self_check, CRYPTO_HDS_ASSET_CONTROL_KEY);
+      bool r = derive_key_pair_from_key_pair(ptc.tx_pub_key, m_account.get_keys().spend_secret_key, asset_control_key, self_check, CRYPTO_HDS_ASSET_CONTROL_KEY);
       if (!r)
       {
         //not critical error, continue to work 
@@ -443,7 +443,7 @@ void wallet2::process_ado_in_new_transaction(const asset_descriptor_operation& a
       WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(m_own_asset_descriptors.count(asset_id) == 0, "asset with asset_id " << asset_id << " has already been registered in the wallet as own asset");
       wallet_own_asset_context& asset_context = m_own_asset_descriptors[asset_id];
       asset_context.asset_descriptor = ado.descriptor;
-      //asset_context.height = height;
+
       std::stringstream ss;
       ss << "New Asset Registered:"
         << ENDL << "asset id:         " << asset_id
@@ -454,7 +454,7 @@ void wallet2::process_ado_in_new_transaction(const asset_descriptor_operation& a
         << ENDL << "Decimal Point:    " << asset_context.asset_descriptor.decimal_point;
 
       
-      add_rollback_event(height, asset_register_event{ asset_id });
+      add_rollback_event(ptc.height, asset_register_event{ asset_id });
       WLT_LOG_MAGENTA(ss.str(), LOG_LEVEL_0);
       if (m_wcallback)
         m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
@@ -467,13 +467,13 @@ void wallet2::process_ado_in_new_transaction(const asset_descriptor_operation& a
       if (it->second.asset_descriptor.owner != ado.descriptor.owner)
       {
         //ownership of the asset had been transfered
-        add_rollback_event(height, asset_unown_event{ it->first, it->second });
+        add_rollback_event(ptc.height, asset_unown_event{ it->first, it->second });
         m_own_asset_descriptors.erase(it);
       }
       else
       {
         //asset had been updated
-        add_rollback_event(height, asset_update_event{ it->first, it->second });
+        add_rollback_event(ptc.height, asset_update_event{ it->first, it->second });
         it->second.asset_descriptor = ado.descriptor;
       }
     }
@@ -567,15 +567,15 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
 
   std::vector<wallet_out_info> outs;
   //uint64_t sum_of_native_outs = 0;   // TODO:  @#@# correctly calculate tx_money_got_in_outs for post-HF4
-  crypto::public_key tx_pub_key = null_pkey;
-  bool r = parse_and_validate_tx_extra(tx, tx_pub_key);
+  ptc.tx_pub_key = null_pkey;
+  bool r = parse_and_validate_tx_extra(tx, ptc.tx_pub_key);
   THROW_IF_TRUE_WALLET_EX(!r, error::tx_extra_parse_error, tx);
 
   //check for transaction income
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
   std::list<htlc_info> htlc_info_list;
-  r = lookup_acc_outs(m_account.get_keys(), tx, tx_pub_key, outs, derivation, htlc_info_list);
-  THROW_IF_TRUE_WALLET_EX(!r, error::acc_outs_lookup_error, tx, tx_pub_key, m_account.get_keys());
+  r = lookup_acc_outs(m_account.get_keys(), tx, ptc.tx_pub_key, outs, derivation, htlc_info_list);
+  THROW_IF_TRUE_WALLET_EX(!r, error::acc_outs_lookup_error, tx, ptc.tx_pub_key, m_account.get_keys());
 
   if (!outs.empty())
   {
@@ -649,7 +649,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           {
             // normal wallet, calculate and store key images for own outs
             currency::keypair in_ephemeral = AUTO_VAL_INIT(in_ephemeral);
-            currency::generate_key_image_helper(m_account.get_keys(), tx_pub_key, o, in_ephemeral, ki);
+            currency::generate_key_image_helper(m_account.get_keys(), ptc.tx_pub_key, o, in_ephemeral, ki);
             WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(in_ephemeral.pub == out_key, "key_image generated ephemeral public key that does not match with output_key");
           }
 
@@ -873,7 +873,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
     if (get_type_in_variant_container(tx.extra, ado))
     {
-      process_ado_in_new_transaction(ado, height);
+      process_ado_in_new_transaction(ado, ptc);
     }
   }
 
@@ -2799,13 +2799,11 @@ void wallet2::handle_rollback_events(uint64_t including_height)
 {
   while (m_rollback_events.size() && m_rollback_events.back().first >= including_height)
   {
-    boost::apply_visitor(*this, m_rollback_events.back());
+    boost::apply_visitor(*this, m_rollback_events.back().second);
     m_rollback_events.pop_back();
   }
 }
 //----------------------------------------------------------------------------------------------------
-
-m_rollback_events
 bool wallet2::deinit()
 {
   m_wcallback.reset();
@@ -4692,7 +4690,7 @@ void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info
   ctp.extra.push_back(asset_reg_info);
   ctp.need_at_least_1_zc = true;
 
-  finalized_tx ft = AUTO_VAL_INIT(ft);6++
+  finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
   result_tx = ft.tx;
   //get generated asset id
@@ -4713,10 +4711,9 @@ void wallet2::emmit_asset(const crypto::public_key asset_id, std::vector<currenc
   asset_descriptor_operation asset_emmit_info = AUTO_VAL_INIT(asset_emmit_info);
   asset_emmit_info.descriptor = own_asset_entry_it->second.asset_descriptor;
   asset_emmit_info.operation_type = ASSET_DESCRIPTOR_OPERATION_EMMIT;
-  asset_emmit_info.asset_id = asset_id;
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.dsts = destinations;
-  ctp.extra.push_back(asset_reg_info);
+  ctp.extra.push_back(asset_emmit_info);
   ctp.need_at_least_1_zc = true;
   ctp.asset_deploy_control_key = own_asset_entry_it->second.control_key;
 
@@ -4725,17 +4722,16 @@ void wallet2::emmit_asset(const crypto::public_key asset_id, std::vector<currenc
   result_tx = ft.tx;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::update_asset(const crypto::public_key asset_id, const asset_descriptor_base new_descriptor, currency::transaction& result_tx)
+void wallet2::update_asset(const crypto::public_key asset_id, const currency::asset_descriptor_base new_descriptor, currency::transaction& result_tx)
 {
   auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
   CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
 
-  asset_descriptor_operation asset_emmit_info = AUTO_VAL_INIT(asset_emmit_info);
-  asset_emmit_info.descriptor = new_descriptor;
-  asset_emmit_info.operation_type = ASSET_DESCRIPTOR_OPERATION_UPDATE;
-  asset_emmit_info.asset_id = asset_id;
+  asset_descriptor_operation asset_update_info = AUTO_VAL_INIT(asset_update_info);
+  asset_update_info.descriptor = new_descriptor;
+  asset_update_info.operation_type = ASSET_DESCRIPTOR_OPERATION_UPDATE;
   construct_tx_param ctp = get_default_construct_tx_param();
-  ctp.extra.push_back(asset_reg_info);
+  ctp.extra.push_back(asset_update_info);
   ctp.need_at_least_1_zc = true;
   ctp.asset_deploy_control_key = own_asset_entry_it->second.control_key;
 
@@ -4749,19 +4745,18 @@ void wallet2::burn_asset(const crypto::public_key asset_id, uint64_t amount_to_b
   auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
   CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
 
-  asset_descriptor_operation asset_emmit_info = AUTO_VAL_INIT(asset_emmit_info);
-  asset_emmit_info.descriptor = own_asset_entry_it->second.asset_descriptor;
+  asset_descriptor_operation asset_burn_info = AUTO_VAL_INIT(asset_burn_info);
+  asset_burn_info.descriptor = own_asset_entry_it->second.asset_descriptor;
 
-  CHECK_AND_ASSERT_THROW_MES(asset_emmit_info.descriptor.current_supply > amount_to_burn, "Wrong amount to burn (current_supply" << asset_emmit_info.descriptor.current_supply << " is less then " << amount_to_burn << ")");
+  CHECK_AND_ASSERT_THROW_MES(asset_burn_info.descriptor.current_supply > amount_to_burn, "Wrong amount to burn (current_supply" << asset_burn_info.descriptor.current_supply << " is less then " << amount_to_burn << ")");
 
   currency::tx_destination_entry dst_to_burn = AUTO_VAL_INIT(dst_to_burn);
   dst_to_burn.amount = amount_to_burn;
   dst_to_burn.asset_id = asset_id;
 
-  asset_emmit_info.operation_type = ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN;
-  asset_emmit_info.asset_id = asset_id;
+  asset_burn_info.operation_type = ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN;
   construct_tx_param ctp = get_default_construct_tx_param();
-  ctp.extra.push_back(asset_reg_info);
+  ctp.extra.push_back(asset_burn_info);
   ctp.need_at_least_1_zc = true;
   ctp.asset_deploy_control_key = own_asset_entry_it->second.control_key;
   ctp.dsts.push_back(dst_to_burn);
@@ -6673,7 +6668,7 @@ bool wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
     
     if (msc.escrow)
       needed_money_map[currency::native_coin_asset_id].needed_amount += (currency::get_outs_money_amount(tx_for_mode_separate) - get_inputs_money_amount(tx_for_mode_separate));
-  }else if(ctp.)
+  }
   TIME_MEASURE_FINISH_MS(get_needed_money_time);
 
   //uint64_t found_money = 0;
@@ -6954,7 +6949,6 @@ void wallet2::transfer(construct_tx_param& ctp,
 
   TIME_MEASURE_START(prepare_transaction_time);
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
-  ftp.p_construct_tx_param = &ctp;
   ftp.tx_version = this->get_current_tx_version();
   if (!prepare_transaction(ctp, ftp))
   {

@@ -292,7 +292,7 @@ namespace tools
     bool shuffle = false;
     bool create_utxo_defragmentation_tx = false;
     bool need_at_least_1_zc = false;
-    crypto::secret_key asset_deploy_control_key = currency::null_pkey;
+    crypto::secret_key asset_deploy_control_key = currency::null_skey;
   };
 
   struct mode_separate_context
@@ -321,7 +321,52 @@ namespace tools
     static std::string transform_tx_to_str(const currency::transaction& tx);
     static currency::transaction transform_str_to_tx(const std::string& tx_str);
 
+    //general rollback mechanism
+    struct asset_register_event
+    {
+      crypto::public_key asset_id = currency::null_pkey;
+      BEGIN_BOOST_SERIALIZATION()
+        BOOST_SERIALIZE(asset_id)
+        END_BOOST_SERIALIZATION()
 
+    };
+
+    struct wallet_own_asset_context
+    {
+      currency::asset_descriptor_base asset_descriptor;
+      crypto::secret_key control_key;
+      //uint64_t height = 0;
+
+      BEGIN_BOOST_SERIALIZATION()
+        BOOST_SERIALIZE(asset_descriptor)
+        BOOST_SERIALIZE(control_key)
+        //BOOST_SERIALIZE(height)
+        END_BOOST_SERIALIZATION()
+    };
+
+    struct asset_update_event
+    {
+      crypto::public_key asset_id = currency::null_pkey;
+      wallet_own_asset_context own_context;
+
+      BEGIN_BOOST_SERIALIZATION()
+        BOOST_SERIALIZE(asset_id)
+        BOOST_SERIALIZE(own_context)
+        END_BOOST_SERIALIZATION()
+    };
+
+    struct asset_unown_event
+    {
+      crypto::public_key asset_id = currency::null_pkey;
+      wallet_own_asset_context own_context;
+
+      BEGIN_BOOST_SERIALIZATION()
+        BOOST_SERIALIZE(asset_id)
+        BOOST_SERIALIZE(own_context)
+        END_BOOST_SERIALIZATION()
+    };
+
+    typedef boost::variant<asset_register_event, asset_update_event, asset_unown_event> wallet_event_t;
 
     struct transaction_wallet_info
     {
@@ -578,6 +623,7 @@ namespace tools
       std::vector<std::string> recipients;
       std::vector<std::string> remote_aliases;
       multisig_entries_map* pmultisig_entries = nullptr;
+      crypto::public_key tx_pub_key = currency::null_pkey;
       uint64_t tx_expiration_ts_median = 0;
 
       const crypto::hash& tx_hash() const
@@ -593,18 +639,7 @@ namespace tools
     };
 
 
-    struct wallet_own_asset_context
-    {
-      currency::asset_descriptor_base asset_descriptor;
-      crypto::secret_key control_key;
-      //uint64_t height = 0;
 
-      BEGIN_BOOST_SERIALIZATION()
-        BOOST_SERIALIZE(asset_descriptor)
-        BOOST_SERIALIZE(control_key)
-        //BOOST_SERIALIZE(height)
-      END_BOOST_SERIALIZATION()
-    };
 
     void assign_account(const currency::account_base& acc);
     void generate(const std::wstring& path, const std::string& password, bool auditable_wallet);
@@ -655,6 +690,9 @@ namespace tools
     bool check_available_sources(std::list<uint64_t>& amounts);
 
     void deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id);
+    void emmit_asset(const crypto::public_key asset_id, std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx);
+    void update_asset(const crypto::public_key asset_id, const currency::asset_descriptor_base new_descriptor, currency::transaction& result_tx);
+    void burn_asset(const crypto::public_key asset_id, uint64_t amount_to_burn, currency::transaction& result_tx);
 
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
     void set_pos_utxo_count_limits_for_defragmentation_tx(uint64_t min_outs, uint64_t max_outs); // don't create UTXO defrag. tx if there are less than 'min_outs' outs; don't put more than 'max_outs' outs
@@ -998,21 +1036,23 @@ namespace tools
 
     construct_tx_param get_default_construct_tx_param();
 
-private:
-
-    // -------- t_transport_state_notifier ------------------------------------------------
-    virtual void notify_state_change(const std::string& state_code, const std::string& details = std::string());
     //---------- m_rollback_events visitor ------------------------------------------------
     void operator()(const asset_register_event& e);
     void operator()(const asset_update_event& e);
     void operator()(const asset_unown_event& e);
 
+private:
+
+    // -------- t_transport_state_notifier ------------------------------------------------
+    virtual void notify_state_change(const std::string& state_code, const std::string& details = std::string());
+
     void add_rollback_event(uint64_t h, const wallet_event_t& ev);
+    void handle_rollback_events(uint64_t including_height);
     // ------------------------------------------------------------------------------------
     void add_transfers_to_expiration_list(const std::vector<uint64_t>& selected_transfers, const std::vector<payment_details_subtransfer>& received, uint64_t expiration, const crypto::hash& related_tx_id);
     void remove_transfer_from_expiration_list(uint64_t transfer_index);
     void load_keys(const std::string& keys_file_name, const std::string& password, uint64_t file_signature, keys_file_data& kf_data);
-    void process_ado_in_new_transaction(const asset_descriptor_operation& ado, uint64_t height);
+    void process_ado_in_new_transaction(const currency::asset_descriptor_operation& ado, process_transaction_context& ptc);
     void process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes);
     void fetch_tx_global_indixes(const currency::transaction& tx, std::vector<uint64_t>& goutputs_indexes);
     void fetch_tx_global_indixes(const std::list<std::reference_wrapper<const currency::transaction>>& txs, std::vector<std::vector<uint64_t>>& goutputs_indexes);
@@ -1210,41 +1250,6 @@ private:
     mutable current_operation_context m_current_context;
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;
-
-
-    //general rollback mechanism
-    struct asset_register_event
-    {
-      crypto::public_key asset_id = currency::null_pkey;
-      BEGIN_BOOST_SERIALIZATION()
-        BOOST_SERIALIZE(asset_id)
-      END_BOOST_SERIALIZATION()
-
-    };
-
-    struct asset_update_event
-    {
-      crypto::public_key asset_id = currency::null_pkey;
-      wallet_own_asset_context own_context;
-
-      BEGIN_BOOST_SERIALIZATION()
-        BOOST_SERIALIZE(asset_id)
-        BOOST_SERIALIZE(own_context)
-      END_BOOST_SERIALIZATION()
-    };
-
-    struct asset_unown_event
-    {
-      crypto::public_key asset_id = currency::null_pkey;
-      wallet_own_asset_context own_context;
-
-      BEGIN_BOOST_SERIALIZATION()
-        BOOST_SERIALIZE(asset_id)
-        BOOST_SERIALIZE(own_context)
-      END_BOOST_SERIALIZATION()
-    };
-
-    typedef boost::variant<asset_register_event, asset_update_event, asset_unown_event> wallet_event_t;
 
     std::list<std::pair<uint64_t, wallet_event_t>> m_rollback_events;
 

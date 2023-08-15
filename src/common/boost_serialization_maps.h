@@ -20,7 +20,7 @@ template<size_t A, size_t B> struct TAssertEquality {
 #define BOOST_SERIALIZE(x)    _arch & x;
 
 #define BOOST_END_VERSION_UNDER(x)                            \
-  if(ver < x ) {return true;}
+  if(ver < x ) {return;}
 
 #define END_BOOST_SERIALIZATION()       }
 
