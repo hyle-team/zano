@@ -115,23 +115,27 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
   alice_wlt->refresh();
-  balances.clear();
-  alice_wlt->balance(balances, mined);
+  uint64_t last_alice_balances = alice_wlt->balance(asset_id, mined);
+  CHECK_AND_ASSERT_MES(last_alice_balances == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC + AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC/2, false, "Failed to find needed asset in result balances");
 
-  it_asset = balances.find(asset_id);
+  
 
-  CHECK_AND_ASSERT_MES(it_asset != balances.end(), false, "Failed to find needed asset in result balances");
-  CHECK_AND_ASSERT_MES(it_asset->second.total == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC + AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC/2, false, "Failed to find needed asset in result balances");
+  miner_wlt->refresh();
+  uint64_t last_miner_balance = miner_wlt->balance(asset_id, mined);
 
-  try {
 
-    miner_wlt->transfer(AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC / 2, alice_wlt->get_account().get_public_address(), asset_id);
-    //pass over hardfork
-    CHECK_AND_ASSERT_MES(false, false, "Transfer with 0 Zano worked(fail)");
-  }
-  catch (...)
   {
-    return true;
+    try {
+
+      miner_wlt->transfer(AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC / 2, alice_wlt->get_account().get_public_address(), asset_id);
+      //pass over hardfork
+      CHECK_AND_ASSERT_MES(false, false, "Transfer with 0 Zano worked(fail)");
+    }
+    catch (...)
+    {
+      LOG_PRINT_L0("Transfer failed as planned");
+      //return true;
+    }
   }
 
   asset_descriptor_base asset_info = AUTO_VAL_INIT(asset_info);
@@ -141,10 +145,39 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
     adb.ticker = "TCT";
     adb.decimal_point = 12 
   */
-  bool r = c.get_blockchain_storage().get_asset_info(asset_id);
+  r = c.get_blockchain_storage().get_asset_info(asset_id, asset_info);
   CHECK_AND_ASSERT_MES(r, false, "Failed to get_asset_info");
 
-  CHECK_AND_ASSERT_MES(asset_info.current_supply = AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC*2, false, "Failed to find needed asset in result balances");
+  CHECK_AND_ASSERT_MES(asset_info.current_supply == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC*2, false, "Failed to find needed asset in result balances");
+
+  //test update function
+  asset_info.meta_info = "{\"some\": \"info\"}";
+  miner_wlt->update_asset(asset_id, asset_info, tx);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 2);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
+  asset_descriptor_base asset_info2 = AUTO_VAL_INIT(asset_info2);
+  r = c.get_blockchain_storage().get_asset_info(asset_id, asset_info2);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to get_asset_info");
+
+  CHECK_AND_ASSERT_MES(asset_info2.meta_info == asset_info.meta_info, false, "Failed to find needed asset in result balances");
+
+  //test emmit function
+  //use same destinations as we used before
+  miner_wlt->emmit_asset(asset_id, destinations, tx);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
+  miner_wlt->refresh();
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_MES(miner_wlt->balance(asset_id, mined) == last_miner_balance + destinations[0].amount, false, "Miner balance wrong");
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(asset_id, mined) == last_alice_balances + destinations[1].amount, false, "Alice balance wrong");
+
+  asset_descriptor_base asset_info3 = AUTO_VAL_INIT(asset_info3);
+  r = c.get_blockchain_storage().get_asset_info(asset_id, asset_info3);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to get_asset_info");
+  CHECK_AND_ASSERT_MES(asset_info3.current_supply == asset_info2.current_supply + destinations[1].amount + destinations[0].amount, false, "Failed to find needed asset in result balances");
+
 
   return true;
 }

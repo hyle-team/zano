@@ -299,8 +299,7 @@ namespace currency
   
     // solely for consolidated txs, asset opration fields are not serialized
     BEGIN_SERIALIZE_OBJECT()
-      VERSION()
-      CURRENT_VERSION(0)
+      VERSION(0)
       FIELD(asset_ids)
       FIELD(blinded_asset_ids)
       FIELD(amount_commitments)

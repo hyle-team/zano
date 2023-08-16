@@ -749,7 +749,7 @@ namespace currency
     crypto::public_key  owner = currency::null_pkey; // consider premultipling by 1/8
     bool                hidden_supply = false;
 
-    BEGIN_VERSIONED_SERIALIZE()
+    BEGIN_VERSIONED_SERIALIZE(0)
       FIELD(total_max_supply)
       FIELD(current_supply)
       FIELD(decimal_point)
@@ -816,8 +816,7 @@ namespace currency
     boost::optional<crypto::signature> opt_proof; // operation proof - for update/emit
     boost::optional<crypto::public_key> opt_asset_id; // target asset_id - for update/emit
 
-    BEGIN_VERSIONED_SERIALIZE()
-      CURRENT_VERSION(1)
+    BEGIN_VERSIONED_SERIALIZE(1)
       FIELD(operation_type)
       FIELD(descriptor)
       FIELD(opt_amount_commitment)
@@ -842,7 +841,7 @@ namespace currency
     boost::optional<crypto::linear_composition_proof_s> opt_amount_commitment_composition_proof; // for hidden supply
     boost::optional<crypto::signature> opt_amount_commitment_g_proof; // for non-hidden supply, proofs that amount_commitment - supply * asset_id = lin(G)
 
-    BEGIN_VERSIONED_SERIALIZE()
+    BEGIN_VERSIONED_SERIALIZE(0)
       FIELD(opt_amount_commitment_composition_proof)
       FIELD(opt_amount_commitment_g_proof)
     END_SERIALIZE()

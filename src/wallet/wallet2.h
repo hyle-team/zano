@@ -703,6 +703,7 @@ namespace tools
     uint64_t balance(uint64_t& unloked, uint64_t& awaiting_in, uint64_t& awaiting_out, uint64_t& mined, const crypto::public_key& asset_id = currency::native_coin_asset_id) const;
     bool balance(std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base>& balances, uint64_t& mined) const;
     bool balance(std::list<wallet_public::asset_balance_entry>& balances, uint64_t& mined) const;
+    uint64_t balance(crypto::public_key asset_id, uint64_t& unloked) const;
 
     uint64_t balance(uint64_t& unloked) const;
 

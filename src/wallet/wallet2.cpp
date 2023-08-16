@@ -3335,6 +3335,20 @@ uint64_t wallet2::balance(uint64_t& unlocked, uint64_t& awaiting_in, uint64_t& a
   return total;
 }
 //----------------------------------------------------------------------------------------------------
+uint64_t wallet2::balance(crypto::public_key asset_id, uint64_t& unlocked) const
+{
+  std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base> balances;
+  uint64_t dummy;
+  balance(balances, dummy);
+  auto it = balances.find(asset_id);
+  if (it == balances.end())
+  {
+    return 0;
+  }
+  unlocked = it->second.unlocked;
+  return it->second.total;
+}
+//----------------------------------------------------------------------------------------------------
 bool wallet2::balance(std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base>& balances, uint64_t& mined) const
 {
   mined = 0;
