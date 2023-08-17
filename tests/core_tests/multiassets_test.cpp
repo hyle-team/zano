@@ -120,10 +120,6 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
   
 
-  miner_wlt->refresh();
-  uint64_t last_miner_balance = miner_wlt->balance(asset_id, mined);
-
-
   {
     try {
 
@@ -137,6 +133,10 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
       //return true;
     }
   }
+
+  miner_wlt->refresh();
+  uint64_t last_miner_balance = miner_wlt->balance(asset_id, mined);
+
 
   asset_descriptor_base asset_info = AUTO_VAL_INIT(asset_info);
   /*

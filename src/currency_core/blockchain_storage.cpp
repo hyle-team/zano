@@ -3865,11 +3865,12 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
     }
 
     avc.amout_to_validate = 0;
-    //validate balance proof
+    bool need_to_validate_balance_proof = true;
     if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
     {
       //check that total current_supply haven't changed
-      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply != avc.asset_op_history->back().descriptor.current_supply, false, "update operation actually try to change emission, failed");
+      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply == avc.asset_op_history->back().descriptor.current_supply, false, "update operation actually try to change emission, failed");
+      need_to_validate_balance_proof = false;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT)
     {
@@ -3886,13 +3887,17 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
       LOG_ERROR("Unknown operation type: " << ado.operation_type);
       return false;
     }
-    bool r = validate_asset_operation_balance_proof(avc);
-    CHECK_AND_ASSERT_MES(r, false, "Balance proof validation failed for asset_descriptor_operation");
+    if (need_to_validate_balance_proof)
+    {
+      bool r = validate_asset_operation_balance_proof(avc);
+      CHECK_AND_ASSERT_MES(r, false, "Balance proof validation failed for asset_descriptor_operation");
+    }
+
     assets_container::t_value_type local_asset_history = *avc.asset_op_history;
 
     local_asset_history.push_back(ado);
-    m_db_assets.set(avc.asset_id, local_asset_history);
-    LOG_PRINT_MAGENTA("[ASSET_UPDATED]: " << avc.asset_id << ": " << ado.descriptor.full_name, LOG_LEVEL_1);
+    m_db_assets.set(*avc.ado.opt_asset_id, local_asset_history);
+    LOG_PRINT_MAGENTA("[ASSET_UPDATED]: " << *avc.ado.opt_asset_id << ": " << ado.descriptor.full_name, LOG_LEVEL_1);
 
     //TODO:
     //rise_core_event(CORE_EVENT_ADD_ASSET, alias_info_to_rpc_alias_info(ai));

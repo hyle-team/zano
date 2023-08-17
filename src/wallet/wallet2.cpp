@@ -443,6 +443,7 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
       WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(m_own_asset_descriptors.count(asset_id) == 0, "asset with asset_id " << asset_id << " has already been registered in the wallet as own asset");
       wallet_own_asset_context& asset_context = m_own_asset_descriptors[asset_id];
       asset_context.asset_descriptor = ado.descriptor;
+      asset_context.control_key = asset_control_key;
 
       std::stringstream ss;
       ss << "New Asset Registered:"
@@ -4725,6 +4726,7 @@ void wallet2::emmit_asset(const crypto::public_key asset_id, std::vector<currenc
   asset_descriptor_operation asset_emmit_info = AUTO_VAL_INIT(asset_emmit_info);
   asset_emmit_info.descriptor = own_asset_entry_it->second.asset_descriptor;
   asset_emmit_info.operation_type = ASSET_DESCRIPTOR_OPERATION_EMMIT;
+  asset_emmit_info.opt_asset_id = asset_id;
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.dsts = destinations;
   ctp.extra.push_back(asset_emmit_info);
@@ -4744,6 +4746,7 @@ void wallet2::update_asset(const crypto::public_key asset_id, const currency::as
   asset_descriptor_operation asset_update_info = AUTO_VAL_INIT(asset_update_info);
   asset_update_info.descriptor = new_descriptor;
   asset_update_info.operation_type = ASSET_DESCRIPTOR_OPERATION_UPDATE;
+  asset_update_info.opt_asset_id = asset_id;
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.extra.push_back(asset_update_info);
   ctp.need_at_least_1_zc = true;
@@ -4769,6 +4772,7 @@ void wallet2::burn_asset(const crypto::public_key asset_id, uint64_t amount_to_b
   dst_to_burn.asset_id = asset_id;
 
   asset_burn_info.operation_type = ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN;
+  asset_burn_info.opt_asset_id = asset_id;
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.extra.push_back(asset_burn_info);
   ctp.need_at_least_1_zc = true;

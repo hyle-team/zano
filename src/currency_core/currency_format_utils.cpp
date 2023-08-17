@@ -2133,9 +2133,10 @@ namespace currency
         uint64_t amount_of_emitted_asset = 0;
         for (auto& item : shuffled_dsts)
         {
-          if (item.asset_id == gen_context.ao_asset_id)
+          if (item.asset_id == currency::null_pkey)
           {
             amount_of_emitted_asset += item.amount;
+            item.asset_id = gen_context.ao_asset_id;
           }
         }
         ado.descriptor.current_supply += amount_of_emitted_asset; // TODO: consider setting current_supply beforehand, not setting it hear in ad-hoc manner -- sowle
@@ -2147,7 +2148,7 @@ namespace currency
       else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
       {
         CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT/UPDATE");
-        CHECK_AND_ASSERT_MES(ado.opt_proof, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT/UPDATE");
+        //CHECK_AND_ASSERT_MES(ado.opt_proof, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT/UPDATE");
         CHECK_AND_ASSERT_MES(!ado.opt_amount_commitment, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT/UPDATE");
 
         //fields that not supposed to be changed?

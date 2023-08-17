@@ -769,6 +769,7 @@ namespace currency
       BOOST_SERIALIZE(full_name)
       BOOST_SERIALIZE(meta_info)
       BOOST_SERIALIZE(owner)
+      BOOST_SERIALIZE(hidden_supply)
     END_BOOST_SERIALIZATION()
 
     BEGIN_KV_SERIALIZE_MAP()
@@ -779,6 +780,7 @@ namespace currency
       KV_SERIALIZE(full_name)
       KV_SERIALIZE(meta_info)
       KV_SERIALIZE_POD_AS_HEX_STRING(owner)
+      KV_SERIALIZE(hidden_supply)
     END_KV_SERIALIZE_MAP()
   };
 
