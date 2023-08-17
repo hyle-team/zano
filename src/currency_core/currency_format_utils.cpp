@@ -635,7 +635,7 @@ namespace currency
       crypto::point_t sum_of_pseudo_out_amount_commitments = crypto::c_point_0;
       // take into account newly emitted assets
       asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
-      if (get_type_in_variant_container(tx.extra, ado) && ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER) // @#@ TODO: Support other asset operations
+      if (get_type_in_variant_container(tx.extra, ado) && (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT)) 
       {
         // opt_amount_commitment supposed to be validated earlier in validate_asset_operation()
         CHECK_AND_ASSERT_MES(ado.opt_amount_commitment.has_value(), false, "opt_amount_commitment is not set");
