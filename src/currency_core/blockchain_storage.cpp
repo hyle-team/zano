@@ -3851,10 +3851,13 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
     LOG_PRINT_MAGENTA("[ASSET_REGISTERED]: " << avc.asset_id << ": " << ado.descriptor.full_name, LOG_LEVEL_1);
     //TODO:
     //rise_core_event(CORE_EVENT_ADD_ASSET, alias_info_to_rpc_alias_info(ai));
-  }else 
+  }
+  else
   {
     CHECK_AND_ASSERT_MES(avc.ado.opt_asset_id, false, "asset_id not provided for asset altering operation");
     avc.asset_op_history = m_db_assets.find(*avc.ado.opt_asset_id);
+    avc.asset_id = *avc.ado.opt_asset_id; // consider redisign
+    avc.asset_id_pt.from_public_key(avc.asset_id);
 
     CHECK_AND_ASSERT_MES(avc.asset_op_history && avc.asset_op_history->size(), false, "asset with id " << avc.asset_id << " has not been registered");
     // check ownership permission
