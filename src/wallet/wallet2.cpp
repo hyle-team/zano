@@ -2582,7 +2582,7 @@ bool wallet2::handle_expiration_list(uint64_t tx_expiration_ts_median)
 {
   for (auto it = m_money_expirations.begin(); it != m_money_expirations.end(); )
   {
-    if (tx_expiration_ts_median > it->expiration_time - TX_EXPIRATION_MEDIAN_SHIFT)
+    if (it->expiration_time < TX_EXPIRATION_MEDIAN_SHIFT || tx_expiration_ts_median > it->expiration_time - TX_EXPIRATION_MEDIAN_SHIFT)
     {
       for (auto tr_ind : it->selected_transfers)
       {
@@ -5380,7 +5380,7 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
   selected_transfers = ftp.selected_transfers;
   currency::finalized_tx finalize_result = AUTO_VAL_INIT(finalize_result);
   finalize_transaction(ftp, finalize_result, false);
-  add_transfers_to_expiration_list(selected_transfers, for_expiration_list, proposal_detais.expiration_time, currency::null_hash);
+  add_transfers_to_expiration_list(selected_transfers, for_expiration_list, this->get_core_runtime_config().get_core_time() + proposal_detais.expiration_time, currency::null_hash);
 
   //wrap it all 
   proposal.tx_template = finalize_result.tx;
