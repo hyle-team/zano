@@ -179,6 +179,18 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   CHECK_AND_ASSERT_MES(asset_info3.current_supply == asset_info2.current_supply + destinations[1].amount + destinations[0].amount, false, "Failed to find needed asset in result balances");
 
 
+  miner_wlt->burn_asset(asset_id, last_miner_balance, tx);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
+
+  miner_wlt->refresh();
+  CHECK_AND_ASSERT_MES(miner_wlt->balance(asset_id, mined) == destinations[0].amount, false, "Miner balance wrong");
+
+  asset_descriptor_base asset_info4 = AUTO_VAL_INIT(asset_info4);
+  r = c.get_blockchain_storage().get_asset_info(asset_id, asset_info4);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to get_asset_info");
+  CHECK_AND_ASSERT_MES(asset_info4.current_supply == asset_info3.current_supply - last_miner_balance, false, "Failed to find needed asset in result balances");
+
+
   return true;
 }
 
