@@ -2191,7 +2191,7 @@ namespace currency
         }
         ado.descriptor.current_supply -= amount_of_burned_assets; // TODO: consider setting current_supply beforehand, not setting it hear in ad-hoc manner -- sowle
 
-        gen_context.ao_amount_commitment = amount_of_burned_assets * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
+        gen_context.ao_amount_commitment = gen_context.ao_amount_blinding_mask * crypto::c_point_G - amount_of_burned_assets * gen_context.ao_asset_id_pt;
         ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
       }
 
