@@ -633,13 +633,21 @@ namespace currency
         ", additional inputs + fees = " << print_money_brief(additional_inputs_amount_and_fees_for_mining_tx));
 
       crypto::point_t sum_of_pseudo_out_amount_commitments = crypto::c_point_0;
-      // take into account newly emitted assets
+      // take into account generated/burnt assets
       asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
-      if (get_type_in_variant_container(tx.extra, ado) && (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT)) 
+      if (get_type_in_variant_container(tx.extra, ado))
       {
-        // opt_amount_commitment supposed to be validated earlier in validate_asset_operation()
-        CHECK_AND_ASSERT_MES(ado.opt_amount_commitment.has_value(), false, "opt_amount_commitment is not set");
-        sum_of_pseudo_out_amount_commitments += crypto::point_t(ado.opt_amount_commitment.get()); // *1/8
+        if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT)
+        {
+          // opt_amount_commitment supposed to be validated earlier in validate_asset_operation()
+          CHECK_AND_ASSERT_MES(ado.opt_amount_commitment.has_value(), false, "opt_amount_commitment is not set");
+          sum_of_pseudo_out_amount_commitments += crypto::point_t(ado.opt_amount_commitment.get()); // *1/8
+        }
+        else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+        {
+          CHECK_AND_ASSERT_MES(ado.opt_amount_commitment.has_value(), false, "opt_amount_commitment is not set");
+          outs_commitments_sum += crypto::point_t(ado.opt_amount_commitment.get()); // *1/8
+        }
       }
       size_t zc_sigs_count = 0;
       for(auto& sig_v : tx.signatures)
