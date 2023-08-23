@@ -106,8 +106,8 @@ namespace currency
           secret_index = ring.size() - 1;
       }
 
-      // additional ring member for asset emitting operation
-      if (!ogc.ao_amount_blinding_mask.is_zero())
+      // additional ring member for asset emitting operation (which has asset operation commitment in the inputs part)
+      if (!ogc.ao_amount_blinding_mask.is_zero() && !ogc.ao_commitment_in_outputs)
       {
         ring.emplace_back(ogc.ao_asset_id_pt - T);
         if (secret_index == SIZE_MAX && H == ogc.ao_asset_id)
@@ -307,12 +307,13 @@ namespace currency
     {
       // there're ZC inputs => in main balance equation we only need to cancel out X-component, because G-component cancelled out by choosing blinding mask for the last pseudo out amount commitment
 
-      crypto::point_t commitment_to_zero = (crypto::scalar_t(bare_inputs_sum) - crypto::scalar_t(fee)) * currency::native_coin_asset_id_pt + ogc.pseudo_out_amount_commitments_sum + ogc.ao_amount_commitment - ogc.amount_commitments_sum;
+      crypto::point_t commitment_to_zero = (crypto::scalar_t(bare_inputs_sum) - crypto::scalar_t(fee)) * currency::native_coin_asset_id_pt + ogc.pseudo_out_amount_commitments_sum + (ogc.ao_commitment_in_outputs ? -ogc.ao_amount_commitment : ogc.ao_amount_commitment) - ogc.amount_commitments_sum;
       crypto::scalar_t secret_x = ogc.real_in_asset_id_blinding_mask_x_amount_sum - ogc.asset_id_blinding_mask_x_amount_sum;
 
       DBG_VAL_PRINT(bare_inputs_sum);
       DBG_VAL_PRINT(fee);
       DBG_VAL_PRINT(ogc.pseudo_out_amount_commitments_sum);
+      DBG_VAL_PRINT((int)ogc.ao_commitment_in_outputs);
       DBG_VAL_PRINT(ogc.ao_amount_commitment);
       DBG_VAL_PRINT(ogc.amount_commitments_sum);
       DBG_VAL_PRINT(ogc.real_in_asset_id_blinding_mask_x_amount_sum);
@@ -321,7 +322,8 @@ namespace currency
       DBG_VAL_PRINT(secret_x);
 
 #ifndef NDEBUG
-      CHECK_AND_ASSERT_MES(commitment_to_zero == secret_x * crypto::c_point_X, false, "internal error: commitment_to_zero is malformed (X)");
+      bool commitment_to_zero_is_sane = commitment_to_zero == secret_x * crypto::c_point_X;
+      CHECK_AND_ASSERT_MES(commitment_to_zero_is_sane, false, "internal error: commitment_to_zero is malformed (X)");
 #endif
       r = crypto::generate_schnorr_sig<crypto::gt_X>(tx_id, commitment_to_zero, secret_x, proof.ss);
       CHECK_AND_ASSERT_MES(r, false, "generate_schnorr_sig (X) failed");
@@ -559,15 +561,8 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool validate_asset_operation_balance_proof(asset_op_verification_context& context)// const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, crypto::public_key& asset_id)
   {
-
     CHECK_AND_ASSERT_MES(count_type_in_variant_container<asset_operation_proof>(context.tx.proofs) == 1, false, "asset_operation_proof not present or present more than once");
     const asset_operation_proof& aop = get_type_in_variant_container_by_ref<const asset_operation_proof>(context.tx.proofs);
-
-    bool is_burn = false;
-    if (context.ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
-    {
-      is_burn = true;
-    }
 
     if (context.ado.descriptor.hidden_supply)
     {
@@ -580,11 +575,7 @@ namespace currency
       // make sure that amount commitment corresponds to opt_amount_commitment_g_proof
       CHECK_AND_ASSERT_MES(context.ado.opt_amount_commitment.has_value(), false, "opt_amount_commitment is absent");
       CHECK_AND_ASSERT_MES(aop.opt_amount_commitment_g_proof.has_value(), false, "opt_amount_commitment_g_proof is absent");
-      crypto::point_t A = is_burn ? 
-        crypto::point_t(context.ado.opt_amount_commitment.get()).modify_mul8() + context.amout_to_validate * context.asset_id_pt
-        :
-        crypto::point_t(context.ado.opt_amount_commitment.get()).modify_mul8() - context.amout_to_validate * context.asset_id_pt
-        ;
+      crypto::point_t A = crypto::point_t(context.ado.opt_amount_commitment.get()).modify_mul8() - context.amout_to_validate * context.asset_id_pt;
 
       bool r = crypto::check_signature(context.tx_id, A.to_public_key(), aop.opt_amount_commitment_g_proof.get());
       CHECK_AND_ASSERT_MES(r, false, "opt_amount_commitment_g_proof check failed");
@@ -624,7 +615,6 @@ namespace currency
         const tx_out_zarcanum& ozc = boost::get<tx_out_zarcanum>(vout);
         outs_commitments_sum += crypto::point_t(ozc.amount_commitment); // amount_commitment premultiplied by 1/8
       }
-      outs_commitments_sum.modify_mul8();
 
       uint64_t fee = 0;
       CHECK_AND_ASSERT_MES(get_tx_fee(tx, fee) || additional_inputs_amount_and_fees_for_mining_tx > 0, false, "unable to get fee for a non-mining tx");
@@ -661,6 +651,8 @@ namespace currency
           ++zc_sigs_count;
         VARIANT_SWITCH_END();
       }
+
+      outs_commitments_sum.modify_mul8();
       sum_of_pseudo_out_amount_commitments.modify_mul8();
 
       // (sum(bare inputs' amounts) - fee) * H + sum(pseudo outs commitments for ZC inputs) - sum(outputs' commitments) = lin(X)  OR  = lin(G)
@@ -1965,7 +1957,7 @@ namespace currency
     if ((last_output && (tx_flags & TX_FLAG_SIGNATURE_MODE_SEPARATE) == 0) || se.separately_signed_tx_complete)
     {
       // either normal tx or the last signature of consolidated tx -- in both cases we need to calculate non-random blinding mask for pseudo output commitment
-      pseudo_out_amount_blinding_mask   = ogc.amount_blinding_masks_sum - ogc.pseudo_out_amount_blinding_masks_sum - ogc.ao_amount_blinding_mask;      // A_1 - A^p_0 = (f_1 - f'_1) * G   =>  f'_{i-1} = sum{y_j} - sum{f'_i}
+      pseudo_out_amount_blinding_mask   = ogc.amount_blinding_masks_sum - ogc.pseudo_out_amount_blinding_masks_sum + (ogc.ao_commitment_in_outputs ? ogc.ao_amount_blinding_mask : -ogc.ao_amount_blinding_mask);      // A_1 - A^p_0 = (f_1 - f'_1) * G   =>  f'_{i-1} = sum{y_j} - sum{f'_i}
     }
     else
     {
@@ -2171,6 +2163,7 @@ namespace currency
         gen_context.ao_asset_id_pt.from_public_key(gen_context.ao_asset_id);
         // calculate amount blinding mask
         gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, ftp.asset_control_key);
+        gen_context.ao_commitment_in_outputs = true;
 
         // set correct asset_id to the corresponding destination entries
         uint64_t amount_of_burned_assets = 0;
@@ -2191,7 +2184,7 @@ namespace currency
         }
         ado.descriptor.current_supply -= amount_of_burned_assets; // TODO: consider setting current_supply beforehand, not setting it hear in ad-hoc manner -- sowle
 
-        gen_context.ao_amount_commitment = gen_context.ao_amount_blinding_mask * crypto::c_point_G - amount_of_burned_assets * gen_context.ao_asset_id_pt;
+        gen_context.ao_amount_commitment = amount_of_burned_assets * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
         ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
       }
 

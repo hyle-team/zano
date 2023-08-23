@@ -6585,6 +6585,19 @@ void wallet2::prepare_tx_destinations(const assets_selection_context& needed_mon
       if (dst.asset_id == currency::null_pkey)
         final_destinations.emplace_back(dst.amount, dst.addr, dst.asset_id);
 
+    //exclude destinations that supposed to be burned (for ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+    for (size_t i = 0; i < final_destinations.size(); )
+    {
+      if (final_destinations[i].addr.size() == 0)
+      {
+        final_destinations.erase(final_destinations.begin() + i);
+      }
+      else
+      {
+        i++;
+      }
+    }
+
     if (final_destinations.empty())
     {
       // if there's no destinations -- make CURRENCY_TX_MIN_ALLOWED_OUTS empty destinations
@@ -6602,19 +6615,6 @@ void wallet2::prepare_tx_destinations(const assets_selection_context& needed_mon
       decompose_amount_randomly(de.amount, [&](uint64_t amount){ de.amount = amount; final_destinations.push_back(de); }, items_to_be_added, num_digits_to_keep);
       WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(final_destinations.size() == CURRENCY_TX_MIN_ALLOWED_OUTS,
         "can't get necessary number of outputs using decompose_amount_randomly(), got " << final_destinations.size() << " while mininum is " << CURRENCY_TX_MIN_ALLOWED_OUTS);
-    }
-
-    //exclude destinations that supposed to be burned (for ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
-    for (size_t i = 0; i < final_destinations.size(); )
-    {
-      if (final_destinations[i].addr.size() == 0)
-      {
-        final_destinations.erase(final_destinations.begin() + i);
-      }
-      else
-      {
-        i++;
-      }
     }
   }
 }
