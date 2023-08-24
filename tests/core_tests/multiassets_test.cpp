@@ -11,6 +11,65 @@
 
 using namespace currency;
 
+
+
+
+
+
+/*
+
+
+struct debug_context_event_1
+{
+  int& i;
+  std::string& s;
+};
+
+
+
+//#define RAISE_DEBUG_EVENT   dw.handle_type
+
+
+void test_test()
+{
+  epee::misc_utils::events_dispatcher ed;
+
+  //--------------------------------------------------------------------------------
+  //--------------------------------------------------------------------------------
+  //--------------------------------------------------------------------------------
+  //thus code will be called in the tests
+  ed.SUBSCIRBE_DEBUG_EVENT<debug_context_event_1>([&](debug_context_event_1& d) 
+  {
+    //here some operations
+    LOG_PRINT_L0("lala: " << d.i << d.s);    
+    //
+    d.i = 10;
+    d.s = "33333";
+
+  });
+
+
+  //--------------------------------------------------------------------------------
+  //--------------------------------------------------------------------------------
+  //--------------------------------------------------------------------------------
+  //this code will be in the wallet and helper functions
+
+  int i = 22;
+  std::string sss = "11111";
+ 
+  ed.RAISE_DEBUG_EVENT(debug_context_event_1{i, sss });
+
+
+  LOG_PRINT_L0("lala: " << i << sss);
+}
+*/
+
+
+
+
+
+
+
 //------------------------------------------------------------------------------
 
 #define  AMOUNT_TO_TRANSFER_MULTIASSETS_BASIC (TESTS_DEFAULT_FEE)
@@ -47,12 +106,14 @@ bool multiassets_basic_test::generate(std::vector<test_event_entry>& events) con
 
 bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
+  //test_test();
+
   bool r = false;
-  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::debug_wallet2> miner_wlt = init_playtime_test_wallet_t<debug_wallet2>(events, c, MINER_ACC_IDX);
   miner_wlt->get_account().set_createtime(0);
   account_base alice_acc;
   alice_acc.generate();
-  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, alice_acc);
+  std::shared_ptr<tools::debug_wallet2> alice_wlt = init_playtime_test_wallet_t<debug_wallet2>(events, c, alice_acc);
   alice_wlt->get_account().set_createtime(0);
   miner_wlt->refresh();
 
@@ -179,6 +240,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   CHECK_AND_ASSERT_MES(asset_info3.current_supply == asset_info2.current_supply + destinations[1].amount + destinations[0].amount, false, "Failed to find needed asset in result balances");
 
 
+
   miner_wlt->burn_asset(asset_id, last_miner_balance, tx);
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
 
@@ -189,6 +251,8 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   r = c.get_blockchain_storage().get_asset_info(asset_id, asset_info4);
   CHECK_AND_ASSERT_MES(r, false, "Failed to get_asset_info");
   CHECK_AND_ASSERT_MES(asset_info4.current_supply == asset_info3.current_supply - last_miner_balance, false, "Failed to find needed asset in result balances");
+
+   
 
 
   return true;

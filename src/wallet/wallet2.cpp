@@ -42,6 +42,7 @@ using namespace epee;
 #include "common/variant_helper.h"
 #include "currency_core/crypto_config.h"
 #include "crypto/zarcanum.h"
+#include "wallet_debug_events_definitions.h"
 
 using namespace currency;
 
@@ -7009,6 +7010,7 @@ void wallet2::transfer(construct_tx_param& ctp,
 
   print_tx_sent_message(result.tx, std::string() + "(transfer)", ctp.fee);
 }
+
 //----------------------------------------------------------------------------------------------------
 void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
   uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx /* = nullptr */, std::string* p_filename_or_unsigned_tx_blob_str /* = nullptr */)

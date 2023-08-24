@@ -118,3 +118,12 @@ struct wlt_lambda_on_transfer2_wrapper : public tools::i_wallet2_callback
   bool m_result;
   Func m_callback;
 };
+
+class  debug_wallet2: public tools::wallet2
+{
+public:
+  epee::misc_utils::events_dispatcher& get_debug_events_dispatcher()
+  {
+    return this->m_debug_events_dispatcher;
+  }
+};

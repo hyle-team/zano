@@ -159,7 +159,7 @@ namespace currency
     uint64_t tx_version;
     uint64_t mode_separate_fee = 0;
     crypto::secret_key asset_control_key = currency::null_skey;
-    
+    epee::misc_utils::events_dispatcher* pevents_dispatcher;
 
     tx_generation_context gen_context{}; // solely for consolidated txs
 

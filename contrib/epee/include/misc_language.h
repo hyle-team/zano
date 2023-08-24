@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <functional>
 #include <boost/thread.hpp>
+#include <boost/any.hpp>
 #include "include_base_utils.h"
 #include "auto_val_init.h"
 
@@ -372,6 +373,11 @@ namespace misc_utils
     virtual void do_call(){};
   };
   
+  template<typename param_t>
+  struct call_basic_param
+  {
+    virtual void do_call(param_t& p) {};
+  };
   
   template<typename t_callback>
   struct call_specific: public call_basic
@@ -386,10 +392,32 @@ namespace misc_utils
     t_callback m_cb;
   };
   
+  template<typename param_t, typename t_callback>
+  struct call_specific_param : public call_basic_param<param_t>
+  {
+    call_specific_param(t_callback cb) :m_cb(cb)
+    {}
+    virtual void do_call(param_t& p)
+    {
+      m_cb(p);
+    }
+  private:
+    t_callback m_cb;
+  };
+
+
+
   template<typename t_callback>
   auto build_abstract_callback(t_callback cb) -> std::shared_ptr<call_basic>
   {
     return std::shared_ptr<call_basic>(new call_specific<t_callback>(cb));
+  }
+
+
+  template<typename param_t, typename t_callback>
+  auto build_abstract_callback_param(t_callback cb) -> std::shared_ptr<call_basic_param<param_t>>
+  {
+    return std::shared_ptr<call_basic_param<param_t>>(new call_specific_param<param_t, t_callback>(cb));
   }
 
   
@@ -426,6 +454,55 @@ namespace misc_utils
     auto res = container.insert(typename t_container_type::value_type(key, AUTO_VAL_INIT(typename t_container_type::mapped_type())));
     return res.first;
   }
+
+
+  class events_dispatcher
+  {
+
+  public:
+
+    template<typename param_t>
+    struct callback_entry
+    {
+      std::shared_ptr<epee::misc_utils::call_basic_param<param_t> > m_cb;
+    };
+
+    std::map<std::type_index, boost::any> m_callbacks;
+
+    template<typename param_t, typename callback_t>
+    void SUBSCIRBE_DEBUG_EVENT(callback_t cb)
+    {
+      std::type_index ti = typeid(param_t);
+      auto it = m_callbacks.find(ti);
+      if (it != m_callbacks.end())
+      {
+        throw std::runtime_error("Handler for this type already registered");
+      }
+
+      callback_entry<param_t> cb_entry = { epee::misc_utils::build_abstract_callback_param<param_t>(cb) };
+
+      m_callbacks[ti] = cb_entry;
+    }
+
+    template<typename param_t>
+    void RAISE_DEBUG_EVENT(param_t& p)
+    {
+      std::type_index ti = typeid(param_t);
+      auto it = m_callbacks.find(ti);
+      if (it != m_callbacks.end())
+      {
+        callback_entry<typename param_t >* pcallback_entry = boost::any_cast<callback_entry<typename param_t >>(&it->second);
+        if (!pcallback_entry)
+        {
+          throw std::runtime_error("Unexpected error: registered tipe holding something else in boost::eny");
+        }
+        pcallback_entry->m_cb->do_call(p);
+      }
+    }
+
+  };
+
+
 
 } // namespace misc_utils
 } // namespace epee

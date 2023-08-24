@@ -1042,6 +1042,8 @@ namespace tools
     void operator()(const asset_update_event& e);
     void operator()(const asset_unown_event& e);
 
+protected: 
+    epee::misc_utils::events_dispatcher m_debug_events_dispatcher;
 private:
 
     // -------- t_transport_state_notifier ------------------------------------------------
