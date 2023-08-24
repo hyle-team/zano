@@ -21,6 +21,30 @@ struct wallet_test : virtual public test_chain_unit_enchanced
 
   static std::string get_test_account_name_by_id(size_t acc_id);
 
+  template<typename wallet_t>
+  std::shared_ptr<typename wallet_t> init_playtime_test_wallet_t(const std::vector<test_event_entry>& events, currency::core& c, const currency::account_base& acc) const
+  {
+    CHECK_AND_ASSERT_THROW_MES(events.size() > 0 && events[0].type() == typeid(currency::block), "Invalid events queue, can't find genesis block at the beginning");
+    crypto::hash genesis_hash = get_block_hash(boost::get<block>(events[0]));
+
+    std::shared_ptr<wallet_t> w(new wallet_t);
+    w->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
+    w->assign_account(acc);
+    w->set_genesis(genesis_hash);
+    w->set_core_proxy(m_core_proxy);
+    w->set_disable_tor_relay(true);
+    return w;
+  }
+
+
+  template<typename wallet_t>
+  std::shared_ptr<typename wallet_t> init_playtime_test_wallet_t(const std::vector<test_event_entry>& events, currency::core& c, size_t account_index) const
+  {
+    CHECK_AND_ASSERT_THROW_MES(account_index < m_accounts.size(), "Invalid account index");
+    return init_playtime_test_wallet_t<wallet_t>(events, c, m_accounts[account_index]);
+  }
+
+
 protected:
 
   struct params_check_balance

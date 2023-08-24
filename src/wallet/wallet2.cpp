@@ -6968,6 +6968,7 @@ void wallet2::transfer(construct_tx_param& ctp,
 
   TIME_MEASURE_START(prepare_transaction_time);
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+  ftp.pevents_dispatcher = &m_debug_events_dispatcher;
   ftp.tx_version = this->get_current_tx_version();
   if (!prepare_transaction(ctp, ftp))
   {

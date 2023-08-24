@@ -8,7 +8,7 @@
 #include "wallet_test_core_proxy.h"
 
 #include "random_helper.h"
-
+#include "wallet/wallet_debug_events_definitions.h"
 using namespace currency;
 
 
@@ -109,11 +109,11 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   //test_test();
 
   bool r = false;
-  std::shared_ptr<tools::debug_wallet2> miner_wlt = init_playtime_test_wallet_t<debug_wallet2>(events, c, MINER_ACC_IDX);
+  std::shared_ptr<debug_wallet2> miner_wlt = init_playtime_test_wallet_t<debug_wallet2>(events, c, MINER_ACC_IDX);
   miner_wlt->get_account().set_createtime(0);
   account_base alice_acc;
   alice_acc.generate();
-  std::shared_ptr<tools::debug_wallet2> alice_wlt = init_playtime_test_wallet_t<debug_wallet2>(events, c, alice_acc);
+  std::shared_ptr<debug_wallet2> alice_wlt = init_playtime_test_wallet_t<debug_wallet2>(events, c, alice_acc);
   alice_wlt->get_account().set_createtime(0);
   miner_wlt->refresh();
 
@@ -252,8 +252,19 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   CHECK_AND_ASSERT_MES(r, false, "Failed to get_asset_info");
   CHECK_AND_ASSERT_MES(asset_info4.current_supply == asset_info3.current_supply - last_miner_balance, false, "Failed to find needed asset in result balances");
 
-   
+  //tests that trying to break stuff
+  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation>([&](wde_construct_tx_handle_asset_descriptor_operation& o)
+  {
+    crypto::signature s = currency::null_sig;
+    o.pado->opt_proof = s;
+  });
 
+  //test update function
+  asset_info.meta_info = "{\"some2\": \"info2\"}";
+  miner_wlt->update_asset(asset_id, asset_info, tx);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 2);
+
+    
 
   return true;
 }

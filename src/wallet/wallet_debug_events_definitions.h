@@ -7,9 +7,9 @@
 
 
 //Wallet Debug Events
-struct wde_construct_tx_a1
+struct wde_construct_tx_handle_asset_descriptor_operation
 {
-
+  currency::asset_descriptor_operation* pado;
 };
 
 

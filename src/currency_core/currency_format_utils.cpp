@@ -33,6 +33,8 @@ using namespace epee;
 #include "common/mnemonic-encoding.h"
 #include "crypto/bitcoin/sha256_helper.h"
 #include "crypto_config.h"
+#include "wallet/wallet_debug_events_definitions.h"
+
 
 #define DBG_VAL_PRINT(x) ((void)0) // LOG_PRINT_CYAN(std::setw(42) << std::left << #x ":" << x, LOG_LEVEL_0)
 
@@ -2453,6 +2455,7 @@ namespace currency
       {
         bool r = construct_tx_handle_ado(sender_account_keys, ftp, *pado, gen_context, one_time_tx_secret_key, shuffled_dsts);
         CHECK_AND_ASSERT_MES(r, false, "Failed to construct_tx_handle_ado()");
+        if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation{ pado });
       }
     }
 
