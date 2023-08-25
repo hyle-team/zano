@@ -13,3 +13,9 @@ struct wde_construct_tx_handle_asset_descriptor_operation
 };
 
 
+//Wallet Debug Events
+struct wde_construct_tx_handle_asset_descriptor_operation_before_seal
+{
+  currency::asset_descriptor_operation* pado;
+};
+

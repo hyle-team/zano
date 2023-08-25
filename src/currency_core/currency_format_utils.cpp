@@ -1116,6 +1116,20 @@ namespace currency
     return origin_blob;
   }
   //---------------------------------------------------------------
+  bool validate_ado_update_allowed(const asset_descriptor_base& a, const asset_descriptor_base& b)
+  {
+    if (a.total_max_supply != b.total_max_supply) return false;
+    //if (a.current_supply != b.current_supply) return false;
+    if (a.decimal_point != b.decimal_point) return false;
+    if (a.ticker != b.ticker) return false;
+    if (a.full_name != b.full_name) return false;
+    //a.meta_info;
+    if (a.owner != b.owner) return false;
+    if (a.hidden_supply != b.hidden_supply) return false;
+    
+    return true;
+  }
+  //---------------------------------------------------------------
   crypto::hash get_signature_hash_for_asset_operation(const asset_descriptor_operation& ado)
   {
     asset_descriptor_operation ado_local = ado;
@@ -2189,6 +2203,8 @@ namespace currency
         gen_context.ao_amount_commitment = amount_of_burned_assets * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
         ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
       }
+
+      if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation_before_seal{ &ado });
 
       //seal it with owners signature
       crypto::signature sig = currency::null_sig;

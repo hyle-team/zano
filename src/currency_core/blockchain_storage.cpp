@@ -3873,17 +3873,25 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
     {
       //check that total current_supply haven't changed
       CHECK_AND_ASSERT_MES(ado.descriptor.current_supply == avc.asset_op_history->back().descriptor.current_supply, false, "update operation actually try to change emission, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, avc.asset_op_history->back().descriptor), false, "update operation trying to change fields that not supposed to be changed, failed");
+
       need_to_validate_balance_proof = false;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT)
     {
       CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > avc.asset_op_history->back().descriptor.current_supply, false, "emmit operation not increasing emission, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, avc.asset_op_history->back().descriptor), false, "emmit operation not allow to update fields");
+      CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == avc.asset_op_history->back().descriptor.meta_info, false, "emmit operation not not allow to update meta info");
       avc.amout_to_validate = ado.descriptor.current_supply - avc.asset_op_history->back().descriptor.current_supply;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
     {
       CHECK_AND_ASSERT_MES(ado.descriptor.current_supply < avc.asset_op_history->back().descriptor.current_supply, false, "burn operation not decreasing emission, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, avc.asset_op_history->back().descriptor), false, "burn operation not allow to update fields");
+      CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == avc.asset_op_history->back().descriptor.meta_info, false, "burn operation not not allow to update meta info");
+
       avc.amout_to_validate =  avc.asset_op_history->back().descriptor.current_supply - ado.descriptor.current_supply;
+
     }
     else
     {

@@ -485,6 +485,18 @@ namespace misc_utils
     }
 
     template<typename param_t>
+    void UNSUBSCRIBE_DEBUG_EVENT()
+    {
+      std::type_index ti = typeid(param_t);
+      auto it = m_callbacks.find(ti);
+      if (it != m_callbacks.end())
+      {
+        m_callbacks.erase(it);
+      }
+    }
+
+
+    template<typename param_t>
     void RAISE_DEBUG_EVENT(param_t& p)
     {
       std::type_index ti = typeid(param_t);

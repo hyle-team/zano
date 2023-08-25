@@ -446,6 +446,8 @@ namespace currency
   std::string get_word_from_timstamp(uint64_t timestamp, bool use_password);
   uint64_t get_timstamp_from_word(std::string word, bool& password_used);
   std::string generate_origin_for_htlc(const txout_htlc& htlc, const account_keys& acc_keys);
+  bool validate_ado_update_allowed(const asset_descriptor_base& a, const asset_descriptor_base& b);
+
 
   void normalize_asset_operation_for_hashing(asset_descriptor_operation& op);
   crypto::hash get_signature_hash_for_asset_operation(const asset_descriptor_operation& ado);

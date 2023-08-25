@@ -4723,9 +4723,14 @@ void wallet2::emmit_asset(const crypto::public_key asset_id, std::vector<currenc
 
   auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
   CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
-
+  COMMAND_RPC_GET_ASSET_INFO::request req;
+  req.asset_id = asset_id;
+  COMMAND_RPC_GET_ASSET_INFO::response rsp;
+  bool r = m_core_proxy->call_COMMAND_RPC_GET_ASSET_INFO(req, rsp);
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed to call_COMMAND_RPC_GET_ASSET_INFO");
+ 
   asset_descriptor_operation asset_emmit_info = AUTO_VAL_INIT(asset_emmit_info);
-  asset_emmit_info.descriptor = own_asset_entry_it->second.asset_descriptor;
+  asset_emmit_info.descriptor = rsp.asset_descriptor;
   asset_emmit_info.operation_type = ASSET_DESCRIPTOR_OPERATION_EMMIT;
   asset_emmit_info.opt_asset_id = asset_id;
   construct_tx_param ctp = get_default_construct_tx_param();
@@ -4762,9 +4767,16 @@ void wallet2::burn_asset(const crypto::public_key asset_id, uint64_t amount_to_b
 {
   auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
   CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
+  COMMAND_RPC_GET_ASSET_INFO::request req;
+  req.asset_id = asset_id;
+  COMMAND_RPC_GET_ASSET_INFO::response rsp;
+  bool r = m_core_proxy->call_COMMAND_RPC_GET_ASSET_INFO(req, rsp);
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed to call_COMMAND_RPC_GET_ASSET_INFO");
+
+
 
   asset_descriptor_operation asset_burn_info = AUTO_VAL_INIT(asset_burn_info);
-  asset_burn_info.descriptor = own_asset_entry_it->second.asset_descriptor;
+  asset_burn_info.descriptor = rsp.asset_descriptor;
 
   CHECK_AND_ASSERT_THROW_MES(asset_burn_info.descriptor.current_supply > amount_to_burn, "Wrong amount to burn (current_supply" << asset_burn_info.descriptor.current_supply << " is less then " << amount_to_burn << ")");
 
