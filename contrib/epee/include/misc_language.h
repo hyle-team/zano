@@ -464,7 +464,7 @@ namespace misc_utils
     template<typename param_t>
     struct callback_entry
     {
-      std::shared_ptr<epee::misc_utils::call_basic_param<param_t> > m_cb;
+      std::shared_ptr<epee::misc_utils::call_basic_param<const param_t> > m_cb;
     };
 
     std::map<std::type_index, boost::any> m_callbacks;
@@ -479,7 +479,7 @@ namespace misc_utils
         throw std::runtime_error("Handler for this type already registered");
       }
 
-      callback_entry<param_t> cb_entry = { epee::misc_utils::build_abstract_callback_param<param_t>(cb) };
+      callback_entry<const param_t> cb_entry = { epee::misc_utils::build_abstract_callback_param<const param_t>(cb) };
 
       m_callbacks[ti] = cb_entry;
     }
@@ -497,13 +497,13 @@ namespace misc_utils
 
 
     template<typename param_t>
-    void RAISE_DEBUG_EVENT(param_t& p)
+    void RAISE_DEBUG_EVENT(const param_t& p)
     {
       std::type_index ti = typeid(param_t);
       auto it = m_callbacks.find(ti);
       if (it != m_callbacks.end())
       {
-        callback_entry<typename param_t >* pcallback_entry = boost::any_cast<callback_entry<typename param_t >>(&it->second);
+        callback_entry<const param_t >* pcallback_entry = boost::any_cast<callback_entry<const param_t >>(&it->second);
         if (!pcallback_entry)
         {
           throw std::runtime_error("Unexpected error: registered tipe holding something else in boost::eny");
