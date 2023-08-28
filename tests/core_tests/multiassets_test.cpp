@@ -255,7 +255,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
   //------------------- tests that trying to break stuff  -------------------
   //tests that trying to break stuff
-  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation>([&](wde_construct_tx_handle_asset_descriptor_operation& o)
+  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation>([&](const wde_construct_tx_handle_asset_descriptor_operation& o)
   {
     crypto::signature s = currency::null_sig;
     o.pado->opt_proof = s;
@@ -334,7 +334,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
 
   // check emmit_asset() with modified 'current_supply'
-  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_seal>([&](wde_construct_tx_handle_asset_descriptor_operation_before_seal& o)
+  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_seal>([&](const wde_construct_tx_handle_asset_descriptor_operation_before_seal& o)
   {
     o.pado->descriptor.current_supply += 1000000;
   });
@@ -351,7 +351,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   //test burn that burns more than tx has
   miner_wlt->get_debug_events_dispatcher().UNSUBSCRIBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_seal>();
 
-  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_seal>([&](wde_construct_tx_handle_asset_descriptor_operation_before_seal& o)
+  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_seal>([&](const wde_construct_tx_handle_asset_descriptor_operation_before_seal& o)
   {
     o.pado->descriptor.current_supply -= 1000000;
   });
