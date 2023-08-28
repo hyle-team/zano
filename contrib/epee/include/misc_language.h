@@ -397,7 +397,7 @@ namespace misc_utils
   {
     call_specific_param(t_callback cb) :m_cb(cb)
     {}
-    virtual void do_call(param_t& p)
+    virtual void do_call(const param_t& p)
     {
       m_cb(p);
     }
