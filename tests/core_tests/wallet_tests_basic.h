@@ -38,7 +38,7 @@ struct wallet_test : virtual public test_chain_unit_enchanced
 
 
   template<typename wallet_t>
-  std::shared_ptr<typename wallet_t> init_playtime_test_wallet_t(const std::vector<test_event_entry>& events, currency::core& c, size_t account_index) const
+  std::shared_ptr<wallet_t> init_playtime_test_wallet_t(const std::vector<test_event_entry>& events, currency::core& c, size_t account_index) const
   {
     CHECK_AND_ASSERT_THROW_MES(account_index < m_accounts.size(), "Invalid account index");
     return init_playtime_test_wallet_t<wallet_t>(events, c, m_accounts[account_index]);
