@@ -275,67 +275,80 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
   miner_wlt->get_debug_events_dispatcher().UNSUBSCRIBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation>();
 
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
   //------------------- tests that trying to break stuff  -------------------
-  //test update function with not allowed fields
+  // check update_asset() with modified 'ticker'
   r = c.get_blockchain_storage().get_asset_info(asset_id, asset_info);
   CHECK_AND_ASSERT_MES(r, false, "Failed to get_asset_info");
 
   asset_info.ticker = "XXX";
   miner_wlt->update_asset(asset_id, asset_info, tx);
-  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 2);
-  CHECK_AND_ASSERT_MES(!r, false, "Test failed, broken ownership passed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_block_in_playtime(miner_wlt->get_account().get_public_address(), c);
+  CHECK_AND_ASSERT_MES(!r, false, "block with a bad tx was unexpectedly mined");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not confirmed
   c.get_tx_pool().purge_transactions();
 
-  //------------------- tests that trying to break stuff  -------------------
-  //test update function with not allowed fields
+  
+  // check update_asset() with modified 'full_name'
   r = c.get_blockchain_storage().get_asset_info(asset_id, asset_info);
   CHECK_AND_ASSERT_MES(r, false, "Failed to get_asset_info");
 
   asset_info.full_name = "XXX";
   miner_wlt->update_asset(asset_id, asset_info, tx);
-  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 2);
-  CHECK_AND_ASSERT_MES(!r, false, "Test failed, broken ownership passed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_block_in_playtime(miner_wlt->get_account().get_public_address(), c);
+  CHECK_AND_ASSERT_MES(!r, false, "block with a bad tx was unexpectedly mined");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not confirmed
   c.get_tx_pool().purge_transactions();
   miner_wlt->refresh();
 
-  //------------------- tests that trying to break stuff  -------------------
+  
+  // check update_asset() with modified 'decimal_point'
   r = c.get_blockchain_storage().get_asset_info(asset_id, asset_info);
   CHECK_AND_ASSERT_MES(r, false, "Failed to get_asset_info");
 
   asset_info.decimal_point = 3;
   miner_wlt->update_asset(asset_id, asset_info, tx);
-  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 2);
-  CHECK_AND_ASSERT_MES(!r, false, "Test failed, broken ownership passed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_block_in_playtime(miner_wlt->get_account().get_public_address(), c);
+  CHECK_AND_ASSERT_MES(!r, false, "block with a bad tx was unexpectedly mined");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not confirmed
   c.get_tx_pool().purge_transactions();
   miner_wlt->refresh();
 
-  //------------------- tests that trying to break stuff  -------------------
+
+  // check update_asset() with modified 'owner'
   r = c.get_blockchain_storage().get_asset_info(asset_id, asset_info);
   CHECK_AND_ASSERT_MES(r, false, "Failed to get_asset_info");
 
-  currency::keypair kp = currency::keypair::generate();
-
-  asset_info.owner = kp.pub;
+  asset_info.owner = currency::keypair::generate().pub;
   miner_wlt->update_asset(asset_id, asset_info, tx);
-  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 2);
-  CHECK_AND_ASSERT_MES(!r, false, "Test failed, broken ownership passed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_block_in_playtime(miner_wlt->get_account().get_public_address(), c);
+  CHECK_AND_ASSERT_MES(!r, false, "block with a bad tx was unexpectedly mined");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not confirmed
   c.get_tx_pool().purge_transactions();
   miner_wlt->refresh();
 
-  //------------------- tests that trying to break stuff  -------------------
+
+  // check emmit_asset() with modified 'current_supply'
   miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_seal>([&](wde_construct_tx_handle_asset_descriptor_operation_before_seal& o)
   {
     o.pado->descriptor.current_supply += 1000000;
   });
   //test emmit function but re-adjust current_supply to wrong amount
   miner_wlt->emmit_asset(asset_id, destinations, tx);
-  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
-  CHECK_AND_ASSERT_MES(!r, false, "mine_next_pow_blocks_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_block_in_playtime(miner_wlt->get_account().get_public_address(), c);
+  CHECK_AND_ASSERT_MES(!r, false, "block with a bad tx was unexpectedly mined");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not confirmed
   c.get_tx_pool().purge_transactions();
   miner_wlt->refresh();
 
   //------------------- tests that trying to break stuff  -------------------
-  //test burn that burn more then tx has
+  //test burn that burns more than tx has
   miner_wlt->get_debug_events_dispatcher().UNSUBSCRIBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_seal>();
 
   miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_seal>([&](wde_construct_tx_handle_asset_descriptor_operation_before_seal& o)
@@ -344,8 +357,10 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   });
 
   miner_wlt->burn_asset(asset_id, 10000000000000, tx);
-  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
-  CHECK_AND_ASSERT_MES(!r, false, "mine_next_pow_blocks_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_block_in_playtime(miner_wlt->get_account().get_public_address(), c);
+  CHECK_AND_ASSERT_MES(!r, false, "block with a bad tx was unexpectedly mined");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not confirmed
   c.get_tx_pool().purge_transactions();
   miner_wlt->refresh();
 
