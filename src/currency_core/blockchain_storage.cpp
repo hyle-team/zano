@@ -3822,10 +3822,6 @@ bool blockchain_storage::validate_ado_ownership(asset_op_verification_context& a
   CHECK_AND_ASSERT_MES(avc.asset_op_history->size() != 0, false, "asset with id " << avc.asset_id << " has invalid history size() == 0");
 
   crypto::public_key owner_key = avc.asset_op_history->back().descriptor.owner;
-  asset_descriptor_operation ado_local = avc.ado;
-  normalize_asset_operation_for_hashing(ado_local);
-  std::string buff = t_serializable_object_to_blob(ado_local);
-  crypto::hash h = crypto::cn_fast_hash(buff.data(), buff.size());
   return crypto::check_signature(get_signature_hash_for_asset_operation(avc.ado), owner_key, *avc.ado.opt_proof);
 }
 //------------------------------------------------------------------
