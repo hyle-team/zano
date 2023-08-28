@@ -3842,7 +3842,7 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
     avc.asset_op_history = m_db_assets.find(avc.asset_id);
     CHECK_AND_ASSERT_MES(!avc.asset_op_history, false, "asset with id " << avc.asset_id << " has already been registered");
 
-    avc.amout_to_validate = ado.descriptor.current_supply;
+    avc.amount_to_validate = ado.descriptor.current_supply;
     CHECK_AND_ASSERT_MES(validate_asset_operation_balance_proof(avc), false, "asset operation validation failed!");
 
     assets_container::t_value_type local_asset_history = AUTO_VAL_INIT(local_asset_history);
@@ -3867,7 +3867,7 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
       CHECK_AND_ASSERT_MES(r, false, "Faild to validate ownership of asset_descriptor_operation, rejecting");
     }
 
-    avc.amout_to_validate = 0;
+    avc.amount_to_validate = 0;
     bool need_to_validate_balance_proof = true;
     if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
     {
@@ -3882,7 +3882,7 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
       CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > avc.asset_op_history->back().descriptor.current_supply, false, "emmit operation not increasing emission, failed");
       CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, avc.asset_op_history->back().descriptor), false, "emmit operation not allow to update fields");
       CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == avc.asset_op_history->back().descriptor.meta_info, false, "emmit operation not not allow to update meta info");
-      avc.amout_to_validate = ado.descriptor.current_supply - avc.asset_op_history->back().descriptor.current_supply;
+      avc.amount_to_validate = ado.descriptor.current_supply - avc.asset_op_history->back().descriptor.current_supply;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
     {
@@ -3890,7 +3890,7 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
       CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, avc.asset_op_history->back().descriptor), false, "burn operation not allow to update fields");
       CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == avc.asset_op_history->back().descriptor.meta_info, false, "burn operation not not allow to update meta info");
 
-      avc.amout_to_validate =  avc.asset_op_history->back().descriptor.current_supply - ado.descriptor.current_supply;
+      avc.amount_to_validate =  avc.asset_op_history->back().descriptor.current_supply - ado.descriptor.current_supply;
 
     }
     else

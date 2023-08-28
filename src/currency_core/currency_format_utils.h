@@ -252,7 +252,7 @@ namespace currency
     const asset_descriptor_operation& ado;
     crypto::public_key asset_id = currency::null_pkey;
     crypto::point_t asset_id_pt = crypto::c_point_0;
-    uint64_t amout_to_validate = 0;
+    uint64_t amount_to_validate = 0;
     std::shared_ptr< const std::list<asset_descriptor_operation> > asset_op_history;
   };
 

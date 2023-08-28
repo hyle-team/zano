@@ -577,7 +577,7 @@ namespace currency
       // make sure that amount commitment corresponds to opt_amount_commitment_g_proof
       CHECK_AND_ASSERT_MES(context.ado.opt_amount_commitment.has_value(), false, "opt_amount_commitment is absent");
       CHECK_AND_ASSERT_MES(aop.opt_amount_commitment_g_proof.has_value(), false, "opt_amount_commitment_g_proof is absent");
-      crypto::point_t A = crypto::point_t(context.ado.opt_amount_commitment.get()).modify_mul8() - context.amout_to_validate * context.asset_id_pt;
+      crypto::point_t A = crypto::point_t(context.ado.opt_amount_commitment.get()).modify_mul8() - context.amount_to_validate * context.asset_id_pt;
 
       bool r = crypto::check_signature(context.tx_id, A.to_public_key(), aop.opt_amount_commitment_g_proof.get());
       CHECK_AND_ASSERT_MES(r, false, "opt_amount_commitment_g_proof check failed");
