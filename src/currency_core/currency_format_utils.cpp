@@ -561,7 +561,7 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------------------------------------
-  bool validate_asset_operation_balance_proof(asset_op_verification_context& context)// const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, crypto::public_key& asset_id)
+  bool validate_asset_operation_amount_proof(asset_op_verification_context& context)// const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, crypto::public_key& asset_id)
   {
     CHECK_AND_ASSERT_MES(count_type_in_variant_container<asset_operation_proof>(context.tx.proofs) == 1, false, "asset_operation_proof not present or present more than once");
     const asset_operation_proof& aop = get_type_in_variant_container_by_ref<const asset_operation_proof>(context.tx.proofs);
@@ -569,7 +569,7 @@ namespace currency
     if (context.ado.descriptor.hidden_supply)
     {
       CHECK_AND_ASSERT_MES(aop.opt_amount_commitment_composition_proof.has_value(), false, "opt_amount_commitment_composition_proof is absent");
-      // TODO @#@# if asset is hidden -- theck composition proof
+      // TODO @#@# if asset is hidden -- check composition proof
       return false;
     }
     else
@@ -3264,15 +3264,16 @@ namespace currency
 
 
   //---------------------------------------------------------------
-  std::string print_money_brief(uint64_t amount)
+  std::string print_money_brief(uint64_t amount, size_t decimal_point /* = CURRENCY_DISPLAY_DECIMAL_POINT */)
   {
-    uint64_t remainder = amount % COIN;
-    amount /= COIN;
+    uint64_t coin = decimal_point == CURRENCY_DISPLAY_DECIMAL_POINT ? COIN : crypto::constexpr_pow(decimal_point, 10);
+    uint64_t remainder = amount % coin;
+    amount /= coin;
     if (remainder == 0)
       return std::to_string(amount) + ".0";
     std::string r = std::to_string(remainder);
-    if (r.size() < CURRENCY_DISPLAY_DECIMAL_POINT)
-      r.insert(0, CURRENCY_DISPLAY_DECIMAL_POINT - r.size(), '0');
+    if (r.size() < decimal_point)
+      r.insert(0, decimal_point - r.size(), '0');
     return std::to_string(amount) + '.' + r.substr(0, r.find_last_not_of('0') + 1);
   }
   //---------------------------------------------------------------
@@ -4281,6 +4282,25 @@ namespace currency
     }
 
     return tx_hash_for_signature;
+  }
+  //------------------------------------------------------------------
+  const char* get_asset_operation_type_string(size_t asset_operation_type, bool short_name /* = false */)
+  {
+    switch(asset_operation_type)
+    {
+    case ASSET_DESCRIPTOR_OPERATION_UNDEFINED:
+      return short_name ? "undefined" : "ASSET_DESCRIPTOR_OPERATION_UNDEFINED";
+    case ASSET_DESCRIPTOR_OPERATION_REGISTER:
+      return short_name ? "register"  : "ASSET_DESCRIPTOR_OPERATION_REGISTER";
+    case ASSET_DESCRIPTOR_OPERATION_UPDATE:
+      return short_name ? "update"    : "ASSET_DESCRIPTOR_OPERATION_UPDATE";
+    case ASSET_DESCRIPTOR_OPERATION_EMIT:
+      return short_name ? "emit"      : "ASSET_DESCRIPTOR_OPERATION_EMIT";
+    case ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN:
+      return short_name ? "burn"      : "ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN";
+    default:
+      return "unknown";
+    }
   }
   //------------------------------------------------------------------
   std::string dump_ring_sig_data(const crypto::hash& hash_for_sig, const crypto::key_image& k_image, const std::vector<const crypto::public_key*>& output_keys_ptrs, const std::vector<crypto::signature>& sig)

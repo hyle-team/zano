@@ -461,11 +461,11 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
       if (m_wcallback)
         m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
     }
-    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
     {
-      WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(ado.opt_asset_id, "ASSET_DESCRIPTOR_OPERATION_UPDATE with empty opt_asset_id");
+      WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(ado.opt_asset_id, get_asset_operation_type_string(ado.operation_type) << " failed with empty opt_asset_id");
       auto  it = m_own_asset_descriptors.find(*ado.opt_asset_id);
-      WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(it != m_own_asset_descriptors.end(), "asset with asset_id " << *ado.opt_asset_id << " not found during ASSET_DESCRIPTOR_OPERATION_UPDATE");
+      WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(it != m_own_asset_descriptors.end(), "asset with asset_id " << *ado.opt_asset_id << " not found during " << get_asset_operation_type_string(ado.operation_type));
       if (it->second.asset_descriptor.owner != ado.descriptor.owner)
       {
         //ownership of the asset had been transfered
@@ -4731,7 +4731,7 @@ void wallet2::emmit_asset(const crypto::public_key asset_id, std::vector<currenc
  
   asset_descriptor_operation asset_emmit_info = AUTO_VAL_INIT(asset_emmit_info);
   asset_emmit_info.descriptor = rsp.asset_descriptor;
-  asset_emmit_info.operation_type = ASSET_DESCRIPTOR_OPERATION_EMMIT;
+  asset_emmit_info.operation_type = ASSET_DESCRIPTOR_OPERATION_EMIT;
   asset_emmit_info.opt_asset_id = asset_id;
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.dsts = destinations;
