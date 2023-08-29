@@ -727,6 +727,15 @@ namespace crypto
       return result;
     }
 
+    point_t operator-() const
+    {
+      point_t result = *this;
+      fe zero = {0};
+      fe_sub(result.m_p3.Y, zero, result.m_p3.Y);
+      fe_sub(result.m_p3.Z, zero, result.m_p3.Z);
+      return result;
+    }
+
     point_t& modify_mul8()
     {
       ge_mul8_p3(&m_p3, &m_p3);

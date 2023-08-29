@@ -98,26 +98,31 @@ do { \
   if (!_ser_ar.stream().good()) return false; \
 } while (0);
 
-#define VERSION()                                       \
+#define VERSION(ver)                                       \
 do {                                                    \
   _ser_ar.tag("VERSION");                               \
   if (!_ser_ar.stream().good()){break;}                 \
+  s_version = s_current_version = ver;                                      \
   _ser_ar.serialize_varint(s_version);                  \
   if (!_ser_ar.stream().good()) return false;           \
   if(s_version > s_current_version) return false;       \
 } while (0);
 
+/*
 #define CURRENT_VERSION(v)                              \
 do {                                                    \
   s_current_version = v;                                \
   if (_ser_ar.is_saving_arch()) { s_version = v; }      \
 } while (0);
+*/
+
+#define END_VERSION_UNDER(x)                            \
+  if(s_version < x ) {return true;}
 
 
-
-#define BEGIN_VERSIONED_SERIALIZE() \
+#define BEGIN_VERSIONED_SERIALIZE(ver) \
   BEGIN_SERIALIZE() \
-  VERSION()
+  VERSION(ver)
 
 
 #define DEFINE_SERIALIZATION_VERSION(v) inline static uint32_t get_serialization_version() { return v; }

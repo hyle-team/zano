@@ -1347,8 +1347,7 @@ namespace wallet_public
     crypto::secret_key one_time_skey;
     
     BEGIN_SERIALIZE_OBJECT()
-      VERSION()
-      CURRENT_VERSION(0)
+      VERSION(0)
       FIELD(gen_context)
       FIELD(one_time_skey)
     END_SERIALIZE()
@@ -1361,8 +1360,7 @@ namespace wallet_public
 
 
     BEGIN_SERIALIZE_OBJECT()
-      VERSION()
-      CURRENT_VERSION(0)
+      VERSION(0)
       FIELD(tx_template)
       FIELD(encrypted_context)
     END_SERIALIZE()

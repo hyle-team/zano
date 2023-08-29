@@ -7,7 +7,6 @@
 #include "chaingen.h"
 #include "wallet_tests_basic.h"
 
-
 struct multiassets_basic_test : public wallet_test
 {
   static uint64_t ts_starter;

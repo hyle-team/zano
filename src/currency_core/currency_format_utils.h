@@ -158,6 +158,8 @@ namespace currency
     crypto::public_key spend_pub_key;  // only for validations
     uint64_t tx_version;
     uint64_t mode_separate_fee = 0;
+    crypto::secret_key asset_control_key = currency::null_skey;
+    epee::misc_utils::events_dispatcher* pevents_dispatcher;
 
     tx_generation_context gen_context{}; // solely for consolidated txs
 
@@ -177,6 +179,7 @@ namespace currency
       FIELD(spend_pub_key)
       FIELD(tx_version)
       FIELD(mode_separate_fee)
+      FIELD(asset_control_key)      
       if (flags & TX_FLAG_SIGNATURE_MODE_SEPARATE)
         FIELD(gen_context);
     END_SERIALIZE()
@@ -242,6 +245,17 @@ namespace currency
     std::vector<crypto::point_t>  amount_commitments;
   };
 
+  struct asset_op_verification_context
+  {
+    const transaction& tx;
+    const crypto::hash& tx_id;
+    const asset_descriptor_operation& ado;
+    crypto::public_key asset_id = currency::null_pkey;
+    crypto::point_t asset_id_pt = crypto::c_point_0;
+    uint64_t amount_to_validate = 0;
+    std::shared_ptr< const std::list<asset_descriptor_operation> > asset_op_history;
+  };
+
   bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs);
   bool generate_asset_surjection_proof(const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, zc_asset_surjection_proof& result);
   bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id);
@@ -250,7 +264,8 @@ namespace currency
     const std::vector<tx_out_v>& vouts, zc_outs_range_proof& result);
   bool check_tx_bare_balance(const transaction& tx, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
   bool check_tx_balance(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
-  bool validate_asset_operation(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, crypto::public_key& asset_id);
+  bool validate_asset_operation_amount_proof(asset_op_verification_context& context);
+  const char* get_asset_operation_type_string(size_t asset_operation_type, bool short_name = false);
   //---------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 
                                                              size_t current_block_size, 
@@ -390,13 +405,13 @@ namespace currency
   uint64_t get_block_height(const block& b);
   std::vector<txout_ref_v> relative_output_offsets_to_absolute(const std::vector<txout_ref_v>& off);
   // DEPRECATED: consider using prepare_outputs_entries_for_key_offsets and absolute_sorted_output_offsets_to_relative_in_place instead
-  std::vector<txout_ref_v> absolute_output_offsets_to_relative(const std::vector<txout_ref_v>& off);
+  [[deprecated]] std::vector<txout_ref_v> absolute_output_offsets_to_relative(const std::vector<txout_ref_v>& off);
   bool absolute_sorted_output_offsets_to_relative_in_place(std::vector<txout_ref_v>& offsets) noexcept;
 
 
 
   // prints amount in format "3.14", "0.0"
-  std::string print_money_brief(uint64_t amount);
+  std::string print_money_brief(uint64_t amount, size_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT);
   uint64_t get_actual_timestamp(const block& b); // obsolete and depricated, use get_block_datetime
   uint64_t get_block_datetime(const block& b);
   void set_block_datetime(uint64_t datetime, block& b);
@@ -432,6 +447,11 @@ namespace currency
   std::string get_word_from_timstamp(uint64_t timestamp, bool use_password);
   uint64_t get_timstamp_from_word(std::string word, bool& password_used);
   std::string generate_origin_for_htlc(const txout_htlc& htlc, const account_keys& acc_keys);
+  bool validate_ado_update_allowed(const asset_descriptor_base& a, const asset_descriptor_base& b);
+
+
+  void normalize_asset_operation_for_hashing(asset_descriptor_operation& op);
+  crypto::hash get_signature_hash_for_asset_operation(const asset_descriptor_operation& ado);
 
   template<class t_txin_v>
   typename std::conditional<std::is_const<t_txin_v>::value, const std::vector<txin_etc_details_v>, std::vector<txin_etc_details_v> >::type& get_txin_etc_options(t_txin_v& in)

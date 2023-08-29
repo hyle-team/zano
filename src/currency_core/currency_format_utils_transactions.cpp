@@ -333,11 +333,10 @@ namespace currency
     if (!get_type_in_variant_container(tx.extra, *p_ado))
       return false;
     
-    // TODO @#@# change to ASSET_DESCRIPTOR_OPERATION_EMMIT !
-    if (p_ado->operation_type != ASSET_DESCRIPTOR_OPERATION_REGISTER)
-      return false;
+    if (p_ado->operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER || p_ado->operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
+      return true;
 
-    return true;
+    return false;
   }
   //---------------------------------------------------------------
   // Prepapres vector of output_entry to be used in key_offsets in a transaction input:

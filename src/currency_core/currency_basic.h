@@ -749,7 +749,7 @@ namespace currency
     crypto::public_key  owner = currency::null_pkey; // consider premultipling by 1/8
     bool                hidden_supply = false;
 
-    BEGIN_VERSIONED_SERIALIZE()
+    BEGIN_VERSIONED_SERIALIZE(0)
       FIELD(total_max_supply)
       FIELD(current_supply)
       FIELD(decimal_point)
@@ -769,6 +769,7 @@ namespace currency
       BOOST_SERIALIZE(full_name)
       BOOST_SERIALIZE(meta_info)
       BOOST_SERIALIZE(owner)
+      BOOST_SERIALIZE(hidden_supply)
     END_BOOST_SERIALIZATION()
 
     BEGIN_KV_SERIALIZE_MAP()
@@ -779,6 +780,7 @@ namespace currency
       KV_SERIALIZE(full_name)
       KV_SERIALIZE(meta_info)
       KV_SERIALIZE_POD_AS_HEX_STRING(owner)
+      KV_SERIALIZE(hidden_supply)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -803,7 +805,7 @@ namespace currency
 
 #define ASSET_DESCRIPTOR_OPERATION_UNDEFINED     0
 #define ASSET_DESCRIPTOR_OPERATION_REGISTER      1
-#define ASSET_DESCRIPTOR_OPERATION_EMMIT         2
+#define ASSET_DESCRIPTOR_OPERATION_EMIT          2
 #define ASSET_DESCRIPTOR_OPERATION_UPDATE        3
 #define ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN   4
 
@@ -813,17 +815,25 @@ namespace currency
     uint8_t                         operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
     asset_descriptor_base           descriptor;
     boost::optional<crypto::public_key> opt_amount_commitment; // premultiplied by 1/8
+    boost::optional<crypto::signature> opt_proof; // operation proof - for update/emit
+    boost::optional<crypto::public_key> opt_asset_id; // target asset_id - for update/emit
 
-    BEGIN_VERSIONED_SERIALIZE()
+    BEGIN_VERSIONED_SERIALIZE(1)
       FIELD(operation_type)
       FIELD(descriptor)
       FIELD(opt_amount_commitment)
+      END_VERSION_UNDER(1)
+      FIELD(opt_proof)
+      FIELD(opt_asset_id)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(operation_type)
       BOOST_SERIALIZE(descriptor)
       BOOST_SERIALIZE(opt_amount_commitment)
+      BOOST_END_VERSION_UNDER(1)
+      BOOST_SERIALIZE(opt_proof)
+      BOOST_SERIALIZE(opt_asset_id)
     END_BOOST_SERIALIZATION()
   };
 
@@ -833,7 +843,7 @@ namespace currency
     boost::optional<crypto::linear_composition_proof_s> opt_amount_commitment_composition_proof; // for hidden supply
     boost::optional<crypto::signature> opt_amount_commitment_g_proof; // for non-hidden supply, proofs that amount_commitment - supply * asset_id = lin(G)
 
-    BEGIN_VERSIONED_SERIALIZE()
+    BEGIN_VERSIONED_SERIALIZE(0)
       FIELD(opt_amount_commitment_composition_proof)
       FIELD(opt_amount_commitment_g_proof)
     END_SERIALIZE()

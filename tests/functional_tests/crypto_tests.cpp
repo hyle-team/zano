@@ -1588,6 +1588,37 @@ TEST(crypto, schnorr_sig)
   return true;
 }
 
+TEST(crypto, point_negation)
+{
+  ASSERT_EQ(c_point_0, -c_point_0);
+  ASSERT_NEQ(c_point_G, -c_point_G);
+  ASSERT_EQ(c_point_G, -(-c_point_G));
+  ASSERT_EQ(-c_point_G, c_scalar_Lm1 * c_point_G);
+  ASSERT_EQ(-c_point_G, c_point_0 - c_point_G);
+  ASSERT_EQ(0 * (-c_point_G), c_point_0);
+  scalar_t a = scalar_t::random(), b = scalar_t::random();
+  ASSERT_EQ(a * (-c_point_G) + b * c_point_G + a * c_point_H + b * (-c_point_H), (b - a) * c_point_G + (a - b) * c_point_H);
+  ASSERT_EQ(a * (-c_point_G), (a * c_scalar_Lm1) * c_point_G);
+
+  for(size_t i = 0, sz = sizeof(canonical_torsion_elements) / sizeof(canonical_torsion_elements[0]); i < sz; ++i)
+  {
+    point_t el{};
+    ASSERT_TRUE(el.from_string(canonical_torsion_elements[i].string));
+    ASSERT_EQ(el, -(-el));
+    ASSERT_EQ((-scalar_t(1)) * el, (c_scalar_0 - c_scalar_1) * el);
+    ASSERT_NEQ(-el, (-scalar_t(1)) * el);  // because torsion elements have order != L
+    ASSERT_NEQ(-el, c_scalar_Lm1 * el);    // because torsion elements have order != L
+    ASSERT_EQ(-el, (scalar_t(canonical_torsion_elements[i].order) - 1) * el); // they rather have order == canonical_torsion_elements[i].order
+    ASSERT_EQ(-el, c_point_0 - el);
+    ASSERT_EQ((-el) + (el), c_point_0);
+    ASSERT_EQ((-el) - (-el), c_point_0);
+    scalar_t x = scalar_t::random();
+    ASSERT_EQ(x * (-el) + x * el, c_point_0);
+  }
+
+  return true;
+}
+
 
 //
 // test's runner

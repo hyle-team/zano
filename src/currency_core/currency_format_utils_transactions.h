@@ -272,6 +272,7 @@ namespace currency
     crypto::point_t     ao_asset_id_pt                      = crypto::c_point_0;
     crypto::point_t     ao_amount_commitment                = crypto::c_point_0;
     crypto::scalar_t    ao_amount_blinding_mask             {};                       //                                                   generate_tx_balance_proof  generate_ZC_sig
+    bool                ao_commitment_in_outputs            = false;
 
     // consider redesign, some data may possibly be excluded from kv serialization -- sowle
     BEGIN_KV_SERIALIZE_MAP()
@@ -295,12 +296,12 @@ namespace currency
       KV_SERIALIZE_POD_AS_HEX_STRING(ao_asset_id_pt)
       KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_commitment)
       KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_blinding_mask)
+      KV_SERIALIZE_POD_AS_HEX_STRING(ao_commitment_in_outputs)
     END_KV_SERIALIZE_MAP()
   
     // solely for consolidated txs, asset opration fields are not serialized
     BEGIN_SERIALIZE_OBJECT()
-      VERSION()
-      CURRENT_VERSION(0)
+      VERSION(0)
       FIELD(asset_ids)
       FIELD(blinded_asset_ids)
       FIELD(amount_commitments)
@@ -323,6 +324,7 @@ namespace currency
       //ao_asset_id_pt
       //ao_amount_commitment
       //ao_amount_blinding_mask
+      //ao_commitment_in_outputs
     END_SERIALIZE()
   }; // struct tx_generation_context
 
