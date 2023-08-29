@@ -333,7 +333,7 @@ namespace currency
     if (!get_type_in_variant_container(tx.extra, *p_ado))
       return false;
     
-    if (p_ado->operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER || p_ado->operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT)
+    if (p_ado->operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER || p_ado->operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
       return true;
 
     return false;

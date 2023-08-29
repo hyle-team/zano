@@ -3857,7 +3857,7 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
 
     CHECK_AND_ASSERT_MES(avc.asset_op_history && avc.asset_op_history->size(), false, "asset with id " << avc.asset_id << " has not been registered");
     // check ownership permission
-    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
     {
       bool r = validate_ado_ownership(avc);
       CHECK_AND_ASSERT_MES(r, false, "Faild to validate ownership of asset_descriptor_operation, rejecting");
@@ -3873,11 +3873,11 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
 
       need_to_validate_balance_proof = false;
     }
-    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT)
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
     {
-      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > avc.asset_op_history->back().descriptor.current_supply, false, "emmit operation not increasing emission, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, avc.asset_op_history->back().descriptor), false, "emmit operation not allow to update fields");
-      CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == avc.asset_op_history->back().descriptor.meta_info, false, "emmit operation not not allow to update meta info");
+      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > avc.asset_op_history->back().descriptor.current_supply, false, "emit operation does not increase the current supply, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, avc.asset_op_history->back().descriptor), false, "emit operation is not allowed to update fields");
+      CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == avc.asset_op_history->back().descriptor.meta_info, false, "emit operation is not allowed to update meta info");
       avc.amount_to_validate = ado.descriptor.current_supply - avc.asset_op_history->back().descriptor.current_supply;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
