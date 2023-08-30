@@ -4806,6 +4806,17 @@ void wallet2::burn_asset(const crypto::public_key asset_id, uint64_t amount_to_b
   result_tx = ft.tx;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb)
+{
+  COMMAND_RPC_GET_ASSET_INFO::request req;
+  req.asset_id = asset_id;
+  COMMAND_RPC_GET_ASSET_INFO::response rsp;
+  bool r = m_core_proxy->call_COMMAND_RPC_GET_ASSET_INFO(req, rsp);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to call_COMMAND_RPC_GET_ASSET_INFO");
+  adb = rsp.asset_descriptor;
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward)
 {
   if (!validate_alias_name(ai.m_alias))

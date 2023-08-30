@@ -695,6 +695,8 @@ namespace tools
     void update_asset(const crypto::public_key asset_id, const currency::asset_descriptor_base new_descriptor, currency::transaction& result_tx);
     void burn_asset(const crypto::public_key asset_id, uint64_t amount_to_burn, currency::transaction& result_tx);
 
+    bool daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb);
+
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
     void set_pos_utxo_count_limits_for_defragmentation_tx(uint64_t min_outs, uint64_t max_outs); // don't create UTXO defrag. tx if there are less than 'min_outs' outs; don't put more than 'max_outs' outs
     void set_pos_decoys_count_for_defragmentation_tx(size_t decoys_count);

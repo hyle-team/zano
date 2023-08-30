@@ -309,6 +309,10 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("tor_enable", boost::bind(&simple_wallet::tor_enable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
   m_cmd_binder.set_handler("tor_disable", boost::bind(&simple_wallet::tor_disable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
   m_cmd_binder.set_handler("deploy_new_asset", boost::bind(&simple_wallet::deploy_new_asset, this, ph::_1), "deploy_new_asset <json_filename> - Deploys new asset in the network, with current wallet as a maintainer");
+  m_cmd_binder.set_handler("emmit_asset", boost::bind(&simple_wallet::emmit_asset, this, ph::_1), "emmit_asset <asset_id> <amount> - Emmit more coins for the asset, possible only if current wallet is a maintainer for the asset");
+  m_cmd_binder.set_handler("burn_asset", boost::bind(&simple_wallet::burn_asset, this, ph::_1), "burn_asset <asset_id> <amount> - Burn coins for the asset, possible only if current wallet is a maintainer for the asset AND possess given amount of coins to burn");
+  m_cmd_binder.set_handler("update_asset", boost::bind(&simple_wallet::update_asset, this, ph::_1), "update_asset <asset_id> <path_to_metadata_file> - Update asset descriptor's metadata, possible only if current wallet is a maintainer for the asset");
+
   m_cmd_binder.set_handler("add_custom_asset_id", boost::bind(&simple_wallet::add_custom_asset_id, this, ph::_1), "Approve asset id to be recognized in the wallet and returned in balances");
   m_cmd_binder.set_handler("remove_custom_asset_id", boost::bind(&simple_wallet::remove_custom_asset_id, this, ph::_1), "Cancel previously made approval for asset id");
 
@@ -1904,6 +1908,158 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
     << "Max emission: " << print_fixed_decimal_point(adb.total_max_supply, adb.decimal_point) << ENDL
     ;
   
+  SIMPLE_WALLET_CATCH_TRY_ENTRY();
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::emmit_asset(const std::vector<std::string> &args)
+{
+
+  SIMPLE_WALLET_BEGIN_TRY_ENTRY();
+  if (args.size() != 2)
+  {
+    fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 2";
+    return true;
+  }
+  crypto::public_key asset_id = currency::null_pkey;
+  bool r = epee::string_tools::parse_tpod_from_hex_string(args[0], asset_id);
+  if (!r)
+  {
+    fail_msg_writer() << "Failed to load asset_id from: " << args[0];
+    return true;
+  }
+
+  uint64_t amount = 0;
+  r = epee::string_tools::get_xtype_from_string(amount, args[1]);
+  if (!r)
+  {
+    fail_msg_writer() << "Failed to load amount from: " << args[1];
+    return true;
+  }
+
+
+  currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
+  r = m_wallet->daemon_get_asset_info(asset_id, adb);
+  if (!r)
+  {
+    fail_msg_writer() << "Wallet seems to don't have control over asset: " << args[0];
+    return true;
+  }
+
+  tx_destination_entry td = AUTO_VAL_INIT(td);
+  td.addr.push_back(m_wallet->get_account().get_public_address());
+  td.amount = amount;
+  td.asset_id = asset_id;
+  std::vector<currency::tx_destination_entry> destinations;
+  destinations.push_back(td);
+  currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
+  m_wallet->emmit_asset(asset_id, destinations, result_tx);
+
+  success_msg_writer(true) << "Emitted " << get_transaction_hash(result_tx) << " (unconfirmed) : " << ENDL
+    << "Asset ID:     " << asset_id << ENDL
+    << "Title:        " << adb.full_name << ENDL
+    << "Ticker:       " << adb.ticker << ENDL
+    << "Emitted:      " << print_fixed_decimal_point(amount, adb.decimal_point) << ENDL
+    << "Max emission: " << print_fixed_decimal_point(adb.total_max_supply, adb.decimal_point) << ENDL
+    ;
+
+  SIMPLE_WALLET_CATCH_TRY_ENTRY();
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::burn_asset(const std::vector<std::string> &args)
+{
+  SIMPLE_WALLET_BEGIN_TRY_ENTRY();
+  if (args.size() != 2)
+  {
+    fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 2";
+    return true;
+  }
+  crypto::public_key asset_id = currency::null_pkey;
+  bool r = epee::string_tools::parse_tpod_from_hex_string(args[0], asset_id);
+  if (!r)
+  {
+    fail_msg_writer() << "Failed to load asset_id from: " << args[0];
+    return true;
+  }
+
+  uint64_t amount = 0;
+  r = epee::string_tools::get_xtype_from_string(amount, args[1]);
+  if (!r)
+  {
+    fail_msg_writer() << "Failed to load amount from: " << args[1];
+    return true;
+  }
+
+
+  currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
+  r = m_wallet->daemon_get_asset_info(asset_id, adb);
+  if (!r)
+  {
+    fail_msg_writer() << "Wallet seems to don't have control over asset: " << args[0];
+    return true;
+  }
+
+  currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
+  m_wallet->burn_asset(asset_id, amount, result_tx);
+
+  success_msg_writer(true) << "Burned " << get_transaction_hash(result_tx) << " (unconfirmed) : " << ENDL
+    << "Asset ID:     " << asset_id << ENDL
+    << "Title:        " << adb.full_name << ENDL
+    << "Ticker:       " << adb.ticker << ENDL
+    << "Burned:      " << print_fixed_decimal_point(amount, adb.decimal_point) << ENDL
+    << "Max emission: " << print_fixed_decimal_point(adb.total_max_supply, adb.decimal_point) << ENDL
+    ;
+
+  SIMPLE_WALLET_CATCH_TRY_ENTRY();
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::update_asset(const std::vector<std::string> &args)
+{
+  SIMPLE_WALLET_BEGIN_TRY_ENTRY();
+  if (args.size() != 2)
+  {
+    fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 2";
+    return true;
+  }
+
+  crypto::public_key asset_id = currency::null_pkey;
+  bool r = epee::string_tools::parse_tpod_from_hex_string(args[0], asset_id);
+  if (!r)
+  {
+    fail_msg_writer() << "Failed to load asset_id from: " << args[0];
+    return true;
+  }
+
+  std::string buff_metainfo = "";
+  r = epee::file_io_utils::load_file_to_string(args[1], buff_metainfo);
+  if (!r)
+  {
+    fail_msg_writer() << "Failed to load metainfo data file: " << args[1];
+    return true;
+  }
+
+  currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
+  r = m_wallet->daemon_get_asset_info(asset_id, adb);
+  if (!r)
+  {
+    fail_msg_writer() << "Wallet seems to don't have control over asset: " << args[0];
+    return true;
+  }
+
+  adb.meta_info = buff_metainfo;
+  currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
+  m_wallet->update_asset(asset_id, adb, result_tx);
+
+  success_msg_writer(true) << "Asset metainfo update tx sent: " << get_transaction_hash(result_tx) << " (unconfirmed) : " << ENDL
+    << "Asset ID:     " << asset_id << ENDL
+    << "Title:        " << adb.full_name << ENDL
+    << "Ticker:       " << adb.ticker << ENDL
+    << "Emitted:      " << print_fixed_decimal_point(adb.current_supply, adb.decimal_point) << ENDL
+    << "Max emission: " << print_fixed_decimal_point(adb.total_max_supply, adb.decimal_point) << ENDL
+    ;
+
   SIMPLE_WALLET_CATCH_TRY_ENTRY();
   return true;
 }
