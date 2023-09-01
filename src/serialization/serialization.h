@@ -102,11 +102,21 @@ do { \
 do {                                                    \
   _ser_ar.tag("VERSION");                               \
   if (!_ser_ar.stream().good()){break;}                 \
-  s_version = s_current_version = ver;                                      \
-  _ser_ar.serialize_varint(s_version);                  \
+  _ser_ar.serialize_varint(s_version);                   \
   if (!_ser_ar.stream().good()) return false;           \
   if(s_version > s_current_version) return false;       \
 } while (0);
+
+#define VERSION_TO_MEMBER(last_ver, this_version_member)                                       \
+do {                                                    \
+  _ser_ar.tag("VERSION");                               \
+  if (!_ser_ar.stream().good()){break;}                 \
+  _ser_ar.serialize_varint(this_version_member);        \
+  if (!_ser_ar.stream().good()) return false;           \
+  if(this_version_member > last_ver) return false;      \
+  s_version = this_version_member;                      \
+} while (0);
+
 
 /*
 #define CURRENT_VERSION(v)                              \
@@ -120,9 +130,9 @@ do {                                                    \
   if(s_version < x ) {return true;}
 
 
-#define BEGIN_VERSIONED_SERIALIZE(ver) \
+#define BEGIN_VERSIONED_SERIALIZE(last_ver, this_version_member) \
   BEGIN_SERIALIZE() \
-  VERSION(ver)
+  VERSION_TO_MEMBER(last_ver, this_version_member)
 
 
 #define DEFINE_SERIALIZATION_VERSION(v) inline static uint32_t get_serialization_version() { return v; }

@@ -561,6 +561,8 @@ namespace currency
       }
 
       context.m_priv.m_requested_objects.erase(req_it);
+
+      LOG_PRINT_L4("[NOTIFY_RESPONSE_GET_OBJECTS] BLOCK " << get_block_hash(b) << "[" << get_block_height(b) << "/" << count << "], txs: " << b.tx_hashes.size());
     }
 
     LOG_PRINT_CYAN("Block parsing time avr: " << (count > 0 ? total_blocks_parsing_time / count : 0) << " mcs, total for " << count << " blocks: " << total_blocks_parsing_time / 1000 << " ms", LOG_LEVEL_2);
@@ -581,12 +583,13 @@ namespace currency
       for (const block_complete_entry& block_entry : arg.blocks)
       {
         CHECK_STOP_FLAG__DROP_AND_RETURN_IF_SET(1, "Blocks processing interrupted, connection dropped");
-
         block_verification_context bvc = boost::value_initialized<block_verification_context>();
         //process transactions
+        size_t count_txs = 0;
         TIME_MEASURE_START(transactions_process_time);
         for (const auto& tx_blob : block_entry.txs)
         {
+          LOG_PRINT_L4("[NOTIFY_RESPONSE_GET_OBJECTS] BL/TX ["<< count << "/" << count_txs << "]: " << epst::buff_to_hex_nodelimer(tx_blob));
           CHECK_STOP_FLAG__DROP_AND_RETURN_IF_SET(1, "Block txs processing interrupted, connection dropped");
           crypto::hash tx_id = null_hash;
           transaction tx = AUTO_VAL_INIT(tx);
@@ -598,6 +601,7 @@ namespace currency
             return 1;
           }
           bvc.m_onboard_transactions[tx_id] = tx;
+          count_txs++;
 //           tx_verification_context tvc = AUTO_VAL_INIT(tvc);
 //           m_core.handle_incoming_tx(tx_blob, tvc, true);
 //           if(tvc.m_verification_failed)

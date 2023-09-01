@@ -748,8 +748,9 @@ namespace currency
     std::string         meta_info;
     crypto::public_key  owner = currency::null_pkey; // consider premultipling by 1/8
     bool                hidden_supply = false;
+    uint8_t             version = 0;
 
-    BEGIN_VERSIONED_SERIALIZE(0)
+    BEGIN_VERSIONED_SERIALIZE(0, version)
       FIELD(total_max_supply)
       FIELD(current_supply)
       FIELD(decimal_point)
@@ -809,6 +810,7 @@ namespace currency
 #define ASSET_DESCRIPTOR_OPERATION_UPDATE        3
 #define ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN   4
 
+#define ASSET_DESCRIPTOR_OPERATION_STRUCTURE_VER  1
 
   struct asset_descriptor_operation
   {
@@ -817,8 +819,9 @@ namespace currency
     boost::optional<crypto::public_key> opt_amount_commitment; // premultiplied by 1/8
     boost::optional<crypto::signature> opt_proof; // operation proof - for update/emit
     boost::optional<crypto::public_key> opt_asset_id; // target asset_id - for update/emit
+    uint8_t verion = ASSET_DESCRIPTOR_OPERATION_STRUCTURE_VER;
 
-    BEGIN_VERSIONED_SERIALIZE(1)
+    BEGIN_VERSIONED_SERIALIZE(ASSET_DESCRIPTOR_OPERATION_STRUCTURE_VER, verion)
       FIELD(operation_type)
       FIELD(descriptor)
       FIELD(opt_amount_commitment)
@@ -842,8 +845,9 @@ namespace currency
     // linear composition proof for the fact amount_commitment = lin(asset_id, G)
     boost::optional<crypto::linear_composition_proof_s> opt_amount_commitment_composition_proof; // for hidden supply
     boost::optional<crypto::signature> opt_amount_commitment_g_proof; // for non-hidden supply, proofs that amount_commitment - supply * asset_id = lin(G)
+    uint8_t version = 0;
 
-    BEGIN_VERSIONED_SERIALIZE(0)
+    BEGIN_VERSIONED_SERIALIZE(0, version)
       FIELD(opt_amount_commitment_composition_proof)
       FIELD(opt_amount_commitment_g_proof)
     END_SERIALIZE()
@@ -851,6 +855,8 @@ namespace currency
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(opt_amount_commitment_composition_proof)
       BOOST_SERIALIZE(opt_amount_commitment_g_proof)
+      BOOST_END_VERSION_UNDER(1)
+      BOOST_SERIALIZE(version)
     END_BOOST_SERIALIZATION()
   };
 
@@ -1159,6 +1165,9 @@ BLOB_SERIALIZER(currency::txout_to_key);
   VARIANT_TAG(binary_archive, type_name, id); \
   VARIANT_TAG(json_archive, type_name, json_tag)
 
+
+BOOST_CLASS_VERSION(currency::asset_descriptor_operation, 1);
+BOOST_CLASS_VERSION(currency::asset_operation_proof, 1);
 
 
 // txin_v variant currency

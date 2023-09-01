@@ -35,8 +35,8 @@ int main(int argc, char** argv)
     epee::log_space::log_singletone::get_default_log_file().c_str(),
     epee::log_space::log_singletone::get_default_log_folder().c_str());
 
-
-  thread_pool_tests();
+  parse_weird_tx();
+  //thread_pool_tests();
 
 //   std::string buf1 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX);
 //   std::string buf2 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX);
