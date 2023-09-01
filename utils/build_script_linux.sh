@@ -17,6 +17,21 @@ ARCHIVE_NAME_PREFIX=zano-linux-x64-
 : "${QT_PREFIX_PATH:?QT_PREFIX_PATH should be set to Qt libs folder, ex.: /home/user/Qt5.10.1/5.10.1/gcc_64}"
 : "${OPENSSL_ROOT_DIR:?OPENSSL_ROOT_DIR should be set to OpenSSL root folder, ex.: /home/user/openssl}"
 
+while [ $# -gt 0 ]; do
+  case "$1" in 
+    -tn|--testnet)
+        testnet=true
+        ;;
+    -bp|--build_prefix)
+        build_prefix="$2"
+        ;;
+    -qtdt|--qt_dev_tools)
+        qt_dev_tools=true
+        ;;
+  esac
+  shift
+done
+
 if [ -n "$build_prefix" ]; then
   ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}${build_prefix}-
   build_prefix_label="$build_prefix "

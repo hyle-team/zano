@@ -109,6 +109,8 @@ For instance, by adding the following lines to `~/.bashrc`
 
           cd zano
           utils/build_sript_linux.sh
+          
+      **NOTICE**: Script will accept the following optional arguments `--testnet`, `--build_prefix "foo"`, `--qt_build_tools`
 
 7. Look for the binaries in `build` folder
 
