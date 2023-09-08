@@ -6608,16 +6608,24 @@ void wallet2::prepare_tx_destinations(const assets_selection_context& needed_mon
   const std::vector<currency::tx_destination_entry>& dsts,
   std::vector<currency::tx_destination_entry>& final_destinations)
 {
+  
+  /* 
+     let's account all processes assets, so if there are some destinations 
+     that haven't been present in needed_money_map we can add it to final destinations
+     (could be in ionic swaps for example)
+  */
+  std::unordered_set<crypto::public_key> processed_assets;
   for (auto& el: needed_money_map)
   {
     prepare_tx_destinations(el.second.needed_amount, el.second.found_amount, destination_split_strategy_id, dust_policy, dsts, final_destinations, el.first);    
+    processed_assets.insert(el.first);
   }
 
   if (is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
   {
     // special case for asset minting destinations
     for (auto& dst : dsts)
-      if (dst.asset_id == currency::null_pkey)
+      if (dst.asset_id == currency::null_pkey || processed_assets.count(dst.asset_id) == 0)
         final_destinations.emplace_back(dst.amount, dst.addr, dst.asset_id);
 
     //exclude destinations that supposed to be burned (for ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)

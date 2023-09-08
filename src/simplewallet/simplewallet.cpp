@@ -309,7 +309,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("tor_enable", boost::bind(&simple_wallet::tor_enable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
   m_cmd_binder.set_handler("tor_disable", boost::bind(&simple_wallet::tor_disable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
   m_cmd_binder.set_handler("deploy_new_asset", boost::bind(&simple_wallet::deploy_new_asset, this, ph::_1), "deploy_new_asset <json_filename> - Deploys new asset in the network, with current wallet as a maintainer");
-  m_cmd_binder.set_handler("emmit_asset", boost::bind(&simple_wallet::emmit_asset, this, ph::_1), "emmit_asset <asset_id> <amount> - Emmit more coins for the asset, possible only if current wallet is a maintainer for the asset");
+  m_cmd_binder.set_handler("emit_asset", boost::bind(&simple_wallet::emit_asset, this, ph::_1), "emit_asset <asset_id> <amount> - Emmit more coins for the asset, possible only if current wallet is a maintainer for the asset");
   m_cmd_binder.set_handler("burn_asset", boost::bind(&simple_wallet::burn_asset, this, ph::_1), "burn_asset <asset_id> <amount> - Burn coins for the asset, possible only if current wallet is a maintainer for the asset AND possess given amount of coins to burn");
   m_cmd_binder.set_handler("update_asset", boost::bind(&simple_wallet::update_asset, this, ph::_1), "update_asset <asset_id> <path_to_metadata_file> - Update asset descriptor's metadata, possible only if current wallet is a maintainer for the asset");
 
@@ -1912,7 +1912,7 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::emmit_asset(const std::vector<std::string> &args)
+bool simple_wallet::emit_asset(const std::vector<std::string> &args)
 {
 
   SIMPLE_WALLET_BEGIN_TRY_ENTRY();
