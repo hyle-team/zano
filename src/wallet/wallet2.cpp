@@ -6308,6 +6308,8 @@ bool wallet2::select_indices_for_transfer(assets_selection_context& needed_money
   //
   for (auto& item : needed_money_map)
   {
+    if(item.second.needed_amount == 0)
+      continue;
     auto asset_cashe_it = m_found_free_amounts.find(item.first);
     WLT_THROW_IF_FALSE_WALLET_EX_MES(asset_cashe_it != m_found_free_amounts.end(), error::not_enough_money, "", item.second.found_amount, item.second.needed_amount, 0, item.first);
     item.second.found_amount = select_indices_for_transfer(selected_indexes, asset_cashe_it->second, item.second.needed_amount, fake_outputs_count);
