@@ -195,6 +195,8 @@ public:
   //for test purposes onlys
   QString request_dummy();
 
+  QString MainWindow::call_rpc(const QString& params);
+
 signals:
   void quit_requested(const QString str);
   void update_daemon_state(const QString str);

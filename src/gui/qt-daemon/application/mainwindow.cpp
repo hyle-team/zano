@@ -269,7 +269,28 @@ QString MainWindow::request_dummy()
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
+QString MainWindow::call_rpc(const QString& params)
+{
+  TRY_ENTRY();
+  epee::net_utils::http::http_request_info query_info = AUTO_VAL_INIT(query_info);
+  epee::net_utils::http::http_response_info response_info  = AUTO_VAL_INIT(response_info);
+  currency::core_rpc_server::connection_context dummy_context = AUTO_VAL_INIT(dummy_context);
 
+  query_info.m_URI = "/json_rpc";
+  query_info.m_body = params.toStdString();
+
+  m_backend.get_rpc_server().handle_http_request(query_info, response_info, dummy_context);
+  if (response_info.m_response_code != 200)
+  {
+    epee::json_rpc::error_response rsp; 
+    rsp.jsonrpc = "2.0"; 
+    rsp.error.code = response_info.m_response_code;
+    rsp.error.message = response_info.m_response_comment;
+    return QString::fromStdString(epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(rsp)));
+  }
+  return QString::fromStdString(response_info.m_body);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
 QString MainWindow::get_default_fee()
 {
   TRY_ENTRY();

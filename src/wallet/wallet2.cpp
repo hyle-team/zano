@@ -5381,9 +5381,9 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
   ctp.mark_tx_as_complete = false;
   ctp.crypt_address = destination_addr;
   
-  etc_tx_details_expiration_time t = AUTO_VAL_INIT(t);
-  t.v = proposal_detais.expiration_time;
-  ctp.extra.push_back(t);
+  //etc_tx_details_expiration_time t = AUTO_VAL_INIT(t);
+  //t.v = 0;//proposal_detais.expiration_time;
+  //ctp.extra.push_back(t);
 
   ctp.dsts.resize(proposal_detais.to_bob.size() + proposal_detais.to_alice.size());
   size_t i = 0;
@@ -5416,7 +5416,7 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
   selected_transfers = ftp.selected_transfers;
   currency::finalized_tx finalize_result = AUTO_VAL_INIT(finalize_result);
   finalize_transaction(ftp, finalize_result, false);
-  add_transfers_to_expiration_list(selected_transfers, for_expiration_list, this->get_core_runtime_config().get_core_time() + proposal_detais.expiration_time, currency::null_hash);
+  //add_transfers_to_expiration_list(selected_transfers, for_expiration_list, this->get_core_runtime_config().get_core_time() + proposal_detais.expiration_time, currency::null_hash);
 
   //wrap it all 
   proposal.tx_template = finalize_result.tx;
@@ -5572,13 +5572,13 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
     proposal_info.to_alice.push_back(view::asset_funds{ a.first, a.second - amounts_provided_by_a[a.first] });
   }
     
-  etc_tx_details_expiration_time t = AUTO_VAL_INIT(t);
-  if (!get_type_in_variant_container(tx.extra, t))
-  {
-    return false;
-  }
+  //etc_tx_details_expiration_time t = AUTO_VAL_INIT(t);
+  //if (!get_type_in_variant_container(tx.extra, t))
+  //{
+  //  return false;
+  //}
 
-  proposal_info.expiration_time = t.v;
+  //proposal_info.expiration_time = t.v;
   return true;
 }
 

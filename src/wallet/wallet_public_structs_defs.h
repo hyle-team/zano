@@ -1327,7 +1327,7 @@ namespace wallet_public
     std::vector<asset_funds> to_alice;   //assets expected to be funded by the side that receiving proposal (Bob) and addressed to Alice
     uint64_t mixins;
     uint64_t fee_paid_by_a;
-    uint64_t expiration_time;
+    //uint64_t expiration_time;
 
     BEGIN_KV_SERIALIZE_MAP()
 
@@ -1335,7 +1335,7 @@ namespace wallet_public
       KV_SERIALIZE(to_alice)
       KV_SERIALIZE(mixins)
       KV_SERIALIZE(fee_paid_by_a)
-      KV_SERIALIZE(expiration_time)
+      //KV_SERIALIZE(expiration_time)
     END_KV_SERIALIZE_MAP()
 
   };
