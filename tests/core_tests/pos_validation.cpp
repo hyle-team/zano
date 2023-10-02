@@ -1029,6 +1029,12 @@ bool pos_minting_tx_packing::configure_core(currency::core& c, size_t ev_index, 
 
 bool pos_minting_tx_packing::pos_minting_tx_packing::generate(std::vector<test_event_entry>& events) const
 {
+  //
+  // THIS TEST IS ONLY FOR PRE-ZARCANUM WALLET
+  // PLEASE, reject all changes made in master/release2/develop branches and use the version from cryptoassets/multiassets
+  // -- sowle
+  //
+
   bool r = false;
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
@@ -1039,12 +1045,12 @@ bool pos_minting_tx_packing::pos_minting_tx_packing::generate(std::vector<test_e
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
 
-  m_alice_start_amount = 10 * CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size;// +TESTS_DEFAULT_FEE;
+  m_alice_start_amount = CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size;
 
-  // 10 outputs each of (CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size) coins
+  // m_pos_mint_packing_size outputs each of CURRENCY_BLOCK_REWARD coins
   
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), m_alice_start_amount, 10, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), m_alice_start_amount, m_pos_mint_packing_size, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
 
   events.push_back(tx_1);
@@ -1085,7 +1091,7 @@ bool pos_minting_tx_packing::c1(currency::core& c, size_t ev_index, const std::v
     m_alice_start_amount + CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size // unlocked
   ), false, "");
 
-  alice_wlt->set_pos_mint_packing_size(m_pos_mint_packing_size);
+  alice_wlt->set_pos_mint_packing_size(100);
 
   // no coinbase tx outputs should be packed
   r = alice_wlt->try_mint_pos();
@@ -1096,7 +1102,7 @@ bool pos_minting_tx_packing::c1(currency::core& c, size_t ev_index, const std::v
     m_alice_start_amount + CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 1), // total
     true,
     UINT64_MAX,
-    m_alice_start_amount // unlocked (one output with amount == CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size was spent as stake)
+    UINT64_MAX //m_alice_start_amount // unlocked (one output with amount == CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size was spent as stake)
   ), false, "");
 
   r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, WALLET_DEFAULT_TX_SPENDABLE_AGE);
@@ -1109,7 +1115,8 @@ bool pos_minting_tx_packing::c1(currency::core& c, size_t ev_index, const std::v
     m_alice_start_amount + CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 1) // unlocked
   ), false, "");
 
-  // coinbase tx outputs should be packed now, there's enough coinbase outputs (> m_pos_mint_packing_size)
+  // coinbase tx outputs still should NOT be packed now (it's only possible with the stake)
+  alice_wlt->set_pos_mint_packing_size(10);
   r = alice_wlt->try_mint_pos();
   CHECK_AND_ASSERT_MES(r, false, "try_mint_pos failed");
   
@@ -1117,11 +1124,10 @@ bool pos_minting_tx_packing::c1(currency::core& c, size_t ev_index, const std::v
     m_alice_start_amount + CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 2), // total (+1 one block reward)
     true,
     UINT64_MAX,
-    // CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size locked for stake
-    // CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 1) locked for packing tx
-    m_alice_start_amount + CURRENCY_BLOCK_REWARD - CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 1) // unlocked
+    m_alice_start_amount + CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 0) // unlocked
   ), false, "");
 
+  alice_wlt->set_pos_mint_packing_size(8);
   r = alice_wlt->try_mint_pos();
   CHECK_AND_ASSERT_MES(r, false, "try_mint_pos failed");
 
@@ -1129,8 +1135,7 @@ bool pos_minting_tx_packing::c1(currency::core& c, size_t ev_index, const std::v
     m_alice_start_amount + CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 3), // total (+1 one block reward)
     true,
     UINT64_MAX,
-    // CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size locked for stake
-    m_alice_start_amount + CURRENCY_BLOCK_REWARD - CURRENCY_BLOCK_REWARD * (m_pos_mint_packing_size + 1) - CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size // unlocked
+    0 // unlocked
   ), false, "");
 
   return true;

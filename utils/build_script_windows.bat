@@ -168,31 +168,32 @@ IF %ERRORLEVEL% NEQ 0 (
 set installer_file=%ACHIVE_NAME_PREFIX%%version%-installer.exe
 set installer_path=%BUILDS_PATH%\builds\%installer_file%
 
-@echo "   SIGNING ...."
-
-%ZANO_SIGN_CMD% %installer_path%
-IF %ERRORLEVEL% NEQ 0 (
-  @echo "failed to sign installer"
-  rem goto error
-)
+:: Signing temporary disable
+::@echo "   SIGNING ...."
+::
+::%ZANO_SIGN_CMD% %installer_path%
+::IF %ERRORLEVEL% NEQ 0 (
+::  @echo "failed to sign installer"
+::  goto error
+::)
 
 @echo "   UPLOADING TO SERVER ...."
 
-pscp -load zano_build_server %installer_path% build.zano.org:/var/www/html/builds
+pscp %installer_path% zano_build_server:/var/www/html/builds
 IF %ERRORLEVEL% NEQ 0 (
   @echo "FAILED TO UPLOAD EXE TO SERVER"
   goto error
 )
 call :sha256 %installer_path% installer_checksum
 
-pscp -load zano_build_server %build_zip_path% build.zano.org:/var/www/html/builds
+pscp %build_zip_path% zano_build_server:/var/www/html/builds
 IF %ERRORLEVEL% NEQ 0 (
   @echo "FAILED TO UPLOAD ZIP TO SERVER"
   goto error
 )
 call :sha256 %build_zip_path% build_zip_checksum
 
-set mail_msg="New %build_prefix% %TESTNET_LABEL%build for win-x64:<br>INST: https://build.zano.org/builds/%installer_file% <br>sha256: %installer_checksum%<br><br>ZIP:  https://build.zano.org/builds/%build_zip_filename% <br>sha256: %build_zip_checksum%<br>"
+set mail_msg="New %build_prefix% %TESTNET_LABEL%build for win-x64:<br>INST: <a href='https://build.zano.org/builds/%installer_file%'>https://build.zano.org/builds/%installer_file%</a> <br>sha256: %installer_checksum%<br><br>ZIP:  <a href='https://build.zano.org/builds/%build_zip_filename%>https://build.zano.org/builds/%build_zip_filename%</a> <br>sha256: %build_zip_checksum%<br>"
 
 echo %mail_msg%
 

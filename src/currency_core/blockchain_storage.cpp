@@ -3921,9 +3921,6 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   if (need_to_profile && mixins_count > 0)
   {
     m_performance_data.tx_mixin_count.push(mixins_count);
-#ifdef _DEBUG
-    LOG_PRINT_L0("[TX_MIXINS]: " <<  mixins_count);
-#endif
   }
 
   //check if there is already transaction with this hash

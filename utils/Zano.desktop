@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Name=Zano
+GenericName=Zano
+Comment=Privacy blockchain
+Icon=Zano
+Terminal=true
+Type=Application
+Categories=Qt;Utility;
+Name[en_US]=Zano
+MimeType=x-scheme-handler/zano;
+

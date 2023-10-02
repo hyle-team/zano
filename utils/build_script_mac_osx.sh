@@ -148,25 +148,28 @@ echo "Build success"
 
 echo "############### Uploading... ################"
 
-package_filepath=$package_filename
+package_filepath="$(pwd)/$package_filename"
 
-scp $package_filepath zano_build_server:/var/www/html/builds/
+#scp $package_filepath zano_build_server:/var/www/html/builds/
+source ../../../utils/macosx_build_uploader.sh
+pushd .
+upload_build $package_filepath
 if [ $? -ne 0 ]; then
     echo "Failed to upload to remote server"
     exit 1
 fi
+popd
 
 
 read checksum <<< $( shasum -a 256 $package_filepath | awk '/^/ { print $1 }' )
 
 mail_msg="New ${build_prefix_label}${testnet_label}build for macOS-x64:<br>
-https://build.zano.org/builds/$package_filename<br>
+<a href='https://build.zano.org/builds/$package_filename'>https://build.zano.org/builds/$package_filename</a><br>
 sha256: $checksum"
 
 echo "$mail_msg"
 
-echo "$mail_msg" | mail -s "Zano macOS-x64 ${build_prefix_label}${testnet_label}build $version_str" ${emails}
-
+python3 ../../../utils/build_mail.py "Zano macOS-x64 ${build_prefix_label}${testnet_label}build $version_str" "${emails}" "$mail_msg"
 
 ######################
 # notarization

@@ -10,6 +10,9 @@
 # export BOOST_ROOT=/home/user/boost_1_66_0
 # export QT_PREFIX_PATH=/home/user/Qt5.10.1/5.10.1/gcc_64
 # export OPENSSL_ROOT_DIR=/home/user/openssl
+# export LINUX_DEPLOY_QT=/home/user/QtDeployment.appimage
+# export LINUX_APPIMAGE_TOOL=/home/user/AppImageTool.appimage
+
 
 ARCHIVE_NAME_PREFIX=zano-linux-x64-
 
@@ -37,12 +40,17 @@ fi
 
 prj_root=$(pwd)
 
+if [ "$1" == "skip_build" ]; then
+        echo "Skipping build, only packing..."
+	cd build/release;
+else
 echo "---------------- BUILDING PROJECT ----------------"
 echo "--------------------------------------------------"
 
 echo "Building...." 
 
-rm -rf build; mkdir -p build/release; cd build/release; 
+rm -rf build; mkdir -p build/release; 
+cd build/release; 
 cmake $testnet_def -D STATIC=true -D ARCH=x86-64 -D BUILD_GUI=TRUE -D OPENSSL_ROOT_DIR="$OPENSSL_ROOT_DIR" -D CMAKE_PREFIX_PATH="$QT_PREFIX_PATH" -D CMAKE_BUILD_TYPE=Release ../..
 if [ $? -ne 0 ]; then
     echo "Failed to run cmake"
@@ -61,64 +69,68 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+fi
+
+
 
 read version_str <<< $(./src/zanod --version | awk '/^Zano/ { print $2 }')
 version_str=${version_str}
+
+read commit_str <<< $(./src/zanod  --version | grep -m 1 -P -o "(?<=\[)[0-9a-f]{7}")
+commit_str=${commit_str}
+
 echo $version_str
+echo $commit_str
+
 
 rm -rf Zano;
-mkdir -p Zano;
+mkdir -p Zano/usr/bin;
+mkdir -p Zano/usr/lib;
+mkdir -p Zano/usr/share/applications;
+mkdir -p Zano/usr/share/icons/hicolor/scalable/apps;
+mkdir -p Zano/usr/share/icons/hicolor/256x256/apps;
 
-rsync -a ../../src/gui/qt-daemon/layout/html ./Zano --exclude less --exclude package.json --exclude gulpfile.js
-cp -Rv ../../utils/Zano.sh ./Zano
-chmod 777 ./Zano/Zano.sh
-mkdir ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libicudata.so.56 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libicui18n.so.56 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libicuuc.so.56 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5Core.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5DBus.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5Gui.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5Network.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5OpenGL.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5Positioning.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5PrintSupport.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5Qml.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5Quick.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5Sensors.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5Sql.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5Widgets.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5WebEngine.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5WebEngineCore.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5WebEngineWidgets.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5WebChannel.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5XcbQpa.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/lib/libQt5QuickWidgets.so.5 ./Zano/lib
-cp $QT_PREFIX_PATH/libexec/QtWebEngineProcess ./Zano
-cp $QT_PREFIX_PATH/resources/qtwebengine_resources.pak ./Zano
-cp $QT_PREFIX_PATH/resources/qtwebengine_resources_100p.pak ./Zano
-cp $QT_PREFIX_PATH/resources/qtwebengine_resources_200p.pak ./Zano
-cp $QT_PREFIX_PATH/resources/icudtl.dat ./Zano
 
-if [ "$copy_qt_dev_tools" = true ] ; then
-  cp $QT_PREFIX_PATH/resources/qtwebengine_devtools_resources.pak ./Zano
-fi
+rsync -a ../../src/gui/qt-daemon/layout/html ./Zano/usr/bin --exclude less --exclude package.json --exclude gulpfile.js
 
-mkdir ./Zano/lib/platforms
-cp $QT_PREFIX_PATH/plugins/platforms/libqxcb.so ./Zano/lib/platforms
-mkdir ./Zano/xcbglintegrations
-cp $QT_PREFIX_PATH/plugins/xcbglintegrations/libqxcb-glx-integration.so ./Zano/xcbglintegrations
+cp -Rv src/zanod src/Zano src/simplewallet  src/connectivity_tool ./Zano/usr/bin
+cp -Rv ../../utils/Zano.desktop ./Zano/usr/share/applications/Zano.desktop
+cp -Rv ../../resources/app_icon.svg ./Zano/usr/share/icons/hicolor/scalable/apps/Zano.svg
+cp -Rv ../../resources/app_icon_256.png ./Zano/usr/share/icons/hicolor/256x256/apps/Zano.png
 
-cp -Rv src/zanod src/Zano src/simplewallet  src/connectivity_tool ./Zano
 
-package_filename=${ARCHIVE_NAME_PREFIX}${version_str}.tar.bz2
-
-rm -f ./$package_filename
-tar -cjvf $package_filename Zano
+echo "Exec=$prj_root/build/release/Zano/usr/bin/Zano" >> ./Zano/usr/share/applications/Zano.desktop
 if [ $? -ne 0 ]; then
-    echo "Failed to pack"
+    echo "Failed to append deskyop file"
     exit 1
 fi
+
+$LINUX_DEPLOY_QT ./Zano/usr/share/applications/Zano.desktop -qmake=$QT_PREFIX_PATH/bin/qmake
+if [ $? -ne 0 ]; then
+    echo "Failed to run linuxqtdeployment"
+    exit 1
+fi
+
+rm -f $prj_root/build/release/Zano/AppRun
+cp -Rv ../../utils/Zano_appimage_wrapper.sh $prj_root/build/release/Zano/AppRun
+
+package_filename=${ARCHIVE_NAME_PREFIX}${version_str}.AppImage
+
+$LINUX_APPIMAGE_TOOL ./Zano ./$package_filename
+if [ $? -ne 0 ]; then
+    echo "Failed to run appimagetool"
+    exit 1
+fi
+
+
+
+
+#pattern="*.AppImage"
+#files=( $pattern )
+#app_image_file=${files[0]}
+
+
+#mv ./$app_image_file ./$package_filename
 
 echo "Build success"
 
