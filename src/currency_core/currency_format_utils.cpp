@@ -1615,6 +1615,35 @@ namespace currency
     return timestamp;
   }
   //---------------------------------------------------------------
+  bool parse_vote(const std::string& json_, std::list<std::pair<std::string, bool>>& votes)
+  {
+    //do preliminary check of text if it looks like json
+    std::string::size_type pos = json_.find('{');
+    if (pos == std::string::npos)
+      return false;
+    std::string json = json_.substr(pos);
+
+    epee::serialization::portable_storage ps;
+    bool rs = ps.load_from_json(json);
+    if (!rs)
+      return false;
+
+
+
+    auto cb = [&](const std::string& name, const epee::serialization::storage_entry& entry) {
+      if (entry.type() == typeid(uint64_t))
+      {
+        bool vote = boost::get<uint64_t>(entry) ? true : false;
+        votes.push_back(std::make_pair(epee::string_encoding::toupper(name), vote));
+      }
+      return true;
+    };
+
+    ps.enum_entries(nullptr, cb);
+    return true;
+
+  }
+  //---------------------------------------------------------------
   bool sign_multisig_input_in_tx(currency::transaction& tx, size_t ms_input_index, const currency::account_keys& keys, const currency::transaction& source_tx, bool *p_is_input_fully_signed /* = nullptr */)
   {
 #define LOC_CHK(cond, msg) CHECK_AND_ASSERT_MES(cond, false, msg << ", ms input index: " << ms_input_index << ", tx: " << get_transaction_hash(tx) << ", source tx: " << get_transaction_hash(source_tx))

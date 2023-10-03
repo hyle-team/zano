@@ -451,6 +451,7 @@ namespace currency
     void serialize(archive_t & ar, const unsigned int version);
     bool get_est_height_from_date(uint64_t date, uint64_t& res_h)const;
 
+    bool get_pos_votes(uint64_t start_h, uint64_t end_h, vote_results& r);
 
     //debug functions
     bool validate_blockchain_prev_links(size_t last_n_blocks_to_check = 10) const;

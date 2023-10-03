@@ -154,6 +154,28 @@ namespace currency
     transactions_map onboard_transactions;
   };
 
+  struct vote_on_proposal
+  {
+    std::string proposal_name;
+    uint64_t vote_1;
+    uint64_t vote_0;
 
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(proposal_name)
+      KV_SERIALIZE(vote_1)
+      KV_SERIALIZE(vote_0)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct vote_results
+  {
+    uint64_t total_pos_blocks; //total pos blocks in a given range
+    std::list<vote_on_proposal> votes;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(total_pos_blocks)
+      KV_SERIALIZE(votes)
+    END_KV_SERIALIZE_MAP()
+  };
 
 }

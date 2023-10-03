@@ -2808,6 +2808,51 @@ size_t blockchain_storage::get_current_sequence_factor_for_alt(alt_chain_type& a
   return n;
 }
 //------------------------------------------------------------------
+bool blockchain_storage::get_pos_votes(uint64_t start_index, uint64_t end_index, vote_results& r)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  if (start_index >= m_db_blocks.size() || start_index >= end_index)
+  {
+    //LOG_PRINT_L0("Wrong starter or end index set: start_index = " << start_index << ", end_index=" << end_index << ", expected max index " << m_db_blocks.size() - 1);
+    return true;
+  }
+  std::map<std::string, vote_on_proposal> summary;
+
+  for (size_t i = start_index; i < m_db_blocks.size() && i < end_index; i++)
+  {    
+    auto block_ptr = m_db_blocks[i];
+    //only coin holders can vote
+    if(!is_pos_block(block_ptr->bl))
+      continue;
+    r.total_pos_blocks++;
+
+    extra_user_data eud = AUTO_VAL_INIT(eud);
+    if (!get_type_in_variant_container(block_ptr->bl.miner_tx.extra, eud))
+    {
+      continue;
+    }
+    std::list<std::pair<std::string, bool>> votes;
+    if (!currency::parse_vote(eud.buff, votes))
+    {
+      continue;
+    }
+    for (const auto& v : votes)
+    {
+      if (v.second)
+        summary[v.first].vote_1++;
+      else
+        summary[v.first].vote_0++;
+    }
+  }
+  for (const auto s_entry : summary)
+  {
+    r.votes.push_back(s_entry.second);
+    r.votes.back().proposal_name = s_entry.first;
+  }
+
+  return true;
+}
+//------------------------------------------------------------------
 std::string blockchain_storage::get_blockchain_string(uint64_t start_index, uint64_t end_index) const
 { 
   std::stringstream ss;

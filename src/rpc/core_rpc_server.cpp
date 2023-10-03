@@ -631,6 +631,18 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_get_votes(const COMMAND_RPC_GET_VOTES::request& req, COMMAND_RPC_GET_VOTES::response& res, connection_context& cntx)
+  {
+    if (!m_core.get_blockchain_storage().get_pos_votes(req.h_start, req.h_end, res.votes))
+    {
+      res.status = API_RETURN_CODE_INTERNAL_ERROR;
+      res.error_code = "Internal error";
+      return true;
+    }
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_main_block_details(const COMMAND_RPC_GET_BLOCK_DETAILS::request& req, COMMAND_RPC_GET_BLOCK_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
     if (!m_core.get_blockchain_storage().get_main_block_rpc_details(req.id, res.block_details))

@@ -67,7 +67,8 @@ namespace tools
                         m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE),
                         m_current_wallet_file_size(0),
                         m_use_deffered_global_outputs(false), 
-                        m_disable_tor_relay(false)
+                        m_disable_tor_relay(false),
+                        m_votes_config_path(tools::get_default_data_dir() + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME)
   {
     m_core_runtime_config = currency::get_default_core_runtime_config();
   }
@@ -171,7 +172,7 @@ std::shared_ptr<wallet2::transaction_wallet_info> wallet2::transform_value_to_pt
 //----------------------------------------------------------------------------------------------------
 void wallet2::init(const std::string& daemon_address)
 {
-  m_miner_text_info = PROJECT_VERSION_LONG;
+  //m_miner_text_info = PROJECT_VERSION_LONG;
   m_core_proxy->set_connection_addr(daemon_address);
   m_core_proxy->check_connection();
 }
@@ -2650,6 +2651,19 @@ bool wallet2::check_connection()
   return m_core_proxy->check_connection();
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::set_votes_config_path(const std::string& path_to_config_file/* = tools::get_default_data_dir() + "\voting_config.json"*/)
+{
+  m_votes_config_path = path_to_config_file;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::load_votes_config()
+{
+  if (boost::filesystem::exists(m_votes_config_path))
+  {
+    epee::serialization::load_t_from_json_file(m_votes_config, m_votes_config_path);
+  }
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::load(const std::wstring& wallet_, const std::string& password)
 {
   clear();
@@ -2720,6 +2734,7 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   );
   WLT_LOG_L1("[LOADING]Blockchain shortener state: " << ENDL << m_chain.get_internal_state_text());
   
+  load_votes_config();
 
   WLT_LOG_L1("(after loading: pending_key_images: " << m_pending_key_images.size() << ", pki file elements: " << m_pending_key_images_file_container.size() << ", tx_keys: " << m_tx_keys.size() << ")");
 
@@ -3599,7 +3614,30 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
 {
   return build_minted_block(req, rsp, m_account.get_public_address(), new_block_expected_height);
 }
-
+//------------------------------------------------------------------
+std::string wallet2::get_extra_text_for_block(uint64_t new_block_expected_height)
+{
+  size_t entries_voted = 0;
+  std::string extra_text = "{";
+  for (const auto& e : m_votes_config.entries)
+  {
+    if (e.h_start <= new_block_expected_height && e.h_end >= new_block_expected_height)
+    {
+      //do vote for/against this
+      if (entries_voted != 0)
+        extra_text += ",";
+      extra_text += "\"";
+      extra_text += e.proposal_id;
+      extra_text += "\":";
+      extra_text += e.vote ? "1" : "0";
+      entries_voted++;
+    }
+  }
+  if (!entries_voted)
+    extra_text = "";
+  return extra_text;
+}
+//------------------------------------------------------------------
 bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& req, 
                                  const currency::COMMAND_RPC_SCAN_POS::response& rsp,
                                  const currency::account_public_address& miner_address,
@@ -3617,7 +3655,7 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     tmpl_req.pos_block = true;
     tmpl_req.pos_amount = req.pos_entries[rsp.index].amount;
     tmpl_req.pos_index = req.pos_entries[rsp.index].index;
-    tmpl_req.extra_text = m_miner_text_info;
+    tmpl_req.extra_text = get_extra_text_for_block(new_block_expected_height); // m_miner_text_info;
     tmpl_req.stake_unlock_time = req.pos_entries[rsp.index].stake_unlock_time;
 
     // mark stake source as spent and make sure it will be restored in case of error

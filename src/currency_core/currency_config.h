@@ -214,6 +214,7 @@
 #define GUI_INTERNAL_CONFIG2                            "gui_internal_config.json"
 #define GUI_IPC_MESSAGE_CHANNEL_NAME                    CURRENCY_NAME_BASE "_message_que"
 
+#define CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME         "voting_config.json"
 
 
 #define CURRENT_TRANSACTION_CHAIN_ENTRY_ARCHIVE_VER     3

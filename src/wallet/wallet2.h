@@ -541,8 +541,7 @@ namespace tools
     void update_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, const bc_services::offer_details_ex& od, currency::transaction& res_tx);
     void request_alias_registration(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward, const crypto::secret_key& authority_key = currency::null_skey);
     void request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward);
-    bool check_available_sources(std::list<uint64_t>& amounts);
-    
+    bool check_available_sources(std::list<uint64_t>& amounts);    
 
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
     void set_pos_mint_packing_size(uint64_t new_size);
@@ -817,6 +816,7 @@ namespace tools
     bool get_pos_entries(currency::COMMAND_RPC_SCAN_POS::request& req);
     bool build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& req, const currency::COMMAND_RPC_SCAN_POS::response& rsp, uint64_t new_block_expected_height = UINT64_MAX);
     bool build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& req, const currency::COMMAND_RPC_SCAN_POS::response& rsp, const currency::account_public_address& miner_address, uint64_t new_block_expected_height = UINT64_MAX);
+    std::string get_extra_text_for_block(uint64_t new_block_expected_height);
     bool reset_history();
     bool is_transfer_unlocked(const transfer_details& td) const;
     bool is_transfer_unlocked(const transfer_details& td, bool for_pos_mining, uint64_t& stake_lock_time) const;
@@ -879,6 +879,9 @@ namespace tools
     void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin, currency::transaction& result_tx);
     void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin);
     bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin, crypto::hash& redeem_tx_id);
+
+    void set_votes_config_path(const std::string& path_to_config_file);
+    const wallet_vote_config& get_current_votes() { return m_votes_config; }
 private:
 
     // -------- t_transport_state_notifier ------------------------------------------------
@@ -958,10 +961,9 @@ private:
     bool handle_cancel_proposal(wallet_public::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb, const std::vector<currency::payload_items_v>& decrypted_attach);
     bool handle_expiration_list(uint64_t tx_expiration_ts_median);
     void handle_contract_expirations(uint64_t tx_expiration_ts_median);
-
     void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const wallet_public::wallet_transfer_info& wti) const;
     void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const std::string& reason = "internal intention") const;
-    
+    void load_votes_config();
 
     const construct_tx_param& get_default_construct_tx_param();
 
@@ -1073,6 +1075,9 @@ private:
     mutable uint64_t m_current_wallet_file_size;
     bool m_use_deffered_global_outputs;
     bool m_disable_tor_relay;
+
+    std::string m_votes_config_path;
+    wallet_vote_config m_votes_config;
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;
  

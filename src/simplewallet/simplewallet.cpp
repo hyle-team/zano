@@ -58,6 +58,7 @@ namespace
   const command_line::arg_descriptor<std::string> arg_addr_to_compare  ( "addr-to-compare", "");
   const command_line::arg_descriptor<bool> arg_disable_tor_relay  ( "disable-tor-relay", "Disable TOR relay", false);
   const command_line::arg_descriptor<unsigned int> arg_set_timeout("set-timeout", "Set timeout for the wallet");
+  const command_line::arg_descriptor<std::string> arg_voting_config_file("voting-config-file", "Set voting config instead of getting if from daemon", "");
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command  ("command", "");
 
@@ -413,6 +414,7 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_do_pos_mining   = command_line::get_arg(vm, arg_do_pos_mining);
   m_restore_wallet  = command_line::get_arg(vm, arg_restore_wallet);
   m_disable_tor     = command_line::get_arg(vm, arg_disable_tor_relay);
+  m_voting_config_file = command_line::get_arg(vm, arg_voting_config_file);
 } 
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::try_connect_to_daemon()
@@ -433,17 +435,20 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
 
   m_wallet.reset(new tools::wallet2());
   m_wallet->callback(this->shared_from_this());
+  if (!m_voting_config_file.empty())
+    m_wallet->set_votes_config_path(m_voting_config_file);
+
   m_wallet->set_do_rise_transfer(false);
   try
   {
     m_wallet->generate(epee::string_encoding::utf8_to_wstring(m_wallet_file), password, create_auditable_wallet);
     message_writer(epee::log_space::console_color_white, true) << "Generated new " << (create_auditable_wallet ? "AUDITABLE" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
+    display_vote_info();
     std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().view_secret_key) << std::endl << std::flush;
     if (m_wallet->is_auditable())
       std::cout << "tracking seed: " << std::endl << m_wallet->get_account().get_tracking_seed() << std::endl << std::flush;
     if (m_do_not_set_date)
       m_wallet->reset_creation_time(0);
-
 
   }
   catch (const std::exception& e)
@@ -465,6 +470,9 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
 
   m_wallet.reset(new tools::wallet2());
   m_wallet->callback(this->shared_from_this());
+  if (!m_voting_config_file.empty())
+    m_wallet->set_votes_config_path(m_voting_config_file);
+
   m_wallet->set_do_rise_transfer(true);
   try
   {
@@ -473,6 +481,7 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
       // auditable watch-only aka tracking wallet
       m_wallet->restore(epee::string_encoding::utf8_to_wstring(wallet_file), password, seed_or_tracking_seed, true, "");
       message_writer(epee::log_space::console_color_white, true) << "Tracking wallet restored: " << m_wallet->get_account().get_public_address_str();
+      display_vote_info();
     }
     else
     {
@@ -509,11 +518,27 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+
+void simple_wallet::display_vote_info()
+{
+  const wallet_vote_config& votes = m_wallet->get_current_votes();
+  if (votes.entries.size())
+  {
+    message_writer(epee::log_space::console_color_magenta, true) << "VOTING SET LOADED:";
+    for (const auto& e : votes.entries)
+    {
+      message_writer(epee::log_space::console_color_magenta, true) << "\t\t" << e.proposal_id << "\t\t" << (e.vote?"1":"0") << "\t\t("<< e.h_start << " - " << e.h_end <<")";
+    }
+  }
+}
 bool simple_wallet::open_wallet(const string &wallet_file, const std::string& password)
 {
   m_wallet_file = wallet_file;
   m_wallet.reset(new tools::wallet2());
   m_wallet->callback(shared_from_this());
+  if (!m_voting_config_file.empty())
+    m_wallet->set_votes_config_path(m_voting_config_file);
+
 
   while (true)
   {
@@ -521,6 +546,7 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
     {
       m_wallet->load(epee::string_encoding::utf8_to_wstring(m_wallet_file), password);
       message_writer(epee::log_space::console_color_white, true) << "Opened" << (m_wallet->is_auditable() ? " auditable" : "") << (m_wallet->is_watch_only() ? " watch-only" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
+      display_vote_info();
 
       break;
     }

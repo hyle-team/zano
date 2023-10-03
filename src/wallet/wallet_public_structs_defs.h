@@ -1147,6 +1147,34 @@ namespace wallet_public
     };
   };
 
+
+
+  struct wallet_vote_config_entry
+  {
+    std::string proposal_id;
+    uint64_t h_start;
+    uint64_t h_end;
+    bool vote;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(proposal_id)
+      KV_SERIALIZE(h_start)
+      KV_SERIALIZE(h_end)
+      KV_SERIALIZE(vote)
+    END_KV_SERIALIZE_MAP()
+
+  };
+
+  struct wallet_vote_config
+  {
+    std::vector<wallet_vote_config_entry> entries;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(entries)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
   inline std::string get_escrow_contract_state_name(uint32_t state)
   {
     switch (state)
