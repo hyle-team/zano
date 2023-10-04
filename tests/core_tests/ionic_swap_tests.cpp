@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2022 Zano Project
+// Copyright (c) 2014-2023 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -140,7 +140,6 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
   {
     //alice_wlt want to trade with bob_wlt, to exchange 10.0 TCT to 1.0 ZANO 
     view::ionic_swap_proposal_info proposal_details = AUTO_VAL_INIT(proposal_details);
-    proposal_details.expiration_time = alice_wlt->get_core_runtime_config().get_core_time() + 10 * 60;
     proposal_details.fee_paid_by_a = TESTS_DEFAULT_FEE;
     proposal_details.mixins = 10;
     proposal_details.to_bob.push_back(view::asset_funds{ asset_id , assets_to_exchange });
@@ -198,7 +197,6 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
   {
     //now alice_wlt want to trade with bob_wlt, to send 1.0 ZANO and get 10.0 TCT in exchange
     view::ionic_swap_proposal_info proposal_details = AUTO_VAL_INIT(proposal_details);
-    proposal_details.expiration_time = alice_wlt->get_core_runtime_config().get_core_time() + 10 * 60;
     proposal_details.fee_paid_by_a = TESTS_DEFAULT_FEE;
     proposal_details.mixins = 10;
     proposal_details.to_bob.push_back(view::asset_funds{ currency::native_coin_asset_id , native_tokens_to_exchange });
