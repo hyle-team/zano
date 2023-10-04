@@ -881,7 +881,7 @@ namespace tools
     bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin, crypto::hash& redeem_tx_id);
 
     void set_votes_config_path(const std::string& path_to_config_file);
-    const wallet_vote_config& get_current_votes() { return m_votes_config; }
+    const tools::wallet_public::wallet_vote_config& get_current_votes() { return m_votes_config; }
 private:
 
     // -------- t_transport_state_notifier ------------------------------------------------
@@ -1077,7 +1077,7 @@ private:
     bool m_disable_tor_relay;
 
     std::string m_votes_config_path;
-    wallet_vote_config m_votes_config;
+    tools::wallet_public::wallet_vote_config m_votes_config;
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;
  

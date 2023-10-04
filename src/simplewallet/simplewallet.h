@@ -96,7 +96,6 @@ namespace currency
 
     uint64_t get_daemon_blockchain_height(std::string& err);
     bool try_connect_to_daemon();
-    void display_vote_info();
 
     //----------------- i_wallet2_callback ---------------------
     virtual void on_new_block(uint64_t height, const currency::block& block) override;

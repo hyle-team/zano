@@ -23,6 +23,7 @@ using namespace epee;
 #include "currency_core/bc_offers_service_basic.h"
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "misc_language.h"
+#include "common/util.h"
 
 #include "common/boost_serialization_helper.h"
 #include "crypto/crypto.h"
@@ -3568,6 +3569,10 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
     WLT_LOG_YELLOW("POS MINING NOT ALLOWED YET", LOG_LEVEL_0);
     return true;
   }
+
+#ifdef _DEBUG
+  get_extra_text_for_block(m_last_pow_block_h);
+#endif
 
   uint64_t pos_entries_amount = 0;
   for (auto& ent : ctx.sp.pos_entries)
