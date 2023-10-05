@@ -176,6 +176,19 @@ void wallet2::init(const std::string& daemon_address)
   //m_miner_text_info = PROJECT_VERSION_LONG;
   m_core_proxy->set_connection_addr(daemon_address);
   m_core_proxy->check_connection();
+
+  std::stringstream ss;
+  const tools::wallet_public::wallet_vote_config& votes = this->get_current_votes();
+  if (votes.entries.size())
+  {
+    ss << "VOTING SET LOADED:";
+    for (const auto& e : votes.entries)
+    {
+      ss << "\t\t" << e.proposal_id << "\t\t" << (e.vote ? "1" : "0") << "\t\t(" << e.h_start << " - " << e.h_end << ")";
+    }
+  }
+  WLT_LOG_L0(ss.str());
+
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy)
