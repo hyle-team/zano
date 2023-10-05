@@ -5412,6 +5412,10 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
   selected_transfers = ftp.selected_transfers;
   currency::finalized_tx finalize_result = AUTO_VAL_INIT(finalize_result);
   finalize_transaction(ftp, finalize_result, false);
+  for(uint64_t i: selected_transfers)
+    m_transfers[i].m_flags &= ~WALLET_TRANSFER_DETAIL_FLAG_BLOCKED;
+
+  //add_transfers_to_expiration_list(selected_transfers, for_expiration_list, this->get_core_runtime_config().get_core_time() + proposal_detais.expiration_time, currency::null_hash);
 
   //wrap it all 
   proposal.tx_template = finalize_result.tx;
