@@ -3660,7 +3660,7 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     tmpl_req.pos_block = true;
     tmpl_req.pos_amount = req.pos_entries[rsp.index].amount;
     tmpl_req.pos_index = req.pos_entries[rsp.index].index;
-    tmpl_req.extra_text = get_extra_text_for_block(new_block_expected_height); // m_miner_text_info;
+    tmpl_req.extra_text = get_extra_text_for_block(m_chain.get_top_block_height()); // m_miner_text_info;
     tmpl_req.stake_unlock_time = req.pos_entries[rsp.index].stake_unlock_time;
 
     // mark stake source as spent and make sure it will be restored in case of error
