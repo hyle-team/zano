@@ -3638,6 +3638,7 @@ std::string wallet2::get_extra_text_for_block(uint64_t new_block_expected_height
       entries_voted++;
     }
   }
+  extra_text += "}";
   if (!entries_voted)
     extra_text = "";
   return extra_text;
