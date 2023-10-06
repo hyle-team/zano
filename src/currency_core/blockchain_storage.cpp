@@ -2847,7 +2847,7 @@ bool blockchain_storage::get_pos_votes(uint64_t start_index, uint64_t end_index,
   for (const auto s_entry : summary)
   {
     r.votes.push_back(s_entry.second);
-    r.votes.back().proposal_name = s_entry.first;
+    r.votes.back().proposal_id = s_entry.first;
   }
 
   return true;
