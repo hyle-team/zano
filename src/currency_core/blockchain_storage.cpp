@@ -2839,9 +2839,9 @@ bool blockchain_storage::get_pos_votes(uint64_t start_index, uint64_t end_index,
     for (const auto& v : votes)
     {
       if (v.second)
-        summary[v.first].vote_1++;
+        summary[v.first].yes++;
       else
-        summary[v.first].vote_0++;
+        summary[v.first].no++;
     }
   }
   for (const auto s_entry : summary)

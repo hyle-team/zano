@@ -157,13 +157,13 @@ namespace currency
   struct vote_on_proposal
   {
     std::string proposal_name;
-    uint64_t vote_1;
-    uint64_t vote_0;
+    uint64_t yes;
+    uint64_t no;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(proposal_name)
-      KV_SERIALIZE(vote_1)
-      KV_SERIALIZE(vote_0)
+      KV_SERIALIZE(yes)
+      KV_SERIALIZE(no)
     END_KV_SERIALIZE_MAP()
   };
 
