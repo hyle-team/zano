@@ -4,15 +4,11 @@
 #pragma once 
 #include "chaingen.h"
 #include "wallet_tests_basic.h"
-#include "random_helper.h"
 
 struct ionic_swap_basic_test : public wallet_test
 {
   ionic_swap_basic_test();
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
-  
-private:
-  random_state_test_restorer m_random_state_test_restorer;
 };
 
