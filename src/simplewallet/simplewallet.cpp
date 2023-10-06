@@ -62,9 +62,7 @@ namespace ph = boost::placeholders;
           } \
           catch (const tools::error::not_enough_money& e) \
           { \
-            fail_msg_writer() << "not enough money to transfer, available only " << print_money(e.available()) << \
-              ", transaction amount " << print_money(e.tx_amount() + e.fee()) << " = " << print_money(e.tx_amount()) << \
-              " + " << print_money(e.fee()) << " (fee)"; \
+            fail_msg_writer() << "not enough money to transfer, " << e.to_string(); \
           } \
           catch (const tools::error::not_enough_outs_to_mix& e) \
           { \

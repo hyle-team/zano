@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <boost/algorithm/string.hpp>
 
 #include "currency_core/currency_format_utils.h"
 #include "rpc/core_rpc_server_commands_defs.h"
@@ -70,10 +71,10 @@ namespace tools
       std::string to_string() const
       {
         std::ostringstream ss;
-        ss << m_loc << ':' << typeid(*this).name();
+        ss << m_loc << '[' << boost::replace_all_copy(std::string(typeid(*this).name()), "struct ", "");
         if (!m_error_code.empty())
           ss << "[" << m_error_code << "]";
-        ss << ": " << Base::what();
+        ss << "] " << Base::what();
         return ss.str();
       }
 
@@ -350,7 +351,7 @@ namespace tools
     struct not_enough_money : public transfer_error
     {
       not_enough_money(std::string&& loc, uint64_t availbable, uint64_t tx_amount, uint64_t fee, const crypto::public_key& asset_id)
-        : transfer_error(std::move(loc), "NOT_ENOUGH_MONEY")
+        : transfer_error(std::move(loc), "")
         , m_available(availbable)
         , m_tx_amount(tx_amount)
         , m_fee(fee)
@@ -366,11 +367,11 @@ namespace tools
       {
         std::ostringstream ss;
         ss << transfer_error::to_string() <<
-          ", available = " << currency::print_money(m_available) <<
-          ", tx_amount = " << currency::print_money(m_tx_amount) <<
-          ", fee = " << currency::print_money(m_fee);
+          "available: " << currency::print_money_brief(m_available) <<
+          ", required: " << currency::print_money_brief(m_tx_amount + m_fee) <<
+          " = " << currency::print_money_brief(m_tx_amount) << " + " << currency::print_money_brief(m_fee) << " (fee)";
         if (m_asset_id != currency::native_coin_asset_id)
-          ss << ", asset_id = " << m_asset_id;
+          ss << ", asset_id: " << m_asset_id;
         return ss.str();
       }
 

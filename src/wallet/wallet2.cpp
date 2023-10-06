@@ -5603,7 +5603,7 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
   {
     if (balances[item.asset_id].unlocked < item.amount)
     {
-      return false;
+      WLT_THROW_IF_FALSE_WALLET_EX_MES(false, error::not_enough_money, "", balances[item.asset_id].unlocked, item.amount, 0 /*fee*/, item.asset_id);
     }
     if (item.asset_id == currency::native_coin_asset_id)
     {
@@ -5618,7 +5618,7 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
     additional_fee = m_core_runtime_config.tx_default_fee - msc.proposal_info.fee_paid_by_a;
     if (balances[currency::native_coin_asset_id].unlocked < additional_fee + native_amount_required)
     {
-      return false;
+      WLT_THROW_IF_FALSE_WALLET_EX_MES(false, error::not_enough_money, "", balances[currency::native_coin_asset_id].unlocked, native_amount_required, additional_fee, currency::native_coin_asset_id);
     }
   }
 
