@@ -5381,26 +5381,26 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
   ctp.mark_tx_as_complete = false;
   ctp.crypt_address = destination_addr;
   
-  ctp.dsts.resize(proposal_detais.to_bob.size() + proposal_detais.to_alice.size());
+  ctp.dsts.resize(proposal_detais.to_finalizer.size() + proposal_detais.to_initiator.size());
   size_t i = 0;
   // Here is an proposed for exchange funds
-  for (; i != proposal_detais.to_bob.size(); i++)
+  for (; i != proposal_detais.to_finalizer.size(); i++)
   {
-    ctp.dsts[i].amount = proposal_detais.to_bob[i].amount;
-    ctp.dsts[i].amount_to_provide = proposal_detais.to_bob[i].amount;
+    ctp.dsts[i].amount = proposal_detais.to_finalizer[i].amount;
+    ctp.dsts[i].amount_to_provide = proposal_detais.to_finalizer[i].amount;
     ctp.dsts[i].flags |= tx_destination_entry_flags::tdef_explicit_amount_to_provide;
     ctp.dsts[i].addr.push_back(destination_addr);
-    ctp.dsts[i].asset_id = proposal_detais.to_bob[i].asset_id;
+    ctp.dsts[i].asset_id = proposal_detais.to_finalizer[i].asset_id;
   }
   // Here is an expected in return funds
   std::vector<payment_details_subtransfer> for_expiration_list;
-  for (size_t j = 0; j != proposal_detais.to_alice.size(); j++, i++)
+  for (size_t j = 0; j != proposal_detais.to_initiator.size(); j++, i++)
   {
-    ctp.dsts[i].amount = proposal_detais.to_alice[j].amount;
+    ctp.dsts[i].amount = proposal_detais.to_initiator[j].amount;
     ctp.dsts[i].amount_to_provide = 0;
     ctp.dsts[i].flags |= tx_destination_entry_flags::tdef_explicit_amount_to_provide;
     ctp.dsts[i].addr.push_back(m_account.get_public_address());
-    ctp.dsts[i].asset_id = proposal_detais.to_alice[j].asset_id;
+    ctp.dsts[i].asset_id = proposal_detais.to_initiator[j].asset_id;
     for_expiration_list.push_back(payment_details_subtransfer{ ctp.dsts[i].asset_id, ctp.dsts[i].amount});
   }
 
@@ -5539,15 +5539,15 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
   //need to make sure that funds for Bob properly funded
   for (const auto& a : ammounts_to_b)
   {
-    uint64_t amount_sent_back_to_alice = ammounts_to_a[a.first];
+    uint64_t amount_sent_back_to_initiator = ammounts_to_a[a.first];
 
-    if (amounts_provided_by_a[a.first] < (a.second + amount_sent_back_to_alice) )
+    if (amounts_provided_by_a[a.first] < (a.second + amount_sent_back_to_initiator) )
     {
       WLT_LOG_RED("Amount[" << a.first << "] provided by Alice(" << amounts_provided_by_a[a.first] << ") is less then transfered to Bob(" << a.second <<")", LOG_LEVEL_0);
       return false;
     }
-    amounts_provided_by_a[a.first] -= (amount_sent_back_to_alice + a.second);
-    proposal_info.to_bob.push_back(view::asset_funds{ a.first, a.second });
+    amounts_provided_by_a[a.first] -= (amount_sent_back_to_initiator + a.second);
+    proposal_info.to_finalizer.push_back(view::asset_funds{ a.first, a.second });
     //clean accounted assets
     ammounts_to_a.erase(ammounts_to_a.find(a.first));
     if (amounts_provided_by_a[a.first] > 0)
@@ -5568,7 +5568,7 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
       return false;
     }
 
-    proposal_info.to_alice.push_back(view::asset_funds{ a.first, a.second - amounts_provided_by_a[a.first] });
+    proposal_info.to_initiator.push_back(view::asset_funds{ a.first, a.second - amounts_provided_by_a[a.first] });
   }
     
   return true;
@@ -5599,7 +5599,7 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
   this->balance(balances, mined);
   //validate balances needed 
   uint64_t native_amount_required = 0;
-  for (const auto& item : msc.proposal_info.to_alice)
+  for (const auto& item : msc.proposal_info.to_initiator)
   {
     if (balances[item.asset_id].unlocked < item.amount)
     {
@@ -6717,7 +6717,7 @@ bool wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(get_tx_flags(tx_for_mode_separate) & TX_FLAG_SIGNATURE_MODE_SEPARATE, "tx_param.flags differs from tx.flags");
     if (ftp.tx_version > TRANSACTION_VERSION_PRE_HF4)
     {
-      for (const auto& el : msc.proposal_info.to_alice)
+      for (const auto& el : msc.proposal_info.to_initiator)
         needed_money_map[el.asset_id].needed_amount += el.amount;
     }
     

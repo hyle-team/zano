@@ -431,7 +431,7 @@ bool gen_block_miner_tx_has_no_out::generate(std::vector<test_event_entry>& even
   return true;
 }
 
-bool gen_block_miner_tx_has_out_to_alice::generate(std::vector<test_event_entry>& events) const
+bool gen_block_miner_tx_has_out_to_initiator::generate(std::vector<test_event_entry>& events) const
 {
   BLOCK_VALIDATION_INIT_GENERATE();
   GENERATE_ACCOUNT(alice);
@@ -444,11 +444,11 @@ bool gen_block_miner_tx_has_out_to_alice::generate(std::vector<test_event_entry>
   crypto::generate_key_derivation(alice.get_keys().account_address.view_public_key, txkey.sec, derivation);
   crypto::derive_public_key(derivation, 1, alice.get_keys().account_address.spend_public_key, out_eph_public_key);
 
-  tx_out_bare out_to_alice;
-  out_to_alice.amount =boost::get<currency::tx_out_bare>( miner_tx.vout[0]).amount / 2;
-boost::get<currency::tx_out_bare>(  miner_tx.vout[0]).amount -= out_to_alice.amount;
-  out_to_alice.target = txout_to_key(out_eph_public_key);
-  miner_tx.vout.push_back(out_to_alice);
+  tx_out_bare out_to_initiator;
+  out_to_initiator.amount =boost::get<currency::tx_out_bare>( miner_tx.vout[0]).amount / 2;
+boost::get<currency::tx_out_bare>(  miner_tx.vout[0]).amount -= out_to_initiator.amount;
+  out_to_initiator.target = txout_to_key(out_eph_public_key);
+  miner_tx.vout.push_back(out_to_initiator);
 
   block blk_1;
   generator.construct_block_manually(blk_1, blk_0, miner_account, test_generator::bf_miner_tx, 0, 0, 0, crypto::hash(), 0, miner_tx);

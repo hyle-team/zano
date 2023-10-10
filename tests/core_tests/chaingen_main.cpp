@@ -1161,7 +1161,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(gen_block_miner_tx_out_is_small, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_miner_tx_out_is_big, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_no_out, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_out_to_alice, "0,3");
+    GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_out_to_initiator, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_has_invalid_tx, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_is_too_big, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_wrong_version_agains_hardfork, "0,3");  

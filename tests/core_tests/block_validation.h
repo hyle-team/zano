@@ -153,7 +153,7 @@ struct gen_block_miner_tx_has_no_out : public gen_block_verification_base<2>
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_block_miner_tx_has_out_to_alice : public gen_block_accepted_base<2>
+struct gen_block_miner_tx_has_out_to_initiator : public gen_block_accepted_base<2>
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };

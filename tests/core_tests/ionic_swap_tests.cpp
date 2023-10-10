@@ -121,8 +121,8 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
     view::ionic_swap_proposal_info proposal_details = AUTO_VAL_INIT(proposal_details);
     proposal_details.fee_paid_by_a = TESTS_DEFAULT_FEE;
     proposal_details.mixins = 10;
-    proposal_details.to_bob.push_back(view::asset_funds{ asset_id , assets_to_exchange });
-    proposal_details.to_alice.push_back(view::asset_funds{ currency::native_coin_asset_id , native_coins_to_exchange });
+    proposal_details.to_finalizer.push_back(view::asset_funds{ asset_id , assets_to_exchange });
+    proposal_details.to_initiator.push_back(view::asset_funds{ currency::native_coin_asset_id , native_coins_to_exchange });
 
     tools::wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
     alice_wlt->create_ionic_swap_proposal(proposal_details, m_accounts[BOB_ACC_IDX].get_public_address(), proposal);
@@ -131,8 +131,8 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
     bob_wlt->get_ionic_swap_proposal_info(proposal, proposal_decoded_info);
 
     //Validate proposal
-    if (proposal_decoded_info.to_bob != proposal_details.to_bob
-      || proposal_decoded_info.to_alice != proposal_details.to_alice
+    if (proposal_decoded_info.to_finalizer != proposal_details.to_finalizer
+      || proposal_decoded_info.to_initiator != proposal_details.to_initiator
       || proposal_decoded_info.fee_paid_by_a != proposal_details.fee_paid_by_a
       || proposal_decoded_info.mixins != proposal_details.mixins
       )
@@ -175,8 +175,8 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
     view::ionic_swap_proposal_info proposal_details = AUTO_VAL_INIT(proposal_details);
     proposal_details.fee_paid_by_a = TESTS_DEFAULT_FEE;
     proposal_details.mixins = 10;
-    proposal_details.to_bob.push_back(view::asset_funds{ currency::native_coin_asset_id , native_coins_to_exchange });
-    proposal_details.to_alice.push_back(view::asset_funds{ asset_id , assets_to_exchange });
+    proposal_details.to_finalizer.push_back(view::asset_funds{ currency::native_coin_asset_id , native_coins_to_exchange });
+    proposal_details.to_initiator.push_back(view::asset_funds{ asset_id , assets_to_exchange });
 
     tools::wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
     alice_wlt->create_ionic_swap_proposal(proposal_details, m_accounts[BOB_ACC_IDX].get_public_address(), proposal);
@@ -185,8 +185,8 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
     bob_wlt->get_ionic_swap_proposal_info(proposal, proposal_decoded_info);
 
     //Validate proposal
-    if (proposal_decoded_info.to_bob != proposal_details.to_bob
-      || proposal_decoded_info.to_alice != proposal_details.to_alice
+    if (proposal_decoded_info.to_finalizer != proposal_details.to_finalizer
+      || proposal_decoded_info.to_initiator != proposal_details.to_initiator
       || proposal_decoded_info.fee_paid_by_a != proposal_details.fee_paid_by_a
       || proposal_decoded_info.mixins != proposal_details.mixins
       )
