@@ -21,7 +21,9 @@ namespace tools
   {
     virtual void lock() {};
     virtual void unlock() {};
+#ifndef MOBILE_WALLET_BUILD
     virtual std::shared_ptr<wallet2> get_wallet() = 0;
+#endif
   };
 
   struct wallet_rpc_locker
