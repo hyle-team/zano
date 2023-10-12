@@ -43,12 +43,16 @@ Recommended OS version: Ubuntu 18.04 LTS.
        sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev mesa-common-dev libglu1-mesa-dev
 
 2. Download and build Boost
+(Assuming you have cloned Zano into the 'zano' folder. If you used a different location for Zano, edit line 4 accordingly.)
 
        curl -OL https://boostorg.jfrog.io/artifactory/main/release/1.70.0/source/boost_1_70_0.tar.bz2
        echo "430ae8354789de4fd19ee52f3b1f739e1fba576f0aded0897c3c2bc00fb38778  boost_1_70_0.tar.bz2" | shasum -c && tar -xjf boost_1_70_0.tar.bz2
-       cd boost_1_70_0
+       rm boost_1_70_0.tar.bz2 && cd boost_1_70_0
+       patch -p0 < ../zano/utils/boost_1.70_gcc_8.patch || cd ..
        ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
        ./b2
+
+Make sure that you see "The Boost C++ Libraries were successfully built!" message at the end.
 
 3. Install Qt\
 (*GUI version only, skip this step if you're building server version*)
