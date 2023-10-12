@@ -144,7 +144,9 @@ public:
   std::string get_fav_offers(const std::list<bc_services::offer_id>& hashes, const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers);
   std::string get_tx_pool_info(currency::COMMAND_RPC_GET_POOL_INFO::response& res);
   std::string export_wallet_history(const view::export_wallet_info& ewi);
+#ifndef MOBILE_WALLET_BUILD
   currency::core_rpc_server& get_rpc_server() { return m_rpc_server; }
+#endif
   uint64_t get_default_fee();
   std::string get_mining_estimate(uint64_t amuont_coins, 
     uint64_t time, 
