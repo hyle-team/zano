@@ -2050,7 +2050,9 @@ bool wallets_manager::on_mw_select_wallet(uint64_t wallet_id)
   if (it == m_wallets.end())                
     return false; 
  
+#ifndef MOBILE_WALLET_BUILD
   m_rpc_selected_wallet_id = wallet_id;
+#endif
   return true;
 }
 
@@ -2070,6 +2072,7 @@ bool wallets_manager::on_mw_select_wallet(const tools::wallet_public::COMMAND_MW
 
 void wallets_manager::lock() 
 {
+#ifndef MOBILE_WALLET_BUILD
   {
     SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
     auto it = m_wallets.find(m_rpc_selected_wallet_id);
@@ -2079,21 +2082,26 @@ void wallets_manager::lock()
     }
     m_current_wallet_locked_object = it->second.w.lock();
   }
+#endif
 }
 
 void wallets_manager::unlock() 
 {
+#ifndef MOBILE_WALLET_BUILD
   m_current_wallet_locked_object.reset();
+#endif
 }
-
+#ifndef MOBILE_WALLET_BUILD
 std::shared_ptr<tools::wallet2> wallets_manager::get_wallet()
 {
+
   if (!m_current_wallet_locked_object.get())
   {
     throw std::runtime_error("Wallet is not locked for get_wallet() call");
   }
   return **m_current_wallet_locked_object;
 }
+#endif
 
 void wallets_manager::wallet_vs_options::worker_func()
 {
