@@ -189,6 +189,11 @@ else()
 endif()
 
 
+# If BOOST_ROOT is set, ignore system-wide Boost
+if(DEFINED ENV{BOOST_ROOT})
+  set(Boost_NO_SYSTEM_PATHS ON)
+endif()
+
 if(MSVC)
   set(Boost_USE_STATIC_LIBS ON)
 endif()
