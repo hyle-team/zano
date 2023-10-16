@@ -1112,9 +1112,10 @@ void append_vector_by_another_vector(U& dst, const V& src)
   PRINT_EVENT_N_TEXT(VEC_EVENTS, "MAKE_NEXT_POS_BLOCK_TX1(" << #BLK_NAME << ")");                           \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                                       \
   {                                                                                                         \
-    std::list<currency::transaction>tx_list;                                                                \
+    std::list<currency::transaction> tx_list;                                                               \
     tx_list.push_back(TX_1);                                                                                \
-    generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, tx_list, MINERS_ACC_LIST);       \
+    if (!generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, tx_list, MINERS_ACC_LIST))  \
+      return false;                                                                                         \
   }                                                                                                         \
   VEC_EVENTS.push_back(BLK_NAME)
 
