@@ -1905,10 +1905,10 @@ bool find_block_chain(const std::vector<test_event_entry>& events, std::vector<c
   return b_success;
 }
 
-void balance_via_wallet(const tools::wallet2& w, uint64_t* p_total, uint64_t* p_unlocked, uint64_t* p_awaiting_in, uint64_t* p_awaiting_out, uint64_t* p_mined)
+void balance_via_wallet(const tools::wallet2& w, const crypto::public_key& asset_id, uint64_t* p_total, uint64_t* p_unlocked, uint64_t* p_awaiting_in, uint64_t* p_awaiting_out, uint64_t* p_mined)
 {
   uint64_t total, unlocked, awaiting_in, awaiting_out, mined;
-  total = w.balance(unlocked, awaiting_in, awaiting_out, mined);
+  total = w.balance(unlocked, awaiting_in, awaiting_out, mined, asset_id);
 
   if (p_total)
     *p_total = total;
@@ -1923,12 +1923,16 @@ void balance_via_wallet(const tools::wallet2& w, uint64_t* p_total, uint64_t* p_
 }
 
 bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name,
-  uint64_t expected_total, uint64_t expected_mined, uint64_t expected_unlocked, uint64_t expected_awaiting_in, uint64_t expected_awaiting_out)
+  uint64_t expected_total, uint64_t expected_mined, uint64_t expected_unlocked, uint64_t expected_awaiting_in, uint64_t expected_awaiting_out, const crypto::public_key& asset_id /* = currency::native_coin_asset_id */)
 {
   uint64_t total, unlocked, awaiting_in, awaiting_out, mined;
-  balance_via_wallet(w, &total, &unlocked, &awaiting_in, &awaiting_out, &mined);
+  balance_via_wallet(w, asset_id, &total, &unlocked, &awaiting_in, &awaiting_out, &mined);
 
-  LOG_PRINT_CYAN("Balance for wallet " << account_name << " @ height " << w.get_top_block_height() << ":" << ENDL <<
+  std::string asset_id_str;
+  if (asset_id != currency::native_coin_asset_id)
+    asset_id_str = std::string(", asset_id: ") + epee::string_tools::pod_to_hex(asset_id).erase(4, 56).insert(4, "...");
+
+  LOG_PRINT_CYAN("Balance for wallet " << account_name << " @ height " << w.get_top_block_height() << asset_id_str << ":" << ENDL <<
     "unlocked:     " << print_money(unlocked) << ENDL <<
     "awaiting in:  " << print_money(awaiting_in) << ENDL <<
     "awaiting out: " << print_money(awaiting_out) << ENDL <<
@@ -1939,7 +1943,7 @@ bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name,
 
   bool r = true;
 
-#define _CHECK_BAL(v) if (!(expected_##v == INVALID_BALANCE_VAL || v == expected_##v)) { r = false; LOG_PRINT_RED_L0("invalid " #v " balance, expected: " << print_money_brief(expected_##v)); }
+#define _CHECK_BAL(v) if (!(expected_##v == INVALID_BALANCE_VAL || v == expected_##v)) { r = false; LOG_PRINT_RED_L0("invalid " #v " balance, expected: " << print_money_brief(expected_##v) << asset_id_str); }
   _CHECK_BAL(unlocked)
   _CHECK_BAL(awaiting_in)
   _CHECK_BAL(awaiting_out)
@@ -2329,6 +2333,7 @@ bool shuffle_source_entries(std::vector<tx_source_entry>& sources)
   return true;
 }
 
+// creates destinations.size() + 1 outputs if the total sum of amounts is less than the original premine amount (the last one will have amount = old_premine - sum)
 bool replace_coinbase_in_genesis_block(const std::vector<currency::tx_destination_entry>& destinations, test_generator& generator, std::vector<test_event_entry>& events, currency::block& genesis_block)
 {
   bool r = false;
@@ -2340,13 +2345,19 @@ bool replace_coinbase_in_genesis_block(const std::vector<currency::tx_destinatio
 
   // replace tx key
   keypair tx_key = keypair::generate();
-  for(auto& el : genesis_block.miner_tx.extra)
+  for(auto it = genesis_block.miner_tx.extra.begin(); it != genesis_block.miner_tx.extra.end(); /* nothing */)
   {
-    if (el.type() == typeid(crypto::public_key))
+    if (it->type() == typeid(crypto::public_key))
     {
-      boost::get<crypto::public_key>(el) = tx_key.pub;
-      break;
+      boost::get<crypto::public_key>(*it) = tx_key.pub;    // rewtire it
     }
+    else if (it->type() == typeid(tx_derivation_hint))
+    {
+      it = genesis_block.miner_tx.extra.erase(it);
+      continue;                                            // remove it
+    }
+
+    ++it;
   }
   uint64_t total_amount = 0;
 
@@ -2357,10 +2368,13 @@ bool replace_coinbase_in_genesis_block(const std::vector<currency::tx_destinatio
   {
     uint64_t amount = output_index < destinations.size() ? destinations[output_index].amount : premine_amount - total_amount;
     const account_public_address& addr = output_index < destinations.size() ? destinations[output_index].addr.back() : destinations.back().addr.back();
+    if (amount == 0)
+      break;
 
     crypto::key_derivation derivation{};
     bool r = crypto::generate_key_derivation(addr.view_public_key, tx_key.sec, derivation);
     CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed");
+    genesis_block.miner_tx.extra.emplace_back(make_tx_derivation_hint_from_uint16(get_derivation_hint(derivation)));
 
     txout_to_key target{};
     r = crypto::derive_public_key(derivation, output_index, addr.spend_public_key, target.key);
