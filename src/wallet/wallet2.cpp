@@ -5427,7 +5427,7 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::get_ionic_swap_proposal_info(const std::string&raw_proposal, wallet_public::ionic_swap_proposal_info& proposal_info)
+bool wallet2::get_ionic_swap_proposal_info(const std::string&raw_proposal, wallet_public::ionic_swap_proposal_info& proposal_info) const
 {
   wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
   bool r = t_unserializable_object_from_blob(proposal, raw_proposal);
@@ -5435,13 +5435,13 @@ bool wallet2::get_ionic_swap_proposal_info(const std::string&raw_proposal, walle
   return get_ionic_swap_proposal_info(proposal, proposal_info);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_proposal& proposal, wallet_public::ionic_swap_proposal_info& proposal_info)
+bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_proposal& proposal, wallet_public::ionic_swap_proposal_info& proposal_info) const
 {
   wallet_public::ionic_swap_proposal_context ionic_context = AUTO_VAL_INIT(ionic_context);
   return get_ionic_swap_proposal_info(proposal, proposal_info, ionic_context);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_proposal& proposal, wallet_public::ionic_swap_proposal_info& proposal_info, wallet_public::ionic_swap_proposal_context& ionic_context)
+bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_proposal& proposal, wallet_public::ionic_swap_proposal_info& proposal_info, wallet_public::ionic_swap_proposal_context& ionic_context) const
 {
   const transaction& tx = proposal.tx_template;
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
