@@ -34,7 +34,7 @@
 
 //TODO: global objects, subject to refactoring
 
-std::shared_ptr<plain_wallet_instance> ginstance_ptr;
+std::shared_ptr<plain_wallet::plain_wallet_instance> ginstance_ptr;
 
 #define GET_INSTANCE_PTR(ptr_name) \
   auto ptr_name = std::atomic_load(&ginstance_ptr); \
