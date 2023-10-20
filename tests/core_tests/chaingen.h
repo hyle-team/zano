@@ -703,14 +703,15 @@ bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& event
                                       bool use_ref_by_id = false);
 uint64_t get_balance(const currency::account_keys& addr, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, bool dbg_log = false);
 uint64_t get_balance(const currency::account_base& addr, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, bool dbg_log = false);
-void balance_via_wallet(const tools::wallet2& w, uint64_t* p_total, uint64_t* p_unlocked = 0, uint64_t* p_awaiting_in = 0, uint64_t* p_awaiting_out = 0, uint64_t* p_mined = 0);
+void balance_via_wallet(const tools::wallet2& w, const crypto::public_key& asset_id, uint64_t* p_total, uint64_t* p_unlocked = 0, uint64_t* p_awaiting_in = 0, uint64_t* p_awaiting_out = 0, uint64_t* p_mined = 0);
 #define INVALID_BALANCE_VAL std::numeric_limits<uint64_t>::max()
 bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name,
                               uint64_t expected_total,
                               uint64_t expected_mined = INVALID_BALANCE_VAL,
                               uint64_t expected_unlocked = INVALID_BALANCE_VAL,
                               uint64_t expected_awaiting_in = INVALID_BALANCE_VAL,
-                              uint64_t expected_awaiting_out = INVALID_BALANCE_VAL);
+                              uint64_t expected_awaiting_out = INVALID_BALANCE_VAL,
+                              const crypto::public_key& asset_id = currency::native_coin_asset_id);
 
 bool calculate_amounts_many_outs_have_and_no_outs_have(const uint64_t first_blocks_reward, uint64_t& amount_many_outs_have, uint64_t& amount_no_outs_have);
 bool find_global_index_for_output(const std::vector<test_event_entry>& events, const crypto::hash& head_block_hash, const currency::transaction& reference_tx, const size_t reference_tx_out_index, uint64_t& global_index);
@@ -1112,9 +1113,10 @@ void append_vector_by_another_vector(U& dst, const V& src)
   PRINT_EVENT_N_TEXT(VEC_EVENTS, "MAKE_NEXT_POS_BLOCK_TX1(" << #BLK_NAME << ")");                           \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                                       \
   {                                                                                                         \
-    std::list<currency::transaction>tx_list;                                                                \
+    std::list<currency::transaction> tx_list;                                                               \
     tx_list.push_back(TX_1);                                                                                \
-    generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, tx_list, MINERS_ACC_LIST);       \
+    if (!generator.construct_block(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, tx_list, MINERS_ACC_LIST))  \
+      return false;                                                                                         \
   }                                                                                                         \
   VEC_EVENTS.push_back(BLK_NAME)
 

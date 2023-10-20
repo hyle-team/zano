@@ -10,6 +10,64 @@
 #include "random_helper.h"
 #include "tx_builder.h"
 
+using namespace currency;
+
+// Helpers
+
+bool check_ionic_swap_tx_outs(const std::vector<currency::account_base>& accounts, const currency::transaction& tx, std::shared_ptr<const tools::wallet2> w, const tools::wallet_public::ionic_swap_proposal& proposal)
+{
+  tools::mode_separate_context msc = AUTO_VAL_INIT(msc);
+  msc.tx_for_mode_separate = proposal.tx_template;
+
+  tools::wallet_public::ionic_swap_proposal_context ionic_context = AUTO_VAL_INIT(ionic_context);
+  bool r = w->get_ionic_swap_proposal_info(proposal, msc.proposal_info, ionic_context);
+  CHECK_AND_ASSERT_MES(r, false, "get_ionic_swap_proposal_info failed");
+
+  // decode all outputs amounts and asset_ids
+  std::vector<std::pair<uint64_t, crypto::public_key>> outs_amounts_and_asset_ids;
+  outs_amounts_and_asset_ids.resize(tx.vout.size());
+
+  //ionic_context.one_time_skey
+  const crypto::public_key& tx_pub_key = get_tx_pub_key_from_extra(tx);
+
+  for(size_t i = 0; i < tx.vout.size(); ++i)
+  {
+    VARIANT_SWITCH_BEGIN(tx.vout[i])
+      VARIANT_CASE_CONST(currency::tx_out_zarcanum, oz)
+      for(size_t k = 0; k < accounts.size(); ++k)
+      {
+        crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
+        bool r = crypto::generate_key_derivation(tx_pub_key, accounts[k].get_keys().view_secret_key, derivation);
+        CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed");
+        uint64_t decoded_amount = 0;
+        crypto::public_key decoded_asset_id{};
+        crypto::scalar_t amount_blinding_mask{};
+        crypto::scalar_t asset_id_blinding_mask{};
+        if (decode_output_amount_and_asset_id(oz, derivation, i, decoded_amount, decoded_asset_id, amount_blinding_mask, asset_id_blinding_mask))
+        {
+          outs_amounts_and_asset_ids[i] = std::make_pair(decoded_amount, decoded_asset_id);
+          break;
+        }
+      }
+    VARIANT_SWITCH_END()
+  }
+
+  static_assert(CURRENCY_TX_MIN_ALLOWED_OUTS >= 2);
+  const size_t expected_number_of_zero_amount_outputs = CURRENCY_TX_MIN_ALLOWED_OUTS - 2;
+  size_t zero_amount_outputs = 0;
+  for(auto& oaai : outs_amounts_and_asset_ids)
+  {
+    CHECK_AND_ASSERT_MES(oaai.second != null_pkey, false, "Not all outputs were decoded");
+    if (oaai.first == 0)
+      ++zero_amount_outputs;
+  }
+
+  CHECK_AND_ASSERT_MES(zero_amount_outputs <= expected_number_of_zero_amount_outputs, false, "zero_amount_outputs: " << zero_amount_outputs << ", expected_number_of_zero_amount_outputs: " << expected_number_of_zero_amount_outputs);
+
+  return true;
+}
+
+//----------------------------------------------------------------------------------------------------
 
 ionic_swap_basic_test::ionic_swap_basic_test()
 {
