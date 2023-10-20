@@ -205,6 +205,8 @@ namespace plain_wallet
 
     LOG_PRINT_L0("[INIT PLAIN_WALLET_INSTANCE] Ver:" << PROJECT_VERSION_LONG << "(" << BUILD_TYPE << ")");
 
+
+#ifndef CAKEWALLET
     std::string wallets_folder = get_wallets_folder();
     boost::system::error_code ec;
     boost::filesystem::create_directories(wallets_folder, ec);
@@ -225,11 +227,15 @@ namespace plain_wallet
       err_result.error.message = LOCATION_STR + " \nmessage:" + ec.message();
       return epee::serialization::store_t_to_json(err_result);
     }
-
+#endif
     std::atomic_store(&ginstance_ptr, ptr);
+#ifndef CAKEWALLET
     epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
     ok_response.result.return_code = API_RETURN_CODE_OK;
     return epee::serialization::store_t_to_json(ok_response);
+#else
+    return API_RETURN_CODE_OK;
+#endif
   }
 
   std::string get_appconfig(const std::string& encryption_key)
