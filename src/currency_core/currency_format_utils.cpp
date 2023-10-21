@@ -277,10 +277,10 @@ namespace currency
         bare_inputs_sum += tk.amount;
       VARIANT_CASE_CONST(txin_htlc, foo);
         CHECK_AND_ASSERT_MES(false, false, "unexpected txin_htlc input");
-        VARIANT_CASE_CONST(txin_multisig, ms);
+      VARIANT_CASE_CONST(txin_multisig, ms);
         //bare_inputs_sum += ms.amount;
         CHECK_AND_ASSERT_MES(false, false, "unexpected txin_multisig input"); // TODO @#@# check support for multisig inputs
-        VARIANT_CASE_CONST(txin_zc_input, foo);
+      VARIANT_CASE_CONST(txin_zc_input, foo);
         ++zc_inputs_count;
       VARIANT_SWITCH_END();
     }
@@ -1179,11 +1179,11 @@ namespace currency
         out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
       
         CHECK_AND_ASSERT_MES(~de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
-        asset_blinding_mask = de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
+        asset_blinding_mask = de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // s = Hs(domain_sep, Hs(8 * r * V, i))
         blinded_asset_id = crypto::point_t(de.asset_id) + asset_blinding_mask * crypto::c_point_X;
         out.blinded_asset_id = (crypto::c_scalar_1div8 * blinded_asset_id).to_public_key(); // T = 1/8 * (H_asset + s * X)
         
-        amount_blinding_mask = de.flags & tx_destination_entry_flags::tdef_zero_amount_blinding_mask ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
+        amount_blinding_mask = de.flags & tx_destination_entry_flags::tdef_zero_amount_blinding_mask ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_BLINDING_MASK, h); // y = Hs(domain_sep, Hs(8 * r * V, i))
         amount_commitment = de.amount * blinded_asset_id + amount_blinding_mask * crypto::c_point_G;
         out.amount_commitment = (crypto::c_scalar_1div8 * amount_commitment).to_public_key(); // E = 1/8 * e * T + 1/8 * y * G
 
@@ -1203,19 +1203,24 @@ namespace currency
         out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
       
         CHECK_AND_ASSERT_MES(~de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
-        asset_blinding_mask = de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
+        asset_blinding_mask = de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // s = Hs(domain_sep, Hs(8 * r * V, i))
         blinded_asset_id = crypto::point_t(de.asset_id) + asset_blinding_mask * crypto::c_point_X;
         out.blinded_asset_id = (crypto::c_scalar_1div8 * blinded_asset_id).to_public_key(); // T = 1/8 * (H_asset + s * X)
 
-        amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
+        amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_BLINDING_MASK, h); // y = Hs(domain_sep, Hs(8 * r * V, i))
         amount_commitment = de.amount * blinded_asset_id + amount_blinding_mask * crypto::c_point_G;
         out.amount_commitment = (crypto::c_scalar_1div8 * amount_commitment).to_public_key(); // E = 1/8 * e * T + 1/8 * y * G
 
-        //LOG_PRINT_CYAN("OUT " << std::setw(2) << output_index << ": " << de.asset_id << " + " << asset_blinding_mask << " x X", LOG_LEVEL_0);
-        //LOG_PRINT_CYAN("     == " << blinded_asset_id, LOG_LEVEL_0);
-        //LOG_PRINT_CYAN("OUT " << std::setw(2) << output_index << ": " << crypto::scalar_t(de.amount) << " x " << blinded_asset_id << " + " << amount_blinding_mask << " x G", LOG_LEVEL_0);
-        //LOG_PRINT_CYAN("     == " << amount_commitment << ", x 1/8 == " << out.amount_commitment, LOG_LEVEL_0);
-
+        DBG_VAL_PRINT(output_index);
+        DBG_VAL_PRINT(de.amount);
+        DBG_VAL_PRINT(de.asset_id);
+        DBG_VAL_PRINT(amount_mask);
+        DBG_VAL_PRINT(asset_blinding_mask);
+        DBG_VAL_PRINT(blinded_asset_id);
+        DBG_VAL_PRINT(amount_blinding_mask);
+        DBG_VAL_PRINT(amount_mask);
+        DBG_VAL_PRINT(amount_commitment);
+        
         if (de.addr.front().is_auditable())
           out.mix_attr = CURRENCY_TO_KEY_OUT_FORCED_NO_MIX; // override mix_attr to 1 for auditable target addresses
         else
@@ -1942,7 +1947,7 @@ namespace currency
   };
   //--------------------------------------------------------------------------------
   bool generate_ZC_sig(const crypto::hash& tx_hash_for_signature, size_t input_index, const tx_source_entry& se, const input_generation_context_data& in_context,
-    const account_keys& sender_account_keys, const uint64_t tx_flags, tx_generation_context& ogc, transaction& tx, bool last_output)
+    const account_keys& sender_account_keys, const uint64_t tx_flags, tx_generation_context& ogc, transaction& tx, bool last_output, bool separately_signed_tx_complete)
   {
     bool watch_only_mode = sender_account_keys.spend_secret_key == null_skey;
     CHECK_AND_ASSERT_MES(se.is_zc(), false, "sources contains a non-zc input");
@@ -1970,16 +1975,26 @@ namespace currency
 
     crypto::scalar_t pseudo_out_amount_blinding_mask = 0;
     crypto::scalar_t pseudo_out_asset_id_blinding_mask = crypto::scalar_t::random();
-    if ((last_output && (tx_flags & TX_FLAG_SIGNATURE_MODE_SEPARATE) == 0) || se.separately_signed_tx_complete)
+    if (last_output && ((tx_flags & TX_FLAG_SIGNATURE_MODE_SEPARATE) == 0 || separately_signed_tx_complete))
     {
       // either normal tx or the last signature of consolidated tx -- in both cases we need to calculate non-random blinding mask for pseudo output commitment
-      pseudo_out_amount_blinding_mask   = ogc.amount_blinding_masks_sum - ogc.pseudo_out_amount_blinding_masks_sum + (ogc.ao_commitment_in_outputs ? ogc.ao_amount_blinding_mask : -ogc.ao_amount_blinding_mask);      // A_1 - A^p_0 = (f_1 - f'_1) * G   =>  f'_{i-1} = sum{y_j} - sum{f'_i}
+      pseudo_out_amount_blinding_mask = ogc.amount_blinding_masks_sum - ogc.pseudo_out_amount_blinding_masks_sum + (ogc.ao_commitment_in_outputs ? ogc.ao_amount_blinding_mask : -ogc.ao_amount_blinding_mask);      // A_1 - A^p_0 = (f_1 - f'_1) * G   =>  f'_{i-1} = sum{y_j} - sum{f'_i}
     }
     else
     {
       pseudo_out_amount_blinding_mask.make_random();
       ogc.pseudo_out_amount_blinding_masks_sum += pseudo_out_amount_blinding_mask;
     }
+
+    DBG_VAL_PRINT("ZC sig generation");
+    DBG_VAL_PRINT(input_index);
+    DBG_VAL_PRINT(source_blinded_asset_id);
+    DBG_VAL_PRINT(pseudo_out_asset_id_blinding_mask);
+    DBG_VAL_PRINT(se.real_out_amount_blinding_mask);
+    DBG_VAL_PRINT(se.real_out_asset_id_blinding_mask);
+    DBG_VAL_PRINT(se.asset_id);
+    DBG_VAL_PRINT(se.amount);
+    DBG_VAL_PRINT(pseudo_out_amount_blinding_mask);
 
     crypto::point_t pseudo_out_blinded_asset_id = source_blinded_asset_id + pseudo_out_asset_id_blinding_mask * crypto::c_point_X;            // T^p_i = T_i + r'_i * X
     sig.pseudo_out_blinded_asset_id = (crypto::c_scalar_1div8 * pseudo_out_blinded_asset_id).to_public_key();
@@ -1990,11 +2005,6 @@ namespace currency
     crypto::point_t pseudo_out_amount_commitment = se.amount * source_blinded_asset_id + pseudo_out_amount_blinding_mask * crypto::c_point_G; // A^p_i = a_i * T_i + f'_i * G
     sig.pseudo_out_amount_commitment = (crypto::c_scalar_1div8 * pseudo_out_amount_commitment).to_public_key();
     ogc.pseudo_out_amount_commitments_sum += pseudo_out_amount_commitment;
-
-    //LOG_PRINT_CYAN("SBAID " << ": " << asset_id_pt << " + " << se.real_out_asset_id_blinding_mask << " x X", LOG_LEVEL_0);
-    //LOG_PRINT_CYAN("     == " << source_blinded_asset_id, LOG_LEVEL_0);
-    //LOG_PRINT_CYAN("POAM  " << ": " << crypto::scalar_t(se.amount) << " x " << source_blinded_asset_id << " + " << pseudo_out_amount_blinding_mask << " x G", LOG_LEVEL_0);
-    //LOG_PRINT_CYAN("     == " << pseudo_out_amount_commitment << ", x 1/8 == " << sig.pseudo_out_amount_commitment, LOG_LEVEL_0);
 
     // = three-layers ring signature data outline =
     // (j in [0, ring_size-1])
@@ -2489,7 +2499,7 @@ namespace currency
     for(size_t destination_index = 0; destination_index < shuffled_dsts.size(); ++destination_index, ++output_index)
     {
       tx_destination_entry& dst_entr = shuffled_dsts[destination_index];
-      if (!append_mode && all_inputs_are_obviously_native_coins && gen_context.ao_asset_id == currency::null_pkey)
+      if (!(flags & TX_FLAG_SIGNATURE_MODE_SEPARATE) && all_inputs_are_obviously_native_coins && gen_context.ao_asset_id == currency::null_pkey)
         dst_entr.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // all inputs are obviously native coins -- all outputs must have explicit asset ids (unless there's an asset emission)
 
       r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys,
@@ -2580,6 +2590,7 @@ namespace currency
 
     // ring signatures (per-input proofs)
     r = false;
+    bool separately_signed_tx_complete = !sources.empty() ? sources.back().separately_signed_tx_complete : false;
     size_t curren_zc_index = thirdparty_zc_inputs_count;
     for (size_t i_ = 0; i_ != sources.size(); i_++)
     {
@@ -2592,8 +2603,7 @@ namespace currency
       if (source_entry.is_zc())
       {
         // ZC
-        // blinding_masks_sum is supposed to be sum(mask of all tx output) - sum(masks of all pseudo out commitments) 
-        r = generate_ZC_sig(tx_hash_for_signature, i_ + input_starter_index, source_entry, in_contexts[i_mapped], sender_account_keys, flags, gen_context, tx, i_ + 1 == sources.size());
+        r = generate_ZC_sig(tx_hash_for_signature, i_ + input_starter_index, source_entry, in_contexts[i_mapped], sender_account_keys, flags, gen_context, tx, i_ + 1 == sources.size(), separately_signed_tx_complete);
         CHECK_AND_ASSERT_MES(r, false, "generate_ZC_sigs failed");
         gen_context.zc_input_amounts[curren_zc_index] = source_entry.amount;
         curren_zc_index++;
