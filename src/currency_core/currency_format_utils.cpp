@@ -2272,7 +2272,6 @@ namespace currency
     bool has_non_zc_inputs = false;
 
     std::list<crypto::key_image> key_images_total;
-    size_t thirdparty_zc_inputs_count = zc_inputs_count;
     //
     // INs
     //
@@ -2591,7 +2590,7 @@ namespace currency
     // ring signatures (per-input proofs)
     r = false;
     bool separately_signed_tx_complete = !sources.empty() ? sources.back().separately_signed_tx_complete : false;
-    size_t curren_zc_index = thirdparty_zc_inputs_count;
+    size_t zc_input_index = 0;
     for (size_t i_ = 0; i_ != sources.size(); i_++)
     {
       size_t i_mapped = inputs_mapping[i_];
@@ -2605,8 +2604,8 @@ namespace currency
         // ZC
         r = generate_ZC_sig(tx_hash_for_signature, i_ + input_starter_index, source_entry, in_contexts[i_mapped], sender_account_keys, flags, gen_context, tx, i_ + 1 == sources.size(), separately_signed_tx_complete);
         CHECK_AND_ASSERT_MES(r, false, "generate_ZC_sigs failed");
-        gen_context.zc_input_amounts[curren_zc_index] = source_entry.amount;
-        curren_zc_index++;
+        gen_context.zc_input_amounts[zc_input_index] = source_entry.amount;
+        zc_input_index++;
       }
       else
       {
