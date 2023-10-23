@@ -201,6 +201,7 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
     currency::transaction res_tx2 = AUTO_VAL_INIT(res_tx2);
     r = bob_wlt->accept_ionic_swap_proposal(proposal, res_tx2);
     CHECK_AND_ASSERT_MES(r, false, "Failed to accept ionic proposal");
+    CHECK_AND_ASSERT_MES(check_ionic_swap_tx_outs(m_accounts, res_tx2, bob_wlt, proposal), false, "");
   }
 
   r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
@@ -403,7 +404,7 @@ bool ionic_swap_exact_amounts_test::c1(currency::core& c, size_t ev_index, const
   currency::transaction tx_is{};
   r = bob_wlt->accept_ionic_swap_proposal(proposal, tx_is);
   CHECK_AND_ASSERT_MES(r, false, "Failed to accept ionic proposal");
-  //CHECK_AND_ASSERT_MES(check_ionic_swap_tx_outs(m_accounts, tx_is, bob_wlt, proposal), false, "");
+  CHECK_AND_ASSERT_MES(check_ionic_swap_tx_outs(m_accounts, tx_is, bob_wlt, proposal), false, "");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
   r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
@@ -443,7 +444,7 @@ bool ionic_swap_exact_amounts_test::c1(currency::core& c, size_t ev_index, const
   currency::transaction tx_is2{};
   r = alice_wlt->accept_ionic_swap_proposal(proposal, tx_is2);
   CHECK_AND_ASSERT_MES(r, false, "Failed to accept ionic proposal");
-  //CHECK_AND_ASSERT_MES(check_ionic_swap_tx_outs(m_accounts, tx_is2, bob_wlt, proposal), false, "");
+  CHECK_AND_ASSERT_MES(check_ionic_swap_tx_outs(m_accounts, tx_is2, bob_wlt, proposal), false, "");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
   r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
