@@ -954,21 +954,6 @@ namespace currency
     END_BOOST_SERIALIZATION()
   };
 
-  //TODO: @val, should we call it something like schnorr_sig ? 
-  struct simple_sig
-  {
-    crypto::signature s;
-
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(s)
-    END_SERIALIZE()
-
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(s)
-    END_BOOST_SERIALIZATION()
-  };
-
-
   struct void_sig
   {
     //TODO:

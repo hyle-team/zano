@@ -3478,7 +3478,9 @@ bool wallet2::get_asset_id_info(const crypto::public_key& asset_id, currency::as
 {
   if (asset_id == currency::native_coin_asset_id)
   {
-    return CURRENCY_NAME_ABR;
+    asset_info = currency::get_native_coin_asset_descriptor();
+    whitelist_ = true;
+    return true;
   }
   //check if asset is whitelisted or customly added
   whitelist_ = false;
