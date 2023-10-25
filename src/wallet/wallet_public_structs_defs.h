@@ -1483,7 +1483,7 @@ namespace wallet_public
       KV_SERIALIZE(spend_public_key)
       KV_SERIALIZE(seed)
     END_KV_SERIALIZE_MAP()
-  }
+  };
 
 
   struct wallet_entry_info

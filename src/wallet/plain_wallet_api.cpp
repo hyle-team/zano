@@ -162,17 +162,6 @@ namespace plain_wallet
     return epee::serialization::store_t_to_json(ok_response);
   }
 
-  std::string init(const std::string& address, const std::string& working_dir, int log_level)
-  {
-    epee::net_utils::http::url_content url_data = AUTO_VAL_INIT(url_data);
-    if(!epee::net_utils::parse_url(address, url_data))
-    {
-        LOG_ERROR("Failed to parse address");
-        return API_RETURN_CODE_BAD_ARG;
-    }
-    return init(url_data.ip, url_data.port, const std::string& working_dir, int log_level);
-  }
-
 
   std::string init(const std::string& ip, const std::string& port, const std::string& working_dir, int log_level)
   {
@@ -250,6 +239,18 @@ namespace plain_wallet
 #endif
   }
 
+  std::string init(const std::string& address, const std::string& working_dir, int log_level)
+  {
+    epee::net_utils::http::url_content url_data = AUTO_VAL_INIT(url_data);
+    if(!epee::net_utils::parse_url(address, url_data))
+    {
+        LOG_ERROR("Failed to parse address");
+        return API_RETURN_CODE_BAD_ARG;
+    }
+    return init(url_data.host, std::to_string(url_data.port), working_dir, log_level);
+  }
+
+
   std::string get_appconfig(const std::string& encryption_key)
   {
     std::string res_str;
@@ -283,7 +284,7 @@ namespace plain_wallet
   bool is_wallet_exist(const std::string& path)
   {
     boost::system::error_code ec;
-    return exists(path, ec);
+    return boost::filesystem::exists(path, ec);
   }
 
   std::string generate_random_key(uint64_t lenght)
@@ -625,25 +626,23 @@ namespace plain_wallet
     return res;
   }
 
+  struct wallet_extended_info
+  {
+    view::wallet_info wi;
+    view::wallet_info_extra wi_extended;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wi)
+      KV_SERIALIZE(wi_extended)
+    END_KV_SERIALIZE_MAP()
+  };
+
   std::string get_wallet_info(hwallet h)
   {
     GET_INSTANCE_PTR(inst_ptr);
-    epee::json_rpc::response<std::list<view::open_wallet_response>, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
-
-    struct wallet_extended_info
-    {
-      view::wallet_info wi;
-      view::wallet_info_extended wi_extended;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(wi)
-        KV_SERIALIZE(wi_extended)
-      END_KV_SERIALIZE_MAP()
-    }
     wallet_extended_info wei = AUTO_VAL_INIT(wei);
-
     inst_ptr->gwm.get_wallet_info(h, wei.wi);
-    inst_ptr->gwm.get_wallet_info_extended(h, wei.wi_extended);
+    inst_ptr->gwm.get_wallet_info_extra(h, wei.wi_extended);
     return epee::serialization::store_t_to_json(wei);
   }
   std::string reset_wallet_password(hwallet h, const std::string& password)
