@@ -3590,12 +3590,13 @@ bool wallet2::generate_utxo_defragmentation_transaction_if_needed(currency::tran
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/) const
+std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/, bool show_only_unknown /*= false*/, const std::string& filter_asset_ticker /*= std::string{}*/) const
 {
-  static const char* header = "index                 amount  g_index  flags       block  tx                                                                out#  key image";
+  static const char* header = "index                 amount  ticker  g_index  flags       block  tx                                                                out#  asset id";
   std::stringstream ss;
   ss << header << ENDL;
   size_t count = 0;
+  size_t unknown_assets_outs_count = 0;
   for (size_t i = 0; i != m_transfers.size(); ++i)
   {
     const transfer_details& td = m_transfers[i];
@@ -3603,21 +3604,44 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
     if ((td.is_spent() && !include_spent) || (!td.is_spent() && !include_unspent))
       continue;
 
+    bool native_coin = td.is_native_coin();
+    asset_descriptor_base adb{};
+    bool whitelisted = false;
+    if (get_asset_id_info(td.get_asset_id(), adb, whitelisted) == show_only_unknown)
+    {
+      if (!show_only_unknown)
+        ++unknown_assets_outs_count;
+      continue;
+    }
+
+    if (!filter_asset_ticker.empty() && adb.ticker != filter_asset_ticker)
+      continue;
+
     ss << std::right <<
       std::setw(5) << i << "  " <<
-      std::setw(21) << print_money(td.amount()) << "  " <<
+      std::setw(21) << print_asset_money(td.m_amount, adb.decimal_point) << "  " <<
+      std::setw(6) << std::left << (native_coin ? std::string("      ") : adb.ticker) << "  " << std::right <<
       std::setw(7) << td.m_global_output_index << "  " <<
       std::setw(2) << std::setfill('0') << td.m_flags << std::setfill(' ') << ":" <<
       std::setw(5) << transfer_flags_to_str(td.m_flags) << "  " <<
       std::setw(7) << td.m_ptx_wallet_info->m_block_height << "  " <<
       get_transaction_hash(td.m_ptx_wallet_info->m_tx) << "  " <<
-      std::setw(4) << td.m_internal_output_index << "  " <<
-      td.m_key_image << ENDL;
+      std::setw(4) << td.m_internal_output_index << "  ";
+    if (native_coin)
+      ss << "                                                                ";
+    else
+      ss << td.get_asset_id();
     
+    ss << ENDL;
+
     ++count;
   }
 
   ss << "printed " << count << " outputs of " << m_transfers.size() << " total" << ENDL;
+  if (unknown_assets_outs_count == 1)
+    ss << "(" << unknown_assets_outs_count << " output with unrecognized asset id is not shown, use 'list_outputs unknown' to see it)" << ENDL;
+  else if (unknown_assets_outs_count > 1)
+    ss << "(" << unknown_assets_outs_count << " outputs with unrecognized asset ids are not shown, use 'list_outputs unknown' to see them)" << ENDL;
   return ss.str();
 }
 //----------------------------------------------------------------------------------------------------
