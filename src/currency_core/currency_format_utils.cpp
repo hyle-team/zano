@@ -2105,6 +2105,25 @@ namespace currency
       p_result_point->to_public_key(*p_result_pub_key);
   }
 
+  const asset_descriptor_base& get_native_coin_asset_descriptor()
+  {
+    static asset_descriptor_base native_coin_asset_descriptor = [](){
+      asset_descriptor_base adb{};
+      adb.total_max_supply  = UINT64_MAX;
+      adb.current_supply    = 0;
+      adb.decimal_point     = CURRENCY_DISPLAY_DECIMAL_POINT;
+      adb.ticker            = CURRENCY_NAME_ABR;
+      adb.full_name         = CURRENCY_NAME_BASE;
+      adb.meta_info         = "";
+      adb.owner             = currency::null_pkey;
+      adb.hidden_supply     = false;
+      adb.version           = 0;
+      return adb;
+    }();
+
+    return native_coin_asset_descriptor;
+  }
+
   bool construct_tx_handle_ado(const account_keys& sender_account_keys, 
     const finalize_tx_param& ftp, 
     asset_descriptor_operation& ado, 
