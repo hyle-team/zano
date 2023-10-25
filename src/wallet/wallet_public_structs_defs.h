@@ -1463,11 +1463,27 @@ namespace wallet_public
       KV_SERIALIZE(address)
       KV_SERIALIZE(view_sec_key)
       KV_SERIALIZE(path)
-      KV_SERIALIZE(is_auditable);
-    KV_SERIALIZE(is_watch_only);
+      KV_SERIALIZE(is_auditable)
+      KV_SERIALIZE(is_watch_only)
     END_KV_SERIALIZE_MAP()
   };
 
+  struct wallet_info_extra
+  {
+    std::string view_private_key;
+    std::string view_public_key;
+    std::string spend_private_key;
+    std::string spend_public_key;
+    std::string seed;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(view_private_key)
+      KV_SERIALIZE(view_public_key)
+      KV_SERIALIZE(spend_private_key)
+      KV_SERIALIZE(spend_public_key)
+      KV_SERIALIZE(seed)
+    END_KV_SERIALIZE_MAP()
+  }
 
 
   struct wallet_entry_info

@@ -6,10 +6,12 @@
 #pragma once
 
 #include <string>
+#include "../common/error_codes.h"
 
 namespace plain_wallet
 {
   typedef int64_t hwallet;
+  std::string init(const std::string& address, const std::string& working_dir, int log_level);
   std::string init(const std::string& ip, const std::string& port, const std::string& working_dir, int log_level);
   std::string reset();
   std::string set_log_level(int log_level);
@@ -31,6 +33,7 @@ namespace plain_wallet
   std::string generate(const std::string& path, const std::string& password);
   std::string get_opened_wallets();  
 
+
   std::string get_wallet_status(hwallet h);
   std::string close_wallet(hwallet h);
   std::string invoke(hwallet h, const std::string& params);
@@ -39,4 +42,10 @@ namespace plain_wallet
   std::string async_call(const std::string& method_name, uint64_t instance_id, const std::string& params);
   std::string try_pull_result(uint64_t);
   std::string sync_call(const std::string& method_name, uint64_t instance_id, const std::string& params);
+
+  //cake wallet api extension
+  bool is_wallet_exist(const std::string& path);
+  std::string get_wallet_info(hwallet h);
+  std::string reset_wallet_password(hwallet h, const std::string& password);
+
 }

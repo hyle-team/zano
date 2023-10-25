@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "../currency_core/basic_api_response_codes.h"
 
 #define API_RETURN_CODE_OK                                      BASIC_RESPONSE_STATUS_OK
 #define API_RETURN_CODE_FAIL                                    BASIC_RESPONSE_STATUS_FAILED
