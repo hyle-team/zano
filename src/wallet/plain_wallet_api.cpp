@@ -33,20 +33,7 @@
 
 //TODO: global objects, subject to refactoring
 
-struct plain_wallet_instance
-{
-  plain_wallet_instance() :initialized(false), gjobs_counter(1)
-  {}
-  wallets_manager gwm;
-  std::atomic<bool> initialized;
 
-  std::atomic<uint64_t> gjobs_counter;
-  std::map<uint64_t, std::string> gjobs;
-  epee::critical_section gjobs_lock;
-};
-
-
-std::shared_ptr<plain_wallet::plain_wallet_instance> ginstance_ptr;
 
 #define GET_INSTANCE_PTR(ptr_name) \
   auto ptr_name = std::atomic_load(&ginstance_ptr); \
@@ -71,6 +58,22 @@ void static_destroy_handler()
 
 namespace plain_wallet
 {
+  struct plain_wallet_instance
+  {
+    plain_wallet_instance() :initialized(false), gjobs_counter(1)
+    {}
+    wallets_manager gwm;
+    std::atomic<bool> initialized;
+
+    std::atomic<uint64_t> gjobs_counter;
+    std::map<uint64_t, std::string> gjobs;
+    epee::critical_section gjobs_lock;
+  };
+
+  std::shared_ptr<plain_wallet::plain_wallet_instance> ginstance_ptr;
+
+
+
   typedef epee::json_rpc::response<epee::json_rpc::dummy_result, error> error_response;
 
 
