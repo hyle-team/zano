@@ -17,7 +17,6 @@
 #include "common/config_encrypt_helper.h"
 #include "static_helpers.h"
 #include "wallet_helpers.h"
-#include "plain_wallet_api_ex.h"
 
 #define ANDROID_PACKAGE_NAME    "com.zano_mobile"
 
