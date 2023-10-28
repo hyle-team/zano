@@ -2842,6 +2842,7 @@ bool wallet2::reset_all()
   m_last_pow_block_h = 0;
   m_current_wallet_file_size = 0;
   m_custom_assets.clear();
+  m_own_asset_descriptors.clear();
   return true;
 }
 //----------------------------------------------------------------------------------------------------
