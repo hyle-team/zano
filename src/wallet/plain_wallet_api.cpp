@@ -666,4 +666,10 @@ namespace plain_wallet
     return inst_ptr->gwm.reset_wallet_password(h, password);
   }
 
+
+  // 0 (default), 1 (unimportant), 2 (normal), 3 (elevated), 4 (priority)
+  uint64_t get_current_tx_fee(uint64_t priority)
+  {
+    return TX_DEFAULT_FEE;
+  }
 }
