@@ -545,6 +545,7 @@ namespace tools
 
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
     void set_pos_mint_packing_size(uint64_t new_size);
+    void set_pos_required_decoys_count(size_t v) { m_required_decoys_count = v; }
     void set_minimum_height(uint64_t h);
     std::shared_ptr<i_core_proxy> get_core_proxy();
     uint64_t balance() const;
@@ -802,11 +803,7 @@ namespace tools
     //next functions in public area only becausce of test_generator
     //TODO: Need refactoring - remove it back to private zone 
     void set_genesis(const crypto::hash& genesis_hash);
-    bool prepare_and_sign_pos_block(currency::block& b,
-      const currency::pos_entry& pos_info,
-      const crypto::public_key& source_tx_pub_key,
-      uint64_t in_tx_output_index,
-      const std::vector<const crypto::public_key*>& keys_ptrs);
+    bool prepare_and_sign_pos_block(const currency::pos_entry& pe, currency::block& b);
     void process_new_blockchain_entry(const currency::block& b, 
       const currency::block_direct_data_entry& bche, 
       const crypto::hash& bl_id,
@@ -1036,6 +1033,7 @@ private:
     std::atomic<uint64_t> m_last_bc_timestamp; 
     bool m_do_rise_transfer;
     uint64_t m_pos_mint_packing_size;
+    size_t m_required_decoys_count;
 
     transfer_container m_transfers;
     multisig_transfer_container m_multisig_transfers;

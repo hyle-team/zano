@@ -359,6 +359,10 @@ namespace currency
 #pragma pack (push, 1)
     struct out_entry
     {
+      out_entry() = default;
+      out_entry(uint64_t global_amount_index, const crypto::public_key& stealth_address)
+        : global_amount_index(global_amount_index), out_key(stealth_address)
+      {}
       uint64_t global_amount_index;
       crypto::public_key out_key;
     };

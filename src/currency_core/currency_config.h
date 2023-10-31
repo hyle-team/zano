@@ -30,6 +30,8 @@
 #define HF1_BLOCK_MAJOR_VERSION                         1
 #define CURRENT_BLOCK_MAJOR_VERSION                     2
 
+#define CURRENCY_DEFAULT_DECOY_SET_SIZE                 10
+
 #define CURRENT_BLOCK_MINOR_VERSION                     0
 #define CURRENCY_BLOCK_FUTURE_TIME_LIMIT                60*60*2
 #define CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT            60*20
