@@ -188,14 +188,9 @@ namespace currency
 
     if (pos)
     {
-      txin_to_key posin;
-      posin.amount = pe.amount;
-      posin.key_offsets.push_back(pe.index);
-      posin.k_image = pe.keyimage;
-      tx.vin.push_back(posin);
-      //reserve place for ring signature
-      tx.signatures.resize(1);
-      tx.signatures[0].resize(posin.key_offsets.size());
+      // just placeholders, they will be filled in wallet2::prepare_and_sign_pos_block()
+      tx.vin.emplace_back(std::move(txin_to_key()));
+      tx.signatures.emplace_back();
     }
 
     uint64_t no = 0;

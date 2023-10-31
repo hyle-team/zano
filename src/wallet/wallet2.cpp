@@ -66,6 +66,7 @@ namespace tools
                         m_last_pow_block_h(0),
                         m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST),
                         m_pos_mint_packing_size(WALLET_DEFAULT_POS_MINT_PACKING_SIZE),
+                        m_required_decoys_count(CURRENCY_DEFAULT_DECOY_SET_SIZE),
                         m_current_wallet_file_size(0),
                         m_use_deffered_global_outputs(false), 
                         m_disable_tor_relay(false),
@@ -3476,52 +3477,125 @@ bool wallet2::get_pos_entries(currency::COMMAND_RPC_SCAN_POS::request& req)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::prepare_and_sign_pos_block(currency::block& b, 
-                                         const currency::pos_entry& pos_info, 
-                                         const crypto::public_key& source_tx_pub_key, 
-                                         uint64_t in_tx_output_index, 
-                                         const std::vector<const crypto::public_key*>& keys_ptrs)
+bool wallet2::prepare_and_sign_pos_block(const currency::pos_entry& pe, currency::block& b)
 {
-  //generate coinbase transaction
-  WLT_CHECK_AND_ASSERT_MES(b.miner_tx.vin[0].type() == typeid(currency::txin_gen), false, "Wrong output input in transaction");
-  WLT_CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(currency::txin_to_key), false, "Wrong output input in transaction");
-  auto& txin = boost::get<currency::txin_to_key>(b.miner_tx.vin[1]);
-  txin.k_image = pos_info.keyimage;
-  WLT_CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1 && b.miner_tx.signatures[0].size() == txin.key_offsets.size(),
-    false, "Wrong signatures amount in coinbase transacton");
+  bool r = false;
+  WLT_CHECK_AND_ASSERT_MES(pe.wallet_index < m_transfers.size(), false, "invalid pe.wallet_index: " << pe.wallet_index);
+  const transfer_details& td = m_transfers[pe.wallet_index];
+  const transaction& source_tx = td.m_ptx_wallet_info->m_tx;
+  const crypto::public_key source_tx_pub_key = get_tx_pub_key_from_extra(source_tx);
+  WLT_CHECK_AND_ASSERT_MES(td.m_internal_output_index < source_tx.vout.size(), false, "invalid td.m_internal_output_index: " << td.m_internal_output_index);
+  const currency::tx_out& stake_out = source_tx.vout[td.m_internal_output_index];
+
+  // calculate stake_out_derivation and secret_x (derived ephemeral secret key)
+  crypto::key_derivation stake_out_derivation = AUTO_VAL_INIT(stake_out_derivation);
+  r = crypto::generate_key_derivation(source_tx_pub_key, m_account.get_keys().view_secret_key, stake_out_derivation);               // d = 8 * v * R
+  WLT_CHECK_AND_ASSERT_MES(r, false, "generate_key_derivation failed, tid: " << pe.wallet_index << ", source_tx: " << get_transaction_hash(source_tx));
+  crypto::secret_key secret_x = AUTO_VAL_INIT(secret_x);
+  crypto::derive_secret_key(stake_out_derivation, td.m_internal_output_index, m_account.get_keys().spend_secret_key, secret_x);     // x = Hs(8 * v * R, i) + s
+
+  WLT_CHECK_AND_ASSERT_MES(b.miner_tx.vin[0].type() == typeid(currency::txin_gen), false, "Wrong input 0 type in transaction: " << b.miner_tx.vin[0].type().name());
+  WLT_CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(currency::txin_to_key), false, "Wrong input 1 type in transaction: " << b.miner_tx.vin[1].type().name());
+  WLT_CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1, false, "Wrong sig prepared in PoS block");
+  WLT_CHECK_AND_ASSERT_MES(stake_out.target.type() == typeid(currency::txout_to_key), false, "wrong type_id in source transaction in coinbase tx");
+
+  std::vector<crypto::signature>& sig = b.miner_tx.signatures[0];
+  txin_to_key& stake_input = boost::get<currency::txin_to_key>(b.miner_tx.vin[1]);
+  const txout_to_key& stake_out_target = boost::get<txout_to_key>(stake_out.target);
+
+  // partially fill stake input
+  stake_input.k_image = pe.keyimage;
+  stake_input.amount = stake_out.amount;
 
 
+  // get decoys outputs and construct miner tx
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response decoys_resp = AUTO_VAL_INIT(decoys_resp);
+  std::vector<const crypto::public_key*> ring;
+  uint64_t secret_index = 0; // index of the real stake output
+  if (m_required_decoys_count > 0)
+  {
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request decoys_req = AUTO_VAL_INIT(decoys_req);
+    decoys_req.use_forced_mix_outs = false;
+    decoys_req.outs_count = m_required_decoys_count + 1; // one more to be able to skip a decoy in case it hits the real output
+    decoys_req.amounts.push_back(pe.amount); // request one batch of decoys
 
-  //derive secret key
-  crypto::key_derivation pos_coin_derivation = AUTO_VAL_INIT(pos_coin_derivation);
-  bool r = crypto::generate_key_derivation(source_tx_pub_key,
-    m_account.get_keys().view_secret_key,
-    pos_coin_derivation);
+    r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(decoys_req, decoys_resp);
+    // TODO @#@# do we need these exceptions?
+    THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs.bin");
+    THROW_IF_FALSE_WALLET_EX(decoys_resp.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs.bin");
+    THROW_IF_FALSE_WALLET_EX(decoys_resp.status == API_RETURN_CODE_OK, error::get_random_outs_error, decoys_resp.status);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(decoys_resp.outs.size() == 1, "got wrong number of decoys batches: " << decoys_resp.outs.size());
+    
+    // we expect that less decoys can be returned than requested, we will use them all anyway
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoys_resp.outs[0].outs.size() <= m_required_decoys_count + 1, "for PoS stake tx got greater decoys to mix than requested: " << decoys_resp.outs[0].outs.size() << " < " << m_required_decoys_count + 1);
 
-  WLT_CHECK_AND_ASSERT_MES(r, false, "internal error: pos coin base generator: failed to generate_key_derivation("
-    <<  source_tx_pub_key
-    << ", view secret key: " << m_account.get_keys().view_secret_key << ")");
+    auto& ring_candidates = decoys_resp.outs[0].outs;
+    ring_candidates.emplace_front(td.m_global_output_index, stake_out_target.key);
 
-  crypto::secret_key derived_secret_ephemeral_key = AUTO_VAL_INIT(derived_secret_ephemeral_key);
-  crypto::derive_secret_key(pos_coin_derivation,
-    in_tx_output_index,
-    m_account.get_keys().spend_secret_key,
-    derived_secret_ephemeral_key);
+    std::unordered_set<uint64_t> used_gindices;
+    size_t good_outs_count = 0;
+    for(auto it = ring_candidates.begin(); it != ring_candidates.end(); )
+    {
+      if (used_gindices.count(it->global_amount_index) != 0)
+      {
+        it = ring_candidates.erase(it);
+        continue;
+      }
+      used_gindices.insert(it->global_amount_index);
+      if (++good_outs_count == m_required_decoys_count + 1)
+      {
+        ring_candidates.erase(++it, ring_candidates.end());
+        break;
+      }
+      ++it;
+    }
+    
+    // won't assert that ring_candidates.size() == m_required_decoys_count + 1 here as we will use all the decoys anyway
+    if (ring_candidates.size() < m_required_decoys_count + 1)
+      LOG_PRINT_YELLOW("PoS: using " << ring_candidates.size() - 1 << " decoys for mining tx, while " << m_required_decoys_count << " are required", LOG_LEVEL_1);
+
+    ring_candidates.sort([](auto& l, auto& r){ return l.global_amount_index < r.global_amount_index; }); // sort them now (note absolute_output_offsets_to_relative() below)
+
+    uint64_t i = 0;
+    for(auto& el : ring_candidates)
+    {
+      uint64_t gindex = el.global_amount_index;
+      if (gindex == td.m_global_output_index)
+        secret_index = i;
+      ++i;
+      ring.emplace_back(&el.out_key);
+      stake_input.key_offsets.push_back(el.global_amount_index);
+    }
+    stake_input.key_offsets = absolute_output_offsets_to_relative(stake_input.key_offsets);
+  }
+  else
+  {
+    // no decoys, the ring consist of one element -- the real stake output
+    ring.emplace_back(&stake_out_target.key);
+    stake_input.key_offsets.push_back(td.m_global_output_index);
+  }
 
   // sign block actually in coinbase transaction
   crypto::hash block_hash = currency::get_block_hash(b);
 
-  crypto::generate_ring_signature(block_hash,
-    txin.k_image,
-    keys_ptrs,
-    derived_secret_ephemeral_key,
-    0,
-    &b.miner_tx.signatures[0][0]);
+  // generate sring signature
+  sig.resize(ring.size());
+  crypto::generate_ring_signature(block_hash, stake_input.k_image, ring, secret_x, secret_index, sig.data());
 
-  WLT_LOG_L4("GENERATED RING SIGNATURE: block_id " << block_hash
-    << "txin.k_image" << txin.k_image
-    << "key_ptr:" << *keys_ptrs[0]
-    << "signature:" << b.miner_tx.signatures[0][0]);
+  if (epee::log_space::get_set_log_detalisation_level() >= LOG_LEVEL_4)
+  {
+    std::stringstream ss;
+    ss << "GENERATED RING SIGNATURE for PoS block coinbase:" << ENDL <<
+      "    block hash: " << block_hash << ENDL <<
+      "    key image:  " << stake_input.k_image << ENDL <<
+      "    ring:" << ENDL;
+    for(auto el: ring)
+      ss << "        " << *el << ENDL;
+    ss << "    signature:" << ENDL;
+    for(auto el: sig)
+      ss << "        " << el << ENDL;
+    WLT_LOG_L4(ss.str());
+  }
 
   return true;
 }
@@ -3666,19 +3740,20 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     WLT_LOG_GREEN("Found kernel, constructing block", LOG_LEVEL_0);
 
     CHECK_AND_NO_ASSERT_MES(rsp.index < req.pos_entries.size(), false, "call_COMMAND_RPC_SCAN_POS returned wrong index: " << rsp.index << ", expected less then " << req.pos_entries.size());
+    const pos_entry& pe = req.pos_entries[rsp.index];
 
     currency::COMMAND_RPC_GETBLOCKTEMPLATE::request tmpl_req = AUTO_VAL_INIT(tmpl_req);
     currency::COMMAND_RPC_GETBLOCKTEMPLATE::response tmpl_rsp = AUTO_VAL_INIT(tmpl_rsp);
     tmpl_req.wallet_address = get_account_address_as_str(miner_address);
     tmpl_req.stakeholder_address = get_account_address_as_str(m_account.get_public_address());
     tmpl_req.pos_block = true;
-    tmpl_req.pos_amount = req.pos_entries[rsp.index].amount;
-    tmpl_req.pos_index = req.pos_entries[rsp.index].index;
+    tmpl_req.pos_amount = pe.amount;
+    tmpl_req.pos_index = pe.index;
     tmpl_req.extra_text = get_extra_text_for_block(m_chain.get_top_block_height()); // m_miner_text_info;
-    tmpl_req.stake_unlock_time = req.pos_entries[rsp.index].stake_unlock_time;
+    tmpl_req.stake_unlock_time = pe.stake_unlock_time;
 
     // mark stake source as spent and make sure it will be restored in case of error
-    const std::vector<uint64_t> stake_transfer_idx_vec{ req.pos_entries[rsp.index].wallet_index };
+    const std::vector<uint64_t> stake_transfer_idx_vec{ pe.wallet_index };
     mark_transfers_as_spent(stake_transfer_idx_vec, "stake source");
     bool gracefull_leaving = false;
     auto stake_transfer_spent_flag_restorer = epee::misc_utils::create_scope_leave_handler([&](){
@@ -3710,27 +3785,17 @@ bool wallet2::build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& 
     }
 
     std::vector<const crypto::public_key*> keys_ptrs;
-    WLT_CHECK_AND_ASSERT_MES(req.pos_entries[rsp.index].wallet_index < m_transfers.size(),
+    WLT_CHECK_AND_ASSERT_MES(pe.wallet_index < m_transfers.size(),
         false, "Wrong wallet_index at generating coinbase transacton");
-
-    const auto& target = m_transfers[req.pos_entries[rsp.index].wallet_index].m_ptx_wallet_info->m_tx.vout[m_transfers[req.pos_entries[rsp.index].wallet_index].m_internal_output_index].target;
-    WLT_CHECK_AND_ASSERT_MES(target.type() == typeid(currency::txout_to_key), false, "wrong type_id in source transaction in coinbase tx");
-
-    const currency::txout_to_key& txtokey = boost::get<currency::txout_to_key>(target);
-    keys_ptrs.push_back(&txtokey.key);
 
     // set a real timestamp
     b.timestamp = rsp.block_timestamp;
     uint64_t current_timestamp = m_core_runtime_config.get_core_time();
     set_block_datetime(current_timestamp, b);
-    WLT_LOG_MAGENTA("Applying actual timestamp: " << current_timestamp, LOG_LEVEL_0);
+    WLT_LOG_MAGENTA("Applying actual timestamp: " << current_timestamp, LOG_LEVEL_2);
 
     //sign block
-    res = prepare_and_sign_pos_block(b,
-      req.pos_entries[rsp.index],
-      get_tx_pub_key_from_extra(m_transfers[req.pos_entries[rsp.index].wallet_index].m_ptx_wallet_info->m_tx),
-      m_transfers[req.pos_entries[rsp.index].wallet_index].m_internal_output_index,
-      keys_ptrs);
+    res = prepare_and_sign_pos_block(pe, b);
     WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to prepare_and_sign_pos_block");
     
     WLT_LOG_GREEN("Block " << get_block_hash(b) << " @ " << get_block_height(b) << " has been constructed, sending to core...", LOG_LEVEL_0);
