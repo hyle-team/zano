@@ -419,17 +419,6 @@ namespace currency
     THROW_IF_TRUE_WALLET_INT_ERR_EX_NO_HANDLER(false, "transform_str_to_tx shoruld never be called");
     return currency::transaction();
   }
-  //----------------------------------------------------------------------------------------------------
-  const transaction_wallet_info& wallet2::transform_ptr_to_value(const std::shared_ptr<transaction_wallet_info>& a)
-  {
-    return *a;
-  }
-  //----------------------------------------------------------------------------------------------------
-  std::shared_ptr<transaction_wallet_info> wallet2::transform_value_to_ptr(const transaction_wallet_info& d)
-  {
-    THROW_IF_TRUE_WALLET_INT_ERR_EX_NO_HANDLER(false, "transform_value_to_ptr shoruld never be called");
-    return std::shared_ptr<transaction_wallet_info>();
-  }
 
 
 }

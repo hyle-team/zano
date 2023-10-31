@@ -298,7 +298,7 @@ namespace tools
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(m_block_height)
       KV_SERIALIZE(m_block_timestamp)
-      KV_SERIALIZE_CUSTOM(m_tx, std::string, currency::wallet2::transform_tx_to_str, currency::transform_str_to_tx)
+      KV_SERIALIZE_CUSTOM(m_tx, std::string, currency::transform_tx_to_str, currency::transform_str_to_tx)
     END_KV_SERIALIZE_MAP()
 
     BEGIN_BOOST_SERIALIZATION()
@@ -308,6 +308,20 @@ namespace tools
     END_BOOST_SERIALIZATION()
 
   };
+  namespace detail
+  {
+    //----------------------------------------------------------------------------------------------------
+    inline const transaction_wallet_info& transform_ptr_to_value(const std::shared_ptr<transaction_wallet_info>& a)
+    {
+      return *a;
+    }
+    //----------------------------------------------------------------------------------------------------
+    inline std::shared_ptr<transaction_wallet_info> transform_value_to_ptr(const transaction_wallet_info& d)
+    {
+      THROW_IF_TRUE_WALLET_INT_ERR_EX_NO_HANDLER(false, "transform_value_to_ptr shoruld never be called");
+      return std::shared_ptr<transaction_wallet_info>();
+    }
+  }
 
 
   struct transfer_details_base
@@ -366,7 +380,7 @@ namespace tools
     }
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE_CUSTOM(m_ptx_wallet_info, const transaction_wallet_info&, currency::transform_ptr_to_value, currency::transform_value_to_ptr)
+      KV_SERIALIZE_CUSTOM(m_ptx_wallet_info, const transaction_wallet_info&, detail::transform_ptr_to_value, detail::transform_value_to_ptr)
       KV_SERIALIZE(m_internal_output_index)
       KV_SERIALIZE(m_spent_height)
       KV_SERIALIZE(m_flags)
