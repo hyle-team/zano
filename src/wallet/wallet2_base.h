@@ -298,7 +298,7 @@ namespace tools
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(m_block_height)
       KV_SERIALIZE(m_block_timestamp)
-      KV_SERIALIZE_CUSTOM(m_tx, std::string, tools::wallet2::transform_tx_to_str, tools::wallet2::transform_str_to_tx)
+      KV_SERIALIZE_CUSTOM(m_tx, std::string, currency::wallet2::transform_tx_to_str, currency::transform_str_to_tx)
     END_KV_SERIALIZE_MAP()
 
     BEGIN_BOOST_SERIALIZATION()
@@ -366,7 +366,7 @@ namespace tools
     }
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE_CUSTOM(m_ptx_wallet_info, const transaction_wallet_info&, tools::wallet2::transform_ptr_to_value, tools::wallet2::transform_value_to_ptr)
+      KV_SERIALIZE_CUSTOM(m_ptx_wallet_info, const transaction_wallet_info&, currency::transform_ptr_to_value, currency::transform_value_to_ptr)
       KV_SERIALIZE(m_internal_output_index)
       KV_SERIALIZE(m_spent_height)
       KV_SERIALIZE(m_flags)

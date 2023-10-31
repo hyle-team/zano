@@ -329,5 +329,11 @@ namespace currency
   }; // struct tx_generation_context
 
   bool validate_tx_output_details_againt_tx_generation_context(const transaction& tx, const tx_generation_context& gen_context, const crypto::secret_key& onet_time_key);
+  std::string transform_tx_to_str(const transaction& tx);
+  transaction transform_str_to_tx(const std::string& tx_str);
+  const transaction_wallet_info& transform_ptr_to_value(const std::shared_ptr<transaction_wallet_info>& a);
+  std::shared_ptr<transaction_wallet_info> transform_value_to_ptr(const transaction_wallet_info& d);
+
+
 
 } // namespace currency

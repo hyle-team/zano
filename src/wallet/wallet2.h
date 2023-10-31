@@ -224,11 +224,7 @@ namespace tools
     wallet2();
 
     static std::string transfer_flags_to_str(uint32_t flags);
-    static std::string transform_tx_to_str(const currency::transaction& tx);
-    static currency::transaction transform_str_to_tx(const std::string& tx_str);
 
-    static const transaction_wallet_info& transform_ptr_to_value(const std::shared_ptr<transaction_wallet_info>& a);
-    static std::shared_ptr<transaction_wallet_info> transform_value_to_ptr(const transaction_wallet_info& d);
        
     static uint64_t transfer_details_base_to_amount(const transfer_details_base& tdb);
     static std::string transfer_details_base_to_tx_hash(const transfer_details_base& tdb);

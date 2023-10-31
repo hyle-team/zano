@@ -133,17 +133,6 @@ std::string wallet2::transfer_flags_to_str(uint32_t flags)
   return result;
 }
 //----------------------------------------------------------------------------------------------------
-std::string wallet2::transform_tx_to_str(const currency::transaction& tx)
-{
-  return currency::obj_to_json_str(tx);
-}
-//----------------------------------------------------------------------------------------------------
-currency::transaction wallet2::transform_str_to_tx(const std::string& tx_str)
-{
-  THROW_IF_TRUE_WALLET_INT_ERR_EX_NO_HANDLER(false, "transform_str_to_tx shoruld never be called");
-  return currency::transaction();
-}
-//----------------------------------------------------------------------------------------------------
 uint64_t transfer_details_base_to_amount(const transfer_details_base& tdb)
 {
   return tdb.amount();
@@ -152,17 +141,6 @@ uint64_t transfer_details_base_to_amount(const transfer_details_base& tdb)
 std::string transfer_details_base_to_tx_hash(const transfer_details_base& tdb)
 {
   return epee::string_tools::pod_to_hex(currency::get_transaction_hash(tdb.m_ptx_wallet_info->m_tx));
-}
-//----------------------------------------------------------------------------------------------------
-const transaction_wallet_info& wallet2::transform_ptr_to_value(const std::shared_ptr<transaction_wallet_info>& a)
-{
-  return *a;
-}
-//----------------------------------------------------------------------------------------------------
-std::shared_ptr<transaction_wallet_info> wallet2::transform_value_to_ptr(const transaction_wallet_info& d)
-{
-  THROW_IF_TRUE_WALLET_INT_ERR_EX_NO_HANDLER(false, "transform_value_to_ptr shoruld never be called");
-  return std::shared_ptr<transaction_wallet_info>();
 }
 
 //----------------------------------------------------------------------------------------------------
