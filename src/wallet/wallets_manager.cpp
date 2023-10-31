@@ -1613,6 +1613,7 @@ std::string wallets_manager::get_wallet_status(uint64_t wallet_id)
   wsi.progress = wo.w.unlocked_get().get()->get_sync_progress();
   wsi.wallet_state = wo.wallet_state;
   wsi.current_daemon_height = m_last_daemon_height;
+  wsi.current_wallet_height = wo.w.unlocked_get().get()->get_top_block_height();
   return epee::serialization::store_t_to_json(wsi);
 }
 
@@ -1648,6 +1649,24 @@ std::string wallets_manager::get_wallet_info(uint64_t wallet_id, view::wallet_in
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   return get_wallet_info(w, wi);
 }
+
+std::string wallets_manager::get_wallet_info_extra(uint64_t wallet_id, view::wallet_info_extra& wi)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, wo);
+  
+  auto locker_object = wo.w.lock();
+  tools::wallet2& rw = *(*(*locker_object)); //this looks a bit crazy, i know
+  
+  auto& keys = rw.get_account().get_keys();
+
+  wi.view_private_key = epee::string_tools::pod_to_hex(keys.view_secret_key);
+  wi.view_public_key  = epee::string_tools::pod_to_hex(keys.account_address.view_public_key);
+  wi.spend_private_key = epee::string_tools::pod_to_hex(keys.spend_secret_key);
+  wi.spend_public_key  = epee::string_tools::pod_to_hex(keys.account_address.spend_public_key);
+  wi.seed = rw.get_account().get_seed_phrase("");
+  return API_RETURN_CODE_OK;
+}
+
 std::string wallets_manager::get_contracts(size_t wallet_id, std::vector<tools::wallet_public::escrow_contract_details>& contracts)
 {
   tools::wallet2::escrow_contracts_container cc;
