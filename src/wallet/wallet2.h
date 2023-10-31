@@ -226,8 +226,6 @@ namespace tools
     static std::string transfer_flags_to_str(uint32_t flags);
 
        
-    static uint64_t transfer_details_base_to_amount(const transfer_details_base& tdb);
-    static std::string transfer_details_base_to_tx_hash(const transfer_details_base& tdb);
 
     struct mining_context : public currency::pos_mining_context
     {

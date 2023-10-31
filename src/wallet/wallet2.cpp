@@ -133,17 +133,6 @@ std::string wallet2::transfer_flags_to_str(uint32_t flags)
   return result;
 }
 //----------------------------------------------------------------------------------------------------
-uint64_t transfer_details_base_to_amount(const transfer_details_base& tdb)
-{
-  return tdb.amount();
-}
-//----------------------------------------------------------------------------------------------------
-std::string transfer_details_base_to_tx_hash(const transfer_details_base& tdb)
-{
-  return epee::string_tools::pod_to_hex(currency::get_transaction_hash(tdb.m_ptx_wallet_info->m_tx));
-}
-
-//----------------------------------------------------------------------------------------------------
 void wallet2::init(const std::string& daemon_address)
 {
   m_miner_text_info = PROJECT_VERSION_LONG;
