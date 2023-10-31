@@ -308,6 +308,8 @@ namespace tools
     END_BOOST_SERIALIZATION()
 
   };
+
+ 
   namespace detail
   {
     //----------------------------------------------------------------------------------------------------
@@ -322,15 +324,6 @@ namespace tools
       return std::shared_ptr<transaction_wallet_info>();
     }
     //----------------------------------------------------------------------------------------------------
-    inline uint64_t transfer_details_base_to_amount(const transfer_details_base& tdb)
-    {
-      return tdb.amount();
-    }
-    //----------------------------------------------------------------------------------------------------
-    inline std::string transfer_details_base_to_tx_hash(const transfer_details_base& tdb)
-    {
-      return epee::string_tools::pod_to_hex(currency::get_transaction_hash(tdb.m_ptx_wallet_info->m_tx));
-    }
   }
 
 
@@ -388,6 +381,17 @@ namespace tools
         return true;
       return false;
     }
+    static inline uint64_t transfer_details_base_to_amount(const transfer_details_base& tdb)
+    {
+      return tdb.amount();
+    }
+    //----------------------------------------------------------------------------------------------------
+    static inline std::string transfer_details_base_to_tx_hash(const transfer_details_base& tdb)
+    {
+      return epee::string_tools::pod_to_hex(currency::get_transaction_hash(tdb.m_ptx_wallet_info->m_tx));
+    }
+
+
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE_CUSTOM(m_ptx_wallet_info, const transaction_wallet_info&, detail::transform_ptr_to_value, detail::transform_value_to_ptr)
@@ -396,8 +400,8 @@ namespace tools
       KV_SERIALIZE(m_flags)
       KV_SERIALIZE(m_amount)
       KV_SERIALIZE_N(m_zc_info_ptr, "zc_out_info")
-      KV_SERIALIZE_EPHEMERAL_N(uint64_t, detail::transfer_details_base_to_amount, "amount")
-      KV_SERIALIZE_EPHEMERAL_N(std::string, detail::transfer_details_base_to_tx_hash, "tx_id")
+      KV_SERIALIZE_EPHEMERAL_N(uint64_t, transfer_details_base_to_amount, "amount")
+      KV_SERIALIZE_EPHEMERAL_N(std::string, transfer_details_base_to_tx_hash, "tx_id")
     END_KV_SERIALIZE_MAP()
 
     BEGIN_BOOST_SERIALIZATION()
@@ -409,6 +413,8 @@ namespace tools
       BOOST_SERIALIZE(m_zc_info_ptr)
     END_BOOST_SERIALIZATION()
   };
+
+
 
 
   struct transfer_details_extra_option_htlc_info
