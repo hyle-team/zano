@@ -45,17 +45,10 @@
 #include "tor-connect/torlib/tor_lib_iface.h"
 #include "currency_core/pos_mining.h"
 #include "view_iface.h"
-
+#include "wallet2_base.h"
 
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               10
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
-
-#define   WALLET_TRANSFER_DETAIL_FLAG_SPENT                            uint32_t(1 << 0)
-#define   WALLET_TRANSFER_DETAIL_FLAG_BLOCKED                          uint32_t(1 << 1)       
-#define   WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION      uint32_t(1 << 2)
-#define   WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER                   uint32_t(1 << 3)
-#define   WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION             uint32_t(1 << 4) // transfer is reserved for cold-signing (unsigned tx was created and passed for signing)
-#define   WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM                      uint32_t(1 << 5) // for htlc keeps info if this htlc belong as redeem or as refund
 
 
 const uint64_t WALLET_MINIMUM_HEIGHT_UNSET_CONST = std::numeric_limits<uint64_t>::max();
@@ -83,9 +76,6 @@ const uint64_t WALLET_MINIMUM_HEIGHT_UNSET_CONST = std::numeric_limits<uint64_t>
 #define WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(cond, msg) THROW_IF_FALSE_WALLET_INT_ERR_EX(cond, "[W:" << m_log_prefix << "] " << msg)
 #define WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(cond, msg) THROW_IF_FALSE_WALLET_CMN_ERR_EX(cond, "[W:" << m_log_prefix << "] " << msg)
 #define WLT_THROW_IF_FALSE_WALLET_EX_MES(cond, exception_t, msg, ...) THROW_IF_FALSE_WALLET_EX_MES(cond, exception_t, "[W:" << m_log_prefix << "] " << msg, ## __VA_ARGS__)
-
-
-
 
 class test_generator;
 
@@ -124,391 +114,118 @@ namespace tools
     virtual bool on_mw_select_wallet(uint64_t wallet_id) { return true; }
   };
 
-  struct tx_dust_policy
-  {
-    uint64_t dust_threshold = 0;
-    bool add_to_fee = false;
-    currency::account_public_address addr_for_dust;
 
-    tx_dust_policy(uint64_t a_dust_threshold = DEFAULT_DUST_THRESHOLD, bool an_add_to_fee = true, currency::account_public_address an_addr_for_dust = currency::account_public_address())
-      : dust_threshold(a_dust_threshold)
-      , add_to_fee(an_add_to_fee)
-      , addr_for_dust(an_addr_for_dust)
-    {
-    }
-
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(dust_threshold)
-      FIELD(add_to_fee)
-      FIELD(addr_for_dust)
-    END_SERIALIZE()
-  };
 
   class test_generator;
 
-#pragma pack(push, 1)
-  struct out_key_to_ki
+
+  /*
+  This structure aggregates all variables that hold current wallet synchronization state and could be reset 
+  */
+  struct wallet2_base_state
   {
-    crypto::public_key out_key;
-    crypto::key_image  key_image;
-  };
-#pragma pack(pop)
+    wallet_chain_shortener m_chain;
+    uint64_t m_minimum_height = WALLET_MINIMUM_HEIGHT_UNSET_CONST;
+    amount_gindex_to_transfer_id_container m_amount_gindex_to_transfer_id;
+    transfer_container m_transfers;
+    multisig_transfer_container m_multisig_transfers;
+    payment_container m_payments;
+    std::unordered_map<crypto::key_image, size_t> m_key_images;
+    std::vector<wallet_public::wallet_transfer_info> m_transfer_history;
+    std::unordered_map<crypto::hash, currency::transaction> m_unconfirmed_in_transfers;
+    std::unordered_map<crypto::hash, tools::wallet_public::wallet_transfer_info> m_unconfirmed_txs;
+    std::unordered_set<crypto::hash> m_unconfirmed_multisig_transfers;
+    std::unordered_map<crypto::hash, crypto::secret_key> m_tx_keys;
+    std::unordered_map<crypto::public_key, wallet_own_asset_context> m_own_asset_descriptors;
+    std::unordered_map<crypto::public_key, currency::asset_descriptor_base> m_custom_assets; //assets that manually added by user
+    escrow_contracts_container m_contracts;
+    std::multimap<uint64_t, htlc_expiration_trigger> m_htlcs; //map [expired_if_more_then] -> height of expiration
+    amount_gindex_to_transfer_id_container m_active_htlcs; // map [amount; gindex] -> transfer index
+    std::unordered_map<crypto::hash, uint64_t> m_active_htlcs_txid; // map [txid] -> transfer index, limitation: 1 transactiom -> 1 htlc
+    std::list<expiration_entry_info> m_money_expirations;
+    std::unordered_map<crypto::public_key, crypto::key_image> m_pending_key_images; // (out_pk -> ki) pairs of change outputs to be added in watch-only wallet without spend sec key
+    uint64_t m_last_pow_block_h = 0;
+    std::list<std::pair<uint64_t, wallet_event_t>> m_rollback_events;
 
+    //variables that not being serialized
+    std::atomic<uint64_t> m_last_bc_timestamp = 0;
+    uint64_t m_height_of_start_sync = 0;
+    std::atomic<uint64_t> m_last_sync_percent = 0;
+    mutable uint64_t m_current_wallet_file_size = 0;
 
-  typedef tools::pod_array_file_container<out_key_to_ki> pending_ki_file_container_t;
-
-  namespace detail
-  {
-    //----------------------------------------------------------------------------------------------------
-    inline void digit_split_strategy(const std::vector<currency::tx_destination_entry>& dsts,
-      const currency::tx_destination_entry& change_dst, uint64_t dust_threshold,
-      std::vector<currency::tx_destination_entry>& splitted_dsts, uint64_t& dust, uint64_t max_output_allowed)
+    //===============================================================
+    template <class t_archive>
+    inline void serialize(t_archive &a, const unsigned int ver)
     {
-      splitted_dsts.clear();
-      dust = 0;
-
-      for(auto& de : dsts)
+      if (t_archive::is_saving::value)
       {
-        if (de.addr.size() > 1)
-        {
-          //for multisig we don't split
-          splitted_dsts.push_back(de);
-        }
-        else if (de.htlc_options.expiration != 0)
-        {
-          //for htlc we don't do split
-          splitted_dsts.push_back(de);
-        }
-        else
-        {
-          currency::decompose_amount_into_digits(de.amount, dust_threshold,
-            [&](uint64_t chunk) { splitted_dsts.push_back(currency::tx_destination_entry(chunk, de.addr, de.asset_id)); },
-            [&](uint64_t a_dust) { splitted_dsts.push_back(currency::tx_destination_entry(a_dust, de.addr, de.asset_id)); }, max_output_allowed);
-        }
+        LOG_PRINT_MAGENTA("Serializing file with ver: " << ver, LOG_LEVEL_0);
       }
 
-      if (change_dst.amount > 0)
+
+      // do not load wallet if data version is greather than the code version 
+      if (ver > WALLET_FILE_SERIALIZATION_VERSION)
       {
-        if (change_dst.addr.size() > 1)
+        LOG_PRINT_MAGENTA("Wallet file truncated due to WALLET_FILE_SERIALIZATION_VERSION is more then curren build", LOG_LEVEL_0);
+        return;
+      }
+      if (ver < WALLET_FILE_LAST_SUPPORTED_VERSION)
+      {
+        LOG_PRINT_MAGENTA("Wallet file truncated due to ver(" << ver << ") is less then WALLET_FILE_LAST_SUPPORTED_VERSION", LOG_LEVEL_0);
+        return;
+      }
+
+      if (t_archive::is_saving::value)
+      {
+        uint64_t formation_ver = CURRENCY_FORMATION_VERSION;
+        a & formation_ver;
+      }
+      else
+      {
+        uint64_t formation_ver = 0;
+        a & formation_ver;
+        if (formation_ver != CURRENCY_FORMATION_VERSION)
         {
-          //for multisig we don't split
-          splitted_dsts.push_back(change_dst);
-        }
-        else
-        {
-          currency::decompose_amount_into_digits(change_dst.amount, dust_threshold,
-            [&](uint64_t chunk) { splitted_dsts.push_back(currency::tx_destination_entry(chunk, change_dst.addr)); },
-            [&](uint64_t a_dust) { dust = a_dust; }, max_output_allowed);
+          LOG_PRINT_MAGENTA("Wallet file truncated due to mismatch CURRENCY_FORMATION_VERSION", LOG_LEVEL_0);
+          return;
         }
       }
+      //convert from old version
+      a & m_chain;
+      a & m_minimum_height;
+      a & m_amount_gindex_to_transfer_id;
+      a & m_transfers;
+      a & m_multisig_transfers;
+      a & m_key_images;
+      a & m_unconfirmed_txs;
+      a & m_unconfirmed_multisig_transfers;
+      a & m_payments;
+      a & m_transfer_history;
+      a & m_unconfirmed_in_transfers;
+      a & m_contracts;
+      a & m_money_expirations;
+      a & m_pending_key_images;
+      a & m_tx_keys;
+      a & m_last_pow_block_h;
+      a & m_htlcs;
+      a & m_active_htlcs;
+      a & m_active_htlcs_txid;
+      a & m_own_asset_descriptors;
+      a & m_custom_assets;
+      a & m_rollback_events;
     }
-    //----------------------------------------------------------------------------------------------------
-    inline void null_split_strategy(const std::vector<currency::tx_destination_entry>& dsts,
-      const currency::tx_destination_entry& change_dst, uint64_t dust_threshold,
-      std::vector<currency::tx_destination_entry>& splitted_dsts, uint64_t& dust, uint64_t max_output_allowed)
-    {
-      splitted_dsts = dsts;
-
-      dust = 0;
-      uint64_t change = change_dst.amount;
-      if (0 < dust_threshold)
-      {
-        for (uint64_t order = 10; order <= 10 * dust_threshold; order *= 10)
-        {
-          uint64_t dust_candidate = change_dst.amount % order;
-          uint64_t change_candidate = (change_dst.amount / order) * order;
-          if (dust_candidate <= dust_threshold)
-          {
-            dust = dust_candidate;
-            change = change_candidate;
-          }
-          else
-          {
-            break;
-          }
-        }
-      }
-
-      if (0 != change)
-      {
-        splitted_dsts.push_back(currency::tx_destination_entry(change, change_dst.addr));
-      }
-    }
-    //----------------------------------------------------------------------------------------------------
-    inline void void_split_strategy(const std::vector<currency::tx_destination_entry>& dsts,
-      const currency::tx_destination_entry& change_dst, uint64_t dust_threshold,
-      std::vector<currency::tx_destination_entry>& splitted_dsts, uint64_t& dust, uint64_t max_output_allowed)
-    {
-      splitted_dsts.insert(splitted_dsts.end(), dsts.begin(), dsts.end());
-      if (change_dst.amount > 0)
-        splitted_dsts.push_back(change_dst);
-    }
-    //----------------------------------------------------------------------------------------------------
-    enum split_strategy_id_t { ssi_none = 0, ssi_digit = 1, ssi_null = 2, ssi_void = 3 };
-    //----------------------------------------------------------------------------------------------------
-    inline bool apply_split_strategy_by_id(split_strategy_id_t id, const std::vector<currency::tx_destination_entry>& dsts,
-      const currency::tx_destination_entry& change_dst, uint64_t dust_threshold,
-      std::vector<currency::tx_destination_entry>& splitted_dsts, uint64_t& dust, uint64_t max_output_allowed)
-    {
-      switch (id)
-      {
-      case ssi_digit:
-        digit_split_strategy(dsts, change_dst, dust_threshold, splitted_dsts, dust, max_output_allowed);
-        return true;
-      case ssi_null:
-        null_split_strategy(dsts, change_dst, dust_threshold, splitted_dsts, dust, max_output_allowed);
-        return true;
-      case ssi_void:
-        void_split_strategy(dsts, change_dst, dust_threshold, splitted_dsts, dust, max_output_allowed);
-        return true;
-      default:
-        return false;
-      }
-    }
-
-  } // namespace detail
-
-  struct construct_tx_param
-  {
-    // preparing data for tx
-    std::vector<currency::tx_destination_entry> dsts;
-    size_t fake_outputs_count = 0;
-    uint64_t fee = 0;
-    tx_dust_policy dust_policy;
-    crypto::hash multisig_id = currency::null_hash;
-    uint8_t flags = 0;
-    uint8_t split_strategy_id = 0;
-    bool mark_tx_as_complete = false;
-
-    crypto::hash htlc_tx_id;
-    std::string htlc_origin;
-
-    // constructing tx
-    uint64_t unlock_time = 0;
-    std::vector<currency::extra_v> extra;
-    std::vector<currency::attachment_v> attachments;
-    currency::account_public_address crypt_address;
-    uint8_t tx_outs_attr = 0;
-    bool shuffle = false;
-    bool create_utxo_defragmentation_tx = false;
-    bool need_at_least_1_zc = false;
-    crypto::secret_key asset_deploy_control_key = currency::null_skey;
-  };
-
-  struct mode_separate_context
-  {
-    currency::transaction tx_for_mode_separate;
-    view::ionic_swap_proposal_info proposal_info;
-    bool escrow = false;
   };
   
 
-  struct selection_for_amount
-  {
-    uint64_t needed_amount = 0;
-    uint64_t found_amount = 0;
-    //std::vector<uint64_t> selected_indicies;
-  };
-  typedef std::unordered_map<crypto::public_key, selection_for_amount> assets_selection_context;
-
-  class wallet2: public tools::tor::t_transport_state_notifier, public boost::static_visitor<void>
+  class wallet2: public tools::tor::t_transport_state_notifier, public boost::static_visitor<void>, public wallet2_base_state
   {
     wallet2(const wallet2&) = delete;
   public:
     wallet2();
 
     static std::string transfer_flags_to_str(uint32_t flags);
-    static std::string transform_tx_to_str(const currency::transaction& tx);
-    static currency::transaction transform_str_to_tx(const std::string& tx_str);
 
-    //general rollback mechanism
-    struct asset_register_event
-    {
-      crypto::public_key asset_id = currency::null_pkey;
-      BEGIN_BOOST_SERIALIZATION()
-        BOOST_SERIALIZE(asset_id)
-        END_BOOST_SERIALIZATION()
-
-    };
-
-    struct wallet_own_asset_context
-    {
-      currency::asset_descriptor_base asset_descriptor;
-      crypto::secret_key control_key;
-      //uint64_t height = 0;
-
-      BEGIN_BOOST_SERIALIZATION()
-        BOOST_SERIALIZE(asset_descriptor)
-        BOOST_SERIALIZE(control_key)
-        //BOOST_SERIALIZE(height)
-        END_BOOST_SERIALIZATION()
-    };
-
-    struct asset_update_event
-    {
-      crypto::public_key asset_id = currency::null_pkey;
-      wallet_own_asset_context own_context;
-
-      BEGIN_BOOST_SERIALIZATION()
-        BOOST_SERIALIZE(asset_id)
-        BOOST_SERIALIZE(own_context)
-        END_BOOST_SERIALIZATION()
-    };
-
-    struct asset_unown_event
-    {
-      crypto::public_key asset_id = currency::null_pkey;
-      wallet_own_asset_context own_context;
-
-      BEGIN_BOOST_SERIALIZATION()
-        BOOST_SERIALIZE(asset_id)
-        BOOST_SERIALIZE(own_context)
-        END_BOOST_SERIALIZATION()
-    };
-
-    typedef boost::variant<asset_register_event, asset_update_event, asset_unown_event> wallet_event_t;
-
-    struct transaction_wallet_info
-    {
-      uint64_t m_block_height = 0;
-      uint64_t m_block_timestamp = 0;
-      currency::transaction m_tx;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(m_block_height)
-        KV_SERIALIZE(m_block_timestamp)
-        KV_SERIALIZE_CUSTOM(m_tx, std::string, tools::wallet2::transform_tx_to_str, tools::wallet2::transform_str_to_tx)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    static const transaction_wallet_info& transform_ptr_to_value(const std::shared_ptr<transaction_wallet_info>& a);
-    static std::shared_ptr<transaction_wallet_info> transform_value_to_ptr(const transaction_wallet_info& d);
-    
-    struct transfer_details_base;
-    static uint64_t transfer_details_base_to_amount(const transfer_details_base& tdb);
-    static std::string transfer_details_base_to_tx_hash(const transfer_details_base& tdb);
-
-    struct transfer_details_base
-    {
-      struct ZC_out_info // TODO: @#@# consider using wallet_out_info instead
-      {
-        ZC_out_info() = default;
-        ZC_out_info(const crypto::scalar_t& amount_blinding_mask, const crypto::scalar_t& asset_id_blinding_mask, const crypto::public_key& asset_id)
-          : amount_blinding_mask(amount_blinding_mask), asset_id_blinding_mask(asset_id_blinding_mask), asset_id(asset_id)
-        {}
-        crypto::scalar_t amount_blinding_mask = 0;
-        crypto::scalar_t asset_id_blinding_mask = 0;
-        crypto::public_key asset_id = currency::null_pkey; // not blinded, not multiplied by 1/8 TODO: @#@# consider changing to point_t, also consider using wallet wallet_out_info
-        BEGIN_KV_SERIALIZE_MAP()
-          KV_SERIALIZE(amount_blinding_mask)
-          KV_SERIALIZE(asset_id_blinding_mask)
-          KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
-        END_KV_SERIALIZE_MAP()
-      };
-
-      std::shared_ptr<transaction_wallet_info> m_ptx_wallet_info;
-      uint64_t m_internal_output_index = 0;
-      uint64_t m_spent_height = 0;
-      uint32_t m_flags = 0;
-      uint64_t m_amount = 0;
-      boost::shared_ptr<ZC_out_info> m_zc_info_ptr;
-
-      uint64_t amount() const { return m_amount; } 
-      uint64_t amount_for_global_output_index() const { return is_zc() ? 0 : m_amount; } // amount value for global outputs index, it's zero for outputs with hidden amounts
-
-      // @#@ will throw if type is not tx_out_bare, TODO: change according to new model, 
-      // need to replace all get_tx_out_bare_from_out_v() to proper code
-      //const currency::tx_out_bare& output() const { return currency::get_tx_out_bare_from_out_v(m_ptx_wallet_info->m_tx.vout[m_internal_output_index]); }
-      
-      const currency::tx_out_v& output() const { return m_ptx_wallet_info->m_tx.vout[m_internal_output_index]; }
-      uint8_t mix_attr() const { uint8_t result = UINT8_MAX; get_mix_attr_from_tx_out_v(output(), result); return result; }
-      crypto::hash tx_hash() const { return get_transaction_hash(m_ptx_wallet_info->m_tx); }
-      bool is_spent() const { return m_flags & WALLET_TRANSFER_DETAIL_FLAG_SPENT; }
-      bool is_spendable() const { return (m_flags & (WALLET_TRANSFER_DETAIL_FLAG_SPENT | WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION | WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION)) == 0; }
-      bool is_reserved_for_escrow() const { return ( (m_flags & WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION) != 0 );  }
-      bool is_zc() const { return m_zc_info_ptr.get(); }
-      const crypto::public_key& get_asset_id() const { if (m_zc_info_ptr.get()) { return m_zc_info_ptr->asset_id; } else { return currency::native_coin_asset_id; } }
-      bool is_native_coin() const { return m_zc_info_ptr.get() ? (m_zc_info_ptr->asset_id == currency::native_coin_asset_id) : true; }
-      bool is_htlc() const { 
-      
-        if (m_ptx_wallet_info->m_tx.vout[m_internal_output_index].type() == typeid(currency::tx_out_bare) &&
-          boost::get<currency::tx_out_bare>(m_ptx_wallet_info->m_tx.vout[m_internal_output_index]).target.type() == typeid(currency::txout_htlc))
-          return true;
-        return false;      
-      }
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_CUSTOM(m_ptx_wallet_info, const transaction_wallet_info&, tools::wallet2::transform_ptr_to_value, tools::wallet2::transform_value_to_ptr)
-        KV_SERIALIZE(m_internal_output_index)
-        KV_SERIALIZE(m_spent_height)
-        KV_SERIALIZE(m_flags)
-        KV_SERIALIZE(m_amount)
-        KV_SERIALIZE_N(m_zc_info_ptr, "zc_out_info")
-        KV_SERIALIZE_EPHEMERAL_N(uint64_t, tools::wallet2::transfer_details_base_to_amount, "amount")
-        KV_SERIALIZE_EPHEMERAL_N(std::string, tools::wallet2::transfer_details_base_to_tx_hash, "tx_id")
-      END_KV_SERIALIZE_MAP()
-
-    };
-
-
-    struct transfer_details_extra_option_htlc_info
-    {
-      std::string origin;  //this field filled only if htlc had been redeemed
-      crypto::hash redeem_tx_id = currency::null_hash;
-    };
-
-
-    typedef boost::variant<transfer_details_extra_option_htlc_info, currency::tx_payer> transfer_details_extra_options_v;
-
-    struct transfer_details : public transfer_details_base
-    {
-      uint64_t m_global_output_index = 0;
-      crypto::key_image m_key_image; //TODO: key_image stored twice :(
-      std::vector<transfer_details_extra_options_v> varian_options;
-
-      //v2
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(m_global_output_index)
-        KV_SERIALIZE_POD_AS_HEX_STRING(m_key_image)
-        KV_CHAIN_BASE(transfer_details_base)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    //used in wallet 
-    struct htlc_expiration_trigger
-    {
-      bool is_wallet_owns_redeem = false; //specify if this HTLC belong to this wallet by pkey_redeem or by pkey_refund
-      uint64_t transfer_index = 0;
-    };
-
-
-    struct payment_details_subtransfer
-    {
-      crypto::public_key asset_id = currency::null_pkey;
-      uint64_t amount = 0;
-
-      BEGIN_BOOST_SERIALIZATION()
-        BOOST_SERIALIZE(asset_id)
-        BOOST_SERIALIZE(amount)
-      END_BOOST_SERIALIZATION()
-    };
-
-    struct payment_details
-    {
-      crypto::hash m_tx_hash = currency::null_hash;
-      uint64_t m_amount = 0;                                 // native coins amount
-      uint64_t m_block_height = 0;
-      uint64_t m_unlock_time = 0;
-      std::vector<payment_details_subtransfer> subtransfers; //subtransfers added for confidential asset only, native amount should be stored in m_amount (for space saving)
-
-      BEGIN_BOOST_SERIALIZATION()
-        BOOST_SERIALIZE(m_tx_hash)
-        BOOST_SERIALIZE(m_amount)
-        BOOST_SERIALIZE(m_block_height)
-        BOOST_SERIALIZE(m_unlock_time)
-        BOOST_SERIALIZE(subtransfers)
-      END_BOOST_SERIALIZATION()
-    };
+       
 
     struct mining_context : public currency::pos_mining_context
     {
@@ -528,20 +245,6 @@ namespace tools
       uint64_t      total_amount_checked = 0;
     };
 
-    struct expiration_entry_info
-    {
-      std::vector<uint64_t> selected_transfers;
-      uint64_t expiration_time = 0;
-      crypto::hash related_tx_id = currency::null_hash; // tx id which caused money lock, if any (ex: escrow proposal transport tx)
-      std::vector<payment_details_subtransfer> receved;
-
-      BEGIN_BOOST_SERIALIZATION()
-        BOOST_SERIALIZE(selected_transfers)
-        BOOST_SERIALIZE(expiration_time)
-        BOOST_SERIALIZE(related_tx_id)
-        BOOST_SERIALIZE(receved)
-      END_BOOST_SERIALIZATION()
-    };
 
     /*
       This might be not the best solution so far, but after discussion with @sowle we came up to conclusion 
@@ -558,17 +261,6 @@ namespace tools
       const mode_separate_context* pmode_separate_context = nullptr;
     };
     
-
-
-    typedef std::unordered_multimap<std::string, payment_details> payment_container;
-
-    typedef std::deque<transfer_details> transfer_container;
-    typedef std::unordered_map<crypto::hash, transfer_details_base> multisig_transfer_container;
-    typedef std::unordered_map<crypto::hash, tools::wallet_public::escrow_contract_details_basic> escrow_contracts_container;
-    typedef std::map<uint64_t, std::set<size_t> > free_amounts_cache_type;
-    typedef std::unordered_map<crypto::public_key, free_amounts_cache_type> free_assets_amounts_cache_type;
-    typedef std::unordered_map<std::pair<uint64_t, uint64_t>, uint64_t> amount_gindex_to_transfer_id_container; // maps [amount; gindex] -> tid
-
 
     struct keys_file_data_old
     {
@@ -832,7 +524,7 @@ namespace tools
     bool scan_pos(mining_context& cxt, std::atomic<bool>& stop, idle_condition_cb_t idle_condition_cb, const currency::core_runtime_config &runtime_config);
     bool fill_mining_context(mining_context& ctx);
     
-    void get_transfers(wallet2::transfer_container& incoming_transfers) const;
+    void get_transfers(transfer_container& incoming_transfers) const;
     std::string get_transfers_str(bool include_spent = true, bool include_unspent = true, bool show_only_unknown = false, const std::string& filter_asset_ticker = std::string{}) const;
     std::string get_balance_str() const;
 
@@ -868,61 +560,7 @@ namespace tools
     template <class t_archive>
     inline void serialize(t_archive &a, const unsigned int ver)
     {
-      if (t_archive::is_saving::value)
-      {
-        WLT_LOG_MAGENTA("Serializing file with ver: " << ver, LOG_LEVEL_0);
-      }
-
-
-      // do not load wallet if data version is greather than the code version 
-      if (ver > WALLET_FILE_SERIALIZATION_VERSION)
-      {
-        WLT_LOG_MAGENTA("Wallet file truncated due to WALLET_FILE_SERIALIZATION_VERSION is more then curren build", LOG_LEVEL_0);
-        return;
-      }
-      if(ver < WALLET_FILE_LAST_SUPPORTED_VERSION)
-      {
-        WLT_LOG_MAGENTA("Wallet file truncated due to ver(" << ver << ") is less then WALLET_FILE_LAST_SUPPORTED_VERSION", LOG_LEVEL_0);
-        return;
-      }
-
-      if (t_archive::is_saving::value)
-      {
-        uint64_t formation_ver = CURRENCY_FORMATION_VERSION;
-        a & formation_ver;
-      }
-      else
-      {
-        uint64_t formation_ver = 0;
-        a & formation_ver;
-        if (formation_ver != CURRENCY_FORMATION_VERSION)
-        {
-          WLT_LOG_MAGENTA("Wallet file truncated due to mismatch CURRENCY_FORMATION_VERSION", LOG_LEVEL_0);
-          return;
-        }
-      }
-      //convert from old version
-      a & m_chain;
-      a & m_minimum_height;
-      a & m_amount_gindex_to_transfer_id;
-      a & m_transfers;
-      a & m_multisig_transfers;
-      a & m_key_images;      
-      a & m_unconfirmed_txs;
-      a & m_unconfirmed_multisig_transfers;
-      a & m_payments;
-      a & m_transfer_history;
-      a & m_unconfirmed_in_transfers;
-      a & m_contracts;
-      a & m_money_expirations;
-      a & m_pending_key_images;
-      a & m_tx_keys;
-      a & m_last_pow_block_h;
-      a & m_htlcs;
-      a & m_active_htlcs;
-      a & m_active_htlcs_txid;
-      a & m_own_asset_descriptors;
-      a & m_custom_assets;
+      wallet2_base_state::serialize(a, ver);
     }
 
     bool is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_outputs_count);
@@ -1197,71 +835,52 @@ private:
     static void wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index);
     static void wti_to_json_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index);
 
+
+
+    /*     
+     
+     !!!!! IMPORTAN !!!!! 
+
+     All variables that supposed to hold wallet state of synchronization(i.e. transfers, assets, htlc, swaps, contracts) - should 
+     be placed in wallet2_base_state base class to avoid typical bugs when it's forgotten to be included in reset/resync/serialize functions     
+     
+     */
+
+
+
     currency::account_base m_account;
     bool m_watch_only;
     std::string m_log_prefix; // part of pub address, prefix for logging functions
     std::wstring m_wallet_file;
     std::wstring m_pending_ki_file;
     std::string m_password;
-    uint64_t m_minimum_height;
+   
 
-    std::atomic<uint64_t> m_last_bc_timestamp; 
     bool m_do_rise_transfer;
     uint64_t m_min_utxo_count_for_defragmentation_tx;
     uint64_t m_max_utxo_count_for_defragmentation_tx;
     size_t m_decoys_count_for_defragmentation_tx;
-
-    transfer_container m_transfers;
-    multisig_transfer_container m_multisig_transfers;
-    amount_gindex_to_transfer_id_container m_amount_gindex_to_transfer_id;
-    payment_container m_payments;
-    std::unordered_map<crypto::key_image, size_t> m_key_images;
-    std::unordered_map<crypto::public_key, crypto::key_image> m_pending_key_images; // (out_pk -> ki) pairs of change outputs to be added in watch-only wallet without spend sec key
     pending_ki_file_container_t m_pending_key_images_file_container;
     uint64_t m_upper_transaction_size_limit; //TODO: auto-calc this value or request from daemon, now use some fixed value
 
     std::atomic<bool> m_stop;
-    std::vector<wallet_public::wallet_transfer_info> m_transfer_history;
-    std::unordered_map<crypto::hash, currency::transaction> m_unconfirmed_in_transfers;
-    std::unordered_map<crypto::hash, tools::wallet_public::wallet_transfer_info> m_unconfirmed_txs;
-    std::unordered_set<crypto::hash> m_unconfirmed_multisig_transfers;
-    std::unordered_map<crypto::hash, crypto::secret_key> m_tx_keys;
-    std::unordered_map<crypto::public_key, wallet_own_asset_context> m_own_asset_descriptors;
-    std::unordered_map<crypto::public_key, currency::asset_descriptor_base> m_custom_assets; //assets that manually added by user
     mutable std::unordered_map<crypto::public_key, currency::asset_descriptor_base> m_whitelisted_assets; //assets that whitelisted
-
-
-    std::multimap<uint64_t, htlc_expiration_trigger> m_htlcs; //map [expired_if_more_then] -> height of expiration
-    amount_gindex_to_transfer_id_container m_active_htlcs; // map [amount; gindex] -> transfer index
-    std::unordered_map<crypto::hash, uint64_t> m_active_htlcs_txid; // map [txid] -> transfer index, limitation: 1 transactiom -> 1 htlc
-
     std::shared_ptr<i_core_proxy> m_core_proxy;
     std::shared_ptr<i_wallet2_callback> m_wcallback;
-    uint64_t m_height_of_start_sync;
-    std::atomic<uint64_t> m_last_sync_percent;
-    uint64_t m_last_pow_block_h;
-    currency::core_runtime_config m_core_runtime_config;
-    escrow_contracts_container m_contracts;
-    wallet_chain_shortener m_chain;
-    std::list<expiration_entry_info> m_money_expirations;
-    //optimization for big wallets and batch tx
 
+
+    currency::core_runtime_config m_core_runtime_config;    
+    //optimization for big wallets and batch tx
     free_assets_amounts_cache_type m_found_free_amounts;
     uint64_t m_fake_outputs_count;
     std::string m_miner_text_info;
 
-    mutable uint64_t m_current_wallet_file_size;
     bool m_use_deffered_global_outputs;
     bool m_disable_tor_relay;
     bool m_use_assets_whitelisting = true;
-
     mutable current_operation_context m_current_context;
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;
-
-    std::list<std::pair<uint64_t, wallet_event_t>> m_rollback_events;
-
- 
   }; // class wallet2
 
 } // namespace tools
@@ -1269,70 +888,23 @@ private:
 BOOST_CLASS_VERSION(tools::wallet2, WALLET_FILE_SERIALIZATION_VERSION)
 
 BOOST_CLASS_VERSION(tools::wallet_public::wallet_transfer_info, 12)
-BOOST_CLASS_VERSION(tools::wallet2::transfer_details, 3)
-BOOST_CLASS_VERSION(tools::wallet2::transfer_details_base, 2)
 
 namespace boost
 {
   namespace serialization
   {
-    template <class Archive>
-    inline void serialize(Archive &a, tools::wallet2::transaction_wallet_info &x, const boost::serialization::version_type ver)
-    {
-      a & x.m_block_height;
-      a & x.m_block_timestamp;
-      a & x.m_tx;
-    }
 
-    template <class Archive>
-    inline void serialize(Archive& a, tools::wallet2::transfer_details_base::ZC_out_info& x, const boost::serialization::version_type ver)
-    {
-      a & x.amount_blinding_mask;
-      a & x.asset_id_blinding_mask;
-      a & x.asset_id;
-    }
+//     template <class Archive>
+//     inline void serialize(Archive &a, tools::transfer_details &x, const boost::serialization::version_type ver)
+//     {
+//       a & x.m_global_output_index;
+//       a & x.m_key_image;
+//       a & static_cast<tools::transfer_details_base&>(x);
+//       if (ver < 3)
+//         return;
+//       a & x.varian_options;
+//     }
 
-    template <class Archive>
-    inline void serialize(Archive &a, tools::wallet2::transfer_details_base &x, const boost::serialization::version_type ver)
-    {
-      a & x.m_ptx_wallet_info;
-      a & x.m_internal_output_index;
-      a & x.m_flags;
-      a & x.m_spent_height;
-      if (ver < 2)
-      {
-        x.m_amount = get_amount_from_variant(x.output());
-        return;
-      }
-      a & x.m_amount;
-      a & x.m_zc_info_ptr;
-    }
-
-   
-    template <class Archive>
-    inline void serialize(Archive &a, tools::wallet2::transfer_details_extra_option_htlc_info &x, const boost::serialization::version_type ver)
-    {
-      a & x.origin;
-    }
-
-
-    template <class Archive>
-    inline void serialize(Archive &a, tools::wallet2::transfer_details &x, const boost::serialization::version_type ver)
-    {
-      a & x.m_global_output_index;
-      a & x.m_key_image;
-      a & static_cast<tools::wallet2::transfer_details_base&>(x);
-      if (ver < 3)
-        return;
-      a & x.varian_options;
-    }
-
-    template <class Archive>
-    inline void serialize(Archive &a, tools::wallet2::htlc_expiration_trigger &x, const boost::serialization::version_type ver)
-    {
-      a & x.is_wallet_owns_redeem;
-      a & x.transfer_index;
-    }
     
     template <class Archive>
     inline void serialize(Archive& a, tools::wallet_public::escrow_contract_details_basic& x, const boost::serialization::version_type ver)

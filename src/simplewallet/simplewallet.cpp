@@ -1087,7 +1087,7 @@ bool simple_wallet::show_incoming_transfers(const std::vector<std::string>& args
     }
   }
 
-  tools::wallet2::transfer_container transfers;
+  tools::transfer_container transfers;
   m_wallet->get_transfers(transfers);
 
   bool transfers_found = false;
@@ -1130,7 +1130,7 @@ bool simple_wallet::show_incoming_transfers(const std::vector<std::string>& args
 bool simple_wallet::show_incoming_transfers_counts(const std::vector<std::string>& args)
 {
 
-  tools::wallet2::transfer_container transfers;
+  tools::transfer_container transfers;
   m_wallet->get_transfers(transfers);
 
   uint64_t spent_count = 0;
@@ -1189,7 +1189,7 @@ bool simple_wallet::fix_collisions(const std::vector<std::string> &args)
   return true;
 }
 
-void print_td_list(const std::list<tools::wallet2::transfer_details>& td)
+void print_td_list(const std::list<tools::transfer_details>& td)
 {
   message_writer() << "entries found: " << td.size();
   for (auto& e : td)
@@ -1208,7 +1208,7 @@ bool simple_wallet::scan_transfers_for_id(const std::vector<std::string> &args)
     fail_msg_writer() << "expected valid tx id";
     return true;
   }
-  std::list<tools::wallet2::transfer_details> td;
+  std::list<tools::transfer_details> td;
   m_wallet->scan_for_transaction_entries(id, currency::null_ki, td);
   print_td_list(td);
   return true;
@@ -1222,7 +1222,7 @@ bool simple_wallet::scan_transfers_for_ki(const std::vector<std::string> &args)
     fail_msg_writer() << "expected valid key_image";
     return true;
   }
-  std::list<tools::wallet2::transfer_details> td;
+  std::list<tools::transfer_details> td;
   m_wallet->scan_for_transaction_entries(currency::null_hash, ki, td);
   print_td_list(td);
   return true;
@@ -1249,7 +1249,7 @@ bool simple_wallet::get_transfer_info(const std::vector<std::string> &args)
   }
 
   size_t i = 0;
-  tools::wallet2::transfer_details td = AUTO_VAL_INIT(td);
+  tools::transfer_details td = AUTO_VAL_INIT(td);
 
   if (epee::string_tools::get_xtype_from_string(i, args[0]))
   {
@@ -1294,7 +1294,7 @@ bool simple_wallet::show_payments(const std::vector<std::string> &args)
   bool payments_found = false;
   for(std::string arg : args)
   {
-    std::list<tools::wallet2::payment_details> payments;
+    std::list<tools::payment_details> payments;
     m_wallet->get_payments(arg, payments);
     if (payments.empty())
     {
@@ -1302,7 +1302,7 @@ bool simple_wallet::show_payments(const std::vector<std::string> &args)
       continue;
     }
 
-    for (const tools::wallet2::payment_details& pd : payments)
+    for (const tools::payment_details& pd : payments)
     {
       if (!payments_found)
       {

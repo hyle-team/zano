@@ -1072,10 +1072,10 @@ bool gen_wallet_payment_id::generate(std::vector<test_event_entry>& events) cons
   CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, MK_TEST_COINS(40 + 5 + 7 - 10 + 13 + 1) - TESTS_DEFAULT_FEE);
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, MK_TEST_COINS(40 + 5 + 7 - 10 + 13 + 1) - TESTS_DEFAULT_FEE));
 
-  std::list<tools::wallet2::payment_details> payments;
+  std::list<tools::payment_details> payments;
   alice_wlt->get_payments(m_payment_id, payments);
   CHECK_AND_ASSERT_MES(payments.size() == 3, false, "Invalid payments count");
-  payments.sort([](const tools::wallet2::payment_details& lhs, const tools::wallet2::payment_details& rhs) -> bool { return lhs.m_amount < rhs.m_amount; } ); // sort payments by amount to order them for further checks
+  payments.sort([](const tools::payment_details& lhs, const tools::payment_details& rhs) -> bool { return lhs.m_amount < rhs.m_amount; } ); // sort payments by amount to order them for further checks
   CHECK_AND_ASSERT_MES(payments.front().m_amount == MK_TEST_COINS(5) && payments.front().m_tx_hash == get_transaction_hash(tx_1), false, "Invalid payments #1");
   CHECK_AND_ASSERT_MES(payments.back().m_amount == MK_TEST_COINS(13) && payments.back().m_tx_hash == get_transaction_hash(tx_4), false, "Invalid payments #3");
   payments.clear();
@@ -1104,7 +1104,7 @@ bool gen_wallet_payment_id::generate(std::vector<test_event_entry>& events) cons
   payments.clear();
   alice_wlt->get_payments(m_payment_id, payments);
   CHECK_AND_ASSERT_MES(payments.size() == 3, false, "Invalid payments count (2)");
-  payments.sort([](const tools::wallet2::payment_details& lhs, const tools::wallet2::payment_details& rhs) -> bool { return lhs.m_amount < rhs.m_amount; } ); // sort payments by amount to order them for further checks
+  payments.sort([](const tools::payment_details& lhs, const tools::payment_details& rhs) -> bool { return lhs.m_amount < rhs.m_amount; } ); // sort payments by amount to order them for further checks
   CHECK_AND_ASSERT_MES(payments.front().m_amount == MK_TEST_COINS(5) && payments.front().m_tx_hash == get_transaction_hash(tx_1), false, "Invalid payments #1");
   CHECK_AND_ASSERT_MES(payments.back().m_amount == MK_TEST_COINS(9) && payments.back().m_tx_hash == get_transaction_hash(tx_6), false, "Invalid payments #3");
 
@@ -1126,10 +1126,10 @@ bool gen_wallet_payment_id::c1(currency::core& c, size_t ev_index, const std::ve
   if (!check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", MK_TEST_COINS(56) - TESTS_DEFAULT_FEE, 0, 0, 0, 0))
     return false;
 
-  std::list<tools::wallet2::payment_details> payments;
+  std::list<tools::payment_details> payments;
   alice_wlt->get_payments(m_payment_id, payments);
   CHECK_AND_ASSERT_MES(payments.size() == 3, false, "Invalid payments count (4)");
-  payments.sort([](const tools::wallet2::payment_details& lhs, const tools::wallet2::payment_details& rhs) -> bool { return lhs.m_amount < rhs.m_amount; } ); // sort payments by amount to order them for further checks
+  payments.sort([](const tools::payment_details& lhs, const tools::payment_details& rhs) -> bool { return lhs.m_amount < rhs.m_amount; } ); // sort payments by amount to order them for further checks
   CHECK_AND_ASSERT_MES(payments.front().m_amount == MK_TEST_COINS(5), false, "Invalid payments #1");
   CHECK_AND_ASSERT_MES(payments.back().m_amount == MK_TEST_COINS(13), false, "Invalid payments #3");
 
@@ -1157,10 +1157,10 @@ bool gen_wallet_payment_id::c2(currency::core& c, size_t ev_index, const std::ve
     return false;
 
 
-  std::list<tools::wallet2::payment_details> payments;
+  std::list<tools::payment_details> payments;
   alice_wlt->get_payments(m_payment_id, payments);
   CHECK_AND_ASSERT_MES(payments.size() == 3, false, "Invalid payments count (4)");
-  payments.sort([](const tools::wallet2::payment_details& lhs, const tools::wallet2::payment_details& rhs) -> bool { return lhs.m_amount < rhs.m_amount; } ); // sort payments by amount to order them for further checks
+  payments.sort([](const tools::payment_details& lhs, const tools::payment_details& rhs) -> bool { return lhs.m_amount < rhs.m_amount; } ); // sort payments by amount to order them for further checks
   CHECK_AND_ASSERT_MES(payments.front().m_amount == MK_TEST_COINS(5), false, "Invalid payments #1");
   CHECK_AND_ASSERT_MES(payments.back().m_amount == MK_TEST_COINS(9), false, "Invalid payments #3");
 
@@ -1230,7 +1230,7 @@ bool gen_wallet_oversized_payment_id::c1(currency::core& c, size_t ev_index, con
   alice_wlt->refresh(blocks_fetched, received_money, atomic_false);
   CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3 + 1, false, "incorrect number of blocks fetched by Alice's wallet: " << blocks_fetched);
 
-  std::list<tools::wallet2::payment_details> payments;
+  std::list<tools::payment_details> payments;
   alice_wlt->get_payments(payment_id, payments);
   CHECK_AND_ASSERT_MES(payments.size() == 1, false, "Invalid payments count: " << payments.size());
   CHECK_AND_ASSERT_MES(payments.front().m_amount == MK_TEST_COINS(3), false, "Invalid payment");
@@ -1306,7 +1306,7 @@ bool gen_wallet_transfers_and_outdated_unconfirmed_txs::generate(std::vector<tes
   // refresh the wallet and check transfers, both should be not spent
   CREATE_TEST_WALLET(alice_wlt, alice_acc, blk_0);
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_1r, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2 + WALLET_DEFAULT_TX_SPENDABLE_AGE);
-  tools::wallet2::transfer_container trs;
+  tools::transfer_container trs;
   alice_wlt->get_transfers(trs);
   CHECK_AND_ASSERT_MES(trs.size() == 2 && !trs[0].is_spent() && !trs[1].is_spent(), false, "Wrong transfers state");
 
@@ -1383,7 +1383,7 @@ bool gen_wallet_transfers_and_chain_switch::generate(std::vector<test_event_entr
   // refresh the wallet and check transfers, both should be not spent
   CREATE_TEST_WALLET(alice_wlt, alice_acc, blk_0);
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_1r, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1 + WALLET_DEFAULT_TX_SPENDABLE_AGE);
-  tools::wallet2::transfer_container trs;
+  tools::transfer_container trs;
   alice_wlt->get_transfers(trs);
   CHECK_AND_ASSERT_MES(trs.size() == 2 && !trs[0].is_spent() && !trs[1].is_spent(), false, "Wrong transfers state");
 

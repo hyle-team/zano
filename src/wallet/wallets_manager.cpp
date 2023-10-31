@@ -1669,7 +1669,7 @@ std::string wallets_manager::get_wallet_info_extra(uint64_t wallet_id, view::wal
 
 std::string wallets_manager::get_contracts(size_t wallet_id, std::vector<tools::wallet_public::escrow_contract_details>& contracts)
 {
-  tools::wallet2::escrow_contracts_container cc;
+  tools::escrow_contracts_container cc;
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   try
   {
@@ -1693,7 +1693,7 @@ std::string wallets_manager::get_contracts(size_t wallet_id, std::vector<tools::
 }
 std::string wallets_manager::create_proposal(const view::create_proposal_param_gui& cpp)
 {
-  //tools::wallet2::escrow_contracts_container cc;
+  //tools::escrow_contracts_container cc;
   GET_WALLET_OPT_BY_ID(cpp.wallet_id, w);
   currency::transaction tx = AUTO_VAL_INIT(tx);
   currency::transaction template_tx = AUTO_VAL_INIT(template_tx);
