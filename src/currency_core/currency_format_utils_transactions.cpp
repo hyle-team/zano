@@ -409,15 +409,15 @@ namespace currency
   }
 
   //----------------------------------------------------------------------------------------------------
-  std::string wallet2::transform_tx_to_str(const currency::transaction& tx)
+  std::string transform_tx_to_str(const currency::transaction& tx)
   {
     return currency::obj_to_json_str(tx);
   }
   //----------------------------------------------------------------------------------------------------
-  currency::transaction wallet2::transform_str_to_tx(const std::string& tx_str)
+  transaction transform_str_to_tx(const std::string& tx_str)
   {
-    THROW_IF_TRUE_WALLET_INT_ERR_EX_NO_HANDLER(false, "transform_str_to_tx shoruld never be called");
-    return currency::transaction();
+    CHECK_AND_ASSERT_THROW_MES(false, "transform_str_to_tx shoruld never be called");
+    return transaction();
   }
 
 
