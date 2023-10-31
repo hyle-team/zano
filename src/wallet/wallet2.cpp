@@ -66,18 +66,13 @@ namespace tools
     , m_wcallback(new i_wallet2_callback()) //stub
     , m_core_proxy(new default_http_core_proxy())
     , m_upper_transaction_size_limit(0)
-    , m_height_of_start_sync(0)
-    , m_last_sync_percent(0)
     , m_fake_outputs_count(0)
     , m_do_rise_transfer(false)
     , m_log_prefix("???")
     , m_watch_only(false)
-    , m_last_pow_block_h(0)
-    , m_minimum_height(WALLET_MINIMUM_HEIGHT_UNSET_CONST)
     , m_min_utxo_count_for_defragmentation_tx(WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX)
     , m_max_utxo_count_for_defragmentation_tx(WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX)
     , m_decoys_count_for_defragmentation_tx(WALLET_DEFAULT_DECOYS_COUNT_FOR_DEFRAGMENTATION_TX)
-    , m_current_wallet_file_size(0)
     , m_use_deffered_global_outputs(false)
 #ifdef DISABLE_TOR
     , m_disable_tor_relay(true)
@@ -149,25 +144,25 @@ currency::transaction wallet2::transform_str_to_tx(const std::string& tx_str)
   return currency::transaction();
 }
 //----------------------------------------------------------------------------------------------------
-uint64_t wallet2::transfer_details_base_to_amount(const transfer_details_base& tdb)
+uint64_t transfer_details_base_to_amount(const transfer_details_base& tdb)
 {
   return tdb.amount();
 }
 //----------------------------------------------------------------------------------------------------
-std::string wallet2::transfer_details_base_to_tx_hash(const transfer_details_base& tdb)
+std::string transfer_details_base_to_tx_hash(const transfer_details_base& tdb)
 {
   return epee::string_tools::pod_to_hex(currency::get_transaction_hash(tdb.m_ptx_wallet_info->m_tx));
 }
 //----------------------------------------------------------------------------------------------------
-const wallet2::transaction_wallet_info& wallet2::transform_ptr_to_value(const std::shared_ptr<wallet2::transaction_wallet_info>& a)
+const transaction_wallet_info& wallet2::transform_ptr_to_value(const std::shared_ptr<transaction_wallet_info>& a)
 {
   return *a;
 }
 //----------------------------------------------------------------------------------------------------
-std::shared_ptr<wallet2::transaction_wallet_info> wallet2::transform_value_to_ptr(const wallet2::transaction_wallet_info& d)
+std::shared_ptr<transaction_wallet_info> wallet2::transform_value_to_ptr(const transaction_wallet_info& d)
 {
   THROW_IF_TRUE_WALLET_INT_ERR_EX_NO_HANDLER(false, "transform_value_to_ptr shoruld never be called");
-  return std::shared_ptr<wallet2::transaction_wallet_info>();
+  return std::shared_ptr<transaction_wallet_info>();
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -1248,12 +1243,12 @@ void wallet2::change_contract_state(wallet_public::escrow_contract_details_basic
   contract.state = new_state;
 }
 //-----------------------------------------------------------------------------------------------------
-void from_outs_to_received_items(const std::vector<currency::wallet_out_info>& outs, std::vector<tools::wallet2::payment_details_subtransfer>& received, const currency::transaction& tx)
+void from_outs_to_received_items(const std::vector<currency::wallet_out_info>& outs, std::vector<tools::payment_details_subtransfer>& received, const currency::transaction& tx)
 {
   for (const auto& item : outs)
   {
     if(!out_is_multisig(tx.vout[item.index]))
-      received.push_back(tools::wallet2::payment_details_subtransfer{ item.asset_id, item.amount});
+      received.push_back(tools::payment_details_subtransfer{ item.asset_id, item.amount});
   }
 }
 //-----------------------------------------------------------------------------------------------------
@@ -2820,29 +2815,9 @@ bool wallet2::clear()
 //----------------------------------------------------------------------------------------------------
 bool wallet2::reset_all()
 {
-  //m_blockchain.clear();
-  m_chain.clear();
-  m_transfers.clear();
-  m_amount_gindex_to_transfer_id.clear();
-  m_key_images.clear();
-  // m_pending_key_images is not cleared intentionally
-  m_unconfirmed_in_transfers.clear();
-  m_unconfirmed_txs.clear();
-  m_unconfirmed_multisig_transfers.clear();
-  // m_tx_keys is not cleared intentionally, considered to be safe
-  m_multisig_transfers.clear();
-  m_payments.clear();
-  m_transfer_history.clear();
-  //m_account = AUTO_VAL_INIT(m_account);
-
-  //m_local_bc_size = 1; //including genesis
-  m_last_bc_timestamp = 0;
-  m_height_of_start_sync = 0;
-  m_last_sync_percent = 0;
-  m_last_pow_block_h = 0;
-  m_current_wallet_file_size = 0;
-  m_custom_assets.clear();
-  m_own_asset_descriptors.clear();
+  //static_cast<wallet2_base_state&>(*this) = wallet2_base_state{};
+  static_cast<wallet2_base_state&>(*this).~wallet2_base_state();
+  new (static_cast<wallet2_base_state*>(this)) wallet2_base_state();
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -3571,7 +3546,7 @@ bool wallet2::load_whitelisted_tokens_if_not_loaded() const
   return load_whitelisted_tokens();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_transfers(wallet2::transfer_container& incoming_transfers) const
+void wallet2::get_transfers(transfer_container& incoming_transfers) const
 {
   incoming_transfers = m_transfers;
 }
@@ -3673,7 +3648,7 @@ std::string wallet2::get_balance_str() const
   return ss.str();
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::get_payments(const std::string& payment_id, std::list<wallet2::payment_details>& payments, uint64_t min_height) const
+void wallet2::get_payments(const std::string& payment_id, std::list<payment_details>& payments, uint64_t min_height) const
 {
   auto range = m_payments.equal_range(payment_id);
   std::for_each(range.first, range.second, [&payments, &min_height](const payment_container::value_type& x)
@@ -4912,10 +4887,10 @@ std::string get_random_rext(size_t len)
 // local_transfers_struct - structure to avoid copying the whole m_transfers 
 struct local_transfers_struct
 {
-  local_transfers_struct(wallet2::transfer_container& tf) :l_transfers_ref(tf)
+  local_transfers_struct(transfer_container& tf) :l_transfers_ref(tf)
   {}
 
-  wallet2::transfer_container& l_transfers_ref;
+  transfer_container& l_transfers_ref;
   BEGIN_KV_SERIALIZE_MAP()
     KV_SERIALIZE(l_transfers_ref)
   END_KV_SERIALIZE_MAP()

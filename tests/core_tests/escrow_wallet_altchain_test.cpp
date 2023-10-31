@@ -312,7 +312,7 @@ bool escrow_altchain_meta_impl::c1(currency::core& c, size_t ev_index, const std
       LOG_PRINT_YELLOW("sub event #" << eam_event_index << " (height " << e.height << "): eam_event_refresh_and_check", LOG_LEVEL_0);
 
       LOG_PRINT_GREEN("Alice's wallet is refreshing...", LOG_LEVEL_1);
-      tools::wallet2::escrow_contracts_container contracts;
+      tools::escrow_contracts_container contracts;
       bool stub;
       alice_wlt->scan_tx_pool(stub);
       size_t blocks_fetched = 0;

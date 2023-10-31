@@ -15,10 +15,7 @@
 static void exception_handler(){}
 
 
-wallet_chain_shortener::wallet_chain_shortener(): m_genesis(currency::gdefault_genesis)
-{
-  m_local_bc_size = 1;
-}
+
 void wallet_chain_shortener::clear()
 {
   m_local_bc_size = 1;

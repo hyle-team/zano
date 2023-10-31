@@ -185,7 +185,7 @@ bool multisig_wallet_test::c1(currency::core& c, size_t ev_index, const std::vec
 
   wallet_a->refresh();
   wallet_b->refresh();
-  tools::wallet2::multisig_transfer_container ms_a, ms_b;
+  tools::multisig_transfer_container ms_a, ms_b;
   wallet_a->get_multisig_transfers(ms_a);
   wallet_b->get_multisig_transfers(ms_b);
   CHECK_AND_ASSERT_MES(ms_a.size() == 1 && ms_b.size() == 1, false, "Multisig failed: ms_a.size() == 1 && ms_b.size() == 1");
@@ -334,7 +334,7 @@ bool multisig_wallet_test_many_dst::c1(currency::core& c, size_t ev_index, const
   r = check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", amount - TESTS_DEFAULT_FEE);
   CHECK_AND_ASSERT_MES(r, false, "invalid balance");
 
-  tools::wallet2::multisig_transfer_container mstc;
+  tools::multisig_transfer_container mstc;
   alice_wlt->get_multisig_transfers(mstc);
   CHECK_AND_ASSERT_MES(mstc.empty(), false, "Got invalid multisig transfer");
 
@@ -446,7 +446,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1, false, "Incorrect numbers of blocks fetched");
   r = check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", amount5 + TESTS_DEFAULT_FEE);
   CHECK_AND_ASSERT_MES(r, false, "Invalid wallet balance");
-  tools::wallet2::multisig_transfer_container alice_mstc;
+  tools::multisig_transfer_container alice_mstc;
   alice_wlt->get_multisig_transfers(alice_mstc);
   CHECK_AND_ASSERT_MES(alice_mstc.size() == 2 && alice_mstc.count(ms1_hash) == 1 && alice_mstc.count(ms3_hash) == 1, false, "Alice has incorrect multisig transfers");
 
@@ -456,7 +456,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1, false, "Incorrect numbers of blocks fetched");
   r = check_balance_via_wallet(*bob_wlt.get(), "bob_wlt", 0);
   CHECK_AND_ASSERT_MES(r, false, "Invalid wallet balance");
-  tools::wallet2::multisig_transfer_container bob_mstc;
+  tools::multisig_transfer_container bob_mstc;
   bob_wlt->get_multisig_transfers(bob_mstc);
   CHECK_AND_ASSERT_MES(bob_mstc.size() == 2 && bob_mstc.count(ms1_hash) == 1 && bob_mstc.count(ms4_hash) == 1, false, "Bob has incorrect multisig transfers");
 
@@ -466,7 +466,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1, false, "Incorrect numbers of blocks fetched");
   r = check_balance_via_wallet(*carol_wlt.get(), "carol_wlt", 0);
   CHECK_AND_ASSERT_MES(r, false, "Invalid wallet balance");
-  tools::wallet2::multisig_transfer_container carol_mstc;
+  tools::multisig_transfer_container carol_mstc;
   carol_wlt->get_multisig_transfers(carol_mstc);
   CHECK_AND_ASSERT_MES(carol_mstc.size() == 2 && carol_mstc.count(ms2_hash) == 1 && carol_mstc.count(ms4_hash) == 1, false, "Carol has incorrect multisig transfers");
 
@@ -476,7 +476,7 @@ bool multisig_wallet_heterogenous_dst::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(blocks_fetched == CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1, false, "Incorrect numbers of blocks fetched");
   r = check_balance_via_wallet(*dan_wlt.get(), "dan_wlt", amount6 + TESTS_DEFAULT_FEE);
   CHECK_AND_ASSERT_MES(r, false, "Invalid wallet balance");
-  tools::wallet2::multisig_transfer_container dan_mstc;
+  tools::multisig_transfer_container dan_mstc;
   dan_wlt->get_multisig_transfers(dan_mstc);
   CHECK_AND_ASSERT_MES(dan_mstc.size() == 2 && dan_mstc.count(ms2_hash) == 1 && dan_mstc.count(ms3_hash) == 1, false, "Dan has incorrect multisig transfers");
 
@@ -2540,7 +2540,7 @@ bool multisig_unconfirmed_transfer_and_multiple_scan_pool_calls::c1(currency::co
 
   miner_wlt->refresh();
   alice_wlt->refresh();
-  tools::wallet2::multisig_transfer_container ms_m, ms_a;
+  tools::multisig_transfer_container ms_m, ms_a;
   miner_wlt->get_multisig_transfers(ms_m);
   alice_wlt->get_multisig_transfers(ms_a);
   CHECK_AND_ASSERT_MES(ms_m.size() == 1 && ms_a.size() == 1, false, "Multisig failed: ms_m.size() == 1 && ms_a.size() == 1");
@@ -2571,7 +2571,7 @@ bool multisig_unconfirmed_transfer_and_multiple_scan_pool_calls::c1(currency::co
   LOG_PRINT_YELLOW("%%%%% tx " << get_transaction_hash(tx) << " is spending multisig output " << multisig_id, LOG_LEVEL_0);
   
   bool stub;
-  std::deque<tools::wallet2::transfer_details> transfers;
+  std::deque<tools::transfer_details> transfers;
   std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed_transfers;
 
   alice_wlt->scan_tx_pool(stub);

@@ -67,7 +67,7 @@ inline bool refresh_wallet_and_check_1_contract_state(const char* wallet_name, s
   LOG_PRINT_CYAN("Scan tx pool for " << wallet_name << "'s wallet...", LOG_LEVEL_0);
   wallet->scan_tx_pool(stub_bool);
 
-  tools::wallet2::escrow_contracts_container contracts;
+  tools::escrow_contracts_container contracts;
   r = wallet->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r && contracts.size() == 1, false, "get_contracts() for " << wallet_name << " failed or returned wrong contracts count: " << contracts.size());
   CHECK_AND_ASSERT_MES(contracts.begin()->second.state == expected_contract_state, false, wallet_name << " has invalid contract state: " << tools::wallet_public::get_escrow_contract_state_name(contracts.begin()->second.state)
@@ -85,7 +85,7 @@ inline bool refresh_wallet_and_check_contract_state(const char* wallet_name, std
   CHECK_AND_ASSERT_MES(block_to_be_fetched == SIZE_MAX || blocks_fetched == block_to_be_fetched, false, wallet_name << ": incorrect amount of fetched blocks: " << blocks_fetched << ", expected: " << block_to_be_fetched);
   wallet->scan_tx_pool(stub_bool);
 
-  tools::wallet2::escrow_contracts_container contracts;
+  tools::escrow_contracts_container contracts;
   r = wallet->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for " << wallet_name << " failed");
   for (const auto& c : contracts)
@@ -611,7 +611,7 @@ inline bool operator==(const bc_services::contract_private_details& lhs, const b
     lhs.title == rhs.title;
 }
 
-inline bool check_contract_state(const tools::wallet2::escrow_contracts_container& contracts, const bc_services::contract_private_details& cpd, tools::wallet_public::escrow_contract_details::contract_state state, const char* party)
+inline bool check_contract_state(const tools::escrow_contracts_container& contracts, const bc_services::contract_private_details& cpd, tools::wallet_public::escrow_contract_details::contract_state state, const char* party)
 {
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, party << " has incorrect number of contracts: " << contracts.size());
   CHECK_AND_ASSERT_MES(contracts.begin()->second.private_detailes == cpd, false, party << " has invalid contract's private details");
