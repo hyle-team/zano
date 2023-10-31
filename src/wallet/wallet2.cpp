@@ -2842,6 +2842,7 @@ bool wallet2::reset_all()
   m_last_pow_block_h = 0;
   m_current_wallet_file_size = 0;
   m_custom_assets.clear();
+  m_own_asset_descriptors.clear();
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -3478,7 +3479,9 @@ bool wallet2::get_asset_id_info(const crypto::public_key& asset_id, currency::as
 {
   if (asset_id == currency::native_coin_asset_id)
   {
-    return CURRENCY_NAME_ABR;
+    asset_info = currency::get_native_coin_asset_descriptor();
+    whitelist_ = true;
+    return true;
   }
   //check if asset is whitelisted or customly added
   whitelist_ = false;
@@ -3588,12 +3591,13 @@ bool wallet2::generate_utxo_defragmentation_transaction_if_needed(currency::tran
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/) const
+std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/, bool show_only_unknown /*= false*/, const std::string& filter_asset_ticker /*= std::string{}*/) const
 {
-  static const char* header = "index                 amount  g_index  flags       block  tx                                                                out#  key image";
+  static const char* header = "index                 amount  ticker  g_index  flags       block  tx                                                                out#  asset id";
   std::stringstream ss;
   ss << header << ENDL;
   size_t count = 0;
+  size_t unknown_assets_outs_count = 0;
   for (size_t i = 0; i != m_transfers.size(); ++i)
   {
     const transfer_details& td = m_transfers[i];
@@ -3601,21 +3605,44 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
     if ((td.is_spent() && !include_spent) || (!td.is_spent() && !include_unspent))
       continue;
 
+    bool native_coin = td.is_native_coin();
+    asset_descriptor_base adb{};
+    bool whitelisted = false;
+    if (get_asset_id_info(td.get_asset_id(), adb, whitelisted) == show_only_unknown)
+    {
+      if (!show_only_unknown)
+        ++unknown_assets_outs_count;
+      continue;
+    }
+
+    if (!filter_asset_ticker.empty() && adb.ticker != filter_asset_ticker)
+      continue;
+
     ss << std::right <<
       std::setw(5) << i << "  " <<
-      std::setw(21) << print_money(td.amount()) << "  " <<
+      std::setw(21) << print_asset_money(td.m_amount, adb.decimal_point) << "  " <<
+      std::setw(6) << std::left << (native_coin ? std::string("      ") : adb.ticker) << "  " << std::right <<
       std::setw(7) << td.m_global_output_index << "  " <<
       std::setw(2) << std::setfill('0') << td.m_flags << std::setfill(' ') << ":" <<
       std::setw(5) << transfer_flags_to_str(td.m_flags) << "  " <<
       std::setw(7) << td.m_ptx_wallet_info->m_block_height << "  " <<
       get_transaction_hash(td.m_ptx_wallet_info->m_tx) << "  " <<
-      std::setw(4) << td.m_internal_output_index << "  " <<
-      td.m_key_image << ENDL;
+      std::setw(4) << td.m_internal_output_index << "  ";
+    if (native_coin)
+      ss << "                                                                ";
+    else
+      ss << td.get_asset_id();
     
+    ss << ENDL;
+
     ++count;
   }
 
   ss << "printed " << count << " outputs of " << m_transfers.size() << " total" << ENDL;
+  if (unknown_assets_outs_count == 1)
+    ss << "(" << unknown_assets_outs_count << " output with unrecognized asset id is not shown, use 'list_outputs unknown' to see it)" << ENDL;
+  else if (unknown_assets_outs_count > 1)
+    ss << "(" << unknown_assets_outs_count << " outputs with unrecognized asset ids are not shown, use 'list_outputs unknown' to see them)" << ENDL;
   return ss.str();
 }
 //----------------------------------------------------------------------------------------------------
@@ -6600,6 +6627,7 @@ void wallet2::prepare_tx_destinations(const assets_selection_context& needed_mon
   detail::split_strategy_id_t destination_split_strategy_id,
   const tx_dust_policy& dust_policy,
   const std::vector<currency::tx_destination_entry>& dsts,
+  uint8_t tx_flags,
   std::vector<currency::tx_destination_entry>& final_destinations)
 {
   
@@ -6611,7 +6639,7 @@ void wallet2::prepare_tx_destinations(const assets_selection_context& needed_mon
   std::unordered_set<crypto::public_key> processed_assets;
   for (auto& el: needed_money_map)
   {
-    prepare_tx_destinations(el.second.needed_amount, el.second.found_amount, destination_split_strategy_id, dust_policy, dsts, final_destinations, el.first);    
+    prepare_tx_destinations(el.second.needed_amount, el.second.found_amount, destination_split_strategy_id, dust_policy, dsts, el.first, final_destinations);    
     processed_assets.insert(el.first);
   }
 
@@ -6635,23 +6663,26 @@ void wallet2::prepare_tx_destinations(const assets_selection_context& needed_mon
       }
     }
 
-    if (final_destinations.empty())
+    if (!(tx_flags & TX_FLAG_SIGNATURE_MODE_SEPARATE))
     {
-      // if there's no destinations -- make CURRENCY_TX_MIN_ALLOWED_OUTS empty destinations
-      for(size_t i = 0; i < CURRENCY_TX_MIN_ALLOWED_OUTS; ++i)
-        final_destinations.emplace_back(0, m_account.get_public_address());
-    }
-    else if (final_destinations.size() < CURRENCY_TX_MIN_ALLOWED_OUTS)
-    {
-      // if there's not ehough destinations items (i.e. outputs), split the last one
-      tx_destination_entry de = final_destinations.back();
-      final_destinations.pop_back();
-      size_t items_to_be_added = CURRENCY_TX_MIN_ALLOWED_OUTS - final_destinations.size();
-      // TODO: consider allowing to set them somewhere
-      size_t num_digits_to_keep = CURRENCY_TX_OUTS_RND_SPLIT_DIGITS_TO_KEEP;
-      decompose_amount_randomly(de.amount, [&](uint64_t amount){ de.amount = amount; final_destinations.push_back(de); }, items_to_be_added, num_digits_to_keep);
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(final_destinations.size() == CURRENCY_TX_MIN_ALLOWED_OUTS,
-        "can't get necessary number of outputs using decompose_amount_randomly(), got " << final_destinations.size() << " while mininum is " << CURRENCY_TX_MIN_ALLOWED_OUTS);
+      if (final_destinations.empty())
+      {
+        // if there's no destinations -- make CURRENCY_TX_MIN_ALLOWED_OUTS empty destinations
+        for(size_t i = 0; i < CURRENCY_TX_MIN_ALLOWED_OUTS; ++i)
+          final_destinations.emplace_back(0, m_account.get_public_address());
+      }
+      else if (final_destinations.size() < CURRENCY_TX_MIN_ALLOWED_OUTS)
+      {
+        // if there's not ehough destinations items (i.e. outputs), split the last one
+        tx_destination_entry de = final_destinations.back();
+        final_destinations.pop_back();
+        size_t items_to_be_added = CURRENCY_TX_MIN_ALLOWED_OUTS - final_destinations.size();
+        // TODO: consider allowing to set them somewhere
+        size_t num_digits_to_keep = CURRENCY_TX_OUTS_RND_SPLIT_DIGITS_TO_KEEP;
+        decompose_amount_randomly(de.amount, [&](uint64_t amount){ de.amount = amount; final_destinations.push_back(de); }, items_to_be_added, num_digits_to_keep);
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(final_destinations.size() == CURRENCY_TX_MIN_ALLOWED_OUTS,
+          "can't get necessary number of outputs using decompose_amount_randomly(), got " << final_destinations.size() << " while mininum is " << CURRENCY_TX_MIN_ALLOWED_OUTS);
+      }
     }
   }
 }
@@ -6661,7 +6692,8 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
   detail::split_strategy_id_t destination_split_strategy_id,
   const tx_dust_policy& dust_policy,
   const std::vector<currency::tx_destination_entry>& dsts,
-  std::vector<currency::tx_destination_entry>& final_destinations, const crypto::public_key& asset_id)
+  const crypto::public_key& asset_id,
+  std::vector<currency::tx_destination_entry>& final_destinations)
 {
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(found_money >= needed_money, "needed_money==" << needed_money << "  <  found_money==" << found_money);
 
@@ -6767,7 +6799,7 @@ bool wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   TIME_MEASURE_FINISH_MS(prepare_tx_sources_time);
 
   TIME_MEASURE_START_MS(prepare_tx_destinations_time);
-  prepare_tx_destinations(needed_money_map, static_cast<detail::split_strategy_id_t>(ctp.split_strategy_id), ctp.dust_policy, ctp.dsts, ftp.prepared_destinations);
+  prepare_tx_destinations(needed_money_map, static_cast<detail::split_strategy_id_t>(ctp.split_strategy_id), ctp.dust_policy, ctp.dsts, ctp.flags, ftp.prepared_destinations);
   TIME_MEASURE_FINISH_MS(prepare_tx_destinations_time);
 
 
@@ -7219,7 +7251,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
     assets_selection_context needed_money_map;
     needed_money_map[currency::native_coin_asset_id] = {};
     std::vector<currency::tx_destination_entry> dsts({ tx_destination_entry(amount_swept - fee, destination_addr) });
-    prepare_tx_destinations(needed_money_map, get_current_split_strategy(), tools::tx_dust_policy(), dsts, ftp.prepared_destinations);
+    prepare_tx_destinations(needed_money_map, get_current_split_strategy(), tools::tx_dust_policy(), ftp.prepared_destinations, ftp.flags, dsts);
 
     currency::transaction tx = AUTO_VAL_INIT(tx);
     crypto::secret_key tx_key = AUTO_VAL_INIT(tx_key);

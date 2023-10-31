@@ -1250,7 +1250,8 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(zarcanum_basic_test);
 
     GENERATE_AND_PLAY_HF(multiassets_basic_test, "4-*");
-    GENERATE_AND_PLAY(ionic_swap_basic_test);    
+    GENERATE_AND_PLAY(ionic_swap_basic_test);
+    GENERATE_AND_PLAY_HF(ionic_swap_exact_amounts_test, "4-*");
     GENERATE_AND_PLAY(zarcanum_test_n_inputs_validation);
     GENERATE_AND_PLAY(zarcanum_gen_time_balance);
     GENERATE_AND_PLAY(zarcanum_txs_with_big_shuffled_decoy_set_shuffled);

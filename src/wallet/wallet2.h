@@ -833,7 +833,7 @@ namespace tools
     bool fill_mining_context(mining_context& ctx);
     
     void get_transfers(wallet2::transfer_container& incoming_transfers) const;
-    std::string get_transfers_str(bool include_spent = true, bool include_unspent = true) const;
+    std::string get_transfers_str(bool include_spent = true, bool include_unspent = true, bool show_only_unknown = false, const std::string& filter_asset_ticker = std::string{}) const;
     std::string get_balance_str() const;
 
     // Returns all payments by given id in unspecified order
@@ -1110,13 +1110,15 @@ private:
       detail::split_strategy_id_t destination_split_strategy_id,
       const tx_dust_policy& dust_policy,
       const std::vector<currency::tx_destination_entry>& dsts,
+      uint8_t tx_flags,
       std::vector<currency::tx_destination_entry>& final_destinations);
     void prepare_tx_destinations(uint64_t needed_money,
       uint64_t found_money,
       detail::split_strategy_id_t destination_split_strategy_id,
       const tx_dust_policy& dust_policy,
       const std::vector<currency::tx_destination_entry>& dsts,
-      std::vector<currency::tx_destination_entry>& final_detinations, const crypto::public_key& asset_id);
+      const crypto::public_key& asset_id,
+      std::vector<currency::tx_destination_entry>& final_detinations);
     bool handle_contract(wallet_public::wallet_transfer_info& wti, const bc_services::contract_private_details& cntr, const std::vector<currency::payload_items_v>& decrypted_attach);
     bool handle_release_contract(wallet_public::wallet_transfer_info& wti, const std::string& release_instruction);
     bool handle_cancel_proposal(wallet_public::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb, const std::vector<currency::payload_items_v>& decrypted_attach);

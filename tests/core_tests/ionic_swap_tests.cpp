@@ -201,6 +201,7 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
     currency::transaction res_tx2 = AUTO_VAL_INIT(res_tx2);
     r = bob_wlt->accept_ionic_swap_proposal(proposal, res_tx2);
     CHECK_AND_ASSERT_MES(r, false, "Failed to accept ionic proposal");
+    CHECK_AND_ASSERT_MES(check_ionic_swap_tx_outs(m_accounts, res_tx2, bob_wlt, proposal), false, "");
   }
 
   r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
@@ -293,3 +294,167 @@ bool ionic_swap_basic_test::c1(currency::core& c, size_t ev_index, const std::ve
   return true;
 }
 
+//----------------------------------------------------------------------------------------------------
+
+ionic_swap_exact_amounts_test::ionic_swap_exact_amounts_test()
+{
+  REGISTER_CALLBACK_METHOD(ionic_swap_exact_amounts_test, c1);
+}
+
+bool ionic_swap_exact_amounts_test::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  currency::account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  currency::account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  currency::account_base& bob_acc =   m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+  currency::account_base& carol_acc = m_accounts[CAROL_ACC_IDX]; carol_acc.generate(); carol_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+
+  // rebuild genesis miner tx
+  std::vector<tx_destination_entry> destinations;
+  destinations.emplace_back(MK_TEST_COINS(21), alice_acc.get_public_address());
+  destinations.emplace_back(MK_TEST_COINS(21), miner_acc.get_public_address()); // decoy (later Alice will spend her output using mixins)
+  destinations.emplace_back(MK_TEST_COINS(21), miner_acc.get_public_address()); // decoy
+  destinations.emplace_back(COIN, miner_acc.get_public_address());
+  // leftover amount will be also send to miner
+  CHECK_AND_ASSERT_MES(replace_coinbase_in_genesis_block(destinations, generator, events, blk_0), false, "");
+
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_04_ZARCANUM));
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool ionic_swap_exact_amounts_test::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  miner_wlt->refresh();
+
+  asset_descriptor_base adb{};
+  adb.total_max_supply = 10000000000;
+  adb.full_name = "test";
+  adb.ticker = "TEST";
+
+  std::vector<currency::tx_destination_entry> destinations;
+  destinations.emplace_back(7070000000, m_accounts[BOB_ACC_IDX].get_public_address(), null_pkey);
+  destinations.emplace_back(2930000000, m_accounts[BOB_ACC_IDX].get_public_address(), null_pkey);
+  destinations.emplace_back(MK_TEST_COINS(21), m_accounts[CAROL_ACC_IDX].get_public_address()); // Carol will get coins with non-explicit asset id
+
+  currency::transaction tx{};
+  crypto::public_key asset_id = currency::null_pkey;
+  miner_wlt->deploy_new_asset(adb, destinations, tx, asset_id);
+  LOG_PRINT_L0("Deployed new asset: " << asset_id << ", tx_id: " << currency::get_transaction_hash(tx));
+
+  CHECK_AND_ASSERT_MES(tx.vout.size() >= 2, false, "Unexpected vout size: " << tx.vout.size());
+  for(auto& out : tx.vout)
+  {
+    CHECK_AND_ASSERT_MES(out.type() == typeid(tx_out_zarcanum), false, "invalid out type");
+    CHECK_AND_ASSERT_MES(boost::get<tx_out_zarcanum>(out).blinded_asset_id != native_coin_asset_id_1div8, false, "One of outputs has explicit native asset id, which is unexpected");
+  }
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  alice_wlt->refresh();
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  bob_wlt->refresh();
+  std::shared_ptr<tools::wallet2> carol_wlt = init_playtime_test_wallet(events, c, CAROL_ACC_IDX);
+  carol_wlt->refresh();
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", MK_TEST_COINS(21),     MK_TEST_COINS(21), MK_TEST_COINS(21),    0, 0), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt,   "Bob",   adb.total_max_supply,  0,                 adb.total_max_supply, 0, 0, asset_id), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*carol_wlt, "Carol", MK_TEST_COINS(21),     0,                 MK_TEST_COINS(21),    0, 0), false, "");
+
+  size_t current_blockchain_size = c.get_current_blockchain_size();
+
+  // Normal ionic swap between Alice and Bob:  (Alice has only coins with explicit asset id)
+  //   before:
+  // Alice (initiator): 0.21 ZANO    < - >     Bob (finalizer): 0.01 TEST
+  //   after:
+  // Alice (initiator): 0.01 TEST              Bob (finalizer): 0.20 ZANO
+
+  view::ionic_swap_proposal_info proposal_details{};
+  proposal_details.to_initiator.push_back(view::asset_funds{ asset_id, adb.total_max_supply });
+  proposal_details.to_finalizer.push_back(view::asset_funds{ native_coin_asset_id, MK_TEST_COINS(20) });
+  proposal_details.fee_paid_by_a = MK_TEST_COINS(1);
+  proposal_details.mixins = 2;
+
+  tools::wallet_public::ionic_swap_proposal proposal{};
+  alice_wlt->create_ionic_swap_proposal(proposal_details, m_accounts[BOB_ACC_IDX].get_public_address(), proposal);
+
+  view::ionic_swap_proposal_info proposal_decoded_info{};
+  bob_wlt->get_ionic_swap_proposal_info(proposal, proposal_decoded_info);
+  CHECK_AND_ASSERT_MES(
+    proposal_decoded_info.to_finalizer == proposal_details.to_finalizer &&
+    proposal_decoded_info.to_initiator == proposal_details.to_initiator &&
+    proposal_decoded_info.fee_paid_by_a == proposal_details.fee_paid_by_a &&
+    proposal_decoded_info.mixins == proposal_details.mixins,
+    false, "actual and decoded proposal mismatch");
+
+  currency::transaction tx_is{};
+  r = bob_wlt->accept_ionic_swap_proposal(proposal, tx_is);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to accept ionic proposal");
+  CHECK_AND_ASSERT_MES(check_ionic_swap_tx_outs(m_accounts, tx_is, bob_wlt, proposal), false, "");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  alice_wlt->refresh();
+  bob_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", adb.total_max_supply,  0, adb.total_max_supply,  0, 0, asset_id), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt,   "Bob",   MK_TEST_COINS(20),     0, MK_TEST_COINS(20),     0, 0), false, "");
+
+
+  // Normal ionic swap between Carol and Alice:  (Carol has only coins with non-explicit asset id)
+  //   before:
+  // Carol (initiator): 0.21 Zano              Alice (finalizer): 0.01 TEST
+  //   after:
+  // Carol (initiator): 0.01 TEST              Alice (finalizer): 0.2  ZANO
+
+  proposal_details = view::ionic_swap_proposal_info{};
+  proposal_details.to_initiator.push_back(view::asset_funds{ asset_id, adb.total_max_supply });
+  proposal_details.to_finalizer.push_back(view::asset_funds{ native_coin_asset_id, MK_TEST_COINS(20) });
+  proposal_details.fee_paid_by_a = MK_TEST_COINS(1);
+  proposal_details.mixins = 2;
+
+  proposal = tools::wallet_public::ionic_swap_proposal{};
+  carol_wlt->create_ionic_swap_proposal(proposal_details, m_accounts[ALICE_ACC_IDX].get_public_address(), proposal);
+
+  proposal_decoded_info = view::ionic_swap_proposal_info{};
+  alice_wlt->get_ionic_swap_proposal_info(proposal, proposal_decoded_info);
+  CHECK_AND_ASSERT_MES(
+    proposal_decoded_info.to_finalizer == proposal_details.to_finalizer &&
+    proposal_decoded_info.to_initiator == proposal_details.to_initiator &&
+    proposal_decoded_info.fee_paid_by_a == proposal_details.fee_paid_by_a &&
+    proposal_decoded_info.mixins == proposal_details.mixins,
+    false, "actual and decoded proposal mismatch");
+
+  currency::transaction tx_is2{};
+  r = alice_wlt->accept_ionic_swap_proposal(proposal, tx_is2);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to accept ionic proposal");
+  CHECK_AND_ASSERT_MES(check_ionic_swap_tx_outs(m_accounts, tx_is2, alice_wlt, proposal), false, "");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  carol_wlt->refresh();
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*carol_wlt, "Carol", adb.total_max_supply,  0, adb.total_max_supply,  0, 0, asset_id), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", MK_TEST_COINS(20),     0, MK_TEST_COINS(20),     0, 0), false, "");
+
+  return true;
+}

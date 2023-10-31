@@ -269,7 +269,8 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("incoming_counts", boost::bind(&simple_wallet::show_incoming_transfers_counts, this, ph::_1), "incoming_transfers counts");
   m_cmd_binder.set_handler("list_recent_transfers", boost::bind(&simple_wallet::list_recent_transfers, this, ph::_1), "list_recent_transfers [offset] [count] - Show recent maximum 1000 transfers, offset default = 0, count default = 100 ");
   m_cmd_binder.set_handler("export_recent_transfers", boost::bind(&simple_wallet::export_recent_transfers, this, ph::_1), "list_recent_transfers_tx - Write recent transfer in json to wallet_recent_transfers.txt");
-  m_cmd_binder.set_handler("list_outputs", boost::bind(&simple_wallet::list_outputs, this, ph::_1), "list_outputs [spent|unspent] - Lists all the outputs that have ever been sent to this wallet if called without arguments, otherwise it lists only the spent or unspent outputs");
+  m_cmd_binder.set_handler("list_outputs", boost::bind(&simple_wallet::list_outputs, this, ph::_1), "list_outputs [spent|unspent] [ticker=ZANO] [unknown] - Lists all the outputs. The result may be filtered by spent status, asset ticker or unknown asset ids.");
+  m_cmd_binder.set_handler("lo", boost::bind(&simple_wallet::list_outputs, this, ph::_1), "alias for list_outputs");
   m_cmd_binder.set_handler("dump_transfers", boost::bind(&simple_wallet::dump_trunsfers, this, ph::_1), "dump_transfers - Write  transfers in json to dump_transfers.txt");
   m_cmd_binder.set_handler("dump_keyimages", boost::bind(&simple_wallet::dump_key_images, this, ph::_1), "dump_keyimages - Write  key_images in json to dump_key_images.txt");
   m_cmd_binder.set_handler("payments", boost::bind(&simple_wallet::show_payments, this, ph::_1), "payments <payment_id_1> [<payment_id_2> ... <payment_id_N>] - Show payments <payment_id_1>, ... <payment_id_N>");
@@ -1775,28 +1776,36 @@ bool simple_wallet::save_watch_only(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::list_outputs(const std::vector<std::string> &args)
 {
-  if (args.size() > 1)
-  {
-    fail_msg_writer() << "invalid syntax: one or none parameters are expected, " << args.size() << " was given";
-    return true;
-  }
+  bool include_spent = true, include_unspent = true, show_only_unknown = false;
+  std::string filter_asset_ticker{};
 
-  bool include_spent = true, include_unspent = true;
-  if (args.size() == 1)
-  {
-    if (args[0] == "unspent" || args[0] == "available")
-      include_spent = false;
-    else if (args[0] == "spent" || args[0] == "unavailable")
-      include_unspent = false;
+  bool arg_spent_flags = false, arg_unknown_assets = false, arg_ticker_filer = false;
+
+  auto process_arg = [&](const std::string& arg) -> bool {
+    if (!arg_spent_flags && (arg == "u" || arg == "unspent" || arg == "available"))
+      arg_spent_flags = true, include_spent = false;
+    else if (!arg_spent_flags && (arg == "s" || arg == "spent" || arg == "unavailable"))
+      arg_spent_flags = true, include_unspent = false;
+    else if (!arg_unknown_assets && (arg == "unknown"))
+      arg_unknown_assets = true, show_only_unknown = true;
+    else if (!arg_ticker_filer && (arg.find("ticker=") == 0 || arg.find("t=") == 0))
+      arg_ticker_filer = true, filter_asset_ticker = boost::erase_all_copy(boost::erase_all_copy(arg, "ticker="), "t=");
     else
+      return false;
+    return true;
+  };
+
+  for(auto& arg : args)
+  {
+    if (!process_arg(arg))
     {
-      fail_msg_writer() << "invalid parameter: " << args[0];
+      fail_msg_writer() << "invalid parameter: " << arg;
       return true;
     }
   }
 
-  success_msg_writer() << "list of all the outputs that have ever been sent to this wallet:" << ENDL <<
-    m_wallet->get_transfers_str(include_spent, include_unspent);
+  success_msg_writer() << m_wallet->get_transfers_str(include_spent, include_unspent, show_only_unknown, filter_asset_ticker);
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------
