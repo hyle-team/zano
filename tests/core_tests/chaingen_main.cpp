@@ -893,6 +893,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(pos_wallet_big_block_test);
     //GENERATE_AND_PLAY(block_template_against_txs_size); // Long test! by demand only
     GENERATE_AND_PLAY(pos_altblocks_validation);
+    GENERATE_AND_PLAY(pos_mining_with_decoys);
 
     // alternative blocks and generic chain-switching tests
     GENERATE_AND_PLAY(gen_chain_switch_pow_pos);
