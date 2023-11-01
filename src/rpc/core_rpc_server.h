@@ -150,6 +150,7 @@ namespace currency
         MAP_JON_RPC   ("get_pool_txs_brief_details",  on_get_pool_txs_brief_details,  COMMAND_RPC_GET_POOL_TXS_BRIEF_DETAILS)
         MAP_JON_RPC   ("get_all_pool_tx_list",        on_get_all_pool_tx_list,        COMMAND_RPC_GET_ALL_POOL_TX_LIST)
         MAP_JON_RPC   ("get_pool_info",               on_get_pool_info,               COMMAND_RPC_GET_POOL_INFO)
+        MAP_JON_RPC   ("getrandom_outs",              on_get_random_outs,             COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS)
 
         MAP_JON_RPC_WE("get_main_block_details",      on_get_main_block_details,      COMMAND_RPC_GET_BLOCK_DETAILS)
         MAP_JON_RPC_WE("get_alt_block_details",       on_get_alt_block_details,       COMMAND_RPC_GET_BLOCK_DETAILS)
