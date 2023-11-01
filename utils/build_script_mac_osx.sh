@@ -186,7 +186,7 @@ rm -f Zano.zip
 
 tmpfile="tmptmptmp"
 #xcrun altool --notarize-app --primary-bundle-id "org.zano.desktop" -u "andrey@zano.org" -p "@keychain:Developer-altool" --file ./Zano.zip > $tmpfile 2>&1
-xcrun notarytool submit --wait  --apple-id "andrey@zano.org" --team-id "562DC258Q6"  --password "@keychain:Developer-altool"  ./Zano.zip
+xcrun notarytool submit --wait --keychain-profile "notarytool-password" ./Zano.zip
 RETURN=$?
 if [ $RETURN -ne 0 ]; then
     echo "Failed to submit for notarization or notarization failed, error code $RETURN"
