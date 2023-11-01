@@ -185,41 +185,11 @@ rm -f Zano.zip
 /usr/bin/ditto -c -k --keepParent ./Zano.app ./Zano.zip
 
 tmpfile="tmptmptmp"
-xcrun altool --notarize-app --primary-bundle-id "org.zano.desktop" -u "andrey@zano.org" -p "@keychain:Developer-altool" --file ./Zano.zip > $tmpfile 2>&1
-NOTARIZE_RES=$?
-NOTARIZE_OUTPUT=$( cat $tmpfile )
-rm $tmpfile
-echo "NOTARIZE_OUTPUT=$NOTARIZE_OUTPUT"
-if [ $NOTARIZE_RES -ne 0 ]; then
-    echo "Notarization failed"
-    exit 1
-fi
-
-GUID=$(echo "$NOTARIZE_OUTPUT" | egrep -Ewo '[[:xdigit:]]{8}(-[[:xdigit:]]{4}){3}-[[:xdigit:]]{12}')
-if [ ${#GUID} -ne 36 ]; then
-    echo "Couldn't get correct GUID from the response, got only \"$GUID\""
-    exit 1
-fi
-
-
-success=0
-
-# check notarization status
-for i in {1..10}; do
-    xcrun altool --notarization-info $GUID -u "andrey@zano.org" -p "@keychain:Developer-altool" > $tmpfile 2>&1
-    NOTARIZE_OUTPUT=$( cat $tmpfile )
-    rm $tmpfile 
-    NOTARIZATION_LOG_URL=$(echo "$NOTARIZE_OUTPUT" | sed -n "s/.*LogFileURL\: \([[:graph:]]*\).*/\1/p")
-    if [ ${#NOTARIZATION_LOG_URL} -ge 30 ]; then
-        success=1
-        curl -L $NOTARIZATION_LOG_URL
-        break
-    fi
-    sleep 60 
-done
-
-if [ $success -ne 1 ]; then
-    echo "Build notarization failed"
+#xcrun altool --notarize-app --primary-bundle-id "org.zano.desktop" -u "andrey@zano.org" -p "@keychain:Developer-altool" --file ./Zano.zip > $tmpfile 2>&1
+xcrun notarytool submit --wait  --apple-id "andrey@zano.org" --team-id "562DC258Q6"  --password "@keychain:Developer-altool"  ./Zano.zip
+RETURN=$?
+if [ $RETURN -ne 0 ]; then
+    echo "Failed to submit for notarization or notarization failed, error code $RETURN"
     exit 1
 fi
 
