@@ -2646,7 +2646,7 @@ bool blockchain_storage::get_random_outs_for_amounts(const COMMAND_RPC_GET_RANDO
       }
       if (result_outs.outs.size() < req.decoys_count)
       {
-        LOG_PRINT_RED_L0("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.decoys_count << ", added " << result_outs.outs.size() << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total");
+        LOG_PRINT_YELLOW("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.decoys_count << ", added " << result_outs.outs.size() << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total", LOG_LEVEL_0);
       }
     }
     else
@@ -2654,7 +2654,7 @@ bool blockchain_storage::get_random_outs_for_amounts(const COMMAND_RPC_GET_RANDO
       size_t added = 0;
       for (size_t i = 0; i != up_index_limit; i++)
         added += add_out_to_get_random_outs(result_outs, amount, i, req.decoys_count, req.use_forced_mix_outs, req.height_upper_limit) ? 1 : 0;
-      LOG_PRINT_RED_L0("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.decoys_count << ", added " << added << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total - respond with all good outs");
+      LOG_PRINT_YELLOW("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.decoys_count << ", added " << added << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total - respond with all good outs", LOG_LEVEL_0);
     }
   }
   return true;
@@ -2887,6 +2887,51 @@ size_t blockchain_storage::get_current_sequence_factor_for_alt(alt_chain_type& a
     }
   }
   return n;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::get_pos_votes(uint64_t start_index, uint64_t end_index, vote_results& r)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  if (start_index >= m_db_blocks.size() || start_index >= end_index)
+  {
+    //LOG_PRINT_L0("Wrong starter or end index set: start_index = " << start_index << ", end_index=" << end_index << ", expected max index " << m_db_blocks.size() - 1);
+    return true;
+  }
+  std::map<std::string, vote_on_proposal> summary;
+
+  for (size_t i = start_index; i < m_db_blocks.size() && i < end_index; i++)
+  {    
+    auto block_ptr = m_db_blocks[i];
+    //only coin holders can vote
+    if(!is_pos_block(block_ptr->bl))
+      continue;
+    r.total_pos_blocks++;
+
+    extra_user_data eud = AUTO_VAL_INIT(eud);
+    if (!get_type_in_variant_container(block_ptr->bl.miner_tx.extra, eud))
+    {
+      continue;
+    }
+    std::list<std::pair<std::string, bool>> votes;
+    if (!currency::parse_vote(eud.buff, votes))
+    {
+      continue;
+    }
+    for (const auto& v : votes)
+    {
+      if (v.second)
+        summary[v.first].yes++;
+      else
+        summary[v.first].no++;
+    }
+  }
+  for (const auto s_entry : summary)
+  {
+    r.votes.push_back(s_entry.second);
+    r.votes.back().proposal_id = s_entry.first;
+  }
+
+  return true;
 }
 //------------------------------------------------------------------
 std::string blockchain_storage::get_blockchain_string(uint64_t start_index, uint64_t end_index) const

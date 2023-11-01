@@ -516,6 +516,8 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
     wallets.back().wallet->assign_account(a);
     wallets.back().wallet->get_account().set_createtime(0);
     wallets.back().wallet->set_core_proxy(tmp_proxy);
+    wallets.back().wallet->set_minimum_height(0);
+    wallets.back().wallet->set_pos_required_decoys_count(0);
 
     currency::core_runtime_config pc = cc;
     pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;

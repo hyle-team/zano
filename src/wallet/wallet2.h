@@ -392,6 +392,7 @@ namespace tools
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
     void set_pos_utxo_count_limits_for_defragmentation_tx(uint64_t min_outs, uint64_t max_outs); // don't create UTXO defrag. tx if there are less than 'min_outs' outs; don't put more than 'max_outs' outs
     void set_pos_decoys_count_for_defragmentation_tx(size_t decoys_count);
+    void set_pos_required_decoys_count(size_t v) { m_required_decoys_count = v; }
     void set_minimum_height(uint64_t h);
     std::shared_ptr<i_core_proxy> get_core_proxy();
     uint64_t balance() const;
@@ -591,6 +592,7 @@ namespace tools
 
     bool build_minted_block(const mining_context& cxt);
     bool build_minted_block(const mining_context& cxt, const currency::account_public_address& miner_address);
+    std::string get_extra_text_for_block(uint64_t new_block_expected_height);
     bool reset_history();
     bool is_transfer_unlocked(const transfer_details& td) const;
     bool is_transfer_unlocked(const transfer_details& td, bool for_pos_mining, uint64_t& stake_lock_time) const;
@@ -648,6 +650,8 @@ namespace tools
     bool load_whitelisted_tokens_if_not_loaded() const;
     bool load_whitelisted_tokens() const;
 
+    void set_connectivity_options(unsigned int timeout);
+    
     /*
     create_htlc_proposal: if htlc_hash == null_hash, then this wallet is originator of the atomic process, and 
     we use deterministic origin, if given some particular htlc_hash, then we use this hash, and this means that 
@@ -658,6 +662,9 @@ namespace tools
     void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin, currency::transaction& result_tx);
     void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin);
     bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin, crypto::hash& redeem_tx_id);
+
+    void set_votes_config_path(const std::string& path_to_config_file);
+    const tools::wallet_public::wallet_vote_config& get_current_votes() { return m_votes_config; }
 
     // ionic swaps:
     bool create_ionic_swap_proposal(const wallet_public::ionic_swap_proposal_info& proposal_details, const currency::account_public_address& destination_addr, wallet_public::ionic_swap_proposal& proposal);
@@ -685,6 +692,7 @@ namespace tools
 
 protected: 
     epee::misc_utils::events_dispatcher m_debug_events_dispatcher;
+
 private:
 
     // -------- t_transport_state_notifier ------------------------------------------------
@@ -765,6 +773,7 @@ private:
     uint64_t get_current_tx_version();
     void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const wallet_public::wallet_transfer_info& wti) const;
     void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const std::string& reason = "internal intention") const;
+    void load_votes_config();
     bool is_need_to_split_outputs();
     template<typename input_t>
     bool process_input_t(const input_t& in_t, wallet2::process_transaction_context& ptc, const currency::transaction& tx);
@@ -860,6 +869,7 @@ private:
     uint64_t m_min_utxo_count_for_defragmentation_tx;
     uint64_t m_max_utxo_count_for_defragmentation_tx;
     size_t m_decoys_count_for_defragmentation_tx;
+    size_t m_required_decoys_count;
     pending_ki_file_container_t m_pending_key_images_file_container;
     uint64_t m_upper_transaction_size_limit; //TODO: auto-calc this value or request from daemon, now use some fixed value
 
@@ -879,6 +889,10 @@ private:
     bool m_disable_tor_relay;
     bool m_use_assets_whitelisting = true;
     mutable current_operation_context m_current_context;
+
+    std::string m_votes_config_path;
+    tools::wallet_public::wallet_vote_config m_votes_config;
+
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;
   }; // class wallet2
@@ -906,6 +920,38 @@ namespace boost
 //     }
 
     
+    /*template <class Archive>
+    inline void serialize(Archive& a, tools::wallet_public::wallet_transfer_info_details& x, const boost::serialization::version_type ver)
+    {
+      a & x.rcv;
+      a & x.spn;
+    }
+
+    template <class Archive>
+    inline void serialize(Archive& a, tools::wallet_public::wallet_transfer_info& x, const boost::serialization::version_type ver)
+    {      
+
+      a & x.amount;
+      a & x.timestamp;
+      a & x.tx_hash;
+      a & x.height;
+      a & x.tx_blob_size;
+      a & x.payment_id;
+      a & x.remote_addresses; 
+      a & x.is_income;
+      a & x.td;
+      a & x.tx;
+      a & x.remote_aliases;
+      a & x.comment;
+      a & x.contract;
+      a & x.selected_indicies;
+      a & x.marketplace_entries;
+      a & x.unlock_time;
+      if (ver < 10)
+        return;
+      a & x.service_entries;
+    }*/
+
     template <class Archive>
     inline void serialize(Archive& a, tools::wallet_public::escrow_contract_details_basic& x, const boost::serialization::version_type ver)
     {

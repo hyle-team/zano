@@ -159,6 +159,28 @@ namespace currency
     transactions_map onboard_transactions;
   };
 
+  struct vote_on_proposal
+  {
+    std::string proposal_id;
+    uint64_t yes;
+    uint64_t no;
 
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(proposal_id)
+      KV_SERIALIZE(yes)
+      KV_SERIALIZE(no)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct vote_results
+  {
+    uint64_t total_pos_blocks; //total pos blocks in a given range
+    std::list<vote_on_proposal> votes;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(total_pos_blocks)
+      KV_SERIALIZE(votes)
+    END_KV_SERIALIZE_MAP()
+  };
 
 } // namespace currency

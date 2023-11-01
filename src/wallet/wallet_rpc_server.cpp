@@ -94,6 +94,8 @@ namespace tools
     static const uint64_t wallet_rpc_idle_work_period_ms = 2000;
 
     m_do_mint = do_mint;
+    if (m_do_mint)
+      LOG_PRINT_CYAN("PoS mining is ON", LOG_LEVEL_0);
 
     if (!offline_mode)
     {
@@ -171,6 +173,7 @@ namespace tools
     {
       w.get_wallet()->set_miner_text_info(command_line::get_arg(vm, arg_miner_text_info));
     }
+
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------

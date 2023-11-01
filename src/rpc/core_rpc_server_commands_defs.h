@@ -82,6 +82,33 @@ namespace currency
     };
   };
 
+  struct COMMAND_RPC_GET_VOTES
+  {
+    struct request
+    {
+      uint64_t h_start;
+      uint64_t h_end;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(h_start)
+        KV_SERIALIZE(h_end)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+      std::string error_code;
+      vote_results votes;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)
+        KV_SERIALIZE(error_code)
+        KV_SERIALIZE(votes)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
   struct asset_id_kv
   {
     crypto::public_key asset_id;

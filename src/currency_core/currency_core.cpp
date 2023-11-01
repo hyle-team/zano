@@ -504,6 +504,15 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::add_new_block(const block& b, block_verification_context& bvc)
   {
+    uint64_t h = m_blockchain_storage.get_top_block_height();
+    if (m_stop_after_height != 0 && h >= m_stop_after_height)
+    {
+      LOG_PRINT_YELLOW("Blockchain top block height is " << h << ", the daemon will now stop as requested", LOG_LEVEL_0);
+      if (m_critical_error_handler)
+        return m_critical_error_handler->on_immediate_stop_requested();
+      return false;
+    }
+
     bool r = m_blockchain_storage.add_new_block(b, bvc);
     if (r && bvc.m_added_to_main_chain)
     {

@@ -37,6 +37,7 @@
   #endif
   #include <windows.h>
 #endif
+#include <cctype>
 #include "warnings.h"
 
 
@@ -310,7 +311,14 @@ namespace string_encoding
 		return get_md5_as_hexstring(src.data(), src.size());
 	}
 #endif
-
+  inline
+  std::string toupper(std::string s)
+  {
+    std::transform(s.begin(), s.end(), s.begin(),
+      [](unsigned char c) { return std::toupper(c); } // correct
+    );
+    return s;
+  }
 
 }
 }

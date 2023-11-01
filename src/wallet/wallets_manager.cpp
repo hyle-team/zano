@@ -1037,6 +1037,9 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
     LOG_ERROR("Unexpected location reached");
 #endif
   }
+
+  w->set_votes_config_path(m_data_dir + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME);
+
   
   std::string return_code = API_RETURN_CODE_OK;
   while (true)
@@ -1051,6 +1054,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
       w->get_unconfirmed_transfers(owr.recent_history.history, exclude_mining_txs);
       owr.wallet_local_bc_size = w->get_blockchain_current_size();
+
       //workaround for missed fee
       //owr.seed = w->get_account().get_seed_phrase();
       break;
@@ -1142,6 +1146,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
 {
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
+  w->set_votes_config_path(m_data_dir + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME);
   owr.wallet_id = m_wallet_id_counter++;
   w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
   if (m_remote_node_mode)
@@ -1248,6 +1253,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
 {
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
+  w->set_votes_config_path(m_data_dir + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME);
   owr.wallet_id = m_wallet_id_counter++;
   w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
   if (m_remote_node_mode)

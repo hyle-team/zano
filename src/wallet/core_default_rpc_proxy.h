@@ -28,7 +28,7 @@ namespace tools
 
 
     bool set_connection_addr(const std::string& url) override;
-    bool set_connectivity(unsigned int connection_timeout, size_t repeats_count);
+    void set_connectivity(unsigned int connection_timeout, size_t repeats_count);
     bool call_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES(const currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request& rqt, currency::COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::response& rsp) override;
     bool call_COMMAND_RPC_GET_BLOCKS_FAST(const currency::COMMAND_RPC_GET_BLOCKS_FAST::request& rqt, currency::COMMAND_RPC_GET_BLOCKS_FAST::response& rsp) override;
     bool call_COMMAND_RPC_GET_BLOCKS_DIRECT(const currency::COMMAND_RPC_GET_BLOCKS_DIRECT::request& rqt, currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& rsp) override;
@@ -56,7 +56,7 @@ namespace tools
     bool check_connection() override;
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override;
 
-    void set_plast_daemon_is_disconnected(std::atomic<bool> *plast_daemon_is_disconnected);
+    void set_plast_daemon_is_disconnected(std::atomic<bool> *plast_daemon_is_disconnected);   
     default_http_core_proxy();
   private:
 
