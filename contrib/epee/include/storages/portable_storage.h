@@ -77,8 +77,7 @@ namespace epee
       bool            insert_next_section(harray hSecArray, hsection& hinserted_childsection);
       //------------------------------------------------------------------------
       //delete entry (section, value or array)
-      bool        delete_entry(const std::string& pentry_name, hsection hparent_section = nullptr);
-
+      bool        delete_entry(const std::string& pentry_name, hsection hparent_section = nullptr);      
       //-------------------------------------------------------------------------------
       bool		store_to_binary(binarybuffer& target);
       bool		load_from_binary(const binarybuffer& target);
@@ -87,6 +86,8 @@ namespace epee
       bool		  dump_as_json(std::string& targetObj, size_t indent = 0, end_of_line_t eol = eol_crlf);
       bool		  load_from_json(const std::string& source);
 
+      template<typename cb_t>
+      bool enum_entries(hsection hparent_section, cb_t cb);
     private:
       section m_root;
       hsection	get_root_section() {return &m_root;}
@@ -384,6 +385,20 @@ namespace epee
       CATCH_ENTRY("portable_storage::insert_first_value", nullptr);
     }
     //---------------------------------------------------------------------------------------------------------------
+    template<typename cb_t>
+    bool portable_storage::enum_entries(hsection hparent_section, cb_t cb)
+    {
+      TRY_ENTRY();
+      if (!hparent_section) hparent_section = &m_root;
+      for (const auto& e : hparent_section->m_entries)
+      {
+        if (!cb(e.first, e.second))
+          break;
+      }
+      return true;
+      CATCH_ENTRY("portable_storage::enum_entries", false);
+    }
+
     template<class t_value>
     bool portable_storage::insert_next_value(harray hval_array, const t_value& target)
     {

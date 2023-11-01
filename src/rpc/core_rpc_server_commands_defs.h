@@ -83,6 +83,34 @@ namespace currency
     };
   };
 
+
+  struct COMMAND_RPC_GET_VOTES
+  {
+    struct request
+    {
+      uint64_t h_start;
+      uint64_t h_end;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(h_start)
+        KV_SERIALIZE(h_end)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+      std::string error_code;
+      vote_results votes;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)
+        KV_SERIALIZE(error_code)
+        KV_SERIALIZE(votes)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
   struct COMMAND_RPC_GET_HEIGHT
   {
     struct request
@@ -331,6 +359,10 @@ namespace currency
 #pragma pack (push, 1)
     struct out_entry
     {
+      out_entry() = default;
+      out_entry(uint64_t global_amount_index, const crypto::public_key& stealth_address)
+        : global_amount_index(global_amount_index), out_key(stealth_address)
+      {}
       uint64_t global_amount_index;
       crypto::public_key out_key;
     };
@@ -1069,11 +1101,11 @@ namespace currency
     struct response
     {
       //std::string alias;
-      alias_rpc_details alias_info;
+      std::vector<alias_rpc_details> alias_info_list;
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(alias_info)
+        KV_SERIALIZE(alias_info_list)
         KV_SERIALIZE(status)
       END_KV_SERIALIZE_MAP()
     };

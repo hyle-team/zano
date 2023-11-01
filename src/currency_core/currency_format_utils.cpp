@@ -188,14 +188,9 @@ namespace currency
 
     if (pos)
     {
-      txin_to_key posin;
-      posin.amount = pe.amount;
-      posin.key_offsets.push_back(pe.index);
-      posin.k_image = pe.keyimage;
-      tx.vin.push_back(posin);
-      //reserve place for ring signature
-      tx.signatures.resize(1);
-      tx.signatures[0].resize(posin.key_offsets.size());
+      // just placeholders, they will be filled in wallet2::prepare_and_sign_pos_block()
+      tx.vin.emplace_back(std::move(txin_to_key()));
+      tx.signatures.emplace_back();
     }
 
     uint64_t no = 0;
@@ -1613,6 +1608,35 @@ namespace currency
     uint64_t timestamp = count_of_weeks * WALLET_BRAIN_DATE_QUANTUM + WALLET_BRAIN_DATE_OFFSET;
     
     return timestamp;
+  }
+  //---------------------------------------------------------------
+  bool parse_vote(const std::string& json_, std::list<std::pair<std::string, bool>>& votes)
+  {
+    //do preliminary check of text if it looks like json
+    std::string::size_type pos = json_.find('{');
+    if (pos == std::string::npos)
+      return false;
+    std::string json = json_.substr(pos);
+
+    epee::serialization::portable_storage ps;
+    bool rs = ps.load_from_json(json);
+    if (!rs)
+      return false;
+
+
+
+    auto cb = [&](const std::string& name, const epee::serialization::storage_entry& entry) {
+      if (entry.type() == typeid(uint64_t))
+      {
+        bool vote = boost::get<uint64_t>(entry) ? true : false;
+        votes.push_back(std::make_pair(epee::string_encoding::toupper(name), vote));
+      }
+      return true;
+    };
+
+    ps.enum_entries(nullptr, cb);
+    return true;
+
   }
   //---------------------------------------------------------------
   bool sign_multisig_input_in_tx(currency::transaction& tx, size_t ms_input_index, const currency::account_keys& keys, const currency::transaction& source_tx, bool *p_is_input_fully_signed /* = nullptr */)

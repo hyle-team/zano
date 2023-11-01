@@ -49,14 +49,16 @@ namespace
   const command_line::arg_descriptor<bool> arg_dont_refresh  ( "no-refresh", "Do not refresh after load");
   const command_line::arg_descriptor<bool> arg_dont_set_date  ( "no-set-creation-date", "Do not set wallet creation date", false);
   const command_line::arg_descriptor<int> arg_daemon_port  ("daemon-port", "Use daemon instance at port <arg> instead of default", 0);
-  const command_line::arg_descriptor<uint32_t> arg_log_level  ("set-log", "");
+  //const command_line::arg_descriptor<uint32_t> arg_log_level  ("set-log", "");
   const command_line::arg_descriptor<bool> arg_do_pos_mining  ( "do-pos-mining", "Do PoS mining", false);
   const command_line::arg_descriptor<std::string> arg_pos_mining_reward_address  ( "pos-mining-reward-address", "Block reward will be sent to the giving address if specified", "" );
   const command_line::arg_descriptor<std::string> arg_restore_wallet  ( "restore-wallet", "Restore wallet from seed phrase or tracking seed and save it to <arg>", "" );
   const command_line::arg_descriptor<bool> arg_offline_mode  ( "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)");
   const command_line::arg_descriptor<std::string> arg_scan_for_wallet  ( "scan-for-wallet", "");
   const command_line::arg_descriptor<std::string> arg_addr_to_compare  ( "addr-to-compare", "");
-  const command_line::arg_descriptor<bool> arg_disable_tor_relay  ( "disable-tor-relay", "Do PoS mining", false);
+  const command_line::arg_descriptor<bool> arg_disable_tor_relay  ( "disable-tor-relay", "Disable TOR relay", false);
+  const command_line::arg_descriptor<unsigned int> arg_set_timeout("set-timeout", "Set timeout for the wallet");
+  const command_line::arg_descriptor<std::string> arg_voting_config_file("voting-config-file", "Set voting config instead of getting if from daemon", "");
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command  ("command", "");
 
@@ -158,6 +160,26 @@ namespace
   }
 }
 
+void display_vote_info(tools::wallet2& w)
+{
+  const tools::wallet_public::wallet_vote_config& votes = w.get_current_votes();
+  if (votes.entries.size())
+  {
+    message_writer(epee::log_space::console_color_magenta, true) << "VOTING SET LOADED:";
+    for (const auto& e : votes.entries)
+    {
+      epee::log_space::console_colors color = epee::log_space::console_color_green;
+      if (e.h_end < w.get_top_block_height())
+      {
+        color = epee::log_space::console_color_white;
+      }
+
+      message_writer(color, true) << "\t\t" << e.proposal_id << "\t\t" << (e.vote ? "1" : "0") << "\t\t(" << e.h_start << " - " << e.h_end << ")";
+    }
+  }
+}
+
+
 std::string simple_wallet::get_commands_str()
 {
   std::stringstream ss;
@@ -183,7 +205,8 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("start_mining", boost::bind(&simple_wallet::start_mining, this, ph::_1), "start_mining <threads_count> - Start mining in daemon");
   m_cmd_binder.set_handler("stop_mining", boost::bind(&simple_wallet::stop_mining, this, ph::_1), "Stop mining in daemon");
   m_cmd_binder.set_handler("refresh", boost::bind(&simple_wallet::refresh, this, ph::_1), "Resynchronize transactions and balance");
-  m_cmd_binder.set_handler("balance", boost::bind(&simple_wallet::show_balance, this, ph::_1), "Show current wallet balance");
+  m_cmd_binder.set_handler("balance", boost::bind(&simple_wallet::show_balance, this, ph::_1), "Show current wallet balance"); 
+  m_cmd_binder.set_handler("show_staking_history", boost::bind(&simple_wallet::show_staking_history, this, ph::_1), "show_staking_history [2] - Show staking transfers, if option provided - number of days for history to display");
   m_cmd_binder.set_handler("incoming_transfers", boost::bind(&simple_wallet::show_incoming_transfers, this, ph::_1), "incoming_transfers [available|unavailable] - Show incoming transfers - all of them or filter them by availability");
   m_cmd_binder.set_handler("incoming_counts", boost::bind(&simple_wallet::show_incoming_transfers_counts, this, ph::_1), "incoming_transfers counts");
   m_cmd_binder.set_handler("list_recent_transfers", boost::bind(&simple_wallet::list_recent_transfers, this, ph::_1), "list_recent_transfers [offset] [count] - Show recent maximum 1000 transfers, offset default = 0, count default = 100 ");
@@ -261,6 +284,29 @@ bool simple_wallet::set_log(const std::vector<std::string> &args)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+void process_wallet_command_line_params(const po::variables_map& vm, tools::wallet2& wal, bool is_server_mode = true)
+{
+  if (command_line::has_arg(vm, arg_disable_tor_relay))
+  {
+    wal.set_disable_tor_relay(command_line::get_arg(vm, arg_disable_tor_relay));
+    message_writer(epee::log_space::console_color_default, true, std::string(), LOG_LEVEL_0) << "Notice: Relaying transactions over TOR disabled with command line parameter";
+  }
+  else
+  {
+    if (is_server_mode)
+    {
+      //disable TOR by default for server-mode, to avoid potential sporadic errors due to TOR connectivity fails
+      wal.set_disable_tor_relay(true);
+    }
+  }
+
+  if (command_line::has_arg(vm, arg_set_timeout))
+  {
+    wal.set_connectivity_options(command_line::get_arg(vm, arg_set_timeout));
+  }
+
+}
+//----------------------------------------------------------------------------------------------------
 bool simple_wallet::init(const boost::program_options::variables_map& vm)
 {
   handle_command_line(vm);
@@ -305,7 +351,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     m_do_refresh_after_load = false;
   }
 
-
+  bool was_open = false;
   if (!m_generate_new.empty())
   {
     bool r = new_wallet(m_generate_new, pwd_container.password(), false);
@@ -356,12 +402,14 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
   {
     bool r = open_wallet(m_wallet_file, pwd_container.password());
     CHECK_AND_ASSERT_MES(r, false, "could not open account");
+    was_open = true;
   }
-  if (m_disable_tor)
-  {
-    m_wallet->set_disable_tor_relay(true);
-    message_writer(epee::log_space::console_color_default, true, std::string(), LOG_LEVEL_0) << "Notice: Relaying transactions over TOR disabled with command line parameter";
-  }
+  process_wallet_command_line_params(vm, *m_wallet, false);
+
+  m_wallet->init(m_daemon_address);
+
+  if (was_open && (m_do_refresh_after_load && !m_offline_mode))
+    refresh(std::vector<std::string>());
 
   return true;
 }
@@ -386,6 +434,7 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_do_pos_mining   = command_line::get_arg(vm, arg_do_pos_mining);
   m_restore_wallet  = command_line::get_arg(vm, arg_restore_wallet);
   m_disable_tor     = command_line::get_arg(vm, arg_disable_tor_relay);
+  m_voting_config_file = command_line::get_arg(vm, arg_voting_config_file);
 } 
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::try_connect_to_daemon()
@@ -406,17 +455,20 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
 
   m_wallet.reset(new tools::wallet2());
   m_wallet->callback(this->shared_from_this());
+  if (!m_voting_config_file.empty())
+    m_wallet->set_votes_config_path(m_voting_config_file);
+
   m_wallet->set_do_rise_transfer(false);
   try
   {
     m_wallet->generate(epee::string_encoding::utf8_to_wstring(m_wallet_file), password, create_auditable_wallet);
     message_writer(epee::log_space::console_color_white, true) << "Generated new " << (create_auditable_wallet ? "AUDITABLE" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
+    display_vote_info(*m_wallet);
     std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().view_secret_key) << std::endl << std::flush;
     if (m_wallet->is_auditable())
       std::cout << "tracking seed: " << std::endl << m_wallet->get_account().get_tracking_seed() << std::endl << std::flush;
     if (m_do_not_set_date)
       m_wallet->reset_creation_time(0);
-
 
   }
   catch (const std::exception& e)
@@ -424,9 +476,6 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
     fail_msg_writer() << "failed to generate new wallet: " << e.what();
     return false;
   }
-
-  m_wallet->init(m_daemon_address);
-
 
   success_msg_writer() <<
     "**********************************************************************\n" <<
@@ -441,6 +490,9 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
 
   m_wallet.reset(new tools::wallet2());
   m_wallet->callback(this->shared_from_this());
+  if (!m_voting_config_file.empty())
+    m_wallet->set_votes_config_path(m_voting_config_file);
+
   m_wallet->set_do_rise_transfer(true);
   try
   {
@@ -459,6 +511,7 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
       if (m_wallet->is_auditable())
         std::cout << "tracking seed: " << std::endl << m_wallet->get_account().get_tracking_seed() << std::endl << std::flush;
     }
+    display_vote_info(*m_wallet);
     if (m_do_not_set_date)
       m_wallet->reset_creation_time(0);
   }
@@ -472,7 +525,6 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
     fail_msg_writer() << "failed to restore wallet, check your " << (tracking_wallet ? "tracking seed!" : "seed phrase!") << ENDL;
     return false;
   }
-  m_wallet->init(m_daemon_address);
 
   success_msg_writer() <<
     "**********************************************************************\n" <<
@@ -486,11 +538,15 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+
 bool simple_wallet::open_wallet(const string &wallet_file, const std::string& password)
 {
   m_wallet_file = wallet_file;
   m_wallet.reset(new tools::wallet2());
   m_wallet->callback(shared_from_this());
+  if (!m_voting_config_file.empty())
+    m_wallet->set_votes_config_path(m_voting_config_file);
+
 
   while (true)
   {
@@ -498,6 +554,7 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
     {
       m_wallet->load(epee::string_encoding::utf8_to_wstring(m_wallet_file), password);
       message_writer(epee::log_space::console_color_white, true) << "Opened" << (m_wallet->is_auditable() ? " auditable" : "") << (m_wallet->is_watch_only() ? " watch-only" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
+      display_vote_info(*m_wallet);
 
       break;
     }
@@ -513,12 +570,6 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
       return false;
     }
   }
-
-
-  m_wallet->init(m_daemon_address);
-
-  if (m_do_refresh_after_load && !m_offline_mode)
-    refresh(std::vector<std::string>());
 
   success_msg_writer() <<
     "**********************************************************************\n" <<
@@ -774,9 +825,9 @@ bool print_wti(const tools::wallet_public::wallet_transfer_info& wti)
 
   static const std::string separator = ", ";
   std::string remote_side;
-  if (!wti.recipients_aliases.empty())
+  if (!wti.remote_aliases.empty())
   {
-    for (auto it : wti.recipients_aliases)
+    for (auto it : wti.remote_aliases)
       remote_side += remote_side.empty() ? it : (separator + it);
   }
   else
@@ -812,15 +863,13 @@ bool simple_wallet::list_recent_transfers(const std::vector<std::string>& args)
   success_msg_writer() << "Unconfirmed transfers: ";
   for (auto & wti : unconfirmed)
   {
-    if (!wti.fee)
-      wti.fee = currency::get_tx_fee(wti.tx);
+    wti.fee = currency::get_tx_fee(wti.tx);
     print_wti(wti);
   }
   success_msg_writer() << "Recent transfers: ";
   for (auto & wti : recent)
   {
-    if (!wti.fee)
-      wti.fee = currency::get_tx_fee(wti.tx);
+    wti.fee = currency::get_tx_fee(wti.tx);
     print_wti(wti);
   }
   return true;
@@ -892,6 +941,70 @@ bool simple_wallet::dump_key_images(const std::vector<std::string>& args)
   success_msg_writer() << "Storing text to dump_keyimages.txt....";
   file_io_utils::save_string_to_file(log_space::log_singletone::get_default_log_folder() + "/dump_keyimages.txt", ss.str());
   success_msg_writer() << "Done....";
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::show_staking_history(const std::vector<std::string>& args)
+{
+  uint64_t n_days = 0;
+  if (!args.empty())
+  {
+    if (!epee::string_tools::get_xtype_from_string(n_days, args[0]))
+    {
+      fail_msg_writer() << "Unknown amount of days to list";
+      return true;
+    }
+  }
+
+  tools::wallet2::transfer_container transfers;
+  m_wallet->get_transfers(transfers);
+
+  uint64_t timestamp = 0;
+
+  if (n_days)
+    timestamp = static_cast<uint64_t>(time(nullptr)) - (n_days * 60 * 60 * 24);
+  
+  uint64_t amount_total_staked = 0;
+  bool transfers_found = false;
+  for (auto it = transfers.rbegin(); it != transfers.rend(); it++)
+  {
+    const auto& td = *it;
+
+    if (timestamp && td.m_ptx_wallet_info->m_block_timestamp < timestamp)
+      break;
+
+    if (!(td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER))
+      continue;
+
+    bool pos_coinbase = false;
+    is_coinbase(td.m_ptx_wallet_info->m_tx, pos_coinbase);
+    if (!pos_coinbase)
+      continue;
+  
+    if (!transfers_found)
+    {
+      message_writer() << "        amount       \tspent\tglobal index\t                              tx id";
+      transfers_found = true;
+    }
+    amount_total_staked += td.amount();
+    message_writer(static_cast<bool>(td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_SPENT) ? epee::log_space::console_color_magenta : epee::log_space::console_color_green, false) <<
+      std::setw(21) << print_money(td.amount()) << '\t' <<
+      std::setw(3) << (static_cast<bool>(td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_SPENT) ? 'T' : 'F') << "  \t" <<
+      std::setw(12) << td.m_global_output_index << '\t' <<
+      get_transaction_hash(td.m_ptx_wallet_info->m_tx) << "[" << td.m_ptx_wallet_info->m_block_height << "] unlocked: " << (m_wallet->is_transfer_unlocked(td) ? 'T' : 'F');
+  }
+
+  if (!transfers_found)
+  {
+    success_msg_writer() << "No staking transactions";
+  }
+  else
+  {
+    success_msg_writer() << "Total staked: " << print_money(amount_total_staked);
+  }
+
+  
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -1946,6 +2059,7 @@ bool search_for_wallet_file(const std::wstring &search_here/*, const std::string
   }
   return false;
 }
+
 //----------------------------------------------------------------------------------------------------
 #ifdef WIN32
 int wmain( int argc, wchar_t* argv_w[ ], wchar_t* envp[ ] )
@@ -1994,7 +2108,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_daemon_host);
   command_line::add_arg(desc_params, arg_daemon_port);
   command_line::add_arg(desc_params, arg_command);
-  command_line::add_arg(desc_params, arg_log_level);
+  //command_line::add_arg(desc_params, arg_log_level);
   command_line::add_arg(desc_params, arg_dont_refresh);
   command_line::add_arg(desc_params, arg_dont_set_date);
   command_line::add_arg(desc_params, arg_do_pos_mining);
@@ -2006,6 +2120,9 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_scan_for_wallet);
   command_line::add_arg(desc_params, arg_addr_to_compare);
   command_line::add_arg(desc_params, arg_disable_tor_relay);
+  command_line::add_arg(desc_params, arg_set_timeout);
+  command_line::add_arg(desc_params, arg_voting_config_file);
+  
   
 
   tools::wallet_rpc_server::init_options(desc_params);
@@ -2043,7 +2160,7 @@ int main(int argc, char* argv[])
     return EXIT_FAILURE;
 
   //set up logging options
-  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
+  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
   boost::filesystem::path log_file_path(command_line::get_arg(vm, command_line::arg_log_file));
   if (log_file_path.empty())
     log_file_path = log_space::log_singletone::get_default_log_file();
@@ -2052,15 +2169,13 @@ int main(int argc, char* argv[])
   log_space::log_singletone::add_logger(LOGGER_FILE, log_file_path.filename().string().c_str(), log_dir.c_str(), LOG_LEVEL_4);
   message_writer(epee::log_space::console_color_white, true) << CURRENCY_NAME << " wallet v" << PROJECT_VERSION_LONG;
 
-  if (command_line::has_arg(vm, arg_log_level))
-  {
-    LOG_PRINT_L0("Setting log level = " << command_line::get_arg(vm, arg_log_level));
-    log_space::get_set_log_detalisation_level(true, command_line::get_arg(vm, arg_log_level));
-  }
   if (command_line::has_arg(vm, command_line::arg_log_level))
   {
-    LOG_PRINT_L0("Setting log level = " << command_line::get_arg(vm, command_line::arg_log_level));
-    log_space::get_set_log_detalisation_level(true, command_line::get_arg(vm, command_line::arg_log_level));
+    int old_log_level = log_space::get_set_log_detalisation_level(false);
+    int new_log_level = command_line::get_arg(vm, command_line::arg_log_level);
+    log_space::get_set_log_detalisation_level(true, new_log_level);
+    LOG_PRINT_L0("Log level changed: " << old_log_level << " -> " << new_log_level);
+    message_writer(epee::log_space::console_color_white, true) << "Log level changed: " << old_log_level << " -> " << new_log_level;
   }
 
 
@@ -2081,7 +2196,7 @@ int main(int argc, char* argv[])
     // runs wallet as RPC server
     log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
     sw->set_offline_mode(offline_mode);
-    LOG_PRINT_L0("Starting wallet RPC server...");
+    LOG_PRINT_L0("Starting in RPC server mode...");
 
     if (!command_line::has_arg(vm, arg_wallet_file) || command_line::get_arg(vm, arg_wallet_file).empty())
     {
@@ -2147,7 +2262,9 @@ int main(int argc, char* argv[])
       try
       {
         LOG_PRINT_L0("Initializing wallet...");
+        process_wallet_command_line_params(vm, wal);
         wal.init(daemon_address);
+        display_vote_info(wal);
         if (command_line::get_arg(vm, arg_generate_new_wallet).size() || command_line::get_arg(vm, arg_generate_new_auditable_wallet).size())
           return EXIT_FAILURE;
 
@@ -2176,6 +2293,8 @@ int main(int argc, char* argv[])
         LOG_PRINT_YELLOW("PoS reward will be sent to another address: " << arg_pos_mining_reward_address_str, LOG_LEVEL_0);
       }
     }
+    
+    
 
     tools::wallet_rpc_server wrpc(wal);
     bool r = wrpc.init(vm);
@@ -2204,7 +2323,7 @@ int main(int argc, char* argv[])
     if (command_line::get_arg(vm, arg_do_pos_mining))
     { 
       // PoS mining can be turned on only in RPC server mode, please provide --rpc-bind-port to make this
-      fail_msg_writer() << "PoS mining can be turned on only in RPC server mode, please provide --rpc-bind-port=PORT_NO to enable staking in simplewallet";
+      fail_msg_writer() << "PoS mining can only be started in RPC server mode, please use command-line option --rpc-bind-port=<PORT_NUM> along with --do-pos-mining to enable staking";
       return EXIT_FAILURE;
     }
 

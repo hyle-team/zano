@@ -50,7 +50,7 @@ namespace tools
     //------------------------------------------------------------------------------------------------------------------------------
     bool call_COMMAND_RPC_GET_ALIASES_BY_ADDRESS(const currency::COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& req, currency::COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& res) override
     {
-      return m_rpc.on_alias_by_address(req, res, m_err_stub, m_cntxt_stub);
+      return m_rpc.on_aliases_by_address(req, res, m_err_stub, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
     bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res) override

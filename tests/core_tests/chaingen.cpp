@@ -382,7 +382,7 @@ bool test_generator::sign_block(currency::block& b,
 
   std::vector<const crypto::public_key*> keys_ptrs;
   keys_ptrs.push_back(&out_key);
-  r = w.prepare_and_sign_pos_block(b, pe, source_tx_pub_key, out_i, keys_ptrs);
+  r = w.prepare_and_sign_pos_block(pe, b);
   CHECK_AND_ASSERT_THROW_MES(r,"Failed to prepare_and_sign_pos_block()");
 
   return true;
@@ -425,6 +425,8 @@ bool test_generator::build_wallets(const blockchain_vector& blocks,
     wallets.back()->assign_account(a);
     wallets.back()->get_account().set_createtime(0);
     wallets.back()->set_core_proxy(tmp_proxy);
+    wallets.back()->set_minimum_height(0);
+    wallets.back()->set_pos_required_decoys_count(0);
 
     currency::core_runtime_config pc = cc;
     pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;

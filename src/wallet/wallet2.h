@@ -512,6 +512,7 @@ namespace tools
     const currency::account_base& get_account() const { return m_account; }
 
     void get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs = false, bool start_from_end = true);
+    bool is_consolidating_transaction(const wallet_public::wallet_transfer_info& wti);
     uint64_t get_recent_transfers_total_count();
     uint64_t get_transfer_entries_count();
     void get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs, bool exclude_mining_txs = false);
@@ -538,13 +539,13 @@ namespace tools
     void push_offer(const bc_services::offer_details_ex& od, currency::transaction& res_tx);
     void cancel_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, uint64_t fee, currency::transaction& tx);
     void update_offer_by_id(const crypto::hash& tx_id, uint64_t of_ind, const bc_services::offer_details_ex& od, currency::transaction& res_tx);
-    void request_alias_registration(const currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward);
+    void request_alias_registration(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward, const crypto::secret_key& authority_key = currency::null_skey);
     void request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward);
-    bool check_available_sources(std::list<uint64_t>& amounts);
-    
+    bool check_available_sources(std::list<uint64_t>& amounts);    
 
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
     void set_pos_mint_packing_size(uint64_t new_size);
+    void set_pos_required_decoys_count(size_t v) { m_required_decoys_count = v; }
     void set_minimum_height(uint64_t h);
     std::shared_ptr<i_core_proxy> get_core_proxy();
     uint64_t balance() const;
@@ -802,11 +803,7 @@ namespace tools
     //next functions in public area only becausce of test_generator
     //TODO: Need refactoring - remove it back to private zone 
     void set_genesis(const crypto::hash& genesis_hash);
-    bool prepare_and_sign_pos_block(currency::block& b,
-      const currency::pos_entry& pos_info,
-      const crypto::public_key& source_tx_pub_key,
-      uint64_t in_tx_output_index,
-      const std::vector<const crypto::public_key*>& keys_ptrs);
+    bool prepare_and_sign_pos_block(const currency::pos_entry& pe, currency::block& b);
     void process_new_blockchain_entry(const currency::block& b, 
       const currency::block_direct_data_entry& bche, 
       const crypto::hash& bl_id,
@@ -816,6 +813,7 @@ namespace tools
     bool get_pos_entries(currency::COMMAND_RPC_SCAN_POS::request& req);
     bool build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& req, const currency::COMMAND_RPC_SCAN_POS::response& rsp, uint64_t new_block_expected_height = UINT64_MAX);
     bool build_minted_block(const currency::COMMAND_RPC_SCAN_POS::request& req, const currency::COMMAND_RPC_SCAN_POS::response& rsp, const currency::account_public_address& miner_address, uint64_t new_block_expected_height = UINT64_MAX);
+    std::string get_extra_text_for_block(uint64_t new_block_expected_height);
     bool reset_history();
     bool is_transfer_unlocked(const transfer_details& td) const;
     bool is_transfer_unlocked(const transfer_details& td, bool for_pos_mining, uint64_t& stake_lock_time) const;
@@ -864,8 +862,9 @@ namespace tools
     void set_use_deffered_global_outputs(bool use);
     construct_tx_param get_default_construct_tx_param_inital();
     void set_disable_tor_relay(bool disable);
-
+    uint64_t get_default_fee() {return TX_DEFAULT_FEE;}
     void export_transaction_history(std::ostream& ss, const std::string& format, bool include_pos_transactions = true);
+    void set_connectivity_options(unsigned int timeout);
     
     /*
     create_htlc_proposal: if htlc_hash == null_hash, then this wallet is originator of the atomic process, and 
@@ -877,6 +876,9 @@ namespace tools
     void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin, currency::transaction& result_tx);
     void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin);
     bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin, crypto::hash& redeem_tx_id);
+
+    void set_votes_config_path(const std::string& path_to_config_file);
+    const tools::wallet_public::wallet_vote_config& get_current_votes() { return m_votes_config; }
 private:
 
     // -------- t_transport_state_notifier ------------------------------------------------
@@ -929,6 +931,7 @@ private:
     void handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop,
       currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& blocks);
     std::string get_alias_for_address(const std::string& addr);
+    std::vector<std::string> get_aliases_for_address(const std::string& addr);
     static bool build_kernel(const currency::pos_entry& pe, const currency::stake_modifier_type& stake_modifier, const uint64_t timestamp, currency::stake_kernel& kernel);
     bool is_connected_to_net();
     bool is_transfer_okay_for_pos(const transfer_details& tr, uint64_t& stake_unlock_time);
@@ -955,10 +958,9 @@ private:
     bool handle_cancel_proposal(wallet_public::wallet_transfer_info& wti, const bc_services::escrow_cancel_templates_body& ectb, const std::vector<currency::payload_items_v>& decrypted_attach);
     bool handle_expiration_list(uint64_t tx_expiration_ts_median);
     void handle_contract_expirations(uint64_t tx_expiration_ts_median);
-
     void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const wallet_public::wallet_transfer_info& wti) const;
     void change_contract_state(wallet_public::escrow_contract_details_basic& contract, uint32_t new_state, const crypto::hash& contract_id, const std::string& reason = "internal intention") const;
-    
+    void load_votes_config();
 
     const construct_tx_param& get_default_construct_tx_param();
 
@@ -1014,6 +1016,7 @@ private:
 
     void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
     void remove_transfer_from_amount_gindex_map(uint64_t tid);
+    uint64_t get_alias_cost(const std::string& alias);
 
     static void wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index);
     static void wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index);
@@ -1030,6 +1033,7 @@ private:
     std::atomic<uint64_t> m_last_bc_timestamp; 
     bool m_do_rise_transfer;
     uint64_t m_pos_mint_packing_size;
+    size_t m_required_decoys_count;
 
     transfer_container m_transfers;
     multisig_transfer_container m_multisig_transfers;
@@ -1069,6 +1073,9 @@ private:
     mutable uint64_t m_current_wallet_file_size;
     bool m_use_deffered_global_outputs;
     bool m_disable_tor_relay;
+
+    std::string m_votes_config_path;
+    tools::wallet_public::wallet_vote_config m_votes_config;
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;
  
@@ -1157,7 +1164,7 @@ namespace boost
       a & x.is_income;
       a & x.td;
       a & x.tx;
-      a & x.recipients_aliases;
+      a & x.remote_aliases;
       a & x.comment;
       a & x.contract;
       a & x.selected_indicies;

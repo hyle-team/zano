@@ -2569,14 +2569,14 @@ bool blockchain_storage::get_random_outs_for_amounts(const COMMAND_RPC_GET_RANDO
       }
       if (result_outs.outs.size() < req.outs_count)
       {
-        LOG_PRINT_RED_L0("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.outs_count << ", added " << result_outs.outs.size() << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total");
+        LOG_PRINT_YELLOW("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.outs_count << ", added " << result_outs.outs.size() << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total", LOG_LEVEL_0);
       }
     }else
     {
       size_t added = 0;
       for (size_t i = 0; i != up_index_limit; i++)
         added += add_out_to_get_random_outs(result_outs, amount, i, req.outs_count, req.use_forced_mix_outs) ? 1 : 0;
-      LOG_PRINT_RED_L0("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.outs_count << ", added " << added << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total - respond with all good outs");
+      LOG_PRINT_YELLOW("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.outs_count << ", added " << added << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total - respond with all good outs", LOG_LEVEL_0);
     }
   }
   return true;
@@ -2806,6 +2806,51 @@ size_t blockchain_storage::get_current_sequence_factor_for_alt(alt_chain_type& a
     }
   }
   return n;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::get_pos_votes(uint64_t start_index, uint64_t end_index, vote_results& r)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  if (start_index >= m_db_blocks.size() || start_index >= end_index)
+  {
+    //LOG_PRINT_L0("Wrong starter or end index set: start_index = " << start_index << ", end_index=" << end_index << ", expected max index " << m_db_blocks.size() - 1);
+    return true;
+  }
+  std::map<std::string, vote_on_proposal> summary;
+
+  for (size_t i = start_index; i < m_db_blocks.size() && i < end_index; i++)
+  {    
+    auto block_ptr = m_db_blocks[i];
+    //only coin holders can vote
+    if(!is_pos_block(block_ptr->bl))
+      continue;
+    r.total_pos_blocks++;
+
+    extra_user_data eud = AUTO_VAL_INIT(eud);
+    if (!get_type_in_variant_container(block_ptr->bl.miner_tx.extra, eud))
+    {
+      continue;
+    }
+    std::list<std::pair<std::string, bool>> votes;
+    if (!currency::parse_vote(eud.buff, votes))
+    {
+      continue;
+    }
+    for (const auto& v : votes)
+    {
+      if (v.second)
+        summary[v.first].yes++;
+      else
+        summary[v.first].no++;
+    }
+  }
+  for (const auto s_entry : summary)
+  {
+    r.votes.push_back(s_entry.second);
+    r.votes.back().proposal_id = s_entry.first;
+  }
+
+  return true;
 }
 //------------------------------------------------------------------
 std::string blockchain_storage::get_blockchain_string(uint64_t start_index, uint64_t end_index) const
@@ -3462,6 +3507,17 @@ std::string blockchain_storage::get_alias_by_address(const account_public_addres
   return "";
 }
 //------------------------------------------------------------------
+std::set<std::string> blockchain_storage::get_aliases_by_address(const account_public_address& addr)const
+{
+  auto alias_ptr = m_db_addr_to_alias.find(addr);
+  if (alias_ptr && alias_ptr->size())
+  {
+    return *(alias_ptr);
+  }
+
+  return std::set<std::string>();
+}
+//------------------------------------------------------------------
 bool blockchain_storage::pop_alias_info(const extra_alias_entry& ai)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
@@ -3650,15 +3706,6 @@ uint64_t blockchain_storage::validate_alias_reward(const transaction& tx, const 
   
   //validate the price had been paid
   uint64_t found_alias_reward = get_amount_for_zero_pubkeys(tx);
-
-  //@#@ 
-  //work around for net 68's generation
-#if CURRENCY_FORMATION_VERSION == 68
-  if (alias == "bhrfrrrtret" && get_transaction_hash(tx) == epee::string_tools::parse_tpod_from_hex_string<crypto::hash>("760b85546678d2235a1843e18d8a016a2e4d9b8273cc4d7c09bebff1f6fa7eaf")  )
-    return true; 
-  if (alias == "test-420" &&    get_transaction_hash(tx) == epee::string_tools::parse_tpod_from_hex_string<crypto::hash>("10f8a2539b2551bd0919bf7e3b1dfbae7553eca63e58cd2264ae60f90030edf8"))
-    return true;
-#endif
 
   CHECK_AND_ASSERT_MES(found_alias_reward >= fee_for_alias, false, "registration of alias '" 
     << alias << "' goes with a reward of " << print_money(found_alias_reward) << " which is less than expected: " << print_money(fee_for_alias) 

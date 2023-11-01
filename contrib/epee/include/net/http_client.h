@@ -322,7 +322,7 @@ using namespace std;
 					LOG_PRINT("Reconnecting...", LOG_LEVEL_3);
 					if(!connect(m_host_buff, m_port))
 					{
-						LOG_PRINT("Failed to connect to " << m_host_buff << ":" << m_port, LOG_LEVEL_3);
+						LOG_PRINT("Failed to connect to " << m_host_buff << ":" << m_port, LOG_LEVEL_1);
 						return false;
 					}
 				}
@@ -370,7 +370,7 @@ using namespace std;
 					{
 						if(!m_net_client.recv(recv_buffer))
 						{
-							LOG_PRINT("Unexpected reciec fail", LOG_LEVEL_3);
+							LOG_PRINT("Unexpected reciec fail", LOG_LEVEL_2);
 							m_state = reciev_machine_state_error;
             }
             if(!recv_buffer.size())
@@ -415,10 +415,10 @@ using namespace std;
 					return true;
 				}
 				else
-                {
-                  LOG_PRINT_L3("Returning false because of wrong state machine. state: " << m_state);
-                  return false;
-                }
+        {
+          LOG_PRINT_L3("Returning false because of wrong state machine. state: " << m_state);
+          return false;
+        }
 			}
 			//---------------------------------------------------------------------------
 			inline

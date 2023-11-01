@@ -25,6 +25,7 @@
 #include "htlc_hash_tests.h"
 #include "threads_pool_tests.h"
 
+int test_get_rand_outs();
 
 int main(int argc, char** argv)
 {
@@ -36,7 +37,8 @@ int main(int argc, char** argv)
     epee::log_space::log_singletone::get_default_log_folder().c_str());
 
 
-  thread_pool_tests();
+   test_get_rand_outs();
+  //thread_pool_tests();
 
 //   std::string buf1 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX);
 //   std::string buf2 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX);

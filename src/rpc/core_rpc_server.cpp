@@ -631,6 +631,18 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_get_votes(const COMMAND_RPC_GET_VOTES::request& req, COMMAND_RPC_GET_VOTES::response& res, connection_context& cntx)
+  {
+    if (!m_core.get_blockchain_storage().get_pos_votes(req.h_start, req.h_end, res.votes))
+    {
+      res.status = API_RETURN_CODE_INTERNAL_ERROR;
+      res.error_code = "Internal error";
+      return true;
+    }
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_main_block_details(const COMMAND_RPC_GET_BLOCK_DETAILS::request& req, COMMAND_RPC_GET_BLOCK_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
     if (!m_core.get_blockchain_storage().get_main_block_rpc_details(req.id, res.block_details))
@@ -1286,7 +1298,7 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_alias_by_address(const COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& req, COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
+  bool core_rpc_server::on_aliases_by_address(const COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& req, COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
     account_public_address addr = AUTO_VAL_INIT(addr);
     if (!get_account_address_from_str(addr, req))
@@ -1298,22 +1310,28 @@ namespace currency
     COMMAND_RPC_GET_ALIAS_DETAILS::request req2 = AUTO_VAL_INIT(req2);
     COMMAND_RPC_GET_ALIAS_DETAILS::response res2 = AUTO_VAL_INIT(res2);
 
-    req2.alias = m_core.get_blockchain_storage().get_alias_by_address(addr);
-    if (!req2.alias.size())
+    std::set<std::string> aliases = m_core.get_blockchain_storage().get_aliases_by_address(addr);
+
+    if (!aliases.size())
     {
       res.status = API_RETURN_CODE_NOT_FOUND;
       return true;
     }
 
-    bool r = this->on_get_alias_details(req2, res2, error_resp, cntx);
-    if (!r || res2.status != API_RETURN_CODE_OK)
+    for (auto it = aliases.begin(); it != aliases.end(); it++)
     {
-      res.status = API_RETURN_CODE_FAIL;
-      return true;
-    }
+      req2.alias = *it;
+      bool r = this->on_get_alias_details(req2, res2, error_resp, cntx);
+      if (!r || res2.status != API_RETURN_CODE_OK)
+      {
+        res.status = API_RETURN_CODE_FAIL;
+        return true;
+      }
+      res.alias_info_list.push_back(alias_rpc_details());
+      res.alias_info_list.back().details = res2.alias_details;
+      res.alias_info_list.back().alias = req2.alias;
 
-    res.alias_info.details = res2.alias_details;
-    res.alias_info.alias = req2.alias;
+    }
     res.status = API_RETURN_CODE_OK;
     return true;
   }

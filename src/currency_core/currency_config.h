@@ -30,6 +30,8 @@
 #define HF1_BLOCK_MAJOR_VERSION                         1
 #define CURRENT_BLOCK_MAJOR_VERSION                     2
 
+#define CURRENCY_DEFAULT_DECOY_SET_SIZE                 10
+
 #define CURRENT_BLOCK_MINOR_VERSION                     0
 #define CURRENCY_BLOCK_FUTURE_TIME_LIMIT                60*60*2
 #define CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT            60*20
@@ -214,6 +216,7 @@
 #define GUI_INTERNAL_CONFIG2                            "gui_internal_config.json"
 #define GUI_IPC_MESSAGE_CHANNEL_NAME                    CURRENCY_NAME_BASE "_message_que"
 
+#define CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME         "voting_config.json"
 
 
 #define CURRENT_TRANSACTION_CHAIN_ENTRY_ARCHIVE_VER     3

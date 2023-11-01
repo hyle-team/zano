@@ -279,6 +279,7 @@ namespace currency
     bool get_tx_outputs_gindexs(const crypto::hash& tx_id, std::vector<uint64_t>& indexs)const;
     bool get_alias_info(const std::string& alias, extra_alias_entry_base& info)const;
     std::string get_alias_by_address(const account_public_address& addr)const;
+    std::set<std::string> get_aliases_by_address(const account_public_address& addr)const;
     template<typename cb_t>
     bool enumerate_aliases(cb_t cb) const;
     template<typename cb_t>
@@ -450,6 +451,7 @@ namespace currency
     void serialize(archive_t & ar, const unsigned int version);
     bool get_est_height_from_date(uint64_t date, uint64_t& res_h)const;
 
+    bool get_pos_votes(uint64_t start_h, uint64_t end_h, vote_results& r);
 
     //debug functions
     bool validate_blockchain_prev_links(size_t last_n_blocks_to_check = 10) const;
