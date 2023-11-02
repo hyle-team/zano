@@ -1130,7 +1130,7 @@ bool simple_wallet::show_staking_history(const std::vector<std::string>& args)
     }
   }
 
-  tools::wallet2::transfer_container transfers;
+  tools::transfer_container transfers;
   m_wallet->get_transfers(transfers);
 
   uint64_t timestamp = 0;
