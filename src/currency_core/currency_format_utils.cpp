@@ -3396,9 +3396,8 @@ namespace currency
     return median_fee * 10;
   }
   //---------------------------------------------------------------
-  // NOTE: this function is obsolete and depricated
-  [[deprecated("PoS block real timestamp is set using a service attachment in mining tx extra since 2021-10")]]
-  uint64_t get_actual_timestamp(const block& b)
+  // TODO: remove this function after HF4 -- sowle
+  uint64_t get_block_timestamp_from_miner_tx_extra(const block& b)
   {
     uint64_t tes_ts = b.timestamp;
     if (is_pos_block(b))

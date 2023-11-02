@@ -413,7 +413,7 @@ namespace currency
 
   // prints amount in format "3.14", "0.0"
   std::string print_money_brief(uint64_t amount, size_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT);
-  uint64_t get_actual_timestamp(const block& b); // obsolete and depricated, use get_block_datetime
+  uint64_t get_block_timestamp_from_miner_tx_extra(const block& b); // remove this function after HF4 -- sowle
   uint64_t get_block_datetime(const block& b);
   void set_block_datetime(uint64_t datetime, block& b);
 
@@ -425,8 +425,6 @@ namespace currency
   bool does_tx_have_only_mixin_inputs(const transaction& tx);
   bool is_showing_sender_addres(const transaction& tx);
   bool check_native_coins_amount_burnt_in_outs(const transaction& tx, const uint64_t amount, uint64_t* p_amount_burnt = nullptr);
-  [[deprecated("Use check_native_coins_amount_burnt_in_outs instead")]] uint64_t get_amount_for_zero_pubkeys(const transaction& tx);
-  //std::string get_comment_from_tx(const transaction& tx);
   std::string print_stake_kernel_info(const stake_kernel& sk);
   std::string dump_ring_sig_data(const crypto::hash& hash_for_sig, const crypto::key_image& k_image, const std::vector<const crypto::public_key*>& output_keys_ptrs, const std::vector<crypto::signature>& sig);
 

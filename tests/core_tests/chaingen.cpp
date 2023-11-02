@@ -1458,7 +1458,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
     }
   }
 
-  uint64_t head_block_ts = get_actual_timestamp(blk_head);
+  uint64_t head_block_ts = get_block_datetime(blk_head);
   uint64_t next_block_height = blockchain.size();
 
   // Iterate in reverse is more efficiency

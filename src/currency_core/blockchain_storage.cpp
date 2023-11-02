@@ -5705,15 +5705,19 @@ bool blockchain_storage::validate_pos_block(const block& b,
     CHECK_AND_ASSERT_MES(!have_tx_keyimg_as_spent(stake_key_image), false, "stake key image has been already spent in blockchain: " << stake_key_image);
   }
 
-  // the following check is de-facto not applicable since 2021-10, but left intact to avoid consensus issues
-  // PoS blocks don't use etc_tx_time anymore to store actual timestamp; instead, they use tx_service_attachment in mining tx extra
-  uint64_t actual_ts = get_actual_timestamp(b);
-  if ((actual_ts > b.timestamp && actual_ts - b.timestamp > POS_MAX_ACTUAL_TIMESTAMP_TO_MINED) ||
-    (actual_ts < b.timestamp && b.timestamp - actual_ts > POS_MAX_ACTUAL_TIMESTAMP_TO_MINED)
-     )
+  if (!is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM))
   {
-    LOG_PRINT_L0("PoS block actual timestamp " << actual_ts << " differs from b.timestamp " << b.timestamp << " by " << ((int64_t)actual_ts - (int64_t)b.timestamp) << " s, it's more than allowed " << POS_MAX_ACTUAL_TIMESTAMP_TO_MINED << " s.");
-    return false;
+    // the following check is de-facto not applicable since 2021-10, but left intact to avoid consensus issues
+    // PoS blocks don't use etc_tx_time anymore to store actual timestamp; instead, they use tx_service_attachment in mining tx extra
+    // TODO: remove this entire section after HF4 -- sowle
+    uint64_t actual_ts = get_block_timestamp_from_miner_tx_extra(b);
+    if ((actual_ts > b.timestamp && actual_ts - b.timestamp > POS_MAX_ACTUAL_TIMESTAMP_TO_MINED) ||
+      (actual_ts < b.timestamp && b.timestamp - actual_ts > POS_MAX_ACTUAL_TIMESTAMP_TO_MINED)
+       )
+    {
+      LOG_PRINT_L0("PoS block actual timestamp " << actual_ts << " differs from b.timestamp " << b.timestamp << " by " << ((int64_t)actual_ts - (int64_t)b.timestamp) << " s, it's more than allowed " << POS_MAX_ACTUAL_TIMESTAMP_TO_MINED << " s.");
+      return false;
+    }
   }
 
   // build kernel and calculate hash
