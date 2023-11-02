@@ -118,7 +118,7 @@ bool test_parse_hardfork_str_mask()
 {
   static_assert(ZANO_HARDFORKS_TOTAL >= 5, "this test was made in assumption that this condition holds");
   auto v_range = [](size_t a, size_t b) -> std::vector<size_t> { std::vector<size_t> r; for(size_t i = a; i <= b; ++i) r.push_back(i); return r; };
-  auto v_concat = [](const std::vector<size_t>& a, const std::vector<size_t>& b) -> std::vector<size_t> { std::vector<size_t> r = a; r.insert(r.end(), b.begin(), b.end()); return r; };
+  //auto v_concat = [](const std::vector<size_t>& a, const std::vector<size_t>& b) -> std::vector<size_t> { std::vector<size_t> r = a; r.insert(r.end(), b.begin(), b.end()); return r; };
   const std::vector<size_t> res_empty;
   const std::vector<size_t> res_all_hf = v_range(0, ZANO_HARDFORKS_TOTAL - 1);
   std::string hf_total_num_str_m_1 = epee::string_tools::num_to_string_fast(ZANO_HARDFORKS_TOTAL - 1);
