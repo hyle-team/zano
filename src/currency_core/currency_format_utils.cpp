@@ -3689,50 +3689,6 @@ namespace currency
     return res;
   }
   //---------------------------------------------------------------
-  // DEPRECATED: consider using prepare_outputs_entries_for_key_offsets and absolute_sorted_output_offsets_to_relative_in_place instead
-  std::vector<txout_ref_v> absolute_output_offsets_to_relative(const std::vector<txout_ref_v>& off)
-  {
-    std::vector<txout_ref_v> res = off;
-    if (off.size() < 2)
-      return res;
-
-    std::sort(res.begin(), res.end(), [](const txout_ref_v& lft, const txout_ref_v& rght)
-    {
-      if (lft.type() == typeid(uint64_t))
-      {
-        if (rght.type() == typeid(uint64_t))
-          return boost::get<uint64_t>(lft) < boost::get<uint64_t>(rght);
-        else if (rght.type() == typeid(ref_by_id))
-          return true;
-        else
-          LOG_ERROR("Unknown type in txout_v");
-      }
-      else if (lft.type() == typeid(ref_by_id))
-      {
-        if (rght.type() == typeid(uint64_t))
-          return false;
-        else if (rght.type() == typeid(ref_by_id))
-          return false; // don't change the order of ref_by_id elements
-        else
-          LOG_ERROR("Unknown type in txout_v");
-      }
-      return false;
-    });//just to be sure, actually it is already should be sorted
-
-    //find starter index - skip ref_by_id entries
-    size_t i = res.size() - 1;
-    while (i != 0 && res[i].type() == typeid(ref_by_id))
-      --i;
-
-    for (; i != 0; i--)
-    {
-      boost::get<uint64_t>(res[i]) -= boost::get<uint64_t>(res[i - 1]);
-    }
-
-
-    return res;
-  }
-  //---------------------------------------------------------------
   bool absolute_sorted_output_offsets_to_relative_in_place(std::vector<txout_ref_v>& offsets) noexcept
   {
     if (offsets.size() < 2)

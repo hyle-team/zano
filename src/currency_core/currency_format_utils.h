@@ -405,8 +405,6 @@ namespace currency
   uint64_t get_block_height(const transaction& coinbase);
   uint64_t get_block_height(const block& b);
   std::vector<txout_ref_v> relative_output_offsets_to_absolute(const std::vector<txout_ref_v>& off);
-  // DEPRECATED: consider using prepare_outputs_entries_for_key_offsets and absolute_sorted_output_offsets_to_relative_in_place instead
-  [[deprecated]] std::vector<txout_ref_v> absolute_output_offsets_to_relative(const std::vector<txout_ref_v>& off);
   bool absolute_sorted_output_offsets_to_relative_in_place(std::vector<txout_ref_v>& offsets) noexcept;
 
 
