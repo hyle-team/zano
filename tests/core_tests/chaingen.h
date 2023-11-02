@@ -819,7 +819,7 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
   struct input_generation_context_data
   {
     currency::keypair in_ephemeral;
-    std::vector<tx_source_entry::output_entry> sorted_outputs;
+    std::vector<currency::tx_source_entry::output_entry> sorted_outputs;
     size_t real_out_index = 0;
   };
   std::vector<input_generation_context_data> in_contexts;
