@@ -3838,7 +3838,11 @@ namespace currency
         VARIANT_SWITCH_END();
       }
       VARIANT_CASE_CONST(tx_out_zarcanum, o)
-        //@#@      
+        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.stealth_address));
+        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.concealing_point));
+        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.amount_commitment));
+        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.blinded_asset_id));
+        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.encrypted_amount));
       VARIANT_SWITCH_END();
       ++i;
     }
