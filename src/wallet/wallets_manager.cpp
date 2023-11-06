@@ -1935,7 +1935,7 @@ void wallets_manager::wallet_vs_options::worker_func()
 {
   LOG_PRINT_GREEN("[WALLET_HANDLER] Wallet handler thread started, addr: " << w->get()->get_account().get_public_address_str(), LOG_LEVEL_0);
   epee::math_helper::once_a_time_seconds<TX_POOL_SCAN_INTERVAL> scan_pool_interval;
-  epee::math_helper::once_a_time_seconds<POS_WALLET_MINING_SCAN_INTERVAL> pos_minin_interval;
+  epee::math_helper::once_a_time_seconds<2> pos_minin_interval;
   view::wallet_status_info wsi = AUTO_VAL_INIT(wsi);
   while (!major_stop)
   {
