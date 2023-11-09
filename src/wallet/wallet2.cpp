@@ -4155,7 +4155,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response decoys_resp = AUTO_VAL_INIT(decoys_resp);
     std::vector<const crypto::public_key*> ring;
     uint64_t secret_index = 0; // index of the real stake output
-    if (m_required_decoys_count > 0)
+    if (m_required_decoys_count > 0 && !is_auditable())
     {
       COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request decoys_req = AUTO_VAL_INIT(decoys_req);
       decoys_req.height_upper_limit = 0; // TODO @#@# maybe use m_last_pow_block_h like Zarcanum?
@@ -4265,7 +4265,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
   // get decoys outputs and construct miner tx
   static size_t required_decoys_count = 4;          // TODO @#@# set them somewhere else
   static bool use_only_forced_to_mix = false;       // TODO @#@# set them somewhere else
-  if (required_decoys_count > 0)
+  if (required_decoys_count > 0 && !is_auditable())
   {
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request decoys_req = AUTO_VAL_INIT(decoys_req);
     decoys_req.height_upper_limit = m_last_pow_block_h; // request decoys to be either older than, or the same age as stake output's height
