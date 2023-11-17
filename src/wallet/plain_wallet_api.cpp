@@ -96,7 +96,9 @@ namespace plain_wallet
   
   std::string get_wallets_folder()
   {
-#ifdef WIN32
+#ifdef CAKEWALLET    
+    std::string path = "";    
+#elif WIN32
     std::string path = get_bundle_working_dir() + "/" + WALLETS_FOLDER_NAME + "/";
 #else
     std::string path = get_bundle_working_dir() + "/" + WALLETS_FOLDER_NAME + "/";
