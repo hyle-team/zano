@@ -59,12 +59,12 @@ if [ $? -ne 0 ]; then
 fi
 
 # copy all necessary libs into the bundle in order to workaround El Capitan's SIP restrictions
-#mkdir -p Zano.app/Contents/Frameworks/boost_libs
-#cp -R "$ZANO_BOOST_LIBS_PATH/" Zano.app/Contents/Frameworks/boost_libs/
-#if [ $? -ne 0 ]; then
-#    echo "Failed to cp workaround to MacOS"
-#    exit 1
-#fi
+mkdir -p Zano.app/Contents/Frameworks/boost_libs
+cp -R $ZANO_BOOST_LIBS_PATH/*.dylib Zano.app/Contents/Frameworks/boost_libs/
+if [ $? -ne 0 ]; then
+    echo "Failed to cp workaround to MacOS"
+    exit 1
+fi
 
 # rename process name to big letter 
 mv Zano.app/Contents/MacOS/zano Zano.app/Contents/MacOS/Zano
@@ -81,11 +81,10 @@ fi
 
 # fix boost libs paths in main executable and libs to workaround El Capitan's SIP restrictions
 source ../../../utils/macosx_fix_boost_libs_path.sh
-fix_boost_libs_in_binary @executable_path/../Frameworks Zano.app/Contents/MacOS/Zano
-fix_boost_libs_in_binary @executable_path/../Frameworks Zano.app/Contents/MacOS/simplewallet
-fix_boost_libs_in_binary @executable_path/../Frameworks Zano.app/Contents/MacOS/zanod
+fix_boost_libs_in_binary @executable_path/../Frameworks/boost_libs Zano.app/Contents/MacOS/Zano
+fix_boost_libs_in_binary @executable_path/../Frameworks/boost_libs Zano.app/Contents/MacOS/simplewallet
+fix_boost_libs_in_binary @executable_path/../Frameworks/boost_libs Zano.app/Contents/MacOS/zanod
 #fix_boost_libs_in_libs @executable_path/../Frameworks/boost_libs Zano.app/Contents/Frameworks/boost_libs
-
 
 
 "$ZANO_QT_PATH/clang_64/bin/macdeployqt" Zano.app
@@ -94,6 +93,8 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+
+rm -rf Zano.app/Contents/Frameworks/libboost*.dylib
 
 
 rsync -a ../../../src/gui/qt-daemon/layout/html Zano.app/Contents/MacOS --exclude less --exclude package.json --exclude gulpfile.js
