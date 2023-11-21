@@ -877,7 +877,7 @@ private:
     uint64_t m_upper_transaction_size_limit; //TODO: auto-calc this value or request from daemon, now use some fixed value
 
     std::atomic<bool> m_stop;
-    std::atomic<bool> whitelist_updated = false;
+    mutable std::atomic<bool> m_whitelist_updated = false;
     std::shared_ptr<i_core_proxy> m_core_proxy;
     std::shared_ptr<i_wallet2_callback> m_wcallback;
 
