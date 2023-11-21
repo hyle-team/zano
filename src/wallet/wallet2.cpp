@@ -3519,8 +3519,6 @@ bool wallet2::load_whitelisted_tokens() const
   if(!m_use_assets_whitelisting)
     return true;
 
-  
-
   m_whitelisted_assets.clear();
   std::string body;
   wallet_public::assets_whitelist aw = AUTO_VAL_INIT(aw);
@@ -3536,11 +3534,14 @@ bool wallet2::load_whitelisted_tokens() const
 //----------------------------------------------------------------------------------------------------
 bool wallet2::load_whitelisted_tokens_if_not_loaded() const
 {
-  if (m_whitelisted_assets.size())
+  if (m_whitelist_updated)
   {
     return true;
   }
-  return load_whitelisted_tokens();
+  if (!load_whitelisted_tokens())
+    return false;
+  m_whitelist_updated = true;
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::get_transfers(transfer_container& incoming_transfers) const
