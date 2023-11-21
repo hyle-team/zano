@@ -24,6 +24,32 @@
 #include "free_space_check.h"
 #include "htlc_hash_tests.h"
 #include "threads_pool_tests.h"
+#include "wallet/plain_wallet_api.h"
+#include "wallet/view_iface.h"
+
+void test_plain_wallet()
+{
+  std::string res = plain_wallet::init("195.201.107.230", "33336", "E:\\tmp\\", 0);
+  
+  uint64_t instance_id = 0;
+  res = plain_wallet::open("test.zan", "111");
+  while(true)
+  {
+    epee::misc_utils::sleep_no_w(2000);
+    res = plain_wallet::sync_call("get_wallet_status", instance_id, "");
+    view::wallet_sync_status_info wsi = AUTO_VAL_INIT(wsi);
+    epee::serialization::load_t_from_json(wsi, res);
+    if (wsi.wallet_state == 2)
+      break;
+  }
+
+
+  std::string invoke_body = "{\"method\":\"get_recent_txs_and_info\",\"params\":{\"offset\":0,\"count\":30,\"update_provision_info\":true}}";
+  
+  res = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+  LOG_PRINT_L0(res);
+
+}
 
 
 int main(int argc, char** argv)
@@ -35,7 +61,8 @@ int main(int argc, char** argv)
     epee::log_space::log_singletone::get_default_log_file().c_str(),
     epee::log_space::log_singletone::get_default_log_folder().c_str());
 
-  parse_weird_tx();
+  test_plain_wallet();
+  //parse_weird_tx();
   //thread_pool_tests();
 
 //   std::string buf1 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX);
