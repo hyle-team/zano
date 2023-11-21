@@ -204,9 +204,9 @@ private:
   //----- i_wallet_provider ------
   virtual void lock();
   virtual void unlock();
-#ifndef MOBILE_WALLET_BUILD
+//#ifndef MOBILE_WALLET_BUILD
   virtual std::shared_ptr<tools::wallet2> get_wallet();
-#endif
+//#endif
   //--------
 
   BEGIN_URI_MAP2_VIRTUAL()

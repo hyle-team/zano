@@ -1866,6 +1866,7 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
     r = string_tools::parse_tpod_from_hex_string(gbd_res.blocks.back().id, new_genesis_id);
     THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "get_blocks_details");
     reset_all();
+    m_minimum_height = req.minimum_height;
     m_chain.set_genesis(new_genesis_id);
     WLT_LOG_MAGENTA("New genesis set for wallet: " << new_genesis_id, LOG_LEVEL_0);
     m_chain.get_short_chain_history(req.block_ids);

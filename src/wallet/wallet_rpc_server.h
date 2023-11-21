@@ -21,9 +21,9 @@ namespace tools
   {
     virtual void lock() {};
     virtual void unlock() {};
-#ifndef MOBILE_WALLET_BUILD
+//#ifndef MOBILE_WALLET_BUILD
     virtual std::shared_ptr<wallet2> get_wallet() = 0;
-#endif
+//#endif
   };
 
   struct wallet_rpc_locker
@@ -31,9 +31,9 @@ namespace tools
     wallet_rpc_locker(i_wallet_provider* wallet_provider) :m_pwallet_provider(wallet_provider)
     {
       m_pwallet_provider->lock();
-#ifndef MOBILE_WALLET_BUILD
+//#ifndef MOBILE_WALLET_BUILD
       m_wallet_ptr = m_pwallet_provider->get_wallet();
-#endif   
+//#endif   
       if (!m_wallet_ptr.get())
       {
         throw std::runtime_error("Wallet object closed");
