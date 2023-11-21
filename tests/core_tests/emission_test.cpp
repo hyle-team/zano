@@ -118,7 +118,7 @@ bool emission_test::c1(currency::core& c, size_t ev_index, const std::vector<tes
 
       c.handle_incoming_block(t_serializable_object_to_blob(pb.m_block), bvc);
       CHECK_AND_NO_ASSERT_MES(!bvc.m_verification_failed && !bvc.m_marked_as_orphaned && !bvc.m_already_exists, false, "PoS block verification context check failed");
-      //CHECK_AND_ASSERT_MES(get_actual_timestamp(pb.m_block) == timestamp, false, "Invalid PoS block ts: " << get_actual_timestamp(pb.m_block) << ", expected: " << timestamp);
+      //CHECK_AND_ASSERT_MES(get_block_datetime(pb.m_block) == timestamp, false, "Invalid PoS block ts: " << get_block_datetime(pb.m_block) << ", expected: " << timestamp);
       gen_coins = get_outs_money_amount(pb.m_block.miner_tx) - boost::get<txin_to_key>(pb.m_block.miner_tx.vin[1]).amount;
       already_generated_coins += gen_coins;
       CHECK_AND_ASSERT_MES(already_generated_coins == bcs.total_coins(), false, "total coins missmatch: BCS has: " << bcs.total_coins() << ", expected: " << already_generated_coins);

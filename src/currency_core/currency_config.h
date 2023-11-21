@@ -36,6 +36,8 @@
 #define HF3_BLOCK_MINOR_VERSION                         0
 #define CURRENT_BLOCK_MAJOR_VERSION                     3
 
+#define CURRENCY_DEFAULT_DECOY_SET_SIZE                 10
+
 #define CURRENT_BLOCK_MINOR_VERSION                     0
 #define CURRENCY_BLOCK_FUTURE_TIME_LIMIT                60*60*2
 #define CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT            60*20
@@ -230,6 +232,7 @@
 #define GUI_INTERNAL_CONFIG2                            "gui_internal_config.json"
 #define GUI_IPC_MESSAGE_CHANNEL_NAME                    CURRENCY_NAME_BASE "_message_que"
 
+#define CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME         "voting_config.json"
 
 
 #define CURRENT_TRANSACTION_CHAIN_ENTRY_ARCHIVE_VER     3
@@ -246,8 +249,8 @@
 #define WALLET_FILE_SERIALIZATION_VERSION               160
 #define WALLET_FILE_LAST_SUPPORTED_VERSION              160
 #else 
-#define WALLET_FILE_LAST_SUPPORTED_VERSION              (CURRENCY_FORMATION_VERSION+74)
-#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+74)
+#define WALLET_FILE_LAST_SUPPORTED_VERSION              (CURRENCY_FORMATION_VERSION+76)
+#define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+76)
 #endif
 
 #define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)

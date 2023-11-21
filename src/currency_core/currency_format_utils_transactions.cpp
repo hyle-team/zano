@@ -408,4 +408,17 @@ namespace currency
 #endif
   }
 
+  //----------------------------------------------------------------------------------------------------
+  std::string transform_tx_to_str(const currency::transaction& tx)
+  {
+    return currency::obj_to_json_str(tx);
+  }
+  //----------------------------------------------------------------------------------------------------
+  transaction transform_str_to_tx(const std::string& tx_str)
+  {
+    CHECK_AND_ASSERT_THROW_MES(false, "transform_str_to_tx shoruld never be called");
+    return transaction();
+  }
+
+
 }

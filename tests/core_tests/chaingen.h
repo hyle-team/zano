@@ -819,47 +819,44 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
   struct input_generation_context_data
   {
     currency::keypair in_ephemeral;
+    std::vector<currency::tx_source_entry::output_entry> sorted_outputs;
+    size_t real_out_index = 0;
   };
   std::vector<input_generation_context_data> in_contexts;
 
 
   uint64_t summary_inputs_money = 0;
-  //fill inputs
-  BOOST_FOREACH(const currency::tx_source_entry& src_entr, sources)
+  // fill inputs
+  for(const currency::tx_source_entry& src_entr : sources)
   {
-    if (src_entr.real_output >= src_entr.outputs.size())
-    {
-      LOG_ERROR("real_output index (" << src_entr.real_output << ")bigger than output_keys.size()=" << src_entr.outputs.size());
-      return false;
-    }
+    CHECK_AND_ASSERT_MES(src_entr.real_output < src_entr.outputs.size(), false, "real_output index = " << src_entr.real_output << " is bigger than output_keys.size() =  " << src_entr.outputs.size());
+
+    input_generation_context_data& igc = in_contexts.emplace_back();
+    igc.sorted_outputs = prepare_outputs_entries_for_key_offsets(src_entr.outputs, src_entr.real_output, igc.real_out_index);
     summary_inputs_money += src_entr.amount;
 
-    //key_derivation recv_derivation;
-    in_contexts.push_back(input_generation_context_data());
-    currency::keypair& in_ephemeral = in_contexts.back().in_ephemeral;
     crypto::key_image img;
-    if (!currency::generate_key_image_helper(sender_account_keys, src_entr.real_out_tx_key, src_entr.real_output_in_tx_index, in_ephemeral, img))
+    if (!currency::generate_key_image_helper(sender_account_keys, src_entr.real_out_tx_key, src_entr.real_output_in_tx_index, igc.in_ephemeral, img))
       return false;
 
     //check that derivated key is equal with real output key
-    if (!(in_ephemeral.pub == src_entr.outputs[src_entr.real_output].stealth_address))
+    if (!(igc.in_ephemeral.pub == igc.sorted_outputs[igc.real_out_index].stealth_address))
     {
       LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
-        << epst::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
-        << epst::pod_to_hex(src_entr.outputs[src_entr.real_output].stealth_address));
+        << epst::pod_to_hex(igc.in_ephemeral.pub) << ENDL << "real output_public_key:"
+        << epst::pod_to_hex(igc.sorted_outputs[igc.real_out_index].stealth_address));
       return false;
     }
 
-    //put key image into tx input
+    // fill tx input
     currency::txin_to_key input_to_key;
     input_to_key.amount = src_entr.amount;
     input_to_key.k_image = img;
 
-    //fill outputs array and use relative offsets
-    BOOST_FOREACH(const currency::tx_source_entry::output_entry& out_entry, src_entr.outputs)
+    // fill ring references
+    for(const currency::tx_source_entry::output_entry& out_entry : igc.sorted_outputs)
       input_to_key.key_offsets.push_back(out_entry.out_reference);
 
-    input_to_key.key_offsets = currency::absolute_output_offsets_to_relative(input_to_key.key_offsets); // TODO @#@#
     tx.vin.push_back(input_to_key);
   }
 
@@ -899,11 +896,11 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
 
   std::stringstream ss_ring_s;
   size_t i = 0;
-  BOOST_FOREACH(const currency::tx_source_entry& src_entr, sources)
+  for(const currency::tx_source_entry& src_entr : sources)
   {
     ss_ring_s << "pub_keys:" << ENDL;
     std::vector<const crypto::public_key*> keys_ptrs;
-    BOOST_FOREACH(const currency::tx_source_entry::output_entry& o, src_entr.outputs)
+    for(const currency::tx_source_entry::output_entry& o : in_contexts[i].sorted_outputs)
     {
       keys_ptrs.push_back(&o.stealth_address);
       ss_ring_s << o.stealth_address << ENDL;
@@ -912,10 +909,10 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
     tx.signatures.push_back(currency::NLSAG_sig());
     std::vector<crypto::signature>& sigs = boost::get<currency::NLSAG_sig>(tx.signatures.back()).s;
     sigs.resize(src_entr.outputs.size());
-    crypto::generate_ring_signature(tx_prefix_hash, boost::get<currency::txin_to_key>(tx.vin[i]).k_image, keys_ptrs, in_contexts[i].in_ephemeral.sec, src_entr.real_output, sigs.data());
+    crypto::generate_ring_signature(tx_prefix_hash, boost::get<currency::txin_to_key>(tx.vin[i]).k_image, keys_ptrs, in_contexts[i].in_ephemeral.sec, in_contexts[i].real_out_index, sigs.data());
     ss_ring_s << "signatures:" << ENDL;
     std::for_each(sigs.begin(), sigs.end(), [&](const crypto::signature& s){ss_ring_s << s << ENDL; });
-    ss_ring_s << "prefix_hash:" << tx_prefix_hash << ENDL << "in_ephemeral_key: " << in_contexts[i].in_ephemeral.sec << ENDL << "real_output: " << src_entr.real_output;
+    ss_ring_s << "prefix_hash:" << tx_prefix_hash << ENDL << "in_ephemeral_key: " << in_contexts[i].in_ephemeral.sec << ENDL << "real_output: " << in_contexts[i].real_out_index;
     i++;
   }
 

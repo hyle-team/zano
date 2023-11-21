@@ -18,6 +18,7 @@ template<size_t A, size_t B> struct TAssertEquality {
 
 
 #define BOOST_SERIALIZE(x)    _arch & x;
+#define BOOST_SERIALIZE_BASE_CLASS(class_type)    _arch & static_cast<class_type&>(*this);
 
 #define BOOST_END_VERSION_UNDER(x)                            \
   if(ver < x ) {return;}

@@ -2751,6 +2751,35 @@ namespace currency
     return timestamp;
   }
   //---------------------------------------------------------------
+  bool parse_vote(const std::string& json_, std::list<std::pair<std::string, bool>>& votes)
+  {
+    //do preliminary check of text if it looks like json
+    std::string::size_type pos = json_.find('{');
+    if (pos == std::string::npos)
+      return false;
+    std::string json = json_.substr(pos);
+
+    epee::serialization::portable_storage ps;
+    bool rs = ps.load_from_json(json);
+    if (!rs)
+      return false;
+
+
+
+    auto cb = [&](const std::string& name, const epee::serialization::storage_entry& entry) {
+      if (entry.type() == typeid(uint64_t))
+      {
+        bool vote = boost::get<uint64_t>(entry) ? true : false;
+        votes.push_back(std::make_pair(epee::string_encoding::toupper(name), vote));
+      }
+      return true;
+    };
+
+    ps.enum_entries(nullptr, cb);
+    return true;
+
+  }
+  //---------------------------------------------------------------
   bool sign_multisig_input_in_tx(currency::transaction& tx, size_t ms_input_index, const currency::account_keys& keys, const currency::transaction& source_tx, bool *p_is_input_fully_signed /* = nullptr */)
   {
 #define LOC_CHK(cond, msg) CHECK_AND_ASSERT_MES(cond, false, msg << ", ms input index: " << ms_input_index << ", tx: " << get_transaction_hash(tx) << ", source tx: " << get_transaction_hash(source_tx))
@@ -3367,9 +3396,8 @@ namespace currency
     return median_fee * 10;
   }
   //---------------------------------------------------------------
-  // NOTE: this function is obsolete and depricated
-  [[deprecated("PoS block real timestamp is set using a service attachment in mining tx extra since 2021-10")]]
-  uint64_t get_actual_timestamp(const block& b)
+  // TODO: remove this function after HF4 -- sowle
+  uint64_t get_block_timestamp_from_miner_tx_extra(const block& b)
   {
     uint64_t tes_ts = b.timestamp;
     if (is_pos_block(b))
@@ -3661,50 +3689,6 @@ namespace currency
     return res;
   }
   //---------------------------------------------------------------
-  // DEPRECATED: consider using prepare_outputs_entries_for_key_offsets and absolute_sorted_output_offsets_to_relative_in_place instead
-  std::vector<txout_ref_v> absolute_output_offsets_to_relative(const std::vector<txout_ref_v>& off)
-  {
-    std::vector<txout_ref_v> res = off;
-    if (off.size() < 2)
-      return res;
-
-    std::sort(res.begin(), res.end(), [](const txout_ref_v& lft, const txout_ref_v& rght)
-    {
-      if (lft.type() == typeid(uint64_t))
-      {
-        if (rght.type() == typeid(uint64_t))
-          return boost::get<uint64_t>(lft) < boost::get<uint64_t>(rght);
-        else if (rght.type() == typeid(ref_by_id))
-          return true;
-        else
-          LOG_ERROR("Unknown type in txout_v");
-      }
-      else if (lft.type() == typeid(ref_by_id))
-      {
-        if (rght.type() == typeid(uint64_t))
-          return false;
-        else if (rght.type() == typeid(ref_by_id))
-          return false; // don't change the order of ref_by_id elements
-        else
-          LOG_ERROR("Unknown type in txout_v");
-      }
-      return false;
-    });//just to be sure, actually it is already should be sorted
-
-    //find starter index - skip ref_by_id entries
-    size_t i = res.size() - 1;
-    while (i != 0 && res[i].type() == typeid(ref_by_id))
-      --i;
-
-    for (; i != 0; i--)
-    {
-      boost::get<uint64_t>(res[i]) -= boost::get<uint64_t>(res[i - 1]);
-    }
-
-
-    return res;
-  }
-  //---------------------------------------------------------------
   bool absolute_sorted_output_offsets_to_relative_in_place(std::vector<txout_ref_v>& offsets) noexcept
   {
     if (offsets.size() < 2)
@@ -3802,33 +3786,6 @@ namespace currency
     return sum_of_amount_commitments == amount * native_coin_asset_id_pt;
   }
   //---------------------------------------------------------------
-  // DEPRECATED, don't use -- sowle
-  uint64_t get_amount_for_zero_pubkeys(const transaction& tx)
-  {
-    uint64_t found_alias_reward = 0;
-    for (const auto& out : tx.vout)
-    {
-      VARIANT_SWITCH_BEGIN(out);
-      VARIANT_CASE_CONST(tx_out_bare, out)
-        if (out.target.type() != typeid(txout_to_key))
-          continue;
-
-        const txout_to_key& o = boost::get<txout_to_key>(out.target);
-        if (o.key == null_pkey)
-          found_alias_reward += out.amount;
-      VARIANT_CASE_CONST(tx_out_zarcanum, o)
-        //@#@      
-      VARIANT_SWITCH_END();
-    }
-#ifdef TESTNET
-    found_alias_reward = 10 * COIN;
-#else
-    @#@ fix it for mainnet bui
-#endif
-    return found_alias_reward;
-  }
-
-  //---------------------------------------------------------------
   bool get_aliases_reward_account(account_public_address& acc)
   {
     bool r = string_tools::parse_tpod_from_hex_string(ALIAS_REWARDS_ACCOUNT_SPEND_PUB_KEY, acc.spend_public_key);
@@ -3881,7 +3838,11 @@ namespace currency
         VARIANT_SWITCH_END();
       }
       VARIANT_CASE_CONST(tx_out_zarcanum, o)
-        //@#@      
+        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.stealth_address));
+        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.concealing_point));
+        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.amount_commitment));
+        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.blinded_asset_id));
+        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.encrypted_amount));
       VARIANT_SWITCH_END();
       ++i;
     }

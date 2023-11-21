@@ -1037,6 +1037,9 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
     LOG_ERROR("Unexpected location reached");
 #endif
   }
+
+  w->set_votes_config_path(m_data_dir + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME);
+
   
   std::string return_code = API_RETURN_CODE_OK;
   while (true)
@@ -1051,6 +1054,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
       w->get_unconfirmed_transfers(owr.recent_history.history, exclude_mining_txs);
       owr.wallet_local_bc_size = w->get_blockchain_current_size();
+
       //workaround for missed fee
       //owr.seed = w->get_account().get_seed_phrase();
       break;
@@ -1142,6 +1146,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
 {
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
+  w->set_votes_config_path(m_data_dir + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME);
   owr.wallet_id = m_wallet_id_counter++;
   w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
   if (m_remote_node_mode)
@@ -1248,6 +1253,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
 {
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
+  w->set_votes_config_path(m_data_dir + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME);
   owr.wallet_id = m_wallet_id_counter++;
   w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
   if (m_remote_node_mode)
@@ -1669,7 +1675,7 @@ std::string wallets_manager::get_wallet_info_extra(uint64_t wallet_id, view::wal
 
 std::string wallets_manager::get_contracts(size_t wallet_id, std::vector<tools::wallet_public::escrow_contract_details>& contracts)
 {
-  tools::wallet2::escrow_contracts_container cc;
+  tools::escrow_contracts_container cc;
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   try
   {
@@ -1693,7 +1699,7 @@ std::string wallets_manager::get_contracts(size_t wallet_id, std::vector<tools::
 }
 std::string wallets_manager::create_proposal(const view::create_proposal_param_gui& cpp)
 {
-  //tools::wallet2::escrow_contracts_container cc;
+  //tools::escrow_contracts_container cc;
   GET_WALLET_OPT_BY_ID(cpp.wallet_id, w);
   currency::transaction tx = AUTO_VAL_INIT(tx);
   currency::transaction template_tx = AUTO_VAL_INIT(template_tx);
@@ -2126,7 +2132,7 @@ void wallets_manager::wallet_vs_options::worker_func()
 {
   LOG_PRINT_GREEN("[WALLET_HANDLER] Wallet handler thread started, addr: " << w->get()->get_account().get_public_address_str(), LOG_LEVEL_0);
   epee::math_helper::once_a_time_seconds<TX_POOL_SCAN_INTERVAL> scan_pool_interval;
-  epee::math_helper::once_a_time_seconds<POS_WALLET_MINING_SCAN_INTERVAL> pos_minin_interval;
+  epee::math_helper::once_a_time_seconds<2> pos_minin_interval;
   view::wallet_status_info wsi = AUTO_VAL_INIT(wsi);
   while (!major_stop)
   {

@@ -94,6 +94,8 @@ namespace tools
     static const uint64_t wallet_rpc_idle_work_period_ms = 2000;
 
     m_do_mint = do_mint;
+    if (m_do_mint)
+      LOG_PRINT_CYAN("PoS mining is ON", LOG_LEVEL_0);
 
     if (!offline_mode)
     {
@@ -171,6 +173,7 @@ namespace tools
     {
       w.get_wallet()->set_miner_text_info(command_line::get_arg(vm, arg_miner_text_info));
     }
+
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -448,7 +451,7 @@ namespace tools
     }
 
     res.payments.clear();
-    std::list<wallet2::payment_details> payment_list;
+    std::list<payment_details> payment_list;
     w.get_wallet()->get_payments(payment_id, payment_list);
     for (auto payment : payment_list)
     {
@@ -486,7 +489,7 @@ namespace tools
         return false;
       }
 
-      std::list<wallet2::payment_details> payment_list;
+      std::list<payment_details> payment_list;
       w.get_wallet()->get_payments(payment_id, payment_list, req.min_block_height);
 
       for (auto & payment : payment_list)
@@ -772,7 +775,7 @@ namespace tools
   bool wallet_rpc_server::on_contracts_get_all(const wallet_public::COMMAND_CONTRACTS_GET_ALL::request& req, wallet_public::COMMAND_CONTRACTS_GET_ALL::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();    
-    tools::wallet2::escrow_contracts_container ecc;
+    tools::escrow_contracts_container ecc;
     w.get_wallet()->get_contracts(ecc);
     res.contracts.resize(ecc.size());
     size_t i = 0;

@@ -516,6 +516,8 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
     wallets.back().wallet->assign_account(a);
     wallets.back().wallet->get_account().set_createtime(0);
     wallets.back().wallet->set_core_proxy(tmp_proxy);
+    wallets.back().wallet->set_minimum_height(0);
+    wallets.back().wallet->set_pos_required_decoys_count(0);
 
     currency::core_runtime_config pc = cc;
     pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
@@ -634,7 +636,7 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
       found_timestamp = context.sk.block_timestamp;
       found_kh = crypto::cn_fast_hash(&context.sk, sizeof(context.sk)); // TODO: consider passing kernel_hash from scan_pos and do_pos_mining_iteration
 
-      tools::wallet2::transfer_details td = AUTO_VAL_INIT(td);
+      tools::transfer_details td = AUTO_VAL_INIT(td);
       r = w->get_transfer_info_by_index(context.index, td);
       CHECK_AND_NO_ASSERT_MES(r, false, "get_transfer_info_by_index() failed for index " << context.index);
 
@@ -1456,7 +1458,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
     }
   }
 
-  uint64_t head_block_ts = get_actual_timestamp(blk_head);
+  uint64_t head_block_ts = get_block_datetime(blk_head);
   uint64_t next_block_height = blockchain.size();
 
   // Iterate in reverse is more efficiency
@@ -2151,18 +2153,18 @@ bool make_tx_multisig_to_key(const currency::transaction& source_tx,
 
 bool estimate_wallet_balance_blocked_for_escrow(const tools::wallet2& w, uint64_t& result, bool substruct_change_from_result /* = true */)
 {
-  std::deque<tools::wallet2::transfer_details> transfers;
+  std::deque<tools::transfer_details> transfers;
   w.get_transfers(transfers);
 
   result = 0;
-  for (const tools::wallet2::transfer_details& td : transfers)
+  for (const tools::transfer_details& td : transfers)
   {
     if (td.m_flags == (WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION))
       result += td.amount();
   }
   if (substruct_change_from_result)
   {
-    const std::list<tools::wallet2::expiration_entry_info>& ee = w.get_expiration_entries();
+    const std::list<tools::expiration_entry_info>& ee = w.get_expiration_entries();
     for (auto &e : ee)
     {
       uint64_t change_amount_native = 0;
