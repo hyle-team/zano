@@ -2116,17 +2116,19 @@ void wallets_manager::unlock()
   m_current_wallet_locked_object.reset();
 #endif
 }
-#ifndef MOBILE_WALLET_BUILD
 std::shared_ptr<tools::wallet2> wallets_manager::get_wallet()
 {
-
+#ifndef MOBILE_WALLET_BUILD
   if (!m_current_wallet_locked_object.get())
   {
     throw std::runtime_error("Wallet is not locked for get_wallet() call");
   }
   return **m_current_wallet_locked_object;
-}
+#else
+  std::runtime_error("Unexpected call: std::shared_ptr<tools::wallet2> wallets_manager::get_wallet()");
+  return std::shared_ptr<tools::wallet2>();
 #endif
+}
 
 void wallets_manager::wallet_vs_options::worker_func()
 {
