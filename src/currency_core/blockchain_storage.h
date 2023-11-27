@@ -68,6 +68,11 @@ namespace currency
       epee::math_helper::average<uint64_t, 5> etc_stuff_6;
       epee::math_helper::average<uint64_t, 5> insert_time_4;
       epee::math_helper::average<uint64_t, 5> raise_block_core_event;
+      epee::math_helper::average<uint64_t, 5> validate_miner_transaction_time;
+      epee::math_helper::average<uint64_t, 5> collect_rangeproofs_data_from_tx_time;
+      epee::math_helper::average<uint64_t, 5> verify_multiple_zc_outs_range_proofs_time;
+      
+      
       //target_calculating_time_2
       epee::math_helper::average<uint64_t, 5> target_calculating_enum_blocks;
       epee::math_helper::average<uint64_t, 5> target_calculating_calc;
