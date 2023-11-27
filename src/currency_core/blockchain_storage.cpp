@@ -6135,6 +6135,8 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
 
 
   size_t tx_processed_count = 0;
+  size_t tx_total_inputs_count = 0;
+  uint64_t tx_total_inputs_processing_time = 0;
   uint64_t fee_summary = 0;
   uint64_t burned_coins = 0;
   std::list<crypto::key_image> block_summary_kimages;
@@ -6211,6 +6213,8 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       return false;
     }
     TIME_MEASURE_FINISH_PD(tx_check_inputs_time);
+    tx_total_inputs_processing_time += tx_check_inputs_time;
+    tx_total_inputs_count++;
     burned_coins += get_burned_amount(tx);
 
     TIME_MEASURE_START_PD(tx_prapare_append);
@@ -6261,6 +6265,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
 
   if (!m_is_in_checkpoint_zone)
   {
+    TIME_MEASURE_START_PD(validate_miner_transaction_time);
     if (!validate_miner_transaction(bl, cumulative_block_size, fee_summary, base_reward, already_generated_coins)) // TODO @#@# base_reward will be calculated once again, consider refactoring
     {
       LOG_PRINT_L0("Block with id: " << id
@@ -6269,7 +6274,9 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       bvc.m_verification_failed = true;
       return false;
     }
+    TIME_MEASURE_FINISH_PD(validate_miner_transaction_time);
 
+    TIME_MEASURE_START_PD(collect_rangeproofs_data_from_tx_time);
     if (!collect_rangeproofs_data_from_tx(bl.miner_tx, get_transaction_hash(bl.miner_tx), range_proofs_agregated))
     {
       LOG_PRINT_L0("Block with id: " << id
@@ -6278,8 +6285,10 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       bvc.m_verification_failed = true;
       return false;
     }
+    TIME_MEASURE_FINISH_PD(collect_rangeproofs_data_from_tx_time);
 
     //validate range proofs
+    TIME_MEASURE_START_PD(verify_multiple_zc_outs_range_proofs_time);
     if (!verify_multiple_zc_outs_range_proofs(range_proofs_agregated))
     {
       LOG_PRINT_L0("Block with id: " << id
@@ -6288,6 +6297,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       bvc.m_verification_failed = true;
       return false;
     }
+    TIME_MEASURE_FINISH_PD(verify_multiple_zc_outs_range_proofs_time);
   }
 
 
@@ -6441,7 +6451,12 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     << "/" << longhash_calculating_time_3 
     << "/" << insert_time_4 
     << "/" << all_txs_insert_time_5
-    << "/" << etc_stuff_6    
+    << "/" << etc_stuff_6
+    << "/" << tx_total_inputs_processing_time << " of " << tx_total_inputs_count
+    << "/(" << m_performance_data.validate_miner_transaction_time.get_last_val() << "|" 
+            << m_performance_data.collect_rangeproofs_data_from_tx_time.get_last_val() << "|"
+            << m_performance_data.verify_multiple_zc_outs_range_proofs_time.get_last_val()
+    << ")"
     << "))");
 
   on_block_added(bei, id, block_summary_kimages);
