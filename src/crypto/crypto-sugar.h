@@ -612,9 +612,13 @@ namespace crypto
 
     bool is_zero() const
     {
-      // (0, 1) ~ (0, z, z, 0)
+      // (0, 1) ~ (0, z, z, 0) for any non-zero z           https://www.rfc-editor.org/rfc/rfc8032#page-17
       if (fe_isnonzero(m_p3.X) != 0)
-        return false;
+        return false; // x != 0
+      if (fe_isnonzero(m_p3.Z) == 0)
+        return false; // z == 0
+      if (fe_isnonzero(m_p3.T) != 0)
+        return false; // t != 0
       fe y_minus_z;
       fe_sub(y_minus_z, m_p3.Y, m_p3.Z);
       return fe_isnonzero(y_minus_z) == 0;

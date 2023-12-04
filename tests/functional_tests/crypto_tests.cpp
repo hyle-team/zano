@@ -1466,6 +1466,37 @@ TEST(crypto, point_is_zero)
 
   ASSERT_TRUE(p.is_zero());
 
+  
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  memcpy(&p.m_p3.Y, f_x, sizeof p.m_p3.Y);
+  memcpy(&p.m_p3.Z, f_x, sizeof p.m_p3.Z);
+  memcpy(&p.m_p3.T, fancy_p, sizeof p.m_p3.T);
+  // {0, x, x, P} == {0, 1} (still the identity point)
+
+  ASSERT_TRUE(p.is_zero());
+
+  //
+  // negative tests
+  //
+
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  // {0, 0, 0, 0} is not a point at all
+
+  ASSERT_FALSE(p.is_zero());
+
+
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  memcpy(&p.m_p3.Y, f_x, sizeof p.m_p3.Y);
+  memcpy(&p.m_p3.Z, f_x, sizeof p.m_p3.Z);
+  memcpy(&p.m_p3.T, fancy_p_plus_1, sizeof p.m_p3.T);
+  // {0, x, x, !0} is not a valid point (incorrect non-zero T) 
+
+  ASSERT_FALSE(p.is_zero());
+
+  memcpy(&p.m_p3.T, f_x, sizeof p.m_p3.T);
+  // {0, x, x, x}, while x != 0 is still incorrect point representation
+  ASSERT_FALSE(p.is_zero());
+
   return true;
 }
 
