@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.5)
 
 PROJECT(Zano)
 
@@ -194,7 +194,7 @@ else()
 endif()
 
 
-# always use system-wide Boost (unless ZANO_USE_SYSTEM_BOOST is defined for some reason, which is not recommended)
+# always use local Boost installation rather than the system-wide (unless ZANO_USE_SYSTEM_BOOST is defined for some reason, which is not recommended)
 if(NOT DEFINED ENV{ZANO_USE_SYSTEM_BOOST})
   set(Boost_NO_SYSTEM_PATHS ON)
 endif()
