@@ -42,18 +42,25 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
 
        sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev mesa-common-dev libglu1-mesa-dev
 
-2. Download and build Boost\
-    (Assuming you have cloned Zano into the 'zano' folder. If you used a different location for Zano, edit line 4 accordingly.)
+2. Clone Zano into a local folder\
+   (If for some reason you need to use alternative Zano branch, change 'master' to the required branch name.)
+   
+       git clone --recursive https://github.com/hyle-team/zano.git -b master
+
+   In the following steps we assume that you cloned Zano into '~/zano' folder in your home directory. 
+
+3. Download and build Boost\
+    (Assuming you have cloned Zano into the 'zano' folder. If you used a different location for Zano, **edit line 4** accordingly.)
 
        curl -OL https://boostorg.jfrog.io/artifactory/main/release/1.70.0/source/boost_1_70_0.tar.bz2
        echo "430ae8354789de4fd19ee52f3b1f739e1fba576f0aded0897c3c2bc00fb38778  boost_1_70_0.tar.bz2" | shasum -c && tar -xjf boost_1_70_0.tar.bz2
        rm boost_1_70_0.tar.bz2 && cd boost_1_70_0
        patch -p0 < ../zano/utils/boost_1.70_gcc_8.patch || cd ..
        ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
-       ./b2
+       ./b2 && cd ..
     Make sure that you see "The Boost C++ Libraries were successfully built!" message at the end.
 
-3. Install Qt\
+4. Install Qt\
 (*GUI version only, skip this step if you're building server version*)
 
     [*GUI version*]
@@ -64,18 +71,19 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
     Then follow the instructions in Wizard. Don't forget to tick the WebEngine module checkbox!
 
 
-4. Install OpenSSL
+5. Install OpenSSL
 
-   We recommend installing OpenSSL v1.1.1w locally unless you would like to use the same version system-wide. Adjust the local path `/home/user/openssl` in the commands below according to your needs.
+   We recommend installing OpenSSL v1.1.1w locally unless you would like to use the same version system-wide.\
+   (Assuming that `$HOME` environment variable is set to your home directory. Otherwise, edit line 4 accordingly.)
 
        curl -OL https://www.openssl.org/source/openssl-1.1.1w.tar.gz
        echo "cf3098950cb4d853ad95c0841f1f9c6d3dc102dccfcacd521d93925208b76ac8  openssl-1.1.1w.tar.gz" | shasum -c && tar xaf openssl-1.1.1w.tar.gz 
        cd openssl-1.1.1w/
-       ./config --prefix=/home/user/openssl --openssldir=/home/user/openssl shared zlib
-       make && make test && make install
+       ./config --prefix=$HOME/openssl --openssldir=$HOME/openssl shared zlib
+       make && make test && make install && cd ..
 
 
-5. Set environment variables properly\
+6. [*OPTIONAL*] Set global environment variables for convenient use\
 For instance, by adding the following lines to `~/.bashrc`
 
     [*server version*]
@@ -90,18 +98,27 @@ For instance, by adding the following lines to `~/.bashrc`
        export OPENSSL_ROOT_DIR=/home/user/openssl  
        export QT_PREFIX_PATH=/home/user/Qt5.11.2/5.11.2/gcc_64
 
-    Make sure you've restarted your terminal session (by reopening the terminal window or reconnecting the server) to apply these changes.
-
-6. Build the binaries
-   1. Build daemon and simplewallet:
-
-          cd zano/ && make -j1
-      or 
+      **NOTICE: Please edit the lines above according to your actual paths.**
    
+      **NOTICE 2:** Make sure you've restarted your terminal session (by reopening the terminal window or reconnecting the server) to apply these changes.
+
+8. Build the binaries
+   1. If you skipped step 6 and did not set the environment variables:
+
+          cd zano && mkdir build && cd build
+          BOOST_ROOT=$HOME/boost_1_70_0 OPENSSL_ROOT_DIR=$HOME/openssl cmake ..
+          make -j1 daemon simplewallet
+
+   2. If you set the variables in step 6:
+
           cd zano && mkdir build && cd build
           cmake ..
           make -j1 daemon simplewallet
 
+      or simply:
+
+          cd zano && make -j1
+   
       **NOTICE**: If you are building on a machine with a relatively high amount of RAM or with the proper setting of virtual memory, then you can use `-j2` or `-j` option to speed up the building process. Use with caution.
       
       **NOTICE 2**: If you'd like to build binaries for the testnet, use `cmake -D TESTNET=TRUE ..` instead of `cmake ..` .
@@ -111,12 +128,12 @@ For instance, by adding the following lines to `~/.bashrc`
           cd zano
           utils/build_script_linux.sh
 
-7. Look for the binaries in `build` folder
+    Look for the binaries in `build` folder
 
 <br />
 
 ### Windows
-Recommended OS version: Windows 7 x64.
+Recommended OS version: Windows 7 x64, Windows 11 x64.
 1. Install required prerequisites (Boost, Qt, CMake, OpenSSL).
 2. Edit paths in `utils/configure_local_paths.cmd`.
 3. Run one of `utils/configure_win64_msvsNNNN_gui.cmd` according to your MSVC version.
