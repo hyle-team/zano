@@ -422,6 +422,76 @@ namespace currency
     };
   };
 
+
+  //-----------------------------------------------
+  struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2
+  {
+    struct offsets_distribution
+    {
+      uint64_t amount; //if amount is 0 then lookup in post-zarcanum zone only, if not 0 then pre-zarcanum only
+      std::list<uint64_t> offsets; //[i] = height, estimated location where to pickup output of transaction
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(amount)
+        KV_SERIALIZE(offsets)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct request
+    {
+      std::list<offsets_distribution> amounts;
+      uint64_t            height_upper_limit; // if nonzero, all the decoy outputs must be either older than, or the same age as this height
+      bool                use_forced_mix_outs;
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(amounts)
+        KV_SERIALIZE(decoys_count)
+        KV_SERIALIZE(height_upper_limit)
+        KV_SERIALIZE(use_forced_mix_outs)
+      END_KV_SERIALIZE_MAP()
+    };
+
+#pragma pack (push, 1)
+    struct out_entry
+    {
+      out_entry() = default;
+      out_entry(uint64_t global_amount_index, const crypto::public_key& stealth_address)
+        : global_amount_index(global_amount_index), stealth_address(stealth_address), concealing_point{}, amount_commitment{}, blinded_asset_id{}
+      {}
+      out_entry(uint64_t global_amount_index, const crypto::public_key& stealth_address, const crypto::public_key& amount_commitment, const crypto::public_key& concealing_point, const crypto::public_key& blinded_asset_id)
+        : global_amount_index(global_amount_index), stealth_address(stealth_address), concealing_point(concealing_point), amount_commitment(amount_commitment), blinded_asset_id(blinded_asset_id)
+      {}
+      uint64_t global_amount_index;
+      crypto::public_key stealth_address;
+      crypto::public_key concealing_point;  // premultiplied by 1/8
+      crypto::public_key amount_commitment; // premultiplied by 1/8
+      crypto::public_key blinded_asset_id;  // premultiplied by 1/8
+    };
+#pragma pack(pop)
+
+    struct outs_for_amount
+    {
+      uint64_t amount;
+      std::list<out_entry> outs;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(amount)
+        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(outs)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::vector<outs_for_amount> outs;
+      std::string status;
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(outs)
+        KV_SERIALIZE(status)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+
   //-----------------------------------------------
   struct COMMAND_RPC_SET_MAINTAINERS_INFO
   {

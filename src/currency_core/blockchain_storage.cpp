@@ -2660,6 +2660,81 @@ bool blockchain_storage::get_random_outs_for_amounts(const COMMAND_RPC_GET_RANDO
   return true;
 }
 //------------------------------------------------------------------
+bool blockchain_storage::get_random_outs_for_amounts2(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::response& res)const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  LOG_PRINT_L3("[get_random_outs_for_amounts] amounts: " << req.amounts.size());
+  std::map<uint64_t, uint64_t> amounts_to_up_index_limit_cache;
+
+  for (size_t i = 0; i != req.amounts.size(); i++)
+  {
+    uint64_t amount = req.amounts[i].amount;
+    const std::list<uint64_t>& offsets = req.amounts[i].offsets;
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs = *res.outs.insert(res.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount());
+    result_outs.amount = amount;
+
+    uint64_t zc_hard_fork_after_h = m_core_runtime_config.hard_forks[ZANO_HARDFORK_04_ZARCANUM];
+    for (auto it = offsets.begin(); it != offsets.end(); it++)
+    {
+      uint64_t target_height = 
+
+    }
+
+
+
+
+    uint64_t outs_container_size = m_db_outputs.get_item_size(amount);
+    if (!outs_container_size)
+    {
+      LOG_ERROR("COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS: not outs for amount " << amount << ", wallet should use some real outs when it lookup for some mix, so, at least one out for this amount should exist");
+      continue;//actually this is strange situation, wallet should use some real outs when it lookup for some mix, so, at least one out for this amount should exist
+    }
+    //it is not good idea to use top fresh outs, because it increases possibility of transaction canceling on split
+    //lets find upper bound of not fresh outs
+    size_t up_index_limit = 0;
+    auto it_limit = amounts_to_up_index_limit_cache.find(amount);
+    if (it_limit == amounts_to_up_index_limit_cache.end())
+    {
+      up_index_limit = find_end_of_allowed_index(amount);
+      amounts_to_up_index_limit_cache[up_index_limit];
+    }
+    else
+    {
+      up_index_limit = it_limit->second;
+    }
+
+    CHECK_AND_ASSERT_MES(up_index_limit <= outs_container_size, false, "internal error: find_end_of_allowed_index returned wrong index=" << up_index_limit << ", with amount_outs.size = " << outs_container_size);
+    if (up_index_limit >= req.decoys_count)
+    {
+      std::set<size_t> used;
+      size_t try_count = 0;
+      for (uint64_t j = 0; j != req.decoys_count && try_count < up_index_limit;)
+      {
+        size_t g_index = crypto::rand<size_t>() % up_index_limit;
+        if (used.count(g_index))
+          continue;
+        bool added = add_out_to_get_random_outs(result_outs, amount, g_index, req.decoys_count, req.use_forced_mix_outs, req.height_upper_limit);
+        used.insert(g_index);
+        if (added)
+          ++j;
+        ++try_count;
+      }
+      if (result_outs.outs.size() < req.decoys_count)
+      {
+        LOG_PRINT_YELLOW("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.decoys_count << ", added " << result_outs.outs.size() << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total", LOG_LEVEL_0);
+      }
+    }
+    else
+    {
+      size_t added = 0;
+      for (size_t i = 0; i != up_index_limit; i++)
+        added += add_out_to_get_random_outs(result_outs, amount, i, req.decoys_count, req.use_forced_mix_outs, req.height_upper_limit) ? 1 : 0;
+      LOG_PRINT_YELLOW("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.decoys_count << ", added " << added << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total - respond with all good outs", LOG_LEVEL_0);
+    }
+  }
+  return true;
+}
+//------------------------------------------------------------------
 boost::multiprecision::uint128_t blockchain_storage::total_coins() const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
