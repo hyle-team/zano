@@ -58,6 +58,11 @@ namespace tools
       return m_rpc.on_get_random_outs(req, res, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
+    bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::response& res) override
+    {
+      return m_rpc.on_get_random_outs2(req, res, m_cntxt_stub);
+    }
+    //------------------------------------------------------------------------------------------------------------------------------
     bool call_COMMAND_RPC_SEND_RAW_TX(const currency::COMMAND_RPC_SEND_RAW_TX::request& req, currency::COMMAND_RPC_SEND_RAW_TX::response& res) override
     {
       return m_rpc.on_send_raw_tx(req, res, m_cntxt_stub);

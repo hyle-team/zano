@@ -2660,6 +2660,149 @@ bool blockchain_storage::get_random_outs_for_amounts(const COMMAND_RPC_GET_RANDO
   return true;
 }
 //------------------------------------------------------------------
+bool blockchain_storage::get_target_outs_for_amount_prezarcanum(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request& req, const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::offsets_distribution& details,  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, std::map<uint64_t, uint64_t>& amounts_to_up_index_limit_cache) const
+{  
+  size_t decoys_count = details.offsets.size();
+  uint64_t amount = details.amount;
+
+  uint64_t outs_container_size = m_db_outputs.get_item_size(details.amount);
+  if (!outs_container_size)
+  {
+    LOG_ERROR("COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS: not outs for amount " << amount << ", wallet should use some real outs when it lookup for some mix, so, at least one out for this amount should exist");
+    return false;//actually this is strange situation, wallet should use some real outs when it lookup for some mix, so, at least one out for this amount should exist
+  }
+  //it is not good idea to use top fresh outs, because it increases possibility of transaction canceling on split
+  //lets find upper bound of not fresh outs
+  size_t up_index_limit = 0;
+  auto it_limit = amounts_to_up_index_limit_cache.find(amount);
+  if (it_limit == amounts_to_up_index_limit_cache.end())
+  {
+    up_index_limit = find_end_of_allowed_index(amount);
+    amounts_to_up_index_limit_cache[up_index_limit];
+  }
+  else
+  {
+    up_index_limit = it_limit->second;
+  }
+
+  CHECK_AND_ASSERT_MES(up_index_limit <= outs_container_size, false, "internal error: find_end_of_allowed_index returned wrong index=" << up_index_limit << ", with amount_outs.size = " << outs_container_size);
+  if (up_index_limit >= decoys_count)
+  {
+    std::set<size_t> used;
+    size_t try_count = 0;
+    for (uint64_t j = 0; j != decoys_count && try_count < up_index_limit;)
+    {
+      size_t g_index = crypto::rand<size_t>() % up_index_limit;
+      if (used.count(g_index))
+        continue;
+      bool added = add_out_to_get_random_outs(result_outs, amount, g_index, decoys_count, req.use_forced_mix_outs, req.height_upper_limit);
+      used.insert(g_index);
+      if (added)
+        ++j;
+      ++try_count;
+    }
+    if (result_outs.outs.size() < decoys_count)
+    {
+      LOG_PRINT_YELLOW("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << decoys_count << ", added " << result_outs.outs.size() << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total", LOG_LEVEL_0);
+    }
+    return true;
+  }
+  else
+  {
+    size_t added = 0;
+    for (size_t i = 0; i != up_index_limit; i++)
+      added += add_out_to_get_random_outs(result_outs, amount, i, decoys_count, req.use_forced_mix_outs, req.height_upper_limit) ? 1 : 0;
+    LOG_PRINT_YELLOW("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << decoys_count << ", added " << added << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total - respond with all good outs", LOG_LEVEL_0);
+    return true;
+  }
+}
+//------------------------------------------------------------------
+
+bool blockchain_storage::get_target_outs_for_amount_postzarcanum(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request& req, const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::offsets_distribution& details, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, std::map<uint64_t, uint64_t>& amounts_to_up_index_limit_cache) const 
+{
+  size_t decoys_count = details.offsets.size();
+  for (auto offset : details.offsets)
+  {
+    //perfectly we would need to find transaction's output on the given height, with the given probability
+    //of being coinbase(coinbase outputs should be included less in decoy selection algorithm) 
+    bool is_coinbase = (crypto::rand<uint64_t>() % 101) > req.coinbase_percents ? false : true;
+
+    //TODO: Consider including PoW coinbase to transactions(does it needed?)
+    
+    // convert offset to estimated height 
+    uint64_t estimated_h = this->get_current_blockchain_size() - 1 - offset;
+    //make sure it's after zc hardfork
+    if (estimated_h < m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_HARDFORK_04_ZARCANUM])
+    {
+      LOG_ERROR("Wrong estimated offset(" << offset << "), it hits zone before zarcanum hardfork");
+      return false;
+    }
+
+#define TARGET_RANDOM_OUTS_SELECTIOM_POOL_MIN 10
+    //try to find output around given H
+    std::vector<uint64_t> selected_global_indexes;
+
+
+    auto process_tx = [&](const crypto::hash& tx_id) {
+    
+      auto tx_ptr = m_db_transactions.find(tx_id);
+      CHECK_AND_ASSERT_THROW_MES(tx_ptr, "internal error: tx_id " << tx_id << " around estimated_h = " << estimated_h << " not found in db");
+      //go through tx outputs
+      for (size_t i = 0; i != tx_ptr->tx.vout.size(); i++)
+      {
+        if (tx_ptr->tx.vout[i].type() != typeid(tx_out_zarcanum))
+        {
+          continue;
+        }
+        const tx_out_zarcanum& z_out = boost::get<tx_out_zarcanum>(tx_ptr->tx.vout[i]);
+
+        //  NOTE: second part of condition (mix_attr >= CURRENCY_TO_KEY_OUT_FORCED_MIX_LOWER_BOUND && ..) might be not accurate
+        //        since the wallet might want to request more inputs then it planning to do mixins. For now let's keep it this way and fix 
+        //        it if we see the problems about it.
+        if (z_out.mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX || (z_out.mix_attr >= CURRENCY_TO_KEY_OUT_FORCED_MIX_LOWER_BOUND && z_out.mix_attr < details.offsets.size()))
+        {
+          continue;
+        }
+
+        // skip spent outptus 
+        if (tx_ptr->m_spent_flags[i])
+        {
+          continue;
+        }
+
+        // add output
+        // note: code that will process selected_global_indes will be revisiting transactions entries to obtain all 
+        //       needed data, that should work relatively effective because of on-top-of-db cache keep daya unserialized 
+        selected_global_indexes.push_back(selected_global_indexes[i]);
+      }
+    
+    };
+
+    while (selected_global_indexes.size() < TARGET_RANDOM_OUTS_SELECTIOM_POOL_MIN)
+    {
+      auto block_ptr = m_db_blocks.get(estimated_h--);
+      if (is_coinbase &&  is_pos_block(block_ptr->bl) )
+      {
+        process_tx(get_transaction_hash(block_ptr->bl.miner_tx));
+      }
+      else
+      {
+        //looking for regular output of regular transactions
+        for (auto tx_id : block_ptr->bl.tx_hashes)
+        {
+          process_tx(tx_id);
+        }
+      }
+    }
+
+    //pick up a random output from selected_global_indes
+    uint64_t global_index = selected_global_indexes[crypto::rand<uint64_t>() % selected_global_indexes.size()];
+    bool res = add_out_to_get_random_outs(result_outs, details.amount, global_index, details.offsets.size(), req.use_forced_mix_outs, req.height_upper_limit);
+    CHECK_AND_ASSERT_THROW_MES(res, "Failed to add_out_to_get_random_outs([" << global_index << "]) at postzarcanum era");
+  }
+  return true;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::get_random_outs_for_amounts2(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::response& res)const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
@@ -2669,67 +2812,19 @@ bool blockchain_storage::get_random_outs_for_amounts2(const COMMAND_RPC_GET_RAND
   for (size_t i = 0; i != req.amounts.size(); i++)
   {
     uint64_t amount = req.amounts[i].amount;
-    const std::list<uint64_t>& offsets = req.amounts[i].offsets;
+    //const std::vector<uint64_t>& offsets = req.amounts[i].offsets;
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs = *res.outs.insert(res.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount());
     result_outs.amount = amount;
 
-    uint64_t zc_hard_fork_after_h = m_core_runtime_config.hard_forks[ZANO_HARDFORK_04_ZARCANUM];
-    for (auto it = offsets.begin(); it != offsets.end(); it++)
+    if (amount == 0)
     {
-      uint64_t target_height = 
-
-    }
-
-
-
-
-    uint64_t outs_container_size = m_db_outputs.get_item_size(amount);
-    if (!outs_container_size)
-    {
-      LOG_ERROR("COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS: not outs for amount " << amount << ", wallet should use some real outs when it lookup for some mix, so, at least one out for this amount should exist");
-      continue;//actually this is strange situation, wallet should use some real outs when it lookup for some mix, so, at least one out for this amount should exist
-    }
-    //it is not good idea to use top fresh outs, because it increases possibility of transaction canceling on split
-    //lets find upper bound of not fresh outs
-    size_t up_index_limit = 0;
-    auto it_limit = amounts_to_up_index_limit_cache.find(amount);
-    if (it_limit == amounts_to_up_index_limit_cache.end())
-    {
-      up_index_limit = find_end_of_allowed_index(amount);
-      amounts_to_up_index_limit_cache[up_index_limit];
+      //zarcanum era inputs
+      get_target_outs_for_amount_postzarcanum(req, req.amounts[i], result_outs, amounts_to_up_index_limit_cache);
     }
     else
     {
-      up_index_limit = it_limit->second;
-    }
-
-    CHECK_AND_ASSERT_MES(up_index_limit <= outs_container_size, false, "internal error: find_end_of_allowed_index returned wrong index=" << up_index_limit << ", with amount_outs.size = " << outs_container_size);
-    if (up_index_limit >= req.decoys_count)
-    {
-      std::set<size_t> used;
-      size_t try_count = 0;
-      for (uint64_t j = 0; j != req.decoys_count && try_count < up_index_limit;)
-      {
-        size_t g_index = crypto::rand<size_t>() % up_index_limit;
-        if (used.count(g_index))
-          continue;
-        bool added = add_out_to_get_random_outs(result_outs, amount, g_index, req.decoys_count, req.use_forced_mix_outs, req.height_upper_limit);
-        used.insert(g_index);
-        if (added)
-          ++j;
-        ++try_count;
-      }
-      if (result_outs.outs.size() < req.decoys_count)
-      {
-        LOG_PRINT_YELLOW("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.decoys_count << ", added " << result_outs.outs.size() << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total", LOG_LEVEL_0);
-      }
-    }
-    else
-    {
-      size_t added = 0;
-      for (size_t i = 0; i != up_index_limit; i++)
-        added += add_out_to_get_random_outs(result_outs, amount, i, req.decoys_count, req.use_forced_mix_outs, req.height_upper_limit) ? 1 : 0;
-      LOG_PRINT_YELLOW("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << req.decoys_count << ", added " << added << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total - respond with all good outs", LOG_LEVEL_0);
+      //zarcanum era inputs
+      get_target_outs_for_amount_prezarcanum(req, req.amounts[i], result_outs, amounts_to_up_index_limit_cache);
     }
   }
   return true;

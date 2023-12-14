@@ -44,6 +44,7 @@ using namespace epee;
 #include "currency_core/crypto_config.h"
 #include "crypto/zarcanum.h"
 #include "wallet_debug_events_definitions.h"
+#include "decoy_selection.h"
 
 using namespace currency;
 
@@ -5864,21 +5865,51 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency
   COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response daemon_resp = AUTO_VAL_INIT(daemon_resp);
   if (fake_outputs_count)
   {
-    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request req = AUTO_VAL_INIT(req);
+    uint64_t zarcanum_start_from = m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_HARDFORK_04_ZARCANUM];
+    uint64_t current_size = m_chain.get_blockchain_current_size();
+    decoy_selection_generator zarcanum_decoy_set_generator;
+    if (current_size - 1 >= zarcanum_start_from)
+    {
+      //in Zarcanum era
+      const uint64_t test_scale_size = current_size - 1 - zarcanum_start_from;
+      zarcanum_decoy_set_generator.init(test_scale_size - 1);
+    }
+
+
+
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request req = AUTO_VAL_INIT(req);
     req.height_upper_limit = m_last_pow_block_h;  // request decoys to be either older than, or the same age as stake output's height
     req.use_forced_mix_outs = false; // TODO: add this feature to UI later
-    req.decoys_count = fake_outputs_count + 1;    // one more to be able to skip a decoy in case it hits the real output
+    //req.decoys_count = fake_outputs_count + 1;    // one more to be able to skip a decoy in case it hits the real output
     for (uint64_t i: selected_indicies)
     {
+      req.amounts.push_back(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::offsets_distribution());
+      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::offsets_distribution& rdisttib = req.amounts.back();
+      
       auto it = m_transfers.begin() + i;
       WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->m_ptx_wallet_info->m_tx.vout.size() > it->m_internal_output_index,
         "m_internal_output_index = " << it->m_internal_output_index <<
         " is greater or equal to outputs count = " << it->m_ptx_wallet_info->m_tx.vout.size());
-      req.amounts.push_back(it->is_zc() ? 0 : it->m_amount);
+      
+      //check if we have Zarcanum era output of pre-Zarcanum
+      if (it->is_zc())
+      {
+        //Zarcanum era
+        rdisttib.amount = 0;
+        //generate distribution in Zarcanum hardfork
+        THROW_IF_FALSE_WALLET_INT_ERR_EX(zarcanum_decoy_set_generator.is_initialized(), "zarcanum_decoy_set_generator are not initialized");
+        rdisttib.offsets = zarcanum_decoy_set_generator.generate_distribution(fake_outputs_count);
+      }
+      else
+      {
+        //for prezarcanum era use flat distribution
+        rdisttib.amount = it->m_amount;
+        rdisttib.offsets.resize(fake_outputs_count, 0);
+      }
     }
 
-    bool r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(req, daemon_resp);
-    THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs.bin");
+    bool r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2(req, daemon_resp);
+    THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs2.bin");
     THROW_IF_FALSE_WALLET_EX(daemon_resp.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs.bin");
     THROW_IF_FALSE_WALLET_EX(daemon_resp.status == API_RETURN_CODE_OK, error::get_random_outs_error, daemon_resp.status);
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(daemon_resp.outs.size() == selected_indicies.size(), 
@@ -5887,7 +5918,7 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency
     std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount> scanty_outs;
     for(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& amount_outs : daemon_resp.outs)
     {
-      if (amount_outs.outs.size() < req.decoys_count)
+      if (amount_outs.outs.size() < fake_outputs_count)
       {
         scanty_outs.push_back(amount_outs);
       }
