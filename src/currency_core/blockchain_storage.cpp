@@ -5617,7 +5617,11 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   if (var_is_after_hardfork_4_zone)
   {
     CHECK_AND_ASSERT_MES(tx.version > TRANSACTION_VERSION_PRE_HF4, false, "HF4: tx with version " << tx.version << " is not allowed");
-    CHECK_AND_ASSERT_MES(tx.vout.size() >= CURRENCY_TX_MIN_ALLOWED_OUTS, false, "HF4: tx.vout has " << tx.vout.size() << " element(s), while required minimum is " << CURRENCY_TX_MIN_ALLOWED_OUTS);
+
+    if (is_pos_miner_tx(tx))
+      CHECK_AND_ASSERT_MES(tx.vout.size() == 1 || tx.vout.size() >= CURRENCY_TX_MIN_ALLOWED_OUTS, false, "HF4: tx.vout has " << tx.vout.size() << " element(s), while 1 or >= " << CURRENCY_TX_MIN_ALLOWED_OUTS << " is expected for a PoS miner tx");
+    else
+      CHECK_AND_ASSERT_MES(tx.vout.size() >= CURRENCY_TX_MIN_ALLOWED_OUTS, false, "HF4: tx.vout has " << tx.vout.size() << " element(s), while required minimum is " << CURRENCY_TX_MIN_ALLOWED_OUTS);
 
     if(!validate_inputs_sorting(tx))
     {
