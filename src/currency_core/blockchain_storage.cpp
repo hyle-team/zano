@@ -2773,7 +2773,7 @@ bool blockchain_storage::get_target_outs_for_amount_postzarcanum(const COMMAND_R
         // add output
         // note: code that will process selected_global_indes will be revisiting transactions entries to obtain all 
         //       needed data, that should work relatively effective because of on-top-of-db cache keep daya unserialized 
-        selected_global_indexes.push_back(selected_global_indexes[i]);
+        selected_global_indexes.push_back(tx_ptr->m_global_output_indexes[i]);
       }
     
     };

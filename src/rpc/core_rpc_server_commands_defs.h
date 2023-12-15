@@ -446,7 +446,6 @@ namespace currency
       uint64_t            coinbase_percents;     //from 0 to 100, estimate percents of coinbase outputs included in decoy sets  
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(amounts)
-        KV_SERIALIZE(decoys_count)
         KV_SERIALIZE(height_upper_limit)
         KV_SERIALIZE(use_forced_mix_outs)
         KV_SERIALIZE(coinbase_percents)
