@@ -1651,6 +1651,49 @@ TEST(crypto, point_negation)
 }
 
 
+TEST(crypto, scalar_get_bits)
+{
+  scalar_t x = scalar_t::random();
+  for(size_t i = 0; i < 256; ++i)
+    ASSERT_EQ(x.get_bits(i, 0), 0);
+  for(size_t i = 0; i < 256; ++i)
+    ASSERT_EQ(x.get_bits(i, std::min(255ull, i + 65)), 0);
+
+  ASSERT_EQ(x.get_bits(0,   64), x.m_u64[0]);
+  ASSERT_EQ(x.get_bits(64,  64), x.m_u64[1]);
+  ASSERT_EQ(x.get_bits(128, 64), x.m_u64[2]);
+  ASSERT_EQ(x.get_bits(192, 64), x.m_u64[3]);
+
+  uint64_t high_32_bits = x.m_u64[3] >> 32;
+  ASSERT_EQ(x.get_bits(192+32, 32), high_32_bits);
+
+  for(size_t i = 33; i <= 64; ++i)
+    ASSERT_EQ(x.get_bits(192+32, i), high_32_bits);
+
+  for(size_t i = 0; i < 10000; ++i)
+  {
+    scalar_t b = scalar_t::random();
+    scalar_t x = scalar_t::random();
+    size_t bit_index_from = b.m_s[5];
+    size_t bits_count     = b.m_s[6] % 65; // [0; 64] are allowed
+
+    uint64_t extracted_bits = 0;
+    for(size_t j = 0; j < bits_count; ++j)
+    {
+      if (bit_index_from + j <= 255 && x.get_bit(bit_index_from + j))
+        extracted_bits |= 1ull << j;
+    }
+
+    if (extracted_bits != x.get_bits(bit_index_from, bits_count))
+    {
+      std::cout << "i: " << i << ", bit_index_from: " << bit_index_from << ", bits_count: " << bits_count << ENDL
+        << "extracted_bits: " << extracted_bits << ", get_bits(): " << x.get_bits(bit_index_from, bits_count);
+      ASSERT_TRUE(false);
+    }
+  }
+  return true;
+}
+
 //
 // test's runner
 //
