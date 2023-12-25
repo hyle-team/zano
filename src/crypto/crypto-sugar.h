@@ -764,6 +764,24 @@ namespace crypto
       return *this;
     }
 
+    point_t modify_mul_pow_2(size_t power)
+    {
+      if (power > 0)
+      {
+        ge_p1p1 p1;
+        ge_p2 p2;
+        ge_p3_to_p2(&p2, &m_p3);
+        for (size_t i = 1; i < power; ++i)
+        {
+          ge_p2_dbl(&p1, &p2);
+          ge_p1p1_to_p2(&p2, &p1);
+        }
+        ge_p2_dbl(&p1, &p2);
+        ge_p1p1_to_p3(&m_p3, &p1);
+      }
+      return *this;
+    }
+
     // returns a * this + G
     point_t mul_plus_G(const scalar_t& a) const
     {

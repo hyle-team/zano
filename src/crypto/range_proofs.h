@@ -41,7 +41,7 @@ namespace crypto
   ////////////////////////////////////////
   struct bpp_ct_generators_HGX
   {
-    // NOTE! This notation follows the original BP+ whitepaper, see mapping to Zano's generators below
+    // NOTE! This notation follows the original BP+ whitepaper, see mapping to Zano's generators in range_proofs.cpp
     static const point_t& bpp_G;
     static const point_t& bpp_H;
     static const point_t& bpp_H2;
@@ -49,7 +49,7 @@ namespace crypto
 
   struct bpp_ct_generators_UGX
   {
-    // NOTE! This notation follows the original BP+ whitepaper, see mapping to Zano's generators below
+    // NOTE! This notation follows the original BP+ whitepaper, see mapping to Zano's generators in range_proofs.cpp
     static const point_t& bpp_G;
     static const point_t& bpp_H;
     static const point_t& bpp_H2;
@@ -138,32 +138,11 @@ namespace crypto
 
   typedef bpp_crypto_trait_zano<bpp_ct_generators_HGX, 128, 16> bpp_crypto_trait_Zarcanum;
 
-  
-  // efficient multiexponentiation (naive stub implementation atm, TODO)
-  template<typename CT>
-  bool multiexp_and_check_being_zero(const scalar_vec_t& g_scalars, const scalar_vec_t& h_scalars, const point_t& summand)
-  {
-    CHECK_AND_ASSERT_MES(g_scalars.size() <= CT::c_bpp_mn_max, false, "g_scalars oversized");
-    CHECK_AND_ASSERT_MES(h_scalars.size() <= CT::c_bpp_mn_max, false, "h_scalars oversized");
-
-    point_t result = summand;
-
-    for (size_t i = 0; i < g_scalars.size(); ++i)
-      result += g_scalars[i] * CT::get_generator(false, i);
-
-    for (size_t i = 0; i < h_scalars.size(); ++i)
-      result += h_scalars[i] * CT::get_generator(true, i);
-
-    if (!result.is_zero())
-    {
-      LOG_PRINT_L0("multiexp result is non zero: " << result);
-      return false;
-    }
-    return true;
-  }
-
 
 } // namespace crypto
 
+#include "epee/include/profile_tools.h" // <- remove this, sowle
+
+#include "msm.h"
 #include "range_proof_bpp.h"
 #include "range_proof_bppe.h"
