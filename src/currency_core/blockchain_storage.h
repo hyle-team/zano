@@ -77,6 +77,11 @@ namespace currency
       epee::math_helper::average<uint64_t, 5> target_calculating_enum_blocks;
       epee::math_helper::average<uint64_t, 5> target_calculating_calc;
 
+      //longhash_calculating_time_3
+      epee::math_helper::average<uint64_t, 1> pos_validate_ki_search;
+      epee::math_helper::average<uint64_t, 1> pos_validate_get_out_keys_for_inputs;
+      epee::math_helper::average<uint64_t, 1> pos_validate_zvp;
+
       //tx processing zone
       epee::math_helper::average<uint64_t, 1> tx_check_inputs_time;
       epee::math_helper::average<uint64_t, 1> tx_add_one_tx_time;

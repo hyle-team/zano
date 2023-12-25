@@ -5697,10 +5697,12 @@ bool blockchain_storage::validate_pos_block(const block& b,
   CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_to_key) || b.miner_tx.vin[1].type() == typeid(txin_zc_input), false, "incorrect input 1 type: " << b.miner_tx.vin[1].type().name());
   const crypto::key_image& stake_key_image = get_key_image_from_txin_v(b.miner_tx.vin[1]);
   //check keyimage if it's main chain candidate
+  TIME_MEASURE_START_PD(pos_validate_ki_search);
   if (!for_altchain)
   {
     CHECK_AND_ASSERT_MES(!have_tx_keyimg_as_spent(stake_key_image), false, "stake key image has been already spent in blockchain: " << stake_key_image);
   }
+  TIME_MEASURE_FINISH_PD(pos_validate_ki_search);
 
   if (!is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM))
   {
@@ -5737,6 +5739,7 @@ bool blockchain_storage::validate_pos_block(const block& b,
     
     if (!for_altchain)
     {
+      TIME_MEASURE_START_PD(pos_validate_get_out_keys_for_inputs);
       // do general input check for main chain blocks only
       // TODO @#@#: txs in alternative PoS blocks (including miner_tx) must be validated by validate_alt_block_txs()
       const zarcanum_sig& sig = boost::get<zarcanum_sig>(b.miner_tx.signatures[0]);
@@ -5750,6 +5753,8 @@ bool blockchain_storage::validate_pos_block(const block& b,
       // make sure that all referring inputs are either older then, or the same age as, the most resent PoW block.
       CHECK_AND_ASSERT_MES(max_related_block_height <= last_pow_block_height, false, "stake input refs' max related block height is " << max_related_block_height << " while last PoW block height is " << last_pow_block_height);    
 
+      TIME_MEASURE_FINISH_PD(pos_validate_get_out_keys_for_inputs);
+
       // build a ring of references
       vector<crypto::CLSAG_GGXXG_input_ref_t> ring;
       ring.reserve(scan_contex.zc_outs.size());
@@ -5759,7 +5764,9 @@ bool blockchain_storage::validate_pos_block(const block& b,
       crypto::scalar_t last_pow_block_id_hashed = crypto::hash_helper_t::hs(CRYPTO_HDS_ZARCANUM_LAST_POW_HASH, sm.last_pow_id);
 
       uint8_t err = 0;
+      TIME_MEASURE_START_PD(pos_validate_zvp);
       r = crypto::zarcanum_verify_proof(id, kernel_hash, ring, last_pow_block_id_hashed, stake_input.k_image, basic_diff, sig, &err);
+      TIME_MEASURE_FINISH_PD(pos_validate_zvp);
       CHECK_AND_ASSERT_MES(r, false, "zarcanum_verify_proof failed with code " << (int)err);
     }
 
@@ -6214,7 +6221,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     }
     TIME_MEASURE_FINISH_PD(tx_check_inputs_time);
     tx_total_inputs_processing_time += tx_check_inputs_time;
-    tx_total_inputs_count++;
+    tx_total_inputs_count += tx.vin.size();
     burned_coins += get_burned_amount(tx);
 
     TIME_MEASURE_START_PD(tx_prapare_append);
@@ -6265,6 +6272,8 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
 
   if (!m_is_in_checkpoint_zone)
   {
+    // validate_miner_transaction will check balance proof and asset surjection proof
+    // and, as a side effect, it MAY recalculate base_reward, consider redisign, TODO -- sowle
     TIME_MEASURE_START_PD(validate_miner_transaction_time);
     if (!validate_miner_transaction(bl, cumulative_block_size, fee_summary, base_reward, already_generated_coins)) // TODO @#@# base_reward will be calculated once again, consider refactoring
     {
@@ -6414,7 +6423,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   TIME_MEASURE_FINISH_PD_MS(block_processing_time_0_ms);
 
   //print result
-  stringstream powpos_str_entry, timestamp_str_entry;
+  stringstream powpos_str_entry, timestamp_str_entry, pos_validation_str_entry;
   if (is_pos_bl)
   { // PoS
     int64_t actual_ts = get_block_datetime(bei.bl); // signed int is intentionally used here
@@ -6428,6 +6437,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     else
       powpos_str_entry << "hidden";
     timestamp_str_entry << ", actual ts: " << actual_ts << " (diff: " << std::showpos << ts_diff << "s) block ts: " << std::noshowpos << bei.bl.timestamp << " (shift: " << std::showpos << static_cast<int64_t>(bei.bl.timestamp) - actual_ts << ")";
+    pos_validation_str_entry << "(" << m_performance_data.pos_validate_ki_search.get_last_val() << "/" << m_performance_data.pos_validate_get_out_keys_for_inputs.get_last_val() << "/" << m_performance_data.pos_validate_zvp.get_last_val() << ")";
   }
   else
   { // PoW
@@ -6448,14 +6458,15 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     << ", timing: " << block_processing_time_0_ms <<  "ms" 
     << "(micrsec:" << block_processing_time_1 
     << "(" << target_calculating_time_2 << "(" << m_performance_data.target_calculating_enum_blocks.get_last_val() << "/" << m_performance_data.target_calculating_calc.get_last_val() << ")"
-    << "/" << longhash_calculating_time_3 
+    << "/" << longhash_calculating_time_3 << pos_validation_str_entry.str()
     << "/" << insert_time_4 
     << "/" << all_txs_insert_time_5
     << "/" << etc_stuff_6
     << "/" << tx_total_inputs_processing_time << " of " << tx_total_inputs_count
     << "/(" << m_performance_data.validate_miner_transaction_time.get_last_val() << "|" 
             << m_performance_data.collect_rangeproofs_data_from_tx_time.get_last_val() << "|"
-            << m_performance_data.verify_multiple_zc_outs_range_proofs_time.get_last_val()
+            << m_performance_data.verify_multiple_zc_outs_range_proofs_time.get_last_val() << "~"
+            << range_proofs_agregated.size()
     << ")"
     << "))");
 
