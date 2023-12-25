@@ -1360,13 +1360,10 @@ bool blockchain_storage::validate_miner_transaction(const block& b,
     return false;
   }
 
-  if (b.miner_tx.version > TRANSACTION_VERSION_PRE_HF4)
+  if (!verify_asset_surjection_proof(b.miner_tx, tx_id_for_post_hf4_era))
   {
-    if (!verify_asset_surjection_proof(b.miner_tx, tx_id_for_post_hf4_era))
-    {
-      LOG_ERROR("asset surjection proof verification failed for miner tx");
-      return false;
-    }
+    LOG_ERROR("asset surjection proof verification failed for miner tx");
+    return false;
   }
 
   LOG_PRINT_MAGENTA("Mining tx verification ok, blocks_size_median = " << blocks_size_median, LOG_LEVEL_2);
