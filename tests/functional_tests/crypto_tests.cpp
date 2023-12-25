@@ -1695,6 +1695,32 @@ TEST(crypto, scalar_get_bits)
   return true;
 }
 
+
+TEST(crypto, scalarmult_base_vartime)
+{
+  auto check_for_x = [&](const scalar_t& x) -> bool {
+    point_t P, P2;
+    ge_scalarmult_base_vartime(&P.m_p3, x.m_s);
+    ge_scalarmult_base(&P2.m_p3, x.m_s);
+    return (P - P2).is_zero();
+    };
+
+  ASSERT_TRUE(check_for_x(c_scalar_0));
+  ASSERT_TRUE(check_for_x(c_scalar_1));
+  ASSERT_TRUE(check_for_x(c_scalar_1div8));
+  ASSERT_TRUE(check_for_x(c_scalar_Lm1));
+  ASSERT_TRUE(check_for_x(c_scalar_L));
+
+  for(size_t i = 0; i < 1000; ++i)
+  {
+    scalar_t x = scalar_t::random();
+    ASSERT_TRUE(check_for_x(x));
+  }
+
+  return true;
+}
+
+
 template<typename CT>
 bool crypto_msm_runner(size_t N, size_t low_bits_to_clear, size_t high_bits_to_clear)
 {

@@ -41,6 +41,42 @@ inline std::ostream &operator <<(std::ostream &o, const crypto::ge_precomp v)
   return o;
 }
 
+TEST(crypto, ge_precomp)
+{
+  //precomp_data_t G_precomp = {};
+  //construct_precomp_data(G_precomp, c_point_G);
+  //std::cout << "size of G_precomp: " << sizeof G_precomp << " bytes" << ENDL;
+  //for(size_t i = 0; i < 32; ++i)
+  //  for(size_t j = 0; j < 8; ++j)
+  //    std::cout << "i: " << i << ", j: " << j << ", precomp: " << ENDL << G_precomp[i][j] << ENDL;
+
+  precomp_data_t H_precomp = {};
+  construct_precomp_data(H_precomp, c_point_H);
+
+  auto check_for_x = [&](const scalar_t& x) -> bool {
+    point_t P;
+    ge_scalarmult_precomp_vartime(&P.m_p3, H_precomp, x.m_s);
+    return P == x * c_point_H;
+  };
+
+  ASSERT_TRUE(check_for_x(c_scalar_0));
+  ASSERT_TRUE(check_for_x(c_scalar_1));
+  ASSERT_TRUE(check_for_x(c_scalar_1div8));
+  ASSERT_TRUE(check_for_x(c_scalar_Lm1));
+  ASSERT_TRUE(check_for_x(c_scalar_L));
+
+  for(size_t i = 0; i < 1000; ++i)
+  {
+    scalar_t x = scalar_t::random();
+    ASSERT_TRUE(check_for_x(x));
+  }
+
+  return true;
+}
+
+
+
+
 TEST(perf, primitives)
 {
   struct helper
@@ -315,7 +351,7 @@ TEST(perf, primitives)
     return HASH_64_VEC(points_cached);
   });
 
-  run("ge_add(p3 + p3)", 50000, [](timer_t& t, size_t rounds) {
+  run("ge_add(p1p1 = p3 + cached)", 50000, [](timer_t& t, size_t rounds) {
     std::vector<size_t> rnd_indecies;
     helper::make_rnd_indicies(rnd_indecies, rounds);
     std::vector<ge_cached> points_cached(rounds);
@@ -530,7 +566,7 @@ TEST(perf, primitives)
     return HASH_64_VEC(points_p3);
   });
 
-  run("ge_scalarmult_base()", 5000, [](timer_t& t, size_t rounds) {
+  run("ge_scalarmult_base()", 10000, [](timer_t& t, size_t rounds) {
     std::vector<size_t> rnd_indecies;
     helper::make_rnd_indicies(rnd_indecies, rounds);
 
@@ -549,6 +585,87 @@ TEST(perf, primitives)
     for (size_t i = 0; i < rounds; ++i)
     {
       ge_scalarmult_base(&points_p3[i], (const unsigned char*)&scalars[rnd_indecies[i]]);
+    }
+    t.stop();
+
+    return HASH_64_VEC(points_p3);
+  });
+
+  run("construct_precomp_data()", 300, [](timer_t& t, size_t rounds) {
+    std::vector<size_t> rnd_indecies;
+    helper::make_rnd_indicies(rnd_indecies, rounds);
+
+    unsigned char s[32] = {};
+    std::vector<point_t> random_points(rounds);
+    for (size_t i = 0; i < rounds; ++i)
+    {
+      s[0] = i;
+      ge_p2 p2;
+      ge_fromfe_frombytes_vartime(&p2, s);
+      ge_p2_to_p3(&random_points[i].m_p3, &p2);
+    }
+
+    std::vector<ge_p3> points_p3(rounds);
+    precomp_data_t precomp_data;
+    uint64_t result = 0;
+    t.start();
+    for (size_t i = 0; i < rounds; ++i)
+    {
+      construct_precomp_data(precomp_data, random_points[rnd_indecies[i]]);
+      result ^= (precomp_data[1][1].xy2d[1] + precomp_data[31][7].xy2d[9]);
+    }
+    t.stop();
+
+    return result;
+  });
+
+  run("ge_scalarmult_precomp_vartime()", 10000, [](timer_t& t, size_t rounds) {
+    std::vector<size_t> rnd_indecies;
+    helper::make_rnd_indicies(rnd_indecies, rounds);
+
+    scalar_t x;
+    x.make_random();
+
+    std::vector<crypto::ec_scalar> scalars(rounds);
+    for (size_t i = 0; i < rounds; ++i)
+    {
+      scalar_t x = x + x + x;
+      memcpy(&scalars[i].data, x.data(), 32);
+    }
+
+    precomp_data_t precomp_data;
+    construct_precomp_data(precomp_data, x * c_point_X);
+
+    std::vector<ge_p3> points_p3(rounds);
+    t.start();
+    for (size_t i = 0; i < rounds; ++i)
+    {
+      ge_scalarmult_precomp_vartime(&points_p3[i], precomp_data, (const unsigned char*)&scalars[rnd_indecies[i]]);
+    }
+    t.stop();
+
+    return HASH_64_VEC(points_p3);
+  });
+
+  run("ge_scalarmult_base_vartime()", 10000, [](timer_t& t, size_t rounds) {
+    std::vector<size_t> rnd_indecies;
+    helper::make_rnd_indicies(rnd_indecies, rounds);
+
+    scalar_t x;
+    x.make_random();
+
+    std::vector<crypto::ec_scalar> scalars(rounds);
+    for (size_t i = 0; i < rounds; ++i)
+    {
+      scalar_t x = x + x + x;
+      memcpy(&scalars[i].data, x.data(), 32);
+    }
+
+    std::vector<ge_p3> points_p3(rounds);
+    t.start();
+    for (size_t i = 0; i < rounds; ++i)
+    {
+      ge_scalarmult_base_vartime(&points_p3[i], (const unsigned char*)&scalars[rnd_indecies[i]]);
     }
     t.stop();
 
@@ -737,6 +854,403 @@ TEST(perf, primitives)
 
     return HASH_64_VEC(result);
   });
+
+  run("get_bits x 10", 20000, [](timer_t& t, size_t rounds) {
+    std::vector<size_t> rnd_indecies;
+    helper::make_rnd_indicies(rnd_indecies, rounds);
+
+    scalar_vec_t data;
+    data.resize_and_make_random(rounds);
+
+    std::vector<uint64_t> result(rounds);
+    t.start();
+    for (size_t i = 0; i < rounds; ++i)
+    {
+      auto& x = data[rnd_indecies[i]];
+      result[i] =
+        x.get_bits(x.m_s[11], x.m_s[21] % 65) ^ 
+        x.get_bits(x.m_s[12], x.m_s[22] % 65) ^ 
+        x.get_bits(x.m_s[13], x.m_s[23] % 65) ^ 
+        x.get_bits(x.m_s[14], x.m_s[24] % 65) ^ 
+        x.get_bits(x.m_s[15], x.m_s[25] % 65) ^ 
+        x.get_bits(x.m_s[16], x.m_s[26] % 65) ^ 
+        x.get_bits(x.m_s[17], x.m_s[27] % 65) ^ 
+        x.get_bits(x.m_s[18], x.m_s[28] % 65) ^
+        x.get_bits(x.m_s[19], x.m_s[29] % 65) ^
+        x.get_bits(x.m_s[20], x.m_s[30] % 65);
+    }
+    t.stop();
+
+    return HASH_64_VEC(result);
+  });
+
+  return true;
+} // TEST  
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+///////////////// v3
+
+
+
+///////////////// v4
+
+
+template<typename CT>
+bool msm_and_check_zero_pippenger_v4(const scalar_vec_t& g_scalars, const scalar_vec_t& h_scalars, const point_t& summand, size_t c)
+{
+  // TODO: with c = 8 and with direct access got much worse result than with c = 7 and get_bits(), consider checking again for bigger datasets (N>256) 
+  CHECK_AND_ASSERT_MES(g_scalars.size() <= CT::c_bpp_mn_max, false, "g_scalars oversized");
+  CHECK_AND_ASSERT_MES(h_scalars.size() <= CT::c_bpp_mn_max, false, "h_scalars oversized");
+  CHECK_AND_ASSERT_MES(c < 10, false, "c is too big");
+
+  size_t C = 1ull << c;
+
+  // k_max * c + (c-1) >= max_bit_idx
+  // 
+  //                 max_bit_idx - (c - 1)            max_bit_idx - (c - 1) + (c - 1)              max_bit_idx
+  // k_max = ceil ( --------------------- ) = floor ( ------------------------------ )  =  floor ( ----------- )
+  //                           c                                    c                                   c      
+  const size_t b = 253; // the maximum number of bits in x  https://eprint.iacr.org/2022/999.pdf  TODO: we may also scan for maximum bit used in all the scalars if all the scalars are small
+  const size_t max_bit_idx = b - 1;
+  const size_t k_max = max_bit_idx / c;
+  const size_t K = k_max + 1;
+
+  std::unique_ptr<point_t[]> buckets( new point_t[C * K] );
+  std::vector<bool> buckets_inited(C * K);
+
+  // first loop, calculate partial bucket sums
+  for (size_t n = 0; n < g_scalars.size(); ++n)
+  {
+    for (size_t k = 0; k < K; ++k)
+    {
+      uint64_t l = g_scalars[n].get_bits(k * c, c); // l in [0; 2^c-1]
+      if (l != 0)
+      {
+        size_t bucket_id = l * K + k;
+        if (buckets_inited[bucket_id])
+          buckets[bucket_id] += CT::get_generator(false, n);
+        else
+        {
+          buckets[bucket_id] =  CT::get_generator(false, n);
+          buckets_inited[bucket_id] = true;
+        }
+      }
+    }
+  }
+
+  for (size_t n = 0; n < h_scalars.size(); ++n)
+  {
+    for (size_t k = 0; k < K; ++k)
+    {
+      uint64_t l = h_scalars[n].get_bits(k * c, c); // l in [0; 2^c-1]
+      if (l != 0)
+      {
+        size_t bucket_id = l * K + k;
+        if (buckets_inited[bucket_id])
+          buckets[bucket_id] += CT::get_generator(true, n);
+        else
+        {
+          buckets[bucket_id] =  CT::get_generator(true, n);
+          buckets_inited[bucket_id] = true;
+        }
+      }
+    }
+  }
+
+  // the second loop
+  // S[l, k] = S[l-1, k] + B[l, k]
+  // G[k]    = sum{1..C-1} S[l, k] 
+  std::unique_ptr<point_t[]> Sk( new point_t[K] );
+  std::vector<bool> Sk_inited(K);
+  std::unique_ptr<point_t[]> Gk( new point_t[K] );
+  std::vector<bool> Gk_inited(K);
+  for (size_t l = C - 1; l > 0; --l)
+  {
+    for (size_t k = 0; k < K; ++k)
+    {
+      size_t bucket_id = l * K + k;
+      if (buckets_inited[bucket_id])
+      {
+        if (Sk_inited[k])
+          Sk[k] += buckets[bucket_id];
+        else
+        {
+          Sk[k] = buckets[bucket_id];
+          Sk_inited[k] = true;
+        }
+      }
+
+      if (Sk_inited[k])
+      {
+        if (Gk_inited[k])
+          Gk[k] += Sk[k];
+        else
+        {
+          Gk[k] = Sk[k];
+          Gk_inited[k] = true;
+        }
+      }
+    }
+  }
+
+  // the third loop: Horner’s rule
+  point_t result = Gk_inited[K - 1] ? Gk[K - 1] : c_point_0;
+  for (size_t k = K - 2; k != SIZE_MAX; --k)
+  {
+    result.modify_mul_pow_2(c);
+    if (Gk_inited[k])
+      result += Gk[k];
+  }
+
+  result += summand;
+
+  if (!result.is_zero())
+  {
+    LOG_PRINT_L0("msm result is non zero: " << result);
+    return false;
+  }
+
+  return true;
+}
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+
+//template<typename CT>
+//struct mes_msm_and_check_zero_pippenger_v1
+//{
+//  static bool msm_and_check_zero(const scalar_vec_t& g_scalars, const scalar_vec_t& h_scalars, const point_t& summand, size_t c)
+//  {
+//    return msm_and_check_zero_pippenger_v1<CT>(g_scalars, h_scalars, summand, c);
+//  }
+//};
+//
+//template<typename CT>
+//struct mes_msm_and_check_zero_pippenger_v2
+//{
+//  static bool msm_and_check_zero(const scalar_vec_t& g_scalars, const scalar_vec_t& h_scalars, const point_t& summand, size_t c)
+//  {
+//    return msm_and_check_zero_pippenger_v2<CT>(g_scalars, h_scalars, summand, c);
+//  }
+//};
+
+template<typename CT>
+struct mes_msm_and_check_zero_pippenger_v3
+{
+  static bool msm_and_check_zero(const scalar_vec_t& g_scalars, const scalar_vec_t& h_scalars, const point_t& summand, size_t c)
+  {
+    return msm_and_check_zero_pippenger_v3<CT>(g_scalars, h_scalars, summand, c);
+  }
+};
+
+template<typename CT>
+struct mes_msm_and_check_zero_pippenger_v4
+{
+  static bool msm_and_check_zero(const scalar_vec_t& g_scalars, const scalar_vec_t& h_scalars, const point_t& summand, size_t c)
+  {
+    return msm_and_check_zero_pippenger_v4<CT>(g_scalars, h_scalars, summand, c);
+  }
+};
+
+
+
+struct pme_runner_i
+{
+  virtual ~pme_runner_i() {}
+  virtual bool iteration(bool warmup) = 0;
+};
+
+template<size_t N, typename CT, template<typename> typename selector_t>
+struct pme_runner_t : public pme_runner_i
+{
+  pme_runner_t(const char* testname_, size_t pip_partition_bits_c)
+    : testname(testname_)
+    , pip_partition_bits_c(pip_partition_bits_c)
+  {
+    testname += std::string(", ") + std::string(typeid(selector_t).name()).erase(0, 11) + std::string(", c = ") + epee::string_tools::num_to_string_fast(pip_partition_bits_c);
+    std::cout << testname << ENDL;
+  }
+  virtual ~pme_runner_t()
+  {
+    if (timings.empty())
+      return;
+
+    uint64_t median = 0;
+    auto median_it = timings.begin() + timings.size() / 2;
+    std::nth_element(timings.begin(), median_it, timings.end());
+    median = *median_it;
+    if (timings.size() % 2 == 0)
+    {
+      auto max_it = std::max_element(timings.begin(), median_it);
+      median = (median + *max_it) /  2;
+    }
+
+    uint64_t total_time = std::accumulate(timings.begin(), timings.end(), 0);
+    std::cout << std::left << std::setw(100) << testname << "  :  " << std::setw(5) << median << " (median),  " << std::setw(5) << total_time / timings.size() << " (avg), mcs" << ENDL;
+  }
+
+  virtual bool iteration(bool warmup)
+  {
+    scalar_vec_t g_scalars, h_scalars;
+    g_scalars.resize_and_make_random(N);
+    g_scalars[0] = c_scalar_Lm1;
+    //std::cout << "bit 251: " << g_scalars[0].get_bit(251) << ", bit 252: " << g_scalars[0].get_bit(252) << ENDL;
+    h_scalars.resize_and_make_random(N);
+    point_t sum = c_point_0;
+    for(size_t i = 0; i < N; ++i)
+    {
+      //g_scalars[i].m_u64[3] = 0;
+      //h_scalars[i].m_u64[3] = 0;
+      //g_scalars[i].m_s[31] = 0;
+      //h_scalars[i].m_s[31] = 0;
+      sum += g_scalars[i] * CT::get_generator(false, i) + h_scalars[i] * CT::get_generator(true, i);
+    }
+
+    TIME_MEASURE_START(t);
+    bool r = typename selector_t<CT>::msm_and_check_zero(g_scalars, h_scalars, -sum, pip_partition_bits_c);
+    TIME_MEASURE_FINISH(t);
+    ASSERT_TRUE(r);
+
+    if (!warmup)
+      timings.push_back(t);
+    return true;
+  }
+
+  std::vector<uint64_t> timings;
+  std::string testname;
+  size_t pip_partition_bits_c;
+};
+
+
+TEST(perf, msm)
+{
+  bool r = false;
+
+  std::deque<std::unique_ptr<pme_runner_i>> runners;
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v1> >("Zarcanum, BPPE, 128", 1));
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v1> >("Zarcanum, BPPE, 128", 2));
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v1> >("Zarcanum, BPPE, 128", 3));
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v1> >("Zarcanum, BPPE, 128", 4));
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v1> >("Zarcanum, BPPE, 128", 5));
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v1> >("Zarcanum, BPPE, 128", 6));
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v1> >("Zarcanum, BPPE, 128", 7));
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v1> >("Zarcanum, BPPE, 128", 8));
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v1> >("Zarcanum, BPPE, 128", 9));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v1> >("ZC out, BPP, 256", 1));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v1> >("ZC out, BPP, 256", 2));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v1> >("ZC out, BPP, 256", 3));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v1> >("ZC out, BPP, 256", 4));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v1> >("ZC out, BPP, 256", 5));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v1> >("ZC out, BPP, 256", 6));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v1> >("ZC out, BPP, 256", 7));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v1> >("ZC out, BPP, 256", 8));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v1> >("ZC out, BPP, 256", 9));
+
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v2> >("Zarcanum, BPPE, 128", 1));
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v2> >("Zarcanum, BPPE, 128", 2));
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v2> >("Zarcanum, BPPE, 128", 3));
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v2> >("Zarcanum, BPPE, 128", 4));
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v2> >("Zarcanum, BPPE, 128", 5));
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v2> >("Zarcanum, BPPE, 128", 6));
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v2> >("Zarcanum, BPPE, 128", 7));
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v2> >("Zarcanum, BPPE, 128", 8));
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v2> >("Zarcanum, BPPE, 128", 9));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v2> >("ZC out, BPP, 256", 1));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v2> >("ZC out, BPP, 256", 2));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v2> >("ZC out, BPP, 256", 3));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v2> >("ZC out, BPP, 256", 4));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v2> >("ZC out, BPP, 256", 5));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v2> >("ZC out, BPP, 256", 6));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v2> >("ZC out, BPP, 256", 7));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v2> >("ZC out, BPP, 256", 8));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v2> >("ZC out, BPP, 256", 9));
+
+
+  runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v3> >("Zarcanum, BPPE, 128 +++++++++++", 7));
+  runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v3> >("ZC out, BPP, 256    +++++++++++", 7));
+
+  runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v4> >("Zarcanum, BPPE, 128 ###########", 7));
+  runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v4> >("ZC out, BPP, 256    ###########", 7));
+
+  //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v1> >("Zarcanum, BPPE, 128", 7));
+  //runners.emplace_front(std::make_unique< pme_runner_t<256, bpp_crypto_trait_ZC_out,    mes_msm_and_check_zero_pippenger_v1> >("ZC out, BPP, 256", 7));
+
+
+  std::cout << "warm up..." << ENDL;
+  size_t runs_count = 30;
+  for(size_t k = 0; k < runs_count; ++k)
+  {
+    for(auto& runner : runners)
+      ASSERT_TRUE(runner->iteration(true));
+  }
+
+  runs_count = 200;
+  for(size_t k = 0; k < runs_count; ++k)
+  {
+    for(auto& runner : runners)
+      ASSERT_TRUE(runner->iteration(false));
+
+    size_t done_percent = 100 * k / runs_count;
+    if (100 * (k + 1) / runs_count > done_percent && done_percent % 5 == 0)
+      std::cout << done_percent << " %" << ENDL;
+  }
+
+  return true;
+}
+
+
+
+template<typename T>
+bool perf_generators_runner(const T& generator, const char* title)
+{
+  const size_t warmup_rounds = 20;
+  const size_t rounds = 500;
+  const size_t inner_rounds = 128;
+  uint64_t h = 0;
+  std::vector<uint64_t> timings;
+
+  size_t N = 1024;
+  scalar_vec_t scalars;
+  scalars.resize_and_make_random(N);
+  std::vector<point_t> points(N);
+
+  for(size_t i = 0; i < warmup_rounds; ++i)
+    for(size_t j = 0; j < inner_rounds; ++j)
+      points[(i + j) % N] = scalars[(i + j) % N] * generator;
+
+  h = hash_64(points.data(), points.size() * sizeof(point_t));
+
+  for(size_t i = 0; i < rounds; ++i)
+  {
+    TIME_MEASURE_START(t);
+    for(size_t j = 0; j < inner_rounds; ++j)
+      points[(i + j) % N] = scalars[(i + j) % N] * generator;
+    TIME_MEASURE_FINISH(t);
+    timings.push_back(t);
+  }
+
+  h ^= hash_64(points.data(), points.size() * sizeof(point_t));
+
+  std::cout << std::left << std::setw(20) << title << " : " << std::setw(5) << std::fixed << std::setprecision(1) << (double)epee::misc_utils::median(timings) / inner_rounds << " mcs,  hash = " << h << ENDL;
+
+  return true;
+}
+
+TEST(perf, generators)
+{
+#define TEST_GENERATOR(G) ASSERT_TRUE(perf_generators_runner(G, #G))
+
+  TEST_GENERATOR(c_point_0);
+  TEST_GENERATOR(c_point_G);
+  TEST_GENERATOR(c_point_H);
+  TEST_GENERATOR(c_point_H2);
+  TEST_GENERATOR(c_point_U);
+  TEST_GENERATOR(c_point_X);
+  TEST_GENERATOR(c_point_H_plus_G);
+  TEST_GENERATOR(c_point_H_minus_G);
 
   return true;
 }
