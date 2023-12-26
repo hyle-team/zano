@@ -933,6 +933,13 @@ namespace currency
     const difficulties& b_diff
   );
 
+  boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty_hf4(const wide_difficulty_type& difficulty_pos_at_split_point,
+    const wide_difficulty_type& difficulty_pow_at_split_point,
+    const difficulties& a_diff,
+    const difficulties& b_diff
+  );
+
+
   struct rpc_tx_payload_handler : public boost::static_visitor<bool>
   {
     tx_extra_rpc_entry& tv;

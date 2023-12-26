@@ -2046,9 +2046,18 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
     wide_difficulty_type main_pow_diff_begin = get_last_alt_x_block_cumulative_precise_adj_difficulty(alt_chain_type(), connection_point.height - 1, false);
     main_cumul_diff.pow_diff = main_pow_diff_end - main_pow_diff_begin;
 
-    //TODO: measurement of precise cumulative difficult
-    boost::multiprecision::uint1024_t alt = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
-    boost::multiprecision::uint1024_t main = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
+    boost::multiprecision::uint1024_t alt = 0;
+    boost::multiprecision::uint1024_t main = 0;
+    if (m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, alt_chain_bei.height))
+    {
+      alt = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
+      main = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
+    }
+    else
+    {
+      alt = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
+      main = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
+    }
     LOG_PRINT_L1("[FORK_CHOICE]: " << ENDL 
       << "difficulty_pow_at_split_point:" << difficulty_pow_at_split_point << ENDL
       << "difficulty_pos_at_split_point:" << difficulty_pos_at_split_point << ENDL
@@ -6515,11 +6524,12 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     bvc.m_verification_failed = true;
     return false;
   }
-
-  bei.cumulative_diff_adjusted += cumulative_diff_delta;
+  //this used only in pre-hardfork 1
+  bei.cumulative_diff_adjusted += cumulative_diff_delta; 
 
   //////////////////////////////////////////////////////////////////////////
   // rebuild cumulative_diff_precise_adjusted for whole period 
+  // cumulative_diff_precise_adjusted - native cumulative difficulty adjusted ONLY by sequence_factor
   wide_difficulty_type diff_precise_adj = correct_difficulty_with_sequence_factor(sequence_factor, current_diffic);
   bei.cumulative_diff_precise_adjusted = last_x_h ? m_db_blocks[last_x_h]->cumulative_diff_precise_adjusted + diff_precise_adj : diff_precise_adj;
 
@@ -6612,7 +6622,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   LOG_PRINT_L1("+++++ BLOCK SUCCESSFULLY ADDED " << (is_pos_bl ? "[PoS]" : "[PoW]") << "["<< static_cast<uint64_t>(bei.bl.major_version) << "." << static_cast<uint64_t>(bei.bl.minor_version) << "] "<<  " Sq: " << sequence_factor
     << ENDL << "id:\t" << id << timestamp_str_entry.str()
     << ENDL << powpos_str_entry.str()
-    << ENDL << "HEIGHT " << bei.height << ", difficulty: " << current_diffic << ", cumul_diff_precise: " << bei.cumulative_diff_precise << ", cumul_diff_adj: " << bei.cumulative_diff_adjusted << " (+" << cumulative_diff_delta << ")"
+    << ENDL << "HEIGHT " << bei.height << ", difficulty: " << current_diffic << ", cumul_diff_precise: " << bei.cumulative_diff_precise << ", cumul_diff_precise_adj: " << bei.cumulative_diff_precise_adjusted << " (+" << cumulative_diff_delta << ")"
     << ENDL << "block reward: " << print_money_brief(base_reward + fee_summary) << " (" << print_money_brief(base_reward) << " + " << print_money_brief(fee_summary) 
     << ")" << ", coinbase_blob_size: " << coinbase_blob_size << ", cumulative size: " << cumulative_block_size << ", tx_count: " << bei.bl.tx_hashes.size()
     << ", timing: " << block_processing_time_0_ms <<  "ms" 
