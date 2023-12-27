@@ -1049,7 +1049,7 @@ struct pme_runner_t : public pme_runner_i
     : testname(testname_)
     , pip_partition_bits_c(pip_partition_bits_c)
   {
-    testname += std::string(", ") + std::string(typeid(selector_t).name()).erase(0, 11) + std::string(", c = ") + epee::string_tools::num_to_string_fast(pip_partition_bits_c);
+    testname += std::string(", ") + std::string(typeid(typename selector_t<CT>).name()).erase(0, 11) + std::string(", c = ") + epee::string_tools::num_to_string_fast(pip_partition_bits_c);
     std::cout << testname << ENDL;
   }
   virtual ~pme_runner_t()
