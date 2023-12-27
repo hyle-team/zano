@@ -292,26 +292,25 @@ namespace misc_utils
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
-  template<class type_vec_type>
-  type_vec_type median(std::vector<type_vec_type> &v)
+  template<typename container_t>
+  typename container_t::value_type median(container_t &v)
   {
-    //CRITICAL_REGION_LOCAL(m_lock);
+    container_t::value_type median{};
     if(v.empty())
-      return boost::value_initialized<type_vec_type>();
+      return median;
     if(v.size() == 1)
       return v[0];
 
-    size_t n = (v.size()) / 2;
-    std::sort(v.begin(), v.end());
-    //nth_element(v.begin(), v.begin()+n-1, v.end());
-    if(v.size()%2)
-    {//1, 3, 5...
-      return v[n];
-    }else 
-    {//2, 4, 6...
-      return (v[n-1] + v[n])/2;
+    auto median_it = v.begin() + v.size() / 2;
+    std::nth_element(v.begin(), median_it, v.end());
+    median = *median_it;
+    if (v.size() % 2 == 0)
+    {
+      auto max_it = std::max_element(v.begin(), median_it); // it's garanteed that after nth_element() the necessary element is in this interval
+      median = (median + *max_it) / 2;                      // average of [size/2-1] and [size/2] elements
     }
 
+    return median;
   }
 
   /************************************************************************/
