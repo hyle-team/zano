@@ -40,7 +40,6 @@ DISABLE_VS_WARNINGS(4146 4244)
 void fe_mul(fe, const fe, const fe);
 void fe_sq(fe, const fe);
 void fe_tobytes(unsigned char *, const fe);
-static void ge_madd(ge_p1p1 *, const ge_p3 *, const ge_precomp *);
 static void ge_msub(ge_p1p1 *, const ge_p3 *, const ge_precomp *);
 static void ge_p2_0(ge_p2 *);
 static void ge_p3_dbl(ge_p1p1 *, const ge_p3 *);
@@ -1425,7 +1424,7 @@ int ge_frombytes_vartime(ge_p3 *h, const unsigned char *s) {
 r = p + q
 */
 
-static void ge_madd(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q) {
+void ge_madd(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q) {
   fe t0;
   fe_add(r->X, p->Y, p->X);
   fe_sub(r->Y, p->Y, p->X);

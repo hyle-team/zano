@@ -113,6 +113,7 @@ void ge_p2_to_p3(ge_p3 *r, const ge_p2 *t);
 void ge_bytes_hash_to_ec(ge_p3 *, const void *, size_t);
 void ge_bytes_hash_to_ec_32(ge_p3 *, const unsigned char *);
 void ge_cached_to_p2(ge_p2 *r, const ge_cached *c);
+void ge_madd(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q);
 
 void ge_p3_0(ge_p3 *h);
 void ge_sub(ge_p1p1 *, const ge_p3 *, const ge_cached *);

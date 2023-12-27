@@ -20,27 +20,6 @@ uint64_t get_bits_v1(const scalar_t& s, uint8_t bit_index_first, uint8_t bits_co
 }
 
 
-inline std::ostream &operator <<(std::ostream &o, const crypto::ge_precomp v)
-{
-  o << "{{";
-  
-  for(size_t i = 0; i < 9; ++i)
-    o << v.yplusx[i] << ", ";
-
-  o << v.yplusx[9] << "},\n {";
-  
-  for(size_t i = 0; i < 9; ++i)
-    o << v.yminusx[i] << ", ";
-  
-  o << v.yminusx[9] << "},\n {";
-  
-  for(size_t i = 0; i < 9; ++i)
-    o << v.xy2d[i] << ", ";
-  
-  o << v.xy2d[9] << "}}\n";
-  return o;
-}
-
 TEST(crypto, ge_precomp)
 {
   //precomp_data_t G_precomp = {};

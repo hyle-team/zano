@@ -1788,6 +1788,116 @@ TEST(crypto, msm)
 }
 
 
+
+inline std::ostream &operator <<(std::ostream &o, const crypto::ge_precomp v)
+{
+  o << "{{";
+
+  for(size_t i = 0; i < 9; ++i)
+    o << v.yplusx[i] << ", ";
+
+  o << v.yplusx[9] << "}, {";
+
+  for(size_t i = 0; i < 9; ++i)
+    o << v.yminusx[i] << ", ";
+
+  o << v.yminusx[9] << "}, {";
+
+  for(size_t i = 0; i < 9; ++i)
+    o << v.xy2d[i] << ", ";
+
+  o << v.xy2d[9] << "}}";
+  return o;
+}
+
+bool calc_and_print_generator_precomp(const point_pc_t& generator, const char* generator_var_name)
+{
+  precomp_data_t precomp_data = {};
+  construct_precomp_data(precomp_data, generator);
+
+  std::cout << "    const precomp_data_t " << generator_var_name << "_precomp_data = {" << ENDL;
+
+  for(size_t i = 0; i < 32; ++i)
+  {
+    std::cout << "      {" << ENDL;
+    for(size_t j = 0; j < 8; ++j)
+      std::cout << "        " << precomp_data[i][j] << (j != 7 ? "," : "" ) << ENDL;
+    std::cout << "      }" << (i != 31 ? "," : "" ) << ENDL;
+  }
+
+  std::cout << "    };" << ENDL;
+
+  return true;
+}
+
+TEST(print, generators_precomp)
+{
+#define CALC_PRECOMP(G) calc_and_print_generator_precomp(G, #G)
+
+  CALC_PRECOMP(c_point_H);
+  CALC_PRECOMP(c_point_H2);
+  CALC_PRECOMP(c_point_U);
+  CALC_PRECOMP(c_point_X);
+  CALC_PRECOMP(c_point_H_plus_G);
+  CALC_PRECOMP(c_point_H_minus_G);
+  return true;
+
+#undef CALC_PRECOMP
+}
+
+bool check_generator_precomp(const point_pc_t& generator, const char* generator_var_name)
+{
+  point_t generator_pt = generator; // to avoid using precomputed data in scalar multiplications
+  point_t random_point = hash_helper_t::hp(scalar_t::random());
+
+  point_t A = generator_pt;
+  for(size_t i = 0; i < 32; ++i)
+  {
+    point_t B = c_point_0;
+    for(size_t j = 0; j < 8; ++j)
+    {
+      B += A;
+
+      // restore ge_p3 from ge_precomp using native NaCl functions... 
+      point_t restored_pt{};
+      ge_p1p1 p1p1{};
+      ge_madd(&p1p1, &random_point.m_p3, &((*generator.m_precomp_data_p)[i][j]));
+      ge_p1p1_to_p3(&restored_pt.m_p3, &p1p1);
+      restored_pt -= random_point;
+
+      // ...and compare it with the calculated one
+      if (B != restored_pt)
+      {
+        std::cout << "ERROR: " << generator_var_name << ", i: " << i << ", j: " << j << ENDL;
+        return false;
+      }
+    }
+    if (i != 31)
+      A.modify_mul_pow_2(8);
+  }
+
+  std::cout << "   " << std::left << std::setw(32) << generator_var_name << "   OK" << ENDL;
+  return true;
+}
+
+TEST(crypto, generators_precomp)
+{
+#define CHECK_PRECOMP(G) ASSERT_TRUE(check_generator_precomp(G, #G))
+
+  CHECK_PRECOMP(c_point_H);
+  CHECK_PRECOMP(c_point_H2);
+  CHECK_PRECOMP(c_point_U);
+  CHECK_PRECOMP(c_point_X);
+  CHECK_PRECOMP(c_point_H_plus_G);
+  CHECK_PRECOMP(c_point_H_minus_G);
+
+  return true;
+
+#undef CHECK_PRECOMP
+}
+
+
+
 //
 // test's runner
 //
