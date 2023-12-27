@@ -5734,6 +5734,7 @@ bool blockchain_storage::validate_pos_block(const block& b,
     CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1, false, "incorrect number of stake input signatures: " << b.miner_tx.signatures.size());
     CHECK_AND_ASSERT_MES(b.miner_tx.signatures[0].type() == typeid(zarcanum_sig), false, "incorrect sig 0 type: " << b.miner_tx.signatures[0].type().name());
     
+    //std::stringstream ss;
     if (!for_altchain)
     {
       TIME_MEASURE_START_PD(pos_validate_get_out_keys_for_inputs);
@@ -5745,6 +5746,18 @@ bool blockchain_storage::validate_pos_block(const block& b,
       uint64_t dummy_source_max_unlock_time_for_pos_coinbase_dummy = 0; // won't be used
       scan_for_keys_context scan_contex = AUTO_VAL_INIT(scan_contex);
       r = get_output_keys_for_input_with_checks(b.miner_tx, stake_input, dummy_output_keys, max_related_block_height, dummy_source_max_unlock_time_for_pos_coinbase_dummy, scan_contex);
+
+//#define ADD_ITEM_TO_SS(item) ss << "      " #item ": " << m_performance_data.item.get_last_val() << ENDL
+//      ADD_ITEM_TO_SS(tx_check_inputs_loop_scan_outputkeys_get_item_size);
+//      ADD_ITEM_TO_SS(tx_check_inputs_loop_scan_outputkeys_relative_to_absolute);
+//      ADD_ITEM_TO_SS(tx_check_inputs_loop_scan_outputkeys_loop);
+//      ADD_ITEM_TO_SS(tx_check_inputs_loop_scan_outputkeys_loop_iteration);
+//      ss << "      tx_check_inputs_loop_scan_outputkeys_loop_iteration (avg): " << m_performance_data.tx_check_inputs_loop_scan_outputkeys_loop_iteration.get_avg() << ENDL;
+//      ADD_ITEM_TO_SS(tx_check_inputs_loop_scan_outputkeys_loop_get_subitem);
+//      ADD_ITEM_TO_SS(tx_check_inputs_loop_scan_outputkeys_loop_find_tx);
+//      ADD_ITEM_TO_SS(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
+//#undef ADD_ITEM_TO_SS
+
       CHECK_AND_ASSERT_MES(r, false, "get_output_keys_for_input_with_checks failed for stake input");
       CHECK_AND_ASSERT_MES(scan_contex.zc_outs.size() == stake_input.key_offsets.size(), false, "incorrect number of referenced outputs found: " << scan_contex.zc_outs.size() << ", while " << stake_input.key_offsets.size() << " is expected.");
       // make sure that all referring inputs are either older then, or the same age as, the most resent PoW block.
@@ -5765,6 +5778,8 @@ bool blockchain_storage::validate_pos_block(const block& b,
       r = crypto::zarcanum_verify_proof(id, kernel_hash, ring, last_pow_block_id_hashed, stake_input.k_image, basic_diff, sig, &err);
       TIME_MEASURE_FINISH_PD(pos_validate_zvp);
       CHECK_AND_ASSERT_MES(r, false, "zarcanum_verify_proof failed with code " << (int)err);
+      //std::stringstream ss;
+      //std::cout << "    validate_pos_block > get_output_keys_for_input_with_checks: " << ENDL << ss.str();
     }
 
     return true;
@@ -6466,6 +6481,23 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
             << range_proofs_agregated.size()
     << ")"
     << "))");
+
+  {
+    static epee::math_helper::average<uint64_t, 30> blocks_processing_time_avg_pos, blocks_processing_time_avg_pow;
+    (is_pos_bl ? blocks_processing_time_avg_pos : blocks_processing_time_avg_pow).push(block_processing_time_0_ms);
+
+    static std::deque<uint64_t> blocks_processing_time_median_pos, blocks_processing_time_median_pow;
+    std::deque<uint64_t>& d = (is_pos_bl ? blocks_processing_time_median_pos : blocks_processing_time_median_pow);
+    d.push_back(block_processing_time_0_ms);
+    if (d.size() > 200)
+      d.pop_front();
+
+    uint64_t median_pow = epee::misc_utils::median(blocks_processing_time_median_pow);
+    uint64_t median_pos = epee::misc_utils::median(blocks_processing_time_median_pos);
+
+    LOG_PRINT_YELLOW("last 30 blocks of type processing time (ms):  PoW: " << std::setw(3) << (uint64_t)blocks_processing_time_avg_pow.get_avg() << ",  PoS: " << (uint64_t)blocks_processing_time_avg_pos.get_avg(), LOG_LEVEL_1);
+    LOG_PRINT_YELLOW("last 200 blocks of type processing time (median, ms):  PoW: " << std::setw(3) << median_pow << ",  PoS: " << median_pos, LOG_LEVEL_1);
+  }
 
   on_block_added(bei, id, block_summary_kimages);
 
