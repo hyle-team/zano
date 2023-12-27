@@ -2,7 +2,7 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #pragma once
-
+#include <numeric>
 
 uint64_t get_bits_v1(const scalar_t& s, uint8_t bit_index_first, uint8_t bits_count)
 {
@@ -1049,7 +1049,7 @@ struct pme_runner_t : public pme_runner_i
     : testname(testname_)
     , pip_partition_bits_c(pip_partition_bits_c)
   {
-    testname += std::string(", ") + std::string(typeid(typename selector_t<CT>).name()).erase(0, 11) + std::string(", c = ") + epee::string_tools::num_to_string_fast(pip_partition_bits_c);
+    testname += std::string(", ") + std::string(typeid(selector_t<CT>).name()).erase(0, 11) + std::string(", c = ") + epee::string_tools::num_to_string_fast(pip_partition_bits_c);
     std::cout << testname << ENDL;
   }
   virtual ~pme_runner_t()
@@ -1089,7 +1089,7 @@ struct pme_runner_t : public pme_runner_i
     }
 
     TIME_MEASURE_START(t);
-    bool r = typename selector_t<CT>::msm_and_check_zero(g_scalars, h_scalars, -sum, pip_partition_bits_c);
+    bool r = selector_t<CT>::msm_and_check_zero(g_scalars, h_scalars, -sum, pip_partition_bits_c);
     TIME_MEASURE_FINISH(t);
     ASSERT_TRUE(r);
 

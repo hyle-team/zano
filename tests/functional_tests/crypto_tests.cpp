@@ -1658,7 +1658,7 @@ TEST(crypto, scalar_get_bits)
   for(size_t i = 0; i < 256; ++i)
     ASSERT_EQ(x.get_bits(i, 0), 0);
   for(size_t i = 0; i < 256; ++i)
-    ASSERT_EQ(x.get_bits(i, std::min(255ull, i + 65)), 0);
+    ASSERT_EQ(x.get_bits(i, std::min((size_t)255, i + 65)), 0);
 
   ASSERT_EQ(x.get_bits(0,   64), x.m_u64[0]);
   ASSERT_EQ(x.get_bits(64,  64), x.m_u64[1]);
