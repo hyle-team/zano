@@ -295,7 +295,7 @@ namespace misc_utils
   template<typename container_t>
   typename container_t::value_type median(container_t &v)
   {
-    container_t::value_type median{};
+    typename container_t::value_type median{};
     if(v.empty())
       return median;
     if(v.size() == 1)
