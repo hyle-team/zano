@@ -731,7 +731,7 @@ if (!(cond))                                                                    
 {                                                                                                          \
   exception_handler();                                                                                     \
   std::stringstream ss;                                                                                    \
-  ss << std::endl << mess;                                                                                 \
+  ss << std::endl << "[" << error_code << "]" << mess ;                                                                                 \
   LOG_ERROR(#cond << ". THROW EXCEPTION: " << error_code << ss.str());                                                  \
   tools::error::throw_wallet_ex<tools::error::wallet_error>(std::string(__FILE__ ":" STRINGIZE(__LINE__)), ss.str(), error_code); \
 }

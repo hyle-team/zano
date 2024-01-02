@@ -4275,6 +4275,7 @@ uint64_t blockchain_storage::get_tx_fee_median() const
 //------------------------------------------------------------------
 uint64_t blockchain_storage::get_alias_coast(const std::string& alias) const
 {
+  CRITICAL_REGION_LOCAL(m_read_lock);
   uint64_t median_fee = get_tx_fee_median();
   //CHECK_AND_ASSERT_MES_NO_RET(median_fee, "can't calculate median");
 
@@ -4285,9 +4286,29 @@ uint64_t blockchain_storage::get_alias_coast(const std::string& alias) const
   return get_alias_coast_from_fee(alias, median_fee);
 }
 //------------------------------------------------------------------
+uint64_t blockchain_storage::get_tx_fee_window_value_median() const
+{
+  //     calc it every time and cache it so it won't recalculated before next block
+  //     it's effective because it's not affect sync time and needed only when node is synced 
+  //     and processing transactions
+
+  misc_utils::median_helper<uint64_t, uint64_t> mh;
+  for (uint64_t i = 0; i < CORE_FEE_BLOCKS_LOOKUP_WINDOW; i++)
+  {
+    uint64_t h = m_db_blocks.size() - 1 - i;
+    if (h >= m_db_blocks.size())
+      break;
+
+    auto block_ptr = m_db_blocks[h];
+    CHECK_AND_ASSERT_THROW_MES(block_ptr, "Unexpected missing block " << h << " in get_tx_fee_window_value_median");
+    mh.push_item(block_ptr->block_cumulative_size, 0);
+  }
+
+  return (mh.get_median() + mh.get_avg())/2;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::unprocess_blockchain_tx_attachments(const transaction& tx, uint64_t h, uint64_t timestamp)
 {
-
   size_t cnt_serv_attach = get_service_attachments_count_in_tx(tx);
   if (cnt_serv_attach == 0)
     return true;
@@ -4599,7 +4620,7 @@ uint64_t blockchain_storage::tx_fee_median_for_height(uint64_t h)const
 //------------------------------------------------------------------
 bool blockchain_storage::validate_all_aliases_for_new_median_mode()
 {
-    LOG_PRINT_L0("Started reinitialization of median fee...");
+  LOG_PRINT_L0("Started reinitialization of median fee...");
   math_helper::once_a_time_seconds<10> log_idle;
   uint64_t sz = m_db_blocks.size();
   for (uint64_t i = 0; i != sz; i++)

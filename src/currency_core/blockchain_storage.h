@@ -325,6 +325,7 @@ namespace currency
     boost::multiprecision::uint128_t total_coins()const;
     bool is_pos_allowed()const;
     uint64_t get_tx_fee_median()const;
+    uint64_t get_tx_fee_window_value_median() const;
     uint64_t get_tx_expiration_median() const;
     uint64_t validate_alias_reward(const transaction& tx, const std::string& ai)const;
     void set_event_handler(i_core_event_handler* event_handler) const;
@@ -585,8 +586,8 @@ namespace currency
     mutable std::atomic<bool> m_deinit_is_done;
     mutable uint64_t m_blockchain_launch_timestamp;
 
-    bool init_tx_fee_median();
-    bool update_tx_fee_median();
+    //bool init_tx_fee_median();
+    //bool update_tx_fee_median();
     void store_db_solo_options_values();
     bool set_lost_tx_unmixable();
     bool set_lost_tx_unmixable_for_height(uint64_t height);
@@ -653,6 +654,7 @@ namespace currency
     uint64_t get_tx_fee_median_effective_index(uint64_t h) const;    
     void on_abort_transaction();
     void load_targetdata_cache(bool is_pos) const;
+
     
 
     uint64_t get_adjusted_time()const;

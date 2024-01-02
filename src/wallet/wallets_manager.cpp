@@ -1805,6 +1805,12 @@ std::string wallets_manager::reset_wallet_password(uint64_t wallet_id, const std
   else
     return API_RETURN_CODE_FAIL;
 }
+std::string wallets_manager::use_whitelisting(uint64_t wallet_id, bool use)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, w);  
+  w.w->get()->set_use_assets_whitelisting(use);
+  return API_RETURN_CODE_OK;
+}
 std::string wallets_manager::add_custom_asset_id(uint64_t wallet_id, const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_descriptor)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);

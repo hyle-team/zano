@@ -116,7 +116,7 @@ namespace ph = boost::placeholders;
             fail_msg_writer() << "unknown error"; \
           } \
 
-
+#define CONFIRM_WITH_PASSWORD() if(!check_password_for_operation()) return true;
 
 
 namespace
@@ -140,6 +140,7 @@ namespace
   const command_line::arg_descriptor<bool> arg_disable_tor_relay  ( "disable-tor-relay", "Disable TOR relay", false);
   const command_line::arg_descriptor<unsigned int> arg_set_timeout("set-timeout", "Set timeout for the wallet");
   const command_line::arg_descriptor<std::string> arg_voting_config_file("voting-config-file", "Set voting config instead of getting if from daemon", "");
+  const command_line::arg_descriptor<bool> arg_no_password_confirmations("no-password-confirmation", "Enable/Disable password confirmation for transactions", false);
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command  ("command", "");
 
@@ -445,6 +446,9 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     m_do_refresh_after_load = false;
   }
 
+  m_password_salt = crypto::rand<uint64_t>();
+  m_password_hash = get_hash_from_pass_and_salt(pwd_container.password(), m_password_salt);
+
   bool was_open = false;
   if (!m_generate_new.empty())
   {
@@ -516,6 +520,12 @@ bool simple_wallet::deinit()
   return close_wallet();
 }
 //----------------------------------------------------------------------------------------------------
+crypto::hash simple_wallet::get_hash_from_pass_and_salt(const std::string& pass, uint64_t salt)
+{
+  std::string pass_and_salt = pass + std::to_string(salt);
+  return crypto::cn_fast_hash(pass_and_salt.data(), pass_and_salt.size());
+}
+//----------------------------------------------------------------------------------------------------
 void simple_wallet::handle_command_line(const boost::program_options::variables_map& vm)
 {
   m_wallet_file     = command_line::get_arg(vm, arg_wallet_file);
@@ -529,7 +539,35 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_restore_wallet  = command_line::get_arg(vm, arg_restore_wallet);
   m_disable_tor     = command_line::get_arg(vm, arg_disable_tor_relay);
   m_voting_config_file = command_line::get_arg(vm, arg_voting_config_file);
+  m_no_password_confirmations = command_line::get_arg(vm, arg_no_password_confirmations);
+  
 } 
+//----------------------------------------------------------------------------------------------------
+
+#define PASSWORD_CONFIRMATION_ATTEMPTS 3
+bool simple_wallet::check_password_for_operation()
+{
+  if (m_no_password_confirmations)
+    return true;
+  for (size_t i = 0; i != PASSWORD_CONFIRMATION_ATTEMPTS; i++)
+  {
+    tools::password_container pass_container;
+    if (!pass_container.read_password("Enter password to confirm operation:\n"))
+    {
+      fail_msg_writer() << "Failed to read password";
+      return false;
+    }
+    if (get_hash_from_pass_and_salt(pass_container.password(), m_password_salt) != m_password_hash)
+    {
+      fail_msg_writer() << "Wrong password";
+      continue;
+    }
+    return true;
+  }
+
+  fail_msg_writer() << "Confirmation failed with " << PASSWORD_CONFIRMATION_ATTEMPTS << " attempts";
+  return false;
+}
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::try_connect_to_daemon()
 {
@@ -1529,6 +1567,7 @@ bool preprocess_asset_id(std::string& address_arg, crypto::public_key& asset_id)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::transfer(const std::vector<std::string> &args_)
 {
+  CONFIRM_WITH_PASSWORD();
   SIMPLE_WALLET_BEGIN_TRY_ENTRY();
   if (!try_connect_to_daemon())
     return true;
@@ -1692,6 +1731,7 @@ bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::show_seed(const std::vector<std::string> &args)
 {
+  CONFIRM_WITH_PASSWORD();
   success_msg_writer() << "Please enter a password to secure this seed. Securing your seed is HIGHLY recommended. Leave password blank to stay unsecured.";
   success_msg_writer(true) << "Remember, restoring a wallet from Secured Seed can only be done if you know its password.";
 
@@ -1715,6 +1755,7 @@ bool simple_wallet::show_seed(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::spendkey(const std::vector<std::string> &args)
 {
+  CONFIRM_WITH_PASSWORD();
   message_writer(epee::log_space::console_color_red, true, std::string())
    << "WARNING! Anyone who knows the following secret key can access your wallet and spend your coins.";
 
@@ -1727,6 +1768,7 @@ bool simple_wallet::spendkey(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::viewkey(const std::vector<std::string> &args)
 {
+  CONFIRM_WITH_PASSWORD();
   message_writer(epee::log_space::console_color_yellow, false, std::string())
     << "WARNING! Anyone who knows the following secret key can view your wallet (but can not spend your coins).";
 
@@ -1924,6 +1966,7 @@ bool simple_wallet::list_outputs(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::sign_transfer(const std::vector<std::string> &args)
 {
+  CONFIRM_WITH_PASSWORD();
   if (m_wallet->is_watch_only())
   {
     fail_msg_writer() << "You can't sign transaction in watch-only wallet";
@@ -1997,6 +2040,7 @@ bool simple_wallet::tor_disable(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
 {
+  CONFIRM_WITH_PASSWORD();
   SIMPLE_WALLET_BEGIN_TRY_ENTRY();
   asset_descriptor_base adb = AUTO_VAL_INIT(adb);
   if (!args.size() || args.size() > 1)
@@ -2034,7 +2078,7 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::emit_asset(const std::vector<std::string> &args)
 {
-
+  CONFIRM_WITH_PASSWORD();
   SIMPLE_WALLET_BEGIN_TRY_ENTRY();
   if (args.size() != 2)
   {
@@ -2089,6 +2133,7 @@ bool simple_wallet::emit_asset(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::burn_asset(const std::vector<std::string> &args)
 {
+  CONFIRM_WITH_PASSWORD();
   SIMPLE_WALLET_BEGIN_TRY_ENTRY();
   if (args.size() != 2)
   {
@@ -2137,6 +2182,7 @@ bool simple_wallet::burn_asset(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::update_asset(const std::vector<std::string> &args)
 {
+  CONFIRM_WITH_PASSWORD();
   SIMPLE_WALLET_BEGIN_TRY_ENTRY();
   if (args.size() != 2)
   {
@@ -2186,6 +2232,7 @@ bool simple_wallet::update_asset(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::add_custom_asset_id(const std::vector<std::string> &args)
 {
+  CONFIRM_WITH_PASSWORD();
   SIMPLE_WALLET_BEGIN_TRY_ENTRY();
   if (!args.size() || args.size() > 1)
   {
@@ -2221,6 +2268,7 @@ bool simple_wallet::add_custom_asset_id(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::generate_ionic_swap_proposal(const std::vector<std::string> &args)
 {
+  CONFIRM_WITH_PASSWORD();
   SIMPLE_WALLET_BEGIN_TRY_ENTRY();
 
   if (args.size() != 2)
@@ -2309,6 +2357,7 @@ bool simple_wallet::get_ionic_swap_proposal_info(const std::vector<std::string> 
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::accept_ionic_swap_proposal(const std::vector<std::string> &args)
 {
+  CONFIRM_WITH_PASSWORD();
   SIMPLE_WALLET_BEGIN_TRY_ENTRY();
 
   if (args.size() != 1)
@@ -2350,6 +2399,7 @@ bool simple_wallet::accept_ionic_swap_proposal(const std::vector<std::string> &a
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::remove_custom_asset_id(const std::vector<std::string> &args)
 {
+  CONFIRM_WITH_PASSWORD();
   SIMPLE_WALLET_BEGIN_TRY_ENTRY();
   if (!args.size() || args.size() > 1)
   {
@@ -2380,6 +2430,7 @@ bool simple_wallet::remove_custom_asset_id(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::sweep_below(const std::vector<std::string> &args)
 {
+  CONFIRM_WITH_PASSWORD();
   SIMPLE_WALLET_BEGIN_TRY_ENTRY();
   bool r = false;
   if (args.size() < 3 || args.size() > 4)
@@ -2623,6 +2674,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_disable_tor_relay);
   command_line::add_arg(desc_params, arg_set_timeout);
   command_line::add_arg(desc_params, arg_voting_config_file);
+  command_line::add_arg(desc_params, arg_no_password_confirmations);
+  
   
   
 

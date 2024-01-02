@@ -164,6 +164,8 @@
 #define BLOCK_POS_STRICT_SEQUENCE_LIMIT                 20  // the highest allowed sequence factor for a PoS block (i.e., the max total number of sequential PoS blocks is BLOCK_POS_STRICT_SEQUENCE_LIMIT + 1)
 
 
+#define CORE_FEE_BLOCKS_LOOKUP_WINDOW                   60  //number of blocks used to check if transaction flow is big enought to rise default fee
+
 #define WALLET_FILE_SIGNATURE_OLD                       0x1111012101101011LL  // Bender's nightmare
 #define WALLET_FILE_SIGNATURE_V2                        0x1111011201101011LL  // another Bender's nightmare
 #define WALLET_FILE_BINARY_HEADER_VERSION_INITAL        1000
@@ -246,8 +248,8 @@
 #define BC_OFFERS_CURRENCY_MARKET_FILENAME              "market.bin"
 
 #ifndef TESTNET
-#define WALLET_FILE_SERIALIZATION_VERSION               160
-#define WALLET_FILE_LAST_SUPPORTED_VERSION              160
+#define WALLET_FILE_SERIALIZATION_VERSION               161
+#define WALLET_FILE_LAST_SUPPORTED_VERSION              161
 #else 
 #define WALLET_FILE_LAST_SUPPORTED_VERSION              (CURRENCY_FORMATION_VERSION+76)
 #define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+76)

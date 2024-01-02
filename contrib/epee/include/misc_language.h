@@ -274,6 +274,21 @@ namespace misc_utils
       }
     }
 
+    uint64_t get_avg() const
+    {
+      CRITICAL_REGION_LOCAL(m_lock);
+      if (!queued_items.size())
+        return 0;
+
+      uint64_t summ = 0;
+      for (const auto& item : queued_items)
+      {
+        summ += *item.first;
+      }
+
+      return summ / queued_items.size();      
+    }
+
     template<typename key_t, typename associated_data_t>
     friend std::ostream & operator<< (std::ostream &out, median_helper<key_t, associated_data_t> const &mh);
   }; // class median_helper

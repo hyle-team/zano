@@ -1939,6 +1939,17 @@ QString MainWindow::restore_wallet(const QString& param)
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
+QString MainWindow::use_whitelisting(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  //return que_call2<view::restore_wallet_request>("restore_wallet", param, [this](const view::restore_wallet_request& owd, view::api_response& ar){
+  PREPARE_ARG_FROM_JSON(view::api_request_t<bool>, owd);
+  PREPARE_RESPONSE(view::api_responce_return_code, ar);
+  ar.error_code = m_backend.use_whitelisting(owd.wallet_id, owd.req_data);
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
 QString MainWindow::open_wallet(const QString& param)
 {
   TRY_ENTRY();

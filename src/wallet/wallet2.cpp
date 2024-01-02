@@ -640,8 +640,17 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
             auto it = m_key_images.find(ki);
             if (it != m_key_images.end())
             {
+              // Issue that has been discovered by Luke Parker (twitter: @kayabaNerve)
+              // An attacker can quickly issue transaction that use same outputs ephemeral keys + same tx key, as a result both 
+              // transaction's outputs would have same key image, so the wallet should have smart approach to this situation, ie 
+              // use output that offer biggest output value.(tokens?)
+
+
               WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second < m_transfers.size(), "m_key_images entry has wrong m_transfers index, it->second: " << it->second << ", m_transfers.size(): " << m_transfers.size());
               const transfer_details& local_td = m_transfers[it->second];
+
+
+
               std::stringstream ss;
               ss << "tx " << ptc.tx_hash() << " @ block " << height << " has output #" << o << " with key image " << ki << " that has already been seen in output #" <<
                 local_td.m_internal_output_index << " in tx " << get_transaction_hash(local_td.m_ptx_wallet_info->m_tx) << " @ block " << local_td.m_spent_height <<
@@ -3414,10 +3423,13 @@ bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, u
     auto it_cust = custom_assets_local.find(item.first);
     if(it_cust == custom_assets_local.end()) 
     {
+      if(!m_use_assets_whitelisting)
+        continue;
+
       auto it_local = m_whitelisted_assets.find(item.first);
-      if(it_local == m_whitelisted_assets.end()) 
+      if(it_local == m_whitelisted_assets.end())
       {
-        WLT_LOG_YELLOW("WARNING: unknown asset " << item.first << " found and skipped; it's NOT included in balance", LOG_LEVEL_0);
+        WLT_LOG_YELLOW("WARNING: unknown asset " << item.first << " found and skipped; it's NOT included in balance", LOG_LEVEL_1);
         continue;
       }
       else 
@@ -3637,7 +3649,7 @@ std::string wallet2::get_balance_str() const
   balance(balances, mined);
   for (const tools::wallet_public::asset_balance_entry& b : balances)
   {
-    ss << " " << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(b.unlocked, b.asset_info.decimal_point);
+    ss << " " << std::left << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(b.unlocked, b.asset_info.decimal_point);
     if (b.total == b.unlocked)
       ss << "                       ";
     else
@@ -5466,17 +5478,19 @@ bool wallet2::create_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
 {
   std::vector<uint64_t> selected_transfers_for_template;
   
-  build_ionic_swap_template(proposal_details, destination_addr, proposal, selected_transfers_for_template);
+  return build_ionic_swap_template(proposal_details, destination_addr, proposal, selected_transfers_for_template);
 
   //const uint32_t mask_to_mark_escrow_template_locked_transfers = WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION;
   //mark_transfers_with_flag(selected_transfers_for_template, mask_to_mark_escrow_template_locked_transfers, "preparing ionic_swap");
-  return true;
+  //return true;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal_info& proposal_detais, const currency::account_public_address& destination_addr,
   wallet_public::ionic_swap_proposal& proposal,
   std::vector<uint64_t>& selected_transfers)
 {
+  WLT_THROW_IF_FALSE_WITH_CODE(proposal_detais.fee_paid_by_a >= get_current_minimum_network_fee(), "Error at build_ionic_swap_template, ", API_RETURN_CODE_WALLET_FEE_TOO_LOW);
+
   construct_tx_param ctp = get_default_construct_tx_param();
   
   ctp.fake_outputs_count = proposal_detais.mixins;
