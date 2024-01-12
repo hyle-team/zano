@@ -5815,9 +5815,11 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   // TODO @#@# consider: 1) tx.proofs, 2) new proof data structures
 
   if (var_is_after_hardfork_4_zone)
-  {
+  {    
     CHECK_AND_ASSERT_MES(tx.version > TRANSACTION_VERSION_PRE_HF4, false, "HF4: tx with version " << tx.version << " is not allowed");
-    CHECK_AND_ASSERT_MES(tx.vout.size() >= CURRENCY_TX_MIN_ALLOWED_OUTS, false, "HF4: tx.vout has " << tx.vout.size() << " element(s), while required minimum is " << CURRENCY_TX_MIN_ALLOWED_OUTS);
+    bool pos_coinbase = false;
+    bool coinbase = is_coinbase(tx, pos_coinbase);
+    CHECK_AND_ASSERT_MES((coinbase && pos_coinbase) || tx.vout.size() >= CURRENCY_TX_MIN_ALLOWED_OUTS, false, "HF4: tx.vout has " << tx.vout.size() << " element(s), while required minimum is " << CURRENCY_TX_MIN_ALLOWED_OUTS);
 
     if(!validate_inputs_sorting(tx))
     {
