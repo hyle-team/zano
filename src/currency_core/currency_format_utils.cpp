@@ -116,7 +116,7 @@ namespace currency
           secret_index = ring.size() - 1;
       }
 
-      CHECK_AND_ASSERT_MES(secret_index != SIZE_MAX, false, "out #" << j << ": can't find a corresponding asset id in inputs");
+      CHECK_AND_ASSERT_MES(secret_index != SIZE_MAX, false, "out #" << j << ": can't find a corresponding asset id in inputs, asset id: " << H);
 
       result.bge_proofs.emplace_back(crypto::BGE_proof_s{});
       uint8_t err = 0;
@@ -547,16 +547,16 @@ namespace currency
     if (additional_inputs_amount_and_fees_for_mining_tx == 0)
     {
       // normal tx
-      CHECK_AND_ASSERT_MES(bare_inputs_sum >= bare_outputs_sum, false, "tx balance error: sum of inputs (" << print_money_brief(bare_inputs_sum)
-        << ") is less than or equal to sum of outputs(" << print_money_brief(bare_outputs_sum) << ")");
+      CHECK_AND_ASSERT_MES(bare_inputs_sum >= bare_outputs_sum, false, "tx balance error: the sum of inputs (" << print_money_brief(bare_inputs_sum)
+        << ") is less than or equal to the sum of outputs (" << print_money_brief(bare_outputs_sum) << ")");
     }
     else
     {
       // miner tx
       CHECK_AND_ASSERT_MES(bare_inputs_sum + additional_inputs_amount_and_fees_for_mining_tx == bare_outputs_sum, false,
-        "tx balance error: sum of inputs (" << print_money_brief(bare_inputs_sum) <<
+        "tx balance error: the sum of inputs (" << print_money_brief(bare_inputs_sum) <<
         ") + additional inputs and fees (" << print_money_brief(additional_inputs_amount_and_fees_for_mining_tx) <<
-        ") is less than or equal to sum of outputs(" << print_money_brief(bare_outputs_sum) << ")");
+        ") is less than or equal to the sum of outputs (" << print_money_brief(bare_outputs_sum) << ")");
     }
     return true;
   }
