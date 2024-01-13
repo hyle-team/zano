@@ -3751,6 +3751,25 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
+  //if return 0 -> no txin_zc_input seen
+  uint64_t get_hf4_inputs_key_offsets_count(const transaction& tx)
+  {
+    uint64_t key_offsets_count = 0;
+
+    for (const auto& e : tx.vin)
+    {
+      if (e.type() != typeid(txin_zc_input))
+        continue;
+
+      if (boost::get<txin_zc_input>(e).key_offsets.size() > key_offsets_count)
+      {
+        key_offsets_count = boost::get<txin_zc_input>(e).key_offsets.size();
+      }
+    }
+
+    return key_offsets_count;
+  }
+  //---------------------------------------------------------------
   bool check_native_coins_amount_burnt_in_outs(const transaction& tx, const uint64_t amount, uint64_t* p_amount_burnt /* = nullptr */)
   {
     if (tx.version <= TRANSACTION_VERSION_PRE_HF4)

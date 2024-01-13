@@ -37,6 +37,7 @@
 #define CURRENT_BLOCK_MAJOR_VERSION                     3
 
 #define CURRENCY_DEFAULT_DECOY_SET_SIZE                 10
+#define CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE           15
 
 #define CURRENT_BLOCK_MINOR_VERSION                     0
 #define CURRENCY_BLOCK_FUTURE_TIME_LIMIT                60*60*2

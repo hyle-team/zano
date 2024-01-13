@@ -421,6 +421,7 @@ namespace currency
   bool add_padding_to_tx(transaction& tx, size_t count);
   bool is_service_tx(const transaction& tx);
   bool does_tx_have_only_mixin_inputs(const transaction& tx);
+  uint64_t get_hf4_inputs_key_offsets_count(const transaction& tx);
   bool is_showing_sender_addres(const transaction& tx);
   bool check_native_coins_amount_burnt_in_outs(const transaction& tx, const uint64_t amount, uint64_t* p_amount_burnt = nullptr);
   std::string print_stake_kernel_info(const stake_kernel& sk);

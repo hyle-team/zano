@@ -5814,6 +5814,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   
   // TODO @#@# consider: 1) tx.proofs, 2) new proof data structures
 
+
   if (var_is_after_hardfork_4_zone)
   {    
     CHECK_AND_ASSERT_MES(tx.version > TRANSACTION_VERSION_PRE_HF4, false, "HF4: tx with version " << tx.version << " is not allowed");
@@ -5825,6 +5826,10 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     {
       return false;
     }
+    uint64_t keys_count = get_hf4_inputs_key_offsets_count(tx); 
+    if (keys_count != 0 && keys_count - 1 < CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE)
+      return false;
+
   }
 
 
