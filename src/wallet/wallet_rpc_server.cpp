@@ -289,7 +289,7 @@ namespace tools
     for (const auto& item : rsp2.transfers)
     {
       res.transfers.push_back(wallet_public::wallet_transfer_info_old());
-      static_cast<wallet_public::wallet_transfer_info>(res.transfers.back()) = item;
+      *static_cast<wallet_public::wallet_transfer_info*>(&res.transfers.back()) = item;
       for (const auto& subitem : item.subtransfers)
       {
         if (subitem.asset_id == currency::native_coin_asset_id)
