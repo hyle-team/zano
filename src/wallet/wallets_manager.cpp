@@ -548,7 +548,8 @@ bool wallets_manager::init_local_daemon()
 
   //chain calls to rpc server
   m_prpc_chain_handler = &m_wallet_rpc_server;
-  m_rpc_server.set_rpc_chain_handler(this);
+  //disable this until we get full support of authentication with network
+  //m_rpc_server.set_rpc_chain_handler(this);
 
 
   LOG_PRINT_L0("Starting core rpc server...");
