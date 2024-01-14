@@ -21,6 +21,7 @@
 #include "crypto/hash.h"
 #include "profile_tools.h"
 #include "common/db_backend_selector.h"
+#include "tx_semantic_validation.h"
 
 DISABLE_VS_WARNINGS(4244 4345 4503) //'boost::foreach_detail_::or_' : decorated name length exceeded, name was truncated
 
@@ -167,6 +168,17 @@ namespace currency
     //check key images for transaction if it is not kept by block
     if(!from_core && !kept_by_block)
     {
+
+      if(!validate_tx_semantic(tx, blob_size))
+      {          
+        // tx semantics check failed
+        LOG_PRINT_RED_L0("Transaction " << id << " semantics check failed ");
+        tvc.m_verification_failed = true;
+        tvc.m_should_be_relayed = false;
+        tvc.m_added_to_pool = false;
+        return false;
+      }
+
       crypto::key_image spent_ki = AUTO_VAL_INIT(spent_ki);
       r = !have_tx_keyimges_as_spent(tx, &spent_ki);
       CHECK_AND_ASSERT_MES(r, false, "Transaction " << id << " uses already spent key image " << spent_ki);
