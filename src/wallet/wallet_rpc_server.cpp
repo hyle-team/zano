@@ -240,6 +240,7 @@ namespace tools
     WALLET_RPC_CATCH_TRY_ENTRY();
     return true;
   }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_getwallet_info(const wallet_public::COMMAND_RPC_GET_WALLET_INFO::request& req, wallet_public::COMMAND_RPC_GET_WALLET_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
@@ -258,6 +259,7 @@ namespace tools
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_getwallet_restore_info(const wallet_public::COMMAND_RPC_GET_WALLET_RESTORE_INFO::request& req, wallet_public::COMMAND_RPC_GET_WALLET_RESTORE_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
@@ -265,6 +267,7 @@ namespace tools
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_get_seed_phrase_info(const wallet_public::COMMAND_RPC_GET_SEED_PHRASE_INFO::request& req, wallet_public::COMMAND_RPC_GET_SEED_PHRASE_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
@@ -272,7 +275,36 @@ namespace tools
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_get_recent_txs_and_info(const wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::request& req, wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    //this is legacy api, should be removed after successful transition to HF4 
+    wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO2::response rsp2 = AUTO_VAL_INIT(rsp2);
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    
+    on_get_recent_txs_and_info2(req, rsp2, er, cntx);
+    res.pi = rsp2.pi;
+    res.total_transfers = rsp2.total_transfers;
+    res.last_item_index = rsp2.last_item_index;
+    for (const auto& item : rsp2.transfers)
+    {
+      res.transfers.push_back(wallet_public::wallet_transfer_info_old());
+      static_cast<wallet_public::wallet_transfer_info>(res.transfers.back()) = item;
+      for (const auto& subitem : item.subtransfers)
+      {
+        if (subitem.asset_id == currency::native_coin_asset_id)
+        {
+          res.transfers.back().amount = subitem.amount;
+          res.transfers.back().is_income = subitem.is_income;
+        }
+      }
+    }
+   
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_get_recent_txs_and_info2(const wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO2::request& req, wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO2::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
     if (req.update_provision_info)
