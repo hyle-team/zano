@@ -4533,7 +4533,7 @@ bool blockchain_storage::print_tx_outputs_lookup(const crypto::hash& tx_id)const
   return true;
 }
 //------------------------------------------------------------------
-bool check_tx_explicit_asset_id_rules(const transaction& tx, bool all_tx_ins_have_explicit_asset_ids)
+bool check_tx_explicit_asset_id_rules(const transaction& tx, bool all_tx_ins_have_explicit_native_asset_ids)
 {
   if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
     return true;
@@ -4541,13 +4541,13 @@ bool check_tx_explicit_asset_id_rules(const transaction& tx, bool all_tx_ins_hav
   // ( assuming that post-HF4 txs can only have tx_out_zarcanum outs )
 
   bool r = false;
-  // if all tx inputs have explicit asset id AND it does not emit a new asset THEN all outputs must have explicit asset id (native coin)
-  if (all_tx_ins_have_explicit_asset_ids && !is_asset_emitting_transaction(tx))
+  // if all tx inputs have explicit native asset id AND it does not emit a new asset THEN all outputs must have explicit asset id (native coin)
+  if (all_tx_ins_have_explicit_native_asset_ids && !is_asset_emitting_transaction(tx))
   {
     for(size_t j = 0, k = tx.vout.size(); j < k; ++j)
     {
       r = crypto::point_t(boost::get<tx_out_zarcanum>(tx.vout[j]).blinded_asset_id).modify_mul8().to_public_key() == native_coin_asset_id;
-      CHECK_AND_ASSERT_MES(r, false, "output #" << j << " has a non-explicit asset id");
+      CHECK_AND_ASSERT_MES(r, false, "output #" << j << " has a non-explicit asset id in a tx where all inputs have an explicit native asset id");
     }
   }
   else // otherwise all outputs must have hidden asset id (unless they burn money by sending them to null pubkey) 
@@ -4556,7 +4556,7 @@ bool check_tx_explicit_asset_id_rules(const transaction& tx, bool all_tx_ins_hav
     {
       const tx_out_zarcanum& zo = boost::get<tx_out_zarcanum>(tx.vout[j]);
       r = zo.stealth_address == null_pkey || crypto::point_t(zo.blinded_asset_id).modify_mul8().to_public_key() != native_coin_asset_id;
-      CHECK_AND_ASSERT_MES(r, false, "output #" << j << " has an explicit asset id");
+      CHECK_AND_ASSERT_MES(r, false, "output #" << j << " has an explicit asset id in a tx where not all inputs have an explicit native asset id");
     }
   }
   return true;
@@ -4602,7 +4602,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
 {
   size_t sig_index = 0;
   max_used_block_height = 0;
-  bool all_tx_ins_have_explicit_asset_ids = true;
+  bool all_tx_ins_have_explicit_native_asset_ids = true;
 
   auto local_check_key_image = [&](const crypto::key_image& ki) -> bool
   {
@@ -4664,7 +4664,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
       if (!local_check_key_image(in_zc.k_image))
         return false;
 
-      if (!check_tx_input(tx, sig_index, in_zc, tx_prefix_hash, max_used_block_height, all_tx_ins_have_explicit_asset_ids))
+      if (!check_tx_input(tx, sig_index, in_zc, tx_prefix_hash, max_used_block_height, all_tx_ins_have_explicit_native_asset_ids))
       {
         LOG_ERROR("Failed to validate zc input #" << sig_index << " in tx: " << tx_prefix_hash);
         return false;
@@ -4687,7 +4687,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
       CHECK_AND_ASSERT_MES(r, false, "Failed to validate attachments in tx " << tx_prefix_hash << ": incorrect extra_attachment_info in tx.extra");
     }
 
-    CHECK_AND_ASSERT_MES(check_tx_explicit_asset_id_rules(tx, all_tx_ins_have_explicit_asset_ids), false, "tx does not comply with explicit asset id rules");
+    CHECK_AND_ASSERT_MES(check_tx_explicit_asset_id_rules(tx, all_tx_ins_have_explicit_native_asset_ids), false, "tx does not comply with explicit asset id rules");
   }
   TIME_MEASURE_FINISH_PD(tx_check_inputs_attachment_check);
   return true;
@@ -5071,7 +5071,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 }
 //------------------------------------------------------------------
 bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_zc_input& zc_in, const crypto::hash& tx_prefix_hash,
-  uint64_t& max_related_block_height, bool& all_tx_ins_have_explicit_asset_ids) const
+  uint64_t& max_related_block_height, bool& all_tx_ins_have_explicit_native_asset_ids) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
@@ -5104,8 +5104,8 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   for(auto& zc_out : scan_contex.zc_outs)
   {
     ring.emplace_back(zc_out.stealth_address, zc_out.amount_commitment, zc_out.blinded_asset_id);
-    if (all_tx_ins_have_explicit_asset_ids && crypto::point_t(zc_out.blinded_asset_id).modify_mul8().to_public_key() != native_coin_asset_id)
-      all_tx_ins_have_explicit_asset_ids = false;
+    if (all_tx_ins_have_explicit_native_asset_ids && crypto::point_t(zc_out.blinded_asset_id).modify_mul8().to_public_key() != native_coin_asset_id)
+      all_tx_ins_have_explicit_native_asset_ids = false;
   }
 
   // calculate corresponding tx prefix hash
