@@ -725,14 +725,24 @@ namespace currency
     return total;
   }
   //---------------------------------------------------------------
-  bool is_mixattr_applicable_for_fake_outs_counter(uint8_t mix_attr, uint64_t fake_outputs_count)
+  bool is_mixattr_applicable_for_fake_outs_counter(uint64_t out_tx_version, uint8_t mix_attr, uint64_t fake_outputs_count)
   {
-    if (mix_attr >= CURRENCY_TO_KEY_OUT_FORCED_MIX_LOWER_BOUND)
-      return fake_outputs_count + 1 >= mix_attr;
-    else if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
-      return fake_outputs_count == 0;
+    if (out_tx_version >= TRANSACTION_VERSION_POST_HF4)
+    {
+      if (mix_attr != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+        return fake_outputs_count == CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE;
+      else
+        return fake_outputs_count == 0; // CURRENCY_TO_KEY_OUT_FORCED_NO_MIX
+    }
     else
-      return true;
+    {
+      if (mix_attr >= CURRENCY_TO_KEY_OUT_FORCED_MIX_LOWER_BOUND)
+        return fake_outputs_count + 1 >= mix_attr;
+      else if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+        return fake_outputs_count == 0;
+      else
+        return true;
+    }
   }
   //---------------------------------------------------------------
   bool parse_amount(uint64_t& amount, const std::string& str_amount_)

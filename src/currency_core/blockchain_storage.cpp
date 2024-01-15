@@ -7473,7 +7473,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
         const txout_to_key& out_tk = boost::get<txout_to_key>(t);
         pk = out_tk.key;
 
-        bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(out_tk.mix_attr, abs_key_offsets.size() - 1);
+        bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(p->tx.version, out_tk.mix_attr, abs_key_offsets.size() - 1);
         CHECK_AND_ASSERT_MES(mixattr_ok, false, "input offset #" << pk_n << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(out_tk.mix_attr) << ", input's key_offsets.size = " << abs_key_offsets.size());
 
       }
