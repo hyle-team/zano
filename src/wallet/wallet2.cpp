@@ -3348,7 +3348,7 @@ bool wallet2::balance(std::unordered_map<crypto::public_key, wallet_public::asse
       if (is_transfer_unlocked(td))
         e.unlocked += td.amount();
       if (td.m_flags & WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER)
-        mined += td.amount();
+        mined += CURRENCY_BLOCK_REWARD; //this code would work only for cases where block reward is full. For reduced block rewards might need more flexible code (TODO)
     }
   }
 
