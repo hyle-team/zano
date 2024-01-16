@@ -407,7 +407,7 @@ namespace currency
   std::vector<txout_ref_v> relative_output_offsets_to_absolute(const std::vector<txout_ref_v>& off);
   bool absolute_sorted_output_offsets_to_relative_in_place(std::vector<txout_ref_v>& offsets) noexcept;
 
-
+  bool validate_output_key_legit(const crypto::public_key& k);
 
   // prints amount in format "3.14", "0.0"
   std::string print_money_brief(uint64_t amount, size_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT);

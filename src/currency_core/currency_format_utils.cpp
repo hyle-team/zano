@@ -3330,9 +3330,15 @@ namespace currency
     att.push_back(tsa);
     return true;
   }
-
-
-
+  //---------------------------------------------------------------
+  bool validate_output_key_legit(const crypto::public_key& k)
+  {
+    if (currency::null_pkey == k)
+    {
+      return false;
+    }
+    return true;
+  }
   //---------------------------------------------------------------
   std::string print_money_brief(uint64_t amount, size_t decimal_point /* = CURRENCY_DISPLAY_DECIMAL_POINT */)
   {

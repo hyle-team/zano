@@ -737,6 +737,8 @@ namespace currency
   template<class visitor_t>
   bool blockchain_storage::scan_outputkeys_for_indexes(const transaction &validated_tx, const txin_v& verified_input, visitor_t& vis, uint64_t& max_related_block_height, scan_for_keys_context& scan_context) const
   {
+    bool hf4 = this->is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM);
+
     uint64_t amount = get_amount_from_variant(verified_input);
     const std::vector<txout_ref_v>& key_offsets = get_key_offsets_from_txin_v(verified_input);
 
@@ -809,6 +811,11 @@ namespace currency
 
           bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(tx_ptr->tx.version, outtk.mix_attr, key_offsets.size() - 1);
           CHECK_AND_ASSERT_MES(mixattr_ok, false, "tx input ref #" << output_index << " violates mixin restrictions: tx.version = " << tx_ptr->tx.version << ", mix_attr = " << static_cast<uint32_t>(outtk.mix_attr) << ", key_offsets.size = " << key_offsets.size());
+          if (hf4)
+          {
+            bool legit_output_key = validate_output_key_legit(outtk.key);
+            CHECK_AND_ASSERT_MES(legit_output_key, false, "tx input ref #" << output_index << " violates public key restrictions: tx.version = " << tx_ptr->tx.version << ", outtk.key = " << outtk.key);
+          }
         }
         else if (o.target.type() == typeid(txout_htlc))
         {
@@ -828,6 +835,12 @@ namespace currency
             //HTLC IS expired, can be used ONLY by pkey_after_expiration and ONLY by to_key input
             scan_context.htlc_is_expired = true;
           }
+          if (hf4)
+          {
+            bool legit_output_key = validate_output_key_legit(scan_context.htlc_is_expired ? htlc_out.pkey_refund: htlc_out.pkey_redeem);
+            CHECK_AND_ASSERT_MES(legit_output_key, false, "tx input ref #" << output_index << " violates public key restrictions: tx.version = " << tx_ptr->tx.version << ", outtk.key = " << static_cast<const crypto::public_key&>(scan_context.htlc_is_expired ? htlc_out.pkey_refund : htlc_out.pkey_redeem));
+          }
+
         }
         else
         {
@@ -851,6 +864,10 @@ namespace currency
 
         r = is_mixattr_applicable_for_fake_outs_counter(tx_ptr->tx.version, out_zc.mix_attr, key_offsets.size() - 1);
         CHECK_AND_ASSERT_MES(r, false, "tx input ref #" << output_index << " violates mixin restrictions: tx.version = " << tx_ptr->tx.version << ", mix_attr = " << static_cast<uint32_t>(out_zc.mix_attr) << ", key_offsets.size = " << key_offsets.size());
+
+        bool legit_output_key = validate_output_key_legit(out_zc.stealth_address);
+        CHECK_AND_ASSERT_MES(legit_output_key, false, "tx input ref #" << output_index << " violates public key restrictions: tx.version = " << tx_ptr->tx.version << ", outtk.key = " << out_zc.stealth_address);
+
 
         TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
         if (!vis.handle_output(tx_ptr->tx, validated_tx, out_zc, n))
