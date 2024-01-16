@@ -4278,7 +4278,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
   uint64_t secret_index = 0; // index of the real stake output
 
   // get decoys outputs and construct miner tx
-  static size_t required_decoys_count = 4;          // TODO @#@# set them somewhere else
+  const size_t required_decoys_count = m_core_runtime_config.hf4_minimum_mixins == 0 ? 4 /* <-- for tests */ : m_core_runtime_config.hf4_minimum_mixins;
   static bool use_only_forced_to_mix = false;       // TODO @#@# set them somewhere else
   if (required_decoys_count > 0 && !is_auditable())
   {
