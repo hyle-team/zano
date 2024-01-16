@@ -387,8 +387,10 @@ namespace currency
     std::vector<uint64_t> out_amounts;
     if (tx_version > TRANSACTION_VERSION_PRE_HF4)
     {
-      // randomly split into CURRENCY_TX_MIN_ALLOWED_OUTS outputs
-      decompose_amount_randomly(block_reward, [&](uint64_t a){ out_amounts.push_back(a); }, CURRENCY_TX_MIN_ALLOWED_OUTS);
+      // randomly split into CURRENCY_TX_MIN_ALLOWED_OUTS outputs for PoW block, or for PoS block only if the stakeholder address differs
+      // (otherwise for PoS miner tx there will be ONE output with amount = stake_amount + reward)
+      if (!pos || miner_address != stakeholder_address)
+        decompose_amount_randomly(block_reward, [&](uint64_t a){ out_amounts.push_back(a); }, CURRENCY_TX_MIN_ALLOWED_OUTS);
     }
     else
     {
@@ -424,7 +426,8 @@ namespace currency
       uint64_t stake_lock_time = 0;
       if (pe.stake_unlock_time && pe.stake_unlock_time > height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
         stake_lock_time = pe.stake_unlock_time;
-      destinations.push_back(tx_destination_entry(pe.amount, stakeholder_address, stake_lock_time));
+      uint64_t amount = destinations.empty() ? pe.amount + block_reward : pe.amount;  // combine stake and reward into one output if no destinations were generated above
+      destinations.push_back(tx_destination_entry(amount, stakeholder_address, stake_lock_time));
       destinations.back().flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // don't use asset id blinding as it's obvious which asset it is
     }
 
