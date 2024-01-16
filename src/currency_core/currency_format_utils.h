@@ -362,7 +362,7 @@ namespace currency
   tx_derivation_hint make_tx_derivation_hint_from_uint16(uint16_t hint);
 
   std::string short_hash_str(const crypto::hash& h);
-  bool is_mixattr_applicable_for_fake_outs_counter(uint64_t out_tx_version, uint8_t out_mix_attr, uint64_t fake_outputs_count);
+  bool is_mixattr_applicable_for_fake_outs_counter(uint64_t out_tx_version, uint8_t out_mix_attr, uint64_t fake_outputs_count, const core_runtime_config& rtc);
   bool is_tx_spendtime_unlocked(uint64_t unlock_time, uint64_t current_blockchain_size, uint64_t current_time);
   crypto::key_derivation get_encryption_key_derivation(bool is_income, const transaction& tx, const account_keys& acc_keys);
   bool decrypt_payload_items(bool is_income, const transaction& tx, const account_keys& acc_keys, std::vector<payload_items_v>& decrypted_items);

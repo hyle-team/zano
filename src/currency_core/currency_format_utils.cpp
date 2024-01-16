@@ -728,12 +728,12 @@ namespace currency
     return total;
   }
   //---------------------------------------------------------------
-  bool is_mixattr_applicable_for_fake_outs_counter(uint64_t out_tx_version, uint8_t mix_attr, uint64_t fake_outputs_count)
+  bool is_mixattr_applicable_for_fake_outs_counter(uint64_t out_tx_version, uint8_t mix_attr, uint64_t fake_outputs_count, const core_runtime_config& rtc)
   {
     if (out_tx_version >= TRANSACTION_VERSION_POST_HF4)
     {
       if (mix_attr != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
-        return fake_outputs_count == CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE;
+        return fake_outputs_count >= rtc.hf4_minimum_mixins;
       else
         return fake_outputs_count == 0; // CURRENCY_TO_KEY_OUT_FORCED_NO_MIX
     }

@@ -809,7 +809,7 @@ namespace currency
           //fix for burned money
           patch_out_if_needed(const_cast<txout_to_key&>(outtk), tx_id, n);
 
-          bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(tx_ptr->tx.version, outtk.mix_attr, key_offsets.size() - 1);
+          bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(tx_ptr->tx.version, outtk.mix_attr, key_offsets.size() - 1, this->get_core_runtime_config());
           CHECK_AND_ASSERT_MES(mixattr_ok, false, "tx input ref #" << output_index << " violates mixin restrictions: tx.version = " << tx_ptr->tx.version << ", mix_attr = " << static_cast<uint32_t>(outtk.mix_attr) << ", key_offsets.size = " << key_offsets.size());
           if (hf4)
           {
@@ -862,7 +862,7 @@ namespace currency
         bool r = is_output_allowed_for_input(out_zc, verified_input);
         CHECK_AND_ASSERT_MES(r, false, "Input and output are incompatible");
 
-        r = is_mixattr_applicable_for_fake_outs_counter(tx_ptr->tx.version, out_zc.mix_attr, key_offsets.size() - 1);
+        r = is_mixattr_applicable_for_fake_outs_counter(tx_ptr->tx.version, out_zc.mix_attr, key_offsets.size() - 1, this->get_core_runtime_config());
         CHECK_AND_ASSERT_MES(r, false, "tx input ref #" << output_index << " violates mixin restrictions: tx.version = " << tx_ptr->tx.version << ", mix_attr = " << static_cast<uint32_t>(out_zc.mix_attr) << ", key_offsets.size = " << key_offsets.size());
 
         bool legit_output_key = validate_output_key_legit(out_zc.stealth_address);

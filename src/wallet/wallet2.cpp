@@ -6526,7 +6526,7 @@ bool wallet2::is_transfer_able_to_go(const transfer_details& td, uint64_t fake_o
   uint8_t mix_attr = CURRENCY_TO_KEY_OUT_RELAXED;
   if (get_mix_attr_from_tx_out_v(out_v, mix_attr))
   {
-    if (!currency::is_mixattr_applicable_for_fake_outs_counter(td.m_ptx_wallet_info->m_tx.version, mix_attr, fake_outputs_count))
+    if (!currency::is_mixattr_applicable_for_fake_outs_counter(td.m_ptx_wallet_info->m_tx.version, mix_attr, fake_outputs_count, m_core_runtime_config))
       return false;
   }
 

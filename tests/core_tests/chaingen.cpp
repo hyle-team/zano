@@ -2478,6 +2478,7 @@ bool test_chain_unit_enchanced::configure_core(currency::core& c, size_t ev_inde
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
+  pc.hf4_minimum_mixins = 0;
   pc.hard_forks = m_hardforks;
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
