@@ -2832,7 +2832,11 @@ bool blockchain_storage::get_random_outs_for_amounts2(const COMMAND_RPC_GET_RAND
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   LOG_PRINT_L3("[get_random_outs_for_amounts] amounts: " << req.amounts.size());
-  std::map<uint64_t, uint64_t> amounts_to_up_index_limit_cache;
+  std::map<uint64_t, uint64_t> amounts_to_up_index_limit_cache;  
+  uint64_t count_zarcanum_blocks = 0;
+  if(is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM))
+     count_zarcanum_blocks = this->get_current_blockchain_size() - m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_HARDFORK_04_ZARCANUM];
+
 
   for (size_t i = 0; i != req.amounts.size(); i++)
   {
@@ -2842,7 +2846,7 @@ bool blockchain_storage::get_random_outs_for_amounts2(const COMMAND_RPC_GET_RAND
     result_outs.amount = amount;
 
     bool r = false;
-    if (amount == 0)
+    if (amount == 0 && count_zarcanum_blocks > 20000)
     {
       //zarcanum era inputs
       r = get_target_outs_for_postzarcanum(req, req.amounts[i], result_outs, amounts_to_up_index_limit_cache);
