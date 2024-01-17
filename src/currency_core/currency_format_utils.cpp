@@ -4041,11 +4041,7 @@ namespace currency
   //-----------------------------------------------------------------------
   bool is_pos_coinbase(const transaction& tx)
   {
-    bool pos = false;
-    if (!is_coinbase(tx, pos) || !pos)
-      return false;
-
-    return true;
+    return is_pos_miner_tx(tx);
   }
   //-----------------------------------------------------------------------
   bool is_coinbase(const transaction& tx, bool& pos_coinbase)
@@ -4053,7 +4049,7 @@ namespace currency
     if (!is_coinbase(tx))
       return false;
 
-    pos_coinbase = (tx.vin.size() == 2 && tx.vin[1].type() == typeid(txin_to_key));
+    pos_coinbase = is_pos_coinbase(tx);
     return true;
   }
   //-----------------------------------------------------------------------
