@@ -3508,7 +3508,7 @@ bool wallet2::add_custom_asset_id(const crypto::public_key& asset_id, asset_desc
   req.asset_id = asset_id;
 
   bool r = m_core_proxy->call_COMMAND_RPC_GET_ASSET_INFO(req, resp);
-  if (resp.status == API_RETURN_CODE_OK)
+  if (r && resp.status == API_RETURN_CODE_OK)
   {
     m_custom_assets[asset_id] = resp.asset_descriptor;
     asset_descriptor = resp.asset_descriptor;
