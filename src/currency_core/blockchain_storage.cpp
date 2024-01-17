@@ -2729,7 +2729,6 @@ bool blockchain_storage::get_target_outs_for_amount_prezarcanum(const COMMAND_RP
 
 bool blockchain_storage::get_target_outs_for_amount_postzarcanum(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request& req, const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::offsets_distribution& details, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, std::map<uint64_t, uint64_t>& amounts_to_up_index_limit_cache) const 
 {
-  size_t decoys_count = details.offsets.size();
   for (auto offset : details.offsets)
   {
     //perfectly we would need to find transaction's output on the given height, with the given probability
