@@ -2726,11 +2726,12 @@ bool blockchain_storage::get_target_outs_for_amount_prezarcanum(const COMMAND_RP
   }
 }
 //------------------------------------------------------------------
-
-bool blockchain_storage::get_target_outs_for_amount_postzarcanum(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request& req, const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::offsets_distribution& details, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, std::map<uint64_t, uint64_t>& amounts_to_up_index_limit_cache) const 
+bool blockchain_storage::get_target_outs_for_postzarcanum(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request& req, const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::offsets_distribution& details, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, std::map<uint64_t, uint64_t>& amounts_to_up_index_limit_cache) const 
 {
+  std::set<uint64_t> used;
   for (auto offset : details.offsets)
   {
+
     //perfectly we would need to find transaction's output on the given height, with the given probability
     //of being coinbase(coinbase outputs should be included less in decoy selection algorithm) 
     bool is_coinbase = (crypto::rand<uint64_t>() % 101) > req.coinbase_percents ? false : true;
@@ -2749,8 +2750,6 @@ bool blockchain_storage::get_target_outs_for_amount_postzarcanum(const COMMAND_R
 #define TARGET_RANDOM_OUTS_SELECTIOM_POOL_MIN 10
     //try to find output around given H
     std::vector<uint64_t> selected_global_indexes;
-
-
     auto process_tx = [&](const crypto::hash& tx_id) {
     
       auto tx_ptr = m_db_transactions.find(tx_id);
@@ -2778,6 +2777,11 @@ bool blockchain_storage::get_target_outs_for_amount_postzarcanum(const COMMAND_R
           continue;
         }
 
+        if (used.find(tx_ptr->m_global_output_indexes[i]) != used.end())
+        {
+          continue;
+        }
+
         // add output
         // note: code that will process selected_global_indes will be revisiting transactions entries to obtain all 
         //       needed data, that should work relatively effective because of on-top-of-db cache keep daya unserialized 
@@ -2788,7 +2792,7 @@ bool blockchain_storage::get_target_outs_for_amount_postzarcanum(const COMMAND_R
 
     while (selected_global_indexes.size() < TARGET_RANDOM_OUTS_SELECTIOM_POOL_MIN)
     {
-      auto block_ptr = m_db_blocks.get(estimated_h--);
+      auto block_ptr = m_db_blocks.get(estimated_h);
       if (is_coinbase &&  is_pos_block(block_ptr->bl) )
       {
         process_tx(get_transaction_hash(block_ptr->bl.miner_tx));
@@ -2801,12 +2805,25 @@ bool blockchain_storage::get_target_outs_for_amount_postzarcanum(const COMMAND_R
           process_tx(tx_id);
         }
       }
+      if(estimated_h)
+        estimated_h--;
+      else 
+      {
+        //likely unusual situation when blocks enumerated all way back to genesis
+        //let's check if we have at least something
+        if (!selected_global_indexes.size())
+        {
+          //need to regenerate offsets
+          return false;
+        }
+      }
     }
 
     //pick up a random output from selected_global_indes
     uint64_t global_index = selected_global_indexes[crypto::rand<uint64_t>() % selected_global_indexes.size()];
     bool res = add_out_to_get_random_outs(result_outs, details.amount, global_index, details.offsets.size(), req.use_forced_mix_outs, req.height_upper_limit);
     CHECK_AND_ASSERT_THROW_MES(res, "Failed to add_out_to_get_random_outs([" << global_index << "]) at postzarcanum era");
+    used.insert(global_index);
   }
   return true;
 }
@@ -2824,16 +2841,19 @@ bool blockchain_storage::get_random_outs_for_amounts2(const COMMAND_RPC_GET_RAND
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs = *res.outs.insert(res.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount());
     result_outs.amount = amount;
 
+    bool r = false;
     if (amount == 0)
     {
       //zarcanum era inputs
-      get_target_outs_for_amount_postzarcanum(req, req.amounts[i], result_outs, amounts_to_up_index_limit_cache);
+      r = get_target_outs_for_postzarcanum(req, req.amounts[i], result_outs, amounts_to_up_index_limit_cache);
     }
     else
     {
       //zarcanum era inputs
-      get_target_outs_for_amount_prezarcanum(req, req.amounts[i], result_outs, amounts_to_up_index_limit_cache);
+      r = get_target_outs_for_amount_prezarcanum(req, req.amounts[i], result_outs, amounts_to_up_index_limit_cache);
     }
+    if (!r)
+      return false;
   }
   return true;
 }
