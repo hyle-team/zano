@@ -708,7 +708,8 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           if (ptc.coin_base_tx)
           {
             //last out in coinbase tx supposed to be change from coinstake
-            if (!(o == tx.vout.size() - 1 && !ptc.is_derived_from_coinbase)) // TODO: @#@# reconsider this condition
+            //for genesis block we'll count every input as WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER
+            if (td.m_ptx_wallet_info->m_block_height == 0 || !(o == tx.vout.size() - 1 && !ptc.is_derived_from_coinbase)) // TODO: @#@# reconsider this condition
             {
               td.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER;
             }
@@ -3348,7 +3349,16 @@ bool wallet2::balance(std::unordered_map<crypto::public_key, wallet_public::asse
       if (is_transfer_unlocked(td))
         e.unlocked += td.amount();
       if (td.m_flags & WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER)
-        mined += CURRENCY_BLOCK_REWARD; //this code would work only for cases where block reward is full. For reduced block rewards might need more flexible code (TODO)
+      {
+        if (td.m_ptx_wallet_info->m_block_height == 0)
+        {
+          //for genesis block we add actual amounts
+          mined += td.amount();
+        }
+        else {
+          mined += CURRENCY_BLOCK_REWARD; //this code would work only for cases where block reward is full. For reduced block rewards might need more flexible code (TODO)
+        }        
+      }
     }
   }
 
@@ -5905,6 +5915,7 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency
         "m_internal_output_index = " << it->m_internal_output_index <<
         " is greater or equal to outputs count = " << it->m_ptx_wallet_info->m_tx.vout.size());
       
+      rdisttib.own_global_index = it->m_global_output_index;
       //check if we have Zarcanum era output of pre-Zarcanum
       if (it->is_zc())
       {

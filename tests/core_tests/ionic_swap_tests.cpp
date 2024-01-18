@@ -399,7 +399,9 @@ bool ionic_swap_exact_amounts_test::c1(currency::core& c, size_t ev_index, const
     proposal_decoded_info.to_initiator == proposal_details.to_initiator &&
     proposal_decoded_info.fee_paid_by_a == proposal_details.fee_paid_by_a &&
     proposal_decoded_info.mixins == proposal_details.mixins,
-    false, "actual and decoded proposal mismatch");
+    false, "actual and decoded proposal mismatch \nproposal_decoded_info: " 
+    << epee::serialization::store_t_to_json(proposal_decoded_info) << 
+    "\nproposal_details" << epee::serialization::store_t_to_json(proposal_details));
 
   currency::transaction tx_is{};
   r = bob_wlt->accept_ionic_swap_proposal(proposal, tx_is);

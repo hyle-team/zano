@@ -430,10 +430,12 @@ namespace currency
     {
       uint64_t amount; //if amount is 0 then lookup in post-zarcanum zone only, if not 0 then pre-zarcanum only
       std::vector<uint64_t> offsets; //[i] = height, estimated location where to pickup output of transaction
+      uint64_t own_global_index; //index to exclude from selection
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(amount)
         KV_SERIALIZE(offsets)
+        KV_SERIALIZE(own_global_index)
       END_KV_SERIALIZE_MAP()
     };
 

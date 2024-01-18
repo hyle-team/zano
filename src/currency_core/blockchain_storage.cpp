@@ -2698,6 +2698,7 @@ bool blockchain_storage::get_target_outs_for_amount_prezarcanum(const COMMAND_RP
   if (up_index_limit >= decoys_count)
   {
     std::set<size_t> used;
+    used.insert(details.own_global_index);
     size_t try_count = 0;
     for (uint64_t j = 0; j != decoys_count && try_count < up_index_limit;)
     {
@@ -2729,6 +2730,7 @@ bool blockchain_storage::get_target_outs_for_amount_prezarcanum(const COMMAND_RP
 bool blockchain_storage::get_target_outs_for_postzarcanum(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request& req, const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::offsets_distribution& details, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, std::map<uint64_t, uint64_t>& amounts_to_up_index_limit_cache) const 
 {
   std::set<uint64_t> used;
+  used.insert(details.own_global_index);
   for (auto offset : details.offsets)
   {
 
