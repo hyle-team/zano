@@ -2700,7 +2700,7 @@ bool blockchain_storage::get_target_outs_for_amount_prezarcanum(const COMMAND_RP
     std::set<size_t> used;
     used.insert(details.own_global_index);
     size_t try_count = 0;
-    for (uint64_t j = 0; j != decoys_count && try_count++ < up_index_limit;)
+    for (uint64_t j = 0; j != decoys_count && try_count++ < up_index_limit*2;)
     {
       size_t g_index = crypto::rand<size_t>() % up_index_limit;
       if (used.count(g_index))
