@@ -2700,11 +2700,27 @@ bool blockchain_storage::get_target_outs_for_amount_prezarcanum(const COMMAND_RP
     std::set<size_t> used;
     used.insert(details.own_global_index);
     size_t try_count = 0;
-    for (uint64_t j = 0; j != decoys_count && try_count++ < up_index_limit*2;)
+    for (uint64_t j = 0; j != decoys_count && try_count++ < decoys_count+1;)
     {
-      size_t g_index = crypto::rand<size_t>() % up_index_limit;
-      if (used.count(g_index))
-        continue;
+      size_t g_index_initial = crypto::rand<size_t>() % up_index_limit;
+      size_t g_index = g_index_initial;
+      //enumerate via whole loop from g_index to up_index_limit and then from 0 to g_index
+      while (true)
+      {
+        if (!used.count(g_index))
+          break;
+        g_index++;
+        
+        if (g_index >= up_index_limit)
+          g_index = 0;
+        if (g_index == g_index_initial)
+        {
+          // we enumerated full circle and couldn't find needed amount of outs
+          LOG_PRINT_YELLOW("Not enough inputs for amount " << print_money_brief(amount) << ", needed " << decoys_count << ", added " << result_outs.outs.size() << " good outs from " << up_index_limit << " unlocked of " << outs_container_size << " total", LOG_LEVEL_0);
+          return true;
+        }
+      }
+
       bool added = add_out_to_get_random_outs(result_outs, amount, g_index, decoys_count, req.use_forced_mix_outs, req.height_upper_limit);
       used.insert(g_index);
       if (added)
