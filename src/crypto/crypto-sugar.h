@@ -517,6 +517,24 @@ namespace crypto
       m_u64[bit_index >> 6] &= ~(1ull << (bit_index & 63));
     }
 
+    // the result is guaranteed to be within [ 0; 2 ^ bits_count )
+    uint64_t get_bits(uint8_t bit_index_first, uint8_t bits_count) const
+    {
+      if (bits_count == 0 || bits_count > 64)
+        return 0;
+      uint8_t bits_count_m_1 = bits_count - 1;
+      unsigned int bit_index_last = bit_index_first + bits_count_m_1;
+      if (bit_index_last > 255)
+        bit_index_last = 255;
+
+      uint64_t result = m_u64[bit_index_first >> 6] >> (bit_index_first & 63);
+      if (bits_count_m_1 > (bit_index_last & 63))
+        result |= m_u64[bit_index_last >> 6] << (bits_count_m_1 - (bit_index_last & 63));
+
+      uint64_t result_mask = ((1ull << bits_count_m_1) - 1) << 1 | 1;  // (just because 1ull << 64 in undefined behaviour, not a 0 as one would expect)
+      return result & result_mask;
+    }
+
     // does not reduce
     static scalar_t power_of_2(uint8_t exponent)
     {
@@ -743,6 +761,24 @@ namespace crypto
     point_t& modify_mul8()
     {
       ge_mul8_p3(&m_p3, &m_p3);
+      return *this;
+    }
+
+    point_t modify_mul_pow_2(size_t power)
+    {
+      if (power > 0)
+      {
+        ge_p1p1 p1;
+        ge_p2 p2;
+        ge_p3_to_p2(&p2, &m_p3);
+        for (size_t i = 1; i < power; ++i)
+        {
+          ge_p2_dbl(&p1, &p2);
+          ge_p1p1_to_p2(&p2, &p1);
+        }
+        ge_p2_dbl(&p1, &p2);
+        ge_p1p1_to_p3(&m_p3, &p1);
+      }
       return *this;
     }
 

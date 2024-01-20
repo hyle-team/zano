@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -38,6 +38,7 @@
 #include "hard_fork_1_bad_pos_source.h"
 #include "hard_fork_1.h"
 #include "hard_fork_2.h"
+#include "hard_fork_4.h"
 #include "atomic_tests.h"
 #include "isolate_auditable_and_proof.h"
 #include "zarcanum_test.h"

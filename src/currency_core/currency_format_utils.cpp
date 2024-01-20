@@ -116,7 +116,7 @@ namespace currency
           secret_index = ring.size() - 1;
       }
 
-      CHECK_AND_ASSERT_MES(secret_index != SIZE_MAX, false, "out #" << j << ": can't find a corresponding asset id in inputs");
+      CHECK_AND_ASSERT_MES(secret_index != SIZE_MAX, false, "out #" << j << ": can't find a corresponding asset id in inputs, asset id: " << H);
 
       result.bge_proofs.emplace_back(crypto::BGE_proof_s{});
       uint8_t err = 0;
@@ -550,16 +550,16 @@ namespace currency
     if (additional_inputs_amount_and_fees_for_mining_tx == 0)
     {
       // normal tx
-      CHECK_AND_ASSERT_MES(bare_inputs_sum >= bare_outputs_sum, false, "tx balance error: sum of inputs (" << print_money_brief(bare_inputs_sum)
-        << ") is less than or equal to sum of outputs(" << print_money_brief(bare_outputs_sum) << ")");
+      CHECK_AND_ASSERT_MES(bare_inputs_sum >= bare_outputs_sum, false, "tx balance error: the sum of inputs (" << print_money_brief(bare_inputs_sum)
+        << ") is less than or equal to the sum of outputs (" << print_money_brief(bare_outputs_sum) << ")");
     }
     else
     {
       // miner tx
       CHECK_AND_ASSERT_MES(bare_inputs_sum + additional_inputs_amount_and_fees_for_mining_tx == bare_outputs_sum, false,
-        "tx balance error: sum of inputs (" << print_money_brief(bare_inputs_sum) <<
+        "tx balance error: the sum of inputs (" << print_money_brief(bare_inputs_sum) <<
         ") + additional inputs and fees (" << print_money_brief(additional_inputs_amount_and_fees_for_mining_tx) <<
-        ") is less than or equal to sum of outputs(" << print_money_brief(bare_outputs_sum) << ")");
+        ") is less than or equal to the sum of outputs (" << print_money_brief(bare_outputs_sum) << ")");
     }
     return true;
   }
@@ -4060,11 +4060,7 @@ namespace currency
   //-----------------------------------------------------------------------
   bool is_pos_coinbase(const transaction& tx)
   {
-    bool pos = false;
-    if (!is_coinbase(tx, pos) || !pos)
-      return false;
-
-    return true;
+    return is_pos_miner_tx(tx);
   }
   //-----------------------------------------------------------------------
   bool is_coinbase(const transaction& tx, bool& pos_coinbase)
@@ -4072,7 +4068,7 @@ namespace currency
     if (!is_coinbase(tx))
       return false;
 
-    pos_coinbase = (tx.vin.size() == 2 && tx.vin[1].type() == typeid(txin_to_key));
+    pos_coinbase = is_pos_coinbase(tx);
     return true;
   }
   //-----------------------------------------------------------------------

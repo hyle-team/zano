@@ -3,7 +3,45 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #pragma once
 
-TEST(crypto, primitives)
+
+uint64_t get_bits_v1(const scalar_t& s, uint8_t bit_index_first, uint8_t bits_count)
+{
+  if (bits_count == 0 || bits_count > 64)
+    return 0;
+  unsigned int bit_index_last = bit_index_first + bits_count - 1;
+  if (bit_index_last > 255)
+    bit_index_last = 255;
+  uint64_t result_mask = ((1ull << (bits_count - 1)) - 1) << 1 | 1;  // (just because 1ull << 64 in undefined behaviour, not a 0 as one would expect)
+
+  uint64_t result = s.m_u64[bit_index_first >> 6] >> (bit_index_first & 63);
+  if (bits_count > (bit_index_last & 63) + 1)
+    result |= s.m_u64[bit_index_last >> 6] << (bits_count - (bit_index_last & 63) - 1);
+  return result & result_mask;
+}
+
+
+inline std::ostream &operator <<(std::ostream &o, const crypto::ge_precomp v)
+{
+  o << "{{";
+  
+  for(size_t i = 0; i < 9; ++i)
+    o << v.yplusx[i] << ", ";
+
+  o << v.yplusx[9] << "},\n {";
+  
+  for(size_t i = 0; i < 9; ++i)
+    o << v.yminusx[i] << ", ";
+  
+  o << v.yminusx[9] << "},\n {";
+  
+  for(size_t i = 0; i < 9; ++i)
+    o << v.xy2d[i] << ", ";
+  
+  o << v.xy2d[9] << "}}\n";
+  return o;
+}
+
+TEST(perf, primitives)
 {
   struct helper
   {
@@ -45,6 +83,44 @@ TEST(crypto, primitives)
   };
 
 #define HASH_64_VEC(vec_var_name) hash_64(vec_var_name.data(), vec_var_name.size() * sizeof(vec_var_name[0]))
+
+  LOG_PRINT_L0(ENDL << "hash functions:");
+
+  struct run_cn_fash_hash
+  {
+    static uint64_t run(timer_t& t, size_t rounds, size_t data_size)
+    {
+      std::vector<size_t> rnd_indecies;
+      helper::make_rnd_indicies(rnd_indecies, rounds);
+
+      struct bytes64
+      {
+        unsigned char b[64];
+      };
+
+      std::vector<bytes64> scalars_64(rounds);
+      for (size_t i = 0; i < scalars_64.size(); ++i)
+        crypto::generate_random_bytes(sizeof(bytes64), scalars_64[i].b);
+
+      std::vector<hash> results(rounds);
+      t.start();
+      for (size_t i = 0; i < rounds; ++i)
+      {
+        results[i] = cn_fast_hash(scalars_64[rnd_indecies[i]].b, 64);
+      }
+      t.stop();
+
+      return HASH_64_VEC(results);
+    };
+  };
+
+  run("cn_fast_hash(64 bytes)", 1000, [](timer_t& t, size_t rounds) {
+    return run_cn_fash_hash::run(t, rounds, 64ull);
+  });
+
+  run("cn_fast_hash(2048 bytes)", 1000, [](timer_t& t, size_t rounds) {
+    return run_cn_fash_hash::run(t, rounds, 2048ull);
+  });
 
   LOG_PRINT_L0(ENDL << "native crypto primitives:");
 

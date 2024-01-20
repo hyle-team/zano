@@ -1241,6 +1241,9 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(hard_fork_2_incorrect_alias_update<true>);
     GENERATE_AND_PLAY(hard_fork_2_incorrect_alias_update<false>);
 
+    // HF4
+    // GENERATE_AND_PLAY_HF(hard_fork_4_consolidated_txs, "4"); TODO, doesn't work atm -- sowle
+
     // atomics
     GENERATE_AND_PLAY(atomic_simple_test);
     GENERATE_AND_PLAY(atomic_test_wrong_redeem_wrong_refund);    

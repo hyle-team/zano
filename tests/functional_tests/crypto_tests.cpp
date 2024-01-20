@@ -1619,6 +1619,7 @@ TEST(crypto, schnorr_sig)
   return true;
 }
 
+
 TEST(crypto, point_negation)
 {
   ASSERT_EQ(c_point_0, -c_point_0);
@@ -1645,6 +1646,116 @@ TEST(crypto, point_negation)
     ASSERT_EQ((-el) - (-el), c_point_0);
     scalar_t x = scalar_t::random();
     ASSERT_EQ(x * (-el) + x * el, c_point_0);
+  }
+
+  return true;
+}
+
+
+TEST(crypto, scalar_get_bits)
+{
+  scalar_t x = scalar_t::random();
+  for(size_t i = 0; i < 256; ++i)
+    ASSERT_EQ(x.get_bits(i, 0), 0);
+  for(size_t i = 0; i < 256; ++i)
+    ASSERT_EQ(x.get_bits(i, std::min(255ull, i + 65)), 0);
+
+  ASSERT_EQ(x.get_bits(0,   64), x.m_u64[0]);
+  ASSERT_EQ(x.get_bits(64,  64), x.m_u64[1]);
+  ASSERT_EQ(x.get_bits(128, 64), x.m_u64[2]);
+  ASSERT_EQ(x.get_bits(192, 64), x.m_u64[3]);
+
+  uint64_t high_32_bits = x.m_u64[3] >> 32;
+  ASSERT_EQ(x.get_bits(192+32, 32), high_32_bits);
+
+  for(size_t i = 33; i <= 64; ++i)
+    ASSERT_EQ(x.get_bits(192+32, i), high_32_bits);
+
+  for(size_t i = 0; i < 10000; ++i)
+  {
+    scalar_t b = scalar_t::random();
+    scalar_t x = scalar_t::random();
+    size_t bit_index_from = b.m_s[5];
+    size_t bits_count     = b.m_s[6] % 65; // [0; 64] are allowed
+
+    uint64_t extracted_bits = 0;
+    for(size_t j = 0; j < bits_count; ++j)
+    {
+      if (bit_index_from + j <= 255 && x.get_bit(bit_index_from + j))
+        extracted_bits |= 1ull << j;
+    }
+
+    if (extracted_bits != x.get_bits(bit_index_from, bits_count))
+    {
+      std::cout << "i: " << i << ", bit_index_from: " << bit_index_from << ", bits_count: " << bits_count << ENDL
+        << "extracted_bits: " << extracted_bits << ", get_bits(): " << x.get_bits(bit_index_from, bits_count);
+      ASSERT_TRUE(false);
+    }
+  }
+  return true;
+}
+
+template<typename CT>
+bool crypto_msm_runner(size_t N, size_t low_bits_to_clear, size_t high_bits_to_clear)
+{
+  scalar_vec_t g_scalars, h_scalars;
+  g_scalars.resize_and_make_random(N);
+  h_scalars.resize_and_make_random(N);
+  if (N > 4)
+  {
+    g_scalars[0] = c_scalar_Lm1; // always include the max and the min
+    h_scalars[0] = c_scalar_Lm1;
+    g_scalars[1] = 0;
+    h_scalars[1] = 0;
+  }
+
+  point_t sum = c_point_0;
+  for(size_t i = 0; i < N; ++i)
+  {
+    for(size_t bit_index = 0; bit_index < low_bits_to_clear; ++bit_index)
+    {
+      g_scalars[i].clear_bit(bit_index);
+      h_scalars[i].clear_bit(bit_index);
+    }
+    for(size_t bit_index = 256 - high_bits_to_clear; bit_index < 256; ++bit_index)
+    {
+      g_scalars[i].clear_bit(bit_index);
+      h_scalars[i].clear_bit(bit_index);
+    }
+    sum += g_scalars[i] * CT::get_generator(false, i) + h_scalars[i] * CT::get_generator(true, i);
+  }
+
+  //TIME_MEASURE_START(t);
+  bool r = msm_and_check_zero<CT>(g_scalars, h_scalars, -sum);
+  //TIME_MEASURE_FINISH(t);
+  return r;
+}
+
+TEST(crypto, msm)
+{
+  // test the default msm_and_check_zero correctness
+  bool r = false;
+
+  for(size_t N = 1; N <= 128; ++N)
+  {
+    std::cout << "N = " << N << ENDL;
+    r = crypto_msm_runner<bpp_crypto_trait_Zarcanum>(N, 0, 0);
+    ASSERT_TRUE(r);
+    r = crypto_msm_runner<bpp_crypto_trait_ZC_out>(N, 0, 0);
+    ASSERT_TRUE(r);
+  }
+
+  for(size_t i = 0; i <= 128; ++i)
+  {
+    std::cout << "i = " << i << ENDL;
+    r = crypto_msm_runner<bpp_crypto_trait_Zarcanum>(128, i, 0);
+    ASSERT_TRUE(r);
+    r = crypto_msm_runner<bpp_crypto_trait_Zarcanum>(128, 0, i);
+    ASSERT_TRUE(r);
+    r = crypto_msm_runner<bpp_crypto_trait_ZC_out>(256, i, 0);
+    ASSERT_TRUE(r);
+    r = crypto_msm_runner<bpp_crypto_trait_ZC_out>(256, 0, i);
+    ASSERT_TRUE(r);
   }
 
   return true;

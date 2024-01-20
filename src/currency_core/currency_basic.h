@@ -315,51 +315,6 @@ namespace currency
   /////////////////////////////////////////////////////////////////////////////
   // Zarcanum structures
   //
-  //#pragma pack(push, 1)
-  /*
-  struct zarcanum_input : public referring_input
-  {
-    zarcanum_input() {}
-    // Boost's Assignable concept
-    zarcanum_input(const zarcanum_input&)           = default;
-    zarcanum_input& operator=(const zarcanum_input&)= default;
-
-    crypto::key_image               k_image;
-
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(k_image)
-      FIELD(key_offsets) // referring_input
-    END_SERIALIZE()
-
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(k_image)
-      BOOST_SERIALIZE(key_offsets) // referring_input
-    END_BOOST_SERIALIZATION()
-  };
-
-  // txin_zarcanum_inputs contains several zarcanum_input instances and corresponds to one ZC_sig
-  struct txin_zarcanum_inputs
-  {
-    txin_zarcanum_inputs() {}
-
-    // Boost's Assignable concept
-    txin_zarcanum_inputs(const txin_zarcanum_inputs&)             = default;
-    txin_zarcanum_inputs& operator=(const txin_zarcanum_inputs&)  = default;
-
-    std::vector<zarcanum_input>     elements;
-    std::vector<txin_etc_details_v> etc_details;
-
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(elements)
-      FIELD(etc_details)
-    END_SERIALIZE()
-
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(elements)
-      BOOST_SERIALIZE(etc_details)
-    END_BOOST_SERIALIZATION()
-  };
-  */
 
   struct txin_zc_input : public referring_input
   {
