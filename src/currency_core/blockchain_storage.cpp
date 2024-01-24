@@ -5865,6 +5865,11 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     {
       return false;
     }
+    if (is_coinbase(tx) && get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE)
+    {
+      LOG_ERROR("TX_FLAG_SIGNATURE_MODE_SEPARATE not allowed for coinbase tx");
+      return false;
+    }
   }
   return true;
 }
