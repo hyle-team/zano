@@ -2071,6 +2071,21 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
       return false;
     else
     {
+      if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM))
+      {
+        // prefer blocks with more summary fee(to motivate stakers include transactions)
+
+        // since we don't have "summary block fee" field yet, we can use this_block_tx_fee_median multiplied to transactions 
+        // count as an indirect measure of sumarry paid fee. If this approach won't be doing it's job it's subject 
+        // to reconsider and introducing additional field in block_extended_info structure
+
+        if (alt_chain_bei.this_block_tx_fee_median * alt_chain_bei.bl.tx_hashes.size() >
+          main_chain_bei.this_block_tx_fee_median * main_chain_bei.bl.tx_hashes.size())
+        {
+          //with the rest equal, alt block has more fees in it, prefer it
+          return true;
+        }
+      }
       if (!is_pos_block(main_chain_bei.bl))
         return false; // do not reorganize on the same cummul diff if it's a PoW block
 
@@ -7920,6 +7935,7 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
 
   CHECK_AND_ASSERT_MES(validate_tx_for_hardfork_specific_terms(b.miner_tx, null_hash, height), false, "miner tx hardfork-specific validation failed");
 
+  std::vector<uint64_t> fees;
   for (auto tx_id : b.tx_hashes)
   {
     std::shared_ptr<transaction> tx_ptr;
@@ -7931,6 +7947,9 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     const transaction& tx = it == abei.onboard_transactions.end() ? *tx_ptr : it->second;
 
     CHECK_AND_ASSERT_MES(tx.signatures.size() == tx.vin.size(), false, "invalid tx: signatures.size() == " <<  tx.signatures.size() << ", tx.vin.size() == " << tx.vin.size());
+
+    fees.push_back(get_tx_fee(tx));
+
     for (size_t n = 0; n < tx.vin.size(); ++n)
     {
       if (tx.vin[n].type() == typeid(txin_to_key) || tx.vin[n].type() == typeid(txin_htlc) || tx.vin[n].type() == typeid(txin_zc_input))
@@ -7963,6 +7982,7 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     update_alt_out_indexes_for_tx_in_block(tx, abei);
   }
 
+  abei.this_block_tx_fee_median = epee::misc_utils::median(fees);
 
   return true;
 }
