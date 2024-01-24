@@ -5824,9 +5824,12 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       return false;
   }
 
+  size_t count_ado = 0;
   //extra
   for (const auto el : tx.extra)
   {
+    if (el.type() == typeid(asset_descriptor_operation))
+      count_ado++;
     if (!var_is_after_hardfork_1_zone && !is_allowed_before_hardfork1(el))
       return false;
     if (!var_is_after_hardfork_2_zone && !is_allowed_before_hardfork2(el))
@@ -5865,11 +5868,23 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     {
       return false;
     }
-    if (is_coinbase(tx) && get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE)
+    bool mode_separate = get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE? true:false;
+    if (is_coinbase(tx) && mode_separate)
     {
       LOG_ERROR("TX_FLAG_SIGNATURE_MODE_SEPARATE not allowed for coinbase tx");
       return false;
     }
+    if (count_ado > 1)
+    {
+      LOG_ERROR("More then 1 asset_descriptor_operation not allowed in tx");
+      return false;
+    }
+    if (mode_separate && count_ado > 0)
+    {
+      LOG_ERROR("asset_descriptor_operation not allowed in tx with TX_FLAG_SIGNATURE_MODE_SEPARATE");
+      return false;
+    }
+
   }
   return true;
 }
