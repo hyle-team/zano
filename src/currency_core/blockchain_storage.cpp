@@ -7310,8 +7310,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   CRITICAL_REGION_LOCAL(m_read_lock);
   bool r = false;
 
-  if (p_max_related_block_height != nullptr)
-    *p_max_related_block_height = 0;
+  uint64_t max_related_block_height = 0;
 
   CHECK_AND_ASSERT_MES(input_index < input_tx.vin.size(), false, "invalid input index: " << input_index);
 
@@ -7572,8 +7571,8 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
       // case b4 (make sure source tx in the main chain is preceding split point, otherwise this referece is invalid)
       CHECK_AND_ASSERT_MES(p->m_keeper_block_height < split_height, false, "input offset #" << pk_n << " refers to main chain tx " << tx_id << " at height " << p->m_keeper_block_height << " while split height is " << split_height);
 
-      if (p_max_related_block_height != nullptr && *p_max_related_block_height < p->m_keeper_block_height)
-        *p_max_related_block_height = p->m_keeper_block_height;
+      if (max_related_block_height < p->m_keeper_block_height)
+        max_related_block_height = p->m_keeper_block_height;
 
       // TODO: consider checking p->tx for unlock time validity as it's checked in get_output_keys_for_input_with_checks()
       // make sure it was actually found
@@ -7619,6 +7618,20 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   VARIANT_SWITCH_END();
 
 
+  if (p_max_related_block_height != nullptr)
+    *p_max_related_block_height = max_related_block_height;
+
+  uint64_t alt_bl_h = split_height + alt_chain.size() + 1;
+  if (m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, alt_bl_h))
+  {
+    if (alt_bl_h - max_related_block_height > CURRENCY_HF4_MANDATORY_MIN_COINAGE)
+    {
+      LOG_ERROR("Coinage rule broken(altblock): h = " << alt_bl_h << ", max_related_block_height=" << max_related_block_height << ", tx: " << input_tx_hash);
+      return false;
+    }
+  }
+
+  
   // TODO: consider checking input_tx for valid extra attachment info as it's checked in check_tx_inputs()
   return true;
 }

@@ -47,7 +47,7 @@
 #include "view_iface.h"
 #include "wallet2_base.h"
 
-#define WALLET_DEFAULT_TX_SPENDABLE_AGE                               10
+#define WALLET_DEFAULT_TX_SPENDABLE_AGE                               CURRENCY_HF4_MANDATORY_MIN_COINAGE
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
 
 

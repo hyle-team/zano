@@ -759,7 +759,7 @@ namespace currency
     TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_relative_to_absolute);
     TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop);
     size_t output_index = 0;
-    for(const txout_ref_v& o : absolute_offsets)
+    for (const txout_ref_v& o : absolute_offsets)
     {
       crypto::hash tx_id = null_hash;
       size_t n = 0;
@@ -842,7 +842,7 @@ namespace currency
           }
           if (hf4)
           {
-            bool legit_output_key = validate_output_key_legit(scan_context.htlc_is_expired ? htlc_out.pkey_refund: htlc_out.pkey_redeem);
+            bool legit_output_key = validate_output_key_legit(scan_context.htlc_is_expired ? htlc_out.pkey_refund : htlc_out.pkey_redeem);
             CHECK_AND_ASSERT_MES(legit_output_key, false, "tx input ref #" << output_index << " violates public key restrictions: tx.version = " << tx_ptr->tx.version << ", outtk.key = " << static_cast<const crypto::public_key&>(scan_context.htlc_is_expired ? htlc_out.pkey_refund : htlc_out.pkey_redeem));
           }
 
@@ -865,23 +865,23 @@ namespace currency
       }
       VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
         bool r = is_output_allowed_for_input(out_zc, verified_input);
-        CHECK_AND_ASSERT_MES(r, false, "Input and output are incompatible");
+      CHECK_AND_ASSERT_MES(r, false, "Input and output are incompatible");
 
-        r = is_mixattr_applicable_for_fake_outs_counter(tx_ptr->tx.version, out_zc.mix_attr, key_offsets.size() - 1, this->get_core_runtime_config());
-        CHECK_AND_ASSERT_MES(r, false, "tx input ref #" << output_index << " violates mixin restrictions: tx.version = " << tx_ptr->tx.version << ", mix_attr = " << static_cast<uint32_t>(out_zc.mix_attr) << ", key_offsets.size = " << key_offsets.size());
+      r = is_mixattr_applicable_for_fake_outs_counter(tx_ptr->tx.version, out_zc.mix_attr, key_offsets.size() - 1, this->get_core_runtime_config());
+      CHECK_AND_ASSERT_MES(r, false, "tx input ref #" << output_index << " violates mixin restrictions: tx.version = " << tx_ptr->tx.version << ", mix_attr = " << static_cast<uint32_t>(out_zc.mix_attr) << ", key_offsets.size = " << key_offsets.size());
 
-        bool legit_output_key = validate_output_key_legit(out_zc.stealth_address);
-        CHECK_AND_ASSERT_MES(legit_output_key, false, "tx input ref #" << output_index << " violates public key restrictions: tx.version = " << tx_ptr->tx.version << ", outtk.key = " << out_zc.stealth_address);
+      bool legit_output_key = validate_output_key_legit(out_zc.stealth_address);
+      CHECK_AND_ASSERT_MES(legit_output_key, false, "tx input ref #" << output_index << " violates public key restrictions: tx.version = " << tx_ptr->tx.version << ", outtk.key = " << out_zc.stealth_address);
 
 
-        TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
-        if (!vis.handle_output(tx_ptr->tx, validated_tx, out_zc, n))
-        {
-          size_t verified_input_index = std::find(validated_tx.vin.begin(), validated_tx.vin.end(), verified_input) - validated_tx.vin.begin();
-          LOG_PRINT_RED_L0("handle_output failed for output #" << n << " in " << tx_id << " referenced by input #" << verified_input_index << " in tx " << get_transaction_hash(validated_tx));
-          return false;
-        }
-        TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
+      TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
+      if (!vis.handle_output(tx_ptr->tx, validated_tx, out_zc, n))
+      {
+        size_t verified_input_index = std::find(validated_tx.vin.begin(), validated_tx.vin.end(), verified_input) - validated_tx.vin.begin();
+        LOG_PRINT_RED_L0("handle_output failed for output #" << n << " in " << tx_id << " referenced by input #" << verified_input_index << " in tx " << get_transaction_hash(validated_tx));
+        return false;
+      }
+      TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
       VARIANT_CASE_THROW_ON_OTHER();
       VARIANT_SWITCH_END();
 
@@ -889,9 +889,22 @@ namespace currency
 
       if (max_related_block_height < tx_ptr->m_keeper_block_height)
         max_related_block_height = tx_ptr->m_keeper_block_height;
-  
+
       ++output_index;
     }
+
+    if (m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, this->get_current_blockchain_size()))
+    { 
+      //with hard fork 4 make it network rule to have at least 10 confirmations
+      
+      if (this->get_current_blockchain_size() - max_related_block_height > CURRENCY_HF4_MANDATORY_MIN_COINAGE)
+      {
+        LOG_ERROR("Coinage rule broken(mainblock): h = " << this->get_current_blockchain_size() << ", max_related_block_height=" << max_related_block_height << ", tx: " << get_transaction_hash(validated_tx));
+        return false;
+      }
+    }
+    
+
     TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop);
     return true;
   }
