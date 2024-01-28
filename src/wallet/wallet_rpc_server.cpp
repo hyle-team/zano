@@ -1053,7 +1053,7 @@ namespace tools
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
     std::string buff = epee::string_encoding::base64_decode(req.buff);
-    bool r = w.get_wallet()->encrypt_buffer(buff, res.res_buff);
+    w.get_wallet()->encrypt_buffer(buff, res.res_buff);
     res.res_buff = epee::string_encoding::base64_encode(res.res_buff);
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
@@ -1063,7 +1063,7 @@ namespace tools
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
     std::string buff = epee::string_encoding::base64_decode(req.buff);
-    bool r = w.get_wallet()->encrypt_buffer(buff, res.res_buff);
+    w.get_wallet()->encrypt_buffer(buff, res.res_buff);
     res.res_buff = epee::string_encoding::base64_encode(res.res_buff);
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();

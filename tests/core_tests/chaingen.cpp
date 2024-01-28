@@ -1193,8 +1193,6 @@ namespace
 
 bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, const currency::account_keys& acc_keys)
 {
-  bool r = false;
-
   for (const block& blk : blockchain)
   {
     uint64_t height = get_block_height(blk);
@@ -2338,7 +2336,6 @@ bool shuffle_source_entries(std::vector<tx_source_entry>& sources)
 // creates destinations.size() + 1 outputs if the total sum of amounts is less than the original premine amount (the last one will have amount = old_premine - sum)
 bool replace_coinbase_in_genesis_block(const std::vector<currency::tx_destination_entry>& destinations, test_generator& generator, std::vector<test_event_entry>& events, currency::block& genesis_block)
 {
-  bool r = false;
   generator.remove_block_info(genesis_block);
   events.pop_back();
 

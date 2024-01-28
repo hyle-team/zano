@@ -716,8 +716,6 @@ bool assets_and_pos_mining::generate(std::vector<test_event_entry>& events) cons
 {
   // Test idea: ensure that post-HF4 Zarcanum staking functions correctly with outputs that have a nonzero asset id blinding mask (i.e., outputs with a non-explicit asset id)
 
-  bool r = false;
-
   uint64_t ts = test_core_time::get_time();
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);

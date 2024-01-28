@@ -422,8 +422,6 @@ zarcanum_pos_block_math::zarcanum_pos_block_math()
 
 bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) const
 {
-  bool r = false;
-
   GENERATE_ACCOUNT(miner_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
@@ -602,8 +600,6 @@ zarcanum_in_alt_chain::zarcanum_in_alt_chain()
 
 bool zarcanum_in_alt_chain::generate(std::vector<test_event_entry>& events) const
 {
-  bool r = false;
-
   uint64_t ts = test_core_time::get_time();
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
@@ -749,8 +745,6 @@ zarcanum_block_with_txs::zarcanum_block_with_txs()
 bool zarcanum_block_with_txs::generate(std::vector<test_event_entry>& events) const
 {
   // Test idea: make sure Zarcanum PoS block can have txs and the sum of fees is correctly added to the block reward
-
-  bool r = false;
 
   uint64_t ts = test_core_time::get_time();
   m_accounts.resize(TOTAL_ACCS_COUNT);

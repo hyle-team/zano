@@ -129,7 +129,6 @@ namespace currency
   //--------------------------------------------------------------------------------
   bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id)
   {
-    bool r = false;
     if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
       return true;
 
