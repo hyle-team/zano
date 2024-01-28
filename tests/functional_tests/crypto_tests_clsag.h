@@ -1,5 +1,5 @@
-// Copyright (c) 2022 Zano Project (https://zano.org/)
-// Copyright (c) 2022 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2022-2024 Zano Project (https://zano.org/)
+// Copyright (c) 2022-2024 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #pragma once
@@ -166,11 +166,11 @@ TEST(clsag, bad_pub_keys)
     ASSERT_TRUE(cc.generate());
     ASSERT_TRUE(cc.verify());
 
-    // torsion component in K1 should not affect protocol
+    // torsion component in K1 should break the protocol
     cc = cc_orig;
     ASSERT_TRUE(cc.generate());
     cc.sig.K1 = (point_t(cc.sig.K1) + tor).to_public_key();
-    ASSERT_TRUE(cc.verify());
+    ASSERT_FALSE(cc.verify());
 
     // torsion component in stealth_address for secret_index (i.e. for P = xG) must break the protocol
     // 1
@@ -399,9 +399,9 @@ TEST(clsag_ggx, basics)
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //
-// CLSAG GGXG
+// CLSAG GGXG (eventually not used in Zano)
 //
-
+/*
 struct clsag_ggxg_sig_check_t
 {
   crypto::hash prefix_hash;
@@ -537,7 +537,7 @@ TEST(clsag_ggxg, basics)
   ASSERT_TRUE(cc.verify());
 
   return true;
-}
+}*/
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 //

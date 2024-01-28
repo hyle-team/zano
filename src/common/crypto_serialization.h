@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -113,27 +113,6 @@ namespace crypto
       BOOST_SERIALIZE(K1)
       BOOST_SERIALIZE(K2)
       END_BOOST_SERIALIZATION()
-  };
-
-  struct CLSAG_GGXG_signature_serialized : public CLSAG_GGXG_signature
-  {
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(c)
-      FIELD((std::vector<scalar_t>&)(r_g))
-      FIELD((std::vector<scalar_t>&)(r_x))
-      FIELD(K1)
-      FIELD(K2)
-      FIELD(K3)
-    END_SERIALIZE()
-
-    BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(c)
-      BOOST_SERIALIZE((std::vector<scalar_t>&)(r_g))
-      BOOST_SERIALIZE((std::vector<scalar_t>&)(r_x))
-      BOOST_SERIALIZE(K1)
-      BOOST_SERIALIZE(K2)
-      BOOST_SERIALIZE(K3)
-    END_BOOST_SERIALIZATION()
   };
 
   struct CLSAG_GGXXG_signature_serialized : public CLSAG_GGXXG_signature
