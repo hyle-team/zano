@@ -1232,7 +1232,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(hard_fork_2_tx_payer_in_wallet);
     GENERATE_AND_PLAY(hard_fork_2_tx_receiver_in_wallet);
     GENERATE_AND_PLAY(hard_fork_2_tx_extra_alias_entry_in_wallet);
-    GENERATE_AND_PLAY(hard_fork_2_auditable_addresses_basics);
+    GENERATE_AND_PLAY_HF(hard_fork_2_auditable_addresses_basics, "2-*");
     GENERATE_AND_PLAY(hard_fork_2_no_new_structures_before_hf);
     GENERATE_AND_PLAY(hard_fork_2_awo_wallets_basic_test<true>);
     GENERATE_AND_PLAY(hard_fork_2_awo_wallets_basic_test<false>);
@@ -1250,7 +1250,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(atomic_test_altchain_simple);
     GENERATE_AND_PLAY(atomic_test_check_hardfork_rules);
 
-    GENERATE_AND_PLAY(isolate_auditable_and_proof);
+    GENERATE_AND_PLAY_HF(isolate_auditable_and_proof, "2-*");
     
     GENERATE_AND_PLAY(zarcanum_basic_test);
 

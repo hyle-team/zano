@@ -897,7 +897,7 @@ namespace currency
     { 
       //with hard fork 4 make it network rule to have at least 10 confirmations
       
-      if (this->get_current_blockchain_size() - max_related_block_height > CURRENCY_HF4_MANDATORY_MIN_COINAGE)
+      if (this->get_current_blockchain_size() - max_related_block_height < CURRENCY_HF4_MANDATORY_MIN_COINAGE)
       {
         LOG_ERROR("Coinage rule broken(mainblock): h = " << this->get_current_blockchain_size() << ", max_related_block_height=" << max_related_block_height << ", tx: " << get_transaction_hash(validated_tx));
         return false;

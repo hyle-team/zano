@@ -612,7 +612,6 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::c1(currency::core& c, size_t ev
 //------------------------------------------------------------------------------
 
 hard_fork_2_auditable_addresses_basics::hard_fork_2_auditable_addresses_basics()
-  : hard_fork_2_base_test(23)
 {
   REGISTER_CALLBACK_METHOD(hard_fork_2_auditable_addresses_basics, c1);
 }
@@ -644,6 +643,8 @@ bool hard_fork_2_auditable_addresses_basics::generate(std::vector<test_event_ent
   // make sure all Bob's outputs has mix_attr = 1
   for (auto& out : tx_1.vout)
   {
+    if (out.type() != typeid(tx_out_bare))
+      continue; // skip if we're in postzarcanum era
     if (boost::get<tx_out_bare>(out).amount != MK_TEST_COINS(5))
       continue; // skip change
     uint8_t mix_attr = boost::get<txout_to_key>(boost::get<tx_out_bare>(out).target).mix_attr;
@@ -677,6 +678,9 @@ bool hard_fork_2_auditable_addresses_basics::c1(currency::core& c, size_t ev_ind
   // make sure all Bob's outputs has mix_attr = 1
   for (auto& out : tx.vout)
   {
+    if (out.type() != typeid(tx_out_bare))
+      continue; // skip if we're in postzarcanum era
+
     if (boost::get<tx_out_bare>(out).amount != MK_TEST_COINS(1))
       continue; // skip change
     uint8_t mix_attr = boost::get<txout_to_key>(boost::get<tx_out_bare>(out).target).mix_attr;
@@ -702,6 +706,9 @@ bool hard_fork_2_auditable_addresses_basics::c1(currency::core& c, size_t ev_ind
   // make sure all Bob's outputs has mix_attr = 1
   for (auto& out : tx.vout)
   {
+    if (out.type() != typeid(tx_out_bare))
+      continue; // skip if we're in postzarcanum era
+
     if (boost::get<tx_out_bare>(out).amount != MK_TEST_COINS(1))
       continue; // skip change
     uint8_t mix_attr = boost::get<txout_to_key>(boost::get<tx_out_bare>(out).target).mix_attr;
