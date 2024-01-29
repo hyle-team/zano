@@ -7655,7 +7655,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   uint64_t alt_bl_h = split_height + alt_chain.size() + 1;
   if (m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, alt_bl_h))
   {
-    if (alt_bl_h - max_related_block_height > CURRENCY_HF4_MANDATORY_MIN_COINAGE)
+    if (alt_bl_h - max_related_block_height < CURRENCY_HF4_MANDATORY_MIN_COINAGE)
     {
       LOG_ERROR("Coinage rule broken(altblock): h = " << alt_bl_h << ", max_related_block_height=" << max_related_block_height << ", tx: " << input_tx_hash);
       return false;
