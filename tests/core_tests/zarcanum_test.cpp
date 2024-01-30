@@ -794,7 +794,7 @@ bool zarcanum_block_with_txs::generate(std::vector<test_event_entry>& events) co
   MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_2);
   m_alice_balance += MK_TEST_COINS(200);
 
-  REWIND_BLOCKS_N_WITH_TIME(events, blk_4r, blk_4, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_4r, blk_4, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW+5);
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, m_alice_balance, m_alice_balance, mined_amount, 0, 0));
 
   // then miner sends few coins to Bob via a tx with a big fee amount

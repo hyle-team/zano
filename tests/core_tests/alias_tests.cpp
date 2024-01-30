@@ -1068,7 +1068,7 @@ bool gen_alias_too_small_reward::generate(std::vector<test_event_entry>& events)
   set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   DO_CALLBACK(events, "init_runtime_config"); 
-  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW+20);
   
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), miner_acc.get_public_address(), 3 * aliases_count * TESTS_DEFAULT_FEE * 100, 3 * aliases_count, TESTS_DEFAULT_FEE, tx_1);
@@ -1271,7 +1271,8 @@ bool gen_alias_switch_and_check_block_template::generate(std::vector<test_event_
   uint64_t miner_amount = get_outs_money_amount(blk_0r.miner_tx, miner_acc.get_keys()) * 4;
   // alice get some money
   MAKE_TX_LIST(events, tx_list, miner_acc, alice, miner_amount / 2, blk_0r);                                 // 2N+3
-  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, tx_list);                                        // 2N+4
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1_, blk_0r, miner_acc, tx_list);                                        // 2N+4
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1, blk_1_, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);       // 2N = CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2
   tx_list.clear();
 
   // Alice registers an alias
