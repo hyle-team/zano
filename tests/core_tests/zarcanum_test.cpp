@@ -367,14 +367,15 @@ bool zarcanum_gen_time_balance::generate(std::vector<test_event_entry>& events) 
   uint64_t bob_amount = MK_TEST_COINS(15);
 
   MAKE_TX(events, tx_1, alice_acc, bob_acc, bob_amount, blk_1r);
-  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_1);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2__, blk_1r, miner_acc, tx_1);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_2, blk_2__, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   // check Bob's balance in play time...
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, bob_amount, 0, 0, 0, 0));
 
   // ... and in gen time
   CREATE_TEST_WALLET(bob_wlt, bob_acc, blk_0);
-  REFRESH_TEST_WALLET_AT_GEN_TIME(events, bob_wlt, blk_2, 2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, bob_wlt, blk_2, 2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 15);
   CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(bob_wlt, bob_amount);
 
   // try to construct tx with only one output (that is wrong for HF4)
@@ -400,10 +401,10 @@ bool zarcanum_gen_time_balance::generate(std::vector<test_event_entry>& events) 
   CHECK_AND_ASSERT_MES(tx_2.vout.size() != 1, false, "tx_2.vout.size() = " << tx_2.vout.size());
   MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_2);
 
-  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_3, 2);
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_3, 12);
   CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, alice_amount - 2 * TESTS_DEFAULT_FEE);
 
-  REFRESH_TEST_WALLET_AT_GEN_TIME(events, bob_wlt, blk_3, 1);
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, bob_wlt, blk_3, 11);
   CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(bob_wlt, 0);
 
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, alice_amount - 2 * TESTS_DEFAULT_FEE, 0, 0, 0, 0));

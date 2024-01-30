@@ -1496,7 +1496,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
             continue;
         }
       } 
-      if (blk_head.miner_tx.version < TRANSACTION_VERSION_POST_HF4 && next_block_height - get_block_height(*oi.p_blk) < CURRENCY_HF4_MANDATORY_MIN_COINAGE)
+      if (blk_head.miner_tx.version >= TRANSACTION_VERSION_POST_HF4 && next_block_height - get_block_height(*oi.p_blk) < CURRENCY_HF4_MANDATORY_MIN_COINAGE)
       {
         //ignore outs that doesn't fit the HF4 rule
         continue;
