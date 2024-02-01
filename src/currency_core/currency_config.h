@@ -10,7 +10,7 @@
 #ifndef TESTNET
 #define CURRENCY_FORMATION_VERSION                      84
 #else
-#define CURRENCY_FORMATION_VERSION                      89
+#define CURRENCY_FORMATION_VERSION                      90
 #endif
 
 #define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121) //bender's nightmare
@@ -269,7 +269,7 @@
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   1082577
 #define ZANO_HARDFORK_04_AFTER_HEIGHT                   999999999
 #else
-/////// Zarcanum Testnet Pre-Alpha //////////////////////////////
+/////// Zarcanum Testnet //////////////////////////////
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   0
