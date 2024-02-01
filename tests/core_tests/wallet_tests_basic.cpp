@@ -67,7 +67,7 @@ bool wallet_test::check_balance(currency::core& c, size_t ev_index, const std::v
   bool has_aliases = false;
   w->scan_tx_pool(has_aliases);
 
-  if (!check_balance_via_wallet(*w.get(), get_test_account_name_by_id(pcb.account_index).c_str(), pcb.total_balance, pcb.mined_balance, pcb.unlocked_balance, pcb.awaiting_in, pcb.awaiting_out))
+  if (!check_balance_via_wallet(*w.get(), get_test_account_name_by_id(pcb.account_index).c_str(), pcb.total_balance, INVALID_BALANCE_VAL, pcb.unlocked_balance, pcb.awaiting_in, pcb.awaiting_out))
     return false;
 
   return true;

@@ -274,6 +274,21 @@ namespace wallet_public
   };
 
 
+  struct wallet_transfer_info_old : public wallet_transfer_info
+  {
+    uint64_t amount = 0;
+    bool is_income = false;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(is_income)
+      KV_SERIALIZE(amount)
+      KV_CHAIN_BASE(wallet_transfer_info)
+    END_KV_SERIALIZE_MAP()
+
+  };
+
+
+
   struct asset_balance_entry_base
   {
     uint64_t total = 0;
@@ -486,25 +501,25 @@ namespace wallet_public
 #define ORDER_FROM_BEGIN_TO_END        "FROM_BEGIN_TO_END"
 #define ORDER_FROM_FROM_END_TO_BEGIN   "FROM_END_TO_BEGIN"
 
-  struct COMMAND_RPC_GET_RECENT_TXS_AND_INFO
+  struct COMMAND_RPC_GET_RECENT_TXS_AND_INFO2
   {
     struct request
     {
 
       /*
-      if offset is 0, then GET_RECENT_TXS_AND_INFO return 
-      unconfirmed transactions as the first first items of "transfers", 
+      if offset is 0, then GET_RECENT_TXS_AND_INFO return
+      unconfirmed transactions as the first first items of "transfers",
       this unconfirmed transactions is not counted regarding "count" parameter
       */
       uint64_t offset;
       uint64_t count;
 
-      /* 
-      need_to_get_info - should backend re-calculate balance(could be relatively heavy, 
-      and not needed when getting long tx history with multiple calls 
+      /*
+      need_to_get_info - should backend re-calculate balance(could be relatively heavy,
+      and not needed when getting long tx history with multiple calls
       of GET_RECENT_TXS_AND_INFO with offsets)
       */
-      bool update_provision_info;  
+      bool update_provision_info;
       bool exclude_mining_txs;
       bool exclude_unconfirmed;
       std::string order; // "FROM_BEGIN_TO_END" or "FROM_END_TO_BEGIN"
@@ -535,6 +550,30 @@ namespace wallet_public
     };
   };
 
+
+  struct COMMAND_RPC_GET_RECENT_TXS_AND_INFO
+  {
+    typedef COMMAND_RPC_GET_RECENT_TXS_AND_INFO2::request request;
+
+    struct response
+    {
+      wallet_provision_info pi;
+      std::vector<wallet_transfer_info_old> transfers;
+      uint64_t total_transfers;
+      uint64_t last_item_index;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(pi)
+        KV_SERIALIZE(transfers)
+        KV_SERIALIZE(total_transfers)
+        KV_SERIALIZE(last_item_index)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+
+
+
   struct COMMAND_RPC_REGISTER_ALIAS
   {
     struct request
@@ -561,9 +600,9 @@ namespace wallet_public
   
   struct transfer_destination
   {
-    uint64_t amount;
+    uint64_t amount = 0;
     std::string address;
-    crypto::public_key asset_id;
+    crypto::public_key asset_id = currency::native_coin_asset_id;
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(amount)
       KV_SERIALIZE(address)

@@ -60,7 +60,7 @@ namespace currency
   // Using C++17 extended aggregate initialization (P0017R1). C++17, finally! -- sowle
   const static crypto::public_key native_coin_asset_id       = {{'\xd6', '\x32', '\x9b', '\x5b', '\x1f', '\x7c', '\x08', '\x05', '\xb5', '\xc3', '\x45', '\xf4', '\x95', '\x75', '\x54', '\x00', '\x2a', '\x2f', '\x55', '\x78', '\x45', '\xf6', '\x4d', '\x76', '\x45', '\xda', '\xe0', '\xe0', '\x51', '\xa6', '\x49', '\x8a'}}; // == crypto::c_point_H, checked in crypto_constants
   const static crypto::public_key native_coin_asset_id_1div8 = {{'\x74', '\xc3', '\x2d', '\x3e', '\xaa', '\xfa', '\xfc', '\x62', '\x3b', '\xf4', '\x83', '\xe8', '\x58', '\xd4', '\x2e', '\x8b', '\xf4', '\xec', '\x7d', '\xf0', '\x64', '\xad', '\xa2', '\xe3', '\x49', '\x34', '\x46', '\x9c', '\xff', '\x6b', '\x62', '\x68'}}; // == 1/8 * crypto::c_point_H, checked in crypto_constants
-  const static crypto::point_t    native_coin_asset_id_pt    = crypto::c_point_H;
+  const static crypto::point_t    native_coin_asset_id_pt      {{ 20574939, 16670001, -29137604, 14614582, 24883426, 3503293, 2667523, 420631, 2267646, -4769165, -11764015, -12206428, -14187565, -2328122, -16242653, -788308, -12595746, -8251557, -10110987, 853396, -4982135, 6035602, -21214320, 16156349, 977218, 2807645, 31002271, 5694305, -16054128, 5644146, -15047429, -568775, -22568195, -8089957, -27721961, -10101877, -29459620, -13359100, -31515170, -6994674 }}; // c_point_H
 
   const static wide_difficulty_type global_difficulty_pow_starter = DIFFICULTY_POW_STARTER;
   const static wide_difficulty_type global_difficulty_pos_starter = DIFFICULTY_POS_STARTER;

@@ -144,6 +144,7 @@ public:
   QString webkit_launched_script();
   QString get_smart_wallet_info(const QString& param);
   QString restore_wallet(const QString& param);
+  QString use_whitelisting(const QString& param);
   QString is_pos_allowed();
   QString store_to_file(const QString& path, const QString& buff);
   QString load_from_file(const QString& path);

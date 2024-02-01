@@ -1,9 +1,10 @@
-// Copyright (c) 2022-2023 Zano Project
-// Copyright (c) 2022-2023 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2022-2024 Zano Project
+// Copyright (c) 2022-2024 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 //
-// This file contains implementation of CLSAG (s.a. https://eprint.iacr.org/2019/654.pdf by Goodel at el)
+// This file contains implementation of the original d-CLSAG (s.a. https://eprint.iacr.org/2019/654.pdf by Goodel at el)
+// and the extended d/v-CLSAG version (s.a. https://github.com/hyle-team/docs/blob/master/zano/dv-CLSAG-extension/ by sowle)
 //
 #include "clsag.h"
 //#include "misc_log_ex.h"
@@ -51,6 +52,7 @@ namespace crypto
     }
     hsc.add_point(c_scalar_1div8 * pseudo_out_amount_commitment);
     hsc.add_key_image(ki);
+    hsc.add_pub_key(sig.K1);
     hash input_hash = hsc.calc_hash_no_reduce();
 
     hsc.add_32_chars(CRYPTO_HDS_CLSAG_GG_LAYER_0);
@@ -87,10 +89,7 @@ namespace crypto
     hsc.add_point(alpha * ki_base);
     scalar_t c_prev = hsc.calc_hash();  // c_{secret_index + 1}
 
-    sig.r.clear();
-    sig.r.reserve(ring_size);
-    for(size_t i = 0; i < ring_size; ++i)
-      sig.r.emplace_back(scalar_t::random());
+    sig.r.resize_and_make_random(ring_size);
 
     for(size_t j = 0, i = (secret_index + 1) % ring_size; j < ring_size - 1; ++j, i = (i + 1) % ring_size)
     {
@@ -137,6 +136,7 @@ namespace crypto
     }
     hsc.add_pub_key(pseudo_out_amount_commitment);
     hsc.add_key_image(ki);
+    hsc.add_pub_key(sig.K1);
     hash input_hash = hsc.calc_hash_no_reduce();
 
     hsc.add_32_chars(CRYPTO_HDS_CLSAG_GG_LAYER_0);
@@ -203,8 +203,6 @@ namespace crypto
     CRYPTO_CHECK_AND_THROW_MES((secret_0_xp * c_point_G).to_public_key() == ring[secret_index].stealth_address, "secret_0_xp mismatch");
     CRYPTO_CHECK_AND_THROW_MES( secret_1_f  * c_point_G == 8 * point_t(ring[secret_index].amount_commitment) - pseudo_out_amount_commitment, "secret_1_f mismatch");
     CRYPTO_CHECK_AND_THROW_MES( secret_2_t  * c_point_X == 8 * point_t(ring[secret_index].blinded_asset_id)  - pseudo_out_blinded_asset_id, "secret_2_t mismatch");
-  //CRYPTO_CHECK_AND_THROW_MES( secret_3_q  * c_point_G == 8 * point_t(ring[secret_index].concealing_point), "");
-  //CRYPTO_CHECK_AND_THROW_MES( secret_4_x  * c_point_X == extended_amount_commitment - 8 * point_t(ring[secret_index].amount_commitment) - 8 * point_t(ring[secret_index].concealing_point), "");
 #endif
 
     point_t K1_div8 = (c_scalar_1div8 * secret_1_f) * ki_base;
@@ -216,16 +214,6 @@ namespace crypto
     K2_div8.to_public_key(sig.K2);
     point_t K2 = K2_div8;
     K2.modify_mul8();
-
-    //point_t K3_div8 = (c_scalar_1div8 * secret_3_q) * ki_base;
-    //K3_div8.to_public_key(sig.K3);
-    //point_t K3 = K3_div8;
-    //K3.modify_mul8();
-
-    //point_t K4_div8 = (c_scalar_1div8 * secret_4_x) * ki_base;
-    //K4_div8.to_public_key(sig.K4);
-    //point_t K4 = K4_div8;
-    //K4.modify_mul8();
 
     // calculate aggregation coefficients
     hash_helper_t::hs_t hsc(4 + 3  * ring_size);
@@ -240,6 +228,8 @@ namespace crypto
     hsc.add_point(c_scalar_1div8 * pseudo_out_amount_commitment);
     hsc.add_point(c_scalar_1div8 * pseudo_out_blinded_asset_id);
     hsc.add_key_image(ki);
+    hsc.add_pub_key(sig.K1);
+    hsc.add_pub_key(sig.K2);
     hash input_hash = hsc.calc_hash_no_reduce();
     DBG_VAL_PRINT(input_hash);
 
@@ -258,11 +248,6 @@ namespace crypto
     hsc.add_hash(input_hash);
     scalar_t agg_coeff_2 = hsc.calc_hash();
     DBG_VAL_PRINT(agg_coeff_2);
-
-    //hsc.add_32_chars(CRYPTO_HDS_CLSAG_GGX_LAYER_3);
-    //hsc.add_hash(input_hash);
-    //scalar_t agg_coeff_3 = hsc.calc_hash();
-    //DBG_VAL_PRINT(agg_coeff_3);
 
     // prepare A_i, Q_i
     std::vector<point_t> A_i, Q_i;
@@ -300,18 +285,17 @@ namespace crypto
     }
 
     // aggregate secret key (layers 0, 1; G component)
-    scalar_t w_sec_key_g = agg_coeff_0 * secret_0_xp + agg_coeff_1 * secret_1_f; // + agg_coeff_3 * secret_3_q;
+    scalar_t w_sec_key_g = agg_coeff_0 * secret_0_xp + agg_coeff_1 * secret_1_f;
     DBG_VAL_PRINT(w_sec_key_g * c_point_G);
 
     // aggregate secret key (layer 2; X component)
     scalar_t w_sec_key_x   = agg_coeff_2 * secret_2_t;
     DBG_VAL_PRINT(w_sec_key_x * c_point_X);
 
-    // calculate aggregate key image (layers 0, 1, 3; G component)
-    point_t W_key_image_g = agg_coeff_0 * key_image + agg_coeff_1 * K1 /* + agg_coeff_3 * K3 */;
+    // calculate aggregate key image (layers 0, 1; G component)
+    point_t W_key_image_g = agg_coeff_0 * key_image + agg_coeff_1 * K1;
     DBG_VAL_PRINT(key_image);
     DBG_VAL_PRINT(K1);
-    //DBG_VAL_PRINT(K3);
     DBG_VAL_PRINT(W_key_image_g);
 
     // calculate aggregate key image (layer 2; X component)
@@ -338,15 +322,8 @@ namespace crypto
     //DBG_PRINT("c[" << secret_index << "] = Hs(ih, " << alpha_g * c_point_G << ", " << alpha_g * ki_base << ", " << alpha_x * c_point_X << ", " << alpha_x * ki_base << ")");
     scalar_t c_prev = hsc.calc_hash();  // c_{secret_index + 1}
 
-    sig.r_g.clear();
-    sig.r_x.clear();
-    sig.r_g.reserve(ring_size);
-    sig.r_x.reserve(ring_size);
-    for(size_t i = 0; i < ring_size; ++i)
-    {
-      sig.r_g.emplace_back(scalar_t::random());
-      sig.r_x.emplace_back(scalar_t::random());
-    }
+    sig.r_g.resize_and_make_random(ring_size);
+    sig.r_x.resize_and_make_random(ring_size);
 
     for(size_t j = 0, i = (secret_index + 1) % ring_size; j < ring_size - 1; ++j, i = (i + 1) % ring_size)
     {
@@ -403,6 +380,8 @@ namespace crypto
     hsc.add_pub_key(pseudo_out_amount_commitment);
     hsc.add_pub_key(pseudo_out_blinded_asset_id);
     hsc.add_key_image(ki);
+    hsc.add_pub_key(sig.K1);
+    hsc.add_pub_key(sig.K2);
     hash input_hash = hsc.calc_hash_no_reduce();
     DBG_VAL_PRINT(input_hash);
 
@@ -421,11 +400,6 @@ namespace crypto
     hsc.add_hash(input_hash);
     scalar_t agg_coeff_2 = hsc.calc_hash();
     DBG_VAL_PRINT(agg_coeff_2);
-
-    //hsc.add_32_chars(CRYPTO_HDS_CLSAG_GGX_LAYER_3);
-    //hsc.add_hash(input_hash);
-    //scalar_t agg_coeff_3 = hsc.calc_hash();
-    //DBG_VAL_PRINT(agg_coeff_3);
 
     // prepare A_i, Q_i
     std::vector<point_t> A_i, Q_i;
@@ -462,13 +436,11 @@ namespace crypto
       DBG_VAL_PRINT(W_pub_keys_x[i]);
     }
 
-    // calculate aggregate key image (layers 0, 1, 3; G components)
+    // calculate aggregate key image (layers 0, 1; G components)
     point_t W_key_image_g =
       agg_coeff_0 * key_image +
       agg_coeff_1 * point_t(sig.K1).modify_mul8();
-      // agg_coeff_3 * point_t(sig.K3).modify_mul8();
     DBG_VAL_PRINT(point_t(sig.K1).modify_mul8());
-    //DBG_VAL_PRINT(point_t(sig.K3).modify_mul8());
     DBG_VAL_PRINT(W_key_image_g);
 
     // calculate aggregate key image (layer 2; X component)
@@ -498,7 +470,7 @@ namespace crypto
 
 
   //---------------------------------------------------------------
-
+  /*
 
   bool generate_CLSAG_GGXG(const hash& m, const std::vector<CLSAG_GGXG_input_ref_t>& ring, const point_t& pseudo_out_amount_commitment, const point_t& extended_amount_commitment, const key_image& ki,
     const scalar_t& secret_0_xp, const scalar_t& secret_1_f, const scalar_t& secret_2_x, const scalar_t& secret_3_q, uint64_t secret_index, CLSAG_GGXG_signature& sig)
@@ -548,6 +520,9 @@ namespace crypto
     hsc.add_point(c_scalar_1div8 * pseudo_out_amount_commitment);
     hsc.add_point(c_scalar_1div8 * extended_amount_commitment);
     hsc.add_key_image(ki);
+    hsc.add_pub_key(sig.K1);
+    hsc.add_pub_key(sig.K2);
+    hsc.add_pub_key(sig.K3);
     hash input_hash = hsc.calc_hash_no_reduce();
     DBG_VAL_PRINT(input_hash);
 
@@ -617,7 +592,7 @@ namespace crypto
     DBG_VAL_PRINT(w_sec_key_x * c_point_X);
 
     // calculate aggregate key image (layers 0, 1, 3; G component)
-    point_t W_key_image_g = agg_coeff_0 * key_image + agg_coeff_1 * K1 + /*agg_coeff_2 * K2 +*/ agg_coeff_3 * K3;
+    point_t W_key_image_g = agg_coeff_0 * key_image + agg_coeff_1 * K1 + agg_coeff_3 * K3;
     DBG_VAL_PRINT(key_image);
     DBG_VAL_PRINT(K1);
     DBG_VAL_PRINT(K3);
@@ -647,15 +622,8 @@ namespace crypto
     //DBG_PRINT("c[" << secret_index << "] = Hs(ih, " << alpha_g * c_point_G << ", " << alpha_g * ki_base << ", " << alpha_x * c_point_X << ", " << alpha_x * ki_base << ")");
     scalar_t c_prev = hsc.calc_hash();  // c_{secret_index + 1}
 
-    sig.r_g.clear();
-    sig.r_x.clear();
-    sig.r_g.reserve(ring_size);
-    sig.r_x.reserve(ring_size);
-    for(size_t i = 0; i < ring_size; ++i)
-    {
-      sig.r_g.emplace_back(scalar_t::random());
-      sig.r_x.emplace_back(scalar_t::random());
-    }
+    sig.r_g.resize_and_make_random(ring_size);
+    sig.r_x.resize_and_make_random(ring_size);
 
     for(size_t j = 0, i = (secret_index + 1) % ring_size; j < ring_size - 1; ++j, i = (i + 1) % ring_size)
     {
@@ -713,6 +681,9 @@ namespace crypto
     hsc.add_pub_key(pseudo_out_amount_commitment);
     hsc.add_pub_key(extended_amount_commitment);
     hsc.add_key_image(ki);
+    hsc.add_pub_key(sig.K1);
+    hsc.add_pub_key(sig.K2);
+    hsc.add_pub_key(sig.K3);
     hash input_hash = hsc.calc_hash_no_reduce();
     DBG_VAL_PRINT(input_hash);
 
@@ -807,7 +778,7 @@ namespace crypto
     return c_prev == sig.c;
   }
 
-
+  */
   //---------------------------------------------------------------
 
 
@@ -868,6 +839,10 @@ namespace crypto
     hsc.add_point(c_scalar_1div8 * pseudo_out_blinded_asset_id);
     hsc.add_point(c_scalar_1div8 * extended_amount_commitment);
     hsc.add_key_image(ki);
+    hsc.add_pub_key(sig.K1);
+    hsc.add_pub_key(sig.K2);
+    hsc.add_pub_key(sig.K3);
+    hsc.add_pub_key(sig.K4);
     hash input_hash = hsc.calc_hash_no_reduce();
     DBG_VAL_PRINT(input_hash);
 
@@ -976,15 +951,8 @@ namespace crypto
     //DBG_PRINT("c[" << secret_index << "] = Hs(ih, " << alpha_g * c_point_G << ", " << alpha_g * ki_base << ", " << alpha_x * c_point_X << ", " << alpha_x * ki_base << ")");
     scalar_t c_prev = hsc.calc_hash();  // c_{secret_index + 1}
 
-    sig.r_g.clear();
-    sig.r_x.clear();
-    sig.r_g.reserve(ring_size);
-    sig.r_x.reserve(ring_size);
-    for(size_t i = 0; i < ring_size; ++i)
-    {
-      sig.r_g.emplace_back(scalar_t::random());
-      sig.r_x.emplace_back(scalar_t::random());
-    }
+    sig.r_g.resize_and_make_random(ring_size);
+    sig.r_x.resize_and_make_random(ring_size);
 
     for(size_t j = 0, i = (secret_index + 1) % ring_size; j < ring_size - 1; ++j, i = (i + 1) % ring_size)
     {
@@ -1048,6 +1016,10 @@ namespace crypto
     hsc.add_pub_key(pseudo_out_blinded_asset_id);
     hsc.add_pub_key(extended_amount_commitment);
     hsc.add_key_image(ki);
+    hsc.add_pub_key(sig.K1);
+    hsc.add_pub_key(sig.K2);
+    hsc.add_pub_key(sig.K3);
+    hsc.add_pub_key(sig.K4);
     hash input_hash = hsc.calc_hash_no_reduce();
     DBG_VAL_PRINT(input_hash);
 

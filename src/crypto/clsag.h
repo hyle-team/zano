@@ -1,9 +1,10 @@
-// Copyright (c) 2022-2023 Zano Project
-// Copyright (c) 2022-2023 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2022-2024 Zano Project
+// Copyright (c) 2022-2024 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 //
-// This file contains implementation of CLSAG (s.a. https://eprint.iacr.org/2019/654.pdf by Goodel at el)
+// This file contains implementation of the original d-CLSAG (s.a. https://eprint.iacr.org/2019/654.pdf by Goodel at el)
+// and the extended d/v-CLSAG version (s.a. https://github.com/hyle-team/docs/blob/master/zano/dv-CLSAG-extension/ by sowle)
 //
 #pragma once
 #include "crypto-sugar.h"
@@ -57,11 +58,11 @@ namespace crypto
 
 
   //
-  // 3-CLSAG
+  // 3/2-CLSAG
   //
 
 
-  // 3-CLSAG signature (with respect to the group element G, G, X -- that's why 'GGX')
+  // 3/2-CLSAG signature (with respect to the group element G, G, X -- that's why 'GGX')
   struct CLSAG_GGX_signature
   {
     scalar_t      c;
@@ -93,12 +94,13 @@ namespace crypto
     const public_key& pseudo_out_asset_id, const key_image& ki, const CLSAG_GGX_signature& sig);
 
 
+  /*
   //
-  // 4-CLSAG
+  // 4/2-CLSAG  (eventually, it's not used in Zano)
   //
 
 
-  // 4-CLSAG signature (with respect to the group element G, G, X, G -- that's why 'GGXG')
+  // 4/2-CLSAG signature (with respect to the group element G, G, X, G -- that's why 'GGXG')
   struct CLSAG_GGXG_signature
   {
     scalar_t      c;
@@ -130,14 +132,14 @@ namespace crypto
   bool verify_CLSAG_GGXG(const hash& m, const std::vector<CLSAG_GGXG_input_ref_t>& ring, const public_key& pseudo_out_amount_commitment,
     const public_key& extended_amount_commitment, const key_image& ki, const CLSAG_GGXG_signature& sig);
 
-
+  */
 
   //
-  // 5-CLSAG
+  // 5/2-CLSAG
   //
 
 
-  // 5-CLSAG signature (with respect to the group element G, G, X, X, G -- that's why 'GGXXG')
+  // 5/2-CLSAG signature (with respect to the group element G, G, X, X, G -- that's why 'GGXXG')
   struct CLSAG_GGXXG_signature
   {
     scalar_t      c;

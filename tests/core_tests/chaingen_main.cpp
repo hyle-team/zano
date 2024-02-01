@@ -197,7 +197,8 @@ bool generate_and_play(const char* const genclass_name, size_t hardfork_id = SIZ
   std::vector<test_event_entry> events;
   bool generated = false;
   bool result = false;
-  std::cout << ENDL << concolor::bright_white << "#TEST# >>>> " << genclass_name << " <<<<" << ENDL << ENDL;
+  //std::cout << ENDL << concolor::bright_white << "#TEST# >>>> " << genclass_name << " <<<<" << ENDL << ENDL;
+  LOG_PRINT_MAGENTA( "#TEST# >>>> " << genclass_name << " <<<<" << ENDL, LOG_LEVEL_0);
 
   LOG_PRINT2("get_object_blobsize.log", "#TEST# " << genclass_name, LOG_LEVEL_3);
 
@@ -231,16 +232,16 @@ bool generate_and_play(const char* const genclass_name, size_t hardfork_id = SIZ
     generated = g.generate(events);
     if (generated)
     {
-      std::cout << concolor::normal << events.size() << " events generated successfully" << std::endl; 
+      LOG_PRINT_MAGENTA( events.size() << " events generated successfully" << std::endl, LOG_LEVEL_0);
       if (has_non_default_hardforks || g.get_hardforks() != tcub.get_hardforks())
       {
         size_t configure_core_events_count = std::count_if(events.begin(), events.end(), [](auto& ev){ return ev.type() == typeid(callback_entry) && boost::get<callback_entry>(ev).callback_name == "configure_core"; });  
         CHECK_AND_ASSERT_THROW_MES(configure_core_events_count != 0, "Test " << genclass_name << " has non-default hardfork settings and therefore must use 'configure_core' callback");
       }
 
-      std::cout << concolor::bright_white << std::string(100, '=') << std::endl <<
+      LOG_PRINT_MAGENTA(std::string(100, '=') << std::endl <<
         "#TEST# >>>> " << genclass_name << " <<<< start replaying events" << std::endl <<
-        std::string(100, '=') << concolor::normal << std::endl;
+        std::string(100, '=') << std::endl, LOG_LEVEL_0);
       
       result = do_replay_events(events, g);
     }
@@ -263,18 +264,18 @@ bool generate_and_play(const char* const genclass_name, size_t hardfork_id = SIZ
 
   if (result)
   {
-    std::cout << concolor::green << std::string(100, '=') << std::endl <<
+    LOG_PRINT_GREEN(std::string(100, '=') << std::endl <<
       "#TEST# >>>> " << genclass_name << " <<<< Succeeded" << std::endl <<
-      std::string(100, '=') << concolor::normal << std::endl;
+      std::string(100, '=') << std::endl, LOG_LEVEL_0 );
   }
   else
   {
-    std::cout << concolor::red << std::string(100, '=') << std::endl <<
+    LOG_PRINT_RED( std::string(100, '=') << std::endl <<
       "#TEST# >>>> " << genclass_name << " <<<< FAILED" << std::endl <<
-      std::string(100, '=') << concolor::normal << std::endl;
+      std::string(100, '=') << std::endl, LOG_LEVEL_0);
     result = false;
   }
-  std::cout << std::endl;
+  //std::cout << std::endl;
   return result;
 }
 
@@ -1231,7 +1232,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(hard_fork_2_tx_payer_in_wallet);
     GENERATE_AND_PLAY(hard_fork_2_tx_receiver_in_wallet);
     GENERATE_AND_PLAY(hard_fork_2_tx_extra_alias_entry_in_wallet);
-    GENERATE_AND_PLAY(hard_fork_2_auditable_addresses_basics);
+    GENERATE_AND_PLAY_HF(hard_fork_2_auditable_addresses_basics, "2-*");
     GENERATE_AND_PLAY(hard_fork_2_no_new_structures_before_hf);
     GENERATE_AND_PLAY(hard_fork_2_awo_wallets_basic_test<true>);
     GENERATE_AND_PLAY(hard_fork_2_awo_wallets_basic_test<false>);
@@ -1249,7 +1250,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(atomic_test_altchain_simple);
     GENERATE_AND_PLAY(atomic_test_check_hardfork_rules);
 
-    GENERATE_AND_PLAY(isolate_auditable_and_proof);
+    GENERATE_AND_PLAY_HF(isolate_auditable_and_proof, "2-*");
     
     GENERATE_AND_PLAY(zarcanum_basic_test);
 

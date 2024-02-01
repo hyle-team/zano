@@ -129,7 +129,6 @@ namespace currency
   //--------------------------------------------------------------------------------
   bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id)
   {
-    bool r = false;
     if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
       return true;
 
@@ -387,8 +386,10 @@ namespace currency
     std::vector<uint64_t> out_amounts;
     if (tx_version > TRANSACTION_VERSION_PRE_HF4)
     {
-      // randomly split into CURRENCY_TX_MIN_ALLOWED_OUTS outputs
-      decompose_amount_randomly(block_reward, [&](uint64_t a){ out_amounts.push_back(a); }, CURRENCY_TX_MIN_ALLOWED_OUTS);
+      // randomly split into CURRENCY_TX_MIN_ALLOWED_OUTS outputs for PoW block, or for PoS block only if the stakeholder address differs
+      // (otherwise for PoS miner tx there will be ONE output with amount = stake_amount + reward)
+      if (!pos || miner_address != stakeholder_address)
+        decompose_amount_randomly(block_reward, [&](uint64_t a){ out_amounts.push_back(a); }, CURRENCY_TX_MIN_ALLOWED_OUTS);
     }
     else
     {
@@ -424,7 +425,8 @@ namespace currency
       uint64_t stake_lock_time = 0;
       if (pe.stake_unlock_time && pe.stake_unlock_time > height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
         stake_lock_time = pe.stake_unlock_time;
-      destinations.push_back(tx_destination_entry(pe.amount, stakeholder_address, stake_lock_time));
+      uint64_t amount = destinations.empty() ? pe.amount + block_reward : pe.amount;  // combine stake and reward into one output if no destinations were generated above
+      destinations.push_back(tx_destination_entry(amount, stakeholder_address, stake_lock_time));
       destinations.back().flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // don't use asset id blinding as it's obvious which asset it is
     }
 
@@ -725,14 +727,24 @@ namespace currency
     return total;
   }
   //---------------------------------------------------------------
-  bool is_mixattr_applicable_for_fake_outs_counter(uint8_t mix_attr, uint64_t fake_outputs_count)
+  bool is_mixattr_applicable_for_fake_outs_counter(uint64_t out_tx_version, uint8_t mix_attr, uint64_t fake_outputs_count, const core_runtime_config& rtc)
   {
-    if (mix_attr >= CURRENCY_TO_KEY_OUT_FORCED_MIX_LOWER_BOUND)
-      return fake_outputs_count + 1 >= mix_attr;
-    else if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
-      return fake_outputs_count == 0;
+    if (out_tx_version >= TRANSACTION_VERSION_POST_HF4)
+    {
+      if (mix_attr != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+        return fake_outputs_count >= rtc.hf4_minimum_mixins;
+      else
+        return fake_outputs_count == 0; // CURRENCY_TO_KEY_OUT_FORCED_NO_MIX
+    }
     else
-      return true;
+    {
+      if (mix_attr >= CURRENCY_TO_KEY_OUT_FORCED_MIX_LOWER_BOUND)
+        return fake_outputs_count + 1 >= mix_attr;
+      else if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+        return fake_outputs_count == 0;
+      else
+        return true;
+    }
   }
   //---------------------------------------------------------------
   bool parse_amount(uint64_t& amount, const std::string& str_amount_)
@@ -3317,9 +3329,15 @@ namespace currency
     att.push_back(tsa);
     return true;
   }
-
-
-
+  //---------------------------------------------------------------
+  bool validate_output_key_legit(const crypto::public_key& k)
+  {
+    if (currency::null_pkey == k)
+    {
+      return false;
+    }
+    return true;
+  }
   //---------------------------------------------------------------
   std::string print_money_brief(uint64_t amount, size_t decimal_point /* = CURRENCY_DISPLAY_DECIMAL_POINT */)
   {
@@ -4425,8 +4443,6 @@ namespace currency
       a.k_image     == b.k_image;
   }
   //--------------------------------------------------------------------------------
-
-
   boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,
     const wide_difficulty_type& difficulty_pow_at_split_point,
     const difficulties& a_diff,
@@ -4456,6 +4472,51 @@ namespace currency
 //     }
     TRY_ENTRY();
 //    wide_difficulty_type short_res = res.convert_to<wide_difficulty_type>();
+    return res;
+    CATCH_ENTRY_WITH_FORWARDING_EXCEPTION();
+  }
+  //--------------------------------------------------------------------------------
+  // Note:  we adjust formula and introduce multiplier, 
+  //        that let us never dive into floating point calculations (which we can't use in consensus)
+  //        this multiplier should be greater than max multiprecision::uint128_t power 2
+
+  boost::multiprecision::uint1024_t get_adjuster_for_fork_choice_rule_hf4()
+  {
+    return boost::multiprecision::uint1024_t(std::numeric_limits<boost::multiprecision::uint128_t>::max()) * 10 * std::numeric_limits<boost::multiprecision::uint128_t>::max();
+  }
+
+  const boost::multiprecision::uint1024_t adjusting_multiplier = get_adjuster_for_fork_choice_rule_hf4();
+
+  boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty_hf4(const wide_difficulty_type& difficulty_pos_at_split_point,
+    const wide_difficulty_type& difficulty_pow_at_split_point,
+    const difficulties& a_diff,
+    const difficulties& b_diff)
+  {
+    static const wide_difficulty_type difficulty_pos_starter = DIFFICULTY_POS_STARTER;
+    static const wide_difficulty_type difficulty_pow_starter = DIFFICULTY_POW_STARTER;
+    const wide_difficulty_type& a_pos_cumulative_difficulty = a_diff.pos_diff > 0 ? a_diff.pos_diff : difficulty_pos_starter;
+    const wide_difficulty_type& b_pos_cumulative_difficulty = b_diff.pos_diff > 0 ? b_diff.pos_diff : difficulty_pos_starter;
+    const wide_difficulty_type& a_pow_cumulative_difficulty = a_diff.pow_diff > 0 ? a_diff.pow_diff : difficulty_pow_starter;
+    const wide_difficulty_type& b_pow_cumulative_difficulty = b_diff.pow_diff > 0 ? b_diff.pow_diff : difficulty_pow_starter;
+
+    boost::multiprecision::uint1024_t basic_sum_ = boost::multiprecision::uint1024_t(a_pow_cumulative_difficulty) + (boost::multiprecision::uint1024_t(a_pos_cumulative_difficulty)*difficulty_pow_at_split_point) / difficulty_pos_at_split_point;
+    boost::multiprecision::uint1024_t basic_sum_pow_minus2 = adjusting_multiplier /(basic_sum_ * basic_sum_);
+    boost::multiprecision::uint1024_t res =
+      (basic_sum_pow_minus2 * a_pow_cumulative_difficulty * a_pos_cumulative_difficulty) / (boost::multiprecision::uint1024_t(b_pow_cumulative_difficulty)*b_pos_cumulative_difficulty);
+
+    //     if (res > boost::math::tools::max_value<wide_difficulty_type>())
+    //     {
+    //       ASSERT_MES_AND_THROW("[INTERNAL ERROR]: Failed to get_a_to_b_relative_cumulative_difficulty, res = " << res << ENDL
+    //         << ", difficulty_pos_at_split_point: " << difficulty_pos_at_split_point << ENDL
+    //         << ", difficulty_pow_at_split_point:" << difficulty_pow_at_split_point << ENDL
+    //         << ", a_pos_cumulative_difficulty:" << a_pos_cumulative_difficulty << ENDL
+    //         << ", b_pos_cumulative_difficulty:" << b_pos_cumulative_difficulty << ENDL
+    //         << ", a_pow_cumulative_difficulty:" << a_pow_cumulative_difficulty << ENDL
+    //         << ", b_pow_cumulative_difficulty:" << b_pow_cumulative_difficulty << ENDL       
+    //       );
+    //     }
+    TRY_ENTRY();
+    //    wide_difficulty_type short_res = res.convert_to<wide_difficulty_type>();
     return res;
     CATCH_ENTRY_WITH_FORWARDING_EXCEPTION();
   }

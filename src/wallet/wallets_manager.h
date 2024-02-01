@@ -137,6 +137,7 @@ public:
   std::string get_wallet_restore_info(uint64_t wallet_id, std::string& seed_phrase, const std::string& seed_password);
   std::string backup_wallet(uint64_t wallet_id, const std::wstring& path);
   std::string reset_wallet_password(uint64_t wallet_id, const std::string& pass);
+  std::string use_whitelisting(uint64_t wallet_id, bool use);
   std::string is_wallet_password_valid(uint64_t wallet_id, const std::string& pass);
   std::string create_ionic_swap_proposal(uint64_t wallet_id, const tools::wallet_public::create_ionic_swap_proposal_request& proposal, std::string& result_proposal_hex);
   std::string get_ionic_swap_proposal_info(uint64_t wallet_id, std::string&raw_tx_template_hex, tools::wallet_public::ionic_swap_proposal_info& proposal);

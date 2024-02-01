@@ -375,7 +375,7 @@ bool ionic_swap_exact_amounts_test::c1(currency::core& c, size_t ev_index, const
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt,   "Bob",   adb.total_max_supply,  0,                 adb.total_max_supply, 0, 0, asset_id), false, "");
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*carol_wlt, "Carol", MK_TEST_COINS(21),     0,                 MK_TEST_COINS(21),    0, 0), false, "");
 
-  size_t current_blockchain_size = c.get_current_blockchain_size();
+  //size_t current_blockchain_size = c.get_current_blockchain_size();
 
   // Normal ionic swap between Alice and Bob:  (Alice has only coins with explicit asset id)
   //   before:
@@ -399,7 +399,9 @@ bool ionic_swap_exact_amounts_test::c1(currency::core& c, size_t ev_index, const
     proposal_decoded_info.to_initiator == proposal_details.to_initiator &&
     proposal_decoded_info.fee_paid_by_a == proposal_details.fee_paid_by_a &&
     proposal_decoded_info.mixins == proposal_details.mixins,
-    false, "actual and decoded proposal mismatch");
+    false, "actual and decoded proposal mismatch \nproposal_decoded_info: " 
+    << epee::serialization::store_t_to_json(proposal_decoded_info) << 
+    "\nproposal_details" << epee::serialization::store_t_to_json(proposal_details));
 
   currency::transaction tx_is{};
   r = bob_wlt->accept_ionic_swap_proposal(proposal, tx_is);

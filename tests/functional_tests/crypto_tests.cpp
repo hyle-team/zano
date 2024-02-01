@@ -1658,7 +1658,7 @@ TEST(crypto, scalar_get_bits)
   for(size_t i = 0; i < 256; ++i)
     ASSERT_EQ(x.get_bits(i, 0), 0);
   for(size_t i = 0; i < 256; ++i)
-    ASSERT_EQ(x.get_bits(i, std::min(255ull, i + 65)), 0);
+    ASSERT_EQ(x.get_bits(i, std::min((size_t)255, i + 65)), 0);
 
   ASSERT_EQ(x.get_bits(0,   64), x.m_u64[0]);
   ASSERT_EQ(x.get_bits(64,  64), x.m_u64[1]);
@@ -1694,6 +1694,32 @@ TEST(crypto, scalar_get_bits)
   }
   return true;
 }
+
+
+TEST(crypto, scalarmult_base_vartime)
+{
+  auto check_for_x = [&](const scalar_t& x) -> bool {
+    point_t P, P2;
+    ge_scalarmult_base_vartime(&P.m_p3, x.m_s);
+    ge_scalarmult_base(&P2.m_p3, x.m_s);
+    return (P - P2).is_zero();
+    };
+
+  ASSERT_TRUE(check_for_x(c_scalar_0));
+  ASSERT_TRUE(check_for_x(c_scalar_1));
+  ASSERT_TRUE(check_for_x(c_scalar_1div8));
+  ASSERT_TRUE(check_for_x(c_scalar_Lm1));
+  ASSERT_TRUE(check_for_x(c_scalar_L));
+
+  for(size_t i = 0; i < 1000; ++i)
+  {
+    scalar_t x = scalar_t::random();
+    ASSERT_TRUE(check_for_x(x));
+  }
+
+  return true;
+}
+
 
 template<typename CT>
 bool crypto_msm_runner(size_t N, size_t low_bits_to_clear, size_t high_bits_to_clear)
@@ -1760,6 +1786,116 @@ TEST(crypto, msm)
 
   return true;
 }
+
+
+
+inline std::ostream &operator <<(std::ostream &o, const crypto::ge_precomp v)
+{
+  o << "{{";
+
+  for(size_t i = 0; i < 9; ++i)
+    o << v.yplusx[i] << ", ";
+
+  o << v.yplusx[9] << "}, {";
+
+  for(size_t i = 0; i < 9; ++i)
+    o << v.yminusx[i] << ", ";
+
+  o << v.yminusx[9] << "}, {";
+
+  for(size_t i = 0; i < 9; ++i)
+    o << v.xy2d[i] << ", ";
+
+  o << v.xy2d[9] << "}}";
+  return o;
+}
+
+bool calc_and_print_generator_precomp(const point_pc_t& generator, const char* generator_var_name)
+{
+  precomp_data_t precomp_data = {};
+  construct_precomp_data(precomp_data, generator);
+
+  std::cout << "    const precomp_data_t " << generator_var_name << "_precomp_data = {" << ENDL;
+
+  for(size_t i = 0; i < 32; ++i)
+  {
+    std::cout << "      {" << ENDL;
+    for(size_t j = 0; j < 8; ++j)
+      std::cout << "        " << precomp_data[i][j] << (j != 7 ? "," : "" ) << ENDL;
+    std::cout << "      }" << (i != 31 ? "," : "" ) << ENDL;
+  }
+
+  std::cout << "    };" << ENDL;
+
+  return true;
+}
+
+TEST(print, generators_precomp)
+{
+#define CALC_PRECOMP(G) calc_and_print_generator_precomp(G, #G)
+
+  CALC_PRECOMP(c_point_H);
+  CALC_PRECOMP(c_point_H2);
+  CALC_PRECOMP(c_point_U);
+  CALC_PRECOMP(c_point_X);
+  CALC_PRECOMP(c_point_H_plus_G);
+  CALC_PRECOMP(c_point_H_minus_G);
+  return true;
+
+#undef CALC_PRECOMP
+}
+
+bool check_generator_precomp(const point_pc_t& generator, const char* generator_var_name)
+{
+  point_t generator_pt = generator; // to avoid using precomputed data in scalar multiplications
+  point_t random_point = hash_helper_t::hp(scalar_t::random());
+
+  point_t A = generator_pt;
+  for(size_t i = 0; i < 32; ++i)
+  {
+    point_t B = c_point_0;
+    for(size_t j = 0; j < 8; ++j)
+    {
+      B += A;
+
+      // restore ge_p3 from ge_precomp using native NaCl functions... 
+      point_t restored_pt{};
+      ge_p1p1 p1p1{};
+      ge_madd(&p1p1, &random_point.m_p3, &((*generator.m_precomp_data_p)[i][j]));
+      ge_p1p1_to_p3(&restored_pt.m_p3, &p1p1);
+      restored_pt -= random_point;
+
+      // ...and compare it with the calculated one
+      if (B != restored_pt)
+      {
+        std::cout << "ERROR: " << generator_var_name << ", i: " << i << ", j: " << j << ENDL;
+        return false;
+      }
+    }
+    if (i != 31)
+      A.modify_mul_pow_2(8);
+  }
+
+  std::cout << "   " << std::left << std::setw(32) << generator_var_name << "   OK" << ENDL;
+  return true;
+}
+
+TEST(crypto, generators_precomp)
+{
+#define CHECK_PRECOMP(G) ASSERT_TRUE(check_generator_precomp(G, #G))
+
+  CHECK_PRECOMP(c_point_H);
+  CHECK_PRECOMP(c_point_H2);
+  CHECK_PRECOMP(c_point_U);
+  CHECK_PRECOMP(c_point_X);
+  CHECK_PRECOMP(c_point_H_plus_G);
+  CHECK_PRECOMP(c_point_H_minus_G);
+
+  return true;
+
+#undef CHECK_PRECOMP
+}
+
 
 
 //

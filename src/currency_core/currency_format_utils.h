@@ -362,7 +362,7 @@ namespace currency
   tx_derivation_hint make_tx_derivation_hint_from_uint16(uint16_t hint);
 
   std::string short_hash_str(const crypto::hash& h);
-  bool is_mixattr_applicable_for_fake_outs_counter(uint8_t mix_attr, uint64_t fake_attr_count);
+  bool is_mixattr_applicable_for_fake_outs_counter(uint64_t out_tx_version, uint8_t out_mix_attr, uint64_t fake_outputs_count, const core_runtime_config& rtc);
   bool is_tx_spendtime_unlocked(uint64_t unlock_time, uint64_t current_blockchain_size, uint64_t current_time);
   crypto::key_derivation get_encryption_key_derivation(bool is_income, const transaction& tx, const account_keys& acc_keys);
   bool decrypt_payload_items(bool is_income, const transaction& tx, const account_keys& acc_keys, std::vector<payload_items_v>& decrypted_items);
@@ -407,7 +407,7 @@ namespace currency
   std::vector<txout_ref_v> relative_output_offsets_to_absolute(const std::vector<txout_ref_v>& off);
   bool absolute_sorted_output_offsets_to_relative_in_place(std::vector<txout_ref_v>& offsets) noexcept;
 
-
+  bool validate_output_key_legit(const crypto::public_key& k);
 
   // prints amount in format "3.14", "0.0"
   std::string print_money_brief(uint64_t amount, size_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT);
@@ -421,6 +421,7 @@ namespace currency
   bool add_padding_to_tx(transaction& tx, size_t count);
   bool is_service_tx(const transaction& tx);
   bool does_tx_have_only_mixin_inputs(const transaction& tx);
+  uint64_t get_hf4_inputs_key_offsets_count(const transaction& tx);
   bool is_showing_sender_addres(const transaction& tx);
   bool check_native_coins_amount_burnt_in_outs(const transaction& tx, const uint64_t amount, uint64_t* p_amount_burnt = nullptr);
   std::string print_stake_kernel_info(const stake_kernel& sk);
@@ -932,6 +933,13 @@ namespace currency
     const difficulties& a_diff, 
     const difficulties& b_diff
   );
+
+  boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty_hf4(const wide_difficulty_type& difficulty_pos_at_split_point,
+    const wide_difficulty_type& difficulty_pow_at_split_point,
+    const difficulties& a_diff,
+    const difficulties& b_diff
+  );
+
 
   struct rpc_tx_payload_handler : public boost::static_visitor<bool>
   {

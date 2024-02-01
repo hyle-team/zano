@@ -448,6 +448,16 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
     {
       for (uint64_t amount : rqt.amounts)
       {
+        uint64_t height_upper_limit_local = rqt.height_upper_limit;
+        if (amount == 0)
+        {
+          //for hardfork 4 we need to have at least 10 confirmations on hard rule level
+          //rqt.height_upper_limit > - 10
+          if (m_blockchain.size() < CURRENCY_HF4_MANDATORY_MIN_COINAGE)
+            return false;
+          if (height_upper_limit_local > m_blockchain.size() - CURRENCY_HF4_MANDATORY_MIN_COINAGE)
+            height_upper_limit_local = m_blockchain.size() - CURRENCY_HF4_MANDATORY_MIN_COINAGE;
+        }
         rsp.outs.resize(rsp.outs.size() + 1);
         auto& rsp_entry = rsp.outs.back();
         rsp_entry.amount = amount;
@@ -463,7 +473,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
         for (size_t gindex : random_mapping)
         {
           const out_index_info& oii = it->second[gindex];
-          if (rqt.height_upper_limit != 0 && oii.block_height > rqt.height_upper_limit)
+          if (height_upper_limit_local != 0 && oii.block_height > height_upper_limit_local)
             continue;
           const transaction& tx = oii.in_block_tx_index == 0 ? m_blockchain[oii.block_height]->b.miner_tx : m_blockchain[oii.block_height]->m_transactions[oii.in_block_tx_index - 1];
           auto& out_v = tx.vout[oii.in_tx_out_index];
@@ -1193,8 +1203,6 @@ namespace
 
 bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, const currency::account_keys& acc_keys)
 {
-  bool r = false;
-
   for (const block& blk : blockchain)
   {
     uint64_t height = get_block_height(blk);
@@ -1487,6 +1495,11 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
           if (unlock_time > head_block_ts + DIFFICULTY_TOTAL_TARGET)
             continue;
         }
+      } 
+      if (blk_head.miner_tx.version >= TRANSACTION_VERSION_POST_HF4 && next_block_height - get_block_height(*oi.p_blk) < CURRENCY_HF4_MANDATORY_MIN_COINAGE)
+      {
+        //ignore outs that doesn't fit the HF4 rule
+        continue;
       }
 
 
@@ -2338,7 +2351,6 @@ bool shuffle_source_entries(std::vector<tx_source_entry>& sources)
 // creates destinations.size() + 1 outputs if the total sum of amounts is less than the original premine amount (the last one will have amount = old_premine - sum)
 bool replace_coinbase_in_genesis_block(const std::vector<currency::tx_destination_entry>& destinations, test_generator& generator, std::vector<test_event_entry>& events, currency::block& genesis_block)
 {
-  bool r = false;
   generator.remove_block_info(genesis_block);
   events.pop_back();
 
@@ -2478,6 +2490,7 @@ bool test_chain_unit_enchanced::configure_core(currency::core& c, size_t ev_inde
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
+  pc.hf4_minimum_mixins = 0;
   pc.hard_forks = m_hardforks;
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
