@@ -234,7 +234,7 @@ namespace crypto
 
     const size_t m = std::max(static_cast<uint64_t>(1), constexpr_ceil_log_n(ring_size, n));
     const size_t N = constexpr_pow(m, n);
-    const size_t mn = m * n;
+    //const size_t mn = m * n;
 
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.Pk.size() == m, 1);
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(sig.f.size() == m * (n - 1), 2);
