@@ -15,7 +15,7 @@ void thread_pool_tests_simple()
   {
     utils::threads_pool pool;
     pool.init();
-    std::atomic<uint64_t> count_jobs_finished = 0;
+    std::atomic<uint64_t> count_jobs_finished(0);
     size_t i = 0;
     for (; i != 10; i++)
     {
@@ -36,7 +36,7 @@ void thread_pool_tests()
   {
     utils::threads_pool pool;
     pool.init();
-    std::atomic<uint64_t> count_jobs_finished = 0;
+    std::atomic<uint64_t> count_jobs_finished(0);
 
     utils::threads_pool::jobs_container jobs;
     size_t i = 0;

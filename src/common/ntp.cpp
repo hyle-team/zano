@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Zano Project
+// Copyright (c) 2019-2022 Zano Project
 
 // Note: class udp_blocking_client is a slightly modified version of an example
 // taken from https://www.boost.org/doc/libs/1_53_0/doc/html/boost_asio/example/timeouts/blocking_udp_client.cpp
@@ -13,7 +13,7 @@
 #include <boost/asio/deadline_timer.hpp>
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/ip/udp.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 #include <boost/array.hpp>
 #include <epee/include/misc_log_ex.h>

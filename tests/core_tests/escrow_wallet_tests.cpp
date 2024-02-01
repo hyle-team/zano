@@ -17,7 +17,7 @@ using namespace currency;
 
 struct wallet_tests_callback_handler : public tools::i_wallet2_callback
 {
-  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) 
+  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
   {
     all_wtis.push_back(wti);
   }
@@ -108,8 +108,8 @@ bool escrow_wallet_test::prepare_proposal_accepted_test(currency::core& c, const
   cpd.title = "Afterlife? If I thought I had to live another life, I'd kill myself right now!";
   wallet_buyer->send_escrow_proposal(cpd, 0, 0, 3600, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, "", escrow_proposal_tx, escrow_template_tx);
 
-  auto it = std::find_if(escrow_template_tx.vout.begin(), escrow_template_tx.vout.end(), [](const tx_out& o){
-    if (o.target.type() == typeid(txout_multisig))
+  auto it = std::find_if(escrow_template_tx.vout.begin(), escrow_template_tx.vout.end(), [](const tx_out_v& o){
+    if (boost::get<tx_out_bare>(o).target.type() == typeid(txout_multisig))
       return true;
     return false;
   });
@@ -126,7 +126,7 @@ bool escrow_wallet_test::prepare_proposal_accepted_test(currency::core& c, const
   wallet_buyer->refresh();
   wallet_seller->refresh();
 
-  tools::wallet2::escrow_contracts_container contracts_buyer, contracts_seller;
+  tools::escrow_contracts_container contracts_buyer, contracts_seller;
   wallet_buyer->get_contracts(contracts_buyer);
   wallet_seller->get_contracts(contracts_seller);
 
@@ -163,7 +163,7 @@ bool escrow_wallet_test::prepare_proposal_accepted_test(currency::core& c, const
   CHECK_AND_FORCE_ASSERT_MES(contracts_buyer.begin()->second.state == tools::wallet_public::escrow_contract_details_basic::contract_accepted, false, "Incorrect contracts_buyer state");
   CHECK_AND_FORCE_ASSERT_MES(contracts_seller.begin()->second.state == tools::wallet_public::escrow_contract_details_basic::contract_accepted, false, "Incorrect contracts_seller state");
 
-  tools::wallet2::multisig_transfer_container  ms_buyer, ms_seller;
+  tools::multisig_transfer_container  ms_buyer, ms_seller;
   wallet_buyer->get_multisig_transfers(ms_buyer);
   wallet_seller->get_multisig_transfers(ms_seller);
   CHECK_AND_FORCE_ASSERT_MES(ms_buyer.size() == 1, false, "Incorrect contracts_buyer state");
@@ -195,7 +195,7 @@ bool escrow_wallet_test::exec_test_with_specific_release_type(currency::core& c,
     expected_state = tools::wallet_public::escrow_contract_details_basic::contract_released_burned;
   }
 
-  tools::wallet2::escrow_contracts_container contracts_buyer, contracts_seller;
+  tools::escrow_contracts_container contracts_buyer, contracts_seller;
   wallet_buyer->finish_contract(multisig_id, release_instruction);
   r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, 2);
   wallet_buyer->refresh();
@@ -232,7 +232,7 @@ bool escrow_wallet_test::exec_test_with_cancel_release_type(currency::core& c, c
   wallet_miner->transfer(TESTS_DEFAULT_FEE, wallet_buyer->get_account().get_public_address());
   r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, 10);
   wallet_buyer->refresh();
-  tools::wallet2::escrow_contracts_container contracts_buyer, contracts_seller;
+  tools::escrow_contracts_container contracts_buyer, contracts_seller;
   wallet_buyer->request_cancel_contract(multisig_id, TESTS_DEFAULT_FEE, 60 * 60);
   r = mine_next_pow_blocks_in_playtime(m_mining_accunt.get_public_address(), c, 2);
   wallet_buyer->refresh();
@@ -503,10 +503,10 @@ bool escrow_incorrect_proposal::generate(std::vector<test_event_entry>& events) 
 
   // 1. create normal proposal and make sure it goes correctly through out the whole mechanism (test self-check)
   // if it fails, it means build_custom_escrow_proposal() produced incorrect proposal
-  
+  uint64_t tx_version = get_tx_version(get_block_height(blk_1r),  m_hardforks);
   uint64_t normal_escrow_mask = eccf_proposal_additional_attach | eccf_template_additional_extra | eccf_template_additional_attach;
   transaction normal_escrow_proposal_tx = AUTO_VAL_INIT(normal_escrow_proposal_tx);
-  r = build_custom_escrow_proposal(events, blk_1r, miner_acc.get_keys(), cpd, 0, 0, 0, blk_1r.timestamp + 3600, 0, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, normal_escrow_mask, normal_escrow_proposal_tx, used_sources);
+  r = build_custom_escrow_proposal(events, blk_1r, miner_acc.get_keys(), cpd, 0, 0, 0, blk_1r.timestamp + 3600, 0, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, normal_escrow_mask, tx_version, normal_escrow_proposal_tx, used_sources);
   CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_proposal failed");
 
   events.push_back(normal_escrow_proposal_tx);
@@ -550,8 +550,9 @@ bool escrow_incorrect_proposal::generate(std::vector<test_event_entry>& events) 
     uint64_t config_mask = custom_config_masks[i].mask;
     cpd.comment = "#" + std::to_string(i) + " " + custom_config_masks[i].name;
     
+    tx_version = get_tx_version(get_block_height(top_block), m_hardforks);
     transaction escrow_proposal_tx = AUTO_VAL_INIT(escrow_proposal_tx);
-    r = build_custom_escrow_proposal(events, top_block, miner_acc.get_keys(), cpd, 0, 0, 0, top_block.timestamp + 3600, 0, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, config_mask, escrow_proposal_tx, used_sources);
+    r = build_custom_escrow_proposal(events, top_block, miner_acc.get_keys(), cpd, 0, 0, 0, top_block.timestamp + 3600, 0, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, config_mask, tx_version, escrow_proposal_tx, used_sources);
     CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_proposal failed");
 
     LOG_PRINT_YELLOW("proposal tx: " << get_transaction_hash(escrow_proposal_tx) << " is built for mask: " << cpd.comment, LOG_LEVEL_0);
@@ -579,8 +580,9 @@ bool escrow_incorrect_proposal::generate(std::vector<test_event_entry>& events) 
   {
     cpd.comment = "incorrect unlock time (past)";
     transaction tx = AUTO_VAL_INIT(tx);
+    tx_version = get_tx_version(get_block_height(top_block), m_hardforks);
     // set unlock time to the past (suppose it's incorrect for escrow proposals)
-    r = build_custom_escrow_proposal(events, top_block, miner_acc.get_keys(), cpd, top_block.timestamp, 0, top_block.timestamp, 0, 0, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, eccf_normal, tx, used_sources);
+    r = build_custom_escrow_proposal(events, top_block, miner_acc.get_keys(), cpd, top_block.timestamp, 0, top_block.timestamp, 0, 0, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, eccf_normal, tx_version, tx, used_sources);
     CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_proposal failed");
     LOG_PRINT_YELLOW("proposal tx: " << get_transaction_hash(tx) << " is built for " << cpd.comment, LOG_LEVEL_0);
     events.push_back(tx);
@@ -591,9 +593,10 @@ bool escrow_incorrect_proposal::generate(std::vector<test_event_entry>& events) 
   {
     cpd.comment = "incorrect unlock time (future)";
     transaction tx = AUTO_VAL_INIT(tx);
+    tx_version = get_tx_version(get_block_height(top_block), m_hardforks);
     // set unlock time to the future (suppose it's incorrect for escrow proposals)
     uint64_t unlock_time = top_block.timestamp + 365 * 24 * 60 * 60;
-    r = build_custom_escrow_proposal(events, top_block, miner_acc.get_keys(), cpd, unlock_time, 0, unlock_time, 0, 0, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, eccf_normal, tx, used_sources);
+    r = build_custom_escrow_proposal(events, top_block, miner_acc.get_keys(), cpd, unlock_time, 0, unlock_time, 0, 0, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, eccf_normal, tx_version,  tx, used_sources);
     CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_proposal failed");
     LOG_PRINT_YELLOW("proposal tx: " << get_transaction_hash(tx) << " is built for " << cpd.comment, LOG_LEVEL_0);
     events.push_back(tx);
@@ -604,7 +607,8 @@ bool escrow_incorrect_proposal::generate(std::vector<test_event_entry>& events) 
   {
     cpd.comment = "template zero expiration time";
     transaction tx = AUTO_VAL_INIT(tx);
-    r = build_custom_escrow_proposal(events, top_block, miner_acc.get_keys(), cpd, 0, 0, 0, 0, 0, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, eccf_normal, tx, used_sources);
+    tx_version = get_tx_version(get_block_height(top_block), m_hardforks);
+    r = build_custom_escrow_proposal(events, top_block, miner_acc.get_keys(), cpd, 0, 0, 0, 0, 0, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, eccf_normal, tx_version, tx, used_sources);
     CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_proposal failed");
     LOG_PRINT_YELLOW("proposal tx: " << get_transaction_hash(tx) << " is built for " << cpd.comment, LOG_LEVEL_0);
     events.push_back(tx);
@@ -615,9 +619,10 @@ bool escrow_incorrect_proposal::generate(std::vector<test_event_entry>& events) 
   {
     cpd.comment = "proposal non-zero expiration time";
     transaction tx = AUTO_VAL_INIT(tx);
+    tx_version = get_tx_version(get_block_height(top_block), m_hardforks);
     uint64_t proposal_expiration_time = top_block.timestamp + 12 * 60 * 60;
     uint64_t template_expiration_time = top_block.timestamp + 12 * 60 * 60;
-    r = build_custom_escrow_proposal(events, top_block, miner_acc.get_keys(), cpd, 0, proposal_expiration_time, 0, template_expiration_time, 0, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, eccf_normal, tx, used_sources);
+    r = build_custom_escrow_proposal(events, top_block, miner_acc.get_keys(), cpd, 0, proposal_expiration_time, 0, template_expiration_time, 0, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, eccf_normal, tx_version, tx, used_sources);
     CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_proposal failed");
     LOG_PRINT_YELLOW("proposal tx: " << get_transaction_hash(tx) << " is built for " << cpd.comment, LOG_LEVEL_0);
     events.push_back(tx);
@@ -638,7 +643,7 @@ bool escrow_incorrect_proposal::check_normal_proposal(currency::core& c, size_t 
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
   alice_wlt->refresh();
 
-  tools::wallet2::escrow_contracts_container contracts;
+  tools::escrow_contracts_container contracts;
   alice_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "Alice didn't receive escrow proposal");
   CHECK_AND_ASSERT_MES(contracts.begin()->second.is_a == false, false, "proposal has wrong is_a");
@@ -677,7 +682,7 @@ bool escrow_incorrect_proposal::check_incorrect_proposal(currency::core& c, size
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
   alice_wlt->refresh();
 
-  tools::wallet2::escrow_contracts_container contracts;
+  tools::escrow_contracts_container contracts;
   alice_wlt->get_contracts(contracts);
 
   if (contracts.size() != 0)
@@ -728,7 +733,7 @@ bool escrow_proposal_expiration::generate(std::vector<test_event_entry>& events)
   destinations.push_back(tx_destination_entry(amount, bob_acc.get_public_address()));
   destinations.push_back(tx_destination_entry(amount, bob_acc.get_public_address()));
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_to_key(events, tx_1, blk_0r, miner_acc, destinations);
+  r = construct_tx_to_key(m_hardforks, events, tx_1, blk_0r, miner_acc, destinations);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
   events.push_back(tx_1);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);
@@ -775,7 +780,7 @@ bool escrow_proposal_expiration::c1(currency::core& c, size_t ev_index, const st
   uint64_t alice_post_proposal_balance = alice_wlt->balance();
   uint64_t alice_post_proposal_balance_expected = alice_start_balance - TESTS_DEFAULT_FEE;
   CHECK_AND_ASSERT_MES(alice_post_proposal_balance == alice_post_proposal_balance_expected, false, "Incorrect alice_post_proposal_balance: " << print_money(alice_post_proposal_balance) << ", expected: " << print_money(alice_post_proposal_balance_expected));
-  std::deque<tools::wallet2::transfer_details> transfers;
+  std::deque<tools::transfer_details> transfers;
   alice_wlt->get_transfers(transfers);
   CHECK_AND_ASSERT_MES(transfers.size() == 2 && (
       (transfers[0].is_spent() && (transfers[1].m_flags & (WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION))) ||
@@ -946,11 +951,11 @@ bool escrow_proposal_and_accept_expiration::generate(std::vector<test_event_entr
 
   // send few coins to Alice and Bob
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), TESTS_DEFAULT_FEE * 50, 10, TESTS_DEFAULT_FEE, tx_0);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), TESTS_DEFAULT_FEE * 50, 10, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), TESTS_DEFAULT_FEE * 50, 10, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), TESTS_DEFAULT_FEE * 50, 10, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({ tx_0, tx_1 }));
@@ -1121,7 +1126,7 @@ bool escrow_incorrect_proposal_acceptance::generate(std::vector<test_event_entry
   destinations.push_back(tx_destination_entry(big_chunk_amount, bob_acc.get_public_address()));
   destinations.push_back(tx_destination_entry(big_chunk_amount, bob_acc.get_public_address()));
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_to_key(events, tx_1, blk_0r, miner_acc, destinations);
+  r = construct_tx_to_key(m_hardforks, events, tx_1, blk_0r, miner_acc, destinations);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
   events.push_back(tx_1);
   m_alice_bob_start_amount = big_chunk_amount * 2;
@@ -1144,15 +1149,17 @@ bool escrow_incorrect_proposal_acceptance::generate(std::vector<test_event_entry
   // create escrow proposal
   bc_services::proposal_body prop = AUTO_VAL_INIT(prop);
   transaction escrow_proposal_tx = AUTO_VAL_INIT(escrow_proposal_tx);
-  r = build_custom_escrow_proposal(events, blk_1r, alice_acc.get_keys(), m_cpd, 0, 0, 0, blk_1r.timestamp + 36000, 0, TESTS_DEFAULT_FEE, m_bob_fee_release, eccf_normal, escrow_proposal_tx, used_sources, &prop);
+  uint64_t tx_version = get_tx_version(get_block_height(blk_1r), m_hardforks);
+  r = build_custom_escrow_proposal(events, blk_1r, alice_acc.get_keys(), m_cpd, 0, 0, 0, blk_1r.timestamp + 36000, 0, TESTS_DEFAULT_FEE, m_bob_fee_release, eccf_normal, tx_version, escrow_proposal_tx, used_sources, &prop);
   CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_proposal failed");
   events.push_back(escrow_proposal_tx);
   MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, escrow_proposal_tx);
 
   // create normal acceptance
+  tx_version = get_tx_version(get_block_height(blk_2), m_hardforks);
   transaction escrow_normal_acceptance_tx = prop.tx_template;
   uint64_t normal_acceptance_mask = eccf_acceptance_no_tsa_compression;
-  r = build_custom_escrow_accept_proposal(events, blk_2, 0, bob_acc.get_keys(), m_cpd, 0, 0, 0, 0, TESTS_DEFAULT_FEE, m_bob_fee_release, normal_acceptance_mask, prop.tx_onetime_secret_key, escrow_normal_acceptance_tx, used_sources);
+  r = build_custom_escrow_accept_proposal(events, blk_2, 0, bob_acc.get_keys(), m_cpd, 0, 0, 0, 0, TESTS_DEFAULT_FEE, m_bob_fee_release, normal_acceptance_mask, prop.tx_onetime_secret_key, tx_version, escrow_normal_acceptance_tx, used_sources);
   CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_accept_proposal failed");
 
   events.push_back(escrow_normal_acceptance_tx);
@@ -1200,7 +1207,7 @@ bool escrow_incorrect_proposal_acceptance::generate(std::vector<test_event_entry
   for(size_t i = 0; i < 15; ++i)
     destinations.push_back(tx_destination_entry(m_cpd.amount_b_pledge + m_bob_fee_release + bob_fee_acceptance, bob_acc.get_public_address()));
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
-  r = construct_tx_to_key(events, tx_2, blk_7c, miner_acc, destinations);
+  r = construct_tx_to_key(m_hardforks, events, tx_2, blk_7c, miner_acc, destinations);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
   events.push_back(tx_2);
   MAKE_NEXT_BLOCK_TX1(events, blk_8c, blk_7c, miner_acc, tx_2);
@@ -1251,9 +1258,10 @@ bool escrow_incorrect_proposal_acceptance::generate(std::vector<test_event_entry
     const auto &ccm_el = custom_config_masks[i];
     uint64_t mask = ccm_el.mask;
 
+    tx_version = get_tx_version(get_block_height(prev_block), m_hardforks);
     transaction incorrect_acceptance_tx = prop.tx_template;
     r = build_custom_escrow_accept_proposal(events, prev_block, 0, bob_acc.get_keys(), m_cpd, ccm_el.unlock_time, ccm_el.expiration_time, ccm_el.release_unlock_time, ccm_el.release_expiration_time,
-      bob_fee_acceptance, m_bob_fee_release, mask, prop.tx_onetime_secret_key, incorrect_acceptance_tx, used_sources);
+      bob_fee_acceptance, m_bob_fee_release, mask, prop.tx_onetime_secret_key, tx_version, incorrect_acceptance_tx, used_sources);
     CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_accept_proposal failed");
 
     // In order to use the same escrow proposal to test different invalid acceptance we need to switch chains after each try
@@ -1322,7 +1330,7 @@ bool escrow_incorrect_proposal_acceptance::check_normal_acceptance(currency::cor
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
-  tools::wallet2::escrow_contracts_container contracts;
+  tools::escrow_contracts_container contracts;
   r = alice_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Alice failed");
 
@@ -1385,7 +1393,7 @@ bool escrow_incorrect_proposal_acceptance::check_incorrect_acceptance(currency::
   alice_wlt->dump_trunsfers(ss, false);
   LOG_PRINT_L0("check_incorrect_acceptance(" << param << "):" << ENDL << "Alice balance: " << print_money(alice_balance) << ", transfers: " << ENDL << ss.str());
 
-  tools::wallet2::escrow_contracts_container contracts;
+  tools::escrow_contracts_container contracts;
   r = alice_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Alice failed");
 
@@ -1487,7 +1495,7 @@ bool escrow_custom_test::generate(std::vector<test_event_entry>& events) const
   }
   // no change back to the miner - it will become a fee
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   events.push_back(tx_1);
@@ -1619,6 +1627,7 @@ bool escrow_custom_test::generate(std::vector<test_event_entry>& events) const
     test_details.push_back(cd);
   }
 
+  
   for(auto cd : test_details)
   {
     DO_CALLBACK_PARAMS_STR(events, "check", epee::serialization::store_t_to_json(cd));
@@ -1629,7 +1638,7 @@ bool escrow_custom_test::generate(std::vector<test_event_entry>& events) const
 
     prev_block = blk_n;
   }
-
+  
   return true;
 }
 
@@ -1714,7 +1723,7 @@ bool escrow_custom_test::do_custom_test(currency::core& c, size_t ev_index, cons
   bob_wlt->refresh();
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", bob_start_balance, 0, INVALID_BALANCE_VAL, 0, 0), false, "");
 
-  tools::wallet2::escrow_contracts_container contracts;
+  tools::escrow_contracts_container contracts;
   r = bob_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Bob failed");
   CHECK_AND_ASSERT_MES(check_contract_state(contracts, cd.cpd, tools::wallet_public::escrow_contract_details::proposal_sent, "Bob"), false, "wrong contract");
@@ -1940,7 +1949,7 @@ bool escrow_incorrect_cancel_proposal::generate(std::vector<test_event_entry>& e
   }
   // no change back to the miner - it will become a fee
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   events.push_back(tx_1);
@@ -1960,24 +1969,27 @@ bool escrow_incorrect_cancel_proposal::generate(std::vector<test_event_entry>& e
 
   // create normal escrow proposal
   bc_services::proposal_body prop = AUTO_VAL_INIT(prop);
+  uint64_t tx_version = get_tx_version(get_block_height(blk_1r), m_hardforks);
   transaction escrow_proposal_tx = AUTO_VAL_INIT(escrow_proposal_tx);
-  r = build_custom_escrow_proposal(events, blk_1r, alice_acc.get_keys(), m_cpd, 0, 0, 0, blk_1r.timestamp + 36000, 0, TESTS_DEFAULT_FEE, m_bob_fee_release, eccf_normal, escrow_proposal_tx, used_sources, &prop);
+  r = build_custom_escrow_proposal(events, blk_1r, alice_acc.get_keys(), m_cpd, 0, 0, 0, blk_1r.timestamp + 36000, 0, TESTS_DEFAULT_FEE, m_bob_fee_release, eccf_normal, tx_version, escrow_proposal_tx, used_sources, &prop);
   CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_proposal failed");
   events.push_back(escrow_proposal_tx);
   MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, escrow_proposal_tx);
 
   // create normal escrow proposal acceptance
   transaction escrow_normal_acceptance_tx = prop.tx_template;
+  tx_version = get_tx_version(get_block_height(blk_2), m_hardforks);
   uint64_t normal_acceptance_mask = eccf_acceptance_no_tsa_compression;
-  r = build_custom_escrow_accept_proposal(events, blk_2, 0, bob_acc.get_keys(), m_cpd, 0, 0, 0, 0, TESTS_DEFAULT_FEE, m_bob_fee_release, normal_acceptance_mask, prop.tx_onetime_secret_key, escrow_normal_acceptance_tx, used_sources);
+  r = build_custom_escrow_accept_proposal(events, blk_2, 0, bob_acc.get_keys(), m_cpd, 0, 0, 0, 0, TESTS_DEFAULT_FEE, m_bob_fee_release, normal_acceptance_mask, prop.tx_onetime_secret_key, tx_version, escrow_normal_acceptance_tx, used_sources);
   CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_accept_proposal failed");
 
   events.push_back(escrow_normal_acceptance_tx);
   MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, escrow_normal_acceptance_tx);
 
   // create normal cancel proposal
+  tx_version = get_tx_version(get_block_height(blk_3), m_hardforks);
   transaction escrow_normal_cancel_proposal_tx = AUTO_VAL_INIT(escrow_normal_cancel_proposal_tx);
-  r = build_custom_escrow_cancel_proposal(events, blk_3, 0, alice_acc.get_keys(), m_cpd, 0, 0, 0, blk_3.timestamp + 3600, TESTS_DEFAULT_FEE, eccf_normal, prop.tx_template, escrow_normal_cancel_proposal_tx, used_sources);
+  r = build_custom_escrow_cancel_proposal(events, blk_3, 0, alice_acc.get_keys(), m_cpd, 0, 0, 0, blk_3.timestamp + 3600, TESTS_DEFAULT_FEE, eccf_normal, prop.tx_template, tx_version, escrow_normal_cancel_proposal_tx, used_sources);
   CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_cancel_proposal failed");
 
   events.push_back(escrow_normal_cancel_proposal_tx);
@@ -2045,8 +2057,9 @@ bool escrow_incorrect_cancel_proposal::generate(std::vector<test_event_entry>& e
     uint64_t mask = ccm_el.mask;
 
     transaction incorrect_cancellation_proposal_tx = prop.tx_template;
+    uint64_t tx_version = get_tx_version(get_block_height(blk_3), m_hardforks);
     r = build_custom_escrow_cancel_proposal(events, prev_block, 0, alice_acc.get_keys(), m_cpd, ccm_el.unlock_time, ccm_el.expiration_time, ccm_el.release_unlock_time, ccm_el.release_expiration_time,
-      TESTS_DEFAULT_FEE, mask, prop.tx_template, incorrect_cancellation_proposal_tx, used_sources);
+      TESTS_DEFAULT_FEE, mask, prop.tx_template, tx_version, incorrect_cancellation_proposal_tx, used_sources);
     CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_cancel_proposal failed");
 
     // In order to use the same escrow proposal to test different invalid cancellations we need to switch chains after each try
@@ -2108,7 +2121,7 @@ bool escrow_incorrect_cancel_proposal::check_normal_cancel_proposal(currency::co
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
-  tools::wallet2::escrow_contracts_container contracts;
+  tools::escrow_contracts_container contracts;
   r = alice_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Alice failed");
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "Alice has incorrect number of contracts: " << contracts.size());
@@ -2196,7 +2209,7 @@ bool escrow_incorrect_cancel_proposal::check_incorrect_cancel_proposal_internal(
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
-  tools::wallet2::escrow_contracts_container contracts;
+  tools::escrow_contracts_container contracts;
   r = alice_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Alice failed");
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "Alice has incorrect number of contracts: " << contracts.size());
@@ -2270,7 +2283,7 @@ bool escrow_proposal_not_enough_money::c1(currency::core& c, size_t ev_index, co
 
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", MK_TEST_COINS(30), 0, MK_TEST_COINS(30), 0, 0), false, "");
 
-  std::deque<tools::wallet2::transfer_details> transfers;
+  std::deque<tools::transfer_details> transfers;
   alice_wlt->get_transfers(transfers);
   CHECK_AND_ASSERT_MES(transfers.size() == 1, false, "Incorrect transfers size: " << transfers.size());
 
@@ -2334,12 +2347,12 @@ bool escrow_cancellation_and_tx_order::generate(std::vector<test_event_entry>& e
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  bool r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_0);
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
 
@@ -2379,7 +2392,7 @@ bool escrow_cancellation_and_tx_order::c1(currency::core& c, size_t ev_index, co
   LOG_PRINT_GREEN("\n" "alice_wlt->send_escrow_proposal()", LOG_LEVEL_0);
   alice_wlt->send_escrow_proposal(cpd, 0, 0, expiration_time, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, "", proposal_tx, escrow_template_tx);
 
-  tools::wallet2::escrow_contracts_container contracts;
+  tools::escrow_contracts_container contracts;
   r = alice_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Alice failed");
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "Alice has incorrect number of contracts: " << contracts.size());
@@ -2534,12 +2547,12 @@ bool escrow_cancellation_proposal_expiration::generate(std::vector<test_event_en
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  bool r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_0);
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
 
@@ -2580,7 +2593,7 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   LOG_PRINT_GREEN("\n" "alice_wlt->send_escrow_proposal()", LOG_LEVEL_0);
   alice_wlt->send_escrow_proposal(cpd, 0, 0, expiration_time, TESTS_DEFAULT_FEE, b_release_fee, "", proposal_tx, escrow_template_tx);
 
-  tools::wallet2::escrow_contracts_container contracts;
+  tools::escrow_contracts_container contracts;
   r = alice_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r, false, "get_contracts() for Alice failed");
   CHECK_AND_ASSERT_MES(contracts.size() == 1, false, "Alice has incorrect number of contracts: " << contracts.size());
@@ -2589,7 +2602,7 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   crypto::hash contract_id = contracts.begin()->first;
 
   uint64_t alice_blocked_transfers_sum = 0;
-  CHECK_AND_ASSERT_MES(estimate_wallet_balance_blocked_for_escrow(*alice_wlt.get(), alice_blocked_transfers_sum, false), false, "");
+  CHECK_AND_ASSERT_MES(estimate_wallet_balance_blocked_for_escrow(*alice_wlt.get(), alice_blocked_transfers_sum), false, "");
 
   // mine a block, containing escrow proposal tx
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
@@ -2610,7 +2623,7 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   bob_wlt->accept_proposal(contract_id, TESTS_DEFAULT_FEE);
 
   uint64_t bob_blocked_transfers_sum = 0;
-  CHECK_AND_ASSERT_MES(estimate_wallet_balance_blocked_for_escrow(*bob_wlt.get(), bob_blocked_transfers_sum, false), false, "");
+  CHECK_AND_ASSERT_MES(estimate_wallet_balance_blocked_for_escrow(*bob_wlt.get(), bob_blocked_transfers_sum), false, "");
   
   // mine a block containing contract acceptance
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
@@ -2781,12 +2794,12 @@ bool escrow_cancellation_acceptance_expiration::generate(std::vector<test_event_
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  bool r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(100), 20, TESTS_DEFAULT_FEE, tx_0);
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(100), 20, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(100), 20, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(100), 20, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
 
@@ -2830,7 +2843,7 @@ bool escrow_cancellation_acceptance_expiration::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::proposal_sent), false, "");
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::proposal_sent), false, "");
   
-  tools::wallet2::escrow_contracts_container contracts;
+  tools::escrow_contracts_container contracts;
   r = alice_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r && contracts.size() == 1, false, "get_contracts() for Alice failed");
   crypto::hash contract_id = contracts.begin()->first;
@@ -2948,12 +2961,12 @@ bool escrow_proposal_acceptance_in_alt_chain::generate(std::vector<test_event_en
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  bool r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_0);
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
 
@@ -2972,8 +2985,9 @@ bool escrow_proposal_acceptance_in_alt_chain::generate(std::vector<test_event_en
 
   // escrow proposal
   bc_services::proposal_body prop = AUTO_VAL_INIT(prop);
+  uint64_t tx_version = get_tx_version(get_block_height(blk_1), m_hardforks);
   transaction escrow_proposal_tx = AUTO_VAL_INIT(escrow_proposal_tx);
-  r = build_custom_escrow_proposal(events, blk_1, alice_acc.get_keys(), cpd, 0, 0, 0, blk_1.timestamp + 36000, 0, TESTS_DEFAULT_FEE, bob_fee_release, eccf_normal, escrow_proposal_tx, used_sources, &prop);
+  r = build_custom_escrow_proposal(events, blk_1, alice_acc.get_keys(), cpd, 0, 0, 0, blk_1.timestamp + 36000, 0, TESTS_DEFAULT_FEE, bob_fee_release, eccf_normal, tx_version, escrow_proposal_tx, used_sources, &prop);
   CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_proposal failed");
   events.push_back(escrow_proposal_tx);
   MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1, miner_acc, escrow_proposal_tx);
@@ -2981,9 +2995,10 @@ bool escrow_proposal_acceptance_in_alt_chain::generate(std::vector<test_event_en
   MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
 
   // escrow proposal acceptance
+  tx_version = get_tx_version(get_block_height(blk_2), m_hardforks);
   transaction escrow_normal_acceptance_tx = prop.tx_template;
   uint64_t normal_acceptance_mask = eccf_normal; //eccf_acceptance_no_tsa_compression;
-  r = build_custom_escrow_accept_proposal(events, blk_2, 0, bob_acc.get_keys(), cpd, 0, 0, 0, 0, TESTS_DEFAULT_FEE, bob_fee_release, normal_acceptance_mask, prop.tx_onetime_secret_key, escrow_normal_acceptance_tx, used_sources);
+  r = build_custom_escrow_accept_proposal(events, blk_2, 0, bob_acc.get_keys(), cpd, 0, 0, 0, 0, TESTS_DEFAULT_FEE, bob_fee_release, normal_acceptance_mask, prop.tx_onetime_secret_key, tx_version, escrow_normal_acceptance_tx, used_sources);
   CHECK_AND_ASSERT_MES(r, false, "build_custom_escrow_accept_proposal failed");
 
   events.push_back(escrow_normal_acceptance_tx);
@@ -3023,12 +3038,12 @@ bool escrow_zero_amounts::generate(std::vector<test_event_entry>& events) const
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  bool r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_0);
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(200), 20, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
 
@@ -3121,16 +3136,16 @@ bool escrow_balance::generate(std::vector<test_event_entry>& events) const
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   m_alice_bob_start_amount = MK_TEST_COINS(200);
-  uint64_t amount_chunks = 10;
+  //uint64_t amount_chunks = 10;
   m_alice_bob_start_chunk_amount = m_alice_bob_start_amount / 10;
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  bool r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), m_alice_bob_start_amount, 10, TESTS_DEFAULT_FEE, tx_0);
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), m_alice_bob_start_amount, 10, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), m_alice_bob_start_amount, 10, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), bob_acc.get_public_address(), m_alice_bob_start_amount, 10, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
 
@@ -3145,7 +3160,7 @@ bool escrow_balance::generate(std::vector<test_event_entry>& events) const
 
 bool escrow_balance::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false, stub_bool = false;
+  bool r = false;
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
@@ -3202,7 +3217,7 @@ bool escrow_balance::c1(currency::core& c, size_t ev_index, const std::vector<te
 
   CHECK_AND_ASSERT_MES(alice_bc->check(), false, "balance callback check failed, see above");
 
-  tools::wallet2::escrow_contracts_container contracts;
+  tools::escrow_contracts_container contracts;
   r = alice_wlt->get_contracts(contracts);
   CHECK_AND_ASSERT_MES(r && contracts.size() == 1, false, "get_contracts() for Alice failed");
   crypto::hash contract_id = contracts.begin()->first;

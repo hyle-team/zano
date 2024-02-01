@@ -10,13 +10,14 @@
 #include "currency_core/account.h"
 #include "currency_core/currency_format_utils.h"
 #include "misc_language.h"
-
+#include "chaingen_helpers.h"
 using namespace currency;
 
 
 
 bool test_transaction_generation_and_ring_signature()
 {
+  currency::hard_forks_descriptor hf = AUTO_VAL_INIT(hf);
 
   account_base miner_acc1;
   miner_acc1.generate();
@@ -33,23 +34,24 @@ bool test_transaction_generation_and_ring_signature()
 
   std::string add_str = miner_acc3.get_public_address_str();
 
+  uint64_t block_reward_without_fee = 0;
 
   account_base rv_acc;
   rv_acc.generate();
   account_base rv_acc2;
   rv_acc2.generate();
   transaction tx_mine_1;
-  construct_miner_tx(0, 0, 0, 10, 0, miner_acc1.get_keys().account_address, miner_acc1.get_keys().account_address, tx_mine_1);
+  construct_miner_tx(0, 0, 0, 10, 0, miner_acc1.get_keys().account_address, miner_acc1.get_keys().account_address, tx_mine_1, block_reward_without_fee, TRANSACTION_VERSION_PRE_HF4);
   transaction tx_mine_2;
-  construct_miner_tx(0, 0, 0, 0, 0, miner_acc2.get_keys().account_address, miner_acc2.get_keys().account_address, tx_mine_2);
+  construct_miner_tx(0, 0, 0, 0, 0, miner_acc2.get_keys().account_address, miner_acc2.get_keys().account_address, tx_mine_2, block_reward_without_fee, TRANSACTION_VERSION_PRE_HF4);
   transaction tx_mine_3;
-  construct_miner_tx(0, 0, 0, 0, 0, miner_acc3.get_keys().account_address, miner_acc3.get_keys().account_address, tx_mine_3);
+  construct_miner_tx(0, 0, 0, 0, 0, miner_acc3.get_keys().account_address, miner_acc3.get_keys().account_address, tx_mine_3, block_reward_without_fee, TRANSACTION_VERSION_PRE_HF4);
   transaction tx_mine_4;
-  construct_miner_tx(0, 0, 0, 0, 0, miner_acc4.get_keys().account_address, miner_acc4.get_keys().account_address, tx_mine_4);
+  construct_miner_tx(0, 0, 0, 0, 0, miner_acc4.get_keys().account_address, miner_acc4.get_keys().account_address, tx_mine_4, block_reward_without_fee, TRANSACTION_VERSION_PRE_HF4);
   transaction tx_mine_5;
-  construct_miner_tx(0, 0, 0, 0, 0, miner_acc5.get_keys().account_address, miner_acc5.get_keys().account_address, tx_mine_5);
+  construct_miner_tx(0, 0, 0, 0, 0, miner_acc5.get_keys().account_address, miner_acc5.get_keys().account_address, tx_mine_5, block_reward_without_fee, TRANSACTION_VERSION_PRE_HF4);
   transaction tx_mine_6;
-  construct_miner_tx(0, 0, 0, 0, 0, miner_acc6.get_keys().account_address, miner_acc6.get_keys().account_address, tx_mine_6);
+  construct_miner_tx(0, 0, 0, 0, 0, miner_acc6.get_keys().account_address, miner_acc6.get_keys().account_address, tx_mine_6, block_reward_without_fee, TRANSACTION_VERSION_PRE_HF4);
 
   //fill inputs entry
   typedef tx_source_entry::output_entry tx_output_entry;
@@ -59,28 +61,28 @@ bool test_transaction_generation_and_ring_signature()
   src.amount = 70368744177663;
   {
     tx_output_entry oe;
-    oe.first = 0;
-    oe.second = boost::get<txout_to_key>(tx_mine_1.vout[0].target).key;
+    oe.out_reference = 0;
+    oe.stealth_address = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_1.vout[0]).target).key;
     src.outputs.push_back(oe);
 
-    oe.first = 1;
-    oe.second = boost::get<txout_to_key>(tx_mine_2.vout[0].target).key;
+    oe.out_reference = 1;
+    oe.stealth_address = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_2.vout[0]).target).key;
     src.outputs.push_back(oe);
 
-    oe.first = 2;
-    oe.second = boost::get<txout_to_key>(tx_mine_3.vout[0].target).key;
+    oe.out_reference = 2;
+    oe.stealth_address = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_3.vout[0]).target).key;
     src.outputs.push_back(oe);
 
-    oe.first = 3;
-    oe.second = boost::get<txout_to_key>(tx_mine_4.vout[0].target).key;
+    oe.out_reference = 3;
+    oe.stealth_address = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_4.vout[0]).target).key;
     src.outputs.push_back(oe);
 
-    oe.first = 4;
-    oe.second = boost::get<txout_to_key>(tx_mine_5.vout[0].target).key;
+    oe.out_reference = 4;
+    oe.stealth_address = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_5.vout[0]).target).key;
     src.outputs.push_back(oe);
 
-    oe.first = 5;
-    oe.second = boost::get<txout_to_key>(tx_mine_6.vout[0].target).key;
+    oe.out_reference = 5;
+    oe.stealth_address = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_6.vout[0]).target).key;
     src.outputs.push_back(oe);
 
     crypto::public_key tx_pub_key = null_pkey;
@@ -98,29 +100,29 @@ bool test_transaction_generation_and_ring_signature()
 
   transaction tx_rc1;
   std::vector<currency::attachment_v> attachments;
-  bool r = construct_tx(miner_acc2.get_keys(), sources, destinations, attachments, tx_rc1, 0);
+  bool r = construct_tx(miner_acc2.get_keys(), sources, destinations, attachments, tx_rc1, get_tx_version(0, hf), 0);
   CHECK_AND_ASSERT_MES(r, false, "failed to construct transaction");
 
   crypto::hash pref_hash = get_transaction_prefix_hash(tx_rc1);
   std::vector<const crypto::public_key *> output_keys;
-  output_keys.push_back(&boost::get<txout_to_key>(tx_mine_1.vout[0].target).key);
-  output_keys.push_back(&boost::get<txout_to_key>(tx_mine_2.vout[0].target).key);
-  output_keys.push_back(&boost::get<txout_to_key>(tx_mine_3.vout[0].target).key);
-  output_keys.push_back(&boost::get<txout_to_key>(tx_mine_4.vout[0].target).key);
-  output_keys.push_back(&boost::get<txout_to_key>(tx_mine_5.vout[0].target).key);
-  output_keys.push_back(&boost::get<txout_to_key>(tx_mine_6.vout[0].target).key);
-  r = crypto::check_ring_signature(pref_hash, boost::get<txin_to_key>(tx_rc1.vin[0]).k_image, output_keys, &tx_rc1.signatures[0][0]);
+  output_keys.push_back(&boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_1.vout[0]).target).key);
+  output_keys.push_back(&boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_2.vout[0]).target).key);
+  output_keys.push_back(&boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_3.vout[0]).target).key);
+  output_keys.push_back(&boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_4.vout[0]).target).key);
+  output_keys.push_back(&boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_5.vout[0]).target).key);
+  output_keys.push_back(&boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx_mine_6.vout[0]).target).key);
+  r = crypto::check_ring_signature(pref_hash, boost::get<txin_to_key>(tx_rc1.vin[0]).k_image, output_keys, &boost::get<currency::NLSAG_sig>(tx_rc1.signatures[0]).s[0]);
   CHECK_AND_ASSERT_MES(r, false, "failed to check ring signature");
 
-  std::vector<size_t> outs;
+  std::vector<wallet_out_info> outs;
   uint64_t money = 0;
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-  r = lookup_acc_outs(rv_acc.get_keys(), tx_rc1, get_tx_pub_key_from_extra(tx_rc1), outs,  money, derivation);
+  r = lookup_acc_outs(rv_acc.get_keys(), tx_rc1, outs,  money, derivation);
   CHECK_AND_ASSERT_MES(r, false, "failed to lookup_acc_outs");
   CHECK_AND_ASSERT_MES(td.amount == money, false, "wrong money amount in new transaction");
   money = 0;
   derivation = AUTO_VAL_INIT(derivation);
-  r = lookup_acc_outs(rv_acc2.get_keys(), tx_rc1, get_tx_pub_key_from_extra(tx_rc1), outs,  money, derivation);
+  r = lookup_acc_outs(rv_acc2.get_keys(), tx_rc1, outs,  money, derivation);
   CHECK_AND_ASSERT_MES(r, false, "failed to lookup_acc_outs");
   CHECK_AND_ASSERT_MES(0 == money, false, "wrong money amount in new transaction");
   return true;
@@ -133,8 +135,9 @@ bool test_block_creation()
   account_public_address adr;
   bool r = get_account_address_from_str(adr, "ZxDLGBGXbjo5w51tJkvxEPHFRr7Xft4hf33N8EkJPndoGCqocQF1mzpZqYwXByx5gMbfQuPAAB9vj79EFR6Jwkgu1o3aMQPwJ");
   CHECK_AND_ASSERT_MES(r, false, "failed to import");
+  uint64_t block_reward_without_fee = 0;
   block b;
-  r = construct_miner_tx(90, epee::misc_utils::median(szs), 3553616528562147, 33094, 10000000, adr, adr, b.miner_tx);
+  r = construct_miner_tx(90, epee::misc_utils::median(szs), 3553616528562147, 33094, 10000000, adr, adr, b.miner_tx, block_reward_without_fee, TRANSACTION_VERSION_PRE_HF4);
   return r;
 }
 

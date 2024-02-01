@@ -7,7 +7,7 @@
 
 struct tx_builder
 {
-  void step1_init(size_t version = CURRENT_TRANSACTION_VERSION, uint64_t unlock_time = 0)
+  void step1_init(size_t version = TRANSACTION_VERSION_PRE_HF4, uint64_t unlock_time = 0)
   {
     m_tx = AUTO_VAL_INIT(m_tx);
     m_in_contexts.clear();
@@ -35,9 +35,10 @@ struct tx_builder
 
       // fill outputs array and use relative offsets
       for(const currency::tx_source_entry::output_entry& out_entry : src_entr.outputs)
-        input_to_key.key_offsets.push_back(out_entry.first);
+        input_to_key.key_offsets.push_back(out_entry.out_reference);
 
-      input_to_key.key_offsets = currency::absolute_output_offsets_to_relative(input_to_key.key_offsets);
+      // if the following line fails, consider using prepare_outputs_entries_for_key_offsets() for correct calculation of real out index
+      CHECK_AND_ASSERT_THROW_MES(absolute_sorted_output_offsets_to_relative_in_place(input_to_key.key_offsets), "absolute_sorted_output_offsets_to_relative_in_place failed");
       m_tx.vin.push_back(input_to_key);
     }
   }
@@ -49,7 +50,7 @@ struct tx_builder
     {
       CHECK_AND_ASSERT_MES(!dst_entr.addr.empty(), void(0), "Destination entry #" << output_index << " contains empty addr list");
 
-      currency::tx_out out = AUTO_VAL_INIT(out);
+      currency::tx_out_bare out = AUTO_VAL_INIT(out);
       out.amount = dst_entr.amount;
 
       if (dst_entr.addr.size() == 1)
@@ -106,11 +107,11 @@ struct tx_builder
       std::vector<const crypto::public_key*> keys_ptrs;
       for(const currency::tx_source_entry::output_entry& o : src_entr.outputs)
       {
-        keys_ptrs.push_back(&o.second);
+        keys_ptrs.push_back(&o.stealth_address);
       }
 
-      m_tx.signatures.push_back(std::vector<crypto::signature>());
-      std::vector<crypto::signature>& sigs = m_tx.signatures.back();
+      m_tx.signatures.push_back(currency::NLSAG_sig());
+      std::vector<crypto::signature>& sigs = boost::get<currency::NLSAG_sig>(m_tx.signatures.back()).s;
       sigs.resize(src_entr.outputs.size());
       generate_ring_signature(m_tx_prefix_hash, boost::get<currency::txin_to_key>(m_tx.vin[i]).k_image, keys_ptrs, m_in_contexts[i].sec, src_entr.real_output, sigs.data());
       i++;
@@ -126,7 +127,7 @@ struct tx_builder
     fill_tx_sources_and_destinations(events, blk_head, from, to, amount, TESTS_DEFAULT_FEE, 0, sources, destinations, true, check_for_unlock_time);
 
     tx_builder builder;
-    builder.step1_init(CURRENT_TRANSACTION_VERSION, unlock_time);
+    builder.step1_init(TRANSACTION_VERSION_PRE_HF4, unlock_time);
     builder.step2_fill_inputs(from.get_keys(), sources);
     builder.step3_fill_outputs(destinations);
     builder.step4_calc_hash();

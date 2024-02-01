@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <functional>
 #include <boost/thread.hpp>
+#include <boost/any.hpp>
 #include "include_base_utils.h"
 #include "auto_val_init.h"
 
@@ -273,6 +274,21 @@ namespace misc_utils
       }
     }
 
+    uint64_t get_avg() const
+    {
+      CRITICAL_REGION_LOCAL(m_lock);
+      if (!queued_items.size())
+        return 0;
+
+      uint64_t summ = 0;
+      for (const auto& item : queued_items)
+      {
+        summ += *item.first;
+      }
+
+      return summ / queued_items.size();      
+    }
+
     template<typename key_t, typename associated_data_t>
     friend std::ostream & operator<< (std::ostream &out, median_helper<key_t, associated_data_t> const &mh);
   }; // class median_helper
@@ -291,26 +307,25 @@ namespace misc_utils
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
-  template<class type_vec_type>
-  type_vec_type median(std::vector<type_vec_type> &v)
+  template<typename container_t>
+  typename container_t::value_type median(container_t &v)
   {
-    //CRITICAL_REGION_LOCAL(m_lock);
+    typename container_t::value_type median{};
     if(v.empty())
-      return boost::value_initialized<type_vec_type>();
+      return median;
     if(v.size() == 1)
       return v[0];
 
-    size_t n = (v.size()) / 2;
-    std::sort(v.begin(), v.end());
-    //nth_element(v.begin(), v.begin()+n-1, v.end());
-    if(v.size()%2)
-    {//1, 3, 5...
-      return v[n];
-    }else 
-    {//2, 4, 6...
-      return (v[n-1] + v[n])/2;
+    auto median_it = v.begin() + v.size() / 2;
+    std::nth_element(v.begin(), median_it, v.end());
+    median = *median_it;
+    if (v.size() % 2 == 0)
+    {
+      auto max_it = std::max_element(v.begin(), median_it); // it's garanteed that after nth_element() the necessary element is in this interval
+      median = (median + *max_it) / 2;                      // average of [size/2-1] and [size/2] elements
     }
 
+    return median;
   }
 
   /************************************************************************/
@@ -372,6 +387,11 @@ namespace misc_utils
     virtual void do_call(){};
   };
   
+  template<typename param_t>
+  struct call_basic_param
+  {
+    virtual void do_call(param_t& p) {};
+  };
   
   template<typename t_callback>
   struct call_specific: public call_basic
@@ -386,10 +406,32 @@ namespace misc_utils
     t_callback m_cb;
   };
   
+  template<typename param_t, typename t_callback>
+  struct call_specific_param : public call_basic_param<param_t>
+  {
+    call_specific_param(t_callback cb) :m_cb(cb)
+    {}
+    virtual void do_call(const param_t& p)
+    {
+      m_cb(p);
+    }
+  private:
+    t_callback m_cb;
+  };
+
+
+
   template<typename t_callback>
   auto build_abstract_callback(t_callback cb) -> std::shared_ptr<call_basic>
   {
     return std::shared_ptr<call_basic>(new call_specific<t_callback>(cb));
+  }
+
+
+  template<typename param_t, typename t_callback>
+  auto build_abstract_callback_param(t_callback cb) -> std::shared_ptr<call_basic_param<param_t>>
+  {
+    return std::shared_ptr<call_basic_param<param_t>>(new call_specific_param<param_t, t_callback>(cb));
   }
 
   
@@ -426,6 +468,67 @@ namespace misc_utils
     auto res = container.insert(typename t_container_type::value_type(key, AUTO_VAL_INIT(typename t_container_type::mapped_type())));
     return res.first;
   }
+
+
+  class events_dispatcher
+  {
+
+  public:
+
+    template<typename param_t>
+    struct callback_entry
+    {
+      std::shared_ptr<epee::misc_utils::call_basic_param<const param_t> > m_cb;
+    };
+
+    std::map<std::type_index, boost::any> m_callbacks;
+
+    template<typename param_t, typename callback_t>
+    void SUBSCIRBE_DEBUG_EVENT(callback_t cb)
+    {
+      std::type_index ti = typeid(param_t);
+      auto it = m_callbacks.find(ti);
+      if (it != m_callbacks.end())
+      {
+        throw std::runtime_error("Handler for this type already registered");
+      }
+
+      callback_entry<const param_t> cb_entry = { epee::misc_utils::build_abstract_callback_param<const param_t>(cb) };
+
+      m_callbacks[ti] = cb_entry;
+    }
+
+    template<typename param_t>
+    void UNSUBSCRIBE_DEBUG_EVENT()
+    {
+      std::type_index ti = typeid(param_t);
+      auto it = m_callbacks.find(ti);
+      if (it != m_callbacks.end())
+      {
+        m_callbacks.erase(it);
+      }
+    }
+
+
+    template<typename param_t>
+    void RAISE_DEBUG_EVENT(const param_t& p)
+    {
+      std::type_index ti = typeid(param_t);
+      auto it = m_callbacks.find(ti);
+      if (it != m_callbacks.end())
+      {
+        callback_entry<const param_t >* pcallback_entry = boost::any_cast<callback_entry<const param_t >>(&it->second);
+        if (!pcallback_entry)
+        {
+          throw std::runtime_error("Unexpected error: registered tipe holding something else in boost::eny");
+        }
+        pcallback_entry->m_cb->do_call(p);
+      }
+    }
+
+  };
+
+
 
 } // namespace misc_utils
 } // namespace epee

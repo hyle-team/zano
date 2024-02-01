@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2019 Zano Project
+// Copyright (c) 2014-2022 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -19,9 +19,9 @@
 #include "hash.h"
 
 #if !defined(NDEBUG)
-#  define crypto_assert(expression) assert(expression)
+#  define crypto_assert(expression) assert(expression); CRYPTO_CHECK_AND_THROW_MES(expression, #expression)
 #else
-#  define crypto_assert(expression) ((void)0)
+#  define crypto_assert(expression) CRYPTO_CHECK_AND_THROW_MES(expression, #expression)
 #endif
 
 namespace crypto {
@@ -187,7 +187,8 @@ namespace crypto {
     return true;
   }
 
-  static void derivation_to_scalar(const key_derivation &derivation, size_t output_index, ec_scalar &res) {
+  void crypto_ops::derivation_to_scalar(const key_derivation &derivation, size_t output_index, ec_scalar &res)
+  {
     struct {
       key_derivation derivation;
       char output_index[(sizeof(size_t) * 8 + 6) / 7];

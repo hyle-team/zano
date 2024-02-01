@@ -15,9 +15,9 @@ Be sure to clone the repository properly:\
 |--|--|--|--|
 | gcc (Linux) | 5.4.0 | 9.4.0 | 12.3.0 |
 | llvm/clang (Linux) | UNKNOWN | 7.0.1 | 8.0.0 |
-| [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2015 (14.0 update 1) | 2017 (15.9.0) | 2022 (17.7.5) |
-| [XCode](https://developer.apple.com/downloads/) (macOS) | 9.2 | 12.3 | 12.3 |
-| [CMake](https://cmake.org/download/) | 3.1 | 3.22.1 | 3.26.3 |
+| [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2017 (15.9.30) | 2017 (15.9.30) | 2022 (17.7.5) |
+| [XCode](https://developer.apple.com/downloads/) (macOS) | 12.3 | 14.3 | 14.3 |
+| [CMake](https://cmake.org/download/) | 3.15.5 | 3.22.1 | 3.26.3 |
 | [Boost](https://www.boost.org/users/download/) | 1.70 | 1.70 | 1.76 |
 | [OpenSSL](https://www.openssl.org/source/) [(win)](https://slproweb.com/products/Win32OpenSSL.html) | 1.1.1n | 1.1.1w | 1.1.1w | 
 | [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.11.2 | 5.15.2 |

@@ -174,7 +174,7 @@ bool pos_mining_with_decoys::generate(std::vector<test_event_entry>& events) con
   destinations.emplace_back(COIN,                   carol_acc.get_public_address());
 
   transaction tx_0{};
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_0);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);

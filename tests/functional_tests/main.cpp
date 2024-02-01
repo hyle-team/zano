@@ -109,7 +109,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_crypto_tests);
   
   
-  test_serialization();
+  test_serialization2();
 
   po::variables_map vm;
   bool r = command_line::handle_error_helper(desc_options, [&]()

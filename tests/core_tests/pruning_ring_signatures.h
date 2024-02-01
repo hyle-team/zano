@@ -17,7 +17,7 @@ public:
 
   bool set_check_points(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_blockchain(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
-  
+  bool generate_blockchain_with_pruned_rs(std::vector<test_event_entry>& events) const;
 private:
 };
 

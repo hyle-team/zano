@@ -28,7 +28,7 @@ bool wallet_rpc_integrated_address::generate(std::vector<test_event_entry>& even
   CREATE_TEST_WALLET(miner_wlt, miner_acc, blk_0);
 
   // wallet RPC server
-  tools::wallet_rpc_server miner_wlt_rpc(*miner_wlt);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
 
@@ -110,7 +110,7 @@ bool wallet_rpc_integrated_address_transfer::c1(currency::core& c, size_t ev_ind
   std::string alice_integrated_address = get_account_address_and_payment_id_as_str(m_accounts[ALICE_ACC_IDX].get_public_address(), payment_id);
 
   // wallet RPC server
-  tools::wallet_rpc_server miner_wlt_rpc(*miner_wlt);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
 
@@ -144,7 +144,7 @@ bool wallet_rpc_integrated_address_transfer::c1(currency::core& c, size_t ev_ind
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, tds.amount), false, "");
 
   // check the transfer has been received
-  std::list<tools::wallet2::payment_details> payments;
+  std::list<tools::payment_details> payments;
   alice_wlt->get_payments(payment_id, payments);
   CHECK_AND_ASSERT_MES(payments.size() == 1, false, "Invalid payments count: " << payments.size());
   CHECK_AND_ASSERT_MES(payments.front().m_amount == MK_TEST_COINS(3), false, "Invalid payment");
@@ -194,6 +194,10 @@ wallet_rpc_transfer::wallet_rpc_transfer()
 {
   REGISTER_CALLBACK_METHOD(wallet_rpc_transfer, configure_core);
   REGISTER_CALLBACK_METHOD(wallet_rpc_transfer, c1);
+  
+  m_hardforks.set_hardfork_height(1, 1);
+  m_hardforks.set_hardfork_height(2, 1);
+  m_hardforks.set_hardfork_height(3, 1);
 }
 
 bool wallet_rpc_transfer::generate(std::vector<test_event_entry>& events) const
@@ -204,22 +208,12 @@ bool wallet_rpc_transfer::generate(std::vector<test_event_entry>& events) const
   account_base& bob_acc = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  DO_CALLBACK(events, "configure_core");
+  DO_CALLBACK(events, "configure_core"); // default callback will initialize core runtime config with m_hardforks
   set_hard_fork_heights_to_generator(generator);
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 6);
 
   DO_CALLBACK(events, "c1");
 
-  return true;
-}
-
-bool wallet_rpc_transfer::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
-  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
-  pc.hard_fork_01_starts_after_height = 1;
-  pc.hard_fork_02_starts_after_height = 1;
-  pc.hard_fork_03_starts_after_height = 1;
-  c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
 }
 
@@ -232,7 +226,7 @@ bool wallet_rpc_transfer::c1(currency::core& c, size_t ev_index, const std::vect
   miner_wlt->refresh();
 
   // wallet RPC server
-  tools::wallet_rpc_server miner_wlt_rpc(*miner_wlt);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
 
@@ -260,7 +254,7 @@ bool wallet_rpc_transfer::c1(currency::core& c, size_t ev_index, const std::vect
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, tds.amount), false, "");
 
   // check the transfer has been received
-  tools::wallet2::transfer_details td = AUTO_VAL_INIT(td);
+  tools::transfer_details td = AUTO_VAL_INIT(td);
   CHECK_AND_ASSERT_MES(alice_wlt->get_transfer_info_by_index(0, td), false, "");
   CHECK_AND_ASSERT_MES(td.amount() == MK_TEST_COINS(3), false, "Invalid payment");
   CHECK_AND_ASSERT_MES(check_mixin_value_for_each_input(2, td.tx_hash(), c), false, "");

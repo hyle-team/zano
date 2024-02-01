@@ -73,6 +73,7 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_rpc_server(m_ccore, m_p2psrv, m_offers_service),
                                  m_rpc_proxy(new tools::core_fast_rpc_proxy(m_rpc_server)),
                                  m_offers_service(nullptr),
+                                 m_wallet_rpc_server(this),
 #else 
                                  m_rpc_proxy(new tools::default_http_core_proxy()),
 #endif                            
@@ -545,6 +546,12 @@ bool wallets_manager::init_local_daemon()
   CHECK_AND_ASSERT_AND_SET_GUI(res, "Failed to initialize core rpc server.");
   LOG_PRINT_GREEN("Core rpc server initialized OK on port: " << m_rpc_server.get_binded_port(), LOG_LEVEL_0);
 
+  //chain calls to rpc server
+  m_prpc_chain_handler = &m_wallet_rpc_server;
+  //disable this until we get full support of authentication with network
+  //m_rpc_server.set_rpc_chain_handler(this);
+
+
   LOG_PRINT_L0("Starting core rpc server...");
   //dsi.text_state = "Starting core rpc server";
   m_pview->update_daemon_status(dsi);
@@ -802,7 +809,7 @@ void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
   wo.m_pproxy_diagnostig_info = m_rpc_proxy->get_proxy_diagnostic_info();
   wo.pview = m_pview;  
   wo.has_related_alias_in_unconfirmed = false;
-  wo.rpc_wrapper.reset(new tools::wallet_rpc_server(*wo.w.unlocked_get().get()));
+  wo.rpc_wrapper.reset(new tools::wallet_rpc_server(wo.w.unlocked_get()));
   if (m_remote_node_mode)
     wo.core_conf = currency::get_default_core_runtime_config();
   else
@@ -876,6 +883,80 @@ std::string wallets_manager::get_fav_offers(const std::list<bc_services::offer_i
 #endif
 }
 
+std::string wallets_manager::create_ionic_swap_proposal(uint64_t wallet_id, const tools::wallet_public::create_ionic_swap_proposal_request& proposal_req, std::string& result_proposal_hex)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, wo);
+  try {
+    currency::account_public_address dest_account = AUTO_VAL_INIT(dest_account);
+    if (!currency::get_account_address_from_str(dest_account, proposal_req.destination_add))
+    {
+      return API_RETURN_CODE_BAD_ARG;
+    }
+    tools::wallet_public::ionic_swap_proposal proposal = AUTO_VAL_INIT(proposal);
+    bool r = wo.w->get()->create_ionic_swap_proposal(proposal_req.proposal_info, dest_account, proposal);
+    if (!r)
+    {
+      return API_RETURN_CODE_FAIL;
+    }
+    else
+    {
+      result_proposal_hex = epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(proposal));
+      return API_RETURN_CODE_OK;
+    }
+  }
+  catch (...)
+  {
+    return API_RETURN_CODE_FAIL;
+  }
+  return API_RETURN_CODE_OK;
+}
+
+std::string wallets_manager::get_ionic_swap_proposal_info(uint64_t wallet_id, std::string&raw_tx_template_hex, tools::wallet_public::ionic_swap_proposal_info& proposal)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, wo);
+  try {
+    std::string raw_tx_template;
+    bool r = epee::string_tools::parse_hexstr_to_binbuff(raw_tx_template_hex, raw_tx_template);
+    if (!r)
+    {
+      return API_RETURN_CODE_BAD_ARG;
+    }
+
+    if (!wo.w->get()->get_ionic_swap_proposal_info(raw_tx_template, proposal))
+    {
+      return API_RETURN_CODE_FAIL;
+    }
+  }
+  catch (...)
+  {
+    return API_RETURN_CODE_FAIL;
+  }
+  return API_RETURN_CODE_OK;
+}
+
+std::string wallets_manager::accept_ionic_swap_proposal(uint64_t wallet_id, std::string&raw_tx_template_hex, std::string& result_raw_tx_hex)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, wo);
+  try {
+    std::string raw_tx_template;
+    bool r = epee::string_tools::parse_hexstr_to_binbuff(raw_tx_template_hex, raw_tx_template);
+    if (!r)
+    {
+      return API_RETURN_CODE_BAD_ARG;
+    }
+    currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
+    if (!wo.w->get()->accept_ionic_swap_proposal(raw_tx_template, result_tx))
+    {
+      return API_RETURN_CODE_FAIL;
+    }
+    result_raw_tx_hex = epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(result_tx));
+  }
+  catch (...)
+  {
+    return API_RETURN_CODE_FAIL;
+  }
+  return API_RETURN_CODE_OK;
+}
 std::string wallets_manager::get_my_offers(const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers)
 {
   if (m_remote_node_mode)
@@ -941,6 +1022,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
 
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
+  w->set_use_assets_whitelisting(true);
   owr.wallet_id = m_wallet_id_counter++;
 
   w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
@@ -1084,7 +1166,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   try
   {
     w->generate(path, password, false);
-    w->set_minimum_height(m_last_daemon_height);
+    w->set_minimum_height(m_last_daemon_height-1);
     //owr.seed = w->get_account().get_seed_phrase();
   }
   catch (const tools::error::file_exists&)
@@ -1303,6 +1385,8 @@ std::string wallets_manager::get_alias_info_by_name(const std::string& name, cur
   if (!r)
     return API_RETURN_CODE_FAIL;
 
+  if (res.status == API_RETURN_CODE_NOT_FOUND)
+    return API_RETURN_CODE_NOT_FOUND;
 
   res_details.alias = name;
   res_details.details = res.alias_details;
@@ -1317,9 +1401,8 @@ std::string wallets_manager::get_alias_coast(const std::string& a, uint64_t& coa
   if (!m_rpc_proxy->call_COMMAND_RPC_GET_ALIAS_REWARD(req, rsp))
     return API_RETURN_CODE_BAD_ARG;
 
-  coast = rsp.reward + rsp.reward/10; //add 10% of price to be sure
+  coast = rsp.reward;
   return rsp.status;
-
 }
 
 std::string wallets_manager::request_alias_registration(const currency::alias_rpc_details& al, uint64_t wallet_id, uint64_t fee, currency::transaction& res_tx, uint64_t reward)
@@ -1389,7 +1472,7 @@ std::string wallets_manager::request_alias_update(const currency::alias_rpc_deta
 }
 
 
-std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx)
+std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx)
 {
 
   std::vector<currency::tx_destination_entry> dsts;
@@ -1445,6 +1528,7 @@ std::string wallets_manager::transfer(size_t wallet_id, const view::transfer_par
         return API_RETURN_CODE_BAD_ARG_WRONG_PAYMENT_ID; // payment id is specified more than once
       payment_id = embedded_payment_id;
     }
+    dsts.back().asset_id = d.asset_id;
   }
 
   if (payment_id.size())
@@ -1536,6 +1620,7 @@ std::string wallets_manager::get_wallet_status(uint64_t wallet_id)
   wsi.progress = wo.w.unlocked_get().get()->get_sync_progress();
   wsi.wallet_state = wo.wallet_state;
   wsi.current_daemon_height = m_last_daemon_height;
+  wsi.current_wallet_height = wo.w.unlocked_get().get()->get_top_block_height();
   return epee::serialization::store_t_to_json(wsi);
 }
 
@@ -1566,14 +1651,32 @@ std::string wallets_manager::invoke(uint64_t wallet_id, std::string params)
   return response_info.m_body;
 }
 
-std::string wallets_manager::get_wallet_info(size_t wallet_id, view::wallet_info& wi)
+std::string wallets_manager::get_wallet_info(uint64_t wallet_id, view::wallet_info& wi)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   return get_wallet_info(w, wi);
 }
+
+std::string wallets_manager::get_wallet_info_extra(uint64_t wallet_id, view::wallet_info_extra& wi)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, wo);
+  
+  auto locker_object = wo.w.lock();
+  tools::wallet2& rw = *(*(*locker_object)); //this looks a bit crazy, i know
+  
+  auto& keys = rw.get_account().get_keys();
+
+  wi.view_private_key = epee::string_tools::pod_to_hex(keys.view_secret_key);
+  wi.view_public_key  = epee::string_tools::pod_to_hex(keys.account_address.view_public_key);
+  wi.spend_private_key = epee::string_tools::pod_to_hex(keys.spend_secret_key);
+  wi.spend_public_key  = epee::string_tools::pod_to_hex(keys.account_address.spend_public_key);
+  wi.seed = rw.get_account().get_seed_phrase("");
+  return API_RETURN_CODE_OK;
+}
+
 std::string wallets_manager::get_contracts(size_t wallet_id, std::vector<tools::wallet_public::escrow_contract_details>& contracts)
 {
-  tools::wallet2::escrow_contracts_container cc;
+  tools::escrow_contracts_container cc;
   GET_WALLET_OPT_BY_ID(wallet_id, w);
   try
   {
@@ -1597,7 +1700,7 @@ std::string wallets_manager::get_contracts(size_t wallet_id, std::vector<tools::
 }
 std::string wallets_manager::create_proposal(const view::create_proposal_param_gui& cpp)
 {
-  //tools::wallet2::escrow_contracts_container cc;
+  //tools::escrow_contracts_container cc;
   GET_WALLET_OPT_BY_ID(cpp.wallet_id, w);
   currency::transaction tx = AUTO_VAL_INIT(tx);
   currency::transaction template_tx = AUTO_VAL_INIT(template_tx);
@@ -1703,6 +1806,29 @@ std::string wallets_manager::reset_wallet_password(uint64_t wallet_id, const std
   else
     return API_RETURN_CODE_FAIL;
 }
+std::string wallets_manager::use_whitelisting(uint64_t wallet_id, bool use)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, w);  
+  w.w->get()->set_use_assets_whitelisting(use);
+  return API_RETURN_CODE_OK;
+}
+std::string wallets_manager::add_custom_asset_id(uint64_t wallet_id, const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_descriptor)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, w);
+  if(w.w->get()->add_custom_asset_id(asset_id, asset_descriptor))
+    return API_RETURN_CODE_OK;
+  else
+    return API_RETURN_CODE_FAIL;
+}
+std::string wallets_manager::delete_custom_asset_id(uint64_t wallet_id, const crypto::public_key& asset_id)
+{
+  GET_WALLET_OPT_BY_ID(wallet_id, w);
+  if (w.w->get()->delete_custom_asset_id(asset_id))
+    return API_RETURN_CODE_OK;
+  else
+    return API_RETURN_CODE_FAIL;
+
+}
 std::string wallets_manager::is_wallet_password_valid(uint64_t wallet_id, const std::string& pass)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, w);
@@ -1751,7 +1877,7 @@ void wallets_manager::prepare_wallet_status_info(wallet_vs_options& wo, view::wa
   wsi.is_mining = wo.do_mining;
   wsi.wallet_id = wo.wallet_id;
   wsi.is_alias_operations_available = !wo.has_related_alias_in_unconfirmed;
-  wsi.balance = wo.w->get()->balance(wsi.unlocked_balance, wsi.awaiting_in, wsi.awaiting_out, wsi.minied_total);
+  wo.w->get()->balance(wsi.balances, wsi.minied_total);
 }
 std::string wallets_manager::check_available_sources(uint64_t wallet_id, std::list<uint64_t>& amounts)
 {
@@ -1865,12 +1991,12 @@ void wallets_manager::on_new_block(size_t wallet_id, uint64_t /*height*/, const 
 
 }
 
-void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined)
+void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
 {  
   view::transfer_event_info tei = AUTO_VAL_INIT(tei);
   tei.ti = wti;
-  tei.balance = balance;
-  tei.unlocked_balance = unlocked_balance;
+  tei.balances = balances;
+  tei.total_mined = total_mined;
   tei.wallet_id = wallet_id;
 
   GET_WALLET_OPTIONS_BY_ID_VOID_RET(wallet_id, w);
@@ -1911,16 +2037,21 @@ void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet
   tei.ti = wti;
 
   SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
-  auto& w = m_wallets[wallet_id].w;
+  auto it = m_wallets.find(wallet_id);
+  if (it == m_wallets.end())
+  {
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "on_transfer_canceled() wallet with id = " << wallet_id << " not found");
+    return;
+  }
+  auto& w = it->second.w;
   if (w->get() != nullptr)
   {
-    tei.balance = w->get()->balance();
-    tei.unlocked_balance = w->get()->unlocked_balance();
+    w->get()->balance(tei.balances, tei.total_mined);
     tei.wallet_id = wallet_id;
   }
   else
   {
-    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "on_transfer() wallet with id = " << wallet_id << " not found");
+    LOG_ERROR(get_wallet_log_prefix(wallet_id) + "on_transfer_canceled() wallet with id = " << wallet_id << "  has nullptr");
   }
   m_pview->money_transfer_cancel(tei);
 }
@@ -1929,6 +2060,81 @@ void wallets_manager::on_tor_status_change(size_t wallet_id, const std::string& 
 {
   view::current_action_status tsu = { wallet_id , state };
   m_pview->update_tor_status(tsu);
+}
+
+void wallets_manager::on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets)
+{
+  std::list<view::open_wallet_response> opened_wallets;
+  this->get_opened_wallets(opened_wallets);
+  wallets.resize(opened_wallets.size());
+  size_t i = 0;
+  for (const auto& item : opened_wallets)
+  {
+    wallets[i].wi = item.wi;
+    wallets[i].wallet_id = item.wallet_id;
+    i++;
+  }
+}
+bool wallets_manager::on_mw_select_wallet(uint64_t wallet_id)
+{
+  SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);    
+  auto it = m_wallets.find(wallet_id);      
+  if (it == m_wallets.end())                
+    return false; 
+ 
+#ifndef MOBILE_WALLET_BUILD
+  m_rpc_selected_wallet_id = wallet_id;
+#endif
+  return true;
+}
+
+
+bool wallets_manager::on_mw_get_wallets(const tools::wallet_public::COMMAND_MW_GET_WALLETS::request& req, tools::wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, epee::net_utils::connection_context_base& cntx)
+{
+  this->on_mw_get_wallets(res.wallets);
+  return true;
+}
+bool wallets_manager::on_mw_select_wallet(const tools::wallet_public::COMMAND_MW_SELECT_WALLET::request& req, tools::wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, epee::net_utils::connection_context_base& cntx)
+{
+  this->on_mw_select_wallet(req.wallet_id);
+  res.status = API_RETURN_CODE_OK;
+  return true;
+}
+
+
+void wallets_manager::lock() 
+{
+#ifndef MOBILE_WALLET_BUILD
+  {
+    SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
+    auto it = m_wallets.find(m_rpc_selected_wallet_id);
+    if (it == m_wallets.end())
+    {
+      throw std::runtime_error("Wallet not selected");
+    }
+    m_current_wallet_locked_object = it->second.w.lock();
+  }
+#endif
+}
+
+void wallets_manager::unlock() 
+{
+#ifndef MOBILE_WALLET_BUILD
+  m_current_wallet_locked_object.reset();
+#endif
+}
+std::shared_ptr<tools::wallet2> wallets_manager::get_wallet()
+{
+#ifndef MOBILE_WALLET_BUILD
+  if (!m_current_wallet_locked_object.get())
+  {
+    throw std::runtime_error("Wallet is not locked for get_wallet() call");
+  }
+  return **m_current_wallet_locked_object;
+#else
+  std::runtime_error("Unexpected call: std::shared_ptr<tools::wallet2> wallets_manager::get_wallet()");
+  return std::shared_ptr<tools::wallet2>();
+#endif
 }
 
 void wallets_manager::wallet_vs_options::worker_func()
@@ -2015,25 +2221,25 @@ void wallets_manager::wallet_vs_options::worker_func()
         pos_minin_interval.do_call([this](){
           tools::wallet2::mining_context ctx = AUTO_VAL_INIT(ctx);
           LOG_PRINT_L1(get_log_prefix() + " Starting PoS mint iteration");
-          if (!w->get()->fill_mining_context(ctx) || ctx.rsp.status != API_RETURN_CODE_OK)
+          if (!w->get()->fill_mining_context(ctx) || ctx.status != API_RETURN_CODE_OK)
           {
             LOG_PRINT_L1(get_log_prefix() + " cannot obtain PoS mining context, skip iteration");
             return true;
           }
 
-          uint64_t pos_entries_amount = 0;
-          for (auto& ent : ctx.sp.pos_entries)
-            pos_entries_amount += ent.amount;
+          //uint64_t pos_entries_amount = 0;
+          //for (auto& ent : ctx.sp.pos_entries)
+          //  pos_entries_amount += ent.amount;
 
-          tools::wallet2::scan_pos(ctx, break_mining_loop, [this](){
+          w->get()->scan_pos(ctx, break_mining_loop, [this](){
             return *plast_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_online &&  *plast_daemon_height == last_wallet_synch_height;
           }, core_conf);
 
-          if (ctx.rsp.status == API_RETURN_CODE_OK)
+          if (ctx.status == API_RETURN_CODE_OK)
           {
-            w->get()->build_minted_block(ctx.sp, ctx.rsp);
+            w->get()->build_minted_block(ctx);
           }
-          LOG_PRINT_L1(get_log_prefix() << " PoS mining iteration finished, status: " << ctx.rsp.status << ", used " << ctx.sp.pos_entries.size() << " entries with total amount: " << currency::print_money_brief(pos_entries_amount) << ", processed: " << ctx.rsp.iterations_processed << " iter.");
+          LOG_PRINT_L1(get_log_prefix() << " PoS mining iteration finished, status: " << ctx.status << ", used " << ctx.total_items_checked << " entries with total amount: " << currency::print_money_brief(ctx.total_amount_checked) << ", processed: " << ctx.iterations_processed << " iter.");
           return true;
         });
       }

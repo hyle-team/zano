@@ -63,6 +63,7 @@ namespace currency
      bool set_genesis_block(const block& b);
      bool deinit();
      uint64_t get_current_blockchain_size() const;
+     uint64_t get_current_tx_version() const;
      uint64_t get_top_block_height() const;
      std::string get_config_folder();
      bool get_blockchain_top(uint64_t& heeight, crypto::hash& top_id) const;
@@ -139,18 +140,18 @@ namespace currency
      tx_memory_pool m_mempool;
      i_currency_protocol* m_pprotocol;
      i_critical_error_handler* m_critical_error_handler;
-     critical_section m_incoming_tx_lock;
+     epee::critical_section m_incoming_tx_lock;
      miner m_miner;
      account_public_address m_miner_address;
      std::string m_config_folder;
      uint64_t m_stop_after_height;
      currency_protocol_stub m_protocol_stub;
-     math_helper::once_a_time_seconds<60*60*12, false> m_prune_alt_blocks_interval;
-     math_helper::once_a_time_seconds<60, true> m_check_free_space_interval;
+     epee::math_helper::once_a_time_seconds<60*60*12, false> m_prune_alt_blocks_interval;
+     epee::math_helper::once_a_time_seconds<60, true> m_check_free_space_interval;
      friend class tx_validate_inputs;
      std::atomic<bool> m_starter_message_showed;
 
-     critical_section m_blockchain_update_listeners_lock;
+     epee::critical_section m_blockchain_update_listeners_lock;
      std::vector<i_blockchain_update_listener*> m_blockchain_update_listeners;
    };
 }

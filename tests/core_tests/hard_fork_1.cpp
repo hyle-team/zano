@@ -27,6 +27,10 @@ void remove_unlock_v2_entries_from_extra(extra_t& extra)
 hard_fork_1_base_test::hard_fork_1_base_test(size_t hardfork_height)
   : m_hardfork_height(hardfork_height)
 {
+  m_hardforks.m_height_the_hardfork_n_active_after[1] = 1440;
+  m_hardforks.m_height_the_hardfork_n_active_after[2] = 1800;
+  m_hardforks.m_height_the_hardfork_n_active_after[3] = 1801;
+  m_hardforks.m_height_the_hardfork_n_active_after[4] = 50000000000;
   REGISTER_CALLBACK_METHOD(hard_fork_1_base_test, configure_core);
 }
 
@@ -35,7 +39,7 @@ bool hard_fork_1_base_test::configure_core(currency::core& c, size_t ev_index, c
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
-  pc.hard_fork_01_starts_after_height = m_hardfork_height;
+  pc.hard_forks.set_hardfork_height(1, m_hardfork_height);
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
 }
@@ -78,7 +82,7 @@ bool hard_fork_1_unlock_time_2_in_normal_tx::generate(std::vector<test_event_ent
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
   crypto::secret_key tx_sec_key;
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, get_tx_version_from_events(events), tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   // tx_0 shouldn't be accepted
   DO_CALLBACK(events, "mark_invalid_tx"); 
@@ -92,7 +96,7 @@ bool hard_fork_1_unlock_time_2_in_normal_tx::generate(std::vector<test_event_ent
 
   // make another tx with the same inputs and extra (tx_0 was rejected so inputs can be reused)
   transaction tx_0a = AUTO_VAL_INIT(tx_0a);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0a, tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0a, get_tx_version_from_events(events), tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   // tx_0a shouldn't be accepted as well
   DO_CALLBACK(events, "mark_invalid_tx");
@@ -132,7 +136,7 @@ bool hard_fork_1_unlock_time_2_in_normal_tx::generate(std::vector<test_event_ent
   extra.push_back(ut2);
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_1, tx_sec_key, 0 /* unlock time 1 is zero and not set */);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_1, get_tx_version_from_events(events), tx_sec_key, 0 /* unlock time 1 is zero and not set */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_1);
 
@@ -151,7 +155,7 @@ bool hard_fork_1_unlock_time_2_in_normal_tx::generate(std::vector<test_event_ent
   extra.push_back(ut2);
   
   transaction tx_1a = AUTO_VAL_INIT(tx_1a);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_1a, tx_sec_key, 0 /* unlock time 1 is zero and not set */);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_1a, get_tx_version_from_events(events), tx_sec_key, 0 /* unlock time 1 is zero and not set */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_1a);
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
@@ -186,7 +190,7 @@ bool hard_fork_1_unlock_time_2_in_coinbase::generate(std::vector<test_event_entr
   // Test idea: make sure etc_tx_details_unlock_time2 can be used in-coinbase txs
   // only after hardfork 1
 
-  bool r = false;
+  //bool r = false;
   GENERATE_ACCOUNT(miner_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   generator.set_hardfork_height(1, m_hardfork_height);
@@ -257,7 +261,7 @@ bool hard_fork_1_chain_switch_pow_only::generate(std::vector<test_event_entry>& 
 {
   // Test idea: make sure chain switches without PoS before and after hardfork
 
-  bool r = false;
+  //bool r = false;
   GENERATE_ACCOUNT(miner_acc);
   GENERATE_ACCOUNT(alice_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
@@ -339,7 +343,7 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
   extra.push_back(ut2);
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
   crypto::secret_key tx_sec_key;
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, get_tx_version_from_events(events), tx_sec_key, 0 /* unlock time 1 is zero and thus will not be set */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   // tx_0 should be accepted
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true)); // tx_0 goes with blk_1_bad
@@ -390,14 +394,14 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
     crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
     size_t stake_output_idx = 0;
     size_t stake_output_gidx = 0;
-    uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+    uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
     crypto::key_image stake_output_key_image;
     keypair kp;
     generate_key_image_helper(stakeholder.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
@@ -433,7 +437,7 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(alice_acc.get_keys(), sources, std::vector<tx_destination_entry>{ tx_destination_entry(MK_TEST_COINS(90) - TESTS_DEFAULT_FEE, miner_acc.get_public_address()) },
-    empty_attachment, tx_1, stake_lock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
+    empty_attachment, tx_1, get_tx_version_from_events(events), stake_lock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   
   DO_CALLBACK(events, "mark_invalid_tx");
@@ -475,11 +479,12 @@ hard_fork_1_pos_and_locked_coins::hard_fork_1_pos_and_locked_coins()
 
 bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& events) const
 {
+  random_state_test_restorer::reset_random();
   bool r = false;
   GENERATE_ACCOUNT(miner_acc);
   GENERATE_ACCOUNT(alice_acc);
   GENERATE_ACCOUNT(bob_acc);
-  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, starter_timestamp);
   generator.set_hardfork_height(1, m_hardfork_height);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
@@ -506,7 +511,7 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
     destinations.push_back(tx_destination_entry(unique_amount_alice, alice_acc.get_public_address()));
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx_to_key(events, tx_0, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
+  r = construct_tx_to_key(m_hardforks, events, tx_0, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_0);
 
@@ -523,7 +528,7 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
   ut2.unlock_time_array.push_back(ut2_unlock_time);
   extra.push_back(ut2);
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_to_key(events, tx_1, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
+  r = construct_tx_to_key(m_hardforks, events, tx_1, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(tx_1);
@@ -566,14 +571,14 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
     crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
     size_t stake_output_idx = 0;
     size_t stake_output_gidx = 0;
-    uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+    uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
     crypto::key_image stake_output_key_image;
     keypair kp;
     generate_key_image_helper(alice_acc.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
     pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner_acc.get_public_address());
@@ -605,14 +610,14 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
     crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
     size_t stake_output_idx = 0;
     size_t stake_output_gidx = 0;
-    uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+    uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
     crypto::key_image stake_output_key_image;
     keypair kp;
     generate_key_image_helper(alice_acc.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
@@ -653,14 +658,14 @@ bool hard_fork_1_pos_and_locked_coins::generate(std::vector<test_event_entry>& e
     crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
     size_t stake_output_idx = 0;
     size_t stake_output_gidx = 0;
-    uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+    uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
     crypto::key_image stake_output_key_image;
     keypair kp;
     generate_key_image_helper(bob_acc.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
@@ -725,7 +730,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
   destinations.push_back(tx_destination_entry(stake_amount, bob_acc.get_public_address()));
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx_to_key(events, tx_0, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
+  r = construct_tx_to_key(m_hardforks, events, tx_0, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_0);
 
@@ -750,14 +755,14 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
     crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
     size_t stake_output_idx = 0;
     size_t stake_output_gidx = 0;
-    uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+    uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
     crypto::key_image stake_output_key_image;
     keypair kp;
     generate_key_image_helper(stakeholder.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
@@ -795,14 +800,14 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
     crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
     size_t stake_output_idx = 0;
     size_t stake_output_gidx = 0;
-    uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+    uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
     crypto::key_image stake_output_key_image;
     keypair kp;
     generate_key_image_helper(stakeholder.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
@@ -839,14 +844,14 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
     crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
     size_t stake_output_idx = 0;
     size_t stake_output_gidx = 0;
-    uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+    uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
     crypto::key_image stake_output_key_image;
     keypair kp;
     generate_key_image_helper(stakeholder.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.m_block.major_version = HF1_BLOCK_MAJOR_VERSION;
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
@@ -877,7 +882,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(alice_acc.get_keys(), sources, std::vector<tx_destination_entry>{ tx_destination_entry(stake_amount / 2, miner_acc.get_public_address()) },
-    empty_attachment, tx_1, stake_unlock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
+    empty_attachment, tx_1, get_tx_version_from_events(events), stake_unlock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   
   DO_CALLBACK(events, "mark_invalid_tx");

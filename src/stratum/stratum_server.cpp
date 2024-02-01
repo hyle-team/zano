@@ -368,7 +368,7 @@ namespace
 
     void block_template_update_thread()
     {
-      log_space::log_singletone::set_thread_log_prefix("[ST]");
+      epee::log_space::log_singletone::set_thread_log_prefix("[ST]");
       while (!m_stop_flag)
       {
         if (is_core_syncronized() && epee::misc_utils::get_tick_count() - m_block_template_update_ts >= m_block_template_update_pediod_ms)
@@ -951,14 +951,14 @@ namespace
       bool r = params_array != nullptr && ps.get_next_value(params_array, rate_submit_id_str);
       CHECK_AND_ASSERT_MES(r, false, "Incorrect parameters");
 
-      struct { uint64_t low, high; } rate_128 = { 0 };
-      CHECK_AND_ASSERT_MES(pod_from_net_format_reverse(rate_str, rate_128, true), false, "Can't parse rate from " << rate_str);
-      CHECK_AND_ASSERT_MES(rate_128.high == 0, false, "rate overflow, rate str: " << rate_str);
+      struct { uint64_t low, high, higher, highest; } rate_256 = { 0 }; // this will allow any length of data from 64 to 256 bits (helpful for odd miners)
+      CHECK_AND_ASSERT_MES(pod_from_net_format_reverse(rate_str, rate_256, true), false, "Can't parse rate from " << rate_str);
+      CHECK_AND_ASSERT_MES(rate_256.high == 0 && rate_256.higher == 0 && rate_256.highest == 0, false, "rate overflow, rate str: " << rate_str);
       crypto::hash rate_submit_id = null_hash;
       CHECK_AND_ASSERT_MES(pod_from_net_format(rate_submit_id_str, rate_submit_id), false, "Can't parse rate_submit_id from " << rate_submit_id_str);
 
-      m_last_reported_hashrate = rate_128.low;
-      return m_config.handle_submit_hashrate(this, rate_128.low, rate_submit_id);
+      m_last_reported_hashrate = rate_256.low;
+      return m_config.handle_submit_hashrate(this, rate_256.low, rate_submit_id);
     }
 
     bool handle_method_eth_submitWork(const jsonrpc_id_t& id, epee::serialization::portable_storage& ps, epee::serialization::portable_storage::hsection params_section)

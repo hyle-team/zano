@@ -23,16 +23,12 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
-
-
-
 #ifndef _STRING_TOOLS_H_
 #define _STRING_TOOLS_H_
 
-//#include <objbase.h>
 #include <locale>
 #include <cstdlib>
-//#include <strsafe.h>
+#include <map>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/lexical_cast.hpp>
@@ -212,7 +208,7 @@ namespace string_tools
   t_pod_type parse_tpod_from_hex_string(const std::string& str_hash)
   {
     t_pod_type t_pod = AUTO_VAL_INIT(t_pod);
-    parse_tpod_from_hex_string(str_hash, t_pod);
+    epee::string_tools::parse_tpod_from_hex_string(str_hash, t_pod); // using fully qualified name to avoid Argument-Dependent Lookup issues
     return t_pod;
   }
   //----------------------------------------------------------------------------
@@ -321,13 +317,6 @@ POP_GCC_WARNINGS
     }
     return true;
 	}
-
-/*  template<typename t_type>
-  bool get_xparam_from_command_line(const std::map<std::string, std::string>& res, const std::basic_string<typename t_string::value_type> & key, t_type& val)
-  {
-
-  }
-  */
 
 	template<class t_string, typename t_type>
 	bool get_xparam_from_command_line(const std::map<t_string, t_string>& res, const t_string & key, t_type& val)
@@ -803,6 +792,9 @@ POP_GCC_WARNINGS
 		return buff;	
 	}
 #endif
-}
-}
+} // namespace stringtools
+} // namwspace epee
+
+namespace epst = epee::string_tools; // EPshort alias for convenience
+
 #endif //_STRING_TOOLS_H_

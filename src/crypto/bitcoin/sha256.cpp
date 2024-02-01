@@ -7,7 +7,7 @@
 
 #include <assert.h>
 #include <string.h>
-
+#include "warnings.h"
 //#include <compat/cpuid.h>
 
 #if defined(__x86_64__) || defined(__amd64__) || defined(__i386__)
@@ -462,6 +462,9 @@ namespace
   TransformD64Type TransformD64_4way = nullptr;
   TransformD64Type TransformD64_8way = nullptr;
 
+  PUSH_GCC_WARNINGS
+  DISABLE_GCC_AND_CLANG_WARNING(unused-function)
+
   bool SelfTest() {
     // Input state (equal to the initial SHA256 state)
     static const uint32_t init[8] = {
@@ -626,7 +629,7 @@ std::string SHA256AutoDetect()
   assert(SelfTest());
   return ret;
 }
-
+POP_GCC_WARNINGS
 ////// SHA-256
 
 CSHA256::CSHA256() : bytes(0)

@@ -299,7 +299,7 @@ namespace db_test
     }
 
     // class i_db_visitor
-    virtual bool on_enum_item(size_t i, const void* key_data, size_t key_size, const void* value_data, size_t value_size) override
+    virtual bool on_enum_item(uint64_t i, const void* key_data, uint64_t key_size, const void* value_data, uint64_t value_size) override
     {
       CHECK_AND_ASSERT_MES(key_size == sizeof(crypto::hash), false, "invalid key size: " << key_size);
       const crypto::hash *p_key = reinterpret_cast<const crypto::hash*>(key_data);
@@ -377,7 +377,7 @@ namespace db_test
     }
 
     // restore PRNG state to keep other tests unaffected
-    crypto::random_prng_get_state(prng_state, sizeof prng_state);
+    crypto::random_prng_set_state(prng_state, sizeof prng_state);
 
     ASSERT_TRUE(result);
   }
@@ -986,7 +986,7 @@ namespace db_test
     bool r = false;
     epee::shared_recursive_mutex rw_lock;
 
-    epee::log_space::log_singletone::enable_channels("lmdb");
+    epee::log_space::log_singletone::enable_channels("lmdb", false);
 
     static const uint64_t buffer_size = 64 * 1024;                                         // 64 KB
     static const uint64_t db_total_size = static_cast<uint64_t>(2.1 * 1024 * 1024 * 1024); // 2.1 GB -- a bit more than 2GB to test 2GB boundary

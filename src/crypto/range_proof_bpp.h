@@ -23,18 +23,26 @@ namespace crypto
     scalar_t delta;
   };
 
-#define DBG_VAL_PRINT(x) std::cout << #x ": " << x << ENDL
-#define DBG_PRINT(x) std::cout << x << ENDL
+#if 0
+#  define DBG_VAL_PRINT(x) std::cout << std::setw(30) << std::left << #x ": " << x << std::endl
+#  define DBG_PRINT(x)     std::cout << x << std::endl
+#else
+#  define DBG_VAL_PRINT(x) (void(0))
+#  define DBG_PRINT(x)     (void(0))
+#endif
+
+
+#define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
+  if (!(cond)) { LOG_PRINT_RED("bpp_gen: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << (int)err_code, LOG_LEVEL_3); \
+  if (p_err) { *p_err = err_code; } return false; }
+
 
   template<typename CT>
-  bool bpp_gen(const scalar_vec_t& values, const scalar_vec_t& masks, bpp_signature& sig, std::vector<point_t>& commitments, uint8_t* p_err = nullptr)
+  bool bpp_gen(const scalar_vec_t& values, const scalar_vec_t& masks, const std::vector<const crypto::public_key*>& commitments_1div8, bpp_signature& sig, uint8_t* p_err = nullptr)
   {
-#define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
-    if (!(cond)) { LOG_PRINT_RED("bpp_gen: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << err_code, LOG_LEVEL_3); \
-    if (p_err) { *p_err = err_code; } return false; }
-
+    // Note: commitments_1div8 are supposed to be already calculated
     static_assert(CT::c_bpp_n <= 255, "too big N");
-    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(values.size() > 0 && values.size() <= CT::c_bpp_values_max && values.size() == masks.size(), 1);
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(values.size() > 0 && values.size() <= CT::c_bpp_values_max && values.size() == masks.size() && values.size() == commitments_1div8.size(), 1);
     CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(masks.is_reduced(), 3);
 
     const size_t c_bpp_log2_m = constexpr_ceil_log2(values.size());
@@ -42,14 +50,14 @@ namespace crypto
     const size_t c_bpp_mn = c_bpp_m * CT::c_bpp_n;
     const size_t c_bpp_log2_mn = c_bpp_log2_m + CT::c_bpp_log2_n;
 
-    // pre-multiply all output points by c_scalar_1div8
-    // in order to enforce these points to be in the prime-order subgroup (after mul by 8 in bpp_verify())
-
-    // calc commitments vector as commitments[i] = 1/8 * values[i] * G + 1/8 * masks[i] * H
-    commitments.resize(values.size());
-    for (size_t i = 0; i < values.size(); ++i)
-      CT::calc_pedersen_commitment(values[i] * c_scalar_1div8, masks[i] * c_scalar_1div8, commitments[i]);
-
+#ifndef NDEBUG
+    for(size_t i = 0; i < values.size(); ++i)
+    {
+      point_t V{};
+      CT::calc_pedersen_commitment(values[i], masks[i], V);
+      CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(point_t(*commitments_1div8[i]).modify_mul8() == V, 4);
+    }
+#endif
 
     // s.a. BP+ paper, page 15, eq. 11
     // decompose v into aL and aR:
@@ -85,7 +93,7 @@ namespace crypto
     DBG_PRINT("initial transcript: " << e);
 
     hash_helper_t::hs_t hsc;
-    CT::update_transcript(hsc, e, commitments);
+    CT::update_transcript(hsc, e, commitments_1div8);
 
     // BP+ paper, page 15: The prover begins with sending A = g^aL h^aR h^alpha (group element)
     // so we calculate A0 = alpha * H + SUM(aL_i * G_i) + SUM(aR_i * H_i)
@@ -96,7 +104,8 @@ namespace crypto
     for (size_t i = 0; i < c_bpp_mn; ++i)
       A0 += aLs[i] * CT::get_generator(false, i) + aRs[i] * CT::get_generator(true, i);
 
-    // part of 1/8 defense scheme
+    // pre-multiply all output points by c_scalar_1div8
+    // in order to enforce these points to be in the prime-order subgroup (after mul by 8 in bpp_verify())
     A0 *= c_scalar_1div8;
     A0.to_public_key(sig.A0);
 
@@ -147,7 +156,7 @@ namespace crypto
 
     // aL_hat = aL - 1*z
     scalar_vec_t aLs_hat = aLs - z;
-    // aL_hat = aR + d o y^leftarr + 1*z where y^leftarr = (y^n, y^(n-1), ..., y)  (BP+ paper, page 18, Fig. 3)
+    // aR_hat = aR + d o y^leftarr + 1*z where y^leftarr = (y^n, y^(n-1), ..., y)  (BP+ paper, page 18, Fig. 3)
     scalar_vec_t aRs_hat = aRs + z;
     for (size_t i = 0; i < c_bpp_mn; ++i)
       aRs_hat[i] += d[i] * y_powers[c_bpp_mn - i];
@@ -324,8 +333,26 @@ namespace crypto
     DBG_VAL_PRINT(sig.delta);
 
     return true;
-#undef CHECK_AND_FAIL_WITH_ERROR_IF_FALSE
   } // bpp_gen()
+
+  
+  // convenient overload for tests 
+  template<typename CT>
+  bool bpp_gen(const scalar_vec_t& values, const scalar_vec_t& masks, bpp_signature& sig, std::vector<point_t>& commitments_1div8_to_be_generated, uint8_t* p_err = nullptr)
+  {
+    CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(values.size() == masks.size(), 91);
+    commitments_1div8_to_be_generated.resize(values.size());
+    std::vector<crypto::public_key> commitments_1div8(values.size());
+    std::vector<const crypto::public_key*> commitments_1div8_pointers(values.size());
+    for(size_t i = 0; i < values.size(); ++i)
+    {
+      CT::calc_pedersen_commitment(c_scalar_1div8 * values[i], c_scalar_1div8 * masks[i], commitments_1div8_to_be_generated[i]);
+      commitments_1div8[i] = (commitments_1div8_to_be_generated[i]).to_public_key();
+      commitments_1div8_pointers[i] = &commitments_1div8[i];
+    }
+    return bpp_gen<CT>(values, masks, commitments_1div8_pointers, sig, p_err);
+  }
+#undef CHECK_AND_FAIL_WITH_ERROR_IF_FALSE
 
 
   struct bpp_sig_commit_ref_t
@@ -335,7 +362,7 @@ namespace crypto
       , commitments(commitments)
     {}
     const bpp_signature& sig;
-    const std::vector<point_t>& commitments;
+    const std::vector<point_t>& commitments; // assumed to be premultiplied by 1/8
   };
 
 
@@ -343,7 +370,7 @@ namespace crypto
   bool bpp_verify(const std::vector<bpp_sig_commit_ref_t>& sigs, uint8_t* p_err = nullptr)
   {
 #define CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(cond, err_code) \
-    if (!(cond)) { LOG_PRINT_RED("bpp_verify: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << err_code, LOG_LEVEL_3); \
+    if (!(cond)) { LOG_PRINT_RED("bpp_verify: \"" << #cond << "\" is false at " << LOCATION_SS << ENDL << "error code = " << (int)err_code, LOG_LEVEL_3); \
     if (p_err) { *p_err = err_code; } return false; }
 
     DBG_PRINT(ENDL << " . . . . bpp_verify() . . . . ");
@@ -689,11 +716,14 @@ namespace crypto
 
     point_t GH_exponents = c_point_0;
     CT::calc_pedersen_commitment(G_scalar, H_scalar, GH_exponents);
-    bool result = multiexp_and_check_being_zero<CT>(g_scalars, h_scalars, summand + GH_exponents);
+    bool result = msm_and_check_zero<CT>(g_scalars, h_scalars, summand + GH_exponents);
     if (result)
       DBG_PRINT(ENDL << " . . . . bpp_verify() -- SUCCEEDED!!!" << ENDL);
     return result;
 #undef CHECK_AND_FAIL_WITH_ERROR_IF_FALSE
   }
+
+#undef DBG_VAL_PRINT
+#undef DBG_PRINT
 
 } // namespace crypto

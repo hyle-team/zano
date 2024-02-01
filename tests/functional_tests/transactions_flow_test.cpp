@@ -17,7 +17,10 @@ using namespace epee;
 #include "wallet/wallet2.h"
 #include "string_coding.h"
 #include "math_helper.h"
+#include "common/variant_helper.h"
+
 using namespace currency;
+namespace ph = boost::placeholders;
 
 #define TESTS_DEFAULT_FEE                   TX_DEFAULT_FEE 
 
@@ -190,13 +193,13 @@ bool do_send_money_by_fractions(tools::wallet2& w1, tools::wallet2& w2, size_t m
   }
 }
 
-uint64_t got_money_in_first_transfers(const tools::wallet2::transfer_container& incoming_transfers, size_t n_transfers)
+uint64_t got_money_in_first_transfers(const tools::transfer_container& incoming_transfers, size_t n_transfers)
 {
   uint64_t summ = 0;
   size_t count = 0;
-  BOOST_FOREACH(const tools::wallet2::transfer_details& td, incoming_transfers)
+  BOOST_FOREACH(const tools::transfer_details& td, incoming_transfers)
   {
-    summ += td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].amount;
+    summ += boost::get<tx_out_bare>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]).amount;
     if(++count >= n_transfers)
       return summ;
   }
@@ -237,7 +240,7 @@ void wait_unlock_money(tools::wallet2& w, flow_test_context& control)
 
 std::string get_incoming_transfers_str(tools::wallet2& w)
 {
-  tools::wallet2::transfer_container transfers;
+  tools::transfer_container transfers;
   w.get_transfers(transfers);
 
   uint64_t spent_count = 0;
@@ -315,11 +318,11 @@ class flow_test_console_cmmands_handler
 public:
   flow_test_console_cmmands_handler(flow_test_context& contxt):m_context(contxt)
   {
-    m_cmd_binder.set_handler("help", boost::bind(&console_handlers_binder::help, &m_cmd_binder, _1), "Show this help");
-    m_cmd_binder.set_handler("exit", boost::bind(&flow_test_console_cmmands_handler::exit, this, _1), "Exit");
-    m_cmd_binder.set_handler("pause", boost::bind(&flow_test_console_cmmands_handler::pause, this, _1), "Pause");
-    m_cmd_binder.set_handler("continue", boost::bind(&flow_test_console_cmmands_handler::do_continue, this, _1), "Continue");
-    m_cmd_binder.set_handler("refresh", boost::bind(&flow_test_console_cmmands_handler::refresh, this, _1), "Refresh");
+    m_cmd_binder.set_handler("help", boost::bind(&console_handlers_binder::help, &m_cmd_binder, ph::_1), "Show this help");
+    m_cmd_binder.set_handler("exit", boost::bind(&flow_test_console_cmmands_handler::exit, this, ph::_1), "Exit");
+    m_cmd_binder.set_handler("pause", boost::bind(&flow_test_console_cmmands_handler::pause, this, ph::_1), "Pause");
+    m_cmd_binder.set_handler("continue", boost::bind(&flow_test_console_cmmands_handler::do_continue, this, ph::_1), "Continue");
+    m_cmd_binder.set_handler("refresh", boost::bind(&flow_test_console_cmmands_handler::refresh, this, ph::_1), "Refresh");
   }
 
   bool start_handling()
@@ -383,6 +386,26 @@ bool test_serialization()
   return true;
 }
 
+
+struct test_serialization_2
+{
+  uint64_t var1;
+  uint64_t var2;
+  BEGIN_KV_SERIALIZE_MAP()
+    KV_SERIALIZE(var1)
+    KV_SERIALIZE(var2)
+  END_KV_SERIALIZE_MAP()
+};
+
+bool test_serialization2()
+{
+  test_serialization_2 ee = {};
+  std::string json_buf = "{\"var1\": 111, \"var2\": \"222\"}";
+  epee::serialization::load_t_from_json(ee, json_buf);
+  std::string json_buf2 = epee::serialization::store_t_to_json(ee);
+  return true;
+}
+
 bool transactions_flow_test(
   std::wstring path_source_wallet, std::string source_wallet_pass,
   std::wstring path_terget_wallet, std::string target_wallet_pass,
@@ -430,7 +453,7 @@ bool transactions_flow_test(
   LOG_PRINT_GREEN("Transfers: " << get_incoming_transfers_str(w1), LOG_LEVEL_0);
 
   uint64_t transfer_size = TX_DEFAULT_FEE;//amount_to_transfer / transactions_count;
-  tools::wallet2::transfer_container incoming_transfers; 
+  tools::transfer_container incoming_transfers; 
   size_t prepared_transfers = 0;
 
    
@@ -446,22 +469,27 @@ bool transactions_flow_test(
       //lets go!
       size_t count = 0;
       prepared_transfers = 0;
-      BOOST_FOREACH(tools::wallet2::transfer_details& td, incoming_transfers)
+      BOOST_FOREACH(tools::transfer_details& td, incoming_transfers)
       {
         if (td.is_spent())
           continue;
 
-        if (td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].amount <= transfer_size + TX_DEFAULT_FEE)
-        {
-          ++prepared_transfers;
-          continue;
-        }
+        VARIANT_SWITCH_BEGIN(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]);
+        VARIANT_CASE(currency::tx_out_bare, ob);
+          if (ob.amount <= transfer_size + TX_DEFAULT_FEE)
+          {
+            ++prepared_transfers;
+            continue;
+          }
+        VARIANT_CASE(currency::tx_out_zarcanum, oz);
+          // @#@
+        VARIANT_SWITCH_END();
 
         ++count;
         currency::transaction tx_s;
-        if (w1.unlocked_balance() >= td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].amount)
+        if (w1.unlocked_balance() >= boost::get<tx_out_bare>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]).amount)
         {
-          bool r = do_send_money_by_fractions(w1, w1, 0, td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].amount - TX_DEFAULT_FEE, tx_s, transfer_size);
+          bool r = do_send_money_by_fractions(w1, w1, 0, boost::get<tx_out_bare>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]).amount - TX_DEFAULT_FEE, tx_s, transfer_size);
           CHECK_AND_ASSERT_MES(r, false, "Failed to send starter tx " << get_transaction_hash(tx_s));
         }
         else

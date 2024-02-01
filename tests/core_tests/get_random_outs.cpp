@@ -52,7 +52,7 @@ bool get_random_outs_test::check_get_rand_outs(currency::core& c, size_t ev_inde
 {
   currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request req = AUTO_VAL_INIT(req);
   req.amounts.push_back(m_amount);
-  req.outs_count = 4;
+  req.decoys_count = 4;
   req.use_forced_mix_outs = false;
   currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response res = AUTO_VAL_INIT(res);
   c.get_blockchain_storage().get_random_outs_for_amounts(req, res);
@@ -99,7 +99,7 @@ bool random_outs_and_burnt_coins::generate(std::vector<test_event_entry>& events
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   uint64_t burned_tx_amount_total = get_burned_amount(tx_0);

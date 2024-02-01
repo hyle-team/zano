@@ -37,7 +37,6 @@ bool hard_fork_1_bad_pos_source::generate(std::vector<test_event_entry>& events)
 
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
-  generator.set_pos_to_low_timestamp(true);
   MAKE_TX(events, tx_1, miner_acc, pos_miner_acc_before_pow, 1000000000000, blk_0r);
   MAKE_NEXT_BLOCK_TX1(events, blk_pow_tx1, blk_0r, miner_acc, tx_1);
   MAKE_TX(events, tx_2, preminer_acc, pos_miner_acc_after_pow, 1000000000000, blk_pow_tx1);
@@ -72,7 +71,7 @@ bool hard_fork_1_bad_pos_source::configure_core(currency::core& c, size_t ev_ind
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE; //four blocks
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH; //four blocks
-  pc.hard_fork_01_starts_after_height = get_hardfork_height();
+  pc.hard_forks.set_hardfork_height(1, get_hardfork_height());
 
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;

@@ -11,7 +11,7 @@ int test_get_rand_outs()
   currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request req = AUTO_VAL_INIT(req);
   currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response rsp = AUTO_VAL_INIT(rsp);
   req.use_forced_mix_outs = false;
-  req.outs_count = 10 + 1;
+  req.decoys_count = 10 + 1;
   for (size_t i = 0; i != 50; i++)
     req.amounts.push_back(COIN);
 

@@ -18,12 +18,11 @@
 
 #include "include_base_utils.h"
 #include "crypto/crypto.h"
-
+#include "currency_core/currency_basic.h"
 
 class wallet_chain_shortener
 {
 public:
-  wallet_chain_shortener();
   void push_new_block_id(const crypto::hash& id, uint64_t height);
   uint64_t get_top_block_height() const;
   uint64_t get_blockchain_current_size() const;
@@ -48,8 +47,8 @@ public:
   //debug functions
   std::string get_internal_state_text() const;
 private:
-  std::atomic<uint64_t> m_local_bc_size; //temporary workaround 
-  crypto::hash m_genesis;
+  std::atomic<uint64_t> m_local_bc_size = 1; //temporary workaround 
+  crypto::hash m_genesis = currency::gdefault_genesis;
   std::map<uint64_t, crypto::hash> m_last_20_blocks;
   std::map<uint64_t, crypto::hash> m_last_144_blocks_every_10;   //1 day
   std::map<uint64_t, crypto::hash> m_last_144_blocks_every_100;  //10 days

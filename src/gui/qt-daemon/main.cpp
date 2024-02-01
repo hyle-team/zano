@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 #ifdef _MSC_VER
 #if _MSC_VER >= 1910
   QCoreApplication::setAttribute(Qt::AA_UseHighDpiPixmaps); //HiDPI pixmaps
-  qputenv("QT_SCALE_FACTOR", "0.75");
+  //qputenv("QT_SCALE_FACTOR", "0.75");
 #endif
 #endif
 
