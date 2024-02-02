@@ -367,9 +367,12 @@ namespace currency
     bool pos                                  /* = false */,
     const pos_entry& pe                       /* = pos_entry() */,  // only pe.stake_unlock_time and pe.stake_amount are used now, TODO: consider refactoring -- sowle
     tx_generation_context* ogc_ptr            /* = nullptr */,
-    const keypair* tx_one_time_key_to_use     /* = nullptr */
+    const keypair* tx_one_time_key_to_use     /* = nullptr */, 
+    const std::vector<tx_destination_entry>& destinations_ /* = std::vector<tx_destination_entry>() */
   )
   {
+    std::vector<tx_destination_entry> destinations = destinations_;
+
     bool r = false;
 
     if (!get_block_reward(pos, median_size, current_block_size, already_generated_coins, block_reward_without_fee, height))
@@ -379,45 +382,48 @@ namespace currency
     }
     uint64_t block_reward = block_reward_without_fee + fee;
       
-    //
-    // prepare destinations
-    //
-    // 1. split block_reward into out_amounts
-    std::vector<uint64_t> out_amounts;
-    if (tx_version > TRANSACTION_VERSION_PRE_HF4)
+    if (!destinations.size())
     {
-      // randomly split into CURRENCY_TX_MIN_ALLOWED_OUTS outputs for PoW block, or for PoS block only if the stakeholder address differs
-      // (otherwise for PoS miner tx there will be ONE output with amount = stake_amount + reward)
-      if (!pos || miner_address != stakeholder_address)
-        decompose_amount_randomly(block_reward, [&](uint64_t a){ out_amounts.push_back(a); }, CURRENCY_TX_MIN_ALLOWED_OUTS);
-    }
-    else
-    {
-      // non-hidden outs: split into digits
-      decompose_amount_into_digits(block_reward, DEFAULT_DUST_THRESHOLD,
-        [&out_amounts](uint64_t a_chunk) { out_amounts.push_back(a_chunk); },
-        [&out_amounts](uint64_t a_dust) { out_amounts.push_back(a_dust); });
-      CHECK_AND_ASSERT_MES(1 <= max_outs, false, "max_out must be non-zero");
-      while (max_outs < out_amounts.size())
+      //
+      // prepare destinations
+      //
+      // 1. split block_reward into out_amounts
+      std::vector<uint64_t> out_amounts;
+      if (tx_version > TRANSACTION_VERSION_PRE_HF4)
       {
-        out_amounts[out_amounts.size() - 2] += out_amounts.back();
-        out_amounts.resize(out_amounts.size() - 1);
+        // randomly split into CURRENCY_TX_MIN_ALLOWED_OUTS outputs for PoW block, or for PoS block only if the stakeholder address differs
+        // (otherwise for PoS miner tx there will be ONE output with amount = stake_amount + reward)
+        if (!pos || miner_address != stakeholder_address)
+          decompose_amount_randomly(block_reward, [&](uint64_t a) { out_amounts.push_back(a); }, CURRENCY_TX_MIN_ALLOWED_OUTS);
       }
-    }
-    // 2. construct destinations using out_amounts
-    std::vector<tx_destination_entry> destinations;
-    for (auto a : out_amounts)
-    {
-      tx_destination_entry de = AUTO_VAL_INIT(de);
-      de.addr.push_back(miner_address);
-      de.amount = a;
-      de.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // don't use asset id blinding as it's obvious which asset it is
-      if (pe.stake_unlock_time && pe.stake_unlock_time > height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+      else
       {
-        //this means that block is creating after hardfork_1 and unlock_time is needed to set for every destination separately
-        de.unlock_time = height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW;
+        // non-hidden outs: split into digits
+        decompose_amount_into_digits(block_reward, DEFAULT_DUST_THRESHOLD,
+          [&out_amounts](uint64_t a_chunk) { out_amounts.push_back(a_chunk); },
+          [&out_amounts](uint64_t a_dust) { out_amounts.push_back(a_dust); });
+        CHECK_AND_ASSERT_MES(1 <= max_outs, false, "max_out must be non-zero");
+        while (max_outs < out_amounts.size())
+        {
+          out_amounts[out_amounts.size() - 2] += out_amounts.back();
+          out_amounts.resize(out_amounts.size() - 1);
+        }
       }
-      destinations.push_back(de);
+      // 2. construct destinations using out_amounts
+
+      for (auto a : out_amounts)
+      {
+        tx_destination_entry de = AUTO_VAL_INIT(de);
+        de.addr.push_back(miner_address);
+        de.amount = a;
+        de.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // don't use asset id blinding as it's obvious which asset it is
+        if (pe.stake_unlock_time && pe.stake_unlock_time > height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+        {
+          //this means that block is creating after hardfork_1 and unlock_time is needed to set for every destination separately
+          de.unlock_time = height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW;
+        }
+        destinations.push_back(de);
+      }
     }
 
     if (pos)
