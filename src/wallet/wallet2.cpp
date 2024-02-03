@@ -5966,11 +5966,13 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, std::vector<currenc
       }
 
       std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount> scanty_outs;
-      for (COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& amount_outs : daemon_resp.outs)
+      THROW_IF_FALSE_WALLET_EX(daemon_resp.outs.size() == req.amounts.size(), error::not_enough_outs_to_mix, scanty_outs, fake_outputs_count);
+      //for (COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& amount_outs : daemon_resp.outs)
+      for(size_t i = 0; i != daemon_resp.outs.size(); i++)
       {
-        if (amount_outs.outs.size() < fake_outputs_count)
+        if (daemon_resp.outs[i].outs.size() != req.amounts[i].offsets.size())
         {
-          scanty_outs.push_back(amount_outs);
+          scanty_outs.push_back(daemon_resp.outs[i]);
         }
       }
       THROW_IF_FALSE_WALLET_EX(scanty_outs.empty(), error::not_enough_outs_to_mix, scanty_outs, fake_outputs_count);
