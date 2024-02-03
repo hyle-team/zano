@@ -4069,7 +4069,7 @@ bool wallet2::is_transfer_okay_for_pos(const transfer_details& tr, bool is_zarca
     return false;
 
   //prevent staking of after-last-pow-coins
-  if (get_blockchain_current_size() - tr.m_ptx_wallet_info->m_block_height <= m_core_runtime_config.min_coinstake_age)
+  if (get_blockchain_current_size() - tr.m_ptx_wallet_info->m_block_height <= m_core_runtime_config.min_coinstake_age + 1)
     return false;
   
   if (tr.m_ptx_wallet_info->m_block_height > m_last_pow_block_h)
