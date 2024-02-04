@@ -2145,21 +2145,21 @@ namespace currency
   bool construct_tx_handle_ado(const account_keys& sender_account_keys, 
     const finalize_tx_param& ftp, 
     asset_descriptor_operation& ado, 
-    tx_generation_context& gen_context, 
-    const crypto::secret_key& one_time_tx_secret_key, 
+    tx_generation_context& gen_context,
+    const keypair& tx_key,
     std::vector<tx_destination_entry>& shuffled_dsts)
   {
     if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
     {
       //CHECK_AND_ASSERT_MES(ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER, false, "unsupported asset operation: " << (int)ado.operation_type);
       crypto::secret_key asset_control_key{};
-      bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, one_time_tx_secret_key, asset_control_key, ado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
+      bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, tx_key.sec, asset_control_key, ado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
       CHECK_AND_ASSERT_MES(r, false, "derive_key_pair_from_key_pair failed");
 
       calculate_asset_id(ado.descriptor.owner, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id);
 
       // calculate amount blinding mask
-      gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, asset_control_key);
+      gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, asset_control_key, tx_key.pub);
 
       // set correct asset_id to the corresponding destination entries
       uint64_t amount_of_emitted_asset = 0;
@@ -2190,7 +2190,7 @@ namespace currency
         gen_context.ao_asset_id = *ado.opt_asset_id;
         gen_context.ao_asset_id_pt.from_public_key(gen_context.ao_asset_id);
         // calculate amount blinding mask
-        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, ftp.asset_control_key);
+        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, ftp.asset_control_key, tx_key.pub);
 
         // set correct asset_id to the corresponding destination entries
         uint64_t amount_of_emitted_asset = 0;
@@ -2225,7 +2225,7 @@ namespace currency
         gen_context.ao_asset_id = *ado.opt_asset_id;
         gen_context.ao_asset_id_pt.from_public_key(gen_context.ao_asset_id);
         // calculate amount blinding mask
-        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, ftp.asset_control_key);
+        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, ftp.asset_control_key, tx_key.pub);
         gen_context.ao_commitment_in_outputs = true;
 
         // set correct asset_id to the corresponding destination entries
@@ -2515,7 +2515,7 @@ namespace currency
       pado = get_type_in_variant_container<asset_descriptor_operation>(tx.extra);
       if (pado)
       {
-        bool r = construct_tx_handle_ado(sender_account_keys, ftp, *pado, gen_context, one_time_tx_secret_key, shuffled_dsts);
+        bool r = construct_tx_handle_ado(sender_account_keys, ftp, *pado, gen_context, txkey, shuffled_dsts);
         CHECK_AND_ASSERT_MES(r, false, "Failed to construct_tx_handle_ado()");
         if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation{ pado });
       }
