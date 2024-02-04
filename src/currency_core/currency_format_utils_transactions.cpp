@@ -404,7 +404,7 @@ namespace currency
 #ifdef TESTNET
     return true;
 #else
-    return false;
+    return true;
 #endif
   }
 

@@ -585,6 +585,9 @@ public:
   void set_hardforks(const currency::hard_forks_descriptor& hardforks);
   const currency::hard_forks_descriptor& get_hardforks() const { return m_hardforks; }
 
+  void load_hardforks_from(const test_chain_unit_base* pthis) { m_hardforks = pthis->get_hardforks(); }
+  template<typename t_type>
+  void load_hardforks_from(const t_type* pthis) {}
 
 private:
   bool m_ignore_last_pow_in_wallets;
