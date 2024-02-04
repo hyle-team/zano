@@ -2111,7 +2111,7 @@ namespace currency
   {
     crypto::hash h = get_hash_from_POD_objects(CRYPTO_HDS_ASSET_ID, asset_owner);
 
-    // this hash function needs to be computationally expensive (s.e. the whitepaper)
+    // this hash function needs to be computationally expensive (s.a. the whitepaper)
     for(uint64_t i = 0; i < CRYPTO_HASH_ASSET_ID_ITERATIONS; ++i)
       h = get_hash_from_POD_objects(CRYPTO_HDS_ASSET_ID, h, i);
 
@@ -2151,7 +2151,6 @@ namespace currency
   {
     if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
     {
-      //CHECK_AND_ASSERT_MES(ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER, false, "unsupported asset operation: " << (int)ado.operation_type);
       crypto::secret_key asset_control_key{};
       bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, tx_key.sec, asset_control_key, ado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
       CHECK_AND_ASSERT_MES(r, false, "derive_key_pair_from_key_pair failed");
@@ -2175,17 +2174,12 @@ namespace currency
 
       gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
       ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
-
     }
-    else {
+    else
+    {
       if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
       {
-
-        //bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, one_time_tx_secret_key, asset_control_key, ado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
-        //CHECK_AND_ASSERT_MES(r, false, "derive_key_pair_from_key_pair failed");
-
-        //calculate_asset_id(ado.descriptor.owner, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id);
-        CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT/UPDATE");
+        CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT");
 
         gen_context.ao_asset_id = *ado.opt_asset_id;
         gen_context.ao_asset_id_pt.from_public_key(gen_context.ao_asset_id);
@@ -2202,7 +2196,7 @@ namespace currency
             item.asset_id = gen_context.ao_asset_id;
           }
         }
-        ado.descriptor.current_supply += amount_of_emitted_asset; // TODO: consider setting current_supply beforehand, not setting it hear in ad-hoc manner -- sowle
+        ado.descriptor.current_supply += amount_of_emitted_asset;
 
         gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
         ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
@@ -2210,17 +2204,15 @@ namespace currency
       }
       else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
       {
-        CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT/UPDATE");
-        //CHECK_AND_ASSERT_MES(ado.opt_proof, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT/UPDATE");
-        CHECK_AND_ASSERT_MES(!ado.opt_amount_commitment, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT/UPDATE");
+        CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE");
+        //CHECK_AND_ASSERT_MES(ado.opt_proof, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE");
+        CHECK_AND_ASSERT_MES(!ado.opt_amount_commitment, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE");
 
         //fields that not supposed to be changed?
       }
       else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
       {
-
-        //calculate_asset_id(ado.descriptor.owner, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id);
-        CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT/UPDATE");
+        CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN");
 
         gen_context.ao_asset_id = *ado.opt_asset_id;
         gen_context.ao_asset_id_pt.from_public_key(gen_context.ao_asset_id);
@@ -2245,7 +2237,7 @@ namespace currency
             amount_of_burned_assets -= item.amount;
           }
         }
-        ado.descriptor.current_supply -= amount_of_burned_assets; // TODO: consider setting current_supply beforehand, not setting it hear in ad-hoc manner -- sowle
+        ado.descriptor.current_supply -= amount_of_burned_assets;
 
         gen_context.ao_amount_commitment = amount_of_burned_assets * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
         ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();

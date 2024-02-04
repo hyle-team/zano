@@ -126,6 +126,9 @@ namespace crypto
   template<generator_tag gen>
   inline bool verify_schnorr_sig(const hash& m, const public_key& A, const generic_schnorr_sig& sig) noexcept;
 
+  // TODO @#@# make optimized version   inline bool verify_schnorr_sig(const hash& m, const point_t& A, const generic_schnorr_sig& sig) noexcept;
+  // and change check_tx_balance() accordingly
+
   template<>
   inline bool verify_schnorr_sig<gt_G>(const hash& m, const public_key& A, const generic_schnorr_sig& sig) noexcept
   {
