@@ -635,8 +635,8 @@ namespace tools
 
     bool prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const mode_separate_context& emode_separate = mode_separate_context());
 
-    void finalize_transaction(const currency::finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key = true);
-    void finalize_transaction(const currency::finalize_tx_param& ftp, currency::finalized_tx& result, bool broadcast_tx, bool store_tx_secret_key = true );
+    void finalize_transaction(currency::finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key = true);
+    void finalize_transaction(currency::finalize_tx_param& ftp, currency::finalized_tx& result, bool broadcast_tx, bool store_tx_secret_key = true );
 
     std::string get_log_prefix() const { return m_log_prefix; }
     static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const wallet_public::employed_tx_entries& td);

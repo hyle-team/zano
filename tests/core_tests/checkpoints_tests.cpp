@@ -681,6 +681,7 @@ gen_no_attchments_in_coinbase::gen_no_attchments_in_coinbase()
 
 bool gen_no_attchments_in_coinbase::generate(std::vector<test_event_entry>& events) const
 {
+  this->on_test_generator_created(generator);
   uint64_t ts = 1450000000;
   test_core_time::adjust(ts);
   
@@ -704,7 +705,16 @@ bool gen_no_attchments_in_coinbase::init_config_set_cp(currency::core& c, size_t
   crc.pos_minimum_heigh = 1;
   c.get_blockchain_storage().set_core_runtime_config(crc);
 
-  m_checkpoints.add_checkpoint(12, "475331fb4a325e722ddbc2d087d32687a58392e5a9314001120de0f2ce7737f2");
+  // different checkpoints due to different block versions for different hardforks -> different hashes
+  if (crc.is_hardfork_active_for_height(ZANO_HARDFORK_03, 11) && !crc.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, 11))
+  {
+    m_checkpoints.add_checkpoint(12, "4e6055dda442e04b2feb70bc7245584742604e8515b8d2e1c3d46c26f758d59f");
+  }
+  else
+  {
+    m_checkpoints.add_checkpoint(12, "475331fb4a325e722ddbc2d087d32687a58392e5a9314001120de0f2ce7737f2");
+  }                
+
   c.set_checkpoints(currency::checkpoints(m_checkpoints));
 
   return true;

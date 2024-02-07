@@ -1,5 +1,5 @@
-// Copyright (c) 2020-2023 Zano Project
-// Copyright (c) 2020-2023 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2020-2024 Zano Project
+// Copyright (c) 2020-2024 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 //
@@ -1339,6 +1339,15 @@ namespace crypto
       hs_t hs_calculator(2);
       hs_calculator.add_32_chars(str32);
       hs_calculator.add_scalar(s);
+      return hs_calculator.calc_hash();
+    }
+
+    static scalar_t hs(const char(&str32)[32], const scalar_t& s, const crypto::public_key& pk)
+    {
+      hs_t hs_calculator(2);
+      hs_calculator.add_32_chars(str32);
+      hs_calculator.add_scalar(s);
+      hs_calculator.add_pub_key(pk);
       return hs_calculator.calc_hash();
     }
 

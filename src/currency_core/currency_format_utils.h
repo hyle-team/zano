@@ -280,7 +280,9 @@ namespace currency
                                                              bool pos                               = false,
                                                              const pos_entry& pe                    = pos_entry(),
                                                              tx_generation_context* ogc_ptr    = nullptr,
-                                                             const keypair* tx_one_time_key_to_use  = nullptr);
+                                                             const keypair* tx_one_time_key_to_use  = nullptr, 
+                                                             const std::vector<tx_destination_entry>& destinations = std::vector<tx_destination_entry>()
+                                                        );
   //---------------------------------------------------------------
   uint64_t get_string_uint64_hash(const std::string& str);
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, crypto::scalar_t& asset_blinding_mask, crypto::scalar_t& amount_blinding_mask, crypto::point_t& blinded_asset_id, crypto::point_t& amount_commitment, finalized_tx& result, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);

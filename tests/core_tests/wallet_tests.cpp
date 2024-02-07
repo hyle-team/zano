@@ -1778,9 +1778,6 @@ bool gen_wallet_alias_and_unconfirmed_txs::c3(currency::core& c, size_t ev_index
 
 gen_wallet_alias_via_special_wallet_funcs::gen_wallet_alias_via_special_wallet_funcs()
 {
-  // start hardfork from block 0 in order to use extra_alias_entry (allowed only since HF2)
-  m_hardforks.set_hardfork_height(1, 0);
-  m_hardforks.set_hardfork_height(2, 0);
   REGISTER_CALLBACK_METHOD(gen_wallet_alias_via_special_wallet_funcs, c1);
 }
 

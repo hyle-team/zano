@@ -367,9 +367,12 @@ namespace currency
     bool pos                                  /* = false */,
     const pos_entry& pe                       /* = pos_entry() */,  // only pe.stake_unlock_time and pe.stake_amount are used now, TODO: consider refactoring -- sowle
     tx_generation_context* ogc_ptr            /* = nullptr */,
-    const keypair* tx_one_time_key_to_use     /* = nullptr */
+    const keypair* tx_one_time_key_to_use     /* = nullptr */, 
+    const std::vector<tx_destination_entry>& destinations_ /* = std::vector<tx_destination_entry>() */
   )
   {
+    std::vector<tx_destination_entry> destinations = destinations_;
+
     bool r = false;
 
     if (!get_block_reward(pos, median_size, current_block_size, already_generated_coins, block_reward_without_fee, height))
@@ -379,45 +382,48 @@ namespace currency
     }
     uint64_t block_reward = block_reward_without_fee + fee;
       
-    //
-    // prepare destinations
-    //
-    // 1. split block_reward into out_amounts
-    std::vector<uint64_t> out_amounts;
-    if (tx_version > TRANSACTION_VERSION_PRE_HF4)
+    if (!destinations.size())
     {
-      // randomly split into CURRENCY_TX_MIN_ALLOWED_OUTS outputs for PoW block, or for PoS block only if the stakeholder address differs
-      // (otherwise for PoS miner tx there will be ONE output with amount = stake_amount + reward)
-      if (!pos || miner_address != stakeholder_address)
-        decompose_amount_randomly(block_reward, [&](uint64_t a){ out_amounts.push_back(a); }, CURRENCY_TX_MIN_ALLOWED_OUTS);
-    }
-    else
-    {
-      // non-hidden outs: split into digits
-      decompose_amount_into_digits(block_reward, DEFAULT_DUST_THRESHOLD,
-        [&out_amounts](uint64_t a_chunk) { out_amounts.push_back(a_chunk); },
-        [&out_amounts](uint64_t a_dust) { out_amounts.push_back(a_dust); });
-      CHECK_AND_ASSERT_MES(1 <= max_outs, false, "max_out must be non-zero");
-      while (max_outs < out_amounts.size())
+      //
+      // prepare destinations
+      //
+      // 1. split block_reward into out_amounts
+      std::vector<uint64_t> out_amounts;
+      if (tx_version > TRANSACTION_VERSION_PRE_HF4)
       {
-        out_amounts[out_amounts.size() - 2] += out_amounts.back();
-        out_amounts.resize(out_amounts.size() - 1);
+        // randomly split into CURRENCY_TX_MIN_ALLOWED_OUTS outputs for PoW block, or for PoS block only if the stakeholder address differs
+        // (otherwise for PoS miner tx there will be ONE output with amount = stake_amount + reward)
+        if (!pos || miner_address != stakeholder_address)
+          decompose_amount_randomly(block_reward, [&](uint64_t a) { out_amounts.push_back(a); }, CURRENCY_TX_MIN_ALLOWED_OUTS);
       }
-    }
-    // 2. construct destinations using out_amounts
-    std::vector<tx_destination_entry> destinations;
-    for (auto a : out_amounts)
-    {
-      tx_destination_entry de = AUTO_VAL_INIT(de);
-      de.addr.push_back(miner_address);
-      de.amount = a;
-      de.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // don't use asset id blinding as it's obvious which asset it is
-      if (pe.stake_unlock_time && pe.stake_unlock_time > height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+      else
       {
-        //this means that block is creating after hardfork_1 and unlock_time is needed to set for every destination separately
-        de.unlock_time = height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW;
+        // non-hidden outs: split into digits
+        decompose_amount_into_digits(block_reward, DEFAULT_DUST_THRESHOLD,
+          [&out_amounts](uint64_t a_chunk) { out_amounts.push_back(a_chunk); },
+          [&out_amounts](uint64_t a_dust) { out_amounts.push_back(a_dust); });
+        CHECK_AND_ASSERT_MES(1 <= max_outs, false, "max_out must be non-zero");
+        while (max_outs < out_amounts.size())
+        {
+          out_amounts[out_amounts.size() - 2] += out_amounts.back();
+          out_amounts.resize(out_amounts.size() - 1);
+        }
       }
-      destinations.push_back(de);
+      // 2. construct destinations using out_amounts
+
+      for (auto a : out_amounts)
+      {
+        tx_destination_entry de = AUTO_VAL_INIT(de);
+        de.addr.push_back(miner_address);
+        de.amount = a;
+        de.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // don't use asset id blinding as it's obvious which asset it is
+        if (pe.stake_unlock_time && pe.stake_unlock_time > height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW)
+        {
+          //this means that block is creating after hardfork_1 and unlock_time is needed to set for every destination separately
+          de.unlock_time = height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW;
+        }
+        destinations.push_back(de);
+      }
     }
 
     if (pos)
@@ -2105,7 +2111,7 @@ namespace currency
   {
     crypto::hash h = get_hash_from_POD_objects(CRYPTO_HDS_ASSET_ID, asset_owner);
 
-    // this hash function needs to be computationally expensive (s.e. the whitepaper)
+    // this hash function needs to be computationally expensive (s.a. the whitepaper)
     for(uint64_t i = 0; i < CRYPTO_HASH_ASSET_ID_ITERATIONS; ++i)
       h = get_hash_from_POD_objects(CRYPTO_HDS_ASSET_ID, h, i);
 
@@ -2139,21 +2145,20 @@ namespace currency
   bool construct_tx_handle_ado(const account_keys& sender_account_keys, 
     const finalize_tx_param& ftp, 
     asset_descriptor_operation& ado, 
-    tx_generation_context& gen_context, 
-    const crypto::secret_key& one_time_tx_secret_key, 
+    tx_generation_context& gen_context,
+    const keypair& tx_key,
     std::vector<tx_destination_entry>& shuffled_dsts)
   {
     if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
     {
-      //CHECK_AND_ASSERT_MES(ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER, false, "unsupported asset operation: " << (int)ado.operation_type);
       crypto::secret_key asset_control_key{};
-      bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, one_time_tx_secret_key, asset_control_key, ado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
+      bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, tx_key.sec, asset_control_key, ado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
       CHECK_AND_ASSERT_MES(r, false, "derive_key_pair_from_key_pair failed");
 
       calculate_asset_id(ado.descriptor.owner, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id);
 
       // calculate amount blinding mask
-      gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, asset_control_key);
+      gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, asset_control_key, tx_key.pub);
 
       // set correct asset_id to the corresponding destination entries
       uint64_t amount_of_emitted_asset = 0;
@@ -2169,22 +2174,17 @@ namespace currency
 
       gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
       ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
-
     }
-    else {
+    else
+    {
       if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
       {
-
-        //bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, one_time_tx_secret_key, asset_control_key, ado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
-        //CHECK_AND_ASSERT_MES(r, false, "derive_key_pair_from_key_pair failed");
-
-        //calculate_asset_id(ado.descriptor.owner, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id);
-        CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT/UPDATE");
+        CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT");
 
         gen_context.ao_asset_id = *ado.opt_asset_id;
         gen_context.ao_asset_id_pt.from_public_key(gen_context.ao_asset_id);
         // calculate amount blinding mask
-        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, ftp.asset_control_key);
+        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, ftp.asset_control_key, tx_key.pub);
 
         // set correct asset_id to the corresponding destination entries
         uint64_t amount_of_emitted_asset = 0;
@@ -2196,7 +2196,7 @@ namespace currency
             item.asset_id = gen_context.ao_asset_id;
           }
         }
-        ado.descriptor.current_supply += amount_of_emitted_asset; // TODO: consider setting current_supply beforehand, not setting it hear in ad-hoc manner -- sowle
+        ado.descriptor.current_supply += amount_of_emitted_asset;
 
         gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
         ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
@@ -2204,22 +2204,20 @@ namespace currency
       }
       else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
       {
-        CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT/UPDATE");
-        //CHECK_AND_ASSERT_MES(ado.opt_proof, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMMIT/UPDATE");
-        CHECK_AND_ASSERT_MES(!ado.opt_amount_commitment, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT/UPDATE");
+        CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE");
+        //CHECK_AND_ASSERT_MES(ado.opt_proof, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE");
+        CHECK_AND_ASSERT_MES(!ado.opt_amount_commitment, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE");
 
         //fields that not supposed to be changed?
       }
       else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
       {
-
-        //calculate_asset_id(ado.descriptor.owner, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id);
-        CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT/UPDATE");
+        CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN");
 
         gen_context.ao_asset_id = *ado.opt_asset_id;
         gen_context.ao_asset_id_pt.from_public_key(gen_context.ao_asset_id);
         // calculate amount blinding mask
-        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, ftp.asset_control_key);
+        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, ftp.asset_control_key, tx_key.pub);
         gen_context.ao_commitment_in_outputs = true;
 
         // set correct asset_id to the corresponding destination entries
@@ -2239,7 +2237,7 @@ namespace currency
             amount_of_burned_assets -= item.amount;
           }
         }
-        ado.descriptor.current_supply -= amount_of_burned_assets; // TODO: consider setting current_supply beforehand, not setting it hear in ad-hoc manner -- sowle
+        ado.descriptor.current_supply -= amount_of_burned_assets;
 
         gen_context.ao_amount_commitment = amount_of_burned_assets * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
         ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
@@ -2509,7 +2507,7 @@ namespace currency
       pado = get_type_in_variant_container<asset_descriptor_operation>(tx.extra);
       if (pado)
       {
-        bool r = construct_tx_handle_ado(sender_account_keys, ftp, *pado, gen_context, one_time_tx_secret_key, shuffled_dsts);
+        bool r = construct_tx_handle_ado(sender_account_keys, ftp, *pado, gen_context, txkey, shuffled_dsts);
         CHECK_AND_ASSERT_MES(r, false, "Failed to construct_tx_handle_ado()");
         if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation{ pado });
       }
