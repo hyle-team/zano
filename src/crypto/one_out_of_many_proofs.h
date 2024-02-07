@@ -20,7 +20,14 @@ namespace crypto
   // Disclaimer: shouldn't be used in production code until the security proofs and the code are peer-reviewed.
   //
 
-  // m+2 group elements, m(n-1)+2 field elements
+  // m+2 group elements, m(n-1)+2 field elements.
+  // Assuming fixed n=4, m = log4(ring_sz) the size is (log4(ring_sz) + 2) group elements and (3*log4(ring_sz) + 2) or, in total, (4*log4(ring_sz) + 4) 32-bytes words
+
+  // ring_sz = m (inputs number)
+  // sig_count = k (outputs number)
+  // thus:
+  // k * (log4(m) + 2) group elements and k * (3*log4(m) + 2) field elements 
+
   struct BGE_proof
   {
     public_key A;                  // premultiplied by 1/8
