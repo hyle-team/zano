@@ -10,7 +10,7 @@
 #ifndef TESTNET
 #define CURRENCY_FORMATION_VERSION                      84
 #else
-#define CURRENCY_FORMATION_VERSION                      93
+#define CURRENCY_FORMATION_VERSION                      94
 #endif
 
 #define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121) //bender's nightmare
@@ -273,7 +273,7 @@
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   0
-#define ZANO_HARDFORK_04_AFTER_HEIGHT                   4440  
+#define ZANO_HARDFORK_04_AFTER_HEIGHT                   2440  
 #endif
 
 

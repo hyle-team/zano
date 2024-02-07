@@ -957,10 +957,11 @@ bool test_generator::construct_block_gentime_with_coinbase_cb(const currency::bl
   //size_t current_block_size = get_object_blobsize(miner_tx);
 
   uint64_t block_reward_without_fee = 0;
+  uint64_t block_reward = 0;
 
   currency::keypair tx_sec_key = currency::keypair::generate();
   r = construct_miner_tx(height, epee::misc_utils::median(block_sizes), already_generated_coins, 0 /* current_block_size !HACK! */, 0,
-    acc.get_public_address(), acc.get_public_address(), miner_tx, block_reward_without_fee, get_tx_version(height, m_hardforks), currency::blobdata(), /* max outs: */ 1,
+    acc.get_public_address(), acc.get_public_address(), miner_tx, block_reward_without_fee, block_reward, get_tx_version(height, m_hardforks), currency::blobdata(), /* max outs: */ 1,
     /* pos: */ false, currency::pos_entry(), /* ogc_ptr: */ nullptr, &tx_sec_key);
   CHECK_AND_ASSERT_MES(r, false, "construct_miner_tx failed");
 

@@ -1345,7 +1345,12 @@ bool blockchain_storage::validate_miner_transaction(const block& b,
     return false;
   }
 
-  uint64_t block_reward = base_reward + fee;
+  uint64_t block_reward = base_reward;
+  // before HF4: add tx fee to the block reward; after HF4: burn it
+  if (b.miner_tx.version < TRANSACTION_VERSION_POST_HF4)
+  {
+    block_reward += fee;
+  }
 
   crypto::hash tx_id_for_post_hf4_era = b.miner_tx.version > TRANSACTION_VERSION_PRE_HF4 ? get_transaction_hash(b.miner_tx) : null_hash;
   if (!check_tx_balance(b.miner_tx, tx_id_for_post_hf4_era, block_reward))
@@ -1519,6 +1524,7 @@ bool blockchain_storage::create_block_template(const create_block_template_param
                                                    stakeholder_address,
                                                    b.miner_tx,
                                                    resp.block_reward_without_fee,
+                                                   resp.block_reward,
                                                    get_tx_version(height, m_core_runtime_config.hard_forks),
                                                    ex_nonce, 
                                                    CURRENCY_MINER_TX_MAX_OUTS, 
@@ -6663,6 +6669,10 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     return false;
   }
   bei.already_generated_coins = already_generated_coins - burned_coins + base_reward;
+  if (bei.bl.miner_tx.version >= TRANSACTION_VERSION_POST_HF4)
+  {
+    bei.already_generated_coins -= fee_summary;
+  }
 
   auto blocks_index_ptr = m_db_blocks_index.get(id);
   if (blocks_index_ptr)

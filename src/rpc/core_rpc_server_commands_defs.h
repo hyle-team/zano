@@ -927,6 +927,7 @@ namespace currency
       std::string prev_hash;
       tx_generation_context miner_tx_tgc;
       uint64_t block_reward_without_fee;
+      uint64_t block_reward; // == block_reward_without_fee + txs_fee if fees are given to the miner, OR block_reward_without_fee if fees are burnt
       uint64_t txs_fee;
       std::string status;
 
@@ -938,6 +939,7 @@ namespace currency
         KV_SERIALIZE(prev_hash)
         KV_SERIALIZE(miner_tx_tgc)
         KV_SERIALIZE(block_reward_without_fee)
+        KV_SERIALIZE(block_reward)
         KV_SERIALIZE(txs_fee)
         KV_SERIALIZE(status)
       END_KV_SERIALIZE_MAP()

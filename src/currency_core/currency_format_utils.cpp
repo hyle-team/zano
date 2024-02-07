@@ -361,6 +361,7 @@ namespace currency
     const account_public_address &stakeholder_address,
     transaction& tx,
     uint64_t& block_reward_without_fee,
+    uint64_t& block_reward,
     uint64_t tx_version,
     const blobdata& extra_nonce               /* = blobdata() */,
     size_t max_outs                           /* = CURRENCY_MINER_TX_MAX_OUTS */,
@@ -380,7 +381,13 @@ namespace currency
       LOG_ERROR("Block is too big");
       return false;
     }
-    uint64_t block_reward = block_reward_without_fee + fee;
+
+    block_reward = block_reward_without_fee;
+    // before HF4: add tx fee to the block reward; after HF4: burn it
+    if (tx_version < TRANSACTION_VERSION_POST_HF4)
+    {
+      block_reward += fee;
+    }
       
     if (!destinations.size())
     {

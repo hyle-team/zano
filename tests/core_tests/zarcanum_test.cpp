@@ -812,8 +812,8 @@ bool zarcanum_block_with_txs::generate(std::vector<test_event_entry>& events) co
   // and Alice mines a PoS block with this tx -- so Alice is expected to receive the fee
   MAKE_NEXT_POS_BLOCK_TX1(events, blk_5, blk_4r, alice_acc, alice_stake_sources, tx_3);
 
-  // make sure Alice received both block reward and the fee
-  uint64_t mined_amount_2 = COIN + fee;
+  // make sure Alice received block reward but not received the fee
+  uint64_t mined_amount_2 = COIN /* + fee */;
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, m_alice_balance + mined_amount_2, UINT64_MAX, mined_amount + mined_amount_2, 0, 0));
   m_alice_balance += mined_amount_2;
 
