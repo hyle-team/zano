@@ -380,7 +380,13 @@ namespace currency
       LOG_ERROR("Block is too big");
       return false;
     }
-    uint64_t block_reward = block_reward_without_fee + fee;
+
+    uint64_t block_reward = block_reward_without_fee;
+    // burn fees after HF4 
+    if (tx_version < TRANSACTION_VERSION_POST_HF4)
+    {
+      block_reward += fee;
+    }
       
     if (!destinations.size())
     {
