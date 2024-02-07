@@ -1346,7 +1346,7 @@ bool blockchain_storage::validate_miner_transaction(const block& b,
   }
 
   uint64_t block_reward = base_reward;
-  // we burn fees after hardfork 4
+  // before HF4: add tx fee to the block reward; after HF4: burn it
   if (b.miner_tx.version < TRANSACTION_VERSION_POST_HF4)
   {
     block_reward += fee;
@@ -1524,6 +1524,7 @@ bool blockchain_storage::create_block_template(const create_block_template_param
                                                    stakeholder_address,
                                                    b.miner_tx,
                                                    resp.block_reward_without_fee,
+                                                   resp.block_reward,
                                                    get_tx_version(height, m_core_runtime_config.hard_forks),
                                                    ex_nonce, 
                                                    CURRENCY_MINER_TX_MAX_OUTS, 

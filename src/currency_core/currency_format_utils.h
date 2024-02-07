@@ -274,6 +274,7 @@ namespace currency
                                                              const account_public_address &stakeholder_address,
                                                              transaction& tx,
                                                              uint64_t& block_reward_without_fee,
+                                                             uint64_t& block_reward,
                                                              uint64_t tx_version,
                                                              const blobdata& extra_nonce            = blobdata(), 
                                                              size_t max_outs                        = CURRENCY_MINER_TX_MAX_OUTS, 

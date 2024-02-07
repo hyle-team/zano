@@ -4601,8 +4601,7 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   set_block_datetime(current_timestamp, b);
   WLT_LOG_MAGENTA("Applying actual timestamp: " << current_timestamp, LOG_LEVEL_2);
 
-  uint64_t full_block_reward = tmpl_rsp.block_reward_without_fee + tmpl_rsp.txs_fee;
-  res = prepare_and_sign_pos_block(cxt, full_block_reward, tmpl_req.pe, tmpl_rsp.miner_tx_tgc, b);
+  res = prepare_and_sign_pos_block(cxt, tmpl_rsp.block_reward, tmpl_req.pe, tmpl_rsp.miner_tx_tgc, b);
   WLT_CHECK_AND_ASSERT_MES(res, false, "Failed to prepare_and_sign_pos_block");
 
   crypto::hash block_hash = get_block_hash(b);

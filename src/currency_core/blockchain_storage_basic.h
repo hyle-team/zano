@@ -148,6 +148,7 @@ namespace currency
     uint64_t height;
     tx_generation_context miner_tx_tgc; // bad design, a lot of copying, consider redesign -- sowle
     uint64_t block_reward_without_fee;
+    uint64_t block_reward;   // == block_reward_without_fee + txs_fee if fees are given to the miner, OR block_reward_without_fee if fees are burnt
     uint64_t txs_fee; // sum of transactions' fee if any
   };
 
