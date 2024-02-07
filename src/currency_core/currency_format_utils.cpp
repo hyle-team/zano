@@ -590,9 +590,8 @@ namespace currency
     else
     {
       // make sure that amount commitment corresponds to opt_amount_commitment_g_proof
-      CHECK_AND_ASSERT_MES(context.ado.opt_amount_commitment.has_value(), false, "opt_amount_commitment is absent");
       CHECK_AND_ASSERT_MES(aop.opt_amount_commitment_g_proof.has_value(), false, "opt_amount_commitment_g_proof is absent");
-      crypto::point_t A = crypto::point_t(context.ado.opt_amount_commitment.get()).modify_mul8() - context.amount_to_validate * context.asset_id_pt;
+      crypto::point_t A = crypto::point_t(context.ado.amount_commitment).modify_mul8() - context.amount_to_validate * context.asset_id_pt;
 
       bool r = crypto::check_signature(context.tx_id, A.to_public_key(), aop.opt_amount_commitment_g_proof.get());
       CHECK_AND_ASSERT_MES(r, false, "opt_amount_commitment_g_proof check failed");
@@ -647,13 +646,11 @@ namespace currency
         if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
         {
           // opt_amount_commitment supposed to be validated earlier in validate_asset_operation()
-          CHECK_AND_ASSERT_MES(ado.opt_amount_commitment.has_value(), false, "opt_amount_commitment is not set");
-          sum_of_pseudo_out_amount_commitments += crypto::point_t(ado.opt_amount_commitment.get()); // *1/8
+          sum_of_pseudo_out_amount_commitments += crypto::point_t(ado.amount_commitment); // *1/8
         }
         else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
         {
-          CHECK_AND_ASSERT_MES(ado.opt_amount_commitment.has_value(), false, "opt_amount_commitment is not set");
-          outs_commitments_sum += crypto::point_t(ado.opt_amount_commitment.get()); // *1/8
+          outs_commitments_sum += crypto::point_t(ado.amount_commitment); // *1/8
         }
       }
       size_t zc_sigs_count = 0;
@@ -2180,7 +2177,7 @@ namespace currency
       ado.descriptor.current_supply = amount_of_emitted_asset; // TODO: consider setting current_supply beforehand, not setting it hear in ad-hoc manner -- sowle
 
       gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
-      ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
+      ado.amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
     }
     else
     {
@@ -2206,14 +2203,13 @@ namespace currency
         ado.descriptor.current_supply += amount_of_emitted_asset;
 
         gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
-        ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
+        ado.amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
 
       }
       else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
       {
         CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE");
         //CHECK_AND_ASSERT_MES(ado.opt_proof, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE");
-        CHECK_AND_ASSERT_MES(!ado.opt_amount_commitment, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE");
 
         //fields that not supposed to be changed?
       }
@@ -2247,7 +2243,7 @@ namespace currency
         ado.descriptor.current_supply -= amount_of_burned_assets;
 
         gen_context.ao_amount_commitment = amount_of_burned_assets * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
-        ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
+        ado.amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
       }
 
       if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation_before_seal{ &ado });

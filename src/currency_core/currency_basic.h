@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2014-2015 The Boolberry developers
@@ -771,15 +771,15 @@ namespace currency
   {
     uint8_t                         operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
     asset_descriptor_base           descriptor;
-    boost::optional<crypto::public_key> opt_amount_commitment; // premultiplied by 1/8         TODO: make it non-optional, as it must always be present -- sowle
-    boost::optional<crypto::signature> opt_proof; // operation proof - for update/emit
-    boost::optional<crypto::public_key> opt_asset_id; // target asset_id - for update/emit
+    crypto::public_key              amount_commitment;     // premultiplied by 1/8
+    boost::optional<crypto::signature> opt_proof;          // operation proof - for update/emit
+    boost::optional<crypto::public_key> opt_asset_id;      // target asset_id - for update/emit
     uint8_t verion = ASSET_DESCRIPTOR_OPERATION_STRUCTURE_VER;
 
     BEGIN_VERSIONED_SERIALIZE(ASSET_DESCRIPTOR_OPERATION_STRUCTURE_VER, verion)
       FIELD(operation_type)
       FIELD(descriptor)
-      FIELD(opt_amount_commitment)
+      FIELD(amount_commitment)
       END_VERSION_UNDER(1)
       FIELD(opt_proof)
       FIELD(opt_asset_id)
@@ -788,7 +788,7 @@ namespace currency
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(operation_type)
       BOOST_SERIALIZE(descriptor)
-      BOOST_SERIALIZE(opt_amount_commitment)
+      BOOST_SERIALIZE(amount_commitment)
       BOOST_END_VERSION_UNDER(1)
       BOOST_SERIALIZE(opt_proof)
       BOOST_SERIALIZE(opt_asset_id)
