@@ -793,6 +793,7 @@ namespace currency
       uint64_t minimum_fee;
       uint64_t last_block_timestamp;
       std::string last_block_hash;
+      std::vector<bool> is_hardfok_active;
       //market
       uint64_t offers_count;
 
@@ -843,6 +844,7 @@ namespace currency
         KV_SERIALIZE(minimum_fee)
         KV_SERIALIZE(last_block_timestamp)
         KV_SERIALIZE(last_block_hash)
+        KV_SERIALIZE(is_hardfok_active)
         KV_SERIALIZE(offers_count)
       END_KV_SERIALIZE_MAP()
     };
