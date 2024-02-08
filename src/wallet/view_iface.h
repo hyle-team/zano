@@ -35,10 +35,12 @@ namespace view
   {
     std::string address;
     std::string amount;
+    crypto::public_key asset_id;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(address)
       KV_SERIALIZE(amount)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -197,58 +199,19 @@ public:
       wallet_state_error = 3
     };
 
-    uint64_t balance;
-    uint64_t unlocked_balance;
-    uint64_t awaiting_in;
-    uint64_t awaiting_out;
+    std::list<tools::wallet_public::asset_balance_entry> balances;
     uint64_t minied_total;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_CHAIN_BASE(wallet_status_info_base)
-      KV_SERIALIZE(balance)
-      KV_SERIALIZE(unlocked_balance)
-      KV_SERIALIZE(awaiting_in)
-      KV_SERIALIZE(awaiting_out)
+      KV_SERIALIZE(balances)
       KV_SERIALIZE(minied_total)
     END_KV_SERIALIZE_MAP()
   };  
   
-  struct wallet_info
-  {
-    uint64_t unlocked_balance;
-    uint64_t balance;
-		uint64_t mined_total;
-    std::string address;
-    std::string view_sec_key;
-    std::string path;
-    bool is_auditable;
-    bool is_watch_only;
-
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(unlocked_balance)
-      KV_SERIALIZE(balance)
-			KV_SERIALIZE(mined_total)			
-      KV_SERIALIZE(address)
-      KV_SERIALIZE(view_sec_key)
-      KV_SERIALIZE(path)
-      KV_SERIALIZE(is_auditable);
-      KV_SERIALIZE(is_watch_only);
-    END_KV_SERIALIZE_MAP()
-  };
-
-
-
-  struct wallet_entry_info
-  {
-    wallet_info wi;
-    uint64_t    wallet_id;
-
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(wi)
-      KV_SERIALIZE(wallet_id)
-    END_KV_SERIALIZE_MAP()
-
-  };
+  typedef tools::wallet_public::wallet_info wallet_info;
+  typedef tools::wallet_public::wallet_info_extra wallet_info_extra;
+  typedef tools::wallet_public::wallet_entry_info wallet_entry_info;
 
 
 
@@ -383,16 +346,14 @@ public:
   struct transfer_event_info
   {
     tools::wallet_public::wallet_transfer_info ti;
-    uint64_t unlocked_balance;
-    uint64_t balance;
+    std::list<tools::wallet_public::asset_balance_entry> balances; 
 		uint64_t total_mined;
     uint64_t wallet_id;
     bool is_wallet_in_sync_process;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(ti)
-      KV_SERIALIZE(unlocked_balance)
-			KV_SERIALIZE(balance)
+      KV_SERIALIZE(balances)
 			KV_SERIALIZE(total_mined)
       KV_SERIALIZE(wallet_id)
       KV_SERIALIZE(is_wallet_in_sync_process)
@@ -432,10 +393,10 @@ public:
 
   struct get_recent_transfers_request
   {
-    uint64_t wallet_id;
-    uint64_t offset;
-    uint64_t count;
-    bool exclude_mining_txs;
+    uint64_t wallet_id = 0;
+    uint64_t offset = 0;
+    uint64_t count = 0;
+    bool exclude_mining_txs = false;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
@@ -445,9 +406,20 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
+  struct wallet_and_asset_id
+  {
+    uint64_t wallet_id = 0;
+    crypto::public_key asset_id = currency::null_pkey;
+    
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wallet_id)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
+    END_KV_SERIALIZE_MAP()
+  };
+
   struct reset_pass_request
   {
-    uint64_t wallet_id;
+    uint64_t wallet_id = 0;
     std::string pass;
 
     BEGIN_KV_SERIALIZE_MAP()
@@ -600,6 +572,18 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
+  struct current_action_status
+  {
+    uint64_t wallet_id;
+    std::string status;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wallet_id)
+      KV_SERIALIZE(status)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
   struct wallet_sync_status_info
   {
     bool is_daemon_connected;
@@ -607,6 +591,7 @@ public:
     bool is_in_long_refresh;
     uint64_t progress;
     uint64_t current_daemon_height;
+    uint64_t current_wallet_height;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(is_daemon_connected)
@@ -614,6 +599,7 @@ public:
       KV_SERIALIZE(is_in_long_refresh)
       KV_SERIALIZE(progress)
       KV_SERIALIZE(current_daemon_height)
+      KV_SERIALIZE(current_wallet_height)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -671,13 +657,10 @@ public:
 
   };
 
-
-
   struct wallet_and_contract_id_param
   {
     uint64_t wallet_id;
     crypto::hash contract_id;
-
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
@@ -727,6 +710,11 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
+
+  typedef tools::wallet_public::asset_funds asset_funds;
+  typedef tools::wallet_public::ionic_swap_proposal_info ionic_swap_proposal_info;
+  typedef tools::wallet_public::create_ionic_swap_proposal_request create_ionic_swap_proposal_request;
+
   struct address_validation_response
   {
     std::string error_code;
@@ -742,9 +730,11 @@ public:
   struct gui_options
   {
     bool use_debug_mode;
+    bool disable_price_fetch;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(use_debug_mode)
+      KV_SERIALIZE(disable_price_fetch)
     END_KV_SERIALIZE_MAP()
 
   };
@@ -828,6 +818,7 @@ public:
     virtual bool pos_block_found(const currency::block& block_found){ return true; }
     virtual bool money_transfer_cancel(const transfer_event_info& wsi){ return true; }
     virtual bool set_options(const gui_options& opt){ return true; }
+    virtual bool update_tor_status(const current_action_status & opt) { return true; }
   };
 
 }

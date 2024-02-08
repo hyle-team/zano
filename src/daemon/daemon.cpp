@@ -125,7 +125,7 @@ int main(int argc, char* argv[])
 #endif
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
   log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
-  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,wallet");
+  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,wallet", false);
   LOG_PRINT_L0("Starting...");
 
   tools::signal_handler::install_fatal([](int sig_number, void* address) {
@@ -146,7 +146,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_only, command_line::arg_version);
   command_line::add_arg(desc_cmd_only, command_line::arg_os_version);
   // tools::get_default_data_dir() can't be called during static initialization
-  command_line::add_arg(desc_cmd_only, command_line::arg_data_dir, tools::get_default_data_dir());
+  command_line::add_arg(desc_cmd_sett, command_line::arg_data_dir, tools::get_default_data_dir());
   command_line::add_arg(desc_cmd_only, command_line::arg_stop_after_height);
   command_line::add_arg(desc_cmd_only, command_line::arg_config_file);
   command_line::add_arg(desc_cmd_only, command_line::arg_disable_upnp);
@@ -154,8 +154,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_dir);
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_level);
   command_line::add_arg(desc_cmd_sett, command_line::arg_console);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_show_details);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_show_rpc_autodoc);
+  command_line::add_arg(desc_cmd_only, command_line::arg_show_details);
+  command_line::add_arg(desc_cmd_only, command_line::arg_show_rpc_autodoc);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_stop_if_time_out_of_sync);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_stop_on_low_free_space);
   command_line::add_arg(desc_cmd_sett, command_line::arg_enable_offers_service);
@@ -164,10 +164,11 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_sett, command_line::arg_force_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_disable_ntp);
 
 
   arg_market_disable.default_value = true;
-  arg_market_disable.not_use_default = false;
+  arg_market_disable.use_default = true;
 
   currency::core::init_options(desc_cmd_sett);
   currency::core_rpc_server::init_options(desc_cmd_sett);

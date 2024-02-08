@@ -23,6 +23,7 @@ namespace currency
     , m_last_median2local_time_difference(0)
     , m_last_ntp2local_time_difference(0)
     , m_debug_ip_address(0)
+    , m_disable_ntp(false)
   {
     if(!m_p2p)
       m_p2p = &m_p2p_stub;
@@ -38,6 +39,8 @@ namespace currency
   bool t_currency_protocol_handler<t_core>::init(const boost::program_options::variables_map& vm)
   {
     m_relay_que_thread = std::thread([this](){relay_que_worker();});
+    if (command_line::has_arg(vm, command_line::arg_disable_ntp))
+      m_disable_ntp = command_line::get_arg(vm, command_line::arg_disable_ntp);
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------  
@@ -104,7 +107,7 @@ namespace currency
       std::stringstream conn_ss;
       time_t livetime = time(NULL) - cntxt.m_started;
       conn_ss << std::setw(29) << std::left << std::string(cntxt.m_is_income ? "[INC]":"[OUT]") + 
-        string_tools::get_ip_string_from_int32(cntxt.m_remote_ip) + ":" + std::to_string(cntxt.m_remote_port) 
+        epst::get_ip_string_from_int32(cntxt.m_remote_ip) + ":" + std::to_string(cntxt.m_remote_port) 
         << std::setw(20) << std::hex << peer_id
         << std::setw(25) << std::to_string(cntxt.m_recv_cnt)+ "(" + std::to_string(time(NULL) - cntxt.m_last_recv) + ")" + "/" + std::to_string(cntxt.m_send_cnt) + "(" + std::to_string(time(NULL) - cntxt.m_last_send) + ")"
         << std::setw(25) << get_protocol_state_string(cntxt.m_state)
@@ -366,45 +369,79 @@ namespace currency
   }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core> 
-  int t_currency_protocol_handler<t_core>::handle_notify_new_transactions(int command, NOTIFY_NEW_TRANSACTIONS::request& arg, currency_connection_context& context)
+  int t_currency_protocol_handler<t_core>::handle_notify_new_transactions(int command, NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& arg, currency_connection_context& context)
+  {
+    NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::response rsp_dummy = AUTO_VAL_INIT(rsp_dummy);
+    return this->handle_new_transaction_from_net(arg, rsp_dummy, context, true);
+  }
+  //------------------------------------------------------------------------------------------------------------------------
+  template<class t_core>
+  int t_currency_protocol_handler<t_core>::handle_invoke_new_transaction(int command, NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& req, NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::response& rsp, currency_connection_context& context)
+  {
+    return this->handle_new_transaction_from_net(req, rsp, context, false);
+  }
+  //------------------------------------------------------------------------------------------------------------------------
+  template<class t_core>
+  int t_currency_protocol_handler<t_core>::handle_new_transaction_from_net(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& arg, NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::response& rsp, currency_connection_context& context, bool is_notify)
   {
     //do not process requests if it comes from node wich is debugged
     if (m_debug_ip_address != 0 && context.m_remote_ip == m_debug_ip_address)
+    {
+      rsp.code = API_RETURN_CODE_ACCESS_DENIED;
       return 1;
+    }
 
-    if(context.m_state != currency_connection_context::state_normal)
+    //if(context.m_state != currency_connection_context::state_normal)
+    //  return 1;
+    if (!this->is_synchronized())
+    {
+      rsp.code = API_RETURN_CODE_BUSY;
       return 1;
+    }
+
+
     uint64_t inital_tx_count = arg.txs.size();
+
+    if (inital_tx_count > CURRENCY_RELAY_TXS_MAX_COUNT)
+    {
+      LOG_PRINT_L1("NOTIFY_NEW_TRANSACTIONS: To many transactions in NOTIFY_OR_INVOKE_NEW_TRANSACTIONS(" << inital_tx_count << ")");
+      rsp.code = API_RETURN_CODE_OVERFLOW;
+      return 1;
+    }
+
     TIME_MEASURE_START_MS(new_transactions_handle_time);
-    for(auto tx_blob_it = arg.txs.begin(); tx_blob_it!=arg.txs.end();)
+    for (auto tx_blob_it = arg.txs.begin(); tx_blob_it != arg.txs.end();)
     {
       currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
 
       m_core.handle_incoming_tx(*tx_blob_it, tvc, false);
-      if(tvc.m_verification_failed)
+      if (tvc.m_verification_failed)
       {
         LOG_PRINT_L0("NOTIFY_NEW_TRANSACTIONS: Tx verification failed, dropping connection");
-        m_p2p->drop_connection(context);
-
+        if(is_notify)
+          m_p2p->drop_connection(context);
+        else 
+          rsp.code = API_RETURN_CODE_FAIL;
         return 1;
       }
-      if(tvc.m_should_be_relayed)
+      if (tvc.m_should_be_relayed)
         ++tx_blob_it;
       else
         arg.txs.erase(tx_blob_it++);
     }
 
-    if(arg.txs.size())
+    if (arg.txs.size())
     {
       //TODO: add announce usage here
       relay_transactions(arg, context);
     }
     TIME_MEASURE_FINISH_MS(new_transactions_handle_time);
 
-    LOG_PRINT_L2("NOTIFY_NEW_TRANSACTIONS: " << new_transactions_handle_time << "ms (inital_tx_count: " << inital_tx_count << ", relayed_tx_count: " << arg.txs.size() << ")");
-
-    return true;
+    LOG_PRINT_L2("NOTIFY_OR_INVOKE_NEW_TRANSACTIONS(is_notify=" << is_notify <<"): " << new_transactions_handle_time << "ms (inital_tx_count: " << inital_tx_count << ", relayed_tx_count: " << arg.txs.size() << ")");
+    rsp.code = API_RETURN_CODE_OK;
+    return 1;
   }
+
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core> 
   int t_currency_protocol_handler<t_core>::handle_request_get_objects(int command, NOTIFY_REQUEST_GET_OBJECTS::request& arg, currency_connection_context& context)
@@ -486,7 +523,7 @@ namespace currency
       if(!parse_and_validate_block_from_blob(block_entry.block, b))
       {
         LOG_ERROR_CCONTEXT("sent wrong block: failed to parse and validate block: \r\n" 
-          << string_tools::buff_to_hex_nodelimer(block_entry.block) << "\r\n dropping connection");
+          << epst::buff_to_hex_nodelimer(block_entry.block) << "\r\n dropping connection");
         m_p2p->drop_connection(context);
         m_p2p->add_ip_fail(context.m_remote_ip);
         return 1;
@@ -510,20 +547,22 @@ namespace currency
       auto req_it = context.m_priv.m_requested_objects.find(get_block_hash(b));
       if(req_it == context.m_priv.m_requested_objects.end())
       {
-        LOG_ERROR_CCONTEXT("sent wrong NOTIFY_RESPONSE_GET_OBJECTS: block with id=" << string_tools::pod_to_hex(get_blob_hash(block_entry.block)) 
+        LOG_ERROR_CCONTEXT("sent wrong NOTIFY_RESPONSE_GET_OBJECTS: block with id=" << epst::pod_to_hex(get_blob_hash(block_entry.block)) 
           << " wasn't requested, dropping connection");
         m_p2p->drop_connection(context);
         return 1;
       }
       if(b.tx_hashes.size() != block_entry.txs.size()) 
       {
-        LOG_ERROR_CCONTEXT("sent wrong NOTIFY_RESPONSE_GET_OBJECTS: block with id=" << string_tools::pod_to_hex(get_blob_hash(block_entry.block)) 
+        LOG_ERROR_CCONTEXT("sent wrong NOTIFY_RESPONSE_GET_OBJECTS: block with id=" << epst::pod_to_hex(get_blob_hash(block_entry.block)) 
           << ", tx_hashes.size()=" << b.tx_hashes.size() << " mismatch with block_complete_entry.m_txs.size()=" << block_entry.txs.size() << ", dropping connection");
         m_p2p->drop_connection(context);
         return 1;
       }
 
       context.m_priv.m_requested_objects.erase(req_it);
+
+      LOG_PRINT_L4("[NOTIFY_RESPONSE_GET_OBJECTS] BLOCK " << get_block_hash(b) << "[" << get_block_height(b) << "/" << count << "], txs: " << b.tx_hashes.size());
     }
 
     LOG_PRINT_CYAN("Block parsing time avr: " << (count > 0 ? total_blocks_parsing_time / count : 0) << " mcs, total for " << count << " blocks: " << total_blocks_parsing_time / 1000 << " ms", LOG_LEVEL_2);
@@ -538,29 +577,31 @@ namespace currency
 
     {
       m_core.pause_mine();
-      misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler(
+      epee::misc_utils::auto_scope_leave_caller scope_exit_handler = epee::misc_utils::create_scope_leave_handler(
         boost::bind(&t_core::resume_mine, &m_core));
       size_t count = 0;
       for (const block_complete_entry& block_entry : arg.blocks)
       {
         CHECK_STOP_FLAG__DROP_AND_RETURN_IF_SET(1, "Blocks processing interrupted, connection dropped");
-
         block_verification_context bvc = boost::value_initialized<block_verification_context>();
         //process transactions
+        size_t count_txs = 0;
         TIME_MEASURE_START(transactions_process_time);
         for (const auto& tx_blob : block_entry.txs)
         {
+          LOG_PRINT_L4("[NOTIFY_RESPONSE_GET_OBJECTS] BL/TX ["<< count << "/" << count_txs << "]: " << epst::buff_to_hex_nodelimer(tx_blob));
           CHECK_STOP_FLAG__DROP_AND_RETURN_IF_SET(1, "Block txs processing interrupted, connection dropped");
           crypto::hash tx_id = null_hash;
           transaction tx = AUTO_VAL_INIT(tx);
           if (!parse_and_validate_tx_from_blob(tx_blob, tx, tx_id))
           {
             LOG_ERROR_CCONTEXT("failed to parse tx: " 
-              << string_tools::pod_to_hex(get_blob_hash(tx_blob)) << ", dropping connection");
+              << epst::pod_to_hex(get_blob_hash(tx_blob)) << ", dropping connection");
             m_p2p->drop_connection(context);
             return 1;
           }
           bvc.m_onboard_transactions[tx_id] = tx;
+          count_txs++;
 //           tx_verification_context tvc = AUTO_VAL_INIT(tvc);
 //           m_core.handle_incoming_tx(tx_blob, tvc, true);
 //           if(tvc.m_verification_failed)
@@ -705,7 +746,7 @@ namespace currency
                            << "\r\nm_remote_blockchain_height=" << context.m_remote_blockchain_height
                            << "\r\nm_needed_objects.size()=" << context.m_priv.m_needed_objects.size()
                            << "\r\nm_requested_objects.size()=" << context.m_priv.m_requested_objects.size()
-                           << "\r\non connection [" << net_utils::print_connection_context_short(context)<< "]");
+                           << "\r\non connection [" << epee::net_utils::print_connection_context_short(context)<< "]");
       
       context.m_state = currency_connection_context::state_normal;
       LOG_PRINT_GREEN("[REQUEST_MISSING_OBJECTS]: SYNCHRONIZED OK", LOG_LEVEL_0);
@@ -753,7 +794,7 @@ namespace currency
     m_p2p->get_connections(connections);
     for (auto& cc : connections)
     {
-      NOTIFY_NEW_TRANSACTIONS::request req = AUTO_VAL_INIT(req);
+      NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request req = AUTO_VAL_INIT(req);
       for (auto& qe : que)
       {
         //exclude relaying to original sender
@@ -763,7 +804,7 @@ namespace currency
       }
       if (req.txs.size())
       {
-        post_notify<NOTIFY_NEW_TRANSACTIONS>(req, cc);
+        post_notify<NOTIFY_OR_INVOKE_NEW_TRANSACTIONS>(req, cc);
 
         if (debug_ss.tellp())
           debug_ss << ", ";
@@ -834,6 +875,12 @@ namespace currency
     LOG_PRINT_MAGENTA("TIME: network time difference is " << m_last_median2local_time_difference << " (max is " << TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE << ")", ((m_last_median2local_time_difference >= 3) ? LOG_LEVEL_2 : LOG_LEVEL_3));
     if (std::abs(m_last_median2local_time_difference) > TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE)
     {
+      // treat as error getting ntp time
+      if (m_disable_ntp)
+      {
+        LOG_PRINT_RED("TIME: network time difference is " << m_last_median2local_time_difference << " (max is " << TIME_SYNC_DELTA_TO_LOCAL_MAX_DIFFERENCE << ") while NTP is disabled", LOG_LEVEL_0);
+        return false;
+      }
       int64_t ntp_time = tools::get_ntp_time();
       LOG_PRINT_L2("NTP: received time " << ntp_time << " (" << epee::misc_utils::get_time_str_v2(ntp_time) << "), diff: " << std::showpos << get_core_time() - ntp_time);
       if (ntp_time == 0)
@@ -876,7 +923,7 @@ namespace currency
   void t_currency_protocol_handler<t_core>::set_to_debug_mode(uint32_t ip)
   {
     m_debug_ip_address = ip;
-    LOG_PRINT_L0("debug mode is set for IP " << epee::string_tools::get_ip_string_from_int32(m_debug_ip_address));
+    LOG_PRINT_L0("debug mode is set for IP " << epst::get_ip_string_from_int32(m_debug_ip_address));
   }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core> 
@@ -901,7 +948,7 @@ namespace currency
     if(!m_core.have_block(arg.m_block_ids.front().h))
     {
       LOG_ERROR_CCONTEXT("sent m_block_ids starting from unknown id: "
-                                              << string_tools::pod_to_hex(arg.m_block_ids.front()) << " , dropping connection");
+                                              << epst::pod_to_hex(arg.m_block_ids.front()) << " , dropping connection");
       m_p2p->drop_connection(context);
       m_p2p->add_ip_fail(context.m_remote_ip);
       return 1;
@@ -935,7 +982,7 @@ namespace currency
   }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core> 
-  bool t_currency_protocol_handler<t_core>::relay_transactions(NOTIFY_NEW_TRANSACTIONS::request& arg, currency_connection_context& exclude_context)
+  bool t_currency_protocol_handler<t_core>::relay_transactions(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& arg, currency_connection_context& exclude_context)
     {
 #ifdef ASYNC_RELAY_MODE
     {
@@ -947,7 +994,7 @@ namespace currency
     //m_relay_que_cv.notify_all();
     return true;
 #else 
-    return relay_post_notify<NOTIFY_NEW_TRANSACTIONS>(arg, exclude_context);
+    return relay_post_notify<NOTIFY_OR_INVOKE_NEW_TRANSACTIONS>(arg, exclude_context);
 #endif
   }
 }

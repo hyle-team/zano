@@ -45,6 +45,7 @@ struct hard_fork_1_pos_and_locked_coins : public hard_fork_1_base_test
   bool generate(std::vector<test_event_entry>& events) const;
 
   bool check_outputs_with_unique_amount(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  uint64_t starter_timestamp = 1564434640;
 };
 
 struct hard_fork_1_pos_locked_height_vs_time : public hard_fork_1_base_test

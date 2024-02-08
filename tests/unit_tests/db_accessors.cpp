@@ -105,7 +105,9 @@ struct naive_median
     if (m_items.empty())
       return;
     if (fee_to_check != UINT64_MAX)
+    {
       ASSERT_EQ(m_items.back().first, fee_to_check);
+    }
 
     m_items.pop_back();
   }

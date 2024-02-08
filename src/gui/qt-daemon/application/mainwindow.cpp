@@ -18,6 +18,7 @@
 #define PREPARE_ARG_FROM_JSON(arg_type, var_name)   \
   arg_type var_name = AUTO_VAL_INIT(var_name); \
   view::api_response default_ar = AUTO_VAL_INIT(default_ar);  \
+  LOG_PRINT_BLUE("[REQUEST]: " << param.toStdString(), LOG_LEVEL_3); \
 if (!epee::serialization::load_t_from_json(var_name, param.toStdString())) \
 { \
   default_ar.error_code = API_RETURN_CODE_BAD_ARG;                 \
@@ -28,6 +29,7 @@ template<typename T>
 QString make_response(const T& r)
 {
   std::string str = epee::serialization::store_t_to_json(r);
+  LOG_PRINT_BLUE("[RESPONSE]: " << str, LOG_LEVEL_3);
   return str.c_str();
 }
 
@@ -100,6 +102,7 @@ MainWindow::MainWindow()
   , m_system_shutdown(false)
   , m_view(nullptr)
   , m_channel(nullptr)
+  , m_ui_dispatch_id_counter(0)
 {
 #ifndef _MSC_VER
   //workaround for macos broken tolower from std, very dirty hack
@@ -121,6 +124,10 @@ MainWindow::~MainWindow()
     delete m_channel;
     m_channel = nullptr;
   }
+  if (m_ipc_worker.joinable())
+  {
+    m_ipc_worker.join();
+  }
 }
 
 void MainWindow::on_load_finished(bool ok)
@@ -137,6 +144,8 @@ bool MainWindow::init_window()
   m_view->page()->setWebChannel(m_channel);
 
   QWidget* central_widget_to_be_set = m_view;
+  double zoom_factor_test = 0.75;
+  m_view->setZoomFactor(zoom_factor_test);
 
   std::string qt_dev_tools_option = m_backend.get_qt_dev_tools_option();
   if (!qt_dev_tools_option.empty())
@@ -260,7 +269,28 @@ QString MainWindow::request_dummy()
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
+QString MainWindow::call_rpc(const QString& params)
+{
+  TRY_ENTRY();
+  epee::net_utils::http::http_request_info query_info = AUTO_VAL_INIT(query_info);
+  epee::net_utils::http::http_response_info response_info  = AUTO_VAL_INIT(response_info);
+  currency::core_rpc_server::connection_context dummy_context = AUTO_VAL_INIT(dummy_context);
 
+  query_info.m_URI = "/json_rpc";
+  query_info.m_body = params.toStdString();
+
+  m_backend.get_rpc_server().handle_http_request(query_info, response_info, dummy_context);
+  if (response_info.m_response_code != 200)
+  {
+    epee::json_rpc::error_response rsp; 
+    rsp.jsonrpc = "2.0"; 
+    rsp.error.code = response_info.m_response_code;
+    rsp.error.message = response_info.m_response_comment;
+    return QString::fromStdString(epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(rsp)));
+  }
+  return QString::fromStdString(response_info.m_body);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
 QString MainWindow::get_default_fee()
 {
   TRY_ENTRY();
@@ -387,9 +417,9 @@ void MainWindow::changeEvent(QEvent *e)
 bool MainWindow::store_app_config()
 {
   TRY_ENTRY();
-  std::string conf_path = m_backend.get_config_folder() + "/" + GUI_INTERNAL_CONFIG;
-  LOG_PRINT_L0("storing gui internal config from " << conf_path);
-  CHECK_AND_ASSERT_MES(tools::serialize_obj_to_file(m_config, conf_path), false, "failed to store gui internal config");
+  std::string conf_path = m_backend.get_config_folder() + "/" + GUI_INTERNAL_CONFIG2;
+  LOG_PRINT_L0("storing gui internal config to " << conf_path);
+  CHECK_AND_ASSERT_MES(epee::serialization::store_t_to_json_file(m_config, conf_path), false, "failed to store gui internal config");
   return true;
   CATCH_ENTRY2(false);
 }
@@ -397,9 +427,9 @@ bool MainWindow::store_app_config()
 bool MainWindow::load_app_config()
 {
   TRY_ENTRY();
-  std::string conf_path = m_backend.get_config_folder() + "/" + GUI_INTERNAL_CONFIG;
+  std::string conf_path = m_backend.get_config_folder() + "/" + GUI_INTERNAL_CONFIG2;
   LOG_PRINT_L0("loading gui internal config from " << conf_path);
-  bool r = tools::unserialize_obj_from_file(m_config, conf_path);
+  bool r = epee::serialization::load_t_from_json_file(m_config, conf_path);
   LOG_PRINT_L0("gui internal config " << (r ? "loaded ok" : "was not loaded"));
   return r;
   CATCH_ENTRY2(false);
@@ -411,7 +441,7 @@ bool MainWindow::init(const std::string& html_path)
   //QtWebEngine::initialize();
   init_tray_icon(html_path);
   set_html_path(html_path);
-
+  m_threads_pool.init(2);
   m_backend.subscribe_to_core_events(this);
 
   bool r = QSslSocket::supportsSsl();
@@ -542,29 +572,43 @@ void MainWindow::store_pos(bool consider_showed)
 void MainWindow::restore_pos(bool consider_showed)
 {
   TRY_ENTRY();
-  if (m_config.is_maximazed)
-  {
-    this->setWindowState(windowState() | Qt::WindowMaximized);
-  }
-  else
-  {
-
-    QPoint pos;
-    QSize sz;
-    pos.setX(m_config.m_window_position.first);
-    pos.setY(m_config.m_window_position.second);
-    sz.setHeight(m_config.m_window_size.first);
-    sz.setWidth(m_config.m_window_size.second);
-    this->move(pos);
-    this->resize(sz);
-  }
-
   if (consider_showed)
   {
     if (m_config.is_showed)
       this->showNormal();
     else
       this->showMinimized();
+  }
+
+  if (m_config.is_maximazed)
+  {
+    this->setWindowState(windowState() | Qt::WindowMaximized);
+  }
+  else
+  {
+    QPoint point = QApplication::desktop()->screenGeometry().bottomRight();
+    if (m_config.m_window_position.first + m_config.m_window_size.second > point.x() ||
+      m_config.m_window_position.second + m_config.m_window_size.first > point.y()
+      )
+    {
+      QSize sz = AUTO_VAL_INIT(sz);
+      sz.setHeight(770);
+      sz.setWidth(1200);
+      this->resize(sz);
+      store_window_pos();
+      //reset position(screen changed or other reason)
+    }
+    else
+    {
+      QPoint pos = AUTO_VAL_INIT(pos);
+      QSize sz = AUTO_VAL_INIT(sz);
+      pos.setX(m_config.m_window_position.first);
+      pos.setY(m_config.m_window_position.second);
+      sz.setHeight(m_config.m_window_size.first);
+      sz.setWidth(m_config.m_window_size.second);
+      this->move(pos);
+      this->resize(sz);
+    }
   }
 
   CATCH_ENTRY2(void());
@@ -645,7 +689,7 @@ bool MainWindow::show_inital()
   {
     m_config = AUTO_VAL_INIT(m_config);
     this->show();
-    QSize sz;
+    QSize sz = AUTO_VAL_INIT(sz);
     sz.setHeight(770);
     sz.setWidth(1200);
     this->resize(sz);
@@ -726,14 +770,127 @@ void qt_log_message_handler(QtMsgType type, const QMessageLogContext &context, c
     }
 }
 
+bool MainWindow::remove_ipc()
+{
+  try {
+    boost::interprocess::message_queue::remove(GUI_IPC_MESSAGE_CHANNEL_NAME);
+  }
+  catch (...)
+  {
+  }
+  return true;
+}
+ 
+
+bool MainWindow::init_ipc_server()
+{
+
+  //in case previous instance wasn't close graceful, ipc channel will remain open and new creation will fail, so we 
+  //trying to close it anyway before open, to make sure there are no dead channels. If there are another running instance, it wom't 
+  //let channel to close, so it will fail later on creating channel
+  remove_ipc();
+#define GUI_IPC_BUFFER_SIZE  10000
+  try {
+    //Create a message queue.
+    std::shared_ptr<boost::interprocess::message_queue> pmq(new boost::interprocess::message_queue(boost::interprocess::create_only //only create
+      , GUI_IPC_MESSAGE_CHANNEL_NAME           //name
+      , 100                                    //max message number
+      , GUI_IPC_BUFFER_SIZE                    //max message size
+    ));
+
+    m_ipc_worker = std::thread([this, pmq]()
+    {
+      //m_ipc_worker;
+      try
+      {
+        unsigned int priority = 0;
+        boost::interprocess::message_queue::size_type recvd_size = 0;
+
+        while (m_gui_deinitialize_done_1 == false)
+        {
+          std::string buff(GUI_IPC_BUFFER_SIZE, ' ');
+          bool data_received = pmq->timed_receive((void*)buff.data(), GUI_IPC_BUFFER_SIZE, recvd_size, priority, boost::posix_time::ptime(boost::posix_time::microsec_clock::universal_time()) + boost::posix_time::milliseconds(1000));
+          if (data_received && recvd_size != 0)
+          {
+            buff.resize(recvd_size, '*');
+            handle_ipc_event(buff);//todo process token
+          }
+        }        
+        remove_ipc();
+        LOG_PRINT_L0("IPC Handling thread finished");
+      }
+      catch (const std::exception& ex)
+      {
+        remove_ipc();
+        boost::interprocess::message_queue::remove(GUI_IPC_MESSAGE_CHANNEL_NAME);
+        LOG_ERROR("Failed to receive IPC que: " << ex.what());
+      }
+
+      catch (...)
+      {
+        remove_ipc();
+        LOG_ERROR("Failed to receive IPC que: unknown exception");
+      }
+    });
+  }
+  catch(const std::exception& ex)
+  {
+    boost::interprocess::message_queue::remove(GUI_IPC_MESSAGE_CHANNEL_NAME);
+    LOG_ERROR("Failed to initialize IPC que: " << ex.what());
+    return false;
+  }
+
+  catch (...)
+  {
+    boost::interprocess::message_queue::remove(GUI_IPC_MESSAGE_CHANNEL_NAME);
+    LOG_ERROR("Failed to initialize IPC que: unknown exception");
+    return false;
+  }
+  return true;
+}
+
+
+bool MainWindow::handle_ipc_event(const std::string& arguments)
+{
+  std::string zzz = std::string("Received IPC: ") + arguments.c_str();
+  std::cout << zzz;//message_box(zzz.c_str());
+
+  handle_deeplink_click(arguments.c_str());
+
+  return true;
+}
+
+bool MainWindow::handle_deeplink_params_in_commandline()
+{
+  std::string deep_link_params = command_line::get_arg(m_backend.get_arguments(), command_line::arg_deeplink);
+
+  try {
+    boost::interprocess::message_queue mq(boost::interprocess::open_only, GUI_IPC_MESSAGE_CHANNEL_NAME);
+    mq.send(deep_link_params.data(), deep_link_params.size(), 0);
+    return false;
+  }
+  catch (...)
+  {
+    //ui not launched yet
+    return true;
+  }
+}
+
 bool MainWindow::init_backend(int argc, char* argv[])
 {
+
   TRY_ENTRY();
   std::string command_line_fail_details;
   if (!m_backend.init_command_line(argc, argv, command_line_fail_details))
   {
     this->show_msg_box(command_line_fail_details);
     return false;
+  }
+
+  if (command_line::has_arg(m_backend.get_arguments(), command_line::arg_deeplink))
+  {
+    if (!handle_deeplink_params_in_commandline())
+      return false;
   }
 
   if (!init_window())
@@ -754,6 +911,12 @@ bool MainWindow::init_backend(int argc, char* argv[])
   {
     qInstallMessageHandler(qt_log_message_handler);
     QLoggingCategory::setFilterRules("*=true"); // enable all logs
+  }
+
+  if (!init_ipc_server())
+  {
+    this->show_msg_box("Failed to initialize IPC server, check debug logs for more details.");
+    return false;
   }
 
   return true;
@@ -783,6 +946,41 @@ QString MainWindow::start_backend(const QString& params)
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
+QString MainWindow::sync_call(const QString& func_name, const QString& params)
+{
+  if (func_name == "transfer")
+  {
+    return this->transfer(params);
+  }
+  else if (func_name == "test_call")
+  {
+    return params;
+  }
+  else
+  {
+    return QString(QString() + "{ \"status\": \"Method '" + func_name  + "' not found\"}");
+  }
+}
+
+QString MainWindow::async_call(const QString& func_name, const QString& params)
+{
+
+  uint64_t job_id = m_ui_dispatch_id_counter++;
+  QString method_name = func_name;
+  QString argements = params;
+
+  auto async_callback = [this, method_name, argements, job_id]()
+  {
+    QString res_str = this->sync_call(method_name, argements);
+    this->dispatch_async_call_result(std::to_string(job_id).c_str(), res_str);  //general function
+  };
+
+  m_threads_pool.add_job(async_callback);
+  LOG_PRINT_L2("[UI_ASYNC_CALL]: started " << method_name.toStdString() << ", job id: " << job_id);
+  return QString::fromStdString(std::string("{ \"job_id\": ") + std::to_string(job_id) + "}");
+}
+
+
 bool MainWindow::update_wallet_status(const view::wallet_status_info& wsi)
 {
   TRY_ENTRY();
@@ -806,6 +1004,17 @@ bool MainWindow::set_options(const view::gui_options& opt)
   epee::serialization::store_t_to_json(opt, json_str, 0, epee::serialization::eol_lf);
   LOG_PRINT_L0("SENDING SIGNAL -> [set_options]:" << std::endl << json_str);
   QMetaObject::invokeMethod(this, "set_options", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
+  return true;
+  CATCH_ENTRY2(false);
+}
+
+bool MainWindow::update_tor_status(const view::current_action_status& opt)
+{
+  TRY_ENTRY();
+  std::string json_str;
+  epee::serialization::store_t_to_json(opt, json_str, 0, epee::serialization::eol_lf);
+  LOG_PRINT_L0("SENDING SIGNAL -> [HANDLE_CURRENT_ACTION_STATE]:" << std::endl << json_str);
+  QMetaObject::invokeMethod(this, "handle_current_action_state", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
   return true;
   CATCH_ENTRY2(false);
 }
@@ -842,7 +1051,7 @@ QString   MainWindow::export_wallet_history(const QString& param)
   PREPARE_RESPONSE(view::api_response, ar);
   ar.error_code = m_backend.export_wallet_history(ewi);
   return MAKE_RESPONSE(ar);
-  CATCH_ENTRY2(false);
+  CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 bool MainWindow::update_wallets_info(const view::wallets_summary_info& wsi)
 {
@@ -871,9 +1080,9 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
 
   if (!m_tray_icon)
     return true;
-  if (!tei.ti.is_income)
+  if (tei.ti.has_outgoing_entries())
     return true;
-  if (!tei.ti.amount)
+  if (!tei.ti.get_native_amount())
     return true;
 //  if (tei.ti.is_mining && m_wallet_states->operator [](tei.wallet_id) != view::wallet_status_info::wallet_state_ready)
 //    return true;
@@ -887,9 +1096,9 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
     return true;
   }
 
-  auto amount_str = currency::print_money_brief(tei.ti.amount);
+  auto amount_str = currency::print_money_brief(tei.ti.get_native_amount()); //@#@ add handling of assets
   std::string title, msg;
-  if (tei.ti.height == 0) // unconfirmed trx
+  if (tei.ti.height == 0) // unconfirmed tx
   {
     msg = amount_str + " " + CURRENCY_NAME_ABR + " " + m_localization[localization_id_is_received];
     title = m_localization[localization_id_income_transfer_unconfirmed];
@@ -1517,6 +1726,20 @@ QString MainWindow::get_log_level(const QString& param)
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
+QString MainWindow::set_enable_tor(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(currency::struct_with_one_t_type<bool>, enabl_tor);
+  m_backend.set_use_tor(enabl_tor.v);
+  //epee::log_space::get_set_log_detalisation_level(true, enabl_tor.v);
+  default_ar.error_code = API_RETURN_CODE_OK;
+  LOG_PRINT("[TOR]: Enable TOR set to " << enabl_tor.v, LOG_LEVEL_MIN);
+
+  return MAKE_RESPONSE(default_ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
 // QString MainWindow::dump_all_offers()
 // {
 //   LOG_API_TIMING();
@@ -1713,6 +1936,17 @@ QString MainWindow::restore_wallet(const QString& param)
   PREPARE_ARG_FROM_JSON(view::restore_wallet_request, owd);
   PREPARE_RESPONSE(view::open_wallet_response, ar);
   ar.error_code = m_backend.restore_wallet(epee::string_encoding::utf8_to_wstring(owd.path), owd.pass, owd.seed_phrase, owd.seed_pass, ar.response_data);
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+QString MainWindow::use_whitelisting(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  //return que_call2<view::restore_wallet_request>("restore_wallet", param, [this](const view::restore_wallet_request& owd, view::api_response& ar){
+  PREPARE_ARG_FROM_JSON(view::api_request_t<bool>, owd);
+  PREPARE_RESPONSE(view::api_responce_return_code, ar);
+  ar.error_code = m_backend.use_whitelisting(owd.wallet_id, owd.req_data);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
@@ -1929,6 +2163,70 @@ QString MainWindow::get_mining_estimate(const QString& param)
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
+QString MainWindow::add_custom_asset_id(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::wallet_and_asset_id, waid);
+  PREPARE_RESPONSE(currency::COMMAND_RPC_GET_ASSET_INFO::response, ar);
+
+  ar.error_code = m_backend.add_custom_asset_id(waid.wallet_id, waid.asset_id, ar.response_data.asset_descriptor);
+  ar.response_data.status = ar.error_code;
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+QString MainWindow::remove_custom_asset_id(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::wallet_and_asset_id, waid);
+  default_ar.error_code = m_backend.delete_custom_asset_id(waid.wallet_id, waid.asset_id);
+  return MAKE_RESPONSE(default_ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+QString MainWindow::get_wallet_info(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::wallet_id_obj, waid);
+  PREPARE_RESPONSE(view::wallet_info, ar);
+  ar.error_code = m_backend.get_wallet_info(waid.wallet_id, ar.response_data);
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+QString MainWindow::create_ionic_swap_proposal(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::create_ionic_swap_proposal_request, cispr);
+  PREPARE_RESPONSE(std::string, ar);
+  ar.error_code = m_backend.create_ionic_swap_proposal(cispr.wallet_id, cispr, ar.response_data);
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
+QString MainWindow::get_ionic_swap_proposal_info(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::api_request_t<std::string>, tx_raw_hex);
+  PREPARE_RESPONSE(tools::wallet_public::ionic_swap_proposal_info, ar);
+  ar.error_code = m_backend.get_ionic_swap_proposal_info(tx_raw_hex.wallet_id, tx_raw_hex.req_data, ar.response_data);
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+
+}
+
+QString MainWindow::accept_ionic_swap_proposal(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::api_request_t<std::string>, tx_raw_hex);
+  PREPARE_RESPONSE(std::string, ar);
+  ar.error_code = m_backend.accept_ionic_swap_proposal(tx_raw_hex.wallet_id, tx_raw_hex.req_data, ar.response_data);
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
 QString MainWindow::backup_wallet_keys(const QString& param)
 {
   TRY_ENTRY();
@@ -1986,6 +2284,7 @@ QString MainWindow::toggle_autostart(const QString& param)
   return MAKE_RESPONSE(default_ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
+/*
 QString MainWindow::check_available_sources(const QString& param)
 {
   TRY_ENTRY();
@@ -1994,6 +2293,7 @@ QString MainWindow::check_available_sources(const QString& param)
   return m_backend.check_available_sources(sources.wallet_id, sources.req_data).c_str();
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
+*/
 
 QString MainWindow::open_url_in_browser(const QString& param)
 {

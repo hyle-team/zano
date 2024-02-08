@@ -9,6 +9,35 @@
 
 #include "misc_language.h"
 
+namespace epee::misc_utils
+{
+  // old impelementation that uses std::sort
+  template<class type_vec_type>
+  type_vec_type old_median(std::vector<type_vec_type> &v)
+  {
+    //CRITICAL_REGION_LOCAL(m_lock);
+    if(v.empty())
+      return boost::value_initialized<type_vec_type>();
+    if(v.size() == 1)
+      return v[0];
+
+    size_t n = (v.size()) / 2;
+    std::sort(v.begin(), v.end());
+    //nth_element(v.begin(), v.begin()+n-1, v.end());
+    if(v.size()%2)
+    {//1, 3, 5...
+      return v[n];
+    }else 
+    {//2, 4, 6...
+      return (v[n-1] + v[n])/2;
+    }
+
+  }
+} // namespace epee::misc_utils
+
+//------------------------------------------------------------------------------
+
+
 bool test_median(const std::vector<uint64_t>& v_)
 {
   std::vector<uint64_t> v(v_);
@@ -21,8 +50,9 @@ bool test_median(const std::vector<uint64_t>& v_)
   }
   uint64_t m1 = epee::misc_utils::median(v);
   uint64_t m2 = mh.get_median();
-  if (m1 != m2)
-    return false;
+  uint64_t m3 = epee::misc_utils::old_median(v);
+  CHECK_AND_ASSERT_MES(m1 == m2, false, "m1 != m2");
+  CHECK_AND_ASSERT_MES(m2 == m3, false, "m2 != m3");
   return true;
 }
 

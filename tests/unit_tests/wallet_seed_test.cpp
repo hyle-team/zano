@@ -193,7 +193,9 @@ TEST(wallet_seed, basic_test)
     if (r)
     {
       if (wse.timestamp)
+      {
         ASSERT_EQ(wse.timestamp, acc.get_createtime());
+      }
 
       ASSERT_EQ(wse.auditable, acc.get_public_address().is_auditable());
 

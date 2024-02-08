@@ -60,6 +60,7 @@ void ge_double_scalarmult_base_vartime(ge_p2 *, const unsigned char *, const ge_
 
 extern const fe fe_sqrtm1;
 extern const fe fe_d;
+extern const fe fe_d2;
 int ge_frombytes_vartime(ge_p3 *, const unsigned char *);
 
 /* From ge_p1p1_to_p2.c */
@@ -111,12 +112,20 @@ void ge_fromfe_frombytes_vartime(ge_p2 *, const unsigned char *);
 void ge_p2_to_p3(ge_p3 *r, const ge_p2 *t);
 void ge_bytes_hash_to_ec(ge_p3 *, const void *, size_t);
 void ge_bytes_hash_to_ec_32(ge_p3 *, const unsigned char *);
+void ge_cached_to_p2(ge_p2 *r, const ge_cached *c);
+void ge_madd(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q);
 
 void ge_p3_0(ge_p3 *h);
 void ge_sub(ge_p1p1 *, const ge_p3 *, const ge_cached *);
 void ge_double_scalarmult_base_vartime_p3(ge_p3 *r, const unsigned char *a, const ge_p3 *A, const unsigned char *b);
 void ge_scalarmult_vartime_p3(ge_p3 *r, const unsigned char *a, const ge_p3 *A);
 void ge_scalarmult_vartime_p3_v2(ge_p3 *r, const unsigned char *a, const ge_p3 *A);
+void ge_scalarmult_base_vartime(ge_p3 *h, const unsigned char *a);
+
+/* precomp_data[i][j] = (j + 1) * 256^i * G */
+typedef ge_precomp (precomp_data_t)[32][8];
+void ge_scalarmult_precomp_vartime(ge_p3 *h, const precomp_data_t base_precomp, const unsigned char *a);
+void ge_p3_to_precomp(ge_precomp *r, const ge_p3* p);
 
 extern const fe fe_ma2;
 extern const fe fe_ma;
@@ -138,8 +147,10 @@ void sc_invert(unsigned char*, const unsigned char*);
 
 void fe_sq(fe h, const fe f);
 int fe_isnonzero(const fe f);
-int fe_cmp(const fe a, const fe b);
+void fe_add(fe h, const fe f, const fe g);
+void fe_sub(fe h, const fe f, const fe g);
 void fe_mul(fe, const fe, const fe);
 void fe_frombytes(fe h, const unsigned char *s);
 void fe_invert(fe out, const fe z);
 void fe_tobytes(unsigned char *s, const fe h);
+int fe_isnegative(const fe f);

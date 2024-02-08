@@ -35,14 +35,15 @@ namespace currency
     typedef core_stat_info stat_info;
     typedef t_currency_protocol_handler<t_core> currency_protocol_handler;
     typedef CORE_SYNC_DATA payload_type;
-    typedef std::pair<NOTIFY_NEW_TRANSACTIONS::request, currency_connection_context> relay_que_entry;
+    typedef std::pair<NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request, currency_connection_context> relay_que_entry;
 
     t_currency_protocol_handler(t_core& rcore, nodetool::i_p2p_endpoint<connection_context>* p_net_layout);
     ~t_currency_protocol_handler();
 
     BEGIN_INVOKE_MAP2(currency_protocol_handler)
       HANDLE_NOTIFY_T2(NOTIFY_NEW_BLOCK, &currency_protocol_handler::handle_notify_new_block)
-      HANDLE_NOTIFY_T2(NOTIFY_NEW_TRANSACTIONS, &currency_protocol_handler::handle_notify_new_transactions)
+      HANDLE_NOTIFY_T2(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS, &currency_protocol_handler::handle_notify_new_transactions)
+      HANDLE_INVOKE_T2(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS, &currency_protocol_handler::handle_invoke_new_transaction)
       HANDLE_NOTIFY_T2(NOTIFY_REQUEST_GET_OBJECTS, &currency_protocol_handler::handle_request_get_objects)
       HANDLE_NOTIFY_T2(NOTIFY_RESPONSE_GET_OBJECTS, &currency_protocol_handler::handle_response_get_objects)
       HANDLE_NOTIFY_T2(NOTIFY_REQUEST_CHAIN, &currency_protocol_handler::handle_request_chain)
@@ -76,16 +77,18 @@ namespace currency
   private:
     //----------------- commands handlers ----------------------------------------------
     int handle_notify_new_block(int command, NOTIFY_NEW_BLOCK::request& arg, currency_connection_context& context);
-    int handle_notify_new_transactions(int command, NOTIFY_NEW_TRANSACTIONS::request& arg, currency_connection_context& context);
+    int handle_notify_new_transactions(int command, NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& arg, currency_connection_context& context);
+    int handle_invoke_new_transaction(int command, NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& req, NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::response& rsp, currency_connection_context& context);
     int handle_request_get_objects(int command, NOTIFY_REQUEST_GET_OBJECTS::request& arg, currency_connection_context& context);
     int handle_response_get_objects(int command, NOTIFY_RESPONSE_GET_OBJECTS::request& arg, currency_connection_context& context);
     int handle_request_chain(int command, NOTIFY_REQUEST_CHAIN::request& arg, currency_connection_context& context);
     int handle_response_chain_entry(int command, NOTIFY_RESPONSE_CHAIN_ENTRY::request& arg, currency_connection_context& context);
-
+   
+    
 
     //----------------- i_bc_protocol_layout ---------------------------------------
     virtual bool relay_block(NOTIFY_NEW_BLOCK::request& arg, currency_connection_context& exclude_context);
-    virtual bool relay_transactions(NOTIFY_NEW_TRANSACTIONS::request& arg, currency_connection_context& exclude_context);
+    virtual bool relay_transactions(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& arg, currency_connection_context& exclude_context);
     //----------------------------------------------------------------------------------
     //bool get_payload_sync_data(HANDSHAKE_DATA::request& hshd, currency_connection_context& context);
     bool request_missing_objects(currency_connection_context& context, bool check_having_blocks);
@@ -93,7 +96,7 @@ namespace currency
     void relay_que_worker();
     void process_current_relay_que(const std::list<relay_que_entry>& que);
     bool check_stop_flag_and_drop_cc(currency_connection_context& context);
-
+    int handle_new_transaction_from_net(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& req, NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::response& rsp, currency_connection_context& context, bool is_notify);
     t_core& m_core;
 
     nodetool::p2p_endpoint_stub<connection_context> m_p2p_stub;
@@ -117,6 +120,7 @@ namespace currency
     int64_t m_last_median2local_time_difference;
     int64_t m_last_ntp2local_time_difference;
     uint32_t m_debug_ip_address;
+    bool m_disable_ntp;
 
     template<class t_parametr>
     bool post_notify(typename t_parametr::request& arg, currency_connection_context& context)

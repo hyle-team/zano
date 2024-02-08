@@ -46,11 +46,12 @@ namespace levin
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
-	class levin_client_impl
+  template<typename transport_t>
+	class levin_client_impl_t
 	{
 	public:
-		levin_client_impl();
-		virtual ~levin_client_impl();
+    levin_client_impl_t();
+		virtual ~levin_client_impl_t();
 
 		bool connect(u_long ip, int port, unsigned int timeout, const std::string& bind_ip = "0.0.0.0");
     bool connect(const std::string& addr, int port, unsigned int timeout, const std::string& bind_ip = "0.0.0.0");
@@ -61,26 +62,30 @@ namespace levin
 		virtual int notify(int command, const std::string& in_buff);
 
 	protected: 
-		net_utils::blocked_mode_client m_transport;
+    transport_t m_transport;
+    //net_utils::blocked_mode_client m_transport;
 	};
 
 
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
-  class levin_client_impl2: public levin_client_impl
+  template<typename transport_t>
+  class levin_client_impl2: public levin_client_impl_t<transport_t>
   {
   public:
 
     int invoke(int command, const std::string& in_buff, std::string& buff_out);
     int notify(int command, const std::string& in_buff);
+
+    transport_t& get_transport() {return this->m_transport;}
   };
 
 }
 namespace net_utils
 {
-  typedef levin::levin_client_impl levin_client;
-  typedef levin::levin_client_impl2 levin_client2;
+  typedef levin::levin_client_impl_t<net_utils::blocked_mode_client> levin_client;
+  typedef levin::levin_client_impl2<net_utils::blocked_mode_client> levin_client2;
 }
 }
 

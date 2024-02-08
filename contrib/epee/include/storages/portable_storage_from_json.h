@@ -30,7 +30,6 @@
 
 namespace epee
 {
-  using namespace misc_utils::parse;
   namespace serialization
   {
     namespace json
@@ -86,7 +85,7 @@ namespace epee
             switch(*it)
             {
             case '"':
-              match_string2(it, buf_end, name);
+              misc_utils::parse::match_string2(it, buf_end, name);
               state = match_state_waiting_separator;
               break;
             case '}':
@@ -107,7 +106,7 @@ namespace epee
             if(*it == '"')
             {//just a named string value started
               std::string val;
-              match_string2(it, buf_end, val);
+              misc_utils::parse::match_string2(it, buf_end, val);
               //insert text value 
               stg.set_value(name, val, current_section);              
               state = match_state_wonder_after_value;
@@ -115,7 +114,7 @@ namespace epee
             {//just a named number value started
               std::string val;
               bool is_v_float = false;bool is_signed = false;
-              match_number2(it, buf_end, val, is_v_float, is_signed);
+              misc_utils::parse::match_number2(it, buf_end, val, is_v_float, is_signed);
               if(!is_v_float)
               {
                 if(is_signed)
@@ -136,7 +135,7 @@ namespace epee
             }else if(isalpha(*it) )
             {// could be null, true or false
               std::string word;
-              match_word2(it, buf_end, word);
+              misc_utils::parse::match_word2(it, buf_end, word);
               if(boost::iequals(word, "null"))
               {
                 state = match_state_wonder_after_value;
@@ -191,7 +190,7 @@ namespace epee
             {
               //mean array of strings
               std::string val;
-              match_string2(it, buf_end, val);
+              misc_utils::parse::match_string2(it, buf_end, val);
               h_array = stg.insert_first_value(name, val, current_section);
               CHECK_AND_ASSERT_THROW_MES(h_array, " failed to insert values entry");
               state = match_state_array_after_value;
@@ -200,7 +199,7 @@ namespace epee
             {//array of numbers value started
               std::string val;
               bool is_v_float = false;bool is_signed_val = false;
-              match_number2(it, buf_end, val, is_v_float, is_signed_val);
+              misc_utils::parse::match_number2(it, buf_end, val, is_v_float, is_signed_val);
               if(!is_v_float)
               {
                 int64_t nval = boost::lexical_cast<int64_t>(val);//bool res = string_tools::string_to_num_fast(val, nval);
@@ -222,7 +221,7 @@ namespace epee
             }else if(isalpha(*it) )
             {// array of booleans
               std::string word;
-              match_word2(it, buf_end, word);
+              misc_utils::parse::match_word2(it, buf_end, word);
               if(boost::iequals(word, "true"))
               {
                 h_array = stg.insert_first_value(name, true, current_section);              
@@ -266,7 +265,7 @@ namespace epee
               if(*it == '"')
               {
                 std::string val;
-                match_string2(it, buf_end, val);
+                misc_utils::parse::match_string2(it, buf_end, val);
                 bool res = stg.insert_next_value(h_array, val);
                 CHECK_AND_ASSERT_THROW_MES(res, "failed to insert values");
                 state = match_state_array_after_value;
@@ -277,7 +276,7 @@ namespace epee
               {//array of numbers value started
                 std::string val;
                 bool is_v_float = false;bool is_signed_val = false;
-                match_number2(it, buf_end, val, is_v_float, is_signed_val);
+                misc_utils::parse::match_number2(it, buf_end, val, is_v_float, is_signed_val);
                 bool insert_res = false;
                 if(!is_v_float)
                 {
@@ -299,7 +298,7 @@ namespace epee
               if(isalpha(*it) )
               {// array of booleans
                 std::string word;
-                match_word2(it, buf_end, word);
+                misc_utils::parse::match_word2(it, buf_end, word);
                 if(boost::iequals(word, "true"))
                 {
                   bool r = stg.insert_next_value(h_array, true);              

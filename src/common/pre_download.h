@@ -21,8 +21,8 @@ namespace tools
   };
 
 #ifndef TESTNET
-  static constexpr pre_download_entry c_pre_download_mdbx = { "http://95.217.42.247/pre-download/zano_mdbx_95_1161000.pak", "26660ffcdaf80a43a586e64a1a6da042dcb9ff3b58e14ce1ec9a775b995dc146", 1330022593, 2684313600 };
-  static constexpr pre_download_entry c_pre_download_lmdb = { "http://95.217.42.247/pre-download/zano_lmdb_95_1161000.pak", "9dd03f08dea396fe32e6483a8221b292be35fa41c29748f119f11c3275956cdc", 1787475468, 2600247296 };
+  static constexpr pre_download_entry c_pre_download_mdbx = { "http://95.217.42.247/pre-download/zano_mdbx_95_2390000.pak", "ffc8d2220a4d8b3fba51073a422cbb6139c60858469ea086623f9d16329eb5b4", 2767268964, 5368627200 };
+  static constexpr pre_download_entry c_pre_download_lmdb = { "http://95.217.42.247/pre-download/zano_lmdb_95_2390000.pak", "7e58951bc523eb12e0ec07171bc67b3f96bad4d5454dd2da56f642a872e230d3", 3618283035, 5156397056 };
 #else
   static constexpr pre_download_entry c_pre_download_mdbx = { "", "", 0, 0 };
   static constexpr pre_download_entry c_pre_download_lmdb = { "", "", 0, 0 };

@@ -34,7 +34,7 @@ struct gen_wallet_save_load_and_balance : public wallet_test
 
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1_check_balance_and_store(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
-  bool c2_load_refresh_check_balance(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool c3_load_refresh_check_balance(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
@@ -44,7 +44,6 @@ struct gen_wallet_mine_pos_block : public wallet_test
   gen_wallet_mine_pos_block();
 
   bool generate(std::vector<test_event_entry>& events) const;
-  bool set_core_config(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
@@ -111,7 +110,7 @@ struct gen_wallet_decrypted_attachments : public wallet_test, virtual public too
   bool generate(std::vector<test_event_entry>& events) const;
 
   // intrface tools::i_wallet2_callback
-  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) override;
+  virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) override;
 
 private:
   mutable bool          m_on_transfer2_called;
@@ -256,8 +255,11 @@ struct packing_outputs_on_pos_minting_wallet : public wallet_test
 {
   packing_outputs_on_pos_minting_wallet();
   bool generate(std::vector<test_event_entry>& events) const;
-  bool set_core_config(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  mutable uint64_t m_single_amount = 0;
+  mutable uint64_t m_alice_initial_balance = 0;
+  mutable uint64_t m_bob_initial_balance = 0;
 };
 
 struct wallet_sending_to_integrated_address : public wallet_test
@@ -275,4 +277,13 @@ struct wallet_watch_only_and_chain_switch : public wallet_test
 
   mutable crypto::hash m_split_point_block_id;
   mutable uint64_t m_split_point_block_height;
+};
+
+struct wallet_spend_form_auditable_and_track : public wallet_test
+{
+  wallet_spend_form_auditable_and_track();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  mutable std::string m_comment;
 };

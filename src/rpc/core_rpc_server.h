@@ -14,7 +14,6 @@
 #include "currency_core/currency_core.h"
 #include "p2p/net_node.h"
 #include "currency_protocol/currency_protocol_handler.h"
-#include "mining_protocol_defs.h"
 #include "currency_core/bc_offers_service.h"
 
 
@@ -38,6 +37,7 @@ namespace currency
     static void init_options(boost::program_options::options_description& desc);
     bool init(const boost::program_options::variables_map& vm);
     
+    void set_rpc_chain_handler(epee::net_utils::http::i_chain_handler* prpc_chain_handler) { m_prpc_chain_handler = prpc_chain_handler; }
     bool on_get_blocks_direct(const COMMAND_RPC_GET_BLOCKS_DIRECT::request& req, COMMAND_RPC_GET_BLOCKS_DIRECT::response& res, connection_context& cntx);
     
 
@@ -49,11 +49,11 @@ namespace currency
     bool on_start_mining(const COMMAND_RPC_START_MINING::request& req, COMMAND_RPC_START_MINING::response& res, connection_context& cntx);
     bool on_stop_mining(const COMMAND_RPC_STOP_MINING::request& req, COMMAND_RPC_STOP_MINING::response& res, connection_context& cntx);
     bool on_get_random_outs(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res, connection_context& cntx);
+    bool on_get_random_outs2(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::response& res, connection_context& cntx);
     bool on_get_info(const COMMAND_RPC_GET_INFO::request& req, COMMAND_RPC_GET_INFO::response& res, connection_context& cntx);
     bool on_set_maintainers_info(const COMMAND_RPC_SET_MAINTAINERS_INFO::request& req, COMMAND_RPC_SET_MAINTAINERS_INFO::response& res, connection_context& cntx);
     bool on_get_tx_pool(const COMMAND_RPC_GET_TX_POOL::request& req, COMMAND_RPC_GET_TX_POOL::response& res, connection_context& cntx);
     bool on_check_keyimages(const COMMAND_RPC_CHECK_KEYIMAGES::request& req, COMMAND_RPC_CHECK_KEYIMAGES::response& res, connection_context& cntx);
-    bool on_scan_pos(const COMMAND_RPC_SCAN_POS::request& req, COMMAND_RPC_SCAN_POS::response& res, connection_context& cntx);
     bool on_rpc_get_blocks_details(const COMMAND_RPC_GET_BLOCKS_DETAILS::request& req, COMMAND_RPC_GET_BLOCKS_DETAILS::response& res, connection_context& cntx);
 		bool on_force_relaey_raw_txs(const COMMAND_RPC_FORCE_RELAY_RAW_TXS::request& req, COMMAND_RPC_FORCE_RELAY_RAW_TXS::response& res, connection_context& cntx);
     bool on_get_offers_ex(const COMMAND_RPC_GET_OFFERS_EX::request& req, COMMAND_RPC_GET_OFFERS_EX::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
@@ -71,9 +71,8 @@ namespace currency
     bool on_get_alias_details(const COMMAND_RPC_GET_ALIAS_DETAILS::request& req, COMMAND_RPC_GET_ALIAS_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_get_all_aliases(const COMMAND_RPC_GET_ALL_ALIASES::request& req, COMMAND_RPC_GET_ALL_ALIASES::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_get_aliases(const COMMAND_RPC_GET_ALIASES::request& req, COMMAND_RPC_GET_ALIASES::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
-    bool on_alias_by_address(const COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& req, COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
+    bool on_aliases_by_address(const COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& req, COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_get_alias_reward(const COMMAND_RPC_GET_ALIAS_REWARD::request& req, COMMAND_RPC_GET_ALIAS_REWARD::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);  
-    bool on_get_addendums(const COMMAND_RPC_GET_ADDENDUMS::request& req, COMMAND_RPC_GET_ADDENDUMS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_reset_transaction_pool(const COMMAND_RPC_RESET_TX_POOL::request& req, COMMAND_RPC_RESET_TX_POOL::response& res, connection_context& cntx);
     bool on_get_pos_mining_details(const COMMAND_RPC_GET_POS_MINING_DETAILS::request& req, COMMAND_RPC_GET_POS_MINING_DETAILS::response& res, connection_context& cntx);
     bool on_get_current_core_tx_expiration_median(const COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::request& req, COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::response& res, connection_context& cntx);
@@ -85,24 +84,17 @@ namespace currency
     bool on_get_pool_txs_brief_details(const COMMAND_RPC_GET_POOL_TXS_BRIEF_DETAILS::request& req, COMMAND_RPC_GET_POOL_TXS_BRIEF_DETAILS::response& res, connection_context& cntx);
     bool on_get_all_pool_tx_list(const COMMAND_RPC_GET_ALL_POOL_TX_LIST::request& req, COMMAND_RPC_GET_ALL_POOL_TX_LIST::response& res, connection_context& cntx);
     bool on_get_pool_info(const COMMAND_RPC_GET_POOL_INFO::request& req, COMMAND_RPC_GET_POOL_INFO::response& res, connection_context& cntx);
-    
+    bool on_get_votes(const COMMAND_RPC_GET_VOTES::request& req, COMMAND_RPC_GET_VOTES::response& res, connection_context& cntx);
+    bool on_get_asset_info(const COMMAND_RPC_GET_ASSET_INFO::request& req, COMMAND_RPC_GET_ASSET_INFO::response& res, connection_context& cntx);
+
     bool on_get_main_block_details(const COMMAND_RPC_GET_BLOCK_DETAILS::request& req, COMMAND_RPC_GET_BLOCK_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_get_alt_block_details(const COMMAND_RPC_GET_BLOCK_DETAILS::request& req, COMMAND_RPC_GET_BLOCK_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_get_alt_blocks_details(const COMMAND_RPC_GET_ALT_BLOCKS_DETAILS::request& req, COMMAND_RPC_GET_ALT_BLOCKS_DETAILS::response& res, connection_context& cntx);
     bool on_get_est_height_from_date(const COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::request& req, COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::response& res, connection_context& cntx);
+    bool on_validate_signature(const COMMAND_VALIDATE_SIGNATURE::request& req, COMMAND_VALIDATE_SIGNATURE::response& res, epee::json_rpc::error& er, connection_context& cntx);
     
     
     
-    
-    //mining rpc
-    bool on_login(const mining::COMMAND_RPC_LOGIN::request& req, mining::COMMAND_RPC_LOGIN::response& res, connection_context& cntx);
-    bool on_getjob(const mining::COMMAND_RPC_GETJOB::request& req, mining::COMMAND_RPC_GETJOB::response& res, connection_context& cntx);
-    bool on_submit(const mining::COMMAND_RPC_SUBMITSHARE::request& req, mining::COMMAND_RPC_SUBMITSHARE::response& res, connection_context& cntx);
-    
-    
-
-
-
     CHAIN_HTTP_TO_MAP2(connection_context); //forward http requests to uri map
 
     BEGIN_URI_MAP2()
@@ -118,10 +110,10 @@ namespace currency
       MAP_URI_AUTO_BIN2("/getblocks.bin",             on_get_blocks,                  COMMAND_RPC_GET_BLOCKS_FAST)
       MAP_URI_AUTO_BIN2("/get_o_indexes.bin",         on_get_indexes,                 COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES)      
       MAP_URI_AUTO_BIN2("/getrandom_outs.bin",        on_get_random_outs,             COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS)
+      MAP_URI_AUTO_BIN2("/getrandom_outs2.bin",       on_get_random_outs2,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2)
       MAP_URI_AUTO_BIN2("/set_maintainers_info.bin",  on_set_maintainers_info,        COMMAND_RPC_SET_MAINTAINERS_INFO)
       MAP_URI_AUTO_BIN2("/get_tx_pool.bin",           on_get_tx_pool,                 COMMAND_RPC_GET_TX_POOL)
       MAP_URI_AUTO_BIN2("/check_keyimages.bin",       on_check_keyimages,             COMMAND_RPC_CHECK_KEYIMAGES) 
-      MAP_URI_AUTO_BIN2("/scan_pos.bin",              on_scan_pos,                    COMMAND_RPC_SCAN_POS)    
       MAP_URI_AUTO_BIN2("/get_pos_details.bin",       on_get_pos_mining_details,      COMMAND_RPC_GET_POS_MINING_DETAILS)
       // JSON RPCs
       BEGIN_JSON_RPC_MAP("/json_rpc")
@@ -134,7 +126,7 @@ namespace currency
         MAP_JON_RPC_WE("getblockheaderbyhash",        on_get_block_header_by_hash,    COMMAND_RPC_GET_BLOCK_HEADER_BY_HASH)
         MAP_JON_RPC_WE("getblockheaderbyheight",      on_get_block_header_by_height,  COMMAND_RPC_GET_BLOCK_HEADER_BY_HEIGHT)
         MAP_JON_RPC_WE("get_alias_details",           on_get_alias_details,           COMMAND_RPC_GET_ALIAS_DETAILS)
-        MAP_JON_RPC_WE("get_alias_by_address",        on_alias_by_address,            COMMAND_RPC_GET_ALIASES_BY_ADDRESS)
+        MAP_JON_RPC_WE("get_alias_by_address",        on_aliases_by_address,          COMMAND_RPC_GET_ALIASES_BY_ADDRESS)
         MAP_JON_RPC_WE("get_alias_reward",            on_get_alias_reward,            COMMAND_RPC_GET_ALIAS_REWARD)
         MAP_JON_RPC   ("get_est_height_from_date",    on_get_est_height_from_date,    COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE)
         //block explorer api
@@ -150,6 +142,11 @@ namespace currency
         MAP_JON_RPC   ("get_pool_txs_brief_details",  on_get_pool_txs_brief_details,  COMMAND_RPC_GET_POOL_TXS_BRIEF_DETAILS)
         MAP_JON_RPC   ("get_all_pool_tx_list",        on_get_all_pool_tx_list,        COMMAND_RPC_GET_ALL_POOL_TX_LIST)
         MAP_JON_RPC   ("get_pool_info",               on_get_pool_info,               COMMAND_RPC_GET_POOL_INFO)
+        MAP_JON_RPC   ("getrandom_outs",              on_get_random_outs,             COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS)
+        MAP_JON_RPC   ("getrandom_outs2",             on_get_random_outs2,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2)
+        MAP_JON_RPC   ("get_votes",                   on_get_votes,                   COMMAND_RPC_GET_VOTES)
+        //assets api
+        MAP_JON_RPC  ("get_asset_info",               on_get_asset_info,              COMMAND_RPC_GET_ASSET_INFO)
 
         MAP_JON_RPC_WE("get_main_block_details",      on_get_main_block_details,      COMMAND_RPC_GET_BLOCK_DETAILS)
         MAP_JON_RPC_WE("get_alt_block_details",       on_get_alt_block_details,       COMMAND_RPC_GET_BLOCK_DETAILS)
@@ -158,12 +155,11 @@ namespace currency
         MAP_JON_RPC   ("reset_transaction_pool",      on_reset_transaction_pool,      COMMAND_RPC_RESET_TX_POOL)
         MAP_JON_RPC   ("get_current_core_tx_expiration_median", on_get_current_core_tx_expiration_median, COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN)
         //
-        MAP_JON_RPC_WE("marketplace_global_get_offers_ex",               on_get_offers_ex,               COMMAND_RPC_GET_OFFERS_EX)
-        //remote miner rpc
-        MAP_JON_RPC_N(on_login,            mining::COMMAND_RPC_LOGIN)
-        MAP_JON_RPC_N(on_getjob,           mining::COMMAND_RPC_GETJOB)
-        MAP_JON_RPC_N(on_submit,           mining::COMMAND_RPC_SUBMITSHARE)        
+        MAP_JON_RPC_WE("marketplace_global_get_offers_ex", on_get_offers_ex,          COMMAND_RPC_GET_OFFERS_EX)        
+        MAP_JON_RPC_WE("validate_signature",          on_validate_signature,          COMMAND_VALIDATE_SIGNATURE)
+        CHAIN_TO_PHANDLER(m_prpc_chain_handler)
       END_JSON_RPC_MAP()
+      CHAIN_TO_PHANDLER(m_prpc_chain_handler)
     END_URI_MAP2()
   
   private:
@@ -171,8 +167,6 @@ namespace currency
     //-----------------------
     bool handle_command_line(const boost::program_options::variables_map& vm);
     bool check_core_ready_(const std::string& calling_method);
-    bool get_job(const std::string& job_id, mining::job_details& job, epee::json_rpc::error& err, connection_context& cntx);
-    bool get_current_hi(mining::height_info& hi);
 
     //utils
     uint64_t get_block_reward(const block& blk);
@@ -186,10 +180,7 @@ namespace currency
     std::string m_port;
     std::string m_bind_ip;
     bool m_ignore_status;
-    //mining stuff
-    epee::critical_section m_session_jobs_lock;
-    std::map<std::string, currency::block> m_session_jobs; //session id -> blob
-    std::atomic<size_t> m_session_counter;
+    epee::net_utils::http::i_chain_handler* m_prpc_chain_handler = nullptr;
   };
 }
 

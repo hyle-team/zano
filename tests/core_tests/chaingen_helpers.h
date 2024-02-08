@@ -5,6 +5,7 @@
 
 #pragma once
 #include "currency_core/currency_core.h"
+#include "currency_core/currency_format_utils.h"
 #include "currency_core/miner.h"
 #include "wallet/wallet2.h"
 #include "test_core_time.h"
@@ -87,7 +88,7 @@ inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::accou
   {
     CRITICAL_REGION_LOCAL(s_locker);
     loc_helper::txs_accessor() = &txs;
-    r = c.get_blockchain_storage().create_block_template(b, miner_addr, miner_addr, diff, height_from_template, extra, false, pe, loc_helper::fill_block_template_func);
+    r = c.get_blockchain_storage().create_block_template(miner_addr, miner_addr, extra, false, pe, loc_helper::fill_block_template_func, b, diff, height_from_template);
   }
   CHECK_AND_ASSERT_MES(r, false, "get_block_template failed");
 
@@ -173,39 +174,32 @@ inline bool mine_next_pos_block_in_playtime_with_wallet(tools::wallet2& w, const
 {
   tools::wallet2::mining_context ctx = AUTO_VAL_INIT(ctx);
   w.fill_mining_context(ctx);
-  if (!ctx.rsp.is_pos_allowed)
+  if (!ctx.is_pos_allowed)
     return false;
-  
-  pos_entries_count = ctx.sp.pos_entries.size();
+ 
 
   std::atomic<bool> stop(false);
   w.scan_pos(ctx, stop, [&w](){size_t blocks_fetched; w.refresh(blocks_fetched); return blocks_fetched == 0; }, w.get_core_runtime_config());
   
-  if (ctx.rsp.status != API_RETURN_CODE_OK)
+  pos_entries_count = ctx.total_items_checked;
+  if (ctx.status != API_RETURN_CODE_OK)
     return false;
   
-  return w.build_minted_block(ctx.sp, ctx.rsp, miner_address);
+  return w.build_minted_block(ctx, miner_address);
 }
 
-inline uint64_t random_in_range(uint64_t from, uint64_t to)
-{
-  if (from == to)
-    return from;
-  CHECK_AND_ASSERT_MES(from < to, 0, "Invalid arguments: from = " << from << ", to = " << to);
-  return crypto::rand<uint64_t>() % (to - from + 1) + from;
-}
 
 struct log_level_scope_changer
 {
   log_level_scope_changer(int desired_log_level)
   {
-    m_original_log_level = log_space::get_set_log_detalisation_level();
-    log_space::get_set_log_detalisation_level(true, desired_log_level);
+    m_original_log_level = epee::log_space::get_set_log_detalisation_level();
+    epee::log_space::get_set_log_detalisation_level(true, desired_log_level);
   }
 
   ~log_level_scope_changer()
   {
-    log_space::get_set_log_detalisation_level(true, m_original_log_level);
+    epee::log_space::get_set_log_detalisation_level(true, m_original_log_level);
   }
 
   int m_original_log_level;
@@ -234,8 +228,8 @@ inline bool resign_tx(const currency::account_keys& sender_keys, const std::vect
       return false;
     crypto::derive_secret_key(recv_derivation, se.real_output_in_tx_index, sender_keys.spend_secret_key, in_ephemeral_sec);
 
-    tx.signatures.push_back(std::vector<crypto::signature>());
-    std::vector<crypto::signature>& sigs = tx.signatures.back();
+    tx.signatures.push_back(currency::NLSAG_sig());
+    std::vector<crypto::signature>& sigs = boost::get<currency::NLSAG_sig>(tx.signatures.back()).s;
 
     if (se.is_multisig())
     {
@@ -255,7 +249,7 @@ inline bool resign_tx(const currency::account_keys& sender_keys, const std::vect
     {
       std::vector<const crypto::public_key*> keys_ptrs;
       for (const currency::tx_source_entry::output_entry& o : se.outputs)
-        keys_ptrs.push_back(&o.second);
+        keys_ptrs.push_back(&o.stealth_address);
 
       sigs.resize(se.outputs.size());
       generate_ring_signature(tx_hash_for_signature, boost::get<currency::txin_to_key>(tx.vin[i]).k_image, keys_ptrs, in_ephemeral_sec, se.real_output, sigs.data());
@@ -281,41 +275,129 @@ inline std::string gen_random_alias(size_t len)
 }
 
 template<typename alias_entry_t>
-inline bool put_alias_via_tx_to_list(std::vector<test_event_entry>& events,
+inline bool put_alias_via_tx_to_list(const currency::hard_forks_descriptor& hf, // <-- TODO: remove this
+    std::vector<test_event_entry>& events,
     std::list<currency::transaction>& tx_set,
     const currency::block& head_block,
     const currency::account_base& miner_acc,
     const alias_entry_t& ae,
     test_generator& generator)
 {
-  std::vector<currency::extra_v> ex;
-  ex.push_back(ae);
+  std::vector<currency::extra_v> extra;
+  extra.push_back(ae);
   currency::account_base reward_acc;
   currency::account_keys& ak = const_cast<currency::account_keys&>(reward_acc.get_keys());
   currency::get_aliases_reward_account(ak.account_address, ak.view_secret_key);
 
-  uint64_t fee_median = generator.get_last_n_blocks_fee_median(get_block_hash(head_block));
-  uint64_t reward = currency::get_alias_coast_from_fee(ae.m_alias, fee_median);
-
-  MAKE_TX_MIX_LIST_EXTRA_MIX_ATTR(events, 
-    tx_set,
-    miner_acc,
-    reward_acc,
-    reward,
-    0,
-    head_block,
-    CURRENCY_TO_KEY_OUT_RELAXED,
-    ex,
-    std::vector<currency::attachment_v>());
-  
-
-  uint64_t found_alias_reward = get_amount_for_zero_pubkeys(tx_set.back());
-  if (found_alias_reward != reward)
+  uint64_t alias_reward = 0;
+  if (get_block_height(head_block) < ALIAS_MEDIAN_RECALC_INTERWAL)
   {
-    LOCAL_ASSERT(false);
-    CHECK_AND_ASSERT_MES(false, false, "wrong transaction constructed, first input value not match alias amount or account");
-    return false;
+    alias_reward = currency::get_alias_coast_from_fee(ae.m_alias, ALIAS_VERY_INITAL_COAST); // don't ask why
+  }
+  else
+  {
+    LOCAL_ASSERT(false); // not implemented yet, see also all the mess around blockchain_storage::get_tx_fee_median(), get_tx_fee_median_effective_index() etc.
+  }
+
+  std::vector<currency::tx_source_entry> sources;
+  std::vector<currency::tx_destination_entry> destinations;
+  bool r = fill_tx_sources_and_destinations(events, head_block, miner_acc, reward_acc, alias_reward, TESTS_DEFAULT_FEE, 0, sources, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "alias: fill_tx_sources_and_destinations failed");
+
+  for(auto& el : destinations)
+  {
+    if (el.addr.front() == reward_acc.get_public_address())
+      el.flags |= currency::tx_destination_entry_flags::tdef_explicit_native_asset_id | currency::tx_destination_entry_flags::tdef_zero_amount_blinding_mask; // all alias-burn outputs must have explicit native asset id and zero amount mask
+  }
+
+  uint64_t tx_version = currency::get_tx_version(get_block_height(head_block) + 1, generator.get_hardforks()); // assuming the tx will be in the next block (head_block + 1)
+  tx_set.emplace_back();
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_set.back(), tx_version, generator.last_tx_generated_secret_key, 0);
+  PRINT_EVENT_N_TEXT(events, "put_alias_via_tx_to_list()");
+  events.push_back(tx_set.back());
+
+  // make sure the tx's amount commitments balance each other correctly 
+  uint64_t burnt_amount = 0;
+  if (!check_native_coins_amount_burnt_in_outs(tx_set.back(), alias_reward, &burnt_amount))
+  {
+    CHECK_AND_ASSERT_MES(false, false, "alias reward was not found, expected: " << currency::print_money_brief(alias_reward)
+      << "; burnt: " << (tx_set.back().version <= TRANSACTION_VERSION_PRE_HF4 ? currency::print_money_brief(burnt_amount) : "hidden") << "; tx: " << get_transaction_hash(tx_set.back()));
   }
 
   return true;
+}
+
+namespace details
+{
+  template<typename C, typename R>
+  void print_tx_size_breakdown_processor(C& container, R& result)
+  {
+    for(auto& el : container)
+      result.emplace_back(el.type().name(), t_serializable_object_to_blob(el).size());
+  }
+}
+
+inline std::string print_tx_size_breakdown(const currency::transaction& tx)
+{
+  std::vector<std::pair<std::string, size_t>> sizes;
+
+  details::print_tx_size_breakdown_processor(tx.vin, sizes);
+  details::print_tx_size_breakdown_processor(tx.signatures, sizes);
+  details::print_tx_size_breakdown_processor(tx.extra, sizes);
+  details::print_tx_size_breakdown_processor(tx.vout, sizes);
+  details::print_tx_size_breakdown_processor(tx.attachment, sizes);
+  details::print_tx_size_breakdown_processor(tx.proofs, sizes);
+
+  size_t len_max = 0;
+  for(auto& el : sizes)
+  {
+    boost::ireplace_all(el.first, "struct ", "");
+    boost::ireplace_all(el.first, "currency::", "");
+    boost::ireplace_all(el.first, "crypto::", "");
+    len_max = std::max(len_max, el.first.size());
+  }
+
+  std::stringstream ss;
+  ss << "total tx size: " << t_serializable_object_to_blob(tx).size() << ENDL;
+  for(auto& el : sizes)
+    ss << el.first << std::string(len_max - el.first.size() + 4, ' ') << el.second << ENDL;
+
+  return ss.str();
+}
+
+//---------------------------------------------------------------
+namespace currency
+{
+  //this lookup_acc_outs overload is mostly for backward compatibility for tests, ineffective from performance perspective, should not be used in wallet
+  inline bool lookup_acc_outs(const currency::account_keys& acc, const currency::transaction& tx, std::vector<currency::wallet_out_info>& outs, uint64_t& sum_of_native_outs, crypto::key_derivation& derivation)
+  {
+    outs.clear();
+    sum_of_native_outs = 0;
+    bool res = currency::lookup_acc_outs(acc, tx, outs, derivation);
+    for (const auto& o : outs)
+    {
+      if (o.asset_id == currency::native_coin_asset_id)
+      {
+        sum_of_native_outs += o.amount;
+      }
+    }
+    return res;
+  }
+
+  //this lookup_acc_outs overload is mostly for backward compatibility for tests, ineffective from performance perspective, should not be used in wallet
+  inline bool lookup_acc_outs(const currency::account_keys& acc, const currency::transaction& tx, const crypto::public_key& /*tx_onetime_pubkey*/, std::vector<currency::wallet_out_info>& outs, uint64_t& sum_of_native_outs, crypto::key_derivation& derivation)
+  {
+    sum_of_native_outs = 0;
+    bool res = currency::lookup_acc_outs(acc, tx, outs, derivation);
+    for (const auto& o : outs)
+    {
+      if (o.asset_id == currency::native_coin_asset_id)
+      {
+        sum_of_native_outs += o.amount;
+      }
+    }
+    return res;
+  }
+ 
+
 }

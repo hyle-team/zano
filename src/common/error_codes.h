@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "../currency_core/basic_api_response_codes.h"
 
 #define API_RETURN_CODE_OK                                      BASIC_RESPONSE_STATUS_OK
 #define API_RETURN_CODE_FAIL                                    BASIC_RESPONSE_STATUS_FAILED
@@ -23,6 +24,7 @@
 #define API_RETURN_CODE_WALLET_WRONG_ID                         "WALLET_WRONG_ID"
 #define API_RETURN_CODE_WALLET_WATCH_ONLY_NOT_SUPPORTED         "WALLET_WATCH_ONLY_NOT_SUPPORTED"
 #define API_RETURN_CODE_WALLET_AUDITABLE_NOT_SUPPORTED          "WALLET_AUDITABLE_NOT_SUPPORTED"
+#define API_RETURN_CODE_WALLET_FEE_TOO_LOW                      "API_RETURN_CODE_WALLET_FEE_TOO_LOW"
 #define API_RETURN_CODE_FILE_NOT_FOUND                          "FILE_NOT_FOUND"
 #define API_RETURN_CODE_ALREADY_EXISTS                          "ALREADY_EXISTS"
 #define API_RETURN_CODE_CANCELED                                "CANCELED"
@@ -41,3 +43,4 @@
 #define API_RETURN_CODE_TX_REJECTED                             "TX_REJECTED"
 #define API_RETURN_CODE_HTLC_ORIGIN_HASH_MISSMATCHED            "HTLC_ORIGIN_HASH_MISSMATCHED"
 #define API_RETURN_CODE_WRAP                                    "WRAP"
+#define API_RETURN_CODE_MISSING_ZC_INPUTS                       "MISSING_ZC_INPUTS"

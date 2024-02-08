@@ -7,6 +7,7 @@
 #include "pos_validation.h"
 #include "tx_builder.h"
 #include "pos_block_builder.h"
+#include "random_helper.h"
 
 using namespace epee;
 using namespace crypto;
@@ -71,14 +72,14 @@ bool gen_pos_coinstake_already_spent::generate(std::vector<test_event_entry>& ev
   uint64_t stake_output_gidx = 0;
   bool r = find_global_index_for_output(events, prev_id, stake, stake_output_idx, stake_output_gidx);
   CHECK_AND_ASSERT_MES(r, false, "find_global_index_for_output failed");
-  uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+  uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
   crypto::key_image stake_output_key_image;
   keypair kp;
   generate_key_image_helper(miner.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
   pos_block_builder pb;
-  pb.step1_init_header(height, prev_id);
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
   pb.step2_set_txs(std::vector<transaction>());
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
   pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), alice.get_public_address());
@@ -122,14 +123,14 @@ bool gen_pos_incorrect_timestamp::generate(std::vector<test_event_entry>& events
   crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
   size_t stake_output_idx = 0;
   size_t stake_output_gidx = 0;
-  uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+  uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
   crypto::key_image stake_output_key_image;
   keypair kp;
   generate_key_image_helper(miner.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
   pos_block_builder pb;
-  pb.step1_init_header(height, prev_id);
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
   pb.step2_set_txs(std::vector<transaction>());
   // use incorrect timestamp_step
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, blk_0r.timestamp - 1, POS_SCAN_WINDOW, POS_SCAN_STEP - 1);
@@ -147,7 +148,7 @@ bool gen_pos_incorrect_timestamp::generate(std::vector<test_event_entry>& events
 
   // Now try PoS timestamp window boundaries.
   pb.clear();
-  pb.step1_init_header(height, prev_id);
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
   pb.step2_set_txs(std::vector<transaction>());
   // move timestamp to the future
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, ts + CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT + 1, POS_SCAN_WINDOW, POS_SCAN_STEP);
@@ -161,7 +162,7 @@ bool gen_pos_incorrect_timestamp::generate(std::vector<test_event_entry>& events
 
   // lower limit
   pb.clear();
-  pb.step1_init_header(height, prev_id);
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
   pb.step2_set_txs(std::vector<transaction>());
   // move timestamp to the future
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, genesis_ts - POS_SCAN_WINDOW, POS_SCAN_WINDOW, POS_SCAN_STEP);
@@ -239,24 +240,24 @@ bool gen_pos_extra_nonce::generate(std::vector<test_event_entry>& events) const
   crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
   size_t stake_output_idx = 0;
   size_t stake_output_gidx = 0;
-  uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+  uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
   crypto::key_image stake_output_key_image;
   keypair kp;
   generate_key_image_helper(miner.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
   pos_block_builder pb;
-  pb.step1_init_header(height, prev_id);
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
   pb.step2_set_txs(std::vector<transaction>());
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, blk_0r.timestamp);
 
   // use biggest possible extra nonce (255 bytes) + largest alias
-  currency::blobdata extra_none(255, 'x');
-  currency::extra_alias_entry alias = AUTO_VAL_INIT(alias);
-  alias.m_alias = std::string(255, 'a');
-  alias.m_address = miner.get_keys().account_address;
-  alias.m_text_comment = std::string(255, 'y');
-  pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(blk_0r), alice.get_public_address(), extra_none, CURRENCY_MINER_TX_MAX_OUTS, alias);
+  currency::blobdata extra_nonce(255, 'x');
+  //currency::extra_alias_entry alias = AUTO_VAL_INIT(alias); // TODO: this alias entry was ignored for a long time, now I commented it out, make sure it's okay -- sowle 
+  //alias.m_alias = std::string(255, 'a');
+  //alias.m_address = miner.get_keys().account_address;
+  //alias.m_text_comment = std::string(255, 'y');
+  pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(blk_0r), alice.get_public_address(), extra_nonce, CURRENCY_MINER_TX_MAX_OUTS);
   pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, miner);
   block blk_1 = pb.m_block;
 
@@ -293,14 +294,14 @@ bool gen_pos_min_allowed_height::generate(std::vector<test_event_entry>& events)
   crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
   size_t stake_output_idx = 0;
   size_t stake_output_gidx = 0;
-  uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+  uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
   crypto::key_image stake_output_key_image;
   keypair kp;
   generate_key_image_helper(miner.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
   pos_block_builder pb;
-  pb.step1_init_header(height, prev_id);
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
   pb.step2_set_txs(std::vector<transaction>(1, tx_1));
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, blk_0r.timestamp);
   pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(blk_0r), alice.get_public_address());
@@ -345,14 +346,14 @@ bool gen_pos_invalid_coinbase::generate(std::vector<test_event_entry>& events) c
   crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
   size_t stake_output_idx = 0;
   size_t stake_output_gidx = 0;
-  uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+  uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
   crypto::key_image stake_output_key_image;
   keypair kp;
   generate_key_image_helper(miner_acc.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
   pos_block_builder pb;
-  pb.step1_init_header(height, prev_id);
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
   pb.step2_set_txs(std::vector<transaction>());
   pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
   pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), alice_acc.get_public_address());
@@ -503,10 +504,10 @@ bool pos_wallet_minting_same_amount_diff_outs::prepare_wallets_0(currency::core&
 
     // check pos entries actually available
     w.w->refresh();
-    currency::COMMAND_RPC_SCAN_POS::request req = AUTO_VAL_INIT(req);
-    r = w.w->get_pos_entries(req);
+    std::vector<pos_entry> pos_entries;
+    r = w.w->get_pos_entries(pos_entries);
     CHECK_AND_ASSERT_MES(r, false, "get_pos_entries failed");
-    CHECK_AND_ASSERT_MES(req.pos_entries.size() == w.pos_entries_count, false, "incorrect pos entries count in the wallet: " << req.pos_entries.size() << ", expected: " << w.pos_entries_count);
+    CHECK_AND_ASSERT_MES(pos_entries.size() == w.pos_entries_count, false, "incorrect pos entries count in the wallet: " << pos_entries.size() << ", expected: " << w.pos_entries_count);
     uint64_t balance_unlocked = 0;
     w.w->balance(balance_unlocked);
     CHECK_AND_ASSERT_MES(balance_unlocked == m_wallet_stake_amount, false, "incorrect wallet unlocked balance: " << print_money(balance_unlocked) << ", expected: " << print_money(m_wallet_stake_amount));
@@ -514,13 +515,13 @@ bool pos_wallet_minting_same_amount_diff_outs::prepare_wallets_0(currency::core&
     // make sure all wallets has the same distribution of pos_entries
     if (i == 0)
     {
-      first_wallet_pos_entries = req.pos_entries;
+      first_wallet_pos_entries = pos_entries;
     }
     else
     {
       for(size_t i = 0; i < pos_amounts.size(); ++i)
       {
-        CHECK_AND_ASSERT_MES(req.pos_entries[i].amount == first_wallet_pos_entries[i].amount, false, "Wallet pos entry #" << i << " has incorrect amount: " << print_money(req.pos_entries[i].amount) << ", expected (as in 1st wallet): " << print_money(first_wallet_pos_entries[i].amount));
+        CHECK_AND_ASSERT_MES(pos_entries[i].amount == first_wallet_pos_entries[i].amount, false, "Wallet pos entry #" << i << " has incorrect amount: " << print_money(pos_entries[i].amount) << ", expected (as in 1st wallet): " << print_money(first_wallet_pos_entries[i].amount));
       }
     }
   }
@@ -560,10 +561,8 @@ bool pos_wallet_minting_same_amount_diff_outs::prepare_wallets_1(currency::core&
 
     // check pos entries actually available
     w.w->refresh();
-    currency::COMMAND_RPC_SCAN_POS::request req = AUTO_VAL_INIT(req);
-    r = w.w->get_pos_entries(req);
-    CHECK_AND_ASSERT_MES(r, false, "get_pos_entries failed");
-    CHECK_AND_ASSERT_MES(req.pos_entries.size() == w.pos_entries_count, false, "incorrect pos entries count in the wallet: " << req.pos_entries.size() << ", expected: " << w.pos_entries_count);
+    size_t pos_entries_count = w.w->get_pos_entries_count();
+    CHECK_AND_ASSERT_MES(pos_entries_count == w.pos_entries_count, false, "incorrect pos entries count in the wallet: " << pos_entries_count << ", expected: " << w.pos_entries_count);
     uint64_t balance_unlocked = 0;
     w.w->balance(balance_unlocked);
     CHECK_AND_ASSERT_MES(balance_unlocked == m_wallet_stake_amount, false, "incorrect wallet unlocked balance: " << print_money(balance_unlocked) << ", expected: " << print_money(m_wallet_stake_amount));
@@ -771,14 +770,14 @@ bool pos_wallet_big_block_test::generate(std::vector<test_event_entry>& events) 
 
   crypto::secret_key stub;
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources_1, destinations, extra, empty_attachment, tx_1, stub, 0);
+  r = construct_tx(miner_acc.get_keys(), sources_1, destinations, extra, empty_attachment, tx_1, get_tx_version_from_events(events), stub, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   size_t tx_size = get_object_blobsize(tx_1);
   CHECK_AND_ASSERT_MES(tx_size > padding_size, false, "Tx size is: " << tx_size << ", expected to be bigger than: " << padding_size);
   events.push_back(tx_1); // push it to the pool
 
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
-  r = construct_tx(miner_acc.get_keys(), sources_2, destinations, extra, empty_attachment, tx_2, stub, 0);
+  r = construct_tx(miner_acc.get_keys(), sources_2, destinations, extra, empty_attachment, tx_2, get_tx_version_from_events(events), stub, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   tx_size = get_object_blobsize(tx_2);
   CHECK_AND_ASSERT_MES(tx_size > padding_size, false, "Tx size is: " << tx_size << ", expected to be bigger than: " << padding_size);
@@ -850,6 +849,7 @@ bool pos_wallet_big_block_test::c1(currency::core& c, size_t ev_index, const std
 
 pos_altblocks_validation::pos_altblocks_validation()
 {
+  test_chain_unit_base::set_hardforks_for_old_tests();
 }
 
 bool pos_altblocks_validation::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
@@ -881,7 +881,7 @@ bool pos_altblocks_validation::generate(std::vector<test_event_entry>& events) c
   // select stake_tx_out_id as an output with the biggest amount
   for (size_t i = 1; i < stake_tx.vout.size(); ++i)
   {
-    if (stake_tx.vout[i].amount > stake_tx.vout[stake_tx_out_id].amount)
+    if (boost::get<currency::tx_out_bare>(stake_tx.vout[i]).amount >boost::get<currency::tx_out_bare>( stake_tx.vout[stake_tx_out_id]).amount)
       stake_tx_out_id = i;
   }
 
@@ -1044,7 +1044,7 @@ bool pos_minting_tx_packing::pos_minting_tx_packing::generate(std::vector<test_e
   // 10 outputs each of (CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size) coins
   
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), m_alice_start_amount, 10, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), m_alice_start_amount, 10, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
 
   events.push_back(tx_1);
@@ -1085,7 +1085,7 @@ bool pos_minting_tx_packing::c1(currency::core& c, size_t ev_index, const std::v
     m_alice_start_amount + CURRENCY_BLOCK_REWARD * m_pos_mint_packing_size // unlocked
   ), false, "");
 
-  alice_wlt->set_pos_mint_packing_size(m_pos_mint_packing_size);
+  alice_wlt->set_pos_utxo_count_limits_for_defragmentation_tx(m_pos_mint_packing_size + 1, m_pos_mint_packing_size + 1); // +1 because previous implementation () had an error with this limit 
 
   // no coinbase tx outputs should be packed
   r = alice_wlt->try_mint_pos();

@@ -17,7 +17,10 @@ public:
 
   bool test()
   {
-    const currency::txout_to_key& tx_out = boost::get<currency::txout_to_key>(m_tx.vout[0].target);
-    return currency::is_out_to_acc(m_bob.get_keys(), tx_out, m_tx_pub_key, 0);
+    const currency::txout_to_key& tx_out = boost::get<currency::txout_to_key>(boost::get<currency::tx_out_bare>(m_tx.vout[0]).target);
+
+    crypto::key_derivation derivation;
+    generate_key_derivation(m_tx_pub_key, m_bob.get_keys().view_secret_key, derivation);
+    return currency::is_out_to_acc(m_bob.get_public_address(), tx_out, derivation, 0);
   }
 };

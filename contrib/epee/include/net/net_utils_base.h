@@ -79,6 +79,8 @@ namespace net_utils
                                m_started(time(NULL))
     {}
 
+    connection_context_base(const connection_context_base& a) = default;
+
     connection_context_base& operator=(const connection_context_base& a)
     {
       set_details(a.m_connection_id, a.m_remote_ip, a.m_remote_port, a.m_is_income);

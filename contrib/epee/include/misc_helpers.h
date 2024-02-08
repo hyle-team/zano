@@ -54,18 +54,19 @@
   catch(const std::exception& ex) \
 { \
   (void)(ex); \
-  LOG_ERROR("Exception at [" << location << "], what=" << ex.what()); \
   custom_code; \
+  LOG_ERROR("Exception at [" << location << "], what=" << ex.what()); \
   return return_val; \
 } \
   catch(...) \
 { \
-  LOG_ERROR("Exception at [" << location << "], generic exception \"...\""); \
   custom_code; \
+  LOG_ERROR("Exception at [" << location << "], generic exception \"...\""); \
   return return_val; \
 }
 #define CATCH_ENTRY(location, return_val) CATCH_ENTRY_CUSTOM(location, (void)0, return_val)
 #define CATCH_ENTRY2(return_val) CATCH_ENTRY_CUSTOM(LOCATION_SS, (void)0, return_val)
+#define CATCH_ENTRY_CUSTOM2(custom_code, return_val) CATCH_ENTRY_CUSTOM(LOCATION_SS, custom_code, return_val)
 
 #define CATCH_ENTRY_L0(location, return_val) CATCH_ENTRY(location, return_val)
 #define CATCH_ENTRY_L1(location, return_val) CATCH_ENTRY(location, return_val)

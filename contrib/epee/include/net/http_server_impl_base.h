@@ -31,7 +31,7 @@
 
 
 #include <boost/thread.hpp>
-#include <boost/bind.hpp> 
+#include <boost/bind/bind.hpp> 
 
 #include "net/http_server_cp2.h"
 #include "net/http_server_handlers_map2.h"
@@ -65,7 +65,7 @@ namespace epee
       bool res = m_net_server.init_server(bind_port, bind_ip);
       if(!res)
       {
-        LOG_ERROR("Failed to bind server");
+        LOG_ERROR("Failed to bind to " << bind_ip << ":" << bind_port);
         return false;
       }
       return true;
@@ -74,14 +74,14 @@ namespace epee
     bool run(size_t threads_count, bool wait = true)
     {
       //go to loop
-      LOG_PRINT("Run net_service loop( " << threads_count << " threads)...", LOG_LEVEL_0);
+      LOG_PRINT("Run net_service loop (" << threads_count << " threads)...", LOG_LEVEL_1);
       if(!m_net_server.run_server(threads_count, wait))
       {
         LOG_ERROR("Failed to run net tcp server!");
       }
 
       if(wait)
-        LOG_PRINT("net_service loop stopped.", LOG_LEVEL_0);
+        LOG_PRINT("net_service loop stopped.", LOG_LEVEL_1);
       return true;
     }
 

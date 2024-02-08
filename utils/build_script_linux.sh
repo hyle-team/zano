@@ -3,16 +3,19 @@
 # Environment prerequisites:
 # 1) QT_PREFIX_PATH should be set to Qt libs folder
 # 2) BOOST_ROOT should be set to the root of Boost
+# 3) OPENSSL_ROOT_DIR should be set to the root of OpenSSL
 #
 # for example, place these lines to the end of your ~/.bashrc :
 #
 # export BOOST_ROOT=/home/user/boost_1_66_0
 # export QT_PREFIX_PATH=/home/user/Qt5.10.1/5.10.1/gcc_64
+# export OPENSSL_ROOT_DIR=/home/user/openssl
 
 ARCHIVE_NAME_PREFIX=zano-linux-x64-
 
 : "${BOOST_ROOT:?BOOST_ROOT should be set to the root of Boost, ex.: /home/user/boost_1_66_0}"
 : "${QT_PREFIX_PATH:?QT_PREFIX_PATH should be set to Qt libs folder, ex.: /home/user/Qt5.10.1/5.10.1/gcc_64}"
+: "${OPENSSL_ROOT_DIR:?OPENSSL_ROOT_DIR should be set to OpenSSL root folder, ex.: /home/user/openssl}"
 
 if [ -n "$build_prefix" ]; then
   ARCHIVE_NAME_PREFIX=${ARCHIVE_NAME_PREFIX}${build_prefix}-
@@ -40,30 +43,23 @@ echo "--------------------------------------------------"
 echo "Building...." 
 
 rm -rf build; mkdir -p build/release; cd build/release; 
-cmake $testnet_def -D STATIC=true -D ARCH=x86-64 -D BUILD_GUI=TRUE -D CMAKE_PREFIX_PATH="$QT_PREFIX_PATH" -D CMAKE_BUILD_TYPE=Release ../..
+cmake $testnet_def -D STATIC=true -D ARCH=x86-64 -D BUILD_GUI=TRUE -D OPENSSL_ROOT_DIR="$OPENSSL_ROOT_DIR" -D CMAKE_PREFIX_PATH="$QT_PREFIX_PATH" -D CMAKE_BUILD_TYPE=Release ../..
 if [ $? -ne 0 ]; then
     echo "Failed to run cmake"
     exit 1
 fi
 
-make -j1 daemon Zano;
+make -j2 daemon simplewallet connectivity_tool
 if [ $? -ne 0 ]; then
     echo "Failed to make!"
     exit 1
 fi
 
-make -j1 simplewallet;
+make -j1 Zano
 if [ $? -ne 0 ]; then
     echo "Failed to make!"
     exit 1
 fi
-
-make -j1 connectivity_tool;
-if [ $? -ne 0 ]; then
-    echo "Failed to make!"
-    exit 1
-fi
-
 
 
 read version_str <<< $(./src/zanod --version | awk '/^Zano/ { print $2 }')
@@ -141,11 +137,11 @@ fi
 read checksum <<< $(sha256sum $package_filename | awk '/^/ { print $1 }' )
 
 mail_msg="New ${build_prefix_label}${testnet_label}${copy_qt_dev_tools_label}build for linux-x64:<br>
-https://build.zano.org/builds/$package_filename<br>
+<a href='https://build.zano.org/builds/$package_filename'>https://build.zano.org/builds/$package_filename</a><br>
 sha256: $checksum"
 
 echo "$mail_msg"
 
-echo "$mail_msg" | mail -s "Zano linux-x64 ${build_prefix_label}${testnet_label}${copy_qt_dev_tools_label}build $version_str" ${emails}
+python3 ../../utils/build_mail.py "Zano linux-x64 ${build_prefix_label}${testnet_label}${copy_qt_dev_tools_label}build $version_str" "${emails}" "$mail_msg"
 
 exit 0

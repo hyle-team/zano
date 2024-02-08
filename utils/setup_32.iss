@@ -51,6 +51,8 @@ Root: HKCR; Subkey: "ZanoWalletDataKyesFile"; ValueType: string; ValueName: ""; 
 Root: HKCR; Subkey: "ZanoWalletDataFile\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\zano.exe,0"
 Root: HKCR; Subkey: "ZanoWalletDataKyesFile\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\zano.exe,0"
 
+Root: HKCR; Subkey: "Zano"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
+Root: HKCR; Subkey: "Zano\shell\open\command"; ValueType: string; ValueName: ""; ValueData: "{app}\zano.exe %1"
 
 [Files]
 

@@ -7,6 +7,7 @@
 #pragma once
 
 #include <boost/lexical_cast.hpp>
+#include <boost/bind/placeholders.hpp>
 
 #include "console_handler.h"
 #include "p2p/net_node.h"
@@ -17,6 +18,8 @@
 #include "currency_core/bc_offers_service.h"
 #include "serialization/binary_utils.h"
 #include "simplewallet/password_container.h"
+
+namespace ph = boost::placeholders;
 
 PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4100)
@@ -31,49 +34,49 @@ class daemon_commands_handler
 public:
   daemon_commands_handler(nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >& srv, currency::core_rpc_server& rpc) :m_srv(srv), m_rpc(rpc)
   {
-    m_cmd_binder.set_handler("help", boost::bind(&console_handlers_binder::help, &m_cmd_binder, _1), "Show this help");
-    m_cmd_binder.set_handler("print_pl", boost::bind(&daemon_commands_handler::print_pl, this, _1), "Print peer list");
-    m_cmd_binder.set_handler("print_cn", boost::bind(&daemon_commands_handler::print_cn, this, _1), "Print connections");
-    m_cmd_binder.set_handler("print_bc", boost::bind(&daemon_commands_handler::print_bc, this, _1), "Print blockchain info in a given blocks range, print_bc <begin_height> [<end_height>]");
-    m_cmd_binder.set_handler("print_bc_tx", boost::bind(&daemon_commands_handler::print_bc_tx, this, _1), "Print blockchain info with trnsactions in a given blocks range, print_bc <begin_height> [<end_height>]");
-    //m_cmd_binder.set_handler("print_bci", boost::bind(&daemon_commands_handler::print_bci, this, _1));
-    m_cmd_binder.set_handler("print_bc_outs", boost::bind(&daemon_commands_handler::print_bc_outs, this, _1));
-    m_cmd_binder.set_handler("print_market", boost::bind(&daemon_commands_handler::print_market, this, _1));
-    m_cmd_binder.set_handler("print_bc_outs_stats", boost::bind(&daemon_commands_handler::print_bc_outs_stats, this, _1));
-    m_cmd_binder.set_handler("print_block", boost::bind(&daemon_commands_handler::print_block, this, _1), "Print block, print_block <block_hash> | <block_height>");
-    m_cmd_binder.set_handler("print_block_info", boost::bind(&daemon_commands_handler::print_block_info, this, _1), "Print block info, print_block <block_hash> | <block_height>");
-    m_cmd_binder.set_handler("print_tx_prun_info", boost::bind(&daemon_commands_handler::print_tx_prun_info, this, _1), "Print tx prunning info");
-    m_cmd_binder.set_handler("print_tx", boost::bind(&daemon_commands_handler::print_tx, this, _1), "Print transaction, print_tx <transaction_hash>");
-    m_cmd_binder.set_handler("start_mining", boost::bind(&daemon_commands_handler::start_mining, this, _1), "Start mining for specified address, start_mining <addr> [threads=1]");
-    m_cmd_binder.set_handler("stop_mining", boost::bind(&daemon_commands_handler::stop_mining, this, _1), "Stop mining");
-    m_cmd_binder.set_handler("print_pool", boost::bind(&daemon_commands_handler::print_pool, this, _1), "Print transaction pool (long format)");
-    m_cmd_binder.set_handler("print_pool_sh", boost::bind(&daemon_commands_handler::print_pool_sh, this, _1), "Print transaction pool (short format)");
-    m_cmd_binder.set_handler("show_hr", boost::bind(&daemon_commands_handler::show_hr, this, _1), "Start showing hash rate");
-    m_cmd_binder.set_handler("hide_hr", boost::bind(&daemon_commands_handler::hide_hr, this, _1), "Stop showing hash rate");
-    m_cmd_binder.set_handler("save", boost::bind(&daemon_commands_handler::save, this, _1), "Save blockchain");
-    m_cmd_binder.set_handler("print_daemon_stat", boost::bind(&daemon_commands_handler::print_daemon_stat, this, _1), "Print daemon stat");
-    m_cmd_binder.set_handler("print_debug_stat", boost::bind(&daemon_commands_handler::print_debug_stat, this, _1), "Print debug stat info");
-    m_cmd_binder.set_handler("get_transactions_statics", boost::bind(&daemon_commands_handler::get_transactions_statistics, this, _1), "Calculates transactions statistics");
-    m_cmd_binder.set_handler("force_relay_tx_pool", boost::bind(&daemon_commands_handler::force_relay_tx_pool, this, _1), "re-relay all transactions from pool");
-    m_cmd_binder.set_handler("enable_channel", boost::bind(&daemon_commands_handler::enable_channel, this, _1), "Enable specified log channel");
-    m_cmd_binder.set_handler("disable_channel", boost::bind(&daemon_commands_handler::disable_channel, this, _1), "Enable specified log channel");
-    m_cmd_binder.set_handler("clear_cache", boost::bind(&daemon_commands_handler::clear_cache, this, _1), "Clear blockchain storage cache");
-    m_cmd_binder.set_handler("clear_altblocks", boost::bind(&daemon_commands_handler::clear_altblocks, this, _1), "Clear blockchain storage cache");
-    m_cmd_binder.set_handler("truncate_bc", boost::bind(&daemon_commands_handler::truncate_bc, this, _1), "Truncate blockchain to specified height");
-    m_cmd_binder.set_handler("inspect_block_index", boost::bind(&daemon_commands_handler::inspect_block_index, this, _1), "Inspects block index for internal errors");
-    m_cmd_binder.set_handler("print_db_performance_data", boost::bind(&daemon_commands_handler::print_db_performance_data, this, _1), "Dumps all db containers performance counters");
-    m_cmd_binder.set_handler("search_by_id", boost::bind(&daemon_commands_handler::search_by_id, this, _1), "Search all possible elemets by given id");
-    m_cmd_binder.set_handler("find_key_image", boost::bind(&daemon_commands_handler::find_key_image, this, _1), "Try to find tx related to key_image");
-    m_cmd_binder.set_handler("rescan_aliases", boost::bind(&daemon_commands_handler::rescan_aliases, this, _1), "Debug function");
-    m_cmd_binder.set_handler("forecast_difficulty", boost::bind(&daemon_commands_handler::forecast_difficulty, this, _1), "Prints PoW and PoS difficulties for as many future blocks as possible based on current conditions");
-    m_cmd_binder.set_handler("print_deadlock_guard", boost::bind(&daemon_commands_handler::print_deadlock_guard, this, _1), "Print all threads which is blocked or involved in mutex ownership");
-    m_cmd_binder.set_handler("print_block_from_hex_blob", boost::bind(&daemon_commands_handler::print_block_from_hex_blob, this, _1), "Unserialize block from hex binary data to json-like representation");
-    m_cmd_binder.set_handler("print_tx_from_hex_blob", boost::bind(&daemon_commands_handler::print_tx_from_hex_blob, this, _1), "Unserialize transaction from hex binary data to json-like representation");
-    m_cmd_binder.set_handler("print_tx_outputs_usage", boost::bind(&daemon_commands_handler::print_tx_outputs_usage, this, _1), "Analyse if tx outputs for involved in subsequent transactions");
-    m_cmd_binder.set_handler("print_difficulties_of_last_n_blocks", boost::bind(&daemon_commands_handler::print_difficulties_of_last_n_blocks, this, _1), "Print difficulties of last n blocks");
-    m_cmd_binder.set_handler("debug_remote_node_mode", boost::bind(&daemon_commands_handler::debug_remote_node_mode, this, _1), "<ip-address> - If node got connected put node into 'debug mode' i.e. no sync process of other communication except ping responses, maintenance secrete key will be requested"); 
+    m_cmd_binder.set_handler("help", boost::bind(&console_handlers_binder::help, &m_cmd_binder, ph::_1), "Show this help");
+    m_cmd_binder.set_handler("print_pl", boost::bind(&daemon_commands_handler::print_pl, this, ph::_1), "Print peer list");
+    m_cmd_binder.set_handler("print_cn", boost::bind(&daemon_commands_handler::print_cn, this, ph::_1), "Print connections");
+    m_cmd_binder.set_handler("print_bc", boost::bind(&daemon_commands_handler::print_bc, this, ph::_1), "Print blockchain info in a given blocks range, print_bc <begin_height> [<end_height>]");
+    m_cmd_binder.set_handler("print_bc_tx", boost::bind(&daemon_commands_handler::print_bc_tx, this, ph::_1), "Print blockchain info with trnsactions in a given blocks range, print_bc <begin_height> [<end_height>]");
+    //m_cmd_binder.set_handler("print_bci", boost::bind(&daemon_commands_handler::print_bci, this, ph::_1));
+    m_cmd_binder.set_handler("print_bc_outs", boost::bind(&daemon_commands_handler::print_bc_outs, this, ph::_1));
+    m_cmd_binder.set_handler("print_market", boost::bind(&daemon_commands_handler::print_market, this, ph::_1));
+    m_cmd_binder.set_handler("print_bc_outs_stats", boost::bind(&daemon_commands_handler::print_bc_outs_stats, this, ph::_1));
+    m_cmd_binder.set_handler("print_block", boost::bind(&daemon_commands_handler::print_block, this, ph::_1), "Print block, print_block <block_hash> | <block_height>");
+    m_cmd_binder.set_handler("print_block_info", boost::bind(&daemon_commands_handler::print_block_info, this, ph::_1), "Print block info, print_block <block_hash> | <block_height>");
+    m_cmd_binder.set_handler("print_tx_prun_info", boost::bind(&daemon_commands_handler::print_tx_prun_info, this, ph::_1), "Print tx prunning info");
+    m_cmd_binder.set_handler("print_tx", boost::bind(&daemon_commands_handler::print_tx, this, ph::_1), "Print transaction, print_tx <transaction_hash>");
+    m_cmd_binder.set_handler("start_mining", boost::bind(&daemon_commands_handler::start_mining, this, ph::_1), "Start mining for specified address, start_mining <addr> [threads=1]");
+    m_cmd_binder.set_handler("stop_mining", boost::bind(&daemon_commands_handler::stop_mining, this, ph::_1), "Stop mining");
+    m_cmd_binder.set_handler("print_pool", boost::bind(&daemon_commands_handler::print_pool, this, ph::_1), "Print transaction pool (long format)");
+    m_cmd_binder.set_handler("print_pool_sh", boost::bind(&daemon_commands_handler::print_pool_sh, this, ph::_1), "Print transaction pool (short format)");
+    m_cmd_binder.set_handler("show_hr", boost::bind(&daemon_commands_handler::show_hr, this, ph::_1), "Start showing hash rate");
+    m_cmd_binder.set_handler("hide_hr", boost::bind(&daemon_commands_handler::hide_hr, this, ph::_1), "Stop showing hash rate");
+    m_cmd_binder.set_handler("save", boost::bind(&daemon_commands_handler::save, this, ph::_1), "Save blockchain");
+    m_cmd_binder.set_handler("print_daemon_stat", boost::bind(&daemon_commands_handler::print_daemon_stat, this, ph::_1), "Print daemon stat");
+    m_cmd_binder.set_handler("print_debug_stat", boost::bind(&daemon_commands_handler::print_debug_stat, this, ph::_1), "Print debug stat info");
+    m_cmd_binder.set_handler("get_transactions_statics", boost::bind(&daemon_commands_handler::get_transactions_statistics, this, ph::_1), "Calculates transactions statistics");
+    m_cmd_binder.set_handler("force_relay_tx_pool", boost::bind(&daemon_commands_handler::force_relay_tx_pool, this, ph::_1), "re-relay all transactions from pool");
+    m_cmd_binder.set_handler("enable_channel", boost::bind(&daemon_commands_handler::enable_channel, this, ph::_1), "Enable specified log channel");
+    m_cmd_binder.set_handler("disable_channel", boost::bind(&daemon_commands_handler::disable_channel, this, ph::_1), "Enable specified log channel");
+    m_cmd_binder.set_handler("clear_cache", boost::bind(&daemon_commands_handler::clear_cache, this, ph::_1), "Clear blockchain storage cache");
+    m_cmd_binder.set_handler("clear_altblocks", boost::bind(&daemon_commands_handler::clear_altblocks, this, ph::_1), "Clear blockchain storage cache");
+    m_cmd_binder.set_handler("truncate_bc", boost::bind(&daemon_commands_handler::truncate_bc, this, ph::_1), "Truncate blockchain to specified height");
+    m_cmd_binder.set_handler("inspect_block_index", boost::bind(&daemon_commands_handler::inspect_block_index, this, ph::_1), "Inspects block index for internal errors");
+    m_cmd_binder.set_handler("print_db_performance_data", boost::bind(&daemon_commands_handler::print_db_performance_data, this, ph::_1), "Dumps all db containers performance counters");
+    m_cmd_binder.set_handler("search_by_id", boost::bind(&daemon_commands_handler::search_by_id, this, ph::_1), "Search all possible elemets by given id");
+    m_cmd_binder.set_handler("find_key_image", boost::bind(&daemon_commands_handler::find_key_image, this, ph::_1), "Try to find tx related to key_image");
+    m_cmd_binder.set_handler("rescan_aliases", boost::bind(&daemon_commands_handler::rescan_aliases, this, ph::_1), "Debug function");
+    m_cmd_binder.set_handler("forecast_difficulty", boost::bind(&daemon_commands_handler::forecast_difficulty, this, ph::_1), "Prints PoW and PoS difficulties for as many future blocks as possible based on current conditions");
+    m_cmd_binder.set_handler("print_deadlock_guard", boost::bind(&daemon_commands_handler::print_deadlock_guard, this, ph::_1), "Print all threads which is blocked or involved in mutex ownership");
+    m_cmd_binder.set_handler("print_block_from_hex_blob", boost::bind(&daemon_commands_handler::print_block_from_hex_blob, this, ph::_1), "Unserialize block from hex binary data to json-like representation");
+    m_cmd_binder.set_handler("print_tx_from_hex_blob", boost::bind(&daemon_commands_handler::print_tx_from_hex_blob, this, ph::_1), "Unserialize transaction from hex binary data to json-like representation");
+    m_cmd_binder.set_handler("print_tx_outputs_usage", boost::bind(&daemon_commands_handler::print_tx_outputs_usage, this, ph::_1), "Analyse if tx outputs for involved in subsequent transactions");
+    m_cmd_binder.set_handler("print_difficulties_of_last_n_blocks", boost::bind(&daemon_commands_handler::print_difficulties_of_last_n_blocks, this, ph::_1), "Print difficulties of last n blocks");
+    m_cmd_binder.set_handler("debug_remote_node_mode", boost::bind(&daemon_commands_handler::debug_remote_node_mode, this, ph::_1), "<ip-address> - If node got connected put node into 'debug mode' i.e. no sync process of other communication except ping responses, maintenance secrete key will be requested"); 
 #ifdef _DEBUG
-    m_cmd_binder.set_handler("debug_set_time_adj", boost::bind(&daemon_commands_handler::debug_set_time_adj, this, _1), "DEBUG: set core time adjustment");
+    m_cmd_binder.set_handler("debug_set_time_adj", boost::bind(&daemon_commands_handler::debug_set_time_adj, this, ph::_1), "DEBUG: set core time adjustment");
 #endif
   }
 
@@ -662,9 +665,9 @@ private:
 
         if (ptx->signatures.size() == 0)
           pruned_txs += 1;
+        signatures += ptx->signatures.size();
 
         txs += 1;
-        signatures += ptx->signatures.size();
         attachments += ptx->attachment.size();
       }
     }

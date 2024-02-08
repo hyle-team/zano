@@ -89,6 +89,11 @@ namespace currency
     return m_blockchain_storage.get_current_blockchain_size();
   }
   //-----------------------------------------------------------------------------------------------
+  uint64_t core::get_current_tx_version() const
+  {
+    return get_tx_version(m_blockchain_storage.get_current_blockchain_size(), m_blockchain_storage.get_core_runtime_config().hard_forks);
+  }
+  //-----------------------------------------------------------------------------------------------
   uint64_t core::get_top_block_height() const
   {
     return m_blockchain_storage.get_top_block_height();
@@ -350,7 +355,7 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::get_block_template(block& b, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos, const pos_entry& pe)
   {
-    return m_blockchain_storage.create_block_template(b, adr, stakeholder_address, diffic, height, ex_nonce, pos, pe);
+    return m_blockchain_storage.create_block_template(adr, stakeholder_address, ex_nonce, pos, pe, nullptr, b, diffic, height);
   }
   //-----------------------------------------------------------------------------------------------
   bool core::get_block_template(const create_block_template_params& params, create_block_template_response& resp)
@@ -499,15 +504,29 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::add_new_block(const block& b, block_verification_context& bvc)
   {
+    uint64_t h = m_blockchain_storage.get_top_block_height();
+    if (m_stop_after_height != 0 && h >= m_stop_after_height)
+    {
+      LOG_PRINT_YELLOW("Blockchain top block height is " << h << ", the daemon will now stop as requested", LOG_LEVEL_0);
+      if (m_critical_error_handler)
+        return m_critical_error_handler->on_immediate_stop_requested();
+      return false;
+    }
+
     bool r = m_blockchain_storage.add_new_block(b, bvc);
     if (r && bvc.m_added_to_main_chain)
     {
       uint64_t h = get_block_height(b);
-      auto& crc = m_blockchain_storage.get_core_runtime_config();
-      if (h == crc.hard_fork_01_starts_after_height + 1)
-      { LOG_PRINT_GREEN("Hardfork 1 activated at height " << h, LOG_LEVEL_0); }
-      else if (h == crc.hard_fork_02_starts_after_height + 1)
-      { LOG_PRINT_GREEN("Hardfork 2 activated at height " << h, LOG_LEVEL_0); }
+      if (h > 0)
+      {
+        auto& crc = m_blockchain_storage.get_core_runtime_config();
+        size_t hardfork_id_for_prev_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h);
+        size_t hardfork_id_for_curr_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h + 1);
+        if (hardfork_id_for_prev_block != hardfork_id_for_curr_block)
+        {
+          LOG_PRINT_GREEN("Hardfork " << hardfork_id_for_curr_block << " has been activated after the block at height " << h, LOG_LEVEL_0);
+        }
+      }
 
       if (h == m_stop_after_height)
       {

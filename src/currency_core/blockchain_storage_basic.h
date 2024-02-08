@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2023 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -19,6 +19,8 @@
 #include "currency_basic.h"
 #include "difficulty.h"
 #include "currency_protocol/blobdatatype.h"
+#include "currency_format_utils_transactions.h" // only for output_generation_context
+
 namespace currency
 {
 
@@ -46,9 +48,9 @@ namespace currency
     block   bl;
     uint64_t height;
     uint64_t block_cumulative_size;
-    wide_difficulty_type cumulative_diff_adjusted;
+    wide_difficulty_type cumulative_diff_adjusted; // used only before hardfork 1
     wide_difficulty_type cumulative_diff_precise;
-    wide_difficulty_type cumulative_diff_precise_adjusted;
+    wide_difficulty_type cumulative_diff_precise_adjusted; //used after hardfork 1 (cumulative difficulty adjusted only by sequence factor)
     wide_difficulty_type difficulty;
     boost::multiprecision::uint128_t already_generated_coins;
     crypto::hash stake_hash;                  //TODO: unused field for PoW blocks, subject for refactoring
@@ -144,6 +146,10 @@ namespace currency
     block b;
     wide_difficulty_type diffic;
     uint64_t height;
+    tx_generation_context miner_tx_tgc; // bad design, a lot of copying, consider redesign -- sowle
+    uint64_t block_reward_without_fee;
+    uint64_t block_reward;   // == block_reward_without_fee + txs_fee if fees are given to the miner, OR block_reward_without_fee if fees are burnt
+    uint64_t txs_fee; // sum of transactions' fee if any
   };
 
   typedef std::unordered_map<crypto::hash, transaction> transactions_map;
@@ -154,6 +160,28 @@ namespace currency
     transactions_map onboard_transactions;
   };
 
+  struct vote_on_proposal
+  {
+    std::string proposal_id;
+    uint64_t yes;
+    uint64_t no;
 
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(proposal_id)
+      KV_SERIALIZE(yes)
+      KV_SERIALIZE(no)
+    END_KV_SERIALIZE_MAP()
+  };
 
-}
+  struct vote_results
+  {
+    uint64_t total_pos_blocks; //total pos blocks in a given range
+    std::list<vote_on_proposal> votes;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(total_pos_blocks)
+      KV_SERIALIZE(votes)
+    END_KV_SERIALIZE_MAP()
+  };
+
+} // namespace currency

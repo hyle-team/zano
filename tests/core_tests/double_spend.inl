@@ -71,7 +71,7 @@ bool gen_double_spend_in_tx<txs_kept_by_block>::generate(std::vector<test_event_
   // find correct output by amount (selecting random or fixed one can be possibly mistaken with changeback)
   for (auto out : tx_0.vout)
   {
-    se.amount = out.amount;
+    se.amount = boost::get<currency::tx_out_bare>(out).amount;
     if (se.amount == send_amount)
       break;
     ++se.real_output_in_tx_index;
@@ -80,7 +80,7 @@ bool gen_double_spend_in_tx<txs_kept_by_block>::generate(std::vector<test_event_
   uint64_t global_out_index = 0;
   bool r = find_global_index_for_output(events, get_block_hash(blk_1r), tx_0, se.real_output_in_tx_index, global_out_index);
   CHECK_AND_ASSERT_MES(r, false, "find_global_index_for_output failed");
-  se.outputs.push_back(make_serializable_pair<currency::txout_ref_v, crypto::public_key>(global_out_index, boost::get<currency::txout_to_key>(tx_0.vout[se.real_output_in_tx_index].target).key));
+  se.outputs.push_back(currency::tx_source_entry::output_entry(global_out_index, boost::get<currency::txout_to_key>(boost::get<currency::tx_out_bare>(tx_0.vout[se.real_output_in_tx_index]).target).key));
   se.real_output = 0;
   se.real_out_tx_key = get_tx_pub_key_from_extra(tx_0);
   sources.push_back(se);
@@ -95,7 +95,7 @@ bool gen_double_spend_in_tx<txs_kept_by_block>::generate(std::vector<test_event_
 
   currency::transaction tx_1 = AUTO_VAL_INIT(tx_1);
   std::vector<currency::attachment_v> attachments;
-  if (!construct_tx(bob_account.get_keys(), sources, destinations, attachments, tx_1, 0))
+  if (!construct_tx(bob_account.get_keys(), sources, destinations, attachments, tx_1, this->get_tx_version_from_events(events), uint64_t(0)))
     return false;
 
   SET_EVENT_VISITOR_SETT(events, event_visitor_settings::set_txs_kept_by_block, txs_kept_by_block);

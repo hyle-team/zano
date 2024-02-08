@@ -693,7 +693,7 @@ bool boosted_tcp_server<t_protocol_handler>::connect(const std::string& adr, con
     shared_context->cond.notify_one();
   };
 
-  sock_.async_connect(remote_endpoint, boost::bind<void>(connect_callback, _1, local_shared_context));
+  sock_.async_connect(remote_endpoint, boost::bind<void>(connect_callback, boost::placeholders::_1, local_shared_context));
   while(local_shared_context->ec == boost::asio::error::would_block) {
     bool r = false;
     try {

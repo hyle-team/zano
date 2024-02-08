@@ -19,9 +19,9 @@ namespace bc_services
   {
 
     //fields filled in UI
-    uint8_t offer_type;             // OFFER_TYPE_PRIMARY_TO_TARGET(SELL ORDER) - 0, OFFER_TYPE_TARGET_TO_PRIMARY(BUY ORDER) - 1 etc.
-    uint64_t amount_primary;        // amount of the currency
-    uint64_t amount_target;         // amount of other currency or goods
+    uint8_t offer_type = 0;         // OFFER_TYPE_PRIMARY_TO_TARGET(SELL ORDER) - 0, OFFER_TYPE_TARGET_TO_PRIMARY(BUY ORDER) - 1 etc.
+    uint64_t amount_primary = 0;    // amount of the currency
+    uint64_t amount_target = 0;     // amount of other currency or goods
     std::string bonus;              //
     std::string target;             // [] currency / goods
     std::string primary;            // currency for goods
@@ -32,7 +32,8 @@ namespace bc_services
     std::string payment_types;      // []money accept type(bank transaction, internet money, cash, etc)
     std::string deal_option;        // []full amount, by parts
     std::string category;           // []
-    uint8_t expiration_time;        // n-days
+    std::string preview_url;        // []
+    uint8_t expiration_time = 0;    // n-days
     //-----------------
 
     BEGIN_KV_SERIALIZE_MAP()
@@ -50,6 +51,7 @@ namespace bc_services
       KV_SERIALIZE_N(deal_option, "do")
       KV_SERIALIZE_N(category, "cat")
       KV_SERIALIZE_N(expiration_time, "et")
+      KV_SERIALIZE_N(preview_url, "url")
     END_KV_SERIALIZE_MAP()
   };
 

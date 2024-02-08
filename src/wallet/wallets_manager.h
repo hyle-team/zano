@@ -15,8 +15,6 @@ DISABLE_VS_WARNINGS(4503)
 #include "include_base_utils.h"
 #include "version.h"
 
-using namespace epee;
-
 #include "console_handler.h"
 #include "p2p/net_node.h"
 #include "currency_core/checkpoints_create.h"
@@ -49,7 +47,7 @@ struct wallet_lock_time_watching_policy
 };
 
 
-class wallets_manager : public i_backend_wallet_callback
+class wallets_manager : public i_backend_wallet_callback, public tools::i_wallet_provider, epee::net_utils::http::i_chain_handler
 {
 
 public:
@@ -57,6 +55,7 @@ public:
   {
     currency::core_runtime_config core_conf;
     epee::locked_object<std::shared_ptr<tools::wallet2>, wallet_lock_time_watching_policy> w;
+    typedef epee::locked_object<std::shared_ptr<tools::wallet2>, wallet_lock_time_watching_policy>::lock_shared_ptr wallet_lock_object;
     std::shared_ptr<tools::wallet_rpc_server> rpc_wrapper; //500 bytes of extra data, we can afford it, to have rpc-like invoke map
     std::atomic<bool> do_mining;
     std::atomic<bool> major_stop;
@@ -97,6 +96,8 @@ public:
   bool quick_clear_wallets_no_save();
   bool send_stop_signal();
   bool get_opened_wallets(std::list<view::open_wallet_response>& result);
+  const po::variables_map& get_arguments();
+
   std::string open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr, bool exclude_mining_txs = false);
   std::string generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr);
   std::string restore_wallet(const std::wstring& path, const std::string& password, const std::string& seed_phrase, const std::string& seed_password, view::open_wallet_response& owr);
@@ -104,7 +105,8 @@ public:
   std::string get_wallet_status(uint64_t wallet_id);
   std::string run_wallet(uint64_t wallet_id);
   std::string get_recent_transfers(size_t wallet_id, uint64_t offset, uint64_t count, view::transfers_array& tr_hist, bool exclude_mining_txs = false);
-  std::string get_wallet_info(size_t wallet_id, view::wallet_info& wi);
+  std::string get_wallet_info(uint64_t wallet_id, view::wallet_info& wi);
+  std::string get_wallet_info_extra(uint64_t wallet_id, view::wallet_info_extra& wi);
   std::string get_contracts(size_t wallet_id, std::vector<tools::wallet_public::escrow_contract_details>& contracts);
   std::string create_proposal(const view::create_proposal_param_gui& cpp);
   std::string accept_proposal(size_t wallet_id, const crypto::hash& contract_id);
@@ -135,11 +137,18 @@ public:
   std::string get_wallet_restore_info(uint64_t wallet_id, std::string& seed_phrase, const std::string& seed_password);
   std::string backup_wallet(uint64_t wallet_id, const std::wstring& path);
   std::string reset_wallet_password(uint64_t wallet_id, const std::string& pass);
+  std::string use_whitelisting(uint64_t wallet_id, bool use);
   std::string is_wallet_password_valid(uint64_t wallet_id, const std::string& pass);
+  std::string create_ionic_swap_proposal(uint64_t wallet_id, const tools::wallet_public::create_ionic_swap_proposal_request& proposal, std::string& result_proposal_hex);
+  std::string get_ionic_swap_proposal_info(uint64_t wallet_id, std::string&raw_tx_template_hex, tools::wallet_public::ionic_swap_proposal_info& proposal);
+  std::string accept_ionic_swap_proposal(uint64_t wallet_id, std::string&raw_tx_template_hex, std::string& result_raw_tx);
   std::string get_my_offers(const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers);
   std::string get_fav_offers(const std::list<bc_services::offer_id>& hashes, const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers);
   std::string get_tx_pool_info(currency::COMMAND_RPC_GET_POOL_INFO::response& res);
   std::string export_wallet_history(const view::export_wallet_info& ewi);
+#ifndef MOBILE_WALLET_BUILD
+  currency::core_rpc_server& get_rpc_server() { return m_rpc_server; }
+#endif
   uint64_t get_default_fee();
   std::string get_mining_estimate(uint64_t amuont_coins, 
     uint64_t time, 
@@ -148,7 +157,7 @@ public:
     std::vector<uint64_t>& days);
   std::string is_pos_allowed();
   void toggle_pos_mining();
-  std::string transfer(size_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx);
+  std::string transfer(uint64_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx);
   std::string get_config_folder();
   std::string is_valid_brain_restore_data(const std::string& seed_phrase, const std::string& seed_password);
   std::string get_seed_phrase_info(const std::string& seed_phrase, const std::string& seed_password, view::seed_phrase_info& result);
@@ -161,6 +170,9 @@ public:
   bool is_qt_logs_enabled() const { return m_qt_logs_enbaled; }
   std::string get_qt_dev_tools_option() const { return m_qt_dev_tools; }
   void set_use_deffered_global_outputs(bool use) { m_use_deffered_global_outputs = use; }
+  bool set_use_tor(bool use_tor);
+  std::string add_custom_asset_id(uint64_t wallet_id, const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_descriptor);
+  std::string delete_custom_asset_id(uint64_t wallet_id, const crypto::public_key& asset_id);
 
 private:
   void main_worker(const po::variables_map& vm);
@@ -181,11 +193,38 @@ private:
 
   //----- i_backend_wallet_callback ------
   virtual void on_new_block(size_t wallet_id, uint64_t height, const currency::block& block);
-	virtual void on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined);
+  virtual void on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined);
   virtual void on_pos_block_found(size_t wallet_id, const currency::block& /*block*/);
   virtual void on_sync_progress(size_t wallet_id, const uint64_t& /*percents*/);
   virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti);
+  virtual void on_tor_status_change(size_t wallet_id, const std::string& state);
 
+  virtual void on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets) override;
+  virtual bool on_mw_select_wallet(uint64_t wallet_id) override;
+  
+  //----- i_wallet_provider ------
+  virtual void lock();
+  virtual void unlock();
+//#ifndef MOBILE_WALLET_BUILD
+  virtual std::shared_ptr<tools::wallet2> get_wallet();
+//#endif
+  //--------
+
+  BEGIN_URI_MAP2_VIRTUAL()
+    BEGIN_JSON_RPC_MAP("/json_rpc")
+      //MULTIWALLET APIs
+      MAP_JON_RPC_WE("mw_get_wallets", on_mw_get_wallets, tools::wallet_public::COMMAND_MW_GET_WALLETS)
+      MAP_JON_RPC_WE("mw_select_wallet", on_mw_select_wallet, tools::wallet_public::COMMAND_MW_SELECT_WALLET)
+      CHAIN_TO_PHANDLER(m_prpc_chain_handler)
+    END_JSON_RPC_MAP()
+    CHAIN_TO_PHANDLER(m_prpc_chain_handler)
+  END_URI_MAP2()
+
+  bool on_mw_get_wallets(const tools::wallet_public::COMMAND_MW_GET_WALLETS::request& req, tools::wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, epee::net_utils::connection_context_base& cntx);
+  bool on_mw_select_wallet(const tools::wallet_public::COMMAND_MW_SELECT_WALLET::request& req, tools::wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, epee::net_utils::connection_context_base& cntx);
+
+
+  epee::net_utils::http::i_chain_handler* m_prpc_chain_handler = nullptr;
   std::thread m_main_worker_thread;
   
   std::atomic<bool> m_stop_singal_sent;
@@ -216,12 +255,17 @@ private:
   currency::t_currency_protocol_handler<currency::core> m_cprotocol;
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > m_p2psrv;
   currency::core_rpc_server m_rpc_server;
+
+  tools::wallet_rpc_server m_wallet_rpc_server;
+  wallet_vs_options::wallet_lock_object m_current_wallet_locked_object;
+  uint64_t m_rpc_selected_wallet_id = 0;
 #endif
 
   bool m_remote_node_mode;
   bool m_qt_logs_enbaled;
   std::string m_qt_dev_tools;
   std::atomic<bool> m_is_pos_allowed;
+  std::atomic<bool> m_use_tor;
 
 
   std::map<size_t, wallet_vs_options> m_wallets;

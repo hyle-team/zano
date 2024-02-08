@@ -32,7 +32,7 @@ target_link_libraries(coretests rpc wallet currency_core common crypto zlibstati
 target_link_libraries(functional_tests rpc wallet currency_core crypto common zlibstatic ethash libminiupnpc-static ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
 target_link_libraries(hash-tests crypto ethash)
 target_link_libraries(hash-target-tests crypto currency_core ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
-target_link_libraries(performance_tests currency_core common crypto zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
+target_link_libraries(performance_tests rpc wallet currency_core common crypto zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
 target_link_libraries(unit_tests wallet currency_core common crypto gtest_main zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
 target_link_libraries(net_load_tests_clt currency_core common crypto gtest_main ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
 target_link_libraries(net_load_tests_srv currency_core common crypto gtest_main ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
@@ -43,6 +43,8 @@ if(NOT MSVC)
   if(APPLE)
     set_property(TARGET gtest gtest_main APPEND_STRING PROPERTY COMPILE_FLAGS " -Wno-unused-private-field")
   endif()
+  target_link_libraries(coretests dl)
+  target_link_libraries(functional_tests dl)
 endif()
 
 
@@ -60,8 +62,9 @@ add_test(coretests coretests)
 
 # set PCH for core_tests
 if(MSVC AND USE_PCH)
+  add_definitions("/DUSE_PCH")
   set_property(TARGET coretests APPEND_STRING PROPERTY COMPILE_FLAGS " /Yuchaingen.h /Zm1000")
-  set_property(SOURCE "core_tests/chaingen.cpp" APPEND_STRING PROPERTY COMPILE_FLAGS " /Ycchaingen.h /Zm1000")
+  set_property(SOURCE "core_tests/chaingen_pch.cpp" APPEND_STRING PROPERTY COMPILE_FLAGS " /Ycchaingen.h /Zm1000")
   set_property(TARGET coretests functional_tests hash-target-tests performance_tests unit_tests APPEND_STRING PROPERTY LINK_FLAGS "$(MSBuildProjectDirectory)/../src/$(ConfigurationName)/stdafx.obj")
   set_property(TARGET db_tests APPEND_STRING PROPERTY LINK_FLAGS "$(MSBuildProjectDirectory)/../../src/$(ConfigurationName)/stdafx.obj")
 endif()

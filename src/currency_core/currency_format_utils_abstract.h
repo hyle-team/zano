@@ -42,7 +42,7 @@ namespace currency
   /*                                                                      */
   /************************************************************************/
   template<class t_array>
-  struct array_hasher : std::unary_function<t_array&, std::size_t>
+  struct array_hasher
   {
     std::size_t operator()(const t_array& val) const
     {
@@ -91,20 +91,64 @@ namespace currency
         ++result;
     }
     return result;
-  }
+  }  
   //---------------------------------------------------------------
   template<typename specific_type_t, typename variant_t_container>
-  bool get_type_in_variant_container(const variant_t_container& av, specific_type_t& a)
+  specific_type_t* get_type_in_variant_container(variant_t_container& av)
   {
     for (auto& ai : av)
     {
       if (ai.type() == typeid(specific_type_t))
       {
-        a = boost::get<specific_type_t>(ai);
-        return true;
+        return &boost::get<specific_type_t>(ai);
       }
     }
+    return nullptr;
+  }
+  //---------------------------------------------------------------
+  template<typename specific_type_t, typename variant_t_container>
+  bool get_type_in_variant_container(variant_t_container& av, specific_type_t& a)
+  {
+    const specific_type_t* pa = get_type_in_variant_container<const specific_type_t>(av);
+    if (pa)
+    {
+      a = *pa;
+      return true;
+    }
     return false;
+  }
+  //---------------------------------------------------------------
+  //---------------------------------------------------------------
+  template<typename specific_type_t, typename variant_t_container>
+  specific_type_t& get_type_in_variant_container_by_ref(variant_t_container& av)
+  {
+    for (auto& ai : av)
+    {
+      if (ai.type() == typeid(specific_type_t))
+      {
+        return boost::get<specific_type_t>(ai);
+      }
+    }
+    ASSERT_MES_AND_THROW("Object with type " << typeid(specific_type_t).name() << " was not found in a container");
+  }
+  //---------------------------------------------------------------
+  // if cb returns true, it means "continue", false -- means "stop"
+  template<typename specific_type_t, typename variant_container_t, typename callback_t>
+  bool process_type_in_variant_container(const variant_container_t& av, callback_t& cb, bool return_value_if_none_found = true)
+  {
+    bool found = false;
+    for (auto& ai : av)
+    {
+      if (ai.type() == typeid(specific_type_t))
+      {
+        found = true;
+        if (!cb(boost::get<specific_type_t>(ai)))
+          return false;
+      }
+    }
+    if (found)
+      return true;
+    return return_value_if_none_found;
   }
   //---------------------------------------------------------------
   // callback should return true to continue iterating through the container
@@ -129,21 +173,160 @@ namespace currency
     }
     return found;
   }
+  //---------------------------------------------------------------
   inline
-  const txin_to_key& get_to_key_input_from_txin_v(const txin_v& in_v)
+  bool get_key_image_from_txin_v(const txin_v& in_v, crypto::key_image& result) noexcept
+  {
+    try
+    {
+      if (in_v.type() == typeid(txin_to_key))
+      {
+        result = boost::get<txin_to_key>(in_v).k_image;
+        return true;
+      }
+    
+      if (in_v.type() == typeid(txin_htlc))
+      {
+        result = boost::get<txin_htlc>(in_v).k_image;
+        return true;
+      }
+
+      if (in_v.type() == typeid(txin_zc_input))
+      {
+        result = boost::get<txin_zc_input>(in_v).k_image;
+        return true;
+      }
+    }
+    catch(...)
+    {
+      // should never go here, just precaution
+    }
+
+    return false;
+  }
+  //---------------------------------------------------------------
+  inline
+  const crypto::key_image& get_key_image_from_txin_v(const txin_v& in_v)
   {
     if (in_v.type() == typeid(txin_to_key))
+      return boost::get<txin_to_key>(in_v).k_image;
+    
+    if (in_v.type() == typeid(txin_htlc))
+      return boost::get<txin_htlc>(in_v).k_image;
+
+    if (in_v.type() == typeid(txin_zc_input))
+      return boost::get<txin_zc_input>(in_v).k_image;
+
+    CHECK_AND_ASSERT_THROW_MES(false, "[get_key_image_from_txin_v] Wrong type: " << in_v.type().name());
+  }
+  //---------------------------------------------------------------
+  inline
+  const std::vector<currency::txout_ref_v>& get_key_offsets_from_txin_v(const txin_v& in_v)
+  {
+    if (in_v.type() == typeid(txin_to_key))
+      return boost::get<txin_to_key>(in_v).key_offsets;
+    
+    if (in_v.type() == typeid(txin_htlc))
+      return boost::get<txin_htlc>(in_v).key_offsets;
+
+    if (in_v.type() == typeid(txin_zc_input))
+      return boost::get<txin_zc_input>(in_v).key_offsets;
+
+    CHECK_AND_ASSERT_THROW_MES(false, "[get_key_offsets_from_txin_v] Wrong type: " << in_v.type().name());
+  }
+  //---------------------------------------------------------------
+  inline
+  bool get_mix_attr_from_tx_out_v(const tx_out_v& out_v, uint8_t& result) noexcept
+  {
+    try
     {
-      return boost::get<txin_to_key>(in_v);
+      if (out_v.type() == typeid(tx_out_bare))
+      {
+        const tx_out_bare& ob = boost::get<tx_out_bare>(out_v);
+        if (ob.target.type() == typeid(txout_to_key))
+        {
+          result = boost::get<txout_to_key>(ob.target).mix_attr;
+          return true;
+        }
+      }
+    
+      if (out_v.type() == typeid(tx_out_zarcanum))
+      {
+        result = boost::get<tx_out_zarcanum>(out_v).mix_attr;
+        return true;
+      }
     }
-    else if (in_v.type() == typeid(txin_htlc))
+    catch(...)
     {
-      const txin_htlc& in = boost::get<txin_htlc>(in_v);
-      return static_cast<const txin_to_key&>(in);
+      // should never go here, just precaution
     }
-    else {
-      ASSERT_MES_AND_THROW("[get_to_key_input_from_txin_v] Wrong type " << in_v.type().name());
+
+    return false;
+  }
+  //---------------------------------------------------------------
+  //, txin_htlc, txin_zc_input
+  inline bool compare_variant_by_types(const txin_multisig& left, const txin_multisig& right)
+  {
+    return (left.multisig_out_id < right.multisig_out_id);
+  }
+  //---------------------------------------------------------------
+  inline bool compare_variant_by_types(const txin_gen& left, const txin_gen& right)
+  {
+    //actually this should never happen, should we leave it in case it happen in unit tests? @sowle 
+    return (left.height < right.height);
+  }
+  //---------------------------------------------------------------
+  template<typename type_with_kimage_t>
+  bool compare_variant_by_types(const type_with_kimage_t& left, const type_with_kimage_t& right)
+  {
+    return (left.k_image < right.k_image);
+  }
+  //---------------------------------------------------------------
+  template<typename t_type_left, typename t_type_right>
+  bool compare_variant_by_types(const t_type_left& left, const t_type_right& right)
+  {
+    if (typeid(t_type_left) == typeid(t_type_right))
+    {
+      ASSERT_MES_AND_THROW("[compare_varian_by_types] Left and Right types matched type " << typeid(t_type_left).name());
     }
+    typedef binary_archive<true> bin_archive;
+    typedef variant_serialization_traits<bin_archive, t_type_left> traits_left;
+    typedef variant_serialization_traits<bin_archive, t_type_right> traits_right;
+    return (traits_left::get_tag() < traits_right::get_tag());
+  }
+  //---------------------------------------------------------------
+  template<typename t_type_left>
+  struct right_visitor : public boost::static_visitor<bool>
+  {
+    const t_type_left& m_rleft;
+
+    right_visitor(const t_type_left& left) : m_rleft(left)
+    {}
+    
+    template<typename t_type_right>
+    bool operator()(const t_type_right& right)const
+    {
+      return compare_variant_by_types(m_rleft, right);
+    }
+  };
+
+  struct left_visitor : public boost::static_visitor<bool>
+  {
+    const txin_v& m_rright;
+
+    left_visitor(const txin_v& right) : m_rright(right)
+    {}
+    template<typename t_type_left>
+    bool operator()(const t_type_left& left)const
+    {
+      return boost::apply_visitor(right_visitor<t_type_left>(left), m_rright);
+    }
+  };
+  //---------------------------------------------------------------
+  inline bool less_txin_v(const txin_v& left, const txin_v& right)
+  {
+    //predefined type hierarchy based on it's tags defined in currency_basic.h, call compare_variant_by_types via 2-level visitor
+    return boost::apply_visitor(left_visitor(right), left);
   }
   //---------------------------------------------------------------
   template<typename variant_container_t>
@@ -245,6 +428,26 @@ namespace currency
   size_t get_object_blobsize(const transaction& t);
   size_t get_object_blobsize(const transaction& t, uint64_t prefix_blob_size);
 
+
+  inline
+  void put_t_to_buff(std::string& buff)
+  {}
+
+  template <typename T, typename... Types>
+  void put_t_to_buff(std::string& buff, const T& var1, Types&... var2)
+  {
+    static_assert(std::is_pod<T>::value, "T must be a POD type.");
+    buff.append((const char*)&var1, sizeof(var1));
+    put_t_to_buff(buff, var2...);
+  }
+
+  template <typename... Types>
+  crypto::hash get_hash_from_POD_objects(Types&... var1)
+  {
+    std::string buff;
+    put_t_to_buff(buff, var1...);
+    return crypto::cn_fast_hash(buff.data(), buff.size());
+  }
 
 
 #define CHECKED_GET_SPECIFIC_VARIANT(variant_var, specific_type, variable_name, fail_return_val) \
