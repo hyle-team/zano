@@ -301,8 +301,8 @@ namespace currency
 #ifndef NDEBUG
       CHECK_AND_ASSERT_MES(commitment_to_zero == secret_x * crypto::c_point_G, false, "internal error: commitment_to_zero is malformed (G)");
 #endif
-      r = crypto::generate_schnorr_sig<crypto::gt_G>(tx_id, commitment_to_zero, secret_x, proof.ss);
-      CHECK_AND_ASSERT_MES(r, false, "generate_schnorr_sig (G) failed");
+      r = crypto::generate_double_schnorr_sig<crypto::gt_G, crypto::gt_G>(tx_id, commitment_to_zero, secret_x, ogc.tx_pub_key_p, ogc.tx_key.sec, proof.dss);
+      CHECK_AND_ASSERT_MES(r, false, "generate_double_schnorr_sig (G, G) failed");
     }
     else // i.e. zc_inputs_count != 0
     {
@@ -326,8 +326,8 @@ namespace currency
       bool commitment_to_zero_is_sane = commitment_to_zero == secret_x * crypto::c_point_X;
       CHECK_AND_ASSERT_MES(commitment_to_zero_is_sane, false, "internal error: commitment_to_zero is malformed (X)");
 #endif
-      r = crypto::generate_schnorr_sig<crypto::gt_X>(tx_id, commitment_to_zero, secret_x, proof.ss);
-      CHECK_AND_ASSERT_MES(r, false, "generate_schnorr_sig (X) failed");
+      r = crypto::generate_double_schnorr_sig<crypto::gt_X, crypto::gt_G>(tx_id, commitment_to_zero, secret_x, ogc.tx_pub_key_p, ogc.tx_key.sec, proof.dss);
+      CHECK_AND_ASSERT_MES(r, false, "genergenerate_double_schnorr_sigate_schnorr_sig (X, G) failed");
     }
 
     return true;
@@ -447,11 +447,9 @@ namespace currency
     tx = AUTO_VAL_INIT_T(transaction);
     tx.version = tx_version;
 
-    keypair txkey_local{};
-    if (!tx_one_time_key_to_use)
-      txkey_local = keypair::generate();
-    const keypair& txkey = tx_one_time_key_to_use ? *tx_one_time_key_to_use : txkey_local;
-    add_tx_pub_key_to_extra(tx, txkey.pub);
+    tx_generation_context tx_gen_context{};
+    tx_gen_context.set_tx_key(tx_one_time_key_to_use ? *tx_one_time_key_to_use : keypair::generate());
+    add_tx_pub_key_to_extra(tx, tx_gen_context.tx_key.pub);
     if (extra_nonce.size())
       if (!add_tx_extra_userdata(tx, extra_nonce))
         return false;
@@ -488,7 +486,6 @@ namespace currency
     }
 
     // fill outputs
-    tx_generation_context tx_gen_context{};
     tx_gen_context.resize(zc_ins_count, destinations.size()); // auxiliary data for each output
     uint64_t output_index = 0;
     std::set<uint16_t> deriv_cache;
@@ -496,7 +493,7 @@ namespace currency
     {
       finalized_tx result = AUTO_VAL_INIT(result);
       uint8_t tx_outs_attr = 0;
-      r = construct_tx_out(d, txkey.sec, output_index, tx, deriv_cache, account_keys(),
+      r = construct_tx_out(d, tx_gen_context.tx_key.sec, output_index, tx, deriv_cache, account_keys(),
         tx_gen_context.asset_id_blinding_masks[output_index], tx_gen_context.amount_blinding_masks[output_index],
         tx_gen_context.blinded_asset_ids[output_index], tx_gen_context.amount_commitments[output_index], result, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "construct_tx_out failed, output #" << output_index << ", amount: " << print_money_brief(d.amount));
@@ -576,7 +573,7 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------------------------------------
-  bool validate_asset_operation_amount_proof(asset_op_verification_context& context)// const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, crypto::public_key& asset_id)
+  bool validate_asset_operation_amount_commitment(asset_op_verification_context& context)
   {
     CHECK_AND_ASSERT_MES(count_type_in_variant_container<asset_operation_proof>(context.tx.proofs) == 1, false, "asset_operation_proof not present or present more than once");
     const asset_operation_proof& aop = get_type_in_variant_container_by_ref<const asset_operation_proof>(context.tx.proofs);
@@ -607,6 +604,8 @@ namespace currency
       zc_balance_proof balance_proof = AUTO_VAL_INIT(balance_proof);
       bool r = get_type_in_variant_container<zc_balance_proof>(tx.proofs, balance_proof);
       CHECK_AND_ASSERT_MES(r, false, "zc_balance_proof is missing in tx proofs");
+
+      crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(tx);
 
       size_t zc_inputs_count = 0;
       uint64_t bare_inputs_sum = additional_inputs_amount_and_fees_for_mining_tx;
@@ -645,7 +644,7 @@ namespace currency
       {
         if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
         {
-          // opt_amount_commitment supposed to be validated earlier in validate_asset_operation()
+          // amount_commitment supposed to be validated earlier in validate_asset_operation_amount_commitment()
           sum_of_pseudo_out_amount_commitments += crypto::point_t(ado.amount_commitment); // *1/8
         }
         else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
@@ -675,13 +674,13 @@ namespace currency
       CHECK_AND_ASSERT_MES(zc_inputs_count == zc_sigs_count, false, "zc inputs count (" << zc_inputs_count << ") and zc sigs count (" << zc_sigs_count << ") missmatch");
       if (zc_inputs_count > 0)
       {
-        r = crypto::verify_schnorr_sig<crypto::gt_X>(tx_id, commitment_to_zero.to_public_key(), balance_proof.ss);
-        CHECK_AND_ASSERT_MES(r, false, "zc_balance_proof (X) is invalid");
+        r = crypto::verify_double_schnorr_sig<crypto::gt_X, crypto::gt_G>(tx_id, commitment_to_zero, tx_pub_key, balance_proof.dss);
+        CHECK_AND_ASSERT_MES(r, false, "verify_double_schnorr_sig (X, G) is invalid");
       }
       else
       {
-        r = crypto::verify_schnorr_sig<crypto::gt_G>(tx_id, commitment_to_zero.to_public_key(), balance_proof.ss);
-        CHECK_AND_ASSERT_MES(r, false, "zc_balance_proof (G) is invalid");
+        r = crypto::verify_double_schnorr_sig<crypto::gt_G, crypto::gt_G>(tx_id, commitment_to_zero, tx_pub_key, balance_proof.dss);
+        CHECK_AND_ASSERT_MES(r, false, "verify_double_schnorr_sig (G, G) is invalid");
       }
       return true;
     }
@@ -2438,15 +2437,14 @@ namespace currency
       LOG_PRINT_YELLOW("WARNING: tx v1 should not use ZC inputs", LOG_LEVEL_0);
     }
 
+    tx_generation_context& gen_context = result.ftp.gen_context;
 
-
-    keypair txkey = AUTO_VAL_INIT(txkey);
     if (!append_mode)
     {
-      txkey = keypair::generate();
+      gen_context.set_tx_key(keypair::generate());
       //deterministic_generate_tx_onetime_key(key_images_total, sender_account_keys, txkey);
-      add_tx_pub_key_to_extra(tx, txkey.pub);
-      one_time_tx_secret_key = txkey.sec;
+      add_tx_pub_key_to_extra(tx, gen_context.tx_key.pub);
+      one_time_tx_secret_key = gen_context.tx_key.sec;
 
       //add flags
       etc_tx_flags16_t e = AUTO_VAL_INIT(e);
@@ -2455,13 +2453,12 @@ namespace currency
 
       //include offers if need
       tx.attachment = attachments;
-      encrypt_attachments(tx, sender_account_keys, crypt_destination_addr, txkey, result.derivation);
+      encrypt_attachments(tx, sender_account_keys, crypt_destination_addr, gen_context.tx_key, result.derivation);
     }
     else
     {
-      txkey.pub = get_tx_pub_key_from_extra(tx);
-      txkey.sec = one_time_tx_secret_key;
-      CHECK_AND_ASSERT_MES(txkey.pub != null_pkey && txkey.sec != null_skey, false, "In append mode both public and secret keys must be provided");
+      gen_context.set_tx_key(keypair{get_tx_pub_key_from_extra(tx), one_time_tx_secret_key});
+      CHECK_AND_ASSERT_MES(gen_context.tx_key.pub != null_pkey && gen_context.tx_key.sec != null_skey, false, "In append mode both public and secret keys must be provided");
 
       //separately encrypt attachments without putting extra
       result.derivation = get_encryption_key_derivation(true, tx, sender_account_keys); 
@@ -2471,7 +2468,7 @@ namespace currency
       std::vector<extra_v> extra_local = extra;
       std::vector<attachment_v> attachments_local = attachments;
 
-      encrypt_attach_visitor v(was_attachment_crypted_entries, derivation,  txkey, account_public_address(), sender_account_keys);
+      encrypt_attach_visitor v(was_attachment_crypted_entries, derivation, gen_context.tx_key, account_public_address(), sender_account_keys);
       for (auto& a : attachments_local)
         boost::apply_visitor(v, a);
       for (auto& a : extra_local)
@@ -2499,8 +2496,6 @@ namespace currency
     // OUTs
     //
     std::vector<tx_destination_entry> shuffled_dsts(destinations);
-    //size_t outputs_to_be_constructed = shuffled_dsts.size();
-    tx_generation_context& gen_context = result.ftp.gen_context;
     gen_context.resize(zc_inputs_count, tx.vout.size() + shuffled_dsts.size());
 
     // ASSET oprations handling
@@ -2510,7 +2505,7 @@ namespace currency
       pado = get_type_in_variant_container<asset_descriptor_operation>(tx.extra);
       if (pado)
       {
-        bool r = construct_tx_handle_ado(sender_account_keys, ftp, *pado, gen_context, txkey, shuffled_dsts);
+        bool r = construct_tx_handle_ado(sender_account_keys, ftp, *pado, gen_context, gen_context.tx_key, shuffled_dsts);
         CHECK_AND_ASSERT_MES(r, false, "Failed to construct_tx_handle_ado()");
         if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation{ pado });
       }
@@ -2533,7 +2528,7 @@ namespace currency
       if (!(flags & TX_FLAG_SIGNATURE_MODE_SEPARATE) && all_inputs_are_obviously_native_coins && gen_context.ao_asset_id == currency::null_pkey)
         dst_entr.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // all inputs are obviously native coins -- all outputs must have explicit asset ids (unless there's an asset emission)
 
-      r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys,
+      r = construct_tx_out(dst_entr, gen_context.tx_key.sec, output_index, tx, deriv_cache, sender_account_keys,
         gen_context.asset_id_blinding_masks[output_index], gen_context.amount_blinding_masks[output_index],
         gen_context.blinded_asset_ids[output_index], gen_context.amount_commitments[output_index], result, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "Failed to construct tx out");
@@ -2642,7 +2637,7 @@ namespace currency
       else
       {
         // NLSAG
-        r = generate_NLSAG_sig(tx_hash_for_signature, tx_prefix_hash, i_ + input_starter_index, source_entry, sender_account_keys, in_contexts[i_mapped], txkey, flags, tx, &ss_ring_s);
+        r = generate_NLSAG_sig(tx_hash_for_signature, tx_prefix_hash, i_ + input_starter_index, source_entry, sender_account_keys, in_contexts[i_mapped], gen_context.tx_key, flags, tx, &ss_ring_s);
         CHECK_AND_ASSERT_MES(r, false, "generate_NLSAG_sig failed");
       }
 
@@ -3180,7 +3175,7 @@ namespace currency
     if (P_prime.to_public_key() != zo.stealth_address)
       return false;
 
-    crypto::point_t Q_prime = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * 8 * crypto::point_t(addr.view_public_key); // Q' * 8 =? Hs(domain_sep, Hs(8 * r * V, i) ) * 8 * V
+    crypto::point_t Q_prime = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * crypto::point_t(addr.view_public_key).modify_mul8(); // Q' * 8 =? Hs(domain_sep, Hs(8 * r * V, i) ) * 8 * V
     if (Q_prime != crypto::point_t(zo.concealing_point).modify_mul8())
       return false;
 

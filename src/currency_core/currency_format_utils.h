@@ -264,7 +264,7 @@ namespace currency
     const std::vector<tx_out_v>& vouts, zc_outs_range_proof& result);
   bool check_tx_bare_balance(const transaction& tx, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
   bool check_tx_balance(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
-  bool validate_asset_operation_amount_proof(asset_op_verification_context& context);
+  bool validate_asset_operation_amount_commitment(asset_op_verification_context& context);
   const char* get_asset_operation_type_string(size_t asset_operation_type, bool short_name = false);
   //---------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 

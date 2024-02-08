@@ -671,9 +671,12 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
             out_get_mixin_attr(out_v) != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
           {
             std::stringstream ss;
-            ss << "output #" << o << " from tx " << ptc.tx_hash() << " with amount " << print_money_brief(outs[i_in_outs].amount)
+            ss << "output #" << o << " from tx " << ptc.tx_hash();
+            if (!out.is_native_coin())
+              ss << " asset_id: " << out.asset_id;
+            ss << " with amount " << print_money_brief(out.amount)
               << " is targeted to this auditable wallet and has INCORRECT mix_attr = " << (uint64_t)out_get_mixin_attr(out_v) << ". Output is IGNORED.";
-            WLT_LOG_RED(ss.str(), LOG_LEVEL_0);
+            WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
             if (m_wcallback)
               m_wcallback->on_message(i_wallet2_callback::ms_red, ss.str());
             //if (out.is_native_coin())
@@ -5548,7 +5551,7 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
   proposal.tx_template = finalize_result.tx;
   wallet_public::ionic_swap_proposal_context ispc = AUTO_VAL_INIT(ispc);
   ispc.gen_context = finalize_result.ftp.gen_context;
-  ispc.one_time_skey = finalize_result.one_time_key;
+  //ispc.one_time_skey = finalize_result.one_time_key;
   std::string proposal_context_blob = t_serializable_object_to_blob(ispc);
   proposal.encrypted_context = crypto::chacha_crypt(static_cast<const std::string&>(proposal_context_blob), finalize_result.derivation); 
   return true;
@@ -5586,7 +5589,7 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
   r = t_unserializable_object_from_blob(ionic_context, decrypted_raw_context);
   THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to unserialize decrypted ionic_context");
 
-  r = validate_tx_output_details_againt_tx_generation_context(tx, ionic_context.gen_context, ionic_context.one_time_skey);
+  r = validate_tx_output_details_againt_tx_generation_context(tx, ionic_context.gen_context);
   THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to validate decrypted ionic_context");
 
   std::unordered_map<crypto::public_key, uint64_t> amounts_provided_by_a;
@@ -5754,7 +5757,7 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
   construct_tx_param construct_param = get_default_construct_tx_param();
   construct_param.fee = additional_fee;
   
-  crypto::secret_key one_time_key = ionic_context.one_time_skey;
+  crypto::secret_key one_time_key = ionic_context.gen_context.tx_key.sec; // TODO: figure out this mess with tx sec key -- sowle
   construct_param.crypt_address = m_account.get_public_address();
   construct_param.flags = TX_FLAG_SIGNATURE_MODE_SEPARATE;
   construct_param.mark_tx_as_complete = true;

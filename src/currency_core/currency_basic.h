@@ -438,18 +438,21 @@ namespace currency
     END_BOOST_SERIALIZATION()
   };
 
-  // 1) for txs without ZC inputs: proves that balance point = lin(G) (cancels out G component of outputs' amount commitments, asset tags assumed to be H (native coin) and non-blinded)
-  // 2) for txs with    ZC inputs: proves that balance point = lin(X) (cancels out X component of blinded asset tags within amount commitments for both outputs and inputs (pseudo outs))
+  // First part of a double Schnorr proof:
+  //   1) for txs without ZC inputs: proves that balance point = lin(G) (cancels out G component of outputs' amount commitments, asset tags assumed to be H (native coin) and non-blinded)
+  //   2) for txs with    ZC inputs: proves that balance point = lin(X) (cancels out X component of blinded asset tags within amount commitments for both outputs and inputs (pseudo outs))
+  // Second part:
+  //   proof of knowing transaction secret key (with respect to G)
   struct zc_balance_proof
   {
-    crypto::generic_schnorr_sig_s ss;
+    crypto::generic_double_schnorr_sig_s dss;
 
     BEGIN_SERIALIZE_OBJECT()
-      FIELD(ss)
+      FIELD(dss)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(ss)
+      BOOST_SERIALIZE(dss)
     END_BOOST_SERIALIZATION()
   };
 

@@ -1407,12 +1407,10 @@ namespace wallet_public
   struct ionic_swap_proposal_context
   {
     currency::tx_generation_context gen_context;
-    crypto::secret_key one_time_skey;
     
     BEGIN_SERIALIZE_OBJECT()
       VERSION(0)   //use VERSION_TO_MEMBER if it's more then 0
       FIELD(gen_context)
-      FIELD(one_time_skey)
     END_SERIALIZE()
   };
 

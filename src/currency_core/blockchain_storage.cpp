@@ -4110,7 +4110,7 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
     CHECK_AND_ASSERT_MES(!avc.asset_op_history, false, "asset with id " << avc.asset_id << " has already been registered");
 
     avc.amount_to_validate = ado.descriptor.current_supply;
-    CHECK_AND_ASSERT_MES(validate_asset_operation_amount_proof(avc), false, "asset operation validation failed!");
+    CHECK_AND_ASSERT_MES(validate_asset_operation_amount_commitment(avc), false, "asset operation validation failed!");
 
     assets_container::t_value_type local_asset_history = AUTO_VAL_INIT(local_asset_history);
     local_asset_history.push_back(ado);
@@ -4163,7 +4163,7 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
 
     if (need_to_validate_balance_proof)
     {
-      bool r = validate_asset_operation_amount_proof(avc);
+      bool r = validate_asset_operation_amount_commitment(avc);
       CHECK_AND_ASSERT_MES(r, false, "Balance proof validation failed for asset_descriptor_operation");
     }
 
