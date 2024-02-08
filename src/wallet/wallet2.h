@@ -47,7 +47,7 @@
 #include "view_iface.h"
 #include "wallet2_base.h"
 
-#define WALLET_DEFAULT_TX_SPENDABLE_AGE                               10
+#define WALLET_DEFAULT_TX_SPENDABLE_AGE                               CURRENCY_HF4_MANDATORY_MIN_COINAGE
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
 
 
@@ -153,6 +153,7 @@ namespace tools
     uint64_t m_height_of_start_sync = 0;
     std::atomic<uint64_t> m_last_sync_percent = 0;
     mutable uint64_t m_current_wallet_file_size = 0;
+    bool m_use_assets_whitelisting = true;
 
 
     //===============================================================
@@ -216,6 +217,7 @@ namespace tools
       a & m_custom_assets;
       a & m_rollback_events;
       a & m_whitelisted_assets;
+      a & m_use_assets_whitelisting;
     }
   };
   
@@ -633,8 +635,8 @@ namespace tools
 
     bool prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const mode_separate_context& emode_separate = mode_separate_context());
 
-    void finalize_transaction(const currency::finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key = true);
-    void finalize_transaction(const currency::finalize_tx_param& ftp, currency::finalized_tx& result, bool broadcast_tx, bool store_tx_secret_key = true );
+    void finalize_transaction(currency::finalize_tx_param& ftp, currency::transaction& tx, crypto::secret_key& tx_key, bool broadcast_tx, bool store_tx_secret_key = true);
+    void finalize_transaction(currency::finalize_tx_param& ftp, currency::finalized_tx& result, bool broadcast_tx, bool store_tx_secret_key = true );
 
     std::string get_log_prefix() const { return m_log_prefix; }
     static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const wallet_public::employed_tx_entries& td);
@@ -646,6 +648,7 @@ namespace tools
     construct_tx_param get_default_construct_tx_param_inital();
     void set_disable_tor_relay(bool disable);
     uint64_t get_default_fee() {return TX_DEFAULT_FEE;}
+    uint64_t get_current_minimum_network_fee() { return TX_DEFAULT_FEE; }
     void export_transaction_history(std::ostream& ss, const std::string& format, bool include_pos_transactions = true);
 
     bool add_custom_asset_id(const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_descriptor);
@@ -890,7 +893,6 @@ private:
 
     bool m_use_deffered_global_outputs;
     bool m_disable_tor_relay;
-    bool m_use_assets_whitelisting = true;
     mutable current_operation_context m_current_context;
 
     std::string m_votes_config_path;

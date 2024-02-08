@@ -205,7 +205,7 @@ namespace crypto
     TRY_ENTRY()
     {
       DBG_PRINT("zarcanum_verify_proof");
-      bool r = false;
+      //bool r = false;
 
       //std::cout << "===== zarcanum_verify_proof =====" << ENDL
       //          << "m:                        " << m << ENDL

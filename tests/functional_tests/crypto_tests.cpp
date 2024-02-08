@@ -1466,6 +1466,37 @@ TEST(crypto, point_is_zero)
 
   ASSERT_TRUE(p.is_zero());
 
+  
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  memcpy(&p.m_p3.Y, f_x, sizeof p.m_p3.Y);
+  memcpy(&p.m_p3.Z, f_x, sizeof p.m_p3.Z);
+  memcpy(&p.m_p3.T, fancy_p, sizeof p.m_p3.T);
+  // {0, x, x, P} == {0, 1} (still the identity point)
+
+  ASSERT_TRUE(p.is_zero());
+
+  //
+  // negative tests
+  //
+
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  // {0, 0, 0, 0} is not a point at all
+
+  ASSERT_FALSE(p.is_zero());
+
+
+  memset(&p.m_p3, 0, sizeof p.m_p3);
+  memcpy(&p.m_p3.Y, f_x, sizeof p.m_p3.Y);
+  memcpy(&p.m_p3.Z, f_x, sizeof p.m_p3.Z);
+  memcpy(&p.m_p3.T, fancy_p_plus_1, sizeof p.m_p3.T);
+  // {0, x, x, !0} is not a valid point (incorrect non-zero T) 
+
+  ASSERT_FALSE(p.is_zero());
+
+  memcpy(&p.m_p3.T, f_x, sizeof p.m_p3.T);
+  // {0, x, x, x}, while x != 0 is still incorrect point representation
+  ASSERT_FALSE(p.is_zero());
+
   return true;
 }
 
@@ -1588,6 +1619,7 @@ TEST(crypto, schnorr_sig)
   return true;
 }
 
+
 TEST(crypto, point_negation)
 {
   ASSERT_EQ(c_point_0, -c_point_0);
@@ -1618,6 +1650,252 @@ TEST(crypto, point_negation)
 
   return true;
 }
+
+
+TEST(crypto, scalar_get_bits)
+{
+  scalar_t x = scalar_t::random();
+  for(size_t i = 0; i < 256; ++i)
+    ASSERT_EQ(x.get_bits(i, 0), 0);
+  for(size_t i = 0; i < 256; ++i)
+    ASSERT_EQ(x.get_bits(i, std::min((size_t)255, i + 65)), 0);
+
+  ASSERT_EQ(x.get_bits(0,   64), x.m_u64[0]);
+  ASSERT_EQ(x.get_bits(64,  64), x.m_u64[1]);
+  ASSERT_EQ(x.get_bits(128, 64), x.m_u64[2]);
+  ASSERT_EQ(x.get_bits(192, 64), x.m_u64[3]);
+
+  uint64_t high_32_bits = x.m_u64[3] >> 32;
+  ASSERT_EQ(x.get_bits(192+32, 32), high_32_bits);
+
+  for(size_t i = 33; i <= 64; ++i)
+    ASSERT_EQ(x.get_bits(192+32, i), high_32_bits);
+
+  for(size_t i = 0; i < 10000; ++i)
+  {
+    scalar_t b = scalar_t::random();
+    scalar_t x = scalar_t::random();
+    size_t bit_index_from = b.m_s[5];
+    size_t bits_count     = b.m_s[6] % 65; // [0; 64] are allowed
+
+    uint64_t extracted_bits = 0;
+    for(size_t j = 0; j < bits_count; ++j)
+    {
+      if (bit_index_from + j <= 255 && x.get_bit(bit_index_from + j))
+        extracted_bits |= 1ull << j;
+    }
+
+    if (extracted_bits != x.get_bits(bit_index_from, bits_count))
+    {
+      std::cout << "i: " << i << ", bit_index_from: " << bit_index_from << ", bits_count: " << bits_count << ENDL
+        << "extracted_bits: " << extracted_bits << ", get_bits(): " << x.get_bits(bit_index_from, bits_count);
+      ASSERT_TRUE(false);
+    }
+  }
+  return true;
+}
+
+
+TEST(crypto, scalarmult_base_vartime)
+{
+  auto check_for_x = [&](const scalar_t& x) -> bool {
+    point_t P, P2;
+    ge_scalarmult_base_vartime(&P.m_p3, x.m_s);
+    ge_scalarmult_base(&P2.m_p3, x.m_s);
+    return (P - P2).is_zero();
+    };
+
+  ASSERT_TRUE(check_for_x(c_scalar_0));
+  ASSERT_TRUE(check_for_x(c_scalar_1));
+  ASSERT_TRUE(check_for_x(c_scalar_1div8));
+  ASSERT_TRUE(check_for_x(c_scalar_Lm1));
+  ASSERT_TRUE(check_for_x(c_scalar_L));
+
+  for(size_t i = 0; i < 1000; ++i)
+  {
+    scalar_t x = scalar_t::random();
+    ASSERT_TRUE(check_for_x(x));
+  }
+
+  return true;
+}
+
+
+template<typename CT>
+bool crypto_msm_runner(size_t N, size_t low_bits_to_clear, size_t high_bits_to_clear)
+{
+  scalar_vec_t g_scalars, h_scalars;
+  g_scalars.resize_and_make_random(N);
+  h_scalars.resize_and_make_random(N);
+  if (N > 4)
+  {
+    g_scalars[0] = c_scalar_Lm1; // always include the max and the min
+    h_scalars[0] = c_scalar_Lm1;
+    g_scalars[1] = 0;
+    h_scalars[1] = 0;
+  }
+
+  point_t sum = c_point_0;
+  for(size_t i = 0; i < N; ++i)
+  {
+    for(size_t bit_index = 0; bit_index < low_bits_to_clear; ++bit_index)
+    {
+      g_scalars[i].clear_bit(bit_index);
+      h_scalars[i].clear_bit(bit_index);
+    }
+    for(size_t bit_index = 256 - high_bits_to_clear; bit_index < 256; ++bit_index)
+    {
+      g_scalars[i].clear_bit(bit_index);
+      h_scalars[i].clear_bit(bit_index);
+    }
+    sum += g_scalars[i] * CT::get_generator(false, i) + h_scalars[i] * CT::get_generator(true, i);
+  }
+
+  //TIME_MEASURE_START(t);
+  bool r = msm_and_check_zero<CT>(g_scalars, h_scalars, -sum);
+  //TIME_MEASURE_FINISH(t);
+  return r;
+}
+
+TEST(crypto, msm)
+{
+  // test the default msm_and_check_zero correctness
+  bool r = false;
+
+  for(size_t N = 1; N <= 128; ++N)
+  {
+    std::cout << "N = " << N << ENDL;
+    r = crypto_msm_runner<bpp_crypto_trait_Zarcanum>(N, 0, 0);
+    ASSERT_TRUE(r);
+    r = crypto_msm_runner<bpp_crypto_trait_ZC_out>(N, 0, 0);
+    ASSERT_TRUE(r);
+  }
+
+  for(size_t i = 0; i <= 128; ++i)
+  {
+    std::cout << "i = " << i << ENDL;
+    r = crypto_msm_runner<bpp_crypto_trait_Zarcanum>(128, i, 0);
+    ASSERT_TRUE(r);
+    r = crypto_msm_runner<bpp_crypto_trait_Zarcanum>(128, 0, i);
+    ASSERT_TRUE(r);
+    r = crypto_msm_runner<bpp_crypto_trait_ZC_out>(256, i, 0);
+    ASSERT_TRUE(r);
+    r = crypto_msm_runner<bpp_crypto_trait_ZC_out>(256, 0, i);
+    ASSERT_TRUE(r);
+  }
+
+  return true;
+}
+
+
+
+inline std::ostream &operator <<(std::ostream &o, const crypto::ge_precomp v)
+{
+  o << "{{";
+
+  for(size_t i = 0; i < 9; ++i)
+    o << v.yplusx[i] << ", ";
+
+  o << v.yplusx[9] << "}, {";
+
+  for(size_t i = 0; i < 9; ++i)
+    o << v.yminusx[i] << ", ";
+
+  o << v.yminusx[9] << "}, {";
+
+  for(size_t i = 0; i < 9; ++i)
+    o << v.xy2d[i] << ", ";
+
+  o << v.xy2d[9] << "}}";
+  return o;
+}
+
+bool calc_and_print_generator_precomp(const point_pc_t& generator, const char* generator_var_name)
+{
+  precomp_data_t precomp_data = {};
+  construct_precomp_data(precomp_data, generator);
+
+  std::cout << "    const precomp_data_t " << generator_var_name << "_precomp_data = {" << ENDL;
+
+  for(size_t i = 0; i < 32; ++i)
+  {
+    std::cout << "      {" << ENDL;
+    for(size_t j = 0; j < 8; ++j)
+      std::cout << "        " << precomp_data[i][j] << (j != 7 ? "," : "" ) << ENDL;
+    std::cout << "      }" << (i != 31 ? "," : "" ) << ENDL;
+  }
+
+  std::cout << "    };" << ENDL;
+
+  return true;
+}
+
+TEST(print, generators_precomp)
+{
+#define CALC_PRECOMP(G) calc_and_print_generator_precomp(G, #G)
+
+  CALC_PRECOMP(c_point_H);
+  CALC_PRECOMP(c_point_H2);
+  CALC_PRECOMP(c_point_U);
+  CALC_PRECOMP(c_point_X);
+  CALC_PRECOMP(c_point_H_plus_G);
+  CALC_PRECOMP(c_point_H_minus_G);
+  return true;
+
+#undef CALC_PRECOMP
+}
+
+bool check_generator_precomp(const point_pc_t& generator, const char* generator_var_name)
+{
+  point_t generator_pt = generator; // to avoid using precomputed data in scalar multiplications
+  point_t random_point = hash_helper_t::hp(scalar_t::random());
+
+  point_t A = generator_pt;
+  for(size_t i = 0; i < 32; ++i)
+  {
+    point_t B = c_point_0;
+    for(size_t j = 0; j < 8; ++j)
+    {
+      B += A;
+
+      // restore ge_p3 from ge_precomp using native NaCl functions... 
+      point_t restored_pt{};
+      ge_p1p1 p1p1{};
+      ge_madd(&p1p1, &random_point.m_p3, &((*generator.m_precomp_data_p)[i][j]));
+      ge_p1p1_to_p3(&restored_pt.m_p3, &p1p1);
+      restored_pt -= random_point;
+
+      // ...and compare it with the calculated one
+      if (B != restored_pt)
+      {
+        std::cout << "ERROR: " << generator_var_name << ", i: " << i << ", j: " << j << ENDL;
+        return false;
+      }
+    }
+    if (i != 31)
+      A.modify_mul_pow_2(8);
+  }
+
+  std::cout << "   " << std::left << std::setw(32) << generator_var_name << "   OK" << ENDL;
+  return true;
+}
+
+TEST(crypto, generators_precomp)
+{
+#define CHECK_PRECOMP(G) ASSERT_TRUE(check_generator_precomp(G, #G))
+
+  CHECK_PRECOMP(c_point_H);
+  CHECK_PRECOMP(c_point_H2);
+  CHECK_PRECOMP(c_point_U);
+  CHECK_PRECOMP(c_point_X);
+  CHECK_PRECOMP(c_point_H_plus_G);
+  CHECK_PRECOMP(c_point_H_minus_G);
+
+  return true;
+
+#undef CHECK_PRECOMP
+}
+
 
 
 //

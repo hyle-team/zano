@@ -407,8 +407,11 @@ bool generate_genesis(const std::string& path_config, uint64_t premine_split_amo
 
   ss.str("");
   ss.clear();
+  const account_public_address dummy_address = AUTO_VAL_INIT(dummy_address);
+
   std::cout << ENDL << "PROOF PHRASE: " << gcp.proof_string << ENDL;
-  // construct_miner_tx(0, 0, 0, 0, 0, destinations, bl.miner_tx, TRANSACTION_VERSION_PRE_HF4, gcp.proof_string, CURRENCY_MINER_TX_MAX_OUTS);  <-- temporarily commented out; this overload needs to be re-implemented -- sowle 
+  uint64_t block_reward_without_fee = 0;
+  construct_miner_tx(0, 0, 0, 0, 0, dummy_address, dummy_address, bl.miner_tx, block_reward_without_fee, TRANSACTION_VERSION_PRE_HF4, gcp.proof_string, CURRENCY_MINER_TX_MAX_OUTS, false, pos_entry(), nullptr, nullptr, destinations);
   currency::blobdata txb = tx_to_blob(bl.miner_tx);
 
   //self validate block

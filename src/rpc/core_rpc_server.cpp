@@ -117,6 +117,13 @@ namespace currency
     res.default_fee = m_core.get_blockchain_storage().get_core_runtime_config().tx_default_fee;
     res.minimum_fee = m_core.get_blockchain_storage().get_core_runtime_config().tx_pool_min_fee;
 
+    auto & hf = m_core.get_blockchain_storage().get_core_runtime_config().hard_forks.m_height_the_hardfork_n_active_after;
+    res.is_hardfok_active.resize(hf.size());
+    for (size_t i = 0; i != hf.size(); i++)
+    {
+      res.is_hardfok_active[i] = m_core.get_blockchain_storage().is_hardfork_active(i);
+    }
+
     //conditional values 
     if (req.flags&COMMAND_RPC_GET_INFO_FLAG_NET_TIME_DELTA_MEDIAN)
     {
@@ -382,6 +389,18 @@ namespace currency
     LOG_PRINT_L2("COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS: " << ENDL << s);
     */
 
+    return true;
+  }
+  bool core_rpc_server::on_get_random_outs2(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::response& res, connection_context& cntx)
+  {
+    CHECK_CORE_READY();
+    res.status = API_RETURN_CODE_FAIL;
+    if (!m_core.get_blockchain_storage().get_random_outs_for_amounts2(req, res))
+    {
+      return true;
+    }
+
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -931,6 +950,7 @@ namespace currency
     res.miner_tx_tgc = resp.miner_tx_tgc;
     res.height = resp.height;
     res.block_reward_without_fee = resp.block_reward_without_fee;
+    res.block_reward = resp.block_reward;
     res.txs_fee = resp.txs_fee;
     //calculate epoch seed
     res.seed = currency::ethash_epoch_to_seed(currency::ethash_height_to_epoch(res.height));

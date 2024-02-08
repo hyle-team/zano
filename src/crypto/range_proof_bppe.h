@@ -734,7 +734,7 @@ namespace crypto
 
     point_t GH_exponents = c_point_0;
     CT::calc_pedersen_commitment_2(G_scalar, H_scalar, H2_scalar, GH_exponents);
-    bool result = multiexp_and_check_being_zero<CT>(g_scalars, h_scalars, summand + GH_exponents);
+    bool result = msm_and_check_zero<CT>(g_scalars, h_scalars, summand + GH_exponents);
     if (result)
       DBG_PRINT(ENDL << " . . . . bppe_verify() -- SUCCEEDED!!!" << ENDL);
     return result;

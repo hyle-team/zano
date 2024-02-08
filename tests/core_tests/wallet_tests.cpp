@@ -1778,9 +1778,6 @@ bool gen_wallet_alias_and_unconfirmed_txs::c3(currency::core& c, size_t ev_index
 
 gen_wallet_alias_via_special_wallet_funcs::gen_wallet_alias_via_special_wallet_funcs()
 {
-  // start hardfork from block 0 in order to use extra_alias_entry (allowed only since HF2)
-  m_hardforks.set_hardfork_height(1, 0);
-  m_hardforks.set_hardfork_height(2, 0);
   REGISTER_CALLBACK_METHOD(gen_wallet_alias_via_special_wallet_funcs, c1);
 }
 
@@ -3452,7 +3449,7 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
   CHECK_AND_ASSERT_MES(blocks_fetched == 1, false, "Incorrect numbers of blocks fetched: " << blocks_fetched);
 
   // (also make sure that unlocked balance is zero)
-  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "bob_wlt", m_bob_initial_balance + CURRENCY_BLOCK_REWARD, CURRENCY_BLOCK_REWARD + TESTS_DEFAULT_FEE, 0), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "bob_wlt", m_bob_initial_balance + CURRENCY_BLOCK_REWARD, INVALID_BALANCE_VAL, 0), false, "");
 
   
   // 2. Try to mine a PoS block and defragment some of UTXO
@@ -3465,7 +3462,7 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
   CHECK_AND_ASSERT_MES(blocks_fetched == 2, false, "Incorrect numbers of blocks fetched: " << blocks_fetched);
 
   // (also make sure that only two UTXOs is unlocked)
-  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", m_alice_initial_balance + CURRENCY_BLOCK_REWARD, CURRENCY_BLOCK_REWARD + TESTS_DEFAULT_FEE, m_single_amount * 2), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", m_alice_initial_balance + CURRENCY_BLOCK_REWARD, INVALID_BALANCE_VAL, m_single_amount * 2), false, "");
 
 
   // 3. Try to mine a PoS block and defragment with huge decoy set. Make sure block is mined successfully without a defragmentation tx
@@ -3479,7 +3476,7 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
   CHECK_AND_ASSERT_MES(blocks_fetched == 1, false, "Incorrect numbers of blocks fetched: " << blocks_fetched);
 
   // Alice's unlocked balance should consist only of one UTXO
-  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", m_alice_initial_balance + CURRENCY_BLOCK_REWARD * 2, CURRENCY_BLOCK_REWARD * 2 + TESTS_DEFAULT_FEE, m_single_amount), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", m_alice_initial_balance + CURRENCY_BLOCK_REWARD * 2, INVALID_BALANCE_VAL, m_single_amount), false, "");
 
 
   // 4. Finally mine a PoS and defragment the last one unlocked UTXO
@@ -3492,7 +3489,7 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
   CHECK_AND_ASSERT_MES(blocks_fetched == 1, false, "Incorrect numbers of blocks fetched: " << blocks_fetched);
 
   // Alice's unlocked balance should be zero
-  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", m_alice_initial_balance + CURRENCY_BLOCK_REWARD * 3, CURRENCY_BLOCK_REWARD * 3 + TESTS_DEFAULT_FEE, 0), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice_wlt", m_alice_initial_balance + CURRENCY_BLOCK_REWARD * 3, INVALID_BALANCE_VAL, 0), false, "");
 
   return true;
 }

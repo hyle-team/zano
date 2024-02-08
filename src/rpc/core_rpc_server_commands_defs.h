@@ -422,6 +422,42 @@ namespace currency
     };
   };
 
+
+  //-----------------------------------------------
+  struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2
+  {
+    struct offsets_distribution
+    {
+      uint64_t amount; //if amount is 0 then lookup in post-zarcanum zone only, if not 0 then pre-zarcanum only
+      std::vector<uint64_t> offsets; //[i] = height, estimated location where to pickup output of transaction
+      uint64_t own_global_index; //index to exclude from selection
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(amount)
+        KV_SERIALIZE(offsets)
+        KV_SERIALIZE(own_global_index)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct request
+    {
+      std::vector<offsets_distribution> amounts;
+      uint64_t            height_upper_limit; // if nonzero, all the decoy outputs must be either older than, or the same age as this height
+      bool                use_forced_mix_outs;
+      uint64_t            coinbase_percents;     //from 0 to 100, estimate percents of coinbase outputs included in decoy sets  
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(amounts)
+        KV_SERIALIZE(height_upper_limit)
+        KV_SERIALIZE(use_forced_mix_outs)
+        KV_SERIALIZE(coinbase_percents)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response response;
+  };
+
+
   //-----------------------------------------------
   struct COMMAND_RPC_SET_MAINTAINERS_INFO
   {
@@ -757,6 +793,7 @@ namespace currency
       uint64_t minimum_fee;
       uint64_t last_block_timestamp;
       std::string last_block_hash;
+      std::vector<bool> is_hardfok_active;
       //market
       uint64_t offers_count;
 
@@ -807,6 +844,7 @@ namespace currency
         KV_SERIALIZE(minimum_fee)
         KV_SERIALIZE(last_block_timestamp)
         KV_SERIALIZE(last_block_hash)
+        KV_SERIALIZE(is_hardfok_active)
         KV_SERIALIZE(offers_count)
       END_KV_SERIALIZE_MAP()
     };
@@ -889,6 +927,7 @@ namespace currency
       std::string prev_hash;
       tx_generation_context miner_tx_tgc;
       uint64_t block_reward_without_fee;
+      uint64_t block_reward; // == block_reward_without_fee + txs_fee if fees are given to the miner, OR block_reward_without_fee if fees are burnt
       uint64_t txs_fee;
       std::string status;
 
@@ -900,6 +939,7 @@ namespace currency
         KV_SERIALIZE(prev_hash)
         KV_SERIALIZE(miner_tx_tgc)
         KV_SERIALIZE(block_reward_without_fee)
+        KV_SERIALIZE(block_reward)
         KV_SERIALIZE(txs_fee)
         KV_SERIALIZE(status)
       END_KV_SERIALIZE_MAP()

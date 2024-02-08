@@ -145,6 +145,7 @@ namespace currency
     bool remove_key_images(const crypto::hash &tx_id, const transaction& tx, bool kept_by_block);
     bool insert_alias_info(const transaction& tx);
     bool remove_alias_info(const transaction& tx);
+    bool check_tx_fee(const transaction &tx, uint64_t amount_fee);
 
     bool is_valid_contract_finalization_tx(const transaction &tx)const;
     void store_db_solo_options_values();

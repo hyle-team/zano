@@ -21,6 +21,7 @@
 #include "crypto/hash.h"
 #include "profile_tools.h"
 #include "common/db_backend_selector.h"
+#include "tx_semantic_validation.h"
 
 DISABLE_VS_WARNINGS(4244 4345 4503) //'boost::foreach_detail_::or_' : decorated name length exceeded, name was truncated
 
@@ -92,6 +93,15 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------------------------
+  bool tx_memory_pool::check_tx_fee(const transaction &tx, uint64_t amount_fee)
+  {
+    if (amount_fee < m_blockchain.get_core_runtime_config().tx_pool_min_fee)
+      return false;
+
+    //m_blockchain.get
+    return true;
+  }
+  //---------------------------------------------------------------------------------
   bool tx_memory_pool::add_tx(const transaction &tx, const crypto::hash &id, uint64_t blob_size, tx_verification_context& tvc, bool kept_by_block, bool from_core)
   {
     bool r = false;
@@ -158,20 +168,31 @@ namespace currency
     //check key images for transaction if it is not kept by block
     if(!from_core && !kept_by_block)
     {
+
+      if(!validate_tx_semantic(tx, blob_size))
+      {          
+        // tx semantics check failed
+        LOG_PRINT_RED_L0("Transaction " << id << " semantics check failed ");
+        tvc.m_verification_failed = true;
+        tvc.m_should_be_relayed = false;
+        tvc.m_added_to_pool = false;
+        return false;
+      }
+
       crypto::key_image spent_ki = AUTO_VAL_INIT(spent_ki);
       r = !have_tx_keyimges_as_spent(tx, &spent_ki);
       CHECK_AND_ASSERT_MES(r, false, "Transaction " << id << " uses already spent key image " << spent_ki);
 
       //transaction spam protection, soft rule
-      if (tx_fee < m_blockchain.get_core_runtime_config().tx_pool_min_fee)
+      if (!check_tx_fee(tx, tx_fee))
       {
-        if (is_valid_contract_finalization_tx(tx))
-        {
+        //if (is_valid_contract_finalization_tx(tx))
+        //{
           // that means tx has less fee then allowed by current tx pull rules, but this transaction is actually 
           // a finalization of contract, and template of this contract finalization tx was prepared actually before 
           // fee rules had been changed, so it's ok, let it in.
-        }
-        else
+        //}
+        //else
         {
           // this tx has no fee 
           LOG_PRINT_RED_L0("Transaction " << id << " has too small fee: " << print_money_brief(tx_fee) << ", minimum fee: " << print_money_brief(m_blockchain.get_core_runtime_config().tx_pool_min_fee));

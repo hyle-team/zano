@@ -110,6 +110,8 @@ namespace currency
     bool try_connect_to_daemon();
     std::string get_tocken_info_string(const crypto::public_key& asset_id, uint64_t& decimal_point);
     bool print_wti(const tools::wallet_public::wallet_transfer_info& wti);
+    bool check_password_for_operation();
+    crypto::hash get_hash_from_pass_and_salt(const std::string& pass, uint64_t salt);
 
     //----------------- i_wallet2_callback ---------------------
     virtual void on_new_block(uint64_t height, const currency::block& block) override;
@@ -189,6 +191,10 @@ namespace currency
     bool m_disable_tor;
     std::string m_restore_wallet;
     std::string m_voting_config_file;
+    bool m_no_password_confirmations = false;
+    
+    crypto::hash m_password_hash;
+    uint64_t m_password_salt;
 
     epee::console_handlers_binder m_cmd_binder;
 

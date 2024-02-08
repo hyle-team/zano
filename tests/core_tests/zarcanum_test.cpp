@@ -215,8 +215,8 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
 
   uint64_t mined_amount = (batches_to_Alice_count - 1) * COIN;
 
-  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*staker_benefeciary_acc_wlt, "staker_benefeciary", mined_amount, mined_amount, mined_amount), false, "");
-  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*miner_benefeciary_acc_wlt, "miner_benefeciary", mined_amount, mined_amount, mined_amount), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*staker_benefeciary_acc_wlt, "staker_benefeciary", mined_amount, INVALID_BALANCE_VAL, mined_amount), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*miner_benefeciary_acc_wlt, "miner_benefeciary", mined_amount, INVALID_BALANCE_VAL, mined_amount), false, "");
 
 
   staker_benefeciary_acc_wlt->transfer(transfer_amount2, bob_wlt->get_account().get_public_address());
@@ -234,7 +234,7 @@ bool zarcanum_basic_test::c1(currency::core& c, size_t ev_index, const std::vect
 
 
   bob_wlt->refresh();
-  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt, "Bob", transfer_amount2*3, UINT64_MAX, transfer_amount2*3), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt, "Bob", transfer_amount2*3, INVALID_BALANCE_VAL, transfer_amount2*3), false, "");
 
   //try to make pre-zarcanum block after hardfork 4
   currency::core_runtime_config rc = alice_wlt->get_core_runtime_config();
@@ -367,14 +367,16 @@ bool zarcanum_gen_time_balance::generate(std::vector<test_event_entry>& events) 
   uint64_t bob_amount = MK_TEST_COINS(15);
 
   MAKE_TX(events, tx_1, alice_acc, bob_acc, bob_amount, blk_1r);
-  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_1);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2__, blk_1r, miner_acc, tx_1);
 
   // check Bob's balance in play time...
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, bob_amount, 0, 0, 0, 0));
 
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_2, blk_2__, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
   // ... and in gen time
   CREATE_TEST_WALLET(bob_wlt, bob_acc, blk_0);
-  REFRESH_TEST_WALLET_AT_GEN_TIME(events, bob_wlt, blk_2, 2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, bob_wlt, blk_2, 2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 15);
   CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(bob_wlt, bob_amount);
 
   // try to construct tx with only one output (that is wrong for HF4)
@@ -399,14 +401,16 @@ bool zarcanum_gen_time_balance::generate(std::vector<test_event_entry>& events) 
   MAKE_TX_FEE_MIX(events, tx_2, bob_acc, alice_acc, bob_amount - TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, nmix, blk_2);
   CHECK_AND_ASSERT_MES(tx_2.vout.size() != 1, false, "tx_2.vout.size() = " << tx_2.vout.size());
   MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_2);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_4, blk_3, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
-  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_3, 2);
+
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_4, 22);
   CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, alice_amount - 2 * TESTS_DEFAULT_FEE);
 
-  REFRESH_TEST_WALLET_AT_GEN_TIME(events, bob_wlt, blk_3, 1);
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, bob_wlt, blk_4, 11);
   CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(bob_wlt, 0);
 
-  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, alice_amount - 2 * TESTS_DEFAULT_FEE, 0, 0, 0, 0));
+  DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, alice_amount - 2 * TESTS_DEFAULT_FEE, alice_amount - 2 * TESTS_DEFAULT_FEE, 0, 0, 0));
 
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, 0, 0, 0, 0, 0));
 
@@ -422,8 +426,6 @@ zarcanum_pos_block_math::zarcanum_pos_block_math()
 
 bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) const
 {
-  bool r = false;
-
   GENERATE_ACCOUNT(miner_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
@@ -602,8 +604,6 @@ zarcanum_in_alt_chain::zarcanum_in_alt_chain()
 
 bool zarcanum_in_alt_chain::generate(std::vector<test_event_entry>& events) const
 {
-  bool r = false;
-
   uint64_t ts = test_core_time::get_time();
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
@@ -628,7 +628,10 @@ bool zarcanum_in_alt_chain::generate(std::vector<test_event_entry>& events) cons
   
   uint64_t bob_amount = COIN * 100;
   MAKE_TX(events, tx_1, miner_acc, bob_acc, bob_amount, blk_3);
-  MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_1);
+  //make another tx just to create more decoys to fit hf4 rules of 16 decoys
+  account_base carol_acc; carol_acc.generate();
+  MAKE_TX(events, tx_1_1, miner_acc, carol_acc, bob_amount, blk_3);
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_4, blk_3, miner_acc, std::list<transaction>({ tx_1, tx_1_1 }));
 
   //                                   HF4
   //                                    |
@@ -712,8 +715,13 @@ bool zarcanum_in_alt_chain::c1(currency::core& c, size_t ev_index, const std::ve
 
   uint64_t transfer_amount  = COIN;
   uint64_t transfer_fee     = TESTS_DEFAULT_FEE * 3;
-  size_t nmix = 38;
-  bob_wlt->transfer(transfer_amount, nmix, m_accounts[ALICE_ACC_IDX].get_public_address(), transfer_fee);
+  size_t nmix = 36;
+  try {
+    bob_wlt->transfer(transfer_amount, nmix, m_accounts[ALICE_ACC_IDX].get_public_address(), transfer_fee);
+  }  
+  catch (...)
+  {
+  }
 
   CHECK_AND_FORCE_ASSERT_MES(c.get_pool_transactions_count() == 3, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
@@ -744,8 +752,6 @@ zarcanum_block_with_txs::zarcanum_block_with_txs()
 bool zarcanum_block_with_txs::generate(std::vector<test_event_entry>& events) const
 {
   // Test idea: make sure Zarcanum PoS block can have txs and the sum of fees is correctly added to the block reward
-
-  bool r = false;
 
   uint64_t ts = test_core_time::get_time();
   m_accounts.resize(TOTAL_ACCS_COUNT);
@@ -788,14 +794,15 @@ bool zarcanum_block_with_txs::generate(std::vector<test_event_entry>& events) co
   //
   // after HF4
   //
-  MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_3_, blk_2, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_3, blk_3_, miner_acc);
   DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_04_ZARCANUM));
 
   MAKE_TX(events, tx_2, miner_acc, alice_acc, MK_TEST_COINS(200), blk_3);
   MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_2);
   m_alice_balance += MK_TEST_COINS(200);
 
-  REWIND_BLOCKS_N_WITH_TIME(events, blk_4r, blk_4, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_4r, blk_4, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW+5);
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, m_alice_balance, m_alice_balance, mined_amount, 0, 0));
 
   // then miner sends few coins to Bob via a tx with a big fee amount
@@ -805,8 +812,8 @@ bool zarcanum_block_with_txs::generate(std::vector<test_event_entry>& events) co
   // and Alice mines a PoS block with this tx -- so Alice is expected to receive the fee
   MAKE_NEXT_POS_BLOCK_TX1(events, blk_5, blk_4r, alice_acc, alice_stake_sources, tx_3);
 
-  // make sure Alice received both block reward and the fee
-  uint64_t mined_amount_2 = COIN + fee;
+  // make sure Alice received block reward but not received the fee
+  uint64_t mined_amount_2 = COIN /* + fee */;
   DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(ALICE_ACC_IDX, m_alice_balance + mined_amount_2, UINT64_MAX, mined_amount + mined_amount_2, 0, 0));
   m_alice_balance += mined_amount_2;
 

@@ -154,7 +154,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
   CHECK_AND_ASSERT_MES(it_asset != balances.end() && it_native != balances.end(), false, "Failed to find needed asset in result balances");
   CHECK_AND_ASSERT_MES(it_asset->second.total == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC, false, "Failed to find needed asset in result balances");
-  CHECK_AND_ASSERT_MES(it_native->second.total == uint64_t(17517226)*COIN, false, "Failed to find needed asset in result balances");
+  CHECK_AND_ASSERT_MES(it_native->second.total == uint64_t(17517225990000000000), false, "Failed to find needed asset in result balances");
 
 
   balances.clear();
@@ -715,8 +715,6 @@ assets_and_pos_mining::assets_and_pos_mining()
 bool assets_and_pos_mining::generate(std::vector<test_event_entry>& events) const
 {
   // Test idea: ensure that post-HF4 Zarcanum staking functions correctly with outputs that have a nonzero asset id blinding mask (i.e., outputs with a non-explicit asset id)
-
-  bool r = false;
 
   uint64_t ts = test_core_time::get_time();
   m_accounts.resize(TOTAL_ACCS_COUNT);

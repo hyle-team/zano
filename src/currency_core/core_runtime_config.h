@@ -105,6 +105,7 @@ namespace currency
     uint64_t max_alt_blocks;
     crypto::public_key alias_validation_pubkey;
     core_time_func_t get_core_time;
+    uint64_t hf4_minimum_mixins;
 
     hard_forks_descriptor hard_forks;
 
@@ -127,6 +128,7 @@ namespace currency
     pc.tx_pool_min_fee = TX_MINIMUM_FEE;
     pc.tx_default_fee = TX_DEFAULT_FEE;
     pc.max_alt_blocks = CURRENCY_ALT_BLOCK_MAX_COUNT;
+    pc.hf4_minimum_mixins = CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE;
     
     // TODO: refactor the following
     pc.hard_forks.set_hardfork_height(1, ZANO_HARDFORK_01_AFTER_HEIGHT);
