@@ -104,15 +104,15 @@ namespace crypto
       FIELD((std::vector<scalar_t>&)(r_x))
       FIELD(K1)
       FIELD(K2)
-      END_SERIALIZE()
+    END_SERIALIZE()
 
-      BEGIN_BOOST_SERIALIZATION()
+    BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(c)
       BOOST_SERIALIZE((std::vector<scalar_t>&)(r_g))
       BOOST_SERIALIZE((std::vector<scalar_t>&)(r_x))
       BOOST_SERIALIZE(K1)
       BOOST_SERIALIZE(K2)
-      END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION()
   };
 
   struct CLSAG_GGXXG_signature_serialized : public CLSAG_GGXXG_signature
@@ -180,6 +180,21 @@ namespace crypto
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(c)
       BOOST_SERIALIZE(y)
+    END_BOOST_SERIALIZATION()
+  };
+
+  struct generic_double_schnorr_sig_s : public generic_double_schnorr_sig
+  {
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(c)
+      FIELD(y0)
+      FIELD(y1)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(c)
+      BOOST_SERIALIZE(y0)
+      BOOST_SERIALIZE(y1)
     END_BOOST_SERIALIZATION()
   };
 

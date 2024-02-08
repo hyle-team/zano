@@ -1,5 +1,5 @@
-// Copyright (c) 2022-2023 Zano Project
-// Copyright (c) 2022-2023 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2022-2024 Zano Project
+// Copyright (c) 2022-2024 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 //
@@ -159,6 +159,110 @@ namespace crypto
       hsc.add_hash(m);
       hsc.add_pub_key(A);
       hsc.add_point(sig.y * c_point_X + sig.c * point_t(A));
+      return sig.c == hsc.calc_hash();
+    }
+    catch(...)
+    {
+      return false;
+    }
+  }
+
+  // --------------------------------------------
+
+  // multi-base Schnorr-like proof (two generators, two secrets, one Fiat-Shamir challenge) 
+  struct generic_double_schnorr_sig
+  {
+    scalar_t  c;
+    scalar_t  y0;
+    scalar_t  y1;
+  };
+
+  template<generator_tag gen0, generator_tag gen1>
+  inline bool generate_double_schnorr_sig(const hash& m, const point_t& A, const scalar_t& secret_a, const point_t& B, const scalar_t& secret_b, generic_double_schnorr_sig& result);
+
+  template<>
+  inline bool generate_double_schnorr_sig<gt_G, gt_G>(const hash& m, const point_t& A, const scalar_t& secret_a, const point_t& B, const scalar_t& secret_b, generic_double_schnorr_sig& result)
+  {
+#ifndef NDEBUG
+    if (A != secret_a * c_point_G || B != secret_b * c_point_G)
+      return false;
+#endif
+    scalar_t r0 = scalar_t::random();
+    scalar_t r1 = scalar_t::random();
+    point_t R0 = r0 * c_point_G;
+    point_t R1 = r1 * c_point_G;
+    hash_helper_t::hs_t hsc(5);
+    hsc.add_hash(m);
+    hsc.add_point(A);
+    hsc.add_point(B);
+    hsc.add_point(R0);
+    hsc.add_point(R1);
+    result.c = hsc.calc_hash();
+    result.y0.assign_mulsub(result.c, secret_a, r0); // y0 = r0 - c * secret_a
+    result.y1.assign_mulsub(result.c, secret_b, r1); // y1 = r1 - c * secret_b
+    return true;
+  }
+
+  template<>
+  inline bool generate_double_schnorr_sig<gt_X, gt_G>(const hash& m, const point_t& A, const scalar_t& secret_a, const point_t& B, const scalar_t& secret_b, generic_double_schnorr_sig& result)
+  {
+#ifndef NDEBUG
+    if (A != secret_a * c_point_X || B != secret_b * c_point_G)
+      return false;
+#endif
+    scalar_t r0 = scalar_t::random();
+    scalar_t r1 = scalar_t::random();
+    point_t R0 = r0 * c_point_X;
+    point_t R1 = r1 * c_point_G;
+    hash_helper_t::hs_t hsc(5);
+    hsc.add_hash(m);
+    hsc.add_point(A);
+    hsc.add_point(B);
+    hsc.add_point(R0);
+    hsc.add_point(R1);
+    result.c = hsc.calc_hash();
+    result.y0.assign_mulsub(result.c, secret_a, r0); // y0 = r0 - c * secret_a
+    result.y1.assign_mulsub(result.c, secret_b, r1); // y1 = r1 - c * secret_b
+    return true;
+  }
+
+  template<generator_tag gen0, generator_tag gen1>
+  inline bool verify_double_schnorr_sig(const hash& m, const point_t& A, const public_key& B, const generic_double_schnorr_sig& sig) noexcept;
+
+  template<>
+  inline bool verify_double_schnorr_sig<gt_G, gt_G>(const hash& m, const point_t& A, const public_key& B, const generic_double_schnorr_sig& sig) noexcept
+  {
+    try
+    {
+      if (!sig.c.is_reduced() || !sig.y0.is_reduced() || !sig.y1.is_reduced())
+        return false;
+      hash_helper_t::hs_t hsc(5);
+      hsc.add_hash(m);
+      hsc.add_point(A);
+      hsc.add_pub_key(B);
+      hsc.add_point(A.mul_plus_G(sig.c, sig.y0));          // sig.y0 * G + sig.c * A
+      hsc.add_point(point_t(B).mul_plus_G(sig.c, sig.y1)); // sig.y1 * G + sig.c * B
+      return sig.c == hsc.calc_hash();
+    }
+    catch(...)
+    {
+      return false;
+    }
+  }
+
+  template<>
+  inline bool verify_double_schnorr_sig<gt_X, gt_G>(const hash& m, const point_t& A, const public_key& B, const generic_double_schnorr_sig& sig) noexcept
+  {
+    try
+    {
+      if (!sig.c.is_reduced() || !sig.y0.is_reduced() || !sig.y1.is_reduced())
+        return false;
+      hash_helper_t::hs_t hsc(5);
+      hsc.add_hash(m);
+      hsc.add_point(A);
+      hsc.add_pub_key(B);
+      hsc.add_point(sig.y0 * c_point_X + sig.c * A);
+      hsc.add_point(point_t(B).mul_plus_G(sig.c, sig.y1)); // sig.y1 * G + sig.c * B
       return sig.c == hsc.calc_hash();
     }
     catch(...)
