@@ -640,21 +640,29 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
             auto it = m_key_images.find(ki);
             if (it != m_key_images.end())
             {
-              // Issue that has been discovered by Luke Parker (twitter: @kayabaNerve)
-              // An attacker can quickly issue transaction that use same outputs ephemeral keys + same tx key, as a result both 
-              // transaction's outputs would have same key image, so the wallet should have smart approach to this situation, ie 
-              // use output that offer biggest output value.(tokens?)
-
+              // We encountered an output with a key image already seen. This implies only one can be spent in the future (assuming the first isn't spent yet).
+              // To address this, we disregard such outputs and log a warning.
+              // 
+              // It was later revealed that auditable wallets could still be vulnerable: an attacker might quickly broadcast a transaction
+              // using the same output's ephemeral keys + the same tx pub key. If the malicious transaction (potentially for a lesser amount)
+              // arrives first, the recipient would be unable to spend the funds from the second, real transaction.
+              // This attack vector was highlighted by Luke Parker (twitter: @kayabaNerve), who suggested selecting the output with the largest amount.
+              // Sadly, this fix only applies to classic RingCT transactions and is incompatible with our use of Confidential Assets.
+              // Consequently, we adopted a solution suggested by @crypto_zoidberg: verifying in zero knowledge that the sender possesses the transaction's
+              // secret key. This verification is integrated with the balance proof (double Schnorr proof).
+              // 
+              // However, we continue to omit outputs with duplicate key images since they could originate from the same source (albeit impractically).
+              // -- sowle
 
               WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second < m_transfers.size(), "m_key_images entry has wrong m_transfers index, it->second: " << it->second << ", m_transfers.size(): " << m_transfers.size());
               const transfer_details& local_td = m_transfers[it->second];
 
-
-
               std::stringstream ss;
-              ss << "tx " << ptc.tx_hash() << " @ block " << height << " has output #" << o << " with key image " << ki << " that has already been seen in output #" <<
-                local_td.m_internal_output_index << " in tx " << get_transaction_hash(local_td.m_ptx_wallet_info->m_tx) << " @ block " << local_td.m_spent_height <<
-                ". This output can't ever be spent and will be skipped.";
+              ss << "tx " << ptc.tx_hash() << " @ block " << height << " has output #" << o << " with amount " << out.amount;
+              if (!out.is_native_coin())
+                ss << "(asset_id: " << out.asset_id << ") ";
+              ss << "and key image " << ki << " that has already been seen in output #" << local_td.m_internal_output_index << " in tx " << get_transaction_hash(local_td.m_ptx_wallet_info->m_tx)
+                << " @ block " << local_td.m_spent_height << ". This output can't ever be spent and will be skipped.";
               WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
               if (m_wcallback)
                 m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
