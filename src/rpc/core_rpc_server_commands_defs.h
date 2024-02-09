@@ -793,7 +793,7 @@ namespace currency
       uint64_t minimum_fee;
       uint64_t last_block_timestamp;
       std::string last_block_hash;
-      std::vector<bool> is_hardfok_active;
+      std::list<bool> is_hardfok_active;
       //market
       uint64_t offers_count;
 
