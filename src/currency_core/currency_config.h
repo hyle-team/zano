@@ -10,7 +10,7 @@
 #ifndef TESTNET
 #define CURRENCY_FORMATION_VERSION                      84
 #else
-#define CURRENCY_FORMATION_VERSION                      94
+#define CURRENCY_FORMATION_VERSION                      95
 #endif
 
 #define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121) //bender's nightmare
