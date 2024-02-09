@@ -65,6 +65,7 @@ bool create_block_template_manually(const currency::block& prev_block, boost::mu
   // make things really simple by assuming block size is less than CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE
   size_t median_size = 0;
   uint64_t block_reward_without_fee = 0;
+  uint64_t block_reward = 0;
 
   bool r = construct_miner_tx(get_block_height(prev_block) + 1,
     median_size,
@@ -75,6 +76,7 @@ bool create_block_template_manually(const currency::block& prev_block, boost::mu
     miner_addr,
     result.miner_tx,
     block_reward_without_fee,
+    block_reward,
     TRANSACTION_VERSION_PRE_HF4);
   CHECK_AND_ASSERT_MES(r, false, "construct_miner_tx failed");
 
