@@ -402,20 +402,8 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
   {
     if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
     {
-      crypto::public_key self_check = AUTO_VAL_INIT(self_check);
-      crypto::secret_key asset_control_key = AUTO_VAL_INIT(asset_control_key);
-      bool r = derive_key_pair_from_key_pair(ptc.tx_pub_key, m_account.get_keys().spend_secret_key, asset_control_key, self_check, CRYPTO_HDS_ASSET_CONTROL_KEY);
-      if (!r)
+      if (ado.descriptor.owner != m_account.get_public_address().spend_public_key)
       {
-        //not critical error, continue to work 
-        LOG_ERROR("Failed to derive_key_pair_from_key_pair for asset_descriptor_operation in tx " << ptc.tx_hash());
-        break;
-      }
-
-      if (self_check != ado.descriptor.owner)
-      {
-        //still not critical error
-        LOG_ERROR("Public key from asset_descriptor_operation(" << ado.descriptor.owner << ") not much with derived public key(" << self_check << "), for tx" << ptc.tx_hash());
         break;
       }
       crypto::public_key asset_id{};
@@ -423,7 +411,6 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
       WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(m_own_asset_descriptors.count(asset_id) == 0, "asset with asset_id " << asset_id << " has already been registered in the wallet as own asset");
       wallet_own_asset_context& asset_context = m_own_asset_descriptors[asset_id];
       asset_context.asset_descriptor = ado.descriptor;
-      asset_context.control_key = asset_control_key;
 
       std::stringstream ss;
       ss << "New Asset Registered:"
@@ -440,22 +427,83 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
       if (m_wcallback)
         m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
     }
-    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+    {
+      WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(ado.opt_asset_id, get_asset_operation_type_string(ado.operation_type) << " failed with empty opt_asset_id");
+      auto it = m_own_asset_descriptors.find(*ado.opt_asset_id);
+      if (it == m_own_asset_descriptors.end())
+        break;
+      //asset had been updated
+      add_rollback_event(ptc.height, asset_update_event{ it->first, it->second });
+      it->second.asset_descriptor = ado.descriptor;      
+    }
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE )
     {
       WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(ado.opt_asset_id, get_asset_operation_type_string(ado.operation_type) << " failed with empty opt_asset_id");
       auto  it = m_own_asset_descriptors.find(*ado.opt_asset_id);
-      WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(it != m_own_asset_descriptors.end(), "asset with asset_id " << *ado.opt_asset_id << " not found during " << get_asset_operation_type_string(ado.operation_type));
-      if (it->second.asset_descriptor.owner != ado.descriptor.owner)
+      if (it == m_own_asset_descriptors.end())
       {
-        //ownership of the asset had been transfered
-        add_rollback_event(ptc.height, asset_unown_event{ it->first, it->second });
-        m_own_asset_descriptors.erase(it);
+        if (ado.descriptor.owner == m_account.get_public_address().spend_public_key)
+        {
+          // ownership of the asset acquired
+
+          wallet_own_asset_context& asset_context = m_own_asset_descriptors[*ado.opt_asset_id];
+          asset_context.asset_descriptor = ado.descriptor;
+
+          std::stringstream ss;
+          ss << "Asset ownership acquired:"
+            << ENDL << "asset id:         " << *ado.opt_asset_id
+            << ENDL << "Name:             " << ado.descriptor.full_name
+            << ENDL << "Ticker:           " << ado.descriptor.ticker
+            << ENDL << "Total Max Supply: " << print_asset_money(ado.descriptor.total_max_supply, ado.descriptor.decimal_point)
+            << ENDL << "Current Supply:   " << print_asset_money(ado.descriptor.current_supply, ado.descriptor.decimal_point)
+            << ENDL << "Decimal Point:    " << ado.descriptor.decimal_point;
+
+
+          add_rollback_event(ptc.height, asset_register_event{ *ado.opt_asset_id });
+          WLT_LOG_MAGENTA(ss.str(), LOG_LEVEL_0);
+          if (m_wcallback)
+            m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
+        }
+        else
+        {
+          // update event of the asset that we not control, skip
+          break;
+        }
       }
       else
       {
-        //asset had been updated
-        add_rollback_event(ptc.height, asset_update_event{ it->first, it->second });
-        it->second.asset_descriptor = ado.descriptor;
+        //update event for asset that we control, check if ownership is still ours
+        if (ado.descriptor.owner != m_account.get_public_address().spend_public_key)
+        {
+          //ownership of the asset had been transfered
+          add_rollback_event(ptc.height, asset_unown_event{ it->first, it->second });
+          m_own_asset_descriptors.erase(it);
+
+          std::stringstream ss;
+          ss << "Asset ownership lost:"
+            << ENDL << "asset id:         " << *ado.opt_asset_id
+            << ENDL << "New owner:        " << ado.descriptor.owner
+            << ENDL << "Name:             " << ado.descriptor.full_name
+            << ENDL << "Ticker:           " << ado.descriptor.ticker
+            << ENDL << "Total Max Supply: " << print_asset_money(ado.descriptor.total_max_supply, ado.descriptor.decimal_point)
+            << ENDL << "Current Supply:   " << print_asset_money(ado.descriptor.current_supply, ado.descriptor.decimal_point)
+            << ENDL << "Decimal Point:    " << ado.descriptor.decimal_point;
+
+          add_rollback_event(ptc.height, asset_register_event{ *ado.opt_asset_id });
+          WLT_LOG_MAGENTA(ss.str(), LOG_LEVEL_0);
+          if (m_wcallback)
+            m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
+
+
+        }
+        else
+        {
+          //just an update of the asset
+          add_rollback_event(ptc.height, asset_update_event{ it->first, it->second });
+          it->second.asset_descriptor = ado.descriptor;
+
+        }
       }
     }
   } while (false);
@@ -869,7 +917,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     WLT_LOG_L2("Payment found, id (hex): " << epee::string_tools::buff_to_hex_nodelimer(payment_id) << ", tx: " << payment.m_tx_hash << ", amount: " << print_money_brief(payment.m_amount) << "subtransfers = " << payment.subtransfers.size());
   }
    
-  if (ptc.spent_own_native_inputs)
+  if (ptc.employed_entries.receive.size() || ptc.employed_entries.spent.size())
   {
     //check if there are asset_registration that belong to this wallet
     asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
@@ -4882,7 +4930,8 @@ void wallet2::emmit_asset(const crypto::public_key asset_id, std::vector<currenc
   ctp.dsts = destinations;
   ctp.extra.push_back(asset_emmit_info);
   ctp.need_at_least_1_zc = true;
-  ctp.asset_deploy_control_key = own_asset_entry_it->second.control_key;
+  ctp.ado_current_asset_owner = rsp.asset_descriptor.owner;
+  //ctp.asset_deploy_control_key = own_asset_entry_it->second.control_key;
 
   finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
@@ -4901,7 +4950,10 @@ void wallet2::update_asset(const crypto::public_key asset_id, const currency::as
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.extra.push_back(asset_update_info);
   ctp.need_at_least_1_zc = true;
-  ctp.asset_deploy_control_key = own_asset_entry_it->second.control_key;
+  currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
+  bool r = this->daemon_get_asset_info(asset_id, adb);
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed to get asset info from daemon");
+  ctp.ado_current_asset_owner = adb.owner;
 
   finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
@@ -4910,8 +4962,8 @@ void wallet2::update_asset(const crypto::public_key asset_id, const currency::as
 //----------------------------------------------------------------------------------------------------
 void wallet2::burn_asset(const crypto::public_key asset_id, uint64_t amount_to_burn, currency::transaction& result_tx)
 {
-  auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
-  CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
+  //auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
+  //CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
   COMMAND_RPC_GET_ASSET_INFO::request req;
   req.asset_id = asset_id;
   COMMAND_RPC_GET_ASSET_INFO::response rsp;
@@ -4934,7 +4986,7 @@ void wallet2::burn_asset(const crypto::public_key asset_id, uint64_t amount_to_b
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.extra.push_back(asset_burn_info);
   ctp.need_at_least_1_zc = true;
-  ctp.asset_deploy_control_key = own_asset_entry_it->second.control_key;
+  ctp.ado_current_asset_owner = rsp.asset_descriptor.owner;
   ctp.dsts.push_back(dst_to_burn);
 
   finalized_tx ft = AUTO_VAL_INIT(ft);
@@ -6927,7 +6979,8 @@ bool wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
 
   const currency::transaction& tx_for_mode_separate = msc.tx_for_mode_separate;
   assets_selection_context needed_money_map = get_needed_money(ctp.fee, ctp.dsts);
-  ftp.asset_control_key = ctp.asset_deploy_control_key;
+  ftp.ado_current_asset_owner = ctp.ado_current_asset_owner;
+  ftp.pthirdparty_sign_handler = ctp.pthirdparty_sign_handler;
   //
   // TODO @#@# need to do refactoring over this part to support hidden amounts and asset_id
   //

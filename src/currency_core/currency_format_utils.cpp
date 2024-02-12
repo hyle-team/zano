@@ -2154,14 +2154,16 @@ namespace currency
   {
     if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
     {
-      crypto::secret_key asset_control_key{};
-      bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, tx_key.sec, asset_control_key, ado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
-      CHECK_AND_ASSERT_MES(r, false, "derive_key_pair_from_key_pair failed");
+      //crypto::secret_key asset_control_key{};
+      //bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, tx_key.sec, asset_control_key, ado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
+      //CHECK_AND_ASSERT_MES(r, false, "derive_key_pair_from_key_pair failed");
+      
+      ado.descriptor.owner = sender_account_keys.account_address.spend_public_key;
 
       calculate_asset_id(ado.descriptor.owner, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id);
 
       // calculate amount blinding mask
-      gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, asset_control_key, tx_key.pub);
+      gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, tx_key.sec, tx_key.pub);
 
       // set correct asset_id to the corresponding destination entries
       uint64_t amount_of_emitted_asset = 0;
@@ -2178,6 +2180,38 @@ namespace currency
       gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
       ado.amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
     }
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+    {
+      CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN");
+
+      gen_context.ao_asset_id = *ado.opt_asset_id;
+      gen_context.ao_asset_id_pt.from_public_key(gen_context.ao_asset_id);
+      // calculate amount blinding mask
+      gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, tx_key.sec, tx_key.pub);
+      gen_context.ao_commitment_in_outputs = true;
+
+      // set correct asset_id to the corresponding destination entries
+      uint64_t amount_of_burned_assets = 0;
+      for (auto& item : ftp.sources)
+      {
+        if (item.asset_id == gen_context.ao_asset_id)
+        {
+          amount_of_burned_assets += item.amount;
+        }
+      }
+      for (auto& item : ftp.prepared_destinations)
+      {
+        if (item.asset_id == gen_context.ao_asset_id)
+        {
+          CHECK_AND_ASSERT_THROW_MES(amount_of_burned_assets >= item.amount, "Failed to find burn amount, failed condition: amount_of_burned_assets(" << amount_of_burned_assets << ") >= item.amount(" << item.amount << ")");
+          amount_of_burned_assets -= item.amount;
+        }
+      }
+      ado.descriptor.current_supply -= amount_of_burned_assets;
+
+      gen_context.ao_amount_commitment = amount_of_burned_assets * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
+      ado.amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
+    }
     else
     {
       if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
@@ -2187,7 +2221,7 @@ namespace currency
         gen_context.ao_asset_id = *ado.opt_asset_id;
         gen_context.ao_asset_id_pt.from_public_key(gen_context.ao_asset_id);
         // calculate amount blinding mask
-        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, ftp.asset_control_key, tx_key.pub);
+        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, tx_key.sec, tx_key.pub);
 
         // set correct asset_id to the corresponding destination entries
         uint64_t amount_of_emitted_asset = 0;
@@ -2212,46 +2246,23 @@ namespace currency
 
         //fields that not supposed to be changed?
       }
-      else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
-      {
-        CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN");
-
-        gen_context.ao_asset_id = *ado.opt_asset_id;
-        gen_context.ao_asset_id_pt.from_public_key(gen_context.ao_asset_id);
-        // calculate amount blinding mask
-        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, ftp.asset_control_key, tx_key.pub);
-        gen_context.ao_commitment_in_outputs = true;
-
-        // set correct asset_id to the corresponding destination entries
-        uint64_t amount_of_burned_assets = 0;
-        for (auto& item: ftp.sources)
-        {
-          if (item.asset_id == gen_context.ao_asset_id)
-          {
-            amount_of_burned_assets += item.amount;
-          }
-        }
-        for (auto& item : ftp.prepared_destinations)
-        {
-          if (item.asset_id == gen_context.ao_asset_id )
-          {
-            CHECK_AND_ASSERT_THROW_MES(amount_of_burned_assets >= item.amount, "Failed to find burn amount, failed condition: amount_of_burned_assets(" << amount_of_burned_assets << ") >= item.amount("<< item.amount << ")");
-            amount_of_burned_assets -= item.amount;
-          }
-        }
-        ado.descriptor.current_supply -= amount_of_burned_assets;
-
-        gen_context.ao_amount_commitment = amount_of_burned_assets * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
-        ado.amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
-      }
-
       if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation_before_seal{ &ado });
 
       //seal it with owners signature
       crypto::signature sig = currency::null_sig;
-      crypto::public_key pub_k = currency::null_pkey;
-      crypto::secret_key_to_public_key(ftp.asset_control_key, pub_k);
-      crypto::generate_signature(get_signature_hash_for_asset_operation(ado), pub_k, ftp.asset_control_key, sig);
+      crypto::hash h = get_signature_hash_for_asset_operation(ado)
+      if (ftp.pthirdparty_sign_handler)
+      {
+        bool r = ftp.pthirdparty_sign_handler->sign(h, ftp.ado_current_asset_owner, sig);
+        CHECK_AND_ASSERT_MES(r, false, "asset thirparty sign failed");
+      }
+      else
+      {
+        crypto::public_key pub_k = currency::null_pkey;
+        crypto::secret_key_to_public_key(sender_account_keys.spend_secret_key, pub_k);
+        CHECK_AND_ASSERT_MES(ftp.ado_current_asset_owner == pub_k, false, "asset owner key not matched with provided private key for asset operation signing");
+        crypto::generate_signature(h, pub_k, account_keys.spend_secret_key, sig);
+      }
       ado.opt_proof = sig;
     }
     return true;

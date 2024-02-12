@@ -4126,7 +4126,7 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
 
     CHECK_AND_ASSERT_MES(avc.asset_op_history && avc.asset_op_history->size(), false, "asset with id " << avc.asset_id << " has not been registered");
     // check ownership permission
-    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE /*|| ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN*/)
     {
       bool r = validate_ado_ownership(avc);
       CHECK_AND_ASSERT_MES(r, false, "Faild to validate ownership of asset_descriptor_operation, rejecting");
