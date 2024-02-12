@@ -199,6 +199,7 @@ namespace tools
       END_SERIALIZE()
   };
 
+
   struct construct_tx_param
   {
     // preparing data for tx
@@ -223,7 +224,9 @@ namespace tools
     bool shuffle = false;
     bool create_utxo_defragmentation_tx = false;
     bool need_at_least_1_zc = false;
-    crypto::secret_key asset_deploy_control_key = currency::null_skey;
+    //crypto::secret_key asset_deploy_control_key = currency::null_skey;
+    currency::thirdparty_sign_handler* pthirdparty_sign_handler = nullptr;
+    crypto::public_key ado_current_asset_owner = currency::null_pkey;
   };
 
   struct mode_separate_context
@@ -255,13 +258,11 @@ namespace tools
   struct wallet_own_asset_context
   {
     currency::asset_descriptor_base asset_descriptor;
-    crypto::secret_key control_key;
-    //uint64_t height = 0;
+    bool thirdparty_custody = false;
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(asset_descriptor)
-      BOOST_SERIALIZE(control_key)
-      //BOOST_SERIALIZE(height)
+      BOOST_SERIALIZE(thirdparty_custody)
       END_BOOST_SERIALIZATION()
   };
 

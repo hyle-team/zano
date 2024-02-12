@@ -134,15 +134,18 @@ namespace currency
 	  END_KV_SERIALIZE_MAP()
   };
 
-   struct htlc_info
-   {
-     bool hltc_our_out_is_before_expiration;
-   };
+  struct htlc_info
+  {
+    bool hltc_our_out_is_before_expiration;
+  };
 
+  struct thirdparty_sign_handler
+  {
+    virtual bool sign(const crypto::hash& h, const crypto::public_key& owner_public_key, crypto::signature& sig);
+  };
 
   struct finalize_tx_param
   {
-
     uint64_t unlock_time;
     std::vector<currency::extra_v> extra;
     std::vector<currency::attachment_v> attachments;
@@ -158,10 +161,14 @@ namespace currency
     crypto::public_key spend_pub_key;  // only for validations
     uint64_t tx_version;
     uint64_t mode_separate_fee = 0;
-    crypto::secret_key asset_control_key = currency::null_skey;
+    
     epee::misc_utils::events_dispatcher* pevents_dispatcher;
-
     tx_generation_context gen_context{}; // solely for consolidated txs
+    
+    //crypto::secret_key asset_control_key = currency::null_skey;
+    crypto::public_key ado_current_asset_owner = null_pkey;
+    thirdparty_sign_handler* pthirdparty_sign_handler = nullptr;
+
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(unlock_time)
@@ -179,9 +186,11 @@ namespace currency
       FIELD(spend_pub_key)
       FIELD(tx_version)
       FIELD(mode_separate_fee)
-      FIELD(asset_control_key)      
       if (flags & TX_FLAG_SIGNATURE_MODE_SEPARATE)
+      {
         FIELD(gen_context);
+      }
+      FIELD(ado_current_asset_owner)
     END_SERIALIZE()
   };
 
