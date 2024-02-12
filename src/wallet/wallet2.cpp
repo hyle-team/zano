@@ -474,7 +474,7 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
       else
       {
         //update event for asset that we control, check if ownership is still ours
-        if (ado.descriptor.owner != m_account.get_public_address().spend_public_key)
+        if (ado.descriptor.owner != m_account.get_public_address().spend_public_key && !it->second.thirdparty_custody)
         {
           //ownership of the asset had been transfered
           add_rollback_event(ptc.height, asset_unown_event{ it->first, it->second });
@@ -494,15 +494,12 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
           WLT_LOG_MAGENTA(ss.str(), LOG_LEVEL_0);
           if (m_wcallback)
             m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
-
-
         }
         else
         {
           //just an update of the asset
           add_rollback_event(ptc.height, asset_update_event{ it->first, it->second });
           it->second.asset_descriptor = ado.descriptor;
-
         }
       }
     }
