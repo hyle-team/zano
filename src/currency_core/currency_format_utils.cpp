@@ -1145,7 +1145,7 @@ namespace currency
     if (a.ticker != b.ticker) return false;
     if (a.full_name != b.full_name) return false;
     //a.meta_info;
-    if (a.owner != b.owner) return false;
+    //if (a.owner != b.owner) return false;
     if (a.hidden_supply != b.hidden_supply) return false;
     
     return true;
