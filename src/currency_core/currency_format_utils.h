@@ -168,7 +168,7 @@ namespace currency
     //crypto::secret_key asset_control_key = currency::null_skey;
     crypto::public_key ado_current_asset_owner = null_pkey;
     thirdparty_sign_handler* pthirdparty_sign_handler = nullptr;
-    bool need_to_generate_ado_proof = false;
+    mutable bool need_to_generate_ado_proof = false;
 
 
     BEGIN_SERIALIZE_OBJECT()

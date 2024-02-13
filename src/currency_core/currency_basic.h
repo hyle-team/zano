@@ -783,7 +783,6 @@ namespace currency
       FIELD(descriptor)
       FIELD(amount_commitment)
       END_VERSION_UNDER(1)
-      FIELD(opt_proof)
       FIELD(opt_asset_id)
     END_SERIALIZE()
 
@@ -792,7 +791,6 @@ namespace currency
       BOOST_SERIALIZE(descriptor)
       BOOST_SERIALIZE(amount_commitment)
       BOOST_END_VERSION_UNDER(1)
-      BOOST_SERIALIZE(opt_proof)
       BOOST_SERIALIZE(opt_asset_id)
     END_BOOST_SERIALIZATION()
   };

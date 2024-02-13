@@ -4096,7 +4096,7 @@ bool blockchain_storage::validate_ado_ownership(asset_op_verification_context& a
   CHECK_AND_ASSERT_MES(avc.asset_op_history->size() != 0, false, "asset with id " << avc.asset_id << " has invalid history size() == 0");
 
   crypto::public_key owner_key = avc.asset_op_history->back().descriptor.owner;
-  return crypto::verify_schnorr_sig(tx_id, owner_key, aoop.gss);
+  return crypto::verify_schnorr_sig(avc.tx_id, owner_key, aoop.gss);
 }
 //------------------------------------------------------------------
 bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado)
