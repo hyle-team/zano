@@ -391,9 +391,10 @@ namespace tools
     void emmit_asset(const crypto::public_key asset_id, std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx);
     void update_asset(const crypto::public_key asset_id, const currency::asset_descriptor_base new_descriptor, currency::transaction& result_tx);
     void burn_asset(const crypto::public_key asset_id, uint64_t amount_to_burn, currency::transaction& result_tx);
+    void transfer_asset_ownership(const crypto::public_key asset_id, const crypto::public_key& new_owner, currency::transaction& result_tx);
 
     bool daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb);
-
+    const std::unordered_map<crypto::public_key, wallet_own_asset_context>& get_own_assets() const { return m_own_asset_descriptors; }
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
     void set_pos_utxo_count_limits_for_defragmentation_tx(uint64_t min_outs, uint64_t max_outs); // don't create UTXO defrag. tx if there are less than 'min_outs' outs; don't put more than 'max_outs' outs
     void set_pos_decoys_count_for_defragmentation_tx(size_t decoys_count);
@@ -404,7 +405,8 @@ namespace tools
     uint64_t balance(uint64_t& unloked, uint64_t& awaiting_in, uint64_t& awaiting_out, uint64_t& mined, const crypto::public_key& asset_id = currency::native_coin_asset_id) const;
     bool balance(std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base>& balances, uint64_t& mined) const;
     bool balance(std::list<wallet_public::asset_balance_entry>& balances, uint64_t& mined) const;
-    uint64_t balance(crypto::public_key asset_id, uint64_t& unloked) const;
+    uint64_t balance(const crypto::public_key& asset_id, uint64_t& unlocked) const;
+    uint64_t balance(const crypto::public_key& asset_id) const;
 
     uint64_t balance(uint64_t& unloked) const;
 

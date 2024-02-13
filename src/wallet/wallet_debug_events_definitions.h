@@ -18,6 +18,12 @@ struct wde_construct_tx_handle_asset_descriptor_operation_before_seal
   currency::asset_descriptor_operation* pado;
 };
 
+struct wde_construct_tx_handle_asset_descriptor_operation_before_burn
+{
+  currency::asset_descriptor_operation* pado;
+};
+
+
 
 struct wde_construct_tx_after_asset_ownership_proof_generated
 {
