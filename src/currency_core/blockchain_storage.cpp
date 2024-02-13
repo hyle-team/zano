@@ -4088,13 +4088,15 @@ bool blockchain_storage::validate_ado_ownership(asset_op_verification_context& a
 {
 //  asset_id = AUTO_VAL_INIT(asset_id);
 //  CHECK_AND_ASSERT_MES(validate_asset_operation_balance_proof(tx, tx_id, ado, asset_id), false, "asset operation validation failed!");
-  CHECK_AND_ASSERT_MES(avc.ado.opt_proof.has_value(), false, "Ownership validation failed - missing signature");
+  asset_operation_ownership_proof aoop = AUTO_VAL_INIT(aoop);
+  bool r = get_type_in_variant_container(avc.tx.proofs, aoop);
+  CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed - missing signature");
 
 
   CHECK_AND_ASSERT_MES(avc.asset_op_history->size() != 0, false, "asset with id " << avc.asset_id << " has invalid history size() == 0");
 
   crypto::public_key owner_key = avc.asset_op_history->back().descriptor.owner;
-  return crypto::check_signature(get_signature_hash_for_asset_operation(avc.ado), owner_key, *avc.ado.opt_proof);
+  return crypto::verify_schnorr_sig(tx_id, owner_key, aoop.gss);
 }
 //------------------------------------------------------------------
 bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado)
