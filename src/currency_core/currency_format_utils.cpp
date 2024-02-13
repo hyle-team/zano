@@ -172,7 +172,16 @@ namespace currency
     if (is_asset_emitting_transaction(tx, &ado))
     {
       crypto::point_t asset_id_pt = crypto::c_point_0;
-      calculate_asset_id(ado.descriptor.owner, &asset_id_pt, nullptr); // TODO @#@# optimization: this expensive calculation should be done only once
+      if (ado.opt_asset_id)
+      {
+        //emmit on existing asset, we SHOULD not calculate asset_id, instead we use the one provided
+        //since the owner might have been changed since creation
+        asset_id_pt = crypto::point_t(*ado.opt_asset_id);
+      }
+      else
+      {
+        calculate_asset_id(ado.descriptor.owner, &asset_id_pt, nullptr); // TODO @#@# optimization: this expensive calculation should be done only once
+      }
       pseudo_outs_blinded_asset_ids.emplace_back(asset_id_pt); // additional ring member for asset emitting tx
     }
 
@@ -2711,7 +2720,8 @@ namespace currency
         else
         {
           //generate signature by wallet account 
-          crypto::generate_schnorr_sig(tx_prefix_hash, ftp.ado_current_asset_owner, sender_account_keys.spend_secret_key, aoop.gss);
+          r = crypto::generate_schnorr_sig(tx_prefix_hash, ftp.ado_current_asset_owner, sender_account_keys.spend_secret_key, aoop.gss);
+          CHECK_AND_ASSERT_MES(r, false, "Failed to sign ado proof");
         }
         if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_after_asset_ownership_proof_generated{ &aoop });
         tx.proofs.emplace_back(aoop);

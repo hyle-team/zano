@@ -916,7 +916,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
   
   //check if there are asset_registration that belong to this wallet
   const asset_descriptor_operation* pado = get_type_in_variant_container<const asset_descriptor_operation>(tx.extra);
-  if (ptc.employed_entries.receive.size() || ptc.employed_entries.spent.size() || (pado && pado->descriptor.owner == m_account.get_public_address().spend_public_key))
+  if (pado && (ptc.employed_entries.receive.size() || ptc.employed_entries.spent.size() || pado->descriptor.owner == m_account.get_public_address().spend_public_key))
   {
     //check if there are asset_registration that belong to this wallet
     process_ado_in_new_transaction(*pado, ptc);

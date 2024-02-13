@@ -509,6 +509,10 @@ namespace misc_utils
       }
     }
 
+    void UNSUBSCRIBE_ALL()
+    {
+      m_callbacks.clear();
+    }
 
     template<typename param_t>
     void RAISE_DEBUG_EVENT(const param_t& p)
