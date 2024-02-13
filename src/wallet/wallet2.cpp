@@ -913,15 +913,13 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     m_payments.emplace(payment_id, payment);
     WLT_LOG_L2("Payment found, id (hex): " << epee::string_tools::buff_to_hex_nodelimer(payment_id) << ", tx: " << payment.m_tx_hash << ", amount: " << print_money_brief(payment.m_amount) << "subtransfers = " << payment.subtransfers.size());
   }
-   
-  if (ptc.employed_entries.receive.size() || ptc.employed_entries.spent.size())
+  
+  //check if there are asset_registration that belong to this wallet
+  const asset_descriptor_operation* pado = get_type_in_variant_container<const asset_descriptor_operation>(tx.extra);
+  if (ptc.employed_entries.receive.size() || ptc.employed_entries.spent.size() || (pado && pado->descriptor.owner == m_account.get_public_address().spend_public_key))
   {
     //check if there are asset_registration that belong to this wallet
-    asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
-    if (get_type_in_variant_container(tx.extra, ado))
-    {
-      process_ado_in_new_transaction(ado, ptc);
-    }
+    process_ado_in_new_transaction(*pado, ptc);
   }
 
   if (has_in_transfers || has_out_transfers || is_derivation_used_to_encrypt(tx, derivation) || ptc.employed_entries.spent.size())
@@ -3378,7 +3376,7 @@ uint64_t wallet2::balance(uint64_t& unlocked, uint64_t& awaiting_in, uint64_t& a
   return total;
 }
 //----------------------------------------------------------------------------------------------------
-uint64_t wallet2::balance(crypto::public_key asset_id, uint64_t& unlocked) const
+uint64_t wallet2::balance(const crypto::public_key& asset_id, uint64_t& unlocked) const
 {
   std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base> balances;
   uint64_t dummy;
@@ -3390,6 +3388,12 @@ uint64_t wallet2::balance(crypto::public_key asset_id, uint64_t& unlocked) const
   }
   unlocked = it->second.unlocked;
   return it->second.total;
+}
+//----------------------------------------------------------------------------------------------------
+uint64_t wallet2::balance(const crypto::public_key& asset_id) const
+{
+  uint64_t dummy = 0;
+  return balance(asset_id, dummy);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::balance(std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base>& balances, uint64_t& mined) const
@@ -4951,6 +4955,29 @@ void wallet2::update_asset(const crypto::public_key asset_id, const currency::as
   bool r = this->daemon_get_asset_info(asset_id, adb);
   CHECK_AND_ASSERT_THROW_MES(r, "Failed to get asset info from daemon");
   ctp.ado_current_asset_owner = adb.owner;
+
+  finalized_tx ft = AUTO_VAL_INIT(ft);
+  this->transfer(ctp, ft, true, nullptr);
+  result_tx = ft.tx;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::transfer_asset_ownership(const crypto::public_key asset_id, const crypto::public_key& new_owner, currency::transaction& result_tx)
+{
+  auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
+  CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
+
+  currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
+  bool r = this->daemon_get_asset_info(asset_id, adb);
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed to get asset info from daemon");
+
+  asset_descriptor_operation asset_update_info = AUTO_VAL_INIT(asset_update_info);
+  asset_update_info.descriptor = adb;
+  asset_update_info.operation_type = ASSET_DESCRIPTOR_OPERATION_UPDATE;
+  asset_update_info.opt_asset_id = asset_id;
+  asset_update_info.descriptor.owner = new_owner;
+  construct_tx_param ctp = get_default_construct_tx_param();
+  ctp.ado_current_asset_owner = adb.owner;
+  ctp.extra.push_back(asset_update_info);
 
   finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
