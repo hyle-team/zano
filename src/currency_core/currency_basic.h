@@ -775,7 +775,6 @@ namespace currency
     uint8_t                         operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
     asset_descriptor_base           descriptor;
     crypto::public_key              amount_commitment;     // premultiplied by 1/8
-    boost::optional<crypto::signature> opt_proof;          // operation proof - for update/emit
     boost::optional<crypto::public_key> opt_asset_id;      // target asset_id - for update/emit
     uint8_t verion = ASSET_DESCRIPTOR_OPERATION_STRUCTURE_VER;
 
