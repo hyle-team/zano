@@ -252,10 +252,10 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
   //------------------- tests that trying to break stuff  -------------------
   //tests that trying to break stuff
-  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation>([&](const wde_construct_tx_handle_asset_descriptor_operation& o)
+  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_after_asset_ownership_proof_generated>([&](const wde_construct_tx_after_asset_ownership_proof_generated& o)
   {
-    crypto::signature s = currency::null_sig;
-    o.pado->opt_proof = s;
+    //crypto::signature s = currency::null_sig;
+    o.pownership_proof->gss = crypto::generic_schnorr_sig_s{};
   });
 
 
