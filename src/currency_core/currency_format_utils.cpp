@@ -2693,6 +2693,23 @@ namespace currency
         aop.opt_amount_commitment_g_proof = aop_g_sig;
         tx.proofs.emplace_back(std::move(aop));
       }
+      if(ftp.need_to_generate_ado_proof)        
+      { 
+        asset_operation_ownership_proof aoop = AUTO_VAL_INIT(aoop);
+
+        if (ftp.pthirdparty_sign_handler)
+        {
+          //ask third party to generate proof
+          r = ftp.pthirdparty_sign_handler->sign(tx_prefix_hash, ftp.ado_current_asset_owner, aoop.gss);
+          CHECK_AND_ASSERT_MES(r, false, "Failed to sign ado by thirdparty");
+        }
+        else
+        {
+          //generate signature by wallet account 
+
+        }
+        tx.proofs.emplace_back(aoop);
+      }
     }
 
     //size_t prefix_size = get_object_blobsize(static_cast<const transaction_prefix&>(tx));

@@ -141,7 +141,7 @@ namespace currency
 
   struct thirdparty_sign_handler
   {
-    virtual bool sign(const crypto::hash& h, const crypto::public_key& owner_public_key, crypto::signature& sig);
+    virtual bool sign(const crypto::hash& h, const crypto::public_key& owner_public_key, crypto::generic_schnorr_sig& sig);
   };
 
   struct finalize_tx_param
