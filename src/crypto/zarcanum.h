@@ -84,7 +84,7 @@ namespace crypto
     scalar_t  y;
   };
 
-  template<generator_tag gen>
+  template<generator_tag gen = gt_G>
   inline bool generate_schnorr_sig(const hash& m, const point_t& A, const scalar_t& secret_a, generic_schnorr_sig& result);
 
   template<>
@@ -123,7 +123,7 @@ namespace crypto
     return true;
   }
 
-  template<generator_tag gen>
+  template<generator_tag gen = gt_G>
   inline bool verify_schnorr_sig(const hash& m, const public_key& A, const generic_schnorr_sig& sig) noexcept;
 
   // TODO @#@# make optimized version   inline bool verify_schnorr_sig(const hash& m, const point_t& A, const generic_schnorr_sig& sig) noexcept;
