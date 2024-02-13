@@ -2248,6 +2248,8 @@ namespace currency
       }
       if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation_before_seal{ &ado });
 
+      ftp.need_to_generate_ado_proof = true;
+      /*
       //seal it with owners signature
       crypto::signature sig = currency::null_sig;
       crypto::hash h = get_signature_hash_for_asset_operation(ado)
@@ -2264,6 +2266,7 @@ namespace currency
         crypto::generate_signature(h, pub_k, account_keys.spend_secret_key, sig);
       }
       ado.opt_proof = sig;
+      */
     }
     return true;
   }
