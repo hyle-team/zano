@@ -819,6 +819,21 @@ namespace currency
   };
 
 
+  struct asset_operation_ownership_proof
+  {
+    crypto::generic_schnorr_sig_s gss;
+    uint8_t version = 0;
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(gss)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(gss)
+      BOOST_END_VERSION_UNDER(1)
+      BOOST_SERIALIZE(version)
+    END_BOOST_SERIALIZATION()
+  };
 
 
   struct extra_padding
@@ -924,7 +939,7 @@ namespace currency
 
   typedef boost::variant<NLSAG_sig, void_sig, ZC_sig, zarcanum_sig> signature_v;
 
-  typedef boost::variant<zc_asset_surjection_proof, zc_outs_range_proof, zc_balance_proof, asset_operation_proof> proof_v;
+  typedef boost::variant<zc_asset_surjection_proof, zc_outs_range_proof, zc_balance_proof, asset_operation_proof, asset_operation_ownership_proof> proof_v;
 
 
   //include backward compatibility defintions
