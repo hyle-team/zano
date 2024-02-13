@@ -1126,6 +1126,7 @@ BLOB_SERIALIZER(currency::txout_to_key);
 
 BOOST_CLASS_VERSION(currency::asset_descriptor_operation, 1);
 BOOST_CLASS_VERSION(currency::asset_operation_proof, 1);
+BOOST_CLASS_VERSION(currency::asset_operation_ownership_proof, 1);
 
 
 // txin_v variant currency
@@ -1196,6 +1197,7 @@ SET_VARIANT_TAGS(currency::zc_balance_proof, 48, "zc_balance_proof");
 
 SET_VARIANT_TAGS(currency::asset_descriptor_operation, 49, "asset_descriptor_base");
 SET_VARIANT_TAGS(currency::asset_operation_proof, 50, "asset_operation_proof");
+SET_VARIANT_TAGS(currency::asset_operation_ownership_proof, 51, "asset_operation_ownership_proof");
 
 
 
