@@ -84,18 +84,16 @@ namespace crypto
     scalar_t  y;
   };
 
-  template<generator_tag gen = gt_G>
-  inline bool generate_schnorr_sig(const hash& m, const point_t& A, const scalar_t& secret_a, generic_schnorr_sig& result);
 
-  template<>
-  inline bool generate_schnorr_sig<gt_G>(const hash& m, const point_t& A, const scalar_t& secret_a, generic_schnorr_sig& result)
+  template<typename generator_t>
+  inline bool generate_schnorr_sig_custom_generator(const hash& m, const point_t& A, const scalar_t& secret_a, generic_schnorr_sig& result, const generator_t& g_point_g)
   {
 #ifndef NDEBUG
-    if (A != secret_a * c_point_G)
+    if (A != secret_a * g_point_g)
       return false;
 #endif
     scalar_t r = scalar_t::random();
-    point_t R = r * c_point_G;
+    point_t R = r * g_point_g;
     hash_helper_t::hs_t hsc(3);
     hsc.add_hash(m);
     hsc.add_point(A);
@@ -105,22 +103,19 @@ namespace crypto
     return true;
   }
 
+  template<generator_tag gen = gt_G>
+  inline bool generate_schnorr_sig(const hash& m, const point_t& A, const scalar_t& secret_a, generic_schnorr_sig& result);
+
+  template<>
+  inline bool generate_schnorr_sig<gt_G>(const hash& m, const point_t& A, const scalar_t& secret_a, generic_schnorr_sig& result)
+  {
+    return generate_schnorr_sig_custom_generator(m, A, secret_a, result, c_point_G);
+  }
+
   template<>
   inline bool generate_schnorr_sig<gt_X>(const hash& m, const point_t& A, const scalar_t& secret_a, generic_schnorr_sig& result)
   {
-#ifndef NDEBUG
-    if (A != secret_a * c_point_X)
-      return false;
-#endif
-    scalar_t r = scalar_t::random();
-    point_t R = r * c_point_X;
-    hash_helper_t::hs_t hsc(3);
-    hsc.add_hash(m);
-    hsc.add_point(A);
-    hsc.add_point(R);
-    result.c = hsc.calc_hash();
-    result.y.assign_mulsub(result.c, secret_a, r); // y = r - c * secret_a
-    return true;
+    return generate_schnorr_sig_custom_generator(m, A, secret_a, result, c_point_X);
   }
 
   inline bool generate_schnorr_sig(const hash& m, const public_key& A, const secret_key& secret_a, generic_schnorr_sig& result)

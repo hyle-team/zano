@@ -2710,6 +2710,7 @@ namespace currency
           //generate signature by wallet account 
           crypto::generate_schnorr_sig(tx_prefix_hash, ftp.ado_current_asset_owner, sender_account_keys.spend_secret_key, aoop.gss);
         }
+        if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_after_asset_ownership_proof_generated{ &aoop });
         tx.proofs.emplace_back(aoop);
       }
     }
