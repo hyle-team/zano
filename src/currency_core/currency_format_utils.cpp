@@ -1151,6 +1151,7 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
+  /*
   crypto::hash get_signature_hash_for_asset_operation(const asset_descriptor_operation& ado)
   {
     asset_descriptor_operation ado_local = ado;
@@ -1164,6 +1165,7 @@ namespace currency
   {
     op.opt_proof = boost::none;
   }
+  */
 
   //---------------------------------------------------------------
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, uint8_t tx_outs_attr /*  = CURRENCY_TO_KEY_OUT_RELAXED */)
@@ -2706,7 +2708,7 @@ namespace currency
         else
         {
           //generate signature by wallet account 
-
+          crypto::generate_schnorr_sig(tx_prefix_hash, ftp.ado_current_asset_owner, sender_account_keys.spend_secret_key, aoop.gss);
         }
         tx.proofs.emplace_back(aoop);
       }
