@@ -29,3 +29,16 @@ struct wallet_rpc_transfer : public wallet_test
   bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+/*
+   Tests to make sure api for exchanges didn't change after HF4(Zarcanum)
+   testing api: get_recent_txs_and_info, make_integrated_address, 
+   getbalance, get_wallet_info, get_transfer_by_txid,
+*/
+struct wallet_rpc_exchange_suite : public wallet_test
+{
+  wallet_rpc_exchange_suite();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
