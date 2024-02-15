@@ -314,6 +314,8 @@ bool wallet_rpc_exchange_suite::generate(std::vector<test_event_entry>& events) 
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core"); // default callback will initialize core runtime config with m_hardforks
+
   DO_CALLBACK(events, "c1");
 
   return true;
@@ -379,7 +381,7 @@ std::string get_integr_addr(tools::wallet_rpc_server& custody_wlt_rpc, const std
 #define TRANSFER_COMMENT "SSDVSf"
 std::string transfer_(std::shared_ptr<tools::wallet2> wlt, const std::string& address, uint64_t amount)
 {
-  tools::wallet_rpc_server custody_wlt_rpc(*wlt);
+  tools::wallet_rpc_server custody_wlt_rpc(wlt);
   pre_hf4_api::COMMAND_RPC_TRANSFER::request tr_req = AUTO_VAL_INIT(tr_req);
   tr_req.comment = TRANSFER_COMMENT;
   tr_req.destinations.resize(1);
@@ -447,7 +449,7 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
 
 
   // wallet RPC server
-  tools::wallet_rpc_server custody_wlt_rpc(*custody_wlt);
+  tools::wallet_rpc_server custody_wlt_rpc(custody_wlt);
 
   r = test_payment_ids_generation(custody_wlt_rpc);
   CHECK_AND_ASSERT_MES(r, false, "test_payment_ids_generation() failed ");
