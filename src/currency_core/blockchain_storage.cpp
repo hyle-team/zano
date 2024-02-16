@@ -5818,7 +5818,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   };
   
   //inputs
-  for (const auto in : tx.vin)
+  for (const auto& in : tx.vin)
   {
     if (!var_is_after_hardfork_1_zone && !is_allowed_before_hardfork1(in))
       return false;
@@ -5832,7 +5832,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       return false;
   }
   //outputs
-  for (const auto out : tx.vout)
+  for (const auto& out : tx.vout)
   {
     if (!var_is_after_hardfork_1_zone && !is_allowed_before_hardfork1(out))
       return false;
@@ -5848,7 +5848,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
 
   size_t count_ado = 0;
   //extra
-  for (const auto el : tx.extra)
+  for (const auto& el : tx.extra)
   {
     if (el.type() == typeid(asset_descriptor_operation))
       count_ado++;
@@ -5863,7 +5863,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   }
 
   //attachments
-  for (const auto el : tx.attachment)
+  for (const auto& el : tx.attachment)
   {
     if (!var_is_after_hardfork_2_zone && !is_allowed_before_hardfork2(el))
       return false;

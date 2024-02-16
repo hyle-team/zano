@@ -679,7 +679,7 @@ namespace currency
   {
     std::list<currency::extra_alias_entry> al_list;
     m_core.get_tx_pool().get_aliases_from_tx_pool(al_list);
-    for (const auto a : al_list)
+    for (const auto& a : al_list)
     {
       res.aliases_que.push_back(alias_info_to_rpc_alias_info(a));
     }

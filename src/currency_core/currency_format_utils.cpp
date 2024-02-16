@@ -2506,7 +2506,7 @@ namespace currency
       tx.attachment.insert(tx.attachment.end(), attachments_local.begin(), attachments_local.end());
       tx.extra.insert(tx.extra.end(), extra_local.begin(), extra_local.end());
 
-      for (const auto in : tx.vin)
+      for (const auto& in : tx.vin)
       {
         if (in.type() == typeid(txin_zc_input))
         {
