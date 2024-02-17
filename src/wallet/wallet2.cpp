@@ -1636,7 +1636,7 @@ void wallet2::load_wti_from_process_transaction_context(wallet_public::wallet_tr
 {
   wti.remote_addresses = tx_process_context.recipients;
   wti.remote_aliases = tx_process_context.remote_aliases;
-  for (const auto bce : tx_process_context.total_balance_change)
+  for (const auto& bce : tx_process_context.total_balance_change)
   {
     wallet_public::wallet_sub_transfer_info wsti = AUTO_VAL_INIT(wsti);
     wsti.asset_id = bce.first;
