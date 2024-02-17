@@ -323,6 +323,7 @@ namespace tools
       multisig_entries_map* pmultisig_entries = nullptr;
       crypto::public_key tx_pub_key = currency::null_pkey;
       uint64_t tx_expiration_ts_median = 0;
+      uint64_t max_out_unlock_time = 0;
 
       const crypto::hash& tx_hash() const
       {
@@ -690,6 +691,7 @@ namespace tools
     bool validate_sign(const std::string& buff, const crypto::signature& sig, const crypto::public_key& pkey);
     bool encrypt_buffer(const std::string& buff, std::string& res_buff);
     bool decrypt_buffer(const std::string& buff, std::string& res_buff);
+    bool is_in_hardfork_zone(uint64_t hardfork_index) const;
 
     construct_tx_param get_default_construct_tx_param();
 
@@ -741,6 +743,7 @@ private:
     void prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_att);    
     void handle_money(const currency::block& b, const process_transaction_context& tx_process_context);
     void load_wti_from_process_transaction_context(wallet_public::wallet_transfer_info& wti, const process_transaction_context& tx_process_context);
+    bool process_payment_id_for_wti(wallet_public::wallet_transfer_info& wti, const process_transaction_context& tx_process_context);
 
     void handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop,
       currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& blocks);
@@ -817,7 +820,8 @@ private:
     void load_keys2ki(bool create_if_not_exist, bool& need_to_resync);
 
     void send_transaction_to_network(const currency::transaction& tx);
-    void add_sent_tx_detailed_info(const currency::transaction& tx,
+    void add_sent_tx_detailed_info(const currency::transaction& tx, 
+      const std::vector<currency::attachment_v>& decrypted_att,
       const std::vector<currency::tx_destination_entry>& destinations,
       const std::vector<uint64_t>& selected_indicies);
     void mark_transfers_as_spent(const std::vector<uint64_t>& selected_transfers, const std::string& reason = std::string());
@@ -838,7 +842,6 @@ private:
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(uint64_t amount, const std::vector<currency::txout_ref_v> & key_offsets);
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_to_key& intk);
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_zc_input& inzc);
-    bool is_in_hardfork_zone(uint64_t hardfork_index) const;
     uint8_t out_get_mixin_attr(const currency::tx_out_v& out_t);
     const crypto::public_key& out_get_pub_key(const currency::tx_out_v& out_t, std::list<currency::htlc_info>& htlc_info_list);
     bool expand_selection_with_zc_input(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes);

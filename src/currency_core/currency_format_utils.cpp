@@ -3361,7 +3361,7 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
-  bool set_payment_id_to_tx(std::vector<attachment_v>& att, const std::string& payment_id)
+  bool set_payment_id_to_tx(std::vector<attachment_v>& att, const std::string& payment_id, bool is_in_hardfork4)
   {
     if (!is_payment_id_size_ok(payment_id))
       return false;
@@ -3369,6 +3369,10 @@ namespace currency
     tx_service_attachment tsa = AUTO_VAL_INIT(tsa);
     tsa.service_id = BC_PAYMENT_ID_SERVICE_ID;
     tsa.body = payment_id;
+    if (is_in_hardfork4)
+    {
+      tsa.flags = TX_SERVICE_ATTACHMENT_ENCRYPT_BODY;
+    }
     att.push_back(tsa);
     return true;
   }

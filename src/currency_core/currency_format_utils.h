@@ -431,7 +431,7 @@ namespace currency
 
   bool addendum_to_hexstr(const std::vector<crypto::hash>& add, std::string& hex_buff);
   bool hexstr_to_addendum(const std::string& hex_buff, std::vector<crypto::hash>& add);
-  bool set_payment_id_to_tx(std::vector<attachment_v>& att, const std::string& payment_id);
+  bool set_payment_id_to_tx(std::vector<attachment_v>& att, const std::string& payment_id, bool is_in_hardfork4 = false);
   bool add_padding_to_tx(transaction& tx, size_t count);
   bool is_service_tx(const transaction& tx);
   bool does_tx_have_only_mixin_inputs(const transaction& tx);
@@ -672,7 +672,7 @@ namespace currency
   }
   //---------------------------------------------------------------
   template<typename t_container>
-  bool get_payment_id_from_tx(const t_container& att, std::string& payment_id)
+  bool get_payment_id_from_decrypted_container(const t_container& att, std::string& payment_id)
   {
     tx_service_attachment sa = AUTO_VAL_INIT(sa);
     if (bc_services::get_first_service_attachment_by_id(att, BC_PAYMENT_ID_SERVICE_ID, "", sa))

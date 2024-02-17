@@ -58,7 +58,7 @@ TEST(parse_and_validate_tx_extra, test_payment_ids)
   ASSERT_TRUE(r);
   
   std::string h2;
-  r = currency::get_payment_id_from_tx(tx.attachment, h2);
+  r = currency::get_payment_id_from_decrypted_container(tx.attachment, h2);
   ASSERT_TRUE(r);
   ASSERT_EQ(h, h2);
   

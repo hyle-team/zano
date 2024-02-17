@@ -589,7 +589,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
   all values m_payments entry, use this strict policy is required to protect exchanges from being feeded with
   useless outputs
   */
-  uint64_t max_out_unlock_time = 0;
+  ptc.max_out_unlock_time = 0;
 
   std::vector<wallet_out_info> outs;
   //uint64_t sum_of_native_outs = 0;   // TODO:  @#@# correctly calculate tx_money_got_in_outs for post-HF4
@@ -833,8 +833,8 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
             m_amount_gindex_to_transfer_id[amount_gindex_pair] = transfer_index;
           }
 
-          if (max_out_unlock_time < get_tx_unlock_time(tx, o))
-            max_out_unlock_time = get_tx_unlock_time(tx, o);
+          if (ptc.max_out_unlock_time < get_tx_unlock_time(tx, o))
+            ptc.max_out_unlock_time = get_tx_unlock_time(tx, o);
 
           if (out_type_to_key || out_type_zc)
           {
@@ -888,32 +888,6 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     }
   }
 
-  std::string payment_id;
-  if (has_in_transfers && get_payment_id_from_tx(tx.attachment, payment_id) && payment_id.size())
-  {
-    payment_details payment;
-    payment.m_tx_hash = ptc.tx_hash();
-    payment.m_amount = 0;
-    payment.m_block_height = height;
-    payment.m_unlock_time = max_out_unlock_time;
-
-    for (const auto& bce : ptc.total_balance_change)
-    {
-      if (bce.second > 0)
-      {
-        if (bce.first == currency::native_coin_asset_id)
-        {
-          payment.m_amount = static_cast<uint64_t>(bce.second);
-        }else
-        {
-          payment.subtransfers.push_back(payment_details_subtransfer{ bce.first, static_cast<uint64_t>(bce.second)});
-        }
-      }
-    }
-    m_payments.emplace(payment_id, payment);
-    WLT_LOG_L2("Payment found, id (hex): " << epee::string_tools::buff_to_hex_nodelimer(payment_id) << ", tx: " << payment.m_tx_hash << ", amount: " << print_money_brief(payment.m_amount) << "subtransfers = " << payment.subtransfers.size());
-  }
-  
   //check if there are asset_registration that belong to this wallet
   const asset_descriptor_operation* pado = get_type_in_variant_container<const asset_descriptor_operation>(tx.extra);
   if (pado && (ptc.employed_entries.receive.size() || ptc.employed_entries.spent.size() || pado->descriptor.owner == m_account.get_public_address().spend_public_key))
@@ -971,7 +945,7 @@ void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_i
   {
     LOG_ERROR("wti.payment_id is expected to be empty. Go ahead.");
   }
-  get_payment_id_from_tx(decrypted_att, wti.payment_id);
+  get_payment_id_from_decrypted_container(decrypted_att, wti.payment_id);
 
   for (const auto& item : decrypted_att)
   {
@@ -1315,7 +1289,7 @@ bool wallet2::handle_proposal(wallet_public::wallet_transfer_info& wti, const bc
   ed.is_a = cpd.a_addr.spend_public_key == m_account.get_keys().account_address.spend_public_key;
   change_contract_state(ed, wallet_public::escrow_contract_details_basic::proposal_sent, ms_id, wti);
   ed.private_detailes = cpd;
-  currency::get_payment_id_from_tx(decrypted_items, ed.payment_id);
+  currency::get_payment_id_from_decrypted_container(decrypted_items, ed.payment_id);
   ed.proposal = prop;
   ed.height = wti.height;
   wti.contract.resize(1);
@@ -1584,8 +1558,42 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, const proces
   }
   prepare_wti_decrypted_attachments(wti, decrypted_att);
   process_contract_info(wti, decrypted_att);
+  process_payment_id_for_wti(wti, tx_process_context);
+
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::process_payment_id_for_wti(wallet_public::wallet_transfer_info& wti, const process_transaction_context& ptc)
+{
+  //if(this->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
+  {
+    if (wti.get_native_is_income() && wti.payment_id.size())
+    {
+      payment_details payment;
+      payment.m_tx_hash = wti.tx_hash;
+      payment.m_amount = 0;
+      payment.m_block_height = wti.height;
+      payment.m_unlock_time = ptc.max_out_unlock_time;
+
+      for (const auto& bce : ptc.total_balance_change)
+      {
+        if (bce.second > 0)
+        {
+          if (bce.first == currency::native_coin_asset_id)
+          {
+            payment.m_amount = static_cast<uint64_t>(bce.second);
+          }
+          else
+          {
+            payment.subtransfers.push_back(payment_details_subtransfer{ bce.first, static_cast<uint64_t>(bce.second) });
+          }
+        }
+      }
+      m_payments.emplace(wti.payment_id, payment);
+      WLT_LOG_L2("Payment found, id (hex): " << epee::string_tools::buff_to_hex_nodelimer(wti.payment_id) << ", tx: " << payment.m_tx_hash << ", amount: " << print_money_brief(payment.m_amount) << "subtransfers = " << payment.subtransfers.size());
+    }
+  }
+  return true;
+}
 void wallet2::rise_on_transfer2(const wallet_public::wallet_transfer_info& wti)
 {
   PROFILE_FUNC("wallet2::rise_on_transfer2");
@@ -3864,7 +3872,7 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
     throw;
   }
 
-  add_sent_tx_detailed_info(tx, ft.ftp.prepared_destinations, ft.ftp.selected_transfers);
+  add_sent_tx_detailed_info(tx, ft.ftp.attachments, ft.ftp.prepared_destinations, ft.ftp.selected_transfers);
   m_tx_keys.insert(std::make_pair(tx_hash, ft.one_time_key));
 
   if (m_watch_only)
@@ -5467,7 +5475,7 @@ void wallet2::send_escrow_proposal(const bc_services::contract_private_details& 
   send_transaction_to_network(tx);
   
   mark_transfers_as_spent(ftp.selected_transfers, std::string("escrow proposal sent, tx <") + epee::string_tools::pod_to_hex(get_transaction_hash(tx)) + ">, contract: " + epee::string_tools::pod_to_hex(ms_id));
-  add_sent_tx_detailed_info(tx, ftp.prepared_destinations, ftp.selected_transfers);
+  add_sent_tx_detailed_info(tx, ftp.attachments, ftp.prepared_destinations, ftp.selected_transfers);
 
   print_tx_sent_message(tx, "(from multisig)", fee);
 }
@@ -6337,12 +6345,12 @@ void wallet2::send_transaction_to_network(const transaction& tx)
 
 }
 //----------------------------------------------------------------------------------------------------------------
-void wallet2::add_sent_tx_detailed_info(const transaction& tx,
+void wallet2::add_sent_tx_detailed_info(const transaction& tx, const std::vector<currency::attachment_v>& decrypted_att,
   const std::vector<currency::tx_destination_entry>& destinations,
   const std::vector<uint64_t>& selected_transfers)
 {
   payment_id_t payment_id;
-  get_payment_id_from_tx(tx.attachment, payment_id);
+  get_payment_id_from_decrypted_container(decrypted_att, payment_id);
 
   std::vector<std::string> recipients;
   std::unordered_set<account_public_address> used_addresses;
@@ -7145,7 +7153,7 @@ void wallet2::finalize_transaction(currency::finalize_tx_param& ftp, currency::f
 
   //TIME_MEASURE_START(add_sent_tx_detailed_info_time);
   if (broadcast_tx)
-    add_sent_tx_detailed_info(result.tx, ftp.prepared_destinations, ftp.selected_transfers);
+    add_sent_tx_detailed_info(result.tx, ftp.attachments, ftp.prepared_destinations, ftp.selected_transfers);
   //TIME_MEASURE_FINISH(add_sent_tx_detailed_info_time);
 
   /* TODO
@@ -7269,7 +7277,7 @@ void wallet2::check_and_throw_if_self_directed_tx_with_payment_id_requested(cons
 
   // it's self-directed tx
   payment_id_t pid;
-  bool has_payment_id = get_payment_id_from_tx(ctp.attachments, pid) && !pid.empty();
+  bool has_payment_id = get_payment_id_from_decrypted_container(ctp.attachments, pid) && !pid.empty();
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!has_payment_id, "sending funds to yourself with payment id is not allowed");
 }
 //----------------------------------------------------------------------------------------------------
@@ -7419,8 +7427,9 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
 
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   ftp.tx_version = this->get_current_tx_version();
+  bool is_hf4 = this->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM);
   if (!payment_id.empty())
-    set_payment_id_to_tx(ftp.attachments, payment_id);
+    set_payment_id_to_tx(ftp.attachments, payment_id, is_hf4);
   // put encrypted payer info into the extra
   ftp.crypt_address = destination_addr;
   

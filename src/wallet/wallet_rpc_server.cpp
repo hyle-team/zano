@@ -410,7 +410,7 @@ namespace tools
 
     std::vector<currency::attachment_v>& attachments = ctp.attachments;
     std::vector<currency::extra_v>& extra = ctp.extra;
-    if (!payment_id.empty() && !currency::set_payment_id_to_tx(attachments, payment_id))
+    if (!payment_id.empty() && !currency::set_payment_id_to_tx(attachments, payment_id, w.get_wallet()->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM)))
     {
       er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
       er.message = std::string("payment id ") + payment_id + " is invalid and can't be set";
