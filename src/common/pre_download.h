@@ -50,6 +50,7 @@ namespace tools
 
     boost::system::error_code ec;
     uint64_t sz = boost::filesystem::file_size(db_main_file_path, ec);
+    if (ec) sz = 0;
     bool flag_force_predownload = command_line::has_arg(vm, command_line::arg_force_predownload);
     if (pre_download.unpacked_size == 0 || !(ec || (pre_download.unpacked_size > sz && pre_download.unpacked_size - sz > pre_download_min_size_difference) || flag_force_predownload) )
     {
