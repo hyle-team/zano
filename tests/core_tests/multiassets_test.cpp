@@ -57,7 +57,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   alice_wlt->get_account().set_createtime(0);
 
   asset_descriptor_base adb = AUTO_VAL_INIT(adb);
-  adb.total_max_supply = 10000000000000000000; //1M coins
+  adb.total_max_supply = 10000000000000000000ULL; //1M coins
   adb.full_name = "Test coins";
   adb.ticker = "TCT";
   adb.decimal_point = 12;
@@ -86,7 +86,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   miner_wlt->refresh();
   alice_wlt->refresh();
   CHECK_AND_ASSERT_MES(miner_wlt->balance(asset_id) == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC, false, "Failed to find needed asset in result balances");
-  CHECK_AND_ASSERT_MES(miner_wlt->balance() == uint64_t(17517225990000000000), false, "Failed to find needed asset in result balances");
+  CHECK_AND_ASSERT_MES(miner_wlt->balance() == uint64_t(17517225990000000000ULL), false, "Failed to find needed asset in result balances");
 
   CHECK_AND_ASSERT_MES(alice_wlt->balance() == 0, false, "Failed to find needed asset in result balances");
   CHECK_AND_ASSERT_MES(alice_wlt->balance(asset_id) == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC, false, "Failed to find needed asset in result balances");
@@ -300,8 +300,8 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   CHECK_AND_ASSERT_MES(miner_own_assets.size() == 0, false, "Miner wlt still think he own asset");
   CHECK_AND_ASSERT_MES(alice_own_assets.size() == 1, false, "Alice still don't know she own asset");
 
-  uint64_t balance_alice_native = alice_wlt->balance();
-  uint64_t balance_miner_native = miner_wlt->balance();
+  //uint64_t balance_alice_native = alice_wlt->balance();
+  //uint64_t balance_miner_native = miner_wlt->balance();
   uint64_t balance_alice_asset = alice_wlt->balance(asset_id);
   uint64_t balance_miner_asset = miner_wlt->balance(asset_id);
 
