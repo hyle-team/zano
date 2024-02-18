@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -25,8 +25,8 @@ namespace bc_services
     {
       return t.type();
     }
-    template<typename t_return_type, typename t_type>
-    static const t_return_type& get(const t_type& t, const t_return_type& dummy)
+    template<typename t_type, typename t_return_type>
+    static const t_return_type& get(const t_type& t)
     {
       return boost::get<t_return_type>(t);
     }
@@ -40,8 +40,8 @@ namespace bc_services
     {
       return typeid(t);
     }
-    template<typename t_return_type, typename t_type>
-    static const t_return_type& get(const t_type& t, const t_return_type& dummy)
+    template<typename t_type, typename t_return_type>
+    static const t_return_type& get(const t_type& t)
     {
       return t;
     }
@@ -52,10 +52,10 @@ namespace bc_services
   {
     for (const auto& item : tx_items)
     {
-      if (/*item.type()*/ type_selector<is_boost_variant<typename t_attachment_type_container_t::value_type>::value>::get_type(item) == typeid(currency::tx_service_attachment))
+      typedef type_selector<is_boost_variant<typename t_attachment_type_container_t::value_type>::value> TS;
+      if (TS::get_type(item) == typeid(currency::tx_service_attachment))
       {
-        const currency::tx_service_attachment& tsa = type_selector<is_boost_variant<typename t_attachment_type_container_t::value_type>::value>::get(item, currency::tx_service_attachment());
-        //const currency::tx_service_attachment& tsa = boost::get<currency::tx_service_attachment>(item);
+        const currency::tx_service_attachment& tsa = TS::template get<decltype(item), currency::tx_service_attachment>(item);
         if (tsa.service_id == id && tsa.instruction == instruction)
         {
           res = tsa;
@@ -65,4 +65,5 @@ namespace bc_services
     }
     return false;
   }
+
 }
