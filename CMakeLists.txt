@@ -246,7 +246,7 @@ elseif(NOT MSVC)
 endif()
 
 if(BUILD_GUI)
-  cmake_minimum_required(VERSION 3.5)
+  cmake_minimum_required(VERSION 3.1)
   find_package(Qt5Widgets REQUIRED)  
 endif()
 
