@@ -52,9 +52,9 @@ namespace bc_services
   {
     for (const auto& item : tx_items)
     {
-      if (/*item.type()*/ type_selector<is_boost_variant<t_attachment_type_container_t::value_type>::value>::get_type(item) == typeid(currency::tx_service_attachment))
+      if (/*item.type()*/ type_selector<is_boost_variant<typename t_attachment_type_container_t::value_type>::value>::get_type(item) == typeid(currency::tx_service_attachment))
       {
-        const currency::tx_service_attachment& tsa = type_selector<is_boost_variant<t_attachment_type_container_t::value_type>::value>::get<t_attachment_type_container_t::value_type, currency::tx_service_attachment>(item);
+        const currency::tx_service_attachment& tsa = type_selector<is_boost_variant<typename t_attachment_type_container_t::value_type>::value>::get<typename t_attachment_type_container_t::value_type, currency::tx_service_attachment>(item);
         //const currency::tx_service_attachment& tsa = boost::get<currency::tx_service_attachment>(item);
         if (tsa.service_id == id && tsa.instruction == instruction)
         {
