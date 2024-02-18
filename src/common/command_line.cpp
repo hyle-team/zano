@@ -37,6 +37,7 @@ namespace command_line
 
   const arg_descriptor<bool>        arg_no_predownload        ( "no-predownload", "Do not pre-download blockchain database");
   const arg_descriptor<bool>        arg_force_predownload     ( "force-predownload", "Pre-download blockchain database regardless of it's status");
+  const arg_descriptor<std::string> arg_process_predownload_from_path("predownload-from-local-path", "Instead of downloading file use downloaded local file");
   const arg_descriptor<bool>        arg_validate_predownload  ( "validate-predownload", "Paranoid mode, re-validate each block from pre-downloaded database and rebuild own database");
   const arg_descriptor<std::string> arg_predownload_link      ( "predownload-link", "Override url for blockchain database pre-downloading");
 

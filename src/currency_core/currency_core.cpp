@@ -76,7 +76,10 @@ namespace currency
   bool core::handle_command_line(const boost::program_options::variables_map& vm)
   {
     m_config_folder = command_line::get_arg(vm, command_line::arg_data_dir);
-    m_stop_after_height = static_cast<uint64_t>(command_line::get_arg(vm, command_line::arg_stop_after_height));
+    m_stop_after_height = 0;
+    if(command_line::has_arg(vm, command_line::arg_stop_after_height))
+      m_stop_after_height = static_cast<uint64_t>(command_line::get_arg(vm, command_line::arg_stop_after_height));
+
     if (m_stop_after_height != 0)
     {
       LOG_PRINT_YELLOW("Daemon will STOP after block " << m_stop_after_height, LOG_LEVEL_0);
