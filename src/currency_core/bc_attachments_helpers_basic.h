@@ -25,7 +25,7 @@ namespace bc_services
     {
       return t.type();
     }
-    template<typename t_type, typename t_return_type>
+    template<typename t_return_type, typename t_type>
     static const t_return_type& get(const t_type& t)
     {
       return boost::get<t_return_type>(t);
@@ -40,7 +40,7 @@ namespace bc_services
     {
       return typeid(t);
     }
-    template<typename t_type, typename t_return_type>
+    template<typename t_return_type, typename t_type>
     static const t_return_type& get(const t_type& t)
     {
       return t;
@@ -54,7 +54,7 @@ namespace bc_services
     {
       if (/*item.type()*/ type_selector<is_boost_variant<typename t_attachment_type_container_t::value_type>::value>::get_type(item) == typeid(currency::tx_service_attachment))
       {
-        const currency::tx_service_attachment& tsa = type_selector<is_boost_variant<typename t_attachment_type_container_t::value_type>::value>::get<typename t_attachment_type_container_t::value_type, currency::tx_service_attachment>(item);
+        const currency::tx_service_attachment& tsa = type_selector<is_boost_variant<typename t_attachment_type_container_t::value_type>::value>::get<currency::tx_service_attachment>(item);
         //const currency::tx_service_attachment& tsa = boost::get<currency::tx_service_attachment>(item);
         if (tsa.service_id == id && tsa.instruction == instruction)
         {
