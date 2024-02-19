@@ -2118,7 +2118,7 @@ namespace currency
         ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE      ||
         ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN )
     {
-      CHECK_AND_ASSERT_MES(ado.opt_asset_id.has_value(), false, "ado.opt_asset_id has no value, op type = " << (int)ado.operation_type);
+      CHECK_AND_ASSERT_MES(ado.opt_asset_id.has_value(), false, "ado.opt_asset_id has no value, op: " << (int)ado.operation_type << ", " << get_asset_operation_type_string(ado.operation_type));
       if (p_result_pub_key)
         *p_result_pub_key = ado.opt_asset_id.get();
       if (p_result_point)
