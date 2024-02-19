@@ -171,17 +171,8 @@ namespace currency
     asset_descriptor_operation ado{};
     if (is_asset_emitting_transaction(tx, &ado))
     {
-      crypto::point_t asset_id_pt = crypto::c_point_0;
-      if (ado.opt_asset_id)
-      {
-        //emmit on existing asset, we SHOULD not calculate asset_id, instead we use the one provided
-        //since the owner might have been changed since creation
-        asset_id_pt = crypto::point_t(*ado.opt_asset_id);
-      }
-      else
-      {
-        calculate_asset_id(ado.descriptor.owner, &asset_id_pt, nullptr); // TODO @#@# optimization: this expensive calculation should be done only once
-      }
+      crypto::point_t asset_id_pt{};
+      CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, &asset_id_pt, nullptr), false, "get_or_calculate_asset_id failed"); // TODO @#@# expensive operation, consider caching 
       pseudo_outs_blinded_asset_ids.emplace_back(asset_id_pt); // additional ring member for asset emitting tx
     }
 
@@ -2121,20 +2112,44 @@ namespace currency
   }
 
 #define CRYPTO_HASH_ASSET_ID_ITERATIONS 1024
-  void calculate_asset_id(const crypto::public_key& asset_owner, crypto::point_t* p_result_point, crypto::public_key* p_result_pub_key)
+  bool get_or_calculate_asset_id(const asset_descriptor_operation& ado, crypto::point_t* p_result_point, crypto::public_key* p_result_pub_key)
   {
-    crypto::hash h = get_hash_from_POD_objects(CRYPTO_HDS_ASSET_ID, asset_owner);
+    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT        ||
+        ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE      ||
+        ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN )
+    {
+      CHECK_AND_ASSERT_MES(ado.opt_asset_id.has_value(), false, "ado.opt_asset_id has no value, op type = " << (int)ado.operation_type);
+      if (p_result_pub_key)
+        *p_result_pub_key = ado.opt_asset_id.get();
+      if (p_result_point)
+        *p_result_point = crypto::point_t(ado.opt_asset_id.get());
+      return true;
+    }
+
+    // otherwise, calculate asset id
+
+    crypto::hash_helper_t::hs_t hsc;
+    hsc.add_32_chars(CRYPTO_HDS_ASSET_ID);
+    hsc.add_hash(crypto::hash_helper_t::h(ado.descriptor.ticker));
+    hsc.add_hash(crypto::hash_helper_t::h(ado.descriptor.full_name));
+    hsc.add_hash(crypto::hash_helper_t::h(ado.descriptor.meta_info));
+    hsc.add_scalar(crypto::scalar_t(ado.descriptor.current_supply));
+    hsc.add_scalar(crypto::scalar_t(ado.descriptor.total_max_supply));
+    hsc.add_scalar(crypto::scalar_t(ado.descriptor.decimal_point));
+    hsc.add_pub_key(ado.descriptor.owner);
+    crypto::hash h = hsc.calc_hash_no_reduce();
 
     // this hash function needs to be computationally expensive (s.a. the whitepaper)
     for(uint64_t i = 0; i < CRYPTO_HASH_ASSET_ID_ITERATIONS; ++i)
       h = get_hash_from_POD_objects(CRYPTO_HDS_ASSET_ID, h, i);
 
-    crypto::point_t local_point{};
-    if (!p_result_point)
-      p_result_point = &local_point;
-    *p_result_point = crypto::hash_helper_t::hp(&h, sizeof h);
+    crypto::point_t result = crypto::hash_helper_t::hp(&h, sizeof h);
+    if (p_result_point)
+      *p_result_point = result;
     if (p_result_pub_key)
-      p_result_point->to_public_key(*p_result_pub_key);
+      result.to_public_key(*p_result_pub_key);
+    
+    return true;
   }
 
   const asset_descriptor_base& get_native_coin_asset_descriptor()
@@ -2168,13 +2183,17 @@ namespace currency
       //crypto::secret_key asset_control_key{};
       //bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, tx_key.sec, asset_control_key, ado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
       //CHECK_AND_ASSERT_MES(r, false, "derive_key_pair_from_key_pair failed");
+      //
+      // old:
+      // asset_control_key = Hs(CRYPTO_HDS_ASSET_CONTROL_KEY, 8 * tx_key.sec * sender_account_keys.account_address.spend_public_key, 0)
+      // ado.descriptor.owner = asset_control_key * G
       
       ado.descriptor.owner = sender_account_keys.account_address.spend_public_key;
 
-      calculate_asset_id(ado.descriptor.owner, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id);
+      CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id), false, "get_or_calculate_asset_id failed");
 
       // calculate amount blinding mask
-      gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, tx_key.sec, tx_key.pub);
+      gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, tx_key.sec);
 
       // set correct asset_id to the corresponding destination entries
       uint64_t amount_of_emitted_asset = 0;
@@ -2193,12 +2212,10 @@ namespace currency
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
     {
-      CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN");
+      CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id), false, "get_or_calculate_asset_id failed");
 
-      gen_context.ao_asset_id = *ado.opt_asset_id;
-      gen_context.ao_asset_id_pt.from_public_key(gen_context.ao_asset_id);
       // calculate amount blinding mask
-      gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, tx_key.sec, tx_key.pub);
+      gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, tx_key.sec);
       gen_context.ao_commitment_in_outputs = true;
 
       // set correct asset_id to the corresponding destination entries
@@ -2230,12 +2247,10 @@ namespace currency
     {
       if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
       {
-        CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT");
+        CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id), false, "get_or_calculate_asset_id failed");
 
-        gen_context.ao_asset_id = *ado.opt_asset_id;
-        gen_context.ao_asset_id_pt.from_public_key(gen_context.ao_asset_id);
         // calculate amount blinding mask
-        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, tx_key.sec, tx_key.pub);
+        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, tx_key.sec);
 
         // set correct asset_id to the corresponding destination entries
         uint64_t amount_of_emitted_asset = 0;
@@ -2266,7 +2281,7 @@ namespace currency
       /*
       //seal it with owners signature
       crypto::signature sig = currency::null_sig;
-      crypto::hash h = get_signature_hash_for_asset_operation(ado)
+      crypto::hash h = get_signature_hash_for_asset_operation(ado);
       if (ftp.pthirdparty_sign_handler)
       {
         bool r = ftp.pthirdparty_sign_handler->sign(h, ftp.ado_current_asset_owner, sig);
