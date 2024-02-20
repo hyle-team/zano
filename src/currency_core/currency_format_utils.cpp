@@ -2119,6 +2119,7 @@ namespace currency
         ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN )
     {
       CHECK_AND_ASSERT_MES(ado.opt_asset_id.has_value(), false, "ado.opt_asset_id has no value, op: " << (int)ado.operation_type << ", " << get_asset_operation_type_string(ado.operation_type));
+      //LOG_PRINT_YELLOW("ado.opt_asset_id = " << ado.opt_asset_id.get(), LOG_LEVEL_0);
       if (p_result_pub_key)
         *p_result_pub_key = ado.opt_asset_id.get();
       if (p_result_point)
@@ -2133,7 +2134,6 @@ namespace currency
     hsc.add_hash(crypto::hash_helper_t::h(ado.descriptor.ticker));
     hsc.add_hash(crypto::hash_helper_t::h(ado.descriptor.full_name));
     hsc.add_hash(crypto::hash_helper_t::h(ado.descriptor.meta_info));
-    hsc.add_scalar(crypto::scalar_t(ado.descriptor.current_supply));
     hsc.add_scalar(crypto::scalar_t(ado.descriptor.total_max_supply));
     hsc.add_scalar(crypto::scalar_t(ado.descriptor.decimal_point));
     hsc.add_pub_key(ado.descriptor.owner);
@@ -2148,7 +2148,8 @@ namespace currency
       *p_result_point = result;
     if (p_result_pub_key)
       result.to_public_key(*p_result_pub_key);
-    
+
+    //LOG_PRINT_YELLOW("calculated asset_id = " << result, LOG_LEVEL_0);
     return true;
   }
 
