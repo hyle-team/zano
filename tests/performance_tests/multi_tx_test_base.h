@@ -29,16 +29,17 @@ public:
     {
       m_miners[i].generate();
 
-      if (!construct_miner_tx(0, 0, 0, 2, 0, m_miners[i].get_keys().m_account_address, m_miner_txs[i]))
+      uint64_t block_reward_without_fee = 0;
+      if (!construct_miner_tx(0, 0, 0, 2, 0, m_miners[i].get_public_address(), m_miners[i].get_public_address(), m_miner_txs[i], block_reward_without_fee, TRANSACTION_VERSION_PRE_HF4))
         return false;
 
-      txout_to_key tx_out = boost::get<txout_to_key>(m_miner_txs[i].vout[0].target);
-      output_entries.push_back(make_serializable_pair<txout_ref_v, crypto::public_key>(i, tx_out.key));
+      txout_to_key tx_out = boost::get<txout_to_key>(boost::get<tx_out_bare>(m_miner_txs[i].vout[0]).target);
+      output_entries.emplace_back(i, tx_out.key);
       m_public_keys[i] = tx_out.key;
       m_public_key_ptrs[i] = &m_public_keys[i];
     }
 
-    m_source_amount = m_miner_txs[0].vout[0].amount;
+    m_source_amount = boost::get<tx_out_bare>(m_miner_txs[0].vout[0]).amount;
 
     tx_source_entry source_entry;
     source_entry.amount = m_source_amount;

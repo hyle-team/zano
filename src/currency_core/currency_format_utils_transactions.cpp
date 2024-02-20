@@ -8,6 +8,7 @@
 #include "serialization/serialization.h"
 #include "currency_format_utils.h"
 #include "currency_format_utils_abstract.h"
+#include "common/variant_helper.h"
 
 namespace currency
 {
@@ -24,6 +25,8 @@ namespace currency
   //------------------------------------------------------------------
   bool is_tx_expired(const transaction& tx, uint64_t expiration_ts_median)
   {
+    if (expiration_ts_median == 0)
+      return false;
     /// tx expiration condition (tx is ok if the following is true)
     /// tx_expiration_time - TX_EXPIRATION_MEDIAN_SHIFT > get_last_n_blocks_timestamps_median(TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW)
     uint64_t expiration_time = get_tx_expiration_time(tx);
@@ -37,11 +40,17 @@ namespace currency
     uint64_t res = 0;
     for (auto& o : tx.vout)
     {
-      if (o.target.type() == typeid(txout_to_key))
-      {
-        if (boost::get<txout_to_key>(o.target).key == null_pkey)
-          res += o.amount;
-      }
+      VARIANT_SWITCH_BEGIN(o);
+      VARIANT_CASE_CONST(tx_out_bare, o)
+        if (o.target.type() == typeid(txout_to_key))
+        {
+          if (boost::get<txout_to_key>(o.target).key == null_pkey)
+            res += o.amount;
+        }
+      VARIANT_CASE_CONST(tx_out_zarcanum, o)
+        //@#@# TODO obtain info about public burn of native coins in ZC outputs
+      VARIANT_CASE_THROW_ON_OTHER();        
+      VARIANT_SWITCH_END();
     }
     return res;
   }
@@ -203,12 +212,35 @@ namespace currency
     return total;
   }
   //---------------------------------------------------------------
+  inline size_t get_input_expected_signature_size_local(const txin_v& tx_in, bool last_input_in_separately_signed_tx)
+  {
+    struct txin_signature_size_visitor : public boost::static_visitor<size_t>
+    {
+      txin_signature_size_visitor(size_t add) : a(add) {}
+      size_t a;
+      size_t operator()(const txin_gen& /*txin*/) const   { return 0; }
+      size_t operator()(const txin_to_key& txin) const    { return tools::get_varint_packed_size(txin.key_offsets.size() + a) + sizeof(crypto::signature) * (txin.key_offsets.size() + a); }
+      size_t operator()(const txin_multisig& txin) const  { return tools::get_varint_packed_size(txin.sigs_count + a) + sizeof(crypto::signature) * (txin.sigs_count + a); }
+      size_t operator()(const txin_htlc& txin) const      { return tools::get_varint_packed_size(1 + a) + sizeof(crypto::signature) * (1 + a);  }
+      size_t operator()(const txin_zc_input& txin) const  { return 96 + tools::get_varint_packed_size(txin.key_offsets.size()) + txin.key_offsets.size() * 32; }
+    };
+
+    return boost::apply_visitor(txin_signature_size_visitor(last_input_in_separately_signed_tx ? 1 : 0), tx_in);
+  }
+  //---------------------------------------------------------------
   size_t get_object_blobsize(const transaction& t, uint64_t prefix_blob_size)
   {
     size_t tx_blob_size = prefix_blob_size;
 
     if (is_coinbase(t))
+    {
+      if (is_pos_miner_tx(t) && t.version > TRANSACTION_VERSION_PRE_HF4)
+      {
+        // Zarcanum
+        return tx_blob_size;
+      }
       return tx_blob_size;
+    }
 
     // for purged tx, with empty signatures and attachments, this function should return the blob size
     // which the tx would have if the signatures and attachments were correctly filled with actual data
@@ -217,14 +249,13 @@ namespace currency
     bool separately_signed_tx = get_tx_flags(t) & TX_FLAG_SIGNATURE_MODE_SEPARATE;
 
     tx_blob_size += tools::get_varint_packed_size(t.vin.size()); // size of transaction::signatures (equals to total inputs count)
+    if (t.version > TRANSACTION_VERSION_PRE_HF4)
+      tx_blob_size += t.vin.size(); // for HF4 txs 'signatures' is a verctor of variants, so it's +1 byte per signature (assuming sigs count equals to inputs count) 
 
     for (size_t i = 0; i != t.vin.size(); i++)
     {
-      size_t sig_count = get_input_expected_signatures_count(t.vin[i]);
-      if (separately_signed_tx && i == t.vin.size() - 1)
-        ++sig_count;                                             // count in one more signature for the last input in a complete separately signed tx
-      tx_blob_size += tools::get_varint_packed_size(sig_count);  // size of transaction::signatures[i]
-      tx_blob_size += sizeof(crypto::signature) * sig_count;     // size of signatures' data itself
+      size_t sig_size = get_input_expected_signature_size_local(t.vin[i], separately_signed_tx && i == t.vin.size() - 1);
+      tx_blob_size += sig_size;
     }
 
     // 2. attachments (try to find extra_attachment_info in tx prefix and count it in if succeed)
@@ -260,16 +291,134 @@ namespace currency
   bool read_keyimages_from_tx(const transaction& tx, std::list<crypto::key_image>& kil)
   {
     std::unordered_set<crypto::key_image> ki;
-    BOOST_FOREACH(const auto& in, tx.vin)
+    for(const auto& in : tx.vin)
     {
-      if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc))
+      if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc) || in.type() == typeid(txin_zc_input))
       {
          
-        if (!ki.insert(get_to_key_input_from_txin_v(in).k_image).second)
+        if (!ki.insert(get_key_image_from_txin_v(in)).second)
           return false;
       }
     }
     return true;
   }
+  //---------------------------------------------------------------
+  bool validate_inputs_sorting(const transaction& tx)
+  {
+    if (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE)
+      return true;
+
+
+    size_t i = 0;
+    for(; i+1 < tx.vin.size(); i++)
+    {
+      //same less_txin_v() function should be used for sorting inputs during transacction creation
+      if (less_txin_v(tx.vin[i+1], tx.vin[i]))
+      {
+        return false;
+      }
+    }
+    return true;
+  }
+  //---------------------------------------------------------------
+  bool is_asset_emitting_transaction(const transaction& tx, asset_descriptor_operation* p_ado /* = nullptr */)
+  {
+    if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
+      return false;
+
+    asset_descriptor_operation local_ado{};
+    if (p_ado == nullptr)
+      p_ado = &local_ado;
+
+    if (!get_type_in_variant_container(tx.extra, *p_ado))
+      return false;
+    
+    if (p_ado->operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER || p_ado->operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
+      return true;
+
+    return false;
+  }
+  //---------------------------------------------------------------
+  // Prepapres vector of output_entry to be used in key_offsets in a transaction input:
+  // 1) sort all entries by gindex (while moving all ref_by_id to the end, keeping they relative order)
+  // 2) convert absolute global indices to relative key_offsets 
+  std::vector<tx_source_entry::output_entry> prepare_outputs_entries_for_key_offsets(const std::vector<tx_source_entry::output_entry>& outputs, size_t old_real_index, size_t& new_real_index) noexcept
+  {
+    TRY_ENTRY()
+
+    std::vector<tx_source_entry::output_entry> result = outputs;
+    if (outputs.size() < 2)
+    {
+      new_real_index = old_real_index;
+      return result;
+    }
+
+    std::sort(result.begin(), result.end(), [](const tx_source_entry::output_entry& lhs, const tx_source_entry::output_entry& rhs)
+    {
+      if (lhs.out_reference.type() == typeid(uint64_t))
+      {
+        if (rhs.out_reference.type() == typeid(uint64_t))
+          return boost::get<uint64_t>(lhs.out_reference) < boost::get<uint64_t>(rhs.out_reference);
+        if (rhs.out_reference.type() == typeid(ref_by_id))
+          return true;
+        CHECK_AND_ASSERT_THROW_MES(false, "unexpected type in out_reference 1: " << rhs.out_reference.type().name());
+      }
+      else if (lhs.out_reference.type() == typeid(ref_by_id))
+      {
+        if (rhs.out_reference.type() == typeid(uint64_t))
+          return false;
+        if (rhs.out_reference.type() == typeid(ref_by_id))
+          return false; // don't change the order of ref_by_id elements
+        CHECK_AND_ASSERT_THROW_MES(false, "unexpected type in out_reference 2: " << rhs.out_reference.type().name());
+      }
+      return false;
+    });
+
+    // restore index of the selected element, if needed
+    if (old_real_index != SIZE_MAX)
+    {
+      CHECK_AND_ASSERT_THROW_MES(old_real_index < outputs.size(), "old_real_index is OOB");
+      auto it = std::find(result.begin(), result.end(), outputs[old_real_index]);
+      CHECK_AND_ASSERT_THROW_MES(it != result.end(), "internal error: cannot find old_real_index");
+      new_real_index = it - result.begin();
+    }
+
+    // find the last uint64_t entry - skip ref_by_id entries goint from the end to the beginnning
+    size_t i = result.size() - 1;
+    while (i != 0 && result[i].out_reference.type() == typeid(ref_by_id))
+      --i;
+
+    for (; i != 0; i--)
+    {
+      boost::get<uint64_t>(result[i].out_reference) -= boost::get<uint64_t>(result[i - 1].out_reference);
+    }
+
+    return result;
+
+    CATCH_ENTRY2(std::vector<tx_source_entry::output_entry>{});
+  }
+  //---------------------------------------------------------------
+  bool validate_tx_output_details_againt_tx_generation_context(const transaction& tx, const tx_generation_context& gen_context)
+  {
+    //TODO: Implement this function before mainnet
+#ifdef TESTNET
+    return true;
+#else
+    return true;
+#endif
+  }
+
+  //----------------------------------------------------------------------------------------------------
+  std::string transform_tx_to_str(const currency::transaction& tx)
+  {
+    return currency::obj_to_json_str(tx);
+  }
+  //----------------------------------------------------------------------------------------------------
+  transaction transform_str_to_tx(const std::string& tx_str)
+  {
+    CHECK_AND_ASSERT_THROW_MES(false, "transform_str_to_tx shoruld never be called");
+    return transaction();
+  }
+
 
 }

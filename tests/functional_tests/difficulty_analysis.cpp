@@ -306,7 +306,7 @@ void run_emulation(const std::string& path)
   perform_simulation_for_function(timestamp_to_hashrate, current_index, blocks, result_blocks, \
     [&](std::vector<uint64_t>& timestamps, std::vector<currency::wide_difficulty_type>& cumulative_difficulties, size_t target_seconds) \
   { \
-    return func_name(timestamps, cumulative_difficulties, target_seconds); \
+    return func_name(timestamps, cumulative_difficulties, target_seconds, DIFFICULTY_POW_STARTER); \
   }); \
   current_index+=2;
 

@@ -15,7 +15,7 @@
 #include <boost/serialization/is_bitwise_serializable.hpp>
 #include "currency_basic.h"
 #include "common/unordered_containers_boost_serialization.h"
-#include "common/crypto_boost_serialization.h"
+#include "common/crypto_serialization.h"
 #include "offers_services_helpers.h"
 
 #define CURRENT_BLOCK_ARCHIVE_VER   2
@@ -104,13 +104,22 @@ namespace boost
     }
 
     template <class Archive>
-    inline void serialize(Archive &a, currency::tx_out &x, const boost::serialization::version_type ver)
+    inline void serialize(Archive &a, currency::tx_out_bare &x, const boost::serialization::version_type ver)
     {
       a & x.amount;
       a & x.target;
     }
 
-
+    template <class Archive>
+    inline void serialize(Archive &a, currency::tx_out_zarcanum &x, const boost::serialization::version_type ver)
+    {
+      a & x.stealth_address;
+      a & x.concealing_point;
+      a & x.amount_commitment;
+      a & x.blinded_asset_id;
+      a & x.encrypted_amount;
+      a & x.mix_attr;
+    }
 
     template <class Archive>
     inline void serialize(Archive &a, currency::tx_comment &x, const boost::serialization::version_type ver)

@@ -28,7 +28,7 @@ endif()
 set_property(TARGET upnpc-static mdbx_chk mdbx_copy mdbx_dump mdbx_load mdbx_stat PROPERTY FOLDER "unused")
 
 if(MSVC)
-  set_property(TARGET ntdll_extra_target PROPERTY FOLDER "unused")
+  #set_property(TARGET ntdll_extra_target PROPERTY FOLDER "unused")
 endif()
 
 

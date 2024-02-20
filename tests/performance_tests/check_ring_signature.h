@@ -36,7 +36,7 @@ public:
     std::vector<tx_destination_entry> destinations;
     destinations.push_back(tx_destination_entry(this->m_source_amount, m_alice.get_keys().account_address));
 
-    if (!construct_tx(this->m_miners[this->real_source_idx].get_keys(), this->m_sources, destinations, m_tx, 0))
+    if (!construct_tx(this->m_miners[this->real_source_idx].get_keys(), this->m_sources, destinations, std::vector<currency::attachment_v>(), m_tx, 0, 0))
       return false;
 
     get_transaction_prefix_hash(m_tx, m_tx_prefix_hash);
@@ -47,7 +47,7 @@ public:
   bool test()
   {
     const currency::txin_to_key& txin = boost::get<currency::txin_to_key>(m_tx.vin[0]);
-    return crypto::check_ring_signature(m_tx_prefix_hash, txin.k_image, this->m_public_key_ptrs, ring_size, m_tx.signatures[0].data());
+    return crypto::check_ring_signature(m_tx_prefix_hash, txin.k_image, this->m_public_key_ptrs, ring_size, boost::get<currency::NLSAG_sig>(m_tx.signatures[0]).s.data());
   }
 
 private:

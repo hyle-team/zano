@@ -6,7 +6,7 @@
 
 #pragma once
 #include <boost/thread.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 #include <boost/foreach.hpp>
 #include <boost/bimap.hpp>
 #include <boost/multi_index_container.hpp>

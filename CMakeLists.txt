@@ -1,20 +1,21 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.5)
 
 PROJECT(Zano)
 
 
 set(VERSION "1.0")
 
-#  if(POLICY CMP0043)
-#    cmake_policy(SET CMP0043 OLD)
-#  endif()
+if(POLICY CMP0043)
+  cmake_policy(SET CMP0043 NEW)
+endif()
+if(POLICY CMP0043)
+  cmake_policy(SET CMP0074 NEW)
+endif()
 
-#  if(POLICY CMP0020)
-#    cmake_policy(SET CMP0020 OLD)
-#  endif()
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "Android")
   add_definitions(-DMOBILE_WALLET_BUILD)
@@ -53,9 +54,12 @@ message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}, and built ty
  
 enable_testing()
 
+set(OPENSSL_USE_STATIC_LIBS TRUE) # link statically
+find_package(OpenSSL REQUIRED)
+
 
 if(APPLE)
-  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.10.5 CACHE STRING "Minimum OS X deployment version")          
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12)          
 endif()
 
 set(USE_PCH FALSE CACHE BOOL "Use shared precompiled headers")
@@ -63,13 +67,18 @@ set(DISABLE_TOR FALSE CACHE BOOL "Disable TOR library(and related tor-connect su
 set(TESTNET FALSE CACHE BOOL "Compile for testnet")
 set(BUILD_GUI FALSE CACHE BOOL "Build qt-daemon")
 
-include_directories(src contrib/eos_portable_archive contrib contrib/epee/include "${CMAKE_BINARY_DIR}/version" "${CMAKE_BINARY_DIR}/contrib/zlib")
+include_directories(src contrib/eos_portable_archive contrib contrib/epee/include ${OPENSSL_INCLUDE_DIR} "${CMAKE_BINARY_DIR}/version" "${CMAKE_BINARY_DIR}/contrib/zlib")
 
 add_definitions(-DSTATICLIB)
 
 if(TESTNET)
   message("!!!!!! NOTICE: Project is building for TESTNET !!!!!!")  
   add_definitions(-DTESTNET)  
+endif()
+
+if(CAKEWALLET)
+  message("NOTICE: Building libraries for CAKEWALLET")  
+  add_definitions(-DCAKEWALLET)  
 endif()
 
 set(OPENSSL_USE_STATIC_LIBS TRUE) # link statically
@@ -93,9 +102,9 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 
 if(MSVC)
-  add_definitions("/D_CRT_SECURE_NO_WARNINGS /D_WIN32_WINNT=0x0600 /DWIN32_LEAN_AND_MEAN /DGTEST_HAS_TR1_TUPLE=0 /D__SSE4_1__")
+  add_definitions("/D_CRT_SECURE_NO_WARNINGS /D_WIN32_WINNT=0x0600 /DWIN32_LEAN_AND_MEAN /DGTEST_HAS_TR1_TUPLE=0")
   add_compile_options(/bigobj /Zm1000 /Z7 /MP2 /W3 /GS- /wd4996 /wd4503 /wd4345 /wd4091 /FIinline_c.h)
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:10485760 /DEBUG dbghelp.lib")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /STACK:10485760 /DEBUG dbghelp.lib crypt32.lib")
   if(STATIC)
     foreach(VAR CMAKE_C_FLAGS_DEBUG CMAKE_CXX_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE CMAKE_CXX_FLAGS_RELEASE)
       string(REPLACE "/MD" "/MT" ${VAR} "${${VAR}}")
@@ -109,7 +118,7 @@ else()
   else()
     set(ARCH_FLAG "-march=${ARCH}")
   endif()
-  set(WARNINGS "-Wall -Wextra -Wpointer-arith -Wvla -Wwrite-strings -Wno-error=extra -Wno-error=deprecated-declarations -Wno-error=sign-compare -Wno-error=strict-aliasing -Wno-error=type-limits -Wno-unused-parameter -Wno-error=unused-variable -Wno-aggregate-return")
+  set(WARNINGS "-Wall -Wextra -Wpointer-arith -Wvla -Wwrite-strings -Wno-error=extra -Wno-error=deprecated-declarations -Wno-error=sign-compare -Wno-error=strict-aliasing -Wno-error=type-limits -Wno-unused-parameter -Wno-error=unused-variable -Wno-aggregate-return -Wno-comment -Wno-unknown-pragmas -Wno-pragmas")
 #  if(NOT APPLE)
 #    set(WARNINGS "${WARNINGS} -Werror")
 #  endif()
@@ -141,16 +150,16 @@ else()
   else()
     set(APPLE_FLAG "")
   endif()
-  set(C_WARNINGS "-Waggregate-return -Wnested-externs -Wstrict-prototypes")
+  set(C_WARNINGS "-Waggregate-return -Wnested-externs -Wstrict-prototypes -Wno-comment")
   set(CXX_WARNINGS "-Wno-reorder -Wno-missing-field-initializers")
-  try_compile(STATIC_ASSERT_RES "${CMAKE_CURRENT_BINARY_DIR}/static-assert" "${CMAKE_CURRENT_SOURCE_DIR}/utils/test-static-assert.c" COMPILE_DEFINITIONS "-std=c11")
+  try_compile(STATIC_ASSERT_RES "${CMAKE_CURRENT_BINARY_DIR}/static-assert" "${CMAKE_CURRENT_SOURCE_DIR}/utils/test-static-assert.c" COMPILE_DEFINITIONS "-std=c++14")
   if(STATIC_ASSERT_RES)
     set(STATIC_ASSERT_FLAG "")
   else()
     set(STATIC_ASSERT_FLAG "-Dstatic_assert=_Static_assert")
   endif()
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11 -D_GNU_SOURCE ${MINGW_FLAG} ${STATIC_ASSERT_FLAG} ${WARNINGS} ${C_WARNINGS} ${ARCH_FLAG}")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive -ftemplate-depth-1024 -std=c++11 -D_GNU_SOURCE ${APPLE_FLAG} ${MINGW_FLAG} ${WARNINGS} ${CXX_WARNINGS} ${ARCH_FLAG}")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive -ftemplate-depth-1024 -std=c++14 -D_GNU_SOURCE ${APPLE_FLAG} ${MINGW_FLAG} ${WARNINGS} ${CXX_WARNINGS} ${ARCH_FLAG}")
   if (NOT APPLE AND NOT MSVC)
     if (CLANG)
       set(LLVM_USE_LINKER "gold")
@@ -185,7 +194,7 @@ else()
 endif()
 
 
-# always use system-wide Boost (unless ZANO_USE_SYSTEM_BOOST is defined for some reason, which is not recommended)
+# always use local Boost installation rather than the system-wide (unless ZANO_USE_SYSTEM_BOOST is defined for some reason, which is not recommended)
 if(NOT DEFINED ENV{ZANO_USE_SYSTEM_BOOST})
   set(Boost_NO_SYSTEM_PATHS ON)
 endif()
@@ -213,9 +222,9 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
   set(Boost_LIBRARY_DIRS "${Boost_LIBRARY_DIRS}/${CMAKE_ANDROID_ARCH_ABI}/")
   set(Boost_LIBRARIES "${Boost_LIBRARY_DIRS}libboost_system.a;${Boost_LIBRARY_DIRS}libboost_filesystem.a;${Boost_LIBRARY_DIRS}libboost_thread.a;${Boost_LIBRARY_DIRS}libboost_timer.a;${Boost_LIBRARY_DIRS}libboost_date_time.a;${Boost_LIBRARY_DIRS}libboost_chrono.a;${Boost_LIBRARY_DIRS}libboost_regex.a;${Boost_LIBRARY_DIRS}libboost_serialization.a;${Boost_LIBRARY_DIRS}libboost_atomic.a;${Boost_LIBRARY_DIRS}libboost_program_options.a")
 elseif(APPLE)
-  find_package(Boost 1.71 EXACT REQUIRED COMPONENTS system filesystem thread timer date_time chrono regex serialization atomic program_options locale)
+  find_package(Boost 1.71 REQUIRED COMPONENTS system filesystem thread timer date_time chrono regex serialization atomic program_options locale)
 else()
-  find_package(Boost 1.70 EXACT REQUIRED COMPONENTS system filesystem thread timer date_time chrono regex serialization atomic program_options locale)
+  find_package(Boost 1.70 REQUIRED COMPONENTS system filesystem thread timer date_time chrono regex serialization atomic program_options locale log)
 endif()
 
 
@@ -237,7 +246,7 @@ elseif(NOT MSVC)
 endif()
 
 if(BUILD_GUI)
-  cmake_minimum_required(VERSION 2.8.11)
+  cmake_minimum_required(VERSION 3.1)
   find_package(Qt5Widgets REQUIRED)  
 endif()
 

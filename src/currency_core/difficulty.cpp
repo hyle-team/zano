@@ -179,7 +179,7 @@ namespace currency {
     return res.convert_to<wide_difficulty_type>();
   }
 
-  wide_difficulty_type next_difficulty_1(vector<uint64_t>& timestamps, vector<wide_difficulty_type>& cumulative_difficulties, size_t target_seconds)
+  wide_difficulty_type next_difficulty_1(vector<uint64_t>& timestamps, vector<wide_difficulty_type>& cumulative_difficulties, size_t target_seconds, const wide_difficulty_type& difficulty_starter)
   {
 
     // timestamps  - first is latest, back - is oldest timestamps
@@ -194,7 +194,7 @@ namespace currency {
     CHECK_AND_ASSERT_MES(length == cumulative_difficulties.size(), 0, "Check \"length == cumulative_difficulties.size()\" failed");
     if (length <= 1)
     {
-      return DIFFICULTY_STARTER;
+      return difficulty_starter;
     }
     static_assert(DIFFICULTY_WINDOW >= 2, "Window is too small");
 
@@ -221,7 +221,7 @@ namespace currency {
     return summ / devider;
   }
 
-  wide_difficulty_type next_difficulty_2(vector<uint64_t>& timestamps, vector<wide_difficulty_type>& cumulative_difficulties, size_t target_seconds)
+  wide_difficulty_type next_difficulty_2(vector<uint64_t>& timestamps, vector<wide_difficulty_type>& cumulative_difficulties, size_t target_seconds, const wide_difficulty_type& difficulty_starter)
   {
 
     // timestamps  - first is latest, back - is oldest timestamps
@@ -236,7 +236,7 @@ namespace currency {
     CHECK_AND_ASSERT_MES(length == cumulative_difficulties.size(), 0, "Check \"length == cumulative_difficulties.size()\" failed");
     if (length <= 1)
     {
-      return DIFFICULTY_STARTER;
+      return difficulty_starter;
     }
     static_assert(DIFFICULTY_WINDOW >= 2, "Window is too small");
 

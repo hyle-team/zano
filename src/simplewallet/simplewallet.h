@@ -89,6 +89,18 @@ namespace currency
     bool sweep_below(const std::vector<std::string> &args);
     bool tor_enable(const std::vector<std::string> &args);
     bool tor_disable(const std::vector<std::string> &args);
+    bool deploy_new_asset(const std::vector<std::string> &args);
+    bool add_custom_asset_id(const std::vector<std::string> &args);
+    bool remove_custom_asset_id(const std::vector<std::string> &args);
+    bool emit_asset(const std::vector<std::string> &args);
+    bool burn_asset(const std::vector<std::string> &args);
+    bool update_asset(const std::vector<std::string> &args);
+
+    //----------------------------------------------------------------------------------------------------
+    bool generate_ionic_swap_proposal(const std::vector<std::string> &args);
+    bool get_ionic_swap_proposal_info(const std::vector<std::string> &args);
+    bool accept_ionic_swap_proposal(const std::vector<std::string> &args);
+
     bool validate_wrap_status(uint64_t amount);
 
     bool get_alias_from_daemon(const std::string& alias_name, currency::extra_alias_entry_base& ai);
@@ -96,13 +108,19 @@ namespace currency
 
     uint64_t get_daemon_blockchain_height(std::string& err);
     bool try_connect_to_daemon();
+    std::string get_tocken_info_string(const crypto::public_key& asset_id, uint64_t& decimal_point);
+    bool print_wti(const tools::wallet_public::wallet_transfer_info& wti);
+    bool check_password_for_operation();
+    crypto::hash get_hash_from_pass_and_salt(const std::string& pass, uint64_t salt);
 
     //----------------- i_wallet2_callback ---------------------
     virtual void on_new_block(uint64_t height, const currency::block& block) override;
-    virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) override;
+    virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) override;
     virtual void on_message(i_wallet2_callback::message_severity severity, const std::string& m) override;
     virtual void on_tor_status_change(const std::string& state) override;
 
+    virtual void on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets) override;
+    virtual bool on_mw_select_wallet(uint64_t wallet_id) override;
     //----------------------------------------------------------
 
     friend class refresh_progress_reporter_t;
@@ -173,10 +191,14 @@ namespace currency
     bool m_disable_tor;
     std::string m_restore_wallet;
     std::string m_voting_config_file;
+    bool m_no_password_confirmations = false;
+    
+    crypto::hash m_password_hash;
+    uint64_t m_password_salt;
 
     epee::console_handlers_binder m_cmd_binder;
 
-    std::unique_ptr<tools::wallet2> m_wallet;
+    std::shared_ptr<tools::wallet2> m_wallet;
     net_utils::http::http_simple_client m_http_client;
     refresh_progress_reporter_t m_refresh_progress_reporter;
   };

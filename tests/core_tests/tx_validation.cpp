@@ -273,7 +273,7 @@ bool gen_tx_key_offest_points_to_foreign_key::generate(std::vector<test_event_en
   builder.step1_init();
   builder.step2_fill_inputs(bob_account.get_keys(), sources_bob);
   txin_to_key& in_to_key = boost::get<txin_to_key>(builder.m_tx.vin.front());
-  in_to_key.key_offsets.front() = sources_alice.front().outputs.front().first;
+  in_to_key.key_offsets.front() = sources_alice.front().outputs.front().out_reference;
   builder.step3_fill_outputs(destinations_bob);
   builder.step4_calc_hash();
   builder.step5_sign(sources_bob);
@@ -329,7 +329,7 @@ bool gen_tx_mixed_key_offest_not_exist::generate(std::vector<test_event_entry>& 
   std::vector<tx_destination_entry> destinations;
   fill_tx_sources_and_destinations(events, blk_2, bob_account, miner_account, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 1, sources, destinations);
 
-  sources.front().outputs[(sources.front().real_output + 1) % 2].first = std::numeric_limits<uint64_t>::max();
+  sources.front().outputs[(sources.front().real_output + 1) % 2].out_reference = std::numeric_limits<uint64_t>::max();
 
   tx_builder builder;
   builder.step1_init();
@@ -371,8 +371,8 @@ bool gen_tx_key_image_not_derive_from_tx_key::generate(std::vector<test_event_en
 
   // Tx with invalid key image can't be subscribed, so create empty signature
   builder.m_tx.signatures.resize(1);
-  builder.m_tx.signatures[0].resize(1);
-  builder.m_tx.signatures[0][0] = boost::value_initialized<crypto::signature>();
+  boost::get<currency::NLSAG_sig>(builder.m_tx.signatures[0]).s.resize(1);
+  boost::get<currency::NLSAG_sig>(builder.m_tx.signatures[0]).s[0] = boost::value_initialized<crypto::signature>();
 
   DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(builder.m_tx);
@@ -405,8 +405,8 @@ bool gen_tx_key_image_is_invalid::generate(std::vector<test_event_entry>& events
 
   // Tx with invalid key image can't be subscribed, so create empty signature
   builder.m_tx.signatures.resize(1);
-  builder.m_tx.signatures[0].resize(1);
-  builder.m_tx.signatures[0][0] = boost::value_initialized<crypto::signature>();
+  boost::get<currency::NLSAG_sig>(builder.m_tx.signatures[0]).s.resize(1);
+  boost::get<currency::NLSAG_sig>(builder.m_tx.signatures[0]).s[0] = boost::value_initialized<crypto::signature>();
 
   DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(builder.m_tx);
@@ -494,7 +494,7 @@ bool gen_tx_txout_to_key_has_invalid_key::generate(std::vector<test_event_entry>
   builder.step2_fill_inputs(miner_account.get_keys(), sources);
   builder.step3_fill_outputs(destinations);
 
-  txout_to_key& out_to_key =  boost::get<txout_to_key>(builder.m_tx.vout.front().target);
+  txout_to_key& out_to_key =  boost::get<txout_to_key>(boost::get<tx_out_bare>(builder.m_tx.vout.front()).target);
   out_to_key.key = tx_builder::generate_invalid_pub_key();
 
   builder.step4_calc_hash();
@@ -523,7 +523,7 @@ bool gen_tx_output_with_zero_amount::generate(std::vector<test_event_entry>& eve
   builder.step2_fill_inputs(miner_account.get_keys(), sources);
   builder.step3_fill_outputs(destinations);
 
-  builder.m_tx.vout.front().amount = 0;
+  boost::get<tx_out_bare>(builder.m_tx.vout.front()).amount = 0;
 
   builder.step4_calc_hash();
   builder.step5_sign(sources);
@@ -655,13 +655,13 @@ bool gen_tx_signatures_are_invalid::generate(std::vector<test_event_entry>& even
 
   // Tx with nmix = 0 have a few inputs, and too many signatures (1/2)
   broken_tx = tx_0;
-  broken_tx.signatures.back().push_back(invalid_signature);
+  boost::get<currency::NLSAG_sig>(broken_tx.signatures.back()).s.push_back(invalid_signature);
   check_broken_tx(events, broken_tx, prev_block, miner_account, generator);
 
   // Tx with nmix = 0 have a few inputs, and too many signatures (2/2)
   broken_tx = tx_0;
-  broken_tx.signatures.push_back(std::vector<crypto::signature>());
-  broken_tx.signatures.back().push_back(invalid_signature);
+  broken_tx.signatures.push_back(currency::NLSAG_sig());
+  boost::get<currency::NLSAG_sig>(broken_tx.signatures.back()).s.push_back(invalid_signature);
   check_broken_tx(events, broken_tx, prev_block, miner_account, generator);
 
 
@@ -677,18 +677,18 @@ bool gen_tx_signatures_are_invalid::generate(std::vector<test_event_entry>& even
 
   // Tx with nmix = 1 have not enough signatures (2/2)
   broken_tx = tx_1;
-  broken_tx.signatures.back().resize(broken_tx.signatures.back().size() - 1);
+  boost::get<currency::NLSAG_sig>(broken_tx.signatures.back()).s.resize(boost::get<currency::NLSAG_sig>(broken_tx.signatures.back()).s.size() - 1);
   check_broken_tx(events, broken_tx, prev_block, miner_account, generator);
 
   // Tx with nmix = 1 have too many signatures (1/2)
   broken_tx = tx_1;
-  broken_tx.signatures.back().push_back(invalid_signature);
+  boost::get<currency::NLSAG_sig>(broken_tx.signatures.back()).s.push_back(invalid_signature);
   check_broken_tx(events, broken_tx, prev_block, miner_account, generator);
 
   // Tx with nmix = 1 have too many signatures (2/2)
   broken_tx = tx_1;
-  broken_tx.signatures.push_back(std::vector<crypto::signature>());
-  broken_tx.signatures.back().push_back(invalid_signature);
+  broken_tx.signatures.push_back(currency::NLSAG_sig());
+  boost::get<currency::NLSAG_sig>(broken_tx.signatures.back()).s.push_back(invalid_signature);
   check_broken_tx(events, broken_tx, prev_block, miner_account, generator);
 
 
@@ -775,8 +775,8 @@ gen_crypted_attachments::gen_crypted_attachments()
   REGISTER_CALLBACK("check_offers_count_befor_cancel", gen_crypted_attachments::check_offers_count_befor_cancel);
   REGISTER_CALLBACK("check_offers_count_after_cancel", gen_crypted_attachments::check_offers_count_after_cancel);
 
-  m_hardfork_01_height = 0;
-  m_hardfork_02_height = 0; // tx_payer is allowed only after HF2
+  m_hardforks.set_hardfork_height(1, 0);
+  m_hardforks.set_hardfork_height(2, 0); // tx_payer is allowed only after HF2
 }
 
 bool gen_crypted_attachments::generate(std::vector<test_event_entry>& events) const
@@ -818,7 +818,7 @@ bool gen_crypted_attachments::generate(std::vector<test_event_entry>& events) co
   fill_test_offer_(od);
   bc_services::put_offer_into_attachment(od, attachments2);
   bc_services::put_offer_into_attachment(od, attachments2);
-  construct_tx_to_key(events, tx, blk_6, miner_account, miner_account, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, CURRENCY_TO_KEY_OUT_RELAXED, std::vector<currency::extra_v>(), attachments2);
+  construct_tx_to_key(m_hardforks, events, tx, blk_6, miner_account, miner_account, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, CURRENCY_TO_KEY_OUT_RELAXED, std::vector<currency::extra_v>(), attachments2);
   txs_list2.push_back(tx);
   events.push_back(tx);
 
@@ -868,7 +868,7 @@ bool gen_crypted_attachments::generate(std::vector<test_event_entry>& events) co
 //                              currency::get_tx_pub_key_from_extra(tx), 
 //                              off_key_pair.sec, co.sig);
   bc_services::put_offer_into_attachment(co, attachments3);
-  construct_tx_to_key(events, tx, blk_7, miner_account, miner_account, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, CURRENCY_TO_KEY_OUT_RELAXED, std::vector<currency::extra_v>(), attachments3);
+  construct_tx_to_key(m_hardforks, events, tx, blk_7, miner_account, miner_account, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, CURRENCY_TO_KEY_OUT_RELAXED, std::vector<currency::extra_v>(), attachments3);
   txs_list3.push_back(tx);
   events.push_back(tx);
 
@@ -989,8 +989,8 @@ bool gen_tx_extra_double_entry::configure_core(currency::core& c, size_t ev_inde
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
-  pc.hard_fork_01_starts_after_height = 0;
-  pc.hard_fork_02_starts_after_height = 0;
+  pc.hard_forks.set_hardfork_height(1, 0);
+  pc.hard_forks.set_hardfork_height(2, 0);
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
 }
@@ -1193,7 +1193,7 @@ bool tx_expiration_time::generate(std::vector<test_event_entry>& events) const
   // transfer to Alice some coins in chunks
   uint64_t alice_amount = MK_TEST_COINS(10);
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), alice_amount, 10, TESTS_DEFAULT_FEE, tx_1);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), alice_amount, 10, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);
@@ -1221,7 +1221,7 @@ bool tx_expiration_time::generate(std::vector<test_event_entry>& events) const
   r = fill_tx_sources_and_destinations(events, blk_2, alice_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_2  = AUTO_VAL_INIT(tx_2);
-  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_2, 0);
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_2, get_tx_version_from_events(events),  0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   set_tx_expiration_time(tx_2, ts_median + TX_EXPIRATION_MEDIAN_SHIFT + 1); // one second greather than minimum allowed
   r = resign_tx(alice_acc.get_keys(), sources, tx_2);
@@ -1239,7 +1239,7 @@ bool tx_expiration_time::generate(std::vector<test_event_entry>& events) const
   r = fill_tx_sources_and_destinations(events, blk_3, alice_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_3  = AUTO_VAL_INIT(tx_3);
-  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_3, 0);
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_3, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   set_tx_expiration_time(tx_3, ts_median + TX_EXPIRATION_MEDIAN_SHIFT + 0); // exact expiration time, should not pass (see core condition above)
   r = resign_tx(alice_acc.get_keys(), sources, tx_3);
@@ -1304,7 +1304,7 @@ bool tx_expiration_time_and_block_template::generate(std::vector<test_event_entr
   bool r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), miner_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_1  = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   uint64_t tx_1_expiration_time = ts_median + TX_EXPIRATION_MEDIAN_SHIFT + 1;  // one second greather than minimum allowed
   set_tx_expiration_time(tx_1, tx_1_expiration_time);
@@ -1376,7 +1376,7 @@ bool tx_expiration_time_and_chain_switching::generate(std::vector<test_event_ent
   r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), miner_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_0  = AUTO_VAL_INIT(tx_0);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   uint64_t tx_0_expiration_time = ts_median + TX_EXPIRATION_MEDIAN_SHIFT + 0;  // one second less than minimum allowed (see condition above)
   set_tx_expiration_time(tx_0, tx_0_expiration_time);
@@ -1497,7 +1497,7 @@ bool tx_key_image_pool_conflict::generate(std::vector<test_event_entry>& events)
   r = fill_tx_sources_and_destinations(events, blk_0r, m_miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_0  = AUTO_VAL_INIT(tx_0);
-  r = construct_tx(m_miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, 0);
+  r = construct_tx(m_miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   LOG_PRINT_YELLOW("tx_0 = " << get_transaction_hash(tx_0), LOG_LEVEL_0);
   // do not push tx_0 into events yet

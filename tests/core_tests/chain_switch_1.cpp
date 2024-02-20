@@ -160,7 +160,7 @@ bool gen_chain_switch_1::check_split_not_switched(currency::core& c, size_t ev_i
   CHECK_TEST_CONDITION(r);
   CHECK_EQ(1, tx_pool.size());
 
-  std::vector<size_t> tx_outs;
+  std::vector<wallet_out_info> tx_outs;
   uint64_t transfered;
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
   lookup_acc_outs(m_recipient_account_4.get_keys(), tx_pool.front(), get_tx_pub_key_from_extra(tx_pool.front()), tx_outs, transfered, derivation);
@@ -223,7 +223,7 @@ bool gen_chain_switch_1::check_split_switched(currency::core& c, size_t ev_index
   CHECK_EQ(1, tx_pool.size());
   CHECK_TEST_CONDITION(!(tx_pool.front() == m_tx_pool.front()));
 
-  std::vector<size_t> tx_outs;
+  std::vector<wallet_out_info> tx_outs;
   uint64_t transfered;
   crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
   lookup_acc_outs(m_recipient_account_2.get_keys(), tx_pool.front(), tx_outs, transfered, derivation);
@@ -521,7 +521,8 @@ bool alt_blocks_validation_and_same_new_amount_in_two_txs::generate(std::vector<
   std::vector<tx_destination_entry> destinations;
   destinations.push_back(tx_destination_entry(new_amount, miner_acc.get_public_address())); // no cashback, just payment
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, 0);
+  uint64_t tx_version = get_tx_version(get_block_height(blk_3), m_hardforks);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, tx_version, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_1);
 
@@ -531,7 +532,8 @@ bool alt_blocks_validation_and_same_new_amount_in_two_txs::generate(std::vector<
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
   // use the same destinations
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_2, 0);
+  tx_version = get_tx_version(get_block_height(blk_3), m_hardforks);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_2, tx_version, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_2);
   
@@ -644,7 +646,7 @@ bool chain_switching_when_out_spent_in_alt_chain_mixin::generate(std::vector<tes
 
   // send batch of 10 x 5 test coins to Alice for easier tx_1 construction (and to generate free decoys)
   transaction tx_0;
-  r = construct_tx_with_many_outputs(events, blk_1r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(50), 10,
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_1r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(50), 10,
     TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
@@ -711,7 +713,7 @@ bool chain_switching_when_out_spent_in_alt_chain_ref_id::generate(std::vector<te
 
   // send batch of 10 x 5 test coins to Alice for easier tx_0 construction
   transaction tx_0;
-  r = construct_tx_with_many_outputs(events, blk_1r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(50), 10,
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_1r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(50), 10,
     TESTS_DEFAULT_FEE, tx_0, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
 
@@ -737,7 +739,7 @@ bool chain_switching_when_out_spent_in_alt_chain_ref_id::generate(std::vector<te
   std::vector<tx_destination_entry> destinations;
   destinations.push_back(tx_destination_entry(MK_TEST_COINS(4), bob_acc.get_public_address()));
   size_t nmix = 3;
-  r = construct_tx_to_key(events, tx_1, blk_2a, alice_acc, destinations, TESTS_DEFAULT_FEE, nmix, 0, empty_extra, empty_attachment, true, true, true);
+  r = construct_tx_to_key(m_hardforks, events, tx_1, blk_2a, alice_acc, destinations, TESTS_DEFAULT_FEE, nmix, 0, empty_extra, empty_attachment, true, true, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
 
   // make sure tx_1 really use ref_by_id

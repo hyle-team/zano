@@ -50,3 +50,22 @@ private:
   std::vector<currency::tx_destination_entry> m_destinations;
   currency::transaction m_tx;
 };
+
+
+
+
+void parse_weird_tx()
+{
+  const std::string expected_hash = "62ee9fb89293f042cbcebb02d05fa15036ffca2bdeb4c48162f2d93a420e5974";
+  std::string tx_hex_buff;
+  epee::file_io_utils::load_file_to_string("E:\\tmp\\tx_as_hex.txt", tx_hex_buff);
+  std::string tx_blob;
+  epee::string_tools::parse_hexstr_to_binbuff(tx_hex_buff, tx_blob);
+  currency::transaction tx;
+  bool r = currency::parse_and_validate_tx_from_blob(tx_blob, tx);
+  std::string res_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(tx));
+  if (res_hash != expected_hash)
+  {
+    std::cout << "this is sad";
+  }
+}

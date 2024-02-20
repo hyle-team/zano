@@ -22,6 +22,7 @@ using namespace currency;
 #include "../core_tests/test_core_time.h"
 std::atomic<int64_t> test_core_time::m_time_shift;
 
+#include "../core_tests/random_helper.h"
 #include "../core_tests/test_core_proxy.h"
 #include "../core_tests/chaingen_helpers.h"
 #include "../core_tests/core_state_helper.h"
@@ -63,8 +64,20 @@ bool create_block_template_manually(const currency::block& prev_block, boost::mu
 
   // make things really simple by assuming block size is less than CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE
   size_t median_size = 0;
-  
-  bool r = construct_miner_tx(get_block_height(prev_block) + 1, median_size, already_generated_coins, txs_size, fee, miner_addr, miner_addr, result.miner_tx);
+  uint64_t block_reward_without_fee = 0;
+  uint64_t block_reward = 0;
+
+  bool r = construct_miner_tx(get_block_height(prev_block) + 1,
+    median_size,
+    already_generated_coins,
+    txs_size,
+    fee,
+    miner_addr,
+    miner_addr,
+    result.miner_tx,
+    block_reward_without_fee,
+    block_reward,
+    TRANSACTION_VERSION_PRE_HF4);
   CHECK_AND_ASSERT_MES(r, false, "construct_miner_tx failed");
 
   size_t coinbase_size = get_object_blobsize(result.miner_tx);
@@ -108,7 +121,7 @@ bool generate_events(currency::core& c, cct_events_t& events, const cct_wallets_
       wide_difficulty_type diff = 0;
       if (prev_block.height != 0)
         test_core_time::adjust(prev_block.bl.timestamp + DIFFICULTY_POW_TARGET);
-      r = bcs.create_block_template(b, miner_addr, diff, height, ex_nonce);
+      r = bcs.create_block_template(miner_addr, ex_nonce, b, diff, height);
       CHECK_AND_ASSERT_MES(r, false, "create_block_template failed");
     }
     else

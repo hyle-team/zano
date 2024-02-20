@@ -18,7 +18,6 @@
 #include "static_helpers.h"
 #include "wallet_helpers.h"
 
-
 #define ANDROID_PACKAGE_NAME    "com.zano_mobile"
 
 #define LOGS_FOLDER             "logs"
@@ -35,19 +34,6 @@
 //TODO: global objects, subject to refactoring
 
 
-struct plain_wallet_instance
-{
-  plain_wallet_instance() :initialized(false), gjobs_counter(1)
-  {}
-  wallets_manager gwm;
-  std::atomic<bool> initialized;
-
-  std::atomic<uint64_t> gjobs_counter;
-  std::map<uint64_t, std::string> gjobs;
-  epee::critical_section gjobs_lock;
-};
-
-std::shared_ptr<plain_wallet_instance> ginstance_ptr;
 
 #define GET_INSTANCE_PTR(ptr_name) \
   auto ptr_name = std::atomic_load(&ginstance_ptr); \
@@ -72,6 +58,22 @@ void static_destroy_handler()
 
 namespace plain_wallet
 {
+  struct plain_wallet_instance
+  {
+    plain_wallet_instance() :initialized(false), gjobs_counter(1)
+    {}
+    wallets_manager gwm;
+    std::atomic<bool> initialized;
+
+    std::atomic<uint64_t> gjobs_counter;
+    std::map<uint64_t, std::string> gjobs;
+    epee::critical_section gjobs_lock;
+  };
+
+  std::shared_ptr<plain_wallet::plain_wallet_instance> ginstance_ptr;
+
+
+
   typedef epee::json_rpc::response<epee::json_rpc::dummy_result, error> error_response;
 
 
@@ -94,7 +96,9 @@ namespace plain_wallet
   
   std::string get_wallets_folder()
   {
-#ifdef WIN32
+#ifdef CAKEWALLET    
+    std::string path = "";    
+#elif WIN32
     std::string path = get_bundle_working_dir() + "/" + WALLETS_FOLDER_NAME + "/";
 #else
     std::string path = get_bundle_working_dir() + "/" + WALLETS_FOLDER_NAME + "/";
@@ -104,7 +108,9 @@ namespace plain_wallet
 
   std::string get_app_config_folder()
   {
-#ifdef WIN32
+#ifdef CAKEWALLET    
+    std::string path = "";
+#elif WIN32
     std::string path = get_bundle_working_dir() + "/" + APP_CONFIG_FOLDER + "/";
 #else
     std::string path = get_bundle_working_dir() + "/" + APP_CONFIG_FOLDER + "/";
@@ -130,7 +136,7 @@ namespace plain_wallet
     log_dir += "/" LOGS_FOLDER;
 
     log_space::get_set_need_thread_id(true, true);
-    log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet");
+    log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet", false);
     epee::log_space::get_set_log_detalisation_level(true, log_level);
 #ifdef ANDROID_BUILD
     epee::log_space::log_singletone::add_logger(new android_logger());
@@ -174,7 +180,8 @@ namespace plain_wallet
     ok_response.result.return_code = API_RETURN_CODE_OK;
     return epee::serialization::store_t_to_json(ok_response);
   }
-  
+
+
   std::string init(const std::string& ip, const std::string& port, const std::string& working_dir, int log_level)
   {
     auto local_ptr = std::atomic_load(&ginstance_ptr);
@@ -218,6 +225,8 @@ namespace plain_wallet
 
     LOG_PRINT_L0("[INIT PLAIN_WALLET_INSTANCE] Ver:" << PROJECT_VERSION_LONG << "(" << BUILD_TYPE << ")");
 
+
+#ifndef CAKEWALLET
     std::string wallets_folder = get_wallets_folder();
     boost::system::error_code ec;
     boost::filesystem::create_directories(wallets_folder, ec);
@@ -238,12 +247,28 @@ namespace plain_wallet
       err_result.error.message = LOCATION_STR + " \nmessage:" + ec.message();
       return epee::serialization::store_t_to_json(err_result);
     }
-
+#endif
     std::atomic_store(&ginstance_ptr, ptr);
+#ifndef CAKEWALLET
     epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
     ok_response.result.return_code = API_RETURN_CODE_OK;
     return epee::serialization::store_t_to_json(ok_response);
+#else
+    return API_RETURN_CODE_OK;
+#endif
   }
+
+  std::string init(const std::string& address, const std::string& working_dir, int log_level)
+  {
+    epee::net_utils::http::url_content url_data = AUTO_VAL_INIT(url_data);
+    if(!epee::net_utils::parse_url(address, url_data))
+    {
+        LOG_ERROR("Failed to parse address");
+        return API_RETURN_CODE_BAD_ARG;
+    }
+    return init(url_data.host, std::to_string(url_data.port), working_dir, log_level);
+  }
+
 
   std::string get_appconfig(const std::string& encryption_key)
   {
@@ -274,6 +299,11 @@ namespace plain_wallet
       ok_response.result.return_code = API_RETURN_CODE_OK;
       return epee::serialization::store_t_to_json(ok_response);
     }
+  }
+  bool is_wallet_exist(const std::string& path)
+  {
+    boost::system::error_code ec;
+    return boost::filesystem::exists(path, ec);
   }
 
   std::string generate_random_key(uint64_t lenght)
@@ -615,4 +645,35 @@ namespace plain_wallet
     return res;
   }
 
+  struct wallet_extended_info
+  {
+    view::wallet_info wi;
+    view::wallet_info_extra wi_extended;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wi)
+      KV_SERIALIZE(wi_extended)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  std::string get_wallet_info(hwallet h)
+  {
+    GET_INSTANCE_PTR(inst_ptr);
+    wallet_extended_info wei = AUTO_VAL_INIT(wei);
+    inst_ptr->gwm.get_wallet_info(h, wei.wi);
+    inst_ptr->gwm.get_wallet_info_extra(h, wei.wi_extended);
+    return epee::serialization::store_t_to_json(wei);
+  }
+  std::string reset_wallet_password(hwallet h, const std::string& password)
+  {
+    GET_INSTANCE_PTR(inst_ptr);
+    return inst_ptr->gwm.reset_wallet_password(h, password);
+  }
+
+
+  // 0 (default), 1 (unimportant), 2 (normal), 3 (elevated), 4 (priority)
+  uint64_t get_current_tx_fee(uint64_t priority)
+  {
+    return TX_DEFAULT_FEE;
+  }
 }

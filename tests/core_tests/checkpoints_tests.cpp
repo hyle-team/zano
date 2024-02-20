@@ -13,6 +13,55 @@ using namespace epee;
 using namespace crypto;
 using namespace currency;
 
+// helpers
+
+bool mine_next_pos_block_in_playtime_sign_cb(currency::core& c, const currency::block& prev_block, const currency::block& coinstake_scr_block, const currency::account_base& acc,
+  std::function<bool(currency::block&)> before_sign_cb, currency::block& output)
+{
+  blockchain_storage& bcs = c.get_blockchain_storage();
+
+  // these values (median and diff) are correct only for the next main chain block, it's incorrect for altblocks, especially for old altblocks
+  // but for now we assume they will work fine
+  uint64_t block_size_median = bcs.get_current_comulative_blocksize_limit() / 2;
+  currency::wide_difficulty_type difficulty = bcs.get_next_diff_conditional(true);
+
+  crypto::hash prev_id = get_block_hash(prev_block);
+  size_t height = get_block_height(prev_block) + 1;
+
+  block_extended_info bei = AUTO_VAL_INIT(bei);
+  bool r = bcs.get_block_extended_info_by_hash(prev_id, bei);
+  CHECK_AND_ASSERT_MES(r, false, "get_block_extended_info_by_hash failed for hash = " << prev_id);
+
+
+  const transaction& stake = coinstake_scr_block.miner_tx;
+  crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
+  size_t stake_output_idx = 0;
+  size_t stake_output_gidx = 0;
+  uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
+  crypto::key_image stake_output_key_image;
+  keypair kp;
+  generate_key_image_helper(acc.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
+  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
+
+  pos_block_builder pb;
+  pb.step1_init_header(bcs.get_core_runtime_config().hard_forks, height, prev_id);
+  pb.step2_set_txs(std::vector<transaction>());
+  pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, difficulty, prev_id, null_hash, prev_block.timestamp);
+  keypair tx_onetime_kp;
+  tx_onetime_kp = keypair::generate();
+  pb.step4_generate_coinbase_tx(block_size_median, bei.already_generated_coins, acc.get_public_address(), currency::blobdata(), CURRENCY_MINER_TX_MAX_OUTS, &tx_onetime_kp);
+
+  if (!before_sign_cb(pb.m_block))
+    return false;
+
+  pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, acc);
+  output = pb.m_block;
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
 checkpoints_test::checkpoints_test()
 {
   REGISTER_CALLBACK_METHOD(checkpoints_test, set_checkpoint);
@@ -552,14 +601,14 @@ bool gen_checkpoints_pos_validation_on_altchain::generate(std::vector<test_event
     crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
     size_t stake_output_idx = 0;
     size_t stake_output_gidx = 0;
-    uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+    uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
     crypto::key_image stake_output_key_image;
     keypair kp;
     generate_key_image_helper(miner_acc.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, blk_0r.timestamp);
     pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(blk_0r), miner_acc.get_public_address());
@@ -581,21 +630,21 @@ bool gen_checkpoints_pos_validation_on_altchain::generate(std::vector<test_event
     crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
     size_t stake_output_idx = 0;
     size_t stake_output_gidx = 0;
-    uint64_t stake_output_amount = stake.vout[stake_output_idx].amount;
+    uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
     crypto::key_image stake_output_key_image;
     keypair kp;
     generate_key_image_helper(miner_acc.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-    //crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+    //crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, blk_0r.timestamp);
     pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(blk_0r), miner_acc.get_public_address());
     
     // don't sign at all
     //pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, miner_acc);
-    pb.m_block.miner_tx.signatures[0].clear(); // just to make sure
+    boost::get<currency::NLSAG_sig>(pb.m_block.miner_tx.signatures[0]).s.clear(); // just to make sure
 
     blk_2 = pb.m_block;
   }
@@ -632,12 +681,14 @@ gen_no_attchments_in_coinbase::gen_no_attchments_in_coinbase()
 
 bool gen_no_attchments_in_coinbase::generate(std::vector<test_event_entry>& events) const
 {
+  this->on_test_generator_created(generator);
   uint64_t ts = 1450000000;
   test_core_time::adjust(ts);
   
   block blk_0 = AUTO_VAL_INIT(blk_0);
   generator.construct_genesis_block(blk_0, m_miner_acc, ts);
   events.push_back(blk_0);
+  DO_CALLBACK(events, "configure_core");
 
   DO_CALLBACK(events, "check_not_being_in_cp_zone");
   DO_CALLBACK(events, "init_config_set_cp");
@@ -654,7 +705,16 @@ bool gen_no_attchments_in_coinbase::init_config_set_cp(currency::core& c, size_t
   crc.pos_minimum_heigh = 1;
   c.get_blockchain_storage().set_core_runtime_config(crc);
 
-  m_checkpoints.add_checkpoint(12, "2a6e13df811eccce121c0de4dbdcc640de1d37c8459c2c8ea02af39717779836");
+  // different checkpoints due to different block versions for different hardforks -> different hashes
+  if (crc.is_hardfork_active_for_height(ZANO_HARDFORK_03, 11) && !crc.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, 11))
+  {
+    m_checkpoints.add_checkpoint(12, "4e6055dda442e04b2feb70bc7245584742604e8515b8d2e1c3d46c26f758d59f");
+  }
+  else
+  {
+    m_checkpoints.add_checkpoint(12, "475331fb4a325e722ddbc2d087d32687a58392e5a9314001120de0f2ce7737f2");
+  }                
+
   c.set_checkpoints(currency::checkpoints(m_checkpoints));
 
   return true;
@@ -777,7 +837,7 @@ bool gen_no_attchments_in_coinbase_gentime::generate(std::vector<test_event_entr
 
   // basic check - add to main chain
   block blk_a = AUTO_VAL_INIT(blk_a);
-  r = generator.construct_block_gentime_with_coinbase_cb(blk_0, miner_acc, [&od](transaction& tx){
+  r = generator.construct_block_gentime_with_coinbase_cb(blk_0, miner_acc, [&od](transaction& tx, [[maybe_unused]] keypair&){
     bc_services::put_offer_into_attachment(od, tx.attachment);
     bool r = add_attachments_info_to_extra(tx.extra, tx.attachment);
     CHECK_AND_ASSERT_MES(r, false, "add_attachments_info_to_extra failed");
@@ -793,7 +853,7 @@ bool gen_no_attchments_in_coinbase_gentime::generate(std::vector<test_event_entr
 
   // make sure we can't add PoW block with tx to altchain
   block blk_b = AUTO_VAL_INIT(blk_b);
-  r = generator.construct_block_gentime_with_coinbase_cb(blk_0, miner_acc, [&od](transaction& tx){
+  r = generator.construct_block_gentime_with_coinbase_cb(blk_0, miner_acc, [&od](transaction& tx, [[maybe_unused]] keypair&){
     bc_services::put_offer_into_attachment(od, tx.attachment);
     bool r = add_attachments_info_to_extra(tx.extra, tx.attachment);
     CHECK_AND_ASSERT_MES(r, false, "add_attachments_info_to_extra failed");
@@ -812,7 +872,7 @@ bool gen_no_attchments_in_coinbase_gentime::generate(std::vector<test_event_entr
 
   // try to add to main chain
   block blk_c = AUTO_VAL_INIT(blk_c);
-  r = generator.construct_block_gentime_with_coinbase_cb(blk_3, miner_acc, [&od](transaction& tx){
+  r = generator.construct_block_gentime_with_coinbase_cb(blk_3, miner_acc, [&od](transaction& tx, [[maybe_unused]] keypair&){
     bc_services::put_offer_into_attachment(od, tx.attachment);
     bool r = add_attachments_info_to_extra(tx.extra, tx.attachment);
     CHECK_AND_ASSERT_MES(r, false, "add_attachments_info_to_extra failed");
@@ -827,7 +887,7 @@ bool gen_no_attchments_in_coinbase_gentime::generate(std::vector<test_event_entr
 
   // .. and to alt chain
   block blk_d = AUTO_VAL_INIT(blk_d);
-  r = generator.construct_block_gentime_with_coinbase_cb(blk_3, miner_acc, [&od](transaction& tx){
+  r = generator.construct_block_gentime_with_coinbase_cb(blk_3, miner_acc, [&od](transaction& tx, [[maybe_unused]] keypair&){
     bc_services::put_offer_into_attachment(od, tx.attachment);
     bool r = add_attachments_info_to_extra(tx.extra, tx.attachment);
     CHECK_AND_ASSERT_MES(r, false, "add_attachments_info_to_extra failed");
@@ -871,7 +931,7 @@ bool gen_checkpoints_and_invalid_tx_to_pool::generate(std::vector<test_event_ent
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");  
   
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   // invalidate tx_0 signature
@@ -927,7 +987,7 @@ bool gen_checkpoints_set_after_switching_to_altchain::generate(std::vector<test_
   //               \ 
   //                \- (2 )-                          <- main chain
 
-  bool r = false;
+  //bool r = false;
   GENERATE_ACCOUNT(miner_acc);
   GENERATE_ACCOUNT(alice_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());

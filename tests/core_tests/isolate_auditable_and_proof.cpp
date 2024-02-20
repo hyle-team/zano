@@ -44,7 +44,7 @@ bool isolate_auditable_and_proof::generate(std::vector<test_event_entry>& events
   generator.construct_genesis_block(blk_0, genesis_acc, test_core_time::get_time());
   events.push_back(blk_0);
   DO_CALLBACK(events, "configure_core");
-  REWIND_BLOCKS_N(events, blk_0r, blk_0, m_mining_accunt, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, m_mining_accunt, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 15);
 
   DO_CALLBACK(events, "c1");
   epee::debug::get_set_enable_assert(true, false);
@@ -111,7 +111,7 @@ bool isolate_auditable_and_proof::c1(currency::core& c, size_t ev_index, const s
 
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
-  tools::wallet_rpc_server miner_wlt_rpc(*auditable_test_instance);
+  tools::wallet_rpc_server miner_wlt_rpc(auditable_test_instance);
   tools::wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::request req = AUTO_VAL_INIT(req);
   tools::wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::response res = AUTO_VAL_INIT(res);
   req.count = 100;
