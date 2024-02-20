@@ -1166,6 +1166,11 @@ namespace crypto
       return scalar_t(crypto::cn_fast_hash(str.c_str(), str.size())); // will reduce mod L
     }
 
+    static hash h(const std::string& str)
+    {
+      return crypto::cn_fast_hash(str.c_str(), str.size());
+    }
+
     struct hs_t
     {
       hs_t(size_t size_to_reserve = 0)

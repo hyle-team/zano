@@ -3828,14 +3828,7 @@ bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx)
   if (ei.m_asset_operation.operation_type != ASSET_DESCRIPTOR_OPERATION_UNDEFINED)
   {
     crypto::public_key asset_id = currency::null_pkey;
-    if (ei.m_asset_operation.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
-    {
-      calculate_asset_id(ei.m_asset_operation.descriptor.owner, nullptr, &asset_id);
-    }
-    else
-    {
-      CHECK_AND_NO_ASSERT_MES(false, false, "asset operation not implemented");
-    }
+    CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ei.m_asset_operation, nullptr, &asset_id), false, "get_or_calculate_asset_id failed");
     r = pop_asset_info(asset_id);
     CHECK_AND_ASSERT_MES(r, false, "failed to pop_alias_info");
   }
@@ -4086,12 +4079,9 @@ bool blockchain_storage::pop_asset_info(const crypto::public_key& asset_id)
 //------------------------------------------------------------------
 bool blockchain_storage::validate_ado_ownership(asset_op_verification_context& avc)
 {
-//  asset_id = AUTO_VAL_INIT(asset_id);
-//  CHECK_AND_ASSERT_MES(validate_asset_operation_balance_proof(tx, tx_id, ado, asset_id), false, "asset operation validation failed!");
   asset_operation_ownership_proof aoop = AUTO_VAL_INIT(aoop);
   bool r = get_type_in_variant_container(avc.tx.proofs, aoop);
-  CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed - missing signature");
-
+  CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed - missing signature (asset_operation_ownership_proof)");
 
   CHECK_AND_ASSERT_MES(avc.asset_op_history->size() != 0, false, "asset with id " << avc.asset_id << " has invalid history size() == 0");
 
@@ -4107,7 +4097,8 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
 
   if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
   {
-    calculate_asset_id(avc.ado.descriptor.owner, &avc.asset_id_pt, &avc.asset_id);
+    CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(avc.ado, &avc.asset_id_pt, &avc.asset_id), false, "get_or_calculate_asset_id failed");
+
     avc.asset_op_history = m_db_assets.find(avc.asset_id);
     CHECK_AND_ASSERT_MES(!avc.asset_op_history, false, "asset with id " << avc.asset_id << " has already been registered");
 
@@ -4121,10 +4112,8 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
   }
   else
   {
-    CHECK_AND_ASSERT_MES(avc.ado.opt_asset_id, false, "asset_id not provided for asset altering operation");
-    avc.asset_op_history = m_db_assets.find(*avc.ado.opt_asset_id);
-    avc.asset_id = *avc.ado.opt_asset_id; // consider redisign
-    avc.asset_id_pt.from_public_key(avc.asset_id);
+    CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(avc.ado, &avc.asset_id_pt, &avc.asset_id), false, "get_or_calculate_asset_id failed");
+    avc.asset_op_history = m_db_assets.find(avc.asset_id);
 
     CHECK_AND_ASSERT_MES(avc.asset_op_history && avc.asset_op_history->size(), false, "asset with id " << avc.asset_id << " has not been registered");
     // check ownership permission
@@ -4159,7 +4148,7 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
     }
     else
     {
-      LOG_ERROR("Unknown operation type: " << ado.operation_type);
+      LOG_ERROR("Unknown operation type: " << (int)ado.operation_type);
       return false;
     }
 
@@ -4171,7 +4160,7 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
 
     assets_container::t_value_type local_asset_history = *avc.asset_op_history;
     local_asset_history.push_back(ado);
-    m_db_assets.set(*avc.ado.opt_asset_id, local_asset_history);
+    m_db_assets.set(avc.asset_id, local_asset_history);
 
     switch(ado.operation_type)
     {
@@ -4185,7 +4174,7 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
       LOG_PRINT_MAGENTA("[ASSET_BURNT]: " << print_money_brief(avc.amount_to_validate, ado.descriptor.decimal_point) << ", " << avc.asset_id << ": " << ado.descriptor.ticker << ", \"" << ado.descriptor.full_name << "\"", LOG_LEVEL_1);
       break;
     default:
-      LOG_ERROR("Unknown operation type: " << ado.operation_type);
+      LOG_ERROR("Unknown operation type: " << (int)ado.operation_type);
     }
   }
 

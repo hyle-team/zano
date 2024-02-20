@@ -342,7 +342,7 @@ namespace currency
 
   uint64_t get_tx_version(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd); // returns tx version based on the height of the block where the transaction is expected to be
   bool construct_tx(const account_keys& sender_account_keys,  const finalize_tx_param& param, finalized_tx& result);
-  void calculate_asset_id(const crypto::public_key& asset_owner, crypto::point_t* p_result_point, crypto::public_key* p_result_pub_key);
+  bool get_or_calculate_asset_id(const asset_descriptor_operation& ado, crypto::point_t* p_result_point, crypto::public_key* p_result_pub_key);
   const asset_descriptor_base& get_native_coin_asset_descriptor();
 
   bool sign_multisig_input_in_tx(currency::transaction& tx, size_t ms_input_index, const currency::account_keys& keys, const currency::transaction& source_tx, bool *p_is_input_fully_signed = nullptr);
