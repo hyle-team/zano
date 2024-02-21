@@ -276,6 +276,16 @@ namespace tools
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  template<typename t_from, typename t_to>
+  void copy_wallet_transfer_info_old_container(const t_from& from_c, t_to& to_c)
+  {
+    for (const auto& item : from_c)
+    {
+      to_c.push_back(wallet_public::wallet_transfer_info_old());
+      *static_cast<wallet_public::wallet_transfer_info*>(&to_c.back()) = item;
+    }
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_get_recent_txs_and_info(const wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::request& req, wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     //this is legacy api, should be removed after successful transition to HF4 
@@ -286,20 +296,7 @@ namespace tools
     res.pi = rsp2.pi;
     res.total_transfers = rsp2.total_transfers;
     res.last_item_index = rsp2.last_item_index;
-    for (const auto& item : rsp2.transfers)
-    {
-      res.transfers.push_back(wallet_public::wallet_transfer_info_old());
-      *static_cast<wallet_public::wallet_transfer_info*>(&res.transfers.back()) = item;
-      for (const auto& subitem : item.subtransfers)
-      {
-        if (subitem.asset_id == currency::native_coin_asset_id)
-        {
-          res.transfers.back().amount = subitem.amount;
-          res.transfers.back().is_income = subitem.is_income;
-        }
-      }
-    }
-   
+    copy_wallet_transfer_info_old_container(rsp2.transfers, res.transfers);   
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
@@ -413,7 +410,7 @@ namespace tools
 
     std::vector<currency::attachment_v>& attachments = ctp.attachments;
     std::vector<currency::extra_v>& extra = ctp.extra;
-    if (!payment_id.empty() && !currency::set_payment_id_to_tx(attachments, payment_id))
+    if (!payment_id.empty() && !currency::set_payment_id_to_tx(attachments, payment_id, w.get_wallet()->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM)))
     {
       er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
       er.message = std::string("payment id ") + payment_id + " is invalid and can't be set";
@@ -699,8 +696,19 @@ namespace tools
 
     return true;
   }
+
+  bool wallet_rpc_server::on_search_for_transactions(const wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS_LEGACY::request& req, wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS_LEGACY::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::response res_origin;
+    bool r = this->on_search_for_transactions2(req, res_origin, er, cntx);
+    copy_wallet_transfer_info_old_container(res_origin.in, res.in);
+    copy_wallet_transfer_info_old_container(res_origin.out, res.out);
+    copy_wallet_transfer_info_old_container(res_origin.pool, res.pool);
+
+    return r;
+  }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_search_for_transactions(const wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::request& req, wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_search_for_transactions2(const wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::request& req, wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
     bool tx_id_specified = req.tx_id != currency::null_hash;
@@ -753,6 +761,7 @@ namespace tools
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_get_mining_history(const wallet_public::COMMAND_RPC_GET_MINING_HISTORY::request& req, wallet_public::COMMAND_RPC_GET_MINING_HISTORY::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();

@@ -11,65 +11,6 @@
 #include "wallet/wallet_debug_events_definitions.h"
 using namespace currency;
 
-
-
-
-
-
-/*
-
-
-struct debug_context_event_1
-{
-  int& i;
-  std::string& s;
-};
-
-
-
-//#define RAISE_DEBUG_EVENT   dw.handle_type
-
-
-void test_test()
-{
-  epee::misc_utils::events_dispatcher ed;
-
-  //--------------------------------------------------------------------------------
-  //--------------------------------------------------------------------------------
-  //--------------------------------------------------------------------------------
-  //thus code will be called in the tests
-  ed.SUBSCIRBE_DEBUG_EVENT<debug_context_event_1>([&](debug_context_event_1& d) 
-  {
-    //here some operations
-    LOG_PRINT_L0("lala: " << d.i << d.s);    
-    //
-    d.i = 10;
-    d.s = "33333";
-
-  });
-
-
-  //--------------------------------------------------------------------------------
-  //--------------------------------------------------------------------------------
-  //--------------------------------------------------------------------------------
-  //this code will be in the wallet and helper functions
-
-  int i = 22;
-  std::string sss = "11111";
- 
-  ed.RAISE_DEBUG_EVENT(debug_context_event_1{i, sss });
-
-
-  LOG_PRINT_L0("lala: " << i << sss);
-}
-*/
-
-
-
-
-
-
-
 //------------------------------------------------------------------------------
 
 #define  AMOUNT_TO_TRANSFER_MULTIASSETS_BASIC (TESTS_DEFAULT_FEE)
@@ -97,6 +38,7 @@ bool multiassets_basic_test::generate(std::vector<test_event_entry>& events) con
   DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
   //TODO: Need to make sure REWIND_BLOCKS_N and other coretests codebase are capable of following hardfork4 rules
   //in this test hardfork4 moment moved to runtime section
+  //REWIND_BLOCKS_N_WITH_TIME(events, blk_2_inital, blk_0, alice_acc, 2);
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
 
   DO_CALLBACK(events, "c1");
@@ -115,7 +57,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   alice_wlt->get_account().set_createtime(0);
 
   asset_descriptor_base adb = AUTO_VAL_INIT(adb);
-  adb.total_max_supply = 1000000000000000000; //1M coins
+  adb.total_max_supply = 10000000000000000000ULL; //1M coins
   adb.full_name = "Test coins";
   adb.ticker = "TCT";
   adb.decimal_point = 12;
@@ -141,31 +83,13 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
-
   miner_wlt->refresh();
   alice_wlt->refresh();
-  uint64_t mined = 0;
-  std::unordered_map<crypto::public_key,  tools::wallet_public::asset_balance_entry_base> balances;
-  miner_wlt->balance(balances, mined);
+  CHECK_AND_ASSERT_MES(miner_wlt->balance(asset_id) == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC, false, "Failed to find needed asset in result balances");
+  CHECK_AND_ASSERT_MES(miner_wlt->balance() == uint64_t(17517225990000000000ULL), false, "Failed to find needed asset in result balances");
 
-  auto it_asset = balances.find(asset_id);
-  auto it_native = balances.find(currency::native_coin_asset_id);
-
-
-  CHECK_AND_ASSERT_MES(it_asset != balances.end() && it_native != balances.end(), false, "Failed to find needed asset in result balances");
-  CHECK_AND_ASSERT_MES(it_asset->second.total == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC, false, "Failed to find needed asset in result balances");
-  CHECK_AND_ASSERT_MES(it_native->second.total == uint64_t(17517225990000000000), false, "Failed to find needed asset in result balances");
-
-
-  balances.clear();
-  alice_wlt->balance(balances, mined);
-
-  it_asset = balances.find(asset_id);
-  it_native = balances.find(currency::native_coin_asset_id);
-
-  CHECK_AND_ASSERT_MES(it_asset != balances.end(), false, "Failed to find needed asset in result balances");
-  CHECK_AND_ASSERT_MES(it_native == balances.end(), false, "Failed to find needed asset in result balances");
-  CHECK_AND_ASSERT_MES(it_asset->second.total == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC, false, "Failed to find needed asset in result balances");
+  CHECK_AND_ASSERT_MES(alice_wlt->balance() == 0, false, "Failed to find needed asset in result balances");
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(asset_id) == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC, false, "Failed to find needed asset in result balances");
   
   miner_wlt->transfer(AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC/2, alice_wlt->get_account().get_public_address(), asset_id);
   //pass over hardfork
@@ -173,10 +97,8 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
   alice_wlt->refresh();
-  uint64_t last_alice_balances = alice_wlt->balance(asset_id, mined);
+  uint64_t last_alice_balances = alice_wlt->balance(asset_id);
   CHECK_AND_ASSERT_MES(last_alice_balances == AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC + AMOUNT_ASSETS_TO_TRANSFER_MULTIASSETS_BASIC/2, false, "Failed to find needed asset in result balances");
-
-  
 
   {
     try {
@@ -193,7 +115,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   }
 
   miner_wlt->refresh();
-  uint64_t last_miner_balance = miner_wlt->balance(asset_id, mined);
+  uint64_t last_miner_balance = miner_wlt->balance(asset_id);
 
 
   asset_descriptor_base asset_info = AUTO_VAL_INIT(asset_info);
@@ -211,7 +133,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   //test update function
   asset_info.meta_info = "{\"some\": \"info\"}";
   miner_wlt->update_asset(asset_id, asset_info, tx);
-  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 2);
+  r = mine_next_pow_blocks_in_playtime(alice_wlt->get_account().get_public_address(), c, 2);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
   asset_descriptor_base asset_info2 = AUTO_VAL_INIT(asset_info2);
@@ -228,8 +150,8 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
   miner_wlt->refresh();
   alice_wlt->refresh();
-  CHECK_AND_ASSERT_MES(miner_wlt->balance(asset_id, mined) == last_miner_balance + destinations[0].amount, false, "Miner balance wrong");
-  CHECK_AND_ASSERT_MES(alice_wlt->balance(asset_id, mined) == last_alice_balances + destinations[1].amount, false, "Alice balance wrong");
+  CHECK_AND_ASSERT_MES(miner_wlt->balance(asset_id) == last_miner_balance + destinations[0].amount, false, "Miner balance wrong");
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(asset_id) == last_alice_balances + destinations[1].amount, false, "Alice balance wrong");
 
   asset_descriptor_base asset_info3 = AUTO_VAL_INIT(asset_info3);
   r = c.get_blockchain_storage().get_asset_info(asset_id, asset_info3);
@@ -242,7 +164,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
 
   miner_wlt->refresh();
-  CHECK_AND_ASSERT_MES(miner_wlt->balance(asset_id, mined) == destinations[0].amount, false, "Miner balance wrong");
+  CHECK_AND_ASSERT_MES(miner_wlt->balance(asset_id) == destinations[0].amount, false, "Miner balance wrong");
 
   asset_descriptor_base asset_info4 = AUTO_VAL_INIT(asset_info4);
   r = c.get_blockchain_storage().get_asset_info(asset_id, asset_info4);
@@ -252,10 +174,10 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
   //------------------- tests that trying to break stuff  -------------------
   //tests that trying to break stuff
-  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation>([&](const wde_construct_tx_handle_asset_descriptor_operation& o)
+  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_after_asset_ownership_proof_generated>([&](const wde_construct_tx_after_asset_ownership_proof_generated& o)
   {
-    crypto::signature s = currency::null_sig;
-    o.pado->opt_proof = s;
+    //crypto::signature s = currency::null_sig;
+    o.pownership_proof->gss = crypto::generic_schnorr_sig_s{};
   });
 
 
@@ -270,7 +192,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   c.get_tx_pool().purge_transactions();
   miner_wlt->refresh();
 
-  miner_wlt->get_debug_events_dispatcher().UNSUBSCRIBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation>();
+  miner_wlt->get_debug_events_dispatcher().UNSUBSCRIBE_ALL();
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
 
@@ -317,17 +239,17 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
 
   // check update_asset() with modified 'owner'
-  r = c.get_blockchain_storage().get_asset_info(asset_id, asset_info);
-  CHECK_AND_ASSERT_MES(r, false, "Failed to get_asset_info");
+  //r = c.get_blockchain_storage().get_asset_info(asset_id, asset_info);
+  //CHECK_AND_ASSERT_MES(r, false, "Failed to get_asset_info");
 
-  asset_info.owner = currency::keypair::generate().pub;
-  miner_wlt->update_asset(asset_id, asset_info, tx);
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
-  r = mine_next_pow_block_in_playtime(miner_wlt->get_account().get_public_address(), c);
-  CHECK_AND_ASSERT_MES(!r, false, "block with a bad tx was unexpectedly mined");
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not confirmed
-  c.get_tx_pool().purge_transactions();
-  miner_wlt->refresh();
+  //asset_info.owner = currency::keypair::generate().pub;
+  //miner_wlt->update_asset(asset_id, asset_info, tx);
+  //CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  //r = mine_next_pow_block_in_playtime(miner_wlt->get_account().get_public_address(), c);
+  //CHECK_AND_ASSERT_MES(!r, false, "block with a bad tx was unexpectedly mined");
+  //CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not confirmed
+  //c.get_tx_pool().purge_transactions();
+  //miner_wlt->refresh();
 
 
   // check emmit_asset() with modified 'current_supply'
@@ -346,12 +268,13 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
   //------------------- tests that trying to break stuff  -------------------
   //test burn that burns more than tx has
-  miner_wlt->get_debug_events_dispatcher().UNSUBSCRIBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_seal>();
+  miner_wlt->get_debug_events_dispatcher().UNSUBSCRIBE_ALL();
 
-  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_seal>([&](const wde_construct_tx_handle_asset_descriptor_operation_before_seal& o)
+  miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_burn>([&](const wde_construct_tx_handle_asset_descriptor_operation_before_burn& o)
   {
     o.pado->descriptor.current_supply -= 1000000;
   });
+
 
   miner_wlt->burn_asset(asset_id, 10000000000000, tx);
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
@@ -360,8 +283,39 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not confirmed
   c.get_tx_pool().purge_transactions();
   miner_wlt->refresh();
+  miner_wlt->get_debug_events_dispatcher().UNSUBSCRIBE_ALL();
 
   //
+  miner_wlt->transfer_asset_ownership(asset_id, alice_wlt->get_account().get_public_address().spend_public_key, tx);
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_block_in_playtime(miner_wlt->get_account().get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "block with a bad tx was unexpectedly mined");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not confirmed
+
+  miner_wlt->refresh();
+  alice_wlt->refresh();
+
+  auto miner_own_assets = miner_wlt->get_own_assets();
+  auto alice_own_assets = alice_wlt->get_own_assets();
+  CHECK_AND_ASSERT_MES(miner_own_assets.size() == 0, false, "Miner wlt still think he own asset");
+  CHECK_AND_ASSERT_MES(alice_own_assets.size() == 1, false, "Alice still don't know she own asset");
+
+  //uint64_t balance_alice_native = alice_wlt->balance();
+  //uint64_t balance_miner_native = miner_wlt->balance();
+  uint64_t balance_alice_asset = alice_wlt->balance(asset_id);
+  uint64_t balance_miner_asset = miner_wlt->balance(asset_id);
+
+  alice_wlt->emmit_asset(asset_id, destinations, tx);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
+  miner_wlt->refresh();
+  alice_wlt->refresh();
+
+  CHECK_AND_ASSERT_MES(miner_wlt->balance(asset_id) == balance_miner_asset + destinations[0].amount, false, "Miner balance wrong");
+  CHECK_AND_ASSERT_MES(alice_wlt->balance(asset_id) == balance_alice_asset + destinations[1].amount, false, "Alice balance wrong");
+
+  //TODO: attempt to emmmit from old key, attempt to emmit from more then max supply
 
   return true;
 }
@@ -432,7 +386,7 @@ bool assets_and_explicit_native_coins_in_outs::generate(std::vector<test_event_e
   MAKE_TX(events, tx_1, alice_acc, alice_acc, m_alice_initial_balance - TESTS_DEFAULT_FEE, blk_1r);
   CHECK_AND_ASSERT_MES(tx_1.vout.size() == 2, false, "unexpected tx_1.vout.size : " << tx_1.vout.size());
 
-  // make sure that all tx_1 outputs have explicit hative coin asset id
+  // make sure that all tx_1 outputs have explicit native coin asset id
   for(auto& out : tx_1.vout)
   {
     CHECK_AND_ASSERT_MES(out.type() == typeid(tx_out_zarcanum), false, "invalid out type");

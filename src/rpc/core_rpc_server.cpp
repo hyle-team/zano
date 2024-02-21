@@ -118,10 +118,9 @@ namespace currency
     res.minimum_fee = m_core.get_blockchain_storage().get_core_runtime_config().tx_pool_min_fee;
 
     auto & hf = m_core.get_blockchain_storage().get_core_runtime_config().hard_forks.m_height_the_hardfork_n_active_after;
-    res.is_hardfok_active.resize(hf.size());
     for (size_t i = 0; i != hf.size(); i++)
     {
-      res.is_hardfok_active[i] = m_core.get_blockchain_storage().is_hardfork_active(i);
+      res.is_hardfok_active.push_back(m_core.get_blockchain_storage().is_hardfork_active(i));
     }
 
     //conditional values 
@@ -680,7 +679,7 @@ namespace currency
   {
     std::list<currency::extra_alias_entry> al_list;
     m_core.get_tx_pool().get_aliases_from_tx_pool(al_list);
-    for (const auto a : al_list)
+    for (const auto& a : al_list)
     {
       res.aliases_que.push_back(alias_info_to_rpc_alias_info(a));
     }

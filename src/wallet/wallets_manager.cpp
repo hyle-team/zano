@@ -188,6 +188,7 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   command_line::add_arg(desc_cmd_sett, arg_qt_dev_tools);
   command_line::add_arg(desc_cmd_sett, command_line::arg_no_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_force_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_process_predownload_from_path);
   command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
   command_line::add_arg(desc_cmd_only, command_line::arg_deeplink);
@@ -1533,17 +1534,16 @@ std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_p
     dsts.back().asset_id = d.asset_id;
   }
 
+  GET_WALLET_BY_ID(wallet_id, w);
+
   if (payment_id.size())
   {
     if (!currency::is_payment_id_size_ok(payment_id))
       return API_RETURN_CODE_BAD_ARG_WRONG_PAYMENT_ID; // payment id is too big
 
-    if (!currency::set_payment_id_to_tx(attachments, payment_id))
+    if (!currency::set_payment_id_to_tx(attachments, payment_id, w->get()->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM)))
       return API_RETURN_CODE_INTERNAL_ERROR;
   }
-
-  GET_WALLET_BY_ID(wallet_id, w);
-
 
 
   //set transaction unlock time if it was specified by user 

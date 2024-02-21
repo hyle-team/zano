@@ -134,15 +134,18 @@ namespace currency
 	  END_KV_SERIALIZE_MAP()
   };
 
-   struct htlc_info
-   {
-     bool hltc_our_out_is_before_expiration;
-   };
+  struct htlc_info
+  {
+    bool hltc_our_out_is_before_expiration;
+  };
 
+  struct thirdparty_sign_handler
+  {
+    virtual bool sign(const crypto::hash& h, const crypto::public_key& owner_public_key, crypto::generic_schnorr_sig& sig);
+  };
 
   struct finalize_tx_param
   {
-
     uint64_t unlock_time;
     std::vector<currency::extra_v> extra;
     std::vector<currency::attachment_v> attachments;
@@ -158,10 +161,15 @@ namespace currency
     crypto::public_key spend_pub_key;  // only for validations
     uint64_t tx_version;
     uint64_t mode_separate_fee = 0;
-    crypto::secret_key asset_control_key = currency::null_skey;
+    
     epee::misc_utils::events_dispatcher* pevents_dispatcher;
-
     tx_generation_context gen_context{}; // solely for consolidated txs
+    
+    //crypto::secret_key asset_control_key = currency::null_skey;
+    crypto::public_key ado_current_asset_owner = null_pkey;
+    thirdparty_sign_handler* pthirdparty_sign_handler = nullptr;
+    mutable bool need_to_generate_ado_proof = false;
+
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(unlock_time)
@@ -179,9 +187,12 @@ namespace currency
       FIELD(spend_pub_key)
       FIELD(tx_version)
       FIELD(mode_separate_fee)
-      FIELD(asset_control_key)      
       if (flags & TX_FLAG_SIGNATURE_MODE_SEPARATE)
+      {
         FIELD(gen_context);
+      }
+      FIELD(ado_current_asset_owner)
+      FIELD(need_to_generate_ado_proof)
     END_SERIALIZE()
   };
 
@@ -264,7 +275,7 @@ namespace currency
     const std::vector<tx_out_v>& vouts, zc_outs_range_proof& result);
   bool check_tx_bare_balance(const transaction& tx, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
   bool check_tx_balance(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
-  bool validate_asset_operation_amount_proof(asset_op_verification_context& context);
+  bool validate_asset_operation_amount_commitment(asset_op_verification_context& context);
   const char* get_asset_operation_type_string(size_t asset_operation_type, bool short_name = false);
   //---------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 
@@ -331,7 +342,7 @@ namespace currency
 
   uint64_t get_tx_version(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd); // returns tx version based on the height of the block where the transaction is expected to be
   bool construct_tx(const account_keys& sender_account_keys,  const finalize_tx_param& param, finalized_tx& result);
-  void calculate_asset_id(const crypto::public_key& asset_owner, crypto::point_t* p_result_point, crypto::public_key* p_result_pub_key);
+  bool get_or_calculate_asset_id(const asset_descriptor_operation& ado, crypto::point_t* p_result_point, crypto::public_key* p_result_pub_key);
   const asset_descriptor_base& get_native_coin_asset_descriptor();
 
   bool sign_multisig_input_in_tx(currency::transaction& tx, size_t ms_input_index, const currency::account_keys& keys, const currency::transaction& source_tx, bool *p_is_input_fully_signed = nullptr);
@@ -420,7 +431,7 @@ namespace currency
 
   bool addendum_to_hexstr(const std::vector<crypto::hash>& add, std::string& hex_buff);
   bool hexstr_to_addendum(const std::string& hex_buff, std::vector<crypto::hash>& add);
-  bool set_payment_id_to_tx(std::vector<attachment_v>& att, const std::string& payment_id);
+  bool set_payment_id_to_tx(std::vector<attachment_v>& att, const std::string& payment_id, bool is_in_hardfork4 = false);
   bool add_padding_to_tx(transaction& tx, size_t count);
   bool is_service_tx(const transaction& tx);
   bool does_tx_have_only_mixin_inputs(const transaction& tx);
@@ -661,7 +672,7 @@ namespace currency
   }
   //---------------------------------------------------------------
   template<typename t_container>
-  bool get_payment_id_from_tx(const t_container& att, std::string& payment_id)
+  bool get_payment_id_from_decrypted_container(const t_container& att, std::string& payment_id)
   {
     tx_service_attachment sa = AUTO_VAL_INIT(sa);
     if (bc_services::get_first_service_attachment_by_id(att, BC_PAYMENT_ID_SERVICE_ID, "", sa))

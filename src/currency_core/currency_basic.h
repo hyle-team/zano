@@ -438,18 +438,21 @@ namespace currency
     END_BOOST_SERIALIZATION()
   };
 
-  // 1) for txs without ZC inputs: proves that balance point = lin(G) (cancels out G component of outputs' amount commitments, asset tags assumed to be H (native coin) and non-blinded)
-  // 2) for txs with    ZC inputs: proves that balance point = lin(X) (cancels out X component of blinded asset tags within amount commitments for both outputs and inputs (pseudo outs))
+  // First part of a double Schnorr proof:
+  //   1) for txs without ZC inputs: proves that balance point = lin(G) (cancels out G component of outputs' amount commitments, asset tags assumed to be H (native coin) and non-blinded)
+  //   2) for txs with    ZC inputs: proves that balance point = lin(X) (cancels out X component of blinded asset tags within amount commitments for both outputs and inputs (pseudo outs))
+  // Second part:
+  //   proof of knowing transaction secret key (with respect to G)
   struct zc_balance_proof
   {
-    crypto::generic_schnorr_sig_s ss;
+    crypto::generic_double_schnorr_sig_s dss;
 
     BEGIN_SERIALIZE_OBJECT()
-      FIELD(ss)
+      FIELD(dss)
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(ss)
+      BOOST_SERIALIZE(dss)
     END_BOOST_SERIALIZATION()
   };
 
@@ -772,7 +775,6 @@ namespace currency
     uint8_t                         operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
     asset_descriptor_base           descriptor;
     crypto::public_key              amount_commitment;     // premultiplied by 1/8
-    boost::optional<crypto::signature> opt_proof;          // operation proof - for update/emit
     boost::optional<crypto::public_key> opt_asset_id;      // target asset_id - for update/emit
     uint8_t verion = ASSET_DESCRIPTOR_OPERATION_STRUCTURE_VER;
 
@@ -781,7 +783,6 @@ namespace currency
       FIELD(descriptor)
       FIELD(amount_commitment)
       END_VERSION_UNDER(1)
-      FIELD(opt_proof)
       FIELD(opt_asset_id)
     END_SERIALIZE()
 
@@ -790,7 +791,6 @@ namespace currency
       BOOST_SERIALIZE(descriptor)
       BOOST_SERIALIZE(amount_commitment)
       BOOST_END_VERSION_UNDER(1)
-      BOOST_SERIALIZE(opt_proof)
       BOOST_SERIALIZE(opt_asset_id)
     END_BOOST_SERIALIZATION()
   };
@@ -816,6 +816,21 @@ namespace currency
   };
 
 
+  struct asset_operation_ownership_proof
+  {
+    crypto::generic_schnorr_sig_s gss;
+    uint8_t version = 0;
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(gss)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(gss)
+      BOOST_END_VERSION_UNDER(1)
+      BOOST_SERIALIZE(version)
+    END_BOOST_SERIALIZATION()
+  };
 
 
   struct extra_padding
@@ -921,7 +936,7 @@ namespace currency
 
   typedef boost::variant<NLSAG_sig, void_sig, ZC_sig, zarcanum_sig> signature_v;
 
-  typedef boost::variant<zc_asset_surjection_proof, zc_outs_range_proof, zc_balance_proof, asset_operation_proof> proof_v;
+  typedef boost::variant<zc_asset_surjection_proof, zc_outs_range_proof, zc_balance_proof, asset_operation_proof, asset_operation_ownership_proof> proof_v;
 
 
   //include backward compatibility defintions
@@ -1108,6 +1123,7 @@ BLOB_SERIALIZER(currency::txout_to_key);
 
 BOOST_CLASS_VERSION(currency::asset_descriptor_operation, 1);
 BOOST_CLASS_VERSION(currency::asset_operation_proof, 1);
+BOOST_CLASS_VERSION(currency::asset_operation_ownership_proof, 1);
 
 
 // txin_v variant currency
@@ -1178,6 +1194,7 @@ SET_VARIANT_TAGS(currency::zc_balance_proof, 48, "zc_balance_proof");
 
 SET_VARIANT_TAGS(currency::asset_descriptor_operation, 49, "asset_descriptor_base");
 SET_VARIANT_TAGS(currency::asset_operation_proof, 50, "asset_operation_proof");
+SET_VARIANT_TAGS(currency::asset_operation_ownership_proof, 51, "asset_operation_ownership_proof");
 
 
 

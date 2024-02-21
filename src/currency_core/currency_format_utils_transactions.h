@@ -243,6 +243,12 @@ namespace currency
         amount_blinding_masks.size()          == outs_count;
     }
 
+    void set_tx_key(const keypair& kp)
+    {
+      tx_key = kp;
+      tx_pub_key_p = crypto::point_t(tx_key.pub);
+    }
+
     // per output data
     std::vector<crypto::point_t> asset_ids;
     std::vector<crypto::point_t> blinded_asset_ids;                                   // generate_zc_outs_range_proof
@@ -274,6 +280,10 @@ namespace currency
     crypto::scalar_t    ao_amount_blinding_mask             {};                       //                                                   generate_tx_balance_proof  generate_ZC_sig
     bool                ao_commitment_in_outputs            = false;
 
+    // per tx data
+    keypair             tx_key                              {};                       //
+    crypto::point_t     tx_pub_key_p                        = crypto::c_point_0;      // == tx_key.pub
+
     // consider redesign, some data may possibly be excluded from kv serialization -- sowle
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE_CONTAINER_POD_AS_BLOB(asset_ids)
@@ -297,6 +307,8 @@ namespace currency
       KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_commitment)
       KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_blinding_mask)
       KV_SERIALIZE_POD_AS_HEX_STRING(ao_commitment_in_outputs)
+      KV_SERIALIZE_POD_AS_HEX_STRING(tx_key)
+      KV_SERIALIZE_POD_AS_HEX_STRING(tx_pub_key_p)
     END_KV_SERIALIZE_MAP()
   
     // solely for consolidated txs, asset opration fields are not serialized
@@ -325,10 +337,14 @@ namespace currency
       //ao_amount_commitment
       //ao_amount_blinding_mask
       //ao_commitment_in_outputs
+      
+      FIELD(tx_key.pub) // TODO: change to sane serialization FIELD(tx_key)
+      FIELD(tx_key.sec)
+      FIELD(tx_pub_key_p)
     END_SERIALIZE()
   }; // struct tx_generation_context
 
-  bool validate_tx_output_details_againt_tx_generation_context(const transaction& tx, const tx_generation_context& gen_context, const crypto::secret_key& onet_time_key);
+  bool validate_tx_output_details_againt_tx_generation_context(const transaction& tx, const tx_generation_context& gen_context);
   std::string transform_tx_to_str(const transaction& tx);
   transaction transform_str_to_tx(const std::string& tx_str);
 

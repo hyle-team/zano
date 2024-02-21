@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2019 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -10,7 +10,7 @@
 #ifndef TESTNET
 #define CURRENCY_FORMATION_VERSION                      84
 #else
-#define CURRENCY_FORMATION_VERSION                      94
+#define CURRENCY_FORMATION_VERSION                      97
 #endif
 
 #define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121) //bender's nightmare
@@ -227,7 +227,7 @@
 #define CURRENCY_POOLDATA_FOLDERNAME_PREFIX             "poolstate_"
 #define CURRENCY_POOLDATA_FOLDERNAME_SUFFIX             "_v1"
 #define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_PREFIX       "blockchain_" 
-#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX       "_v1"
+#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX       "_v2"
 
 #define P2P_NET_DATA_FILENAME                           "p2pstate.bin"
 #define MINER_CONFIG_FILENAME                           "miner_conf.json"
@@ -250,8 +250,8 @@
 #define BC_OFFERS_CURRENCY_MARKET_FILENAME              "market.bin"
 
 #ifndef TESTNET
-#define WALLET_FILE_SERIALIZATION_VERSION               161
-#define WALLET_FILE_LAST_SUPPORTED_VERSION              161
+#define WALLET_FILE_SERIALIZATION_VERSION               162
+#define WALLET_FILE_LAST_SUPPORTED_VERSION              162
 #else 
 #define WALLET_FILE_LAST_SUPPORTED_VERSION              (CURRENCY_FORMATION_VERSION+76)
 #define WALLET_FILE_SERIALIZATION_VERSION               (CURRENCY_FORMATION_VERSION+76)
@@ -264,10 +264,10 @@
 #define BLOCK_MINOR_VERSION_GENESIS                     0
 #define BLOCK_MAJOR_VERSION_INITIAL                     0
 #ifndef TESTNET
-#define ZANO_HARDFORK_01_AFTER_HEIGHT                   194624
-#define ZANO_HARDFORK_02_AFTER_HEIGHT                   999999
-#define ZANO_HARDFORK_03_AFTER_HEIGHT                   1082577
-#define ZANO_HARDFORK_04_AFTER_HEIGHT                   999999999
+#define ZANO_HARDFORK_01_AFTER_HEIGHT                   194624    // 2019-09-21 20:25:16
+#define ZANO_HARDFORK_02_AFTER_HEIGHT                   999999    // 2021-04-05 09:11:45
+#define ZANO_HARDFORK_03_AFTER_HEIGHT                   1082577   // 2021-06-01 23:28:10
+#define ZANO_HARDFORK_04_AFTER_HEIGHT                   2555000   // 2024-03-21 10:16:46 (expected)
 #else
 /////// Zarcanum Testnet //////////////////////////////
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0

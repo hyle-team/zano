@@ -400,30 +400,18 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
 {
   do
   {
+    crypto::public_key asset_id{};
+    if (ado.operation_type != ASSET_DESCRIPTOR_OPERATION_UNDEFINED)
+      WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(get_or_calculate_asset_id(ado, nullptr, &asset_id), "get_or_calculate_asset_id failed");
+
     if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
     {
-      crypto::public_key self_check = AUTO_VAL_INIT(self_check);
-      crypto::secret_key asset_control_key = AUTO_VAL_INIT(asset_control_key);
-      bool r = derive_key_pair_from_key_pair(ptc.tx_pub_key, m_account.get_keys().spend_secret_key, asset_control_key, self_check, CRYPTO_HDS_ASSET_CONTROL_KEY);
-      if (!r)
-      {
-        //not critical error, continue to work 
-        LOG_ERROR("Failed to derive_key_pair_from_key_pair for asset_descriptor_operation in tx " << ptc.tx_hash());
+      if (ado.descriptor.owner != m_account.get_public_address().spend_public_key)
         break;
-      }
 
-      if (self_check != ado.descriptor.owner)
-      {
-        //still not critical error
-        LOG_ERROR("Public key from asset_descriptor_operation(" << ado.descriptor.owner << ") not much with derived public key(" << self_check << "), for tx" << ptc.tx_hash());
-        break;
-      }
-      crypto::public_key asset_id{};
-      calculate_asset_id(ado.descriptor.owner, nullptr, &asset_id);
       WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(m_own_asset_descriptors.count(asset_id) == 0, "asset with asset_id " << asset_id << " has already been registered in the wallet as own asset");
       wallet_own_asset_context& asset_context = m_own_asset_descriptors[asset_id];
       asset_context.asset_descriptor = ado.descriptor;
-      asset_context.control_key = asset_control_key;
 
       std::stringstream ss;
       ss << "New Asset Registered:"
@@ -440,22 +428,78 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
       if (m_wcallback)
         m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
     }
-    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
     {
-      WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(ado.opt_asset_id, get_asset_operation_type_string(ado.operation_type) << " failed with empty opt_asset_id");
-      auto  it = m_own_asset_descriptors.find(*ado.opt_asset_id);
-      WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(it != m_own_asset_descriptors.end(), "asset with asset_id " << *ado.opt_asset_id << " not found during " << get_asset_operation_type_string(ado.operation_type));
-      if (it->second.asset_descriptor.owner != ado.descriptor.owner)
+      auto it = m_own_asset_descriptors.find(asset_id);
+      if (it == m_own_asset_descriptors.end())
+        break;
+      //asset had been updated
+      add_rollback_event(ptc.height, asset_update_event{ it->first, it->second });
+      it->second.asset_descriptor = ado.descriptor;      
+    }
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE )
+    {
+      auto  it = m_own_asset_descriptors.find(asset_id);
+      if (it == m_own_asset_descriptors.end())
       {
-        //ownership of the asset had been transfered
-        add_rollback_event(ptc.height, asset_unown_event{ it->first, it->second });
-        m_own_asset_descriptors.erase(it);
+        if (ado.descriptor.owner == m_account.get_public_address().spend_public_key)
+        {
+          // ownership of the asset acquired
+
+          wallet_own_asset_context& asset_context = m_own_asset_descriptors[asset_id];
+          asset_context.asset_descriptor = ado.descriptor;
+
+          std::stringstream ss;
+          ss << "Asset ownership acquired:"
+            << ENDL << "asset id:         " << asset_id
+            << ENDL << "Name:             " << ado.descriptor.full_name
+            << ENDL << "Ticker:           " << ado.descriptor.ticker
+            << ENDL << "Total Max Supply: " << print_asset_money(ado.descriptor.total_max_supply, ado.descriptor.decimal_point)
+            << ENDL << "Current Supply:   " << print_asset_money(ado.descriptor.current_supply, ado.descriptor.decimal_point)
+            << ENDL << "Decimal Point:    " << ado.descriptor.decimal_point;
+
+
+          add_rollback_event(ptc.height, asset_register_event{ asset_id });
+          WLT_LOG_MAGENTA(ss.str(), LOG_LEVEL_0);
+          if (m_wcallback)
+            m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
+        }
+        else
+        {
+          // update event of the asset that we not control, skip
+          break;
+        }
       }
       else
       {
-        //asset had been updated
-        add_rollback_event(ptc.height, asset_update_event{ it->first, it->second });
-        it->second.asset_descriptor = ado.descriptor;
+        //update event for asset that we control, check if ownership is still ours
+        if (ado.descriptor.owner != m_account.get_public_address().spend_public_key && !it->second.thirdparty_custody)
+        {
+          //ownership of the asset had been transfered
+          add_rollback_event(ptc.height, asset_unown_event{ it->first, it->second });
+          m_own_asset_descriptors.erase(it);
+
+          std::stringstream ss;
+          ss << "Asset ownership lost:"
+            << ENDL << "asset id:         " << asset_id
+            << ENDL << "New owner:        " << ado.descriptor.owner
+            << ENDL << "Name:             " << ado.descriptor.full_name
+            << ENDL << "Ticker:           " << ado.descriptor.ticker
+            << ENDL << "Total Max Supply: " << print_asset_money(ado.descriptor.total_max_supply, ado.descriptor.decimal_point)
+            << ENDL << "Current Supply:   " << print_asset_money(ado.descriptor.current_supply, ado.descriptor.decimal_point)
+            << ENDL << "Decimal Point:    " << ado.descriptor.decimal_point;
+
+          add_rollback_event(ptc.height, asset_register_event{ asset_id });
+          WLT_LOG_MAGENTA(ss.str(), LOG_LEVEL_0);
+          if (m_wcallback)
+            m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
+        }
+        else
+        {
+          //just an update of the asset
+          add_rollback_event(ptc.height, asset_update_event{ it->first, it->second });
+          it->second.asset_descriptor = ado.descriptor;
+        }
       }
     }
   } while (false);
@@ -544,7 +588,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
   all values m_payments entry, use this strict policy is required to protect exchanges from being feeded with
   useless outputs
   */
-  uint64_t max_out_unlock_time = 0;
+  ptc.max_out_unlock_time = 0;
 
   std::vector<wallet_out_info> outs;
   //uint64_t sum_of_native_outs = 0;   // TODO:  @#@# correctly calculate tx_money_got_in_outs for post-HF4
@@ -640,21 +684,29 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
             auto it = m_key_images.find(ki);
             if (it != m_key_images.end())
             {
-              // Issue that has been discovered by Luke Parker (twitter: @kayabaNerve)
-              // An attacker can quickly issue transaction that use same outputs ephemeral keys + same tx key, as a result both 
-              // transaction's outputs would have same key image, so the wallet should have smart approach to this situation, ie 
-              // use output that offer biggest output value.(tokens?)
-
+              // We encountered an output with a key image already seen. This implies only one can be spent in the future (assuming the first isn't spent yet).
+              // To address this, we disregard such outputs and log a warning.
+              // 
+              // It was later revealed that auditable wallets could still be vulnerable: an attacker might quickly broadcast a transaction
+              // using the same output's ephemeral keys + the same tx pub key. If the malicious transaction (potentially for a lesser amount)
+              // arrives first, the recipient would be unable to spend the funds from the second, real transaction.
+              // This attack vector was highlighted by Luke Parker (twitter: @kayabaNerve), who suggested selecting the output with the largest amount.
+              // Sadly, this fix only applies to classic RingCT transactions and is incompatible with our use of Confidential Assets.
+              // Consequently, we adopted a solution suggested by @crypto_zoidberg: verifying in zero knowledge that the sender possesses the transaction's
+              // secret key. This verification is integrated with the balance proof (double Schnorr proof).
+              // 
+              // However, we continue to omit outputs with duplicate key images since they could originate from the same source (albeit impractically).
+              // -- sowle
 
               WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second < m_transfers.size(), "m_key_images entry has wrong m_transfers index, it->second: " << it->second << ", m_transfers.size(): " << m_transfers.size());
               const transfer_details& local_td = m_transfers[it->second];
 
-
-
               std::stringstream ss;
-              ss << "tx " << ptc.tx_hash() << " @ block " << height << " has output #" << o << " with key image " << ki << " that has already been seen in output #" <<
-                local_td.m_internal_output_index << " in tx " << get_transaction_hash(local_td.m_ptx_wallet_info->m_tx) << " @ block " << local_td.m_spent_height <<
-                ". This output can't ever be spent and will be skipped.";
+              ss << "tx " << ptc.tx_hash() << " @ block " << height << " has output #" << o << " with amount " << out.amount;
+              if (!out.is_native_coin())
+                ss << "(asset_id: " << out.asset_id << ") ";
+              ss << "and key image " << ki << " that has already been seen in output #" << local_td.m_internal_output_index << " in tx " << get_transaction_hash(local_td.m_ptx_wallet_info->m_tx)
+                << " @ block " << local_td.m_spent_height << ". This output can't ever be spent and will be skipped.";
               WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
               if (m_wcallback)
                 m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
@@ -671,9 +723,12 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
             out_get_mixin_attr(out_v) != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
           {
             std::stringstream ss;
-            ss << "output #" << o << " from tx " << ptc.tx_hash() << " with amount " << print_money_brief(outs[i_in_outs].amount)
+            ss << "output #" << o << " from tx " << ptc.tx_hash();
+            if (!out.is_native_coin())
+              ss << " asset_id: " << out.asset_id;
+            ss << " with amount " << print_money_brief(out.amount)
               << " is targeted to this auditable wallet and has INCORRECT mix_attr = " << (uint64_t)out_get_mixin_attr(out_v) << ". Output is IGNORED.";
-            WLT_LOG_RED(ss.str(), LOG_LEVEL_0);
+            WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
             if (m_wcallback)
               m_wcallback->on_message(i_wallet2_callback::ms_red, ss.str());
             //if (out.is_native_coin())
@@ -777,8 +832,8 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
             m_amount_gindex_to_transfer_id[amount_gindex_pair] = transfer_index;
           }
 
-          if (max_out_unlock_time < get_tx_unlock_time(tx, o))
-            max_out_unlock_time = get_tx_unlock_time(tx, o);
+          if (ptc.max_out_unlock_time < get_tx_unlock_time(tx, o))
+            ptc.max_out_unlock_time = get_tx_unlock_time(tx, o);
 
           if (out_type_to_key || out_type_zc)
           {
@@ -832,40 +887,12 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     }
   }
 
-  std::string payment_id;
-  if (has_in_transfers && get_payment_id_from_tx(tx.attachment, payment_id) && payment_id.size())
-  {
-    payment_details payment;
-    payment.m_tx_hash = ptc.tx_hash();
-    payment.m_amount = 0;
-    payment.m_block_height = height;
-    payment.m_unlock_time = max_out_unlock_time;
-
-    for (const auto& bce : ptc.total_balance_change)
-    {
-      if (bce.second > 0)
-      {
-        if (bce.first == currency::native_coin_asset_id)
-        {
-          payment.m_amount = static_cast<uint64_t>(bce.second);
-        }else
-        {
-          payment.subtransfers.push_back(payment_details_subtransfer{ bce.first, static_cast<uint64_t>(bce.second)});
-        }
-      }
-    }
-    m_payments.emplace(payment_id, payment);
-    WLT_LOG_L2("Payment found, id (hex): " << epee::string_tools::buff_to_hex_nodelimer(payment_id) << ", tx: " << payment.m_tx_hash << ", amount: " << print_money_brief(payment.m_amount) << "subtransfers = " << payment.subtransfers.size());
-  }
-   
-  if (ptc.spent_own_native_inputs)
+  //check if there are asset_registration that belong to this wallet
+  const asset_descriptor_operation* pado = get_type_in_variant_container<const asset_descriptor_operation>(tx.extra);
+  if (pado && (ptc.employed_entries.receive.size() || ptc.employed_entries.spent.size() || pado->descriptor.owner == m_account.get_public_address().spend_public_key))
   {
     //check if there are asset_registration that belong to this wallet
-    asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
-    if (get_type_in_variant_container(tx.extra, ado))
-    {
-      process_ado_in_new_transaction(ado, ptc);
-    }
+    process_ado_in_new_transaction(*pado, ptc);
   }
 
   if (has_in_transfers || has_out_transfers || is_derivation_used_to_encrypt(tx, derivation) || ptc.employed_entries.spent.size())
@@ -917,7 +944,7 @@ void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_i
   {
     LOG_ERROR("wti.payment_id is expected to be empty. Go ahead.");
   }
-  get_payment_id_from_tx(decrypted_att, wti.payment_id);
+  get_payment_id_from_decrypted_container(decrypted_att, wti.payment_id);
 
   for (const auto& item : decrypted_att)
   {
@@ -1261,7 +1288,7 @@ bool wallet2::handle_proposal(wallet_public::wallet_transfer_info& wti, const bc
   ed.is_a = cpd.a_addr.spend_public_key == m_account.get_keys().account_address.spend_public_key;
   change_contract_state(ed, wallet_public::escrow_contract_details_basic::proposal_sent, ms_id, wti);
   ed.private_detailes = cpd;
-  currency::get_payment_id_from_tx(decrypted_items, ed.payment_id);
+  currency::get_payment_id_from_decrypted_container(decrypted_items, ed.payment_id);
   ed.proposal = prop;
   ed.height = wti.height;
   wti.contract.resize(1);
@@ -1530,8 +1557,42 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, const proces
   }
   prepare_wti_decrypted_attachments(wti, decrypted_att);
   process_contract_info(wti, decrypted_att);
+  process_payment_id_for_wti(wti, tx_process_context);
+
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::process_payment_id_for_wti(wallet_public::wallet_transfer_info& wti, const process_transaction_context& ptc)
+{
+  //if(this->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
+  {
+    if (wti.get_native_is_income() && wti.payment_id.size())
+    {
+      payment_details payment;
+      payment.m_tx_hash = wti.tx_hash;
+      payment.m_amount = 0;
+      payment.m_block_height = wti.height;
+      payment.m_unlock_time = ptc.max_out_unlock_time;
+
+      for (const auto& bce : ptc.total_balance_change)
+      {
+        if (bce.second > 0)
+        {
+          if (bce.first == currency::native_coin_asset_id)
+          {
+            payment.m_amount = static_cast<uint64_t>(bce.second);
+          }
+          else
+          {
+            payment.subtransfers.push_back(payment_details_subtransfer{ bce.first, static_cast<uint64_t>(bce.second) });
+          }
+        }
+      }
+      m_payments.emplace(wti.payment_id, payment);
+      WLT_LOG_L2("Payment found, id (hex): " << epee::string_tools::buff_to_hex_nodelimer(wti.payment_id) << ", tx: " << payment.m_tx_hash << ", amount: " << print_money_brief(payment.m_amount) << "subtransfers = " << payment.subtransfers.size());
+    }
+  }
+  return true;
+}
 void wallet2::rise_on_transfer2(const wallet_public::wallet_transfer_info& wti)
 {
   PROFILE_FUNC("wallet2::rise_on_transfer2");
@@ -1582,7 +1643,7 @@ void wallet2::load_wti_from_process_transaction_context(wallet_public::wallet_tr
 {
   wti.remote_addresses = tx_process_context.recipients;
   wti.remote_aliases = tx_process_context.remote_aliases;
-  for (const auto bce : tx_process_context.total_balance_change)
+  for (const auto& bce : tx_process_context.total_balance_change)
   {
     wallet_public::wallet_sub_transfer_info wsti = AUTO_VAL_INIT(wsti);
     wsti.asset_id = bce.first;
@@ -3322,7 +3383,7 @@ uint64_t wallet2::balance(uint64_t& unlocked, uint64_t& awaiting_in, uint64_t& a
   return total;
 }
 //----------------------------------------------------------------------------------------------------
-uint64_t wallet2::balance(crypto::public_key asset_id, uint64_t& unlocked) const
+uint64_t wallet2::balance(const crypto::public_key& asset_id, uint64_t& unlocked) const
 {
   std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base> balances;
   uint64_t dummy;
@@ -3334,6 +3395,12 @@ uint64_t wallet2::balance(crypto::public_key asset_id, uint64_t& unlocked) const
   }
   unlocked = it->second.unlocked;
   return it->second.total;
+}
+//----------------------------------------------------------------------------------------------------
+uint64_t wallet2::balance(const crypto::public_key& asset_id) const
+{
+  uint64_t dummy = 0;
+  return balance(asset_id, dummy);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::balance(std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base>& balances, uint64_t& mined) const
@@ -3804,7 +3871,7 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
     throw;
   }
 
-  add_sent_tx_detailed_info(tx, ft.ftp.prepared_destinations, ft.ftp.selected_transfers);
+  add_sent_tx_detailed_info(tx, ft.ftp.attachments, ft.ftp.prepared_destinations, ft.ftp.selected_transfers);
   m_tx_keys.insert(std::make_pair(tx_hash, ft.one_time_key));
 
   if (m_watch_only)
@@ -4847,7 +4914,7 @@ void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info
   currency::asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
   bool r = get_type_in_variant_container(result_tx.extra, ado);
   CHECK_AND_ASSERT_THROW_MES(r, "Failed find asset info in tx");
-  calculate_asset_id(ado.descriptor.owner, nullptr, &new_asset_id);
+  CHECK_AND_ASSERT_THROW_MES(get_or_calculate_asset_id(ado, nullptr, &new_asset_id), "get_or_calculate_asset_id failed");
 
   m_custom_assets[new_asset_id] = ado.descriptor;
 }
@@ -4871,7 +4938,8 @@ void wallet2::emmit_asset(const crypto::public_key asset_id, std::vector<currenc
   ctp.dsts = destinations;
   ctp.extra.push_back(asset_emmit_info);
   ctp.need_at_least_1_zc = true;
-  ctp.asset_deploy_control_key = own_asset_entry_it->second.control_key;
+  ctp.ado_current_asset_owner = rsp.asset_descriptor.owner;
+  //ctp.asset_deploy_control_key = own_asset_entry_it->second.control_key;
 
   finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
@@ -4890,7 +4958,33 @@ void wallet2::update_asset(const crypto::public_key asset_id, const currency::as
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.extra.push_back(asset_update_info);
   ctp.need_at_least_1_zc = true;
-  ctp.asset_deploy_control_key = own_asset_entry_it->second.control_key;
+  currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
+  bool r = this->daemon_get_asset_info(asset_id, adb);
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed to get asset info from daemon");
+  ctp.ado_current_asset_owner = adb.owner;
+
+  finalized_tx ft = AUTO_VAL_INIT(ft);
+  this->transfer(ctp, ft, true, nullptr);
+  result_tx = ft.tx;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::transfer_asset_ownership(const crypto::public_key asset_id, const crypto::public_key& new_owner, currency::transaction& result_tx)
+{
+  auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
+  CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
+
+  currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
+  bool r = this->daemon_get_asset_info(asset_id, adb);
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed to get asset info from daemon");
+
+  asset_descriptor_operation asset_update_info = AUTO_VAL_INIT(asset_update_info);
+  asset_update_info.descriptor = adb;
+  asset_update_info.operation_type = ASSET_DESCRIPTOR_OPERATION_UPDATE;
+  asset_update_info.opt_asset_id = asset_id;
+  asset_update_info.descriptor.owner = new_owner;
+  construct_tx_param ctp = get_default_construct_tx_param();
+  ctp.ado_current_asset_owner = adb.owner;
+  ctp.extra.push_back(asset_update_info);
 
   finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
@@ -4899,8 +4993,8 @@ void wallet2::update_asset(const crypto::public_key asset_id, const currency::as
 //----------------------------------------------------------------------------------------------------
 void wallet2::burn_asset(const crypto::public_key asset_id, uint64_t amount_to_burn, currency::transaction& result_tx)
 {
-  auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
-  CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
+  //auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
+  //CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
   COMMAND_RPC_GET_ASSET_INFO::request req;
   req.asset_id = asset_id;
   COMMAND_RPC_GET_ASSET_INFO::response rsp;
@@ -4923,7 +5017,7 @@ void wallet2::burn_asset(const crypto::public_key asset_id, uint64_t amount_to_b
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.extra.push_back(asset_burn_info);
   ctp.need_at_least_1_zc = true;
-  ctp.asset_deploy_control_key = own_asset_entry_it->second.control_key;
+  ctp.ado_current_asset_owner = rsp.asset_descriptor.owner;
   ctp.dsts.push_back(dst_to_burn);
 
   finalized_tx ft = AUTO_VAL_INIT(ft);
@@ -5380,7 +5474,7 @@ void wallet2::send_escrow_proposal(const bc_services::contract_private_details& 
   send_transaction_to_network(tx);
   
   mark_transfers_as_spent(ftp.selected_transfers, std::string("escrow proposal sent, tx <") + epee::string_tools::pod_to_hex(get_transaction_hash(tx)) + ">, contract: " + epee::string_tools::pod_to_hex(ms_id));
-  add_sent_tx_detailed_info(tx, ftp.prepared_destinations, ftp.selected_transfers);
+  add_sent_tx_detailed_info(tx, ftp.attachments, ftp.prepared_destinations, ftp.selected_transfers);
 
   print_tx_sent_message(tx, "(from multisig)", fee);
 }
@@ -5548,7 +5642,7 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
   proposal.tx_template = finalize_result.tx;
   wallet_public::ionic_swap_proposal_context ispc = AUTO_VAL_INIT(ispc);
   ispc.gen_context = finalize_result.ftp.gen_context;
-  ispc.one_time_skey = finalize_result.one_time_key;
+  //ispc.one_time_skey = finalize_result.one_time_key;
   std::string proposal_context_blob = t_serializable_object_to_blob(ispc);
   proposal.encrypted_context = crypto::chacha_crypt(static_cast<const std::string&>(proposal_context_blob), finalize_result.derivation); 
   return true;
@@ -5586,7 +5680,7 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
   r = t_unserializable_object_from_blob(ionic_context, decrypted_raw_context);
   THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to unserialize decrypted ionic_context");
 
-  r = validate_tx_output_details_againt_tx_generation_context(tx, ionic_context.gen_context, ionic_context.one_time_skey);
+  r = validate_tx_output_details_againt_tx_generation_context(tx, ionic_context.gen_context);
   THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to validate decrypted ionic_context");
 
   std::unordered_map<crypto::public_key, uint64_t> amounts_provided_by_a;
@@ -5754,7 +5848,7 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
   construct_tx_param construct_param = get_default_construct_tx_param();
   construct_param.fee = additional_fee;
   
-  crypto::secret_key one_time_key = ionic_context.one_time_skey;
+  crypto::secret_key one_time_key = ionic_context.gen_context.tx_key.sec; // TODO: figure out this mess with tx sec key -- sowle
   construct_param.crypt_address = m_account.get_public_address();
   construct_param.flags = TX_FLAG_SIGNATURE_MODE_SEPARATE;
   construct_param.mark_tx_as_complete = true;
@@ -6250,12 +6344,12 @@ void wallet2::send_transaction_to_network(const transaction& tx)
 
 }
 //----------------------------------------------------------------------------------------------------------------
-void wallet2::add_sent_tx_detailed_info(const transaction& tx,
+void wallet2::add_sent_tx_detailed_info(const transaction& tx, const std::vector<currency::attachment_v>& decrypted_att,
   const std::vector<currency::tx_destination_entry>& destinations,
   const std::vector<uint64_t>& selected_transfers)
 {
   payment_id_t payment_id;
-  get_payment_id_from_tx(tx.attachment, payment_id);
+  get_payment_id_from_decrypted_container(decrypted_att, payment_id);
 
   std::vector<std::string> recipients;
   std::unordered_set<account_public_address> used_addresses;
@@ -6916,7 +7010,8 @@ bool wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
 
   const currency::transaction& tx_for_mode_separate = msc.tx_for_mode_separate;
   assets_selection_context needed_money_map = get_needed_money(ctp.fee, ctp.dsts);
-  ftp.asset_control_key = ctp.asset_deploy_control_key;
+  ftp.ado_current_asset_owner = ctp.ado_current_asset_owner;
+  ftp.pthirdparty_sign_handler = ctp.pthirdparty_sign_handler;
   //
   // TODO @#@# need to do refactoring over this part to support hidden amounts and asset_id
   //
@@ -7057,7 +7152,7 @@ void wallet2::finalize_transaction(currency::finalize_tx_param& ftp, currency::f
 
   //TIME_MEASURE_START(add_sent_tx_detailed_info_time);
   if (broadcast_tx)
-    add_sent_tx_detailed_info(result.tx, ftp.prepared_destinations, ftp.selected_transfers);
+    add_sent_tx_detailed_info(result.tx, ftp.attachments, ftp.prepared_destinations, ftp.selected_transfers);
   //TIME_MEASURE_FINISH(add_sent_tx_detailed_info_time);
 
   /* TODO
@@ -7181,7 +7276,7 @@ void wallet2::check_and_throw_if_self_directed_tx_with_payment_id_requested(cons
 
   // it's self-directed tx
   payment_id_t pid;
-  bool has_payment_id = get_payment_id_from_tx(ctp.attachments, pid) && !pid.empty();
+  bool has_payment_id = get_payment_id_from_decrypted_container(ctp.attachments, pid) && !pid.empty();
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!has_payment_id, "sending funds to yourself with payment id is not allowed");
 }
 //----------------------------------------------------------------------------------------------------
@@ -7331,8 +7426,9 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
 
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   ftp.tx_version = this->get_current_tx_version();
+  bool is_hf4 = this->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM);
   if (!payment_id.empty())
-    set_payment_id_to_tx(ftp.attachments, payment_id);
+    set_payment_id_to_tx(ftp.attachments, payment_id, is_hf4);
   // put encrypted payer info into the extra
   ftp.crypt_address = destination_addr;
   

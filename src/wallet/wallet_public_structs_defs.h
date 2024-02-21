@@ -273,17 +273,27 @@ namespace wallet_public
     }
   };
 
-
   struct wallet_transfer_info_old : public wallet_transfer_info
   {
-    uint64_t amount = 0;
-    bool is_income = false;
+    //uint64_t amount = 0;
+    //bool is_income = false;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(is_income)
-      KV_SERIALIZE(amount)
+      KV_SERIALIZE_EPHEMERAL_N(uint64_t, wallet_transfer_info_to_amount, "amount")
+      KV_SERIALIZE_EPHEMERAL_N(bool, wallet_transfer_info_to_is_income, "is_income")
+      //KV_SERIALIZE(amount)
       KV_CHAIN_BASE(wallet_transfer_info)
     END_KV_SERIALIZE_MAP()
+
+    static uint64_t wallet_transfer_info_to_amount(const wallet_transfer_info_old& wtio)
+    {
+      return wtio.get_native_amount();
+    }
+
+    static bool wallet_transfer_info_to_is_income(const wallet_transfer_info_old& wtio)
+    {
+      return wtio.get_native_is_income();
+    }
 
   };
 
@@ -1226,6 +1236,29 @@ namespace wallet_public
     };
   };
 
+  struct COMMAND_RPC_SEARCH_FOR_TRANSACTIONS_LEGACY
+  {
+    typedef COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::request request;
+
+    struct response
+    {
+      std::list<wallet_transfer_info_old> in;
+      std::list<wallet_transfer_info_old> out;
+      //std::list<wallet_transfer_info> pending;
+      //std::list<wallet_transfer_info> failed;
+      std::list<wallet_transfer_info_old> pool;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(in)
+        KV_SERIALIZE(out)
+        //KV_SERIALIZE(pending)
+        //KV_SERIALIZE(failed)
+        KV_SERIALIZE(pool)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+
   struct htlc_entry_info
   {
     currency::account_public_address counterparty_address;
@@ -1407,12 +1440,10 @@ namespace wallet_public
   struct ionic_swap_proposal_context
   {
     currency::tx_generation_context gen_context;
-    crypto::secret_key one_time_skey;
     
     BEGIN_SERIALIZE_OBJECT()
       VERSION(0)   //use VERSION_TO_MEMBER if it's more then 0
       FIELD(gen_context)
-      FIELD(one_time_skey)
     END_SERIALIZE()
   };
 

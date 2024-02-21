@@ -171,8 +171,8 @@ namespace currency
     asset_descriptor_operation ado{};
     if (is_asset_emitting_transaction(tx, &ado))
     {
-      crypto::point_t asset_id_pt = crypto::c_point_0;
-      calculate_asset_id(ado.descriptor.owner, &asset_id_pt, nullptr); // TODO @#@# optimization: this expensive calculation should be done only once
+      crypto::point_t asset_id_pt{};
+      CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, &asset_id_pt, nullptr), false, "get_or_calculate_asset_id failed"); // TODO @#@# expensive operation, consider caching 
       pseudo_outs_blinded_asset_ids.emplace_back(asset_id_pt); // additional ring member for asset emitting tx
     }
 
@@ -301,8 +301,8 @@ namespace currency
 #ifndef NDEBUG
       CHECK_AND_ASSERT_MES(commitment_to_zero == secret_x * crypto::c_point_G, false, "internal error: commitment_to_zero is malformed (G)");
 #endif
-      r = crypto::generate_schnorr_sig<crypto::gt_G>(tx_id, commitment_to_zero, secret_x, proof.ss);
-      CHECK_AND_ASSERT_MES(r, false, "generate_schnorr_sig (G) failed");
+      r = crypto::generate_double_schnorr_sig<crypto::gt_G, crypto::gt_G>(tx_id, commitment_to_zero, secret_x, ogc.tx_pub_key_p, ogc.tx_key.sec, proof.dss);
+      CHECK_AND_ASSERT_MES(r, false, "generate_double_schnorr_sig (G, G) failed");
     }
     else // i.e. zc_inputs_count != 0
     {
@@ -326,8 +326,8 @@ namespace currency
       bool commitment_to_zero_is_sane = commitment_to_zero == secret_x * crypto::c_point_X;
       CHECK_AND_ASSERT_MES(commitment_to_zero_is_sane, false, "internal error: commitment_to_zero is malformed (X)");
 #endif
-      r = crypto::generate_schnorr_sig<crypto::gt_X>(tx_id, commitment_to_zero, secret_x, proof.ss);
-      CHECK_AND_ASSERT_MES(r, false, "generate_schnorr_sig (X) failed");
+      r = crypto::generate_double_schnorr_sig<crypto::gt_X, crypto::gt_G>(tx_id, commitment_to_zero, secret_x, ogc.tx_pub_key_p, ogc.tx_key.sec, proof.dss);
+      CHECK_AND_ASSERT_MES(r, false, "genergenerate_double_schnorr_sigate_schnorr_sig (X, G) failed");
     }
 
     return true;
@@ -447,11 +447,9 @@ namespace currency
     tx = AUTO_VAL_INIT_T(transaction);
     tx.version = tx_version;
 
-    keypair txkey_local{};
-    if (!tx_one_time_key_to_use)
-      txkey_local = keypair::generate();
-    const keypair& txkey = tx_one_time_key_to_use ? *tx_one_time_key_to_use : txkey_local;
-    add_tx_pub_key_to_extra(tx, txkey.pub);
+    tx_generation_context tx_gen_context{};
+    tx_gen_context.set_tx_key(tx_one_time_key_to_use ? *tx_one_time_key_to_use : keypair::generate());
+    add_tx_pub_key_to_extra(tx, tx_gen_context.tx_key.pub);
     if (extra_nonce.size())
       if (!add_tx_extra_userdata(tx, extra_nonce))
         return false;
@@ -488,7 +486,6 @@ namespace currency
     }
 
     // fill outputs
-    tx_generation_context tx_gen_context{};
     tx_gen_context.resize(zc_ins_count, destinations.size()); // auxiliary data for each output
     uint64_t output_index = 0;
     std::set<uint16_t> deriv_cache;
@@ -496,7 +493,7 @@ namespace currency
     {
       finalized_tx result = AUTO_VAL_INIT(result);
       uint8_t tx_outs_attr = 0;
-      r = construct_tx_out(d, txkey.sec, output_index, tx, deriv_cache, account_keys(),
+      r = construct_tx_out(d, tx_gen_context.tx_key.sec, output_index, tx, deriv_cache, account_keys(),
         tx_gen_context.asset_id_blinding_masks[output_index], tx_gen_context.amount_blinding_masks[output_index],
         tx_gen_context.blinded_asset_ids[output_index], tx_gen_context.amount_commitments[output_index], result, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "construct_tx_out failed, output #" << output_index << ", amount: " << print_money_brief(d.amount));
@@ -576,7 +573,7 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------------------------------------
-  bool validate_asset_operation_amount_proof(asset_op_verification_context& context)// const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, crypto::public_key& asset_id)
+  bool validate_asset_operation_amount_commitment(asset_op_verification_context& context)
   {
     CHECK_AND_ASSERT_MES(count_type_in_variant_container<asset_operation_proof>(context.tx.proofs) == 1, false, "asset_operation_proof not present or present more than once");
     const asset_operation_proof& aop = get_type_in_variant_container_by_ref<const asset_operation_proof>(context.tx.proofs);
@@ -607,6 +604,8 @@ namespace currency
       zc_balance_proof balance_proof = AUTO_VAL_INIT(balance_proof);
       bool r = get_type_in_variant_container<zc_balance_proof>(tx.proofs, balance_proof);
       CHECK_AND_ASSERT_MES(r, false, "zc_balance_proof is missing in tx proofs");
+
+      crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(tx);
 
       size_t zc_inputs_count = 0;
       uint64_t bare_inputs_sum = additional_inputs_amount_and_fees_for_mining_tx;
@@ -645,7 +644,7 @@ namespace currency
       {
         if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
         {
-          // opt_amount_commitment supposed to be validated earlier in validate_asset_operation()
+          // amount_commitment supposed to be validated earlier in validate_asset_operation_amount_commitment()
           sum_of_pseudo_out_amount_commitments += crypto::point_t(ado.amount_commitment); // *1/8
         }
         else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
@@ -675,13 +674,13 @@ namespace currency
       CHECK_AND_ASSERT_MES(zc_inputs_count == zc_sigs_count, false, "zc inputs count (" << zc_inputs_count << ") and zc sigs count (" << zc_sigs_count << ") missmatch");
       if (zc_inputs_count > 0)
       {
-        r = crypto::verify_schnorr_sig<crypto::gt_X>(tx_id, commitment_to_zero.to_public_key(), balance_proof.ss);
-        CHECK_AND_ASSERT_MES(r, false, "zc_balance_proof (X) is invalid");
+        r = crypto::verify_double_schnorr_sig<crypto::gt_X, crypto::gt_G>(tx_id, commitment_to_zero, tx_pub_key, balance_proof.dss);
+        CHECK_AND_ASSERT_MES(r, false, "verify_double_schnorr_sig (X, G) is invalid");
       }
       else
       {
-        r = crypto::verify_schnorr_sig<crypto::gt_G>(tx_id, commitment_to_zero.to_public_key(), balance_proof.ss);
-        CHECK_AND_ASSERT_MES(r, false, "zc_balance_proof (G) is invalid");
+        r = crypto::verify_double_schnorr_sig<crypto::gt_G, crypto::gt_G>(tx_id, commitment_to_zero, tx_pub_key, balance_proof.dss);
+        CHECK_AND_ASSERT_MES(r, false, "verify_double_schnorr_sig (G, G) is invalid");
       }
       return true;
     }
@@ -1138,20 +1137,21 @@ namespace currency
     return origin_blob;
   }
   //---------------------------------------------------------------
-  bool validate_ado_update_allowed(const asset_descriptor_base& a, const asset_descriptor_base& b)
+  bool validate_ado_update_allowed(const asset_descriptor_base& new_ado, const asset_descriptor_base& prev_ado)
   {
-    if (a.total_max_supply != b.total_max_supply) return false;
-    //if (a.current_supply != b.current_supply) return false;
-    if (a.decimal_point != b.decimal_point) return false;
-    if (a.ticker != b.ticker) return false;
-    if (a.full_name != b.full_name) return false;
+    if (new_ado.total_max_supply != prev_ado.total_max_supply) return false;
+    if (new_ado.current_supply > prev_ado.total_max_supply) return false;
+    if (new_ado.decimal_point != prev_ado.decimal_point) return false;
+    if (new_ado.ticker != prev_ado.ticker) return false;
+    if (new_ado.full_name != prev_ado.full_name) return false;
     //a.meta_info;
-    if (a.owner != b.owner) return false;
-    if (a.hidden_supply != b.hidden_supply) return false;
+    //if (a.owner != b.owner) return false;
+    if (new_ado.hidden_supply != prev_ado.hidden_supply) return false;
     
     return true;
   }
   //---------------------------------------------------------------
+  /*
   crypto::hash get_signature_hash_for_asset_operation(const asset_descriptor_operation& ado)
   {
     asset_descriptor_operation ado_local = ado;
@@ -1165,6 +1165,7 @@ namespace currency
   {
     op.opt_proof = boost::none;
   }
+  */
 
   //---------------------------------------------------------------
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, uint8_t tx_outs_attr /*  = CURRENCY_TO_KEY_OUT_RELAXED */)
@@ -2111,20 +2112,45 @@ namespace currency
   }
 
 #define CRYPTO_HASH_ASSET_ID_ITERATIONS 1024
-  void calculate_asset_id(const crypto::public_key& asset_owner, crypto::point_t* p_result_point, crypto::public_key* p_result_pub_key)
+  bool get_or_calculate_asset_id(const asset_descriptor_operation& ado, crypto::point_t* p_result_point, crypto::public_key* p_result_pub_key)
   {
-    crypto::hash h = get_hash_from_POD_objects(CRYPTO_HDS_ASSET_ID, asset_owner);
+    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT        ||
+        ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE      ||
+        ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN )
+    {
+      CHECK_AND_ASSERT_MES(ado.opt_asset_id.has_value(), false, "ado.opt_asset_id has no value, op: " << (int)ado.operation_type << ", " << get_asset_operation_type_string(ado.operation_type));
+      //LOG_PRINT_YELLOW("ado.opt_asset_id = " << ado.opt_asset_id.get(), LOG_LEVEL_0);
+      if (p_result_pub_key)
+        *p_result_pub_key = ado.opt_asset_id.get();
+      if (p_result_point)
+        *p_result_point = crypto::point_t(ado.opt_asset_id.get());
+      return true;
+    }
+
+    // otherwise, calculate asset id
+
+    crypto::hash_helper_t::hs_t hsc;
+    hsc.add_32_chars(CRYPTO_HDS_ASSET_ID);
+    hsc.add_hash(crypto::hash_helper_t::h(ado.descriptor.ticker));
+    hsc.add_hash(crypto::hash_helper_t::h(ado.descriptor.full_name));
+    hsc.add_hash(crypto::hash_helper_t::h(ado.descriptor.meta_info));
+    hsc.add_scalar(crypto::scalar_t(ado.descriptor.total_max_supply));
+    hsc.add_scalar(crypto::scalar_t(ado.descriptor.decimal_point));
+    hsc.add_pub_key(ado.descriptor.owner);
+    crypto::hash h = hsc.calc_hash_no_reduce();
 
     // this hash function needs to be computationally expensive (s.a. the whitepaper)
     for(uint64_t i = 0; i < CRYPTO_HASH_ASSET_ID_ITERATIONS; ++i)
       h = get_hash_from_POD_objects(CRYPTO_HDS_ASSET_ID, h, i);
 
-    crypto::point_t local_point{};
-    if (!p_result_point)
-      p_result_point = &local_point;
-    *p_result_point = crypto::hash_helper_t::hp(&h, sizeof h);
+    crypto::point_t result = crypto::hash_helper_t::hp(&h, sizeof h);
+    if (p_result_point)
+      *p_result_point = result;
     if (p_result_pub_key)
-      p_result_point->to_public_key(*p_result_pub_key);
+      result.to_public_key(*p_result_pub_key);
+
+    //LOG_PRINT_YELLOW("calculated asset_id = " << result, LOG_LEVEL_0);
+    return true;
   }
 
   const asset_descriptor_base& get_native_coin_asset_descriptor()
@@ -2155,14 +2181,20 @@ namespace currency
   {
     if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
     {
-      crypto::secret_key asset_control_key{};
-      bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, tx_key.sec, asset_control_key, ado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
-      CHECK_AND_ASSERT_MES(r, false, "derive_key_pair_from_key_pair failed");
+      //crypto::secret_key asset_control_key{};
+      //bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, tx_key.sec, asset_control_key, ado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
+      //CHECK_AND_ASSERT_MES(r, false, "derive_key_pair_from_key_pair failed");
+      //
+      // old:
+      // asset_control_key = Hs(CRYPTO_HDS_ASSET_CONTROL_KEY, 8 * tx_key.sec * sender_account_keys.account_address.spend_public_key, 0)
+      // ado.descriptor.owner = asset_control_key * G
+      
+      ado.descriptor.owner = sender_account_keys.account_address.spend_public_key;
 
-      calculate_asset_id(ado.descriptor.owner, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id);
+      CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id), false, "get_or_calculate_asset_id failed");
 
       // calculate amount blinding mask
-      gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, asset_control_key, tx_key.pub);
+      gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, tx_key.sec);
 
       // set correct asset_id to the corresponding destination entries
       uint64_t amount_of_emitted_asset = 0;
@@ -2179,16 +2211,47 @@ namespace currency
       gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
       ado.amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
     }
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+    {
+      CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id), false, "get_or_calculate_asset_id failed");
+
+      // calculate amount blinding mask
+      gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, tx_key.sec);
+      gen_context.ao_commitment_in_outputs = true;
+
+      // set correct asset_id to the corresponding destination entries
+      uint64_t amount_of_burned_assets = 0;
+      for (auto& item : ftp.sources)
+      {
+        if (item.asset_id == gen_context.ao_asset_id)
+        {
+          amount_of_burned_assets += item.amount;
+        }
+      }
+      for (auto& item : ftp.prepared_destinations)
+      {
+        if (item.asset_id == gen_context.ao_asset_id)
+        {
+          CHECK_AND_ASSERT_THROW_MES(amount_of_burned_assets >= item.amount, "Failed to find burn amount, failed condition: amount_of_burned_assets(" << amount_of_burned_assets << ") >= item.amount(" << item.amount << ")");
+          amount_of_burned_assets -= item.amount;
+        }
+      }
+      ado.descriptor.current_supply -= amount_of_burned_assets;
+
+      gen_context.ao_amount_commitment = amount_of_burned_assets * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
+      ado.amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
+
+      if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation_before_burn{ &ado });
+    
+    }
     else
     {
       if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
       {
-        CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT");
+        CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id), false, "get_or_calculate_asset_id failed");
 
-        gen_context.ao_asset_id = *ado.opt_asset_id;
-        gen_context.ao_asset_id_pt.from_public_key(gen_context.ao_asset_id);
         // calculate amount blinding mask
-        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, ftp.asset_control_key, tx_key.pub);
+        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, tx_key.sec);
 
         // set correct asset_id to the corresponding destination entries
         uint64_t amount_of_emitted_asset = 0;
@@ -2213,47 +2276,27 @@ namespace currency
 
         //fields that not supposed to be changed?
       }
-      else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
-      {
-        CHECK_AND_ASSERT_MES(ado.opt_asset_id, false, "ado.opt_asset_id is not found at ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN");
-
-        gen_context.ao_asset_id = *ado.opt_asset_id;
-        gen_context.ao_asset_id_pt.from_public_key(gen_context.ao_asset_id);
-        // calculate amount blinding mask
-        gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, ftp.asset_control_key, tx_key.pub);
-        gen_context.ao_commitment_in_outputs = true;
-
-        // set correct asset_id to the corresponding destination entries
-        uint64_t amount_of_burned_assets = 0;
-        for (auto& item: ftp.sources)
-        {
-          if (item.asset_id == gen_context.ao_asset_id)
-          {
-            amount_of_burned_assets += item.amount;
-          }
-        }
-        for (auto& item : ftp.prepared_destinations)
-        {
-          if (item.asset_id == gen_context.ao_asset_id )
-          {
-            CHECK_AND_ASSERT_THROW_MES(amount_of_burned_assets >= item.amount, "Failed to find burn amount, failed condition: amount_of_burned_assets(" << amount_of_burned_assets << ") >= item.amount("<< item.amount << ")");
-            amount_of_burned_assets -= item.amount;
-          }
-        }
-        ado.descriptor.current_supply -= amount_of_burned_assets;
-
-        gen_context.ao_amount_commitment = amount_of_burned_assets * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
-        ado.amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
-      }
-
       if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation_before_seal{ &ado });
 
+      ftp.need_to_generate_ado_proof = true;
+      /*
       //seal it with owners signature
       crypto::signature sig = currency::null_sig;
-      crypto::public_key pub_k = currency::null_pkey;
-      crypto::secret_key_to_public_key(ftp.asset_control_key, pub_k);
-      crypto::generate_signature(get_signature_hash_for_asset_operation(ado), pub_k, ftp.asset_control_key, sig);
+      crypto::hash h = get_signature_hash_for_asset_operation(ado);
+      if (ftp.pthirdparty_sign_handler)
+      {
+        bool r = ftp.pthirdparty_sign_handler->sign(h, ftp.ado_current_asset_owner, sig);
+        CHECK_AND_ASSERT_MES(r, false, "asset thirparty sign failed");
+      }
+      else
+      {
+        crypto::public_key pub_k = currency::null_pkey;
+        crypto::secret_key_to_public_key(sender_account_keys.spend_secret_key, pub_k);
+        CHECK_AND_ASSERT_MES(ftp.ado_current_asset_owner == pub_k, false, "asset owner key not matched with provided private key for asset operation signing");
+        crypto::generate_signature(h, pub_k, account_keys.spend_secret_key, sig);
+      }
       ado.opt_proof = sig;
+      */
     }
     return true;
   }
@@ -2438,15 +2481,14 @@ namespace currency
       LOG_PRINT_YELLOW("WARNING: tx v1 should not use ZC inputs", LOG_LEVEL_0);
     }
 
+    tx_generation_context& gen_context = result.ftp.gen_context;
 
-
-    keypair txkey = AUTO_VAL_INIT(txkey);
     if (!append_mode)
     {
-      txkey = keypair::generate();
+      gen_context.set_tx_key(keypair::generate());
       //deterministic_generate_tx_onetime_key(key_images_total, sender_account_keys, txkey);
-      add_tx_pub_key_to_extra(tx, txkey.pub);
-      one_time_tx_secret_key = txkey.sec;
+      add_tx_pub_key_to_extra(tx, gen_context.tx_key.pub);
+      one_time_tx_secret_key = gen_context.tx_key.sec;
 
       //add flags
       etc_tx_flags16_t e = AUTO_VAL_INIT(e);
@@ -2455,13 +2497,12 @@ namespace currency
 
       //include offers if need
       tx.attachment = attachments;
-      encrypt_attachments(tx, sender_account_keys, crypt_destination_addr, txkey, result.derivation);
+      encrypt_attachments(tx, sender_account_keys, crypt_destination_addr, gen_context.tx_key, result.derivation);
     }
     else
     {
-      txkey.pub = get_tx_pub_key_from_extra(tx);
-      txkey.sec = one_time_tx_secret_key;
-      CHECK_AND_ASSERT_MES(txkey.pub != null_pkey && txkey.sec != null_skey, false, "In append mode both public and secret keys must be provided");
+      gen_context.set_tx_key(keypair{get_tx_pub_key_from_extra(tx), one_time_tx_secret_key});
+      CHECK_AND_ASSERT_MES(gen_context.tx_key.pub != null_pkey && gen_context.tx_key.sec != null_skey, false, "In append mode both public and secret keys must be provided");
 
       //separately encrypt attachments without putting extra
       result.derivation = get_encryption_key_derivation(true, tx, sender_account_keys); 
@@ -2471,7 +2512,7 @@ namespace currency
       std::vector<extra_v> extra_local = extra;
       std::vector<attachment_v> attachments_local = attachments;
 
-      encrypt_attach_visitor v(was_attachment_crypted_entries, derivation,  txkey, account_public_address(), sender_account_keys);
+      encrypt_attach_visitor v(was_attachment_crypted_entries, derivation, gen_context.tx_key, account_public_address(), sender_account_keys);
       for (auto& a : attachments_local)
         boost::apply_visitor(v, a);
       for (auto& a : extra_local)
@@ -2481,7 +2522,7 @@ namespace currency
       tx.attachment.insert(tx.attachment.end(), attachments_local.begin(), attachments_local.end());
       tx.extra.insert(tx.extra.end(), extra_local.begin(), extra_local.end());
 
-      for (const auto in : tx.vin)
+      for (const auto& in : tx.vin)
       {
         if (in.type() == typeid(txin_zc_input))
         {
@@ -2499,8 +2540,6 @@ namespace currency
     // OUTs
     //
     std::vector<tx_destination_entry> shuffled_dsts(destinations);
-    //size_t outputs_to_be_constructed = shuffled_dsts.size();
-    tx_generation_context& gen_context = result.ftp.gen_context;
     gen_context.resize(zc_inputs_count, tx.vout.size() + shuffled_dsts.size());
 
     // ASSET oprations handling
@@ -2510,7 +2549,7 @@ namespace currency
       pado = get_type_in_variant_container<asset_descriptor_operation>(tx.extra);
       if (pado)
       {
-        bool r = construct_tx_handle_ado(sender_account_keys, ftp, *pado, gen_context, txkey, shuffled_dsts);
+        bool r = construct_tx_handle_ado(sender_account_keys, ftp, *pado, gen_context, gen_context.tx_key, shuffled_dsts);
         CHECK_AND_ASSERT_MES(r, false, "Failed to construct_tx_handle_ado()");
         if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation{ pado });
       }
@@ -2533,7 +2572,7 @@ namespace currency
       if (!(flags & TX_FLAG_SIGNATURE_MODE_SEPARATE) && all_inputs_are_obviously_native_coins && gen_context.ao_asset_id == currency::null_pkey)
         dst_entr.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // all inputs are obviously native coins -- all outputs must have explicit asset ids (unless there's an asset emission)
 
-      r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, deriv_cache, sender_account_keys,
+      r = construct_tx_out(dst_entr, gen_context.tx_key.sec, output_index, tx, deriv_cache, sender_account_keys,
         gen_context.asset_id_blinding_masks[output_index], gen_context.amount_blinding_masks[output_index],
         gen_context.blinded_asset_ids[output_index], gen_context.amount_commitments[output_index], result, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "Failed to construct tx out");
@@ -2642,7 +2681,7 @@ namespace currency
       else
       {
         // NLSAG
-        r = generate_NLSAG_sig(tx_hash_for_signature, tx_prefix_hash, i_ + input_starter_index, source_entry, sender_account_keys, in_contexts[i_mapped], txkey, flags, tx, &ss_ring_s);
+        r = generate_NLSAG_sig(tx_hash_for_signature, tx_prefix_hash, i_ + input_starter_index, source_entry, sender_account_keys, in_contexts[i_mapped], gen_context.tx_key, flags, tx, &ss_ring_s);
         CHECK_AND_ASSERT_MES(r, false, "generate_NLSAG_sig failed");
       }
 
@@ -2683,6 +2722,25 @@ namespace currency
         asset_operation_proof aop{};
         aop.opt_amount_commitment_g_proof = aop_g_sig;
         tx.proofs.emplace_back(std::move(aop));
+      }
+      if(ftp.need_to_generate_ado_proof)        
+      { 
+        asset_operation_ownership_proof aoop = AUTO_VAL_INIT(aoop);
+
+        if (ftp.pthirdparty_sign_handler)
+        {
+          //ask third party to generate proof
+          r = ftp.pthirdparty_sign_handler->sign(tx_prefix_hash, ftp.ado_current_asset_owner, aoop.gss);
+          CHECK_AND_ASSERT_MES(r, false, "Failed to sign ado by thirdparty");
+        }
+        else
+        {
+          //generate signature by wallet account 
+          r = crypto::generate_schnorr_sig(tx_prefix_hash, ftp.ado_current_asset_owner, sender_account_keys.spend_secret_key, aoop.gss);
+          CHECK_AND_ASSERT_MES(r, false, "Failed to sign ado proof");
+        }
+        if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_after_asset_ownership_proof_generated{ &aoop });
+        tx.proofs.emplace_back(aoop);
       }
     }
 
@@ -3180,7 +3238,7 @@ namespace currency
     if (P_prime.to_public_key() != zo.stealth_address)
       return false;
 
-    crypto::point_t Q_prime = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * 8 * crypto::point_t(addr.view_public_key); // Q' * 8 =? Hs(domain_sep, Hs(8 * r * V, i) ) * 8 * V
+    crypto::point_t Q_prime = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * crypto::point_t(addr.view_public_key).modify_mul8(); // Q' * 8 =? Hs(domain_sep, Hs(8 * r * V, i) ) * 8 * V
     if (Q_prime != crypto::point_t(zo.concealing_point).modify_mul8())
       return false;
 
@@ -3319,7 +3377,7 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
-  bool set_payment_id_to_tx(std::vector<attachment_v>& att, const std::string& payment_id)
+  bool set_payment_id_to_tx(std::vector<attachment_v>& att, const std::string& payment_id, bool is_in_hardfork4)
   {
     if (!is_payment_id_size_ok(payment_id))
       return false;
@@ -3327,6 +3385,10 @@ namespace currency
     tx_service_attachment tsa = AUTO_VAL_INIT(tsa);
     tsa.service_id = BC_PAYMENT_ID_SERVICE_ID;
     tsa.body = payment_id;
+    if (is_in_hardfork4)
+    {
+      tsa.flags = TX_SERVICE_ATTACHMENT_ENCRYPT_BODY;
+    }
     att.push_back(tsa);
     return true;
   }

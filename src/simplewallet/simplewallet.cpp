@@ -1681,7 +1681,7 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
 
 
   std::vector<currency::attachment_v> attachments;
-  if (!payment_id.empty() && !set_payment_id_to_tx(attachments, payment_id))
+  if (!payment_id.empty() && !set_payment_id_to_tx(attachments, payment_id, m_wallet->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM)))
   {
     fail_msg_writer() << "provided (or embedded) payment id can't be set: \"" << payment_id << "\"";
     return true;
