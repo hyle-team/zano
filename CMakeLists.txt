@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.5)
 
 PROJECT(Zano)
 
-set(VERSION "2.0")
+
+set(VERSION "1.0")
 
 if(POLICY CMP0043)
   cmake_policy(SET CMP0043 NEW)
