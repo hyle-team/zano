@@ -7525,8 +7525,8 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
 
     assets_selection_context needed_money_map;
     needed_money_map[currency::native_coin_asset_id] = {};
-    std::vector<currency::tx_destination_entry> dsts({ tx_destination_entry(amount_swept - fee, destination_addr) });
-    prepare_tx_destinations(needed_money_map, get_current_split_strategy(), tools::tx_dust_policy(), ftp.prepared_destinations, ftp.flags, dsts);
+    const std::vector<currency::tx_destination_entry> dsts({ tx_destination_entry(amount_swept - fee, destination_addr) });
+    prepare_tx_destinations(needed_money_map, get_current_split_strategy(), tools::tx_dust_policy(), dsts, ftp.flags, ftp.prepared_destinations);
 
     currency::transaction tx = AUTO_VAL_INIT(tx);
     crypto::secret_key tx_key = AUTO_VAL_INIT(tx_key);
