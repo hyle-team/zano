@@ -1081,6 +1081,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(wallet_unconfimed_tx_balance);
     GENERATE_AND_PLAY_HF(packing_outputs_on_pos_minting_wallet, "3");
     GENERATE_AND_PLAY(wallet_watch_only_and_chain_switch);
+    GENERATE_AND_PLAY_HF(wallet_and_sweep_below, "3-*");
 
     GENERATE_AND_PLAY(wallet_rpc_integrated_address);
     GENERATE_AND_PLAY(wallet_rpc_integrated_address_transfer);

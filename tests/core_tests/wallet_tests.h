@@ -287,3 +287,10 @@ struct wallet_spend_form_auditable_and_track : public wallet_test
 
   mutable std::string m_comment;
 };
+
+struct wallet_and_sweep_below : public wallet_test
+{
+  wallet_and_sweep_below();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
