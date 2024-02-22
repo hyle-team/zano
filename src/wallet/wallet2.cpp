@@ -58,6 +58,8 @@ using namespace currency;
 #define WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX                  3   // TODO: @#@# consider descreasing to mimic normal tx
 #define WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX                  10  // TODO: @#@# consider descreasing to mimic normal tx
 
+#define WALLET_TX_MAX_ALLOWED_FEE                                     (COIN * 100)
+
 #undef LOG_DEFAULT_CHANNEL
 #define LOG_DEFAULT_CHANNEL "wallet"
 ENABLE_CHANNEL_BY_DEFAULT("wallet")
@@ -7125,6 +7127,8 @@ void wallet2::finalize_transaction(currency::finalize_tx_param& ftp, currency::f
     ftp, result);
   //TIME_MEASURE_FINISH_MS(construct_tx_time);
   THROW_IF_FALSE_WALLET_EX(r, error::tx_not_constructed, ftp.sources, ftp.prepared_destinations, ftp.unlock_time);
+  uint64_t effective_fee = get_tx_fee(result.tx);
+  THROW_IF_FALSE_WALLET_CMN_ERR_EX(effective_fee <= WALLET_TX_MAX_ALLOWED_FEE, "tx fee is WAY too big: " << print_money_brief(effective_fee) << ", max allowed is " << print_money_brief(WALLET_TX_MAX_ALLOWED_FEE));
 
   //TIME_MEASURE_START_MS(sign_ms_input_time);
   if (ftp.multisig_id != currency::null_hash)
@@ -7525,8 +7529,8 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
 
     assets_selection_context needed_money_map;
     needed_money_map[currency::native_coin_asset_id] = {};
-    std::vector<currency::tx_destination_entry> dsts({ tx_destination_entry(amount_swept - fee, destination_addr) });
-    prepare_tx_destinations(needed_money_map, get_current_split_strategy(), tools::tx_dust_policy(), ftp.prepared_destinations, ftp.flags, dsts);
+    const std::vector<currency::tx_destination_entry> dsts({ tx_destination_entry(amount_swept - fee, destination_addr) });
+    prepare_tx_destinations(needed_money_map, get_current_split_strategy(), tools::tx_dust_policy(), dsts, ftp.flags, ftp.prepared_destinations);
 
     currency::transaction tx = AUTO_VAL_INIT(tx);
     crypto::secret_key tx_key = AUTO_VAL_INIT(tx_key);
