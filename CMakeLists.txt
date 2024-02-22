@@ -3,6 +3,13 @@ cmake_minimum_required(VERSION 3.5)
 PROJECT(Zano)
 
 
+message("OPENSSL_INCLUDE_DIR: ${OPENSSL_INCLUDE_DIR}")    
+message("OPENSSL_CRYPTO_LIBRARY: ${OPENSSL_CRYPTO_LIBRARY}")    
+message("OPENSSL_SSL_LIBRARY: ${OPENSSL_SSL_LIBRARY}")    
+
+
+
+
 set(VERSION "1.0")
 
 if(POLICY CMP0043)
@@ -59,7 +66,7 @@ find_package(OpenSSL REQUIRED)
 
 
 if(APPLE)
-  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12)          
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 12.00)          
 endif()
 
 set(USE_PCH FALSE CACHE BOOL "Use shared precompiled headers")
@@ -212,8 +219,8 @@ message("CMAKE_SYSTEM_NAME: ${CMAKE_SYSTEM_NAME}")
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
   set(Boost_LIBRARIES "libboost.a")
   #workaround for new XCode 12 policy for builds(now it includes a slice for the "arm64" when builds for simulator)
-  set(__iphoneos_archs "armv7 armv7s arm64")
-  set(__iphonesimulator_archs "i386 x86_64")
+  set(__iphoneos_archs "arm64")
+  set(__iphonesimulator_archs "x86_64")
   set(CMAKE_XCODE_ATTRIBUTE_ARCHS[sdk=iphoneos*] "${__iphoneos_archs}")
   set(CMAKE_XCODE_ATTRIBUTE_VALID_ARCHS[sdk=iphoneos*] "${__iphoneos_archs}")
   set(CMAKE_XCODE_ATTRIBUTE_ARCHS[sdk=iphonesimulator*] "${__iphonesimulator_archs}")
