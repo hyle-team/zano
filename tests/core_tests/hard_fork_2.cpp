@@ -20,6 +20,10 @@ hard_fork_2_base_test::hard_fork_2_base_test(size_t hardfork_01_height, size_t h
   , m_hardfork_02_height(hardfork_02_height)
   , m_hardfork_03_height(CURRENCY_MAX_BLOCK_NUMBER)
 {
+  m_hardforks.clear();
+  m_hardforks.set_hardfork_height(1, m_hardfork_01_height);
+  m_hardforks.set_hardfork_height(2, m_hardfork_02_height);
+  m_hardforks.set_hardfork_height(3, m_hardfork_03_height);
   REGISTER_CALLBACK_METHOD(hard_fork_2_base_test, configure_core);
 }
 
@@ -28,17 +32,9 @@ bool hard_fork_2_base_test::configure_core(currency::core& c, size_t ev_index, c
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
-  pc.hard_fork_01_starts_after_height = m_hardfork_01_height;
-  pc.hard_fork_02_starts_after_height = m_hardfork_02_height;
-  pc.hard_fork_03_starts_after_height = m_hardfork_03_height;
+  pc.hard_forks = m_hardforks;
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
-}
-
-void hard_fork_2_base_test::set_hard_fork_heights_to_generator(test_generator& generator) const
-{
-  generator.set_hardfork_height(1, m_hardfork_01_height);
-  generator.set_hardfork_height(2, m_hardfork_02_height);
 }
 
 //------------------------------------------------------------------------------
@@ -59,7 +55,6 @@ bool hard_fork_2_tx_payer_in_wallet::generate(std::vector<test_event_entry>& eve
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // Bob has auditable address
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
@@ -75,7 +70,7 @@ bool hard_fork_2_tx_payer_in_wallet::generate(std::vector<test_event_entry>& eve
 
 bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false, stub_bool = false;
+  bool r = false;
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
@@ -86,7 +81,7 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, MK_TEST_COINS(12)), false, "");
 
   // wallet RPC server
-  tools::wallet_rpc_server miner_wlt_rpc(*miner_wlt);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
 
@@ -145,7 +140,7 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
 
   size_t callback_counter = 0;
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
-    [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
+    [&](const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) -> bool {
       CHECK_AND_ASSERT_THROW_MES(wti.show_sender, "show_sender is false");
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.size() == 1, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), "wti.remote_addresses.front is incorrect");
@@ -166,7 +161,7 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
   bob_wlt->callback(std::make_shared<tools::i_wallet2_callback>()); // clear callback
 
   // Before HF2: Bob (auditable address) -> Alice with payer info requested (should NOT put tx_payer or tx_payer_old)
-  tools::wallet_rpc_server bob_wlt_rpc(*bob_wlt);
+  tools::wallet_rpc_server bob_wlt_rpc(bob_wlt);
   tools::wallet_public::COMMAND_RPC_TRANSFER::request req_c = AUTO_VAL_INIT(req_c);
   req_c.destinations.push_back(tools::wallet_public::transfer_destination{ MK_TEST_COINS(1), m_accounts[ALICE_ACC_IDX].get_public_address_str() });
   req_c.fee = TESTS_DEFAULT_FEE;
@@ -239,8 +234,8 @@ bool hard_fork_2_tx_payer_in_wallet::c1(currency::core& c, size_t ev_index, cons
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l2(new wlt_lambda_on_transfer2_wrapper(
-    [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
-      CHECK_AND_ASSERT_THROW_MES(wti.amount == MK_TEST_COINS(2), "incorrect wti.amount = " << print_money_brief(wti.amount));
+    [&](const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) -> bool {
+      CHECK_AND_ASSERT_THROW_MES(wti.get_native_amount() == MK_TEST_COINS(2), "incorrect wti.amount = " << print_money_brief(wti.get_native_amount()));
       CHECK_AND_ASSERT_THROW_MES(wti.show_sender, "show_sender is false");
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.size() == 1, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), "wti.remote_addresses.front is incorrect");
@@ -306,7 +301,6 @@ bool hard_fork_2_tx_receiver_in_wallet::generate(std::vector<test_event_entry>& 
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // Bob has auditable address
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
 
@@ -323,7 +317,7 @@ bool hard_fork_2_tx_receiver_in_wallet::generate(std::vector<test_event_entry>& 
 
 bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false, stub_bool = false;
+  bool r = false;
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
@@ -334,7 +328,7 @@ bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, c
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, 0), false, "");
 
   // wallet RPC server
-  tools::wallet_rpc_server alice_wlt_rpc(*alice_wlt);
+  tools::wallet_rpc_server alice_wlt_rpc(alice_wlt);
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
 
@@ -373,8 +367,8 @@ bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, c
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
-    [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
-      CHECK_AND_ASSERT_THROW_MES(!wti.is_income, "wti.is_income is " << wti.is_income);
+    [&](const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) -> bool {
+      CHECK_AND_ASSERT_THROW_MES(!wti.get_native_is_income(), "wti.is_income is " << wti.get_native_is_income());
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.size() == 2, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), "wti.remote_addresses.front is incorrect");
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.back() == m_accounts[BOB_ACC_IDX].get_public_address_str(), "wti.remote_addresses.back is incorrect");
@@ -415,9 +409,9 @@ bool hard_fork_2_tx_receiver_in_wallet::c1(currency::core& c, size_t ev_index, c
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l2(new wlt_lambda_on_transfer2_wrapper(
-    [&](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
-      CHECK_AND_ASSERT_THROW_MES(!wti.is_income, "wti.is_income is " << wti.is_income);
-      CHECK_AND_ASSERT_THROW_MES(wti.amount == MK_TEST_COINS(4), "incorrect wti.amount = " << print_money_brief(wti.amount));
+    [&](const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) -> bool {
+      CHECK_AND_ASSERT_THROW_MES(!wti.get_native_is_income(), "wti.is_income is " << wti.get_native_is_income());
+      CHECK_AND_ASSERT_THROW_MES(wti.get_native_amount() == MK_TEST_COINS(4), "incorrect wti.amount = " << print_money_brief(wti.get_native_amount()));
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.size() == 2, "incorrect wti.remote_addresses.size() = " << wti.remote_addresses.size());
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.front() == m_accounts[MINER_ACC_IDX].get_public_address_str(), "wti.remote_addresses.front is incorrect");
       CHECK_AND_ASSERT_THROW_MES(wti.remote_addresses.back() == m_accounts[BOB_ACC_IDX].get_public_address_str(), "wti.remote_addresses.back is incorrect");
@@ -447,7 +441,6 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::generate(std::vector<test_event
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // auditable address
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
@@ -467,7 +460,7 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::generate(std::vector<test_event
 
 bool hard_fork_2_tx_extra_alias_entry_in_wallet::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false, stub_bool = false;
+  bool r = false;
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
@@ -619,7 +612,6 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::c1(currency::core& c, size_t ev
 //------------------------------------------------------------------------------
 
 hard_fork_2_auditable_addresses_basics::hard_fork_2_auditable_addresses_basics()
-  : hard_fork_2_base_test(23)
 {
   REGISTER_CALLBACK_METHOD(hard_fork_2_auditable_addresses_basics, c1);
 }
@@ -639,7 +631,6 @@ bool hard_fork_2_auditable_addresses_basics::generate(std::vector<test_event_ent
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // Bob has auditable address
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
@@ -652,9 +643,11 @@ bool hard_fork_2_auditable_addresses_basics::generate(std::vector<test_event_ent
   // make sure all Bob's outputs has mix_attr = 1
   for (auto& out : tx_1.vout)
   {
-    if (out.amount != MK_TEST_COINS(5))
+    if (out.type() != typeid(tx_out_bare))
+      continue; // skip if we're in postzarcanum era
+    if (boost::get<tx_out_bare>(out).amount != MK_TEST_COINS(5))
       continue; // skip change
-    uint8_t mix_attr = boost::get<txout_to_key>(out.target).mix_attr;
+    uint8_t mix_attr = boost::get<txout_to_key>(boost::get<tx_out_bare>(out).target).mix_attr;
     CHECK_AND_ASSERT_MES(mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX, false, "Incorrect mix_attr in tx_1: " << mix_attr);
   }
   
@@ -669,7 +662,7 @@ bool hard_fork_2_auditable_addresses_basics::generate(std::vector<test_event_ent
 
 bool hard_fork_2_auditable_addresses_basics::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false, stub_bool = false;
+  bool r = false;
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
   std::shared_ptr<tools::wallet2> bob_wlt   = init_playtime_test_wallet(events, c, m_accounts[BOB_ACC_IDX]);
@@ -685,9 +678,12 @@ bool hard_fork_2_auditable_addresses_basics::c1(currency::core& c, size_t ev_ind
   // make sure all Bob's outputs has mix_attr = 1
   for (auto& out : tx.vout)
   {
-    if (out.amount != MK_TEST_COINS(1))
+    if (out.type() != typeid(tx_out_bare))
+      continue; // skip if we're in postzarcanum era
+
+    if (boost::get<tx_out_bare>(out).amount != MK_TEST_COINS(1))
       continue; // skip change
-    uint8_t mix_attr = boost::get<txout_to_key>(out.target).mix_attr;
+    uint8_t mix_attr = boost::get<txout_to_key>(boost::get<tx_out_bare>(out).target).mix_attr;
     CHECK_AND_ASSERT_MES(mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX, false, "Incorrect mix_attr in tx: " << mix_attr);
   }
 
@@ -710,9 +706,12 @@ bool hard_fork_2_auditable_addresses_basics::c1(currency::core& c, size_t ev_ind
   // make sure all Bob's outputs has mix_attr = 1
   for (auto& out : tx.vout)
   {
-    if (out.amount != MK_TEST_COINS(1))
+    if (out.type() != typeid(tx_out_bare))
+      continue; // skip if we're in postzarcanum era
+
+    if (boost::get<tx_out_bare>(out).amount != MK_TEST_COINS(1))
       continue; // skip change
-    uint8_t mix_attr = boost::get<txout_to_key>(out.target).mix_attr;
+    uint8_t mix_attr = boost::get<txout_to_key>(boost::get<tx_out_bare>(out).target).mix_attr;
     CHECK_AND_ASSERT_MES(mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX, false, "Incorrect mix_attr in tx: " << mix_attr);
   }
 
@@ -739,13 +738,16 @@ hard_fork_2_no_new_structures_before_hf::hard_fork_2_no_new_structures_before_hf
 
 bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_entry>& events) const
 {
+  test_gentime_settings tgs = test_generator::get_test_gentime_settings();
+  tgs.ignore_invalid_txs = false; // this test pushes originally invalid tx_0, tx_1 and tx_2 which are good after HF2, so we'd like to avoid mess with the sources among txs
+  test_generator::set_test_gentime_settings(tgs);
+
   bool r = false;
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
@@ -802,7 +804,7 @@ bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_en
 
   std::list<transaction> tx_set;
   DO_CALLBACK(events, "mark_invalid_tx");
-  r = put_alias_via_tx_to_list(events, tx_set, blk_2, miner_acc, alias_entry, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_set, blk_2, miner_acc, alias_entry, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   transaction tx_2 = tx_set.front();
 
@@ -817,7 +819,7 @@ bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_en
   alias_entry_old.m_alias = "alicealice";
 
   tx_set.clear();
-  r = put_alias_via_tx_to_list(events, tx_set, blk_2, miner_acc, alias_entry_old, generator);
+  r = put_alias_via_tx_to_list(m_hardforks, events, tx_set, blk_2, miner_acc, alias_entry_old, generator);
   CHECK_AND_ASSERT_MES(r, false, "put_alias_via_tx_to_list failed");
   transaction tx_2_old = tx_set.front();
   MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_2_old);
@@ -829,9 +831,9 @@ bool hard_fork_2_no_new_structures_before_hf::generate(std::vector<test_event_en
   MAKE_NEXT_BLOCK(events, blk_6, blk_5, miner_acc);
   MAKE_NEXT_BLOCK(events, blk_7, blk_6, miner_acc);
 
-  events.push_back(tx_0);
-  events.push_back(tx_1);
-  events.push_back(tx_2);
+  ADD_CUSTOM_EVENT(events, tx_0);
+  ADD_CUSTOM_EVENT(events, tx_1);
+  ADD_CUSTOM_EVENT(events, tx_2);
 
 
   // tx_0 with tx_payer should be accepted after HF2
@@ -883,12 +885,11 @@ bool hard_fork_2_awo_wallets_basic_test<before_hf_2>::generate(std::vector<test_
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // Bob has auditable address
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(110), 10, TESTS_DEFAULT_FEE, tx_0);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(110), 10, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 
@@ -908,7 +909,7 @@ bool hard_fork_2_awo_wallets_basic_test<before_hf_2>::c1(currency::core& c, size
   static const std::wstring bob_wo_restored_filename(L"bob_wo_restored_wallet");
   static const std::wstring bob_non_auditable_filename(L"bob_non_auditable_wallet");
 
-  bool r = false, stub_bool = false;
+  bool r = false;
   
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   std::shared_ptr<tools::wallet2> alice_wlt   = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
@@ -1009,7 +1010,7 @@ bool hard_fork_2_awo_wallets_basic_test<before_hf_2>::c1(currency::core& c, size
 
   bool callback_called = false;
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
-    [&callback_called](const tools::wallet_public::wallet_transfer_info& wti, uint64_t balance, uint64_t unlocked_balance, uint64_t total_mined) -> bool {
+    [&callback_called](const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) -> bool {
       callback_called = true;
       return true;
     }
@@ -1157,14 +1158,13 @@ bool hard_fork_2_alias_update_using_old_tx<before_hf_2>::generate(std::vector<te
   alice_acc.set_createtime(ts);
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
-  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   events.push_back(event_core_time(ts));
 
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(110), 10, TESTS_DEFAULT_FEE, tx_0);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(110), 10, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 
@@ -1180,7 +1180,7 @@ bool hard_fork_2_alias_update_using_old_tx<before_hf_2>::generate(std::vector<te
 template<bool before_hf_2>
 bool hard_fork_2_alias_update_using_old_tx<before_hf_2>::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false, stub_bool = false;
+  bool r = false;
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
@@ -1275,12 +1275,11 @@ bool hard_fork_2_incorrect_alias_update<before_hf_2>::generate(std::vector<test_
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate(true); // Bob has auditable address
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
-  set_hard_fork_heights_to_generator(generator);
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx_with_many_outputs(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(110), 10, TESTS_DEFAULT_FEE, tx_0);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(110), 10, TESTS_DEFAULT_FEE, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_0);
 

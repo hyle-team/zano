@@ -18,6 +18,7 @@
 #define PREPARE_ARG_FROM_JSON(arg_type, var_name)   \
   arg_type var_name = AUTO_VAL_INIT(var_name); \
   view::api_response default_ar = AUTO_VAL_INIT(default_ar);  \
+  LOG_PRINT_BLUE("[REQUEST]: " << param.toStdString(), LOG_LEVEL_3); \
 if (!epee::serialization::load_t_from_json(var_name, param.toStdString())) \
 { \
   default_ar.error_code = API_RETURN_CODE_BAD_ARG;                 \
@@ -28,6 +29,7 @@ template<typename T>
 QString make_response(const T& r)
 {
   std::string str = epee::serialization::store_t_to_json(r);
+  LOG_PRINT_BLUE("[RESPONSE]: " << str, LOG_LEVEL_3);
   return str.c_str();
 }
 
@@ -142,6 +144,8 @@ bool MainWindow::init_window()
   m_view->page()->setWebChannel(m_channel);
 
   QWidget* central_widget_to_be_set = m_view;
+  double zoom_factor_test = 0.75;
+  m_view->setZoomFactor(zoom_factor_test);
 
   std::string qt_dev_tools_option = m_backend.get_qt_dev_tools_option();
   if (!qt_dev_tools_option.empty())
@@ -265,7 +269,28 @@ QString MainWindow::request_dummy()
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
+QString MainWindow::call_rpc(const QString& params)
+{
+  TRY_ENTRY();
+  epee::net_utils::http::http_request_info query_info = AUTO_VAL_INIT(query_info);
+  epee::net_utils::http::http_response_info response_info  = AUTO_VAL_INIT(response_info);
+  currency::core_rpc_server::connection_context dummy_context = AUTO_VAL_INIT(dummy_context);
 
+  query_info.m_URI = "/json_rpc";
+  query_info.m_body = params.toStdString();
+
+  m_backend.get_rpc_server().handle_http_request(query_info, response_info, dummy_context);
+  if (response_info.m_response_code != 200)
+  {
+    epee::json_rpc::error_response rsp; 
+    rsp.jsonrpc = "2.0"; 
+    rsp.error.code = response_info.m_response_code;
+    rsp.error.message = response_info.m_response_comment;
+    return QString::fromStdString(epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(rsp)));
+  }
+  return QString::fromStdString(response_info.m_body);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
 QString MainWindow::get_default_fee()
 {
   TRY_ENTRY();
@@ -547,6 +572,14 @@ void MainWindow::store_pos(bool consider_showed)
 void MainWindow::restore_pos(bool consider_showed)
 {
   TRY_ENTRY();
+  if (consider_showed)
+  {
+    if (m_config.is_showed)
+      this->showNormal();
+    else
+      this->showMinimized();
+  }
+
   if (m_config.is_maximazed)
   {
     this->setWindowState(windowState() | Qt::WindowMaximized);
@@ -576,14 +609,6 @@ void MainWindow::restore_pos(bool consider_showed)
       this->move(pos);
       this->resize(sz);
     }
-  }
-
-  if (consider_showed)
-  {
-    if (m_config.is_showed)
-      this->showNormal();
-    else
-      this->showMinimized();
   }
 
   CATCH_ENTRY2(void());
@@ -1055,9 +1080,9 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
 
   if (!m_tray_icon)
     return true;
-  if (!tei.ti.is_income)
+  if (tei.ti.has_outgoing_entries())
     return true;
-  if (!tei.ti.amount)
+  if (!tei.ti.get_native_amount())
     return true;
 //  if (tei.ti.is_mining && m_wallet_states->operator [](tei.wallet_id) != view::wallet_status_info::wallet_state_ready)
 //    return true;
@@ -1071,9 +1096,9 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
     return true;
   }
 
-  auto amount_str = currency::print_money_brief(tei.ti.amount);
+  auto amount_str = currency::print_money_brief(tei.ti.get_native_amount()); //@#@ add handling of assets
   std::string title, msg;
-  if (tei.ti.height == 0) // unconfirmed trx
+  if (tei.ti.height == 0) // unconfirmed tx
   {
     msg = amount_str + " " + CURRENCY_NAME_ABR + " " + m_localization[localization_id_is_received];
     title = m_localization[localization_id_income_transfer_unconfirmed];
@@ -1914,6 +1939,17 @@ QString MainWindow::restore_wallet(const QString& param)
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
+QString MainWindow::use_whitelisting(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  //return que_call2<view::restore_wallet_request>("restore_wallet", param, [this](const view::restore_wallet_request& owd, view::api_response& ar){
+  PREPARE_ARG_FROM_JSON(view::api_request_t<bool>, owd);
+  PREPARE_RESPONSE(view::api_responce_return_code, ar);
+  ar.error_code = m_backend.use_whitelisting(owd.wallet_id, owd.req_data);
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
 QString MainWindow::open_wallet(const QString& param)
 {
   TRY_ENTRY();
@@ -2127,6 +2163,70 @@ QString MainWindow::get_mining_estimate(const QString& param)
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
+QString MainWindow::add_custom_asset_id(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::wallet_and_asset_id, waid);
+  PREPARE_RESPONSE(currency::COMMAND_RPC_GET_ASSET_INFO::response, ar);
+
+  ar.error_code = m_backend.add_custom_asset_id(waid.wallet_id, waid.asset_id, ar.response_data.asset_descriptor);
+  ar.response_data.status = ar.error_code;
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+QString MainWindow::remove_custom_asset_id(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::wallet_and_asset_id, waid);
+  default_ar.error_code = m_backend.delete_custom_asset_id(waid.wallet_id, waid.asset_id);
+  return MAKE_RESPONSE(default_ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+QString MainWindow::get_wallet_info(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::wallet_id_obj, waid);
+  PREPARE_RESPONSE(view::wallet_info, ar);
+  ar.error_code = m_backend.get_wallet_info(waid.wallet_id, ar.response_data);
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+QString MainWindow::create_ionic_swap_proposal(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::create_ionic_swap_proposal_request, cispr);
+  PREPARE_RESPONSE(std::string, ar);
+  ar.error_code = m_backend.create_ionic_swap_proposal(cispr.wallet_id, cispr, ar.response_data);
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
+QString MainWindow::get_ionic_swap_proposal_info(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::api_request_t<std::string>, tx_raw_hex);
+  PREPARE_RESPONSE(tools::wallet_public::ionic_swap_proposal_info, ar);
+  ar.error_code = m_backend.get_ionic_swap_proposal_info(tx_raw_hex.wallet_id, tx_raw_hex.req_data, ar.response_data);
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+
+}
+
+QString MainWindow::accept_ionic_swap_proposal(const QString& param)
+{
+  TRY_ENTRY();
+  LOG_API_TIMING();
+  PREPARE_ARG_FROM_JSON(view::api_request_t<std::string>, tx_raw_hex);
+  PREPARE_RESPONSE(std::string, ar);
+  ar.error_code = m_backend.accept_ionic_swap_proposal(tx_raw_hex.wallet_id, tx_raw_hex.req_data, ar.response_data);
+  return MAKE_RESPONSE(ar);
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
 QString MainWindow::backup_wallet_keys(const QString& param)
 {
   TRY_ENTRY();
@@ -2184,6 +2284,7 @@ QString MainWindow::toggle_autostart(const QString& param)
   return MAKE_RESPONSE(default_ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
+/*
 QString MainWindow::check_available_sources(const QString& param)
 {
   TRY_ENTRY();
@@ -2192,6 +2293,7 @@ QString MainWindow::check_available_sources(const QString& param)
   return m_backend.check_available_sources(sources.wallet_id, sources.req_data).c_str();
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
+*/
 
 QString MainWindow::open_url_in_browser(const QString& param)
 {

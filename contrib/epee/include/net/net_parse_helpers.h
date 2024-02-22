@@ -155,6 +155,13 @@ namespace net_utils
     {
       content.port = boost::lexical_cast<uint64_t>(result[6]);
     }
+    else
+    {
+      if (content.schema == "http")
+        content.port = 80;
+      else if (content.schema == "https")
+        content.port = 443;
+    }
     if(result[7].matched)
     {
       content.uri = result[7];

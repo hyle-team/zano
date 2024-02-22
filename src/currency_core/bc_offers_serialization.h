@@ -13,7 +13,7 @@
 #include <boost/foreach.hpp>
 #include <boost/serialization/is_bitwise_serializable.hpp>
 #include "common/unordered_containers_boost_serialization.h"
-#include "common/crypto_boost_serialization.h"
+#include "common/crypto_serialization.h"
 #include "offers_service_basics.h"
 #include "offers_services_helpers.h"
 

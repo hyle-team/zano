@@ -60,7 +60,7 @@ std::string get_random_rext(size_t len)
 {
   std::string buff(len/2, 0);
   crypto::generate_random_bytes(len/2, (void*)buff.data());
-  return string_tools::buff_to_hex_nodelimer(buff);
+  return epst::buff_to_hex_nodelimer(buff);
 }
 
 bool run_core_market_performance_tests(uint64_t offers_amount)

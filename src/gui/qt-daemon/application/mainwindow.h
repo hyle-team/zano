@@ -144,6 +144,7 @@ public:
   QString webkit_launched_script();
   QString get_smart_wallet_info(const QString& param);
   QString restore_wallet(const QString& param);
+  QString use_whitelisting(const QString& param);
   QString is_pos_allowed();
   QString store_to_file(const QString& path, const QString& buff);
   QString load_from_file(const QString& path);
@@ -168,12 +169,19 @@ public:
   QString get_default_fee();
   QString get_options();  
   void    bool_toggle_icon(const QString& param);
-  
+  QString add_custom_asset_id(const QString& param);
+  QString remove_custom_asset_id(const QString& param);
+  QString get_wallet_info(const QString& param);
+
+  QString create_ionic_swap_proposal(const QString& param);
+  QString get_ionic_swap_proposal_info(const QString& param);
+  QString accept_ionic_swap_proposal(const QString& param);
+
   bool    get_is_disabled_notifications();
   bool    set_is_disabled_notifications(const bool& param);
   QString export_wallet_history(const QString& param);
   QString get_log_file();
-  QString check_available_sources(const QString& param);
+  //QString check_available_sources(const QString& param);
   QString open_url_in_browser(const QString& param);
 
   void    trayIconActivated(QSystemTrayIcon::ActivationReason reason);
@@ -187,6 +195,8 @@ public:
 
   //for test purposes onlys
   QString request_dummy();
+
+  QString call_rpc(const QString& params);
 
 signals:
   void quit_requested(const QString str);

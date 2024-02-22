@@ -6,7 +6,7 @@
 
 #pragma once
 #include "p2p_protocol_defs.h"
-#include "common/crypto_boost_serialization.h"
+#include "common/crypto_serialization.h"
 
 namespace boost
 {

@@ -14,6 +14,8 @@
 #include "currency_core/bc_escrow_service.h"
 #include "rpc/core_rpc_server_commands_defs.h"
 
+const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64_t>::max();
+
 namespace tools
 {
 namespace wallet_public
@@ -22,16 +24,39 @@ namespace wallet_public
 #define WALLET_RPC_STATUS_BUSY    "BUSY"
 
 
-  struct wallet_transfer_info_details
-  {
-    std::list<uint64_t> rcv;
-    std::list<uint64_t> spn;
+  struct employed_tx_entry {
+    uint64_t index = 0;
+    uint64_t amount = 0;
+    crypto::public_key asset_id = currency::native_coin_asset_id;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(rcv)
-      KV_SERIALIZE(spn)
+      KV_SERIALIZE(index)
+      KV_SERIALIZE(amount)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
     END_KV_SERIALIZE_MAP()
 
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(index)
+      BOOST_SERIALIZE(amount)
+      BOOST_SERIALIZE(asset_id)
+    END_BOOST_SERIALIZATION()
+
+  };
+
+  struct employed_tx_entries
+  {
+    std::vector<employed_tx_entry> receive;
+    std::vector<employed_tx_entry> spent;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(receive)
+      KV_SERIALIZE(spent)
+    END_KV_SERIALIZE_MAP()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(receive)
+      BOOST_SERIALIZE(spent)
+    END_BOOST_SERIALIZATION()
   };
 
   struct escrow_contract_details_basic
@@ -87,51 +112,67 @@ namespace wallet_public
 #define WALLET_TRANSFER_INFO_FLAGS_HTLC_DEPOSIT   static_cast<uint16_t>(1 << 0)
 
 
+  struct wallet_sub_transfer_info
+  {
+    uint64_t      amount = 0;
+    bool          is_income = false;
+    crypto::public_key asset_id = currency::native_coin_asset_id; // not blinded, not premultiplied by 1/8
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(amount)
+      KV_SERIALIZE(is_income)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
+    END_KV_SERIALIZE_MAP()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(amount) 
+      BOOST_SERIALIZE(is_income)
+      BOOST_SERIALIZE(asset_id)
+    END_BOOST_SERIALIZATION()
+
+  };
+
   struct wallet_transfer_info
   {
-    uint64_t      amount;
     uint64_t      timestamp;
     crypto::hash  tx_hash;
     uint64_t      height;          //if height == 0 then tx is unconfirmed
     uint64_t      unlock_time;
     uint32_t      tx_blob_size;
     std::string   payment_id;
-    std::vector<std::string> remote_addresses;  //optional
-    std::vector<std::string> recipients_aliases; //optional
     std::string   comment;
-    bool          is_income;
     bool          is_service;
     bool          is_mixing;
     bool          is_mining;
     uint64_t      tx_type;
-    wallet_transfer_info_details td;
+    employed_tx_entries employed_entries;
     std::vector<currency::tx_service_attachment> service_entries;
+    std::vector<std::string> remote_addresses;  //optional
+    std::vector<std::string> remote_aliases; //optional, describe only if there only one remote address
+
+    std::vector<wallet_sub_transfer_info> subtransfers;
+
     //not included in streaming serialization
     uint64_t      fee;
     bool          show_sender;
     std::vector<escrow_contract_details> contract;
-    uint16_t      extra_flags; 
+    uint16_t      extra_flags;
     uint64_t      transfer_internal_index;
-    
-    
+   
     //not included in kv serialization map
     currency::transaction tx;
     std::vector<uint64_t> selected_indicies;
     std::list<bc_services::offers_attachment_t> marketplace_entries;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(amount)
       KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash)
       KV_SERIALIZE(height)
       KV_SERIALIZE(unlock_time)
       KV_SERIALIZE(tx_blob_size)
       KV_SERIALIZE_BLOB_AS_HEX_STRING(payment_id)
-      KV_SERIALIZE(remote_addresses)      
-      KV_SERIALIZE(recipients_aliases)
       KV_SERIALIZE(comment)
-      KV_SERIALIZE(is_income)
       KV_SERIALIZE(timestamp)
-      KV_SERIALIZE(td)
+      KV_SERIALIZE(employed_entries)
       KV_SERIALIZE(fee)
       KV_SERIALIZE(is_service)
       KV_SERIALIZE(is_mixing)
@@ -141,6 +182,146 @@ namespace wallet_public
       KV_SERIALIZE(contract)
       KV_SERIALIZE(service_entries)
       KV_SERIALIZE(transfer_internal_index)
+      KV_SERIALIZE(remote_addresses)
+      KV_SERIALIZE(remote_aliases)
+      KV_SERIALIZE(subtransfers)
+    END_KV_SERIALIZE_MAP()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(timestamp)
+      BOOST_SERIALIZE(tx_hash)
+      BOOST_SERIALIZE(height)
+      BOOST_SERIALIZE(tx_blob_size)
+      BOOST_SERIALIZE(payment_id)
+      BOOST_SERIALIZE(remote_addresses)
+      BOOST_SERIALIZE(employed_entries)
+      BOOST_SERIALIZE(tx)
+      BOOST_SERIALIZE(remote_aliases)
+      BOOST_SERIALIZE(comment)
+      BOOST_SERIALIZE(contract)
+      BOOST_SERIALIZE(selected_indicies)
+      BOOST_SERIALIZE(marketplace_entries)
+      BOOST_SERIALIZE(unlock_time)
+      BOOST_SERIALIZE(service_entries)
+      BOOST_SERIALIZE(subtransfers)
+    END_BOOST_SERIALIZATION()
+
+    bool is_income_mode_encryption() const 
+    {
+      for (const auto& st : subtransfers)
+      {
+        if (st.asset_id == currency::native_coin_asset_id)
+          return st.is_income;
+      }
+      return true;
+    }
+    bool has_outgoing_entries() const
+    {
+      for (const auto& st : subtransfers)
+      {
+        if (!st.is_income)
+          return true;
+      }
+      return false;
+    }
+    uint64_t get_native_income_amount() const
+    {
+      for (const auto& st : subtransfers)
+      {
+        if (st.asset_id == currency::native_coin_asset_id && st.is_income)
+          return st.amount;
+      }
+      return 0;
+    }
+    uint64_t get_native_amount() const
+    {
+      for (const auto& st : subtransfers)
+      {
+        if (st.asset_id == currency::native_coin_asset_id )
+          return st.amount;
+      }
+      return 0;
+    }
+    bool get_native_is_income() const
+    {
+      for (const auto& st : subtransfers)
+      {
+        if (st.asset_id == currency::native_coin_asset_id)
+          return st.is_income;
+      }
+      return false;
+    }
+    uint64_t& get_native_income_amount()
+    {
+      for (auto& st : subtransfers)
+      {
+        if (st.asset_id == currency::native_coin_asset_id)
+        {
+          if (st.is_income)
+          {
+            return st.amount;
+          }
+          else
+          {
+            throw std::runtime_error("Unexpected wallet_transfer_info: native is not income type");
+          }
+        }
+      }
+      subtransfers.push_back(wallet_sub_transfer_info());
+      subtransfers.back().is_income = true;
+      return subtransfers.back().amount;
+    }
+  };
+
+  struct wallet_transfer_info_old : public wallet_transfer_info
+  {
+    //uint64_t amount = 0;
+    //bool is_income = false;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE_EPHEMERAL_N(uint64_t, wallet_transfer_info_to_amount, "amount")
+      KV_SERIALIZE_EPHEMERAL_N(bool, wallet_transfer_info_to_is_income, "is_income")
+      //KV_SERIALIZE(amount)
+      KV_CHAIN_BASE(wallet_transfer_info)
+    END_KV_SERIALIZE_MAP()
+
+    static uint64_t wallet_transfer_info_to_amount(const wallet_transfer_info_old& wtio)
+    {
+      return wtio.get_native_amount();
+    }
+
+    static bool wallet_transfer_info_to_is_income(const wallet_transfer_info_old& wtio)
+    {
+      return wtio.get_native_is_income();
+    }
+
+  };
+
+
+
+  struct asset_balance_entry_base
+  {
+    uint64_t total = 0;
+    uint64_t unlocked = 0;
+    uint64_t awaiting_in = 0;
+    uint64_t awaiting_out = 0;
+
+    //v2
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(total)
+      KV_SERIALIZE(unlocked)
+      KV_SERIALIZE(awaiting_in)
+      KV_SERIALIZE(awaiting_out)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct asset_balance_entry : public asset_balance_entry_base
+  {
+    currency::asset_descriptor_with_id asset_info;
+    //v2
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(asset_info)
+      KV_CHAIN_BASE(asset_balance_entry_base)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -215,10 +396,12 @@ namespace wallet_public
     {
       uint64_t 	 balance;
       uint64_t 	 unlocked_balance;
+      std::list<asset_balance_entry> balances;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(balance)
         KV_SERIALIZE(unlocked_balance)
+        KV_SERIALIZE(balances)
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -328,25 +511,25 @@ namespace wallet_public
 #define ORDER_FROM_BEGIN_TO_END        "FROM_BEGIN_TO_END"
 #define ORDER_FROM_FROM_END_TO_BEGIN   "FROM_END_TO_BEGIN"
 
-  struct COMMAND_RPC_GET_RECENT_TXS_AND_INFO
+  struct COMMAND_RPC_GET_RECENT_TXS_AND_INFO2
   {
     struct request
     {
 
       /*
-      if offset is 0, then GET_RECENT_TXS_AND_INFO return 
-      unconfirmed transactions as the first first items of "transfers", 
+      if offset is 0, then GET_RECENT_TXS_AND_INFO return
+      unconfirmed transactions as the first first items of "transfers",
       this unconfirmed transactions is not counted regarding "count" parameter
       */
       uint64_t offset;
       uint64_t count;
 
-      /* 
-      need_to_get_info - should backend re-calculate balance(could be relatively heavy, 
-      and not needed when getting long tx history with multiple calls 
+      /*
+      need_to_get_info - should backend re-calculate balance(could be relatively heavy,
+      and not needed when getting long tx history with multiple calls
       of GET_RECENT_TXS_AND_INFO with offsets)
       */
-      bool update_provision_info;  
+      bool update_provision_info;
       bool exclude_mining_txs;
       bool exclude_unconfirmed;
       std::string order; // "FROM_BEGIN_TO_END" or "FROM_END_TO_BEGIN"
@@ -378,15 +561,62 @@ namespace wallet_public
   };
 
 
+  struct COMMAND_RPC_GET_RECENT_TXS_AND_INFO
+  {
+    typedef COMMAND_RPC_GET_RECENT_TXS_AND_INFO2::request request;
+
+    struct response
+    {
+      wallet_provision_info pi;
+      std::vector<wallet_transfer_info_old> transfers;
+      uint64_t total_transfers;
+      uint64_t last_item_index;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(pi)
+        KV_SERIALIZE(transfers)
+        KV_SERIALIZE(total_transfers)
+        KV_SERIALIZE(last_item_index)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+
+
+
+  struct COMMAND_RPC_REGISTER_ALIAS
+  {
+    struct request
+    {
+      currency::alias_rpc_details al;
+      crypto::secret_key authority_key;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(al)
+        KV_SERIALIZE_POD_AS_HEX_STRING(authority_key)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      crypto::hash tx_id;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
 
   
   struct transfer_destination
   {
-    uint64_t amount;
+    uint64_t amount = 0;
     std::string address;
+    crypto::public_key asset_id = currency::native_coin_asset_id;
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(amount)
       KV_SERIALIZE(address)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -1006,6 +1236,29 @@ namespace wallet_public
     };
   };
 
+  struct COMMAND_RPC_SEARCH_FOR_TRANSACTIONS_LEGACY
+  {
+    typedef COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::request request;
+
+    struct response
+    {
+      std::list<wallet_transfer_info_old> in;
+      std::list<wallet_transfer_info_old> out;
+      //std::list<wallet_transfer_info> pending;
+      //std::list<wallet_transfer_info> failed;
+      std::list<wallet_transfer_info_old> pool;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(in)
+        KV_SERIALIZE(out)
+        //KV_SERIALIZE(pending)
+        //KV_SERIALIZE(failed)
+        KV_SERIALIZE(pool)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+
   struct htlc_entry_info
   {
     currency::account_public_address counterparty_address;
@@ -1126,6 +1379,337 @@ namespace wallet_public
     };
   };
 
+
+  struct wallet_vote_config_entry
+  {
+    std::string proposal_id;
+    uint64_t h_start;
+    uint64_t h_end;
+    bool vote;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(proposal_id)
+      KV_SERIALIZE(h_start)
+      KV_SERIALIZE(h_end)
+      KV_SERIALIZE(vote)
+    END_KV_SERIALIZE_MAP()
+
+  };
+
+  struct wallet_vote_config
+  {
+    std::vector<wallet_vote_config_entry> entries;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(entries)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct asset_funds
+  {
+    crypto::public_key asset_id;
+    uint64_t amount;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
+      KV_SERIALIZE(amount)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
+  struct ionic_swap_proposal_info
+  {
+    std::vector<asset_funds> to_finalizer;   //assets that addressed to receiver of proposal (aka Bob, aka "finalizer") and funded by side that creating proposal (aka Alice, aka "initiator") 
+    std::vector<asset_funds> to_initiator;   //assets addressed to initiator of proposal (aka Alice, aka "initiator") and expected to be funded by the side that receiving proposal (aka Bob,  aka "finalizer") 
+    uint64_t mixins;
+    uint64_t fee_paid_by_a;
+    //uint64_t expiration_time;
+
+    BEGIN_KV_SERIALIZE_MAP()
+
+      KV_SERIALIZE(to_finalizer)
+      KV_SERIALIZE(to_initiator)
+      KV_SERIALIZE(mixins)
+      KV_SERIALIZE(fee_paid_by_a)
+      //KV_SERIALIZE(expiration_time)
+    END_KV_SERIALIZE_MAP()
+
+  };
+
+
+  struct ionic_swap_proposal_context
+  {
+    currency::tx_generation_context gen_context;
+    
+    BEGIN_SERIALIZE_OBJECT()
+      VERSION(0)   //use VERSION_TO_MEMBER if it's more then 0
+      FIELD(gen_context)
+    END_SERIALIZE()
+  };
+
+  struct ionic_swap_proposal
+  {
+    currency::transaction tx_template;
+    std::string encrypted_context;          //ionic_swap_proposal_context encrypted with derivation
+
+    BEGIN_SERIALIZE_OBJECT()
+      VERSION(0)   //use VERSION_TO_MEMBER if it's more then 0
+      FIELD(tx_template)
+      FIELD(encrypted_context)
+    END_SERIALIZE()
+  };
+
+  struct create_ionic_swap_proposal_request
+  {
+    uint64_t wallet_id;
+    ionic_swap_proposal_info proposal_info;
+    std::string destination_add;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wallet_id)
+      KV_SERIALIZE(proposal_info)
+      KV_SERIALIZE(destination_add)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
+  struct COMMAND_IONIC_SWAP_GENERATE_PROPOSAL
+  {
+    struct request
+    {
+      ionic_swap_proposal_info proposal;
+      std::string destination_address;
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(proposal)
+        KV_SERIALIZE(destination_address)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      std::string hex_raw_proposal;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(hex_raw_proposal)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO
+  {
+    struct request
+    {
+      std::string hex_raw_proposal;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(hex_raw_proposal)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      ionic_swap_proposal_info proposal;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(proposal)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL
+  {
+    struct request
+    {
+      std::string hex_raw_proposal;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(hex_raw_proposal)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      crypto::hash result_tx_id;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx_id)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+
+  struct wallet_info
+  {
+    std::list<tools::wallet_public::asset_balance_entry> balances;
+    uint64_t mined_total;
+    std::string address;
+    std::string view_sec_key;
+    std::string path;
+    bool is_auditable;
+    bool is_watch_only;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(balances)
+      KV_SERIALIZE(mined_total)
+      KV_SERIALIZE(address)
+      KV_SERIALIZE(view_sec_key)
+      KV_SERIALIZE(path)
+      KV_SERIALIZE(is_auditable)
+      KV_SERIALIZE(is_watch_only)
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct wallet_info_extra
+  {
+    std::string view_private_key;
+    std::string view_public_key;
+    std::string spend_private_key;
+    std::string spend_public_key;
+    std::string seed;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(view_private_key)
+      KV_SERIALIZE(view_public_key)
+      KV_SERIALIZE(spend_private_key)
+      KV_SERIALIZE(spend_public_key)
+      KV_SERIALIZE(seed)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
+  struct wallet_entry_info
+  {
+    wallet_info wi;
+    uint64_t    wallet_id;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(wi)
+      KV_SERIALIZE(wallet_id)
+    END_KV_SERIALIZE_MAP()
+
+  };
+
+  struct COMMAND_MW_GET_WALLETS
+  {
+    struct request
+    {
+      BEGIN_KV_SERIALIZE_MAP()
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::vector<wallet_entry_info> wallets;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(wallets)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_MW_SELECT_WALLET
+  {
+    struct request
+    {
+      uint64_t wallet_id;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(wallet_id)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      std::string status;
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_SIGN_MESSAGE
+  {
+    struct request
+    {
+      std::string buff; //base64 encoded data
+      
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(buff)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      crypto::signature sig = currency::null_sig;
+      crypto::public_key pkey = currency::null_pkey;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(sig)
+        KV_SERIALIZE_POD_AS_HEX_STRING(pkey)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+   
+  struct COMMAND_ENCRYPT_DATA
+  {
+    struct request
+    {
+      std::string buff; //base64 encoded data
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(buff)
+      END_KV_SERIALIZE_MAP()
+    };     
+
+    struct response
+    { 
+      std::string res_buff; //base64 encoded encrypted data
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(res_buff)
+      END_KV_SERIALIZE_MAP()
+    };
+  }; 
+  
+  struct COMMAND_DECRYPT_DATA
+  {
+    struct request
+    {
+      std::string buff; //base64 encoded encrypted data
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(buff)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      std::string res_buff; //base64 encoded data
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(res_buff)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+
+  struct assets_whitelist
+  {
+    std::vector<currency::asset_descriptor_with_id> assets;
+    crypto::signature signature = currency::null_sig;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(assets)
+      KV_SERIALIZE_POD_AS_HEX_STRING(signature)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
   inline std::string get_escrow_contract_state_name(uint32_t state)
   {
     switch (state)
@@ -1147,6 +1731,10 @@ namespace wallet_public
     }
   }
 
+  inline bool operator==(const asset_funds& lhs, const asset_funds& rhs)
+  {
+    return lhs.amount == rhs.amount && lhs.asset_id == rhs.asset_id;
+  }
 
 } // namespace wallet_rpc
 } // namespace tools

@@ -29,13 +29,22 @@
 #include "serialization/keyvalue_serialization.h"
 #include "storages/portable_storage_template_helper.h"
 #include "http_base.h"
+#include "net/net_utils_base.h"
+
+
+
+template<typename typename_t>
+typename_t get_documentation_json_struct()
+{
+  return AUTO_VAL_INIT_T(typename_t);
+}
 
 template<typename request_t, typename response_t>
 bool auto_doc_t(const std::string& prefix_name, std::string& generate_reference)
 {
   if (!generate_reference.size()) return true;
-  request_t req = AUTO_VAL_INIT(req);
-  response_t res = AUTO_VAL_INIT(res);
+  request_t req = get_documentation_json_struct<request_t>();
+  response_t res = get_documentation_json_struct<response_t>();
   std::stringstream ss;
   ss << prefix_name << ENDL
     << "REQUEST: " << ENDL << epee::serialization::store_t_to_json(req) << ENDL <<  "--------------------------------" << ENDL
@@ -50,6 +59,20 @@ bool auto_doc(const std::string& prefix_name, std::string& generate_reference)
 {
   return auto_doc_t<typename command_type_t::request, typename command_type_t::response>(prefix_name, generate_reference);
 }
+
+namespace epee {
+  namespace net_utils {
+    namespace http {
+      struct i_chain_handler
+      {
+        virtual bool handle_http_request_map(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response_info,
+          epee::net_utils::connection_context_base& m_conn_context, bool& call_found, std::string& generate_reference) = 0;
+      };
+    }
+  }
+} 
+
+
 
 
 #define CHAIN_HTTP_TO_MAP2(context_type) bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, \
@@ -72,6 +95,13 @@ bool auto_doc(const std::string& prefix_name, std::string& generate_reference)
   t_context& m_conn_context, bool& call_found, std::string& generate_reference) { \
   call_found = false; \
   if(false) return true; //just a stub to have "else if"
+
+#define BEGIN_URI_MAP2_VIRTUAL()   virtual bool handle_http_request_map(const epee::net_utils::http::http_request_info& query_info, \
+  epee::net_utils::http::http_response_info& response_info, \
+  epee::net_utils::connection_context_base& m_conn_context, bool& call_found, std::string& generate_reference) { \
+  call_found = false; \
+  if(false) return true; //just a stub to have "else if"
+
 
 #define MAP_URI2(pattern, callback)  else if(std::string::npos != query_info.m_URI.find(pattern)) return callback(query_info, response_info, m_conn_context);
 
@@ -116,6 +146,8 @@ bool auto_doc(const std::string& prefix_name, std::string& generate_reference)
       response_info.m_header_info.m_content_type = " application/octet-stream"; \
       LOG_PRINT( "[HTTP/BIN][" << epee::string_tools::get_ip_string_from_int32(m_conn_context.m_remote_ip ) << "][" << query_info.m_URI << "] processed with " << ticks1-ticks << "/"<< ticks2-ticks1 << "/" << ticks3-ticks2 << "ms", LOG_LEVEL_2); \
     }
+
+#define CHAIN_TO_PHANDLER(pi_chain_handler) else if (pi_chain_handler && pi_chain_handler->handle_http_request_map(query_info, response_info, m_conn_context, call_found, generate_reference) && call_found) { return true;}
 
 #define CHAIN_URI_MAP2(callback) else {callback(query_info, response_info, m_conn_context);call_found = true;}
 
@@ -287,6 +319,7 @@ struct json_command_type_t
 #define MAP_JON_RPC_WE(method_name, callback_f, command_type) \
     else if(auto_doc<json_command_type_t<command_type>>("[" method_name "]", generate_reference) && callback_name == method_name) \
 { \
+  call_found = true; \
   PREPARE_OBJECTS_FROM_JSON(command_type) \
   epee::json_rpc::error_response fail_resp = AUTO_VAL_INIT(fail_resp); \
   fail_resp.jsonrpc = "2.0"; \
@@ -304,6 +337,7 @@ struct json_command_type_t
 #define MAP_JON_RPC_WERI(method_name, callback_f, command_type) \
     else if(auto_doc<json_command_type_t<command_type>>("[" method_name "]", generate_reference) && callback_name == method_name) \
 { \
+  call_found = true; \
   PREPARE_OBJECTS_FROM_JSON(command_type) \
   epee::json_rpc::error_response fail_resp = AUTO_VAL_INIT(fail_resp); \
   fail_resp.jsonrpc = "2.0"; \
@@ -321,6 +355,7 @@ struct json_command_type_t
 #define MAP_JON_RPC(method_name, callback_f, command_type) \
     else if(auto_doc<json_command_type_t<command_type>>(std::string("[") + method_name + "]", generate_reference) && callback_name == method_name) \
 { \
+  call_found = true; \
   PREPARE_OBJECTS_FROM_JSON(command_type) \
   if(!callback_f(req.params, resp.result, m_conn_context)) \
   { \

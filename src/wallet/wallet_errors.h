@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <boost/algorithm/string.hpp>
 
 #include "currency_core/currency_format_utils.h"
 #include "rpc/core_rpc_server_commands_defs.h"
@@ -70,10 +71,10 @@ namespace tools
       std::string to_string() const
       {
         std::ostringstream ss;
-        ss << m_loc << ':' << typeid(*this).name();
+        ss << m_loc << '[' << boost::replace_all_copy(std::string(typeid(*this).name()), "struct ", "");
         if (!m_error_code.empty())
           ss << "[" << m_error_code << "]";
-        ss << ": " << Base::what();
+        ss << "] " << Base::what();
         return ss.str();
       }
 
@@ -349,11 +350,12 @@ namespace tools
     //----------------------------------------------------------------------------------------------------
     struct not_enough_money : public transfer_error
     {
-      not_enough_money(std::string&& loc, uint64_t availbable, uint64_t tx_amount, uint64_t fee)
-        : transfer_error(std::move(loc), "NOT_ENOUGH_MONEY")
+      not_enough_money(std::string&& loc, uint64_t availbable, uint64_t tx_amount, uint64_t fee, const crypto::public_key& asset_id)
+        : transfer_error(std::move(loc), "")
         , m_available(availbable)
         , m_tx_amount(tx_amount)
         , m_fee(fee)
+        , m_asset_id(asset_id)
       {
       }
 
@@ -365,9 +367,11 @@ namespace tools
       {
         std::ostringstream ss;
         ss << transfer_error::to_string() <<
-          ", available = " << currency::print_money(m_available) <<
-          ", tx_amount = " << currency::print_money(m_tx_amount) <<
-          ", fee = " << currency::print_money(m_fee);
+          "available: " << currency::print_money_brief(m_available) <<
+          ", required: " << currency::print_money_brief(m_tx_amount + m_fee) <<
+          " = " << currency::print_money_brief(m_tx_amount) << " + " << currency::print_money_brief(m_fee) << " (fee)";
+        if (m_asset_id != currency::native_coin_asset_id)
+          ss << ", asset_id: " << m_asset_id;
         return ss.str();
       }
 
@@ -375,6 +379,18 @@ namespace tools
       uint64_t m_available;
       uint64_t m_tx_amount;
       uint64_t m_fee;
+      crypto::public_key m_asset_id;
+    };
+
+    struct no_zc_inputs : public transfer_error
+    {
+      no_zc_inputs(const std::string& /*v*/): transfer_error(std::string(""), API_RETURN_CODE_MISSING_ZC_INPUTS)
+      {}      
+
+      virtual const char* what() const noexcept
+      {
+        return API_RETURN_CODE_MISSING_ZC_INPUTS;
+      }
     };
     //----------------------------------------------------------------------------------------------------
     struct not_enough_outs_to_mix : public transfer_error
@@ -438,8 +454,19 @@ namespace tools
         for (size_t i = 0; i < m_sources.size(); ++i)
         {
           const currency::tx_source_entry& src = m_sources[i];
-          ss << "\n  source " << i << ":";
-          ss << "\n    amount: " << currency::print_money(src.amount);
+          ss << "\n  " << i << ": ";
+          ss << " amount: " << std::setw(21) << currency::print_money(src.amount);
+          ss << (src.is_zc() ? " ZC  " : " old ");
+          ss << " asset_id: " << src.asset_id;
+           for (size_t j = 0; j < src.outputs.size(); ++j)
+          {
+            const currency::tx_source_entry::output_entry& out = src.outputs[j];
+            if (out.out_reference.type() == typeid(uint64_t))
+              ss << "\n      ref #" << j << ": " << boost::get<uint64_t>(out.out_reference);
+            else
+              ss << "\n      ref #" << j << ": ref by id";
+           }
+
           // It's not good, if logs will contain such much data
           //ss << "\n    real_output: " << src.real_output;
           //ss << "\n    real_output_in_tx_index: " << src.real_output_in_tx_index;
@@ -462,7 +489,8 @@ namespace tools
           {
             ss << currency::get_account_address_as_str(a) << ";";
           } 
-          ss << " anount: " << currency::print_money(dst.amount);
+          ss << " amount: " << std::setw(21) << currency::print_money(dst.amount);
+          ss << " asset_id: " << dst.asset_id;
         }
 
         ss << "\nunlock_time: " << m_unlock_time;
@@ -703,7 +731,7 @@ if (!(cond))                                                                    
 {                                                                                                          \
   exception_handler();                                                                                     \
   std::stringstream ss;                                                                                    \
-  ss << std::endl << mess;                                                                                 \
+  ss << std::endl << "[" << error_code << "]" << mess ;                                                                                 \
   LOG_ERROR(#cond << ". THROW EXCEPTION: " << error_code << ss.str());                                                  \
   tools::error::throw_wallet_ex<tools::error::wallet_error>(std::string(__FILE__ ":" STRINGIZE(__LINE__)), ss.str(), error_code); \
 }
@@ -751,3 +779,11 @@ if (cond)                                                                       
     LOG_ERROR(" (" << #cond << ") is FALSE. THROW EXCEPTION: wallet_common_error");                                               \
     tools::error::throw_wallet_ex<tools::error::wallet_common_error>(std::string(__FILE__ ":" STRINGIZE(__LINE__)), ss.str());    \
   }
+#define THROW_WALLET_CMN_ERR_EX(mess)                                                                              \
+  {                                                                                                                               \
+    std::stringstream ss;                                                                                                         \
+    ss << mess;                                                                                                                   \
+    LOG_ERROR("THROW EXCEPTION: wallet_common_error");                                               \
+    tools::error::throw_wallet_ex<tools::error::wallet_common_error>(std::string(__FILE__ ":" STRINGIZE(__LINE__)), ss.str());    \
+  }
+

@@ -21,16 +21,16 @@ namespace
   {
     uint64_t total_amount = get_outs_money_amount(miner_tx);
     uint64_t amount_2 = total_amount - amount_1;
-    txout_target_v target = miner_tx.vout[0].target;
+    txout_target_v target =boost::get<currency::tx_out_bare>( miner_tx.vout[0]).target;
 
     miner_tx.vout.clear();
 
-    tx_out out1;
+    tx_out_bare out1;
     out1.amount = amount_1;
     out1.target = target;
     miner_tx.vout.push_back(out1);
 
-    tx_out out2;
+    tx_out_bare out2;
     out2.amount = amount_2;
     out2.target = target;
     miner_tx.vout.push_back(out2);
@@ -39,8 +39,13 @@ namespace
   void append_tx_source_entry(std::vector<currency::tx_source_entry>& sources, const transaction& tx, size_t out_idx)
   {
     currency::tx_source_entry se = AUTO_VAL_INIT(se);
-    se.amount = tx.vout[out_idx].amount;
-    se.outputs.push_back(make_serializable_pair<txout_ref_v, crypto::public_key>(0, boost::get<currency::txout_to_key>(tx.vout[out_idx].target).key));
+    se.amount =boost::get<currency::tx_out_bare>( tx.vout[out_idx]).amount;
+
+    currency::tx_source_entry::output_entry oe = AUTO_VAL_INIT(oe);
+    oe.out_reference = 0;
+    oe.stealth_address = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(tx.vout[out_idx]).target).key;
+    se.outputs.push_back(oe);
+    //se.outputs.push_back(make_serializable_pair<txout_ref_v, crypto::public_key>(0, boost::get<currency::txout_to_key>(boost::get<currency::tx_out_bare>(tx.vout[out_idx]).target).key));
     se.real_output = 0;
     se.real_out_tx_key = get_tx_pub_key_from_extra(tx);
     se.real_output_in_tx_index = out_idx;
@@ -110,8 +115,8 @@ bool gen_uint_overflow_1::generate(std::vector<test_event_entry>& events) const
   // Problem 2. total_fee overflow, block_reward overflow
   std::list<currency::transaction> txs_1;
   // Create txs with huge fee
-  txs_1.push_back(construct_tx_with_fee(events, blk_3, bob_account, alice_account, MK_TEST_COINS(1), TX_MAX_TRANSFER_AMOUNT - MK_TEST_COINS(1)));
-  txs_1.push_back(construct_tx_with_fee(events, blk_3, bob_account, alice_account, MK_TEST_COINS(1), TX_MAX_TRANSFER_AMOUNT - MK_TEST_COINS(1)));
+  txs_1.push_back(construct_tx_with_fee(m_hardforks, events, blk_3, bob_account, alice_account, MK_TEST_COINS(1), TX_MAX_TRANSFER_AMOUNT - MK_TEST_COINS(1)));
+  txs_1.push_back(construct_tx_with_fee(m_hardforks, events, blk_3, bob_account, alice_account, MK_TEST_COINS(1), TX_MAX_TRANSFER_AMOUNT - MK_TEST_COINS(1)));
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_4, blk_3r, miner_account, txs_1);
 
   return true;
@@ -134,7 +139,7 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
   std::vector<currency::tx_source_entry> sources;
   for (size_t i = 0; i < blk_0.miner_tx.vout.size(); ++i)
   {
-    if (TESTS_DEFAULT_FEE < blk_0.miner_tx.vout[i].amount)
+    if (TESTS_DEFAULT_FEE < boost::get<currency::tx_out_bare>(blk_0.miner_tx.vout[i]).amount)
     {
       append_tx_source_entry(sources, blk_0.miner_tx, i);
       break;
@@ -154,7 +159,7 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
 
   currency::transaction tx_1;
   std::vector<currency::attachment_v> attachments;
-  if (!construct_tx(miner_account.get_keys(), sources, destinations, attachments, tx_1, 0))
+  if (!construct_tx(miner_account.get_keys(), sources, destinations, attachments, tx_1, get_tx_version_from_events(events), 0))
     return false;
   events.push_back(tx_1);
 
@@ -165,7 +170,7 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
   sources.clear();
   for (size_t i = 0; i < tx_1.vout.size(); ++i)
   {
-    auto& tx_1_out = tx_1.vout[i];
+    auto& tx_1_out = boost::get<tx_out_bare>(tx_1.vout[i]);
     if (tx_1_out.amount < TX_MAX_TRANSFER_AMOUNT - 1)
       continue;
 
@@ -181,7 +186,7 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
 
   currency::transaction tx_2;
   std::vector<currency::attachment_v> attachments2;
-  if (!construct_tx(bob_account.get_keys(), sources, destinations, attachments2, tx_2, 0))
+  if (!construct_tx(bob_account.get_keys(), sources, destinations, attachments2, tx_2, get_tx_version_from_events(events), 0))
     return false;
   events.push_back(tx_2);
 

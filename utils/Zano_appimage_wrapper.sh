@@ -32,8 +32,8 @@ create_desktop_icon()
     echo GenericName=Zano | tee -a $target_file_name  > /dev/null
     echo Comment=Privacy blockchain | tee -a $target_file_name > /dev/null
     echo Icon=${out_dir}/Zano.png | tee -a $target_file_name > /dev/null
-    echo Exec=$APPIMAGE --deeplink-params=%u | tee -a $target_file_name  > /dev/null
-    echo Terminal=true | tee -a $target_file_name  > /dev/null
+    echo Exec=$APPIMAGE --deeplink-params=\\\"%u\\\" | tee -a $target_file_name  > /dev/null
+    echo Terminal=false | tee -a $target_file_name  > /dev/null
     echo Type=Application | tee -a $target_file_name  > /dev/null
     echo "Categories=Qt;Utility;" | tee -a $target_file_name  > /dev/null
     echo "MimeType=x-scheme-handler/zano;" | tee -a $target_file_name  > /dev/null

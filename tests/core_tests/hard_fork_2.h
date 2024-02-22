@@ -7,27 +7,25 @@
 #include "wallet_tests_basic.h"
 #include "random_helper.h"
 
-struct hard_fork_2_base_test : virtual public test_chain_unit_enchanced
+struct hard_fork_2_base_test : public wallet_test
 {
   hard_fork_2_base_test(size_t hardfork_02_height);
   hard_fork_2_base_test(size_t hardfork_01_height, size_t hardfork_02_height);
   bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
-
-  void set_hard_fork_heights_to_generator(test_generator& generator) const;
 
   size_t m_hardfork_01_height;
   size_t m_hardfork_02_height;
   size_t m_hardfork_03_height;
 };
 
-struct hard_fork_2_tx_payer_in_wallet : public wallet_test, public hard_fork_2_base_test
+struct hard_fork_2_tx_payer_in_wallet : public hard_fork_2_base_test
 {
   hard_fork_2_tx_payer_in_wallet();
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
-struct hard_fork_2_tx_receiver_in_wallet : public wallet_test, public hard_fork_2_base_test
+struct hard_fork_2_tx_receiver_in_wallet : public hard_fork_2_base_test
 {
   hard_fork_2_tx_receiver_in_wallet();
   bool generate(std::vector<test_event_entry>& events) const;
@@ -36,21 +34,21 @@ struct hard_fork_2_tx_receiver_in_wallet : public wallet_test, public hard_fork_
   mutable uint64_t m_alice_start_balance;
 };
 
-struct hard_fork_2_tx_extra_alias_entry_in_wallet : public wallet_test, public hard_fork_2_base_test
+struct hard_fork_2_tx_extra_alias_entry_in_wallet : public hard_fork_2_base_test
 {
   hard_fork_2_tx_extra_alias_entry_in_wallet();
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
-struct hard_fork_2_auditable_addresses_basics : public wallet_test, public hard_fork_2_base_test
+struct hard_fork_2_auditable_addresses_basics : public wallet_test //hard_fork_2_base_test
 {
   hard_fork_2_auditable_addresses_basics();
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
-struct hard_fork_2_no_new_structures_before_hf : public wallet_test, public hard_fork_2_base_test
+struct hard_fork_2_no_new_structures_before_hf : public hard_fork_2_base_test
 {
   using hard_fork_2_base_test::check_block_verification_context; // this is necessary for correct work of do_check_block_verification_context, consider rafactoring
 
@@ -60,7 +58,7 @@ struct hard_fork_2_no_new_structures_before_hf : public wallet_test, public hard
 };
 
 template<bool before_hf_2>
-struct hard_fork_2_awo_wallets_basic_test : public wallet_test, public hard_fork_2_base_test
+struct hard_fork_2_awo_wallets_basic_test : public hard_fork_2_base_test
 {
   hard_fork_2_awo_wallets_basic_test();
   bool generate(std::vector<test_event_entry>& events) const;
@@ -68,7 +66,7 @@ struct hard_fork_2_awo_wallets_basic_test : public wallet_test, public hard_fork
 };
 
 template<bool before_hf_2>
-struct hard_fork_2_alias_update_using_old_tx : public wallet_test, public hard_fork_2_base_test
+struct hard_fork_2_alias_update_using_old_tx : public hard_fork_2_base_test
 {
   hard_fork_2_alias_update_using_old_tx();
   bool generate(std::vector<test_event_entry>& events) const;
@@ -78,7 +76,7 @@ struct hard_fork_2_alias_update_using_old_tx : public wallet_test, public hard_f
 };
 
 template<bool before_hf_2>
-struct hard_fork_2_incorrect_alias_update : public wallet_test, public hard_fork_2_base_test
+struct hard_fork_2_incorrect_alias_update : public hard_fork_2_base_test
 {
   hard_fork_2_incorrect_alias_update();
   bool generate(std::vector<test_event_entry>& events) const;

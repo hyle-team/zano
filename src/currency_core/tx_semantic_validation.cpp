@@ -21,27 +21,27 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool check_tx_inputs_keyimages_diff(const transaction& tx)
   {
-    std::unordered_set<crypto::key_image> ki;
-    BOOST_FOREACH(const auto& in, tx.vin)
+    std::unordered_set<crypto::key_image> key_images;
+    crypto::key_image ki{};
+    for(const auto& in_v : tx.vin)
     {
-      if (in.type() == typeid(txin_to_key))
+      if (get_key_image_from_txin_v(in_v, ki))
       {
-        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, tokey_in, false);
-        if (!ki.insert(tokey_in.k_image).second)
-          return false;
-      }
-      else if (in.type() == typeid(txin_htlc))
-      {
-        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_htlc, htlc_in, false);
-        if (!ki.insert(htlc_in.k_image).second)
+        if (!key_images.insert(ki).second)
           return false;
       }
     }
     return true;
   }
   //-----------------------------------------------------------------------------------------------
-  bool validate_tx_semantic(const transaction& tx, size_t tx_block_size)
+  bool validate_tx_semantic(const transaction& tx, size_t tx_blob_size)
   {
+    if (tx_blob_size >= CURRENCY_MAX_TRANSACTION_BLOB_SIZE)
+    {
+      LOG_PRINT_RED_L0("tx blob size is " << tx_blob_size << ", it is greater than or equal to allowed maximum of " << CURRENCY_MAX_TRANSACTION_BLOB_SIZE);
+      return false;
+    }
+
     if (!tx.vin.size())
     {
       LOG_PRINT_RED_L0("tx with empty inputs, rejected for tx id= " << get_transaction_hash(tx));
@@ -56,29 +56,13 @@ namespace currency
 
     if (!check_outs_valid(tx))
     {
-      LOG_PRINT_RED_L0("tx with invalid outputs, rejected for tx id= " << get_transaction_hash(tx));
+      LOG_PRINT_RED_L0("tx has invalid outputs, rejected for tx id= " << get_transaction_hash(tx));
       return false;
     }
 
     if (!check_money_overflow(tx))
     {
       LOG_PRINT_RED_L0("tx has money overflow, rejected for tx id= " << get_transaction_hash(tx));
-      return false;
-    }
-
-    uint64_t amount_in = 0;
-    get_inputs_money_amount(tx, amount_in);
-    uint64_t amount_out = get_outs_money_amount(tx);
-
-    if (amount_in < amount_out)
-    {
-      LOG_PRINT_RED_L0("tx with wrong amounts: ins " << amount_in << ", outs " << amount_out << ", rejected for tx id= " << get_transaction_hash(tx));
-      return false;
-    }
-
-    if (tx_block_size >= CURRENCY_MAX_TRANSACTION_BLOB_SIZE)
-    {
-      LOG_PRINT_RED_L0("tx has too big size " << tx_block_size << ", expected no bigger than " << CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE);
       return false;
     }
 
@@ -93,6 +77,17 @@ namespace currency
     {
       LOG_PRINT_RED_L0("tx has wrong extra, rejected");
       return false;
+    }
+
+    // inexpensive check for pre-HF4 txs
+    // post-HF4 txs balance are being checked in check_tx_balance()
+    if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
+    {
+      if (!check_tx_bare_balance(tx))
+      {
+        LOG_PRINT_RED_L0("balance check failed for tx " << get_transaction_hash(tx));
+        return false;
+      }
     }
 
     return true;

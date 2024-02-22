@@ -61,10 +61,10 @@ inline bool do_serialize(Archive &ar, T &v)
 #define VARIANT_TAG(A, T, Tg) \
   template <bool W> struct variant_serialization_traits<A<W>, T> { static inline typename A<W>::variant_tag_type get_tag() { return Tg; } }
 #define BEGIN_SERIALIZE() \
-  template <bool W, template <bool> class Archive> bool do_serialize(Archive<W> &ar) {
+  template <bool W, template <bool> class Archive> bool do_serialize(Archive<W> &_ser_ar) {uint8_t s_current_version ATTRIBUTE_UNUSED = 0; uint8_t s_version ATTRIBUTE_UNUSED = 0;
 #define BEGIN_SERIALIZE_OBJECT() \
-  template <bool W, template <bool> class Archive> bool do_serialize(Archive<W> &ar) { ar.begin_object(); bool r = do_serialize_object(ar); ar.end_object(); return r; } \
-  template <bool W, template <bool> class Archive> bool do_serialize_object(Archive<W> &ar){
+  template <bool W, template <bool> class Archive> bool do_serialize(Archive<W> &_ser_ar) {_ser_ar.begin_object(); bool _ser_res = do_serialize_object(_ser_ar); _ser_ar.end_object(); return _ser_res; } \
+  template <bool W, template <bool> class Archive> bool do_serialize_object(Archive<W> &_ser_ar){ uint8_t s_current_version ATTRIBUTE_UNUSED = 0; uint8_t s_version ATTRIBUTE_UNUSED = 0; 
 #define PREPARE_CUSTOM_VECTOR_SERIALIZATION(size, vec) ::serialization::detail::prepare_custom_vector_serialization(size, vec, typename Archive<W>::is_saving())
 
 #define END_SERIALIZE() return true;}
@@ -72,42 +72,79 @@ inline bool do_serialize(Archive &ar, T &v)
 
 #define VALUE(f) \
 do { \
-  ar.tag(#f); \
-  bool r = ::do_serialize(ar, f); \
-  if (!r || !ar.stream().good()) return false; \
+  _ser_ar.tag(#f); \
+  bool _ser_res = ::do_serialize(_ser_ar, f); \
+  if (!_ser_res || !_ser_ar.stream().good()) return false; \
 } while (0);
 #define FIELD_N(t, f) \
 do { \
-  ar.tag(t); \
-  bool r = ::do_serialize(ar, f); \
-  if (!r || !ar.stream().good()) return false; \
+  _ser_ar.tag(t); \
+  bool _ser_res = ::do_serialize(_ser_ar, f); \
+  if (!_ser_res || !_ser_ar.stream().good()) return false; \
 } while (0);
 #define FIELDS(f) \
-  bool r = ::do_serialize(ar, f); \
-if (!r || !ar.stream().good()) return false;
+  bool _ser_res = ::do_serialize(_ser_ar, f); \
+if (!_ser_res || !_ser_ar.stream().good()) return false;
 #define FIELD(f) \
 do { \
-  ar.tag(#f); \
-  bool r = ::do_serialize(ar, f); \
-  if (!r || !ar.stream().good()) return false; \
+  _ser_ar.tag(#f); \
+  bool _ser_res = ::do_serialize(_ser_ar, f); \
+  if (!_ser_res || !_ser_ar.stream().good()) return false; \
 } while (0);
 #define VARINT_FIELD(f) \
 do { \
-  ar.tag(#f); \
-  ar.serialize_varint(f); \
-  if (!ar.stream().good()) return false; \
+  _ser_ar.tag(#f); \
+  _ser_ar.serialize_varint(f); \
+  if (!_ser_ar.stream().good()) return false; \
 } while (0);
+
+#define VERSION(ver)                                       \
+do {                                                    \
+  _ser_ar.tag("VERSION");                               \
+  if (!_ser_ar.stream().good()){break;}                 \
+  _ser_ar.serialize_varint(s_version);                   \
+  if (!_ser_ar.stream().good()) return false;           \
+  if(s_version > s_current_version) return false;       \
+} while (0);
+
+#define VERSION_TO_MEMBER(last_ver, this_version_member)                                       \
+do {                                                    \
+  _ser_ar.tag("VERSION");                               \
+  if (!_ser_ar.stream().good()){break;}                 \
+  _ser_ar.serialize_varint(this_version_member);        \
+  if (!_ser_ar.stream().good()) return false;           \
+  if(this_version_member > last_ver) return false;      \
+  s_version = this_version_member;                      \
+} while (0);
+
+
+/*
+#define CURRENT_VERSION(v)                              \
+do {                                                    \
+  s_current_version = v;                                \
+  if (_ser_ar.is_saving_arch()) { s_version = v; }      \
+} while (0);
+*/
+
+#define END_VERSION_UNDER(x)                            \
+  if(s_version < x ) {return true;}
+
+
+#define BEGIN_VERSIONED_SERIALIZE(last_ver, this_version_member) \
+  BEGIN_SERIALIZE() \
+  VERSION_TO_MEMBER(last_ver, this_version_member)
+
 
 #define DEFINE_SERIALIZATION_VERSION(v) inline static uint32_t get_serialization_version() { return v; }
 
 
 #define VERSION_ENTRY(f) \
 do { \
-  ar.tag(#f); \
-  if (ar.is_saving_arch())  \
+  _ser_ar.tag(#f); \
+  if (_ser_ar.is_saving_arch())  \
     f = this->get_serialization_version(); \
-  bool r = ::do_serialize(ar, f); \
-  if (!r || !ar.stream().good()) return false; \
+  bool _ser_res = ::do_serialize(_ser_ar, f); \
+  if (!_ser_res || !_ser_ar.stream().good()) return false; \
 } while (0);
 
 template<typename first_type, typename second_type>
@@ -212,6 +249,38 @@ std::string t_serializable_object_to_blob(const t_object& to)
   t_serializable_object_to_blob(to, b);
   return b;
 }
+
+
+template<bool IsSaving, typename destination_t>
+struct transition_t {};
+
+template<typename destination_t>
+struct transition_t<true, destination_t>
+{
+  template <typename archive, typename origin_type>
+  static bool chain_serialize(archive &ar, const origin_type& origin_tx)
+  {
+    destination_t dst_tx = AUTO_VAL_INIT(dst_tx);
+    transition_convert(origin_tx, dst_tx);
+    return dst_tx.do_serialize(ar);
+  }
+};
+
+template<typename destination_t>
+struct transition_t<false, destination_t>
+{
+  template <typename archive, typename origin_type>
+  static bool chain_serialize(archive &ar, origin_type& origin_tx)
+  {
+    // TODO: consider using move semantic for temporary 'dst_tx'
+    destination_t dst_tx = AUTO_VAL_INIT(dst_tx);
+    bool r = dst_tx.do_serialize(ar);
+    if (!r) return r;
+    return transition_convert(dst_tx, origin_tx);
+  }
+};
+
+#define CHAIN_TRANSITION_VER(tx_version, old_type)   if (tx_version == version) return transition_t<W, old_type>::chain_serialize(_ser_ar, *this);
 
 #include "serialize_basic_types.h"
 #include "string.h"

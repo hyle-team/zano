@@ -41,7 +41,7 @@ struct ev_visitor : public boost::static_visitor<bool>
 };
 
 
-bool generate_blockchain_with_pruned_rs(std::vector<test_event_entry>& events)
+bool prun_ring_signatures::generate_blockchain_with_pruned_rs(std::vector<test_event_entry>& events)const
 {
   uint64_t ts_start = 1338224400;
   GENERATE_ACCOUNT(miner_account);

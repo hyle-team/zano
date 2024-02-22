@@ -50,12 +50,17 @@ namespace tools
     //------------------------------------------------------------------------------------------------------------------------------
     bool call_COMMAND_RPC_GET_ALIASES_BY_ADDRESS(const currency::COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& req, currency::COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& res) override
     {
-      return m_rpc.on_alias_by_address(req, res, m_err_stub, m_cntxt_stub);
+      return m_rpc.on_aliases_by_address(req, res, m_err_stub, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
     bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res) override
     {
       return m_rpc.on_get_random_outs(req, res, m_cntxt_stub);
+    }
+    //------------------------------------------------------------------------------------------------------------------------------
+    bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::response& res) override
+    {
+      return m_rpc.on_get_random_outs2(req, res, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
     bool call_COMMAND_RPC_SEND_RAW_TX(const currency::COMMAND_RPC_SEND_RAW_TX::request& req, currency::COMMAND_RPC_SEND_RAW_TX::response& res) override
@@ -98,11 +103,6 @@ namespace tools
       return m_rpc.on_check_keyimages(req, rsp, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
-    bool call_COMMAND_RPC_SCAN_POS(const currency::COMMAND_RPC_SCAN_POS::request& req, currency::COMMAND_RPC_SCAN_POS::response& rsp) override
-    {
-      return m_rpc.on_scan_pos(req, rsp, m_cntxt_stub);
-    }
-    //------------------------------------------------------------------------------------------------------------------------------
     bool call_COMMAND_RPC_GETBLOCKTEMPLATE(const currency::COMMAND_RPC_GETBLOCKTEMPLATE::request& req, currency::COMMAND_RPC_GETBLOCKTEMPLATE::response& rsp) override
     {
       return m_rpc.on_getblocktemplate(req, rsp, m_err_stub, m_cntxt_stub);
@@ -136,6 +136,11 @@ namespace tools
     bool call_COMMAND_RPC_GET_POOL_INFO(const currency::COMMAND_RPC_GET_POOL_INFO::request& req, currency::COMMAND_RPC_GET_POOL_INFO::response& res) override
     {
       return m_rpc.on_get_pool_info(req, res, m_cntxt_stub);
+    }
+    //------------------------------------------------------------------------------------------------------------------------------
+    virtual bool call_COMMAND_RPC_GET_ASSET_INFO(const currency::COMMAND_RPC_GET_ASSET_INFO::request& req, currency::COMMAND_RPC_GET_ASSET_INFO::response& res)override
+    {
+      return m_rpc.on_get_asset_info(req, res, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
     virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override

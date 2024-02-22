@@ -15,6 +15,11 @@ gen_chain_switch_pow_pos::gen_chain_switch_pow_pos()
   : m_enormous_fee(0)
   , m_invalid_block_index(std::numeric_limits<decltype(m_invalid_block_index)>::max())
 {
+  m_hardforks.m_height_the_hardfork_n_active_after[1] = 1440;
+  m_hardforks.m_height_the_hardfork_n_active_after[2] = 1800;
+  m_hardforks.m_height_the_hardfork_n_active_after[3] = 1801;
+  m_hardforks.m_height_the_hardfork_n_active_after[4] = 50000000000;
+
   REGISTER_CALLBACK_METHOD(gen_chain_switch_pow_pos, configure_core);
   REGISTER_CALLBACK_METHOD(gen_chain_switch_pow_pos, check_height1);
   REGISTER_CALLBACK_METHOD(gen_chain_switch_pow_pos, check_chains_1);
@@ -81,7 +86,7 @@ bool gen_chain_switch_pow_pos::generate(std::vector<test_event_entry>& events) c
   block plk_2 = AUTO_VAL_INIT(plk_2);
   generator.construct_block(events, plk_2, blk_1, miner_acc, std::list<transaction>(1, tx_2), miner_stake_sources);
   events.push_back(plk_2);                                                                    // N+10
-  PRINT_EVENT_NO(events);
+  PRINT_EVENT_N(events);
 
   /* legend: (n) - PoW block, !m! - PoS block
      0....10    11    12   <-- blockchain height
@@ -119,15 +124,24 @@ bool gen_chain_switch_pow_pos::generate(std::vector<test_event_entry>& events) c
     crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
     size_t stake_output_idx = 0, i = 0;
     uint64_t stake_output_amount = 0;
-    std::for_each(stake.vout.begin(), stake.vout.end(), [&stake_output_amount, &stake_output_idx, &i](const tx_out& o){ if (o.amount > stake_output_amount) { stake_output_amount = o.amount; stake_output_idx = i; } ++i; });
+    std::for_each(stake.vout.begin(), stake.vout.end(), [&stake_output_amount, &stake_output_idx, &i](const tx_out_v& o_)
+      {
+      auto& o = boost::get<currency::tx_out_bare>(o_);
+        if (o.amount > stake_output_amount) 
+        {
+          stake_output_amount = o.amount; 
+          stake_output_idx = i; 
+        } 
+        ++i; 
+      });
     size_t stake_output_gidx = generator.get_tx_out_gindex(prev_id, currency::get_transaction_hash(stake), stake_output_idx);
     crypto::key_image stake_output_key_image;
     keypair kp;
     generate_key_image_helper(alice.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(stake.vout[stake_output_idx].target).key;
+    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
-    pb.step1_init_header(height, prev_id);
+    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.step2_set_txs(std::vector<transaction>());
     pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
     pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), alice.get_public_address());
@@ -212,7 +226,7 @@ bool gen_chain_switch_pow_pos::check_balance_1(currency::core& c, size_t ev_inde
 
   test_generator::wallets_vector w;
   bool r = generator.build_wallets(get_block_hash(plk_2), m_accounts, w);
-  CHECK_AND_ASSERT_MES(r && w.size() == 3 && w[0] != 0 && w[1] != 0 && w[2] != 0, false, "failed to build wallets");
+  CHECK_AND_ASSERT_MES(r && w.size() == 3 && w[0].wallet != 0 && w[1].wallet != 0 && w[2].wallet != 0, false, "failed to build wallets");
 
   /*
   uint64_t mined_amount = m_early_blocks_reward * 12 + TX_POOL_MINIMUM_FEE / 2 + m_enormous_fee / 2;
@@ -220,7 +234,7 @@ bool gen_chain_switch_pow_pos::check_balance_1(currency::core& c, size_t ev_inde
     return false;
     */
 
-  if (!check_balance_via_wallet(*w[1], "alice", MK_TEST_COINS(1), 0, 0, 0, 0))
+  if (!check_balance_via_wallet(*w[1].wallet, "alice", MK_TEST_COINS(1), 0, 0, 0, 0))
     return false;
 
   return true;

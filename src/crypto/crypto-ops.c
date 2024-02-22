@@ -40,7 +40,6 @@ DISABLE_VS_WARNINGS(4146 4244)
 void fe_mul(fe, const fe, const fe);
 void fe_sq(fe, const fe);
 void fe_tobytes(unsigned char *, const fe);
-static void ge_madd(ge_p1p1 *, const ge_p3 *, const ge_precomp *);
 static void ge_msub(ge_p1p1 *, const ge_p3 *, const ge_precomp *);
 static void ge_p2_0(ge_p2 *);
 static void ge_p3_dbl(ge_p1p1 *, const ge_p3 *);
@@ -119,7 +118,7 @@ Postconditions:
    |h| bounded by 1.1*2^26,1.1*2^25,1.1*2^26,1.1*2^25,etc.
 */
 
-static void fe_add(fe h, const fe f, const fe g) {
+void fe_add(fe h, const fe f, const fe g) {
   int32_t f0 = f[0];
   int32_t f1 = f[1];
   int32_t f2 = f[2];
@@ -1425,7 +1424,7 @@ int ge_frombytes_vartime(ge_p3 *h, const unsigned char *s) {
 r = p + q
 */
 
-static void ge_madd(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q) {
+void ge_madd(ge_p1p1 *r, const ge_p3 *p, const ge_precomp *q) {
   fe t0;
   fe_add(r->X, p->Y, p->X);
   fe_sub(r->Y, p->Y, p->X);
@@ -4314,3 +4313,171 @@ void ge_cached_to_p2(ge_p2 *r, const ge_cached *c)
 
   fe_copy(r->Z, c->Z);
 }
+
+
+///////////////////////////
+// EXPERIMENTAL
+//
+
+// With these select_vartime/ge_scalarmult_base_vartime I got ~25% speed up comparing to the select/ge_scalarmult_base -- sowle
+static void select_vartime(ge_precomp *t, int pos, signed char b)
+{
+  unsigned char bnegative = negative(b);
+  unsigned char babs = b - (((-bnegative) & b) << 1);
+  const ge_precomp* base;
+
+  if (babs == 0)
+  {
+    ge_precomp_0(t);
+  }
+  else if (bnegative == 0)
+  {
+    base = &ge_base[pos][babs - 1];
+    fe_copy(t->yplusx,  base->yplusx);
+    fe_copy(t->yminusx, base->yminusx);
+    fe_copy(t->xy2d,    base->xy2d);
+  }
+  else
+  {
+    base = &ge_base[pos][babs - 1];
+    fe_copy(t->yplusx,  base->yminusx);
+    fe_copy(t->yminusx, base->yplusx);
+    fe_neg(t->xy2d,     base->xy2d);
+  }
+}
+
+void ge_scalarmult_base_vartime(ge_p3 *h, const unsigned char *a)
+{
+  signed char e[64];
+  signed char carry;
+  ge_p1p1 r;
+  ge_p2 s;
+  ge_precomp t;
+  int i;
+
+  for (i = 0; i < 32; ++i) {
+    e[2 * i + 0] = (a[i] >> 0) & 15;
+    e[2 * i + 1] = (a[i] >> 4) & 15;
+  }
+  /* each e[i] is between 0 and 15 */
+  /* e[63] is between 0 and 7 */
+
+  carry = 0;
+  for (i = 0; i < 63; ++i) {
+    e[i] += carry;
+    carry = e[i] + 8;
+    carry >>= 4;
+    e[i] -= carry << 4;
+  }
+  e[63] += carry;
+  /* each e[i] is between -8 and 8 */
+
+  ge_p3_0(h);
+  for (i = 1; i < 64; i += 2) {
+    select_vartime(&t, i / 2, e[i]);
+    ge_madd(&r, h, &t); ge_p1p1_to_p3(h, &r);
+  }
+
+  ge_p3_dbl(&r, h);  ge_p1p1_to_p2(&s, &r);
+  ge_p2_dbl(&r, &s); ge_p1p1_to_p2(&s, &r);
+  ge_p2_dbl(&r, &s); ge_p1p1_to_p2(&s, &r);
+  ge_p2_dbl(&r, &s); ge_p1p1_to_p3(h, &r);
+
+  for (i = 0; i < 64; i += 2) {
+    select_vartime(&t, i / 2, e[i]);
+    ge_madd(&r, h, &t); ge_p1p1_to_p3(h, &r);
+  }
+}
+
+
+static void select_custom_precomp_vartime(ge_precomp *t, const precomp_data_t base_precomp, int pos, signed char b)
+{
+  unsigned char bnegative = negative(b);
+  unsigned char babs = b - (((-bnegative) & b) << 1);
+  const ge_precomp* base;
+
+  if (babs == 0)
+  {
+    ge_precomp_0(t);
+  }
+  else if (bnegative == 0)
+  {
+    base = &base_precomp[pos][babs - 1];
+    fe_copy(t->yplusx,  base->yplusx);
+    fe_copy(t->yminusx, base->yminusx);
+    fe_copy(t->xy2d,    base->xy2d);
+  }
+  else
+  {
+    base = &base_precomp[pos][babs - 1];
+    fe_copy(t->yplusx,  base->yminusx);
+    fe_copy(t->yminusx, base->yplusx);
+    fe_neg(t->xy2d,     base->xy2d);
+  }
+}
+
+
+void ge_scalarmult_precomp_vartime(ge_p3 *h, const precomp_data_t base_precomp, const unsigned char *a)
+{
+  signed char e[64];
+  signed char carry;
+  ge_p1p1 r;
+  ge_p2 s;
+  ge_precomp t;
+  int i;
+
+  for (i = 0; i < 32; ++i) {
+    e[2 * i + 0] = (a[i] >> 0) & 15;
+    e[2 * i + 1] = (a[i] >> 4) & 15;
+  }
+  /* each e[i] is between 0 and 15 */
+  /* e[63] is between 0 and 7 */
+
+  carry = 0;
+  for (i = 0; i < 63; ++i) {
+    e[i] += carry;
+    carry = e[i] + 8;
+    carry >>= 4;
+    e[i] -= carry << 4;
+  }
+  e[63] += carry;
+  /* each e[i] is between -8 and 8 */
+
+  ge_p3_0(h);
+  for (i = 1; i < 64; i += 2) {
+    select_custom_precomp_vartime(&t, base_precomp, i / 2, e[i]);
+    ge_madd(&r, h, &t); ge_p1p1_to_p3(h, &r);
+  }
+
+  ge_p3_dbl(&r, h);  ge_p1p1_to_p2(&s, &r);
+  ge_p2_dbl(&r, &s); ge_p1p1_to_p2(&s, &r);
+  ge_p2_dbl(&r, &s); ge_p1p1_to_p2(&s, &r);
+  ge_p2_dbl(&r, &s); ge_p1p1_to_p3(h, &r);
+
+  for (i = 0; i < 64; i += 2) {
+    select_custom_precomp_vartime(&t, base_precomp, i / 2, e[i]);
+    ge_madd(&r, h, &t); ge_p1p1_to_p3(h, &r);
+  }
+}
+
+void ge_p3_to_precomp(ge_precomp *r, const ge_p3* p)
+{
+  fe recip;
+  fe x;
+  fe y;
+  //unsigned char s[32];
+
+  fe_invert(recip, p->Z);
+  fe_mul(x, p->X, recip);
+  fe_mul(y, p->Y, recip);
+  fe_sub(r->yminusx, y, x);
+  fe_add(r->yplusx, y, x);
+  fe_mul(r->xy2d, x, y);
+  fe_mul(r->xy2d, r->xy2d, fe_d2);
+
+  // to get canonical representation and obtain the very same beautiful numbers for ge_base in crypto-ops-data.c (maybe unnecessary, TODO -- sowle)
+  //fe_tobytes(s, r->yminusx); fe_frombytes(r->yminusx, s);
+  //fe_tobytes(s, r->yplusx);  fe_frombytes(r->yplusx, s);
+  //fe_tobytes(s, r->xy2d);    fe_frombytes(r->xy2d, s);
+}
+

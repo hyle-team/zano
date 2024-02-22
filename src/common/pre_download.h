@@ -21,8 +21,8 @@ namespace tools
   };
 
 #ifndef TESTNET
-  static constexpr pre_download_entry c_pre_download_mdbx = { "http://95.217.42.247/pre-download/zano_mdbx_95_2200000.pak", "c3bd64c62495c3f266759750952519f13f32fc161b59547beaa8202b6e26d516", 2628767033, 5100195840 };
-  static constexpr pre_download_entry c_pre_download_lmdb = { "http://95.217.42.247/pre-download/zano_lmdb_95_2200000.pak", "fcbf0ab3b23836e1a51fa675e719900fb94110cfb74790b3323cebce7fb9f5bd", 3426025872, 4954472448 };
+  static constexpr pre_download_entry c_pre_download_mdbx = { "http://95.217.42.247/pre-download/zano_mdbx_95_2500000.pak", "8ffa2cb4213f4f96f97033c65a9e52bc350f683237808597784e79b24d5bfee7", 3242348793, 5905489920 };
+  static constexpr pre_download_entry c_pre_download_lmdb = { "http://95.217.42.247/pre-download/zano_lmdb_95_2500000.pak", "5509650e12c8f901e6731a2bfaf3abfd64409e3e1366d3d94cd11db8beddb0c3", 4239505801, 5893566464 };
 #else
   static constexpr pre_download_entry c_pre_download_mdbx = { "", "", 0, 0 };
   static constexpr pre_download_entry c_pre_download_lmdb = { "", "", 0, 0 };
@@ -50,6 +50,7 @@ namespace tools
 
     boost::system::error_code ec;
     uint64_t sz = boost::filesystem::file_size(db_main_file_path, ec);
+    if (ec) sz = 0;
     bool flag_force_predownload = command_line::has_arg(vm, command_line::arg_force_predownload);
     if (pre_download.unpacked_size == 0 || !(ec || (pre_download.unpacked_size > sz && pre_download.unpacked_size - sz > pre_download_min_size_difference) || flag_force_predownload) )
     {
@@ -59,52 +60,58 @@ namespace tools
 
     // okay, let's download
 
-
     std::string downloading_file_path = db_main_file_path + ".download";
-
-    LOG_PRINT_MAGENTA("Trying to download blockchain database from " << url << " ...", LOG_LEVEL_0);
-    epee::net_utils::http::interruptible_http_client cl;
-
-    crypto::stream_cn_hash hash_stream;
-    auto last_update = std::chrono::system_clock::now();
-
-    auto cb = [&hash_stream, &last_update, &cb_should_stop](const std::string& buff, uint64_t total_bytes, uint64_t received_bytes)
+    if (!command_line::has_arg(vm, command_line::arg_process_predownload_from_path))
     {
-      if (cb_should_stop(total_bytes, received_bytes))
+
+      LOG_PRINT_MAGENTA("Trying to download blockchain database from " << url << " ...", LOG_LEVEL_0);
+      epee::net_utils::http::interruptible_http_client cl;
+
+      crypto::stream_cn_hash hash_stream;
+      auto last_update = std::chrono::system_clock::now();
+
+      auto cb = [&hash_stream, &last_update, &cb_should_stop](const std::string& buff, uint64_t total_bytes, uint64_t received_bytes)
       {
-        LOG_PRINT_MAGENTA(ENDL << "Interrupting download", LOG_LEVEL_0);
-        return false;
+        if (cb_should_stop(total_bytes, received_bytes))
+        {
+          LOG_PRINT_MAGENTA(ENDL << "Interrupting download", LOG_LEVEL_0);
+          return false;
+        }
+
+        hash_stream.update(buff.data(), buff.size());
+
+        auto dif = std::chrono::system_clock::now() - last_update;
+        if (dif >= std::chrono::milliseconds(300))
+        {
+          boost::io::ios_flags_saver ifs(std::cout);
+          std::cout << "Received " << received_bytes / 1048576 << " of " << total_bytes / 1048576 << " MiB ( " << std::fixed << std::setprecision(1) << 100.0 * received_bytes / total_bytes << " %)\r";
+          last_update = std::chrono::system_clock::now();
+        }
+
+        return true;
+      };
+
+      tools::create_directories_if_necessary(working_folder);
+      r = cl.download_and_unzip(cb, downloading_file_path, url, 5000 /* timout */, "GET", std::string(), 30 /* fails count */);
+      if (!r)
+      {
+        LOG_PRINT_RED("Downloading failed", LOG_LEVEL_0);
+        return !flag_force_predownload;  // fatal error only if force-predownload
       }
 
-      hash_stream.update(buff.data(), buff.size());
-
-      auto dif = std::chrono::system_clock::now() - last_update;
-      if (dif >= std::chrono::milliseconds(300))
+      crypto::hash data_hash = hash_stream.calculate_hash();
+      if (epee::string_tools::pod_to_hex(data_hash) != pre_download.hash)
       {
-        boost::io::ios_flags_saver ifs(std::cout);
-        std::cout << "Received " << received_bytes / 1048576 << " of " << total_bytes / 1048576 << " MiB ( " << std::fixed << std::setprecision(1) << 100.0 * received_bytes / total_bytes << " %)\r";
-        last_update = std::chrono::system_clock::now();
+        LOG_ERROR("hash missmatch in downloaded file, got: " << epee::string_tools::pod_to_hex(data_hash) << ", expected: " << pre_download.hash);
+        return !flag_force_predownload;  // fatal error only if force-predownload
       }
 
-      return true;
-    };
-
-    tools::create_directories_if_necessary(working_folder);
-    r = cl.download_and_unzip(cb, downloading_file_path, url, 5000 /* timout */, "GET", std::string(), 30 /* fails count */);
-    if (!r)
-    {
-      LOG_PRINT_RED("Downloading failed", LOG_LEVEL_0);
-      return !flag_force_predownload;  // fatal error only if force-predownload
+      LOG_PRINT_GREEN("Download succeeded, hash " << pre_download.hash << " is correct", LOG_LEVEL_0);
     }
-
-    crypto::hash data_hash = hash_stream.calculate_hash();
-    if (epee::string_tools::pod_to_hex(data_hash) != pre_download.hash)
+    else
     {
-      LOG_ERROR("hash missmatch in downloaded file, got: " << epee::string_tools::pod_to_hex(data_hash) << ", expected: " << pre_download.hash);
-      return !flag_force_predownload;  // fatal error only if force-predownload
+      downloading_file_path = command_line::get_arg(vm, command_line::arg_process_predownload_from_path);
     }
-
-    LOG_PRINT_GREEN("Download succeeded, hash " << pre_download.hash << " is correct" , LOG_LEVEL_0);
 
     if (!command_line::has_arg(vm, command_line::arg_validate_predownload))
     {
@@ -138,11 +145,14 @@ namespace tools
     std::string path_to_temp_blockchain_file = path_to_temp_blockchain + "/" + dbbs.get_db_main_file_name();
 
     tools::create_directories_if_necessary(path_to_temp_blockchain);
-    boost::filesystem::rename(downloading_file_path, path_to_temp_blockchain_file, ec);
-    if (ec)
+    if (downloading_file_path != path_to_temp_blockchain_file)
     {
-      LOG_ERROR("Rename failed: " << downloading_file_path << " -> " << path_to_temp_blockchain_file);
-      return false;
+      boost::filesystem::rename(downloading_file_path, path_to_temp_blockchain_file, ec);
+      if (ec)
+      {
+        LOG_ERROR("Rename failed: " << downloading_file_path << " -> " << path_to_temp_blockchain_file);
+        return false;
+      }
     }
 
     // remove old blockchain database from disk
@@ -179,6 +189,28 @@ namespace tools
 
     r = target_core.init(target_core_vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to init target core");
+
+    if (true/*TODO: copnfigure with command line option*/)
+    {
+      //set checkpoints
+      {
+        currency::checkpoints checkpoints;
+        bool res = currency::create_checkpoints(checkpoints);
+        CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize checkpoints");
+        res = source_core.set_checkpoints(std::move(checkpoints));
+        CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core");
+      }
+      {
+        currency::checkpoints checkpoints;
+        bool res = currency::create_checkpoints(checkpoints);
+        CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize checkpoints");
+        res = target_core.set_checkpoints(std::move(checkpoints));
+        CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core");
+      }
+    }
+
+
+
 
     CHECK_AND_ASSERT_MES(target_core.get_top_block_height() == 0, false, "Target blockchain initialized not empty");
     uint64_t total_blocks = source_core.get_current_blockchain_size();

@@ -125,7 +125,7 @@ int main(int argc, char* argv[])
 #endif
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
   log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
-  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,wallet");
+  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,wallet", false);
   LOG_PRINT_L0("Starting...");
 
   tools::signal_handler::install_fatal([](int sig_number, void* address) {
@@ -162,6 +162,7 @@ int main(int argc, char* argv[])
 
   command_line::add_arg(desc_cmd_sett, command_line::arg_no_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_force_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_process_predownload_from_path);
   command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_ntp);

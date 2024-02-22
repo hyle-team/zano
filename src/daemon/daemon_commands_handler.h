@@ -665,9 +665,9 @@ private:
 
         if (ptx->signatures.size() == 0)
           pruned_txs += 1;
+        signatures += ptx->signatures.size();
 
         txs += 1;
-        signatures += ptx->signatures.size();
         attachments += ptx->attachment.size();
       }
     }
