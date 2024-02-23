@@ -66,7 +66,7 @@ find_package(OpenSSL REQUIRED)
 
 
 if(APPLE)
-  set(CMAKE_OSX_DEPLOYMENT_TARGET 12.00)          
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12)
 endif()
 
 set(USE_PCH FALSE CACHE BOOL "Use shared precompiled headers")
@@ -217,6 +217,7 @@ endif()
 
 message("CMAKE_SYSTEM_NAME: ${CMAKE_SYSTEM_NAME}")    
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 12.00)
   set(Boost_LIBRARIES "libboost.a")
   #workaround for new XCode 12 policy for builds(now it includes a slice for the "arm64" when builds for simulator)
   set(__iphoneos_archs "arm64")

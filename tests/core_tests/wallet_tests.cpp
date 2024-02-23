@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -3750,6 +3750,62 @@ bool wallet_spend_form_auditable_and_track::c1(currency::core& c, size_t ev_inde
   }, true);
   CHECK_AND_ASSERT_MES(r, false, "cannot get comment from tx");
   CHECK_AND_ASSERT_MES(r_comment, false, "wrong comment got from tx");
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+wallet_and_sweep_below::wallet_and_sweep_below()
+{
+  REGISTER_CALLBACK_METHOD(wallet_and_sweep_below, c1);
+}
+
+bool wallet_and_sweep_below::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: basic check for wallet2::sweep_below() functionality 
+
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base preminer_acc;
+  preminer_acc.generate();
+  preminer_acc.set_createtime(ts);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  MAKE_GENESIS_BLOCK(events, blk_0, preminer_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, preminer_acc);
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, 3 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW - 1);
+
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool wallet_and_sweep_below::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+
+  uint64_t miner_balance = (3 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW - 1) * COIN;
+  uint64_t unlocked_miner_balance = miner_balance - (CURRENCY_MINED_MONEY_UNLOCK_WINDOW - 1) * COIN;
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Miner", miner_wlt, miner_balance, false, SIZE_MAX, unlocked_miner_balance), false, "");
+
+  size_t outs_total = 0;
+  size_t amount_total = 0;
+  size_t outs_swept = 0;
+  size_t amount_swept = 0;
+  transaction tx{};
+  miner_wlt->sweep_below(10 /* <- decoys */, m_accounts[ALICE_ACC_IDX].get_public_address(), COIN + 1, payment_id_t(), TESTS_DEFAULT_FEE, outs_total, amount_total, outs_swept, amount_swept, &tx);
+
+  CHECK_AND_ASSERT_MES(amount_swept == amount_total, false, "amount_swept != amount_total");
+  CHECK_AND_ASSERT_MES(amount_swept == COIN * (2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW), false, "amount_swept = " << amount_swept);
+
+  mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 1);
+
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, amount_swept - TESTS_DEFAULT_FEE, false, SIZE_MAX, 0), false, "");
 
   return true;
 }
