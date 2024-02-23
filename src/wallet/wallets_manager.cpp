@@ -506,7 +506,6 @@ bool wallets_manager::init_local_daemon()
   CHECK_AND_ASSERT_AND_SET_GUI(res,  "Failed to initialize core");
   LOG_PRINT_L0("Core initialized OK");
 
-
   //check if offers module synchronized with blockchaine storage
   auto& bcs = m_ccore.get_blockchain_storage();
   if (!m_offers_service.is_disabled() && bcs.get_current_blockchain_size() > 1 && bcs.get_top_block_id() != m_offers_service.get_last_seen_block_id())
@@ -562,6 +561,7 @@ bool wallets_manager::init_local_daemon()
   CHECK_AND_ASSERT_AND_SET_GUI(res, "Failed to initialize core rpc server.");
   LOG_PRINT_L0("Core rpc server started ok");
 
+  m_core_initialized = true;
   LOG_PRINT_L0("Starting p2p net loop...");
   //dsi.text_state = "Starting network loop";
   m_pview->update_daemon_status(dsi);
