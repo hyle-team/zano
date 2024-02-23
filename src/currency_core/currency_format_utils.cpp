@@ -1577,6 +1577,11 @@ namespace currency
             crypto::chacha_crypt(derivation_local, m_acc_keys.spend_secret_key);
           }
           else {
+            if (m_acc_keys.spend_secret_key == currency::null_skey)
+            {
+              //tracking wallet, invisible
+              return;
+            }
             CHECK_AND_ASSERT_THROW_MES(m_acc_keys.spend_secret_key != currency::null_skey && m_tx_onetime_pubkey != currency::null_pkey, "tx_service_attachment with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: keys uninitialized");
             bool r = crypto::generate_key_derivation(m_tx_onetime_pubkey, m_acc_keys.spend_secret_key, derivation_local);
             CHECK_AND_ASSERT_THROW_MES(r, "Failed to generate_key_derivation at TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE");
@@ -1685,6 +1690,11 @@ namespace currency
       if (!get_type_in_variant_container(tx.extra, crypto_info) && !get_type_in_variant_container(tx.attachment, crypto_info))
       {
         //no crypt info in tx
+        return null_derivation;
+      }
+      if (acc_keys.spend_secret_key == currency::null_skey)
+      {
+        //traceable wallet and outgoing transfer - skip
         return null_derivation;
       }
 
