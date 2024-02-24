@@ -108,6 +108,10 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   set(CLANG TRUE)
 endif()
 
+
+add_definitions("/DBOOST_NO_CXX98_FUNCTION_BASE")
+
+
 if(MSVC)
   add_definitions("/D_CRT_SECURE_NO_WARNINGS /D_WIN32_WINNT=0x0600 /DWIN32_LEAN_AND_MEAN /DGTEST_HAS_TR1_TUPLE=0")
   add_compile_options(/bigobj /Zm1000 /Z7 /MP2 /W3 /GS- /wd4996 /wd4503 /wd4345 /wd4091 /FIinline_c.h)
