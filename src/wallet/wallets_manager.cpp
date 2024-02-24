@@ -2223,7 +2223,7 @@ void wallets_manager::wallet_vs_options::worker_func()
         pos_minin_interval.do_call([this](){
           tools::wallet2::mining_context ctx = AUTO_VAL_INIT(ctx);
           LOG_PRINT_L1(get_log_prefix() + " Starting PoS mint iteration");
-          if (!w->get()->fill_mining_context(ctx) || ctx.status != API_RETURN_CODE_OK)
+          if (!w->get()->fill_mining_context(ctx))
           {
             LOG_PRINT_L1(get_log_prefix() + " cannot obtain PoS mining context, skip iteration");
             return true;
