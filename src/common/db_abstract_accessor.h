@@ -280,6 +280,8 @@ namespace tools
       template<class t_pod_key, class t_object>
       bool get_t_object(container_handle h, const t_pod_key& k, t_object& obj) const
       {
+        if (!m_is_open)
+          return false;
         performance_data& m_performance_data = m_gperformance_data;
         //TRY_ENTRY();
         std::string res_buff;

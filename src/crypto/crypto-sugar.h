@@ -245,7 +245,7 @@ namespace crypto
     explicit scalar_t(const boost::multiprecision::number<T>& bigint)
     {
       zero();
-      unsigned int bytes_to_copy = bigint.backend().size() * bigint.backend().limb_bits / 8;
+      size_t bytes_to_copy = bigint.backend().size() * bigint.backend().limb_bits / 8;
       if (bytes_to_copy > sizeof *this)
         bytes_to_copy = sizeof *this;
       memcpy(&m_s[0], bigint.backend().limbs(), bytes_to_copy);
