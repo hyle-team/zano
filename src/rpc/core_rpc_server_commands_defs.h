@@ -421,8 +421,6 @@ namespace currency
       END_KV_SERIALIZE_MAP()
     };
   };
-
-
   //-----------------------------------------------
   struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2
   {
@@ -456,6 +454,51 @@ namespace currency
 
     typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response response;
   };
+
+    struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY
+  {
+    struct request
+    {
+      std::list<uint64_t> amounts;
+      uint64_t outs_count;
+      bool use_forced_mix_outs;
+      BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(amounts)
+      KV_SERIALIZE(outs_count)
+      KV_SERIALIZE(use_forced_mix_outs)
+      END_KV_SERIALIZE_MAP()
+    };
+
+#pragma pack(push, 1)
+    struct out_entry
+    {
+      uint64_t global_amount_index;
+      crypto::public_key out_key;
+    };
+#pragma pack(pop)
+
+    struct outs_for_amount
+    {
+      uint64_t amount;
+      std::list<out_entry> outs;
+
+      BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(amount)
+      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(outs)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::vector<outs_for_amount> outs;
+      std::string status;
+      BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(outs)
+      KV_SERIALIZE(status)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
 
 
   //-----------------------------------------------

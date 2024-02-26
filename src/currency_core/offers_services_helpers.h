@@ -193,14 +193,14 @@ namespace bc_services
   inline std::string  extract_contacts(const odeh& v)       { return v.contacts; }
   inline std::string  extract_location(const odeh& v) {
 
-#ifndef ANDROID_BUILD
+#ifndef MOBILE_WALLET_BUILD
     return currency::utf8_to_lower(v.location_country + v.location_city);
 #else 
     return "UNSUPORTED";
 #endif
   }
   inline std::string  extract_name(const odeh& v)           { 
-#ifndef ANDROID_BUILD
+#ifndef MOBILE_WALLET_BUILD
     return currency::utf8_to_lower(v.target); 
 #else
     return "UNSUPORTED";

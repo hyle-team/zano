@@ -173,6 +173,7 @@ public:
   bool set_use_tor(bool use_tor);
   std::string add_custom_asset_id(uint64_t wallet_id, const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_descriptor);
   std::string delete_custom_asset_id(uint64_t wallet_id, const crypto::public_key& asset_id);
+  bool is_core_initialized() { return m_core_initialized;}
 
 private:
   void main_worker(const po::variables_map& vm);
@@ -244,6 +245,7 @@ private:
 //  std::atomic<uint64_t> m_last_wallet_synch_height;
   std::atomic<uint64_t> m_wallet_id_counter;
   std::atomic<bool> m_dont_save_wallet_at_stop;
+  std::atomic<bool> m_core_initialized = false;
 
   std::string m_data_dir;
   view::gui_options m_ui_opt;

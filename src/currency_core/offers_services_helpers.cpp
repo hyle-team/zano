@@ -56,7 +56,7 @@ namespace bc_services
   //------------------------------------------------------------------
   bool order_offers_by_name(const offer_details_ex* a, const offer_details_ex* b)
   {
-#ifndef ANDROID_BUILD
+#ifndef MOBILE_WALLET_BUILD
     return currency::utf8_to_lower(a->target) < currency::utf8_to_lower(b->target);
 #else
     return false;
@@ -150,7 +150,7 @@ namespace bc_services
     //check category
     if (!of.category.empty() && o.category.find(of.category) == std::string::npos)
       return false;
-#ifndef ANDROID_BUILD
+#ifndef MOBILE_WALLET_BUILD
     //check target condition
     if (of.target.size() && !currency::utf8_substring_test_case_insensitive(of.target, o.target))
       return false;
@@ -173,7 +173,7 @@ namespace bc_services
     //check target condition
     if (of.location_country.size() && (of.location_country != o.location_country))
       return false;
-#ifndef ANDROID_BUILD
+#ifndef MOBILE_WALLET_BUILD
     //check target condition
     if (of.location_city.size() && !currency::utf8_substring_test_case_insensitive(of.location_city, o.location_city))
       return false;
@@ -221,7 +221,7 @@ namespace bc_services
   //--------------------------------------------------------------------------------
   bool filter_offers_list(std::list<bc_services::offer_details_ex>& offers, const bc_services::core_offers_filter& filter, uint64_t current_core_time)
   {
-#ifndef ANDROID_BUILD
+#ifndef MOBILE_WALLET_BUILD
     //filter    
     offers.remove_if([&](bc_services::offer_details_ex& o) -> bool {
       return !is_offer_matched_by_filter(o, filter, current_core_time);

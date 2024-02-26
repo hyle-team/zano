@@ -359,14 +359,32 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_get_random_outs(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res, connection_context& cntx)
+  bool core_rpc_server::on_get_random_outs(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
     res.status = API_RETURN_CODE_FAIL;
-    if(!m_core.get_random_outs_for_amounts(req, res))
+
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request req_native = AUTO_VAL_INIT(req_native);
+    req_native.amounts = req.amounts;
+    req_native.decoys_count = req.outs_count;
+    req_native.use_forced_mix_outs = req.use_forced_mix_outs;
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response res_native = AUTO_VAL_INIT(res_native);
+
+    if(!m_core.get_random_outs_for_amounts(req_native, res_native))
     {
       return true;
     }
+
+    for (const auto& item : res_native.outs)
+    {      
+      res.outs.push_back(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY::outs_for_amount());
+      res.outs.back().amount = item.amount;
+      for (const auto& subitem : item.outs)
+      {
+        res.outs.back().outs.push_back(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY::out_entry { subitem.global_amount_index, subitem.stealth_address });
+      }
+    }
+    
 
     res.status = API_RETURN_CODE_OK;
 
@@ -390,6 +408,22 @@ namespace currency
 
     return true;
   }
+
+    //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_get_random_outs1(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res, connection_context& cntx)
+  {
+    CHECK_CORE_READY();
+    res.status = API_RETURN_CODE_FAIL;
+
+    if(!m_core.get_random_outs_for_amounts(req, res))
+    {
+      return true;
+    }
+
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_random_outs2(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
