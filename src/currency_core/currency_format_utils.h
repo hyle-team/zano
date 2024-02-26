@@ -930,7 +930,7 @@ namespace currency
   //---------------------------------------------------------------
   std::ostream& operator <<(std::ostream& o, const ref_by_id& r);
   //---------------------------------------------------------------
-#ifndef ANDROID_BUILD
+#ifndef MOBILE_WALLET_BUILD
   std::string utf8_to_upper(const std::string& s);
   std::string utf8_to_lower(const std::string& s);
   bool utf8_substring_test_case_insensitive(const std::string& match, const std::string& s); // Returns true is 's' contains 'match' (case-insensitive)

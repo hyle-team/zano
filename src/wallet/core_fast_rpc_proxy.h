@@ -55,7 +55,7 @@ namespace tools
     //------------------------------------------------------------------------------------------------------------------------------
     bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res) override
     {
-      return m_rpc.on_get_random_outs(req, res, m_cntxt_stub);
+      return m_rpc.on_get_random_outs1(req, res, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
     bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::response& res) override

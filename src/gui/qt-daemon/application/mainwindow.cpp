@@ -272,13 +272,23 @@ QString MainWindow::request_dummy()
 QString MainWindow::call_rpc(const QString& params)
 {
   TRY_ENTRY();
+
+  if (!m_backend.is_core_initialized())
+  {
+    epee::json_rpc::error_response rsp;
+    rsp.jsonrpc = "2.0";
+    rsp.error.code = -1;
+    rsp.error.message = API_RETURN_CODE_CORE_BUSY;
+    return QString::fromStdString(epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(rsp)));
+  }
+
   epee::net_utils::http::http_request_info query_info = AUTO_VAL_INIT(query_info);
   epee::net_utils::http::http_response_info response_info  = AUTO_VAL_INIT(response_info);
   currency::core_rpc_server::connection_context dummy_context = AUTO_VAL_INIT(dummy_context);
 
   query_info.m_URI = "/json_rpc";
   query_info.m_body = params.toStdString();
-
+  
   m_backend.get_rpc_server().handle_http_request(query_info, response_info, dummy_context);
   if (response_info.m_response_code != 200)
   {
