@@ -7,3 +7,4 @@ Thumbs.db
 ._*
 .idea
 .vs/*
+.vscode/settings.json
