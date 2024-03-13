@@ -843,7 +843,6 @@ private:
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(uint64_t amount, const std::vector<currency::txout_ref_v> & key_offsets);
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_to_key& intk);
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_zc_input& inzc);
-    uint8_t out_get_mixin_attr(const currency::tx_out_v& out_t);
     const crypto::public_key& out_get_pub_key(const currency::tx_out_v& out_t, std::list<currency::htlc_info>& htlc_info_list);
     bool expand_selection_with_zc_input(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes);
 

@@ -343,31 +343,6 @@ const currency::txout_htlc& out_get_htlc(const currency::tx_out_v& out_t)
   return boost::get<currency::txout_htlc>(boost::get<currency::tx_out_bare>(out_t).target);
 }
 
-uint8_t wallet2::out_get_mixin_attr(const currency::tx_out_v& out_t)
-{
-  if (out_t.type() == typeid(currency::tx_out_bare))
-  {
-    if (boost::get<currency::tx_out_bare>(out_t).target.type() == typeid(currency::txout_to_key))
-    {
-      return boost::get<currency::txout_to_key>(boost::get<currency::tx_out_bare>(out_t).target).mix_attr;
-    }
-    else
-    {
-      THROW_WALLET_CMN_ERR_EX("Unexpected type in out_get_mixin_attr");
-    }
-  }
-  else if (out_t.type() == typeid(currency::tx_out_zarcanum))
-  {
-    return boost::get<currency::tx_out_zarcanum>(out_t).mix_attr;
-  }
-  else
-  {
-    THROW_WALLET_CMN_ERR_EX("Unexpected type in out_get_mixin_attr");
-  }
-  THROW_WALLET_CMN_ERR_EX("Unexpected out type im wallet: " << out_t.type().name());
-  return false;
-}
-
 const crypto::public_key& wallet2::out_get_pub_key(const currency::tx_out_v& out_t, std::list<currency::htlc_info>& htlc_info_list)
 {
   if (out_t.type() == typeid(tx_out_bare))
@@ -723,15 +698,16 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
             }
           }
 
-          if (is_auditable() && (out_type_to_key || out_type_zc) &&
-            out_get_mixin_attr(out_v) != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+          uint8_t mix_attr = CURRENCY_TO_KEY_OUT_RELAXED;
+          [[maybe_unused]] bool mix_attr_r = get_mix_attr_from_tx_out_v(out_v, mix_attr);
+          if (is_auditable() && (out_type_to_key || out_type_zc) && mix_attr != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
           {
             std::stringstream ss;
             ss << "output #" << o << " from tx " << ptc.tx_hash();
             if (!out.is_native_coin())
               ss << " asset_id: " << out.asset_id;
             ss << " with amount " << print_money_brief(out.amount)
-              << " is targeted to this auditable wallet and has INCORRECT mix_attr = " << (uint64_t)out_get_mixin_attr(out_v) << ". Output is IGNORED.";
+              << " is targeted to this auditable wallet and has INCORRECT mix_attr = " << (uint64_t)mix_attr << ". Output is IGNORED.";
             WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
             if (m_wcallback)
               m_wcallback->on_message(i_wallet2_callback::ms_red, ss.str());
