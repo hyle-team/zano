@@ -1736,5 +1736,87 @@ namespace wallet_public
     return lhs.amount == rhs.amount && lhs.asset_id == rhs.asset_id;
   }
 
+
+
+  struct COMMAND_ASSETS_WHITELIST_GET
+  {
+    struct request
+    {
+      BEGIN_KV_SERIALIZE_MAP()
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      std::list<currency::asset_descriptor_with_id> assets;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(assets)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_ASSETS_WHITELIST_ADD
+  {
+    struct request
+    {
+      crypto::public_key asset_id = currency::null_pkey;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      std::string status;
+      currency::asset_descriptor_base asset_descriptor;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)
+        KV_SERIALIZE(asset_descriptor)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_ASSETS_WHITELIST_REMOVE
+  {
+    struct request
+    {
+      crypto::public_key asset_id = currency::null_pkey;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct response
+    {
+      std::string status;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 } // namespace wallet_rpc
 } // namespace tools

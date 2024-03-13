@@ -3600,12 +3600,23 @@ bool wallet2::add_custom_asset_id(const crypto::public_key& asset_id, asset_desc
 //----------------------------------------------------------------------------------------------------
 bool wallet2::delete_custom_asset_id(const crypto::public_key& asset_id)
 {
-  auto it = m_custom_assets.find(asset_id);
+  const auto it = m_custom_assets.find(asset_id);
   if (it != m_custom_assets.end())
   {
     m_custom_assets.erase(it);
   }
  
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::get_custom_assets(std::list<currency::asset_descriptor_with_id>& assets) const 
+{
+  for(const auto& pr : m_custom_assets)
+  {
+    assets.push_back(currency::asset_descriptor_with_id());
+    assets.back().asset_id = pr.first;
+    static_cast<currency::asset_descriptor_base>(assets.back()) = pr.second;
+  }
   return true;
 }
 //----------------------------------------------------------------------------------------------------

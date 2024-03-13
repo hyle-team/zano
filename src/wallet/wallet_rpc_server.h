@@ -124,15 +124,20 @@ namespace tools
         MAP_JON_RPC_WE("marketplace_push_update_offer",       on_marketplace_push_update_offer, wallet_public::COMMAND_MARKETPLACE_PUSH_UPDATE_OFFER)
         MAP_JON_RPC_WE("marketplace_cancel_offer",            on_marketplace_cancel_offer,      wallet_public::COMMAND_MARKETPLACE_CANCEL_OFFER)
         //HTLC API
-        MAP_JON_RPC_WE("atomics_create_htlc_proposal", on_create_htlc_proposal,         wallet_public::COMMAND_CREATE_HTLC_PROPOSAL)
-        MAP_JON_RPC_WE("atomics_get_list_of_active_htlc", on_get_list_of_active_htlc,   wallet_public::COMMAND_GET_LIST_OF_ACTIVE_HTLC)
-        MAP_JON_RPC_WE("atomics_redeem_htlc", on_redeem_htlc,                           wallet_public::COMMAND_REDEEM_HTLC)
-        MAP_JON_RPC_WE("atomics_check_htlc_redeemed", on_check_htlc_redeemed,           wallet_public::COMMAND_CHECK_HTLC_REDEEMED)
+        MAP_JON_RPC_WE("atomics_create_htlc_proposal",        on_create_htlc_proposal,          wallet_public::COMMAND_CREATE_HTLC_PROPOSAL)
+        MAP_JON_RPC_WE("atomics_get_list_of_active_htlc",     on_get_list_of_active_htlc,       wallet_public::COMMAND_GET_LIST_OF_ACTIVE_HTLC)
+        MAP_JON_RPC_WE("atomics_redeem_htlc",                 on_redeem_htlc,                   wallet_public::COMMAND_REDEEM_HTLC)
+        MAP_JON_RPC_WE("atomics_check_htlc_redeemed",         on_check_htlc_redeemed,           wallet_public::COMMAND_CHECK_HTLC_REDEEMED)
 
         //IONIC_SWAPS API
-        MAP_JON_RPC_WE("ionic_swap_generate_proposal", on_ionic_swap_generate_proposal, wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL)
-        MAP_JON_RPC_WE("ionic_swap_get_proposal_info", on_ionic_swap_get_proposal_info, wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO)
-        MAP_JON_RPC_WE("ionic_swap_accept_proposal", on_ionic_swap_accept_proposal, wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL)
+        MAP_JON_RPC_WE("ionic_swap_generate_proposal",        on_ionic_swap_generate_proposal,  wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL)
+        MAP_JON_RPC_WE("ionic_swap_get_proposal_info",        on_ionic_swap_get_proposal_info,  wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO)
+        MAP_JON_RPC_WE("ionic_swap_accept_proposal",          on_ionic_swap_accept_proposal,    wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL)
+
+        // Assets API
+        MAP_JON_RPC_WE("assets_whitelist_get",                on_assets_whitelist_get,          wallet_public::COMMAND_ASSETS_WHITELIST_GET)
+        MAP_JON_RPC_WE("assets_whitelist_add",                on_assets_whitelist_add,          wallet_public::COMMAND_ASSETS_WHITELIST_ADD)
+        MAP_JON_RPC_WE("assets_whitelist_remove",             on_assets_whitelist_remove,       wallet_public::COMMAND_ASSETS_WHITELIST_REMOVE)
 
         //MULTIWALLET APIs
         MAP_JON_RPC_WE("mw_get_wallets", on_mw_get_wallets, wallet_public::COMMAND_MW_GET_WALLETS)
@@ -188,6 +193,11 @@ namespace tools
     bool on_ionic_swap_generate_proposal(const wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL::request& req, wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_ionic_swap_get_proposal_info(const wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO::request& req, wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_ionic_swap_accept_proposal(const wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL::request& req, wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx);
+
+    bool on_assets_whitelist_get(const wallet_public::COMMAND_ASSETS_WHITELIST_GET::request& req, wallet_public::COMMAND_ASSETS_WHITELIST_GET::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_assets_whitelist_add(const wallet_public::COMMAND_ASSETS_WHITELIST_ADD::request& req, wallet_public::COMMAND_ASSETS_WHITELIST_ADD::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_assets_whitelist_remove(const wallet_public::COMMAND_ASSETS_WHITELIST_REMOVE::request& req, wallet_public::COMMAND_ASSETS_WHITELIST_REMOVE::response& res, epee::json_rpc::error& er, connection_context& cntx);
+
 
     bool on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS::request& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_mw_select_wallet(const wallet_public::COMMAND_MW_SELECT_WALLET::request& req, wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, connection_context& cntx);
