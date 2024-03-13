@@ -89,6 +89,10 @@ bool hard_fork_4_consolidated_txs::generate(std::vector<test_event_entry>& event
   ADD_CUSTOM_EVENT(events, tx_0b);
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({tx_0a, tx_0b}));
 
+  size_t dhc = count_type_in_variant_container<tx_derivation_hint>(tx_0b.extra);
+  CHECK_AND_ASSERT_MES(dhc == tx_0b.vout.size(), false, "unexpected derivation hints count: " << dhc);
+
+
   REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   // check Alice's balance
@@ -100,7 +104,7 @@ bool hard_fork_4_consolidated_txs::generate(std::vector<test_event_entry>& event
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "alice", alice_amount, 0, alice_amount, 0, 0), false, "");
 
   uint64_t miner_amount = MK_TEST_COINS(60);
-  uint64_t bob_amount = miner_amount + alice_amount - TX_DEFAULT_FEE;
+  m_bob_amount = miner_amount + alice_amount - TX_DEFAULT_FEE;
 
   // Consolidated tx (TX_FLAG_SIGNATURE_MODE_SEPARATE).
   
@@ -119,17 +123,29 @@ bool hard_fork_4_consolidated_txs::generate(std::vector<test_event_entry>& event
     std::vector<tx_destination_entry> destinations;
     if (miner_change != 0)
       destinations.push_back(tx_destination_entry(miner_change, miner_acc.get_public_address()));
-    destinations.push_back(tx_destination_entry(bob_amount, bob_acc.get_public_address()));
+    destinations.push_back(tx_destination_entry(m_bob_amount, bob_acc.get_public_address()));
 
     add_flags_to_all_destination_entries(tx_destination_entry_flags::tdef_explicit_native_asset_id, destinations);
     r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_extra, empty_attachment, tx_1, get_tx_version_from_events(events), one_time_secret_key,
       0, 0, 0, true, TX_FLAG_SIGNATURE_MODE_SEPARATE, TX_DEFAULT_FEE, gen_context);
     CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
+    dhc = count_type_in_variant_container<tx_derivation_hint>(tx_1.extra);
+    CHECK_AND_ASSERT_MES(dhc == destinations.size(), false, "unexpected derivation hints count: " << dhc);
+
     // partially completed tx_1 shouldn't be accepted
-    //DO_CALLBACK(events, "mark_invalid_tx");
-    ADD_CUSTOM_EVENT(events, tx_1);
-    MAKE_NEXT_BLOCK_TX1(events, blk_2a, blk_1r, miner_acc, tx_1);
+    if (m_post_hf4_zarcanum)
+    {
+      ADD_CUSTOM_EVENT(events, tx_1);
+      DO_CALLBACK(events, "mark_invalid_block");
+      MAKE_NEXT_BLOCK_TX1(events, blk_2a, blk_1r, miner_acc, tx_1);
+    }
+    else
+    {
+      DO_CALLBACK(events, "mark_invalid_tx");
+      ADD_CUSTOM_EVENT(events, tx_1);
+    }
+    DO_CALLBACK(events, "clear_tx_pool");
   }
 
 
@@ -147,23 +163,25 @@ bool hard_fork_4_consolidated_txs::generate(std::vector<test_event_entry>& event
       0, 0, 0, true, TX_FLAG_SIGNATURE_MODE_SEPARATE, 0 /* note zero fee here */, gen_context);
     CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
+    size_t dhc_2 = count_type_in_variant_container<tx_derivation_hint>(tx_1.extra);
+    CHECK_AND_ASSERT_MES(dhc_2 == dhc, false, "unexpected derivation hints count: " << dhc_2);
+
     ADD_CUSTOM_EVENT(events, tx_1);
   }
   MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_1);
 
-  //std::shared_ptr<tools::wallet2> bob_wlt;
-  //r = generator.init_test_wallet(bob_acc, get_block_hash(blk_0), bob_wlt);
-  //CHECK_AND_ASSERT_MES(r, false, "init_test_wallet failed");
-  //r = generator.refresh_test_wallet(events, bob_wlt.get(), get_block_hash(blk_2), 2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2);
-  //CHECK_AND_ASSERT_MES(r, false, "refresh_test_wallet failed");
-  //CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", bob_amount, 0, 0, 0, 0), false, "");
-
+  DO_CALLBACK(events, "c1");
 
   return true;
 }
 
 bool hard_fork_4_consolidated_txs::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  bob_wlt->refresh();
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", m_bob_amount, 0, 0, 0, 0), false, "");
+
   return true;
 }
 

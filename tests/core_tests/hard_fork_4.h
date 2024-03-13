@@ -13,6 +13,7 @@ struct hard_fork_4_consolidated_txs : public wallet_test
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
   mutable bool m_post_hf4_zarcanum = false;
+  mutable uint64_t m_bob_amount = 0;
 };
 
 
