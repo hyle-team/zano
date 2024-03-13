@@ -134,7 +134,7 @@ namespace currency
   //---------------------------------------------------------------
   // if cb returns true, it means "continue", false -- means "stop"
   template<typename specific_type_t, typename variant_container_t, typename callback_t>
-  bool process_type_in_variant_container(const variant_container_t& av, callback_t& cb, bool return_value_if_none_found = true)
+  bool process_type_in_variant_container(const variant_container_t& av, callback_t&& cb, bool return_value_if_none_found = true)
   {
     bool found = false;
     for (auto& ai : av)
@@ -153,7 +153,7 @@ namespace currency
   //---------------------------------------------------------------
   // if cb returns false, stop immediately and return false
   template<typename specific_type_t, typename variant_container_t, typename callback_t>
-  bool process_type_in_variant_container_and_make_sure_its_unique(const variant_container_t& av, callback_t& cb, bool return_value_if_none_found = true)
+  bool process_type_in_variant_container_and_make_sure_its_unique(const variant_container_t& av, callback_t&& cb, bool return_value_if_none_found = true)
   {
     bool found = false;
     for (auto& ai : av)
