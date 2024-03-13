@@ -261,6 +261,30 @@ namespace currency
     return diff;
   }
   //------------------------------------------------------------------
+  bool add_random_derivation_hints_and_put_them_to_tx(const std::set<uint16_t>& existing_derivation_hints, std::set<uint16_t>& new_derivation_hints, transaction& tx)
+  {
+    if (existing_derivation_hints.size() > tx.vout.size())
+      return false;
+
+    size_t hints_to_be_added = tx.vout.size() - existing_derivation_hints.size();
+
+    size_t attempts_cnt = 0, attempts_max = 4096;
+    while(new_derivation_hints.size() < hints_to_be_added && ++attempts_cnt < attempts_max)
+    {
+      uint16_t hint = crypto::rand<uint16_t>();
+      if (existing_derivation_hints.count(hint) == 0)
+        new_derivation_hints.insert(hint);
+    }
+
+    if (attempts_cnt == attempts_max)
+      return false;
+
+    for(auto& el : new_derivation_hints) // iterating in sorted sequence
+      tx.extra.push_back(make_tx_derivation_hint_from_uint16(el));
+
+    return true;
+  }
+  //---------------------------------------------------------------
   bool generate_tx_balance_proof(const transaction &tx, const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, currency::zc_balance_proof& proof)
   {
     CHECK_AND_ASSERT_MES(tx.version > TRANSACTION_VERSION_PRE_HF4, false, "unsupported tx.version: " << tx.version);
@@ -488,12 +512,12 @@ namespace currency
     // fill outputs
     tx_gen_context.resize(zc_ins_count, destinations.size()); // auxiliary data for each output
     uint64_t output_index = 0;
-    std::set<uint16_t> deriv_cache;
+    std::set<uint16_t> derivation_hints;
     for (auto& d : destinations)
     {
       finalized_tx result = AUTO_VAL_INIT(result);
       uint8_t tx_outs_attr = 0;
-      r = construct_tx_out(d, tx_gen_context.tx_key.sec, output_index, tx, deriv_cache, account_keys(),
+      r = construct_tx_out(d, tx_gen_context.tx_key.sec, output_index, tx, derivation_hints, account_keys(),
         tx_gen_context.asset_id_blinding_masks[output_index], tx_gen_context.amount_blinding_masks[output_index],
         tx_gen_context.blinded_asset_ids[output_index], tx_gen_context.amount_commitments[output_index], result, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "construct_tx_out failed, output #" << output_index << ", amount: " << print_money_brief(d.amount));
@@ -504,6 +528,7 @@ namespace currency
       tx_gen_context.amount_commitments_sum += tx_gen_context.amount_commitments[output_index];
       ++output_index;
     }
+    CHECK_AND_ASSERT_MES(add_random_derivation_hints_and_put_them_to_tx(std::set<uint16_t>(), derivation_hints, tx), false, "add_random_derivation_hints_and_put_them_to_tx failed");
     
     if (tx.attachment.size())
       add_attachments_info_to_extra(tx.extra, tx.attachment);
@@ -1116,14 +1141,13 @@ namespace currency
     return dh;
   }
   //---------------------------------------------------------------
-//   bool get_uint16_from_tx_derivation_hint(const tx_derivation_hint& dh, uint16_t& hint)
-//   {
-//     tx_derivation_hint dh;
-//     if (dh.msg.size() != sizeof(hint))
-//       return false;
-//     hint = *((uint16_t*)dh.msg.data());
-//     return true;
-//   }  
+  bool get_uint16_from_tx_derivation_hint(const tx_derivation_hint& dh, uint16_t& hint)
+  {
+    if (dh.msg.size() != sizeof(hint))
+      return false;
+    hint = *((uint16_t*)dh.msg.data());
+    return true;
+  }  
   //---------------------------------------------------------------
   std::string generate_origin_for_htlc(const txout_htlc& htlc, const account_keys& acc_keys)
   {
@@ -1250,11 +1274,7 @@ namespace currency
           out.mix_attr = tx_outs_attr;
 
         uint16_t hint = get_derivation_hint(reinterpret_cast<crypto::key_derivation&>(derivation));
-        if (deriv_cache.count(hint) == 0)
-        {          
-          tx.extra.push_back(make_tx_derivation_hint_from_uint16(hint));
-          deriv_cache.insert(hint);
-        }
+        deriv_cache.insert(hint); // won't be inserted if such hint already exists
       }
 
       tx.vout.push_back(out);
@@ -1282,11 +1302,7 @@ namespace currency
           CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
 
           uint16_t hint = get_derivation_hint(derivation);
-          if (deriv_cache.count(hint) == 0)
-          {          
-            tx.extra.push_back(make_tx_derivation_hint_from_uint16(hint));
-            deriv_cache.insert(hint);
-          }
+          deriv_cache.insert(hint); // won't be inserted if such hint already exists
         }
         target_keys.push_back(out_eph_public_key);
       }
@@ -1311,11 +1327,7 @@ namespace currency
         htlc.pkey_refund = out_eph_public_key;
         //add derivation hint for refund address
         uint16_t hint = get_derivation_hint(derivation);
-        if (deriv_cache.count(hint) == 0)
-        {
-          tx.extra.push_back(make_tx_derivation_hint_from_uint16(hint));
-          deriv_cache.insert(hint);
-        }
+        deriv_cache.insert(hint); // won't be inserted if such hint already exists
 
 
         if (htlc_dest.htlc_hash == null_hash)
@@ -1905,7 +1917,22 @@ namespace currency
     }
     return n;
   }
-
+  //---------------------------------------------------------------
+  bool copy_all_derivation_hints_from_tx_to_container(transaction& tx, std::set<uint16_t>& derivation_hints)
+  {
+    for(auto it = tx.extra.begin(); it != tx.extra.end(); ++it)
+    {
+      if (it->type() == typeid(tx_derivation_hint))
+      {
+        uint16_t hint = 0;
+        if (!get_uint16_from_tx_derivation_hint(boost::get<tx_derivation_hint>(*it), hint))
+          return false;
+        if (!derivation_hints.insert(hint).second)
+          return false; // maybe we need to skip this?
+      }
+    }
+    return true;
+  }
   //---------------------------------------------------------------
   bool construct_tx(const account_keys& sender_account_keys,
     const std::vector<tx_source_entry>& sources,
@@ -2575,14 +2602,15 @@ namespace currency
     uint64_t native_coins_output_sum = 0;
     size_t output_index = tx.vout.size(); // in case of append mode we need to start output indexing from the last one + 1
     uint64_t range_proof_start_index = 0;
-    std::set<uint16_t> deriv_cache;
+    std::set<uint16_t> existing_derivation_hints, new_derivation_hints;
+    CHECK_AND_ASSERT_MES(copy_all_derivation_hints_from_tx_to_container(tx, existing_derivation_hints), false, "move_all_derivation_hints_from_tx_to_container failed");
     for(size_t destination_index = 0; destination_index < shuffled_dsts.size(); ++destination_index, ++output_index)
     {
       tx_destination_entry& dst_entr = shuffled_dsts[destination_index];
       if (!(flags & TX_FLAG_SIGNATURE_MODE_SEPARATE) && all_inputs_are_obviously_native_coins && gen_context.ao_asset_id == currency::null_pkey)
         dst_entr.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id; // all inputs are obviously native coins -- all outputs must have explicit asset ids (unless there's an asset emission)
 
-      r = construct_tx_out(dst_entr, gen_context.tx_key.sec, output_index, tx, deriv_cache, sender_account_keys,
+      r = construct_tx_out(dst_entr, gen_context.tx_key.sec, output_index, tx, new_derivation_hints, sender_account_keys,
         gen_context.asset_id_blinding_masks[output_index], gen_context.amount_blinding_masks[output_index],
         gen_context.blinded_asset_ids[output_index], gen_context.amount_commitments[output_index], result, tx_outs_attr);
       CHECK_AND_ASSERT_MES(r, false, "Failed to construct tx out");
@@ -2594,6 +2622,8 @@ namespace currency
       if (dst_entr.is_native_coin())
         native_coins_output_sum += dst_entr.amount;
     }
+
+    CHECK_AND_ASSERT_MES(add_random_derivation_hints_and_put_them_to_tx(existing_derivation_hints, new_derivation_hints, tx), false, "add_random_derivation_hints_and_put_them_to_tx failed");
 
     //process offers and put there offers derived keys
     uint64_t att_count = 0;
