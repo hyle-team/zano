@@ -26,9 +26,35 @@
 #include "threads_pool_tests.h"
 #include "wallet/plain_wallet_api.h"
 #include "wallet/view_iface.h"
+#include <jwt-cpp/jwt.h>
+
 
 void test_plain_wallet()
 {
+
+
+  std::string token  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXUyJ9.eyJpc3MiOiJhdXRoMCIsInNhbXBsZSI6InRlc3QifQ.lQm3N2bVlqt2-1L-FsOjtR6uE-L4E9zJutMWKIe1v1M";
+  auto decoded_token = jwt::decode(token);
+
+  auto verifier = jwt::verify()
+                      .with_issuer("auth0")
+                      .with_claim("sample", jwt::claim(std::string("test")))
+                      .allow_algorithm(jwt::algorithm::hs256 { "secret" });
+
+  verifier.verify(decoded_token);
+
+  auto token = jwt::create()
+                   .set_type("JWS")
+                   .set_issuer("auth0")
+                   .set_payload_claim("sample", jwt::claim(std::string("test")))
+                   .sign(jwt::algorithm::hs256 { "secret" });
+
+
+  return;
+
+
+
+
   std::string res = plain_wallet::init("195.201.107.230", "33336", "E:\\tmp\\", 0);
   
   uint64_t instance_id = 0;

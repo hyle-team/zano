@@ -17,6 +17,7 @@ using namespace epee;
 #include "wallet_rpc_server_error_codes.h"
 #include "wallet_helpers.h"
 #include "wrap_service.h"
+#include <jwt-cpp/jwt.h>
 
 #define GET_WALLET()   wallet_rpc_locker w(m_pwallet_provider);
 
@@ -184,11 +185,43 @@ namespace tools
     m_net_server.set_threads_prefix("RPC");
     bool r = handle_command_line(vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to process command line in core_rpc_server");
+    m_jwt_secrete = "secretesecrete";
+
     return epee::http_server_impl_base<wallet_rpc_server, connection_context>::init(m_port, m_bind_ip);
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::auth_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context)
+  {
+
+    auto it = std::find_if(query_info.m_header_info.m_etc_fields.begin(), query_info.m_header_info.m_etc_fields.end(), [](const auto& element)
+                           { return element.first == ZANO_ACCESS_TOKEN; });
+    if(it == query_info.m_header_info.m_etc_fields.end())
+      return false;
+    std::string token = it->second;  //"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXUyJ9.eyJpc3MiOiJhdXRoMCIsInNhbXBsZSI6InRlc3QifQ.lQm3N2bVlqt2-1L-FsOjtR6uE-L4E9zJutMWKIe1v1M";
+    auto decoded_token      = jwt::decode(token);    
+
+    auto verifier = jwt::verify()
+                        .with_issuer("auth0")
+                        .with_claim("sample", jwt::claim(std::string("test")))
+                        .allow_algorithm(jwt::algorithm::hs256 { m_jwt_secrete });
+
+    verifier.verify(decoded_token);
+    return false;
+
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context)
   {
+    if (m_jwt_secrete.size())
+    {
+      if (!auth_http_request(query_info, response, m_conn_context))
+      {
+        response.m_response_code    = 401;
+        response.m_response_comment = "Unauthorized";
+        return true;
+      }
+    }
+
     response.m_response_code = 200;
     response.m_response_comment = "Ok";
     std::string reference_stub;
