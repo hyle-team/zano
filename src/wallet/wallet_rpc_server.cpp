@@ -245,15 +245,6 @@ namespace tools
       m_jwt_used_salts.add(salt, ticks_now + JWT_TOKEN_EXPIRATION_MAXIMUM);
       m_jwt_used_salts.remove_if_expiration_less_than(ticks_now);
 
-
-      //TODO: check for salt unique
-
-      // std::cout << "Token is valid. Claims:" << std::endl;
-      //for(auto& e : decoded.get_payload_json())
-      //{
-      //  std::cout << e.first << " = " << e.second << std::endl;
-      //}
-
       LOG_PRINT_L0("JWT token OK");
       return true;
     }
