@@ -33,9 +33,31 @@ void test_plain_wallet()
 {
 
 
-  std::string token  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXUyJ9.eyJpc3MiOiJhdXRoMCIsInNhbXBsZSI6InRlc3QifQ.lQm3N2bVlqt2-1L-FsOjtR6uE-L4E9zJutMWKIe1v1M";
+  std::string token  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiemFub19leHRlbnNpb24iLCJzYWx0IjoiYTUyMTk5MzQyNmYxN2Y2MDQyMzkzYTI4YzJhMzk1NjFiYTgxYmVkZDkxODJlY2E5NTY3ZDBlNjQ3YjIwZTE2NSIsImV4cCI6MTcxMDM2MzA1MH0.CwqvPBtgE8ZUFZ4cYy1ZJLWdYCnhfEiCzEhqDYCK4CQ";
   auto decoded_token = jwt::decode(token);
 
+  std::string sharedSecret = "DFDvfedceEDCECECecedcyhtyh";
+
+  try
+  {
+    auto decoded = jwt::decode(token);
+
+    auto verifier = jwt::verify()
+                        .allow_algorithm(jwt::algorithm::hs256 { sharedSecret });
+
+    verifier.verify(decoded);
+
+    std::cout << "Token is valid. Claims:" << std::endl;
+    for(auto& e : decoded.get_payload_json())
+      std::cout << e.first << " = " << e.second << std::endl;
+  }
+  catch(const std::exception& e)
+  {
+    std::cerr << "Invalid token: " << e.what() << std::endl;
+  }
+
+
+  /*
   auto verifier = jwt::verify()
                       .with_issuer("auth0")
                       .with_claim("sample", jwt::claim(std::string("test")))
@@ -49,7 +71,7 @@ void test_plain_wallet()
                    .set_payload_claim("sample", jwt::claim(std::string("test")))
                    .sign(jwt::algorithm::hs256 { "secret" });
 
-
+*/
   return;
 
 

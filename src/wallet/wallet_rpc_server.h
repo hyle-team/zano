@@ -82,12 +82,14 @@ namespace tools
     const static command_line::arg_descriptor<std::string> arg_rpc_bind_ip;
     const static command_line::arg_descriptor<std::string> arg_miner_text_info;
     const static command_line::arg_descriptor<bool>        arg_deaf_mode;
+    const static command_line::arg_descriptor<std::string> arg_jwt_secret;
 
 
     static void init_options(boost::program_options::options_description& desc);
     bool init(const boost::program_options::variables_map& vm);
     bool run(bool do_mint, bool offline_mode, const currency::account_public_address& miner_address);
     bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context);
+    void set_jwt_secret(const std::string& jwt);
 
     BEGIN_URI_MAP2_VIRTUAL()
       BEGIN_JSON_RPC_MAP("/json_rpc")
@@ -223,8 +225,8 @@ namespace tools
     bool m_do_mint;
     bool m_deaf;
     uint64_t m_last_wallet_store_height;
-    std::string m_jwt_secrete;
-
+    std::string m_jwt_secret;
+    epee::misc_utils::expirating_set<std::string, uint64_t> m_jwt_used_salts;
   };
 
 } // namespace tools

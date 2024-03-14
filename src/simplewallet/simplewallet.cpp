@@ -287,7 +287,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("start_mining", boost::bind(&simple_wallet::start_mining, this, ph::_1), "start_mining <threads_count> - Start mining in daemon");
   m_cmd_binder.set_handler("stop_mining", boost::bind(&simple_wallet::stop_mining, this, ph::_1), "Stop mining in daemon");
   m_cmd_binder.set_handler("refresh", boost::bind(&simple_wallet::refresh, this, ph::_1), "Resynchronize transactions and balance");
-  m_cmd_binder.set_handler("balance", boost::bind(&simple_wallet::show_balance, this, ph::_1), "Show current wallet balance"); 
+  m_cmd_binder.set_handler("balance", boost::bind(&simple_wallet::show_balance, this, ph::_1), "[force_all] Show current wallet balance, with 'force_all' param it displays all assets without filtering against whitelists"); 
   m_cmd_binder.set_handler("show_staking_history", boost::bind(&simple_wallet::show_staking_history, this, ph::_1), "show_staking_history [2] - Show staking transfers, if option provided - number of days for history to display");
   m_cmd_binder.set_handler("incoming_transfers", boost::bind(&simple_wallet::show_incoming_transfers, this, ph::_1), "incoming_transfers [available|unavailable] - Show incoming transfers - all of them or filter them by availability");
   m_cmd_binder.set_handler("incoming_counts", boost::bind(&simple_wallet::show_incoming_transfers_counts, this, ph::_1), "incoming_transfers counts");
@@ -539,8 +539,7 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_restore_wallet  = command_line::get_arg(vm, arg_restore_wallet);
   m_disable_tor     = command_line::get_arg(vm, arg_disable_tor_relay);
   m_voting_config_file = command_line::get_arg(vm, arg_voting_config_file);
-  m_no_password_confirmations = command_line::get_arg(vm, arg_no_password_confirmations);
-  
+  m_no_password_confirmations = command_line::get_arg(vm, arg_no_password_confirmations);  
 } 
 //----------------------------------------------------------------------------------------------------
 
@@ -998,9 +997,16 @@ bool simple_wallet::refresh(const std::vector<std::string>& args)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::show_balance(const std::vector<std::string>& args/* = std::vector<std::string>()*/)
+bool simple_wallet::show_balance(const std::vector<std::string>& args /* = std::vector<std::string>()*/)
 {
-  success_msg_writer() << m_wallet->get_balance_str();
+  if (args.size() == 1 && args[0] == "raw")
+  {
+    success_msg_writer() << m_wallet->get_balance_str_raw();
+  }
+  else
+  {
+    success_msg_writer() << m_wallet->get_balance_str();
+  }
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -2675,9 +2681,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_set_timeout);
   command_line::add_arg(desc_params, arg_voting_config_file);
   command_line::add_arg(desc_params, arg_no_password_confirmations);
-  
-  
-  
+    
 
   tools::wallet_rpc_server::init_options(desc_params);
 
