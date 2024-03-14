@@ -261,10 +261,14 @@ namespace currency
     return diff;
   }
   //------------------------------------------------------------------
-  bool add_random_derivation_hints_and_put_them_to_tx(const std::set<uint16_t>& existing_derivation_hints, std::set<uint16_t>& new_derivation_hints, transaction& tx)
+  bool add_random_derivation_hints_and_put_them_to_tx(uint8_t tx_flags, const std::set<uint16_t>& existing_derivation_hints, std::set<uint16_t>& new_derivation_hints, transaction& tx)
   {
     if (existing_derivation_hints.size() > tx.vout.size())
+    {
+      if (tx.version < TRANSACTION_VERSION_POST_HF4 && (tx_flags & TX_FLAG_SIGNATURE_MODE_SEPARATE)) // for pre-HF4 consolidated txs just skip if all hints are already added
+        return true;
       return false;
+    }
 
     size_t hints_to_be_added = tx.vout.size() - existing_derivation_hints.size();
 
@@ -528,7 +532,7 @@ namespace currency
       tx_gen_context.amount_commitments_sum += tx_gen_context.amount_commitments[output_index];
       ++output_index;
     }
-    CHECK_AND_ASSERT_MES(add_random_derivation_hints_and_put_them_to_tx(std::set<uint16_t>(), derivation_hints, tx), false, "add_random_derivation_hints_and_put_them_to_tx failed");
+    CHECK_AND_ASSERT_MES(add_random_derivation_hints_and_put_them_to_tx(0, std::set<uint16_t>(), derivation_hints, tx), false, "add_random_derivation_hints_and_put_them_to_tx failed");
     
     if (tx.attachment.size())
       add_attachments_info_to_extra(tx.extra, tx.attachment);
@@ -2623,7 +2627,7 @@ namespace currency
         native_coins_output_sum += dst_entr.amount;
     }
 
-    CHECK_AND_ASSERT_MES(add_random_derivation_hints_and_put_them_to_tx(existing_derivation_hints, new_derivation_hints, tx), false, "add_random_derivation_hints_and_put_them_to_tx failed");
+    CHECK_AND_ASSERT_MES(add_random_derivation_hints_and_put_them_to_tx(flags, existing_derivation_hints, new_derivation_hints, tx), false, "add_random_derivation_hints_and_put_them_to_tx failed");
 
     //process offers and put there offers derived keys
     uint64_t att_count = 0;
