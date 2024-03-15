@@ -1217,23 +1217,28 @@ bool hard_fork_2_alias_update_using_old_tx<before_hf_2>::c1(currency::core& c, s
   //
   // Send tx and print it's blob
   // this code was used to generate old-style tx in develop branch, commit 36eabb916b95c7db06bdfb5d34d9820bd94b82df 
+  // UPD: 2024-03-15 tx blob was updated as of commit f538fc3a7612e7ce86556a1cd2602400f6b4e9aa 
   //
-  transaction tx_upd = AUTO_VAL_INIT(tx_upd);
-  alice_wlt->request_alias_update(ai_upd, tx_upd, TESTS_DEFAULT_FEE, 0);
-  std::string tx_upd_hex = epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(tx_upd));
-  LOG_PRINT_L0("tx upd: " << ENDL << tx_upd_hex);
+  {
+    transaction tx_upd = AUTO_VAL_INIT(tx_upd);
+    alice_wlt->request_alias_update(ai_upd, tx_upd, TESTS_DEFAULT_FEE, 0);
+    std::string tx_upd_hex = epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(tx_upd));
+    LOG_PRINT_L0("tx upd: " << ENDL << tx_upd_hex);
+  }
   */
   
 
   // use prepared tx blob
-  std::string tx_upd_hex("01010180988be49903011a0100000000000000ff593921b61d52e818058ef881764383fe9fb0cf4512da460daf477e3a216144000180d0dbc3f402037c2e68e9c60914d369dc53fcc91522dcec284e1b7c1604ccc3d8fcf67e2da0790003140a616c696365616c696365efdcf084d7af59e0d68e8bda3ff4514a02d812ccfd6a09f69811c5a6a1b035c9b1b2395fcd84283d02e2fc4f37395ac9d8f01ff3f1ad1b94a26aaf1c76bb39d00c48656c6c6f206d696e657221000118faf7b79730fd6c1ec5c918891e264e959749a0d8eebc7997b503bd185ef100fd9e0150c175e0f048ee729137ceed035e9145d7857eae9ab786dd319fe6520b16b0cc0d6a8766cd098fe5a42875243789cc3b4bf66ee0c12ff6ef2fc179d4cef50b0288360101f3012451b07e58e742c020d68e8ff6db2905fa3aad78806ba80b16f3c861ee09f79817ea1ec36b0e30c7be5412daf59bcbc34410461a0d126de4a2dd897ecf0200");
+  std::string tx_upd_hex("01010180988be49903011a01000000000000007bdeaff6ac11597e9fe397349dd2ecfcd6880cda9bbedaa67f759a5b95ba2ed9000180d0dbc3f4020335db05c510daddcb82257be70789650007ad2d567092ec1eb2a38a93ef8fa0070004140a616c696365616c696365efdcf084d7af59e0d68e8bda3ff4514a02d812ccfd6a09f69811c5a6a1b035c9b1b2395fcd84283d02e2fc4f37395ac9d8f01ff3f1ad1b94a26aaf1c76bb39d00c48656c6c6f206d696e6572210001c2537b8203e9c9981b87a3c63cc0c63e4ccc14ddd0309fdcee94664e4b3bc307ee438e90bb5720b7ac7cbec38fcac9c7aa5b9df02abd2fa1a58c580f9b3eaf0516116e8d89a67440aad0922a7e5dd88870e6f0af792a7af201ee21effd90cc6c7f1700000b02f37101016ed0997a3fe0c6bc47ffde14599a77697ba95c5c1489b65e5e54854146079f06569313d921f19ed2848cdccc8bad7f75fb46fc1608912365f569b7690703010b00");
   std::string tx_upd_blob;
   r = epee::string_tools::parse_hexstr_to_binbuff(tx_upd_hex, tx_upd_blob);
   CHECK_AND_ASSERT_MES(r, false, "parse_hexstr_to_binbuff failed");
-  //r = t_unserializable_object_from_blob(tx_upd, tx_upd_blob);
-  //CHECK_AND_ASSERT_MES(r, false, "t_unserializable_object_from_blob failed");
+  crypto::hash tx_upd_hash{};
+  transaction tx_upd{};
+  CHECK_AND_ASSERT_MES(parse_and_validate_tx_from_blob(tx_upd_blob, tx_upd, tx_upd_hash), false, "parse_tx_form_blob failed");
+  //LOG_PRINT_L0("tx_upd: " << tx_upd_hash << ", json:" << ENDL << obj_to_json_str(tx_upd));
   tx_verification_context tvc = AUTO_VAL_INIT(tvc);
-  r = c.handle_incoming_tx(tx_upd_blob, tvc, false);
+  r = c.handle_incoming_tx(tx_upd, tvc, false, tx_upd_hash);
   CHECK_AND_ASSERT_MES(r, false, "handle_incoming_tx failed");
 
 
