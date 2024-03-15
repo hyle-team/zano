@@ -17,6 +17,16 @@ using namespace epee;
 #include "wallet_rpc_server_error_codes.h"
 #include "wallet_helpers.h"
 #include "wrap_service.h"
+#include "jwt-cpp/jwt.h"
+#include "crypto/bitcoin/sha256_helper.h"
+
+#define JWT_TOKEN_EXPIRATION_MAXIMUM          (60 * 60)
+#define JWT_TOKEN_CLAIM_NAME_BODY_HASH        "body_hash"
+#define JWT_TOKEN_CLAIM_NAME_SALT             "salt"
+#define JWT_TOKEN_CLAIM_NAME_EXPIRATION       "exp"     
+#define JWT_TOKEN_OVERWHELM_LIMIT             100000   // if there are more records in m_jwt_used_salts then we consider it as an attack     
+
+
 
 #define GET_WALLET()   wallet_rpc_locker w(m_pwallet_provider);
 
@@ -60,6 +70,7 @@ namespace tools
   const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_bind_ip  ("rpc-bind-ip", "Specify ip to bind rpc server", "127.0.0.1");
   const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_miner_text_info  ( "miner-text-info", "Wallet password");
   const command_line::arg_descriptor<bool>        wallet_rpc_server::arg_deaf_mode  ( "deaf", "Put wallet into 'deaf' mode make it ignore any rpc commands(usable for safe PoS mining)");
+  const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_jwt_secret("jwt-secret", "Enables JWT auth over secret string provided");
 
   void wallet_rpc_server::init_options(boost::program_options::options_description& desc)
   {
@@ -67,6 +78,7 @@ namespace tools
     command_line::add_arg(desc, arg_rpc_bind_port);
     command_line::add_arg(desc, arg_miner_text_info);
     command_line::add_arg(desc, arg_deaf_mode);
+    command_line::add_arg(desc, arg_jwt_secret);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   wallet_rpc_server::wallet_rpc_server(std::shared_ptr<wallet2> wptr):
@@ -184,11 +196,81 @@ namespace tools
     m_net_server.set_threads_prefix("RPC");
     bool r = handle_command_line(vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to process command line in core_rpc_server");
+
+
+    if(command_line::has_arg(vm, arg_jwt_secret))
+    {
+      m_jwt_secret = command_line::get_arg(vm, arg_jwt_secret);
+    }
     return epee::http_server_impl_base<wallet_rpc_server, connection_context>::init(m_port, m_bind_ip);
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::auth_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context)
+  {
+
+    auto it = std::find_if(query_info.m_header_info.m_etc_fields.begin(), query_info.m_header_info.m_etc_fields.end(), [](const auto& element)
+                           { return element.first == ZANO_ACCESS_TOKEN; });
+    if(it == query_info.m_header_info.m_etc_fields.end())
+      return false;
+    
+    try
+    {
+      if(m_jwt_used_salts.get_set().size() > JWT_TOKEN_OVERWHELM_LIMIT)
+      {
+        throw std::runtime_error("Salt is overwhelmed");
+      }
+
+      auto decoded = jwt::decode(it->second, [](const std::string& str)
+                                 { return jwt::base::decode<jwt::alphabet::base64>(jwt::base::pad<jwt::alphabet::base64>(str)); });
+
+
+      auto verifier = jwt::verify().allow_algorithm(jwt::algorithm::hs256 { m_jwt_secret });
+
+      verifier.verify(decoded);
+      std::string body_hash     = decoded.get_payload_claim(JWT_TOKEN_CLAIM_NAME_BODY_HASH).as_string();
+      std::string salt      = decoded.get_payload_claim(JWT_TOKEN_CLAIM_NAME_SALT).as_string();
+      crypto::hash jwt_claim_sha256 = currency::null_hash;
+      epee::string_tools::hex_to_pod(body_hash, jwt_claim_sha256);
+      crypto::hash sha256 = crypto::sha256_hash(query_info.m_body.data(), query_info.m_body.size());
+      if (sha256 != jwt_claim_sha256)
+      {
+        throw std::runtime_error("Body hash missmatch");
+      }
+      if(m_jwt_used_salts.get_set().find(salt) != m_jwt_used_salts.get_set().end())
+      {
+        throw std::runtime_error("Salt reused");
+      }
+
+      uint64_t ticks_now = epee::misc_utils::get_tick_count();
+      m_jwt_used_salts.add(salt, ticks_now + JWT_TOKEN_EXPIRATION_MAXIMUM);
+      m_jwt_used_salts.remove_if_expiration_less_than(ticks_now);
+
+      LOG_PRINT_L0("JWT token OK");
+      return true;
+    }
+    catch(const std::exception& e)
+    {
+      LOG_ERROR("Invalid JWT token: " << e.what());
+      return false;
+    }
+
+
+    return false;
+
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context)
   {
+    if (m_jwt_secret.size())
+    {
+      if (!auth_http_request(query_info, response, m_conn_context))
+      {
+        response.m_response_code    = 401;
+        response.m_response_comment = "Unauthorized";
+        return true;
+      }
+    }
+
     response.m_response_code = 200;
     response.m_response_comment = "Ok";
     std::string reference_stub;
@@ -212,6 +294,11 @@ namespace tools
       return true;
     }
     return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  void wallet_rpc_server::set_jwt_secret(const std::string& jwt)
+  {
+    m_jwt_secret = jwt;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_getbalance(const wallet_public::COMMAND_RPC_GET_BALANCE::request& req, wallet_public::COMMAND_RPC_GET_BALANCE::response& res, epee::json_rpc::error& er, connection_context& cntx)

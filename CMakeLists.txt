@@ -58,7 +58,7 @@ else()
   endif()
 endif()
 message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}, and built type: ${CMAKE_BUILD_TYPE}")
- 
+
 enable_testing()
 
 set(OPENSSL_USE_STATIC_LIBS TRUE) # link statically
@@ -74,7 +74,7 @@ set(DISABLE_TOR FALSE CACHE BOOL "Disable TOR library(and related tor-connect su
 set(TESTNET FALSE CACHE BOOL "Compile for testnet")
 set(BUILD_GUI FALSE CACHE BOOL "Build qt-daemon")
 
-include_directories(src contrib/eos_portable_archive contrib contrib/epee/include ${OPENSSL_INCLUDE_DIR} "${CMAKE_BINARY_DIR}/version" "${CMAKE_BINARY_DIR}/contrib/zlib")
+include_directories(src contrib/eos_portable_archive contrib contrib/epee/include contrib/jwt-cpp/include ${OPENSSL_INCLUDE_DIR} "${CMAKE_BINARY_DIR}/version" "${CMAKE_BINARY_DIR}/contrib/zlib")
 
 add_definitions(-DSTATICLIB)
 

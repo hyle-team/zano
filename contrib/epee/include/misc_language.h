@@ -532,6 +532,31 @@ namespace misc_utils
 
   };
 
+  template<typename key, typename expiration_type>
+  struct expirating_set
+  {
+    typedef std::set<key> main_set;
+    main_set m_set;
+    std::multimap<expiration_type, typename main_set::iterator> m_expirations;
+
+    const main_set& get_set()
+    {
+      return m_set;
+    }
+    void add(const key& k, const expiration_type& e)
+    {
+      auto res = m_set.insert(k);
+      m_expirations.insert({ e, res.first });
+    }
+
+    void remove_if_expiration_less_than(const expiration_type& e)
+    {
+      while(m_expirations.size() && m_expirations.begin()->first < e)
+      {
+        m_expirations.erase(m_expirations.begin());
+      }
+    }
+  };
 
 
 } // namespace misc_utils

@@ -3728,6 +3728,59 @@ std::string wallet2::get_balance_str() const
   return ss.str();
 }
 //----------------------------------------------------------------------------------------------------
+std::string wallet2::get_balance_str_raw() const
+{
+    // balance unlocked     / [balance total]       ticker   asset id
+  // 1391306.970000000000 / 1391306.970000000000  ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
+  // 1391306.97                                   ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
+  //     106.971          /     206.4             ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
+
+  static const char* header = " balance unlocked     / [balance total]       asset id";
+  std::stringstream ss;
+  ss << header << ENDL;
+  
+  uint64_t dummy = 0;
+  std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base> balances_map;
+  this->balance(balances_map, dummy);
+
+  for(const auto& entry : balances_map)
+  {
+    ss << " " << std::left << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(entry.second.unlocked, 12);
+    if(entry.second.total == entry.second.unlocked)
+      ss << "                       ";
+    else
+      ss << " / " << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(entry.second.total, 12);
+    ss << "  " << std::setw(8) << std::left << entry.first << ENDL;
+  }
+
+  //print whitelist
+  ss << "WHITELIST: " << ENDL;
+
+
+  for(const auto& entry : m_whitelisted_assets)
+  {
+    ss << " " << std::left << entry.first << "    " << entry.second.ticker << ENDL; 
+  }
+
+    // print whitelist
+  ss << "CUSTOM LIST: " << ENDL;
+
+
+  for(const auto& entry : m_custom_assets)
+  {
+    ss << " " << std::left << entry.first << "    " << entry.second.ticker << ENDL;
+  }
+
+  ss << "OWN DESCRIPTORS LIST: " << ENDL;
+  
+  for(const auto& entry : m_own_asset_descriptors)
+  {
+    ss << " " << std::left << entry.first << "    " << entry.second.asset_descriptor.ticker << ENDL;
+  }
+
+  return ss.str();
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::get_payments(const std::string& payment_id, std::list<payment_details>& payments, uint64_t min_height) const
 {
   auto range = m_payments.equal_range(payment_id);

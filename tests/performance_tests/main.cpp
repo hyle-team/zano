@@ -26,9 +26,57 @@
 #include "threads_pool_tests.h"
 #include "wallet/plain_wallet_api.h"
 #include "wallet/view_iface.h"
+#include <jwt-cpp/jwt.h>
+
 
 void test_plain_wallet()
 {
+
+
+  std::string token  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiemFub19leHRlbnNpb24iLCJzYWx0IjoiYTUyMTk5MzQyNmYxN2Y2MDQyMzkzYTI4YzJhMzk1NjFiYTgxYmVkZDkxODJlY2E5NTY3ZDBlNjQ3YjIwZTE2NSIsImV4cCI6MTcxMDM2MzA1MH0.CwqvPBtgE8ZUFZ4cYy1ZJLWdYCnhfEiCzEhqDYCK4CQ";
+  auto decoded_token = jwt::decode(token);
+
+  std::string sharedSecret = "DFDvfedceEDCECECecedcyhtyh";
+
+  try
+  {
+    auto decoded = jwt::decode(token);
+
+    auto verifier = jwt::verify()
+                        .allow_algorithm(jwt::algorithm::hs256 { sharedSecret });
+
+    verifier.verify(decoded);
+
+    std::cout << "Token is valid. Claims:" << std::endl;
+    for(auto& e : decoded.get_payload_json())
+      std::cout << e.first << " = " << e.second << std::endl;
+  }
+  catch(const std::exception& e)
+  {
+    std::cerr << "Invalid token: " << e.what() << std::endl;
+  }
+
+
+  /*
+  auto verifier = jwt::verify()
+                      .with_issuer("auth0")
+                      .with_claim("sample", jwt::claim(std::string("test")))
+                      .allow_algorithm(jwt::algorithm::hs256 { "secret" });
+
+  verifier.verify(decoded_token);
+
+  auto token = jwt::create()
+                   .set_type("JWS")
+                   .set_issuer("auth0")
+                   .set_payload_claim("sample", jwt::claim(std::string("test")))
+                   .sign(jwt::algorithm::hs256 { "secret" });
+
+*/
+  return;
+
+
+
+
   std::string res = plain_wallet::init("195.201.107.230", "33336", "E:\\tmp\\", 0);
   
   uint64_t instance_id = 0;
