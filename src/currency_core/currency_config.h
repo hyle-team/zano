@@ -110,13 +110,14 @@
 
 
 #ifndef TESTNET
-#define P2P_DEFAULT_PORT                                11121
-#define RPC_DEFAULT_PORT                                11211
+#define P2P_DEFAULT_PORT                                11171
+#define RPC_DEFAULT_PORT                                11711
 #define STRATUM_DEFAULT_PORT                            11777
-#define P2P_NETWORK_ID_TESTNET_FLAG                     0
+#define P2P_NETWORK_ID_TESTNET_FLAG                     7
 #define P2P_MAINTAINERS_PUB_KEY                         "8f138bb73f6d663a3746a542770781a09579a7b84cb4125249e95530824ee607"
 #define DIFFICULTY_POS_STARTER                          1
-#else 
+#else
+static_assert(false, "testnet is not supported");
 #define P2P_DEFAULT_PORT                                (11112 + CURRENCY_FORMATION_VERSION)
 #define RPC_DEFAULT_PORT                                12111
 #define STRATUM_DEFAULT_PORT                            11888
@@ -190,12 +191,16 @@
 
 
 
-#define CURRENCY_NAME_ABR                               "ZANO"
-#define CURRENCY_NAME_BASE                              "Zano"
-#define CURRENCY_NAME_SHORT_BASE                        "Zano"
+#define CURRENCY_NAME_ABR                               "ZANO_STAGE"
+#define CURRENCY_NAME_BASE                              "Zano_SN"
+#define CURRENCY_NAME_SHORT_BASE                        "Zano_SN"
+
+#define STAGENET_POW_DIFF_DIVISOR                       10000000
+#define STAGENET_POS_DIFF_DIVISOR                       80000
+
 #ifndef TESTNET
-#define CURRENCY_NAME                                   CURRENCY_NAME_BASE
-#define CURRENCY_NAME_SHORT                             CURRENCY_NAME_SHORT_BASE
+#define CURRENCY_NAME                                   CURRENCY_NAME_BASE"_stagenet"
+#define CURRENCY_NAME_SHORT                             CURRENCY_NAME_SHORT_BASE"_stagenet"
 #else
 #define CURRENCY_NAME                                   CURRENCY_NAME_BASE"_testnet"
 #define CURRENCY_NAME_SHORT                             CURRENCY_NAME_SHORT_BASE"_testnet"
@@ -267,7 +272,7 @@
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   194624    // 2019-09-21 20:25:16
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   999999    // 2021-04-05 09:11:45
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   1082577   // 2021-06-01 23:28:10
-#define ZANO_HARDFORK_04_AFTER_HEIGHT                   2555000   // 2024-03-21 10:16:46 (expected)
+#define ZANO_HARDFORK_04_AFTER_HEIGHT                   2550700   // 2024-03-18 10:36:37 (STAGENET)
 #else
 /////// Zarcanum Testnet //////////////////////////////
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0

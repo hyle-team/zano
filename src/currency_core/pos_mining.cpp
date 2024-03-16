@@ -13,7 +13,7 @@ namespace currency
 {
   void pos_mining_context::init(const wide_difficulty_type& pos_diff, const stake_modifier_type& sm, bool is_zarcanum)
   {
-    this->basic_diff = pos_diff;
+    this->basic_diff = pos_diff / STAGENET_POS_DIFF_DIVISOR;
     this->sk.stake_modifier = sm;
     this->zarcanum = is_zarcanum;
 

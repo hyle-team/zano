@@ -5957,6 +5957,9 @@ bool blockchain_storage::validate_pos_block(const block& b,
                                             uint64_t split_height
                                             )const 
 {
+
+  basic_diff = basic_diff / STAGENET_POS_DIFF_DIVISOR;
+
   bool is_pos = is_pos_block(b);
   CHECK_AND_ASSERT_MES(is_pos, false, "is_pos_block() returned false validate_pos_block()");
 

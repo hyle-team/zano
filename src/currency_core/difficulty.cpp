@@ -68,6 +68,8 @@ namespace currency {
 
   bool check_hash(const crypto::hash &hash_, wide_difficulty_type difficulty)
   {
+    difficulty = difficulty / STAGENET_POW_DIFF_DIVISOR;
+
     //revert byte order
     crypto::hash h = {};
     for (size_t i = 0; i != sizeof(h); i++)
