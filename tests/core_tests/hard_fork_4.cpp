@@ -134,18 +134,22 @@ bool hard_fork_4_consolidated_txs::generate(std::vector<test_event_entry>& event
     CHECK_AND_ASSERT_MES(dhc == destinations.size(), false, "unexpected derivation hints count: " << dhc);
 
     // partially completed tx_1 shouldn't be accepted
-    if (m_post_hf4_zarcanum)
-    {
-      ADD_CUSTOM_EVENT(events, tx_1);
-      DO_CALLBACK(events, "mark_invalid_block");
-      MAKE_NEXT_BLOCK_TX1(events, blk_2a, blk_1r, miner_acc, tx_1);
-    }
-    else
-    {
+     
+    // now we added a balance check to tx_memory_pool::add_tx() for post-HF4 txs, so the behaviour is the same -- partially completed consolidated tx won't be added to the pool -- sowle
+    // (subject to change in future)
+
+    //if (m_post_hf4_zarcanum)
+    //{
+    //  ADD_CUSTOM_EVENT(events, tx_1);
+    //  DO_CALLBACK(events, "mark_invalid_block");
+    //  MAKE_NEXT_BLOCK_TX1(events, blk_2a, blk_1r, miner_acc, tx_1);
+    //  DO_CALLBACK(events, "clear_tx_pool");
+    //}
+    //else
+    //{
       DO_CALLBACK(events, "mark_invalid_tx");
       ADD_CUSTOM_EVENT(events, tx_1);
-    }
-    DO_CALLBACK(events, "clear_tx_pool");
+    //}
   }
 
 

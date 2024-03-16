@@ -224,6 +224,14 @@ namespace currency
     }
     TIME_MEASURE_FINISH_PD(check_inputs_time);
 
+    TIME_MEASURE_START_PD(check_post_hf4_balance);
+    if (tx.version > TRANSACTION_VERSION_PRE_HF4)
+    {
+      r = check_tx_balance(tx, id);
+      CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "post-HF4 tx: balance proof is invalid");
+    }
+    TIME_MEASURE_FINISH_PD(check_post_hf4_balance);
+
     do_insert_transaction(tx, id, blob_size, kept_by_block, tx_fee, ch_inp_res ? max_used_block_id : null_hash, ch_inp_res ? max_used_block_height : 0);
     
     TIME_MEASURE_FINISH_PD(tx_processing_time);
@@ -240,9 +248,11 @@ namespace currency
       << "/" << m_performance_data.validate_alias_time.get_last_val()
       << "/" << m_performance_data.check_keyimages_ws_ms_time.get_last_val()
       << "/" << m_performance_data.check_inputs_time.get_last_val()
+      << "/b"<< m_performance_data.check_post_hf4_balance.get_last_val()
       << "/" << m_performance_data.begin_tx_time.get_last_val()
       << "/" << m_performance_data.update_db_time.get_last_val()
-      << "/" << m_performance_data.db_commit_time.get_last_val() << ")"    );
+      << "/" << m_performance_data.db_commit_time.get_last_val()
+      << ")");
 
     return true;
   }

@@ -77,7 +77,8 @@ namespace currency
       epee::math_helper::average<uint64_t, 5> check_inputs_time;
       epee::math_helper::average<uint64_t, 5> begin_tx_time;
       epee::math_helper::average<uint64_t, 5> update_db_time;
-      epee::math_helper::average<uint64_t, 5> db_commit_time;      
+      epee::math_helper::average<uint64_t, 5> db_commit_time;
+      epee::math_helper::average<uint64_t, 1> check_post_hf4_balance;
     };
 
     typedef std::unordered_map<crypto::key_image, std::set<crypto::hash>> key_image_cache;
