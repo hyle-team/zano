@@ -272,7 +272,7 @@ static_assert(false, "testnet is not supported");
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   194624    // 2019-09-21 20:25:16
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   999999    // 2021-04-05 09:11:45
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   1082577   // 2021-06-01 23:28:10
-#define ZANO_HARDFORK_04_AFTER_HEIGHT                   2550700   // 2024-03-18 10:36:37 (STAGENET)
+#define ZANO_HARDFORK_04_AFTER_HEIGHT                   2551400
 #else
 /////// Zarcanum Testnet //////////////////////////////
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0
