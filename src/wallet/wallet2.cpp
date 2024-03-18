@@ -4450,6 +4450,12 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
     static_cast<crypto::zarcanum_proof&>(sig), &err);
   WLT_CHECK_AND_ASSERT_MES(r, false, "zarcanum_generate_proof failed, err: " << (int)err);
 
+  LOG_PRINT_GREEN("WLT: Zarcanum proof generated: " << ENDL <<
+    "     D                  = 0x" << std::hex << cxt.basic_diff << ENDL <<
+    "     sig.d              = 0x" << sig.d.to_string_as_hex_number() << ENDL <<
+    "     floor(l / (z * D)) = 0x" << std::hex << cxt.z_l_div_z_D / crypto::c_zarcanum_z_coeff_mp << ENDL
+    , LOG_LEVEL_0);
+
   //
   // The miner tx prefix should be sealed by now, and the tx hash should be defined.
   // Any changes made below should only affect the signatures/proofs and should not impact the prefix hash calculation.   

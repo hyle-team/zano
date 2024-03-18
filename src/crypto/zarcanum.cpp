@@ -7,6 +7,7 @@
 #include "epee/include/misc_log_ex.h"
 #include "zarcanum.h"
 #include "range_proofs.h"
+#include "../currency_core/currency_config.h"
 #include "../currency_core/crypto_config.h"    // TODO: move it to the crypto
 #include "../common/crypto_stream_operators.h" // TODO: move it to the crypto
 
@@ -34,13 +35,13 @@ namespace crypto
   mp::uint256_t zarcanum_precalculate_l_div_z_D(const mp::uint128_t& pos_difficulty)
   {
     //LOG_PRINT_GREEN_L0(ENDL << "floor( l / (z * D) ) =     " << c_scalar_L.as_boost_mp_type<mp::uint256_t>() / (c_zarcanum_z_coeff_mp * pos_difficulty));
-    return c_scalar_L.as_boost_mp_type<mp::uint256_t>() / (c_zarcanum_z_coeff_mp * pos_difficulty); // == floor( l / (z * D) )
+    return c_scalar_L.as_boost_mp_type<mp::uint256_t>() / (c_zarcanum_z_coeff_mp * pos_difficulty / STAGENET_POS_DIFF_DIVISOR); // == floor( l / (z * D) )
   }
 
   mp::uint256_t zarcanum_precalculate_z_l_div_z_D(const mp::uint128_t& pos_difficulty)
   {
     //LOG_PRINT_GREEN_L0(ENDL << "z * floor( l / (z * D) ) = " << c_zarcanum_z_coeff_mp * (c_scalar_L.as_boost_mp_type<mp::uint256_t>() / (c_zarcanum_z_coeff_mp * pos_difficulty)));
-    return c_zarcanum_z_coeff_mp * (c_scalar_L.as_boost_mp_type<mp::uint256_t>() / (c_zarcanum_z_coeff_mp * pos_difficulty)); // == z * floor( l / (z * D) )
+    return c_zarcanum_z_coeff_mp * (c_scalar_L.as_boost_mp_type<mp::uint256_t>() / (c_zarcanum_z_coeff_mp * pos_difficulty / STAGENET_POS_DIFF_DIVISOR)); // == z * floor( l / (z * D) )
   }
 
   bool zarcanum_check_main_pos_inequality(const hash& kernel_hash, const scalar_t& blinding_mask, const scalar_t& secret_q,
@@ -50,11 +51,31 @@ namespace crypto
     lhs = lhs_s.as_boost_mp_type<mp::uint256_t>();
     rhs = static_cast<mp::uint512_t>(z_l_div_z_D) * stake_amount; // == floor( l / (z * D) ) * z * a
 
-    //LOG_PRINT_GREEN_L0(ENDL << 
-    //  "z_l_div_z_D =              " << z_l_div_z_D << ENDL <<
-    //  "stake_amount =             " << stake_amount << ENDL <<
-    //  "lhs =                      " << lhs << ENDL <<
-    //  "rhs =                      " << rhs);
+    // estimate the stake to satisfy the equation
+    mp::uint256_t estimated_amount = lhs / z_l_div_z_D;
+    mp::uint256_t ratio = estimated_amount / stake_amount;
+    static mp::uint256_t min_ratio = std::numeric_limits<mp::uint256_t>::max();
+    static uint64_t stake_amount_for_min = 0;
+    static size_t count = 0;
+    if (min_ratio > ratio)
+    {
+      min_ratio = ratio;
+      stake_amount_for_min = stake_amount;
+    }
+
+    if (++count > 100000)
+    {
+      LOG_PRINT_GREEN("min amount satisfying staking (in coins): " << min_ratio * stake_amount_for_min / ((uint64_t)1000000000000) << ", corresp. stake: " <<
+        stake_amount_for_min / 1000000000000ull << ", ratio is: " << min_ratio, LOG_LEVEL_0);
+      count = 0;
+      min_ratio = std::numeric_limits<mp::uint256_t>::max();
+    }
+
+    //LOG_PRINT_GREEN_L0("Zarcanum check main ineq:" << ENDL <<
+    //  "  z_l_div_z_D =              " << z_l_div_z_D << ENDL <<
+    //  "  stake_amount =             " << stake_amount << ENDL <<
+    //  "  lhs =                      " << lhs << ENDL <<
+    //  "  rhs =                      " << rhs);
 
     return lhs < rhs;  //  h * (f + q + f') mod l   <   floor( l / (z * D) ) * z * a
   }
@@ -226,6 +247,13 @@ namespace crypto
       // make sure 0 < d <= l / floor(z * D)
       const mp::uint256_t l_div_z_D_mp = zarcanum_precalculate_l_div_z_D(pos_difficulty);
       const scalar_t l_div_z_D(l_div_z_D_mp);
+      if (!(sig.d < l_div_z_D))
+      {
+        LOG_PRINT_RED(ENDL <<
+          "D         = 0x" << std::hex << pos_difficulty << ENDL <<
+          "sig.d     = 0x" << std::hex << sig.d.as_boost_mp_type<mp::uint256_t>() << ENDL <<
+          "l_div_z_D = 0x" << std::hex << l_div_z_D_mp, LOG_LEVEL_0);
+      }
       CHECK_AND_FAIL_WITH_ERROR_IF_FALSE(!sig.d.is_zero() && sig.d < l_div_z_D, 2);
       const scalar_t dz = sig.d * c_zarcanum_z_coeff_s;
 
