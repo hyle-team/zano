@@ -397,7 +397,6 @@ namespace tools
     void transfer_asset_ownership(const crypto::public_key asset_id, const crypto::public_key& new_owner, currency::transaction& result_tx);
 
     bool daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb);
-    const std::unordered_map<crypto::public_key, wallet_own_asset_context>& get_own_assets() const { return m_own_asset_descriptors; }
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
     void set_pos_utxo_count_limits_for_defragmentation_tx(uint64_t min_outs, uint64_t max_outs); // don't create UTXO defrag. tx if there are less than 'min_outs' outs; don't put more than 'max_outs' outs
     void set_pos_decoys_count_for_defragmentation_tx(size_t decoys_count);
@@ -659,9 +658,13 @@ namespace tools
 
     bool add_custom_asset_id(const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_descriptor);
     bool delete_custom_asset_id(const crypto::public_key& asset_id);
-    bool get_custom_assets(std::list<currency::asset_descriptor_with_id>& assets) const;
+    const std::unordered_map<crypto::public_key, currency::asset_descriptor_base>& get_local_whitelist() const;
+    const std::unordered_map<crypto::public_key, currency::asset_descriptor_base>& get_global_whitelist() const;
+    const std::unordered_map<crypto::public_key, tools::wallet_own_asset_context>& get_own_assets() const;
+    
     bool load_whitelisted_tokens_if_not_loaded() const;
     bool load_whitelisted_tokens() const;
+
 
     void set_connectivity_options(unsigned int timeout);
     
@@ -696,6 +699,9 @@ namespace tools
     bool encrypt_buffer(const std::string& buff, std::string& res_buff);
     bool decrypt_buffer(const std::string& buff, std::string& res_buff);
     bool is_in_hardfork_zone(uint64_t hardfork_index) const;
+    
+    //performance inefficient call, suitable only for rare ocasions or super lazy developers
+    bool proxy_to_daemon(const std::string& uri, const std::string& body, int& response_code, std::string& response_body);
 
     construct_tx_param get_default_construct_tx_param();
 

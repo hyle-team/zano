@@ -143,6 +143,22 @@ namespace tools
       return m_rpc.on_get_asset_info(req, res, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
+    virtual bool call_COMMAND_RPC_INVOKE(const std::string& uri, const std::string& body, int& response_code, std::string& response_body) override
+    {
+      epee::net_utils::http::http_request_info query_info = AUTO_VAL_INIT(query_info);
+      query_info.m_URI = uri;
+      query_info.m_http_method = epee::net_utils::http::http_method_get;
+      query_info.m_body = body;
+
+      epee::net_utils::http::http_response_info response = AUTO_VAL_INIT(response);
+      epee::net_utils::connection_context_base conn_context = AUTO_VAL_INIT(conn_context);
+
+      bool res = m_rpc.handle_http_request(query_info, response, conn_context);
+      response_body = response.m_body;
+      response_code = response.m_response_code;
+      return res;
+    }
+    //------------------------------------------------------------------------------------------------------------------------------
     virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override
     {
       return tools::get_transfer_address(adr_str, addr, payment_id, this);

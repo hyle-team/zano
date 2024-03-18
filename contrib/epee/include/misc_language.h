@@ -82,6 +82,13 @@ namespace epee
 
 namespace misc_utils
 {
+
+  template<typename t_type_a, typename t_type_b>
+  void cast_assign_a_to_b(t_type_a& a, const t_type_b& b)
+  {
+    *static_cast<t_type_b*>(&a) = b;
+  }
+
   template<class _Ty1,
     class _Ty2,
     class _Ty3>

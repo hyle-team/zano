@@ -223,7 +223,7 @@ QString MainWindow::get_default_user_dir(const QString& param)
 }
 
 
-bool MainWindow::toggle_mining()
+bool MainWindow::toggle_mining(const QString& param)
 {
   TRY_ENTRY();
   m_backend.toggle_pos_mining();
@@ -238,7 +238,7 @@ QString MainWindow::get_exchange_last_top(const QString& params)
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString MainWindow::get_tx_pool_info()
+QString MainWindow::get_tx_pool_info(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -248,7 +248,7 @@ QString MainWindow::get_tx_pool_info()
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString MainWindow::request_dummy()
+QString MainWindow::request_dummy(const QString& param)
 {
   static int code_ = 0;
   TRY_ENTRY();
@@ -284,7 +284,7 @@ QString MainWindow::call_rpc(const QString& params)
 
   epee::net_utils::http::http_request_info query_info = AUTO_VAL_INIT(query_info);
   epee::net_utils::http::http_response_info response_info  = AUTO_VAL_INIT(response_info);
-  currency::core_rpc_server::connection_context dummy_context = AUTO_VAL_INIT(dummy_context);
+  currency::core_rpc_server::connection_context dummy_context(RPC_INTERNAL_UI_CONTEXT, 0, 0, true);
 
   query_info.m_URI = "/json_rpc";
   query_info.m_body = params.toStdString();
@@ -301,14 +301,14 @@ QString MainWindow::call_rpc(const QString& params)
   return QString::fromStdString(response_info.m_body);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
-QString MainWindow::get_default_fee()
+QString MainWindow::get_default_fee(const QString& param)
 {
   TRY_ENTRY();
   return QString(std::to_string(m_backend.get_default_fee()).c_str());
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString MainWindow::get_options()
+QString MainWindow::get_options(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -319,7 +319,7 @@ QString MainWindow::get_options()
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-void MainWindow::tray_quit_requested()
+void MainWindow::tray_quit_requested(const QString& param)
 {
   TRY_ENTRY();
   LOG_PRINT_MAGENTA("[GUI]->[HTML] tray_quit_requested", LOG_LEVEL_0);  
@@ -350,10 +350,10 @@ void MainWindow::closeEvent(QCloseEvent *event)
    }
    else
    {
+     event->ignore();
      //m_quit_requested = true;
      LOG_PRINT_L0("[GUI]->[HTML] quit_requested");
      emit quit_requested("{}");
-     event->ignore();
    }
    CATCH_ENTRY2(void());
 }
@@ -474,7 +474,7 @@ bool MainWindow::init(const std::string& html_path)
   CATCH_ENTRY2(false);
 }
 
-void MainWindow::on_menu_show()
+void MainWindow::on_menu_show(const QString& param)
 {
   TRY_ENTRY();
   qDebug() << "Context menu: show()";
@@ -546,7 +546,7 @@ void MainWindow::bool_toggle_icon(const QString& param)
   CATCH_ENTRY2(void());
 }
 
-QString MainWindow::get_log_file()
+QString MainWindow::get_log_file(const QString& param)
 {
   TRY_ENTRY();
   std::string buff;
@@ -662,7 +662,7 @@ QString MainWindow::set_clipboard(const QString& param)
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
-QString MainWindow::get_clipboard()
+QString MainWindow::get_clipboard(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -671,7 +671,7 @@ QString MainWindow::get_clipboard()
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
-QString MainWindow::on_request_quit()
+QString MainWindow::on_request_quit(const QString& param)
 {
   TRY_ENTRY();
   LOG_PRINT_MAGENTA("[HTML]->[GUI] on_request_quit", LOG_LEVEL_0);
@@ -933,7 +933,7 @@ bool MainWindow::init_backend(int argc, char* argv[])
   CATCH_ENTRY2(false);
 }
 
-QString    MainWindow::is_remnotenode_mode_preconfigured()
+QString    MainWindow::is_remnotenode_mode_preconfigured(const QString& param)
 {
   TRY_ENTRY();
   return API_RETURN_CODE_FALSE;
@@ -1044,7 +1044,7 @@ bool MainWindow::nativeEventFilter(const QByteArray &eventType, void *message, l
   CATCH_ENTRY2(false);
 }
 
-bool MainWindow::get_is_disabled_notifications()
+bool MainWindow::get_is_disabled_notifications(const QString& param)
 {
   return m_config.disable_notifications;
 }
@@ -1181,21 +1181,21 @@ bool MainWindow::pos_block_found(const currency::block& block_found)
   CATCH_ENTRY2(false);
 }
 
-QString MainWindow::get_version()
+QString MainWindow::get_version(const QString& param)
 {
   TRY_ENTRY();
   return PROJECT_VERSION_LONG;
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString MainWindow::get_os_version()
+QString MainWindow::get_os_version(const QString& param)
 {
   TRY_ENTRY();
   return tools::get_os_version_string().c_str();
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
-QString MainWindow::get_network_type()
+QString MainWindow::get_network_type(const QString& param)
 {
 #if defined(TESTNET)
   return "testnet";
@@ -1626,7 +1626,7 @@ QString MainWindow::load_from_file(const QString& path)
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
-QString MainWindow::get_app_data()
+QString MainWindow::get_app_data(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -1637,7 +1637,7 @@ QString MainWindow::get_app_data()
 }
 
 
-QString MainWindow::have_secure_app_data()
+QString MainWindow::have_secure_app_data(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -1655,7 +1655,7 @@ QString MainWindow::have_secure_app_data()
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString MainWindow::drop_secure_app_data()
+QString MainWindow::drop_secure_app_data(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -1673,7 +1673,7 @@ QString MainWindow::drop_secure_app_data()
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString MainWindow::get_all_aliases()
+QString MainWindow::get_all_aliases(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -1779,7 +1779,7 @@ QString MainWindow::set_enable_tor(const QString& param)
 //   return MAKE_RESPONSE(ar);
 // }
 
-QString MainWindow::webkit_launched_script()
+QString MainWindow::webkit_launched_script(const QString& param)
 {
   TRY_ENTRY();
   m_last_update_daemon_status_json.clear();
@@ -1993,7 +1993,7 @@ QString MainWindow::get_fav_offers(const QString& param)
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
-QString MainWindow::is_pos_allowed()
+QString MainWindow::is_pos_allowed(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -2265,7 +2265,7 @@ QString MainWindow::is_wallet_password_valid(const QString& param)
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString MainWindow::is_autostart_enabled()
+QString MainWindow::is_autostart_enabled(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -2315,6 +2315,16 @@ QString MainWindow::open_url_in_browser(const QString& param)
     return API_RETURN_CODE_FAIL;
   }
   LOG_PRINT_L0("[Open URL]: " << param.toStdString());
+  return API_RETURN_CODE_OK;
+  CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
+}
+
+QString MainWindow::setup_jwt_wallet_rpc(const QString& param)
+{
+  TRY_ENTRY();
+
+  m_backend.setup_wallet_rpc(param.toStdString());
+
   return API_RETURN_CODE_OK;
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }

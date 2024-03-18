@@ -546,13 +546,12 @@ bool wallets_manager::init_local_daemon()
   CHECK_AND_ASSERT_AND_SET_GUI(res, "Failed to initialize core rpc server.");
   LOG_PRINT_GREEN("Core rpc server initialized OK on port: " << m_rpc_server.get_binded_port(), LOG_LEVEL_0);
 
+  m_ui_opt.rpc_port = m_rpc_server.get_binded_port();
+
+
   //chain calls to rpc server
   m_prpc_chain_handler = &m_wallet_rpc_server;
   //disable this for main net until we get full support of authentication with network
-#ifdef TESTNET
-  m_rpc_server.set_rpc_chain_handler(this);
-#endif
-
 
   LOG_PRINT_L0("Starting core rpc server...");
   //dsi.text_state = "Starting core rpc server";
@@ -570,6 +569,23 @@ bool wallets_manager::init_local_daemon()
   LOG_PRINT_L0("p2p net loop stopped");
 #endif
   return true;
+}
+
+std::string wallets_manager::setup_wallet_rpc(const std::string& jwt_secret)
+{
+  if (!jwt_secret.size())
+  {
+    //disabling wallet RPC
+    m_rpc_server.set_rpc_chain_handler(nullptr);
+    return WALLET_RPC_STATUS_OK;
+  }
+
+  //we don't override command line JWT secret
+  if(!m_wallet_rpc_server.get_jwt_secret().size() ) 
+    m_wallet_rpc_server.set_jwt_secret(jwt_secret);
+
+  m_rpc_server.set_rpc_chain_handler(this);
+  return WALLET_RPC_STATUS_OK;
 }
 
 bool wallets_manager::deinit_local_daemon()
@@ -2102,7 +2118,6 @@ bool wallets_manager::on_mw_select_wallet(const tools::wallet_public::COMMAND_MW
   res.status = API_RETURN_CODE_OK;
   return true;
 }
-
 
 void wallets_manager::lock() 
 {

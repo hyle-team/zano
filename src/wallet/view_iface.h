@@ -729,12 +729,14 @@ public:
 
   struct gui_options
   {
-    bool use_debug_mode;
-    bool disable_price_fetch;
+    bool use_debug_mode = false;
+    bool disable_price_fetch = false;
+    int32_t rpc_port = 0;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(use_debug_mode)
       KV_SERIALIZE(disable_price_fetch)
+      KV_SERIALIZE(rpc_port)
     END_KV_SERIALIZE_MAP()
 
   };

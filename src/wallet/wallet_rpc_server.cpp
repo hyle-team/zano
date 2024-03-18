@@ -261,7 +261,7 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context)
   {
-    if (m_jwt_secret.size())
+    if (m_jwt_secret.size() && m_conn_context.m_connection_id != RPC_INTERNAL_UI_CONTEXT)
     {
       if (!auth_http_request(query_info, response, m_conn_context))
       {
@@ -299,6 +299,11 @@ namespace tools
   void wallet_rpc_server::set_jwt_secret(const std::string& jwt)
   {
     m_jwt_secret = jwt;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  const std::string& wallet_rpc_server::get_jwt_secret()
+  {
+    return m_jwt_secret;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_getbalance(const wallet_public::COMMAND_RPC_GET_BALANCE::request& req, wallet_public::COMMAND_RPC_GET_BALANCE::response& res, epee::json_rpc::error& er, connection_context& cntx)
@@ -1108,7 +1113,13 @@ namespace tools
   bool wallet_rpc_server::on_assets_whitelist_get(const wallet_public::COMMAND_ASSETS_WHITELIST_GET::request& req, wallet_public::COMMAND_ASSETS_WHITELIST_GET::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
-    w.get_wallet()->get_custom_assets(res.assets);
+
+    currency::assets_map_to_assets_list(res.local_whitelist, w.get_wallet()->get_local_whitelist());
+    currency::assets_map_to_assets_list(res.global_whitelist, w.get_wallet()->get_global_whitelist());
+    currency::assets_map_to_assets_list(res.own_assets, w.get_wallet()->get_own_assets());
+
+    const auto global_whitelist = w.get_wallet()->get_global_whitelist();
+
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
@@ -1189,6 +1200,18 @@ namespace tools
     std::string buff = epee::string_encoding::base64_decode(req.buff);
     w.get_wallet()->encrypt_buffer(buff, res.res_buff);
     res.res_buff = epee::string_encoding::base64_encode(res.res_buff);
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_proxy_to_daemon(const wallet_public::COMMAND_PROXY_TO_DAEMON::request& req, wallet_public::COMMAND_PROXY_TO_DAEMON::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    std::string buff = epee::string_encoding::base64_decode(req.base64_body);
+    
+    w.get_wallet()->proxy_to_daemon(req.uri, buff, res.response_code, res.base64_body);
+        
+    res.base64_body = epee::string_encoding::base64_encode(res.base64_body);
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }

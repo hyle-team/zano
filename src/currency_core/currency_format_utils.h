@@ -534,6 +534,20 @@ namespace currency
   bool is_pos_coinbase(const transaction& tx);
   bool have_attachment_service_in_container(const std::vector<attachment_v>& av, const std::string& service_id, const std::string& instruction);
   crypto::hash prepare_prefix_hash_for_sign(const transaction& tx, uint64_t in_index, const crypto::hash& tx_id);
+  
+  
+  //---------------------------------------------------------------
+  template<typename t_assets_map>
+  void assets_map_to_assets_list(std::list<currency::asset_descriptor_with_id>& assets_list, const t_assets_map& assets_map)
+  {
+    for (const auto& pr : assets_map)
+    {
+      assets_list.push_back(currency::asset_descriptor_with_id());
+      assets_list.back().asset_id = pr.first;
+      epee::misc_utils::cast_assign_a_to_b(assets_list.back(), static_cast<currency::asset_descriptor_base>(pr.second));
+      //*static_cast<currency::asset_descriptor_base*>(&assets_list.back()) = pr.second;
+    }
+  }
 
   //---------------------------------------------------------------
   template<class tx_out_t>

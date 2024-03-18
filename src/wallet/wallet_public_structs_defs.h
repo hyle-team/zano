@@ -14,7 +14,11 @@
 #include "currency_core/bc_escrow_service.h"
 #include "rpc/core_rpc_server_commands_defs.h"
 
+
+
 const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64_t>::max();
+
+const boost::uuids::uuid RPC_INTERNAL_UI_CONTEXT = {0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 2, 1, 0, 0}; //Bender's nightmare 
 
 namespace tools
 {
@@ -1697,6 +1701,31 @@ namespace wallet_public
     };
   };
 
+  struct COMMAND_PROXY_TO_DAEMON
+  {
+    struct request
+    {
+
+      std::string uri; 
+      std::string base64_body; //base64 encoded body
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(uri)
+        KV_SERIALIZE(base64_body)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string base64_body; //base64 encoded response body
+      int32_t response_code; 
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(base64_body)
+        KV_SERIALIZE(response_code)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
 
   struct assets_whitelist
   {
@@ -1749,10 +1778,15 @@ namespace wallet_public
 
     struct response
     {
-      std::list<currency::asset_descriptor_with_id> assets;
+      std::list<currency::asset_descriptor_with_id> local_whitelist;
+      std::list<currency::asset_descriptor_with_id> global_whitelist;
+      std::list<currency::asset_descriptor_with_id> own_assets;
+
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(assets)
+        KV_SERIALIZE(local_whitelist)
+        KV_SERIALIZE(global_whitelist)
+        KV_SERIALIZE(own_assets)
       END_KV_SERIALIZE_MAP()
     };
   };

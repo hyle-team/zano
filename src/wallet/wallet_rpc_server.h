@@ -90,6 +90,7 @@ namespace tools
     bool run(bool do_mint, bool offline_mode, const currency::account_public_address& miner_address);
     bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context);
     void set_jwt_secret(const std::string& jwt);
+    const std::string& get_jwt_secret();
 
     BEGIN_URI_MAP2_VIRTUAL()
       BEGIN_JSON_RPC_MAP("/json_rpc")
@@ -149,8 +150,11 @@ namespace tools
         MAP_JON_RPC_WE("sign_message", on_sign_message, wallet_public::COMMAND_SIGN_MESSAGE)
         MAP_JON_RPC_WE("encrypt_data", on_encrypt_data, wallet_public::COMMAND_ENCRYPT_DATA)
         MAP_JON_RPC_WE("decrypt_data", on_decrypt_data, wallet_public::COMMAND_DECRYPT_DATA)
-    END_JSON_RPC_MAP()
-        END_URI_MAP2()
+
+        //utility call
+        MAP_JON_RPC_WE("proxy_to_daemon", on_proxy_to_daemon, wallet_public::COMMAND_PROXY_TO_DAEMON)
+      END_JSON_RPC_MAP()
+    END_URI_MAP2()
 
     bool auth_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context);
     //json_rpc
@@ -209,6 +213,7 @@ namespace tools
     bool on_encrypt_data(const wallet_public::COMMAND_ENCRYPT_DATA::request& req, wallet_public::COMMAND_ENCRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_decrypt_data(const wallet_public::COMMAND_DECRYPT_DATA::request& req, wallet_public::COMMAND_DECRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
+    bool on_proxy_to_daemon(const wallet_public::COMMAND_PROXY_TO_DAEMON::request& req, wallet_public::COMMAND_PROXY_TO_DAEMON::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
 
     //std::shared_ptr<wallet2> get_wallet();

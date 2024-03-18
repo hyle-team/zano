@@ -390,16 +390,17 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
 
       WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(m_own_asset_descriptors.count(asset_id) == 0, "asset with asset_id " << asset_id << " has already been registered in the wallet as own asset");
       wallet_own_asset_context& asset_context = m_own_asset_descriptors[asset_id];
-      asset_context.asset_descriptor = ado.descriptor;
+      epee::misc_utils::cast_assign_a_to_b(asset_context, ado.descriptor);
+      //*static_cast<asset_descriptor_base*>(&asset_context) = ado.descriptor;
 
       std::stringstream ss;
       ss << "New Asset Registered:"
         << ENDL << "asset id:         " << asset_id
-        << ENDL << "Name:             " << asset_context.asset_descriptor.full_name
-        << ENDL << "Ticker:           " << asset_context.asset_descriptor.ticker
-        << ENDL << "Total Max Supply: " << print_asset_money(asset_context.asset_descriptor.total_max_supply, asset_context.asset_descriptor.decimal_point)
-        << ENDL << "Current Supply:   " << print_asset_money(asset_context.asset_descriptor.current_supply, asset_context.asset_descriptor.decimal_point)
-        << ENDL << "Decimal Point:    " << asset_context.asset_descriptor.decimal_point;
+        << ENDL << "Name:             " << asset_context.full_name
+        << ENDL << "Ticker:           " << asset_context.ticker
+        << ENDL << "Total Max Supply: " << print_asset_money(asset_context.total_max_supply, asset_context.decimal_point)
+        << ENDL << "Current Supply:   " << print_asset_money(asset_context.current_supply, asset_context.decimal_point)
+        << ENDL << "Decimal Point:    " << asset_context.decimal_point;
 
       
       add_rollback_event(ptc.height, asset_register_event{ asset_id });
@@ -414,7 +415,8 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
         break;
       //asset had been updated
       add_rollback_event(ptc.height, asset_update_event{ it->first, it->second });
-      it->second.asset_descriptor = ado.descriptor;      
+      epee::misc_utils::cast_assign_a_to_b(it->second, ado.descriptor);
+      
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE )
     {
@@ -426,7 +428,7 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
           // ownership of the asset acquired
 
           wallet_own_asset_context& asset_context = m_own_asset_descriptors[asset_id];
-          asset_context.asset_descriptor = ado.descriptor;
+          epee::misc_utils::cast_assign_a_to_b(asset_context, ado.descriptor);
 
           std::stringstream ss;
           ss << "Asset ownership acquired:"
@@ -477,7 +479,8 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
         {
           //just an update of the asset
           add_rollback_event(ptc.height, asset_update_event{ it->first, it->second });
-          it->second.asset_descriptor = ado.descriptor;
+          epee::misc_utils::cast_assign_a_to_b(it->second, ado.descriptor);
+          
         }
       }
     }
@@ -3461,7 +3464,7 @@ bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, u
   {
     if (m_whitelisted_assets.find(own_asset.first) == m_whitelisted_assets.end())
     {
-      custom_assets_local[own_asset.first] = own_asset.second.asset_descriptor;
+      custom_assets_local[own_asset.first] = own_asset.second;
     }
   }
 
@@ -3585,17 +3588,21 @@ bool wallet2::delete_custom_asset_id(const crypto::public_key& asset_id)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::get_custom_assets(std::list<currency::asset_descriptor_with_id>& assets) const 
+const std::unordered_map<crypto::public_key, currency::asset_descriptor_base>& wallet2::get_local_whitelist() const
 {
-  for(const auto& pr : m_custom_assets)
-  {
-    assets.push_back(currency::asset_descriptor_with_id());
-    assets.back().asset_id = pr.first;
-    static_cast<currency::asset_descriptor_base>(assets.back()) = pr.second;
-  }
-  return true;
+  return m_custom_assets;
 }
 //----------------------------------------------------------------------------------------------------
+const std::unordered_map<crypto::public_key, currency::asset_descriptor_base>& wallet2::get_global_whitelist() const
+{
+  return m_whitelisted_assets;
+}
+//----------------------------------------------------------------------------------------------------
+const std::unordered_map<crypto::public_key, tools::wallet_own_asset_context>& wallet2::get_own_assets() const
+{
+  return m_own_asset_descriptors;
+}
+  //----------------------------------------------------------------------------------------------------
 bool wallet2::load_whitelisted_tokens() const
 {
   if(!m_use_assets_whitelisting)
@@ -3775,7 +3782,7 @@ std::string wallet2::get_balance_str_raw() const
   
   for(const auto& entry : m_own_asset_descriptors)
   {
-    ss << " " << std::left << entry.first << "    " << entry.second.asset_descriptor.ticker << ENDL;
+    ss << " " << std::left << entry.first << "    " << entry.second.ticker << ENDL;
   }
 
   return ss.str();
@@ -4250,6 +4257,11 @@ bool wallet2::get_pos_entries(std::vector<currency::pos_entry>& entries)
 bool wallet2::is_in_hardfork_zone(uint64_t hardfork_index) const
 {
   return m_core_runtime_config.is_hardfork_active_for_height(hardfork_index, get_blockchain_current_size());
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::proxy_to_daemon(const std::string& uri, const std::string& body, int& response_code, std::string& response_body)
+{
+  return m_core_proxy->call_COMMAND_RPC_INVOKE(uri, body, response_code, response_body);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t full_block_reward, const currency::pos_entry& pe, currency::tx_generation_context& miner_tx_tgc, currency::block& b) const

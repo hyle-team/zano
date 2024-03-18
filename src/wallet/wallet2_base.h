@@ -251,19 +251,18 @@ namespace tools
     crypto::public_key asset_id = currency::null_pkey;
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(asset_id)
-      END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION()
 
   };
 
-  struct wallet_own_asset_context
+  struct wallet_own_asset_context: public currency::asset_descriptor_base
   {
-    currency::asset_descriptor_base asset_descriptor;
     bool thirdparty_custody = false;
 
     BEGIN_BOOST_SERIALIZATION()
-      BOOST_SERIALIZE(asset_descriptor)
+      BOOST_SERIALIZE_BASE_CLASS(currency::asset_descriptor_base)
       BOOST_SERIALIZE(thirdparty_custody)
-      END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION()
   };
 
   struct asset_update_event
