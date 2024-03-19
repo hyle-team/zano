@@ -1910,7 +1910,11 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     std::stringstream ss_pow_pos_info;
     if (pos_block)
     {
-      ss_pow_pos_info << "PoS:\t" << abei.stake_hash << ", stake amount: " << print_money(pos_amount) << ", final_difficulty: " << pos_diff_final;
+      ss_pow_pos_info << "PoS:\t" << abei.stake_hash << ", stake amount: ";
+      if (abei.bl.miner_tx.version >= TRANSACTION_VERSION_POST_HF4)
+        ss_pow_pos_info << "hidden";
+      else
+        ss_pow_pos_info << print_money_brief(pos_amount) << ", final_difficulty: " << pos_diff_final;
       proof = abei.stake_hash;
     }
     else
