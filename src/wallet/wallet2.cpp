@@ -1080,7 +1080,8 @@ void wallet2::accept_proposal(const crypto::hash& contract_id, uint64_t b_accept
 //---------------------------------------------------------------------------------
 uint64_t wallet2::get_current_tx_version()
 {
-  return currency::get_tx_version(this->get_top_block_height(), this->m_core_runtime_config.hard_forks);
+  uint64_t tx_expected_block_height = get_top_block_height() + 1;
+  return currency::get_tx_version(tx_expected_block_height, this->m_core_runtime_config.hard_forks);
 }
 //---------------------------------------------------------------------------------
 void wallet2::finish_contract(const crypto::hash& contract_id, const std::string& release_type, currency::transaction* p_release_tx /* = nullptr */)
