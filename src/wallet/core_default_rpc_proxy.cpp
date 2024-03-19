@@ -56,7 +56,7 @@ namespace tools
   {
     return call_request([&]() {
 #ifdef MOBILE_WALLET_BUILD
-      LOG_PRINT_L0("[INVOKE_PROXY] ---> " << method_name)
+      LOG_PRINT_L0("[INVOKE_PROXY] ---> " << uri)
 #endif
 
       const epee::net_utils::http::http_response_info* response = nullptr;
@@ -67,7 +67,7 @@ namespace tools
         response_code = response->m_response_code;
       }
 #ifdef MOBILE_WALLET_BUILD
-      LOG_PRINT_L0("[INVOKE_PROXY] <---" << method_name)
+      LOG_PRINT_L0("[INVOKE_PROXY] <---" << uri)
 #endif
         return res;
       });

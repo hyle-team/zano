@@ -573,6 +573,7 @@ bool wallets_manager::init_local_daemon()
 
 std::string wallets_manager::setup_wallet_rpc(const std::string& jwt_secret)
 {
+#ifndef MOBILE_WALLET_BUILD
   if (!jwt_secret.size())
   {
     //disabling wallet RPC
@@ -585,6 +586,7 @@ std::string wallets_manager::setup_wallet_rpc(const std::string& jwt_secret)
     m_wallet_rpc_server.set_jwt_secret(jwt_secret);
 
   m_rpc_server.set_rpc_chain_handler(this);
+#endif
   return WALLET_RPC_STATUS_OK;
 }
 
