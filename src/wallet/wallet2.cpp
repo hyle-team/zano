@@ -3617,9 +3617,10 @@ bool wallet2::load_whitelisted_tokens() const
     for (auto it = aw.assets.begin(); it != aw.assets.end(); it++)
     {
       m_whitelisted_assets[it->asset_id] = static_cast<currency::asset_descriptor_base>(*it);
-    }    
+    }
+    return true;
   }
-  return true;
+  return false;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::load_whitelisted_tokens_if_not_loaded() const

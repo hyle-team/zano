@@ -17,7 +17,10 @@ using namespace epee;
 #include "wallet_rpc_server_error_codes.h"
 #include "wallet_helpers.h"
 #include "wrap_service.h"
+PUSH_VS_WARNINGS
+DISABLE_VS_WARNINGS(4244)
 #include "jwt-cpp/jwt.h"
+POP_VS_WARNINGS
 #include "crypto/bitcoin/sha256_helper.h"
 
 #define JWT_TOKEN_EXPIRATION_MAXIMUM          (60 * 60)

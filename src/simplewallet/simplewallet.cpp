@@ -2816,6 +2816,22 @@ int main(int argc, char* argv[])
       break;
     }
     //try to sync it
+    struct wallet_rpc_local_callback : public tools::i_wallet2_callback
+    {
+      std::shared_ptr<tools::wallet2> m_wlt_ptr;
+      wallet_rpc_local_callback(std::shared_ptr<tools::wallet2> ptr): m_wlt_ptr(ptr)
+      {}
+      virtual void on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets) 
+      {
+        wallets.push_back(tools::wallet_public::wallet_entry_info());
+        wallets.back().wallet_id = 0;
+        tools::get_wallet_info(*m_wlt_ptr, wallets.back().wi);
+      }
+
+    };
+
+    std::shared_ptr<tools::i_wallet2_callback> callback(new wallet_rpc_local_callback(wallet_ptr));
+
     while (true)
     {
       try
@@ -2828,6 +2844,7 @@ int main(int argc, char* argv[])
           return EXIT_FAILURE;
 
         wal.set_use_assets_whitelisting(true);
+        wal.callback(callback);
 
         if (!offline_mode)
           wal.refresh();

@@ -26,61 +26,19 @@
 #include "threads_pool_tests.h"
 #include "wallet/plain_wallet_api.h"
 #include "wallet/view_iface.h"
-#include <jwt-cpp/jwt.h>
 
+PUSH_VS_WARNINGS
+DISABLE_VS_WARNINGS(4244)
+#include "jwt-cpp/jwt.h"
+POP_VS_WARNINGS
 
 void test_plain_wallet()
 {
 
-
-  std::string token  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoiemFub19leHRlbnNpb24iLCJzYWx0IjoiYTUyMTk5MzQyNmYxN2Y2MDQyMzkzYTI4YzJhMzk1NjFiYTgxYmVkZDkxODJlY2E5NTY3ZDBlNjQ3YjIwZTE2NSIsImV4cCI6MTcxMDM2MzA1MH0.CwqvPBtgE8ZUFZ4cYy1ZJLWdYCnhfEiCzEhqDYCK4CQ";
-  auto decoded_token = jwt::decode(token);
-
-  std::string sharedSecret = "DFDvfedceEDCECECecedcyhtyh";
-
-  try
-  {
-    auto decoded = jwt::decode(token);
-
-    auto verifier = jwt::verify()
-                        .allow_algorithm(jwt::algorithm::hs256 { sharedSecret });
-
-    verifier.verify(decoded);
-
-    std::cout << "Token is valid. Claims:" << std::endl;
-    for(auto& e : decoded.get_payload_json())
-      std::cout << e.first << " = " << e.second << std::endl;
-  }
-  catch(const std::exception& e)
-  {
-    std::cerr << "Invalid token: " << e.what() << std::endl;
-  }
-
-
-  /*
-  auto verifier = jwt::verify()
-                      .with_issuer("auth0")
-                      .with_claim("sample", jwt::claim(std::string("test")))
-                      .allow_algorithm(jwt::algorithm::hs256 { "secret" });
-
-  verifier.verify(decoded_token);
-
-  auto token = jwt::create()
-                   .set_type("JWS")
-                   .set_issuer("auth0")
-                   .set_payload_claim("sample", jwt::claim(std::string("test")))
-                   .sign(jwt::algorithm::hs256 { "secret" });
-
-*/
-  return;
-
-
-
-
-  std::string res = plain_wallet::init("195.201.107.230", "33336", "E:\\tmp\\", 0);
+  std::string res = plain_wallet::init("195.201.107.230", "33336", "C:\\Users\\roky\\home\\", 0);
   
   uint64_t instance_id = 0;
-  res = plain_wallet::open("test.zan", "111");
+  res = plain_wallet::open("SEGA_2", "Test2");
   while(true)
   {
     epee::misc_utils::sleep_no_w(2000);
@@ -95,6 +53,14 @@ void test_plain_wallet()
   std::string invoke_body = "{\"method\":\"get_recent_txs_and_info\",\"params\":{\"offset\":0,\"count\":30,\"update_provision_info\":true}}";
   
   res = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
+  invoke_body = "{\"method\":\"assets_whitelist_get\",\"params\":{}}";
+
+  res = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
+
+  res = plain_wallet::close_wallet(instance_id);
+
   LOG_PRINT_L0(res);
 
 }
@@ -104,10 +70,10 @@ int main(int argc, char** argv)
 {
   epee::string_tools::set_module_name_and_folder(argv[0]);
   epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
-  epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
-  epee::log_space::log_singletone::add_logger(LOGGER_FILE,
-    epee::log_space::log_singletone::get_default_log_file().c_str(),
-    epee::log_space::log_singletone::get_default_log_folder().c_str());
+  //epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
+  //epee::log_space::log_singletone::add_logger(LOGGER_FILE,
+  //  epee::log_space::log_singletone::get_default_log_file().c_str(),
+  //  epee::log_space::log_singletone::get_default_log_folder().c_str());
 
   test_plain_wallet();
   //parse_weird_tx();

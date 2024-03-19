@@ -1043,7 +1043,6 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
 
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
-  w->set_use_assets_whitelisting(true);
   owr.wallet_id = m_wallet_id_counter++;
 
   w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
@@ -1075,6 +1074,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       w->get_recent_transfers_history(owr.recent_history.history, 0, txs_to_return, owr.recent_history.total_history_items, owr.recent_history.last_item_index, exclude_mining_txs);
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
       w->get_unconfirmed_transfers(owr.recent_history.history, exclude_mining_txs);
+      w->set_use_assets_whitelisting(true);
       owr.wallet_local_bc_size = w->get_blockchain_current_size();
 
       //workaround for missed fee
