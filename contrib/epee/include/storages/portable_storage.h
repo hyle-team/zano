@@ -63,18 +63,18 @@ namespace epee
       //serial access for arrays of values --------------------------------------
       //values
       template<class t_value>
-      harray get_first_value(const std::string& value_name, t_value& target, hsection hparent_section);
+      harray        get_first_value(const std::string& value_name, t_value& target, hsection hparent_section);
       template<class t_value>
       bool          get_next_value(harray hval_array, t_value& target);
       template<class t_value>
-      harray insert_first_value(const std::string& value_name, const t_value& target, hsection hparent_section);
+      harray        insert_first_value(const std::string& value_name, const t_value& target, hsection hparent_section);
       template<class t_value>
       bool          insert_next_value(harray hval_array, const t_value& target);
       //sections
-      harray get_first_section(const std::string& pSectionName, hsection& h_child_section, hsection hparent_section);
-      bool            get_next_section(harray hSecArray, hsection& h_child_section);
-      harray insert_first_section(const std::string& pSectionName, hsection& hinserted_childsection, hsection hparent_section);
-      bool            insert_next_section(harray hSecArray, hsection& hinserted_childsection);
+      harray        get_first_section(const std::string& pSectionName, hsection& h_child_section, hsection hparent_section);
+      bool          get_next_section(harray hSecArray, hsection& h_child_section);
+      harray        insert_first_section(const std::string& pSectionName, hsection& hinserted_childsection, hsection hparent_section);
+      bool          insert_next_section(harray hSecArray, hsection& hinserted_childsection);
       //------------------------------------------------------------------------
       //delete entry (section, value or array)
       bool        delete_entry(const std::string& pentry_name, hsection hparent_section = nullptr);      

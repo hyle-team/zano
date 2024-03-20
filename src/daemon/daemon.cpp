@@ -287,6 +287,8 @@ int main(int argc, char* argv[])
     rpc_server.handle_http_request_map(query_info, response_info, conn_context, call_found, json_rpc_reference);
 
     LOG_PRINT_L0(generate_reference << ENDL << "----------------------------------------" << ENDL << json_rpc_reference);
+
+    return 0;
   }
 
   bool res = false;

@@ -32,16 +32,16 @@
 #include "keyvalue_helpers.h"
 #include "keyvalue_serialization_overloads.h"
 namespace epee
-{
+{ 
   /************************************************************************/
   /* Serialize map declarations                                           */
   /************************************************************************/
 #define BEGIN_KV_SERIALIZE_MAP() \
 public: \
   template<class t_storage> \
-  bool store(t_storage& st, typename t_storage::hsection hparent_section = nullptr) const\
+  bool store(t_storage& st, typename t_storage::hsection hparent_section = nullptr, bool auto_doc_mode = false) const\
   {\
-  return serialize_map<true>(*this, st, hparent_section); \
+  return serialize_map<true>(*this, st, hparent_section, auto_doc_mode); \
 }\
   template<class t_storage> \
   bool _load(t_storage& stg, typename t_storage::hsection hparent_section = nullptr)\
@@ -62,11 +62,14 @@ public: \
   }\
 }\
   template<bool is_store, class this_type, class t_storage> \
-  static bool serialize_map(this_type& this_ref, t_storage& stg, typename t_storage::hsection hparent_section) \
+  static bool serialize_map(this_type& this_ref, t_storage& stg, typename t_storage::hsection hparent_section, bool auto_doc_mode = false) \
 {
 
 #define KV_SERIALIZE_N(varialble, val_name) \
   epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name);
+
+#define KV_SERIALIZE_N_DOC(varialble, val_name, substitute) \
+  epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name, auto_doc_mode, substitute);
 
 #define KV_SERIALIZE_CUSTOM_N(varialble, stored_type, from_v_to_stored, from_stored_to_v, val_name) \
   epee::serialization::selector<is_store>::template serialize_custom<stored_type>(this_ref.varialble, stg, hparent_section, val_name, from_v_to_stored, from_stored_to_v);
@@ -95,6 +98,7 @@ public: \
 #define END_KV_SERIALIZE_MAP() return true;}
 
 #define KV_SERIALIZE(varialble)                           KV_SERIALIZE_N(varialble, #varialble)
+#define KV_SERIALIZE_DOC(varialble, substitute)           KV_SERIALIZE_N_DOC( varialble, #varialble, substitute)
 #define KV_SERIALIZE_VAL_POD_AS_BLOB(varialble)           KV_SERIALIZE_VAL_POD_AS_BLOB_N(varialble, #varialble)
 #define KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(varialble)     KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(varialble, #varialble) //skip is_pod compile time check
 #define KV_SERIALIZE_CONTAINER_POD_AS_BLOB(varialble)     KV_SERIALIZE_CONTAINER_POD_AS_BLOB_N(varialble, #varialble)

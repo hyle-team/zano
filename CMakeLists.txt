@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.16)
 
 PROJECT(Zano)
 
@@ -17,6 +17,9 @@ if(POLICY CMP0043)
 endif()
 if(POLICY CMP0043)
   cmake_policy(SET CMP0074 NEW)
+endif()
+if(POLICY CMP0144)
+  cmake_policy(SET CMP0144 NEW)
 endif()
 
 
@@ -122,6 +125,7 @@ if(MSVC)
     endforeach()
   endif()
   include_directories(SYSTEM src/platform/msc)
+  configure_file(utils/Directory.Build.props.in ${CMAKE_BINARY_DIR}/Directory.Build.props)
 else()
   set(ARCH default CACHE STRING "CPU to build for: -march value or default")
   if("${ARCH}" STREQUAL "default")
@@ -258,8 +262,9 @@ elseif(NOT MSVC)
 endif()
 
 if(BUILD_GUI)
-  cmake_minimum_required(VERSION 3.1)
   find_package(Qt5Widgets REQUIRED)  
+  find_package(Qt5WebEngineWidgets REQUIRED)  
+  find_package(Qt5WebChannel REQUIRED)  
 endif()
 
 set(COMMIT_ID_IN_VERSION ON CACHE BOOL "Include commit ID in version")

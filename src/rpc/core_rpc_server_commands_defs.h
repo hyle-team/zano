@@ -149,11 +149,12 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(height)
-        KV_SERIALIZE(status)
+        KV_SERIALIZE_DOC(height, uint64_t(11111))
+        KV_SERIALIZE_DOC(status, std::string("OK"))
       END_KV_SERIALIZE_MAP()
     };
   };
+
 
   template<class t_block_complete_entry>
   struct COMMAND_RPC_GET_BLOCKS_FAST_T

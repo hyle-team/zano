@@ -45,10 +45,23 @@ bool auto_doc_t(const std::string& prefix_name, std::string& generate_reference)
   if (!generate_reference.size()) return true;
   request_t req = get_documentation_json_struct<request_t>();
   response_t res = get_documentation_json_struct<response_t>();
+
+  std::string req_str;
+  epee::serialization::portable_storage ps;
+  req.store(ps, nullptr, true);
+  ps.dump_as_json(req_str);
+
+
+  std::string res_str;
+  epee::serialization::portable_storage ps_res;
+  res.store(ps_res, nullptr, true);
+  ps_res.dump_as_json(res_str);
+
+
   std::stringstream ss;
   ss << prefix_name << ENDL
-    << "REQUEST: " << ENDL << epee::serialization::store_t_to_json(req) << ENDL <<  "--------------------------------" << ENDL
-    << "RESPONSE: " << ENDL << epee::serialization::store_t_to_json(res) << ENDL << "################################" << ENDL;
+    << "REQUEST: " << ENDL << req_str << ENDL <<  "--------------------------------" << ENDL
+    << "RESPONSE: " << ENDL << res_str << ENDL << "################################" << ENDL;
   generate_reference += ss.str();
   return true;
 }
