@@ -198,6 +198,7 @@ public:
   QString request_dummy(const QString& param);
 
   QString call_rpc(const QString& params);
+  QString call_wallet_rpc(const QString& wallet_id, const QString& params);
 
 signals:
   void quit_requested(const QString str);

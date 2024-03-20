@@ -301,6 +301,26 @@ QString MainWindow::call_rpc(const QString& params)
   return QString::fromStdString(response_info.m_body);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
+
+QString MainWindow::call_wallet_rpc(const QString& wallet_id_str, const QString& params)
+{
+  TRY_ENTRY();
+
+  if (!m_backend.is_core_initialized())
+  {
+    epee::json_rpc::error_response rsp;
+    rsp.jsonrpc = "2.0";
+    rsp.error.code = -1;
+    rsp.error.message = API_RETURN_CODE_CORE_BUSY;
+    return QString::fromStdString(epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(rsp)));
+  }
+
+  uint64_t wallet_id = std::stoull(wallet_id_str.toStdString());
+
+  return QString::fromStdString(m_backend.invoke(wallet_id, params.toStdString()));
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
 QString MainWindow::get_default_fee(const QString& param)
 {
   TRY_ENTRY();
