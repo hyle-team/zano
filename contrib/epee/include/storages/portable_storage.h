@@ -44,15 +44,19 @@ namespace epee
     /************************************************************************/
     /*                                                                      */
     /************************************************************************/
-    class portable_storage
+    template<typename t_section>
+    class portable_storage_base
     {
     public:
-      typedef epee::serialization::hsection hsection;
+      //typedef epee::serialization::hsection hsection;
+      typedef t_section hasection;
       typedef epee::serialization::harray  harray;
       typedef storage_entry meta_entry;
 
-      portable_storage(){}
-      virtual ~portable_storage(){}
+      portable_storage_base
+      (){}
+      virtual ~portable_storage_base
+      (){}
       hsection   open_section(const std::string& section_name,  hsection hparent_section, bool create_if_notexist = false);
       template<class t_value>
       bool       get_value(const std::string& value_name, t_value& val, hsection hparent_section);
@@ -107,8 +111,8 @@ namespace epee
       };
 #pragma pack(pop)
     };
-    inline
-    bool		  portable_storage::dump_as_json(std::string& buff, size_t indent /* = 0 */, end_of_line_t eol /* = eol_crlf */)
+    template<typename t_section>
+    bool		  portable_storage_base<t_section>::dump_as_json(std::string& buff, size_t indent /* = 0 */, end_of_line_t eol /* = eol_crlf */)
     {
       TRY_ENTRY();
       std::stringstream ss;

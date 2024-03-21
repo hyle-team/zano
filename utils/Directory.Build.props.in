@@ -3,5 +3,6 @@
   <PropertyGroup Label="Globals">
     <UseMultiToolTask>true</UseMultiToolTask> 
     <EnforceProcessCountAcrossBuilds>true</EnforceProcessCountAcrossBuilds>
+    <MultiProcMaxCount>11</MultiProcMaxCount>
   </PropertyGroup>
 </Project>
