@@ -163,6 +163,8 @@ namespace currency
     r = m_blockchain_storage.init(m_config_folder, vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize blockchain storage");
 
+    m_mempool.remove_incompatible_txs();
+
     r = m_miner.init(vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize miner");
 

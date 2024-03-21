@@ -138,6 +138,8 @@ namespace currency
     
     bool remove_stuck_transactions(); // made public to be called from coretests
 
+    void remove_incompatible_txs(); // made public to be called after the BCS is loaded and hardfork info is ready
+
   private:
     bool on_tx_add(crypto::hash tx_id, const transaction& tx, bool kept_by_block);
     bool on_tx_remove(const crypto::hash &tx_id, const transaction& tx, bool kept_by_block);
