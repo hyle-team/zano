@@ -1303,6 +1303,27 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------------------------
+  void tx_memory_pool::remove_incompatible_txs()
+  {
+    std::vector<crypto::hash> invalid_tx_ids;
+
+    m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
+    {
+      if (!m_blockchain.validate_tx_for_hardfork_specific_terms(tx_entry.tx, h))
+        invalid_tx_ids.push_back(h);
+      return true;
+    });
+
+    for(const auto& id : invalid_tx_ids)
+    {
+      transaction tx{};
+      size_t blob_size = 0;
+      uint64_t fee = 0;
+      take_tx(id, tx, blob_size, fee);
+      LOG_PRINT_L0("tx " << id << " was incompatible with the hardfork rules and removed");
+    }
+  }
+  //---------------------------------------------------------------------------------
   bool tx_memory_pool::load_keyimages_cache()
   {
     CRITICAL_REGION_LOCAL(m_key_images_lock);
