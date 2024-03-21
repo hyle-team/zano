@@ -2089,7 +2089,14 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
           main_chain_bei.this_block_tx_fee_median * main_chain_bei.bl.tx_hashes.size())
         {
           //with the rest equal, alt block has more fees in it, prefer it
+          LOG_PRINT_L1("[is_reorganize_required]:TRUE, \"by order of tx_hashes.size()\" main_stake_hash:" << &main_chain_bei.stake_hash << ", alt_stake_hash" << proof_alt);
           return true;
+        }else if (alt_chain_bei.this_block_tx_fee_median * alt_chain_bei.bl.tx_hashes.size() <
+                 main_chain_bei.this_block_tx_fee_median * main_chain_bei.bl.tx_hashes.size())
+        {
+          //with the rest equal, alt block has more fees in it, prefer it
+          LOG_PRINT_L1("[is_reorganize_required]:FALSE, \"by order of tx_hashes.size()\" main_stake_hash:" << &main_chain_bei.stake_hash << ", alt_stake_hash" << proof_alt);
+          return false;
         }
       }
       if (!is_pos_block(main_chain_bei.bl))
