@@ -37,60 +37,28 @@ namespace epee
     /************************************************************************/
     /*                                                                      */
     /************************************************************************/
-    class portable_storage_extended: public portable_storage
+    class portable_storage_extended_doc: public portable_storage
     {
     public:
-      typedef epee::serialization::hsection hsection;
-      typedef epee::serialization::harray  harray;
-      typedef storage_entry meta_entry;
+      void set_entry_description(hsection hparent_section, const std::string& name, const std::string& description)
+      {
+        if (!hparent_section)
+          hparent_section = &m_root;
+        hparent_section->m_descriptions[name] = description;
+      }
 
-      portable_storage_extended(){}
-      virtual ~portable_storage_extended(){}
-      hsection   open_section(const std::string& section_name,  hsection hparent_section, bool create_if_notexist = false);
-      template<class t_value>
-      bool       get_value(const std::string& value_name, t_value& val, hsection hparent_section);
-      bool       get_value(const std::string& value_name, storage_entry& val, hsection hparent_section);
-      template<class t_value>
-      bool       set_value(const std::string& value_name, const t_value& target, hsection hparent_section);
+      bool dump_as_decriptions(std::string& buff, size_t indent  = 0 , end_of_line_t eol = eol_crlf)
+      {
+        TRY_ENTRY();
+        std::stringstream ss;
 
-      //serial access for arrays of values --------------------------------------
-      //values
-      template<class t_value>
-      harray        get_first_value(const std::string& value_name, t_value& target, hsection hparent_section);
-      template<class t_value>
-      bool          get_next_value(harray hval_array, t_value& target);
-      template<class t_value>
-      harray        insert_first_value(const std::string& value_name, const t_value& target, hsection hparent_section);
-      template<class t_value>
-      bool          insert_next_value(harray hval_array, const t_value& target);
-      //sections
-      harray        get_first_section(const std::string& pSectionName, hsection& h_child_section, hsection hparent_section);
-      bool          get_next_section(harray hSecArray, hsection& h_child_section);
-      harray        insert_first_section(const std::string& pSectionName, hsection& hinserted_childsection, hsection hparent_section);
-      bool          insert_next_section(harray hSecArray, hsection& hinserted_childsection);
-      //------------------------------------------------------------------------
-      //delete entry (section, value or array)
-      bool        delete_entry(const std::string& pentry_name, hsection hparent_section = nullptr);      
-      //-------------------------------------------------------------------------------
-      bool		store_to_binary(binarybuffer& target);
-      bool		load_from_binary(const binarybuffer& target);
-      template<class trace_policy>
-      bool		  dump_as_xml(std::string& targetObj, const std::string& root_name = "");
-      bool		  dump_as_json(std::string& targetObj, size_t indent = 0, end_of_line_t eol = eol_crlf);
-      bool		  load_from_json(const std::string& source);
+        //epee::serialization::dump_as_descriptions(ss, m_root, indent, eol);
+        buff = ss.str();
+        return true;
+        CATCH_ENTRY("portable_storage_base<t_section>::dump_as_json", false)
+      }
 
-      template<typename cb_t>
-      bool enum_entries(hsection hparent_section, cb_t cb);
-    private:
-      section m_root;
-      hsection	get_root_section() {return &m_root;}
-      storage_entry* find_storage_entry(const std::string& pentry_name, hsection psection);
-      template<class entry_type>
-      storage_entry* insert_new_entry_get_storage_entry(const std::string& pentry_name, hsection psection, const entry_type& entry);
-
-      hsection    insert_new_section(const std::string& pentry_name, hsection psection);
     };
-
     //---------------------------------------------------------------------------------------------------------------
   }
 }

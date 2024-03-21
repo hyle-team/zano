@@ -35,169 +35,196 @@ namespace epee
 {
   namespace serialization
   {
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const array_entry& ae, size_t indent, end_of_line_t eol = eol_crlf);
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const storage_entry& se, size_t indent, end_of_line_t eol = eol_crlf);
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const std::string& v, size_t indent, end_of_line_t eol = eol_crlf);
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const int8_t& v, size_t indent, end_of_line_t eol = eol_crlf);
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const uint8_t& v, size_t indent, end_of_line_t eol = eol_crlf);
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const bool& v, size_t indent, end_of_line_t eol = eol_crlf);
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const double& v, size_t indent, end_of_line_t eol = eol_crlf);
-    template<class t_stream, class t_type>
-    void dump_as_json(t_stream& strm, const t_type& v, size_t indent, end_of_line_t eol = eol_crlf);
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const section& sec, size_t indent, end_of_line_t eol = eol_crlf);
-
+    inline const char* get_endline(end_of_line_t eol)
+    {
+      switch (eol)
+      {
+        case eol_lf:    return "\n";
+        case eol_cr:    return  "\r";
+        case eol_space: return  " ";
+        default:        return  "\r\n";
+      }
+    }
 
     inline std::string make_indent(size_t indent)
     {
-      return std::string(indent*2, ' ');
+      return std::string(indent * 2, ' ');
     }
 
-    template<class t_stream>
-    struct array_entry_store_to_json_visitor: public boost::static_visitor<void>
+    class strategy_json
     {
-      t_stream& m_strm;
-      size_t m_indent;
-      end_of_line_t m_eol;
-
-      array_entry_store_to_json_visitor(t_stream& strm, size_t indent, end_of_line_t eol)
-        : m_strm(strm)
-        , m_indent(indent)
-        , m_eol(eol)
-      {}
-
-      template<class t_type>
-      void operator()(const array_entry_t<t_type>& a)
+    public:
+      inline static const char* eol = get_endline(eol_crlf);
+      //static const end_of_line_t eol = eol_crlf;
+      template<class t_stream>
+      static void handle_value(t_stream& strm, const std::string& v, size_t indent)
       {
-        m_strm << "[";
-        if(a.m_array.size())
+        strm << "\"" << misc_utils::parse::transform_to_json_escape_sequence(v) << "\"";
+      }
+      template<class t_stream>
+      static void handle_value(t_stream& strm, const int8_t& v, size_t indent)
+      {
+        strm << static_cast<int32_t>(v);
+      }
+      template<class t_stream>
+      static void handle_value(t_stream& strm, const uint8_t& v, size_t indent)
+      {
+        strm << static_cast<int32_t>(v);
+      }
+      template<class t_stream>
+      static void handle_value(t_stream& strm, const bool& v, size_t indent)
+      {
+        if (v)
+          strm << "true";
+        else
+          strm << "false";
+      }
+      template<class t_stream>
+      static void handle_value(t_stream& strm, const double& v, size_t indent)
+      {
+        boost::io::ios_flags_saver ifs(strm);
+        strm.precision(8);
+        strm << std::fixed << v;
+      }
+      template<class t_stream, class t_type>
+      static void handle_value(t_stream& strm, const t_type& v, size_t indent)
+      {
+        strm << v;
+      }
+
+      template<class t_stream>
+      static void handle_array_start(t_stream& strm, size_t indent)
+      {
+        strm << "[";
+      }
+
+      template<class t_stream>
+      static void handle_array_end(t_stream& strm, size_t indent)
+      {
+        strm << "]";
+      }
+
+      template<class t_stream>
+      static void handle_obj_begin(t_stream& strm, size_t indent)
+      {
+        strm << "{";
+      }
+
+      template<class t_stream>
+      static void handle_obj_end(t_stream& strm, size_t indent)
+      {
+        strm << "}";
+      }
+
+      template<class t_stream>
+      static void handle_print_key(t_stream& strm, const std::string& key, size_t indent)
+      {
+        const std::string indent_str = make_indent(indent);
+        strm << indent_str << "\"" << misc_utils::parse::transform_to_json_escape_sequence(key) << "\"" << ": ";
+      }
+
+
+
+    };
+
+
+    template <typename t_strategy_layout_strategy>
+    class recursive_visitor
+    {
+    public:
+      template<class t_stream>
+      struct array_entry_store_to_json_visitor : public boost::static_visitor<void>
+      {
+        t_stream& m_strm;
+        size_t m_indent;
+
+        array_entry_store_to_json_visitor(t_stream& strm, size_t indent)
+          : m_strm(strm)
+          , m_indent(indent)
+        {}
+
+        template<class t_type>
+        void operator()(const array_entry_t<t_type>& a)
         {
-          auto last_it = --a.m_array.end();
-          for(auto it = a.m_array.begin(); it != a.m_array.end(); it++)
+
+          t_strategy_layout_strategy::handle_array_start(m_strm, m_indent);
+          if (a.m_array.size())
           {
-            dump_as_json(m_strm, *it, m_indent, m_eol);
-            if(it != last_it)
-              m_strm << ",";
+            auto last_it = --a.m_array.end();
+            for (auto it = a.m_array.begin(); it != a.m_array.end(); it++)
+            {
+              dump_as_(m_strm, *it, m_indent);
+              if (it != last_it)
+                m_strm << ",";
+            }
           }
-        }
-        m_strm << "]";
-      }
-    };
-
-    template<class t_stream>
-    struct storage_entry_store_to_json_visitor: public boost::static_visitor<void>
-    {
-      t_stream& m_strm;
-      size_t m_indent;
-      end_of_line_t m_eol;
-
-      storage_entry_store_to_json_visitor(t_stream& strm, size_t indent, end_of_line_t eol)
-        : m_strm(strm)
-        , m_indent(indent)
-        , m_eol(eol)
-      {}
-
-      //section, array_entry
-      template<class visited_type>
-      void operator()(const visited_type& v)
-      { 
-        dump_as_json(m_strm, v, m_indent, m_eol);
-      }
-    };
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const array_entry& ae, size_t indent, end_of_line_t eol)
-    {
-      array_entry_store_to_json_visitor<t_stream> aesv(strm, indent, eol);
-      boost::apply_visitor(aesv, ae);
-    }
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const storage_entry& se, size_t indent, end_of_line_t eol)
-    {
-      storage_entry_store_to_json_visitor<t_stream> sv(strm, indent, eol);
-      boost::apply_visitor(sv, se);
-    }
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const std::string& v, size_t indent, end_of_line_t eol)
-    {
-      strm << "\"" << misc_utils::parse::transform_to_json_escape_sequence(v) << "\"";
-    }
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const int8_t& v, size_t indent, end_of_line_t eol)
-    {
-      strm << static_cast<int32_t>(v);
-    }
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const uint8_t& v, size_t indent, end_of_line_t eol)
-    {
-      strm << static_cast<int32_t>(v);
-    }
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const bool& v, size_t indent, end_of_line_t eol)
-    {
-      if(v)
-        strm << "true";
-      else
-        strm << "false";
-    }
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const double& v, size_t indent, end_of_line_t eol)
-    {
-      boost::io::ios_flags_saver ifs(strm);
-      strm.precision(8);
-      strm << std::fixed << v;
-    }
-
-    template<class t_stream, class t_type>
-    void dump_as_json(t_stream& strm, const t_type& v, size_t indent, end_of_line_t eol)
-    {
-      strm << v;
-    }
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const section& sec, size_t indent, end_of_line_t eol)
-    {
-      auto put_eol = [&]() {
-        switch (eol)
-        {
-        case eol_lf:    strm << "\n";   break;
-        case eol_cr:    strm << "\r";   break;
-        case eol_space: strm << " ";    break;
-        default:        strm << "\r\n"; break;
+          t_strategy_layout_strategy::handle_array_end(m_strm, m_indent);
         }
       };
 
-      size_t local_indent = indent + 1;
-      strm << "{";
-      put_eol();
-      std::string indent_str = make_indent(local_indent);
-      if(sec.m_entries.size())
+      template<class t_stream>
+      struct storage_entry_store_to_json_visitor : public boost::static_visitor<void>
       {
-        auto it_last = --sec.m_entries.end();
-        for(auto it = sec.m_entries.begin(); it!= sec.m_entries.end();it++)
+        t_stream& m_strm;
+        size_t m_indent;
+
+        storage_entry_store_to_json_visitor(t_stream& strm, size_t indent)
+          : m_strm(strm)
+          , m_indent(indent)
+        {}
+
+        //section, array_entry
+        template<class visited_type>
+        void operator()(const visited_type& v)
         {
-          strm << indent_str << "\"" << misc_utils::parse::transform_to_json_escape_sequence(it->first) << "\"" << ": ";
-          dump_as_json(strm, it->second, local_indent, eol);
-          if(it_last != it)
-            strm << ",";
-          put_eol();
+          dump_as_(m_strm, v, m_indent);
         }
+      };
+
+      template<class t_stream>
+      void static dump_as_(t_stream& strm, const array_entry& ae, size_t indent)
+      {
+        array_entry_store_to_json_visitor<t_stream> aesv(strm, indent);
+        boost::apply_visitor(aesv, ae);
       }
-      strm << make_indent(indent) <<  "}";
-    }
+
+      template<class t_stream>
+      void static dump_as_(t_stream& strm, const storage_entry& se, size_t indent)
+      {
+        storage_entry_store_to_json_visitor<t_stream> sv(strm, indent);
+        boost::apply_visitor(sv, se);
+      }
+
+      template<class t_stream, class t_type>
+      void static dump_as_(t_stream& strm, const t_type& v, size_t indent)
+      {
+        t_strategy_layout_strategy::handle_value(strm, v, indent);
+      }
+
+      template<class t_stream>
+      void static dump_as_(t_stream& strm, const section& sec, size_t indent)
+      {
+
+
+        size_t local_indent = indent + 1;
+        t_strategy_layout_strategy::handle_obj_begin(strm, indent);
+        put_eol();
+        
+        if (sec.m_entries.size())
+        {
+          auto it_last = --sec.m_entries.end();
+          for (auto it = sec.m_entries.begin(); it != sec.m_entries.end(); it++)
+          {
+            t_strategy_layout_strategy::handle_print_key(strm, it->first, local_indent);
+            dump_as_(strm, it->second, local_indent/*, eol*/);
+            if (it_last != it)
+              strm << ",";
+            put_eol();
+          }
+        }
+        t_strategy_layout_strategy::handle_obj_end(strm, indent);
+      }
+    };
+
   }
 }

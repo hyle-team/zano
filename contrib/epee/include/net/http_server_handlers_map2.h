@@ -30,6 +30,7 @@
 #include "storages/portable_storage_template_helper.h"
 #include "http_base.h"
 #include "net/net_utils_base.h"
+#include "storages/portable_storage_extended_for_doc.h"
 
 
 
@@ -47,15 +48,19 @@ bool auto_doc_t(const std::string& prefix_name, std::string& generate_reference)
   response_t res = get_documentation_json_struct<response_t>();
 
   std::string req_str;
-  epee::serialization::portable_storage ps;
+  std::string req_str_descr;
+  epee::serialization::portable_storage_extended_doc ps;
   req.store(ps, nullptr, true);
   ps.dump_as_json(req_str);
+  ps.dump_as_decriptions(req_str_descr);
 
 
   std::string res_str;
-  epee::serialization::portable_storage ps_res;
+  std::string res_str_descr;
+  epee::serialization::portable_storage_extended_doc ps_res;
   res.store(ps_res, nullptr, true);
   ps_res.dump_as_json(res_str);
+  ps_res.dump_as_decriptions(res_str_descr);
 
 
   std::stringstream ss;

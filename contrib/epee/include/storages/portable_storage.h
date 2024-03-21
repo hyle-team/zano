@@ -49,7 +49,7 @@ namespace epee
     {
     public:
       //typedef epee::serialization::hsection hsection;
-      typedef t_section hasection;
+      typedef t_section* hsection;
       typedef epee::serialization::harray  harray;
       typedef storage_entry meta_entry;
 
@@ -87,12 +87,13 @@ namespace epee
       bool		load_from_binary(const binarybuffer& target);
       template<class trace_policy>
       bool		  dump_as_xml(std::string& targetObj, const std::string& root_name = "");
-      bool		  dump_as_json(std::string& targetObj, size_t indent = 0, end_of_line_t eol = eol_crlf);
+      bool		  dump_as_json(std::string& targetObj, size_t indent = 0/*, end_of_line_t eol = eol_crlf*/);
       bool		  load_from_json(const std::string& source);
+      void      set_entry_description(hsection hparent_section, const std::string& name, const std::string& description) {}
 
       template<typename cb_t>
       bool enum_entries(hsection hparent_section, cb_t cb);
-    private:
+    protected:
       section m_root;
       hsection	get_root_section() {return &m_root;}
       storage_entry* find_storage_entry(const std::string& pentry_name, hsection psection);
@@ -111,32 +112,36 @@ namespace epee
       };
 #pragma pack(pop)
     };
+
+
     template<typename t_section>
-    bool		  portable_storage_base<t_section>::dump_as_json(std::string& buff, size_t indent /* = 0 */, end_of_line_t eol /* = eol_crlf */)
+    bool portable_storage_base<t_section>::dump_as_json(std::string& buff, size_t indent /* = 0 *//*, end_of_line_t eol *//* = eol_crlf */)
     {
       TRY_ENTRY();
       std::stringstream ss;
-      epee::serialization::dump_as_json(ss, m_root, indent, eol);
+      epee::serialization::recursive_visitor<strategy_json>::dump_as_(ss, m_root, indent/*, eol*/);
       buff = ss.str();
       return true;
-      CATCH_ENTRY("portable_storage::dump_as_json", false)
+      CATCH_ENTRY("portable_storage_base<t_section>::dump_as_json", false)
     }
-    inline
-    bool		portable_storage::load_from_json(const std::string& source)
+
+    template<typename t_section>
+    bool portable_storage_base<t_section>::load_from_json(const std::string& source)
     {
       TRY_ENTRY();
       return json::load_from_json(source, *this);
-      CATCH_ENTRY("portable_storage::load_from_json", false)
+      CATCH_ENTRY("portable_storage_base<t_section>::load_from_json", false)
     }
 
+    template<typename t_section>
     template<class trace_policy>
-    bool		  portable_storage::dump_as_xml(std::string& targetObj, const std::string& root_name)
+    bool portable_storage_base<t_section>::dump_as_xml(std::string& targetObj, const std::string& root_name)
     {
       return false;//TODO: don't think i ever again will use xml - ambiguous and "overtagged" format
     }
 
-    inline
-    bool		portable_storage::store_to_binary(binarybuffer& target)
+    template<typename t_section>
+    bool portable_storage_base<t_section>::store_to_binary(binarybuffer& target)
     {
       TRY_ENTRY();
       std::stringstream ss;
@@ -148,10 +153,10 @@ namespace epee
       pack_entry_to_buff(ss, m_root);
       target = ss.str();
       return true;
-      CATCH_ENTRY("portable_storage::store_to_binary", false)
+      CATCH_ENTRY("portable_storage_base<t_section>::store_to_binary", false)
     }
-    inline
-    bool		portable_storage::load_from_binary(const binarybuffer& source)
+    template<typename t_section>
+    bool portable_storage_base<t_section>::load_from_binary(const binarybuffer& source)
     {
       m_root.m_entries.clear();
       if(source.size() < sizeof(storage_block_header))
@@ -176,11 +181,11 @@ namespace epee
       throwable_buffer_reader buf_reader(source.data()+sizeof(storage_block_header), source.size()-sizeof(storage_block_header));
       buf_reader.read(m_root);
       return true;//TODO:
-      CATCH_ENTRY("portable_storage::load_from_binary", false);
+      CATCH_ENTRY("portable_storage_base<t_section>::load_from_binary", false);
     }
     //---------------------------------------------------------------------------------------------------------------
-    inline
-    hsection   portable_storage::open_section(const std::string& section_name,  hsection hparent_section, bool create_if_notexist)
+    template<typename t_section>
+    typename portable_storage_base<t_section>::hsection portable_storage_base<t_section>::open_section(const std::string& section_name,  hsection hparent_section, bool create_if_notexist)
     {
       TRY_ENTRY();
       hparent_section = hparent_section ? hparent_section:&m_root;
@@ -201,7 +206,7 @@ namespace epee
           return nullptr;
       }
       return &boost::get<section>(*pentry);
-      CATCH_ENTRY("portable_storage::open_section", nullptr);
+      CATCH_ENTRY("portable_storage_base<t_section>::open_section", nullptr);
     }
     //---------------------------------------------------------------------------------------------------------------
     template<class to_type>
@@ -213,8 +218,9 @@ namespace epee
       void operator()(const from_type& v){convert_t(v, m_target);}
     };
 
+    template<typename t_section>
     template<class t_value>
-    bool portable_storage::get_value(const std::string& value_name, t_value& val, hsection hparent_section)
+    bool portable_storage_base<t_section>::get_value(const std::string& value_name, t_value& val, hsection hparent_section)
     {
       BOOST_MPL_ASSERT(( boost::mpl::contains<storage_entry::types, t_value> )); 
       //TRY_ENTRY();
@@ -226,11 +232,11 @@ namespace epee
       get_value_visitor<t_value> gvv(val);
       boost::apply_visitor(gvv, *pentry);
       return true;
-      //CATCH_ENTRY("portable_storage::template<>get_value", false);
+      //CATCH_ENTRY("portable_storage_base<t_section>::template<>get_value", false);
     }
     //---------------------------------------------------------------------------------------------------------------
-    inline
-    bool portable_storage::get_value(const std::string& value_name, storage_entry& val, hsection hparent_section)
+    template<typename t_section>
+    bool portable_storage_base<t_section>::get_value(const std::string& value_name, storage_entry& val, hsection hparent_section)
     {
       //TRY_ENTRY();
       if(!hparent_section) hparent_section = &m_root;
@@ -240,11 +246,12 @@ namespace epee
 
       val = *pentry;
       return true;
-      //CATCH_ENTRY("portable_storage::template<>get_value", false);
+      //CATCH_ENTRY("portable_storage_base<t_section>::template<>get_value", false);
     }
     //---------------------------------------------------------------------------------------------------------------
+    template<typename t_section>
     template<class t_value>
-    bool       portable_storage::set_value(const std::string& value_name, const t_value& v, hsection hparent_section)        
+    bool portable_storage_base<t_section>::set_value(const std::string& value_name, const t_value& v, hsection hparent_section)        
     {
       BOOST_MPL_ASSERT(( boost::mpl::contains<boost::mpl::push_front<storage_entry::types, storage_entry>::type, t_value> )); 
       TRY_ENTRY();
@@ -260,11 +267,11 @@ namespace epee
       }
       *pentry = storage_entry(v);
       return true;
-      CATCH_ENTRY("portable_storage::template<>set_value", false);
+      CATCH_ENTRY("portable_storage_base<t_section>::template<>set_value", false);
     }
     //---------------------------------------------------------------------------------------------------------------
-    inline
-    storage_entry* portable_storage::find_storage_entry(const std::string& pentry_name, hsection psection)
+    template<typename t_section>
+    storage_entry* portable_storage_base<t_section>::find_storage_entry(const std::string& pentry_name, hsection psection)
     {
       TRY_ENTRY();
       CHECK_AND_ASSERT(psection, nullptr);
@@ -273,27 +280,28 @@ namespace epee
         return nullptr;
 
       return &it->second;
-      CATCH_ENTRY("portable_storage::find_storage_entry", nullptr);
+      CATCH_ENTRY("portable_storage_base<t_section>::find_storage_entry", nullptr);
     }
     //---------------------------------------------------------------------------------------------------------------
+    template<typename t_section>
     template<class entry_type>
-    storage_entry* portable_storage::insert_new_entry_get_storage_entry(const std::string& pentry_name, hsection psection, const entry_type& entry)
+    storage_entry* portable_storage_base<t_section>::insert_new_entry_get_storage_entry(const std::string& pentry_name, hsection psection, const entry_type& entry)
     {
       TRY_ENTRY();
       CHECK_AND_ASSERT(psection, nullptr);
       auto ins_res = psection->m_entries.insert(std::pair<std::string, storage_entry>(pentry_name, entry));
       return &ins_res.first->second;
-      CATCH_ENTRY("portable_storage::insert_new_entry_get_storage_entry", nullptr);
+      CATCH_ENTRY("portable_storage_base<t_section>::insert_new_entry_get_storage_entry", nullptr);
     }
     //---------------------------------------------------------------------------------------------------------------
-    inline
-    hsection portable_storage::insert_new_section(const std::string& pentry_name, hsection psection)
+    template<typename t_section>
+    typename portable_storage_base<t_section>::hsection portable_storage_base<t_section>::insert_new_section(const std::string& pentry_name, hsection psection)
     {
       TRY_ENTRY();
       storage_entry* pse = insert_new_entry_get_storage_entry(pentry_name, psection, section());
       if(!pse) return nullptr;
       return &boost::get<section>(*pse);
-      CATCH_ENTRY("portable_storage::insert_new_section", nullptr);
+      CATCH_ENTRY("portable_storage_base<t_section>::insert_new_section", nullptr);
     }
     //---------------------------------------------------------------------------------------------------------------
     template<class to_type>
@@ -312,8 +320,9 @@ namespace epee
       }
     };
     //---------------------------------------------------------------------------------------------------------------
+    template<typename t_section>
     template<class t_value>
-    harray portable_storage::get_first_value(const std::string& value_name, t_value& target, hsection hparent_section)
+    harray portable_storage_base<t_section>::get_first_value(const std::string& value_name, t_value& target, hsection hparent_section)
     {
       BOOST_MPL_ASSERT(( boost::mpl::contains<storage_entry::types, t_value> )); 
       //TRY_ENTRY();
@@ -329,7 +338,7 @@ namespace epee
       if(!boost::apply_visitor(gfv, ar_entry))
         return nullptr;
       return &ar_entry;
-      //CATCH_ENTRY("portable_storage::get_first_value", nullptr);
+      //CATCH_ENTRY("portable_storage_base<t_section>::get_first_value", nullptr);
     }
     //---------------------------------------------------------------------------------------------------------------
     template<class to_type>
@@ -348,10 +357,10 @@ namespace epee
         return true;
       }
     };
-
-
+    //---------------------------------------------------------------------------------------------------------------
+    template<typename t_section>
     template<class t_value>
-    bool          portable_storage::get_next_value(harray hval_array, t_value& target)
+    bool portable_storage_base<t_section>::get_next_value(harray hval_array, t_value& target)
     {
       BOOST_MPL_ASSERT(( boost::mpl::contains<storage_entry::types, t_value> )); 
       //TRY_ENTRY();
@@ -361,11 +370,12 @@ namespace epee
       if(!boost::apply_visitor(gnv, ar_entry))
         return false;
       return true;
-      //CATCH_ENTRY("portable_storage::get_next_value", false);
+      //CATCH_ENTRY("portable_storage_base<t_section>::get_next_value", false);
     } 
     //---------------------------------------------------------------------------------------------------------------
+    template<typename t_section>
     template<class t_value>
-    harray portable_storage::insert_first_value(const std::string& value_name, const t_value& target, hsection hparent_section)
+    harray portable_storage_base<t_section>::insert_first_value(const std::string& value_name, const t_value& target, hsection hparent_section)
     {
       TRY_ENTRY();
       if(!hparent_section) hparent_section = &m_root;
@@ -386,11 +396,12 @@ namespace epee
       array_entry_t<t_value>& arr_typed = boost::get<array_entry_t<t_value> >(arr);
       arr_typed.insert_first_val(target);
       return &arr;
-      CATCH_ENTRY("portable_storage::insert_first_value", nullptr);
+      CATCH_ENTRY("portable_storage_base<t_section>::insert_first_value", nullptr);
     }
     //---------------------------------------------------------------------------------------------------------------
+    template<typename t_section>
     template<typename cb_t>
-    bool portable_storage::enum_entries(hsection hparent_section, cb_t cb)
+    bool portable_storage_base<t_section>::enum_entries(hsection hparent_section, cb_t cb)
     {
       TRY_ENTRY();
       if (!hparent_section) hparent_section = &m_root;
@@ -400,11 +411,12 @@ namespace epee
           break;
       }
       return true;
-      CATCH_ENTRY("portable_storage::enum_entries", false);
+      CATCH_ENTRY("portable_storage_base<t_section>::enum_entries", false);
     }
-
+    //---------------------------------------------------------------------------------------------------------------
+    template<typename t_section>
     template<class t_value>
-    bool portable_storage::insert_next_value(harray hval_array, const t_value& target)
+    bool portable_storage_base<t_section>::insert_next_value(harray hval_array, const t_value& target)
     {
       TRY_ENTRY();
       CHECK_AND_ASSERT(hval_array, false);
@@ -415,12 +427,12 @@ namespace epee
       array_entry_t<t_value>& arr_typed = boost::get<array_entry_t<t_value> >(*hval_array);
       arr_typed.insert_next_value(target);
       return true;
-      CATCH_ENTRY("portable_storage::insert_next_value", false);
+      CATCH_ENTRY("portable_storage_base<t_section>::insert_next_value", false);
     }
     //---------------------------------------------------------------------------------------------------------------
     //sections
-    inline
-    harray portable_storage::get_first_section(const std::string& sec_name, hsection& h_child_section, hsection hparent_section)
+    template<typename t_section>
+    harray portable_storage_base<t_section>::get_first_section(const std::string& sec_name, hsection& h_child_section, hsection hparent_section)
     {
       TRY_ENTRY();
       if(!hparent_section) hparent_section = &m_root;
@@ -438,11 +450,11 @@ namespace epee
         return nullptr;
       h_child_section = psec;
       return &ar_entry;
-      CATCH_ENTRY("portable_storage::get_first_section", nullptr);
+      CATCH_ENTRY("portable_storage_base<t_section>::get_first_section", nullptr);
     }
     //---------------------------------------------------------------------------------------------------------------
-    inline
-    bool portable_storage::get_next_section(harray hsec_array, hsection& h_child_section)
+    template<typename t_section>
+    bool portable_storage_base<t_section>::get_next_section(harray hsec_array, hsection& h_child_section)
     {
       TRY_ENTRY();
       CHECK_AND_ASSERT(hsec_array, false);
@@ -453,11 +465,11 @@ namespace epee
       if(!h_child_section)
         return false;
       return true;
-      CATCH_ENTRY("portable_storage::get_next_section", false);
+      CATCH_ENTRY("portable_storage_base<t_section>::get_next_section", false);
     }
     //---------------------------------------------------------------------------------------------------------------
-    inline
-    harray portable_storage::insert_first_section(const std::string& sec_name, hsection& hinserted_childsection, hsection hparent_section)
+    template<typename t_section>
+    harray portable_storage_base<t_section>::insert_first_section(const std::string& sec_name, hsection& hinserted_childsection, hsection hparent_section)
     {
       TRY_ENTRY();
       if(!hparent_section) hparent_section = &m_root;
@@ -478,11 +490,11 @@ namespace epee
       array_entry_t<section>& sec_array = boost::get<array_entry_t<section>>(ar_entry);
       hinserted_childsection = &sec_array.insert_first_val(section());
       return &ar_entry;
-      CATCH_ENTRY("portable_storage::insert_first_section", nullptr);
+      CATCH_ENTRY("portable_storage_base<t_section>::insert_first_section", nullptr);
     }
     //---------------------------------------------------------------------------------------------------------------
-    inline
-    bool            portable_storage::insert_next_section(harray hsec_array, hsection& hinserted_childsection)
+    template<typename t_section>
+    bool portable_storage_base<t_section>::insert_next_section(harray hsec_array, hsection& hinserted_childsection)
     {
       TRY_ENTRY();
       CHECK_AND_ASSERT(hsec_array, false);
@@ -492,8 +504,9 @@ namespace epee
       array_entry_t<section>& sec_array = boost::get<array_entry_t<section>>(*hsec_array);
       hinserted_childsection = &sec_array.insert_next_value(section());
       return true;
-      CATCH_ENTRY("portable_storage::insert_next_section", false);
+      CATCH_ENTRY("portable_storage_base<t_section>::insert_next_section", false);
     }
-    //---------------------------------------------------------------------------------------------------------------
+    //---------------------------------------------------------------------------------------------------------------    
+    typedef portable_storage_base<section> portable_storage;
   }
 }

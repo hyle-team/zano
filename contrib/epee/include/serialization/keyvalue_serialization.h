@@ -68,8 +68,8 @@ public: \
 #define KV_SERIALIZE_N(varialble, val_name) \
   epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name);
 
-#define KV_SERIALIZE_N_DOC(varialble, val_name, substitute) \
-  epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name, auto_doc_mode, substitute);
+#define KV_SERIALIZE_N_DOC(varialble, val_name, substitute, description) \
+  epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name, auto_doc_mode, substitute, description);
 
 #define KV_SERIALIZE_CUSTOM_N(varialble, stored_type, from_v_to_stored, from_stored_to_v, val_name) \
   epee::serialization::selector<is_store>::template serialize_custom<stored_type>(this_ref.varialble, stg, hparent_section, val_name, from_v_to_stored, from_stored_to_v);
@@ -98,7 +98,7 @@ public: \
 #define END_KV_SERIALIZE_MAP() return true;}
 
 #define KV_SERIALIZE(varialble)                           KV_SERIALIZE_N(varialble, #varialble)
-#define KV_SERIALIZE_DOC(varialble, substitute)           KV_SERIALIZE_N_DOC( varialble, #varialble, substitute)
+#define KV_SERIALIZE_DOC(varialble, substitute, description)           KV_SERIALIZE_N_DOC( varialble, #varialble, substitute, description)
 #define KV_SERIALIZE_VAL_POD_AS_BLOB(varialble)           KV_SERIALIZE_VAL_POD_AS_BLOB_N(varialble, #varialble)
 #define KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(varialble)     KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(varialble, #varialble) //skip is_pod compile time check
 #define KV_SERIALIZE_CONTAINER_POD_AS_BLOB(varialble)     KV_SERIALIZE_CONTAINER_POD_AS_BLOB_N(varialble, #varialble)

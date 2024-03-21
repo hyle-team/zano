@@ -57,7 +57,7 @@ namespace currency
     std::stringstream ss;
     ss << "\"blocks\":{" << ENDL << print_complete_block_entry_list(v.blocks) << ENDL << "}, " << ENDL;
     ss << "\"missed_ids\":" << ENDL;
-    ::epee::serialization::dump_as_json(ss, v.missed_ids, 2);
+    ::epee::serialization::recursive_visitor<::epee::serialization::strategy_json>::dump_as_(ss, v.missed_ids, 2);
     ss << ENDL << "\"current_blockchain_height\":" << v.current_blockchain_height;
     return ss.str();
   }

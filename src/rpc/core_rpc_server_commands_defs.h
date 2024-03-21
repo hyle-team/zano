@@ -149,8 +149,8 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_DOC(height, uint64_t(11111))
-        KV_SERIALIZE_DOC(status, std::string("OK"))
+        KV_SERIALIZE_DOC(height, uint64_t(11111), "Some height of the block")
+        KV_SERIALIZE_DOC(status, std::string("OK"), "Status of the operation")
       END_KV_SERIALIZE_MAP()
     };
   };
