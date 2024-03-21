@@ -525,7 +525,7 @@ namespace nodetool
 
       if (!tools::check_remote_client_version(rsp.payload_data.client_version))
       {
-        LOG_ERROR_CCONTEXT("COMMAND_HANDSHAKE Failed, wrong client version: " << rsp.payload_data.client_version << ", closing connection.");
+        LOG_PRINT_CC_YELLOW(context, "COMMAND_HANDSHAKE Failed, wrong client version: " << rsp.payload_data.client_version << ", closing connection.", LOG_LEVEL_1);
         return;
       }
 
