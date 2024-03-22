@@ -4760,6 +4760,7 @@ void wallet2::get_unconfirmed_transfers(std::vector<wallet_public::wallet_transf
       continue;
     }
     trs.push_back(u.second);
+    load_wallet_transfer_info_flags(trs.back());
   }
 }
 //----------------------------------------------------------------------------------------------------
