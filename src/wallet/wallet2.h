@@ -751,7 +751,7 @@ private:
     std::vector<std::string> get_aliases_for_address(const std::string& addr);
     bool is_connected_to_net();
     bool is_transfer_okay_for_pos(const transfer_details& tr, bool is_zarcanum_hf, uint64_t& stake_unlock_time) const;
-    bool scan_unconfirmed_outdate_tx();
+    bool scan_not_compliant_unconfirmed_txs();
     const currency::transaction& get_transaction_by_id(const crypto::hash& tx_hash);
     void rise_on_transfer2(const wallet_public::wallet_transfer_info& wti);
     void process_genesis_if_needed(const currency::block& genesis);
