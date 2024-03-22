@@ -7023,7 +7023,7 @@ void wallet2::prepare_tx_destinations(uint64_t needed_money,
   const crypto::public_key& asset_id,
   std::vector<currency::tx_destination_entry>& final_destinations)
 {
-  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(found_money >= needed_money, "needed_money==" << needed_money << "  <  found_money==" << found_money);
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(found_money >= needed_money, "found_money = " << print_money_brief(found_money) << " is less than needed_money = " << print_money_brief(needed_money) << ", assed_id: " << asset_id);
 
   if (is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
   {
