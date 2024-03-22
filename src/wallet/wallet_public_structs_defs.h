@@ -134,17 +134,17 @@ namespace wallet_public
 
   struct wallet_transfer_info
   {
-    uint64_t      timestamp;
-    crypto::hash  tx_hash;
-    uint64_t      height;          //if height == 0 then tx is unconfirmed
-    uint64_t      unlock_time;
-    uint32_t      tx_blob_size;
+    uint64_t      timestamp = 0;
+    crypto::hash  tx_hash = currency::null_hash;
+    uint64_t      height = 0;          //if height == 0 then tx is unconfirmed
+    uint64_t      unlock_time = 0;
+    uint32_t      tx_blob_size = 0;
     std::string   payment_id;
     std::string   comment;
-    bool          is_service;
-    bool          is_mixing;
-    bool          is_mining;
-    uint64_t      tx_type;
+    bool          is_service = false;
+    bool          is_mixing = false;
+    bool          is_mining = false;
+    uint64_t      tx_type = 0;
     employed_tx_entries employed_entries;
     std::vector<currency::tx_service_attachment> service_entries;
     std::vector<std::string> remote_addresses;  //optional
@@ -153,11 +153,11 @@ namespace wallet_public
     std::vector<wallet_sub_transfer_info> subtransfers;
 
     //not included in streaming serialization
-    uint64_t      fee;
-    bool          show_sender;
+    uint64_t      fee = 0;
+    bool          show_sender = false;
     std::vector<escrow_contract_details> contract;
-    uint16_t      extra_flags;
-    uint64_t      transfer_internal_index;
+    uint16_t      extra_flags = 0;
+    uint64_t      transfer_internal_index = 0;
    
     //not included in kv serialization map
     currency::transaction tx;
