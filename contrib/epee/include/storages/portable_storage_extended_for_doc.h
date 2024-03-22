@@ -29,6 +29,8 @@
 #pragma once 
 
 #include "portable_storage.h"
+#include "portable_storage.h"
+
 
 namespace epee
 {
@@ -51,8 +53,7 @@ namespace epee
       {
         TRY_ENTRY();
         std::stringstream ss;
-
-        //epee::serialization::dump_as_descriptions(ss, m_root, indent, eol);
+        epee::serialization::recursive_visitor<strategy_json>::dump_as_(ss, m_root, indent);
         buff = ss.str();
         return true;
         CATCH_ENTRY("portable_storage_base<t_section>::dump_as_json", false)
