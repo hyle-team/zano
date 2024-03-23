@@ -2479,20 +2479,37 @@ void wallet2::scan_tx_pool(bool& has_related_alias_in_unconfirmed)
 //----------------------------------------------------------------------------------------------------
 bool wallet2::on_idle()
 {
-  scan_unconfirmed_outdate_tx();
+  scan_not_compliant_unconfirmed_txs();
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::scan_unconfirmed_outdate_tx()
+bool wallet2::scan_not_compliant_unconfirmed_txs()
 {
   uint64_t tx_expiration_ts_median = get_tx_expiration_median();
   uint64_t time_limit = m_core_runtime_config.get_core_time() - CURRENCY_MEMPOOL_TX_LIVETIME;
   for (auto it = m_unconfirmed_txs.begin(); it != m_unconfirmed_txs.end(); )
   {
-    bool tx_outdated = it->second.timestamp < time_limit;
-    if (tx_outdated || is_tx_expired(it->second.tx, tx_expiration_ts_median))
+    bool remove_this_tx = false;
+    std::stringstream reason_ss;
+    if (it->second.timestamp < time_limit)
     {
-      WLT_LOG_BLUE("removing unconfirmed tx " << it->second.tx_hash << ", reason: " << (tx_outdated ? "outdated" : "expired") << ", tx_expiration_ts_median=" << tx_expiration_ts_median, LOG_LEVEL_0);
+      remove_this_tx = true;
+      reason_ss << "outdated, ";
+    }
+    if (is_tx_expired(it->second.tx, tx_expiration_ts_median))
+    {
+      remove_this_tx = true;
+      reason_ss << "expired, ";
+    }
+    if (is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM) && it->second.tx.version < TRANSACTION_VERSION_POST_HF4)
+    {
+      remove_this_tx = true;
+      reason_ss << "not compliant with HF4, ";
+    }
+
+    if (remove_this_tx)
+    {
+      WLT_LOG_BLUE("removing unconfirmed tx " << it->second.tx_hash << ", reason: " << reason_ss.str() << "tx_expiration_ts_median=" << tx_expiration_ts_median, LOG_LEVEL_0);
       //lookup all used transfer and update flags
       for (auto i : it->second.selected_indicies)
       {
@@ -2504,15 +2521,18 @@ bool wallet2::scan_unconfirmed_outdate_tx()
         if (!m_transfers[i].m_spent_height)
         {
           uint32_t flags_before = m_transfers[i].m_flags;
-          m_transfers[i].m_flags &= ~(WALLET_TRANSFER_DETAIL_FLAG_SPENT);
+          m_transfers[i].m_flags &= ~(WALLET_TRANSFER_DETAIL_FLAG_SPENT);  // TODO: consider removing other blocking flags (e.g. for escrow tx) -- sowle
           WLT_LOG_BLUE("mark transfer #" << i << " as unspent, flags: " << flags_before << " -> " << m_transfers[i].m_flags << ", reason: removing unconfirmed tx " << it->second.tx_hash, LOG_LEVEL_0);
         }
       }
       //fire some event
       m_wcallback->on_transfer_canceled(it->second);
       m_unconfirmed_txs.erase(it++);
-    }else
+    }
+    else
+    {
       it++;
+    }
   }
 
   //scan marked as spent but don't have height (unconfirmed, and actually not unconfirmed)
@@ -2522,16 +2542,11 @@ bool wallet2::scan_unconfirmed_outdate_tx()
     if (!it->second.has_outgoing_entries())
       continue;
 
-    for (auto& in : it->second.tx.vin)
+    for (auto& in_v : it->second.tx.vin)
     {
-      if (in.type() == typeid(txin_to_key))
-      {
-        ki_in_unconfirmed.insert(boost::get<txin_to_key>(in).k_image);
-      }
-      else if (in.type() == typeid(txin_zc_input))
-      {
-        ki_in_unconfirmed.insert(boost::get<txin_zc_input>(in).k_image);
-      }
+      crypto::key_image ki{};
+      if (get_key_image_from_txin_v(in_v, ki))
+        ki_in_unconfirmed.insert(ki);
     }
   }
 
