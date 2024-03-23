@@ -149,8 +149,8 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_DOC(height, uint64_t(11111), "Some height of the block")
-        KV_SERIALIZE_DOC(status, std::string("OK"), "Status of the operation")
+        KV_SERIALIZE_DOC2(height)   DOC_EX(11111)           DOC_DSCR("Some height of the block")
+        KV_SERIALIZE_DOC2(status)   DOC_EX("OK")            DOC_DSCR("Status of the operation")
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -212,9 +212,9 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(txs_as_hex)
-        KV_SERIALIZE(missed_tx)
-        KV_SERIALIZE(status)
+        KV_SERIALIZE_DOC(txs_as_hex, std::list<std::string>(1, "97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d914497d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc2f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc"), "Transactions stored as blobs")
+        KV_SERIALIZE_DOC(missed_tx, std::list<std::string>(1, "97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc"), "Missed transactions hashes")
+        KV_SERIALIZE_DOC(status, std::string("OK"), "Command response status")
       END_KV_SERIALIZE_MAP()
     };
   };

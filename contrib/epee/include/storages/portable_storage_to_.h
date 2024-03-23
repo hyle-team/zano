@@ -120,7 +120,7 @@ namespace epee
           auto it_last = --sec.m_entries.end();
           for (auto it = sec.m_entries.begin(); it != sec.m_entries.end(); it++)
           {
-            if (constexpr t_strategy_layout_strategy::use_descriptions::value)
+            if constexpr (t_strategy_layout_strategy::use_descriptions::value)
             {
               std::string descr;
               auto it_descr = sec.m_descriptions.find(it->first);

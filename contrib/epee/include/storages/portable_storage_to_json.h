@@ -55,7 +55,7 @@ namespace epee
     class strategy_json
     {
     public:
-      typedef std::false_type use_descriptions;
+      using use_descriptions = std::false_type;
 
       inline static const char* eol = get_endline(eol_crlf);
       //static const end_of_line_t eol = eol_crlf;
@@ -109,15 +109,11 @@ namespace epee
 
       template<class t_stream>
       static void handle_obj_begin(t_stream& strm, size_t indent)
-      {
-        strm << "{";
-      }
+      {}
 
       template<class t_stream>
       static void handle_obj_end(t_stream& strm, size_t indent)
-      {
-        strm << "}";
-      }
+      {}
 
       template<class t_stream>
       static void handle_print_key(t_stream& strm, const std::string& key, size_t indent)
@@ -129,15 +125,11 @@ namespace epee
 
       template<class t_stream>
       static void handle_section_entry_separator(t_stream& strm, size_t indent)
-      {
-        strm << ",";
-      }
+      {}
 
       template<class t_stream>
       static void handle_array_entry_separator(t_stream& strm, size_t indent)
-      {
-        strm << ",";
-      }
+      {}
 
       template<class t_stream>
       static void handle_line_break(t_stream& strm, size_t indent)

@@ -479,6 +479,5 @@ namespace epee
       return r;
     }
 
-
   }
 }

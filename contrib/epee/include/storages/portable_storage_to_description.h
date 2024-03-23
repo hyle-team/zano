@@ -36,25 +36,11 @@ namespace epee
 {
   namespace serialization
   {
-    inline const char* get_endline(end_of_line_t eol)
-    {
-      switch (eol)
-      {
-        case eol_lf:    return "\n";
-        case eol_cr:    return  "\r";
-        case eol_space: return  " ";
-        default:        return  "\r\n";
-      }
-    }
-
-    inline std::string make_indent(size_t indent)
-    {
-      return std::string(indent * 2, ' ');
-    }
-
-    class strategy_json
+    class strategy_descriptin
     {
     public:
+      using use_descriptions = std::true_type;
+
       inline static const char* eol = get_endline(eol_crlf);
       //static const end_of_line_t eol = eol_crlf;
 
@@ -83,10 +69,10 @@ namespace epee
       {}
 
       template<class t_stream>
-      static void handle_print_key(t_stream& strm, const std::string& key, size_t indent)
+      static void handle_print_key(t_stream& strm, const std::string& key, const std::string& description, size_t indent)
       {
         const std::string indent_str = make_indent(indent);
-        strm << indent_str << "\"" << misc_utils::parse::transform_to_json_escape_sequence(key) << "\"" << ": ";
+        strm << indent_str << "\"" << key << "\"" << ": " << description;
       }
 
       template<class t_stream>
