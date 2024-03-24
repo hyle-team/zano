@@ -161,12 +161,10 @@ namespace currency
 
     struct request
     {
-      bool need_global_indexes;
       uint64_t minimum_height;
       std::list<crypto::hash> block_ids; //*first 10 blocks id goes sequential, next goes in pow(2,n) offset, like 2, 4, 8, 16, 32, 64 and so on, and the last one is always genesis block */
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(need_global_indexes)
         KV_SERIALIZE(minimum_height)
         KV_SERIALIZE_CONTAINER_POD_AS_BLOB(block_ids)
       END_KV_SERIALIZE_MAP()
