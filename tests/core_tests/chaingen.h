@@ -752,6 +752,17 @@ bool shuffle_source_entries(std::vector<currency::tx_source_entry>& sources);
 // one output will be created for each destination entry and one additional output to add up to old coinbase total amount
 bool replace_coinbase_in_genesis_block(const std::vector<currency::tx_destination_entry>& destinations, test_generator& generator, std::vector<test_event_entry>& events, currency::block& genesis_block);
 
+template<typename t_map>
+const std::vector<uint64_t>& get_tx_gindex_from_map(const crypto::hash& tx_id, const t_map& id_to_vector)
+{
+  auto it_global_indexes = id_to_vector.find(tx_id);
+  if (it_global_indexes == id_to_vector.end())
+  {
+    throw std::runtime_error("TX ID NOT FOUND");
+  }
+  return it_global_indexes->second;
+}
+
 //--------------------------------------------------------------------------
 template<class t_test_class>
 auto do_check_tx_verification_context(const currency::tx_verification_context& tvc, bool tx_added, size_t event_index, const currency::transaction& tx, t_test_class& validator, int)
@@ -993,6 +1004,7 @@ namespace crypto {
       "  timestamp:        " << acc.get_createtime();
   }
 }
+
 
 inline uint64_t get_sources_total_amount(const std::vector<currency::tx_source_entry>& s)
 {

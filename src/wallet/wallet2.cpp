@@ -62,6 +62,10 @@ using namespace currency;
 
 #define WALLET_TX_MAX_ALLOWED_FEE                                     (COIN * 100)
 
+#define WALLET_FETCH_RANDOM_OUTS_SIZE                                 200  
+
+
+
 #undef LOG_DEFAULT_CHANNEL
 #define LOG_DEFAULT_CHANNEL "wallet"
 ENABLE_CHANNEL_BY_DEFAULT("wallet")
@@ -527,8 +531,18 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
   //PoW block don't have change, so all outs supposed to be marked as "mined"
   ptc.is_derived_from_coinbase = !ptc.is_pos_coinbase;
   ptc.height = height;
-
-
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(pglobal_indexes, "pglobal_indexes not set");
+  if (this->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
+  {
+    if (pglobal_indexes->size())
+    {
+      //store global index that is under coinage, so we can used in decoy selection algo
+      if (ptc.height < m_last_known_daemon_height && m_last_known_daemon_height - ptc.height > WALLET_DEFAULT_TX_SPENDABLE_AGE)
+      {
+        m_last_zc_global_index = pglobal_indexes->back();
+      }        
+    }
+  }
 
   for(auto& in : tx.vin)
   {
@@ -1970,12 +1984,14 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
   currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& res)
 {
   size_t current_index = res.start_height;
+  m_last_known_daemon_height = res.current_height;
   bool been_matched_block = false;
   if (res.start_height == 0 && get_blockchain_current_size() == 1 && !res.blocks.empty())
   {
     const currency::block& genesis = res.blocks.front().block_ptr->bl;
     THROW_IF_TRUE_WALLET_EX(get_block_height(genesis) != 0, error::wallet_internal_error, "first block expected to be genesis");
-    process_genesis_if_needed(genesis);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(res.blocks.front().coinbase_ptr, "Unexpected empty coinbase");    
+    process_genesis_if_needed(genesis, &(res.blocks.front().coinbase_ptr->m_global_output_indexes));
     res.blocks.pop_front();
     ++current_index;
     been_matched_block = true;
@@ -5970,17 +5986,18 @@ bool wallet2::prepare_tx_sources(assets_selection_context& needed_money_map, siz
 //----------------------------------------------------------------------------------------------------
 void wallet2::prefetch_global_indicies_if_needed(const std::vector<uint64_t>& selected_indicies)
 {
-  std::list<std::reference_wrapper<const currency::transaction>> txs;
-  std::list<uint64_t> indices_that_requested_global_indicies;
+  //std::list<std::reference_wrapper<const currency::transaction>> txs;
+  //std::list<uint64_t> indices_that_requested_global_indicies;
   for (uint64_t i : selected_indicies)
   {
-    if (m_transfers[i].m_global_output_index == WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED)
-    {
-      indices_that_requested_global_indicies.push_back(i);
-      txs.push_back(m_transfers[i].m_ptx_wallet_info->m_tx);
-    }
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(m_transfers[i].m_global_output_index != WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED,
+      "m_transfers[" << i << "].m_global_output_index is WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED");
+      //indices_that_requested_global_indicies.push_back(i);
+      //txs.push_back(m_transfers[i].m_ptx_wallet_info->m_tx);
+    //}
   }
 
+  /*
   std::vector<std::vector<uint64_t> > outputs_for_all_txs;
   fetch_tx_global_indixes(txs, outputs_for_all_txs);
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(txs.size() == outputs_for_all_txs.size(), "missmatch sizes txs.size() == outputs_for_all_txs.size()");
@@ -5991,7 +6008,7 @@ void wallet2::prefetch_global_indicies_if_needed(const std::vector<uint64_t>& se
     transfer_details& td = m_transfers[*it_indices];
     td.m_global_output_index = (*it_ooutputs)[td.m_internal_output_index];
     it_ooutputs++; it_indices++;
-  }
+  }*/
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, std::vector<currency::tx_source_entry>& sources, const std::vector<uint64_t>& selected_indicies)
@@ -6011,26 +6028,26 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, std::vector<currenc
     if (current_size - 1 >= zarcanum_start_from)
     {
       //in Zarcanum era
-      const uint64_t test_scale_size = current_size - 1 - zarcanum_start_from;
-      zarcanum_decoy_set_generator.init(test_scale_size - 1);
+      //const uint64_t test_scale_size = current_size - 1 - zarcanum_start_from;
+      zarcanum_decoy_set_generator.init(m_last_zc_global_index);
     }
 
     bool need_to_request = fake_outputs_count != 0;
-    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request req = AUTO_VAL_INIT(req);
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request req = AUTO_VAL_INIT(req);
     req.height_upper_limit = m_last_pow_block_h;  // request decoys to be either older than, or the same age as stake output's height
     req.use_forced_mix_outs = false; // TODO: add this feature to UI later
     //req.decoys_count = fake_outputs_count + 1;    // one more to be able to skip a decoy in case it hits the real output
     for (uint64_t i: selected_indicies)
     {
-      req.amounts.push_back(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::offsets_distribution());
-      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::offsets_distribution& rdisttib = req.amounts.back();
+      req.amounts.push_back(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution());
+      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution& rdisttib = req.amounts.back();
       
       auto it = m_transfers.begin() + i;
       WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->m_ptx_wallet_info->m_tx.vout.size() > it->m_internal_output_index,
         "m_internal_output_index = " << it->m_internal_output_index <<
         " is greater or equal to outputs count = " << it->m_ptx_wallet_info->m_tx.vout.size());
       
-      rdisttib.own_global_index = it->m_global_output_index;
+      //rdisttib.own_global_index = it->m_global_output_index;
       //check if we have Zarcanum era output of pre-Zarcanum
       if (it->is_zc())
       {
@@ -6039,15 +6056,14 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, std::vector<currenc
         //Zarcanum era
         rdisttib.amount = 0;
         //generate distribution in Zarcanum hardfork
-        THROW_IF_FALSE_WALLET_INT_ERR_EX(zarcanum_decoy_set_generator.is_initialized(), "zarcanum_decoy_set_generator are not initialized");
-        rdisttib.offsets = zarcanum_decoy_set_generator.generate_distribution(m_core_runtime_config.hf4_minimum_mixins);
+        build_distribution_for_input(zarcanum_decoy_set_generator, rdisttib.global_offsets, it->m_global_output_index);
         need_to_request = true;
       }
       else
       {
         //for prezarcanum era use flat distribution
         rdisttib.amount = it->m_amount;
-        rdisttib.offsets.resize(fake_outputs_count, 0);
+        rdisttib.global_offsets.resize(fake_outputs_count + 1, 0);
       }
     }
     if (need_to_request)
@@ -6056,7 +6072,7 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, std::vector<currenc
       while (true)
       {
         daemon_resp = COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response();
-        bool r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2(req, daemon_resp);
+        bool r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3(req, daemon_resp);
         THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs2.bin");
         if (daemon_resp.status == API_RETURN_CODE_FAIL)
         {
@@ -6080,10 +6096,9 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, std::vector<currenc
 
       std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount> scanty_outs;
       THROW_IF_FALSE_WALLET_EX(daemon_resp.outs.size() == req.amounts.size(), error::not_enough_outs_to_mix, scanty_outs, fake_outputs_count);
-      //for (COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& amount_outs : daemon_resp.outs)
       for(size_t i = 0; i != daemon_resp.outs.size(); i++)
       {
-        if (daemon_resp.outs[i].outs.size() != req.amounts[i].offsets.size())
+        if (req.amounts[i].amount != 0 && daemon_resp.outs[i].outs.size() != req.amounts[i].global_offsets.size())
         {
           scanty_outs.push_back(daemon_resp.outs[i]);
         }
@@ -6093,6 +6108,7 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, std::vector<currenc
   }
 
   //lets prefetch m_global_output_index for selected_indicies
+  //this days doesn't prefetch, only validated that prefetch is not needed
   prefetch_global_indicies_if_needed(selected_indicies);
 
   //prepare inputs
@@ -6116,6 +6132,16 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, std::vector<currenc
     //paste mixin transaction
     if (daemon_resp.outs.size())
     {
+      if (td.is_zc())
+      {
+        //get rid of unneeded 
+        select_decoys(daemon_resp.outs[i], td.m_global_output_index);
+      }
+      else
+      {
+        //TODO: make sure we have exact count needed
+      }
+      
       daemon_resp.outs[i].outs.sort([](const out_entry& a, const out_entry& b){return a.global_amount_index < b.global_amount_index; });
       for(out_entry& daemon_oe : daemon_resp.outs[i].outs)
       {
@@ -6126,7 +6152,7 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, std::vector<currenc
         oe.concealing_point   = daemon_oe.concealing_point;
         oe.out_reference      = daemon_oe.global_amount_index;
         oe.stealth_address    = daemon_oe.stealth_address;
-        oe.blinded_asset_id   = daemon_oe.blinded_asset_id;       // TODO @#@# BAD DESING, consider refactoring -- sowle
+        oe.blinded_asset_id   = daemon_oe.blinded_asset_id;       // TODO @#@# BAD DESIGN, consider refactoring -- sowle
         src.outputs.push_back(oe);
         if (src.outputs.size() >= fake_outputs_count)
           break;
@@ -6187,6 +6213,72 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, std::vector<currenc
     ++i;
   }
   return true;
+}
+
+
+//----------------------------------------------------------------------------------------------------------------
+template<typename t_obj_container>
+typename t_obj_container::value_type extract_random_from_container(t_obj_container& container)
+{
+  auto it = container.begin();
+  std::advance(it, (crypto::rand<size_t>() % container.size()));
+  typename t_obj_container::value_type obj = *it;
+  container.erase(it);
+  return obj;
+}
+//----------------------------------------------------------------------------------------------------------------
+void wallet2::select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& amount_entry, uint64_t own_g_index)
+{
+  THROW_IF_FALSE_WALLET_INT_ERR_EX(amount_entry.amount == 0, "Amount is not 0 in zc decoys entry");
+  typedef currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry out_entry;
+
+  //TODO: This strategy would be a subject for continuous refactoring
+  
+  //first take all real transactions if ther are some
+  std::list<out_entry> local_outs;
+  std::list<out_entry> coinbases;
+
+  while (amount_entry.outs.size() && local_outs.size() != m_core_runtime_config.hf4_minimum_mixins)
+  {
+    out_entry entry = extract_random_from_container(amount_entry.outs);
+
+    //skip auditable
+    if ((entry.flags & (RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_NOT_ALLOWED)))
+    {
+      continue;
+    }
+    if (entry.flags & (RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_COINBASE))
+    {
+      coinbases.push_back(entry);
+      continue;
+    }    
+    //
+    if (entry.global_amount_index == own_g_index)
+    {
+      continue;
+    }
+
+    local_outs.push_back(entry);
+  }
+
+  //extend with coin base outs if needed
+  while (coinbases.size() && local_outs.size() != m_core_runtime_config.hf4_minimum_mixins)
+  {
+    out_entry entry = extract_random_from_container(coinbases);
+    local_outs.push_back(entry);
+  }
+
+  THROW_IF_FALSE_WALLET_INT_ERR_EX(local_outs.size() == m_core_runtime_config.hf4_minimum_mixins, "Amount is not 0 in zc decoys entry");
+  amount_entry.outs = local_outs;  
+}
+//----------------------------------------------------------------------------------------------------------------
+void wallet2::build_distribution_for_input(decoy_selection_generator& zarcanum_decoy_set_generator, std::vector<uint64_t>& offsets, uint64_t own_index)
+{
+  THROW_IF_FALSE_WALLET_INT_ERR_EX(zarcanum_decoy_set_generator.is_initialized(), "zarcanum_decoy_set_generator are not initialized");
+  if (m_core_runtime_config.hf4_minimum_mixins)
+  {
+    offsets = zarcanum_decoy_set_generator.generate_unique_reversed_distribution(m_last_zc_global_index - 1 > WALLET_FETCH_RANDOM_OUTS_SIZE ? WALLET_FETCH_RANDOM_OUTS_SIZE: m_last_zc_global_index - 1, own_index);
+  }
 }
 //----------------------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources(crypto::hash multisig_id, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money)
@@ -6719,7 +6811,7 @@ bool wallet2::prepare_free_transfers_cache(uint64_t fake_outputs_count)
       if (td.m_zc_info_ptr)
       {
         //zarcanum out, redefine fake_outputs_count
-        fake_outputs_count_local = this->is_auditable() ? 0 : CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE;
+        fake_outputs_count_local = this->is_auditable() ? 0 : m_core_runtime_config.hf4_minimum_mixins;
       }
       if (is_transfer_able_to_go(td, fake_outputs_count_local))
       {
@@ -6824,7 +6916,7 @@ bool wallet2::is_connected_to_net()
   return (res.synchronized_connections_count) ? true : false;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::process_genesis_if_needed(const currency::block& genesis)
+void wallet2::process_genesis_if_needed(const currency::block& genesis, const std::vector<uint64_t>* pglobal_indexes)
 {
   if (!m_transfers.empty() || !m_key_images.empty())
     return;
@@ -6842,7 +6934,7 @@ void wallet2::process_genesis_if_needed(const currency::block& genesis)
   m_last_bc_timestamp = genesis.timestamp;
 
   WLT_LOG_L2("Processing genesis block: " << genesis_hash);
-  process_new_transaction(genesis.miner_tx, 0, genesis, nullptr);
+  process_new_transaction(genesis.miner_tx, 0, genesis, pglobal_indexes);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::set_genesis(const crypto::hash& genesis_hash)
