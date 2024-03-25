@@ -77,9 +77,10 @@ namespace tools
     , m_log_prefix("???")
     , m_watch_only(false)
     , m_required_decoys_count(CURRENCY_DEFAULT_DECOY_SET_SIZE)
+    , m_max_allowed_output_amount_for_defragmentation_tx(CURRENCY_BLOCK_REWARD)
     , m_min_utxo_count_for_defragmentation_tx(WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX)
     , m_max_utxo_count_for_defragmentation_tx(WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX)
-    , m_decoys_count_for_defragmentation_tx(WALLET_DEFAULT_DECOYS_COUNT_FOR_DEFRAGMENTATION_TX)
+    , m_decoys_count_for_defragmentation_tx(SIZE_MAX)
     , m_use_deffered_global_outputs(false)
 #ifdef DISABLE_TOR
     , m_disable_tor_relay(true)
@@ -5933,10 +5934,11 @@ bool wallet2::prepare_tx_sources_for_defragmentation_tx(std::vector<currency::tx
   for (size_t i = 0, size = m_transfers.size(); i < size && selected_indicies.size() < m_max_utxo_count_for_defragmentation_tx; ++i)
   {
     const auto& td = m_transfers[i];
-    if (!td.is_native_coin() || td.m_amount > CURRENCY_BLOCK_REWARD)
+    if (!td.is_native_coin() || td.m_amount > m_max_allowed_output_amount_for_defragmentation_tx)
       continue;
 
-    if (is_transfer_ready_to_go(td, m_decoys_count_for_defragmentation_tx))
+    uint64_t fake_outs_count_for_td = m_decoys_count_for_defragmentation_tx == SIZE_MAX ? (td.is_zc() ? m_core_runtime_config.hf4_minimum_mixins : CURRENCY_DEFAULT_DECOY_SET_SIZE) : m_decoys_count_for_defragmentation_tx;
+    if (is_transfer_ready_to_go(td, fake_outs_count_for_td))
     {
       found_money += td.m_amount;
       selected_indicies.push_back(i);
@@ -5945,7 +5947,7 @@ bool wallet2::prepare_tx_sources_for_defragmentation_tx(std::vector<currency::tx
     }
   }
 
-  if (selected_indicies.size() < m_min_utxo_count_for_defragmentation_tx)
+  if (selected_indicies.size() < m_min_utxo_count_for_defragmentation_tx || found_money <= TX_MINIMUM_FEE)
   {
     // too few outputs were found, hence don't create a defragmentation tx
     selected_indicies.clear();
@@ -5955,7 +5957,7 @@ bool wallet2::prepare_tx_sources_for_defragmentation_tx(std::vector<currency::tx
 
   WLT_LOG(ss.str(), LOG_LEVEL_2);
 
-  return prepare_tx_sources(m_decoys_count_for_defragmentation_tx, sources, selected_indicies);
+  return prepare_tx_sources(m_decoys_count_for_defragmentation_tx == SIZE_MAX ? CURRENCY_DEFAULT_DECOY_SET_SIZE : m_decoys_count_for_defragmentation_tx, sources, selected_indicies);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies)

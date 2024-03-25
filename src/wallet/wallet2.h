@@ -877,6 +877,7 @@ private:
    
 
     bool m_do_rise_transfer;
+    uint64_t m_max_allowed_output_amount_for_defragmentation_tx;
     uint64_t m_min_utxo_count_for_defragmentation_tx;
     uint64_t m_max_utxo_count_for_defragmentation_tx;
     size_t m_decoys_count_for_defragmentation_tx;
