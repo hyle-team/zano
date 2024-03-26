@@ -2606,6 +2606,14 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
     oen.amount_commitment   = toz.amount_commitment;
     oen.concealing_point    = toz.concealing_point;
     oen.blinded_asset_id    = toz.blinded_asset_id;   // TODO @#@# bad design, too much manual coping, consider redesign -- sowle
+    if (is_coinbase(tx_ptr->tx))
+    {
+      oen.flags |= RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_COINBASE;
+      if (is_pos_coinbase(tx_ptr->tx))
+      {
+        oen.flags |= RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_POS_COINBASE;
+      }
+    }
   }
   VARIANT_SWITCH_END();
 
@@ -2787,9 +2795,6 @@ bool blockchain_storage::get_random_outs_for_amounts3(const COMMAND_RPC_GET_RAND
   CRITICAL_REGION_LOCAL(m_read_lock);
   LOG_PRINT_L3("[get_random_outs_for_amounts] amounts: " << req.amounts.size());
   std::map<uint64_t, uint64_t> amounts_to_up_index_limit_cache;  
-  uint64_t count_zarcanum_blocks = 0;
-  if(is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM))
-     count_zarcanum_blocks = this->get_current_blockchain_size() - m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_HARDFORK_04_ZARCANUM];
 
 
   for (size_t i = 0; i != req.amounts.size(); i++)

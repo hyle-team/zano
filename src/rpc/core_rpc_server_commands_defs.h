@@ -383,6 +383,7 @@ namespace currency
 
 #define RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_COINBASE                       0x0000000000000001LL 
 #define RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_NOT_ALLOWED                    0x0000000000000002LL 
+#define RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_POS_COINBASE                   0x0000000000000004LL 
 
 #pragma pack (push, 1)
     struct out_entry
