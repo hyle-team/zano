@@ -299,6 +299,7 @@ namespace currency
     uint64_t get_aliases_count()const;
     uint64_t get_block_h_older_then(uint64_t timestamp) const;
     bool validate_tx_service_attachmens_in_services(const tx_service_attachment& a, size_t i, const transaction& tx)const;
+    bool get_asset_history(const crypto::public_key& asset_id, std::list<asset_descriptor_operation>& result) const;
     bool get_asset_info(const crypto::public_key& asset_id, asset_descriptor_base& info)const;
     uint64_t get_assets_count() const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase)const;

@@ -81,6 +81,8 @@ public: \
 #define KV_SERIALIZE_BLOB_AS_HEX_STRING_N(varialble, val_name) \
 	KV_SERIALIZE_CUSTOM_N(varialble, std::string, epee::transform_binbuf_to_hexstr, epee::transform_hexstr_to_binbuff, val_name)
 
+#define KV_SERIALIZE_BLOB_AS_BASE64_STRING_N(varialble, val_name) \
+	KV_SERIALIZE_CUSTOM_N(varialble, std::string, epee::transfrom_binbuf_to_base64, epee::transform_base64_to_binbuf, val_name)
 
 #define KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(varialble, val_name) \
   epee::serialization::selector<is_store>::serialize_t_val_as_blob(this_ref.varialble, stg, hparent_section, val_name); 
@@ -100,7 +102,8 @@ public: \
 #define KV_SERIALIZE_CONTAINER_POD_AS_BLOB(varialble)     KV_SERIALIZE_CONTAINER_POD_AS_BLOB_N(varialble, #varialble)
 #define KV_SERIALIZE_CUSTOM(varialble, stored_type, from_v_to_stored, from_stored_to_v)    KV_SERIALIZE_CUSTOM_N(varialble, stored_type, from_v_to_stored, from_stored_to_v, #varialble)
 #define KV_SERIALIZE_POD_AS_HEX_STRING(varialble)         KV_SERIALIZE_POD_AS_HEX_STRING_N(varialble, #varialble)
-#define KV_SERIALIZE_BLOB_AS_HEX_STRING(varialble)         KV_SERIALIZE_BLOB_AS_HEX_STRING_N(varialble, #varialble)
+#define KV_SERIALIZE_BLOB_AS_HEX_STRING(varialble)        KV_SERIALIZE_BLOB_AS_HEX_STRING_N(varialble, #varialble)
+#define KV_SERIALIZE_BLOB_AS_BASE64_STRING(variable)      KV_SERIALIZE_BLOB_AS_BASE64_STRING_N(variable, #variable)
   
 
 
