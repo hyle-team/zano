@@ -99,13 +99,24 @@ bool wallet_test_core_proxy::call_COMMAND_RPC_GET_BLOCKS_FAST(const currency::CO
   {
     auto b = m_blocks[i];
     currency::block_complete_entry bce = AUTO_VAL_INIT(bce);
-    for (auto tx : b->m_transactions)
+    bce.tx_global_outs.resize(b->m_transactions.size());
+    bce.coinbase_global_outs = get_tx_gindex(currency::get_transaction_hash(b->b.miner_tx));
+    for (size_t j = 0; j != b->m_transactions.size(); j++)
+    {
+      const auto& tx = b->m_transactions[j];
       bce.txs.push_back(tx_to_blob(tx));
+      bce.tx_global_outs[j].v = get_tx_gindex(currency::get_transaction_hash(tx));
+    }
     bce.block = block_to_blob(b->b);
     rsp.blocks.push_back(bce);
   }
   rsp.current_height = m_blocks.size();
   return true;
+}
+
+const std::vector<uint64_t>& wallet_test_core_proxy::get_tx_gindex(const crypto::hash& tx_id)
+{
+  return get_tx_gindex_from_map(tx_id, m_txs_outs);
 }
 bool wallet_test_core_proxy::call_COMMAND_RPC_GET_BLOCKS_DIRECT(const currency::COMMAND_RPC_GET_BLOCKS_DIRECT::request& rqt, currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& rsp)
 {

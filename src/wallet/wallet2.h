@@ -46,6 +46,7 @@
 #include "currency_core/pos_mining.h"
 #include "view_iface.h"
 #include "wallet2_base.h"
+#include "decoy_selection.h"
 
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               CURRENCY_HF4_MANDATORY_MIN_COINAGE
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
@@ -147,6 +148,9 @@ namespace tools
     std::unordered_map<crypto::public_key, crypto::key_image> m_pending_key_images; // (out_pk -> ki) pairs of change outputs to be added in watch-only wallet without spend sec key
     uint64_t m_last_pow_block_h = 0;
     std::list<std::pair<uint64_t, wallet_event_t>> m_rollback_events;
+    uint64_t m_last_zc_global_index = 0;
+
+
 
     //variables that not being serialized
     std::atomic<uint64_t> m_last_bc_timestamp = 0;
@@ -154,9 +158,7 @@ namespace tools
     std::atomic<uint64_t> m_last_sync_percent = 0;
     mutable uint64_t m_current_wallet_file_size = 0;
     bool m_use_assets_whitelisting = true;
-    
-    // variables that should be part of state data object but should not be stored during serialization
-    mutable std::atomic<bool> m_whitelist_updated = false;
+
 
     //===============================================================
     template <class t_archive>
@@ -220,7 +222,8 @@ namespace tools
       a & m_rollback_events;
       a & m_whitelisted_assets;
       a & m_use_assets_whitelisting;
-   }
+      a & m_last_zc_global_index;
+    }
   };
   
 
@@ -397,6 +400,7 @@ namespace tools
     void transfer_asset_ownership(const crypto::public_key asset_id, const crypto::public_key& new_owner, currency::transaction& result_tx);
 
     bool daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb);
+    const std::unordered_map<crypto::public_key, wallet_own_asset_context>& get_own_assets() const { return m_own_asset_descriptors; }
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
     void set_pos_utxo_count_limits_for_defragmentation_tx(uint64_t min_outs, uint64_t max_outs); // don't create UTXO defrag. tx if there are less than 'min_outs' outs; don't put more than 'max_outs' outs
     void set_pos_decoys_count_for_defragmentation_tx(size_t decoys_count);
@@ -537,7 +541,6 @@ namespace tools
     void get_transfers(transfer_container& incoming_transfers) const;
     std::string get_transfers_str(bool include_spent = true, bool include_unspent = true, bool show_only_unknown = false, const std::string& filter_asset_ticker = std::string{}) const;
     std::string get_balance_str() const;
-    std::string get_balance_str_raw() const;
 
     // Returns all payments by given id in unspecified order
     void get_payments(const std::string& payment_id, std::list<payment_details>& payments, uint64_t min_height = 0) const;
@@ -658,13 +661,8 @@ namespace tools
 
     bool add_custom_asset_id(const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_descriptor);
     bool delete_custom_asset_id(const crypto::public_key& asset_id);
-    const std::unordered_map<crypto::public_key, currency::asset_descriptor_base>& get_local_whitelist() const;
-    const std::unordered_map<crypto::public_key, currency::asset_descriptor_base>& get_global_whitelist() const;
-    const std::unordered_map<crypto::public_key, tools::wallet_own_asset_context>& get_own_assets() const;
-    
     bool load_whitelisted_tokens_if_not_loaded() const;
     bool load_whitelisted_tokens() const;
-
 
     void set_connectivity_options(unsigned int timeout);
     
@@ -699,9 +697,6 @@ namespace tools
     bool encrypt_buffer(const std::string& buff, std::string& res_buff);
     bool decrypt_buffer(const std::string& buff, std::string& res_buff);
     bool is_in_hardfork_zone(uint64_t hardfork_index) const;
-    
-    //performance inefficient call, suitable only for rare ocasions or super lazy developers
-    bool proxy_to_daemon(const std::string& uri, const std::string& body, int& response_code, std::string& response_body);
 
     construct_tx_param get_default_construct_tx_param();
 
@@ -764,7 +759,7 @@ private:
     bool scan_not_compliant_unconfirmed_txs();
     const currency::transaction& get_transaction_by_id(const crypto::hash& tx_hash);
     void rise_on_transfer2(const wallet_public::wallet_transfer_info& wti);
-    void process_genesis_if_needed(const currency::block& genesis);
+    void process_genesis_if_needed(const currency::block& genesis, const std::vector<uint64_t>* pglobal_indexes);
     bool build_escrow_proposal(bc_services::contract_private_details& ecrow_details, uint64_t fee, uint64_t unlock_time, currency::tx_service_attachment& att, std::vector<uint64_t>& selected_indicies);
     bool prepare_tx_sources(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies);
     bool prepare_tx_sources(size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, const std::vector<uint64_t>& selected_indicies);
@@ -852,6 +847,7 @@ private:
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(uint64_t amount, const std::vector<currency::txout_ref_v> & key_offsets);
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_to_key& intk);
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_zc_input& inzc);
+    uint8_t out_get_mixin_attr(const currency::tx_out_v& out_t);
     const crypto::public_key& out_get_pub_key(const currency::tx_out_v& out_t, std::list<currency::htlc_info>& htlc_info_list);
     bool expand_selection_with_zc_input(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes);
 
@@ -859,6 +855,8 @@ private:
     void remove_transfer_from_amount_gindex_map(uint64_t tid);
     uint64_t get_alias_cost(const std::string& alias);
     detail::split_strategy_id_t get_current_split_strategy();
+    void build_distribution_for_input(decoy_selection_generator& zarcanum_decoy_set_generator, std::vector<uint64_t>& offsets, uint64_t own_index);
+    void select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount & amount_entry, uint64_t own_g_index);
 
     static void wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index);
     static void wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index);
@@ -886,6 +884,7 @@ private:
    
 
     bool m_do_rise_transfer;
+    uint64_t m_max_allowed_output_amount_for_defragmentation_tx;
     uint64_t m_min_utxo_count_for_defragmentation_tx;
     uint64_t m_max_utxo_count_for_defragmentation_tx;
     size_t m_decoys_count_for_defragmentation_tx;
@@ -894,6 +893,7 @@ private:
     uint64_t m_upper_transaction_size_limit; //TODO: auto-calc this value or request from daemon, now use some fixed value
 
     std::atomic<bool> m_stop;
+    mutable std::atomic<bool> m_whitelist_updated = false;
     std::shared_ptr<i_core_proxy> m_core_proxy;
     std::shared_ptr<i_wallet2_callback> m_wcallback;
 
@@ -910,6 +910,8 @@ private:
 
     std::string m_votes_config_path;
     tools::wallet_public::wallet_vote_config m_votes_config;
+
+    uint64_t m_last_known_daemon_height = 0;
 
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;

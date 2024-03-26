@@ -418,11 +418,11 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_get_random_outs2(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::response& res, connection_context& cntx)
+  bool core_rpc_server::on_get_random_outs3(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
     res.status = API_RETURN_CODE_FAIL;
-    if (!m_core.get_blockchain_storage().get_random_outs_for_amounts2(req, res))
+    if (!m_core.get_blockchain_storage().get_random_outs_for_amounts3(req, res))
     {
       return true;
     }

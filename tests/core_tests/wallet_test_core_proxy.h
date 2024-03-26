@@ -26,6 +26,9 @@ struct wallet_test_core_proxy : public tools::i_core_proxy
   virtual bool call_COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN(const currency::COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::request& req, currency::COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::response& res) override;
   virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override;
 
+  const std::vector<uint64_t>& get_tx_gindex(const crypto::hash& tx_id);
+
+
   test_generator::tx_global_indexes m_txs_outs;
   test_generator::blockchain_vector m_blocks;
   test_generator::outputs_index m_oi;
