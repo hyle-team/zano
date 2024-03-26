@@ -976,8 +976,8 @@ namespace currency
         return "(no transactions, the pool is empty)";
       // sort output by receive time
       txs.sort([](const std::pair<crypto::hash, tx_details>& lhs, const std::pair<crypto::hash, tx_details>& rhs) -> bool { return lhs.second.receive_time < rhs.second.receive_time; });
-      ss << "#    | transaction id                                                 | size  | fee       | ins | outs | outs money      | live_time      | max used block   | last failed block | kept by a block?" << ENDL;
-      //     1234  f99fe6d4335fc0ddd69e6880a4d95e0f6ea398de0324a6837021a61c6a31cacd  87157   0.10000111  2000  2000   112000.12345678   d0.h10.m16.s17   123456 <12345..>   123456 <12345..>    YES   
+      ss << "#    | transaction id                                                 | size   | fee       | ins | outs | live_time      | max used block    | last failed block  | ver | kept by a block?" << ENDL;
+      //     1234  f99fe6d4335fc0ddd69e6880a4d95e0f6ea398de0324a6837021a61c6a31cacd  187157   0.10000111  2000  2000   d0.h10.m16.s17   1234567 <12345..>   1234567 <12345..>    2     YES   
       size_t i = 0;
       for (auto& tx : txs)
       {
@@ -985,16 +985,16 @@ namespace currency
         ss << std::left
           << std::setw(4) << i++ << "  "
           << tx.first << "  "
-          << std::setw(5) << txd.blob_size << "   "
+          << std::setw(6) << txd.blob_size << "   "
           << std::setw(10) << print_money_brief(txd.fee) << "  "
           << std::setw(4) << txd.tx.vin.size() << "  "
           << std::setw(4) << txd.tx.vout.size() << "   "
-          << std::right << std::setw(15) << print_money(get_outs_money_amount(txd.tx)) << std::left << "   "
           << std::setw(14) << epee::misc_utils::get_time_interval_string(get_core_time() - txd.receive_time) << "   "
-          << std::setw(6) << txd.max_used_block_height << " "
+          << std::setw(7) << txd.max_used_block_height << " "
           << std::setw(9) << print16(txd.max_used_block_id) << "   "
-          << std::setw(6) << txd.last_failed_height << " "
+          << std::setw(7) << txd.last_failed_height << " "
           << std::setw(9) << print16(txd.last_failed_id) << "    "
+          << std::setw(3) << txd.tx.version << "   "
           << (txd.kept_by_block ? "YES" : "no ")
           << ENDL;
       }

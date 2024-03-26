@@ -1345,7 +1345,7 @@ namespace currency
     std::string object_in_json;
    
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(blob)
+      KV_SERIALIZE_BLOB_AS_BASE64_STRING(blob)
       KV_SERIALIZE(blob_size)
       KV_SERIALIZE(timestamp)
       KV_SERIALIZE(keeper_block)
@@ -1357,7 +1357,7 @@ namespace currency
       KV_SERIALIZE(ins)
       KV_SERIALIZE(extra)
       KV_SERIALIZE(attachments)
-      KV_SERIALIZE(object_in_json)
+      KV_SERIALIZE_BLOB_AS_BASE64_STRING(object_in_json)
     END_KV_SERIALIZE_MAP()
   };
 
