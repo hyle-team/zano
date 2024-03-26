@@ -3780,6 +3780,17 @@ uint64_t blockchain_storage::get_aliases_count() const
   return m_db_aliases.size();
 }
 //------------------------------------------------------------------
+bool blockchain_storage::get_asset_history(const crypto::public_key& asset_id, std::list<asset_descriptor_operation>& result) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  auto as_ptr = m_db_assets.find(asset_id);
+  if (!as_ptr)
+    return false;
+
+  result = *as_ptr;
+  return true;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::get_asset_info(const crypto::public_key& asset_id, asset_descriptor_base& result) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
@@ -5443,7 +5454,6 @@ std::shared_ptr<const transaction_chain_entry> blockchain_storage::find_key_imag
 //---------------------------------------------------------------
 bool blockchain_storage::fill_tx_rpc_details(tx_rpc_extended_info& tei, const transaction& tx, const transaction_chain_entry* ptce, const crypto::hash& h, uint64_t timestamp, bool is_short) const
 {
-  //tei.blob = tx_ptr->tx
   tei.id = epee::string_tools::pod_to_hex(h);
   if (!tei.blob_size)
     tei.blob_size = get_object_blobsize(tx);
@@ -5460,6 +5470,9 @@ bool blockchain_storage::fill_tx_rpc_details(tx_rpc_extended_info& tei, const tr
   fill_tx_rpc_outputs(tei, tx, ptce);
   fill_tx_rpc_payload_items(tei.extra, tx.extra);
   fill_tx_rpc_payload_items(tei.attachments, tx.attachment);
+
+  tei.blob = t_serializable_object_to_blob(tx);
+  tei.object_in_json = obj_to_json_str(tx);
   return true;
 }
 //------------------------------------------------------------------
