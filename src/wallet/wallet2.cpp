@@ -6073,7 +6073,7 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, std::vector<currenc
       {
         daemon_resp = COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response();
         bool r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3(req, daemon_resp);
-        THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs2.bin");
+        THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs3.bin");
         if (daemon_resp.status == API_RETURN_CODE_FAIL)
         {
           if (attempt_count < 10)
