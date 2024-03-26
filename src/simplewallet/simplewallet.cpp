@@ -2113,11 +2113,11 @@ bool simple_wallet::emit_asset(const std::vector<std::string> &args)
   tx_destination_entry td = AUTO_VAL_INIT(td);
   td.addr.push_back(m_wallet->get_account().get_public_address());
   td.amount = amount;
-  td.asset_id = asset_id;
+  td.asset_id = currency::null_pkey;
   std::vector<currency::tx_destination_entry> destinations;
   destinations.push_back(td);
   currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
-  m_wallet->emmit_asset(asset_id, destinations, result_tx);
+  m_wallet->emit_asset(asset_id, destinations, result_tx);
 
   success_msg_writer(true) << "Emitted " << get_transaction_hash(result_tx) << " (unconfirmed) : " << ENDL
     << "Asset ID:     " << asset_id << ENDL

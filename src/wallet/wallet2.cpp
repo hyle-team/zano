@@ -4954,7 +4954,7 @@ void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info
   m_custom_assets[new_asset_id] = ado.descriptor;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::emmit_asset(const crypto::public_key asset_id, std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx)
+void wallet2::emit_asset(const crypto::public_key asset_id, std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx)
 {
 
   auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
@@ -4975,6 +4975,12 @@ void wallet2::emmit_asset(const crypto::public_key asset_id, std::vector<currenc
   ctp.need_at_least_1_zc = true;
   ctp.ado_current_asset_owner = rsp.asset_descriptor.owner;
   //ctp.asset_deploy_control_key = own_asset_entry_it->second.control_key;
+
+  for(auto& dst : ctp.dsts)
+  {
+    if (dst.asset_id == asset_id)
+      dst.asset_id = null_pkey; // emit operation requires null_pkey for emitting asset outputs, fix it ad-hoc here
+  }
 
   finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
