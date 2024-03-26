@@ -85,6 +85,18 @@ namespace epee
     }
     return res;
   }
+
+  // helper for blob-to-base64 serialization
+  inline std::string transfrom_binbuf_to_base64(const std::string& a)
+  {
+    return epee::string_encoding::base64_encode(a);
+  }
+
+  inline std::string transform_base64_to_binbuf(const std::string& a)
+  {
+    return epee::string_encoding::base64_decode(a);
+  }
+
 	//-------------------------------------------------------------------------------------------------------------------
 #pragma pack(push, 1)
   template<class first_t, class second_t>
