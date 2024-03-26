@@ -24,9 +24,10 @@ uint64_t scaler::scale(uint64_t h)
 
 void decoy_selection_generator::init(uint64_t max_h)
 {
+
   load_distribution(g_default_distribution, max_h);
   m_is_initialized = true;
-  
+  m_max = max_h; // distribution INCLUDE m_max, count = m_max + 1
 }
 bool decoy_selection_generator::load_distribution_from_file(const char* path)
 {
@@ -66,6 +67,60 @@ std::vector<uint64_t> decoy_selection_generator::generate_distribution(uint64_t 
   return res;
 }
 
+
+std::vector<uint64_t> decoy_selection_generator::generate_unique_reversed_distribution(uint64_t count)
+{
+  std::set<uint64_t> set_to_extend;
+  generate_unique_reversed_distribution(count, set_to_extend);
+  return std::vector<uint64_t>(set_to_extend.begin(), set_to_extend.end());
+}
+
+std::vector<uint64_t> decoy_selection_generator::generate_unique_reversed_distribution(uint64_t count, uint64_t preincluded_item)
+{
+  std::set<uint64_t> set_to_extend;
+  set_to_extend.insert(preincluded_item);
+  generate_unique_reversed_distribution(count, set_to_extend);
+  return std::vector<uint64_t>(set_to_extend.begin(), set_to_extend.end());
+}
+
+#define DECOY_SELECTION_GENERATOR_MAX_ITERATIONS   1000000
+
+void decoy_selection_generator::generate_unique_reversed_distribution(uint64_t count, std::set<uint64_t>& set_to_extend)
+{
+  if (count + set_to_extend.size() > m_max)
+  {
+    throw std::runtime_error("generate_distribution_set with unexpected count");
+  }
+
+  size_t attempt_count = 0;
+  while (set_to_extend.size() != count)
+  {
+    attempt_count++;
+    if (attempt_count > DECOY_SELECTION_GENERATOR_MAX_ITERATIONS)
+    {
+      throw std::runtime_error("generate_distribution_set: attempt_count hit DECOY_SELECTION_GENERATOR_MAX_ITERATIONS");
+    }
+
+    uint64_t r = 0;
+    crypto::generate_random_bytes(sizeof(r), &r);
+    double r_ = map_uint_to_double(r);
+    auto it = m_distribution_mapping.upper_bound(r_);
+    if (it == m_distribution_mapping.end())
+    {
+      throw(std::runtime_error(std::string("_r not found in m_distribution_mapping: ") + std::to_string(r_)));
+    }
+    uint64_t h = it->second;
+    if (it != m_distribution_mapping.begin())
+    {
+      uint64_t h_0 = (--it)->second;
+      crypto::generate_random_bytes(sizeof(r), &r);
+      h = h_0 + r % (h - h_0) + 1;
+    }
+    //scale from nominal to max_h
+    set_to_extend.insert(m_max - h);
+  }
+}
+
 uint64_t get_distance(const std::vector<decoy_selection_generator::distribution_entry> entries, size_t i)
 {
   if (i == 0)
@@ -79,7 +134,8 @@ bool decoy_selection_generator::load_distribution(const std::vector<decoy_select
   //do prescale of distribution
   std::vector<decoy_selection_generator::distribution_entry> derived_distribution;
   scaler scl;
-  scl.config_scale(original_distribution.back().h, max_h);
+  uint64_t adjustment_value = original_distribution[0].h;
+  scl.config_scale(original_distribution.back().h - adjustment_value, max_h);
 
   uint64_t  last_scaled_h = 0;
   std::list<double> last_scaled_array;
@@ -87,7 +143,7 @@ bool decoy_selection_generator::load_distribution(const std::vector<decoy_select
 
   for (size_t i = 0; i <= original_distribution.size(); i++)
   {
-    if (i == original_distribution.size()  || (scl.scale(original_distribution[i].h) != last_scaled_h && last_scaled_array.size()))
+    if (i == original_distribution.size()  || (scl.scale(original_distribution[i].h - adjustment_value) != last_scaled_h && last_scaled_array.size()))
     {
       //put avg to data_scaled
       double summ = 0;
@@ -96,7 +152,7 @@ bool decoy_selection_generator::load_distribution(const std::vector<decoy_select
         summ += item;
       }
       double avg = summ / last_scaled_array.size();
-      uint64_t prev_h = scl.scale(original_distribution[i - 1].h);
+      uint64_t prev_h = scl.scale(original_distribution[i - 1].h - adjustment_value);
       derived_distribution.push_back(decoy_selection_generator::distribution_entry{ prev_h, avg});
       last_scaled_array.clear();
     }
@@ -105,7 +161,7 @@ bool decoy_selection_generator::load_distribution(const std::vector<decoy_select
       break;
     }
     last_scaled_array.push_back(original_distribution[i].v);
-    last_scaled_h = scl.scale(original_distribution[i].h);
+    last_scaled_h = scl.scale(original_distribution[i].h - adjustment_value);
   }
   
 

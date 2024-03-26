@@ -48,7 +48,7 @@
   #define TX_POOL_SCAN_INTERVAL             1
 #endif
 
-#define HTTP_PROXY_TIMEOUT                2000
+#define HTTP_PROXY_TIMEOUT                4000
 #define HTTP_PROXY_ATTEMPTS_COUNT         1
 
 const command_line::arg_descriptor<bool> arg_alloc_win_console  ( "alloc-win-console", "Allocates debug console with GUI", false );

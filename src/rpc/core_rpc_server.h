@@ -50,7 +50,7 @@ namespace currency
     bool on_stop_mining(const COMMAND_RPC_STOP_MINING::request& req, COMMAND_RPC_STOP_MINING::response& res, connection_context& cntx);
     bool on_get_random_outs(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY::response& res, connection_context& cntx);
     bool on_get_random_outs1(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res, connection_context& cntx);
-    bool on_get_random_outs2(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::response& res, connection_context& cntx);
+    bool on_get_random_outs3(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& res, connection_context& cntx);
     bool on_get_info(const COMMAND_RPC_GET_INFO::request& req, COMMAND_RPC_GET_INFO::response& res, connection_context& cntx);
     bool on_set_maintainers_info(const COMMAND_RPC_SET_MAINTAINERS_INFO::request& req, COMMAND_RPC_SET_MAINTAINERS_INFO::response& res, connection_context& cntx);
     bool on_get_tx_pool(const COMMAND_RPC_GET_TX_POOL::request& req, COMMAND_RPC_GET_TX_POOL::response& res, connection_context& cntx);
@@ -112,7 +112,7 @@ namespace currency
       MAP_URI_AUTO_BIN2("/get_o_indexes.bin",         on_get_indexes,                 COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES)      
       MAP_URI_AUTO_BIN2("/getrandom_outs.bin",        on_get_random_outs,             COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY)
       MAP_URI_AUTO_BIN2("/getrandom_outs1.bin",       on_get_random_outs1,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS)
-      MAP_URI_AUTO_BIN2("/getrandom_outs2.bin",       on_get_random_outs2,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2)
+      MAP_URI_AUTO_BIN2("/getrandom_outs3.bin",       on_get_random_outs3,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3)
       MAP_URI_AUTO_BIN2("/set_maintainers_info.bin",  on_set_maintainers_info,        COMMAND_RPC_SET_MAINTAINERS_INFO)
       MAP_URI_AUTO_BIN2("/get_tx_pool.bin",           on_get_tx_pool,                 COMMAND_RPC_GET_TX_POOL)
       MAP_URI_AUTO_BIN2("/check_keyimages.bin",       on_check_keyimages,             COMMAND_RPC_CHECK_KEYIMAGES) 
@@ -146,7 +146,7 @@ namespace currency
         MAP_JON_RPC   ("get_pool_info",               on_get_pool_info,               COMMAND_RPC_GET_POOL_INFO)
         MAP_JON_RPC   ("getrandom_outs",              on_get_random_outs,             COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY)
         MAP_JON_RPC   ("getrandom_outs1",             on_get_random_outs1,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS)
-        MAP_JON_RPC   ("getrandom_outs2",             on_get_random_outs2,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2)
+        MAP_JON_RPC   ("getrandom_outs3",             on_get_random_outs3,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3)
         MAP_JON_RPC   ("get_votes",                   on_get_votes,                   COMMAND_RPC_GET_VOTES)
         //assets api
         MAP_JON_RPC  ("get_asset_info",               on_get_asset_info,              COMMAND_RPC_GET_ASSET_INFO)

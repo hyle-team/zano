@@ -38,25 +38,25 @@ POP_VS_WARNINGS
         catch (const tools::error::daemon_busy& e) \
         { \
           er.code = WALLET_RPC_ERROR_CODE_DAEMON_IS_BUSY; \
-          er.message = e.what(); \
+          er.message = std::string("WALLET_RPC_ERROR_CODE_DAEMON_IS_BUSY") + e.what(); \
           return false; \
         } \
         catch (const tools::error::not_enough_money& e) \
         { \
-          er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR; \
-          er.message = e.error_code(); \
+          er.code = WALLET_RPC_ERROR_CODE_NOT_ENOUGH_MONEY; \
+          er.message = std::string("WALLET_RPC_ERROR_CODE_NOT_ENOUGH_MONEY") + e.error_code(); \
           return false; \
         } \
         catch (const tools::error::wallet_error& e) \
         { \
           er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR; \
-          er.message = e.error_code(); \
+          er.message = std::string("WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR") + e.error_code(); \
           return false; \
         } \
         catch (const std::exception& e) \
         { \
           er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR; \
-          er.message = e.what(); \
+          er.message = std::string("WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR") + e.what(); \
           return false; \
         } \
         catch (...) \
