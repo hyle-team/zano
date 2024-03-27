@@ -885,7 +885,7 @@ namespace currency
   {
     //not the best implementation at this time, sorry :(
 
-    if (m_db_black_tx_list.get(get_transaction_hash(txd.tx)))
+    if (is_tx_blacklisted(get_transaction_hash(txd.tx)))
       return false;
 
     //check is ring_signature already checked ?
@@ -976,8 +976,8 @@ namespace currency
         return "(no transactions, the pool is empty)";
       // sort output by receive time
       txs.sort([](const std::pair<crypto::hash, tx_details>& lhs, const std::pair<crypto::hash, tx_details>& rhs) -> bool { return lhs.second.receive_time < rhs.second.receive_time; });
-      ss << "#    | transaction id                                                 | size   | fee       | ins | outs | live_time      | max used block    | last failed block  | ver | kept by a block?" << ENDL;
-      //     1234  f99fe6d4335fc0ddd69e6880a4d95e0f6ea398de0324a6837021a61c6a31cacd  187157   0.10000111  2000  2000   d0.h10.m16.s17   1234567 <12345..>   1234567 <12345..>    2     YES   
+      ss << "#    | transaction id                                                 | size   | fee       | ins | outs | live_time      | max used block    | last failed block  | ver | status                     " << ENDL;
+      //     1234  f99fe6d4335fc0ddd69e6880a4d95e0f6ea398de0324a6837021a61c6a31cacd  187157   0.10000111  2000  2000   d0.h10.m16.s17   1234567 <12345..>   1234567 <12345..>    2     kept_by_block BLACKLISTED
       size_t i = 0;
       for (auto& tx : txs)
       {
@@ -995,7 +995,7 @@ namespace currency
           << std::setw(7) << txd.last_failed_height << " "
           << std::setw(9) << print16(txd.last_failed_id) << "    "
           << std::setw(3) << txd.tx.version << "   "
-          << (txd.kept_by_block ? "YES" : "no ")
+          << (txd.kept_by_block ? "kept_by_block " : "") << (is_tx_blacklisted(tx.first) ? "BLACKLISTED " : "")
           << ENDL;
       }
       return ss.str();
@@ -1322,6 +1322,11 @@ namespace currency
       take_tx(id, tx, blob_size, fee);
       LOG_PRINT_L0("tx " << id << " was incompatible with the hardfork rules and removed");
     }
+  }
+  //---------------------------------------------------------------------------------
+  bool tx_memory_pool::is_tx_blacklisted(const crypto::hash& id) const
+  {
+    return m_db_black_tx_list.get(id) != nullptr;
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::load_keyimages_cache()

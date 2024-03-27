@@ -141,6 +141,8 @@ namespace currency
 
     void remove_incompatible_txs(); // made public to be called after the BCS is loaded and hardfork info is ready
 
+    bool is_tx_blacklisted(const crypto::hash& id) const;
+
   private:
     bool on_tx_add(crypto::hash tx_id, const transaction& tx, bool kept_by_block);
     bool on_tx_remove(const crypto::hash &tx_id, const transaction& tx, bool kept_by_block);
