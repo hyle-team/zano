@@ -6414,11 +6414,16 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       tx.signatures.clear();
       tx.proofs.clear();
     }
-
+    currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
     //std::vector<crypto::point_t&> tx_outs_commitments;
     if (!m_is_in_checkpoint_zone)
     {
-      auto cleanup = [&](){ purge_block_data_from_blockchain(bl, tx_processed_count); bvc.m_verification_failed = true; };
+      auto cleanup = [&](){ 
+        bool add_res = m_tx_pool.add_tx(tx, tvc, true, true);
+        m_tx_pool.add_transaction_to_black_list(tx);
+        purge_block_data_from_blockchain(bl, tx_processed_count); 
+        bvc.m_verification_failed = true; 
+        };
 
       CHECK_AND_ASSERT_MES_CUSTOM(collect_rangeproofs_data_from_tx(tx, tx_id, range_proofs_agregated), false, cleanup(),
         "block " << id << ", tx " << tx_id << ": collect_rangeproofs_data_from_tx failed");
@@ -6435,7 +6440,6 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     if(!check_tx_inputs(tx, tx_id))
     {
       LOG_PRINT_L0("Block with id: " << id << " has at least one transaction (id: " << tx_id << ") with wrong inputs.");
-      currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
       if (taken_from_pool)
       {
         bool add_res = m_tx_pool.add_tx(tx, tvc, true, true);
