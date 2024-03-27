@@ -143,6 +143,10 @@ namespace currency
 
     bool is_tx_blacklisted(const crypto::hash& id) const;
 
+#ifdef TX_POOL_USE_UNSECURE_TEST_FUNCTIONS
+    void unsecure_disable_tx_validation_on_addition(bool validation_disabled) { m_unsecure_disable_tx_validation_on_addition = validation_disabled; }
+#endif
+
   private:
     bool on_tx_add(crypto::hash tx_id, const transaction& tx, bool kept_by_block);
     bool on_tx_remove(const crypto::hash &tx_id, const transaction& tx, bool kept_by_block);
@@ -197,6 +201,7 @@ namespace currency
     key_image_cache m_key_images;
     mutable epee::critical_section m_remove_stuck_txs_lock;
 
+    bool m_unsecure_disable_tx_validation_on_addition = false;
   };
 }
 

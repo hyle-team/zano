@@ -104,6 +104,20 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::add_tx(const transaction &tx, const crypto::hash &id, uint64_t blob_size, tx_verification_context& tvc, bool kept_by_block, bool from_core)
   {
+    // ------------------ UNSECURE CODE FOR TESTS ---------------------
+    if (m_unsecure_disable_tx_validation_on_addition)
+    {
+      uint64_t tx_fee = 0;
+      CHECK_AND_ASSERT_MES(get_tx_fee(tx, tx_fee), false, "get_tx_fee failed");
+      do_insert_transaction(tx, id, blob_size, kept_by_block, tx_fee, null_hash, 0);
+      tvc.m_added_to_pool = true;
+      tvc.m_should_be_relayed = true;
+      tvc.m_verification_failed = false;
+      tvc.m_verification_impossible = false;
+      return true;
+    }
+    // ---------------- END OF UNSECURE CODE FOR TESTS -------------------
+
     bool r = false;
 
     // defaults
