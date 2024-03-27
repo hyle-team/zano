@@ -983,7 +983,7 @@ namespace currency
     res.seed = currency::ethash_epoch_to_seed(currency::ethash_height_to_epoch(res.height));
 
     res.status = API_RETURN_CODE_OK;
-
+    LOG_PRINT_L1("COMMAND_RPC_GETBLOCKTEMPLATE OK, response block: " << ENDL << currency::obj_to_json_str(resp.b));
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
