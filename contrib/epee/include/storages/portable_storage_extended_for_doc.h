@@ -42,6 +42,8 @@ namespace epee
     class portable_storage_extended_doc: public portable_storage
     {
     public:
+      using use_descriptions = std::true_type;
+
       void set_entry_description(hsection hparent_section, const std::string& name, const std::string& description)
       {
         if (!hparent_section)

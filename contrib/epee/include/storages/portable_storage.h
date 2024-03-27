@@ -49,6 +49,7 @@ namespace epee
     {
     public:
       //typedef epee::serialization::hsection hsection;
+      using use_descriptions = std::false_type;
       typedef t_section* hsection;
       typedef epee::serialization::harray  harray;
       typedef storage_entry meta_entry;

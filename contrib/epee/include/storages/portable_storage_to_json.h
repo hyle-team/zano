@@ -109,11 +109,15 @@ namespace epee
 
       template<class t_stream>
       static void handle_obj_begin(t_stream& strm, size_t indent)
-      {}
+      {
+        strm << "{";
+      }
 
       template<class t_stream>
       static void handle_obj_end(t_stream& strm, size_t indent)
-      {}
+      {
+        strm << "}";
+      }
 
       template<class t_stream>
       static void handle_print_key(t_stream& strm, const std::string& key, size_t indent)
@@ -125,11 +129,15 @@ namespace epee
 
       template<class t_stream>
       static void handle_section_entry_separator(t_stream& strm, size_t indent)
-      {}
+      {
+        strm << ",";
+      }
 
       template<class t_stream>
       static void handle_array_entry_separator(t_stream& strm, size_t indent)
-      {}
+      {
+        strm << ",";
+      }
 
       template<class t_stream>
       static void handle_line_break(t_stream& strm, size_t indent)

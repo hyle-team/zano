@@ -315,10 +315,17 @@ namespace epee
     struct selector<true>
     {
       template<class t_type, class t_storage>
-      static bool serialize(const t_type& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname, bool doc_mode = false, const t_type& doc_substitute = t_type(), const std::string& description = std::string())
+      static bool serialize(const t_type& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
       {
         stg.set_entry_description(hparent_section, pname, description);
         return kv_serialize( (doc_mode ? doc_substitute:d), stg, hparent_section, pname);
+      }
+      //bool doc_mode = false, const t_type& doc_substitute = t_type(), const std::string& description = std::string()
+      template<class t_type, class t_storage>
+      static bool set_descr(t_storage& stg, typename t_storage::hsection hparent_section, const char* pname, const std::string& description = std::string(), const t_type& doc_substitute = t_type())
+      {
+        stg.set_entry_description(hparent_section, pname, description);
+        return kv_serialize((doc_mode ? doc_substitute : d), stg, hparent_section, pname);
       }
 
       template<class t_type, class t_storage>

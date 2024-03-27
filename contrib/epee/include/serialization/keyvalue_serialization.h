@@ -72,7 +72,15 @@ public: \
   epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name, auto_doc_mode, substitute, description);
 
 #define KV_SERIALIZE_N_DOC2(varialble, val_name) \
-  {using var_type = decltype(this_ref.varialble); epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name, auto_doc_mode, 
+  {using var_type = decltype(this_ref.varialble); \
+     epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name); \
+     if constexpr (t_storage::use_descriptions::value) \
+     { \
+       epee::serialization::selector<is_store>::set_descr(this_ref.varialble, stg, hparent_section, val_name); \
+     } \
+  }
+     
+
 
 
   //substitute, description);
