@@ -294,3 +294,11 @@ struct wallet_and_sweep_below : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+
+struct block_template_blacklist_test : public wallet_test
+{
+  block_template_blacklist_test();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};

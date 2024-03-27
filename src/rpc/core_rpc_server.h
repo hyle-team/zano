@@ -75,6 +75,7 @@ namespace currency
     bool on_aliases_by_address(const COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& req, COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_get_alias_reward(const COMMAND_RPC_GET_ALIAS_REWARD::request& req, COMMAND_RPC_GET_ALIAS_REWARD::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);  
     bool on_reset_transaction_pool(const COMMAND_RPC_RESET_TX_POOL::request& req, COMMAND_RPC_RESET_TX_POOL::response& res, connection_context& cntx);
+    bool on_remove_tx_from_pool(const COMMAND_RPC_REMOVE_TX_FROM_POOL::request& req, COMMAND_RPC_REMOVE_TX_FROM_POOL::response& res, connection_context& cntx);
     bool on_get_pos_mining_details(const COMMAND_RPC_GET_POS_MINING_DETAILS::request& req, COMMAND_RPC_GET_POS_MINING_DETAILS::response& res, connection_context& cntx);
     bool on_get_current_core_tx_expiration_median(const COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::request& req, COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::response& res, connection_context& cntx);
     bool on_get_tx_details(const COMMAND_RPC_GET_TX_DETAILS::request& req, COMMAND_RPC_GET_TX_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
@@ -156,6 +157,7 @@ namespace currency
         MAP_JON_RPC   ("get_alt_blocks_details",      on_get_alt_blocks_details,      COMMAND_RPC_GET_ALT_BLOCKS_DETAILS)
         //
         MAP_JON_RPC   ("reset_transaction_pool",      on_reset_transaction_pool,      COMMAND_RPC_RESET_TX_POOL)
+        MAP_JON_RPC   ("remove_tx_from_pool",         on_remove_tx_from_pool,         COMMAND_RPC_REMOVE_TX_FROM_POOL)
         MAP_JON_RPC   ("get_current_core_tx_expiration_median", on_get_current_core_tx_expiration_median, COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN)
         //
         MAP_JON_RPC_WE("marketplace_global_get_offers_ex", on_get_offers_ex,          COMMAND_RPC_GET_OFFERS_EX)        
