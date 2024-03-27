@@ -27,12 +27,18 @@
 #include "wallet/plain_wallet_api.h"
 #include "wallet/view_iface.h"
 
+
 void test_plain_wallet()
 {
-  std::string res = plain_wallet::init("195.201.107.230", "33336", "E:\\tmp\\", 0);
+  //std::string res = plain_wallet::init("195.201.107.230", "33336", "E:\\tmp\\", 0);
+  std::string res = plain_wallet::init("127.0.0.1", "12111", "C:\\Users\\roky\\home\\", 0);
   
   uint64_t instance_id = 0;
-  res = plain_wallet::open("test.zan", "111");
+  res = plain_wallet::open("test_restored.zan", "111");
+  //res = plain_wallet::restore("heart level clear fate sorrow childhood sent fate ceiling party third steel came ask mix neither message already almost vast date glide tumble color okay space",
+  //  "test_restored.zan", "111", "");
+
+
   while(true)
   {
     epee::misc_utils::sleep_no_w(2000);
@@ -44,9 +50,23 @@ void test_plain_wallet()
   }
 
 
-  std::string invoke_body = "{\"method\":\"get_recent_txs_and_info\",\"params\":{\"offset\":0,\"count\":30,\"update_provision_info\":true}}";
-  
-  res = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+  std::string invoke_body = "{\"method\":\"store\",\"params\":{}}";
+  //std::string res1 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
+  invoke_body = "{\"method\":\"get_recent_txs_and_info\",\"params\":{\"offset\":0,\"count\":30,\"update_provision_info\":true}}";  
+  std::string res2 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
+  invoke_body = "{\"method\":\"getbalance\",\"params\":{}}";
+  std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
+
+  invoke_body = "{\"method\":\"getbalance\",\"params\":{}}";
+  std::string res4 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
+
+  invoke_body = "{\r\n  \"method\": \"transfer\",\r\n  \"params\": {\r\n    \"destinations\": [\r\n      {\r\n        \"amount\": \"1000000000000\",\r\n        \"address\": \"ZxD9oVwGwW6ULix9Pqttnr7JDpaoLvDVA1KJ9eA9KRxPMRZT5X7WwtU94XH1Z6q6XTMxNbHmbV2xfZ429XxV6fST2DxEg4BQV\"  }\r\n    ],\r\n    \"fee\": 10000000000,\r\n    \"mixin\": 10,\r\n    \"payment_id\": \"\",\r\n    \"comment\": \"\",\r\n    \"push_payer\": false,\r\n    \"hide_receiver\": true\r\n  }\r\n}";
+  std::string res5 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
   LOG_PRINT_L0(res);
 
 }
@@ -56,10 +76,10 @@ int main(int argc, char** argv)
 {
   epee::string_tools::set_module_name_and_folder(argv[0]);
   epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
-  epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
-  epee::log_space::log_singletone::add_logger(LOGGER_FILE,
-    epee::log_space::log_singletone::get_default_log_file().c_str(),
-    epee::log_space::log_singletone::get_default_log_folder().c_str());
+  //epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
+  //epee::log_space::log_singletone::add_logger(LOGGER_FILE,
+  //  epee::log_space::log_singletone::get_default_log_file().c_str(),
+  //  epee::log_space::log_singletone::get_default_log_folder().c_str());
 
   test_plain_wallet();
   //parse_weird_tx();

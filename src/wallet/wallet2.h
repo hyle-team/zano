@@ -46,6 +46,7 @@
 #include "currency_core/pos_mining.h"
 #include "view_iface.h"
 #include "wallet2_base.h"
+#include "decoy_selection.h"
 
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               CURRENCY_HF4_MANDATORY_MIN_COINAGE
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
@@ -147,6 +148,9 @@ namespace tools
     std::unordered_map<crypto::public_key, crypto::key_image> m_pending_key_images; // (out_pk -> ki) pairs of change outputs to be added in watch-only wallet without spend sec key
     uint64_t m_last_pow_block_h = 0;
     std::list<std::pair<uint64_t, wallet_event_t>> m_rollback_events;
+    uint64_t m_last_zc_global_index = 0;
+
+
 
     //variables that not being serialized
     std::atomic<uint64_t> m_last_bc_timestamp = 0;
@@ -218,6 +222,7 @@ namespace tools
       a & m_rollback_events;
       a & m_whitelisted_assets;
       a & m_use_assets_whitelisting;
+      a & m_last_zc_global_index;
     }
   };
   
@@ -389,7 +394,7 @@ namespace tools
     bool check_available_sources(std::list<uint64_t>& amounts);
 
     void deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id);
-    void emmit_asset(const crypto::public_key asset_id, std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx);
+    void emit_asset(const crypto::public_key asset_id, std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx);
     void update_asset(const crypto::public_key asset_id, const currency::asset_descriptor_base new_descriptor, currency::transaction& result_tx);
     void burn_asset(const crypto::public_key asset_id, uint64_t amount_to_burn, currency::transaction& result_tx);
     void transfer_asset_ownership(const crypto::public_key asset_id, const crypto::public_key& new_owner, currency::transaction& result_tx);
@@ -754,7 +759,7 @@ private:
     bool scan_not_compliant_unconfirmed_txs();
     const currency::transaction& get_transaction_by_id(const crypto::hash& tx_hash);
     void rise_on_transfer2(const wallet_public::wallet_transfer_info& wti);
-    void process_genesis_if_needed(const currency::block& genesis);
+    void process_genesis_if_needed(const currency::block& genesis, const std::vector<uint64_t>* pglobal_indexes);
     bool build_escrow_proposal(bc_services::contract_private_details& ecrow_details, uint64_t fee, uint64_t unlock_time, currency::tx_service_attachment& att, std::vector<uint64_t>& selected_indicies);
     bool prepare_tx_sources(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies);
     bool prepare_tx_sources(size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, const std::vector<uint64_t>& selected_indicies);
@@ -850,6 +855,8 @@ private:
     void remove_transfer_from_amount_gindex_map(uint64_t tid);
     uint64_t get_alias_cost(const std::string& alias);
     detail::split_strategy_id_t get_current_split_strategy();
+    void build_distribution_for_input(decoy_selection_generator& zarcanum_decoy_set_generator, std::vector<uint64_t>& offsets, uint64_t own_index);
+    void select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount & amount_entry, uint64_t own_g_index);
 
     static void wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index);
     static void wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index);
@@ -877,9 +884,13 @@ private:
    
 
     bool m_do_rise_transfer;
+    
+    bool m_defragmentation_tx_enabled;
+    uint64_t m_max_allowed_output_amount_for_defragmentation_tx;
     uint64_t m_min_utxo_count_for_defragmentation_tx;
     uint64_t m_max_utxo_count_for_defragmentation_tx;
     size_t m_decoys_count_for_defragmentation_tx;
+    
     size_t m_required_decoys_count;
     pending_ki_file_container_t m_pending_key_images_file_container;
     uint64_t m_upper_transaction_size_limit; //TODO: auto-calc this value or request from daemon, now use some fixed value
@@ -902,6 +913,8 @@ private:
 
     std::string m_votes_config_path;
     tools::wallet_public::wallet_vote_config m_votes_config;
+
+    uint64_t m_last_known_daemon_height = 0;
 
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;

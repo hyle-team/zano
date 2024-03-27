@@ -161,12 +161,10 @@ namespace currency
 
     struct request
     {
-      bool need_global_indexes;
       uint64_t minimum_height;
       std::list<crypto::hash> block_ids; //*first 10 blocks id goes sequential, next goes in pow(2,n) offset, like 2, 4, 8, 16, 32, 64 and so on, and the last one is always genesis block */
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(need_global_indexes)
         KV_SERIALIZE(minimum_height)
         KV_SERIALIZE_CONTAINER_POD_AS_BLOB(block_ids)
       END_KV_SERIALIZE_MAP()
@@ -382,6 +380,11 @@ namespace currency
       END_KV_SERIALIZE_MAP()
     };
 
+
+#define RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_COINBASE                       0x0000000000000001LL 
+#define RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_NOT_ALLOWED                    0x0000000000000002LL 
+#define RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_POS_COINBASE                   0x0000000000000004LL 
+
 #pragma pack (push, 1)
     struct out_entry
     {
@@ -397,12 +400,13 @@ namespace currency
       crypto::public_key concealing_point;  // premultiplied by 1/8
       crypto::public_key amount_commitment; // premultiplied by 1/8
       crypto::public_key blinded_asset_id;  // premultiplied by 1/8
+      uint64_t flags;
     };
 #pragma pack(pop)
 
     struct outs_for_amount
     {
-      uint64_t amount;
+      uint64_t amount = 0;
       std::list<out_entry> outs;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -422,18 +426,16 @@ namespace currency
     };
   };
   //-----------------------------------------------
-  struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2
+  struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3
   {
     struct offsets_distribution
     {
       uint64_t amount; //if amount is 0 then lookup in post-zarcanum zone only, if not 0 then pre-zarcanum only
-      std::vector<uint64_t> offsets; //[i] = height, estimated location where to pickup output of transaction
-      uint64_t own_global_index; //index to exclude from selection
+      std::vector<uint64_t> global_offsets; //[i] = global_index to pick up
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(amount)
-        KV_SERIALIZE(offsets)
-        KV_SERIALIZE(own_global_index)
+        KV_SERIALIZE(global_offsets)
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1248,6 +1250,28 @@ namespace currency
     };
   };
 
+  struct COMMAND_RPC_REMOVE_TX_FROM_POOL
+  {
+
+    struct request
+    {
+      std::list<std::string> tx_to_remove;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tx_to_remove)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
   struct COMMAND_RPC_GET_POS_MINING_DETAILS
   {    
     struct request
@@ -1342,7 +1366,7 @@ namespace currency
     std::string object_in_json;
    
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(blob)
+      KV_SERIALIZE_BLOB_AS_BASE64_STRING(blob)
       KV_SERIALIZE(blob_size)
       KV_SERIALIZE(timestamp)
       KV_SERIALIZE(keeper_block)
@@ -1354,7 +1378,7 @@ namespace currency
       KV_SERIALIZE(ins)
       KV_SERIALIZE(extra)
       KV_SERIALIZE(attachments)
-      KV_SERIALIZE(object_in_json)
+      KV_SERIALIZE_BLOB_AS_BASE64_STRING(object_in_json)
     END_KV_SERIALIZE_MAP()
   };
 

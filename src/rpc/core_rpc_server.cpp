@@ -289,7 +289,7 @@ namespace currency
     }
 
     blockchain_storage::blocks_direct_container bs;
-    if(!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT, req.minimum_height, req.need_global_indexes))
+    if(!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT, req.minimum_height))
     {
       res.status = API_RETURN_CODE_FAIL;
       return false;
@@ -326,7 +326,7 @@ namespace currency
     }
 
     blockchain_storage::blocks_direct_container bs;
-    if (!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT, req.minimum_height, req.need_global_indexes))
+    if (!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT, req.minimum_height))
     {
       res.status = API_RETURN_CODE_FAIL;
       return false;
@@ -336,21 +336,15 @@ namespace currency
     {
       res.blocks.resize(res.blocks.size()+1);
       res.blocks.back().block = block_to_blob(b.first->bl);
-      if (req.need_global_indexes)
-      {
-        CHECK_AND_ASSERT_MES(b.third.get(), false, "Internal error on handling COMMAND_RPC_GET_BLOCKS_FAST: b.third is empty, ie coinbase info is not prepared");
-        res.blocks.back().coinbase_global_outs = b.third->m_global_output_indexes;
-        res.blocks.back().tx_global_outs.resize(b.second.size());
-      }
+      CHECK_AND_ASSERT_MES(b.third.get(), false, "Internal error on handling COMMAND_RPC_GET_BLOCKS_FAST: b.third is empty, ie coinbase info is not prepared");
+      res.blocks.back().coinbase_global_outs = b.third->m_global_output_indexes;
+      res.blocks.back().tx_global_outs.resize(b.second.size());
       size_t i = 0;
       
       BOOST_FOREACH(auto& t, b.second)
       {
         res.blocks.back().txs.push_back(tx_to_blob(t->tx));
-        if (req.need_global_indexes)
-        {
-          res.blocks.back().tx_global_outs[i].v = t->m_global_output_indexes;
-        }
+        res.blocks.back().tx_global_outs[i].v = t->m_global_output_indexes;
         i++;
       }
     }
@@ -424,11 +418,11 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_get_random_outs2(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS2::response& res, connection_context& cntx)
+  bool core_rpc_server::on_get_random_outs3(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
     res.status = API_RETURN_CODE_FAIL;
-    if (!m_core.get_blockchain_storage().get_random_outs_for_amounts2(req, res))
+    if (!m_core.get_blockchain_storage().get_random_outs_for_amounts3(req, res))
     {
       return true;
     }
@@ -989,7 +983,7 @@ namespace currency
     res.seed = currency::ethash_epoch_to_seed(currency::ethash_height_to_epoch(res.height));
 
     res.status = API_RETURN_CODE_OK;
-
+    LOG_PRINT_L1("COMMAND_RPC_GETBLOCKTEMPLATE OK, response block: " << ENDL << currency::obj_to_json_str(resp.b));
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1336,6 +1330,20 @@ namespace currency
   bool core_rpc_server::on_reset_transaction_pool(const COMMAND_RPC_RESET_TX_POOL::request& req, COMMAND_RPC_RESET_TX_POOL::response& res, connection_context& cntx)
   {
     m_core.get_tx_pool().purge_transactions();
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_remove_tx_from_pool(const COMMAND_RPC_REMOVE_TX_FROM_POOL::request& req, COMMAND_RPC_REMOVE_TX_FROM_POOL::response& res, connection_context& cntx)
+  {
+    for (const auto& tx_id_str : req.tx_to_remove)
+    {
+      crypto::hash tx_id = epee::transform_str_to_t_pod<crypto::hash>(tx_id_str);
+      currency::transaction tx; size_t dummy1 = 0; uint64_t dummy2 = 0;
+      m_core.get_tx_pool().take_tx(tx_id, tx, dummy1, dummy2);
+    }
+
     res.status = API_RETURN_CODE_OK;
     return true;
   }

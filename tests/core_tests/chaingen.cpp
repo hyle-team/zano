@@ -1,10 +1,8 @@
-// Copyright (c) 2014-2022 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
-#define USE_INSECURE_RANDOM_RPNG_ROUTINES // turns on pseudorandom number generator manupulations for tests
 
 #include "chaingen.h"
 
@@ -553,12 +551,16 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
       //skip genesis
       currency::block_direct_data_entry bdde = AUTO_VAL_INIT(bdde);
       std::shared_ptr<block_extended_info> bptr(new block_extended_info());
-      bptr->bl = b->b;
+      bptr->bl = b->b;      
       bdde.block_ptr = bptr;
+      std::shared_ptr<transaction_chain_entry> coinbase_tx_ptr(new transaction_chain_entry());
+      coinbase_tx_ptr->m_global_output_indexes = get_tx_gindex_from_map(currency::get_transaction_hash(b->b.miner_tx), txs_outs);
+      bdde.coinbase_ptr = coinbase_tx_ptr;
       for (auto& tx : b->m_transactions)
       {
         std::shared_ptr<transaction_chain_entry> tx_ptr(new transaction_chain_entry());
         tx_ptr->tx = tx;
+        tx_ptr->m_global_output_indexes = get_tx_gindex_from_map(currency::get_transaction_hash(tx), txs_outs);
         bdde.txs_ptr.push_back(tx_ptr);
       }
 
