@@ -1340,8 +1340,8 @@ namespace currency
     for (const auto& tx_id_str : req.tx_to_remove)
     {
       crypto::hash tx_id = epee::transform_str_to_t_pod<crypto::hash>(tx_id_str);
-      currency::transaction tx; uint64_t dummy1 = 0; uint64_t dummy2 = 0;
-      m_core.get_tx_pool().take_tx(tx_id,tx, dummy1, dummy1);
+      currency::transaction tx; size_t dummy1 = 0; uint64_t dummy2 = 0;
+      m_core.get_tx_pool().take_tx(tx_id, tx, dummy1, dummy1);
     }
 
     res.status = API_RETURN_CODE_OK;
