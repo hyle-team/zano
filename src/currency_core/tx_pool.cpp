@@ -224,13 +224,19 @@ namespace currency
     }
     TIME_MEASURE_FINISH_PD(check_inputs_time);
 
-    TIME_MEASURE_START_PD(check_post_hf4_balance);
     if (tx.version > TRANSACTION_VERSION_PRE_HF4)
     {
+      TIME_MEASURE_START_PD(check_post_hf4_balance);
       r = check_tx_balance(tx, id);
       CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "post-HF4 tx: balance proof is invalid");
+      TIME_MEASURE_FINISH_PD(check_post_hf4_balance);
+
+      r = process_type_in_variant_container_and_make_sure_its_unique<asset_descriptor_operation>(tx.extra, [&](const asset_descriptor_operation& ado){
+          asset_op_verification_context avc = { tx, id, ado };
+          return m_blockchain.validate_asset_operation_against_current_blochain_state(avc);
+        }, true);
+      CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "post-HF4 tx: asset operation is invalid");
     }
-    TIME_MEASURE_FINISH_PD(check_post_hf4_balance);
 
     do_insert_transaction(tx, id, blob_size, kept_by_block, tx_fee, ch_inp_res ? max_used_block_id : null_hash, ch_inp_res ? max_used_block_height : 0);
     
