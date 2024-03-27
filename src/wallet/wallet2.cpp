@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -81,6 +81,7 @@ namespace tools
     , m_log_prefix("???")
     , m_watch_only(false)
     , m_required_decoys_count(CURRENCY_DEFAULT_DECOY_SET_SIZE)
+    , m_defragmentation_tx_enabled(false)
     , m_max_allowed_output_amount_for_defragmentation_tx(CURRENCY_BLOCK_REWARD)
     , m_min_utxo_count_for_defragmentation_tx(WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX)
     , m_max_utxo_count_for_defragmentation_tx(WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX)
@@ -3676,6 +3677,9 @@ void wallet2::get_transfers(transfer_container& incoming_transfers) const
 //----------------------------------------------------------------------------------------------------
 bool wallet2::generate_utxo_defragmentation_transaction_if_needed(currency::transaction& tx)
 {
+  if (!m_defragmentation_tx_enabled)
+    return false;
+
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.create_utxo_defragmentation_tx = true;
   finalized_tx ftp{};
@@ -5947,8 +5951,8 @@ bool wallet2::decrypt_buffer(const std::string& buff, std::string& res_buff)
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources_for_defragmentation_tx(std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money)
 {
-  //prepare_free_transfers_cache(fake_outputs_count);
-  //free_amounts_cache_type& free_amounts_for_native_coin = m_found_free_amounts[currency::native_coin_asset_id];
+  if (!m_defragmentation_tx_enabled)
+    return false;
 
   std::stringstream ss;
   if (epee::log_space::log_singletone::get_log_detalisation_level() >= LOG_LEVEL_2)

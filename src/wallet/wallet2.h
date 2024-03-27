@@ -884,10 +884,13 @@ private:
    
 
     bool m_do_rise_transfer;
+    
+    bool m_defragmentation_tx_enabled;
     uint64_t m_max_allowed_output_amount_for_defragmentation_tx;
     uint64_t m_min_utxo_count_for_defragmentation_tx;
     uint64_t m_max_utxo_count_for_defragmentation_tx;
     size_t m_decoys_count_for_defragmentation_tx;
+    
     size_t m_required_decoys_count;
     pending_ki_file_container_t m_pending_key_images_file_container;
     uint64_t m_upper_transaction_size_limit; //TODO: auto-calc this value or request from daemon, now use some fixed value
