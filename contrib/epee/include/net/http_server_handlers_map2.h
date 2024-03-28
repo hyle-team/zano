@@ -51,7 +51,7 @@ bool auto_doc_t(const std::string& prefix_name, std::string& generate_reference)
   std::string req_str;
   std::string req_str_descr;
   epee::serialization::portable_storage_extended_doc ps;
-  req.store(ps, nullptr, true);
+  req.store(ps, nullptr);
   ps.dump_as_json(req_str);
   ps.dump_as_decriptions(req_str_descr);
 
@@ -59,7 +59,7 @@ bool auto_doc_t(const std::string& prefix_name, std::string& generate_reference)
   std::string res_str;
   std::string res_str_descr;
   epee::serialization::portable_storage_extended_doc ps_res;
-  res.store(ps_res, nullptr, true);
+  res.store(ps_res, nullptr);
   ps_res.dump_as_json(res_str);
   ps_res.dump_as_decriptions(res_str_descr);
 

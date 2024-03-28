@@ -92,7 +92,7 @@ public: \
 
 
 
-#define DOC_EXMP_AUTO(...) epee::create_t_object<var_type>(__VA_ARGS__)
+#define DOC_EXMP_AUTO(...)                                       , epee::create_t_object<var_type>(__VA_ARGS__)
 
 
 // Function template to create an object with forwarded constructor arguments
