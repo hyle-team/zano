@@ -428,7 +428,7 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
         << ENDL << "Ticker:           " << asset_context.asset_descriptor.ticker
         << ENDL << "Total Max Supply: " << print_asset_money(asset_context.asset_descriptor.total_max_supply, asset_context.asset_descriptor.decimal_point)
         << ENDL << "Current Supply:   " << print_asset_money(asset_context.asset_descriptor.current_supply, asset_context.asset_descriptor.decimal_point)
-        << ENDL << "Decimal Point:    " << asset_context.asset_descriptor.decimal_point;
+        << ENDL << "Decimal Point:    " << (int)asset_context.asset_descriptor.decimal_point;
 
       
       add_rollback_event(ptc.height, asset_register_event{ asset_id });
@@ -464,7 +464,7 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
             << ENDL << "Ticker:           " << ado.descriptor.ticker
             << ENDL << "Total Max Supply: " << print_asset_money(ado.descriptor.total_max_supply, ado.descriptor.decimal_point)
             << ENDL << "Current Supply:   " << print_asset_money(ado.descriptor.current_supply, ado.descriptor.decimal_point)
-            << ENDL << "Decimal Point:    " << ado.descriptor.decimal_point;
+            << ENDL << "Decimal Point:    " << (int)ado.descriptor.decimal_point;
 
 
           add_rollback_event(ptc.height, asset_register_event{ asset_id });
@@ -495,7 +495,7 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
             << ENDL << "Ticker:           " << ado.descriptor.ticker
             << ENDL << "Total Max Supply: " << print_asset_money(ado.descriptor.total_max_supply, ado.descriptor.decimal_point)
             << ENDL << "Current Supply:   " << print_asset_money(ado.descriptor.current_supply, ado.descriptor.decimal_point)
-            << ENDL << "Decimal Point:    " << ado.descriptor.decimal_point;
+            << ENDL << "Decimal Point:    " << (int)ado.descriptor.decimal_point;
 
           add_rollback_event(ptc.height, asset_register_event{ asset_id });
           WLT_LOG_MAGENTA(ss.str(), LOG_LEVEL_0);
