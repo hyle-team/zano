@@ -159,7 +159,8 @@ namespace tools
     mutable uint64_t m_current_wallet_file_size = 0;
     bool m_use_assets_whitelisting = true;
 
-
+    // variables that should be part of state data object but should not be stored during serialization
+    mutable std::atomic<bool> m_whitelist_updated = false;
     //===============================================================
     template <class t_archive>
     inline void serialize(t_archive &a, const unsigned int ver)
@@ -400,7 +401,6 @@ namespace tools
     void transfer_asset_ownership(const crypto::public_key asset_id, const crypto::public_key& new_owner, currency::transaction& result_tx);
 
     bool daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb);
-    const std::unordered_map<crypto::public_key, wallet_own_asset_context>& get_own_assets() const { return m_own_asset_descriptors; }
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
     void set_pos_utxo_count_limits_for_defragmentation_tx(uint64_t min_outs, uint64_t max_outs); // don't create UTXO defrag. tx if there are less than 'min_outs' outs; don't put more than 'max_outs' outs
     void set_pos_decoys_count_for_defragmentation_tx(size_t decoys_count);
@@ -541,6 +541,7 @@ namespace tools
     void get_transfers(transfer_container& incoming_transfers) const;
     std::string get_transfers_str(bool include_spent = true, bool include_unspent = true, bool show_only_unknown = false, const std::string& filter_asset_ticker = std::string{}) const;
     std::string get_balance_str() const;
+    std::string get_balance_str_raw() const;
 
     // Returns all payments by given id in unspecified order
     void get_payments(const std::string& payment_id, std::list<payment_details>& payments, uint64_t min_height = 0) const;
@@ -661,6 +662,10 @@ namespace tools
 
     bool add_custom_asset_id(const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_descriptor);
     bool delete_custom_asset_id(const crypto::public_key& asset_id);
+    const std::unordered_map<crypto::public_key, currency::asset_descriptor_base>& get_local_whitelist() const;
+    const std::unordered_map<crypto::public_key, currency::asset_descriptor_base>& get_global_whitelist() const;
+    const std::unordered_map<crypto::public_key, tools::wallet_own_asset_context>& get_own_assets() const;
+
     bool load_whitelisted_tokens_if_not_loaded() const;
     bool load_whitelisted_tokens() const;
 
@@ -697,6 +702,8 @@ namespace tools
     bool encrypt_buffer(const std::string& buff, std::string& res_buff);
     bool decrypt_buffer(const std::string& buff, std::string& res_buff);
     bool is_in_hardfork_zone(uint64_t hardfork_index) const;
+    //performance inefficient call, suitable only for rare ocasions or super lazy developers
+    bool proxy_to_daemon(const std::string& uri, const std::string& body, int& response_code, std::string& response_body);
 
     construct_tx_param get_default_construct_tx_param();
 
@@ -896,7 +903,6 @@ private:
     uint64_t m_upper_transaction_size_limit; //TODO: auto-calc this value or request from daemon, now use some fixed value
 
     std::atomic<bool> m_stop;
-    mutable std::atomic<bool> m_whitelist_updated = false;
     std::shared_ptr<i_core_proxy> m_core_proxy;
     std::shared_ptr<i_wallet2_callback> m_wcallback;
 
