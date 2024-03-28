@@ -137,6 +137,9 @@ namespace currency
 
   struct COMMAND_RPC_GET_HEIGHT
   {
+    DOC_COMMAND("Return current blockchain height");
+    
+
     struct request
     {
       BEGIN_KV_SERIALIZE_MAP()
@@ -149,8 +152,8 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_DOC2(height)   DOC_EX(11111)           DOC_DSCR("Some height of the block")
-        KV_SERIALIZE_DOC2(status)   DOC_EX("OK")            DOC_DSCR("Status of the operation")
+        KV_SERIALIZE_DOC2(height)   DOC_DSCR("Some height of the block") DOC_EXMP(11111)     DOC_END
+        KV_SERIALIZE_DOC2(status)   DOC_DSCR("Status of the operation")  DOC_EXMP("OK")      DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -202,7 +205,6 @@ namespace currency
       END_KV_SERIALIZE_MAP()
     };
 
-
     struct response
     {
       std::list<std::string> txs_as_hex;  //transactions blobs as hex
@@ -210,9 +212,9 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_DOC(txs_as_hex, std::list<std::string>(1, "97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc97d914497d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc2f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc"), "Transactions stored as blobs")
-        KV_SERIALIZE_DOC(missed_tx, std::list<std::string>(1, "97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc"), "Missed transactions hashes")
-        KV_SERIALIZE_DOC(status, std::string("OK"), "Command response status")
+        KV_SERIALIZE_DOC2(txs_as_hex)    DOC_DSCR("Transactions stored as blobs")   DOC_EXMP_AUTO(1, "7d914497d91442f8f3c2268397d914497d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc2f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
+        KV_SERIALIZE_DOC2(missed_tx)     DOC_DSCR("Missed transactions hashes")     DOC_EXMP_AUTO(1, "97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
+        KV_SERIALIZE_DOC2(status)        DOC_DSCR("Command response status")        DOC_EXMP_AUTO("OK")    DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };

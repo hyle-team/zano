@@ -317,15 +317,26 @@ namespace epee
       template<class t_type, class t_storage>
       static bool serialize(const t_type& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
       {
-        stg.set_entry_description(hparent_section, pname, description);
-        return kv_serialize( (doc_mode ? doc_substitute:d), stg, hparent_section, pname);
+        if constexpr (!t_storage::use_descriptions::value)
+        {
+          return kv_serialize(d, stg, hparent_section, pname);
+        }
+        else 
+          return false;
+
       }
-      //bool doc_mode = false, const t_type& doc_substitute = t_type(), const std::string& description = std::string()
+      //const t_type& doc_substitute = t_type(), const std::string& description = std::string()
       template<class t_type, class t_storage>
-      static bool set_descr(t_storage& stg, typename t_storage::hsection hparent_section, const char* pname, const std::string& description = std::string(), const t_type& doc_substitute = t_type())
+      static bool serialize_and_doc(t_storage& stg, typename t_storage::hsection hparent_section, const char* pname, const std::string& description = std::string(), const t_type& doc_substitute = t_type())
       {
-        stg.set_entry_description(hparent_section, pname, description);
-        return kv_serialize((doc_mode ? doc_substitute : d), stg, hparent_section, pname);
+        if constexpr (t_storage::use_descriptions::value)
+        {
+          stg.set_entry_description(hparent_section, pname, description);
+          return kv_serialize(doc_substitute, stg, hparent_section, pname);
+        }
+        else
+          return false;
+
       }
 
       template<class t_type, class t_storage>

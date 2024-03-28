@@ -39,9 +39,9 @@ namespace epee
 #define BEGIN_KV_SERIALIZE_MAP() \
 public: \
   template<class t_storage> \
-  bool store(t_storage& st, typename t_storage::hsection hparent_section = nullptr, bool auto_doc_mode = false) const\
+  bool store(t_storage& st, typename t_storage::hsection hparent_section = nullptr) const\
   {\
-  return serialize_map<true>(*this, st, hparent_section, auto_doc_mode); \
+  return serialize_map<true>(*this, st, hparent_section); \
 }\
   template<class t_storage> \
   bool _load(t_storage& stg, typename t_storage::hsection hparent_section = nullptr)\
@@ -62,7 +62,7 @@ public: \
   }\
 }\
   template<bool is_store, class this_type, class t_storage> \
-  static bool serialize_map(this_type& this_ref, t_storage& stg, typename t_storage::hsection hparent_section, bool auto_doc_mode = false) \
+  static bool serialize_map(this_type& this_ref, t_storage& stg, typename t_storage::hsection hparent_section) \
 {
 
 #define KV_SERIALIZE_N(varialble, val_name) \
@@ -72,22 +72,43 @@ public: \
   epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name, auto_doc_mode, substitute, description);
 
 #define KV_SERIALIZE_N_DOC2(varialble, val_name) \
-  {using var_type = decltype(this_ref.varialble); \
+  {  using var_type = decltype(this_ref.varialble); \
      epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name); \
      if constexpr (t_storage::use_descriptions::value) \
      { \
-       epee::serialization::selector<is_store>::set_descr(this_ref.varialble, stg, hparent_section, val_name); \
+       epee::serialization::selector<is_store>::serialize_and_doc<var_type>(stg, hparent_section, val_name 
+
+/*
+    {using var_type = decltype(this_ref.varialble); \
+     epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name); \
+     if constexpr (t_storage::use_descriptions::value) \
+     { \
+       epee::serialization::selector<is_store>::set_descr<var_type>(stg, hparent_section, val_name, description, default = var_type()); \
      } \
   }
-     
+*/
+#define DOC_DSCR(description)                                    , description
+#define DOC_EXMP(substitute)                                     , substitute
+#define DOC_EXMP_AUTO_1(arg_1)                                   , var_type(arg_1)
+#define DOC_EXMP_AUTO_2(arg_1, arg_2)                            , var_type(arg_1, arg_2)
+#define DOC_END                                                  ); } }
 
 
+
+#define DOC_EXMP_AUTO(...) epee::create_t_object<var_type>(__VA_ARGS__)
+
+
+// Function template to create an object with forwarded constructor arguments
+  template<typename T, typename... Args>
+  T create_t_object(Args&&... args) {
+    return T(std::forward<Args>(args)...);
+  }
 
   //substitute, description);
-#define DOC_EXAMPLE(substitute)                                  substitute, 
-#define DOC_EX(substitute__)                                     var_type(substitute__),
-#define DOC_DSCR(description)                                    description); }
+//#define DOC_EXAMPLE(substitute)                                  substitute, 
+//#define DOC_EX(substitute__)                                     var_type(substitute__),
 
+//#define DOC_COMMAND(command_general_description)  static const char* explain_yourseflf = command_general_description;
 
 
 #define KV_SERIALIZE_CUSTOM_N(varialble, stored_type, from_v_to_stored, from_stored_to_v, val_name) \

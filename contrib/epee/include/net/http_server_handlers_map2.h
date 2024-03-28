@@ -40,6 +40,7 @@ typename_t get_documentation_json_struct()
   return AUTO_VAL_INIT_T(typename_t);
 }
 
+
 template<typename request_t, typename response_t>
 bool auto_doc_t(const std::string& prefix_name, std::string& generate_reference)
 {
