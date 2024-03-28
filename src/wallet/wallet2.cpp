@@ -174,15 +174,13 @@ bool wallet2::set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::set_pos_utxo_count_limits_for_defragmentation_tx(uint64_t min_outs, uint64_t max_outs)
+void wallet2::set_defragmentation_tx_settings(bool enabled, uint64_t min_outs, uint64_t max_outs, uint64_t max_allowed_amount, size_t decoys_count)
 {
-  m_min_utxo_count_for_defragmentation_tx = min_outs;
-  m_max_utxo_count_for_defragmentation_tx = max_outs;
-}
-//----------------------------------------------------------------------------------------------------
-void wallet2::set_pos_decoys_count_for_defragmentation_tx(size_t decoys_count)
-{
-  m_decoys_count_for_defragmentation_tx = decoys_count;
+  m_defragmentation_tx_enabled                        = enabled;
+  m_min_utxo_count_for_defragmentation_tx             = min_outs;
+  m_max_utxo_count_for_defragmentation_tx             = max_outs;
+  m_max_allowed_output_amount_for_defragmentation_tx  = max_allowed_amount;
+  m_decoys_count_for_defragmentation_tx               = decoys_count;
 }
 //----------------------------------------------------------------------------------------------------
 std::shared_ptr<i_core_proxy> wallet2::get_core_proxy()

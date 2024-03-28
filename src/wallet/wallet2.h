@@ -402,8 +402,7 @@ namespace tools
     bool daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb);
     const std::unordered_map<crypto::public_key, wallet_own_asset_context>& get_own_assets() const { return m_own_asset_descriptors; }
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
-    void set_pos_utxo_count_limits_for_defragmentation_tx(uint64_t min_outs, uint64_t max_outs); // don't create UTXO defrag. tx if there are less than 'min_outs' outs; don't put more than 'max_outs' outs
-    void set_pos_decoys_count_for_defragmentation_tx(size_t decoys_count);
+    void set_defragmentation_tx_settings(bool enabled, uint64_t min_outs, uint64_t max_outs, uint64_t max_allowed_amount = CURRENCY_BLOCK_REWARD, size_t decoys_count = SIZE_MAX);
     void set_pos_required_decoys_count(size_t v) { m_required_decoys_count = v; }
     void set_minimum_height(uint64_t h);
     std::shared_ptr<i_core_proxy> get_core_proxy();
