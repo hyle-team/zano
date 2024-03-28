@@ -89,7 +89,7 @@ void decoy_selection_generator::generate_unique_reversed_distribution(uint64_t c
 {
   if (count + set_to_extend.size() > m_max)
   {
-    throw std::runtime_error("generate_distribution_set with unexpected count");
+    throw std::runtime_error(std::string("generate_distribution_set with unexpected count=") + std::to_string(count) + ", set_to_extend.size() = " + std::to_string(set_to_extend.size()) + ", m_max: " + std::to_string(m_max));
   }
 
   size_t attempt_count = 0;
