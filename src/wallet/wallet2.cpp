@@ -6250,6 +6250,12 @@ void wallet2::select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS
   {
     out_entry entry = extract_random_from_container(amount_entry.outs);
 
+    //
+    if (entry.global_amount_index == own_g_index)
+    {
+      continue;
+    }
+
     //skip auditable
     if ((entry.flags & (RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_NOT_ALLOWED)))
     {
@@ -6260,11 +6266,7 @@ void wallet2::select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS
       coinbases.push_back(entry);
       continue;
     }    
-    //
-    if (entry.global_amount_index == own_g_index)
-    {
-      continue;
-    }
+
 
     local_outs.push_back(entry);
   }
