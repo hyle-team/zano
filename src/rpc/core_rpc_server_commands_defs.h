@@ -1253,6 +1253,28 @@ namespace currency
     };
   };
 
+  struct COMMAND_RPC_REMOVE_TX_FROM_POOL
+  {
+
+    struct request
+    {
+      std::list<std::string> tx_to_remove;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tx_to_remove)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
   struct COMMAND_RPC_GET_POS_MINING_DETAILS
   {    
     struct request

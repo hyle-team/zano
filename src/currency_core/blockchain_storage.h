@@ -375,6 +375,8 @@ namespace currency
       bool for_altchain,
       const alt_chain_type& alt_chain = alt_chain_type(),
       uint64_t split_height = 0)const;
+    bool validate_asset_operation_against_current_blochain_state(asset_op_verification_context& avc) const;
+
     void set_core_runtime_config(const core_runtime_config& pc) const;
     const core_runtime_config& get_core_runtime_config()const;
     size_t get_current_sequence_factor(bool pos)const;
@@ -494,6 +496,7 @@ namespace currency
     bool print_tx_outputs_lookup(const crypto::hash& tx_id) const;
     uint64_t get_last_x_block_height(bool pos)const;
     bool is_tx_spendtime_unlocked(uint64_t unlock_time)const;
+
   private:
 
     //-------------- DB containers --------------
@@ -670,7 +673,6 @@ namespace currency
     bool unprocess_blockchain_tx_extra(const transaction& tx);
     bool process_blockchain_tx_attachments(const transaction& tx, uint64_t h, const crypto::hash& bl_id, uint64_t timestamp);
     bool unprocess_blockchain_tx_attachments(const transaction& tx, uint64_t h, uint64_t timestamp);
-    bool validate_ado_ownership(asset_op_verification_context& avc);
     bool pop_alias_info(const extra_alias_entry& ai);
     bool put_alias_info(const transaction& tx, extra_alias_entry& ai);
     bool pop_asset_info(const crypto::public_key& asset_id);

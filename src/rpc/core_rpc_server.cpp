@@ -983,7 +983,7 @@ namespace currency
     res.seed = currency::ethash_epoch_to_seed(currency::ethash_height_to_epoch(res.height));
 
     res.status = API_RETURN_CODE_OK;
-
+    LOG_PRINT_L1("COMMAND_RPC_GETBLOCKTEMPLATE OK, response block: " << ENDL << currency::obj_to_json_str(resp.b));
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1330,6 +1330,20 @@ namespace currency
   bool core_rpc_server::on_reset_transaction_pool(const COMMAND_RPC_RESET_TX_POOL::request& req, COMMAND_RPC_RESET_TX_POOL::response& res, connection_context& cntx)
   {
     m_core.get_tx_pool().purge_transactions();
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_remove_tx_from_pool(const COMMAND_RPC_REMOVE_TX_FROM_POOL::request& req, COMMAND_RPC_REMOVE_TX_FROM_POOL::response& res, connection_context& cntx)
+  {
+    for (const auto& tx_id_str : req.tx_to_remove)
+    {
+      crypto::hash tx_id = epee::transform_str_to_t_pod<crypto::hash>(tx_id_str);
+      currency::transaction tx; size_t dummy1 = 0; uint64_t dummy2 = 0;
+      m_core.get_tx_pool().take_tx(tx_id, tx, dummy1, dummy2);
+    }
+
     res.status = API_RETURN_CODE_OK;
     return true;
   }
