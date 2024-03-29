@@ -56,10 +56,6 @@ using namespace currency;
 
 #define MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES (100*1024*1024) // 100 MB
 
-#define WALLET_DEFAULT_DECOYS_COUNT_FOR_DEFRAGMENTATION_TX            10  // TODO @#@# change to default decoy set number
-#define WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX                  3   // TODO: @#@# consider descreasing to mimic normal tx
-#define WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX                  10  // TODO: @#@# consider descreasing to mimic normal tx
-
 #define WALLET_TX_MAX_ALLOWED_FEE                                     (COIN * 100)
 
 #define WALLET_FETCH_RANDOM_OUTS_SIZE                                 200  
@@ -83,8 +79,8 @@ namespace tools
     , m_required_decoys_count(CURRENCY_DEFAULT_DECOY_SET_SIZE)
     , m_defragmentation_tx_enabled(false)
     , m_max_allowed_output_amount_for_defragmentation_tx(CURRENCY_BLOCK_REWARD)
-    , m_min_utxo_count_for_defragmentation_tx(WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX)
-    , m_max_utxo_count_for_defragmentation_tx(WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX)
+    , m_min_utxo_count_for_defragmentation_tx(0)
+    , m_max_utxo_count_for_defragmentation_tx(0)
     , m_decoys_count_for_defragmentation_tx(SIZE_MAX)
     , m_use_deffered_global_outputs(false)
 #ifdef DISABLE_TOR
@@ -181,6 +177,8 @@ void wallet2::set_defragmentation_tx_settings(bool enabled, uint64_t min_outs, u
   m_max_utxo_count_for_defragmentation_tx             = max_outs;
   m_max_allowed_output_amount_for_defragmentation_tx  = max_allowed_amount;
   m_decoys_count_for_defragmentation_tx               = decoys_count;
+  WLT_LOG_L0("Defragmentation tx creation is enabled, settings: min outs: " << min_outs << ", max outs: " << max_outs << ", max amount: " << print_money_brief(max_allowed_amount) <<
+    ", decoys: " << (decoys_count != SIZE_MAX ? epee::string_tools::num_to_string_fast(decoys_count) : std::string("default")));
 }
 //----------------------------------------------------------------------------------------------------
 std::shared_ptr<i_core_proxy> wallet2::get_core_proxy()
