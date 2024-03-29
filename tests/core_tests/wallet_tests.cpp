@@ -3440,8 +3440,7 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
 
   // 1. Try to defragment the same UTXO that is used for staking
   // (Bob has two: one UTXO is for staking, other is being defragmented)
-  bob_wlt->set_pos_utxo_count_limits_for_defragmentation_tx(1, 10);
-  bob_wlt->set_pos_decoys_count_for_defragmentation_tx(0);
+  bob_wlt->set_defragmentation_tx_settings(true, 1, 10, CURRENCY_BLOCK_REWARD, 0);
   bob_wlt->try_mint_pos();
 
   CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2 + 3, false, "Incorrect blockchain height:" << c.get_current_blockchain_size());
@@ -3453,8 +3452,7 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
 
   
   // 2. Try to mine a PoS block and defragment some of UTXO
-  alice_wlt->set_pos_utxo_count_limits_for_defragmentation_tx(2, 2);
-  alice_wlt->set_pos_decoys_count_for_defragmentation_tx(0);
+  alice_wlt->set_defragmentation_tx_settings(true, 2, 2, CURRENCY_BLOCK_REWARD, 0);
   alice_wlt->try_mint_pos();
 
   CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2 + 4, false, "Incorrect blockchain height:" << c.get_current_blockchain_size());
@@ -3467,8 +3465,7 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
 
   // 3. Try to mine a PoS block and defragment with huge decoy set. Make sure block is mined successfully without a defragmentation tx
   // Alice has one UTXO
-  alice_wlt->set_pos_utxo_count_limits_for_defragmentation_tx(1, 1);
-  alice_wlt->set_pos_decoys_count_for_defragmentation_tx(80);
+  alice_wlt->set_defragmentation_tx_settings(true, 1, 1, CURRENCY_BLOCK_REWARD, 80);
   alice_wlt->try_mint_pos();
 
   CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2 + 5, false, "Incorrect blockchain height:" << c.get_current_blockchain_size());
@@ -3480,8 +3477,7 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
 
 
   // 4. Finally mine a PoS and defragment the last one unlocked UTXO
-  alice_wlt->set_pos_utxo_count_limits_for_defragmentation_tx(1, 1);
-  alice_wlt->set_pos_decoys_count_for_defragmentation_tx(0);
+  alice_wlt->set_defragmentation_tx_settings(true, 1, 1, CURRENCY_BLOCK_REWARD, 0);
   alice_wlt->try_mint_pos();
 
   CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2 + 6, false, "Incorrect blockchain height:" << c.get_current_blockchain_size());

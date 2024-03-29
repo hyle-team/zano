@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -118,29 +118,32 @@ namespace ph = boost::placeholders;
 
 #define CONFIRM_WITH_PASSWORD() if(!check_password_for_operation()) return true;
 
+#define DEFAULT_WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX  3
+#define DEFAULT_WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX  10
+
 
 namespace
 {
-  const command_line::arg_descriptor<std::string> arg_wallet_file  ("wallet-file", "Use wallet <arg>", "");
-  const command_line::arg_descriptor<std::string> arg_generate_new_wallet  ("generate-new-wallet", "Generate new wallet and save it to <arg> or <address>.wallet by default", "");
-  const command_line::arg_descriptor<std::string> arg_generate_new_auditable_wallet  ("generate-new-auditable-wallet", "Generate new auditable wallet and store it to <arg>", "");
-  const command_line::arg_descriptor<std::string> arg_daemon_address  ("daemon-address", "Use daemon instance at <host>:<port>", "");
-  const command_line::arg_descriptor<std::string> arg_daemon_host  ("daemon-host", "Use daemon instance at host <arg> instead of localhost", "");
-  const command_line::arg_descriptor<std::string> arg_password  ("password", "Wallet password");
-  const command_line::arg_descriptor<bool> arg_dont_refresh  ( "no-refresh", "Do not refresh after load");
-  const command_line::arg_descriptor<bool> arg_dont_set_date  ( "no-set-creation-date", "Do not set wallet creation date", false);
-  const command_line::arg_descriptor<int> arg_daemon_port  ("daemon-port", "Use daemon instance at port <arg> instead of default", 0);
-  //const command_line::arg_descriptor<uint32_t> arg_log_level  ("set-log", "");
-  const command_line::arg_descriptor<bool> arg_do_pos_mining  ( "do-pos-mining", "Do PoS mining", false);
-  const command_line::arg_descriptor<std::string> arg_pos_mining_reward_address  ( "pos-mining-reward-address", "Block reward will be sent to the giving address if specified", "" );
-  const command_line::arg_descriptor<std::string> arg_restore_wallet  ( "restore-wallet", "Restore wallet from seed phrase or tracking seed and save it to <arg>", "" );
-  const command_line::arg_descriptor<bool> arg_offline_mode  ( "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)");
-  const command_line::arg_descriptor<std::string> arg_scan_for_wallet  ( "scan-for-wallet", "");
-  const command_line::arg_descriptor<std::string> arg_addr_to_compare  ( "addr-to-compare", "");
-  const command_line::arg_descriptor<bool> arg_disable_tor_relay  ( "disable-tor-relay", "Disable TOR relay", false);
-  const command_line::arg_descriptor<unsigned int> arg_set_timeout("set-timeout", "Set timeout for the wallet");
-  const command_line::arg_descriptor<std::string> arg_voting_config_file("voting-config-file", "Set voting config instead of getting if from daemon", "");
-  const command_line::arg_descriptor<bool> arg_no_password_confirmations("no-password-confirmation", "Enable/Disable password confirmation for transactions", false);
+  const command_line::arg_descriptor<std::string>   arg_wallet_file  ("wallet-file", "Use wallet <arg>", "");
+  const command_line::arg_descriptor<std::string>   arg_generate_new_wallet  ("generate-new-wallet", "Generate new wallet and save it to <arg> or <address>.wallet by default", "");
+  const command_line::arg_descriptor<std::string>   arg_generate_new_auditable_wallet  ("generate-new-auditable-wallet", "Generate new auditable wallet and store it to <arg>", "");
+  const command_line::arg_descriptor<std::string>   arg_daemon_address  ("daemon-address", "Use daemon instance at <host>:<port>", "");
+  const command_line::arg_descriptor<std::string>   arg_daemon_host  ("daemon-host", "Use daemon instance at host <arg> instead of localhost", "");
+  const command_line::arg_descriptor<std::string>   arg_password  ("password", "Wallet password");
+  const command_line::arg_descriptor<bool>          arg_dont_refresh  ( "no-refresh", "Do not refresh after load");
+  const command_line::arg_descriptor<bool>          arg_dont_set_date  ( "no-set-creation-date", "Do not set wallet creation date", false);
+  const command_line::arg_descriptor<int>           arg_daemon_port  ("daemon-port", "Use daemon instance at port <arg> instead of default", 0);
+  const command_line::arg_descriptor<bool>          arg_do_pos_mining  ( "do-pos-mining", "Do PoS mining", false);
+  const command_line::arg_descriptor<std::string>   arg_pos_mining_reward_address  ( "pos-mining-reward-address", "Block reward will be sent to the giving address if specified", "" );
+  const command_line::arg_descriptor<std::string>   arg_pos_mining_defrag  ( "pos-mining-defrag", "<min_outs_cnt,max_outs_cnt,amount_limit> Generate defragmentation tx for small outputs each time a PoS block is found. Default params: " STR(DEFAULT_WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX) "," STR(DEFAULT_WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX) ",1.0", "" );
+  const command_line::arg_descriptor<std::string>   arg_restore_wallet  ( "restore-wallet", "Restore wallet from seed phrase or tracking seed and save it to <arg>", "" );
+  const command_line::arg_descriptor<bool>          arg_offline_mode  ( "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)");
+  const command_line::arg_descriptor<std::string>   arg_scan_for_wallet  ( "scan-for-wallet", "");
+  const command_line::arg_descriptor<std::string>   arg_addr_to_compare  ( "addr-to-compare", "");
+  const command_line::arg_descriptor<bool>          arg_disable_tor_relay  ( "disable-tor-relay", "Disable TOR relay", false);
+  const command_line::arg_descriptor<unsigned int>  arg_set_timeout("set-timeout", "Set timeout for the wallet");
+  const command_line::arg_descriptor<std::string>   arg_voting_config_file("voting-config-file", "Set voting config instead of getting if from daemon", "");
+  const command_line::arg_descriptor<bool>          arg_no_password_confirmations("no-password-confirmation", "Enable/Disable password confirmation for transactions", false);
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command  ("command", "");
 
@@ -2665,6 +2668,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_dont_set_date);
   command_line::add_arg(desc_params, arg_do_pos_mining);
   command_line::add_arg(desc_params, arg_pos_mining_reward_address);
+  command_line::add_arg(desc_params, arg_pos_mining_defrag);
   command_line::add_arg(desc_params, arg_restore_wallet);
   command_line::add_arg(desc_params, arg_offline_mode);
   command_line::add_arg(desc_params, command_line::arg_log_file);
@@ -2848,6 +2852,28 @@ int main(int argc, char* argv[])
         CHECK_AND_ASSERT_MES(r, EXIT_FAILURE, "Failed to parse miner address from string: " << arg_pos_mining_reward_address_str);
         CHECK_AND_ASSERT_MES(payment_id.size() == 0, EXIT_FAILURE, "Address for rewards should not be integrated address: " << arg_pos_mining_reward_address_str);
         LOG_PRINT_YELLOW("PoS reward will be sent to another address: " << arg_pos_mining_reward_address_str, LOG_LEVEL_0);
+      }
+    }
+
+    if (command_line::has_arg(vm, arg_pos_mining_defrag))
+    {
+      std::string arg_pos_mining_defrag_str = command_line::get_arg(vm, arg_pos_mining_defrag);
+      if (arg_pos_mining_defrag_str.empty())
+      {
+        // enable with default params
+        wal.set_defragmentation_tx_settings(true, DEFAULT_WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX, DEFAULT_WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX, COIN);
+      }
+      else
+      {
+        std::vector<std::string> params;
+        boost::split(params, arg_pos_mining_defrag_str, boost::is_any_of(",;"), boost::token_compress_on);
+        CHECK_AND_ASSERT_MES(params.size() == 3, EXIT_FAILURE, "incorrect number of params given: " << arg_pos_mining_defrag_str);
+        int64_t outs_min = 0, outs_max = 0;
+        uint64_t max_amount = 0;
+        CHECK_AND_ASSERT_MES(epee::string_tools::string_to_num_fast(params[0], outs_min) && outs_min > 0 && outs_min < 256, EXIT_FAILURE, "incorrect param: " << params[0]);
+        CHECK_AND_ASSERT_MES(epee::string_tools::string_to_num_fast(params[1], outs_max) && outs_max > 0 && outs_max < 256, EXIT_FAILURE, "incorrect param: " << params[1]);
+        CHECK_AND_ASSERT_MES(currency::parse_amount(max_amount, params[2]), EXIT_FAILURE, "incorrect param: " << params[2]);
+        wal.set_defragmentation_tx_settings(true, outs_min, outs_max, max_amount);
       }
     }
     

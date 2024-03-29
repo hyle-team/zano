@@ -56,10 +56,6 @@ using namespace currency;
 
 #define MINIMUM_REQUIRED_WALLET_FREE_SPACE_BYTES (100*1024*1024) // 100 MB
 
-#define WALLET_DEFAULT_DECOYS_COUNT_FOR_DEFRAGMENTATION_TX            10  // TODO @#@# change to default decoy set number
-#define WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX                  3   // TODO: @#@# consider descreasing to mimic normal tx
-#define WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX                  10  // TODO: @#@# consider descreasing to mimic normal tx
-
 #define WALLET_TX_MAX_ALLOWED_FEE                                     (COIN * 100)
 
 #define WALLET_FETCH_RANDOM_OUTS_SIZE                                 200  
@@ -83,8 +79,8 @@ namespace tools
     , m_required_decoys_count(CURRENCY_DEFAULT_DECOY_SET_SIZE)
     , m_defragmentation_tx_enabled(false)
     , m_max_allowed_output_amount_for_defragmentation_tx(CURRENCY_BLOCK_REWARD)
-    , m_min_utxo_count_for_defragmentation_tx(WALLET_MIN_UTXO_COUNT_FOR_DEFRAGMENTATION_TX)
-    , m_max_utxo_count_for_defragmentation_tx(WALLET_MAX_UTXO_COUNT_FOR_DEFRAGMENTATION_TX)
+    , m_min_utxo_count_for_defragmentation_tx(0)
+    , m_max_utxo_count_for_defragmentation_tx(0)
     , m_decoys_count_for_defragmentation_tx(SIZE_MAX)
     , m_use_deffered_global_outputs(false)
 #ifdef DISABLE_TOR
@@ -174,15 +170,22 @@ bool wallet2::set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::set_pos_utxo_count_limits_for_defragmentation_tx(uint64_t min_outs, uint64_t max_outs)
+void wallet2::set_defragmentation_tx_settings(bool enabled, uint64_t min_outs, uint64_t max_outs, uint64_t max_allowed_amount, size_t decoys_count)
 {
-  m_min_utxo_count_for_defragmentation_tx = min_outs;
-  m_max_utxo_count_for_defragmentation_tx = max_outs;
-}
-//----------------------------------------------------------------------------------------------------
-void wallet2::set_pos_decoys_count_for_defragmentation_tx(size_t decoys_count)
-{
-  m_decoys_count_for_defragmentation_tx = decoys_count;
+  m_defragmentation_tx_enabled                        = enabled;
+  m_min_utxo_count_for_defragmentation_tx             = min_outs;
+  m_max_utxo_count_for_defragmentation_tx             = max_outs;
+  m_max_allowed_output_amount_for_defragmentation_tx  = max_allowed_amount;
+  m_decoys_count_for_defragmentation_tx               = decoys_count;
+  if (enabled)
+  {
+    WLT_LOG_L0("Defragmentation tx creation is enabled, settings: min outs: " << min_outs << ", max outs: " << max_outs << ", max amount: " << print_money_brief(max_allowed_amount) <<
+      ", decoys: " << (decoys_count != SIZE_MAX ? epee::string_tools::num_to_string_fast(decoys_count) : std::string("default")));
+  }
+  else
+  {
+    WLT_LOG_L0("Defragmentation tx creation is disabled");
+  }
 }
 //----------------------------------------------------------------------------------------------------
 std::shared_ptr<i_core_proxy> wallet2::get_core_proxy()
@@ -430,7 +433,7 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
         << ENDL << "Ticker:           " << asset_context.asset_descriptor.ticker
         << ENDL << "Total Max Supply: " << print_asset_money(asset_context.asset_descriptor.total_max_supply, asset_context.asset_descriptor.decimal_point)
         << ENDL << "Current Supply:   " << print_asset_money(asset_context.asset_descriptor.current_supply, asset_context.asset_descriptor.decimal_point)
-        << ENDL << "Decimal Point:    " << asset_context.asset_descriptor.decimal_point;
+        << ENDL << "Decimal Point:    " << (int)asset_context.asset_descriptor.decimal_point;
 
       
       add_rollback_event(ptc.height, asset_register_event{ asset_id });
@@ -466,7 +469,7 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
             << ENDL << "Ticker:           " << ado.descriptor.ticker
             << ENDL << "Total Max Supply: " << print_asset_money(ado.descriptor.total_max_supply, ado.descriptor.decimal_point)
             << ENDL << "Current Supply:   " << print_asset_money(ado.descriptor.current_supply, ado.descriptor.decimal_point)
-            << ENDL << "Decimal Point:    " << ado.descriptor.decimal_point;
+            << ENDL << "Decimal Point:    " << (int)ado.descriptor.decimal_point;
 
 
           add_rollback_event(ptc.height, asset_register_event{ asset_id });
@@ -497,7 +500,7 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
             << ENDL << "Ticker:           " << ado.descriptor.ticker
             << ENDL << "Total Max Supply: " << print_asset_money(ado.descriptor.total_max_supply, ado.descriptor.decimal_point)
             << ENDL << "Current Supply:   " << print_asset_money(ado.descriptor.current_supply, ado.descriptor.decimal_point)
-            << ENDL << "Decimal Point:    " << ado.descriptor.decimal_point;
+            << ENDL << "Decimal Point:    " << (int)ado.descriptor.decimal_point;
 
           add_rollback_event(ptc.height, asset_register_event{ asset_id });
           WLT_LOG_MAGENTA(ss.str(), LOG_LEVEL_0);
@@ -6252,6 +6255,12 @@ void wallet2::select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS
   {
     out_entry entry = extract_random_from_container(amount_entry.outs);
 
+    //
+    if (entry.global_amount_index == own_g_index)
+    {
+      continue;
+    }
+
     //skip auditable
     if ((entry.flags & (RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_NOT_ALLOWED)))
     {
@@ -6262,11 +6271,7 @@ void wallet2::select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS
       coinbases.push_back(entry);
       continue;
     }    
-    //
-    if (entry.global_amount_index == own_g_index)
-    {
-      continue;
-    }
+
 
     local_outs.push_back(entry);
   }
