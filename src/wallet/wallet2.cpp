@@ -177,8 +177,15 @@ void wallet2::set_defragmentation_tx_settings(bool enabled, uint64_t min_outs, u
   m_max_utxo_count_for_defragmentation_tx             = max_outs;
   m_max_allowed_output_amount_for_defragmentation_tx  = max_allowed_amount;
   m_decoys_count_for_defragmentation_tx               = decoys_count;
-  WLT_LOG_L0("Defragmentation tx creation is enabled, settings: min outs: " << min_outs << ", max outs: " << max_outs << ", max amount: " << print_money_brief(max_allowed_amount) <<
-    ", decoys: " << (decoys_count != SIZE_MAX ? epee::string_tools::num_to_string_fast(decoys_count) : std::string("default")));
+  if (enabled)
+  {
+    WLT_LOG_L0("Defragmentation tx creation is enabled, settings: min outs: " << min_outs << ", max outs: " << max_outs << ", max amount: " << print_money_brief(max_allowed_amount) <<
+      ", decoys: " << (decoys_count != SIZE_MAX ? epee::string_tools::num_to_string_fast(decoys_count) : std::string("default")));
+  }
+  else
+  {
+    WLT_LOG_L0("Defragmentation tx creation is disabled");
+  }
 }
 //----------------------------------------------------------------------------------------------------
 std::shared_ptr<i_core_proxy> wallet2::get_core_proxy()

@@ -2867,7 +2867,7 @@ int main(int argc, char* argv[])
       {
         std::vector<std::string> params;
         boost::split(params, arg_pos_mining_defrag_str, boost::is_any_of(",;"), boost::token_compress_on);
-        CHECK_AND_ASSERT_MES(params.size() != 3, EXIT_FAILURE, "incorrect number of params given: " << arg_pos_mining_defrag_str);
+        CHECK_AND_ASSERT_MES(params.size() == 3, EXIT_FAILURE, "incorrect number of params given: " << arg_pos_mining_defrag_str);
         int64_t outs_min = 0, outs_max = 0;
         uint64_t max_amount = 0;
         CHECK_AND_ASSERT_MES(epee::string_tools::string_to_num_fast(params[0], outs_min) && outs_min > 0 && outs_min < 256, EXIT_FAILURE, "incorrect param: " << params[0]);
