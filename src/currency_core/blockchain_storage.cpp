@@ -6948,7 +6948,12 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
     if (m_event_handler) m_event_handler->on_complete_events();
 
     return res;
-  }  
+  }
+  catch (const std::bad_alloc&)
+  {
+    // failed memory allocation is critical; this is supposed to be handled by the called (assuming immediate stop)
+    throw;
+  }
   catch (const std::exception& ex)
   {
     bvc.m_verification_failed = true;

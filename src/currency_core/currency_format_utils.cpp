@@ -785,6 +785,7 @@ namespace currency
     }
   }
   //---------------------------------------------------------------
+  // TODO: reverse order of arguments
   bool parse_amount(uint64_t& amount, const std::string& str_amount_)
   {
     std::string str_amount = str_amount_;
