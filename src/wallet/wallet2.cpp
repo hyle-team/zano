@@ -6777,7 +6777,7 @@ uint64_t wallet2::select_indices_for_transfer(std::vector<uint64_t>& selected_in
   return found_money;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_outputs_count)
+bool wallet2::is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_outputs_count) const
 {
   if (is_transfer_able_to_go(td, fake_outputs_count) && is_transfer_unlocked(td))
   {
@@ -6786,7 +6786,7 @@ bool wallet2::is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_
   return false;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count)
+bool wallet2::is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count) const
 {
   if (!td.is_spendable())
     return false;

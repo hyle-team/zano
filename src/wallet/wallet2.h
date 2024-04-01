@@ -576,8 +576,8 @@ namespace tools
       wallet2_base_state::serialize(a, ver);
     }
 
-    bool is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_outputs_count);
-    bool is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count);
+    bool is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_outputs_count) const;
+    bool is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count) const;
     uint64_t select_indices_for_transfer(std::vector<uint64_t>& ind, free_amounts_cache_type& found_free_amounts, uint64_t needed_money, uint64_t fake_outputs_count);
     bool select_indices_for_transfer(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes);
 
