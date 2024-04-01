@@ -73,7 +73,7 @@ public: \
      epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name); \
      if constexpr (t_storage::use_descriptions::value) \
      { \
-       epee::serialization::selector<is_store>::serialize_and_doc<var_type>(stg, hparent_section, val_name 
+       epee::serialization::selector<is_store>::template serialize_and_doc<var_type>(stg, hparent_section, val_name 
 
 /*
     {using var_type = decltype(this_ref.varialble); \
