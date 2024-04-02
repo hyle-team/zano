@@ -20,6 +20,7 @@ namespace tools
     wi.path = epee::string_encoding::wstring_to_utf8(w.get_wallet_path());
     wi.is_auditable = w.is_auditable();
     wi.is_watch_only = w.is_watch_only();
+    wi.has_bare_unspent_outputs = w.has_bare_unspent_outputs();
     return true;
   }
 

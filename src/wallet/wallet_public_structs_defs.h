@@ -1550,6 +1550,7 @@ namespace wallet_public
     std::string path;
     bool is_auditable;
     bool is_watch_only;
+    bool has_bare_unspent_outputs;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(balances)
@@ -1559,6 +1560,7 @@ namespace wallet_public
       KV_SERIALIZE(path)
       KV_SERIALIZE(is_auditable)
       KV_SERIALIZE(is_watch_only)
+      KV_SERIALIZE(has_bare_unspent_outputs)
     END_KV_SERIALIZE_MAP()
   };
 

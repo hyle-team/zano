@@ -315,6 +315,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("scan_transfers_for_ki", boost::bind(&simple_wallet::scan_transfers_for_ki, this,ph::_1), "Rescan transfers for key image");
   m_cmd_binder.set_handler("print_utxo_distribution", boost::bind(&simple_wallet::print_utxo_distribution, this,ph::_1), "Prints utxo distribution");
   m_cmd_binder.set_handler("sweep_below", boost::bind(&simple_wallet::sweep_below, this,ph::_1), "sweep_below <mixin_count> <address> <amount_lower_limit> [payment_id] -  Tries to transfers all coins with amount below the given limit to the given address");
+  m_cmd_binder.set_handler("sweep_bare_outs", boost::bind(&simple_wallet::sweep_bare_outs, this,ph::_1), "sweep_bare_outs - Transfers all bare unspent outputs to itself. Uses several txs if necessary.");
   
   m_cmd_binder.set_handler("address", boost::bind(&simple_wallet::print_address, this,ph::_1), "Show current wallet public address");
   m_cmd_binder.set_handler("integrated_address", boost::bind(&simple_wallet::integrated_address, this,ph::_1), "integrated_address [<payment_id>|<integrated_address] - encodes given payment_id along with wallet's address into an integrated address (random payment_id will be used if none is provided). Decodes given integrated_address into standard address");
@@ -2511,8 +2512,129 @@ bool simple_wallet::sweep_below(const std::vector<std::string> &args)
   SIMPLE_WALLET_CATCH_TRY_ENTRY();
   return true;
 }
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::sweep_bare_outs(const std::vector<std::string> &args)
+{
+  CONFIRM_WITH_PASSWORD();
+  SIMPLE_WALLET_BEGIN_TRY_ENTRY();
+  bool r = false;
 
+  if (args.size() > 1)
+  {
+    fail_msg_writer() << "Invalid number of agruments given";
+    return true;
+  }
 
+  currency::account_public_address target_address = m_wallet->get_account().get_public_address();
+  currency::payment_id_t integrated_payment_id{};
+  if (args.size() == 1)
+  {
+    if (!m_wallet->get_transfer_address(args[0], target_address, integrated_payment_id))
+    {
+      fail_msg_writer() << "Unable to parse address from " << args[1];
+      return true;
+    }
+    if (!integrated_payment_id.empty())
+    {
+      fail_msg_writer() << "Payment id is not supported. Please, don't use integrated address with this command.";
+      return true;
+    }
+  }
+  
+  if (!m_wallet->has_bare_unspent_outputs())
+  {
+    success_msg_writer(true) << "This wallet doesn't have bare unspent outputs.\nNothing to do. Everything looks good.";
+    return true;
+  }
+
+  std::vector<tools::wallet2::batch_of_bare_unspent_outs> groups;
+  m_wallet->get_bare_unspent_outputs_stats(groups);
+  if (groups.empty())
+  {
+    uint64_t unlocked_balance = 0;
+    uint64_t balance = m_wallet->balance(unlocked_balance);
+    if (balance < COIN)
+      success_msg_writer(false) << "Looks like it's not enough coins to perform this operation. Transferring " << print_money_brief(TX_MINIMUM_FEE) << " ZANO or more to this wallet may help.";
+    else if (unlocked_balance < COIN)
+      success_msg_writer(false) << "Not enough spendable outputs to perform this operation. Please, try again later.";
+    else
+    {
+      success_msg_writer(false) << "This operation couldn't be performed for some reason. Please, copy simplewallet's log file and ask for support. Nothing was done.";
+      LOG_PRINT_L0("strange situation: balance: " << print_money_brief(balance) << ", unlocked_balance: " << print_money_brief(unlocked_balance) << " but get_bare_unspent_outputs_stats returned empty result");
+    }
+    return true;
+  }
+
+  size_t i = 0, total_bare_outs = 0;
+  uint64_t total_mount = 0;
+  std::stringstream details_ss;
+  for(auto &g : groups)
+  {
+    details_ss << std::setw(2) << i << ": ";
+    for (auto& tid: g.tids)
+    {
+      tools::transfer_details td{};
+      CHECK_AND_ASSERT_THROW_MES(m_wallet->get_transfer_info_by_index(tid, td), "get_transfer_info_by_index failed with index " << tid);
+      details_ss << tid << " (" << print_money_brief(td.m_amount) << "), ";
+      total_mount += td.m_amount;
+    }
+
+    if (g.additional_tid)
+      details_ss << "additional tid: " << g.tids.back() << "( " << print_money_brief(g.additional_tid_amount) << ")";
+    else
+      details_ss.seekp(-2, std::ios_base::end);
+
+    details_ss << ENDL;
+    ++i;
+    total_bare_outs += g.tids.size();
+  }
+
+  LOG_PRINT_L1("bare UTXO:" << ENDL << details_ss.str());
+  
+  success_msg_writer(true) << "This wallet contains " << total_bare_outs << " bare outputs with total amount of " << print_money_brief(total_mount) <<
+    ". They can be converted in " << groups.size() << " transaction" << (groups.size() > 1 ? "s" : "") << ", with total fee = " << print_money_brief(TX_DEFAULT_FEE * i) << ".";
+  if (target_address != m_wallet->get_account().get_public_address())
+    message_writer(epee::log_space::console_color_yellow, false) << print_money_brief(total_mount) << " coins will be sent to address " << get_account_address_as_str(target_address);
+
+  tools::password_container reader;
+  if (!reader.read_input("Would you like to continue? (y/yes/n/no):\n") || (reader.get_input() != "y" && reader.get_input() != "yes"))
+  {
+    success_msg_writer(false) << "Operatation terminated as requested by user.";
+    return true;
+  }
+
+  size_t total_tx_sent = 0;
+  uint64_t total_fee_spent = 0;
+  uint64_t total_amount_sent = 0;
+  auto on_tx_sent_callback = [&](size_t batch_index, const currency::transaction& tx, uint64_t amount, uint64_t fee, bool sent_ok, const std::string& err) {
+      auto mw = success_msg_writer(false);
+      mw << std::setw(2) << batch_index << ": transaction ";
+      if (!sent_ok)
+      {
+        mw << "failed  (" << err << ")";
+        return;
+      }
+      mw << get_transaction_hash(tx) << ", fee: " << print_money_brief(fee) << ", amount: " << print_money_brief(amount);
+      ++total_tx_sent;
+      total_fee_spent += fee;
+      total_amount_sent += amount;
+    };
+
+  if (!m_wallet->sweep_bare_unspent_outputs(target_address, groups, on_tx_sent_callback))
+  {
+    auto mw = fail_msg_writer();
+    mw << "Operatation failed.";
+    if (total_tx_sent > 0)
+      mw << " However, " << total_tx_sent << " transaction" << (total_tx_sent == 1 ? " was" : "s were") << " successfully sent, " << print_money_brief(total_amount_sent) << " coins transferred, and " << print_money_brief(total_fee_spent) << " was spent for fees.";
+  }
+  else
+  {
+    success_msg_writer(true) << "Operatation succeeded. " << ENDL << total_tx_sent << " transaction" << (total_tx_sent == 1 ? " was" : "s were") << " successfully sent, " << print_money_brief(total_amount_sent) << " coins transferred, and " << print_money_brief(total_fee_spent) << " was spent for fees.";
+  }
+
+  SIMPLE_WALLET_CATCH_TRY_ENTRY();
+  return true;
+}
 //----------------------------------------------------------------------------------------------------
 uint64_t
 get_tick_count__()

@@ -158,6 +158,7 @@ namespace tools
     std::atomic<uint64_t> m_last_sync_percent = 0;
     mutable uint64_t m_current_wallet_file_size = 0;
     bool m_use_assets_whitelisting = true;
+    mutable std::optional<bool> m_has_bare_unspent_outputs; // recalculated each time the balance() is called
 
 
     //===============================================================
@@ -342,6 +343,13 @@ namespace tools
       mutable crypto::hash tx_hash_ = currency::null_hash;
     };
 
+    struct batch_of_bare_unspent_outs
+    {
+      std::vector<size_t> tids;
+      uint64_t total_amount = 0;
+      bool additional_tid = false; // additional zc transfer if total_amount < min fee
+      uint64_t additional_tid_amount = 0;
+    };
 
 
 
@@ -377,6 +385,12 @@ namespace tools
     void set_do_rise_transfer(bool do_rise) { m_do_rise_transfer = do_rise; }
 
     bool has_related_alias_entry_unconfirmed(const currency::transaction& tx);
+    bool has_bare_unspent_outputs() const;
+    bool get_bare_unspent_outputs_stats(std::vector<batch_of_bare_unspent_outs>& buo_txs) const;
+    bool sweep_bare_unspent_outputs(const currency::account_public_address& target_address, const std::vector<batch_of_bare_unspent_outs>& tids_grouped_by_txs,
+      std::function<void(size_t batch_index, const currency::transaction& tx, uint64_t amount, uint64_t fee, bool sent_ok, const std::string& err)> on_tx_sent);
+    bool sweep_bare_unspent_outputs(const currency::account_public_address& target_address, const std::vector<batch_of_bare_unspent_outs>& tids_grouped_by_txs,
+      size_t& total_txs_sent, uint64_t& total_amount_sent, uint64_t& total_fee);
     void handle_unconfirmed_tx(process_transaction_context& ptc);
     void scan_tx_pool(bool& has_related_alias_in_unconfirmed);
     void refresh();

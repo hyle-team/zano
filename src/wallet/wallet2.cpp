@@ -2200,6 +2200,189 @@ bool wallet2::has_related_alias_entry_unconfirmed(const currency::transaction& t
   return false;
 }
 //----------------------------------------------------------------------------------------------------
+#define HARDFORK_04_TIMESTAMP_ACTUAL 1711021795ull // block 2555000, 2024-03-21 11:49:55 UTC
+bool wallet2::has_bare_unspent_outputs() const
+{
+  if (m_account.get_createtime() > HARDFORK_04_TIMESTAMP_ACTUAL)
+    return false;
+
+  [[maybe_unused]] uint64_t bal = 0;
+  if (!m_has_bare_unspent_outputs.has_value())
+    bal = balance();
+
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(m_has_bare_unspent_outputs.has_value(), "m_has_bare_unspent_outputs has no value after balance()");
+
+  return m_has_bare_unspent_outputs.value();
+}
+//----------------------------------------------------------------------------------------------------
+#define MAX_INPUTS_FOR_SIMPLE_TX_EURISTIC 20
+bool wallet2::get_bare_unspent_outputs_stats(std::vector<batch_of_bare_unspent_outs>& tids_grouped_by_txs) const
+{
+  tids_grouped_by_txs.clear();
+
+  // 1/3. Populate a list of bare unspent outputs
+  std::unordered_map<crypto::hash, std::vector<size_t>> buo_ids; // tx hash -> Bare Unspent Outs list
+  for(size_t tid = 0; tid != m_transfers.size(); ++tid)
+  {
+    const auto& td = m_transfers[tid];
+    if (!td.is_zc() && td.is_spendable())
+    {
+      buo_ids[td.tx_hash()].push_back(tid);
+    }
+  }
+
+  if (buo_ids.empty())
+    return true;
+
+  // 2/3. Split them into groups
+  tids_grouped_by_txs.emplace_back();
+  for(auto& buo_el : buo_ids)
+  {
+    if (tids_grouped_by_txs.back().tids.size() + buo_el.second.size() > MAX_INPUTS_FOR_SIMPLE_TX_EURISTIC)
+      tids_grouped_by_txs.emplace_back();
+
+    for(auto& tid : buo_el.second)
+    {
+      if (tids_grouped_by_txs.back().tids.size() >= MAX_INPUTS_FOR_SIMPLE_TX_EURISTIC)
+        tids_grouped_by_txs.emplace_back();
+      tids_grouped_by_txs.back().tids.push_back(tid);
+      tids_grouped_by_txs.back().total_amount += m_transfers[tid].m_amount;
+    }
+  }
+
+
+  // 3/3. Iterate through groups and check whether total amount is big enough to cover min fee.
+  // Add additional zc output if not.
+  std::multimap<uint64_t, size_t> usable_zc_outs_tids; // grouped by amount
+  bool usable_zc_outs_tids_precalculated = false;
+  auto precalculate_usable_zc_outs_if_needed = [&](){
+      if (usable_zc_outs_tids_precalculated)
+        return;
+      size_t decoys = is_auditable() ? 0 : m_core_runtime_config.hf4_minimum_mixins;
+      for(size_t tid = 0; tid != m_transfers.size(); ++tid)
+      {
+        auto& td = m_transfers[tid];
+        if (td.is_zc() && td.is_native_coin() && is_transfer_ready_to_go(td, decoys))
+          usable_zc_outs_tids.insert(std::make_pair(td.m_amount, tid));
+      }
+      usable_zc_outs_tids_precalculated = true;
+    };
+
+  std::unordered_set<size_t> used_zc_outs;
+  for(auto it = tids_grouped_by_txs.begin(); it != tids_grouped_by_txs.end(); )
+  {
+    auto& group = *it;
+    if (group.total_amount < TX_MINIMUM_FEE)
+    {
+      precalculate_usable_zc_outs_if_needed();
+
+      uint64_t min_required_amount = TX_MINIMUM_FEE - group.total_amount;
+      auto jt = usable_zc_outs_tids.lower_bound(min_required_amount);
+      bool found = false;
+      while(jt != usable_zc_outs_tids.end())
+      {
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(jt->first >= min_required_amount, "jt->first=" << jt->first << ", min_required_amount=" << min_required_amount);
+        if (used_zc_outs.count(jt->second) == 0)
+        {
+          group.tids.push_back(jt->second);
+          used_zc_outs.insert(jt->second);
+          group.additional_tid = true;
+          group.additional_tid_amount = jt->first;
+          found = true;
+          break;
+        }
+        ++jt;
+      }
+
+      if (!found)
+      {
+        // no usable outs for required amount, remove this group and go to the next
+        it = tids_grouped_by_txs.erase(it);
+        continue;
+      }
+    }
+
+    ++it;
+  }
+
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::sweep_bare_unspent_outputs(const currency::account_public_address& target_address, const std::vector<batch_of_bare_unspent_outs>& tids_grouped_by_txs,
+  std::function<void(size_t batch_index, const currency::transaction& tx, uint64_t amount, uint64_t fee, bool sent_ok, const std::string& err)> on_tx_sent)
+{
+  if (m_watch_only)
+    return false;
+
+  size_t decoys_count = is_auditable() ? 0 : CURRENCY_DEFAULT_DECOY_SET_SIZE;
+
+  bool send_to_network = true;
+
+  size_t batch_index = 0;
+  for(const batch_of_bare_unspent_outs& group : tids_grouped_by_txs)
+  {
+    currency::finalized_tx ftx{};
+    currency::finalize_tx_param ftp{};
+    ftp.pevents_dispatcher = &m_debug_events_dispatcher;
+    ftp.tx_version = this->get_current_tx_version();
+
+    if (!prepare_tx_sources(decoys_count, ftp.sources, group.tids))
+    {
+      on_tx_sent(batch_index, transaction{}, 0, 0, false, "sources for tx couldn't be prepared");
+      LOG_PRINT_L0("prepare_tx_sources failed, batch_index = " << batch_index);
+      return false;
+    }
+    uint64_t fee = TX_DEFAULT_FEE;
+    std::vector<tx_destination_entry> destinations{tx_destination_entry(group.total_amount + group.additional_tid_amount - fee, target_address)};
+    assets_selection_context needed_money_map{std::make_pair(native_coin_asset_id, selection_for_amount{group.total_amount + group.additional_tid_amount, group.total_amount + group.additional_tid_amount})};
+    try
+    {
+      prepare_tx_destinations(needed_money_map, get_current_split_strategy(), tx_dust_policy{}, destinations, 0 /* tx_flags */, ftp.prepared_destinations);
+    }
+    catch(...)
+    {
+      on_tx_sent(batch_index, transaction{}, 0, 0, false, "destinations for tx couldn't be prepared");
+      LOG_PRINT_L0("prepare_tx_destinations failed, batch_index = " << batch_index);
+      return false;
+    }
+
+    mark_transfers_as_spent(ftp.selected_transfers, std::string("sweep bare UTXO, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(ftx.tx)));
+    try
+    {
+      finalize_transaction(ftp, ftx, send_to_network);
+      on_tx_sent(batch_index, ftx.tx, group.total_amount + group.additional_tid_amount, fee, true, std::string());
+    }
+    catch(std::exception& e)
+    {
+      clear_transfers_from_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_SPENT, std::string("exception on sweep bare UTXO, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(ftx.tx)));
+      on_tx_sent(batch_index, transaction{}, 0, 0, false, e.what());
+      return false;
+    }
+    
+    ++batch_index;
+  }
+
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::sweep_bare_unspent_outputs(const currency::account_public_address& target_address, const std::vector<batch_of_bare_unspent_outs>& tids_grouped_by_txs,
+  size_t& total_txs_sent, uint64_t& total_amount_sent, uint64_t& total_fee_spent)
+{
+  total_txs_sent = 0;
+  total_amount_sent = 0;
+  total_fee_spent = 0;
+  auto on_tx_sent_callback = [&](size_t batch_index, const currency::transaction& tx, uint64_t amount, uint64_t fee, bool sent_ok, const std::string& err) {
+      if (sent_ok)
+      {
+        ++total_txs_sent;
+        total_fee_spent += fee;
+        total_amount_sent += amount;
+      }
+    };
+
+  return sweep_bare_unspent_outputs(target_address, tids_grouped_by_txs, on_tx_sent_callback);
+}
+//----------------------------------------------------------------------------------------------------
 uint64_t wallet2::get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_to_key& intk)
 {
   return get_directly_spent_transfer_index_by_input_in_tracking_wallet(intk.amount, intk.key_offsets);
@@ -3444,6 +3627,7 @@ uint64_t wallet2::balance(const crypto::public_key& asset_id) const
 bool wallet2::balance(std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base>& balances, uint64_t& mined) const
 {
   mined = 0;
+  m_has_bare_unspent_outputs = false;
   
   for(auto& td : m_transfers)
   {
@@ -3464,6 +3648,9 @@ bool wallet2::balance(std::unordered_map<crypto::public_key, wallet_public::asse
           mined += CURRENCY_BLOCK_REWARD; //this code would work only for cases where block reward is full. For reduced block rewards might need more flexible code (TODO)
         }        
       }
+
+      if (!td.is_zc())
+        m_has_bare_unspent_outputs = true;
     }
   }
 
