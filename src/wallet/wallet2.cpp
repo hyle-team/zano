@@ -7431,10 +7431,6 @@ void wallet2::finalize_transaction(currency::finalize_tx_param& ftp, currency::f
   // broadcasting tx without secret key storing is forbidden to avoid lost key issues
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!broadcast_tx || store_tx_secret_key, "finalize_tx is requested to broadcast a tx without storing the key");
 
-  //overide mixins count for hardfork 4 outputs
-  if (is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
-    ftp.tx_outs_attr = m_core_runtime_config.hf4_minimum_mixins;
-
   bool r = currency::construct_tx(m_account.get_keys(),
     ftp, result);
   //TIME_MEASURE_FINISH_MS(construct_tx_time);
