@@ -158,6 +158,7 @@ namespace tools
     std::atomic<uint64_t> m_last_sync_percent = 0;
     mutable uint64_t m_current_wallet_file_size = 0;
     bool m_use_assets_whitelisting = true;
+    mutable std::optional<bool> m_has_bare_unspent_outputs; // recalculated each time the balance() is called
 
     // variables that should be part of state data object but should not be stored during serialization
     mutable std::atomic<bool> m_whitelist_updated = false;
@@ -343,6 +344,13 @@ namespace tools
       mutable crypto::hash tx_hash_ = currency::null_hash;
     };
 
+    struct batch_of_bare_unspent_outs
+    {
+      std::vector<size_t> tids;
+      uint64_t total_amount = 0;
+      bool additional_tid = false; // additional zc transfer if total_amount < min fee
+      uint64_t additional_tid_amount = 0;
+    };
 
 
 
@@ -378,6 +386,12 @@ namespace tools
     void set_do_rise_transfer(bool do_rise) { m_do_rise_transfer = do_rise; }
 
     bool has_related_alias_entry_unconfirmed(const currency::transaction& tx);
+    bool has_bare_unspent_outputs() const;
+    bool get_bare_unspent_outputs_stats(std::vector<batch_of_bare_unspent_outs>& buo_txs) const;
+    bool sweep_bare_unspent_outputs(const currency::account_public_address& target_address, const std::vector<batch_of_bare_unspent_outs>& tids_grouped_by_txs,
+      std::function<void(size_t batch_index, const currency::transaction& tx, uint64_t amount, uint64_t fee, bool sent_ok, const std::string& err)> on_tx_sent);
+    bool sweep_bare_unspent_outputs(const currency::account_public_address& target_address, const std::vector<batch_of_bare_unspent_outs>& tids_grouped_by_txs,
+      size_t& total_txs_sent, uint64_t& total_amount_sent, uint64_t& total_fee);
     void handle_unconfirmed_tx(process_transaction_context& ptc);
     void scan_tx_pool(bool& has_related_alias_in_unconfirmed);
     void refresh();
@@ -577,8 +591,8 @@ namespace tools
       wallet2_base_state::serialize(a, ver);
     }
 
-    bool is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_outputs_count);
-    bool is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count);
+    bool is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_outputs_count) const;
+    bool is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count) const;
     uint64_t select_indices_for_transfer(std::vector<uint64_t>& ind, free_amounts_cache_type& found_free_amounts, uint64_t needed_money, uint64_t fake_outputs_count);
     bool select_indices_for_transfer(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes);
 
