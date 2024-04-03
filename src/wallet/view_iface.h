@@ -201,11 +201,13 @@ public:
 
     std::list<tools::wallet_public::asset_balance_entry> balances;
     uint64_t minied_total;
+    bool has_bare_unspent_outputs;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_CHAIN_BASE(wallet_status_info_base)
       KV_SERIALIZE(balances)
       KV_SERIALIZE(minied_total)
+      KV_SERIALIZE(has_bare_unspent_outputs)
     END_KV_SERIALIZE_MAP()
   };  
   

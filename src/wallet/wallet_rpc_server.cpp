@@ -351,6 +351,7 @@ namespace tools
       res.utxo_distribution.push_back(currency::print_money_brief(ent.first) + ":" + std::to_string(ent.second));
 
     res.current_height = w.get_wallet()->get_top_block_height();
+    res.has_bare_unspent_outputs = w.get_wallet()->has_bare_unspent_outputs();
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
@@ -747,6 +748,77 @@ namespace tools
     {
       res.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(tx));
     }
+
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_get_bare_outs_stats(const wallet_public::COMMAND_RPC_GET_BARE_OUTS_STATS ::request& req, wallet_public::COMMAND_RPC_GET_BARE_OUTS_STATS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+
+    if (w.get_wallet()->is_watch_only())
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "operation cannot be performed in watch-only wallet";
+      return false;
+    }
+
+    std::vector<tools::wallet2::batch_of_bare_unspent_outs> groups;
+    if (!w.get_wallet()->get_bare_unspent_outputs_stats(groups))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "get_bare_unspent_outputs_stats failed";
+      return false;
+    }
+
+    res.total_amount = 0;
+    res.total_bare_outs = 0;
+    res.expected_total_fee = 0;
+    res.txs_count = 0;
+    
+    for(auto &g : groups)
+    {
+      for (auto& tid: g.tids)
+      {
+        tools::transfer_details td{};
+        CHECK_AND_ASSERT_THROW_MES(w.get_wallet()->get_transfer_info_by_index(tid, td), "get_transfer_info_by_index failed with index " << tid);
+        res.total_amount += td.m_amount;
+      }
+      ++res.txs_count;
+      res.total_bare_outs += g.tids.size();
+      res.expected_total_fee += TX_DEFAULT_FEE;
+    }
+
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_sweep_bare_outs(const wallet_public::COMMAND_RPC_SWEEP_BARE_OUTS::request& req, wallet_public::COMMAND_RPC_SWEEP_BARE_OUTS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+
+    if (w.get_wallet()->is_watch_only())
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "operation cannot be performed in watch-only wallet";
+      return false;
+    }
+
+    std::vector<tools::wallet2::batch_of_bare_unspent_outs> groups;
+    if (!w.get_wallet()->get_bare_unspent_outputs_stats(groups))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "get_bare_unspent_outputs_stats failed";
+      return false;
+    }
+
+    res.amount_swept = 0;
+    res.bare_outs_swept = 0;
+    res.fee_spent = 0;
+    res.txs_sent = 0;
+
+    w.get_wallet()->sweep_bare_unspent_outputs(w.get_wallet()->get_account().get_public_address(), groups, res.txs_sent, res.amount_swept, res.fee_spent, res.bare_outs_swept);
 
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();

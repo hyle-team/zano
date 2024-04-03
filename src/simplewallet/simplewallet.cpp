@@ -2572,7 +2572,7 @@ bool simple_wallet::sweep_bare_outs(const std::vector<std::string> &args)
   }
 
   size_t i = 0, total_bare_outs = 0;
-  uint64_t total_mount = 0;
+  uint64_t total_amount = 0;
   std::stringstream details_ss;
   for(auto &g : groups)
   {
@@ -2582,7 +2582,7 @@ bool simple_wallet::sweep_bare_outs(const std::vector<std::string> &args)
       tools::transfer_details td{};
       CHECK_AND_ASSERT_THROW_MES(m_wallet->get_transfer_info_by_index(tid, td), "get_transfer_info_by_index failed with index " << tid);
       details_ss << tid << " (" << print_money_brief(td.m_amount) << "), ";
-      total_mount += td.m_amount;
+      total_amount += td.m_amount;
     }
 
     if (g.additional_tid)
@@ -2597,10 +2597,10 @@ bool simple_wallet::sweep_bare_outs(const std::vector<std::string> &args)
 
   LOG_PRINT_L1("bare UTXO:" << ENDL << details_ss.str());
   
-  success_msg_writer(true) << "This wallet contains " << total_bare_outs << " bare outputs with total amount of " << print_money_brief(total_mount) <<
+  success_msg_writer(true) << "This wallet contains " << total_bare_outs << " bare outputs with total amount of " << print_money_brief(total_amount) <<
     ". They can be converted in " << groups.size() << " transaction" << (groups.size() > 1 ? "s" : "") << ", with total fee = " << print_money_brief(TX_DEFAULT_FEE * i) << ".";
   if (target_address != m_wallet->get_account().get_public_address())
-    message_writer(epee::log_space::console_color_yellow, false) << print_money_brief(total_mount) << " coins will be sent to address " << get_account_address_as_str(target_address);
+    message_writer(epee::log_space::console_color_yellow, false) << print_money_brief(total_amount) << " coins will be sent to address " << get_account_address_as_str(target_address);
 
   tools::password_container reader;
   if (!reader.read_input("Would you like to continue? (y/yes/n/no):\n") || (reader.get_input() != "y" && reader.get_input() != "yes"))

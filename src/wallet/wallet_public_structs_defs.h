@@ -445,6 +445,7 @@ namespace wallet_public
       uint64_t                  transfers_count;
       uint64_t                  transfer_entries_count;
       bool                      is_whatch_only;
+      bool                      has_bare_unspent_outputs;
       std::vector<std::string>  utxo_distribution;
       uint64_t                  current_height;
 
@@ -454,6 +455,7 @@ namespace wallet_public
         KV_SERIALIZE(transfers_count)
         KV_SERIALIZE(transfer_entries_count)
         KV_SERIALIZE(is_whatch_only)
+        KV_SERIALIZE(has_bare_unspent_outputs)
         KV_SERIALIZE(utxo_distribution)
         KV_SERIALIZE(current_height)
       END_KV_SERIALIZE_MAP()
@@ -830,6 +832,54 @@ namespace wallet_public
         KV_SERIALIZE(amount_total)
         KV_SERIALIZE(outs_swept)
         KV_SERIALIZE(amount_swept)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_RPC_GET_BARE_OUTS_STATS
+  {
+    struct request
+    {
+      BEGIN_KV_SERIALIZE_MAP()
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      uint64_t      total_bare_outs;
+      uint64_t      total_amount;
+      uint64_t      expected_total_fee;
+      uint64_t      txs_count;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(total_bare_outs)
+        KV_SERIALIZE(total_amount)
+        KV_SERIALIZE(expected_total_fee)
+        KV_SERIALIZE(txs_count)
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_RPC_SWEEP_BARE_OUTS
+  {
+    struct request
+    {
+      BEGIN_KV_SERIALIZE_MAP()
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      uint64_t      bare_outs_swept;
+      uint64_t      amount_swept;
+      uint64_t      fee_spent;
+      uint64_t      txs_sent;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(bare_outs_swept)
+        KV_SERIALIZE(amount_swept)
+        KV_SERIALIZE(fee_spent)
+        KV_SERIALIZE(txs_sent)
       END_KV_SERIALIZE_MAP()
     };
   };

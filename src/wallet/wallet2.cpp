@@ -2346,14 +2346,16 @@ bool wallet2::sweep_bare_unspent_outputs(const currency::account_public_address&
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::sweep_bare_unspent_outputs(const currency::account_public_address& target_address, const std::vector<batch_of_bare_unspent_outs>& tids_grouped_by_txs,
-  size_t& total_txs_sent, uint64_t& total_amount_sent, uint64_t& total_fee_spent)
+  size_t& total_txs_sent, uint64_t& total_amount_sent, uint64_t& total_fee_spent, uint64_t& total_bare_outs_sent)
 {
   total_txs_sent = 0;
   total_amount_sent = 0;
   total_fee_spent = 0;
+  total_bare_outs_sent = 0;
   auto on_tx_sent_callback = [&](size_t batch_index, const currency::transaction& tx, uint64_t amount, uint64_t fee, bool sent_ok, const std::string& err) {
       if (sent_ok)
       {
+        total_bare_outs_sent += count_type_in_variant_container<txin_to_key>(tx.vin);
         ++total_txs_sent;
         total_fee_spent += fee;
         total_amount_sent += amount;

@@ -391,7 +391,7 @@ namespace tools
     bool sweep_bare_unspent_outputs(const currency::account_public_address& target_address, const std::vector<batch_of_bare_unspent_outs>& tids_grouped_by_txs,
       std::function<void(size_t batch_index, const currency::transaction& tx, uint64_t amount, uint64_t fee, bool sent_ok, const std::string& err)> on_tx_sent);
     bool sweep_bare_unspent_outputs(const currency::account_public_address& target_address, const std::vector<batch_of_bare_unspent_outs>& tids_grouped_by_txs,
-      size_t& total_txs_sent, uint64_t& total_amount_sent, uint64_t& total_fee);
+      size_t& total_txs_sent, uint64_t& total_amount_sent, uint64_t& total_fee, uint64_t& total_bare_outs_sent);
     void handle_unconfirmed_tx(process_transaction_context& ptc);
     void scan_tx_pool(bool& has_related_alias_in_unconfirmed);
     void refresh();
