@@ -315,7 +315,7 @@ namespace epee
     struct selector<true>
     {
       template<class t_type, class t_storage>
-      static bool serialize(const t_type& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+      static bool serialize(const t_type& d, t_storage& stg, [[maybe_unused]] typename t_storage::hsection hparent_section, [[maybe_unused]] const char* pname)
       {
         if constexpr (!t_storage::use_descriptions::value)
         {
