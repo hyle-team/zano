@@ -1043,7 +1043,7 @@ namespace crypto
     void zero()
     {
       PUSH_GCC_WARNINGS
-      DISABLE_GCC_AND_CLANG_WARNING(class-memaccess)
+      DISABLE_GCC_WARNING(class-memaccess)
       size_t size_bytes = sizeof(scalar_t) * size();
       memset(data(), 0, size_bytes);
       POP_GCC_WARNINGS

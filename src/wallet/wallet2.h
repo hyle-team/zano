@@ -1096,7 +1096,6 @@ namespace tools
     ts_middle -= ts_middle % POS_SCAN_STEP;
     uint64_t ts_window = std::min(ts_middle - ts_from, ts_to - ts_middle);
 
-    size_t pos_entry_index = 0;
     for (size_t transfer_index = 0; transfer_index != m_transfers.size(); transfer_index++)
     {
       auto& tr = m_transfers[transfer_index];
@@ -1164,7 +1163,6 @@ namespace tools
         
         next_turn();
       }
-      ++pos_entry_index;
     }
     cxt.status = API_RETURN_CODE_NOT_FOUND;
     return false;
