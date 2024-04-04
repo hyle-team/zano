@@ -38,9 +38,9 @@ void test_plain_wallet()
   std::string res = plain_wallet::init("127.0.0.1", "12111", "C:\\Users\\roky\\home\\", 0);
   
   uint64_t instance_id = 0;
-  res = plain_wallet::open("test_restored.zan", "111");
-  //res = plain_wallet::restore("heart level clear fate sorrow childhood sent fate ceiling party third steel came ask mix neither message already almost vast date glide tumble color okay space",
-  //  "test_restored.zan", "111", "");
+  res = plain_wallet::open("test_restored_2.zan", "111");
+  //res = plain_wallet::restore("",
+  //  "test_restored_2.zan", "111", "");
 
 
   while(true)
@@ -59,6 +59,10 @@ void test_plain_wallet()
 
   invoke_body = "{\"method\":\"get_recent_txs_and_info\",\"params\":{\"offset\":0,\"count\":30,\"update_provision_info\":true}}";  
   std::string res2 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
+  invoke_body = "{\"method\":\"get_recent_txs_and_info2\",\"params\":{\"offset\":0,\"count\":30,\"update_provision_info\":true}}";
+  res2 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
 
   invoke_body = "{\"method\":\"getbalance\",\"params\":{}}";
   std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);

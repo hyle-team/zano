@@ -592,7 +592,7 @@ namespace currency
       KV_SERIALIZE(service_id)
       KV_SERIALIZE(instruction)
       KV_SERIALIZE_BLOB_AS_HEX_STRING(body)
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(security)
+      KV_SERIALIZE_CONTAINER_POD_AS_HEX(security)
       KV_SERIALIZE(flags)
     END_KV_SERIALIZE_MAP()
   };

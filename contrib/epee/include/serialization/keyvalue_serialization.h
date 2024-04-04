@@ -131,6 +131,10 @@ public: \
   static_assert(std::is_pod<decltype(this_ref.varialble)>::value, "t_type must be a POD type."); \
   KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(varialble, val_name)
 
+#define KV_SERIALIZE_CONTAINER_POD_AS_HEX_N(varialble, val_name) \
+	KV_SERIALIZE_CUSTOM_N(varialble, std::string, epee::transform_t_pod_array_to_hex_str_array<decltype(varialble)>, epee::transform_hex_str_array_to_t_pod_array<decltype(varialble)>, val_name)
+
+
 #define KV_SERIALIZE_CONTAINER_POD_AS_BLOB_N(varialble, val_name) \
   epee::serialization::selector<is_store>::serialize_stl_container_pod_val_as_blob(this_ref.varialble, stg, hparent_section, val_name);
 
@@ -145,6 +149,7 @@ public: \
 #define KV_SERIALIZE_VAL_POD_AS_BLOB(varialble)                  KV_SERIALIZE_VAL_POD_AS_BLOB_N(varialble, #varialble)
 #define KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(varialble)            KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(varialble, #varialble) //skip is_pod compile time check
 #define KV_SERIALIZE_CONTAINER_POD_AS_BLOB(varialble)            KV_SERIALIZE_CONTAINER_POD_AS_BLOB_N(varialble, #varialble)
+#define KV_SERIALIZE_CONTAINER_POD_AS_HEX(varialble)             KV_SERIALIZE_CONTAINER_POD_AS_HEX_N(varialble, #varialble)
 #define KV_SERIALIZE_CUSTOM(varialble, stored_type, from_v_to_stored, from_stored_to_v)    KV_SERIALIZE_CUSTOM_N(varialble, stored_type, from_v_to_stored, from_stored_to_v, #varialble)
 #define KV_SERIALIZE_POD_AS_HEX_STRING(varialble)                KV_SERIALIZE_POD_AS_HEX_STRING_N(varialble, #varialble)
 #define KV_SERIALIZE_BLOB_AS_HEX_STRING(varialble)               KV_SERIALIZE_BLOB_AS_HEX_STRING_N(varialble, #varialble)
