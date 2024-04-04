@@ -818,7 +818,7 @@ namespace tools
     res.fee_spent = 0;
     res.txs_sent = 0;
 
-    w.get_wallet()->sweep_bare_unspent_outputs(w.get_wallet()->get_account().get_public_address(), groups, res.txs_sent, res.amount_swept, res.fee_spent, res.bare_outs_swept);
+    w.get_wallet()->sweep_bare_unspent_outputs(w.get_wallet()->get_account().get_public_address(), groups, static_cast<size_t&>(res.txs_sent), res.amount_swept, res.fee_spent, res.bare_outs_swept);
 
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
