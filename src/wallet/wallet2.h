@@ -234,6 +234,7 @@ namespace tools
     wallet2(const wallet2&) = delete;
   public:
     wallet2();
+    virtual ~wallet2() {}
 
     static std::string transfer_flags_to_str(uint32_t flags);
 
