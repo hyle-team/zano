@@ -346,7 +346,7 @@ namespace tools
 
     struct batch_of_bare_unspent_outs
     {
-      std::vector<size_t> tids;
+      std::vector<uint64_t> tids;
       uint64_t total_amount = 0;
       bool additional_tid = false; // additional zc transfer if total_amount < min fee
       uint64_t additional_tid_amount = 0;

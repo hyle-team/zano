@@ -195,12 +195,12 @@ private:
   bool do_exception_safe_call(guarded_code_t guarded_code, error_prefix_maker_t error_prefix_maker, std::string& api_return_code_result);
 
   //----- i_backend_wallet_callback ------
-  virtual void on_new_block(size_t wallet_id, uint64_t height, const currency::block& block);
-  virtual void on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined);
-  virtual void on_pos_block_found(size_t wallet_id, const currency::block& /*block*/);
-  virtual void on_sync_progress(size_t wallet_id, const uint64_t& /*percents*/);
-  virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti);
-  virtual void on_tor_status_change(size_t wallet_id, const std::string& state);
+  virtual void on_new_block(size_t wallet_id, uint64_t height, const currency::block& block) override;
+  virtual void on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) override;
+  virtual void on_pos_block_found(size_t wallet_id, const currency::block& /*block*/) override;
+  virtual void on_sync_progress(size_t wallet_id, const uint64_t& /*percents*/) override;
+  virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti) override;
+  virtual void on_tor_status_change(size_t wallet_id, const std::string& state) override;
 
   virtual void on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets) override;
   virtual bool on_mw_select_wallet(uint64_t wallet_id) override;

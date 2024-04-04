@@ -2225,7 +2225,7 @@ bool wallet2::get_bare_unspent_outputs_stats(std::vector<batch_of_bare_unspent_o
     {
       if (tids_grouped_by_txs.back().tids.size() >= MAX_INPUTS_FOR_SIMPLE_TX_EURISTIC)
         tids_grouped_by_txs.emplace_back();
-      tids_grouped_by_txs.back().tids.push_back(tid);
+      tids_grouped_by_txs.back().tids.push_back((uint64_t)tid);
       tids_grouped_by_txs.back().total_amount += m_transfers[tid].m_amount;
     }
   }
@@ -2264,7 +2264,7 @@ bool wallet2::get_bare_unspent_outputs_stats(std::vector<batch_of_bare_unspent_o
         WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(jt->first >= min_required_amount, "jt->first=" << jt->first << ", min_required_amount=" << min_required_amount);
         if (used_zc_outs.count(jt->second) == 0)
         {
-          group.tids.push_back(jt->second);
+          group.tids.push_back((uint64_t)jt->second);
           used_zc_outs.insert(jt->second);
           group.additional_tid = true;
           group.additional_tid_amount = jt->first;
