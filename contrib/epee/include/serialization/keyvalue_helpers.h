@@ -124,10 +124,10 @@ namespace epee
     for (const auto& item : pod_items)
     {
       res.resize(res.size() + 1);
-      t_pod_container_type::value_type& pod_val = res.back();
+      typename t_pod_container_type::value_type& pod_val = res.back();
 
       if (!epee::string_tools::hex_to_pod(item, pod_val))
-        throw std::runtime_error(std::string("Unable to transform \"") + item + "\" to pod type " + typeid(t_pod_container_type::value_type).name());
+        throw std::runtime_error(std::string("Unable to transform \"") + item + "\" to pod type " + typeid(typename t_pod_container_type::value_type).name());
     }
     return res;
   }
