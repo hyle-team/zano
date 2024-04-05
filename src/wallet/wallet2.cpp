@@ -6952,8 +6952,6 @@ bool wallet2::expand_selection_with_zc_input(assets_selection_context& needed_mo
 //----------------------------------------------------------------------------------------------------
 bool wallet2::select_indices_for_transfer(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes)
 {
-  bool res = true;
-  //
   for (auto& item : needed_money_map)
   {
     if(item.second.needed_amount == 0)
@@ -6980,8 +6978,7 @@ bool wallet2::select_indices_for_transfer(assets_selection_context& needed_money
     }
   }
 
-
-  return res;
+  return true;
 }
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::select_indices_for_transfer(std::vector<uint64_t>& selected_indexes, free_amounts_cache_type& found_free_amounts, uint64_t needed_money, uint64_t fake_outputs_count_)
@@ -7097,7 +7094,7 @@ void wallet2::add_transfer_to_transfers_cache(uint64_t amount, uint64_t index, c
   m_found_free_amounts[asset_id][amount].insert(index);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::select_transfers(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t dust, std::vector<uint64_t>& selected_indicies)
+bool wallet2::select_transfers(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t /*dust_threshold*/, std::vector<uint64_t>& selected_indicies)
 {
   prepare_free_transfers_cache(fake_outputs_count);
   return select_indices_for_transfer(needed_money_map, fake_outputs_count, selected_indicies);
