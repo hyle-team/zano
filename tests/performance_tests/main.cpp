@@ -55,7 +55,7 @@ void test_plain_wallet()
 
 
   std::string invoke_body = "{\"method\":\"store\",\"params\":{}}";
-  //std::string res1 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+  std::string res1 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
   invoke_body = "{\"method\":\"get_recent_txs_and_info\",\"params\":{\"offset\":0,\"count\":30,\"update_provision_info\":true}}";  
   std::string res2 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
