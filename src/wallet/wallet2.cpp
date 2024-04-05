@@ -6234,10 +6234,18 @@ bool wallet2::prepare_tx_sources_for_defragmentation_tx(std::vector<currency::tx
 //----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t dust_threshold, std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies)
 {
-  bool r = select_transfers(needed_money_map, fake_outputs_count, dust_threshold, selected_indicies);
-  if (!r)
-    return r;
-  return prepare_tx_sources(fake_outputs_count, sources, selected_indicies);
+  try
+  {
+    select_transfers(needed_money_map, fake_outputs_count, dust_threshold, selected_indicies); // always returns true, TODO consider refactoring -- sowle
+    return prepare_tx_sources(fake_outputs_count, sources, selected_indicies);
+  }
+  catch(...)
+  {
+    // if smth went wrong -- invalidate transfers cache to trigger its regeneration on the next use
+    // it is necessary because it may be in invalid state (some items might be erased within select_indices_for_transfer() or expand_selection_with_zc_input())
+    m_found_free_amounts.clear();
+    throw;
+  }
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::prefetch_global_indicies_if_needed(const std::vector<uint64_t>& selected_indicies)
