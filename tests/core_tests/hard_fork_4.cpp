@@ -243,3 +243,80 @@ bool hardfork_4_explicit_native_ids_in_outs::c1(currency::core& c, size_t ev_ind
   return true;
 }
 */
+
+//------------------------------------------------------------------------------
+
+hardfork_4_wallet_transfer_with_mandatory_mixins::hardfork_4_wallet_transfer_with_mandatory_mixins()
+{
+  REGISTER_CALLBACK_METHOD(hardfork_4_wallet_transfer_with_mandatory_mixins, c1);
+  REGISTER_CALLBACK_METHOD(hardfork_4_wallet_transfer_with_mandatory_mixins, configure_core);
+}
+
+bool hardfork_4_wallet_transfer_with_mandatory_mixins::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  test_chain_unit_enchanced::configure_core(c, ev_index, events); // call default
+  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
+  pc.hf4_minimum_mixins = CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE;
+  c.get_blockchain_storage().set_core_runtime_config(pc);
+  return true;
+}
+
+bool hardfork_4_wallet_transfer_with_mandatory_mixins::generate(std::vector<test_event_entry>& events) const
+{
+  /* Test outline: make sure that after HF4 a normal transfer with CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE decoys goes normal.
+  * (It should also work prior to HF4.)
+  */
+
+  bool r = false;
+
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core"); // necessary for the test to be run by GENERATE_AND_PLAY_HF
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  MAKE_TX(events, tx_1, miner_acc, alice_acc, MK_TEST_COINS(10), blk_0r);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool hardfork_4_wallet_transfer_with_mandatory_mixins::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  alice_wlt->refresh();
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", MK_TEST_COINS(10), 0, 0, 0, 0), false, "");
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
+  alice_wlt->refresh();
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", MK_TEST_COINS(10), 0, MK_TEST_COINS(10), 0, 0), false, "");
+
+  alice_wlt->transfer(MK_TEST_COINS(9), m_accounts[BOB_ACC_IDX].get_public_address());
+
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  bob_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", MK_TEST_COINS(9), 0, 0, 0, 0), false, "");
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", 0, 0, 0, 0, 0), false, "");
+  bob_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", MK_TEST_COINS(9), 0, MK_TEST_COINS(9), 0, 0), false, "");
+
+  return true;
+}

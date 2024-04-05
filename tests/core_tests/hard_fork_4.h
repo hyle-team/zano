@@ -25,3 +25,12 @@ struct hardfork_4_explicit_native_ids_in_outs : public wallet_test
 
   mutable uint64_t m_alice_initial_balance = 0;
 };
+
+
+struct hardfork_4_wallet_transfer_with_mandatory_mixins : public wallet_test
+{
+  hardfork_4_wallet_transfer_with_mandatory_mixins();
+  bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
