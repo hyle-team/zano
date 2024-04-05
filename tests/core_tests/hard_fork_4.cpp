@@ -273,6 +273,7 @@ bool hardfork_4_wallet_transfer_with_mandatory_mixins::generate(std::vector<test
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
   DO_CALLBACK(events, "configure_core"); // necessary for the test to be run by GENERATE_AND_PLAY_HF
 
@@ -316,7 +317,7 @@ bool hardfork_4_wallet_transfer_with_mandatory_mixins::c1(currency::core& c, siz
   alice_wlt->refresh();
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", 0, 0, 0, 0, 0), false, "");
   bob_wlt->refresh();
-  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", MK_TEST_COINS(9), 0, MK_TEST_COINS(9), 0, 0), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", MK_TEST_COINS(9), 0, MK_TEST_COINS(9), 0, 0), false, "");
 
   return true;
 }
