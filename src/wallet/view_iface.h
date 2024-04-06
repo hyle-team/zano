@@ -451,7 +451,7 @@ public:
     uint64_t wallet_id;
     transfers_array recent_history;
     wallet_info wi;
-    std::string seed;
+    //std::string seed;
     bool recovered;
     uint64_t wallet_local_bc_size;
     uint64_t wallet_file_size;
@@ -462,7 +462,7 @@ public:
       KV_SERIALIZE(wallet_id)
       KV_SERIALIZE(recent_history)
       KV_SERIALIZE(wi)
-      KV_SERIALIZE(seed)
+      //KV_SERIALIZE(seed)
       KV_SERIALIZE(recovered)
       KV_SERIALIZE(wallet_local_bc_size)
       KV_SERIALIZE(wallet_file_size)
