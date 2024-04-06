@@ -560,9 +560,70 @@ namespace misc_utils
     {
       while(m_expirations.size() && m_expirations.begin()->first < e)
       {
+        m_set.erase(m_expirations.begin()->second);
         m_expirations.erase(m_expirations.begin());
       }
     }
+  };
+
+  template<typename key, typename expiration_type, typename value_type>
+  struct expirating_map
+  {
+    typedef std::map<key, value_type> main_map;
+    main_map m_map;
+    std::multimap<expiration_type, typename main_map::iterator> m_expirations;
+
+    const main_map& get_map()
+    {
+      return m_map;
+    }
+    void add(const key& k, const value_type& v, const expiration_type& e)
+    {
+      auto res = m_map.insert(k, v);
+      m_expirations.insert({ e, res.first });
+    }
+
+    void remove_if_expiration_less_than(const expiration_type& e)
+    {
+      while (m_expirations.size() && m_expirations.begin()->first < e)
+      {
+        m_map.erase(m_expirations.begin()->second)
+        m_expirations.erase(m_expirations.begin());
+      }
+    }
+
+    template <class t_archive>
+    inline void serialize(t_archive& a, const unsigned int ver)
+    {
+      std::vector<std::tuple<key, value_type, expiration_type> > items;
+      if constexpr (t_archive::is_saving::value)
+      {
+        for (const auto& item: m_expirations)
+        {
+          items.resize(items.size + 1);
+          std::get<2>(items.back()) = item.first;
+          std::get<0>(items.back()) = item.second.first;
+          std::get<1>(items.back()) = item.second.second;
+        }
+      }
+      a & items;
+
+      if constexpr (!t_archive::is_saving::value)
+      {
+        for (const auto& item : items)
+        {
+          this->add(std::get<0>(item), std::get<1>(item), std::get<2>(item));
+
+
+          items.resize(items.size + 1);
+          std::get<2>(items.back()) = item.first;
+          std::get<0>(items.back()) = item.second.first;
+          std::get<1>(items.back()) = item.second.second;
+        }
+      }
+
+    }
+
   };
 
 
