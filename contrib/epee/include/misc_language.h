@@ -587,7 +587,7 @@ namespace misc_utils
     {
       while (m_expirations.size() && m_expirations.begin()->first < e)
       {
-        m_map.erase(m_expirations.begin()->second)
+        m_map.erase(m_expirations.begin()->second);
         m_expirations.erase(m_expirations.begin());
       }
     }
