@@ -501,6 +501,59 @@ void wallet2::add_rollback_event(uint64_t h, const wallet_event_t& ev)
   m_rollback_events.emplace_back(h, ev);
 }
 //----------------------------------------------------------------------------------------------------
+#define M_LAST_ZC_GLOBAL_INDEXS_MAX_SIZE                    30
+void wallet2::add_to_last_zc_global_indexs(uint64_t h, uint64_t last_zc_output_index)
+{
+  //m_last_zc_global_indexs.remove_if_expiration_less_than(m_last_known_daemon_height - (WALLET_DEFAULT_TX_SPENDABLE_AGE * 2) );
+
+  if (m_last_zc_global_indexs.size())
+  {
+    if (m_last_zc_global_indexs.begin()->first > h)
+    {
+      //new block added on top of last one, simply add new record
+      m_last_zc_global_indexs.push_front(std::make_pair(h, last_zc_output_index));
+    }
+    else if (m_last_zc_global_indexs.begin()->first < h)
+    {
+      //looks like reorganize, pop all records before 
+      while (m_last_zc_global_indexs.size() && m_last_zc_global_indexs.begin()->first >= h)
+      {
+        m_last_zc_global_indexs.erase(m_last_zc_global_indexs.begin());
+      }
+      m_last_zc_global_indexs.push_front(std::make_pair(h, last_zc_output_index));
+    }
+    else
+    {
+      //equals, same h but new last_zc_output_index, just update it, should be always bigger then prev
+      WLT_THROW_IF_FALSE_WITH_CODE(m_last_zc_global_indexs.begin()->second <= last_zc_output_index,
+        "condition m_last_zc_global_indexs.begin()->second " << m_last_zc_global_indexs.begin()->second << " <= last_zc_output_index " << last_zc_output_index << " failed", API_RETURN_CODE_INTERNAL_ERROR);
+      m_last_zc_global_indexs.begin()->second = last_zc_output_index;
+    }
+  }
+  else
+  {
+    //new block added on top of last one, simply add new record
+    m_last_zc_global_indexs.push_front(std::make_pair(h, last_zc_output_index));
+  }
+
+  if (m_last_zc_global_indexs.size() > M_LAST_ZC_GLOBAL_INDEXS_MAX_SIZE)
+    m_last_zc_global_indexs.pop_back();
+}
+//----------------------------------------------------------------------------------------------------
+uint64_t wallet2::get_actual_zc_global_index()
+{
+  WLT_THROW_IF_FALSE_WITH_CODE(m_last_zc_global_indexs.size(), "m_last_zc_global_indexs is empty", API_RETURN_CODE_INTERNAL_ERROR);
+  for (auto it = m_last_zc_global_indexs.begin(); it != m_last_zc_global_indexs.end(); it++)
+  {
+    if (it->first <= m_last_known_daemon_height - WALLET_DEFAULT_TX_SPENDABLE_AGE)
+    {
+      return it->second;
+    }
+  }
+  WLT_THROW_IF_FALSE_WITH_CODE(false, "doesn't have anything that match expected height = " << m_last_known_daemon_height - WALLET_DEFAULT_TX_SPENDABLE_AGE, API_RETURN_CODE_INTERNAL_ERROR);
+  throw std::runtime_error(""); //mostly to suppress compiler warning 
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes)
 {
   //check for transaction spends
@@ -518,11 +571,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
   {
     if (pglobal_indexes->size())
     {
-      //store global index that is under coinage, so we can used in decoy selection algo
-      if (ptc.height < m_last_known_daemon_height && m_last_known_daemon_height - ptc.height > WALLET_DEFAULT_TX_SPENDABLE_AGE)
-      {
-        m_last_zc_global_index = pglobal_indexes->back();
-      }        
+      add_to_last_zc_global_indexs(ptc.height, pglobal_indexes->back());
     }
   }
 
@@ -6288,13 +6337,6 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, std::vector<currenc
     size_t fake_outputs_count = fake_outputs_count_;
     uint64_t zarcanum_start_from = m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_HARDFORK_04_ZARCANUM];
     uint64_t current_size = m_chain.get_blockchain_current_size();
-    decoy_selection_generator zarcanum_decoy_set_generator;
-    if (current_size - 1 >= zarcanum_start_from)
-    {
-      //in Zarcanum era
-      //const uint64_t test_scale_size = current_size - 1 - zarcanum_start_from;
-      zarcanum_decoy_set_generator.init(m_last_zc_global_index);
-    }
 
     bool need_to_request = fake_outputs_count != 0;
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request req = AUTO_VAL_INIT(req);
@@ -6320,7 +6362,7 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, std::vector<currenc
         //Zarcanum era
         rdisttib.amount = 0;
         //generate distribution in Zarcanum hardfork
-        build_distribution_for_input(zarcanum_decoy_set_generator, rdisttib.global_offsets, it->m_global_output_index);
+        build_distribution_for_input(rdisttib.global_offsets, it->m_global_output_index);
         need_to_request = true;
       }
       else
@@ -6538,12 +6580,16 @@ void wallet2::select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS
   amount_entry.outs = local_outs;  
 }
 //----------------------------------------------------------------------------------------------------------------
-void wallet2::build_distribution_for_input(decoy_selection_generator& zarcanum_decoy_set_generator, std::vector<uint64_t>& offsets, uint64_t own_index)
+void wallet2::build_distribution_for_input(std::vector<uint64_t>& offsets, uint64_t own_index)
 {
+  decoy_selection_generator zarcanum_decoy_set_generator;
+  zarcanum_decoy_set_generator.init(get_actual_zc_global_index());
+
   THROW_IF_FALSE_WALLET_INT_ERR_EX(zarcanum_decoy_set_generator.is_initialized(), "zarcanum_decoy_set_generator are not initialized");
   if (m_core_runtime_config.hf4_minimum_mixins)
   {
-    offsets = zarcanum_decoy_set_generator.generate_unique_reversed_distribution(m_last_zc_global_index - 1 > WALLET_FETCH_RANDOM_OUTS_SIZE ? WALLET_FETCH_RANDOM_OUTS_SIZE: m_last_zc_global_index - 1, own_index);
+    uint64_t actual_zc_index = get_actual_zc_global_index();
+    offsets = zarcanum_decoy_set_generator.generate_unique_reversed_distribution(actual_zc_index - 1 > WALLET_FETCH_RANDOM_OUTS_SIZE ? WALLET_FETCH_RANDOM_OUTS_SIZE : actual_zc_index - 1, own_index);
   }
 }
 //----------------------------------------------------------------------------------------------------------------
