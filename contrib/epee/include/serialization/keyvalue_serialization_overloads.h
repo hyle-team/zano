@@ -317,12 +317,12 @@ namespace epee
       template<class t_type, class t_storage>
       static bool serialize(const t_type& d, t_storage& stg, [[maybe_unused]] typename t_storage::hsection hparent_section, [[maybe_unused]] const char* pname)
       {
-        if constexpr (!t_storage::use_descriptions::value)
-        {
+        //if constexpr (!t_storage::use_descriptions::value)
+        //{
           return kv_serialize(d, stg, hparent_section, pname);
-        }
-        else 
-          return false;
+        //}
+        //else 
+        //  return false;
 
       }
       //const t_type& doc_substitute = t_type(), const std::string& description = std::string()

@@ -1078,7 +1078,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       owr.wallet_local_bc_size = w->get_blockchain_current_size();
 
       //workaround for missed fee
-      //owr.seed = w->get_account().get_seed_phrase();
+      owr.seed = w->get_account().get_seed_phrase("");
       break;
     }
     catch (const tools::error::file_not_found& /**/)

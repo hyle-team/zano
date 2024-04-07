@@ -65,17 +65,33 @@ public: \
   static bool serialize_map(this_type& this_ref, t_storage& stg, typename t_storage::hsection hparent_section) \
 {
 
+
+#define KV_CAT_(a, b) a ## b
+#define KV_CAT(a, b) KV_CAT_(a, b)
+#define VARNAME(Var) KV_CAT(Var, __LINE__)
+
+#define KV_MAKE_ALIAS_NAME() VARNAME(alias_tmp_name)
+#define KV_MAKE_VAR_NAME() VARNAME(val_tmp_name)
+
 #define KV_SERIALIZE_N(varialble, val_name) \
+  using KV_MAKE_ALIAS_NAME() = decltype(this_ref.varialble); \
+  const char* KV_MAKE_VAR_NAME() = val_name;\
   epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name);
 
-#define KV_SERIALIZE_N_DOC(varialble, val_name) \
-  {  using var_type = decltype(this_ref.varialble); \
-     epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name); \
-     if constexpr (t_storage::use_descriptions::value) \
-     { \
-       epee::serialization::selector<is_store>::template serialize_and_doc<var_type>(stg, hparent_section, val_name 
+//#define KV_SERIALIZE_N_DOC(varialble, val_name) \
+//     using KV_MAKE_ALIAS_NAME() = decltype(this_ref.varialble); \
+//     epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name); \
+//     if constexpr (t_storage::use_descriptions::value) \
+//     { \
+//       epee::serialization::selector<is_store>::template serialize_and_doc<KV_MAKE_ALIAS_NAME()>(stg, hparent_section, val_name 
+ 
 
-/*
+#define DOC_DSCR(description)    if constexpr (t_storage::use_descriptions::value) \
+     { \
+       epee::serialization::selector<is_store>::template serialize_and_doc<KV_MAKE_ALIAS_NAME()>(stg, hparent_section, KV_MAKE_VAR_NAME(), description 
+
+ 
+  /*
     {using var_type = decltype(this_ref.varialble); \
      epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name); \
      if constexpr (t_storage::use_descriptions::value) \
@@ -84,15 +100,16 @@ public: \
      } \
   }
 */
-#define DOC_DSCR(description)                                    , description
+
+//#define DOC_DSCR(description)                                    , description
 #define DOC_EXMP(substitute)                                     , substitute
-#define DOC_EXMP_AUTO_1(arg_1)                                   , var_type(arg_1)
-#define DOC_EXMP_AUTO_2(arg_1, arg_2)                            , var_type(arg_1, arg_2)
-#define DOC_END                                                  ); } }
+#define DOC_EXMP_AUTO_1(arg_1)                                   , KV_MAKE_ALIAS_NAME() (arg_1)
+#define DOC_EXMP_AUTO_2(arg_1, arg_2)                            , KV_MAKE_ALIAS_NAME() (arg_1, arg_2)
+#define DOC_END                                                  ); }
 
 
 
-#define DOC_EXMP_AUTO(...)                                       , epee::create_t_object<var_type>(__VA_ARGS__)
+#define DOC_EXMP_AUTO(...)                                       , epee::create_t_object<KV_MAKE_ALIAS_NAME() >(__VA_ARGS__)
 
 
 // Function template to create an object with forwarded constructor arguments
@@ -109,9 +126,13 @@ public: \
 
 
 #define KV_SERIALIZE_CUSTOM_N(varialble, stored_type, from_v_to_stored, from_stored_to_v, val_name) \
+  using KV_MAKE_ALIAS_NAME() = stored_type; \
+  const char* VARNAME(val_tmp_name) = val_name;\
   epee::serialization::selector<is_store>::template serialize_custom<stored_type>(this_ref.varialble, stg, hparent_section, val_name, from_v_to_stored, from_stored_to_v);
 
 #define KV_SERIALIZE_EPHEMERAL_N(stored_type, from_v_to_stored, val_name) \
+  using KV_MAKE_ALIAS_NAME() = stored_type; \
+  const char* VARNAME(val_tmp_name) = val_name;\
   epee::serialization::selector<is_store>::template serialize_ephemeral<stored_type>(this_ref, stg, hparent_section, val_name, from_v_to_stored);
 
 

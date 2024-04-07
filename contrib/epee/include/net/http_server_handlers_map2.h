@@ -66,8 +66,8 @@ bool auto_doc_t(const std::string& prefix_name, std::string& generate_reference)
 
   std::stringstream ss;
   ss << prefix_name << ENDL
-    << "REQUEST: " << ENDL << req_str << ENDL <<  "--------------------------------" << ENDL
-    << "RESPONSE: " << ENDL << res_str << ENDL << "################################" << ENDL;
+    << "REQUEST: " << ENDL << req_str << ENDL << req_str_descr <<  "--------------------------------" << ENDL
+    << "RESPONSE: " << ENDL << res_str << ENDL << res_str_descr << "################################" << ENDL;
   generate_reference += ss.str();
   return true;
 }

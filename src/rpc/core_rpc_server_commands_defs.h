@@ -152,12 +152,12 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_DOC(height)   DOC_DSCR("Some height of the block") DOC_EXMP(11111)     DOC_END
-        KV_SERIALIZE_DOC(status)   DOC_DSCR("Status of the operation")  DOC_EXMP("OK")      DOC_END
+        KV_SERIALIZE(height)   DOC_DSCR("Some height of the block") DOC_EXMP(11111)     DOC_END
+        KV_SERIALIZE(status)   DOC_DSCR("Status of the operation")  DOC_EXMP("OK")      DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
-
+  
 
   template<class t_block_complete_entry>
   struct COMMAND_RPC_GET_BLOCKS_FAST_T
@@ -212,9 +212,9 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_DOC(txs_as_hex)    DOC_DSCR("Transactions stored as blobs")   DOC_EXMP_AUTO(1, "7d914497d91442f8f3c2268397d914497d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc2f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
-        KV_SERIALIZE_DOC(missed_tx)     DOC_DSCR("Missed transactions hashes")     DOC_EXMP_AUTO(1, "97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
-        KV_SERIALIZE_DOC(status)        DOC_DSCR("Command response status")        DOC_EXMP_AUTO("OK")    DOC_END
+        KV_SERIALIZE(txs_as_hex)    DOC_DSCR("Transactions stored as blobs")   DOC_EXMP_AUTO(1, "7d914497d91442f8f3c2268397d914497d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc2f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
+        KV_SERIALIZE(missed_tx)     DOC_DSCR("Missed transactions hashes")     DOC_EXMP_AUTO(1, "97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
+        KV_SERIALIZE(status)        DOC_DSCR("Command response status")        DOC_EXMP_AUTO("OK")    DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };

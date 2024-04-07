@@ -281,12 +281,12 @@ int main(int argc, char* argv[])
     std::string generate_reference = std::string("RPC_COMMANDS_LIST:\n");
     bool call_found = false;
     rpc_server.handle_http_request_map(query_info, response_info, conn_context, call_found, generate_reference);
-    std::string json_rpc_reference;
-    query_info.m_URI = JSON_RPC_REFERENCE_MARKER;
-    query_info.m_body = "{\"jsonrpc\": \"2.0\", \"method\": \"nonexisting_method\", \"params\": {}},";
-    rpc_server.handle_http_request_map(query_info, response_info, conn_context, call_found, json_rpc_reference);
+    //std::string json_rpc_reference;
+    //query_info.m_URI = JSON_RPC_REFERENCE_MARKER;
+    //query_info.m_body = "{\"jsonrpc\": \"2.0\", \"method\": \"nonexisting_method\", \"params\": {}},";
+    //rpc_server.handle_http_request_map(query_info, response_info, conn_context, call_found, json_rpc_reference);
 
-    LOG_PRINT_L0(generate_reference << ENDL << "----------------------------------------" << ENDL << json_rpc_reference);
+    LOG_PRINT_L0(generate_reference);
 
     return 0;
   }

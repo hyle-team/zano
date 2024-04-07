@@ -2807,7 +2807,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_set_timeout);
   command_line::add_arg(desc_params, arg_voting_config_file);
   command_line::add_arg(desc_params, arg_no_password_confirmations);
-    
+  command_line::add_arg(desc_params, command_line::arg_show_rpc_autodoc);    
 
   tools::wallet_rpc_server::init_options(desc_params);
 
@@ -2860,6 +2860,29 @@ int main(int argc, char* argv[])
     log_space::get_set_log_detalisation_level(true, new_log_level);
     LOG_PRINT_L0("Log level changed: " << old_log_level << " -> " << new_log_level);
     message_writer(epee::log_space::console_color_white, true) << "Log level changed: " << old_log_level << " -> " << new_log_level;
+  }
+
+
+  if (command_line::get_arg(vm, command_line::arg_show_rpc_autodoc))
+  {
+    LOG_PRINT_L0("Dumping RPC auto-generated documents!");
+    epee::net_utils::http::http_request_info query_info;
+    epee::net_utils::http::http_response_info response_info;
+    epee::net_utils::connection_context_base conn_context;
+    std::string generate_reference = std::string("WALLET_RPC_COMMANDS_LIST:\n");
+    bool call_found = false;
+    tools::wallet_rpc_server wallet_rpc_server(std::shared_ptr<tools::wallet2>(new tools::wallet2()));
+    //wallet_rpc_server.handle_http_request_map(query_info, response_info, conn_context, call_found, generate_reference);
+
+    std::string json_rpc_reference = generate_reference;
+    query_info.m_URI = JSON_RPC_REFERENCE_MARKER;
+    query_info.m_body = "{\"jsonrpc\": \"2.0\", \"method\": \"nonexisting_method\", \"params\": {}},";
+    wallet_rpc_server.handle_http_request_map(query_info, response_info, conn_context, call_found, json_rpc_reference);
+
+
+    LOG_PRINT_L0(json_rpc_reference);
+
+    return 0;
   }
 
 

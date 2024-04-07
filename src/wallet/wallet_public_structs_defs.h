@@ -312,10 +312,10 @@ namespace wallet_public
 
     //v2
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(total)
-      KV_SERIALIZE(unlocked)
-      KV_SERIALIZE(awaiting_in)
-      KV_SERIALIZE(awaiting_out)
+      KV_SERIALIZE(total)         DOC_DSCR("Total coins available(including locked)") DOC_EXMP(100000000000000)    DOC_END
+      KV_SERIALIZE(unlocked)      DOC_DSCR("Unlocked coins available(the ones that could be used right now)") DOC_EXMP(50000000000000)    DOC_END
+      KV_SERIALIZE(awaiting_in)   DOC_DSCR("Unconfirmed amount for receive") DOC_EXMP(1000000000000)    DOC_END
+      KV_SERIALIZE(awaiting_out)  DOC_DSCR("Unconfirmed amount for send")    DOC_EXMP(2000000000000)    DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
@@ -324,7 +324,7 @@ namespace wallet_public
     currency::asset_descriptor_with_id asset_info;
     //v2
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(asset_info)
+      KV_SERIALIZE(asset_info)            DOC_DSCR("Asset info details")  DOC_END
       KV_CHAIN_BASE(asset_balance_entry_base)
     END_KV_SERIALIZE_MAP()
   };
@@ -403,9 +403,9 @@ namespace wallet_public
       std::list<asset_balance_entry> balances;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(balance)
-        KV_SERIALIZE(unlocked_balance)
-        KV_SERIALIZE(balances)
+        KV_SERIALIZE(balance)           DOC_DSCR("Native coins total amount")           DOC_EXMP(10000000000)               DOC_END
+        KV_SERIALIZE(unlocked_balance)  DOC_DSCR("Native coins total unlocked amount")  DOC_EXMP(11000000000)               DOC_END
+        KV_SERIALIZE(balances)          DOC_DSCR("Balances groupped by it's asset_id")  DOC_EXMP_AUTO(1)                    DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
