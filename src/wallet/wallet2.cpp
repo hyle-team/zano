@@ -504,16 +504,14 @@ void wallet2::add_rollback_event(uint64_t h, const wallet_event_t& ev)
 #define M_LAST_ZC_GLOBAL_INDEXS_MAX_SIZE                    30
 void wallet2::add_to_last_zc_global_indexs(uint64_t h, uint64_t last_zc_output_index)
 {
-  //m_last_zc_global_indexs.remove_if_expiration_less_than(m_last_known_daemon_height - (WALLET_DEFAULT_TX_SPENDABLE_AGE * 2) );
-
   if (m_last_zc_global_indexs.size())
   {
-    if (m_last_zc_global_indexs.begin()->first > h)
+    if (h > m_last_zc_global_indexs.begin()->first)
     {
       //new block added on top of last one, simply add new record
       m_last_zc_global_indexs.push_front(std::make_pair(h, last_zc_output_index));
     }
-    else if (m_last_zc_global_indexs.begin()->first < h)
+    else if (h < m_last_zc_global_indexs.begin()->first)
     {
       //looks like reorganize, pop all records before 
       while (m_last_zc_global_indexs.size() && m_last_zc_global_indexs.begin()->first >= h)
