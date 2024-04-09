@@ -2353,7 +2353,7 @@ bool wallet2::sweep_bare_unspent_outputs(const currency::account_public_address&
     ftp.pevents_dispatcher = &m_debug_events_dispatcher;
     ftp.tx_version = this->get_current_tx_version();
 
-    if (!prepare_tx_sources(decoys_count, ftp.sources, group.tids))
+    if (!prepare_tx_sources(decoys_count, /*use_all_decoys_if_found_less_than_required*/ true, ftp.sources, group.tids))
     {
       on_tx_sent(batch_index, transaction{}, 0, 0, false, "sources for tx couldn't be prepared");
       LOG_PRINT_L0("prepare_tx_sources failed, batch_index = " << batch_index);
@@ -6322,7 +6322,12 @@ void wallet2::prefetch_global_indicies_if_needed(const std::vector<uint64_t>& se
   }*/
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, std::vector<currency::tx_source_entry>& sources, const std::vector<uint64_t>& selected_indicies)
+bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, const std::vector<uint64_t>& selected_indicies)
+{
+  return prepare_tx_sources(fake_outputs_count, false, sources, selected_indicies);
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys_if_found_less_than_required, std::vector<currency::tx_source_entry>& sources, const std::vector<uint64_t>& selected_indicies)
 {
   typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry out_entry;
   typedef currency::tx_source_entry::output_entry tx_output_entry;
@@ -6400,14 +6405,15 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, std::vector<currenc
 
       std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount> scanty_outs;
       THROW_IF_FALSE_WALLET_EX(daemon_resp.outs.size() == req.amounts.size(), error::not_enough_outs_to_mix, scanty_outs, fake_outputs_count);
-      for(size_t i = 0; i != daemon_resp.outs.size(); i++)
+
+      if (!use_all_decoys_if_found_less_than_required)
       {
-        if (req.amounts[i].amount != 0 && daemon_resp.outs[i].outs.size() != req.amounts[i].global_offsets.size())
-        {
-          scanty_outs.push_back(daemon_resp.outs[i]);
-        }
+        // make sure we have received the requested number of decoys
+        for(size_t i = 0; i != daemon_resp.outs.size(); i++)
+          if (req.amounts[i].amount != 0 && daemon_resp.outs[i].outs.size() != req.amounts[i].global_offsets.size())
+            scanty_outs.push_back(daemon_resp.outs[i]);
+        THROW_IF_FALSE_WALLET_EX(scanty_outs.empty(), error::not_enough_outs_to_mix, scanty_outs, fake_outputs_count);
       }
-      THROW_IF_FALSE_WALLET_EX(scanty_outs.empty(), error::not_enough_outs_to_mix, scanty_outs, fake_outputs_count);
     }
   }
 
