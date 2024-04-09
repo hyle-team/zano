@@ -1248,6 +1248,7 @@ int main(int argc, char* argv[])
     // HF4
     GENERATE_AND_PLAY_HF(hard_fork_4_consolidated_txs, "3-*");
     GENERATE_AND_PLAY_HF(hardfork_4_wallet_transfer_with_mandatory_mixins, "3-*");
+    GENERATE_AND_PLAY(hardfork_4_wallet_sweep_bare_outs);
 
     // atomics
     GENERATE_AND_PLAY(atomic_simple_test);

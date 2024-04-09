@@ -34,3 +34,11 @@ struct hardfork_4_wallet_transfer_with_mandatory_mixins : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+
+struct hardfork_4_wallet_sweep_bare_outs : public wallet_test
+{
+  hardfork_4_wallet_sweep_bare_outs();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};

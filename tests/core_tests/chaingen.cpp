@@ -2319,15 +2319,25 @@ bool check_ring_signature_at_gen_time(const std::vector<test_event_entry>& event
 
 bool check_mixin_value_for_each_input(size_t mixin, const crypto::hash& tx_id, currency::core& c)
 {
-  std::shared_ptr<const currency::transaction_chain_entry> ptce = c.get_blockchain_storage().get_tx_chain_entry(tx_id);
-  if (!ptce)
-    return false;
+  transaction tx_local;
+  const transaction* ptx = &tx_local;
 
-  for (size_t i = 0; i < ptce->tx.vin.size(); ++i)
+  std::shared_ptr<const currency::transaction_chain_entry> ptce = c.get_blockchain_storage().get_tx_chain_entry(tx_id);
+  if (ptce)
   {
-    auto& input = ptce->tx.vin[i];
+    ptx = &ptce->tx;
+  }
+  else
+  {
+    if (!c.get_tx_pool().get_transaction(tx_id, tx_local))
+      return false;
+  }
+  
+  for (size_t i = 0; i < ptx->vin.size(); ++i)
+  {
+    auto& input = ptx->vin[i];
     const std::vector<currency::txout_ref_v>& key_offsets = get_key_offsets_from_txin_v(input);
-    CHECK_AND_ASSERT_MES(key_offsets.size() == mixin + 1, false, "for input #" << i << " mixin count is " << key_offsets.size() - 1 << ", expected is " << mixin);
+    CHECK_AND_ASSERT_MES(key_offsets.size() == mixin + 1, false, "for input #" << i << " ring size is " << key_offsets.size() << ", mixin count is " << key_offsets.size() - 1 << ", expected mixin count is " << mixin);
   }
 
   return true;
