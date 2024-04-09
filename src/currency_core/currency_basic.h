@@ -589,11 +589,11 @@ namespace currency
     END_SERIALIZE()
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(service_id)
-      KV_SERIALIZE(instruction)
-      KV_SERIALIZE_BLOB_AS_HEX_STRING(body)
-      KV_SERIALIZE_CONTAINER_POD_AS_HEX(security)
-      KV_SERIALIZE(flags)
+      KV_SERIALIZE(service_id)                     DOC_DSCR("Service ID, identificator that diferent one service from another") DOC_EXMP("C")     DOC_END
+      KV_SERIALIZE(instruction)                    DOC_DSCR("Instruction that make sence for this particular service") DOC_EXMP("K")              DOC_END
+      KV_SERIALIZE_BLOB_AS_HEX_STRING(body)        DOC_DSCR("Hex-encoded body of the attachment") DOC_EXMP("dcfd7e055a6a3043ea3541a571a57a63e25dcc64e4a270f14fa9a58ac5dbec85dcfd7e055a6a3043ea3541a571a57a63e25dcc64e4a270f14fa9a58ac5dbec85")              DOC_END
+      KV_SERIALIZE_CONTAINER_POD_AS_HEX(security)  DOC_DSCR("Hex-encoded public key of the owner, optional") DOC_EXMP("d8f6e37f28a632c06b0b3466db1b9d2d1b36a580ee35edfd971dc1423bc412a5")              DOC_END
+      KV_SERIALIZE(flags)                          DOC_DSCR("Flags that help wallet to automatically process some properties of the attachment(combination of TX_SERVICE_ATTACHMENT_ENCRYPT_BODY=1, TX_SERVICE_ATTACHMENT_DEFLATE_BODY=2, TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE=4,TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF=8 )")  DOC_END
     END_KV_SERIALIZE_MAP()
   };
 

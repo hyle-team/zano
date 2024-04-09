@@ -51,13 +51,13 @@ namespace epee
       template<class t_stream>
       static void handle_array_start(t_stream& strm, size_t indent)
       {
-        strm << "[";
+        //strm << "[";
       }
 
       template<class t_stream>
       static void handle_array_end(t_stream& strm, size_t indent)
       {
-        strm << "]";
+        //strm << "]";
       }
 
       template<class t_stream>
@@ -71,8 +71,11 @@ namespace epee
       template<class t_stream>
       static void handle_print_key(t_stream& strm, const std::string& key, const std::string& description, size_t indent)
       {
-        const std::string indent_str = make_indent(indent);
-        strm << indent_str << "\"" << key << "\"" << ": " << description;
+        if (description.size())
+        {
+          const std::string indent_str = make_indent(indent);
+          strm << indent_str << "\"" << key << "\"" << ": " << description << eol;
+        }
       }
 
       template<class t_stream>
@@ -84,19 +87,19 @@ namespace epee
       template<class t_stream>
       static void handle_section_entry_separator(t_stream& strm, size_t indent)
       {
-        strm << ",";
+        //strm << ",";
       }
 
       template<class t_stream>
       static void handle_array_entry_separator(t_stream& strm, size_t indent)
       {
-        strm << ",";
+        //strm << ",";
       }
 
       template<class t_stream>
       static void handle_line_break(t_stream& strm, size_t indent)
       {
-        strm << eol;
+        //strm << eol;
       }
     };
 

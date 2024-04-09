@@ -284,7 +284,7 @@ namespace tools
       response.m_response_comment = "Internal Server Error";
       return true;
     }
-    if (!handle_http_request_map(query_info, response, m_conn_context, call_found, reference_stub) && response.m_response_code == 200)
+    if (!handle_http_request_map(query_info, response, m_conn_context, call_found) && response.m_response_code == 200)
     {
       response.m_response_code = 500;
       response.m_response_comment = "Internal Server Error";

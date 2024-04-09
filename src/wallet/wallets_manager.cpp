@@ -1663,11 +1663,10 @@ std::string wallets_manager::invoke(uint64_t wallet_id, std::string params)
   epee::net_utils::http::http_request_info query_info = AUTO_VAL_INIT(query_info);
   epee::net_utils::http::http_response_info response_info = AUTO_VAL_INIT(response_info);
   epee::net_utils::connection_context_base stub_conn_context = AUTO_VAL_INIT(stub_conn_context);
-  std::string reference_stub;
   bool call_found = false;
   query_info.m_URI = "/json_rpc";
   query_info.m_body = params;
-  wo.rpc_wrapper->handle_http_request_map(query_info, response_info, stub_conn_context, call_found, reference_stub);
+  wo.rpc_wrapper->handle_http_request_map(query_info, response_info, stub_conn_context, call_found);
   return response_info.m_body;
 }
 

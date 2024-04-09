@@ -103,12 +103,9 @@ public: \
 
 //#define DOC_DSCR(description)                                    , description
 #define DOC_EXMP(substitute)                                     , substitute
-#define DOC_EXMP_AUTO_1(arg_1)                                   , KV_MAKE_ALIAS_NAME() (arg_1)
-#define DOC_EXMP_AUTO_2(arg_1, arg_2)                            , KV_MAKE_ALIAS_NAME() (arg_1, arg_2)
+//#define DOC_EXMP_AUTO_1(arg_1)                                   , KV_MAKE_ALIAS_NAME() (arg_1)
+//#define DOC_EXMP_AUTO_2(arg_1, arg_2)                            , KV_MAKE_ALIAS_NAME() (arg_1, arg_2)
 #define DOC_END                                                  ); }
-
-
-
 #define DOC_EXMP_AUTO(...)                                       , epee::create_t_object<KV_MAKE_ALIAS_NAME() >(__VA_ARGS__)
 
 
@@ -164,7 +161,7 @@ public: \
 #define KV_SERIALIZE(varialble)                                  KV_SERIALIZE_N(varialble, #varialble)
 #define KV_SERIALIZE_DOC(varialble)                              KV_SERIALIZE_N_DOC( varialble, #varialble) 
   
-#define DOC_COMMAND(desciption_text)                             inline static const char* description;
+#define DOC_COMMAND(desciption_text)                             inline static const char* description = desciption_text;
 
 
 #define KV_SERIALIZE_VAL_POD_AS_BLOB(varialble)                  KV_SERIALIZE_VAL_POD_AS_BLOB_N(varialble, #varialble)

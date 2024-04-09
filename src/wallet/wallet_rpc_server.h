@@ -117,22 +117,22 @@ namespace tools
         MAP_JON_RPC_WE("get_mining_history",        on_get_mining_history,        wallet_public::COMMAND_RPC_GET_MINING_HISTORY)
         MAP_JON_RPC_WE("register_alias",            on_register_alias,            wallet_public::COMMAND_RPC_REGISTER_ALIAS)
         //contracts API
-        MAP_JON_RPC_WE("contracts_send_proposal",             on_contracts_send_proposal,      wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL)
-        MAP_JON_RPC_WE("contracts_accept_proposal",           on_contracts_accept_proposal,    wallet_public::COMMAND_CONTRACTS_ACCEPT_PROPOSAL)
-        MAP_JON_RPC_WE("contracts_get_all",                   on_contracts_get_all,            wallet_public::COMMAND_CONTRACTS_GET_ALL)
-        MAP_JON_RPC_WE("contracts_release",                   on_contracts_release,            wallet_public::COMMAND_CONTRACTS_RELEASE)
-        MAP_JON_RPC_WE("contracts_request_cancel",            on_contracts_request_cancel,     wallet_public::COMMAND_CONTRACTS_REQUEST_CANCEL)
-        MAP_JON_RPC_WE("contracts_accept_cancel",             on_contracts_accept_cancel,      wallet_public::COMMAND_CONTRACTS_ACCEPT_CANCEL)
+        //MAP_JON_RPC_WE("contracts_send_proposal",             on_contracts_send_proposal,      wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL)
+        //MAP_JON_RPC_WE("contracts_accept_proposal",           on_contracts_accept_proposal,    wallet_public::COMMAND_CONTRACTS_ACCEPT_PROPOSAL)
+        //MAP_JON_RPC_WE("contracts_get_all",                   on_contracts_get_all,            wallet_public::COMMAND_CONTRACTS_GET_ALL)
+        //MAP_JON_RPC_WE("contracts_release",                   on_contracts_release,            wallet_public::COMMAND_CONTRACTS_RELEASE)
+        //MAP_JON_RPC_WE("contracts_request_cancel",            on_contracts_request_cancel,     wallet_public::COMMAND_CONTRACTS_REQUEST_CANCEL)
+        //MAP_JON_RPC_WE("contracts_accept_cancel",             on_contracts_accept_cancel,      wallet_public::COMMAND_CONTRACTS_ACCEPT_CANCEL)
         //marketplace API
         MAP_JON_RPC_WE("marketplace_get_offers_ex",           on_marketplace_get_my_offers,     wallet_public::COMMAND_MARKETPLACE_GET_MY_OFFERS)
         MAP_JON_RPC_WE("marketplace_push_offer",              on_marketplace_push_offer,        wallet_public::COMMAND_MARKETPLACE_PUSH_OFFER)
         MAP_JON_RPC_WE("marketplace_push_update_offer",       on_marketplace_push_update_offer, wallet_public::COMMAND_MARKETPLACE_PUSH_UPDATE_OFFER)
         MAP_JON_RPC_WE("marketplace_cancel_offer",            on_marketplace_cancel_offer,      wallet_public::COMMAND_MARKETPLACE_CANCEL_OFFER)
         //HTLC API
-        MAP_JON_RPC_WE("atomics_create_htlc_proposal",        on_create_htlc_proposal,          wallet_public::COMMAND_CREATE_HTLC_PROPOSAL)
-        MAP_JON_RPC_WE("atomics_get_list_of_active_htlc",     on_get_list_of_active_htlc,       wallet_public::COMMAND_GET_LIST_OF_ACTIVE_HTLC)
-        MAP_JON_RPC_WE("atomics_redeem_htlc",                 on_redeem_htlc,                   wallet_public::COMMAND_REDEEM_HTLC)
-        MAP_JON_RPC_WE("atomics_check_htlc_redeemed",         on_check_htlc_redeemed,           wallet_public::COMMAND_CHECK_HTLC_REDEEMED)
+        //MAP_JON_RPC_WE("atomics_create_htlc_proposal",        on_create_htlc_proposal,          wallet_public::COMMAND_CREATE_HTLC_PROPOSAL)
+        //MAP_JON_RPC_WE("atomics_get_list_of_active_htlc",     on_get_list_of_active_htlc,       wallet_public::COMMAND_GET_LIST_OF_ACTIVE_HTLC)
+        //MAP_JON_RPC_WE("atomics_redeem_htlc",                 on_redeem_htlc,                   wallet_public::COMMAND_REDEEM_HTLC)
+        //MAP_JON_RPC_WE("atomics_check_htlc_redeemed",         on_check_htlc_redeemed,           wallet_public::COMMAND_CHECK_HTLC_REDEEMED)
 
         //IONIC_SWAPS API
         MAP_JON_RPC_WE("ionic_swap_generate_proposal",        on_ionic_swap_generate_proposal,  wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL)
@@ -145,16 +145,16 @@ namespace tools
         MAP_JON_RPC_WE("assets_whitelist_remove",             on_assets_whitelist_remove,       wallet_public::COMMAND_ASSETS_WHITELIST_REMOVE)
 
         //MULTIWALLET APIs
-        MAP_JON_RPC_WE("mw_get_wallets", on_mw_get_wallets, wallet_public::COMMAND_MW_GET_WALLETS)
-        MAP_JON_RPC_WE("mw_select_wallet", on_mw_select_wallet, wallet_public::COMMAND_MW_SELECT_WALLET)
+        MAP_JON_RPC_WE("mw_get_wallets",                      on_mw_get_wallets,                wallet_public::COMMAND_MW_GET_WALLETS)
+        MAP_JON_RPC_WE("mw_select_wallet",                    on_mw_select_wallet,              wallet_public::COMMAND_MW_SELECT_WALLET)
 
         //basic crypto operations
-        MAP_JON_RPC_WE("sign_message", on_sign_message, wallet_public::COMMAND_SIGN_MESSAGE)
-        MAP_JON_RPC_WE("encrypt_data", on_encrypt_data, wallet_public::COMMAND_ENCRYPT_DATA)
-        MAP_JON_RPC_WE("decrypt_data", on_decrypt_data, wallet_public::COMMAND_DECRYPT_DATA)
+        MAP_JON_RPC_WE("sign_message",                        on_sign_message,                  wallet_public::COMMAND_SIGN_MESSAGE)
+        MAP_JON_RPC_WE("encrypt_data",                        on_encrypt_data,                  wallet_public::COMMAND_ENCRYPT_DATA)
+        MAP_JON_RPC_WE("decrypt_data",                        on_decrypt_data,                  wallet_public::COMMAND_DECRYPT_DATA)
 
         //utility call
-        MAP_JON_RPC_WE("proxy_to_daemon", on_proxy_to_daemon, wallet_public::COMMAND_PROXY_TO_DAEMON)
+        MAP_JON_RPC_WE("proxy_to_daemon",                     on_proxy_to_daemon,               wallet_public::COMMAND_PROXY_TO_DAEMON)
       END_JSON_RPC_MAP()
     END_URI_MAP2()
 

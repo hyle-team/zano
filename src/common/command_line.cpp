@@ -25,7 +25,7 @@ namespace command_line
 
   const arg_descriptor<bool>        arg_console       ( "no-console", "Disable daemon console commands" );
   const arg_descriptor<bool>        arg_show_details  ( "currency-details", "Display currency details" );
-  const arg_descriptor<bool>        arg_show_rpc_autodoc  ( "show_rpc_autodoc", "Display rpc auto-generated documentation template" );
+  const arg_descriptor<std::string> arg_generate_rpc_autodoc  ( "generate_rpc_autodoc", "Make auto-generated RPC API documentation documents at the given path" );
 
   const arg_descriptor<bool>        arg_disable_upnp  ( "disable-upnp", "Disable UPnP (enhances local network privacy)");
   const arg_descriptor<bool>        arg_disable_ntp  ( "disable-ntp", "Disable NTP, could enhance to time synchronization issue but increase network privacy, consider using disable-stop-if-time-out-of-sync with it");

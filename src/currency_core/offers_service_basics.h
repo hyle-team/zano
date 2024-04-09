@@ -37,21 +37,21 @@ namespace bc_services
     //-----------------
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE_N(offer_type, "ot")
-      KV_SERIALIZE_CUSTOM_N(amount_primary, std::string, bc_services::transform_amount_to_string, bc_services::transform_string_to_amount, "ap")
-      KV_SERIALIZE_CUSTOM_N(amount_target, std::string, bc_services::transform_amount_to_string, bc_services::transform_string_to_amount, "at")
-      KV_SERIALIZE_N(bonus, "b")
-      KV_SERIALIZE_N(target, "t")
-      KV_SERIALIZE_N(primary, "p")
-      KV_SERIALIZE_N(location_country, "lco")
-      KV_SERIALIZE_N(location_city, "lci")
-      KV_SERIALIZE_N(contacts, "cnt")
-      KV_SERIALIZE_N(comment, "com")
-      KV_SERIALIZE_N(payment_types, "pt")
-      KV_SERIALIZE_N(deal_option, "do")
-      KV_SERIALIZE_N(category, "cat")
-      KV_SERIALIZE_N(expiration_time, "et")
-      KV_SERIALIZE_N(preview_url, "url")
+      KV_SERIALIZE_N(offer_type, "ot")             DOC_DSCR("Type of the offer: OFFER_TYPE_PRIMARY_TO_TARGET(SELL ORDER) - 0, OFFER_TYPE_TARGET_TO_PRIMARY(BUY ORDER) - 1 etc.") DOC_EXMP(0) DOC_END
+      KV_SERIALIZE_CUSTOM_N(amount_primary, std::string, bc_services::transform_amount_to_string, bc_services::transform_string_to_amount, "ap") DOC_DSCR("Amount of the currency") DOC_EXMP("100000") DOC_END
+      KV_SERIALIZE_CUSTOM_N(amount_target, std::string, bc_services::transform_amount_to_string, bc_services::transform_string_to_amount, "at")  DOC_DSCR("Smount of other currency or goods") DOC_EXMP("10000000") DOC_END
+      KV_SERIALIZE_N(bonus, "b")                   DOC_DSCR("Bonus associated with the offer") DOC_EXMP(false) DOC_END
+      KV_SERIALIZE_N(target, "t")                  DOC_DSCR("Target:  currency / goods") DOC_EXMP("USDT") DOC_END
+      KV_SERIALIZE_N(primary, "p")                 DOC_DSCR("Currency for goods") DOC_EXMP("ZANO") DOC_END
+      KV_SERIALIZE_N(location_country, "lco")      DOC_DSCR("Country of the offer location") DOC_EXMP("Montenegro") DOC_END
+      KV_SERIALIZE_N(location_city, "lci")         DOC_DSCR("City of the offer location") DOC_EXMP("Kolasin") DOC_END
+      KV_SERIALIZE_N(contacts, "cnt")              DOC_DSCR("Contacts related to the offer") DOC_EXMP("Ranko +38211111111") DOC_END
+      KV_SERIALIZE_N(comment, "com")               DOC_DSCR("Comment associated with the offer") DOC_EXMP("Dobr dan") DOC_END
+      KV_SERIALIZE_N(payment_types, "pt")          DOC_DSCR("Types of payment accepted for the offer") DOC_EXMP("zano") DOC_END
+      KV_SERIALIZE_N(deal_option, "do")            DOC_DSCR("Deal option for the offer") DOC_EXMP("full amount, by parts") DOC_END
+      KV_SERIALIZE_N(category, "cat")              DOC_DSCR("Category of the offer") DOC_EXMP("") DOC_END
+      KV_SERIALIZE_N(expiration_time, "et")        DOC_DSCR("Expiration time of the offer") DOC_EXMP(0) DOC_END
+      KV_SERIALIZE_N(preview_url, "url")           DOC_DSCR("URL for previewing the offer") DOC_EXMP("") DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
@@ -69,12 +69,12 @@ namespace bc_services
     mutable bool stopped;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash)
-      KV_SERIALIZE_POD_AS_HEX_STRING(tx_original_hash)
-      KV_SERIALIZE(index_in_tx)
-      KV_SERIALIZE(timestamp)
-      KV_SERIALIZE(fee)
-      KV_SERIALIZE_POD_AS_HEX_STRING(security)
+      KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash)           DOC_DSCR("Transaction hash represented as a hexadecimal string") DOC_EXMP("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852") DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(tx_original_hash)  DOC_DSCR("Origin transaction hash represented as a hexadecimal string(if offer updated)") DOC_EXMP("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852") DOC_END
+      KV_SERIALIZE(index_in_tx)                         DOC_DSCR("Index of the tx_service_attachment entrie in transaction") DOC_EXMP(0) DOC_END
+      KV_SERIALIZE(timestamp)                           DOC_DSCR("Timestamp of the transaction") DOC_EXMP(1712683857) DOC_END
+      KV_SERIALIZE(fee)                                 DOC_DSCR("Fee associated with the transaction") DOC_EXMP(10000000000) DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(security)          DOC_DSCR("Onwer's public key for access control") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
       KV_CHAIN_BASE(offer_details)
     END_KV_SERIALIZE_MAP()
   };
@@ -163,32 +163,33 @@ namespace bc_services
     bool bonus;
     std::string category;
     std::string keyword;
-    bool fake;
+    //bool fake;
     uint64_t current_time;
 
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(order_by)
-      KV_SERIALIZE(reverse)
-      KV_SERIALIZE(offset)
-      KV_SERIALIZE(limit)
-      KV_SERIALIZE(timestamp_start)
-      KV_SERIALIZE(timestamp_stop)
-      KV_SERIALIZE(offer_type_mask)
-      KV_SERIALIZE(amount_low_limit)
-      KV_SERIALIZE(amount_up_limit)
-      KV_SERIALIZE_CUSTOM(rate_low_limit, std::string, bc_services::transform_double_to_string, bc_services::transform_string_to_double)
-      KV_SERIALIZE_CUSTOM(rate_up_limit, std::string, bc_services::transform_double_to_string, bc_services::transform_string_to_double)
-      KV_SERIALIZE(payment_types)
-      KV_SERIALIZE(location_country)
-      KV_SERIALIZE(location_city)
-      KV_SERIALIZE(target)
-      KV_SERIALIZE(primary)
-      KV_SERIALIZE(bonus)
-      KV_SERIALIZE(category)
-      KV_SERIALIZE(keyword)
-      KV_SERIALIZE(fake)
+      KV_SERIALIZE(order_by)           DOC_DSCR("Field to order the results by one on this: ORDER_BY_TIMESTAMP=0,ORDER_BY_AMOUNT_PRIMARY=1,ORDER_BY_AMOUNT_TARGET=2,ORDER_BY_AMOUNT_RATE=3,ORDER_BY_PAYMENT_TYPES=4,ORDER_BY_CONTACTS=5,ORDER_BY_LOCATION=6,ORDER_BY_NAME=7") DOC_EXMP(0) DOC_END
+      KV_SERIALIZE(reverse)            DOC_DSCR("Flag to indicate whether the results should be sorted in reverse order") DOC_EXMP(false) DOC_END
+      KV_SERIALIZE(offset)             DOC_DSCR("Offset for pagination") DOC_EXMP(0) DOC_END
+      KV_SERIALIZE(limit)              DOC_DSCR("Maximum number of results to return") DOC_EXMP(100) DOC_END
+      KV_SERIALIZE(timestamp_start)    DOC_DSCR("Start timestamp for filtering results") DOC_EXMP(0) DOC_END
+      KV_SERIALIZE(timestamp_stop)     DOC_DSCR("Stop timestamp for filtering results") DOC_EXMP(0) DOC_END
+      KV_SERIALIZE(offer_type_mask)    DOC_DSCR("Mask representing the types of offers to include in the results, conbination of this: OFFER_TYPE_MASK_PRIMARY_TO_TARGET 0x00000001, OFFER_TYPE_MASK_TARGET_TO_PRIMARY 0x00000002, OFFER_TYPE_MASK_GOODS_TO_PRIMARY 0x00000004, OFFER_TYPE_MASK_PRIMARY_TO_GOODS 0x00000008") DOC_EXMP(0) DOC_END
+      KV_SERIALIZE(amount_low_limit)   DOC_DSCR("Lower limit for the amount of offers") DOC_EXMP(0) DOC_END
+      KV_SERIALIZE(amount_up_limit)    DOC_DSCR("Upper limit for the amount of offers") DOC_EXMP(0) DOC_END
+      KV_SERIALIZE_CUSTOM(rate_low_limit, std::string, bc_services::transform_double_to_string, bc_services::transform_string_to_double) DOC_DSCR("Lower limit for the rate") DOC_EXMP("0.1") DOC_END
+      KV_SERIALIZE_CUSTOM(rate_up_limit, std::string, bc_services::transform_double_to_string, bc_services::transform_string_to_double)  DOC_DSCR("Upper limit for the rate") DOC_EXMP("0.1") DOC_END
+      KV_SERIALIZE(payment_types)      DOC_DSCR("Types of payment accepted for the offers(in a free form as it is in contract)") DOC_END
+      KV_SERIALIZE(location_country)   DOC_DSCR("Country of the location for the offers") DOC_END
+      KV_SERIALIZE(location_city)      DOC_DSCR("City of the location for the offers") DOC_END
+      KV_SERIALIZE(target)             DOC_DSCR("Target entity of the offers") DOC_END
+      KV_SERIALIZE(primary)            DOC_DSCR("Primary field for the offers") DOC_END
+      KV_SERIALIZE(bonus)              DOC_DSCR("Bonus associated with the offers") DOC_EXMP(false) DOC_END
+      KV_SERIALIZE(category)           DOC_DSCR("Category of the offers")  DOC_END
+      KV_SERIALIZE(keyword)            DOC_DSCR("Keyword for searching offers") DOC_EXMP("tubes") DOC_END
+      //KV_SERIALIZE(fake)               DOC_DSCR("Flag indicating whether the offer is fake") DOC_EXMP() DOC_END
     END_KV_SERIALIZE_MAP()
+
   };
 
 

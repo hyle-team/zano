@@ -1687,11 +1687,13 @@ namespace currency
 
   struct COMMAND_RPC_GET_OFFERS_EX
   {
+    DOC_COMMAND("Fetch from daemon offers listed in the marketplace with given filters");
+
     struct request
     {
       bc_services::core_offers_filter filter;
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(filter)
+        KV_SERIALIZE(filter)  DOC_DSCR("Filter options.") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1702,9 +1704,9 @@ namespace currency
       uint64_t total_offers;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(status)
-        KV_SERIALIZE(offers)
-        KV_SERIALIZE(total_offers)
+        KV_SERIALIZE(status)         DOC_DSCR("Status of the operation") DOC_EXMP("OK") DOC_END
+        KV_SERIALIZE(offers)         DOC_DSCR("List of offers related to the operation") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(total_offers)   DOC_DSCR("Total number of offers") DOC_EXMP(1) DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
