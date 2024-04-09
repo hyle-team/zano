@@ -1687,7 +1687,7 @@ namespace wallet_public
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wi)
-      KV_SERIALIZE(wallet_id)  DOC_DSCR("Wallet ID") DOC_EXMP() DOC_END
+      KV_SERIALIZE(wallet_id)  DOC_DSCR("Wallet ID") DOC_EXMP(2) DOC_END
     END_KV_SERIALIZE_MAP()
 
   };

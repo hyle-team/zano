@@ -5934,7 +5934,7 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
 
   construct_tx_param ctp = get_default_construct_tx_param();
   
-  ctp.fake_outputs_count = proposal_detais.mixins;
+  //ctp.fake_outputs_count = proposal_detais.mixins;
   ctp.fee = proposal_detais.fee_paid_by_a;
   ctp.flags = TX_FLAG_SIGNATURE_MODE_SEPARATE;
   ctp.mark_tx_as_complete = false;
@@ -6079,10 +6079,10 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
     }
     amounts_provided_by_a[in_asset_id] += amount;
     
-    if (proposal_info.mixins == 0 || proposal_info.mixins > mx)
-    {
-      proposal_info.mixins = mx;
-    }
+    //if (proposal_info.mixins == 0 || proposal_info.mixins > mx)
+    //{
+    //  proposal_info.mixins = mx;
+    //}
 
   }
 
