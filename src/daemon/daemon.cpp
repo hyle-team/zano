@@ -288,7 +288,7 @@ int main(int argc, char* argv[])
     //query_info.m_body = "{\"jsonrpc\": \"2.0\", \"method\": \"nonexisting_method\", \"params\": {}},";
     //rpc_server.handle_http_request_map(query_info, response_info, conn_context, call_found, json_rpc_reference);
 
-    LOG_PRINT_L0(generate_reference);
+    //LOG_PRINT_L0(generate_reference);
 
     return 0;
   }
