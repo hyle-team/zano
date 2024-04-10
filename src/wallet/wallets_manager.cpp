@@ -1188,7 +1188,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   {
     w->generate(path, password, false);
     w->set_minimum_height(m_last_daemon_height-1);
-    //owr.seed = w->get_account().get_seed_phrase();
+    owr.seed = w->get_account().get_seed_phrase("");
   }
   catch (const tools::error::file_exists&)
   {
@@ -1297,7 +1297,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   {
     bool is_tracking = currency::account_base::is_seed_tracking(seed_phrase);
     w->restore(path, password, seed_phrase, is_tracking, seed_password);
-    //owr.seed = w->get_account().get_seed_phrase();
+    owr.seed = w->get_account().get_seed_phrase("");
   }
   catch (const tools::error::file_exists&)
   {
