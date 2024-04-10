@@ -511,11 +511,11 @@ namespace wallet_public
 
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(transfers_count)          DOC_DSCR("Number of transfers in wallet") DOC_EXMP() DOC_END
-      KV_SERIALIZE(transfer_entries_count)   DOC_DSCR("Number of UTXO entries in wallet") DOC_EXMP() DOC_END
-      KV_SERIALIZE(balance)                  DOC_DSCR("Current balance of native coins") DOC_EXMP() DOC_END
-      KV_SERIALIZE(unlocked_balance)         DOC_DSCR("Unlocked balance oof native coins") DOC_EXMP() DOC_END
-      KV_SERIALIZE(curent_height)            DOC_DSCR("Current sync height of the wallet") DOC_EXMP() DOC_END
+      KV_SERIALIZE(transfers_count)          DOC_DSCR("Number of transfers in wallet") DOC_EXMP(1) DOC_END
+      KV_SERIALIZE(transfer_entries_count)   DOC_DSCR("Number of UTXO entries in wallet") DOC_EXMP(3) DOC_END
+      KV_SERIALIZE(balance)                  DOC_DSCR("Current balance of native coins") DOC_EXMP(100000000000) DOC_END
+      KV_SERIALIZE(unlocked_balance)         DOC_DSCR("Unlocked balance oof native coins") DOC_EXMP(90000000000) DOC_END
+      KV_SERIALIZE(curent_height)            DOC_DSCR("Current sync height of the wallet") DOC_EXMP(121212) DOC_END
     END_KV_SERIALIZE_MAP()
 
   };
