@@ -4042,6 +4042,10 @@ bool blockchain_storage::validate_asset_operation_against_current_blochain_state
     CHECK_AND_ASSERT_MES(!avc.asset_op_history, false, "asset with id " << avc.asset_id << " has already been registered");
     avc.amount_to_validate = ado.descriptor.current_supply;
     CHECK_AND_ASSERT_MES(validate_asset_operation_amount_commitment(avc), false, "validate_asset_operation_amount_commitment failed!");
+    if(this->is_hardfork_active(ZANO_HARDFORK_05))
+    {
+      CHECK_AND_ASSERT_MES(validate_ado_initial(ado.descriptor), false, "validate_ado_initial failed!");
+    }
   }
   else
   {

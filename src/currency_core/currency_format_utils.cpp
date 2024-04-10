@@ -1180,6 +1180,12 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
+  bool validate_ado_initial(const asset_descriptor_base& new_ado)
+  {
+    if (new_ado.current_supply > new_ado.total_max_supply) return false;
+    return true;
+  }
+  //---------------------------------------------------------------
   /*
   crypto::hash get_signature_hash_for_asset_operation(const asset_descriptor_operation& ado)
   {
