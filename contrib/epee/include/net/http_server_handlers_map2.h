@@ -221,8 +221,8 @@ bool auto_doc(const std::string& uri, const std::string& method, bool is_json, d
   else
   {
     //json/bin uri/based
-    typedef command_type_t::request request_t;
-    typedef command_type_t::response response_t;
+    typedef typename command_type_t::request request_t;
+    typedef typename command_type_t::response response_t;
 
     request_t req = AUTO_VAL_INIT(req); //get_documentation_json_struct<request_t>();
     response_t res = AUTO_VAL_INIT(res); //get_documentation_json_struct<response_t>();
