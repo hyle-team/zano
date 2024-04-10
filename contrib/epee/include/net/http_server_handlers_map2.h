@@ -194,6 +194,7 @@ bool auto_doc(const std::string& uri, const std::string& method, bool is_json, d
 
   docs.entries.resize(docs.entries.size()+1);
   docs.entries.back().is_binary = !is_json;
+  docs.entries.back().uri = uri;
   docs.entries.back().json_method_name = method;
   docs.entries.back().method_general_decription = get_command_description<command_type_t>();
   
@@ -520,6 +521,8 @@ namespace epee
        if (!filename.size())
        {
          filename = de.uri;
+         if (filename.front() == '/')
+           filename.erase(filename.begin());
        }
        filename += ".md";
        bool r = epee::file_io_utils::save_string_to_file(folder + "/" + filename, ss.str());
