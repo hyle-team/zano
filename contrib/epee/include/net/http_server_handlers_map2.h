@@ -508,7 +508,7 @@ namespace epee
      for (const auto& de : docs.entries)
      {
        std::stringstream ss;
-       ss << de.method_general_decription << ENDL;
+       ss << de.method_general_decription << ENDL << ENDL;;
 
        ss << "URL: ```http:://127.0.0.1:11211" << de.uri << "```" << ENDL;
 
