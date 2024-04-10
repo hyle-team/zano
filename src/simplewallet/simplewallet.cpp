@@ -2862,7 +2862,6 @@ int main(int argc, char* argv[])
     message_writer(epee::log_space::console_color_white, true) << "Log level changed: " << old_log_level << " -> " << new_log_level;
   }
 
-
   if (command_line::has_arg(vm, command_line::arg_generate_rpc_autodoc))
   {
     tools::wallet_rpc_server wallet_rpc_server(std::shared_ptr<tools::wallet2>(new tools::wallet2()));

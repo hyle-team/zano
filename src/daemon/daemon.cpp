@@ -272,24 +272,14 @@ int main(int argc, char* argv[])
   if (stratum_enabled)
     stratum_server_ptr = std::make_shared<currency::stratum_server>(&ccore);
 
+
+
   if (command_line::has_arg(vm, command_line::arg_generate_rpc_autodoc))
   {
-    LOG_PRINT_L0("Dumping RPC auto-generated documents!");
-    epee::net_utils::http::http_request_info query_info;
-    epee::net_utils::http::http_response_info response_info;
-    epee::net_utils::connection_context_base conn_context;
-    //std::string generate_reference = std::string("RPC_COMMANDS_LIST:\n");
-    documentation doc;
-    doc.do_generate_documentation = true;
-    bool call_found = false;
-    rpc_server.handle_http_request_map(query_info, response_info, conn_context, call_found, doc);
-    //std::string json_rpc_reference;
-    //query_info.m_URI = JSON_RPC_REFERENCE_MARKER;
-    //query_info.m_body = "{\"jsonrpc\": \"2.0\", \"method\": \"nonexisting_method\", \"params\": {}},";
-    //rpc_server.handle_http_request_map(query_info, response_info, conn_context, call_found, json_rpc_reference);
+    std::string path_to_generate = command_line::get_arg(vm, command_line::arg_generate_rpc_autodoc);
 
-    //LOG_PRINT_L0(generate_reference);
-
+    if (!generate_doc_as_md_files(path_to_generate, rpc_server))
+      return 1;
     return 0;
   }
 
