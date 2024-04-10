@@ -40,7 +40,7 @@ namespace bc_services
       KV_SERIALIZE_N(offer_type, "ot")             DOC_DSCR("Type of the offer: OFFER_TYPE_PRIMARY_TO_TARGET(SELL ORDER) - 0, OFFER_TYPE_TARGET_TO_PRIMARY(BUY ORDER) - 1 etc.") DOC_EXMP(0) DOC_END
       KV_SERIALIZE_CUSTOM_N(amount_primary, std::string, bc_services::transform_amount_to_string, bc_services::transform_string_to_amount, "ap") DOC_DSCR("Amount of the currency") DOC_EXMP("100000") DOC_END
       KV_SERIALIZE_CUSTOM_N(amount_target, std::string, bc_services::transform_amount_to_string, bc_services::transform_string_to_amount, "at")  DOC_DSCR("Smount of other currency or goods") DOC_EXMP("10000000") DOC_END
-      KV_SERIALIZE_N(bonus, "b")                   DOC_DSCR("Bonus associated with the offer") DOC_EXMP(false) DOC_END
+      KV_SERIALIZE_N(bonus, "b")                   DOC_DSCR("Bonus associated with the offer") DOC_EXMP("") DOC_END
       KV_SERIALIZE_N(target, "t")                  DOC_DSCR("Target:  currency / goods") DOC_EXMP("USDT") DOC_END
       KV_SERIALIZE_N(primary, "p")                 DOC_DSCR("Currency for goods") DOC_EXMP("ZANO") DOC_END
       KV_SERIALIZE_N(location_country, "lco")      DOC_DSCR("Country of the offer location") DOC_EXMP("Montenegro") DOC_END
