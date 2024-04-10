@@ -2865,49 +2865,11 @@ int main(int argc, char* argv[])
 
   if (command_line::has_arg(vm, command_line::arg_generate_rpc_autodoc))
   {
-    LOG_PRINT_L0("Dumping RPC auto-generated documents!");
-    epee::net_utils::http::http_request_info query_info;
-    epee::net_utils::http::http_response_info response_info;
-    epee::net_utils::connection_context_base conn_context;
-    //std::string generate_reference = std::string("WALLET_RPC_COMMANDS_LIST:\n");
-    bool call_found = false;
     tools::wallet_rpc_server wallet_rpc_server(std::shared_ptr<tools::wallet2>(new tools::wallet2()));
-    //wallet_rpc_server.handle_http_request_map(query_info, response_info, conn_context, call_found, generate_reference);
-
-    //::string json_rpc_reference = generate_reference;
-    documentation docs;
-    docs.do_generate_documentation = true;
-//    query_info.m_URI = JSON_RPC_REFERENCE_MARKER;
-    query_info.m_body = "{\"jsonrpc\": \"2.0\", \"method\": \"nonexisting_method\", \"params\": {}},";
-    wallet_rpc_server.handle_http_request_map(query_info, response_info, conn_context, call_found, docs);
-    
     std::string path_to_generate = command_line::get_arg(vm, command_line::arg_generate_rpc_autodoc);
-    for (const auto& de : docs.entries)
-    {
-      std::stringstream ss;
-      ss << de.method_general_decription << ENDL;
 
-      ss << "URL: ```http:://127.0.0.1:11211" << de.uri << "```" << ENDL;
-
-      ss << "### Request: " << ENDL << "```json" << ENDL << de.request_json_example << ENDL << "```" << ENDL;
-      ss << "### Request description: " << ENDL << "```" << ENDL << de.request_json_descriptions << ENDL << "```" << ENDL;
-      ss << "### Response: " << ENDL << "```json" << ENDL << de.response_json_example << ENDL << "```" << ENDL;
-      ss << "### Response description: " << ENDL << "```" << ENDL << de.response_json_descriptions << ENDL << "```" << ENDL;
-
-      std::string filename = de.json_method_name;
-      if (!filename.size())
-      {
-        filename = de.uri;
-      }
-      filename += ".md";
-      bool r = epee::file_io_utils::save_string_to_file(path_to_generate + "/" + filename, ss.str());
-      if (!r)
-      {
-        LOG_ERROR("Failed to save file " << filename);
-        return 1;
-      }
-    }
-
+    if (!generate_doc_as_md_files(path_to_generate, wallet_rpc_server))
+      return 1;
     return 0;
   }
 

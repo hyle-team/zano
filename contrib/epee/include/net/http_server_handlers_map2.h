@@ -150,7 +150,6 @@ struct documentation
   std::list<documentation_entry> entries;
 };
 
-
 // Primary template
 template<typename T>
 struct has_static_member_description {
@@ -485,4 +484,49 @@ namespace epee {
   return true; \
   }
 
+namespace epee
+{
+   template<typename t_rpc_server>
+   bool generate_doc_as_md_files(const std::string& folder, t_rpc_server& server)
+   {
+     LOG_PRINT_L0("Dumping RPC auto-generated documents!");
+     epee::net_utils::http::http_request_info query_info;
+     epee::net_utils::http::http_response_info response_info;
+     epee::net_utils::connection_context_base conn_context;
+     //std::string generate_reference = std::string("WALLET_RPC_COMMANDS_LIST:\n");
+     bool call_found = false;
 
+     documentation docs;
+     docs.do_generate_documentation = true;
+     //    query_info.m_URI = JSON_RPC_REFERENCE_MARKER;
+     query_info.m_body = "{\"jsonrpc\": \"2.0\", \"method\": \"nonexisting_method\", \"params\": {}},";
+     server.handle_http_request_map(query_info, response_info, conn_context, call_found, docs);
+
+     for (const auto& de : docs.entries)
+     {
+       std::stringstream ss;
+       ss << de.method_general_decription << ENDL;
+
+       ss << "URL: ```http:://127.0.0.1:11211" << de.uri << "```" << ENDL;
+
+       ss << "### Request: " << ENDL << "```json" << ENDL << de.request_json_example << ENDL << "```" << ENDL;
+       ss << "### Request description: " << ENDL << "```" << ENDL << de.request_json_descriptions << ENDL << "```" << ENDL;
+       ss << "### Response: " << ENDL << "```json" << ENDL << de.response_json_example << ENDL << "```" << ENDL;
+       ss << "### Response description: " << ENDL << "```" << ENDL << de.response_json_descriptions << ENDL << "```" << ENDL;
+
+       std::string filename = de.json_method_name;
+       if (!filename.size())
+       {
+         filename = de.uri;
+       }
+       filename += ".md";
+       bool r = epee::file_io_utils::save_string_to_file(folder + "/" + filename, ss.str());
+       if (!r)
+       {
+         LOG_ERROR("Failed to save file " << filename);
+         return false;
+       }
+     }
+     return true;
+   }
+}
