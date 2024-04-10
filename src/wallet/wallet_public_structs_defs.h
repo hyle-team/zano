@@ -511,12 +511,13 @@ namespace wallet_public
 
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(transfers_count)
-      KV_SERIALIZE(transfer_entries_count)
-      KV_SERIALIZE(balance)
-      KV_SERIALIZE(unlocked_balance)
-      KV_SERIALIZE(curent_height)
+      KV_SERIALIZE(transfers_count)          DOC_DSCR("Number of transfers in wallet") DOC_EXMP() DOC_END
+      KV_SERIALIZE(transfer_entries_count)   DOC_DSCR("Number of UTXO entries in wallet") DOC_EXMP() DOC_END
+      KV_SERIALIZE(balance)                  DOC_DSCR("Current balance of native coins") DOC_EXMP() DOC_END
+      KV_SERIALIZE(unlocked_balance)         DOC_DSCR("Unlocked balance oof native coins") DOC_EXMP() DOC_END
+      KV_SERIALIZE(curent_height)            DOC_DSCR("Current sync height of the wallet") DOC_EXMP() DOC_END
     END_KV_SERIALIZE_MAP()
+
   };
 
   struct COMMAND_RPC_GET_MINING_HISTORY
@@ -574,10 +575,10 @@ namespace wallet_public
       uint64_t last_item_index;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(pi)
-        KV_SERIALIZE(transfers)
-        KV_SERIALIZE(total_transfers)
-        KV_SERIALIZE(last_item_index)
+        KV_SERIALIZE(pi)               DOC_DSCR("Details on wallet balance etc") DOC_END
+        KV_SERIALIZE(transfers)        DOC_DSCR("Transfers")                     DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(total_transfers)  DOC_DSCR("Total transfers")               DOC_EXMP(1) DOC_END
+        KV_SERIALIZE(last_item_index)  DOC_DSCR("Last item index")               DOC_EXMP(1) DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
