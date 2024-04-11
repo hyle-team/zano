@@ -265,6 +265,7 @@
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   1082577   // 2021-06-01 23:28:10
 #define ZANO_HARDFORK_04_AFTER_HEIGHT                   2555000   // 2024-03-21 11:49:55
 #define ZANO_HARDFORK_05_AFTER_HEIGHT                   999999999999999999  
+#define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1711021795ull // block 2555000, 2024-03-21 11:49:55 UTC
 #else
 /////// Zarcanum Testnet //////////////////////////////
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0
@@ -272,6 +273,7 @@
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_04_AFTER_HEIGHT                   200  
 #define ZANO_HARDFORK_05_AFTER_HEIGHT                   200  
+#define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1712785801ull // block 200, 2024-04-10 21:50:01 UTC
 #endif
 
 

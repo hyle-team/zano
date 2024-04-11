@@ -2227,10 +2227,9 @@ bool wallet2::has_related_alias_entry_unconfirmed(const currency::transaction& t
   return false;
 }
 //----------------------------------------------------------------------------------------------------
-#define HARDFORK_04_TIMESTAMP_ACTUAL 1711021795ull // block 2555000, 2024-03-21 11:49:55 UTC
 bool wallet2::has_bare_unspent_outputs() const
 {
-  if (m_account.get_createtime() > HARDFORK_04_TIMESTAMP_ACTUAL)
+  if (m_account.get_createtime() > ZANO_HARDFORK_04_TIMESTAMP_ACTUAL)
     return false;
 
   [[maybe_unused]] uint64_t bal = 0;
