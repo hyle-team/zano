@@ -1954,16 +1954,84 @@ namespace wallet_public
 
 
 
+  struct COMMAND_ASSETS_DEPLOY
+  {
+    DOC_COMMAND("Deploy new asset in the system.");
+    
+    struct request
+    {
+      std::list<transfer_destination> destinations;
+      currency::asset_descriptor_base asset_descriptor;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(destinations)     DOC_DSCR("Addresses where to receive emitted coins. Asset id in destinations should be set to 0000000000000000000000000000000000000000000000000000000000000000") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(asset_descriptor) DOC_DSCR("Descriptor that holds all information about asset - ticker, emission, description etc") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
 
 
+    struct response
+    {
+      crypto::hash result_tx;
+      crypto::public_key new_asset_id;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx)   DOC_DSCR("Id of transaction that carries asset registration command, asset would be registered as soon as transaction got confirmed") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(new_asset_id)  DOC_DSCR("Issued asset id") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_ASSETS_EMIT
+  {
+    DOC_COMMAND("Emmit new coins of the the asset, that is controlled by this wallet.");
+
+    struct request
+    {
+      crypto::public_key asset_id;
+      std::list<transfer_destination> destinations;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Id of the asset to emit more coins") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
+        KV_SERIALIZE(destinations)     DOC_DSCR("Addresses where to receive emitted coins. Asset id in destinations should be set to 0000000000000000000000000000000000000000000000000000000000000000") DOC_EXMP_AUTO(1) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
 
 
+    struct response
+    {
+      crypto::hash result_tx;
 
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx)   DOC_DSCR("Id of transaction that carries asset registration command, asset would be registered as soon as transaction got confirmed") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
 
+  struct COMMAND_ASSETS_UPDATE
+  {
+    DOC_COMMAND("Update asset descriptor(you can change only owner so far)");
 
+    struct request
+    {
+      crypto::public_key asset_id;
+      currency::asset_descriptor_base asset_descriptor;
 
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Id of the asset to update") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
+        KV_SERIALIZE(asset_descriptor) DOC_DSCR("Descriptor that holds all information about asset that need to be updated (only owner could be updated)") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
 
+    struct response
+    {
+      crypto::hash result_tx;
 
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx)   DOC_DSCR("Id of transaction that carries asset registration command, asset would be registered as soon as transaction got confirmed") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
 
 
 } // namespace wallet_rpc
