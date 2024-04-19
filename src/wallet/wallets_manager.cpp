@@ -582,8 +582,8 @@ std::string wallets_manager::setup_wallet_rpc(const std::string& jwt_secret)
   }
 
   //we don't override command line JWT secret
-  if(!m_wallet_rpc_server.get_jwt_secret().size() ) 
-    m_wallet_rpc_server.set_jwt_secret(jwt_secret);
+  //if(!m_wallet_rpc_server.get_jwt_secret().size() ) 
+  m_wallet_rpc_server.set_jwt_secret(jwt_secret);
 
   m_rpc_server.set_rpc_chain_handler(this);
 #endif

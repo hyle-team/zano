@@ -135,6 +135,33 @@ namespace currency
     };
   };
 
+  struct COMMAND_RPC_GET_ASSETS_LIST
+  {
+    DOC_COMMAND("Return list of assets registered in Zano blockchain");
+
+    struct request
+    {
+      uint64_t offset = 0;
+      uint64_t count = 100;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(offset)  DOC_DSCR("Offset for the item to start copying") DOC_EXMP(0)     DOC_END
+        KV_SERIALIZE(count)   DOC_DSCR("Number of items to recieve")           DOC_EXMP(100)   DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+      std::list<currency::asset_descriptor_with_id> assets;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)      DOC_DSCR("Status code of operation, OK if success")     DOC_EXMP(API_RETURN_CODE_OK)     DOC_END
+        KV_SERIALIZE(assets)      DOC_DSCR("List of assets registered in Zano blockchain")     DOC_EXMP_AUTO(1)     DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
   struct COMMAND_RPC_GET_HEIGHT
   {
     DOC_COMMAND("Return current blockchain height");

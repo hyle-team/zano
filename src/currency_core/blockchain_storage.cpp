@@ -3810,6 +3810,28 @@ bool blockchain_storage::get_asset_info(const crypto::public_key& asset_id, asse
   return false;
 }
 //------------------------------------------------------------------
+uint64_t blockchain_storage::get_assets(uint64_t offset, uint64_t count, std::list<asset_descriptor_with_id>& assets) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  m_db_assets.enumerate_items([&](uint64_t i, const crypto::public_key& asset_id, const std::list<asset_descriptor_base>& asset_descriptor_history)
+  {
+    if (i < offset)
+    {
+      return true;
+    }
+
+    CHECK_AND_ASSERT_THROW_MES(asset_descriptor_history.size(), "asset_descriptor_history unexpectedly have 0 size");
+    assets.push_back(asset_descriptor_with_id());
+    static_cast<asset_descriptor_base&>(assets.back()) = asset_descriptor_history.back();
+    assets.back().asset_id = asset_id;
+    if (i + count > offset)
+    {
+      return false;
+    }
+    return true;
+  });
+}
+//------------------------------------------------------------------
 uint64_t blockchain_storage::get_assets_count() const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);

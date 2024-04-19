@@ -88,6 +88,7 @@ namespace currency
     bool on_get_pool_info(const COMMAND_RPC_GET_POOL_INFO::request& req, COMMAND_RPC_GET_POOL_INFO::response& res, connection_context& cntx);
     bool on_get_votes(const COMMAND_RPC_GET_VOTES::request& req, COMMAND_RPC_GET_VOTES::response& res, connection_context& cntx);
     bool on_get_asset_info(const COMMAND_RPC_GET_ASSET_INFO::request& req, COMMAND_RPC_GET_ASSET_INFO::response& res, connection_context& cntx);
+    bool on_get_assets_list(const COMMAND_RPC_GET_ASSETS_LIST::request& req, COMMAND_RPC_GET_ASSETS_LIST::response& res, connection_context& cntx);
 
     bool on_get_main_block_details(const COMMAND_RPC_GET_BLOCK_DETAILS::request& req, COMMAND_RPC_GET_BLOCK_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_get_alt_block_details(const COMMAND_RPC_GET_BLOCK_DETAILS::request& req, COMMAND_RPC_GET_BLOCK_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
@@ -150,7 +151,8 @@ namespace currency
         MAP_JON_RPC   ("getrandom_outs3",             on_get_random_outs3,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3)
         MAP_JON_RPC   ("get_votes",                   on_get_votes,                   COMMAND_RPC_GET_VOTES)
         //assets api
-        MAP_JON_RPC  ("get_asset_info",               on_get_asset_info,              COMMAND_RPC_GET_ASSET_INFO)
+        MAP_JON_RPC   ("get_asset_info",              on_get_asset_info,             COMMAND_RPC_GET_ASSET_INFO)
+        MAP_JON_RPC   ("get_assets_list",             on_get_assets_list,            COMMAND_RPC_GET_ASSETS_LIST)
 
         MAP_JON_RPC_WE("get_main_block_details",      on_get_main_block_details,      COMMAND_RPC_GET_BLOCK_DETAILS)
         MAP_JON_RPC_WE("get_alt_block_details",       on_get_alt_block_details,       COMMAND_RPC_GET_BLOCK_DETAILS)
