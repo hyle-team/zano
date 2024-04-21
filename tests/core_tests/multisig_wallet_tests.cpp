@@ -23,7 +23,7 @@ using namespace currency;
 #define TMP_LOG_RESTORE
 #endif
 
-void exception_handler(){}
+static void exception_handler(){}
 //==============================================================================================================================
 
 // helper routine: creates multisig-spending tx using a wallet and keys of other ms-participants, then sends it to the core proxy

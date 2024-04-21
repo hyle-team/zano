@@ -2814,6 +2814,7 @@ namespace currency
     return CURRENT_TRANSACTION_VERSION;
   }
   //---------------------------------------------------------------
+  // TODO @#@# this function is obsolete and needs to be re-written
   uint64_t get_reward_from_miner_tx(const transaction& tx)
   {
     uint64_t income = 0;

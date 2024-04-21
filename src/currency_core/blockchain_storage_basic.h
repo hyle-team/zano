@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -167,9 +167,9 @@ namespace currency
     uint64_t no;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(proposal_id)
-      KV_SERIALIZE(yes)
-      KV_SERIALIZE(no)
+      KV_SERIALIZE(proposal_id)                  DOC_DSCR("ID of the proposal.") DOC_EXMP("ZAP999") DOC_END
+      KV_SERIALIZE(yes)                          DOC_DSCR("Nubmer of positve votes.") DOC_EXMP(42) DOC_END
+      KV_SERIALIZE(no)                           DOC_DSCR("Number of negative votes.") DOC_EXMP(37) DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
@@ -179,8 +179,8 @@ namespace currency
     std::list<vote_on_proposal> votes;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(total_pos_blocks)
-      KV_SERIALIZE(votes)
+      KV_SERIALIZE(total_pos_blocks)             DOC_DSCR("Number of blocks in a given range.") DOC_EXMP(87482) DOC_END
+      KV_SERIALIZE(votes)                        DOC_DSCR("Result of votes in a given range.") DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
