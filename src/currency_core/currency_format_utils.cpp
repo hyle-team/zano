@@ -4057,7 +4057,7 @@ namespace currency
       pei_rpc.miner_text_info = eud.buff;
     }
 
-    pei_rpc.base_reward = get_base_block_reward(is_pos_block(bei_chain.bl), bei_chain.already_generated_coins, bei_chain.height);
+    pei_rpc.base_reward = get_base_block_reward(bei_chain.height);
     pei_rpc.summary_reward = get_reward_from_miner_tx(bei_chain.bl.miner_tx);
     pei_rpc.penalty = (pei_rpc.base_reward + pei_rpc.total_fee) - pei_rpc.summary_reward;
     return true;
@@ -4110,7 +4110,7 @@ namespace currency
     return CURRENCY_MAX_BLOCK_SIZE;
   }
   //-----------------------------------------------------------------------------------------------
-  uint64_t get_base_block_reward(bool is_pos, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t height)
+  uint64_t get_base_block_reward(uint64_t height)
   {
     if (!height)
       return PREMINE_AMOUNT;
@@ -4118,9 +4118,18 @@ namespace currency
     return CURRENCY_BLOCK_REWARD;
   }
   //-----------------------------------------------------------------------------------------------
+  // Modern version, requires only necessary arguments. Returns 0 if block is too big (current_block_size > 2 * median_block_size)
+  uint64_t get_block_reward(uint64_t height, size_t median_block_size, size_t current_block_size)
+  {
+    uint64_t reward = 0;
+    get_block_reward(/* is_pos - doesn't matter */ false, median_block_size, current_block_size, /* boost::multiprecision::uint128_t -- doesn't matter*/ boost::multiprecision::uint128_t(0), reward, height);
+    return reward;
+  }
+  //-----------------------------------------------------------------------------------------------
+  // legacy version, some arguments are unnecessary now
   bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t &reward, uint64_t height)
   {
-    uint64_t base_reward = get_base_block_reward(is_pos, already_generated_coins, height);
+    uint64_t base_reward = get_base_block_reward(height);
 
     //make it soft
     if (median_size < CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE)

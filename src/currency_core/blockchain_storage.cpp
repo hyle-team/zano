@@ -6533,7 +6533,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   }
 
   boost::multiprecision::uint128_t already_generated_coins = m_db_blocks.size() ? m_db_blocks.back()->already_generated_coins:0;
-  uint64_t base_reward = get_base_block_reward(is_pos_bl, already_generated_coins, height);
+  uint64_t base_reward = get_base_block_reward(height);
 
   if (!m_is_in_checkpoint_zone)
   {

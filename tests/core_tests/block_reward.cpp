@@ -69,8 +69,8 @@ bool block_template_against_txs_size::c1(currency::core& c, size_t ev_index, con
 
   uint64_t top_block_height = bcs.get_top_block_height();
   uint64_t blocksize_limit = bcs.get_current_comulative_blocksize_limit();
-  uint64_t base_block_reward_pow = get_base_block_reward(false, bcs.total_coins(), top_block_height + 1);
-  uint64_t base_block_reward_pos = get_base_block_reward(true, bcs.total_coins(), top_block_height + 1);
+  uint64_t base_block_reward_pow = get_base_block_reward(top_block_height + 1);
+  uint64_t base_block_reward_pos = base_block_reward_pow;
 
   g_block_txs_fee = TESTS_DEFAULT_FEE; // passing an argument to custom_fill_block_template_func via global variable (not perfect but works well)
 

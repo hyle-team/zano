@@ -176,7 +176,7 @@ namespace currency
       res.pow_sequence_factor = m_core.get_blockchain_storage().get_current_sequence_factor(false);
     if (req.flags&(COMMAND_RPC_GET_INFO_FLAG_POS_DIFFICULTY | COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS))
     {
-      res.block_reward = currency::get_base_block_reward(true, total_coins, res.height);
+      res.block_reward = currency::get_base_block_reward(res.height);
       currency::block b = AUTO_VAL_INIT(b);
       m_core.get_blockchain_storage().get_top_block(b);
       res.last_block_total_reward = currency::get_reward_from_miner_tx(b.miner_tx);

@@ -828,7 +828,7 @@ uint64_t test_generator::get_base_reward_for_next_block(const crypto::hash& head
   auto it = m_blocks_info.find(head_id);
   if (it == m_blocks_info.end())
     return 0;
-  return get_base_block_reward(!pow, it->second.already_generated_coins, get_block_height(it->second.b));
+  return get_base_block_reward(get_block_height(it->second.b));
 }
 
 bool test_generator::find_nounce(currency::block& blk, std::vector<const block_info*>& blocks, wide_difficulty_type dif, uint64_t height) const
