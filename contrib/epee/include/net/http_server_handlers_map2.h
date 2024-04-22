@@ -47,7 +47,7 @@ namespace epee
       t_param     params;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(jsonrpc)
+        KV_SERIALIZE(jsonrpc) DOC_DSCR("") DOC_EXMP("2.0") DOC_END
         KV_SERIALIZE(id)
         KV_SERIALIZE(method)
         KV_SERIALIZE(params)
@@ -98,7 +98,7 @@ namespace epee
       t_param     result;
       epee::serialization::storage_entry id;
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(jsonrpc)
+        KV_SERIALIZE(jsonrpc) DOC_DSCR("") DOC_EXMP("2.0") DOC_END
         KV_SERIALIZE(id)
         KV_SERIALIZE(result)
       END_KV_SERIALIZE_MAP()
@@ -187,6 +187,24 @@ template <typename T>
 void f(T) {}  // Definition #2
 
 
+// Base template
+template<typename T>
+struct is_std_simple_container : std::false_type {};
+
+// Specializations for each container
+template<typename T, typename Alloc>
+struct is_std_simple_container<std::vector<T, Alloc>> : std::true_type {};
+
+template<typename T, typename Alloc>
+struct is_std_simple_container<std::deque<T, Alloc>> : std::true_type {};
+
+template<typename T, typename Alloc>
+struct is_std_simple_container<std::list<T, Alloc>> : std::true_type {};
+
+template<typename T, std::size_t N>
+struct is_std_simple_container<std::array<T, N>> : std::true_type {};
+
+
 template<typename command_type_t, bool is_json_rpc_method>
 bool auto_doc(const std::string& uri, const std::string& method, bool is_json, documentation& docs)
 {
@@ -202,11 +220,20 @@ bool auto_doc(const std::string& uri, const std::string& method, bool is_json, d
   {
     //json rpc-like call
     typedef typename epee::json_rpc::request<typename command_type_t::request> request_t;
-    typedef typename epee::json_rpc::request<typename command_type_t::response> response_t;
+    typedef typename epee::json_rpc::response<typename command_type_t::response, typename epee::json_rpc::dummy_error> response_t;
     request_t req = AUTO_VAL_INIT(req); //get_documentation_json_struct<request_t>();
-    response_t res = AUTO_VAL_INIT(res); //get_documentation_json_struct<response_t>();
+    if constexpr (is_std_simple_container<typename command_type_t::request>::value)
+    {
+      req.params.resize(1);
+    }
+    
+    response_t res = AUTO_VAL_INIT(res); 
+    if constexpr (is_std_simple_container<typename command_type_t::response>::value)
+    {
+      req.result.resize(1);
+    }
 
-
+    req.method = method;
     epee::serialization::portable_storage_extended_doc ps;
     req.store(ps, nullptr);
     ps.dump_as_json(docs.entries.back().request_json_example);
