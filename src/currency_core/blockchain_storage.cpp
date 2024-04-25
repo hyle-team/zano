@@ -4508,7 +4508,6 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
     << " (fee: " << (is_coinbase(tx) ? "0 [coinbase]" : print_money_brief(get_tx_fee(tx))) << ")");
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_print_log);
 
-  //@#@ del me
 //   LOG_PRINT_L0("APPEND_TX_TIME_INNER: " << m_performance_data.tx_append_rl_wait.get_last_val() 
 //     << " | " << m_performance_data.tx_append_is_expired.get_last_val()
 //     << " | " << m_performance_data.tx_process_extra.get_last_val()

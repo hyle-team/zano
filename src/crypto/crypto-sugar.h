@@ -1202,15 +1202,6 @@ namespace crypto
       void add_point(const point_t& point)
       {
         m_elements.emplace_back(point.to_public_key());
-
-        // faster?
-        /* static_assert(sizeof point.m_p3 == 5 * sizeof(item_t), "size missmatch");
-        const item_t *p = (item_t*)&point.m_p3;
-        m_elements.emplace_back(p[0]);
-        m_elements.emplace_back(p[1]);
-        m_elements.emplace_back(p[2]);
-        m_elements.emplace_back(p[3]);
-        m_elements.emplace_back(p[4]); */
       }
 
       void add_pub_key(const crypto::public_key& pk)
