@@ -4703,7 +4703,8 @@ bool blockchain_storage::print_tx_outputs_lookup(const crypto::hash& tx_id)const
         continue;
       usage_stat[o.amount][tx_ptr->m_global_output_indexes[i]];
     VARIANT_CASE_CONST(tx_out_zarcanum, toz)
-      //@#@      
+      strm_tx << "[" << i << "]: " << ENDL;
+      usage_stat[0][tx_ptr->m_global_output_indexes[i]];
     VARIANT_SWITCH_END();
   }
   
@@ -4966,7 +4967,7 @@ struct outputs_visitor
     //check tx unlock time
     uint64_t source_out_unlock_time = get_tx_unlock_time(source_tx, out_i);
     //let coinbase sources for PoS block to have locked inputs, the outputs supposed to be locked same way, except the reward 
-    if (is_coinbase(validated_tx) && is_pos_miner_tx(validated_tx)) // @#@ consider changing to one call to is_pos_coinbase()
+    if (is_pos_miner_tx(validated_tx))
     {
       CHECK_AND_ASSERT_MES(should_unlock_value_be_treated_as_block_height(source_out_unlock_time), false, "source output #" << out_i << " is locked by time, not by height, which is not allowed for PoS coinbase");
       if (source_out_unlock_time > m_source_max_unlock_time_for_pos_coinbase)
@@ -5299,7 +5300,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   CRITICAL_REGION_LOCAL(m_read_lock);
 
   // we need a list<tx_out_zarcanum> this input is referring to
-  // and make sure that all of them are good (i.e. check 1) source tx unlock time validity; 2) mixin restrictions; 3) general gindex/ref_by_id corectness)
+  // and make sure that all of them are good (i.e. check: 1) source tx unlock time validity; 2) mixin restrictions; 3) general gindex/ref_by_id corectness)
   // get_output_keys_for_input_with_checks is used for that
   //
   std::vector<crypto::public_key> dummy_output_keys; // won't be used
@@ -5475,7 +5476,7 @@ std::shared_ptr<const transaction_chain_entry> blockchain_storage::find_key_imag
       {
         if (k_image == ki)
         {
-          id_result = get_transaction_hash(tx_chain_entry->tx);  // ??? @#@#  why not just use tx_id ?
+          id_result = tx_id;
           return tx_chain_entry;
         }
       }
