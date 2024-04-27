@@ -381,12 +381,14 @@ namespace wallet_public
     bool require_password;
     bool hash_sum_matched;
     bool tracking;
+    std::string address;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(syntax_correct)      DOC_DSCR("Indicates whether the syntax is correct.")  DOC_EXMP(true)  DOC_END
       KV_SERIALIZE(require_password)    DOC_DSCR("Indicates whether a password is required.") DOC_EXMP(true)  DOC_END
       KV_SERIALIZE(hash_sum_matched)    DOC_DSCR("Indicates whether the hash sum matches.")   DOC_EXMP(true)  DOC_END
       KV_SERIALIZE(tracking)            DOC_DSCR("Indicates whether tracking is enabled.")    DOC_EXMP(false) DOC_END
+      KV_SERIALIZE(address)             DOC_DSCR("Return address of the seed phrase.")        DOC_EXMP("ZxDNaMeZjwCjnHuU5gUNyrP1pM3U5vckbakzzV6dEHyDYeCpW8XGLBFTshcaY8LkG9RQn7FsQx8w2JeJzJwPwuDm2NfixPAXf") DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
