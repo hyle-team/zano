@@ -35,8 +35,12 @@ POP_VS_WARNINGS
 void test_plain_wallet()
 {
   //std::string res = plain_wallet::init("195.201.107.230", "33336", "E:\\tmp\\", 0);
-  std::string res = plain_wallet::init("127.0.0.1", "12111", "C:\\Users\\roky\\home\\", 0);
+  std::string res = plain_wallet::init("127.0.0.1", "12111", "C:\\Users\\roky\\home22\\", 0);
   
+
+  std::string res___ = plain_wallet::get_wallet_files();
+
+
   uint64_t instance_id = 0;
   res = plain_wallet::open("test_restored_2.zan", "111");
   //res = plain_wallet::restore("",
@@ -52,7 +56,6 @@ void test_plain_wallet()
     if (wsi.wallet_state == 2)
       break;
   }
-
 
   std::string invoke_body = "{\"method\":\"store\",\"params\":{}}";
   std::string res1 = plain_wallet::sync_call("invoke", instance_id, invoke_body);

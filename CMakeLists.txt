@@ -53,7 +53,7 @@ if (UNIX AND NOT APPLE)
 else()
   # multi configurations for MSVC and XCode
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS") 
-    set(CMAKE_CONFIGURATION_TYPES "Release")
+    set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
   elseif(CMAKE_SYSTEM_NAME STREQUAL "Android") 
     set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
   else()
