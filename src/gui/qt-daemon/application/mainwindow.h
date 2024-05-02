@@ -114,7 +114,7 @@ public:
   QString have_secure_app_data(const QString& param);
   QString drop_secure_app_data(const QString& param);
   QString get_secure_app_data(const QString& param);
-  QString store_secure_app_data(const QString& param);
+  QString store_secure_app_data(const QString& param, const QString& password);
   QString set_master_password(const QString& param);
   QString check_master_password(const QString& param);
   QString get_app_data(const QString& param);

@@ -1428,7 +1428,7 @@ void MainWindow::on_clear_events()
 }
 
 
-QString MainWindow::store_secure_app_data(const QString& param)
+QString MainWindow::store_secure_app_data(const QString& param, const QString& password)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
