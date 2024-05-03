@@ -297,10 +297,13 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
       m_db_addr_to_alias.set_cache_size(cache_size);
     }
 
+    LOG_PRINT_L0("Opened DB ver " << m_db_storage_major_compatibility_version << "." << m_db_storage_minor_compatibility_version);
+
     bool need_reinit = false;
     if (m_db_blocks.size() != 0)
     {
 #ifndef TESTNET
+      // MAINNET ONLY
       if ((m_db_storage_major_compatibility_version == 93 || m_db_storage_major_compatibility_version == 94) && BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION == 95)
       {
         // migrate DB to rebuild aliases container
@@ -379,14 +382,21 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         // do not reinit db if moving from version 93 to version 94
         LOG_PRINT_MAGENTA("DB storage does not need reinit because moving from v93 to v94", LOG_LEVEL_0);
       }
+
+#define DB_MAJ_VERSION_FOR_PER_BLOCK_GINDEX_FIX 95
+
 #else
-      // TESTNET
+      // TESTNET ONLY
       if (m_db_storage_major_compatibility_version == 95 && BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION == 96)
       {
         // do not reinit TESTNET db if moving from version 95 to version 96
         LOG_PRINT_MAGENTA("DB storage does not need reinit because moving from v95 to v96", LOG_LEVEL_0);
       }
+
+#define DB_MAJ_VERSION_FOR_PER_BLOCK_GINDEX_FIX 109
+
 #endif
+      // MAINNET and TESTNET
       else if (m_db_storage_major_compatibility_version != BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION)
       {
         need_reinit = true;
@@ -397,6 +407,46 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         // reinit db only if minor version in the DB is greather (i.e. newer) than minor version in the code 
         need_reinit = true;
         LOG_PRINT_MAGENTA("DB storage needs reinit because it has minor compatibility ver " << m_db_storage_minor_compatibility_version << " that is greater than BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION: " << BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION, LOG_LEVEL_0);
+      }
+      
+      if (!need_reinit && m_db_storage_major_compatibility_version == DB_MAJ_VERSION_FOR_PER_BLOCK_GINDEX_FIX && m_db_storage_minor_compatibility_version == 1)
+      {
+        // such version means that DB has unpopulated container m_db_per_block_gindex_incs, fix it now
+        LOG_PRINT_MAGENTA("DB version is " << DB_MAJ_VERSION_FOR_PER_BLOCK_GINDEX_FIX << ".1, migrating m_db_per_block_gindex_incs to ver. " << DB_MAJ_VERSION_FOR_PER_BLOCK_GINDEX_FIX << ".2...", LOG_LEVEL_0);
+
+        // temporary set db compatibility version to zero during migration in order to trigger db reinit on the next lanunch in case the process stops in the middle
+        m_db.begin_transaction();
+        uint64_t tmp_db_maj_version = m_db_storage_major_compatibility_version;
+        m_db_storage_major_compatibility_version = 0;
+        m_db.commit_transaction();
+
+        m_db.begin_transaction();
+        std::unordered_map<uint64_t, uint32_t> gindices;
+        for(size_t height = ZANO_HARDFORK_04_AFTER_HEIGHT + 1, size = m_db_blocks.size(); height < size; ++height)
+        {
+          auto block_ptr = m_db_blocks[height];
+          gindices.clear();
+          append_per_block_increments_for_tx(block_ptr->bl.miner_tx, gindices);
+          for(const crypto::hash& tx_id : block_ptr->bl.tx_hashes)
+          {
+            auto tx_ptr = m_db_transactions.get(tx_id);
+            if (!tx_ptr)
+            {
+              LOG_ERROR("Internal error: couldn't find a transactions with id " << tx_id << ", migration stops now and full resync is triggered in attempt to fix this.");
+              need_reinit = true;
+              break;
+            }
+            append_per_block_increments_for_tx(tx_ptr->tx, gindices);
+          }
+          push_block_to_per_block_increments(height, gindices);
+        }
+        m_db.commit_transaction();
+
+        // restore db maj compatibility
+        m_db.begin_transaction();
+        m_db_storage_major_compatibility_version = tmp_db_maj_version;
+        m_db.commit_transaction();
+        LOG_PRINT_MAGENTA("migration of m_db_per_block_gindex_incs completed successfully", LOG_LEVEL_0);
       }
     }
 
@@ -452,12 +502,12 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
   set_lost_tx_unmixable();
   m_db.commit_transaction();
 
-  LOG_PRINT_GREEN("Blockchain initialized. (v:" << m_db_storage_major_compatibility_version << ") last block: " << m_db_blocks.size() - 1 << ENDL 
-    << "genesis: " << get_block_hash(m_db_blocks[0]->bl) << ENDL
-    << "last block: " << m_db_blocks.size() - 1 << ", " << misc_utils::get_time_interval_string(timestamp_diff) << " time ago" << ENDL
-    << "current pos difficulty: " << get_next_diff_conditional(true) << ENDL
-    << "current pow difficulty: " << get_next_diff_conditional(false) << ENDL
-    << "total transactions: " << m_db_transactions.size(),
+  LOG_PRINT_GREEN("Blockchain initialized, ver: " << m_db_storage_major_compatibility_version << "." << m_db_storage_minor_compatibility_version << ", last block: " << m_db_blocks.size() - 1 << ENDL 
+    << "  genesis:                " << get_block_hash(m_db_blocks[0]->bl) << ENDL
+    << "  last block:             " << m_db_blocks.size() - 1 << ", " << misc_utils::get_time_interval_string(timestamp_diff) << " ago" << ENDL
+    << "  current pos difficulty: " << get_next_diff_conditional(true) << ENDL
+    << "  current pow difficulty: " << get_next_diff_conditional(false) << ENDL
+    << "  total transactions:     " << m_db_transactions.size(),
     LOG_LEVEL_0);
 
   return true;

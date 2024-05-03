@@ -4076,7 +4076,7 @@ namespace currency
           gindices[amount] += 1;
         }
       VARIANT_CASE_CONST(tx_out_zarcanum, o)
-        //@#@      
+        gindices[0] += 1;    
       VARIANT_SWITCH_END();
     }
   }
