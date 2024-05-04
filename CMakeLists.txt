@@ -264,6 +264,7 @@ elseif(NOT MSVC)
 endif()
 
 if(BUILD_GUI)
+  cmake_minimum_required(VERSION 3.1) # <-- this is important for Linux GUI build, don't touch it -- sowle
   find_package(Qt5Widgets REQUIRED)  
   find_package(Qt5WebEngineWidgets REQUIRED)  
   find_package(Qt5WebChannel REQUIRED)  
