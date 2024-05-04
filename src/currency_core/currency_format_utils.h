@@ -414,9 +414,9 @@ namespace currency
   uint64_t get_alias_coast_from_fee(const std::string& alias, uint64_t fee_median);
   //const crypto::public_key get_offer_secure_key_by_index_from_tx(const transaction& tx, size_t index);
 
-  bool check_money_overflow(const transaction& tx);
-  bool check_outs_overflow(const transaction& tx);
-  bool check_inputs_overflow(const transaction& tx);
+  bool check_bare_money_overflow(const transaction& tx);
+  bool check_bare_outs_overflow(const transaction& tx);
+  bool check_bare_inputs_overflow(const transaction& tx);
   uint64_t get_block_height(const transaction& coinbase);
   uint64_t get_block_height(const block& b);
   std::vector<txout_ref_v> relative_output_offsets_to_absolute(const std::vector<txout_ref_v>& off);

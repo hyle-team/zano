@@ -3118,12 +3118,12 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------------------------------------
-  bool check_money_overflow(const transaction& tx)
+  bool check_bare_money_overflow(const transaction& tx)
   {
-    return check_inputs_overflow(tx) && check_outs_overflow(tx);
+    return check_bare_inputs_overflow(tx) && check_bare_outs_overflow(tx);
   }
   //---------------------------------------------------------------
-  bool check_inputs_overflow(const transaction& tx)
+  bool check_bare_inputs_overflow(const transaction& tx)
   {
     uint64_t money = 0;
     for(const auto& in : tx.vin)
@@ -3160,7 +3160,7 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
-  bool check_outs_overflow(const transaction& tx)
+  bool check_bare_outs_overflow(const transaction& tx)
   {
     uint64_t money = 0;
     for(const auto& o : tx.vout)

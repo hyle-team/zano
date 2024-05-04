@@ -1314,8 +1314,8 @@ wide_difficulty_type blockchain_storage::get_next_difficulty_for_alternative_cha
 //------------------------------------------------------------------
 bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t height, bool pos) const
 {
-  CHECK_AND_ASSERT_MES((pos ? (b.miner_tx.vin.size() == 2) : (b.miner_tx.vin.size() == 1)), false, "coinbase transaction in the block has no inputs");
-  CHECK_AND_ASSERT_MES(b.miner_tx.vin[0].type() == typeid(txin_gen), false, "coinbase transaction in the block has the wrong type");
+  CHECK_AND_ASSERT_MES((pos ? (b.miner_tx.vin.size() == 2) : (b.miner_tx.vin.size() == 1)), false, "coinbase transaction in the block has incorrect inputs number: " << b.miner_tx.vin.size());
+  CHECK_AND_ASSERT_MES(b.miner_tx.vin[0].type() == typeid(txin_gen), false, "input #0 of the coinbase transaction in the block has the wrong type : " << b.miner_tx.vin[0].type().name());
   if(boost::get<txin_gen>(b.miner_tx.vin[0]).height != height)
   {
     LOG_PRINT_RED_L0("The miner transaction in block has invalid height: " << boost::get<txin_gen>(b.miner_tx.vin[0]).height << ", expected: " << height);
@@ -1341,8 +1341,6 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
   }
   else
   {
-    //------------------------------------------------------------------
-    //bool blockchain_storage::
     // pre-hard fork rules that don't allow different unlock time in coinbase outputs
     uint64_t max_unlock_time = 0;
     uint64_t min_unlock_time = 0;
