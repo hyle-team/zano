@@ -977,6 +977,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(multisig_out_make_and_spent_in_altchain);
     GENERATE_AND_PLAY(multisig_unconfirmed_transfer_and_multiple_scan_pool_calls);
     GENERATE_AND_PLAY(multisig_out_spent_in_altchain_case_b4);
+    GENERATE_AND_PLAY(multisig_n_participants_seq_signing);
 
     GENERATE_AND_PLAY(ref_by_id_basics);
     GENERATE_AND_PLAY(ref_by_id_mixed_inputs_types);
