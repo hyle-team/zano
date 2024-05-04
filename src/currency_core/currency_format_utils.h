@@ -522,6 +522,7 @@ namespace currency
   /************************************************************************/
   size_t get_max_block_size();
   size_t get_max_tx_size();
+  uint64_t get_block_reward(uint64_t height, size_t median_block_size, size_t current_block_size);
   bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t &reward, uint64_t height);
   uint64_t get_base_block_reward(uint64_t height);
   bool is_payment_id_size_ok(const payment_id_t& payment_id);
