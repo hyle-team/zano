@@ -348,6 +348,7 @@ namespace currency
 
     // returns true as soon as the hardfork is active for the NEXT upcoming block (not for the top block in the blockchain storage)
     bool is_hardfork_active(size_t hardfork_id) const;
+    bool is_hardfork_active_for_height(size_t hardfork_id, uint64_t height) const;
     bool fill_tx_rpc_inputs(tx_rpc_extended_info& tei, const transaction& tx) const;
     bool fill_tx_rpc_details(tx_rpc_extended_info& tei, const transaction& tx, const transaction_chain_entry* ptce, const crypto::hash& h, uint64_t timestamp, bool is_short = false) const;
 

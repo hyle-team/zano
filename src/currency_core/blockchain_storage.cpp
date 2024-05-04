@@ -1323,13 +1323,13 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
   }
   if (pos)
   {
-    if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
+    if (is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, height)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
       CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_zc_input), false, "coinstake tx has incorrect type of input #1: " << b.miner_tx.vin[1].type().name());
     else
       CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_to_key), false, "coinstake tx has incorrect type of input #1: " << b.miner_tx.vin[1].type().name());
   }
 
-  if (m_core_runtime_config.is_hardfork_active_for_height(1, height))
+  if (is_hardfork_active_for_height(ZANO_HARDFORK_01, height))
   {
     // new rules that allow different unlock time in coinbase outputs
     uint64_t max_unlock_time = 0;
@@ -1337,7 +1337,7 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
     bool r = get_tx_max_min_unlock_time(b.miner_tx, max_unlock_time, min_unlock_time);
     CHECK_AND_ASSERT_MES(r && min_unlock_time >= height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW,
       false,
-      "coinbase transaction has wrong min_unlock_time: " << min_unlock_time << ", expected: " << height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+      "coinbase transaction has wrong min_unlock_time: " << min_unlock_time << ", expected to be greater than or equal to " << height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   }
   else
   {
@@ -1352,14 +1352,7 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
   }
 
 
-  //check outs overflow
-  if(!check_outs_overflow(b.miner_tx))
-  {
-    LOG_PRINT_RED_L0("miner transaction have money overflow in block " << get_block_hash(b));
-    return false;
-  }
-
-  if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
+  if (is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, height)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
   {
     CHECK_AND_ASSERT_MES(b.miner_tx.attachment.empty(), false, "coinbase transaction has attachments; attachments are not allowed for coinbase transactions.");
     CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 3, false, "coinbase transaction has incorrect number of proofs (" << b.miner_tx.proofs.size() << "), expected 3");
@@ -1369,6 +1362,12 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
   }
   else
   {
+    if(!check_bare_outs_overflow(b.miner_tx))
+    {
+      LOG_PRINT_RED_L0("miner transaction have money overflow in block " << get_block_hash(b));
+      return false;
+    }
+
     CHECK_AND_ASSERT_MES(b.miner_tx.attachment.empty(), false, "coinbase transaction has attachments; attachments are not allowed for coinbase transactions.");
     CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 0, false, "pre-HF4 coinbase shoudn't have non-empty proofs containter");
   }
@@ -6900,6 +6899,11 @@ bool blockchain_storage::update_next_comulative_size_limit()
 bool blockchain_storage::is_hardfork_active(size_t hardfork_id) const
 {
   return m_core_runtime_config.is_hardfork_active_for_height(hardfork_id, m_db_blocks.size()); // note using m_db_blocks.size() ( == top_block_height + 1 )
+}
+//------------------------------------------------------------------
+bool blockchain_storage::is_hardfork_active_for_height(size_t hardfork_id, uint64_t height) const
+{
+  return m_core_runtime_config.is_hardfork_active_for_height(hardfork_id, height);
 }
 //------------------------------------------------------------------
 bool blockchain_storage::prevalidate_block(const block& bl)
