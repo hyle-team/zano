@@ -1375,50 +1375,44 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::validate_miner_transaction(const block& b, 
-                                                    size_t cumulative_block_size, 
-                                                    uint64_t fee, 
-                                                    uint64_t& base_reward, 
-                                                    const boost::multiprecision::uint128_t& already_generated_coins) const
+bool blockchain_storage::calculate_block_reward_for_next_top_block(size_t next_block_cumulative_size, uint64_t& block_reward_without_fee) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
   std::vector<size_t> last_blocks_sizes;
   get_last_n_blocks_sizes(last_blocks_sizes, CURRENCY_REWARD_BLOCKS_WINDOW);
   size_t blocks_size_median = misc_utils::median(last_blocks_sizes);
-  if (!get_block_reward(is_pos_block(b), blocks_size_median, cumulative_block_size, already_generated_coins, base_reward, get_block_height(b)))
-  {
-    LOG_PRINT_L0("block size " << cumulative_block_size << " is bigger than allowed for this blockchain");
-    return false;
-  }
-
-  uint64_t block_reward = base_reward;
-  // before HF4: add tx fee to the block reward; after HF4: burn it
-  if (b.miner_tx.version < TRANSACTION_VERSION_POST_HF4)
+  LOG_PRINT_MAGENTA("blocks_size_median = " << blocks_size_median, LOG_LEVEL_2);
+  block_reward_without_fee = get_block_reward(get_top_block_height() + 1, blocks_size_median, next_block_cumulative_size);
+  CHECK_AND_ASSERT_MES(block_reward_without_fee != 0, false, "block size " << next_block_cumulative_size << " is bigger than allowed for this blockchain, blocks_size_median: " << blocks_size_median);
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::validate_miner_transaction(const transaction& miner_tx, 
+                                                    uint64_t fee,
+                                                    uint64_t block_reward_without_fee) const
+{
+  uint64_t block_reward = block_reward_without_fee;
+  // before HF4: add tx fee to the block reward; after HF4: burn fees, so they don't count in block_reward
+  if (miner_tx.version < TRANSACTION_VERSION_POST_HF4)
   {
     block_reward += fee;
   }
 
-  crypto::hash tx_id_for_post_hf4_era = b.miner_tx.version > TRANSACTION_VERSION_PRE_HF4 ? get_transaction_hash(b.miner_tx) : null_hash;
-  if (!check_tx_balance(b.miner_tx, tx_id_for_post_hf4_era, block_reward))
+  crypto::hash tx_id_for_post_hf4_era = miner_tx.version > TRANSACTION_VERSION_PRE_HF4 ? get_transaction_hash(miner_tx) : null_hash; // used in the input context for the proofs for txs ver >= 2
+  if (!check_tx_balance(miner_tx, tx_id_for_post_hf4_era, block_reward))
   {
-    LOG_ERROR("coinbase transaction balance check failed. Block reward is " << print_money_brief(block_reward) << "(" << print_money(base_reward) << "+" << print_money(fee)
-      << ", blocks_size_median = " << blocks_size_median
-      << ", cumulative_block_size = " << cumulative_block_size
-      << ", fee = " << fee
-      << ", already_generated_coins = " << already_generated_coins
-      << "), tx:");
-    LOG_PRINT_L0(currency::obj_to_json_str(b.miner_tx));
+    LOG_ERROR("coinbase transaction balance check failed. Block reward is " << print_money_brief(block_reward) << " (" << print_money(block_reward_without_fee) << "+" << print_money(fee) << "), tx:");
+    LOG_PRINT_L0(currency::obj_to_json_str(miner_tx));
     return false;
   }
 
-  if (!verify_asset_surjection_proof(b.miner_tx, tx_id_for_post_hf4_era))
+  if (!verify_asset_surjection_proof(miner_tx, tx_id_for_post_hf4_era))
   {
     LOG_ERROR("asset surjection proof verification failed for miner tx");
     return false;
   }
 
-  LOG_PRINT_MAGENTA("Mining tx verification ok, blocks_size_median = " << blocks_size_median, LOG_LEVEL_2);
   return true;
 }
 //------------------------------------------------------------------
@@ -6579,15 +6573,19 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     return false;
   }
 
-  boost::multiprecision::uint128_t already_generated_coins = m_db_blocks.size() ? m_db_blocks.back()->already_generated_coins:0;
-  uint64_t base_reward = get_base_block_reward(height);
+  uint64_t block_reward_without_fee = 0;
+  if (!calculate_block_reward_for_next_top_block(cumulative_block_size, block_reward_without_fee))
+  {
+    LOG_ERROR("calculate_block_reward_for_next_top_block filed");
+    purge_block_data_from_blockchain(bl, tx_processed_count);
+    bvc.m_verification_failed = true;
+    return false;
+  }
 
   if (!m_is_in_checkpoint_zone)
   {
-    // validate_miner_transaction will check balance proof and asset surjection proof
-    // and, as a side effect, it MAY recalculate base_reward, consider redisign, TODO -- sowle
     TIME_MEASURE_START_PD(validate_miner_transaction_time);
-    if (!validate_miner_transaction(bl, cumulative_block_size, fee_summary, base_reward, already_generated_coins)) // TODO @#@# base_reward will be calculated once again, consider refactoring
+    if (!validate_miner_transaction(bl.miner_tx, fee_summary, block_reward_without_fee))
     {
       LOG_PRINT_L0("Block with id: " << id
         << " have wrong miner transaction");
@@ -6678,6 +6676,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   //////////////////////////////////////////////////////////////////////////
 
   //etc 
+  boost::multiprecision::uint128_t already_generated_coins = m_db_blocks.size() ? m_db_blocks.back()->already_generated_coins : 0;
   if (already_generated_coins < burned_coins)
   {
     LOG_ERROR("Condition failed: already_generated_coins(" << already_generated_coins << ") >= burned_coins(" << burned_coins << ")");
@@ -6685,7 +6684,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     bvc.m_verification_failed = true;
     return false;
   }
-  bei.already_generated_coins = already_generated_coins - burned_coins + base_reward;
+  bei.already_generated_coins = already_generated_coins - burned_coins + block_reward_without_fee;
   if (bei.bl.miner_tx.version >= TRANSACTION_VERSION_POST_HF4)
   {
     bei.already_generated_coins -= fee_summary;
@@ -6763,9 +6762,9 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     timestamp_str_entry << ", block ts: " << bei.bl.timestamp << " (diff: " << std::showpos << ts_diff << "s)";
   }
   if(bei.bl.miner_tx.version >= TRANSACTION_VERSION_POST_HF4)
-    block_reward_entry << "block reward: " << print_money_brief(base_reward) << ", fee burnt: " << print_money_brief(fee_summary);
+    block_reward_entry << "block reward: " << print_money_brief(block_reward_without_fee) << ", fee burnt: " << print_money_brief(fee_summary);
   else
-    block_reward_entry << "block reward: " << print_money_brief(base_reward + fee_summary) << " (" << print_money_brief(base_reward) << " + " << print_money_brief(fee_summary) << ")";
+    block_reward_entry << "block reward: " << print_money_brief(block_reward_without_fee + fee_summary) << " (" << print_money_brief(block_reward_without_fee) << " + " << print_money_brief(fee_summary) << ")";
   //explanation of this code will be provided later with public announce
   set_lost_tx_unmixable_for_height(bei.height);
     

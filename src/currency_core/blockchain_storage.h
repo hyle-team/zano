@@ -340,7 +340,8 @@ namespace currency
     uint64_t get_last_timestamps_check_window_median() const;
     uint64_t get_last_n_blocks_timestamps_median(size_t n) const;
     bool prevalidate_alias_info(const transaction& tx, const extra_alias_entry& eae);
-    bool validate_miner_transaction(const block& b, size_t cumulative_block_size, uint64_t fee, uint64_t& base_reward, const boost::multiprecision::uint128_t& already_generated_coins) const;
+    bool calculate_block_reward_for_next_top_block(size_t next_block_cumulative_size, uint64_t& block_reward_without_fee) const;
+    bool validate_miner_transaction(const transaction& miner_tx, uint64_t fee, uint64_t block_reward_without_fee) const;
     performnce_data& get_performnce_data()const;
     bool validate_instance(const std::string& path);
     bool is_tx_expired(const transaction& tx) const;
