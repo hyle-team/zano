@@ -5189,9 +5189,7 @@ bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, 
 
   LOC_CHK(tx.signatures.size() > in_index, "ms input index is out of signatures container bounds, signatures.size() = " << tx.signatures.size());
 
-  //@#@
   VARIANT_SWITCH_BEGIN(tx.signatures[in_index]);
-  VARIANT_CASE_CONST(void_sig, v);
   VARIANT_CASE_CONST(NLSAG_sig, sig)
   {    
     const std::vector<crypto::signature>& input_signatures = sig.s;
@@ -5236,9 +5234,9 @@ bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, 
       LOC_CHK(r, "failed to check extra signature for last out with TX_FLAG_SIGNATURE_MODE_SEPARATE");
     }
   }
-  VARIANT_CASE_CONST(ZC_sig, s);
-  //@#@
-  //TODO: don't forget about need_to_check_extra_sign
+  VARIANT_CASE_OTHER()
+    LOG_ERROR("Unexpected signature type: " << VARIANT_OBJ_TYPENAME);
+    return false;
   VARIANT_SWITCH_END();
 
 
