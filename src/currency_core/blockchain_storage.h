@@ -366,7 +366,7 @@ namespace currency
       uint64_t timestamp) const;
     bool build_stake_modifier(stake_modifier_type& sm, const alt_chain_type& alt_chain = alt_chain_type(), uint64_t split_height = 0, crypto::hash* p_last_block_hash = nullptr, uint64_t* p_last_pow_block_height = nullptr) const;
 
-    bool validate_pos_coinbase_outs_unlock_time(const transaction& miner_tx, uint64_t staked_amount, uint64_t source_max_unlock_time)const;
+    bool validate_pre_zarcanum_pos_coinbase_outs_unlock_time(const transaction& miner_tx, uint64_t staked_amount, uint64_t source_max_unlock_time)const;
     bool validate_pos_block(const block& b, const crypto::hash& id, bool for_altchain)const;
     bool validate_pos_block(const block& b, wide_difficulty_type basic_diff, const crypto::hash& id, bool for_altchain)const;
     bool validate_pos_block(const block& b,
