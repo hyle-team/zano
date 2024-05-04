@@ -661,6 +661,7 @@ namespace currency
   //-----------------------------------------------
   struct outs_index_stat
   {
+    uint64_t amount_0;
     uint64_t amount_0_001;
     uint64_t amount_0_01;
     uint64_t amount_0_1;
@@ -673,6 +674,7 @@ namespace currency
     uint64_t amount_1000000;
 
     BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(amount_0)
       KV_SERIALIZE(amount_0_001)
       KV_SERIALIZE(amount_0_01)
       KV_SERIALIZE(amount_0_1)

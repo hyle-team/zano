@@ -3773,7 +3773,6 @@ bool blockchain_storage::pop_transaction_from_global_index(const transaction& tx
         CHECK_AND_ASSERT_MES(res, false, "Internal error: multisig out not found, multisig_out_id " << multisig_out_id << "in multisig outs index");
       }
     VARIANT_CASE_CONST(tx_out_zarcanum, toz)
-      // TODO: @#@# temporary comment this section and make a test for the corresponding bug
       if (!do_pop_output(i, 0))
         return false;
     VARIANT_CASE_THROW_ON_OTHER();
@@ -4291,16 +4290,17 @@ bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx, cons
 bool blockchain_storage::get_outs_index_stat(outs_index_stat& outs_stat) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  outs_stat.amount_0_001 = m_db_outputs.get_item_size(COIN / 1000);
-  outs_stat.amount_0_01 = m_db_outputs.get_item_size(COIN / 100);
-  outs_stat.amount_0_1 = m_db_outputs.get_item_size(COIN / 10);
-  outs_stat.amount_1 = m_db_outputs.get_item_size(COIN);
-  outs_stat.amount_10 = m_db_outputs.get_item_size(COIN * 10);
-  outs_stat.amount_100 = m_db_outputs.get_item_size(COIN * 100);
-  outs_stat.amount_1000 = m_db_outputs.get_item_size(COIN * 1000);
-  outs_stat.amount_10000 = m_db_outputs.get_item_size(COIN * 10000);
-  outs_stat.amount_100000 = m_db_outputs.get_item_size(COIN * 100000);
-  outs_stat.amount_1000000 = m_db_outputs.get_item_size(COIN * 1000000);
+  outs_stat.amount_0        = m_db_outputs.get_item_size(0);
+  outs_stat.amount_0_001    = m_db_outputs.get_item_size(COIN / 1000);
+  outs_stat.amount_0_01     = m_db_outputs.get_item_size(COIN / 100);
+  outs_stat.amount_0_1      = m_db_outputs.get_item_size(COIN / 10);
+  outs_stat.amount_1        = m_db_outputs.get_item_size(COIN);
+  outs_stat.amount_10       = m_db_outputs.get_item_size(COIN * 10);
+  outs_stat.amount_100      = m_db_outputs.get_item_size(COIN * 100);
+  outs_stat.amount_1000     = m_db_outputs.get_item_size(COIN * 1000);
+  outs_stat.amount_10000    = m_db_outputs.get_item_size(COIN * 10000);
+  outs_stat.amount_100000   = m_db_outputs.get_item_size(COIN * 100000);
+  outs_stat.amount_1000000  = m_db_outputs.get_item_size(COIN * 1000000);
   return true;
 }
 //------------------------------------------------------------------

@@ -439,3 +439,60 @@ bool hardfork_4_wallet_sweep_bare_outs::c1(currency::core& c, size_t ev_index, c
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+hardfork_4_pop_tx_from_global_index::hardfork_4_pop_tx_from_global_index()
+{
+  REGISTER_CALLBACK_METHOD(hardfork_4_pop_tx_from_global_index, c1);
+}
+
+bool hardfork_4_pop_tx_from_global_index::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure that pop_transaction_from_global_index works for tx_out_zarcanum as well (m_db_outputs is consistent after pop_transaction_from_global_index() call)
+
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_04_ZARCANUM));
+
+  MAKE_NEXT_BLOCK(events, blk_1a, blk_0r, miner_acc);                      // blk_1a will be the alt chain
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_1a)); // make sure now it's the main chain
+
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner_acc);
+
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);                        // this should trigger chain switching
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_2));  // make sure it did
+
+  // during switching to the alternative chain pop_block_from_blockchain() -> ... -> pop_transaction_from_global_index() will be called
+  // but abort_transaction() will not, meaning m_db_outputs will be in incorrect state, if pop_transaction_from_global_index() hasn't properly pop all outs
+  // this will be checked later in c1
+
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool hardfork_4_pop_tx_from_global_index::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  auto& bcs = c.get_blockchain_storage();
+  bool r = false;
+
+  //currency::outs_index_stat outs_stat{};
+  //bcs.get_outs_index_stat(outs_stat); // 24 - bad, 22 - good
+  
+  COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES_BY_AMOUNT::response res;
+  COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES_BY_AMOUNT::request req;
+  req.amount = 0;
+  req.i = 22;
+  CHECK_AND_ASSERT_MES(!bcs.get_global_index_details(req, res), false, "gindex 22 exists which is unexpected");
+  req.i = 21;
+  CHECK_AND_ASSERT_MES(bcs.get_global_index_details(req, res), false, "gindex 21 does not exist which is unexpected");
+
+  return true;
+}
