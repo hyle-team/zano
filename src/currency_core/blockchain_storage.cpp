@@ -7432,7 +7432,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   if (!alt_chain.empty())
   {
     auto abg_it = alt_chain.back()->second.gindex_lookup_table.find(input_amount);
-    if (abg_it != alt_chain.back()->second.gindex_lookup_table.end())
+    if (input_amount != 0 /* <-- TODO @#@# remove this condition after ZC outs support is implemented*/ && abg_it != alt_chain.back()->second.gindex_lookup_table.end())
     {
       amount_touched_altchain = true;
       // local gindex lookup table contains last used gindex, so we can't get total number of outs
