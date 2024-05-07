@@ -104,6 +104,20 @@ namespace currency
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::add_tx(const transaction &tx, const crypto::hash &id, uint64_t blob_size, tx_verification_context& tvc, bool kept_by_block, bool from_core)
   {
+    // ------------------ UNSECURE CODE FOR TESTS ---------------------
+    if (m_unsecure_disable_tx_validation_on_addition)
+    {
+      uint64_t tx_fee = 0;
+      CHECK_AND_ASSERT_MES(get_tx_fee(tx, tx_fee), false, "get_tx_fee failed");
+      do_insert_transaction(tx, id, blob_size, kept_by_block, tx_fee, null_hash, 0);
+      tvc.m_added_to_pool = true;
+      tvc.m_should_be_relayed = true;
+      tvc.m_verification_failed = false;
+      tvc.m_verification_impossible = false;
+      return true;
+    }
+    // ---------------- END OF UNSECURE CODE FOR TESTS -------------------
+
     bool r = false;
 
     // defaults
@@ -224,6 +238,20 @@ namespace currency
     }
     TIME_MEASURE_FINISH_PD(check_inputs_time);
 
+    if (tx.version > TRANSACTION_VERSION_PRE_HF4)
+    {
+      TIME_MEASURE_START_PD(check_post_hf4_balance);
+      r = check_tx_balance(tx, id);
+      CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "post-HF4 tx: balance proof is invalid");
+      TIME_MEASURE_FINISH_PD(check_post_hf4_balance);
+
+      r = process_type_in_variant_container_and_make_sure_its_unique<asset_descriptor_operation>(tx.extra, [&](const asset_descriptor_operation& ado){
+          asset_op_verification_context avc = { tx, id, ado };
+          return m_blockchain.validate_asset_operation_against_current_blochain_state(avc);
+        }, true);
+      CHECK_AND_ASSERT_MES_CUSTOM(r, false, { tvc.m_verification_failed = true; }, "post-HF4 tx: asset operation is invalid");
+    }
+
     do_insert_transaction(tx, id, blob_size, kept_by_block, tx_fee, ch_inp_res ? max_used_block_id : null_hash, ch_inp_res ? max_used_block_height : 0);
     
     TIME_MEASURE_FINISH_PD(tx_processing_time);
@@ -240,9 +268,11 @@ namespace currency
       << "/" << m_performance_data.validate_alias_time.get_last_val()
       << "/" << m_performance_data.check_keyimages_ws_ms_time.get_last_val()
       << "/" << m_performance_data.check_inputs_time.get_last_val()
+      << "/b"<< m_performance_data.check_post_hf4_balance.get_last_val()
       << "/" << m_performance_data.begin_tx_time.get_last_val()
       << "/" << m_performance_data.update_db_time.get_last_val()
-      << "/" << m_performance_data.db_commit_time.get_last_val() << ")"    );
+      << "/" << m_performance_data.db_commit_time.get_last_val()
+      << ")");
 
     return true;
   }
@@ -875,7 +905,7 @@ namespace currency
   {
     //not the best implementation at this time, sorry :(
 
-    if (m_db_black_tx_list.get(get_transaction_hash(txd.tx)))
+    if (is_tx_blacklisted(get_transaction_hash(txd.tx)))
       return false;
 
     //check is ring_signature already checked ?
@@ -966,8 +996,8 @@ namespace currency
         return "(no transactions, the pool is empty)";
       // sort output by receive time
       txs.sort([](const std::pair<crypto::hash, tx_details>& lhs, const std::pair<crypto::hash, tx_details>& rhs) -> bool { return lhs.second.receive_time < rhs.second.receive_time; });
-      ss << "#    | transaction id                                                 | size  | fee       | ins | outs | outs money      | live_time      | max used block   | last failed block | kept by a block?" << ENDL;
-      //     1234  f99fe6d4335fc0ddd69e6880a4d95e0f6ea398de0324a6837021a61c6a31cacd  87157   0.10000111  2000  2000   112000.12345678   d0.h10.m16.s17   123456 <12345..>   123456 <12345..>    YES   
+      ss << "#    | transaction id                                                 | size   | fee       | ins | outs | live_time      | max used block    | last failed block  | ver | status                     " << ENDL;
+      //     1234  f99fe6d4335fc0ddd69e6880a4d95e0f6ea398de0324a6837021a61c6a31cacd  187157   0.10000111  2000  2000   d0.h10.m16.s17   1234567 <12345..>   1234567 <12345..>    2     kept_by_block BLACKLISTED
       size_t i = 0;
       for (auto& tx : txs)
       {
@@ -975,17 +1005,17 @@ namespace currency
         ss << std::left
           << std::setw(4) << i++ << "  "
           << tx.first << "  "
-          << std::setw(5) << txd.blob_size << "   "
+          << std::setw(6) << txd.blob_size << "   "
           << std::setw(10) << print_money_brief(txd.fee) << "  "
           << std::setw(4) << txd.tx.vin.size() << "  "
           << std::setw(4) << txd.tx.vout.size() << "   "
-          << std::right << std::setw(15) << print_money(get_outs_money_amount(txd.tx)) << std::left << "   "
           << std::setw(14) << epee::misc_utils::get_time_interval_string(get_core_time() - txd.receive_time) << "   "
-          << std::setw(6) << txd.max_used_block_height << " "
+          << std::setw(7) << txd.max_used_block_height << " "
           << std::setw(9) << print16(txd.max_used_block_id) << "   "
-          << std::setw(6) << txd.last_failed_height << " "
+          << std::setw(7) << txd.last_failed_height << " "
           << std::setw(9) << print16(txd.last_failed_id) << "    "
-          << (txd.kept_by_block ? "YES" : "no ")
+          << std::setw(3) << txd.tx.version << "   "
+          << (txd.kept_by_block ? "kept_by_block " : "") << (is_tx_blacklisted(tx.first) ? "BLACKLISTED " : "")
           << ENDL;
       }
       return ss.str();
@@ -1291,6 +1321,32 @@ namespace currency
     load_keyimages_cache();
 
     return true;
+  }
+  //---------------------------------------------------------------------------------
+  void tx_memory_pool::remove_incompatible_txs()
+  {
+    std::vector<crypto::hash> invalid_tx_ids;
+
+    m_db_transactions.enumerate_items([&](uint64_t i, const crypto::hash& h, const tx_details &tx_entry)
+    {
+      if (!m_blockchain.validate_tx_for_hardfork_specific_terms(tx_entry.tx, h))
+        invalid_tx_ids.push_back(h);
+      return true;
+    });
+
+    for(const auto& id : invalid_tx_ids)
+    {
+      transaction tx{};
+      size_t blob_size = 0;
+      uint64_t fee = 0;
+      take_tx(id, tx, blob_size, fee);
+      LOG_PRINT_L0("tx " << id << " was incompatible with the hardfork rules and removed");
+    }
+  }
+  //---------------------------------------------------------------------------------
+  bool tx_memory_pool::is_tx_blacklisted(const crypto::hash& id) const
+  {
+    return m_db_black_tx_list.get(id) != nullptr;
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::load_keyimages_cache()

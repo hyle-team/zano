@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -142,9 +142,9 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
   CHECK_AND_ASSERT_MES(asset_info2.meta_info == asset_info.meta_info, false, "Failed to find needed asset in result balances");
 
-  //test emmit function
+  //test emit function
   //use same destinations as we used before
-  miner_wlt->emmit_asset(asset_id, destinations, tx);
+  miner_wlt->emit_asset(asset_id, destinations, tx);
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
@@ -186,7 +186,20 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   CHECK_AND_ASSERT_MES(r, false, "Failed to get_asset_info");
 
   asset_info.meta_info = "{\"some2\": \"info2\"}";
+  r = false;
+  try
+  {
+    miner_wlt->update_asset(asset_id, asset_info, tx);
+  }
+  catch(tools::error::tx_rejected&)
+  {
+    r = true;
+  }
+  CHECK_AND_ASSERT_MES(r, false, "Test failed, broken ownership passed");
+  
+  c.get_tx_pool().unsecure_disable_tx_validation_on_addition(true);
   miner_wlt->update_asset(asset_id, asset_info, tx);
+  c.get_tx_pool().unsecure_disable_tx_validation_on_addition(false);
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 2);
   CHECK_AND_ASSERT_MES(!r, false, "Test failed, broken ownership passed");
   c.get_tx_pool().purge_transactions();
@@ -202,12 +215,27 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   CHECK_AND_ASSERT_MES(r, false, "Failed to get_asset_info");
 
   asset_info.ticker = "XXX";
+  r = false;
+  try
+  {
+    miner_wlt->update_asset(asset_id, asset_info, tx);
+  }
+  catch(tools::error::tx_rejected&)
+  {
+    r = true;
+  }
+  CHECK_AND_ASSERT_MES(r, false, "update_asset succeeded, but this shouldn't happened");
+
+  c.get_tx_pool().unsecure_disable_tx_validation_on_addition(true);
   miner_wlt->update_asset(asset_id, asset_info, tx);
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
   r = mine_next_pow_block_in_playtime(miner_wlt->get_account().get_public_address(), c);
   CHECK_AND_ASSERT_MES(!r, false, "block with a bad tx was unexpectedly mined");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not confirmed
+  c.get_tx_pool().unsecure_disable_tx_validation_on_addition(false);
   c.get_tx_pool().purge_transactions();
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not added
 
   
   // check update_asset() with modified 'full_name'
@@ -215,12 +243,26 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   CHECK_AND_ASSERT_MES(r, false, "Failed to get_asset_info");
 
   asset_info.full_name = "XXX";
+  r = false;
+  try
+  {
+    miner_wlt->update_asset(asset_id, asset_info, tx);
+  }
+  catch(tools::error::tx_rejected&)
+  {
+    r = true;
+  }
+  CHECK_AND_ASSERT_MES(r, false, "update_asset succeeded, but this shouldn't happened");
+
+  c.get_tx_pool().unsecure_disable_tx_validation_on_addition(true);
   miner_wlt->update_asset(asset_id, asset_info, tx);
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
   r = mine_next_pow_block_in_playtime(miner_wlt->get_account().get_public_address(), c);
   CHECK_AND_ASSERT_MES(!r, false, "block with a bad tx was unexpectedly mined");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not confirmed
+  c.get_tx_pool().unsecure_disable_tx_validation_on_addition(false);
   c.get_tx_pool().purge_transactions();
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not added
   miner_wlt->refresh();
 
   
@@ -229,13 +271,27 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   CHECK_AND_ASSERT_MES(r, false, "Failed to get_asset_info");
 
   asset_info.decimal_point = 3;
+  r = false;
+  try
+  {
+    miner_wlt->update_asset(asset_id, asset_info, tx);
+  }
+  catch(tools::error::tx_rejected&)
+  {
+    r = true;
+  }
+  CHECK_AND_ASSERT_MES(r, false, "update_asset succeeded, but this shouldn't happened");
+
+  c.get_tx_pool().unsecure_disable_tx_validation_on_addition(true);
   miner_wlt->update_asset(asset_id, asset_info, tx);
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
   r = mine_next_pow_block_in_playtime(miner_wlt->get_account().get_public_address(), c);
   CHECK_AND_ASSERT_MES(!r, false, "block with a bad tx was unexpectedly mined");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not confirmed
+  c.get_tx_pool().unsecure_disable_tx_validation_on_addition(false);
   c.get_tx_pool().purge_transactions();
   miner_wlt->refresh();
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not added
 
 
   // check update_asset() with modified 'owner'
@@ -252,19 +308,34 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   //miner_wlt->refresh();
 
 
-  // check emmit_asset() with modified 'current_supply'
+  // check emit_asset() with modified 'current_supply'
   miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_seal>([&](const wde_construct_tx_handle_asset_descriptor_operation_before_seal& o)
   {
     o.pado->descriptor.current_supply += 1000000;
   });
-  //test emmit function but re-adjust current_supply to wrong amount
-  miner_wlt->emmit_asset(asset_id, destinations, tx);
+  //test emit function but re-adjust current_supply to wrong amount
+  r = false;
+  try
+  {
+    miner_wlt->emit_asset(asset_id, destinations, tx);
+  }
+  catch(tools::error::tx_rejected&)
+  {
+    r = true;
+  }
+  CHECK_AND_ASSERT_MES(r, false, "emit_asset succeeded, but this shouldn't happened");
+
+  c.get_tx_pool().unsecure_disable_tx_validation_on_addition(true);
+  miner_wlt->emit_asset(asset_id, destinations, tx);
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
   r = mine_next_pow_block_in_playtime(miner_wlt->get_account().get_public_address(), c);
   CHECK_AND_ASSERT_MES(!r, false, "block with a bad tx was unexpectedly mined");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not confirmed
+  c.get_tx_pool().unsecure_disable_tx_validation_on_addition(false);
   c.get_tx_pool().purge_transactions();
   miner_wlt->refresh();
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not added
 
   //------------------- tests that trying to break stuff  -------------------
   //test burn that burns more than tx has
@@ -276,11 +347,24 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   });
 
 
+  r = false;
+  try
+  {
+    miner_wlt->burn_asset(asset_id, 10000000000000, tx);
+  }
+  catch(tools::error::tx_rejected&)
+  {
+    r = true;
+  }
+  CHECK_AND_ASSERT_MES(r, false, "burn_asset succeeded, but this shouldn't happened");
+
+  c.get_tx_pool().unsecure_disable_tx_validation_on_addition(true);
   miner_wlt->burn_asset(asset_id, 10000000000000, tx);
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
   r = mine_next_pow_block_in_playtime(miner_wlt->get_account().get_public_address(), c);
   CHECK_AND_ASSERT_MES(!r, false, "block with a bad tx was unexpectedly mined");
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count()); // make sure tx was not confirmed
+  c.get_tx_pool().unsecure_disable_tx_validation_on_addition(false);
   c.get_tx_pool().purge_transactions();
   miner_wlt->refresh();
   miner_wlt->get_debug_events_dispatcher().UNSUBSCRIBE_ALL();
@@ -305,7 +389,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   uint64_t balance_alice_asset = alice_wlt->balance(asset_id);
   uint64_t balance_miner_asset = miner_wlt->balance(asset_id);
 
-  alice_wlt->emmit_asset(asset_id, destinations, tx);
+  alice_wlt->emit_asset(asset_id, destinations, tx);
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
 
@@ -315,7 +399,7 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   CHECK_AND_ASSERT_MES(miner_wlt->balance(asset_id) == balance_miner_asset + destinations[0].amount, false, "Miner balance wrong");
   CHECK_AND_ASSERT_MES(alice_wlt->balance(asset_id) == balance_alice_asset + destinations[1].amount, false, "Alice balance wrong");
 
-  //TODO: attempt to emmmit from old key, attempt to emmit from more then max supply
+  //TODO: attempt to emmmit from old key, attempt to emit from more then max supply
 
   return true;
 }

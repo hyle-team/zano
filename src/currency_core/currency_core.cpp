@@ -163,6 +163,8 @@ namespace currency
     r = m_blockchain_storage.init(m_config_folder, vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize blockchain storage");
 
+    m_mempool.remove_incompatible_txs();
+
     r = m_miner.init(vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize miner");
 
@@ -413,82 +415,102 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::handle_block_found(const block& b, block_verification_context* p_verification_result, bool need_update_miner_block_template)
   {
-    TIME_MEASURE_START_MS(time_total_ms);
-    block_verification_context bvc = boost::value_initialized<block_verification_context>();
-    if (!p_verification_result)
-      p_verification_result = &bvc;
-
-    m_miner.pause();
-    misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler([this]()
+    try
     {
-      m_miner.resume();
-    });
+      TIME_MEASURE_START_MS(time_total_ms);
+      block_verification_context bvc = boost::value_initialized<block_verification_context>();
+      if (!p_verification_result)
+        p_verification_result = &bvc;
 
-    TIME_MEASURE_START_MS(time_add_new_block_ms);
-    m_blockchain_storage.add_new_block(b, *p_verification_result);
-    TIME_MEASURE_FINISH_MS(time_add_new_block_ms);
-
-
-    //anyway - update miner template
-    TIME_MEASURE_START_MS(time_update_block_template_ms);
-    if (need_update_miner_block_template)
-      update_miner_block_template();
-    TIME_MEASURE_FINISH_MS(time_update_block_template_ms);
-
-    uint64_t time_pack_txs_ms = 0, time_relay_ms = 0;
-
-    if (p_verification_result->m_verification_failed || !p_verification_result->m_added_to_main_chain)
-    {
-      LOG_PRINT2("failed_mined_blocks.log", "verification_failed: " << p_verification_result->m_verification_failed << ", added_to_main_chain: " << p_verification_result->m_added_to_main_chain << ENDL <<
-        currency::obj_to_json_str(b), LOG_LEVEL_0);
-    }
-    CHECK_AND_ASSERT_MES(!p_verification_result->m_verification_failed, false, "mined block has failed to pass verification: id " << get_block_hash(b) << " @ height " << get_block_height(b) << " prev_id: " << b.prev_id);
-
-    if(p_verification_result->m_added_to_main_chain)
-    {
-      time_pack_txs_ms = epee::misc_utils::get_tick_count();
-      currency_connection_context exclude_context = boost::value_initialized<currency_connection_context>();
-      NOTIFY_NEW_BLOCK::request arg = AUTO_VAL_INIT(arg);
-      arg.hop = 0;
-      arg.current_blockchain_height = m_blockchain_storage.get_current_blockchain_size();
-      std::list<crypto::hash> missed_txs;
-      std::list<transaction> txs;
-      m_blockchain_storage.get_transactions(b.tx_hashes, txs, missed_txs);
-      if(missed_txs.size() && m_blockchain_storage.get_block_id_by_height(get_block_height(b)) != get_block_hash(b))
+      m_miner.pause();
+      misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler([this]()
       {
-        LOG_PRINT_L0("Block found (id " << get_block_hash(b) << " @ height " << get_block_height(b) << ") but it seems that reorganize just happened after that, do not relay this block");
-        return true;
-      }
-      if (txs.size() != b.tx_hashes.size() || missed_txs.size() != 0)
+        m_miner.resume();
+      });
+
+      TIME_MEASURE_START_MS(time_add_new_block_ms);
+      m_blockchain_storage.add_new_block(b, *p_verification_result);
+      TIME_MEASURE_FINISH_MS(time_add_new_block_ms);
+
+
+      //anyway - update miner template
+      TIME_MEASURE_START_MS(time_update_block_template_ms);
+      if (need_update_miner_block_template)
+        update_miner_block_template();
+      TIME_MEASURE_FINISH_MS(time_update_block_template_ms);
+
+      uint64_t time_pack_txs_ms = 0, time_relay_ms = 0;
+
+      if (p_verification_result->m_verification_failed || !p_verification_result->m_added_to_main_chain)
       {
-        std::stringstream ss;
-        ss << "txs:" << ENDL;
-        for (auto& t : txs)
-          ss << get_transaction_hash(t) << ENDL;
-        ss << "missed txs:" << ENDL;
-        for (auto& tx_id : missed_txs)
-          ss << tx_id << ENDL;
-        LOG_ERROR("can't find some transactions in found block: " << get_block_hash(b) << ", txs.size()=" << txs.size()
-          << ", b.tx_hashes.size()=" << b.tx_hashes.size() << ", missed_txs.size()=" << missed_txs.size() << ENDL << ss.str());
-        return false;
+        LOG_PRINT2("failed_mined_blocks.log", "verification_failed: " << p_verification_result->m_verification_failed << ", added_to_main_chain: " << p_verification_result->m_added_to_main_chain << ENDL <<
+          currency::obj_to_json_str(b), LOG_LEVEL_0);
+      }
+      CHECK_AND_ASSERT_MES(!p_verification_result->m_verification_failed, false, "mined block has failed to pass verification: id " << get_block_hash(b) << " @ height " << get_block_height(b) << " prev_id: " << b.prev_id);
+
+      if(p_verification_result->m_added_to_main_chain)
+      {
+        time_pack_txs_ms = epee::misc_utils::get_tick_count();
+        currency_connection_context exclude_context = boost::value_initialized<currency_connection_context>();
+        NOTIFY_NEW_BLOCK::request arg = AUTO_VAL_INIT(arg);
+        arg.hop = 0;
+        arg.current_blockchain_height = m_blockchain_storage.get_current_blockchain_size();
+        std::list<crypto::hash> missed_txs;
+        std::list<transaction> txs;
+        m_blockchain_storage.get_transactions(b.tx_hashes, txs, missed_txs);
+        if(missed_txs.size() && m_blockchain_storage.get_block_id_by_height(get_block_height(b)) != get_block_hash(b))
+        {
+          LOG_PRINT_L0("Block found (id " << get_block_hash(b) << " @ height " << get_block_height(b) << ") but it seems that reorganize just happened after that, do not relay this block");
+          return true;
+        }
+        if (txs.size() != b.tx_hashes.size() || missed_txs.size() != 0)
+        {
+          std::stringstream ss;
+          ss << "txs:" << ENDL;
+          for (auto& t : txs)
+            ss << get_transaction_hash(t) << ENDL;
+          ss << "missed txs:" << ENDL;
+          for (auto& tx_id : missed_txs)
+            ss << tx_id << ENDL;
+          LOG_ERROR("can't find some transactions in found block: " << get_block_hash(b) << ", txs.size()=" << txs.size()
+            << ", b.tx_hashes.size()=" << b.tx_hashes.size() << ", missed_txs.size()=" << missed_txs.size() << ENDL << ss.str());
+          return false;
+        }
+
+        block_to_blob(b, arg.b.block);
+        //pack transactions
+        for(auto& tx : txs)
+          arg.b.txs.push_back(t_serializable_object_to_blob(tx));
+
+        TIME_MEASURE_FINISH_MS(time_pack_txs_ms);
+
+        time_relay_ms = epee::misc_utils::get_tick_count();
+        m_pprotocol->relay_block(arg, exclude_context);
+        TIME_MEASURE_FINISH_MS(time_relay_ms);
       }
 
-      block_to_blob(b, arg.b.block);
-      //pack transactions
-      for(auto& tx : txs)
-        arg.b.txs.push_back(t_serializable_object_to_blob(tx));
+      TIME_MEASURE_FINISH_MS(time_total_ms);
+      LOG_PRINT_L2("handle_block_found timings (ms): total: " << time_total_ms << ", add new block: " << time_add_new_block_ms << ", update template: " << time_update_block_template_ms << ", pack txs: " << time_pack_txs_ms << ", relay: " << time_relay_ms);
 
-      TIME_MEASURE_FINISH_MS(time_pack_txs_ms);
-
-      time_relay_ms = epee::misc_utils::get_tick_count();
-      m_pprotocol->relay_block(arg, exclude_context);
-      TIME_MEASURE_FINISH_MS(time_relay_ms);
+      return p_verification_result->m_added_to_main_chain;
     }
-
-    TIME_MEASURE_FINISH_MS(time_total_ms);
-    LOG_PRINT_L2("handle_block_found timings (ms): total: " << time_total_ms << ", add new block: " << time_add_new_block_ms << ", update template: " << time_update_block_template_ms << ", pack txs: " << time_pack_txs_ms << ", relay: " << time_relay_ms);
-
-    return p_verification_result->m_added_to_main_chain;
+    catch(std::bad_alloc&)
+    {
+      LOG_ERROR("bad_alloc in core::handle_block_found(), requesting immediate stop...");
+      if (m_critical_error_handler)
+        m_critical_error_handler->on_immediate_stop_requested();
+      return false;
+    }
+    catch(std::exception& e)
+    {
+      LOG_ERROR("caught exception in core::handle_block_found(): " << e.what());
+      return false;
+    }
+    catch(...)
+    {
+      LOG_ERROR("caught unknown exception in core::handle_block_found()");
+      return false;
+    }
   }
   //-----------------------------------------------------------------------------------------------
   bool core::handle_block_found(const block& b, block_verification_context* p_verification_result /* = nullptr */)
@@ -507,39 +529,59 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::add_new_block(const block& b, block_verification_context& bvc)
   {
-    uint64_t h = m_blockchain_storage.get_top_block_height();
-    if (m_stop_after_height != 0 && h >= m_stop_after_height)
+    try
     {
-      LOG_PRINT_YELLOW("Blockchain top block height is " << h << ", the daemon will now stop as requested", LOG_LEVEL_0);
-      if (m_critical_error_handler)
-        return m_critical_error_handler->on_immediate_stop_requested();
-      return false;
-    }
-
-    bool r = m_blockchain_storage.add_new_block(b, bvc);
-    if (r && bvc.m_added_to_main_chain)
-    {
-      uint64_t h = get_block_height(b);
-      if (h > 0)
+      uint64_t h = m_blockchain_storage.get_top_block_height();
+      if (m_stop_after_height != 0 && h >= m_stop_after_height)
       {
-        auto& crc = m_blockchain_storage.get_core_runtime_config();
-        size_t hardfork_id_for_prev_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h);
-        size_t hardfork_id_for_curr_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h + 1);
-        if (hardfork_id_for_prev_block != hardfork_id_for_curr_block)
-        {
-          LOG_PRINT_GREEN("Hardfork " << hardfork_id_for_curr_block << " has been activated after the block at height " << h, LOG_LEVEL_0);
-        }
-      }
-
-      if (h == m_stop_after_height)
-      {
-        LOG_PRINT_YELLOW("Reached block " << h << ", the daemon will now stop as requested", LOG_LEVEL_0);
+        LOG_PRINT_YELLOW("Blockchain top block height is " << h << ", the daemon will now stop as requested", LOG_LEVEL_0);
         if (m_critical_error_handler)
           return m_critical_error_handler->on_immediate_stop_requested();
         return false;
       }
+
+      bool r = m_blockchain_storage.add_new_block(b, bvc);
+      if (r && bvc.m_added_to_main_chain)
+      {
+        uint64_t h = get_block_height(b);
+        if (h > 0)
+        {
+          auto& crc = m_blockchain_storage.get_core_runtime_config();
+          size_t hardfork_id_for_prev_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h);
+          size_t hardfork_id_for_curr_block = crc.hard_forks.get_the_most_recent_hardfork_id_for_height(h + 1);
+          if (hardfork_id_for_prev_block != hardfork_id_for_curr_block)
+          {
+            LOG_PRINT_GREEN("Hardfork " << hardfork_id_for_curr_block << " has been activated after the block at height " << h, LOG_LEVEL_0);
+          }
+        }
+
+        if (h == m_stop_after_height)
+        {
+          LOG_PRINT_YELLOW("Reached block " << h << ", the daemon will now stop as requested", LOG_LEVEL_0);
+          if (m_critical_error_handler)
+            return m_critical_error_handler->on_immediate_stop_requested();
+          return false;
+        }
+      }
+      return r;
     }
-    return r;
+    catch(std::bad_alloc&)
+    {
+      LOG_ERROR("bad_alloc in core::add_new_block(), requesting immediate stop...");
+      if (m_critical_error_handler)
+        m_critical_error_handler->on_immediate_stop_requested();
+      return false;
+    }
+    catch(std::exception& e)
+    {
+      LOG_ERROR("caught exception in core::add_new_block(): " << e.what());
+      return false;
+    }
+    catch(...)
+    {
+      LOG_ERROR("caught unknown exception in core::add_new_block()");
+      return false;
+    }
   }
   //-----------------------------------------------------------------------------------------------
   bool core::parse_block(const blobdata& block_blob, block& b, block_verification_context& bvc)

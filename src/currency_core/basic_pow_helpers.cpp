@@ -66,7 +66,11 @@ namespace currency
     init_ethash_log_if_necessary();
     int epoch = ethash_height_to_epoch(height);
     std::shared_ptr<ethash::epoch_context_full> p_context = progpow::get_global_epoch_context_full(static_cast<int>(epoch));
-    CHECK_AND_ASSERT_THROW_MES(p_context, "progpow::get_global_epoch_context_full returned null");
+    if (!p_context)
+    {
+      LOG_ERROR("fatal error: get_global_epoch_context_full failed, throwing bad_alloc...");
+      throw std::bad_alloc();
+    }
     auto res_eth = progpow::hash(*p_context,  static_cast<int>(height), *(ethash::hash256*)&block_header_hash, nonce);
     crypto::hash result = currency::null_hash;
     memcpy(&result.data, &res_eth.final_hash, sizeof(res_eth.final_hash));

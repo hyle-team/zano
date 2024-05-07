@@ -146,6 +146,8 @@ public:
   std::string get_fav_offers(const std::list<bc_services::offer_id>& hashes, const bc_services::core_offers_filter& filter, std::list<bc_services::offer_details_ex>& offers);
   std::string get_tx_pool_info(currency::COMMAND_RPC_GET_POOL_INFO::response& res);
   std::string export_wallet_history(const view::export_wallet_info& ewi);
+  std::string setup_wallet_rpc(const std::string& jwt_secret);
+
 #ifndef MOBILE_WALLET_BUILD
   currency::core_rpc_server& get_rpc_server() { return m_rpc_server; }
 #endif
@@ -193,12 +195,12 @@ private:
   bool do_exception_safe_call(guarded_code_t guarded_code, error_prefix_maker_t error_prefix_maker, std::string& api_return_code_result);
 
   //----- i_backend_wallet_callback ------
-  virtual void on_new_block(size_t wallet_id, uint64_t height, const currency::block& block);
-  virtual void on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined);
-  virtual void on_pos_block_found(size_t wallet_id, const currency::block& /*block*/);
-  virtual void on_sync_progress(size_t wallet_id, const uint64_t& /*percents*/);
-  virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti);
-  virtual void on_tor_status_change(size_t wallet_id, const std::string& state);
+  virtual void on_new_block(size_t wallet_id, uint64_t height, const currency::block& block) override;
+  virtual void on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) override;
+  virtual void on_pos_block_found(size_t wallet_id, const currency::block& /*block*/) override;
+  virtual void on_sync_progress(size_t wallet_id, const uint64_t& /*percents*/) override;
+  virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti) override;
+  virtual void on_tor_status_change(size_t wallet_id, const std::string& state) override;
 
   virtual void on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets) override;
   virtual bool on_mw_select_wallet(uint64_t wallet_id) override;
@@ -231,6 +233,8 @@ private:
   std::atomic<bool> m_stop_singal_sent;
   std::mutex m_stop_singal_sent_mutex;
   std::condition_variable m_stop_singal_sent_mutex_cv;
+
+  std::mutex m_select_wallet_rpc_lock;
 
   view::i_view m_view_stub;
   view::i_view* m_pview;

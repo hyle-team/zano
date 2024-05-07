@@ -48,7 +48,7 @@
   #define TX_POOL_SCAN_INTERVAL             1
 #endif
 
-#define HTTP_PROXY_TIMEOUT                2000
+#define HTTP_PROXY_TIMEOUT                4000
 #define HTTP_PROXY_ATTEMPTS_COUNT         1
 
 const command_line::arg_descriptor<bool> arg_alloc_win_console  ( "alloc-win-console", "Allocates debug console with GUI", false );
@@ -546,13 +546,12 @@ bool wallets_manager::init_local_daemon()
   CHECK_AND_ASSERT_AND_SET_GUI(res, "Failed to initialize core rpc server.");
   LOG_PRINT_GREEN("Core rpc server initialized OK on port: " << m_rpc_server.get_binded_port(), LOG_LEVEL_0);
 
+  m_ui_opt.rpc_port = m_rpc_server.get_binded_port();
+
+
   //chain calls to rpc server
   m_prpc_chain_handler = &m_wallet_rpc_server;
   //disable this for main net until we get full support of authentication with network
-#ifdef TESTNET
-  m_rpc_server.set_rpc_chain_handler(this);
-#endif
-
 
   LOG_PRINT_L0("Starting core rpc server...");
   //dsi.text_state = "Starting core rpc server";
@@ -570,6 +569,25 @@ bool wallets_manager::init_local_daemon()
   LOG_PRINT_L0("p2p net loop stopped");
 #endif
   return true;
+}
+
+std::string wallets_manager::setup_wallet_rpc(const std::string& jwt_secret)
+{
+#ifndef MOBILE_WALLET_BUILD
+  if (!jwt_secret.size())
+  {
+    //disabling wallet RPC
+    m_rpc_server.set_rpc_chain_handler(nullptr);
+    return WALLET_RPC_STATUS_OK;
+  }
+
+  //we don't override command line JWT secret
+  //if(!m_wallet_rpc_server.get_jwt_secret().size() ) 
+  m_wallet_rpc_server.set_jwt_secret(jwt_secret);
+
+  m_rpc_server.set_rpc_chain_handler(this);
+#endif
+  return WALLET_RPC_STATUS_OK;
 }
 
 bool wallets_manager::deinit_local_daemon()
@@ -1025,7 +1043,6 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
 
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
-  w->set_use_assets_whitelisting(true);
   owr.wallet_id = m_wallet_id_counter++;
 
   w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
@@ -1057,10 +1074,11 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       w->get_recent_transfers_history(owr.recent_history.history, 0, txs_to_return, owr.recent_history.total_history_items, owr.recent_history.last_item_index, exclude_mining_txs);
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
       w->get_unconfirmed_transfers(owr.recent_history.history, exclude_mining_txs);
+      w->set_use_assets_whitelisting(true);
       owr.wallet_local_bc_size = w->get_blockchain_current_size();
 
       //workaround for missed fee
-      //owr.seed = w->get_account().get_seed_phrase();
+      owr.seed = w->get_account().get_seed_phrase("");
       break;
     }
     catch (const tools::error::file_not_found& /**/)
@@ -1170,7 +1188,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   {
     w->generate(path, password, false);
     w->set_minimum_height(m_last_daemon_height-1);
-    //owr.seed = w->get_account().get_seed_phrase();
+    owr.seed = w->get_account().get_seed_phrase("");
   }
   catch (const tools::error::file_exists&)
   {
@@ -1279,7 +1297,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   {
     bool is_tracking = currency::account_base::is_seed_tracking(seed_phrase);
     w->restore(path, password, seed_phrase, is_tracking, seed_password);
-    //owr.seed = w->get_account().get_seed_phrase();
+    owr.seed = w->get_account().get_seed_phrase("");
   }
   catch (const tools::error::file_exists&)
   {
@@ -1645,11 +1663,10 @@ std::string wallets_manager::invoke(uint64_t wallet_id, std::string params)
   epee::net_utils::http::http_request_info query_info = AUTO_VAL_INIT(query_info);
   epee::net_utils::http::http_response_info response_info = AUTO_VAL_INIT(response_info);
   epee::net_utils::connection_context_base stub_conn_context = AUTO_VAL_INIT(stub_conn_context);
-  std::string reference_stub;
   bool call_found = false;
   query_info.m_URI = "/json_rpc";
   query_info.m_body = params;
-  wo.rpc_wrapper->handle_http_request_map(query_info, response_info, stub_conn_context, call_found, reference_stub);
+  wo.rpc_wrapper->handle_http_request_map(query_info, response_info, stub_conn_context, call_found);
   return response_info.m_body;
 }
 
@@ -1880,6 +1897,7 @@ void wallets_manager::prepare_wallet_status_info(wallet_vs_options& wo, view::wa
   wsi.wallet_id = wo.wallet_id;
   wsi.is_alias_operations_available = !wo.has_related_alias_in_unconfirmed;
   wo.w->get()->balance(wsi.balances, wsi.minied_total);
+  wsi.has_bare_unspent_outputs = wo.w->get()->has_bare_unspent_outputs();
 }
 std::string wallets_manager::check_available_sources(uint64_t wallet_id, std::list<uint64_t>& amounts)
 {
@@ -2103,10 +2121,10 @@ bool wallets_manager::on_mw_select_wallet(const tools::wallet_public::COMMAND_MW
   return true;
 }
 
-
 void wallets_manager::lock() 
 {
 #ifndef MOBILE_WALLET_BUILD
+  m_select_wallet_rpc_lock.lock();
   {
     SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
     auto it = m_wallets.find(m_rpc_selected_wallet_id);
@@ -2123,6 +2141,7 @@ void wallets_manager::unlock()
 {
 #ifndef MOBILE_WALLET_BUILD
   m_current_wallet_locked_object.reset();
+  m_select_wallet_rpc_lock.unlock();
 #endif
 }
 std::shared_ptr<tools::wallet2> wallets_manager::get_wallet()

@@ -77,7 +77,8 @@ namespace currency
       epee::math_helper::average<uint64_t, 5> check_inputs_time;
       epee::math_helper::average<uint64_t, 5> begin_tx_time;
       epee::math_helper::average<uint64_t, 5> update_db_time;
-      epee::math_helper::average<uint64_t, 5> db_commit_time;      
+      epee::math_helper::average<uint64_t, 5> db_commit_time;
+      epee::math_helper::average<uint64_t, 1> check_post_hf4_balance;
     };
 
     typedef std::unordered_map<crypto::key_image, std::set<crypto::hash>> key_image_cache;
@@ -138,6 +139,14 @@ namespace currency
     
     bool remove_stuck_transactions(); // made public to be called from coretests
 
+    void remove_incompatible_txs(); // made public to be called after the BCS is loaded and hardfork info is ready
+
+    bool is_tx_blacklisted(const crypto::hash& id) const;
+
+#ifdef TX_POOL_USE_UNSECURE_TEST_FUNCTIONS
+    void unsecure_disable_tx_validation_on_addition(bool validation_disabled) { m_unsecure_disable_tx_validation_on_addition = validation_disabled; }
+#endif
+
   private:
     bool on_tx_add(crypto::hash tx_id, const transaction& tx, bool kept_by_block);
     bool on_tx_remove(const crypto::hash &tx_id, const transaction& tx, bool kept_by_block);
@@ -192,6 +201,7 @@ namespace currency
     key_image_cache m_key_images;
     mutable epee::critical_section m_remove_stuck_txs_lock;
 
+    bool m_unsecure_disable_tx_validation_on_addition = false;
   };
 }
 

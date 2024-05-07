@@ -684,12 +684,8 @@ std::string get_nix_version_display_string()
 
     // got v_major, v_minor, v_revision
 
-    // allow 1.1.x and greater
-  
-    if (v_major < 1)
-      return false;
-
-    if (v_major == 1 && v_minor < 1)
+    // allow 2.x and greater
+    if (v_major < 2)
       return false;
 
     return true;

@@ -60,7 +60,7 @@ namespace currency
       return false;
     }
 
-    if (!check_money_overflow(tx))
+    if (!check_bare_money_overflow(tx))
     {
       LOG_PRINT_RED_L0("tx has money overflow, rejected for tx id= " << get_transaction_hash(tx));
       return false;

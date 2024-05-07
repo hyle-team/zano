@@ -69,8 +69,8 @@ bool block_template_against_txs_size::c1(currency::core& c, size_t ev_index, con
 
   uint64_t top_block_height = bcs.get_top_block_height();
   uint64_t blocksize_limit = bcs.get_current_comulative_blocksize_limit();
-  uint64_t base_block_reward_pow = get_base_block_reward(false, bcs.total_coins(), top_block_height + 1);
-  uint64_t base_block_reward_pos = get_base_block_reward(true, bcs.total_coins(), top_block_height + 1);
+  uint64_t base_block_reward_pow = get_base_block_reward(top_block_height + 1);
+  uint64_t base_block_reward_pos = base_block_reward_pow;
 
   g_block_txs_fee = TESTS_DEFAULT_FEE; // passing an argument to custom_fill_block_template_func via global variable (not perfect but works well)
 
@@ -91,13 +91,16 @@ bool block_template_against_txs_size::c1(currency::core& c, size_t ev_index, con
       CHECK_AND_ASSERT_MES(r, false, "create_block_template failed, txs_total_size = " << txs_total_size);
       CHECK_AND_ASSERT_MES(height == top_block_height + 1, false, "Incorrect height: " << height << ", expected: " << top_block_height + 1 << ", txs_total_size = " << txs_total_size);
 
-      uint64_t base_reward = 0;
+      uint64_t block_reward_without_fee = 0;
 
       size_t cumulative_block_size = txs_total_size;
       size_t coinbase_blob_size = get_object_blobsize(b.miner_tx);
       if (coinbase_blob_size > CURRENCY_COINBASE_BLOB_RESERVED_SIZE)
         cumulative_block_size += coinbase_blob_size;
-      r = bcs.validate_miner_transaction(b, cumulative_block_size, g_block_txs_fee, base_reward, bcs.total_coins());
+
+      r = bcs.calculate_block_reward_for_next_top_block(cumulative_block_size, block_reward_without_fee);
+      CHECK_AND_ASSERT_MES(r, false, "calculate_block_reward_for_next_top_block failed");
+      r = bcs.validate_miner_transaction(b.miner_tx, g_block_txs_fee, block_reward_without_fee);
       CHECK_AND_ASSERT_MES(r, false, "validate_miner_transaction failed, txs_total_size = " << txs_total_size);
 
       uint64_t generated_coins = get_outs_money_amount(b.miner_tx) - (is_pos != 0 ? boost::get<tx_out_bare>(b.miner_tx.vout.back()).amount : 0) - g_block_txs_fee / 2;

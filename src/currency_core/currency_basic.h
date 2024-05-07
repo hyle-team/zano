@@ -589,11 +589,11 @@ namespace currency
     END_SERIALIZE()
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(service_id)
-      KV_SERIALIZE(instruction)
-      KV_SERIALIZE_BLOB_AS_HEX_STRING(body)
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(security)
-      KV_SERIALIZE(flags)
+      KV_SERIALIZE(service_id)                     DOC_DSCR("Service ID, identificator that diferent one service from another") DOC_EXMP("C")     DOC_END
+      KV_SERIALIZE(instruction)                    DOC_DSCR("Instruction that make sence for this particular service") DOC_EXMP("K")              DOC_END
+      KV_SERIALIZE_BLOB_AS_HEX_STRING(body)        DOC_DSCR("Hex-encoded body of the attachment") DOC_EXMP("dcfd7e055a6a3043ea3541a571a57a63e25dcc64e4a270f14fa9a58ac5dbec85dcfd7e055a6a3043ea3541a571a57a63e25dcc64e4a270f14fa9a58ac5dbec85")              DOC_END
+      KV_SERIALIZE_CONTAINER_POD_AS_HEX(security)  DOC_DSCR("Hex-encoded public key of the owner, optional") DOC_EXMP("d8f6e37f28a632c06b0b3466db1b9d2d1b36a580ee35edfd971dc1423bc412a5")              DOC_END
+      KV_SERIALIZE(flags)                          DOC_DSCR("Flags that help wallet to automatically process some properties of the attachment(combination of TX_SERVICE_ATTACHMENT_ENCRYPT_BODY=1, TX_SERVICE_ATTACHMENT_DEFLATE_BODY=2, TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE=4,TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF=8 )")  DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
@@ -732,14 +732,14 @@ namespace currency
     END_BOOST_SERIALIZATION()
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(total_max_supply)
-      KV_SERIALIZE(current_supply)
-      KV_SERIALIZE(decimal_point)
-      KV_SERIALIZE(ticker)
-      KV_SERIALIZE(full_name)
-      KV_SERIALIZE(meta_info)
-      KV_SERIALIZE_POD_AS_HEX_STRING(owner)
-      KV_SERIALIZE(hidden_supply)
+      KV_SERIALIZE(total_max_supply)  DOC_DSCR("Maximum possible supply for given asset, can't be changed after deployment") DOC_EXMP(1000000000000000000)   DOC_END
+      KV_SERIALIZE(current_supply)    DOC_DSCR("Currently emitted supply for given asset") DOC_EXMP(500000000000000000)   DOC_END
+      KV_SERIALIZE(decimal_point)     DOC_DSCR("Decimal point")                       DOC_EXMP(12)                        DOC_END
+      KV_SERIALIZE(ticker)            DOC_DSCR("Ticker associated with asset")        DOC_EXMP("ZUSD")                    DOC_END
+      KV_SERIALIZE(full_name)         DOC_DSCR("Full name of the asset")              DOC_EXMP("Zano wrapped USD")        DOC_END
+      KV_SERIALIZE(meta_info)         DOC_DSCR("Any other information assetiaded with asset in a free form")              DOC_EXMP("Stable and private")        DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(owner) DOC_DSCR("Owner's key, used to validate any operations on the asset altering, could be changed in case of transfer ownership")  DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8")        DOC_END
+      KV_SERIALIZE(hidden_supply)    DOC_DSCR("This one reserved for future use, will be documented later") DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
@@ -757,7 +757,7 @@ namespace currency
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_CHAIN_BASE(asset_descriptor_base)
-      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)      DOC_DSCR("Asset ID") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8")   DOC_END
     END_KV_SERIALIZE_MAP()
   };
 

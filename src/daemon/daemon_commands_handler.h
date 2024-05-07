@@ -47,6 +47,7 @@ public:
     m_cmd_binder.set_handler("print_block_info", boost::bind(&daemon_commands_handler::print_block_info, this, ph::_1), "Print block info, print_block <block_hash> | <block_height>");
     m_cmd_binder.set_handler("print_tx_prun_info", boost::bind(&daemon_commands_handler::print_tx_prun_info, this, ph::_1), "Print tx prunning info");
     m_cmd_binder.set_handler("print_tx", boost::bind(&daemon_commands_handler::print_tx, this, ph::_1), "Print transaction, print_tx <transaction_hash>");
+    m_cmd_binder.set_handler("print_asset_info", boost::bind(&daemon_commands_handler::print_asset_info, this, ph::_1), "Print information about the given asset by its id");
     m_cmd_binder.set_handler("start_mining", boost::bind(&daemon_commands_handler::start_mining, this, ph::_1), "Start mining for specified address, start_mining <addr> [threads=1]");
     m_cmd_binder.set_handler("stop_mining", boost::bind(&daemon_commands_handler::stop_mining, this, ph::_1), "Stop mining");
     m_cmd_binder.set_handler("print_pool", boost::bind(&daemon_commands_handler::print_pool, this, ph::_1), "Print transaction pool (long format)");
@@ -688,7 +689,7 @@ private:
   {
     if (args.empty())
     {
-      std::cout << "expected: print_tx <transaction hash>" << std::endl;
+      std::cout << "usage: print_tx <transaction hash>" << std::endl;
       return true;
     }
 
@@ -696,60 +697,129 @@ private:
     crypto::hash tx_hash;
     if (!parse_hash256(str_hash, tx_hash))
     {
+      LOG_PRINT_RED_L0("invalid tx hash was given");
       return true;
     }
 
-    //     std::vector<crypto::hash> tx_ids;
-    //     tx_ids.push_back(tx_hash);
-    //     std::list<currency::transaction> txs;
-    //     std::list<crypto::hash> missed_ids;
-    //     m_srv.get_payload_object().get_core().get_transactions(tx_ids, txs, missed_ids);
-
-    currency::transaction_chain_entry tx_entry = AUTO_VAL_INIT(tx_entry);
-
-    if (!m_srv.get_payload_object().get_core().get_blockchain_storage().get_tx_chain_entry(tx_hash, tx_entry))
+    currency::tx_rpc_extended_info tx_rpc_ei{};
+    currency::core& core = m_srv.get_payload_object().get_core();
+    if (core.get_blockchain_storage().get_tx_rpc_details(tx_hash, tx_rpc_ei, 0, false))
     {
-      LOG_PRINT_RED("transaction wasn't found: " << tx_hash, LOG_LEVEL_0);
+      // pass
     }
-    currency::block_extended_info bei = AUTO_VAL_INIT(bei);
-    m_srv.get_payload_object().get_core().get_blockchain_storage().get_block_extended_info_by_height(tx_entry.m_keeper_block_height, bei);
-    uint64_t timestamp = bei.bl.timestamp;
-
-    const currency::transaction& tx = tx_entry.tx;
-    std::stringstream ss;
-
-    ss << "------------------------------------------------------"
-      << ENDL << "tx_id: " << tx_hash
-      << ENDL << "keeper_block: " << tx_entry.m_keeper_block_height << ",  timestamp (" << timestamp << ") " << epee::misc_utils::get_internet_time_str(timestamp)
-      << ENDL << currency::obj_to_json_str(tx)
-      << ENDL << "------------------------------------------------------"
-      << ENDL << epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(tx))
-      << ENDL << "------------------------------------------------------";
-
-
-    ss << "ATTACHMENTS: " << ENDL;
-    for (auto at : tx.attachment)
+    else if (core.get_tx_pool().get_transaction_details(tx_hash, tx_rpc_ei))
     {
-      if (at.type() == typeid(currency::tx_service_attachment))
-      {
-        const currency::tx_service_attachment& sa = boost::get<currency::tx_service_attachment>(at);
-        ss << "++++++++++++++++++++++++++++++++ " << ENDL;
-        ss << "[SERVICE_ATTACHMENT]: ID = \'" << sa.service_id << "\', INSTRUCTION: \'" << sa.instruction << "\'" << ENDL;
+      // pass
+    }
+    else
+    {
+      LOG_PRINT_RED("transaction " << tx_hash << " was not found in either the blockchain or the pool", LOG_LEVEL_0);
+      return true;
+    }
 
-        if (!(sa.flags&TX_SERVICE_ATTACHMENT_ENCRYPT_BODY))
+    std::stringstream ss;
+    ss << ENDL <<
+      "----------------------TX-HEX--------------------------" << ENDL <<
+      epee::string_tools::buff_to_hex_nodelimer(tx_rpc_ei.blob) << ENDL <<
+      "------------------END-OF-TX-HEX-----------------------" << ENDL;
+
+    ss << ENDL <<
+      "tx " << tx_hash << " ";
+
+    if (tx_rpc_ei.keeper_block == -1)
+    {
+      ss << "has been in the transaction pool for " << epee::misc_utils::get_time_interval_string(core.get_blockchain_storage().get_core_runtime_config().get_core_time() - tx_rpc_ei.timestamp) << 
+        ", added " << epee::misc_utils::get_internet_time_str(tx_rpc_ei.timestamp) << ", ts: " << tx_rpc_ei.timestamp << ", blob size: " << tx_rpc_ei.blob_size << ENDL;
+    }
+    else
+    {
+      ss << "was added to block @ " << tx_rpc_ei.keeper_block << ", block time: " << epee::misc_utils::get_internet_time_str(tx_rpc_ei.timestamp) << ", ts: " << tx_rpc_ei.timestamp << ", blob size: " << tx_rpc_ei.blob_size << ENDL;
+    }
+
+    ss << ENDL <<
+      "-----------------------JSON---------------------------" << ENDL <<
+      tx_rpc_ei.object_in_json << ENDL <<
+      "--------------------END-OF-JSON-----------------------" << ENDL;
+
+    currency::transaction tx{};
+    CHECK_AND_ASSERT_MES(currency::parse_and_validate_tx_from_blob(tx_rpc_ei.blob, tx), true, "parse_and_validate_tx_from_blob failed");
+
+    if (!tx.attachment.empty())
+    {
+      ss << "ATTACHMENTS: " << ENDL;
+      for (auto at : tx.attachment)
+      {
+        if (at.type() == typeid(currency::tx_service_attachment))
         {
-          std::string body = sa.body;
-          if (sa.flags&TX_SERVICE_ATTACHMENT_DEFLATE_BODY)
+          const currency::tx_service_attachment& sa = boost::get<currency::tx_service_attachment>(at);
+          ss << "++++++++++++++++++++++++++++++++ " << ENDL;
+          ss << "[SERVICE_ATTACHMENT]: ID = \'" << sa.service_id << "\', INSTRUCTION: \'" << sa.instruction << "\'" << ENDL;
+
+          if (!(sa.flags&TX_SERVICE_ATTACHMENT_ENCRYPT_BODY))
           {
-            bool r = epee::zlib_helper::unpack(sa.body, body);
-            CHECK_AND_ASSERT_MES(r, false, "Failed to unpack");
+            std::string body = sa.body;
+            if (sa.flags&TX_SERVICE_ATTACHMENT_DEFLATE_BODY)
+            {
+              bool r = epee::zlib_helper::unpack(sa.body, body);
+              CHECK_AND_ASSERT_MES(r, false, "Failed to unpack");
+            }
+            ss << "BODY: " << body << ENDL;
           }
-          ss << "BODY: " << body << ENDL;
         }
       }
     }
 
     LOG_PRINT_GREEN(ss.str(), LOG_LEVEL_0);
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool print_asset_info(const std::vector<std::string>& args)
+  {
+    if (args.empty())
+    {
+      std::cout << "usage: print_asset_info <asset_id>" << std::endl;
+      return true;
+    }
+
+    const std::string& str_asset_id = args.front();
+    crypto::public_key asset_id{};
+    crypto::point_t asset_id_pt{};
+    if (!crypto::parse_tpod_from_hex_string(str_asset_id, asset_id) || !asset_id_pt.from_public_key(asset_id))
+    {
+      LOG_PRINT_RED_L0("invalid asset id was given");
+      return true;
+    }
+
+    currency::core& core = m_srv.get_payload_object().get_core();
+    
+    std::list<currency::asset_descriptor_operation> asset_history;
+    if (!core.get_blockchain_storage().get_asset_history(asset_id, asset_history))
+    {
+      LOG_PRINT_RED_L0("asset id doesn't present in the blockchain");
+      return true;
+    }
+
+    std::stringstream ss;
+    ss << ENDL <<
+      "history for asset " << asset_id << ":" << ENDL;
+
+    size_t idx = 0;
+    for(auto& aop: asset_history)
+    {
+      ss << "[" << std::setw(2) << idx << "] operation:        " << currency::get_asset_operation_type_string(aop.operation_type) << " (" << (int)aop.operation_type << ")" << ENDL <<
+                                       "     ticker:           \"" << aop.descriptor.ticker << "\"" << ENDL <<
+                                       "     full name:        \"" << aop.descriptor.full_name << "\"" << ENDL <<
+                                       "     meta info:        \"" << aop.descriptor.meta_info << "\"" << ENDL <<
+                                       "     current supply:   " << currency::print_money_brief(aop.descriptor.current_supply, aop.descriptor.decimal_point) << ENDL <<
+                                       "     max supply:       " << currency::print_money_brief(aop.descriptor.total_max_supply, aop.descriptor.decimal_point) << ENDL <<
+                                       "     decimal point:    " << (int)aop.descriptor.decimal_point << ENDL <<
+                                       "     owner * 1/8:      " << aop.descriptor.owner << ENDL <<
+                                       "     amount cmt * 1/8: " << aop.amount_commitment << ENDL <<
+                                       "     hidden supply:    " << (aop.descriptor.hidden_supply ? "yes" : "no") << ENDL <<
+        "";
+    }
+
+    LOG_PRINT_L0(ss.str());
     return true;
   }
   //--------------------------------------------------------------------------------

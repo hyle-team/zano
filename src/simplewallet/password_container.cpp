@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -64,13 +64,18 @@ namespace tools
 
   bool password_container::read_password(const std::string& prompt_text)
   {
+    return read_input(prompt_text, '*');
+  }
+  
+  bool password_container::read_input(const std::string& prompt_text, char char_to_replace_user_input /* = '\0' */)
+  {
     clear();
 
     bool r;
     if (is_cin_tty())
     {
       std::cout << prompt_text;
-      r = read_from_tty();
+      r = read_from_tty(char_to_replace_user_input);
     }
     else
     {
@@ -122,7 +127,7 @@ namespace tools
     }
   }
 
-  bool password_container::read_from_tty()
+  bool password_container::read_from_tty(char char_to_replace_user_input)
   {
     const char BACKSPACE = 8;
 
@@ -162,7 +167,7 @@ namespace tools
       else
       {
         m_password.push_back(ch);
-        std::cout << '*';
+        std::cout << (char_to_replace_user_input != '\0' ? char_to_replace_user_input : ch);
       }
     }
 
@@ -198,7 +203,7 @@ namespace tools
     }
   }
 
-  bool password_container::read_from_tty()
+  bool password_container::read_from_tty(char char_to_replace_user_input)
   {
     const char BACKSPACE = 127;
 
@@ -227,7 +232,7 @@ namespace tools
       else
       {
         m_password.push_back(ch);
-        std::cout << '*';
+        std::cout << (char_to_replace_user_input != '\0' ? char_to_replace_user_input : ch);
       }
     }
 

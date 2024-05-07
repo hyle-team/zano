@@ -201,11 +201,13 @@ public:
 
     std::list<tools::wallet_public::asset_balance_entry> balances;
     uint64_t minied_total;
+    bool has_bare_unspent_outputs;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_CHAIN_BASE(wallet_status_info_base)
       KV_SERIALIZE(balances)
       KV_SERIALIZE(minied_total)
+      KV_SERIALIZE(has_bare_unspent_outputs)
     END_KV_SERIALIZE_MAP()
   };  
   
@@ -729,12 +731,14 @@ public:
 
   struct gui_options
   {
-    bool use_debug_mode;
-    bool disable_price_fetch;
+    bool use_debug_mode = false;
+    bool disable_price_fetch = false;
+    int32_t rpc_port = 0;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(use_debug_mode)
       KV_SERIALIZE(disable_price_fetch)
+      KV_SERIALIZE(rpc_port)
     END_KV_SERIALIZE_MAP()
 
   };

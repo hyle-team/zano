@@ -3440,8 +3440,7 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
 
   // 1. Try to defragment the same UTXO that is used for staking
   // (Bob has two: one UTXO is for staking, other is being defragmented)
-  bob_wlt->set_pos_utxo_count_limits_for_defragmentation_tx(1, 10);
-  bob_wlt->set_pos_decoys_count_for_defragmentation_tx(0);
+  bob_wlt->set_defragmentation_tx_settings(true, 1, 10, CURRENCY_BLOCK_REWARD, 0);
   bob_wlt->try_mint_pos();
 
   CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2 + 3, false, "Incorrect blockchain height:" << c.get_current_blockchain_size());
@@ -3453,8 +3452,7 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
 
   
   // 2. Try to mine a PoS block and defragment some of UTXO
-  alice_wlt->set_pos_utxo_count_limits_for_defragmentation_tx(2, 2);
-  alice_wlt->set_pos_decoys_count_for_defragmentation_tx(0);
+  alice_wlt->set_defragmentation_tx_settings(true, 2, 2, CURRENCY_BLOCK_REWARD, 0);
   alice_wlt->try_mint_pos();
 
   CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2 + 4, false, "Incorrect blockchain height:" << c.get_current_blockchain_size());
@@ -3467,8 +3465,7 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
 
   // 3. Try to mine a PoS block and defragment with huge decoy set. Make sure block is mined successfully without a defragmentation tx
   // Alice has one UTXO
-  alice_wlt->set_pos_utxo_count_limits_for_defragmentation_tx(1, 1);
-  alice_wlt->set_pos_decoys_count_for_defragmentation_tx(80);
+  alice_wlt->set_defragmentation_tx_settings(true, 1, 1, CURRENCY_BLOCK_REWARD, 80);
   alice_wlt->try_mint_pos();
 
   CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2 + 5, false, "Incorrect blockchain height:" << c.get_current_blockchain_size());
@@ -3480,8 +3477,7 @@ bool packing_outputs_on_pos_minting_wallet::c1(currency::core& c, size_t ev_inde
 
 
   // 4. Finally mine a PoS and defragment the last one unlocked UTXO
-  alice_wlt->set_pos_utxo_count_limits_for_defragmentation_tx(1, 1);
-  alice_wlt->set_pos_decoys_count_for_defragmentation_tx(0);
+  alice_wlt->set_defragmentation_tx_settings(true, 1, 1, CURRENCY_BLOCK_REWARD, 0);
   alice_wlt->try_mint_pos();
 
   CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2 + 6, false, "Incorrect blockchain height:" << c.get_current_blockchain_size());
@@ -3806,6 +3802,98 @@ bool wallet_and_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
 
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, amount_swept - TESTS_DEFAULT_FEE, false, SIZE_MAX, 0), false, "");
+
+  return true;
+}
+
+
+//------------------------------------------------------------------------------
+block_template_blacklist_test::block_template_blacklist_test()
+{
+  REGISTER_CALLBACK_METHOD(block_template_blacklist_test, c1);
+}
+
+bool block_template_blacklist_test::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: basic check for wallet2::sweep_below() functionality 
+
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base preminer_acc;
+  preminer_acc.generate();
+  preminer_acc.set_createtime(ts);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  MAKE_GENESIS_BLOCK(events, blk_0, preminer_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, preminer_acc);
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, 3 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW - 1);
+
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool block_template_blacklist_test::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX); 
+
+  miner_wlt->refresh();
+  miner_wlt->transfer(COIN / 10, alice_wlt->get_account().get_public_address());
+  miner_wlt->transfer(COIN / 10, alice_wlt->get_account().get_public_address());
+  
+  //take first transaction and corrupt it intentionalyy
+  std::list<transaction> txs;
+  c.get_tx_pool().get_transactions(txs);
+  CHECK_AND_ASSERT_MES(txs.size() == 2, false, "wrong tx count");
+
+
+  txs.resize(1);
+  currency::transaction broken_tx;
+  uint64_t blob_size = 0;
+  uint64_t fee = 0;
+  r = c.get_tx_pool().take_tx(currency::get_transaction_hash(*txs.begin()), broken_tx, blob_size, fee);
+  CHECK_AND_ASSERT_MES(r, false, "failed to take from pool");
+  
+
+  broken_tx.signatures.resize(broken_tx.signatures.size() - 1);
+  //manually add completely broken tx to pool
+  c.get_tx_pool().do_insert_transaction(broken_tx, get_transaction_hash(broken_tx), currency::get_object_blobsize(broken_tx), false, get_tx_fee(broken_tx), c.get_block_id_by_height(0), 0);
+  
+  CHECK_AND_ASSERT_MES(c.get_tx_pool().get_transactions_count() == 2, false, "wrong tx count");
+  
+
+  currency::create_block_template_params cbtp = AUTO_VAL_INIT(cbtp);
+  cbtp.miner_address = miner_wlt->get_account().get_public_address();
+  
+  {
+    currency::create_block_template_response cbtr = AUTO_VAL_INIT(cbtr);
+    r = c.get_block_template(cbtp, cbtr);
+
+    CHECK_AND_ASSERT_MES(r, false, "failed to create block template");
+    CHECK_AND_ASSERT_MES(cbtr.b.tx_hashes.size() == 2, false, "failed to create block template");
+  }
+
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(!r, false, "Unexpectedly created block");
+
+  //now let's check if broken tx actually added to next blocktemplate
+
+  {
+    currency::create_block_template_response cbtr = AUTO_VAL_INIT(cbtr);
+    r = c.get_block_template(cbtp, cbtr);
+
+    CHECK_AND_ASSERT_MES(r, false, "failed to create block template");
+    CHECK_AND_ASSERT_MES(cbtr.b.tx_hashes.size() == 1, false, "failed to create block template");
+
+  }
+
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "Unexpectedly failed to create block");
+
 
   return true;
 }

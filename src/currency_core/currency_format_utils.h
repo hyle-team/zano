@@ -276,6 +276,7 @@ namespace currency
   bool check_tx_bare_balance(const transaction& tx, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
   bool check_tx_balance(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
   bool validate_asset_operation_amount_commitment(asset_op_verification_context& context);
+  
   const char* get_asset_operation_type_string(size_t asset_operation_type, bool short_name = false);
   //---------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 
@@ -413,9 +414,9 @@ namespace currency
   uint64_t get_alias_coast_from_fee(const std::string& alias, uint64_t fee_median);
   //const crypto::public_key get_offer_secure_key_by_index_from_tx(const transaction& tx, size_t index);
 
-  bool check_money_overflow(const transaction& tx);
-  bool check_outs_overflow(const transaction& tx);
-  bool check_inputs_overflow(const transaction& tx);
+  bool check_bare_money_overflow(const transaction& tx);
+  bool check_bare_outs_overflow(const transaction& tx);
+  bool check_bare_inputs_overflow(const transaction& tx);
   uint64_t get_block_height(const transaction& coinbase);
   uint64_t get_block_height(const block& b);
   std::vector<txout_ref_v> relative_output_offsets_to_absolute(const std::vector<txout_ref_v>& off);
@@ -463,7 +464,7 @@ namespace currency
 
   std::string generate_origin_for_htlc(const txout_htlc& htlc, const account_keys& acc_keys);
   bool validate_ado_update_allowed(const asset_descriptor_base& a, const asset_descriptor_base& b);
-
+  bool validate_ado_initial(const asset_descriptor_base& a);
 
   void normalize_asset_operation_for_hashing(asset_descriptor_operation& op);
   crypto::hash get_signature_hash_for_asset_operation(const asset_descriptor_operation& ado);
@@ -521,8 +522,9 @@ namespace currency
   /************************************************************************/
   size_t get_max_block_size();
   size_t get_max_tx_size();
+  uint64_t get_block_reward(uint64_t height, size_t median_block_size, size_t current_block_size);
   bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t &reward, uint64_t height);
-  uint64_t get_base_block_reward(bool is_pos, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t height);
+  uint64_t get_base_block_reward(uint64_t height);
   bool is_payment_id_size_ok(const payment_id_t& payment_id);
   std::string get_account_address_as_str(const account_public_address& addr);
   std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const payment_id_t& payment_id);
@@ -534,6 +536,20 @@ namespace currency
   bool is_pos_coinbase(const transaction& tx);
   bool have_attachment_service_in_container(const std::vector<attachment_v>& av, const std::string& service_id, const std::string& instruction);
   crypto::hash prepare_prefix_hash_for_sign(const transaction& tx, uint64_t in_index, const crypto::hash& tx_id);
+  
+  
+  //---------------------------------------------------------------
+  template<typename t_assets_map>
+  void assets_map_to_assets_list(std::list<currency::asset_descriptor_with_id>& assets_list, const t_assets_map& assets_map)
+  {
+    for (const auto& pr : assets_map)
+    {
+      assets_list.push_back(currency::asset_descriptor_with_id());
+      assets_list.back().asset_id = pr.first;
+      epee::misc_utils::cast_assign_a_to_b(assets_list.back(), static_cast<currency::asset_descriptor_base>(pr.second));
+      //*static_cast<currency::asset_descriptor_base*>(&assets_list.back()) = pr.second;
+    }
+  }
 
   //---------------------------------------------------------------
   template<class tx_out_t>

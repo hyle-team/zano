@@ -1,4 +1,4 @@
-// Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
+// Copyright (c) 2006-2024, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
 // Redistribution and use in source and binary forms, with or without
@@ -36,113 +36,70 @@ namespace epee
 {
   namespace serialization
   {
-    inline const char* get_endline(end_of_line_t eol)
-    {
-      switch (eol)
-      {
-        case eol_lf:    return "\n";
-        case eol_cr:    return  "\r";
-        case eol_space: return  " ";
-        default:        return  "\r\n";
-      }
-    }
-
-    inline std::string make_indent(size_t indent)
-    {
-      return std::string(indent * 2, ' ');
-    }
-
-    class strategy_json
+    class strategy_descriptin
     {
     public:
-      using use_descriptions = std::false_type;
+      using use_descriptions = std::true_type;
 
       inline static const char* eol = get_endline(eol_crlf);
       //static const end_of_line_t eol = eol_crlf;
-      template<class t_stream>
-      static void handle_value(t_stream& strm, const std::string& v, size_t indent)
-      {
-        strm << "\"" << misc_utils::parse::transform_to_json_escape_sequence(v) << "\"";
-      }
-      template<class t_stream>
-      static void handle_value(t_stream& strm, const int8_t& v, size_t indent)
-      {
-        strm << static_cast<int32_t>(v);
-      }
-      template<class t_stream>
-      static void handle_value(t_stream& strm, const uint8_t& v, size_t indent)
-      {
-        strm << static_cast<int32_t>(v);
-      }
-      template<class t_stream>
-      static void handle_value(t_stream& strm, const bool& v, size_t indent)
-      {
-        if (v)
-          strm << "true";
-        else
-          strm << "false";
-      }
-      template<class t_stream>
-      static void handle_value(t_stream& strm, const double& v, size_t indent)
-      {
-        boost::io::ios_flags_saver ifs(strm);
-        strm.precision(8);
-        strm << std::fixed << v;
-      }
+
       template<class t_stream, class t_type>
       static void handle_value(t_stream& strm, const t_type& v, size_t indent)
-      {
-        strm << v;
-      }
+      {}
 
       template<class t_stream>
       static void handle_array_start(t_stream& strm, size_t indent)
       {
-        strm << "[";
+        //strm << "[";
       }
 
       template<class t_stream>
       static void handle_array_end(t_stream& strm, size_t indent)
       {
-        strm << "]";
+        //strm << "]";
       }
 
       template<class t_stream>
       static void handle_obj_begin(t_stream& strm, size_t indent)
-      {
-        strm << "{";
-      }
+      {}
 
       template<class t_stream>
       static void handle_obj_end(t_stream& strm, size_t indent)
+      {}
+
+      template<class t_stream>
+      static void handle_print_key(t_stream& strm, const std::string& key, const std::string& description, size_t indent)
       {
-        strm << "}";
+        if (description.size())
+        {
+          const std::string indent_str = make_indent(indent);
+          strm << indent_str << "\"" << key << "\"" << ": " << description << eol;
+        }
       }
 
       template<class t_stream>
-      static void handle_print_key(t_stream& strm, const std::string& key, size_t indent)
+      static void handle_print_description(t_stream& strm, const std::string& description, size_t indent)
       {
-        const std::string indent_str = make_indent(indent);
-        strm << indent_str << "\"" << misc_utils::parse::transform_to_json_escape_sequence(key) << "\"" << ": ";
       }
 
 
       template<class t_stream>
       static void handle_section_entry_separator(t_stream& strm, size_t indent)
       {
-        strm << ",";
+        //strm << ",";
       }
 
       template<class t_stream>
       static void handle_array_entry_separator(t_stream& strm, size_t indent)
       {
-        strm << ",";
+        //strm << ",";
       }
 
       template<class t_stream>
       static void handle_line_break(t_stream& strm, size_t indent)
       {
-        strm << eol;
+        //strm << eol;
       }
     };
 
