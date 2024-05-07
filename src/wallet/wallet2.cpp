@@ -522,6 +522,13 @@ void wallet2::add_to_last_zc_global_indexs(uint64_t h, uint64_t last_zc_output_i
     }
     else
     {
+      //@#@
+#ifdef _DEBUG
+      if (m_last_zc_global_indexs.begin()->second > last_zc_output_index)
+      {
+        LOG_ERROR("!!!!!!!!!!!!!!!!!");
+      }
+#endif
       //equals, same h but new last_zc_output_index, just update it, should be always bigger then prev
       WLT_THROW_IF_FALSE_WITH_CODE(m_last_zc_global_indexs.begin()->second <= last_zc_output_index,
         "condition m_last_zc_global_indexs.begin()->second " << m_last_zc_global_indexs.begin()->second << " <= last_zc_output_index " << last_zc_output_index << " failed", API_RETURN_CODE_INTERNAL_ERROR);
@@ -3070,6 +3077,12 @@ void wallet2::detach_blockchain(uint64_t including_height)
       it = m_payments.erase(it);
     else
       ++it;
+  }
+
+  //detach in m_last_zc_global_indexs
+  while (m_last_zc_global_indexs.size() && including_height <= m_last_zc_global_indexs.begin()->first )
+  {
+    m_last_zc_global_indexs.erase(m_last_zc_global_indexs.begin());
   }
 
   //asset descriptors
