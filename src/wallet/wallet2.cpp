@@ -577,7 +577,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
     if (pglobal_indexes->size())
     {
       //@#@
-      WLT_LOG_L1("add_to_last_zc_global_indexs: h: " << height << ", b: " << currency::get_block_hash(b) << " , tx: " << currency::get_transaction_hash(tx) << ", last_zc_output_index: " << pglobal_indexes->back());
+      WLT_LOG_L2("add_to_last_zc_global_indexs: h: " << height << ", b: " << currency::get_block_hash(b) << " , tx: " << currency::get_transaction_hash(tx) << ", last_zc_output_index: " << pglobal_indexes->back());
       add_to_last_zc_global_indexs(ptc.height, pglobal_indexes->back());
     }
   }
