@@ -227,11 +227,14 @@ namespace tools
         uint64_t last_zc_global_index = 0;
         a& last_zc_global_index;
         m_last_zc_global_indexs.push_back(std::make_pair(uint64_t(0), last_zc_global_index));
+        return;
       }
-      else
+      a& m_last_zc_global_indexs;
+      if (ver == 166 && m_last_zc_global_indexs.size())
       {
-        a& m_last_zc_global_indexs;
-      }
+        //workaround for m_last_zc_global_indexs holding invalid index for last item
+        m_last_zc_global_indexs.pop_front();
+      }      
     }
   };
   

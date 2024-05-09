@@ -576,6 +576,8 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
   {
     if (pglobal_indexes->size())
     {
+      //@#@
+      WLT_LOG_L2("add_to_last_zc_global_indexs: h: " << height << ", b: " << currency::get_block_hash(b) << " , tx: " << currency::get_transaction_hash(tx) << ", last_zc_output_index: " << pglobal_indexes->back());
       add_to_last_zc_global_indexs(ptc.height, pglobal_indexes->back());
     }
   }
@@ -1891,9 +1893,16 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
     TIME_MEASURE_FINISH(miner_tx_handle_time);
 
     TIME_MEASURE_START(txs_handle_time);
+    size_t count = 0;
     for(const auto& tx_entry: bche.txs_ptr)
     {
+      if (b.tx_hashes.size() < count || currency::get_transaction_hash(tx_entry->tx) != b.tx_hashes[count])
+      {
+        LOG_ERROR("Found tx order fail in process_new_blockchain_entry: count=" << count 
+          << ", b.tx_hashes.size() = " << b.tx_hashes.size() << ", tx real id: " << currency::get_transaction_hash(tx_entry->tx) << ", bl_id: " << bl_id);
+      }
       process_new_transaction(tx_entry->tx, height, b, &(tx_entry->m_global_output_indexes));
+      count++;
     }
     TIME_MEASURE_FINISH(txs_handle_time);
     WLT_LOG_L3("Processed block: " << bl_id << ", height " << height << ", " <<  miner_tx_handle_time + txs_handle_time << "(" << miner_tx_handle_time << "/" << txs_handle_time <<")ms");
