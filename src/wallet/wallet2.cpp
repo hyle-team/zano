@@ -4887,15 +4887,16 @@ bool wallet2::try_mint_pos(const currency::account_public_address& miner_address
     return true;
   }, m_core_runtime_config);
   
+  bool res = true;
   if (ctx.status == API_RETURN_CODE_OK)
   {
-    build_minted_block(ctx, miner_address);
+    res = build_minted_block(ctx, miner_address);
   }
   TIME_MEASURE_FINISH_MS(mining_duration_ms);
 
   WLT_LOG_L0("PoS mining: " << ctx.iterations_processed << " iterations finished (" << std::fixed << std::setprecision(2) << (mining_duration_ms / 1000.0f) << "s), status: " << ctx.status << ", " << ctx.total_items_checked << " entries with total amount: " << print_money_brief(ctx.total_amount_checked));
 
-  return true;
+  return res;
 }
 //------------------------------------------------------------------
 void wallet2::do_pos_mining_prepare_entry(mining_context& context, size_t transfer_index)

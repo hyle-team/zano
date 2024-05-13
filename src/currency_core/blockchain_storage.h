@@ -266,8 +266,12 @@ namespace currency
     crypto::hash get_top_block_id(uint64_t& height) const;
     bool get_top_block(block& b) const;
     wide_difficulty_type get_next_diff_conditional(bool pos) const;
-    wide_difficulty_type get_next_diff_conditional2(bool pos, const alt_chain_type& alt_chain, uint64_t split_height, const alt_block_extended_info& abei) const;
+    wide_difficulty_type get_next_diff_conditional_alt(bool pos, const alt_chain_type& alt_chain, uint64_t split_height, const alt_block_extended_info& abei) const;
     wide_difficulty_type get_cached_next_difficulty(bool pos) const;
+    wide_difficulty_type calc_diff_at_h_from_timestamps(std::vector<uint64_t>& timestamps, std::vector<wide_difficulty_type>& commulative_difficulties, uint64_t h, bool pos) const;
+    void collect_timestamps_and_c_difficulties_main(std::vector<uint64_t>& timestamps, std::vector<wide_difficulty_type>& commulative_difficulties, bool pos) const;
+    void collect_timestamps_and_c_difficulties_alt(std::vector<uint64_t>& timestamps, std::vector<wide_difficulty_type>& commulative_difficulties, bool pos, const alt_chain_type& alt_chain, uint64_t split_height) const;
+
 
     
     bool create_block_template(const account_public_address& miner_address, const blobdata& ex_nonce, block& b, wide_difficulty_type& di, uint64_t& height) const;
@@ -551,6 +555,8 @@ namespace currency
     tools::db::solo_db_value<uint64_t, std::string, solo_options_container, true> m_db_last_worked_version;
     tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container> m_db_storage_major_compatibility_version;
     tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container> m_db_storage_minor_compatibility_version;
+    tools::db::solo_db_value<uint64_t, bool, solo_options_container> m_db_major_failure; //safety fuse
+
     outputs_container m_db_outputs;
     multisig_outs_container m_db_multisig_outs;
     aliases_container m_db_aliases;

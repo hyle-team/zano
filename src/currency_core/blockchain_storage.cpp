@@ -67,6 +67,8 @@ using namespace currency;
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_LAST_WORKED_VERSION                   2
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_STORAGE_MAJOR_COMPATIBILITY_VERSION   3 //DON'T CHANGE THIS, if you need to resync db change BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_STORAGE_MINOR_COMPATIBILITY_VERSION   4 //mismatch here means some reinitializations
+#define BLOCKCHAIN_STORAGE_OPTIONS_ID_MAJOR_FAILURE                         5 //if not blocks should ever be added with this condition
+
 
 #define TARGETDATA_CACHE_SIZE                          DIFFICULTY_WINDOW + 10
 
@@ -96,6 +98,7 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
                                                                  m_db_last_worked_version(BLOCKCHAIN_STORAGE_OPTIONS_ID_LAST_WORKED_VERSION, m_db_solo_options),
                                                                  m_db_storage_major_compatibility_version(BLOCKCHAIN_STORAGE_OPTIONS_ID_STORAGE_MAJOR_COMPATIBILITY_VERSION, m_db_solo_options),
                                                                  m_db_storage_minor_compatibility_version(BLOCKCHAIN_STORAGE_OPTIONS_ID_STORAGE_MINOR_COMPATIBILITY_VERSION, m_db_solo_options),
+                                                                 m_db_major_failure(BLOCKCHAIN_STORAGE_OPTIONS_ID_MAJOR_FAILURE, m_db_solo_options),
                                                                  m_db_per_block_gindex_incs(m_db),
                                                                  m_tx_pool(tx_pool), 
                                                                  m_is_in_checkpoint_zone(false), 
@@ -507,7 +510,8 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     << "  last block:             " << m_db_blocks.size() - 1 << ", " << misc_utils::get_time_interval_string(timestamp_diff) << " ago" << ENDL
     << "  current pos difficulty: " << get_next_diff_conditional(true) << ENDL
     << "  current pow difficulty: " << get_next_diff_conditional(false) << ENDL
-    << "  total transactions:     " << m_db_transactions.size(),
+    << "  total transactions:     " << m_db_transactions.size() << ENDL
+    << "  major failure:          " << (m_db_major_failure ? "true" : "false"),
     LOG_LEVEL_0);
 
   return true;
@@ -1181,14 +1185,9 @@ bool blockchain_storage::switch_to_alternative_blockchain(alt_chain_type& alt_ch
   return true;
 }
 //------------------------------------------------------------------
-wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) const
+void blockchain_storage::collect_timestamps_and_c_difficulties_main(std::vector<uint64_t>& timestamps, std::vector<wide_difficulty_type>& commulative_difficulties, bool pos) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  std::vector<uint64_t> timestamps;
-  std::vector<wide_difficulty_type> commulative_difficulties;
-  if (!m_db_blocks.size())
-    return DIFFICULTY_POW_STARTER;
-  //skip genesis timestamp
   TIME_MEASURE_START_PD(target_calculating_enum_blocks);
   CRITICAL_REGION_BEGIN(m_targetdata_cache_lock);
   std::list<std::pair<wide_difficulty_type, uint64_t>>& targetdata_cache = pos ? m_pos_targetdata_cache : m_pow_targetdata_cache;
@@ -1203,11 +1202,14 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
     ++count;
   }
   CRITICAL_REGION_END();
-
-  wide_difficulty_type& dif = pos ? m_cached_next_pos_difficulty : m_cached_next_pow_difficulty;
   TIME_MEASURE_FINISH_PD(target_calculating_enum_blocks);
+}
+//------------------------------------------------------------------
+wide_difficulty_type blockchain_storage::calc_diff_at_h_from_timestamps(std::vector<uint64_t>& timestamps, std::vector<wide_difficulty_type>& commulative_difficulties, uint64_t h, bool pos) const
+{
+  wide_difficulty_type dif;
   TIME_MEASURE_START_PD(target_calculating_calc);
-  if (m_core_runtime_config.is_hardfork_active_for_height(1, m_db_blocks.size()))
+  if (m_core_runtime_config.is_hardfork_active_for_height(1, h))
   {
     dif = next_difficulty_2(timestamps, commulative_difficulties, pos ? global_difficulty_pos_target : global_difficulty_pow_target, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
   }
@@ -1215,22 +1217,36 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
   {
     dif = next_difficulty_1(timestamps, commulative_difficulties, pos ? global_difficulty_pos_target : global_difficulty_pow_target, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
   }
-  
-
   TIME_MEASURE_FINISH_PD(target_calculating_calc);
   return dif;
 }
 //------------------------------------------------------------------
-wide_difficulty_type blockchain_storage::get_next_diff_conditional2(bool pos, const alt_chain_type& alt_chain, uint64_t split_height, const alt_block_extended_info& abei) const
+wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) const
 {
-  CRITICAL_REGION_LOCAL(m_read_lock);
+  {
+    //skip genesis timestamp
+    CRITICAL_REGION_LOCAL(m_read_lock);
+    if (!m_db_blocks.size())
+      return DIFFICULTY_POW_STARTER;
+  }
+
   std::vector<uint64_t> timestamps;
   std::vector<wide_difficulty_type> commulative_difficulties;
-  size_t count = 0;
-  if (!m_db_blocks.size())
-    return DIFFICULTY_POW_STARTER;
+  collect_timestamps_and_c_difficulties_main(timestamps, commulative_difficulties, pos);
 
-  auto cb = [&](const block_extended_info& bei, bool is_main){
+
+  wide_difficulty_type& dif = pos ? m_cached_next_pos_difficulty : m_cached_next_pow_difficulty;
+  dif = calc_diff_at_h_from_timestamps(timestamps, commulative_difficulties, m_db_blocks.size(), pos);
+
+  return dif;
+}
+//------------------------------------------------------------------
+void blockchain_storage::collect_timestamps_and_c_difficulties_alt(std::vector<uint64_t>& timestamps, std::vector<wide_difficulty_type>& commulative_difficulties, bool pos, const alt_chain_type& alt_chain, uint64_t split_height) const 
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  size_t count = 0;
+
+  auto cb = [&](const block_extended_info& bei, bool is_main) {
     if (!bei.height)
       return false;
     bool is_pos_bl = is_pos_block(bei.bl);
@@ -1242,15 +1258,22 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional2(bool pos, co
     if (count >= DIFFICULTY_WINDOW)
       return false;
     return true;
-  };
+    };
   enum_blockchain(cb, alt_chain, split_height);
+}
+//------------------------------------------------------------------
+wide_difficulty_type blockchain_storage::get_next_diff_conditional_alt(bool pos, const alt_chain_type& alt_chain, uint64_t split_height, const alt_block_extended_info& abei) const
+{
+  {
+    CRITICAL_REGION_LOCAL(m_read_lock);
+    if (!m_db_blocks.size())
+      return DIFFICULTY_POW_STARTER;
+  }
+  std::vector<uint64_t> timestamps;
+  std::vector<wide_difficulty_type> commulative_difficulties;
+  collect_timestamps_and_c_difficulties_alt(timestamps, commulative_difficulties, pos,  alt_chain, split_height);
 
-  wide_difficulty_type diff = 0;
-  if(m_core_runtime_config.is_hardfork_active_for_height(1, abei.height))
-    diff = next_difficulty_2(timestamps, commulative_difficulties, pos ? global_difficulty_pos_target : global_difficulty_pow_target, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
-  else
-    diff = next_difficulty_1(timestamps, commulative_difficulties, pos ? global_difficulty_pos_target : global_difficulty_pow_target, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
-  return diff;
+  return calc_diff_at_h_from_timestamps(timestamps, commulative_difficulties, abei.height, pos);
 }
 //------------------------------------------------------------------
 wide_difficulty_type blockchain_storage::get_cached_next_difficulty(bool pos) const
@@ -1865,7 +1888,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     }
 
     // PoW / PoS validation (heavy checks)
-    wide_difficulty_type current_diff = get_next_diff_conditional2(pos_block, alt_chain, connection_height, abei);
+    wide_difficulty_type current_diff = get_next_diff_conditional_alt(pos_block, alt_chain, connection_height, abei);
     CHECK_AND_ASSERT_MES_CUSTOM(current_diff, false, bvc.m_verification_failed = true, "!!!!!!! DIFFICULTY OVERHEAD !!!!!!!");
     
     crypto::hash proof_of_work = null_hash;
@@ -5751,6 +5774,12 @@ void blockchain_storage::get_pos_mining_estimate(uint64_t amount_coins,
 //------------------------------------------------------------------
 bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id) const
 {
+  if (m_db_major_failure)
+  {
+    LOG_ERROR("MAJOR FAILURE: POS DIFFICULTY IS GOT TO HIGH! Contact the team immediately if you see this error in logs and watch them having panic attack.");
+    return false;
+  }
+
   uint64_t block_height = m_db_blocks.size();
   return validate_tx_for_hardfork_specific_terms(tx, tx_id, block_height);
 }
@@ -6780,6 +6809,13 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
             << range_proofs_agregated.size()
     << ")"
     << "))");
+  if (is_pos_bl && current_diffic > m_core_runtime_config.max_pos_difficulty)
+  {
+    m_db_major_failure = true; //burn safety fuse
+    LOG_ERROR("MAJOR FAILURE: POS DIFFICULTY IS GOT TO HIGH! Contact the team immediately if you see this error in logs and watch them having panic attack." 
+      << ENDL << "Block id:"  << id);
+  }
+
 
   {
     static epee::math_helper::average<uint64_t, 30> blocks_processing_time_avg_pos, blocks_processing_time_avg_pow;
@@ -6956,6 +6992,15 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
 {
   try
   {
+
+    if (m_db_major_failure)
+    {
+      LOG_PRINT_RED_L0("Block processing is stoped due to MAJOR FAILURE fuse burned");
+      bvc.m_added_to_main_chain = false;
+      bvc.m_verification_failed = true;
+      return false;
+    }
+
     m_db.begin_transaction();
 
     //block bl = bl_;
@@ -6979,10 +7024,6 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
       m_db.commit_transaction();
       return false;
     }
-
-
-    //check that block refers to chain tail
-
     
     if (!(bl.prev_id == get_top_block_id()))
     {

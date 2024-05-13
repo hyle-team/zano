@@ -157,6 +157,8 @@
 #define POS_MODFIFIER_INTERVAL                          10
 #define POS_WALLET_MINING_SCAN_INTERVAL                 POS_SCAN_STEP  //seconds
 #define POS_MINIMUM_COINSTAKE_AGE                       10 // blocks count
+#define POS_MAX_DIFFICULTY_ALLOWED                      "25000000000000000000000" // maximum expected PoS difficuty (need to change it probaly in 20 years)
+
 
 #ifndef TESTNET
 #  define BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION 57000
