@@ -176,7 +176,7 @@ namespace currency
       res.pow_sequence_factor = m_core.get_blockchain_storage().get_current_sequence_factor(false);
     if (req.flags&(COMMAND_RPC_GET_INFO_FLAG_POS_DIFFICULTY | COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS))
     {
-      res.block_reward = currency::get_base_block_reward(true, total_coins, res.height);
+      res.block_reward = currency::get_base_block_reward(res.height);
       currency::block b = AUTO_VAL_INIT(b);
       m_core.get_blockchain_storage().get_top_block(b);
       res.last_block_total_reward = currency::get_reward_from_miner_tx(b.miner_tx);
@@ -730,6 +730,18 @@ namespace currency
   bool core_rpc_server::on_get_asset_info(const COMMAND_RPC_GET_ASSET_INFO::request& req, COMMAND_RPC_GET_ASSET_INFO::response& res, connection_context& cntx)
   {
     if (!m_core.get_blockchain_storage().get_asset_info(req.asset_id, res.asset_descriptor))
+    {
+      res.status = API_RETURN_CODE_NOT_FOUND;
+      return true;
+    }
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_get_assets_list(const COMMAND_RPC_GET_ASSETS_LIST::request& req, COMMAND_RPC_GET_ASSETS_LIST::response& res, connection_context& cntx)
+  {
+    CHECK_CORE_READY();
+    if (!m_core.get_blockchain_storage().get_assets(req.offset, req.count, res.assets))
     {
       res.status = API_RETURN_CODE_NOT_FOUND;
       return true;

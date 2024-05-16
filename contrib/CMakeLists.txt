@@ -14,7 +14,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "Android")
   message("excluded upnp support for IOS build")
   return()
 endif()
+
 add_subdirectory(miniupnp/miniupnpc)
+
 
 
 set_property(TARGET libminiupnpc-static PROPERTY FOLDER "contrib")

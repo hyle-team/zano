@@ -828,7 +828,7 @@ uint64_t test_generator::get_base_reward_for_next_block(const crypto::hash& head
   auto it = m_blocks_info.find(head_id);
   if (it == m_blocks_info.end())
     return 0;
-  return get_base_block_reward(!pow, it->second.already_generated_coins, get_block_height(it->second.b));
+  return get_base_block_reward(get_block_height(it->second.b));
 }
 
 bool test_generator::find_nounce(currency::block& blk, std::vector<const block_info*>& blocks, wide_difficulty_type dif, uint64_t height) const
@@ -2319,15 +2319,25 @@ bool check_ring_signature_at_gen_time(const std::vector<test_event_entry>& event
 
 bool check_mixin_value_for_each_input(size_t mixin, const crypto::hash& tx_id, currency::core& c)
 {
-  std::shared_ptr<const currency::transaction_chain_entry> ptce = c.get_blockchain_storage().get_tx_chain_entry(tx_id);
-  if (!ptce)
-    return false;
+  transaction tx_local;
+  const transaction* ptx = &tx_local;
 
-  for (size_t i = 0; i < ptce->tx.vin.size(); ++i)
+  std::shared_ptr<const currency::transaction_chain_entry> ptce = c.get_blockchain_storage().get_tx_chain_entry(tx_id);
+  if (ptce)
   {
-    auto& input = ptce->tx.vin[i];
+    ptx = &ptce->tx;
+  }
+  else
+  {
+    if (!c.get_tx_pool().get_transaction(tx_id, tx_local))
+      return false;
+  }
+  
+  for (size_t i = 0; i < ptx->vin.size(); ++i)
+  {
+    auto& input = ptx->vin[i];
     const std::vector<currency::txout_ref_v>& key_offsets = get_key_offsets_from_txin_v(input);
-    CHECK_AND_ASSERT_MES(key_offsets.size() == mixin + 1, false, "for input #" << i << " mixin count is " << key_offsets.size() - 1 << ", expected is " << mixin);
+    CHECK_AND_ASSERT_MES(key_offsets.size() == mixin + 1, false, "for input #" << i << " ring size is " << key_offsets.size() << ", mixin count is " << key_offsets.size() - 1 << ", expected mixin count is " << mixin);
   }
 
   return true;

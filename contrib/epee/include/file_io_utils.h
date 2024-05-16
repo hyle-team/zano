@@ -35,6 +35,7 @@
 #include <iostream>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
+#include <filesystem>
 
 #ifndef MAKE64
 	#define MAKE64(low,high)	((__int64)(((DWORD)(low)) | ((__int64)((DWORD)(high))) << 32))
@@ -561,16 +562,15 @@ namespace file_io_utils
 		try
 		{
 
-			boost::filesystem::directory_iterator end_itr; // default construction yields past-the-end
-			for ( boost::filesystem::directory_iterator itr( epee::string_encoding::utf8_to_wstring(path) ); itr != end_itr; ++itr )
+			std::filesystem::directory_iterator end_itr; // default construction yields past-the-end
+			for ( std::filesystem::directory_iterator itr( epee::string_encoding::utf8_to_wstring(path) ); itr != end_itr; ++itr )
 			{
-				if ( only_files && boost::filesystem::is_directory(itr->status()) )
+				if ( only_files && std::filesystem::is_directory(itr->status()) )
 				{
 					continue;
 				}
 				target_list.push_back(itr->path().filename().string());
 			}
-
 		}
 
 		catch(...)

@@ -20,6 +20,7 @@ namespace tools
     wi.path = epee::string_encoding::wstring_to_utf8(w.get_wallet_path());
     wi.is_auditable = w.is_auditable();
     wi.is_watch_only = w.is_watch_only();
+    wi.has_bare_unspent_outputs = w.has_bare_unspent_outputs();
     return true;
   }
 
@@ -37,21 +38,40 @@ namespace tools
         result.hash_sum_matched = false;
         result.syntax_correct = acc.restore_from_tracking_seed(seed_phrase);
         if (result.syntax_correct)
+        {
           result.tracking = true;
+          result.address = acc.get_public_address_str();
+        }
       }
       else
       {
         result.syntax_correct = currency::account_base::is_seed_password_protected(seed_phrase, result.require_password);
-        if (result.syntax_correct && result.require_password)
+        if (result.syntax_correct )
         {
-          if (seed_password.size())
+          if (result.require_password)
           {
-            currency::account_base acc;
-            result.hash_sum_matched = acc.restore_from_seed_phrase(seed_phrase, seed_password);
+            if (seed_password.size())
+            {
+              currency::account_base acc;
+              result.hash_sum_matched = acc.restore_from_seed_phrase(seed_phrase, seed_password);
+              if (result.hash_sum_matched)
+              {
+                result.address = acc.get_public_address_str();
+              }
+            }
+            else
+            {
+              result.hash_sum_matched = false;
+            }
           }
           else
           {
-            result.hash_sum_matched = false;
+            currency::account_base acc;
+            result.syntax_correct = acc.restore_from_seed_phrase(seed_phrase, "");
+            if (result.syntax_correct)
+            {
+              result.address = acc.get_public_address_str();
+            }            
           }
         }
       }

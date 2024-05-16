@@ -14,6 +14,7 @@
 
 #define VARIANT_SWITCH_END() } }
 
+#define VARIANT_OBJ_TYPENAME local_reference_eokcmeokmeokcm.type().name()
 
 /*
 

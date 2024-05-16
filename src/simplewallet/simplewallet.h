@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -87,6 +87,7 @@ namespace currency
     bool sign_transfer(const std::vector<std::string> &args);
     bool submit_transfer(const std::vector<std::string> &args);
     bool sweep_below(const std::vector<std::string> &args);
+    bool sweep_bare_outs(const std::vector<std::string> &args);
     bool tor_enable(const std::vector<std::string> &args);
     bool tor_disable(const std::vector<std::string> &args);
     bool deploy_new_asset(const std::vector<std::string> &args);

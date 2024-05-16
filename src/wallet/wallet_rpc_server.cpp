@@ -17,6 +17,19 @@ using namespace epee;
 #include "wallet_rpc_server_error_codes.h"
 #include "wallet_helpers.h"
 #include "wrap_service.h"
+PUSH_VS_WARNINGS
+DISABLE_VS_WARNINGS(4244)
+#include "jwt-cpp/jwt.h"
+POP_VS_WARNINGS
+#include "crypto/bitcoin/sha256_helper.h"
+
+#define JWT_TOKEN_EXPIRATION_MAXIMUM          (60 * 60)
+#define JWT_TOKEN_CLAIM_NAME_BODY_HASH        "body_hash"
+#define JWT_TOKEN_CLAIM_NAME_SALT             "salt"
+#define JWT_TOKEN_CLAIM_NAME_EXPIRATION       "exp"     
+#define JWT_TOKEN_OVERWHELM_LIMIT             100000   // if there are more records in m_jwt_used_salts then we consider it as an attack     
+
+
 
 #define GET_WALLET()   wallet_rpc_locker w(m_pwallet_provider);
 
@@ -37,7 +50,7 @@ using namespace epee;
         catch (const tools::error::wallet_error& e) \
         { \
           er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR; \
-          er.message = std::string("WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR") + e.error_code(); \
+          er.message = e.error_code(); \
           return false; \
         } \
         catch (const std::exception& e) \
@@ -53,6 +66,10 @@ using namespace epee;
           return false; \
         } 
 
+
+void exception_handler()
+{}
+
 namespace tools
 {
   //-----------------------------------------------------------------------------------
@@ -60,6 +77,7 @@ namespace tools
   const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_rpc_bind_ip  ("rpc-bind-ip", "Specify ip to bind rpc server", "127.0.0.1");
   const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_miner_text_info  ( "miner-text-info", "Wallet password");
   const command_line::arg_descriptor<bool>        wallet_rpc_server::arg_deaf_mode  ( "deaf", "Put wallet into 'deaf' mode make it ignore any rpc commands(usable for safe PoS mining)");
+  const command_line::arg_descriptor<std::string> wallet_rpc_server::arg_jwt_secret("jwt-secret", "Enables JWT auth over secret string provided");
 
   void wallet_rpc_server::init_options(boost::program_options::options_description& desc)
   {
@@ -67,6 +85,7 @@ namespace tools
     command_line::add_arg(desc, arg_rpc_bind_port);
     command_line::add_arg(desc, arg_miner_text_info);
     command_line::add_arg(desc, arg_deaf_mode);
+    command_line::add_arg(desc, arg_jwt_secret);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   wallet_rpc_server::wallet_rpc_server(std::shared_ptr<wallet2> wptr):
@@ -184,11 +203,81 @@ namespace tools
     m_net_server.set_threads_prefix("RPC");
     bool r = handle_command_line(vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to process command line in core_rpc_server");
+
+
+    if(command_line::has_arg(vm, arg_jwt_secret))
+    {
+      m_jwt_secret = command_line::get_arg(vm, arg_jwt_secret);
+    }
     return epee::http_server_impl_base<wallet_rpc_server, connection_context>::init(m_port, m_bind_ip);
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::auth_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context)
+  {
+
+    auto it = std::find_if(query_info.m_header_info.m_etc_fields.begin(), query_info.m_header_info.m_etc_fields.end(), [](const auto& element)
+                           { return element.first == ZANO_ACCESS_TOKEN; });
+    if(it == query_info.m_header_info.m_etc_fields.end())
+      return false;
+    
+    try
+    {
+      if(m_jwt_used_salts.get_set().size() > JWT_TOKEN_OVERWHELM_LIMIT)
+      {
+        throw std::runtime_error("Salt is overwhelmed");
+      }
+
+      auto decoded = jwt::decode(it->second, [](const std::string& str)
+                                 { return jwt::base::decode<jwt::alphabet::base64>(jwt::base::pad<jwt::alphabet::base64>(str)); });
+
+
+      auto verifier = jwt::verify().allow_algorithm(jwt::algorithm::hs256 { m_jwt_secret });
+
+      verifier.verify(decoded);
+      std::string body_hash     = decoded.get_payload_claim(JWT_TOKEN_CLAIM_NAME_BODY_HASH).as_string();
+      std::string salt      = decoded.get_payload_claim(JWT_TOKEN_CLAIM_NAME_SALT).as_string();
+      crypto::hash jwt_claim_sha256 = currency::null_hash;
+      epee::string_tools::hex_to_pod(body_hash, jwt_claim_sha256);
+      crypto::hash sha256 = crypto::sha256_hash(query_info.m_body.data(), query_info.m_body.size());
+      if (sha256 != jwt_claim_sha256)
+      {
+        throw std::runtime_error("Body hash missmatch");
+      }
+      if(m_jwt_used_salts.get_set().find(salt) != m_jwt_used_salts.get_set().end())
+      {
+        throw std::runtime_error("Salt reused");
+      }
+
+      uint64_t ticks_now = epee::misc_utils::get_tick_count();
+      m_jwt_used_salts.add(salt, ticks_now + JWT_TOKEN_EXPIRATION_MAXIMUM);
+      m_jwt_used_salts.remove_if_expiration_less_than(ticks_now);
+
+      LOG_PRINT_L0("JWT token OK");
+      return true;
+    }
+    catch(const std::exception& e)
+    {
+      LOG_ERROR("Invalid JWT token: " << e.what());
+      return false;
+    }
+
+
+    return false;
+
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context)
   {
+    if (m_jwt_secret.size() && m_conn_context.m_connection_id != RPC_INTERNAL_UI_CONTEXT)
+    {
+      if (!auth_http_request(query_info, response, m_conn_context))
+      {
+        response.m_response_code    = 401;
+        response.m_response_comment = "Unauthorized";
+        return true;
+      }
+    }
+
     response.m_response_code = 200;
     response.m_response_comment = "Ok";
     std::string reference_stub;
@@ -199,7 +288,7 @@ namespace tools
       response.m_response_comment = "Internal Server Error";
       return true;
     }
-    if (!handle_http_request_map(query_info, response, m_conn_context, call_found, reference_stub) && response.m_response_code == 200)
+    if (!handle_http_request_map(query_info, response, m_conn_context, call_found) && response.m_response_code == 200)
     {
       response.m_response_code = 500;
       response.m_response_comment = "Internal Server Error";
@@ -212,6 +301,16 @@ namespace tools
       return true;
     }
     return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  void wallet_rpc_server::set_jwt_secret(const std::string& jwt)
+  {
+    m_jwt_secret = jwt;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  const std::string& wallet_rpc_server::get_jwt_secret()
+  {
+    return m_jwt_secret;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_getbalance(const wallet_public::COMMAND_RPC_GET_BALANCE::request& req, wallet_public::COMMAND_RPC_GET_BALANCE::response& res, epee::json_rpc::error& er, connection_context& cntx)
@@ -256,6 +355,7 @@ namespace tools
       res.utxo_distribution.push_back(currency::print_money_brief(ent.first) + ":" + std::to_string(ent.second));
 
     res.current_height = w.get_wallet()->get_top_block_height();
+    res.has_bare_unspent_outputs = w.get_wallet()->has_bare_unspent_outputs();
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
@@ -325,7 +425,7 @@ namespace tools
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
-  //------------------------------------------------------------------------------------------------------------------------------
+  
   bool wallet_rpc_server::on_transfer(const wallet_public::COMMAND_RPC_TRANSFER::request& req, wallet_public::COMMAND_RPC_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
@@ -357,6 +457,7 @@ namespace tools
     }
     bool wrap = false;
     std::vector<currency::tx_destination_entry>& dsts = ctp.dsts;
+    
     for (auto it = req.destinations.begin(); it != req.destinations.end(); it++)
     {
       currency::tx_destination_entry de;
@@ -652,6 +753,78 @@ namespace tools
     {
       res.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(tx));
     }
+
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_get_bare_outs_stats(const wallet_public::COMMAND_RPC_GET_BARE_OUTS_STATS ::request& req, wallet_public::COMMAND_RPC_GET_BARE_OUTS_STATS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+
+    if (w.get_wallet()->is_watch_only())
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "operation cannot be performed in watch-only wallet";
+      return false;
+    }
+
+    std::vector<tools::wallet2::batch_of_bare_unspent_outs> groups;
+    if (!w.get_wallet()->get_bare_unspent_outputs_stats(groups))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "get_bare_unspent_outputs_stats failed";
+      return false;
+    }
+
+    res.total_amount = 0;
+    res.total_bare_outs = 0;
+    res.expected_total_fee = 0;
+    res.txs_count = 0;
+    
+    for(auto &g : groups)
+    {
+      for (auto& tid: g.tids)
+      {
+        tools::transfer_details td{};
+        CHECK_AND_ASSERT_THROW_MES(w.get_wallet()->get_transfer_info_by_index(tid, td), "get_transfer_info_by_index failed with index " << tid);
+        res.total_amount += td.m_amount;
+      }
+      ++res.txs_count;
+      res.total_bare_outs += g.tids.size();
+      res.expected_total_fee += TX_DEFAULT_FEE;
+    }
+
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_sweep_bare_outs(const wallet_public::COMMAND_RPC_SWEEP_BARE_OUTS::request& req, wallet_public::COMMAND_RPC_SWEEP_BARE_OUTS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+
+    if (w.get_wallet()->is_watch_only())
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "operation cannot be performed in watch-only wallet";
+      return false;
+    }
+
+    std::vector<tools::wallet2::batch_of_bare_unspent_outs> groups;
+    if (!w.get_wallet()->get_bare_unspent_outputs_stats(groups))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+      er.message = "get_bare_unspent_outputs_stats failed";
+      return false;
+    }
+
+    res.amount_swept = 0;
+    res.bare_outs_swept = 0;
+    res.fee_spent = 0;
+
+    size_t txs_sent = 0;
+    w.get_wallet()->sweep_bare_unspent_outputs(w.get_wallet()->get_account().get_public_address(), groups, txs_sent, res.amount_swept, res.fee_spent, res.bare_outs_swept);
+    res.txs_sent = txs_sent;
 
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
@@ -1018,6 +1191,106 @@ namespace tools
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_assets_whitelist_get(const wallet_public::COMMAND_ASSETS_WHITELIST_GET::request& req, wallet_public::COMMAND_ASSETS_WHITELIST_GET::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+
+    currency::assets_map_to_assets_list(res.local_whitelist, w.get_wallet()->get_local_whitelist());
+    currency::assets_map_to_assets_list(res.global_whitelist, w.get_wallet()->get_global_whitelist());
+    currency::assets_map_to_assets_list(res.own_assets, w.get_wallet()->get_own_assets());
+
+    const auto global_whitelist = w.get_wallet()->get_global_whitelist();
+
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_assets_whitelist_add(const wallet_public::COMMAND_ASSETS_WHITELIST_ADD::request& req, wallet_public::COMMAND_ASSETS_WHITELIST_ADD::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    if(!w.get_wallet()->add_custom_asset_id(req.asset_id, res.asset_descriptor))
+    {
+      res.status = API_RETURN_CODE_NOT_FOUND;
+    }
+    else
+    {
+      res.status = API_RETURN_CODE_OK;
+    }
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  } 
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_assets_whitelist_remove(const wallet_public::COMMAND_ASSETS_WHITELIST_REMOVE::request& req, wallet_public::COMMAND_ASSETS_WHITELIST_REMOVE::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    if(!w.get_wallet()->delete_custom_asset_id(req.asset_id))
+    {
+      res.status = API_RETURN_CODE_NOT_FOUND;
+    }
+    else
+    {
+      res.status = API_RETURN_CODE_OK;
+    }
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  void wallet_rpc_server::rpc_destinations_to_currency_destination(const std::list<wallet_public::transfer_destination>& rpc_destinations, std::vector<currency::tx_destination_entry>& currency_destinations)
+  {
+    GET_WALLET();
+    std::vector<currency::tx_destination_entry>& dsts = currency_destinations;
+    for (auto it = rpc_destinations.begin(); it != rpc_destinations.end(); it++)
+    {
+      currency::tx_destination_entry de;
+      de.addr.resize(1);
+      std::string embedded_payment_id;
+      //check if address looks like wrapped address
+      WLT_THROW_IF_FALSE_WITH_CODE(!currency::is_address_like_wrapped(it->address), "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS", "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS");
+      WLT_THROW_IF_FALSE_WITH_CODE(!w.get_wallet()->get_transfer_address(it->address, de.addr.back(), embedded_payment_id), "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS", "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS");
+      WLT_THROW_IF_FALSE_WITH_CODE(embedded_payment_id.size() == 0, "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS", "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS");
+      de.amount = it->amount;
+      de.asset_id = it->asset_id;
+      dsts.push_back(de);
+    }
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_assets_deploy(const wallet_public::COMMAND_ASSETS_DEPLOY::request& req, wallet_public::COMMAND_ASSETS_DEPLOY::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    currency::transaction result_tx;
+    std::vector<currency::tx_destination_entry> currency_destinations;
+    rpc_destinations_to_currency_destination(req.destinations, currency_destinations);
+    w.get_wallet()->deploy_new_asset(req.asset_descriptor, currency_destinations, result_tx, res.new_asset_id);
+    res.result_tx = currency::get_transaction_hash(result_tx);
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_assets_emit(const wallet_public::COMMAND_ASSETS_EMIT::request& req, wallet_public::COMMAND_ASSETS_EMIT::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    currency::transaction result_tx;
+    std::vector<currency::tx_destination_entry> currency_destinations;
+    rpc_destinations_to_currency_destination(req.destinations, currency_destinations);
+
+    w.get_wallet()->emit_asset(req.asset_id, currency_destinations, result_tx);
+    res.result_tx = currency::get_transaction_hash(result_tx);
+    return true;
+
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_assets_update(const wallet_public::COMMAND_ASSETS_UPDATE::request& req, wallet_public::COMMAND_ASSETS_UPDATE::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    currency::transaction result_tx;
+    w.get_wallet()->update_asset(req.asset_id, req.asset_descriptor, result_tx);
+    res.result_tx = currency::get_transaction_hash(result_tx);
+    return true;
+
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }  
+  //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS::request& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
@@ -1064,6 +1337,18 @@ namespace tools
     std::string buff = epee::string_encoding::base64_decode(req.buff);
     w.get_wallet()->encrypt_buffer(buff, res.res_buff);
     res.res_buff = epee::string_encoding::base64_encode(res.res_buff);
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_proxy_to_daemon(const wallet_public::COMMAND_PROXY_TO_DAEMON::request& req, wallet_public::COMMAND_PROXY_TO_DAEMON::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    std::string buff = epee::string_encoding::base64_decode(req.base64_body);
+    
+    w.get_wallet()->proxy_to_daemon(req.uri, buff, res.response_code, res.base64_body);
+        
+    res.base64_body = epee::string_encoding::base64_encode(res.base64_body);
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }

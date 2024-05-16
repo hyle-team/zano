@@ -27,16 +27,24 @@
 #include "wallet/plain_wallet_api.h"
 #include "wallet/view_iface.h"
 
+PUSH_VS_WARNINGS
+DISABLE_VS_WARNINGS(4244)
+#include "jwt-cpp/jwt.h"
+POP_VS_WARNINGS
 
 void test_plain_wallet()
 {
   //std::string res = plain_wallet::init("195.201.107.230", "33336", "E:\\tmp\\", 0);
-  std::string res = plain_wallet::init("127.0.0.1", "12111", "C:\\Users\\roky\\home\\", 0);
+  std::string res = plain_wallet::init("127.0.0.1", "12111", "C:\\Users\\roky\\home22\\", 0);
   
+
+  std::string res___ = plain_wallet::get_wallet_files();
+
+
   uint64_t instance_id = 0;
-  res = plain_wallet::open("test_restored.zan", "111");
-  //res = plain_wallet::restore("heart level clear fate sorrow childhood sent fate ceiling party third steel came ask mix neither message already almost vast date glide tumble color okay space",
-  //  "test_restored.zan", "111", "");
+  res = plain_wallet::open("test_restored_2.zan", "111");
+  //res = plain_wallet::restore("",
+  //  "test_restored_2.zan", "111", "");
 
 
   while(true)
@@ -49,23 +57,22 @@ void test_plain_wallet()
       break;
   }
 
-
   std::string invoke_body = "{\"method\":\"store\",\"params\":{}}";
-  //std::string res1 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+  std::string res1 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
   invoke_body = "{\"method\":\"get_recent_txs_and_info\",\"params\":{\"offset\":0,\"count\":30,\"update_provision_info\":true}}";  
   std::string res2 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
+  invoke_body = "{\"method\":\"get_recent_txs_and_info2\",\"params\":{\"offset\":0,\"count\":30,\"update_provision_info\":true}}";
+  res2 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
 
   invoke_body = "{\"method\":\"getbalance\",\"params\":{}}";
   std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
 
-  invoke_body = "{\"method\":\"getbalance\",\"params\":{}}";
+  invoke_body = "{\r\n  \"method\": \"transfer\",\r\n  \"params\": {\r\n    \"destinations\": [\r\n      {\r\n        \"amount\": \"1000000000000\",\r\n        \"address\": \"ZxD9oVwGwW6ULix9Pqttnr7JDpaoLvDVA1KJ9eA9KRxPMRZT5X7WwtU94XH1Z6q6XTMxNbHmbV2xfZ429XxV6fST2DxEg4BQV\",\r\n        \"asset_id\": \"cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6\"\r\n      }\r\n    ],\r\n    \"fee\": 10000000000,\r\n    \"mixin\": 10,\r\n    \"payment_id\": \"\",\r\n    \"comment\": \"\",\r\n    \"push_payer\": false,\r\n    \"hide_receiver\": true\r\n  }\r\n}";
   std::string res4 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
-
-
-  invoke_body = "{\r\n  \"method\": \"transfer\",\r\n  \"params\": {\r\n    \"destinations\": [\r\n      {\r\n        \"amount\": \"1000000000000\",\r\n        \"address\": \"ZxD9oVwGwW6ULix9Pqttnr7JDpaoLvDVA1KJ9eA9KRxPMRZT5X7WwtU94XH1Z6q6XTMxNbHmbV2xfZ429XxV6fST2DxEg4BQV\"  }\r\n    ],\r\n    \"fee\": 10000000000,\r\n    \"mixin\": 10,\r\n    \"payment_id\": \"\",\r\n    \"comment\": \"\",\r\n    \"push_payer\": false,\r\n    \"hide_receiver\": true\r\n  }\r\n}";
-  std::string res5 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
   LOG_PRINT_L0(res);
 

@@ -708,7 +708,7 @@ bool gen_no_attchments_in_coinbase::init_config_set_cp(currency::core& c, size_t
   // different checkpoints due to different block versions for different hardforks -> different hashes
   if (crc.is_hardfork_active_for_height(ZANO_HARDFORK_03, 11) && !crc.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, 11))
   {
-    m_checkpoints.add_checkpoint(12, "4e6055dda442e04b2feb70bc7245584742604e8515b8d2e1c3d46c26f758d59f");
+    m_checkpoints.add_checkpoint(12, "70fbbd33d88ccaa26f9fe64d102bcff2572494009339de9fab7158a40633fbb5");
   }
   else
   {

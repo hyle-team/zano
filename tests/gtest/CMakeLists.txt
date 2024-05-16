@@ -9,6 +9,10 @@
 # make it prominent in the GUI.
 option(BUILD_SHARED_LIBS "Build shared libraries (DLLs)." OFF)
 
+if(POLICY CMP0148)
+  cmake_policy(SET CMP0148 OLD)
+endif() 
+
 # When other libraries are using a shared version of runtime libraries,
 # Google Test also has to use one.
 option(
@@ -40,7 +44,6 @@ endif()
 # ${gtest_BINARY_DIR}.
 # Language "C" is required for find_package(Threads).
 project(gtest CXX C)
-cmake_minimum_required(VERSION 2.6.2)
 
 if (COMMAND set_up_hermetic_build)
   set_up_hermetic_build()

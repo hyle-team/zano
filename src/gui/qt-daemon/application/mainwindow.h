@@ -106,17 +106,18 @@ public:
   QString accept_cancel_contract(const QString& param);
 
 
-  QString get_version();
-  QString get_os_version();
-  QString get_network_type();
+  QString on_request_quit(const QString& param);
+  QString get_version(const QString& param);
+  QString get_os_version(const QString& param);
+  QString get_network_type(const QString& param);
   QString transfer(const QString& json_transfer_object);
-  QString have_secure_app_data();
-  QString drop_secure_app_data();
+  QString have_secure_app_data(const QString& param);
+  QString drop_secure_app_data(const QString& param);
   QString get_secure_app_data(const QString& param);
-  QString store_secure_app_data(const QString& param);
+  QString store_secure_app_data(const QString& param, const QString& password);
   QString set_master_password(const QString& param);
   QString check_master_password(const QString& param);
-  QString get_app_data();
+  QString get_app_data(const QString& param);
   QString store_app_data(const QString& param);
   QString get_default_user_dir(const QString& param);
 //  QString get_all_offers(const QString& param);
@@ -126,12 +127,11 @@ public:
   QString push_update_offer(const QString& param);
   QString get_alias_info_by_address(const QString& param);
   QString get_alias_info_by_name(const QString& param);
-  QString get_all_aliases();
+  QString get_all_aliases(const QString& param);
   QString request_alias_registration(const QString& param);
   QString request_alias_update(const QString& param);
   QString get_alias_coast(const QString& param);
   QString validate_address(const QString& param);
-  QString on_request_quit();
   QString resync_wallet(const QString& param);
   QString get_recent_transfers(const QString& param);
   QString get_mining_history(const QString& param);
@@ -141,11 +141,11 @@ public:
   QString get_log_level(const QString& param);
   QString set_enable_tor(const QString& param);
 //  QString dump_all_offers();
-  QString webkit_launched_script();
+  QString webkit_launched_script(const QString& param);
   QString get_smart_wallet_info(const QString& param);
   QString restore_wallet(const QString& param);
   QString use_whitelisting(const QString& param);
-  QString is_pos_allowed();
+  QString is_pos_allowed(const QString& param);
   QString store_to_file(const QString& path, const QString& buff);
   QString load_from_file(const QString& path);
   QString is_file_exist(const QString& path);
@@ -153,7 +153,7 @@ public:
   QString backup_wallet_keys(const QString& obj);
   QString reset_wallet_password(const QString& param);
   QString is_wallet_password_valid(const QString& param);
-  QString is_autostart_enabled();
+  QString is_autostart_enabled(const QString& param);
   QString toggle_autostart(const QString& param);
   QString is_valid_restore_wallet_text(const QString& param);
   QString get_seed_phrase_info(const QString& param);
@@ -161,13 +161,13 @@ public:
   QString print_log(const QString& param);
   QString set_clipboard(const QString& param);
   QString set_localization_strings(const QString str);
-  QString get_clipboard();
+  QString get_clipboard(const QString& param);
   void    message_box(const QString& msg);
-  bool    toggle_mining();
+  bool    toggle_mining(const QString& param);
   QString get_exchange_last_top(const QString& params);
-  QString get_tx_pool_info();
-  QString get_default_fee();
-  QString get_options();  
+  QString get_tx_pool_info(const QString& param);
+  QString get_default_fee(const QString& param);
+  QString get_options(const QString& param);
   void    bool_toggle_icon(const QString& param);
   QString add_custom_asset_id(const QString& param);
   QString remove_custom_asset_id(const QString& param);
@@ -177,26 +177,28 @@ public:
   QString get_ionic_swap_proposal_info(const QString& param);
   QString accept_ionic_swap_proposal(const QString& param);
 
-  bool    get_is_disabled_notifications();
+  bool    get_is_disabled_notifications(const QString& param);
   bool    set_is_disabled_notifications(const bool& param);
   QString export_wallet_history(const QString& param);
-  QString get_log_file();
+  QString get_log_file(const QString& param);
   //QString check_available_sources(const QString& param);
   QString open_url_in_browser(const QString& param);
+  QString setup_jwt_wallet_rpc(const QString& param);
 
   void    trayIconActivated(QSystemTrayIcon::ActivationReason reason);
-  void    tray_quit_requested();
-  void    on_menu_show();
-  QString is_remnotenode_mode_preconfigured();
+  void    tray_quit_requested(const QString& param);
+  void    on_menu_show(const QString& param);
+  QString is_remnotenode_mode_preconfigured(const QString& param);
   QString start_backend(const QString& params);
 
   QString async_call(const QString& func_name, const QString& params);
   QString sync_call(const QString& func_name, const QString& params);
 
-  //for test purposes onlys
-  QString request_dummy();
+  //for test purposes only
+  QString request_dummy(const QString& param);
 
   QString call_rpc(const QString& params);
+  QString call_wallet_rpc(const QString& wallet_id, const QString& params);
 
 signals:
   void quit_requested(const QString str);

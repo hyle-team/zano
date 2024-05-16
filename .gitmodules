@@ -9,3 +9,6 @@
 	path = contrib/tor-connect
 	url = https://github.com/hyle-team/tor-connect.git
 	branch = main
+[submodule "contrib/jwt-cpp"]
+	path = contrib/jwt-cpp
+	url = https://github.com/Thalhammer/jwt-cpp.git

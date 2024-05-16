@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.16)
 
 PROJECT(Zano)
 
@@ -17,6 +17,9 @@ if(POLICY CMP0043)
 endif()
 if(POLICY CMP0043)
   cmake_policy(SET CMP0074 NEW)
+endif()
+if(POLICY CMP0144)
+  cmake_policy(SET CMP0144 NEW)
 endif()
 
 
@@ -50,7 +53,7 @@ if (UNIX AND NOT APPLE)
 else()
   # multi configurations for MSVC and XCode
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS") 
-    set(CMAKE_CONFIGURATION_TYPES "Release")
+    set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
   elseif(CMAKE_SYSTEM_NAME STREQUAL "Android") 
     set(CMAKE_CONFIGURATION_TYPES "Debug;Release")
   else()
@@ -58,7 +61,7 @@ else()
   endif()
 endif()
 message("Generated with config types: ${CMAKE_CONFIGURATION_TYPES}, and built type: ${CMAKE_BUILD_TYPE}")
- 
+
 enable_testing()
 
 set(OPENSSL_USE_STATIC_LIBS TRUE) # link statically
@@ -66,7 +69,7 @@ find_package(OpenSSL REQUIRED)
 
 
 if(APPLE)
-  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.12)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15)
 endif()
 
 set(USE_PCH FALSE CACHE BOOL "Use shared precompiled headers")
@@ -74,7 +77,7 @@ set(DISABLE_TOR FALSE CACHE BOOL "Disable TOR library(and related tor-connect su
 set(TESTNET FALSE CACHE BOOL "Compile for testnet")
 set(BUILD_GUI FALSE CACHE BOOL "Build qt-daemon")
 
-include_directories(src contrib/eos_portable_archive contrib contrib/epee/include ${OPENSSL_INCLUDE_DIR} "${CMAKE_BINARY_DIR}/version" "${CMAKE_BINARY_DIR}/contrib/zlib")
+include_directories(src contrib/eos_portable_archive contrib contrib/epee/include contrib/jwt-cpp/include ${OPENSSL_INCLUDE_DIR} "${CMAKE_BINARY_DIR}/version" "${CMAKE_BINARY_DIR}/contrib/zlib")
 
 add_definitions(-DSTATICLIB)
 
@@ -122,6 +125,7 @@ if(MSVC)
     endforeach()
   endif()
   include_directories(SYSTEM src/platform/msc)
+  configure_file(utils/Directory.Build.props.in ${CMAKE_BINARY_DIR}/Directory.Build.props)
 else()
   set(ARCH default CACHE STRING "CPU to build for: -march value or default")
   if("${ARCH}" STREQUAL "default")
@@ -225,11 +229,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
   set(Boost_LIBRARIES "libboost.a")
   #workaround for new XCode 12 policy for builds(now it includes a slice for the "arm64" when builds for simulator)
   set(__iphoneos_archs "arm64")
-  set(__iphonesimulator_archs "x86_64")
+  #set(__iphonesimulator_archs "arm64,x86_64")
   set(CMAKE_XCODE_ATTRIBUTE_ARCHS[sdk=iphoneos*] "${__iphoneos_archs}")
   set(CMAKE_XCODE_ATTRIBUTE_VALID_ARCHS[sdk=iphoneos*] "${__iphoneos_archs}")
-  set(CMAKE_XCODE_ATTRIBUTE_ARCHS[sdk=iphonesimulator*] "${__iphonesimulator_archs}")
-  set(CMAKE_XCODE_ATTRIBUTE_VALID_ARCHS[sdk=iphonesimulator*] "${__iphonesimulator_archs}")
+  #set(CMAKE_XCODE_ATTRIBUTE_ARCHS[sdk=iphonesimulator*] "${__iphonesimulator_archs}")
+  #set(CMAKE_XCODE_ATTRIBUTE_VALID_ARCHS[sdk=iphonesimulator*] "${__iphonesimulator_archs}")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
   set(Boost_LIBRARY_DIRS "${Boost_LIBRARY_DIRS}/${CMAKE_ANDROID_ARCH_ABI}/")
   set(Boost_LIBRARIES "${Boost_LIBRARY_DIRS}libboost_system.a;${Boost_LIBRARY_DIRS}libboost_filesystem.a;${Boost_LIBRARY_DIRS}libboost_thread.a;${Boost_LIBRARY_DIRS}libboost_timer.a;${Boost_LIBRARY_DIRS}libboost_date_time.a;${Boost_LIBRARY_DIRS}libboost_chrono.a;${Boost_LIBRARY_DIRS}libboost_regex.a;${Boost_LIBRARY_DIRS}libboost_serialization.a;${Boost_LIBRARY_DIRS}libboost_atomic.a;${Boost_LIBRARY_DIRS}libboost_program_options.a")
@@ -260,8 +264,10 @@ elseif(NOT MSVC)
 endif()
 
 if(BUILD_GUI)
-  cmake_minimum_required(VERSION 3.1)
+  cmake_minimum_required(VERSION 3.1) # <-- this is important for Linux GUI build, don't touch it -- sowle
   find_package(Qt5Widgets REQUIRED)  
+  find_package(Qt5WebEngineWidgets REQUIRED)  
+  find_package(Qt5WebChannel REQUIRED)  
 endif()
 
 set(COMMIT_ID_IN_VERSION ON CACHE BOOL "Include commit ID in version")

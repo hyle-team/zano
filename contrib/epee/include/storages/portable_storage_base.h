@@ -153,6 +153,7 @@ namespace epee
     /************************************************************************/
     struct section
     {
+      std::map<std::string, std::string>   m_descriptions;
       std::map<std::string, storage_entry> m_entries;
     };
 

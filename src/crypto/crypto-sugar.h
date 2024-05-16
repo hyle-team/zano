@@ -1043,7 +1043,7 @@ namespace crypto
     void zero()
     {
       PUSH_GCC_WARNINGS
-      DISABLE_GCC_AND_CLANG_WARNING(class-memaccess)
+      DISABLE_GCC_WARNING(class-memaccess)
       size_t size_bytes = sizeof(scalar_t) * size();
       memset(data(), 0, size_bytes);
       POP_GCC_WARNINGS
@@ -1202,15 +1202,6 @@ namespace crypto
       void add_point(const point_t& point)
       {
         m_elements.emplace_back(point.to_public_key());
-
-        // faster?
-        /* static_assert(sizeof point.m_p3 == 5 * sizeof(item_t), "size missmatch");
-        const item_t *p = (item_t*)&point.m_p3;
-        m_elements.emplace_back(p[0]);
-        m_elements.emplace_back(p[1]);
-        m_elements.emplace_back(p[2]);
-        m_elements.emplace_back(p[3]);
-        m_elements.emplace_back(p[4]); */
       }
 
       void add_pub_key(const crypto::public_key& pk)

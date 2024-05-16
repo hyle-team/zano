@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -24,13 +24,15 @@ namespace tools
     void clear();
     bool empty() const { return m_empty; }
     const std::string& password() const { return m_password; }
+    const std::string& get_input() const { return m_password; } // TODO: refactor this
     void password(std::string&& val) { m_password = std::move(val); m_empty = false; }
     bool read_password();
     bool read_password(const std::string& prompt_text);
+    bool read_input(const std::string& prompt_text, char char_to_replace_user_input = '\0');
 
   private:
     bool read_from_file();
-    bool read_from_tty();
+    bool read_from_tty(char char_to_replace_user_input);
 
   private:
     bool m_empty;

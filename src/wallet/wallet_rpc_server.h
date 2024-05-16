@@ -12,11 +12,11 @@
 #include "wallet_public_structs_defs.h"
 #include "wallet2.h"
 #include "common/command_line.h"
+
+#define ZANO_ACCESS_TOKEN "Zano-Access-Token"
+
 namespace tools
 {
-
-
-
   struct i_wallet_provider
   {
     virtual void lock() {};
@@ -82,12 +82,15 @@ namespace tools
     const static command_line::arg_descriptor<std::string> arg_rpc_bind_ip;
     const static command_line::arg_descriptor<std::string> arg_miner_text_info;
     const static command_line::arg_descriptor<bool>        arg_deaf_mode;
+    const static command_line::arg_descriptor<std::string> arg_jwt_secret;
 
 
     static void init_options(boost::program_options::options_description& desc);
     bool init(const boost::program_options::variables_map& vm);
     bool run(bool do_mint, bool offline_mode, const currency::account_public_address& miner_address);
     bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context);
+    void set_jwt_secret(const std::string& jwt);
+    const std::string& get_jwt_secret();
 
     BEGIN_URI_MAP2_VIRTUAL()
       BEGIN_JSON_RPC_MAP("/json_rpc")
@@ -103,6 +106,8 @@ namespace tools
         MAP_JON_RPC_WE("make_integrated_address",   on_make_integrated_address,   wallet_public::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS)
         MAP_JON_RPC_WE("split_integrated_address",  on_split_integrated_address,  wallet_public::COMMAND_RPC_SPLIT_INTEGRATED_ADDRESS)
         MAP_JON_RPC_WE("sweep_below",               on_sweep_below,               wallet_public::COMMAND_SWEEP_BELOW)
+        MAP_JON_RPC_WE("get_bare_outs_stats",       on_get_bare_outs_stats,       wallet_public::COMMAND_RPC_GET_BARE_OUTS_STATS)
+        MAP_JON_RPC_WE("sweep_bare_outs",           on_sweep_bare_outs,           wallet_public::COMMAND_RPC_SWEEP_BARE_OUTS)
         MAP_JON_RPC_WE("sign_transfer",             on_sign_transfer,             wallet_public::COMMAND_SIGN_TRANSFER)
         MAP_JON_RPC_WE("submit_transfer",           on_submit_transfer,           wallet_public::COMMAND_SUBMIT_TRANSFER)
         MAP_JON_RPC_WE("search_for_transactions",   on_search_for_transactions,   wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS_LEGACY)
@@ -112,39 +117,52 @@ namespace tools
         MAP_JON_RPC_WE("get_mining_history",        on_get_mining_history,        wallet_public::COMMAND_RPC_GET_MINING_HISTORY)
         MAP_JON_RPC_WE("register_alias",            on_register_alias,            wallet_public::COMMAND_RPC_REGISTER_ALIAS)
         //contracts API
-        MAP_JON_RPC_WE("contracts_send_proposal",             on_contracts_send_proposal,      wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL)
-        MAP_JON_RPC_WE("contracts_accept_proposal",           on_contracts_accept_proposal,    wallet_public::COMMAND_CONTRACTS_ACCEPT_PROPOSAL)
-        MAP_JON_RPC_WE("contracts_get_all",                   on_contracts_get_all,            wallet_public::COMMAND_CONTRACTS_GET_ALL)
-        MAP_JON_RPC_WE("contracts_release",                   on_contracts_release,            wallet_public::COMMAND_CONTRACTS_RELEASE)
-        MAP_JON_RPC_WE("contracts_request_cancel",            on_contracts_request_cancel,     wallet_public::COMMAND_CONTRACTS_REQUEST_CANCEL)
-        MAP_JON_RPC_WE("contracts_accept_cancel",             on_contracts_accept_cancel,      wallet_public::COMMAND_CONTRACTS_ACCEPT_CANCEL)
+        //MAP_JON_RPC_WE("contracts_send_proposal",             on_contracts_send_proposal,      wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL)
+        //MAP_JON_RPC_WE("contracts_accept_proposal",           on_contracts_accept_proposal,    wallet_public::COMMAND_CONTRACTS_ACCEPT_PROPOSAL)
+        //MAP_JON_RPC_WE("contracts_get_all",                   on_contracts_get_all,            wallet_public::COMMAND_CONTRACTS_GET_ALL)
+        //MAP_JON_RPC_WE("contracts_release",                   on_contracts_release,            wallet_public::COMMAND_CONTRACTS_RELEASE)
+        //MAP_JON_RPC_WE("contracts_request_cancel",            on_contracts_request_cancel,     wallet_public::COMMAND_CONTRACTS_REQUEST_CANCEL)
+        //MAP_JON_RPC_WE("contracts_accept_cancel",             on_contracts_accept_cancel,      wallet_public::COMMAND_CONTRACTS_ACCEPT_CANCEL)
         //marketplace API
         MAP_JON_RPC_WE("marketplace_get_offers_ex",           on_marketplace_get_my_offers,     wallet_public::COMMAND_MARKETPLACE_GET_MY_OFFERS)
         MAP_JON_RPC_WE("marketplace_push_offer",              on_marketplace_push_offer,        wallet_public::COMMAND_MARKETPLACE_PUSH_OFFER)
         MAP_JON_RPC_WE("marketplace_push_update_offer",       on_marketplace_push_update_offer, wallet_public::COMMAND_MARKETPLACE_PUSH_UPDATE_OFFER)
         MAP_JON_RPC_WE("marketplace_cancel_offer",            on_marketplace_cancel_offer,      wallet_public::COMMAND_MARKETPLACE_CANCEL_OFFER)
         //HTLC API
-        MAP_JON_RPC_WE("atomics_create_htlc_proposal", on_create_htlc_proposal,         wallet_public::COMMAND_CREATE_HTLC_PROPOSAL)
-        MAP_JON_RPC_WE("atomics_get_list_of_active_htlc", on_get_list_of_active_htlc,   wallet_public::COMMAND_GET_LIST_OF_ACTIVE_HTLC)
-        MAP_JON_RPC_WE("atomics_redeem_htlc", on_redeem_htlc,                           wallet_public::COMMAND_REDEEM_HTLC)
-        MAP_JON_RPC_WE("atomics_check_htlc_redeemed", on_check_htlc_redeemed,           wallet_public::COMMAND_CHECK_HTLC_REDEEMED)
+        //MAP_JON_RPC_WE("atomics_create_htlc_proposal",        on_create_htlc_proposal,          wallet_public::COMMAND_CREATE_HTLC_PROPOSAL)
+        //MAP_JON_RPC_WE("atomics_get_list_of_active_htlc",     on_get_list_of_active_htlc,       wallet_public::COMMAND_GET_LIST_OF_ACTIVE_HTLC)
+        //MAP_JON_RPC_WE("atomics_redeem_htlc",                 on_redeem_htlc,                   wallet_public::COMMAND_REDEEM_HTLC)
+        //MAP_JON_RPC_WE("atomics_check_htlc_redeemed",         on_check_htlc_redeemed,           wallet_public::COMMAND_CHECK_HTLC_REDEEMED)
 
         //IONIC_SWAPS API
-        MAP_JON_RPC_WE("ionic_swap_generate_proposal", on_ionic_swap_generate_proposal, wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL)
-        MAP_JON_RPC_WE("ionic_swap_get_proposal_info", on_ionic_swap_get_proposal_info, wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO)
-        MAP_JON_RPC_WE("ionic_swap_accept_proposal", on_ionic_swap_accept_proposal, wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL)
+        MAP_JON_RPC_WE("ionic_swap_generate_proposal",        on_ionic_swap_generate_proposal,  wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL)
+        MAP_JON_RPC_WE("ionic_swap_get_proposal_info",        on_ionic_swap_get_proposal_info,  wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO)
+        MAP_JON_RPC_WE("ionic_swap_accept_proposal",          on_ionic_swap_accept_proposal,    wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL)
+
+        // Assets API
+        MAP_JON_RPC_WE("assets_whitelist_get",                on_assets_whitelist_get,          wallet_public::COMMAND_ASSETS_WHITELIST_GET)
+        MAP_JON_RPC_WE("assets_whitelist_add",                on_assets_whitelist_add,          wallet_public::COMMAND_ASSETS_WHITELIST_ADD)
+        MAP_JON_RPC_WE("assets_whitelist_remove",             on_assets_whitelist_remove,       wallet_public::COMMAND_ASSETS_WHITELIST_REMOVE)
+        
+        MAP_JON_RPC_WE("deploy_asset",                        on_assets_deploy,                 wallet_public::COMMAND_ASSETS_DEPLOY)
+        MAP_JON_RPC_WE("emit_asset",                          on_assets_emit,                   wallet_public::COMMAND_ASSETS_EMIT)
+        MAP_JON_RPC_WE("update_asset",                        on_assets_update,                 wallet_public::COMMAND_ASSETS_UPDATE)
 
         //MULTIWALLET APIs
-        MAP_JON_RPC_WE("mw_get_wallets", on_mw_get_wallets, wallet_public::COMMAND_MW_GET_WALLETS)
-        MAP_JON_RPC_WE("mw_select_wallet", on_mw_select_wallet, wallet_public::COMMAND_MW_SELECT_WALLET)
+        MAP_JON_RPC_WE("mw_get_wallets",                      on_mw_get_wallets,                wallet_public::COMMAND_MW_GET_WALLETS)
+        MAP_JON_RPC_WE("mw_select_wallet",                    on_mw_select_wallet,              wallet_public::COMMAND_MW_SELECT_WALLET)
 
         //basic crypto operations
-        MAP_JON_RPC_WE("sign_message", on_sign_message, wallet_public::COMMAND_SIGN_MESSAGE)
-        MAP_JON_RPC_WE("encrypt_data", on_encrypt_data, wallet_public::COMMAND_ENCRYPT_DATA)
-        MAP_JON_RPC_WE("decrypt_data", on_decrypt_data, wallet_public::COMMAND_DECRYPT_DATA)
-    END_JSON_RPC_MAP()
+        MAP_JON_RPC_WE("sign_message",                        on_sign_message,                  wallet_public::COMMAND_SIGN_MESSAGE)
+        MAP_JON_RPC_WE("encrypt_data",                        on_encrypt_data,                  wallet_public::COMMAND_ENCRYPT_DATA)
+        MAP_JON_RPC_WE("decrypt_data",                        on_decrypt_data,                  wallet_public::COMMAND_DECRYPT_DATA)
+
+        //utility call
+        MAP_JON_RPC_WE("proxy_to_daemon",                     on_proxy_to_daemon,               wallet_public::COMMAND_PROXY_TO_DAEMON)
+      END_JSON_RPC_MAP()
     END_URI_MAP2()
 
+    bool auth_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context);
     //json_rpc
     bool on_getbalance(const wallet_public::COMMAND_RPC_GET_BALANCE::request& req, wallet_public::COMMAND_RPC_GET_BALANCE::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_getaddress(const wallet_public::COMMAND_RPC_GET_ADDRESS::request& req, wallet_public::COMMAND_RPC_GET_ADDRESS::response& res, epee::json_rpc::error& er, connection_context& cntx);
@@ -160,6 +178,8 @@ namespace tools
     bool on_make_integrated_address(const wallet_public::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::request& req, wallet_public::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_split_integrated_address(const wallet_public::COMMAND_RPC_SPLIT_INTEGRATED_ADDRESS::request& req, wallet_public::COMMAND_RPC_SPLIT_INTEGRATED_ADDRESS::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_sweep_below(const wallet_public::COMMAND_SWEEP_BELOW::request& req, wallet_public::COMMAND_SWEEP_BELOW::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_get_bare_outs_stats(const wallet_public::COMMAND_RPC_GET_BARE_OUTS_STATS ::request& req, wallet_public::COMMAND_RPC_GET_BARE_OUTS_STATS::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_sweep_bare_outs(const wallet_public::COMMAND_RPC_SWEEP_BARE_OUTS::request& req, wallet_public::COMMAND_RPC_SWEEP_BARE_OUTS::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_sign_transfer(const wallet_public::COMMAND_SIGN_TRANSFER::request& req, wallet_public::COMMAND_SIGN_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_submit_transfer(const wallet_public::COMMAND_SUBMIT_TRANSFER::request& req, wallet_public::COMMAND_SUBMIT_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_search_for_transactions(const wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS_LEGACY::request& req, wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS_LEGACY::response& res, epee::json_rpc::error& er, connection_context& cntx);
@@ -189,6 +209,15 @@ namespace tools
     bool on_ionic_swap_get_proposal_info(const wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO::request& req, wallet_public::COMMAND_IONIC_SWAP_GET_PROPOSAL_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_ionic_swap_accept_proposal(const wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL::request& req, wallet_public::COMMAND_IONIC_SWAP_ACCEPT_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
+    bool on_assets_whitelist_get(const wallet_public::COMMAND_ASSETS_WHITELIST_GET::request& req, wallet_public::COMMAND_ASSETS_WHITELIST_GET::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_assets_whitelist_add(const wallet_public::COMMAND_ASSETS_WHITELIST_ADD::request& req, wallet_public::COMMAND_ASSETS_WHITELIST_ADD::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_assets_whitelist_remove(const wallet_public::COMMAND_ASSETS_WHITELIST_REMOVE::request& req, wallet_public::COMMAND_ASSETS_WHITELIST_REMOVE::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    
+    bool on_assets_deploy(const wallet_public::COMMAND_ASSETS_DEPLOY::request& req, wallet_public::COMMAND_ASSETS_DEPLOY::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_assets_emit(const wallet_public::COMMAND_ASSETS_EMIT::request& req, wallet_public::COMMAND_ASSETS_EMIT::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_assets_update(const wallet_public::COMMAND_ASSETS_UPDATE::request& req, wallet_public::COMMAND_ASSETS_UPDATE::response& res, epee::json_rpc::error& er, connection_context& cntx);
+
+
     bool on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS::request& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_mw_select_wallet(const wallet_public::COMMAND_MW_SELECT_WALLET::request& req, wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
@@ -196,6 +225,7 @@ namespace tools
     bool on_encrypt_data(const wallet_public::COMMAND_ENCRYPT_DATA::request& req, wallet_public::COMMAND_ENCRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_decrypt_data(const wallet_public::COMMAND_DECRYPT_DATA::request& req, wallet_public::COMMAND_DECRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
+    bool on_proxy_to_daemon(const wallet_public::COMMAND_PROXY_TO_DAEMON::request& req, wallet_public::COMMAND_PROXY_TO_DAEMON::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
 
     //std::shared_ptr<wallet2> get_wallet();
@@ -203,6 +233,7 @@ namespace tools
     //bool reset_active_wallet(std::shared_ptr<wallet2> w);
 
     bool handle_command_line(const boost::program_options::variables_map& vm);
+    void rpc_destinations_to_currency_destination(const std::list<wallet_public::transfer_destination>& rpc_destinations, std::vector<currency::tx_destination_entry>& currency_destinations);
 
   private:
     std::shared_ptr<i_wallet_provider> m_pwallet_provider_sh_ptr;
@@ -212,6 +243,8 @@ namespace tools
     bool m_do_mint;
     bool m_deaf;
     uint64_t m_last_wallet_store_height;
+    std::string m_jwt_secret;
+    epee::misc_utils::expirating_set<std::string, uint64_t> m_jwt_used_salts;
   };
 
 } // namespace tools

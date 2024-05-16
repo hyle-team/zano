@@ -97,6 +97,40 @@ namespace epee
     return epee::string_encoding::base64_decode(a);
   }
 
+
+  //basic helpers for pod-to-hex serialization 
+  template<class t_pod_container_type>
+  std::string transform_t_pod_array_to_hex_str_array(const t_pod_container_type& a)
+  {
+    std::string res;
+    for (const auto& item : a)
+    {
+      res += epee::string_tools::pod_to_hex(a) + ", ";
+    }
+    if (a.size())
+    {
+      res.erase(res.size() - 2);
+    }
+
+    return res;
+  }
+  template<class t_pod_container_type>
+  t_pod_container_type transform_hex_str_array_to_t_pod_array(const std::string& a)
+  {
+    std::vector<std::string> pod_items;
+    boost::split(pod_items, a, boost::is_any_of(", ][\""));
+
+    t_pod_container_type res;
+    for (const auto& item : pod_items)
+    {
+      res.resize(res.size() + 1);
+      typename t_pod_container_type::value_type& pod_val = res.back();
+
+      if (!epee::string_tools::hex_to_pod(item, pod_val))
+        throw std::runtime_error(std::string("Unable to transform \"") + item + "\" to pod type " + typeid(typename t_pod_container_type::value_type).name());
+    }
+    return res;
+  }
 	//-------------------------------------------------------------------------------------------------------------------
 #pragma pack(push, 1)
   template<class first_t, class second_t>

@@ -977,6 +977,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(multisig_out_make_and_spent_in_altchain);
     GENERATE_AND_PLAY(multisig_unconfirmed_transfer_and_multiple_scan_pool_calls);
     GENERATE_AND_PLAY(multisig_out_spent_in_altchain_case_b4);
+    GENERATE_AND_PLAY(multisig_n_participants_seq_signing);
 
     GENERATE_AND_PLAY(ref_by_id_basics);
     GENERATE_AND_PLAY(ref_by_id_mixed_inputs_types);
@@ -1246,7 +1247,10 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(hard_fork_2_incorrect_alias_update<false>);
 
     // HF4
-    // GENERATE_AND_PLAY_HF(hard_fork_4_consolidated_txs, "4"); TODO, doesn't work atm -- sowle
+    GENERATE_AND_PLAY_HF(hard_fork_4_consolidated_txs, "3-*");
+    GENERATE_AND_PLAY_HF(hardfork_4_wallet_transfer_with_mandatory_mixins, "3-*");
+    GENERATE_AND_PLAY(hardfork_4_wallet_sweep_bare_outs);
+    GENERATE_AND_PLAY_HF(hardfork_4_pop_tx_from_global_index, "4-*");
 
     // atomics
     GENERATE_AND_PLAY(atomic_simple_test);
@@ -1270,6 +1274,9 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(zarcanum_block_with_txs);
     GENERATE_AND_PLAY(asset_depoyment_and_few_zc_utxos);
     GENERATE_AND_PLAY_HF(assets_and_pos_mining, "4-*");
+    
+    GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
+    
 
 
     GENERATE_AND_PLAY_HF(attachment_isolation_test, "4-*");
