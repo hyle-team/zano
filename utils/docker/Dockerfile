@@ -31,26 +31,32 @@
 
 FROM ubuntu:18.04 as build-prep
 
+ENV DEBIAN_FRONTEND noninteractive
+
 RUN apt update && \
     apt install -y build-essential \
     libicu-dev \
+    libz-dev \
     curl \
-    g++ \
+    gcc-8 \
+    g++-8 \
     git
 
+RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 700 --slave /usr/bin/g++ g++ /usr/bin/g++-7 && \
+    update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8
 
 WORKDIR /root
 
 # Lib Settings
-ARG CMAKE_VERSION_DOT=3.15.5
-ARG CMAKE_HASH=62e3e7d134a257e13521e306a9d3d1181ab99af8fcae66699c8f98754fc02dda
+ARG CMAKE_VERSION_DOT=3.16.9
+ARG CMAKE_HASH=d71eda07d6ecf3964de65a0e36d0b171565e1aced56ba9f53ca3783406b5cacf
 
 ARG BOOST_VERSION=1_70_0
 ARG BOOST_VERSION_DOT=1.70.0
 ARG BOOST_HASH=430ae8354789de4fd19ee52f3b1f739e1fba576f0aded0897c3c2bc00fb38778
 
-ARG OPENSSL_VERSION_DOT=1.1.1n
-ARG OPENSSL_HASH=40dceb51a4f6a5275bde0e6bf20ef4b91bfc32ed57c0552e2e8e15463372b17a
+ARG OPENSSL_VERSION_DOT=1.1.1w
+ARG OPENSSL_HASH=cf3098950cb4d853ad95c0841f1f9c6d3dc102dccfcacd521d93925208b76ac8
 
 # Environment Variables
 ENV BOOST_ROOT /root/boost_${BOOST_VERSION}
@@ -68,7 +74,7 @@ RUN set -ex \
 # Download Boost
 RUN set -ex \
     && curl -L -o  boost_${BOOST_VERSION}.tar.bz2 https://downloads.sourceforge.net/project/boost/boost/${BOOST_VERSION_DOT}/boost_${BOOST_VERSION}.tar.bz2 \
-    &&  sha256sum boost_${BOOST_VERSION}.tar.bz2 \
+    && sha256sum boost_${BOOST_VERSION}.tar.bz2 \
     && echo "${BOOST_HASH}  boost_${BOOST_VERSION}.tar.bz2" | sha256sum -c\
     && tar -xvf boost_${BOOST_VERSION}.tar.bz2
 
@@ -82,10 +88,10 @@ RUN curl https://www.openssl.org/source/openssl-${OPENSSL_VERSION_DOT}.tar.gz -O
 # Compile CMake
 RUN set -ex \
     && mkdir /opt/cmake \
-    && sh cmake-3.15.5-Linux-x86_64.sh --prefix=/opt/cmake --skip-license\
+    && sh cmake-3.16.9-Linux-x86_64.sh --prefix=/opt/cmake --skip-license\
     && ln -s /opt/cmake/bin/cmake /usr/local/bin/cmake\
     && cmake --version\
-    && rm cmake-3.15.5-Linux-x86_64.sh
+    && rm cmake-3.16.9-Linux-x86_64.sh
 
 # Compile Boost
 RUN set -ex \
