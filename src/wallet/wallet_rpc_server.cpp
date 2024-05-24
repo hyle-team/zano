@@ -1246,7 +1246,7 @@ namespace tools
       std::string embedded_payment_id;
       //check if address looks like wrapped address
       WLT_THROW_IF_FALSE_WITH_CODE(!currency::is_address_like_wrapped(it->address), "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS", "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS");
-      WLT_THROW_IF_FALSE_WITH_CODE(!w.get_wallet()->get_transfer_address(it->address, de.addr.back(), embedded_payment_id), "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS", "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS");
+      WLT_THROW_IF_FALSE_WITH_CODE(w.get_wallet()->get_transfer_address(it->address, de.addr.back(), embedded_payment_id), "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS", "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS");
       WLT_THROW_IF_FALSE_WITH_CODE(embedded_payment_id.size() == 0, "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS", "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS");
       de.amount = it->amount;
       de.asset_id = it->asset_id;
