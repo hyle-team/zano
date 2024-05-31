@@ -4782,7 +4782,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
 
   crypto::hash hash_for_zarcanum_sig = get_block_hash(b);
 
-  WLT_CHECK_AND_ASSERT_MES(miner_tx_tgc.pseudo_out_amount_blinding_masks_sum.is_zero(), false, "pseudo_out_amount_blinding_masks_sum is nonzero"); // it should be zero because there's only one input (stake), and thus one pseudo out
+  WLT_CHECK_AND_ASSERT_MES(miner_tx_tgc.pseudo_out_amount_blinding_masks_sum.is_zero(), false, "pseudo_out_amount_blinding_masks_sum is nonzero"); // it should be zero because there's only one ZC input (stake), and thus only one pseudo out (the sum is non-zero iff POC > 1)
   crypto::scalar_t pseudo_out_amount_blinding_mask = miner_tx_tgc.amount_blinding_masks_sum; // sum of outputs' amount blinding masks
 
   miner_tx_tgc.pseudo_outs_blinded_asset_ids.emplace_back(currency::native_coin_asset_id_pt); // for Zarcanum stake inputs pseudo outputs commitments has explicit native asset id

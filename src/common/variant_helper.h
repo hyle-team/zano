@@ -9,7 +9,7 @@
 #define VARIANT_CASE(v_type, typed_name) } else if(local_reference_eokcmeokmeokcm.type() == typeid(v_type)) {  v_type& typed_name ATTRIBUTE_UNUSED = boost::get<v_type>(local_reference_eokcmeokmeokcm);
 #define VARIANT_CASE_TV(v_type) VARIANT_CASE(v_type, tv) 
 #define VARIANT_CASE_OTHER() } else { 
-#define VARIANT_CASE_THROW_ON_OTHER() } else { ASSERT_MES_AND_THROW("Unknown type in switch statemet: " << local_reference_eokcmeokmeokcm.type().name());
+#define VARIANT_CASE_THROW_ON_OTHER() } else { ASSERT_MES_AND_THROW("Unknown type in switch statement: " << local_reference_eokcmeokmeokcm.type().name());
 #define VARIANT_CASE_THROW_ON_OTHER_MSG(err_msg) } else { ASSERT_MES_AND_THROW(err_msg << local_reference_eokcmeokmeokcm.type().name());
 
 #define VARIANT_SWITCH_END() } }

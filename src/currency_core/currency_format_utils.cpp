@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -355,7 +355,7 @@ namespace currency
       CHECK_AND_ASSERT_MES(commitment_to_zero_is_sane, false, "internal error: commitment_to_zero is malformed (X)");
 #endif
       r = crypto::generate_double_schnorr_sig<crypto::gt_X, crypto::gt_G>(tx_id, commitment_to_zero, secret_x, ogc.tx_pub_key_p, ogc.tx_key.sec, proof.dss);
-      CHECK_AND_ASSERT_MES(r, false, "genergenerate_double_schnorr_sigate_schnorr_sig (X, G) failed");
+      CHECK_AND_ASSERT_MES(r, false, "generate_double_schnorr_sig (X, G) failed");
     }
 
     return true;
@@ -699,6 +699,14 @@ namespace currency
 
       // (sum(bare inputs' amounts) - fee) * H + sum(pseudo outs commitments for ZC inputs) - sum(outputs' commitments) = lin(X)  OR  = lin(G)
       crypto::point_t commitment_to_zero = (crypto::scalar_t(bare_inputs_sum) - crypto::scalar_t(fee)) * currency::native_coin_asset_id_pt + sum_of_pseudo_out_amount_commitments - outs_commitments_sum;
+
+      DBG_VAL_PRINT(tx_id);
+      DBG_VAL_PRINT(tx_pub_key);
+      DBG_VAL_PRINT(bare_inputs_sum);
+      DBG_VAL_PRINT(fee);
+      DBG_VAL_PRINT(sum_of_pseudo_out_amount_commitments);
+      DBG_VAL_PRINT(outs_commitments_sum);
+      DBG_VAL_PRINT(commitment_to_zero);
 
       CHECK_AND_ASSERT_MES(zc_inputs_count == zc_sigs_count, false, "zc inputs count (" << zc_inputs_count << ") and zc sigs count (" << zc_sigs_count << ") missmatch");
       if (zc_inputs_count > 0)

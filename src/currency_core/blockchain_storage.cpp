@@ -1882,7 +1882,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     // miner tx prevalidation (light checks)
     if (!prevalidate_miner_transaction(b, abei.height, pos_block))
     {
-      LOG_PRINT_RED_L0("Alternative block " << id << " @ " << coinbase_height << "has invalid miner transaction.");
+      LOG_PRINT_RED_L0("Alternative block " << id << " @ " << coinbase_height << " has invalid miner transaction.");
       bvc.m_verification_failed = true;
       return false;
     }
@@ -4990,7 +4990,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   scan_for_keys_context scan_context = AUTO_VAL_INIT(scan_context);
   if(!get_output_keys_for_input_with_checks(tx, txin, output_keys, max_related_block_height, source_max_unlock_time_for_pos_coinbase))
   {
-    LOG_PRINT_L0("Failed to get output keys for input #" << in_index << " (amount = " << print_money(txin.amount) << ", key_offset.size = " << txin.key_offsets.size() << ")");
+    LOG_PRINT_L0("Failed to get output keys for input #" << in_index << " (amount = " << print_money_brief(txin.amount) << ", key_offset.size = " << txin.key_offsets.size() << "), tx: " << tx_prefix_hash);
     return false;
   }
   //TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_ch_in_get_keys_loop);
