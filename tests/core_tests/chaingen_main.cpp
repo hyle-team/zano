@@ -921,8 +921,9 @@ int main(int argc, char* argv[])
     size_t run_single_test_hardfork = SIZE_MAX; // SIZE_MAX means all hard forks, other values mean hardfork id
     if (command_line::has_arg(g_vm, arg_run_single_test))
     {
+      std::string arg = command_line::get_arg(g_vm, arg_run_single_test);
       std::vector<std::string> items;
-      boost::split(items, command_line::get_arg(g_vm, arg_run_single_test), boost::is_any_of("@"));
+      boost::split(items, arg, boost::is_any_of("@"));
       CHECK_AND_ASSERT_MES(items.size() > 0, 2, "unable to parse arg_run_single_test");
       run_single_test = items[0];
       if (items.size() > 1)
