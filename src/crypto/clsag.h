@@ -50,8 +50,9 @@ namespace crypto
 
 
   //
-  // Disclaimer: extensions to the CLSAG implemented below are non-standard and are in proof-of-concept state.
-  // They shouldn't be used in production code until formal security proofs are done and (ideally) the code is peer-reviewed.
+  // d/v-CLSAG implementation
+  // See the whitepaper: https://hyle-team.github.io/docs/zano/dv-CLSAG-extension/dv-CLSAG-extension.pdf
+  // Review by Cypher Stack: https://github.com/cypherstack/zano-clsag-review
   // -- sowle
   //
 
