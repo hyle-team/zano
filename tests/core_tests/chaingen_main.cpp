@@ -1122,7 +1122,7 @@ int main(int argc, char* argv[])
     //GENERATE_AND_PLAY(pos_emission_test); // Long test! by demand only
     GENERATE_AND_PLAY(pos_wallet_big_block_test);
     //GENERATE_AND_PLAY(block_template_against_txs_size); // Long test! by demand only
-    GENERATE_AND_PLAY(pos_altblocks_validation);
+    GENERATE_AND_PLAY_HF(pos_altblocks_validation, "3-*");
     GENERATE_AND_PLAY_HF(pos_mining_with_decoys, "3");
 
     // alternative blocks and generic chain-switching tests
@@ -1131,13 +1131,13 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_chain_switch_1);
     GENERATE_AND_PLAY(bad_chain_switching_with_rollback);
     GENERATE_AND_PLAY(chain_switching_and_tx_with_attachment_blobsize);
-    GENERATE_AND_PLAY(chain_switching_when_gindex_spent_in_both_chains);
+    GENERATE_AND_PLAY_HF(chain_switching_when_gindex_spent_in_both_chains, "3-*");
     GENERATE_AND_PLAY(alt_chain_coins_pow_mined_then_spent);
     GENERATE_AND_PLAY(gen_simple_chain_split_1);
-    GENERATE_AND_PLAY(alt_blocks_validation_and_same_new_amount_in_two_txs);
-    GENERATE_AND_PLAY(alt_blocks_with_the_same_txs);
-    GENERATE_AND_PLAY(chain_switching_when_out_spent_in_alt_chain_mixin);
-    GENERATE_AND_PLAY(chain_switching_when_out_spent_in_alt_chain_ref_id);
+    GENERATE_AND_PLAY_HF(alt_blocks_validation_and_same_new_amount_in_two_txs, "3-*");
+    GENERATE_AND_PLAY_HF(alt_blocks_with_the_same_txs, "3-*");
+    GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_mixin, "3-*");
+    GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_ref_id, "3-*");
 
 
     // miscellaneous tests

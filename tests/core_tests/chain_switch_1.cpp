@@ -422,6 +422,15 @@ bool chain_switching_when_gindex_spent_in_both_chains::generate(std::vector<test
   GENERATE_ACCOUNT(miner_acc);
   GENERATE_ACCOUNT(alice_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
+  if (m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, 2))
+  {
+    // HF4 requires tests_random_split_strategy (for 2 outputs minimum)
+    test_gentime_settings tgts = generator.get_test_gentime_settings();
+    tgts.split_strategy = tests_random_split_strategy;
+    generator.set_test_gentime_settings(tgts);
+  }
+
   MAKE_NEXT_BLOCK(events, blk_1, blk_0, alice_acc);
   REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
@@ -499,6 +508,8 @@ bool alt_blocks_validation_and_same_new_amount_in_two_txs::generate(std::vector<
   GENERATE_ACCOUNT(miner_acc);
   GENERATE_ACCOUNT(alice_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
+  
   MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
   REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
 
@@ -516,26 +527,27 @@ bool alt_blocks_validation_and_same_new_amount_in_two_txs::generate(std::vector<
 
   // make two txs with one output (huge fee, probably - doesn't matter) with amount that is never seen before
   std::vector<tx_source_entry> sources;
-  r = fill_tx_sources(sources, events, blk_1r, miner_acc.get_keys(), new_amount + TESTS_DEFAULT_FEE, 0);
+  r = fill_tx_sources(sources, events, blk_1r, miner_acc.get_keys(), new_amount + 2*TESTS_DEFAULT_FEE, 0);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   std::vector<tx_destination_entry> destinations;
-  destinations.push_back(tx_destination_entry(new_amount, miner_acc.get_public_address())); // no cashback, just payment
+  destinations.push_back(tx_destination_entry(new_amount, miner_acc.get_public_address()));
+  destinations.push_back(tx_destination_entry(TESTS_DEFAULT_FEE, miner_acc.get_public_address())); //just to make two outputs (to please HF4 rules)
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   uint64_t tx_version = get_tx_version(get_block_height(blk_3), m_hardforks);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, tx_version, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
-  events.push_back(tx_1);
+  ADD_CUSTOM_EVENT(events, tx_1);
 
   // second tx
   sources.clear();
-  r = fill_tx_sources(sources, events, blk_1r, miner_acc.get_keys(), new_amount + TESTS_DEFAULT_FEE, 0, sources);
+  r = fill_tx_sources(sources, events, blk_1r, miner_acc.get_keys(), new_amount + 2*TESTS_DEFAULT_FEE, 0, sources);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
   // use the same destinations
   tx_version = get_tx_version(get_block_height(blk_3), m_hardforks);
   r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_2, tx_version, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
-  events.push_back(tx_2);
+  ADD_CUSTOM_EVENT(events, tx_2);
   
   // make an alt block with these txs
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_3a, blk_2a, miner_acc, std::list<transaction>({ tx_1, tx_2 }));
@@ -565,10 +577,19 @@ alt_blocks_with_the_same_txs::alt_blocks_with_the_same_txs()
 
 bool alt_blocks_with_the_same_txs::generate(std::vector<test_event_entry>& events) const
 {
-  // Test idea: check that many two alt blocks having the same tx are correctly handled with respect to is_tx_related_to_altblock()
+  // Test idea: check that two alt blocks having the same tx are correctly handled with respect to is_tx_related_to_altblock()
 
   GENERATE_ACCOUNT(miner_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
+  if (m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, 2))
+  {
+    // HF4 requires tests_random_split_strategy (for 2 outputs minimum)
+    test_gentime_settings tgts = generator.get_test_gentime_settings();
+    tgts.split_strategy = tests_random_split_strategy;
+    generator.set_test_gentime_settings(tgts);
+  }
+
   MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
   REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
 
@@ -634,15 +655,24 @@ bool chain_switching_when_out_spent_in_alt_chain_mixin::generate(std::vector<tes
   GENERATE_ACCOUNT(alice_acc);
   GENERATE_ACCOUNT(bob_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
+  if (m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, 2))
+  {
+    // HF4 requires tests_random_split_strategy (for 2 outputs minimum)
+    test_gentime_settings tgts = generator.get_test_gentime_settings();
+    tgts.split_strategy = tests_random_split_strategy;
+    generator.set_test_gentime_settings(tgts);
+  }
+
   MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
   REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
-  //  0      1       11      12      13      14   
-  // (0 )-  (1 )-...(1r)-   (2 )-   (3 )-            <-- main chain
+  //  0      1       11      12      22      23      24   
+  // (0 )-  (1 )-...(1r)-   (2 )-...(2r)-   (3 )-            <-- main chain
   //                  \     
   //                   \ 
-  //                    \-  (2a)-   (3a)-   (4a)-
-  //                        tx_0 <- tx_1             // tx_1 spends output from tx_0
+  //                    \-  (2a)-...(2ar)-  (3a)-   (4a)-
+  //                        tx_0  <--------  tx_1            // tx_1 spends output from tx_0
 
   // send batch of 10 x 5 test coins to Alice for easier tx_1 construction (and to generate free decoys)
   transaction tx_0;
@@ -652,17 +682,21 @@ bool chain_switching_when_out_spent_in_alt_chain_mixin::generate(std::vector<tes
   events.push_back(tx_0);
 
   MAKE_NEXT_BLOCK(events, blk_2, blk_1r, miner_acc);
-  MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
+  REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW); // this was added to adapt test to HF4 rule of min 10 blocks age to be spent, condiser rewriting the test in future to simplify this -- sowle
+  MAKE_NEXT_BLOCK(events, blk_3, blk_2r, miner_acc);
+
+  // altchain
 
   MAKE_NEXT_BLOCK_TX1(events, blk_2a, blk_1r, miner_acc, tx_0);
+  REWIND_BLOCKS_N(events, blk_2ar, blk_2a, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW); // this was added to adapt test to HF4 rule of min 10 blocks age to be spent, condiser rewriting the test in future to simplify this -- sowle
 
   // make sure Alice received exactly 50 test coins
   CREATE_TEST_WALLET(alice_wlt, alice_acc, blk_0);
-  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_2a, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2);
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_2ar, 2 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2);
   CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, MK_TEST_COINS(50));
 
   // Alice spends her 5 test coins received by tx_0
-  MAKE_TX_FEE_MIX(events, tx_1, alice_acc, bob_acc, MK_TEST_COINS(4), TESTS_DEFAULT_FEE, 3 /* nmix */, blk_2a);
+  MAKE_TX_FEE_MIX(events, tx_1, alice_acc, bob_acc, MK_TEST_COINS(4), TESTS_DEFAULT_FEE, 3 /* nmix */, blk_2ar);
   events.pop_back(); // pop back tx_1 as it won't go into the tx pool normally because of alt chain
 
   // simulate handling a block with that tx: handle tx like going with the block...
@@ -670,7 +704,7 @@ bool chain_switching_when_out_spent_in_alt_chain_mixin::generate(std::vector<tes
   events.push_back(tx_1);
   events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
 
-  MAKE_NEXT_BLOCK_TX1(events, blk_3a, blk_2a, miner_acc, tx_1);
+  MAKE_NEXT_BLOCK_TX1(events, blk_3a, blk_2ar, miner_acc, tx_1);
   MAKE_NEXT_BLOCK(events, blk_4a, blk_3a, miner_acc);
 
   // make sure Alice has correct balance
@@ -687,7 +721,7 @@ bool chain_switching_when_out_spent_in_alt_chain_mixin::generate(std::vector<tes
 
 bool chain_switching_when_out_spent_in_alt_chain_ref_id::generate(std::vector<test_event_entry>& events) const
 {
-  random_state_test_restorer::reset_random(0); // to make the test deterministic
+  //random_state_test_restorer::reset_random(0); // to make the test deterministic
   uint64_t ts = 1450000000;
   test_core_time::adjust(ts);
 
@@ -701,15 +735,24 @@ bool chain_switching_when_out_spent_in_alt_chain_ref_id::generate(std::vector<te
   bob_acc.set_createtime(ts);
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
+  if (m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, 2))
+  {
+    // HF4 requires tests_random_split_strategy (for 2 outputs minimum)
+    test_gentime_settings tgts = generator.get_test_gentime_settings();
+    tgts.split_strategy = tests_random_split_strategy;
+    generator.set_test_gentime_settings(tgts);
+  }
+
   MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
   REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
-  //  0      1       11      12      13      14   
-  // (0 )-  (1 )-...(1r)-   (2 )-   (3 )-            <- main chain
+  //  0      1       11      12      22      23      24   
+  // (0 )-  (1 )-...(1r)-   (2 )-...(2r)-   (3 )-            <-- main chain
   //                  \     
   //                   \ 
-  //                    \-  (2a)-   (3a)-   (4a)-
-  //                        tx_0 <- tx_1             // tx_1 spends an output from tx_0 using ref_by_id and mixins
+  //                    \-  (2a)-...(2ar)-  (3a)-   (4a)-
+  //                        tx_0  <--------  tx_1            // tx_1 spends an output from tx_0 using ref_by_id and mixins
 
   // send batch of 10 x 5 test coins to Alice for easier tx_0 construction
   transaction tx_0;
@@ -722,24 +765,29 @@ bool chain_switching_when_out_spent_in_alt_chain_ref_id::generate(std::vector<te
   count_ref_by_id_and_gindex_refs_for_tx_inputs(tx_0, refs_count, gindex_count);
   CHECK_AND_ASSERT_MES(refs_count == 1 && gindex_count == 0, false, "incorrect input references: " << refs_count << ", " << gindex_count);
 
-  events.push_back(tx_0);
+  ADD_CUSTOM_EVENT(events, tx_0);
 
   MAKE_NEXT_BLOCK(events, blk_2, blk_1r, miner_acc);
-  MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
+  REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW); // this was added to adapt test to HF4 rule of min 10 blocks age to be spent, condiser rewriting the test in future to simplify this -- sowle
+  MAKE_NEXT_BLOCK(events, blk_3, blk_2r, miner_acc);
+
+  // altchain
 
   MAKE_NEXT_BLOCK_TX1(events, blk_2a, blk_1r, miner_acc, tx_0);
+  REWIND_BLOCKS_N(events, blk_2ar, blk_2a, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW); // this was added to adapt test to HF4 rule of min 10 blocks age to be spent, condiser rewriting the test in future to simplify this -- sowle
 
   // make sure Alice received exactly 50 test coins
   CREATE_TEST_WALLET(alice_wlt, alice_acc, blk_0);
-  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_2a, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2);
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_2ar, 2*CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2);
   CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, MK_TEST_COINS(50));
 
   // Alice spends her 5 test coins received by tx_0
   transaction tx_1;
   std::vector<tx_destination_entry> destinations;
-  destinations.push_back(tx_destination_entry(MK_TEST_COINS(4), bob_acc.get_public_address()));
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(3), bob_acc.get_public_address()));
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(1), bob_acc.get_public_address()));
   size_t nmix = 3;
-  r = construct_tx_to_key(m_hardforks, events, tx_1, blk_2a, alice_acc, destinations, TESTS_DEFAULT_FEE, nmix, 0, empty_extra, empty_attachment, true, true, true);
+  r = construct_tx_to_key(m_hardforks, events, tx_1, blk_2ar, alice_acc, destinations, TESTS_DEFAULT_FEE, nmix, 0, empty_extra, empty_attachment, true, true, true /* use_ref_by_id */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
 
   // make sure tx_1 really use ref_by_id
@@ -748,16 +796,21 @@ bool chain_switching_when_out_spent_in_alt_chain_ref_id::generate(std::vector<te
   CHECK_AND_ASSERT_MES(refs_count == nmix + 1 && gindex_count == 0, false, "incorrect input references: " << refs_count << ", " << gindex_count);
 
   // simulate handling a block with that tx: handle tx like going with the block...
-  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
-  events.push_back(tx_1);
-  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
+  ADD_CUSTOM_EVENT(events, event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
+  ADD_CUSTOM_EVENT(events, tx_1);
+  ADD_CUSTOM_EVENT(events, event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
 
-  MAKE_NEXT_BLOCK_TX1(events, blk_3a, blk_2a, miner_acc, tx_1);
+  MAKE_NEXT_BLOCK_TX1(events, blk_3a, blk_2ar, miner_acc, tx_1);
   MAKE_NEXT_BLOCK(events, blk_4a, blk_3a, miner_acc);
 
   // make sure Alice has correct balance
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_4a, 2);
   CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(alice_wlt, MK_TEST_COINS(45));
+
+  // make sure Bob has correct balance
+  CREATE_TEST_WALLET(bob_wlt, bob_acc, blk_0);
+  REFRESH_TEST_WALLET_AT_GEN_TIME(events, bob_wlt, blk_4a, 2*CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 4);
+  CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(bob_wlt, MK_TEST_COINS(4));
 
   // make sure chain successfully switched
   DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(get_block_height(blk_4a), get_block_hash(blk_4a)));
