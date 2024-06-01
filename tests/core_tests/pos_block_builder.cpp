@@ -167,10 +167,10 @@ void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
 
   // generate miner tx using incorrect current_block_size only for size estimation
   uint64_t block_reward_without_fee = 0;
-  uint64_t block_reward = 0;
+  m_block_reward = 0;
   size_t estimated_block_size = m_txs_total_size;
   bool r = construct_miner_tx(m_height, median_size, already_generated_coins, estimated_block_size, m_total_fee,
-    reward_receiver_address, stakeholder_address, m_block.miner_tx, block_reward_without_fee, block_reward, tx_version, extra_nonce, max_outs, true, pe, &m_miner_tx_tgc, tx_one_time_key_to_use);
+    reward_receiver_address, stakeholder_address, m_block.miner_tx, block_reward_without_fee, m_block_reward, tx_version, extra_nonce, max_outs, true, pe, &m_miner_tx_tgc, tx_one_time_key_to_use);
   CHECK_AND_ASSERT_THROW_MES(r, "construct_miner_tx failed");
 
   estimated_block_size = m_txs_total_size + get_object_blobsize(m_block.miner_tx);
@@ -178,7 +178,7 @@ void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
   for (size_t try_count = 0; try_count != 10; ++try_count)
   {
     r = construct_miner_tx(m_height, median_size, already_generated_coins, estimated_block_size, m_total_fee,
-    reward_receiver_address, stakeholder_address, m_block.miner_tx, block_reward_without_fee, block_reward, tx_version, extra_nonce, max_outs, true, pe, &m_miner_tx_tgc, tx_one_time_key_to_use);
+    reward_receiver_address, stakeholder_address, m_block.miner_tx, block_reward_without_fee, m_block_reward, tx_version, extra_nonce, max_outs, true, pe, &m_miner_tx_tgc, tx_one_time_key_to_use);
     CHECK_AND_ASSERT_THROW_MES(r, "construct_homemade_pos_miner_tx failed");
 
     cumulative_size = m_txs_total_size + get_object_blobsize(m_block.miner_tx);
@@ -230,13 +230,71 @@ void pos_block_builder::step5_sign(const currency::tx_source_entry& se, const cu
       ring.emplace_back(el.stealth_address, el.amount_commitment, el.blinded_asset_id, el.concealing_point);
     }
 
-    crypto::hash tx_hash_for_sig = get_block_hash(m_block);
+    crypto::point_t stake_out_blinded_asset_id_pt = currency::native_coin_asset_id_pt + se.real_out_asset_id_blinding_mask * crypto::c_point_X;
+
+    crypto::hash hash_for_zarcanum_sig = get_block_hash(m_block);
+#ifndef NDEBUG
+    {
+      crypto::point_t source_amount_commitment = crypto::c_scalar_1div8 * se.amount * stake_out_blinded_asset_id_pt + crypto::c_scalar_1div8 * se.real_out_amount_blinding_mask * crypto::c_point_G;
+      CHECK_AND_ASSERT_THROW_MES(se.outputs[se.real_output].amount_commitment == source_amount_commitment.to_public_key(), "real output amount commitment check failed");
+      CHECK_AND_ASSERT_THROW_MES(ring[prepared_real_out_index].amount_commitment == se.outputs[se.real_output].amount_commitment, "ring secret member doesn't match with the stake output");
+      CHECK_AND_ASSERT_THROW_MES(m_context.stake_amount == se.amount, "stake_amount missmatch");
+    }
+#endif
+
+    CHECK_AND_ASSERT_THROW_MES(m_miner_tx_tgc.pseudo_out_amount_blinding_masks_sum.is_zero(), "pseudo_out_amount_blinding_masks_sum is nonzero"); // it should be zero because there's only one input (stake), and thus one pseudo out
+    crypto::scalar_t pseudo_out_amount_blinding_mask = m_miner_tx_tgc.amount_blinding_masks_sum; // sum of outputs' amount blinding masks
+
+    //LOG_PRINT_YELLOW(std::setw(42) << std::left << "pseudo_out_amount_blinding_mask : " << pseudo_out_amount_blinding_mask, LOG_LEVEL_0);
+    //LOG_PRINT_YELLOW(std::setw(42) << std::left << "m_miner_tx_tgc.amount_blinding_masks[0] : " << m_miner_tx_tgc.amount_blinding_masks[0], LOG_LEVEL_0);
+
+    m_miner_tx_tgc.pseudo_outs_blinded_asset_ids.emplace_back(currency::native_coin_asset_id_pt); // for Zarcanum stake inputs pseudo outputs commitments has explicit native asset id
+    m_miner_tx_tgc.pseudo_outs_plus_real_out_blinding_masks.emplace_back(0);
+    m_miner_tx_tgc.real_zc_ins_asset_ids.emplace_back(se.asset_id);
+    // TODO @#@# [architecture] the same value is calculated in zarcanum_generate_proof(), consider an impovement 
+    m_miner_tx_tgc.pseudo_out_amount_commitments_sum += m_context.stake_amount * stake_out_blinded_asset_id_pt + pseudo_out_amount_blinding_mask * crypto::c_point_G;
+    m_miner_tx_tgc.real_in_asset_id_blinding_mask_x_amount_sum += se.real_out_asset_id_blinding_mask * m_context.stake_amount;
+
+    //LOG_PRINT_YELLOW(std::setw(42) << std::left << "pseudo_out_amount_commitments_sum : " << m_miner_tx_tgc.pseudo_out_amount_commitments_sum, LOG_LEVEL_0);
+
 
     uint8_t err = 0;
-    r = crypto::zarcanum_generate_proof(tx_hash_for_sig, m_context.kernel_hash, ring, m_context.last_pow_block_id_hashed, m_context.sk.kimage,
-      secret_x, m_context.secret_q, prepared_real_out_index,m_context.stake_amount, se.real_out_asset_id_blinding_mask,  m_context.stake_out_amount_blinding_mask, -m_miner_tx_tgc.amount_blinding_masks_sum,
+    r = crypto::zarcanum_generate_proof(hash_for_zarcanum_sig, m_context.kernel_hash, ring, m_context.last_pow_block_id_hashed, m_context.sk.kimage,
+      secret_x, m_context.secret_q, prepared_real_out_index, m_context.stake_amount, se.real_out_asset_id_blinding_mask,  m_context.stake_out_amount_blinding_mask, pseudo_out_amount_blinding_mask,
       static_cast<crypto::zarcanum_proof&>(sig), &err);
     CHECK_AND_ASSERT_THROW_MES(r, "zarcanum_generate_proof failed, err: " << (int)err);
+
+    //
+    // The miner tx prefix should be sealed by now, and the tx hash should be defined.
+    // Any changes made below should only affect the signatures/proofs and should not impact the prefix hash calculation.   
+    //
+    crypto::hash miner_tx_id = get_transaction_hash(m_block.miner_tx);
+
+    // proofs for miner_tx
+
+    // asset surjection proof
+    currency::zc_asset_surjection_proof asp{};
+    r = generate_asset_surjection_proof(miner_tx_id, false, m_miner_tx_tgc, asp);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs 
+    CHECK_AND_ASSERT_THROW_MES(r, "generete_asset_surjection_proof failed");
+    m_block.miner_tx.proofs.emplace_back(std::move(asp));
+
+    // range proofs
+    currency::zc_outs_range_proof range_proofs{};
+    r = generate_zc_outs_range_proof(miner_tx_id, 0, m_miner_tx_tgc, m_block.miner_tx.vout, range_proofs);
+    CHECK_AND_ASSERT_THROW_MES(r, "Failed to generate zc_outs_range_proof()");
+    m_block.miner_tx.proofs.emplace_back(std::move(range_proofs));
+
+    // balance proof
+    currency::zc_balance_proof balance_proof{};
+    r = generate_tx_balance_proof(m_block.miner_tx, miner_tx_id, m_miner_tx_tgc, m_block_reward, balance_proof);
+    CHECK_AND_ASSERT_THROW_MES(r, "generate_tx_balance_proof failed");
+    m_block.miner_tx.proofs.emplace_back(std::move(balance_proof));
+
+    //err = 0;
+    //r = crypto::zarcanum_verify_proof(hash_for_zarcanum_sig, m_context.kernel_hash, ring, m_context.last_pow_block_id_hashed, m_context.sk.kimage, m_context.basic_diff, sig, &err);
+    //CHECK_AND_ASSERT_THROW_MES(r, "zarcanum_verify_proof failed, err: " << (int)err);
+    //r = check_tx_balance(m_block.miner_tx, miner_tx_id, m_block_reward);
+    //CHECK_AND_ASSERT_THROW_MES(r, "check_tx_balance failed");
   }
   else
   {
