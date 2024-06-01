@@ -741,6 +741,10 @@ bool refresh_wallet_and_check_balance(const char* intro_log_message, const char*
                                       uint64_t expected_awaiting_out = UINT64_MAX);
 
 uint64_t get_last_block_of_type(bool looking_for_pos, const test_generator::blockchain_vector& blck_chain);
+
+bool decode_output_amount_and_asset_id(const currency::account_base& acc, const currency::transaction& tx, size_t output_index, uint64_t &amount, crypto::public_key* p_asset_id = nullptr);
+uint64_t decode_native_output_amount_or_throw(const currency::account_base& acc, const currency::transaction& tx, size_t output_index);
+
 bool generate_pos_block_with_given_coinstake(test_generator& generator, const std::vector<test_event_entry> &events, const currency::account_base& miner, const currency::block& prev_block, const currency::transaction& stake_tx, size_t stake_output_idx, currency::block& result, uint64_t stake_output_gidx = UINT64_MAX);
 bool check_ring_signature_at_gen_time(const std::vector<test_event_entry>& events, const crypto::hash& last_block_id, const currency::txin_to_key& in_t_k,
   const crypto::hash& hash_for_sig, const std::vector<crypto::signature> &sig);
@@ -1021,11 +1025,18 @@ inline void count_ref_by_id_and_gindex_refs_for_tx_inputs(const currency::transa
   refs_by_gindex = 0;
   for (auto& in : tx.vin)
   {
-    if (in.type() != typeid(currency::txin_to_key))
+    const currency::referring_input* p_ri = nullptr;
+    VARIANT_SWITCH_BEGIN(in)
+      VARIANT_CASE_CONST(currency::txin_to_key, intk)
+        p_ri = &intk;
+      VARIANT_CASE_CONST(currency::txin_zc_input, inzc)
+        p_ri = &inzc;
+    VARIANT_SWITCH_END()
+
+    if (!p_ri)
       continue;
 
-    const currency::txin_to_key& in2key = boost::get<currency::txin_to_key>(in);
-    for (auto& ko : in2key.key_offsets)
+    for (auto& ko : p_ri->key_offsets)
     {
       if (ko.type() == typeid(currency::ref_by_id))
         ++refs_by_id;
