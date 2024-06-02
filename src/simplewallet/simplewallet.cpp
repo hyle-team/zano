@@ -339,6 +339,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("emit_asset", boost::bind(&simple_wallet::emit_asset, this, ph::_1), "emit_asset <asset_id> <amount> - Emmit more coins for the asset, possible only if current wallet is a maintainer for the asset");
   m_cmd_binder.set_handler("burn_asset", boost::bind(&simple_wallet::burn_asset, this, ph::_1), "burn_asset <asset_id> <amount> - Burn coins for the asset, possible only if current wallet is a maintainer for the asset AND possess given amount of coins to burn");
   m_cmd_binder.set_handler("update_asset", boost::bind(&simple_wallet::update_asset, this, ph::_1), "update_asset <asset_id> <path_to_metadata_file> - Update asset descriptor's metadata, possible only if current wallet is a maintainer for the asset");
+  m_cmd_binder.set_handler("transfer_asset_ownership", boost::bind(&simple_wallet::transfer_asset_ownership, this, ph::_1), "transfer_asset_ownership <asset_id> <new_owner_public_key> - Update asset descriptor's owner field, so the asset ownership is transfered to new owner");
 
   m_cmd_binder.set_handler("add_custom_asset_id", boost::bind(&simple_wallet::add_custom_asset_id, this, ph::_1), "Approve asset id to be recognized in the wallet and returned in balances");
   m_cmd_binder.set_handler("remove_custom_asset_id", boost::bind(&simple_wallet::remove_custom_asset_id, this, ph::_1), "Cancel previously made approval for asset id");
@@ -2229,6 +2230,55 @@ bool simple_wallet::update_asset(const std::vector<std::string> &args)
   m_wallet->update_asset(asset_id, adb, result_tx);
 
   success_msg_writer(true) << "Asset metainfo update tx sent: " << get_transaction_hash(result_tx) << " (unconfirmed) : " << ENDL
+    << "Asset ID:     " << asset_id << ENDL
+    << "Title:        " << adb.full_name << ENDL
+    << "Ticker:       " << adb.ticker << ENDL
+    << "Emitted:      " << print_fixed_decimal_point(adb.current_supply, adb.decimal_point) << ENDL
+    << "Max emission: " << print_fixed_decimal_point(adb.total_max_supply, adb.decimal_point) << ENDL
+    ;
+
+  SIMPLE_WALLET_CATCH_TRY_ENTRY();
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::transfer_asset_ownership(const std::vector<std::string>& args)
+{
+  CONFIRM_WITH_PASSWORD();
+  SIMPLE_WALLET_BEGIN_TRY_ENTRY();
+  if (args.size() != 2)
+  {
+    fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 2";
+    return true;
+  }
+
+  crypto::public_key asset_id = currency::null_pkey;
+  bool r = epee::string_tools::parse_tpod_from_hex_string(args[0], asset_id);
+  if (!r)
+  {
+    fail_msg_writer() << "Failed to load asset_id from: " << args[0];
+    return true;
+  }
+
+  crypto::public_key new_owner = currency::null_pkey;
+  r = epee::string_tools::parse_tpod_from_hex_string(args[1], new_owner);
+  if (!r)
+  {
+    fail_msg_writer() << "Failed to load new owner public key from: " << args[1];
+    return true;
+  }
+
+  currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
+  r = m_wallet->daemon_get_asset_info(asset_id, adb);
+  if (!r)
+  {
+    fail_msg_writer() << "Unknown asset: " << args[0];
+    return true;
+  }
+
+  currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
+  m_wallet->transfer_asset_ownership(asset_id, new_owner, result_tx);
+
+  success_msg_writer(true) << "Asset owner update tx sent: " << get_transaction_hash(result_tx) << " (unconfirmed) : " << ENDL
     << "Asset ID:     " << asset_id << ENDL
     << "Title:        " << adb.full_name << ENDL
     << "Ticker:       " << adb.ticker << ENDL

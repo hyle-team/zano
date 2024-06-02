@@ -96,7 +96,7 @@ namespace currency
     bool emit_asset(const std::vector<std::string> &args);
     bool burn_asset(const std::vector<std::string> &args);
     bool update_asset(const std::vector<std::string> &args);
-
+    bool transfer_asset_ownership(const std::vector<std::string>& args);
     //----------------------------------------------------------------------------------------------------
     bool generate_ionic_swap_proposal(const std::vector<std::string> &args);
     bool get_ionic_swap_proposal_info(const std::vector<std::string> &args);
