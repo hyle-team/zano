@@ -1199,7 +1199,7 @@ namespace tools
     currency::assets_map_to_assets_list(res.global_whitelist, w.get_wallet()->get_global_whitelist());
     currency::assets_map_to_assets_list(res.own_assets, w.get_wallet()->get_own_assets());
 
-    const auto global_whitelist = w.get_wallet()->get_global_whitelist();
+    //const auto global_whitelist = w.get_wallet()->get_global_whitelist();
 
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();

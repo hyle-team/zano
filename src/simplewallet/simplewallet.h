@@ -91,6 +91,7 @@ namespace currency
     bool tor_enable(const std::vector<std::string> &args);
     bool tor_disable(const std::vector<std::string> &args);
     bool deploy_new_asset(const std::vector<std::string> &args);
+    bool call_rpc(const std::vector<std::string>& args);
     bool add_custom_asset_id(const std::vector<std::string> &args);
     bool remove_custom_asset_id(const std::vector<std::string> &args);
     bool emit_asset(const std::vector<std::string> &args);

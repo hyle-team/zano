@@ -348,6 +348,9 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("get_ionic_swap_proposal_info", boost::bind(&simple_wallet::get_ionic_swap_proposal_info, this, ph::_1), "get_ionic_swap_proposal_info <hex_encoded_raw_proposal.txt> - Extracts and display information from ionic_swap proposal raw data");
   m_cmd_binder.set_handler("accept_ionic_swap_proposal", boost::bind(&simple_wallet::accept_ionic_swap_proposal, this, ph::_1), "accept_ionic_swap_proposal <hex_encoded_raw_proposal.txt> - Accept ionic_swap proposal and generates exchange transaction");
 
+  m_cmd_binder.set_handler("call_rpc", boost::bind(&simple_wallet::call_rpc, this, ph::_1), "call_rpc <json_rpc_method> <request_body_optional> - Invokes rpc request to the wallet");
+  
+
 }
 //----------------------------------------------------------------------------------------------------
 simple_wallet::~simple_wallet()
@@ -2083,6 +2086,46 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
     << "Max emission: " << print_fixed_decimal_point(adb.total_max_supply, adb.decimal_point) << ENDL
     ;
   
+  SIMPLE_WALLET_CATCH_TRY_ENTRY();
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::call_rpc(const std::vector<std::string>& args)
+{
+  CONFIRM_WITH_PASSWORD();
+  SIMPLE_WALLET_BEGIN_TRY_ENTRY();
+  if (!args.size() || args.size() > 2)
+  {
+    fail_msg_writer() << "invalid arguments count: " << args.size() << ", expected 1 or 2 (path to rpc request)";
+    return true;
+  }
+  
+  std::string method = args[0];
+  std::string method_body_request = "{}";
+
+  if (args.size() > 1)
+  {
+    bool r = epee::file_io_utils::load_file_to_string(args[1], method_body_request);
+    if (!r)
+    {
+      fail_msg_writer() << "invalid path: " << args[1] << ", failed to load body";
+      return true;
+    }
+  }
+
+  std::string req_full = "{\"id\": 0,\"jsonrpc\" : \"\", \"method\": \"";
+  req_full += method + "\",\"params\" : " + method_body_request + "}";
+  
+  epee::net_utils::http::http_request_info query_info;
+  query_info.m_URI = "/json_rpc";
+  query_info.m_body = req_full;
+  epee::net_utils::http::http_response_info response;
+  tools::wallet_rpc_server::connection_context conn_context(RPC_INTERNAL_UI_CONTEXT, 0, 0, false);
+  tools::wallet_rpc_server srv(m_wallet);
+  srv.handle_http_request(query_info, response, conn_context);
+    
+  success_msg_writer(true) << "Response code: " << response.m_response_code << ",  body: " << ENDL << response.m_body;
+
   SIMPLE_WALLET_CATCH_TRY_ENTRY();
   return true;
 }
