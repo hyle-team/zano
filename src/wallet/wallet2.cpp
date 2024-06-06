@@ -5396,13 +5396,28 @@ bool wallet2::daemon_get_asset_info(const crypto::public_key& asset_id, currency
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee, uint64_t reward)
+void wallet2::request_alias_update(currency::extra_alias_entry& ai, currency::transaction& res_tx, uint64_t fee)
 {
+  COMMAND_RPC_GET_ALIAS_DETAILS::request req;
+  req.alias = ai.m_alias;
+  COMMAND_RPC_GET_ALIAS_DETAILS::response rsp = AUTO_VAL_INIT(rsp);
+  bool r = m_core_proxy->call_COMMAND_RPC_GET_ALIAS_DETAILS(req, rsp);
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed to call_COMMAND_RPC_GET_ALIAS_DETAILS");
+    
+  CHECK_AND_ASSERT_THROW_MES(rsp.status == API_RETURN_CODE_OK, "call_COMMAND_RPC_GET_ALIAS_DETAILS response: " << rsp.status);
+  
+
+  currency::account_public_address addr = AUTO_VAL_INIT(addr);
+  currency::get_account_address_from_str(addr, rsp.alias_details.address);
+
+  CHECK_AND_ASSERT_THROW_MES(m_account.get_public_address().spend_public_key == addr.spend_public_key && 
+    m_account.get_public_address().view_public_key == addr.view_public_key, "call_COMMAND_RPC_GET_ALIAS_DETAILS: ownership is not confirmed");
+
   if (!validate_alias_name(ai.m_alias))
   {
     throw std::runtime_error(std::string("wrong alias characters: ") + ai.m_alias);
   }
-  bool r = currency::sign_extra_alias_entry(ai, m_account.get_keys().account_address.spend_public_key, m_account.get_keys().spend_secret_key);
+  r = currency::sign_extra_alias_entry(ai, m_account.get_keys().account_address.spend_public_key, m_account.get_keys().spend_secret_key);
   CHECK_AND_ASSERT_THROW_MES(r, "Failed to sign alias update");
   WLT_LOG_L2("Generated update alias info: " << ENDL
     << "alias: " << ai.m_alias << ENDL

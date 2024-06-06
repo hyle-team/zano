@@ -1294,7 +1294,7 @@ QString MainWindow::request_alias_update(const QString& param)
 
   //  view::transfer_response tr = AUTO_VAL_INIT(tr);
   currency::transaction res_tx = AUTO_VAL_INIT(res_tx);
-  ar.error_code = m_backend.request_alias_update(tp.alias, tp.wallet_id, tp.fee, res_tx, tp.reward);
+  ar.error_code = m_backend.request_alias_update(tp.alias, tp.wallet_id, tp.fee, res_tx);
   if (ar.error_code != API_RETURN_CODE_OK)
     return MAKE_RESPONSE(ar);
 
