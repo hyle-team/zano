@@ -6,11 +6,75 @@
 #include "chaingen.h"
 #include "wallet_rpc_tests.h"
 #include "wallet_test_core_proxy.h"
+#include "currency_core/currency_core.h"
+#include "currency_core/bc_offers_service.h"
+#include "rpc/core_rpc_server.h"
+#include "currency_protocol/currency_protocol_handler.h"
+
+
 #include "../../src/wallet/wallet_rpc_server.h"
 #include "offers_helper.h"
 #include "random_helper.h"
 
 using namespace currency;
+
+template<typename server_t>
+struct transport
+{
+  server_t& m_rpc_srv;
+  transport(server_t& rpc_srv) :m_rpc_srv(rpc_srv)
+  {}
+  epee::net_utils::http::http_response_info m_response;
+
+  bool is_connected() { return true; }
+  template<typename t_a, typename t_b, typename t_c>
+  bool connect(t_a ta, t_b tb, t_c tc) { return true; }
+
+  template<typename dummy_t>
+  bool invoke(const std::string uri, const std::string method_, const std::string& body, const epee::net_utils::http::http_response_info** ppresponse_info, const dummy_t& d)
+  {
+    epee::net_utils::http::http_request_info query_info;
+    query_info.m_URI = uri;
+    query_info.m_body = body;
+    tools::wallet_rpc_server::connection_context ctx;
+    bool r = m_rpc_srv.handle_http_request(query_info, m_response, ctx);
+    if (ppresponse_info)
+      *ppresponse_info = &m_response;
+    return r;
+  }
+};
+
+
+
+template<typename request_t, typename response_t, typename t_rpc_server>
+bool invoke_text_json_for_rpc(t_rpc_server& srv, const std::string& method_name, const request_t& req, response_t& resp)
+{
+  transport<t_rpc_server> tr(srv);
+
+  bool r = epee::net_utils::invoke_http_json_rpc("/json_rpc", method_name, req, resp, tr);
+  return r;
+}
+
+template<typename request_t, typename response_t>
+bool invoke_text_json_for_wallet(std::shared_ptr<tools::wallet2> wlt, const std::string& method_name, const request_t& req, response_t& resp)
+{
+  tools::wallet_rpc_server wlt_rpc_wrapper(wlt);
+  return invoke_text_json_for_rpc(wlt_rpc_wrapper, method_name, req, resp);
+}
+
+template<typename request_t, typename response_t>
+bool invoke_text_json_for_core(currency::core& c, const std::string& method_name, const request_t& req, response_t& resp)
+{
+  currency::t_currency_protocol_handler<currency::core> m_cprotocol(c, nullptr);
+  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > p2p(m_cprotocol);
+  bc_services::bc_offers_service of(nullptr); 
+
+  currency::core_rpc_server core_rpc_wrapper(c, p2p, of);
+  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  return invoke_text_json_for_rpc(core_rpc_wrapper, method_name, req, resp);
+}
+
+
 
 wallet_rpc_integrated_address::wallet_rpc_integrated_address()
 {
@@ -189,7 +253,6 @@ bool wallet_rpc_integrated_address_transfer::c1(currency::core& c, size_t ev_ind
 }
 
 //------------------------------------------------------------------------------
-
 wallet_rpc_transfer::wallet_rpc_transfer()
 {
   REGISTER_CALLBACK_METHOD(wallet_rpc_transfer, configure_core);
@@ -300,7 +363,100 @@ bool wallet_rpc_transfer::c1(currency::core& c, size_t ev_index, const std::vect
 
   return true;
 }
+//------------------------------------------------------------------------------
+wallet_rpc_alias_tests::wallet_rpc_alias_tests()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_alias_tests, configure_core);
+  REGISTER_CALLBACK_METHOD(wallet_rpc_alias_tests, c1);
 
+  m_hardforks.set_hardfork_height(1, 1);
+  m_hardforks.set_hardfork_height(2, 1);
+  m_hardforks.set_hardfork_height(3, 1);
+  m_hardforks.set_hardfork_height(4, 1);
+}
+
+bool wallet_rpc_alias_tests::generate(std::vector<test_event_entry>& events) const
+{
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+  account_base& bob_acc = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core"); // default callback will initialize core runtime config with m_hardforks
+  set_hard_fork_heights_to_generator(generator);
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 6);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool wallet_rpc_alias_tests::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+
+  miner_wlt->refresh();
+
+  {
+    tools::wallet_public::COMMAND_RPC_REGISTER_ALIAS::request req = AUTO_VAL_INIT(req);
+    tools::wallet_public::COMMAND_RPC_REGISTER_ALIAS::response rsp = AUTO_VAL_INIT(rsp);
+#define ALIAS_FOR_TEST "monero"
+
+    req.al.alias = ALIAS_FOR_TEST;
+    req.al.details.address = miner_wlt->get_account().get_public_address_str();
+    req.al.details.comment = "XMR";
+    r = invoke_text_json_for_wallet(miner_wlt, "register_alias", req, rsp);
+    CHECK_AND_ASSERT_MES(r, false, "failed to invoke_text_json_for_wallet");
+  }
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 3);
+  CHECK_AND_ASSERT_MES(r, false, "failed to mine_next_pow_blocks_in_playtime");
+
+  {
+    currency::COMMAND_RPC_GET_ALIAS_DETAILS::request req = AUTO_VAL_INIT(req);
+    currency::COMMAND_RPC_GET_ALIAS_DETAILS::response rsp = AUTO_VAL_INIT(rsp);
+
+    req.alias = ALIAS_FOR_TEST;
+    r = invoke_text_json_for_core(c, "get_alias_details", req, rsp);
+    CHECK_AND_ASSERT_MES(r, false, "failed to invoke_text_json_for_wallet");
+    CHECK_AND_ASSERT_MES(rsp.status == API_RETURN_CODE_OK, false, "failed to invoke_text_json_for_wallet");
+
+    CHECK_AND_ASSERT_MES(rsp.alias_details.address == miner_wlt->get_account().get_public_address_str(), false, "failed to invoke_text_json_for_wallet");
+  }
+
+  miner_wlt->refresh();
+
+  {
+    tools::wallet_public::COMMAND_RPC_UPDATE_ALIAS::request req = AUTO_VAL_INIT(req);
+    tools::wallet_public::COMMAND_RPC_UPDATE_ALIAS::response rsp = AUTO_VAL_INIT(rsp);
+
+    req.al.alias = ALIAS_FOR_TEST;
+    req.al.details.address = alice_wlt->get_account().get_public_address_str();
+    req.al.details.comment = "XMR of Alice";
+    r = invoke_text_json_for_wallet(miner_wlt, "update_alias", req, rsp);
+    CHECK_AND_ASSERT_MES(r, false, "failed to invoke_text_json_for_wallet");
+  }
+
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 3);
+  CHECK_AND_ASSERT_MES(r, false, "failed to mine_next_pow_blocks_in_playtime");
+
+  {
+    currency::COMMAND_RPC_GET_ALIAS_DETAILS::request req = AUTO_VAL_INIT(req);
+    currency::COMMAND_RPC_GET_ALIAS_DETAILS::response rsp = AUTO_VAL_INIT(rsp);
+
+    req.alias = ALIAS_FOR_TEST;
+    r = invoke_text_json_for_core(c, "get_alias_details", req, rsp);
+    CHECK_AND_ASSERT_MES(r, false, "failed to invoke_text_json_for_wallet");
+    CHECK_AND_ASSERT_MES(rsp.status == API_RETURN_CODE_OK, false, "failed to invoke_text_json_for_wallet");
+
+    CHECK_AND_ASSERT_MES(rsp.alias_details.address == alice_wlt->get_account().get_public_address_str(), false, "failed to invoke_text_json_for_wallet");
+  }
+
+
+  return true;
+}
 //------------------------------------------------------------------------------
 
 wallet_rpc_exchange_suite::wallet_rpc_exchange_suite()
@@ -321,40 +477,6 @@ bool wallet_rpc_exchange_suite::generate(std::vector<test_event_entry>& events) 
   return true;
 }
 
-
-struct transport
-{
-  tools::wallet_rpc_server& m_rpc_srv;
-  transport(tools::wallet_rpc_server& rpc_srv):m_rpc_srv(rpc_srv)
-  {}
-  epee::net_utils::http::http_response_info m_response;
-
-  bool is_connected() { return true; }
-  template<typename t_a, typename t_b, typename t_c>
-  bool connect(t_a ta, t_b tb, t_c tc) { return true; }
-
-  template<typename dummy_t>
-  bool invoke(const std::string uri, const std::string method_, const std::string& body, const epee::net_utils::http::http_response_info** ppresponse_info, const dummy_t& d)
-  {
-    epee::net_utils::http::http_request_info query_info;
-    query_info.m_URI = uri;
-    query_info.m_body = body;
-    tools::wallet_rpc_server::connection_context ctx;
-    bool r = m_rpc_srv.handle_http_request(query_info, m_response, ctx);
-    if (ppresponse_info)
-      *ppresponse_info = &m_response;
-    return r;
-  }
-};
-
-template<typename request_t, typename response_t>
-bool invoke_text_json_for_rpc(tools::wallet_rpc_server& srv, const std::string& method_name, const request_t& req, response_t& resp)
-{
-  transport tr(srv);
-
-  bool r = epee::net_utils::invoke_http_json_rpc("/json_rpc", method_name, req, resp, tr);
-  return r;
-}
 
 #include "wallet_rpc_tests_legacy_defs.h"
 
