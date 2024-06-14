@@ -3888,7 +3888,7 @@ uint64_t blockchain_storage::get_assets(uint64_t offset, uint64_t count, std::li
     assets.push_back(asset_descriptor_with_id());
     static_cast<asset_descriptor_base&>(assets.back()) = asset_descriptor_history.back().descriptor;
     assets.back().asset_id = asset_id;
-    if (i + count > offset)
+    if (assets.size() >= count)
     {
       return false;
     }
