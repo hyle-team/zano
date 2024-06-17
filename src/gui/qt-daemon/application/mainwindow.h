@@ -110,7 +110,7 @@ public:
   QString get_version(const QString& param);
   QString get_os_version(const QString& param);
   QString get_network_type(const QString& param);
-  QString transfer(const QString& json_transfer_object);
+  QString transfer(const QString& param);
   QString have_secure_app_data(const QString& param);
   QString drop_secure_app_data(const QString& param);
   QString get_secure_app_data(const QString& param);

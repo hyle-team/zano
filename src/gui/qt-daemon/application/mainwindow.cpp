@@ -978,18 +978,21 @@ QString MainWindow::start_backend(const QString& params)
 
 QString MainWindow::sync_call(const QString& func_name, const QString& params)
 {
-  if (func_name == "transfer")
-  {
-    return this->transfer(params);
-  }
-  else if (func_name == "test_call")
+  if (func_name == "test_call")
   {
     return params;
   }
+  std::string fuc_name_std = func_name.toStdString();
+  QString response_str;
+  bool r = QMetaObject::invokeMethod(this, fuc_name_std.c_str(), Qt::DirectConnection, Q_RETURN_ARG(QString, response_str), Q_ARG(QString, params));
+  //bool r = this->invokeMethod(fuc_name_std.c_str(), Q_RETURN_ARG(QString, response_str), Q_ARG(QString, params));
+  if (r)
+    return response_str;
   else
   {
-    return QString(QString() + "{ \"status\": \"Method '" + func_name  + "' not found\"}");
+    return QString(QString() + "{ \"status\": \"Method '" + func_name + "' not found\"}");
   }
+
 }
 
 QString MainWindow::async_call(const QString& func_name, const QString& params)
