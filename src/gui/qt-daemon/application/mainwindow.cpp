@@ -995,6 +995,21 @@ QString MainWindow::sync_call(const QString& func_name, const QString& params)
 
 }
 
+QString MainWindow::sync_call_2a(const QString& func_name, const QString& params1, const QString& params2)
+{
+  std::string fuc_name_std = func_name.toStdString();
+  QString response_str;
+  bool r = QMetaObject::invokeMethod(this, fuc_name_std.c_str(), Qt::DirectConnection, Q_RETURN_ARG(QString, response_str), Q_ARG(QString, params1), Q_ARG(QString, params2));
+  //bool r = this->invokeMethod(fuc_name_std.c_str(), Q_RETURN_ARG(QString, response_str), Q_ARG(QString, params));
+  if (r)
+    return response_str;
+  else
+  {
+    return QString(QString() + "{ \"status\": \"Method '" + func_name + "' not found\"}");
+  }
+
+}
+
 QString MainWindow::async_call(const QString& func_name, const QString& params)
 {
 
@@ -1013,6 +1028,25 @@ QString MainWindow::async_call(const QString& func_name, const QString& params)
   return QString::fromStdString(std::string("{ \"job_id\": ") + std::to_string(job_id) + "}");
 }
 
+QString MainWindow::async_call_2a(const QString& func_name, const QString& params1, const QString& params2)
+{
+
+  uint64_t job_id = m_ui_dispatch_id_counter++;
+  QString method_name = func_name;
+  QString argements1 = params1;
+  QString argements2 = params2;
+
+
+  auto async_callback = [this, method_name, argements1, argements2, job_id]()
+    {
+      QString res_str = this->sync_call_2a(method_name, argements1, argements2);
+      this->dispatch_async_call_result(std::to_string(job_id).c_str(), res_str);  //general function
+    };
+
+  m_threads_pool.add_job(async_callback);
+  LOG_PRINT_L2("[UI_ASYNC_CALL]: started " << method_name.toStdString() << ", job id: " << job_id);
+  return QString::fromStdString(std::string("{ \"job_id\": ") + std::to_string(job_id) + "}");
+}
 
 bool MainWindow::update_wallet_status(const view::wallet_status_info& wsi)
 {
