@@ -110,7 +110,7 @@ namespace currency
 
     uint64_t get_daemon_blockchain_height(std::string& err);
     bool try_connect_to_daemon();
-    std::string get_tocken_info_string(const crypto::public_key& asset_id, uint64_t& decimal_point);
+    std::string get_token_info_string(const crypto::public_key& asset_id, uint64_t& decimal_point);
     bool print_wti(const tools::wallet_public::wallet_transfer_info& wti);
     bool check_password_for_operation();
     crypto::hash get_hash_from_pass_and_salt(const std::string& pass, uint64_t salt);

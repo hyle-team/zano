@@ -3813,37 +3813,42 @@ bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, u
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::get_asset_id_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_info, bool& whitelist_) const
+bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_info, uint32_t& asset_flags) const
 {
+  asset_flags = aif_none;
   if (asset_id == currency::native_coin_asset_id)
   {
     asset_info = currency::get_native_coin_asset_descriptor();
-    whitelist_ = true;
+    asset_flags |= aif_whitelisted;
     return true;
   }
-  //check if asset is whitelisted or customly added
-  whitelist_ = false;
+
+  // whitelisted?
   auto it_white = m_whitelisted_assets.find(asset_id);
-  if (it_white == m_whitelisted_assets.end())
-  {
-    //check if it custom asset
-    auto it_cust = m_custom_assets.find(asset_id);
-    if (it_cust == m_custom_assets.end())
-    {
-      return false;
-    }
-    else
-    {
-      asset_info = it_cust->second;
-    }
-  }
-  else
+  if (it_white != m_whitelisted_assets.end())
   {
     asset_info = it_white->second;
-    whitelist_ = true;
+    asset_flags |= aif_whitelisted;
+    return true;
   }
 
-  return true;
+  // custom asset?
+  auto it_cust = m_custom_assets.find(asset_id);
+  if (it_cust != m_custom_assets.end())
+  {
+    asset_info = it_cust->second;
+    return true;
+  }
+
+  auto it_own = m_own_asset_descriptors.find(asset_id);
+  if (it_own != m_own_asset_descriptors.end())
+  {
+    asset_info = it_own->second;
+    asset_flags |= aif_own;
+    return true;
+  }
+
+  return false;
 }
 //----------------------------------------------------------------------------------------------------
 
@@ -3965,8 +3970,8 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
 
     bool native_coin = td.is_native_coin();
     asset_descriptor_base adb{};
-    bool whitelisted = false;
-    if (get_asset_id_info(td.get_asset_id(), adb, whitelisted) == show_only_unknown)
+    uint32_t asset_info_flags{};
+    if (get_asset_info(td.get_asset_id(), adb, asset_info_flags) == show_only_unknown)
     {
       if (!show_only_unknown)
         ++unknown_assets_outs_count;

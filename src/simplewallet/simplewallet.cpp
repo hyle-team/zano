@@ -816,37 +816,44 @@ void simple_wallet::on_new_block(uint64_t height, const currency::block& block)
 //----------------------------------------------------------------------------------------------------
 std::string print_money_trailing_zeros_replaced_with_spaces(uint64_t amount, size_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT)
 {
-  std::string s = print_money(amount);
+  std::string s = print_money(amount, decimal_point);
   size_t p = s.find_last_not_of('0');
   if (p != std::string::npos)
   {
     if (s[p] == '.')
       ++p;
     size_t l = s.length() - p - 1;
-    return s.replace(p + 1, l, l, ' ');
+    s.replace(p + 1, l, l, ' ');
+    if (decimal_point < CURRENCY_DISPLAY_DECIMAL_POINT)
+      s += std::string(CURRENCY_DISPLAY_DECIMAL_POINT - decimal_point, ' ');
   }
   return s;
 }
 //----------------------------------------------------------------------------------------------------
-std::string simple_wallet::get_tocken_info_string(const crypto::public_key& asset_id, uint64_t& decimal_points)
+std::string simple_wallet::get_token_info_string(const crypto::public_key& asset_id, uint64_t& decimal_points)
 {
   std::string token_info = "ZANO";
   decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
   if (asset_id != currency::native_coin_asset_id)
   {
     currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
-    bool whitelisted = false;
-    if (!m_wallet->get_asset_id_info(asset_id, adb, whitelisted))
+    uint32_t asset_info_flags{};
+    if (!m_wallet->get_asset_info(asset_id, adb, asset_info_flags))
     {
       token_info = "!UNKNOWN!";
     }
-    else {
+    else
+    {
       decimal_points = adb.decimal_point;
       token_info = adb.ticker;
 
-      if (whitelisted)
+      if (asset_info_flags & tools::wallet2::aif_whitelisted)
       {
         token_info += "[*]";
+      }
+      else if (asset_info_flags & tools::wallet2::aif_own)
+      {
+        token_info += "[$]";
       }
       else
       {
@@ -864,7 +871,7 @@ void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_inf
   {
     epee::log_space::console_colors color = !wti.has_outgoing_entries() ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
     uint64_t decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
-    std::string token_info = get_tocken_info_string(wti.subtransfers[0].asset_id, decimal_points);
+    std::string token_info = get_token_info_string(wti.subtransfers[0].asset_id, decimal_points);
     message_writer(color, false) <<
       "height " << wti.height <<
       ", tx " << wti.tx_hash <<
@@ -879,10 +886,10 @@ void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_inf
     {
       epee::log_space::console_colors color = st.is_income ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
       uint64_t decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
-      std::string token_info = get_tocken_info_string(st.asset_id, decimal_points);
+      std::string token_info = get_token_info_string(st.asset_id, decimal_points);
 
-      message_writer(epee::log_space::console_color_cyan, false) << "       " 
-        << std::right << std::setw(18) << print_money_trailing_zeros_replaced_with_spaces(st.amount, decimal_points) << (st.is_income ? " received," : " spent") << " " << token_info;
+      message_writer(epee::log_space::console_color_cyan, false) << "    " 
+        << std::right << std::setw(24) << print_money_trailing_zeros_replaced_with_spaces(st.amount, decimal_points) << std::left << (st.is_income ? " received," : " spent") << " " << token_info;
     }
   }
 
@@ -1059,7 +1066,7 @@ bool simple_wallet::print_wti(const tools::wallet_public::wallet_transfer_info& 
     {
       epee::log_space::console_colors cl = st.is_income ? epee::log_space::console_color_green: epee::log_space::console_color_magenta;
       uint64_t decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
-      std::string token_info = get_tocken_info_string(st.asset_id, decimal_points);
+      std::string token_info = get_token_info_string(st.asset_id, decimal_points);
 
       success_msg_writer(cl) 
         << (st.is_income ? "Received " : "Sent    ")
