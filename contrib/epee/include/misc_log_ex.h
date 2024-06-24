@@ -244,11 +244,6 @@ DISABLE_VS_WARNINGS(4100)
 #define CHECK_AND_ASSERT_MES_CUSTOM(expr, fail_ret_val, custom_code, message)   do{if(!(expr)) {LOG_ERROR(message); custom_code; return fail_ret_val;};}while(0)
 #endif
 
-/*#ifndef CHECK_AND_ASSERT_MES_AND_THROW
-#define CHECK_AND_ASSERT_MES_AND_THROW(expr, message)   do{if(!(expr)) {LOG_ERROR(message); throw std::runtime_error(message);};}while(0)
-#endif
-*/
-
 #ifndef CHECK_AND_NO_ASSERT_MES
 #define CHECK_AND_NO_ASSERT_MES(expr, fail_ret_val, message)   do{if(!(expr)) {LOG_PRINT_MAGENTA(message, LOG_LEVEL_0); /*LOCAL_ASSERT(expr);*/ return fail_ret_val;};}while(0)
 #endif
@@ -263,6 +258,22 @@ DISABLE_VS_WARNINGS(4100)
 
 #ifndef CHECK_AND_ASSERT_MES2
 #define CHECK_AND_ASSERT_MES2(expr, message)         do{if(!(expr)) {LOG_ERROR(message); };}while(0)
+#endif
+
+#ifndef CHECK_AND_ASSERT_EQ
+#define CHECK_AND_ASSERT_EQ(A, B) CHECK_AND_ASSERT_MES((A) == (B), false, STR(A) " != " STR(B) " because " << A << " != " << B)
+#endif
+
+#ifndef CHECK_AND_ASSERT_NEQ
+#define CHECK_AND_ASSERT_NEQ(A, B) CHECK_AND_ASSERT_MES((A) != (B), false, STR(A) " == " STR(B) " because " << A << " == " << B)
+#endif
+
+#ifndef CHECK_AND_ASSERT_LESS
+#define CHECK_AND_ASSERT_LESS(A, B) CHECK_AND_ASSERT_MES((A) < (B), false, STR(A) " >= " STR(B) " because " << A << " >= " << B)
+#endif
+
+#ifndef CHECK_AND_ASSERT_GREATER
+#define CHECK_AND_ASSERT_GREATER(A, B) CHECK_AND_ASSERT_MES((A) > (B), false, STR(A) " <= " STR(B) " because " << A << " <= " << B)
 #endif
 
 namespace epee

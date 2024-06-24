@@ -4463,6 +4463,11 @@ namespace currency
     return o << "<" << r.n << ":" << r.tx_id << ">";
   }
   //--------------------------------------------------------------------------------
+  std::ostream& operator <<(std::ostream& o, const std::type_info& ti)
+  {
+    return o << ti.name();
+  }
+  //--------------------------------------------------------------------------------
 #ifndef MOBILE_WALLET_BUILD
   const std::locale& utf8_get_conversion_locale()
   {

@@ -945,6 +945,7 @@ namespace currency
   //---------------------------------------------------------------
   //---------------------------------------------------------------
   std::ostream& operator <<(std::ostream& o, const ref_by_id& r);
+  std::ostream& operator <<(std::ostream& o, const std::type_info& ti);
   //---------------------------------------------------------------
 #ifndef MOBILE_WALLET_BUILD
   std::string utf8_to_upper(const std::string& s);
