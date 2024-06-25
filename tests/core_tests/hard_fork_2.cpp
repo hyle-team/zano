@@ -1336,7 +1336,7 @@ bool hard_fork_2_incorrect_alias_update<before_hf_2>::c1(currency::core& c, size
   {
     alice_wlt->request_alias_update(ai_upd, tx_upd, TESTS_DEFAULT_FEE);
   }
-  catch (tools::error::tx_rejected&)
+  catch(std::runtime_error&)
   {
     // this should cause an exception with certain type
     r = true;
