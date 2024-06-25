@@ -6099,7 +6099,7 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
   //THROW_IF_FALSE_WALLET_INT_ERR_EX(ionic_context.gen_context.input_amounts.size() == tx.vin.size(), "Tx gen context has mismatch with tx(amount != amount)");
   for (i = 0; i != tx.vin.size(); i++)
   {
-    size_t mx = 0;
+    //size_t mx = 0;
     uint64_t amount = 0;
     crypto::public_key in_asset_id = currency::native_coin_asset_id;
     if (tx.vin[i].type() == typeid(txin_zc_input))
@@ -6107,12 +6107,12 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
       in_asset_id = ionic_context.gen_context.real_zc_ins_asset_ids[zc_current_index].to_public_key();
       amount = ionic_context.gen_context.zc_input_amounts[zc_current_index];
       zc_current_index++;
-      mx = boost::get<currency::txin_zc_input>(tx.vin[i]).key_offsets.size() - 1;
+      //mx = boost::get<currency::txin_zc_input>(tx.vin[i]).key_offsets.size() - 1;
     }
     else if (tx.vin[i].type() == typeid(txin_to_key))
     {
       amount = boost::get<txin_to_key>(tx.vin[i]).amount;
-      mx = boost::get<currency::txin_to_key>(tx.vin[i]).key_offsets.size() - 1;
+      //mx = boost::get<currency::txin_to_key>(tx.vin[i]).key_offsets.size() - 1;
     }
     else
     {
