@@ -6060,8 +6060,8 @@ bool wallet2::get_ionic_swap_proposal_info(const wallet_public::ionic_swap_propo
   r = t_unserializable_object_from_blob(ionic_context, decrypted_raw_context);
   THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to unserialize decrypted ionic_context");
 
-  r = validate_tx_output_details_againt_tx_generation_context(tx, ionic_context.gen_context);
-  THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "Failed to validate decrypted ionic_context");
+  r = validate_tx_details_against_tx_generation_context(tx, ionic_context.gen_context);
+  THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "validate_tx_details_against_tx_generation_context failed");
 
   std::unordered_map<crypto::public_key, uint64_t> amounts_provided_by_a;
 

@@ -344,7 +344,8 @@ namespace currency
     END_SERIALIZE()
   }; // struct tx_generation_context
 
-  bool validate_tx_output_details_againt_tx_generation_context(const transaction& tx, const tx_generation_context& gen_context);
+  bool validate_tx_details_against_tx_generation_context(const transaction& tx, const tx_generation_context& gen_context);
+
   std::string transform_tx_to_str(const transaction& tx);
   transaction transform_str_to_tx(const std::string& tx_str);
 
