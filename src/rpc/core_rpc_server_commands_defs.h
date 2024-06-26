@@ -1645,7 +1645,7 @@ namespace currency
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
-        KV_SERIALIZE(blocks)                     DOC_DSCR("List of alternative blocks with detailed information, retrieved based on the specified parameters.") DOC_END
+        KV_SERIALIZE(blocks)                     DOC_DSCR("List of alternative blocks with detailed information, retrieved based on the specified parameters.") DOC_EXMP_AUTO(1) DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
