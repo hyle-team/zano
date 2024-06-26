@@ -1581,7 +1581,7 @@ namespace currency
       KV_SERIALIZE(already_generated_coins)      DOC_DSCR("Total amount of coins generated in the blockchain up to this block.") DOC_END
       KV_SERIALIZE(this_block_fee_median)        DOC_DSCR("Median transaction fee of the transactions within this block.") DOC_END
       KV_SERIALIZE(effective_fee_median)         // TODO
-      KV_SERIALIZE(transactions_details)         DOC_DSCR("Detailed information about each transaction included in the block.") DOC_END
+      KV_SERIALIZE(transactions_details)         DOC_DSCR("Detailed information about each transaction included in the block.") DOC_EXMP_AUTO(1) DOC_END
       KV_SERIALIZE(type)                         DOC_DSCR("Type of the block.") DOC_END
       KV_SERIALIZE(is_orphan)                    DOC_DSCR("Indicates whether the block is an orphan.") DOC_END
       KV_SERIALIZE(miner_text_info)              DOC_DSCR("Additional textual information provided by the miner of the block.") DOC_END
@@ -1616,7 +1616,7 @@ namespace currency
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
-        KV_SERIALIZE(blocks)                     DOC_DSCR("List of blocks with detailed information, starting from the specified height.") DOC_END
+        KV_SERIALIZE(blocks)                     DOC_DSCR("List of blocks with detailed information, starting from the specified height.")  DOC_EXMP_AUTO(1) DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
