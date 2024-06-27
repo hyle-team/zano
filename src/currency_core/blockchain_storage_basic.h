@@ -180,7 +180,7 @@ namespace currency
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(total_pos_blocks)             DOC_DSCR("Number of blocks in a given range.") DOC_EXMP(87482) DOC_END
-      KV_SERIALIZE(votes)                        DOC_DSCR("Result of votes in a given range.") DOC_END
+      KV_SERIALIZE(votes)                        DOC_DSCR("Result of votes in a given range.") DOC_EXMP_AUTO(2) DOC_END
     END_KV_SERIALIZE_MAP()
   };
 

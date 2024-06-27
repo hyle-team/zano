@@ -89,7 +89,7 @@ namespace currency
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                     DOC_DSCR("Status code, OK if succeeded.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
         KV_SERIALIZE(error_code)                 DOC_DSCR("Error code, if there's any error (optional).") DOC_EXMP_AUTO() DOC_END
-        KV_SERIALIZE(aliases_que)                DOC_DSCR("List of aliases from txs that are currently in the tx pool.") DOC_EXMP_AUTO() DOC_END
+        KV_SERIALIZE(aliases_que)                DOC_DSCR("List of aliases from txs that are currently in the tx pool.") DOC_EXMP_AUTO(1) DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -161,8 +161,8 @@ namespace currency
       uint64_t count = 100;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(offset)  DOC_DSCR("Offset for the item to start copying") DOC_EXMP(0)     DOC_END
-        KV_SERIALIZE(count)   DOC_DSCR("Number of items to recieve")           DOC_EXMP(100)   DOC_END
+        KV_SERIALIZE(offset)                     DOC_DSCR("Offset for the item to start copying") DOC_EXMP(0)     DOC_END
+        KV_SERIALIZE(count)                      DOC_DSCR("Number of items to recieve")           DOC_EXMP(100)   DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -172,8 +172,8 @@ namespace currency
       std::list<currency::asset_descriptor_with_id> assets;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(status)      DOC_DSCR("Status code of operation, OK if success")     DOC_EXMP(API_RETURN_CODE_OK)     DOC_END
-        KV_SERIALIZE(assets)      DOC_DSCR("List of assets registered in Zano blockchain")     DOC_EXMP_AUTO(1)     DOC_END
+        KV_SERIALIZE(status)                     DOC_DSCR("Status code of operation, OK if success")     DOC_EXMP(API_RETURN_CODE_OK)     DOC_END
+        KV_SERIALIZE(assets)                     DOC_DSCR("List of assets registered in Zano blockchain")     DOC_EXMP_AUTO(1)     DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -224,9 +224,9 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(blocks)                     DOC_DSCR("Bunch of blocks") DOC_END
-        KV_SERIALIZE(start_height)               DOC_DSCR("Starting height of the resulting bunch of blocks.") DOC_END
-        KV_SERIALIZE(current_height)             DOC_DSCR("Current height of the blockchain.") DOC_END
+        KV_SERIALIZE(blocks)                     DOC_DSCR("Bunch of blocks") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(start_height)               DOC_DSCR("Starting height of the resulting bunch of blocks.") DOC_EXMP(2000000) DOC_END
+        KV_SERIALIZE(current_height)             DOC_DSCR("Current height of the blockchain.") DOC_EXMP(2555000) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -245,7 +245,7 @@ namespace currency
       std::list<std::string> txs_hashes;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(txs_hashes)                 DOC_DSCR("List of transactions' IDs.") DOC_EXMP_AUTO() DOC_END // "146791c4f5ca94bcf423557e5eb859a3a69991bd33960d52f709d88bf5d1ac6d","ec4d913a40a9ac1fbd9d33b71ef507b5c85d1f503b89096618a18b08991b5171") DOC_END
+        KV_SERIALIZE(txs_hashes)                 DOC_DSCR("List of transactions' IDs.") DOC_EXMP_AGGR("146791c4f5ca94bcf423557e5eb859a3a69991bd33960d52f709d88bf5d1ac6d","ec4d913a40a9ac1fbd9d33b71ef507b5c85d1f503b89096618a18b08991b5171") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -257,7 +257,7 @@ namespace currency
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(txs_as_hex)                 DOC_DSCR("Transactions stored as blobs")   DOC_EXMP_AUTO(1, "7d914497d91442f8f3c2268397d914497d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc2f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
-        KV_SERIALIZE(missed_tx)                  DOC_DSCR("Missed transactions hashes")     DOC_EXMP_AUTO(1, "97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
+        KV_SERIALIZE(missed_tx)                  DOC_DSCR("Missed transactions hashes")     DOC_EXMP_AUTO(1, "ec4d913a40a9ac1fbd9d33b71ef507b5c85d1f503b89096618a18b08991b5171") DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -307,7 +307,7 @@ namespace currency
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(txs)                        DOC_DSCR("Transactions as blobs.") DOC_EXMP_AUTO(1, "7d914497d91442f8f3c2268397d914497d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc2f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
-        KV_SERIALIZE(tx_expiration_ts_median)    DOC_DSCR("Timestamp median value of last TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW blocks.") DOC_END
+        KV_SERIALIZE(tx_expiration_ts_median)    DOC_DSCR("Timestamp median value of last TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW blocks.") DOC_EXMP(1711021795) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -321,7 +321,7 @@ namespace currency
     {
       std::list<crypto::key_image> images;
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(images) //DOC_DSCR("List of key images.") DOC_END
+        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(images) //DOC_DSCR("List of key images.") DOC_EXMP_AGGR({{'\xd6', '\x32', '\x9b', '\x5b', '\x1f', '\x7c', '\x08', '\x05', '\xb5', '\xc3', '\x45', '\xf4', '\x95', '\x75', '\x54', '\x00', '\x2a', '\x2f', '\x55', '\x78', '\x45', '\xf6', '\x4d', '\x76', '\x45', '\xda', '\xe0', '\xe0', '\x51', '\xa6', '\x49', '\x8a'}}) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -374,8 +374,8 @@ namespace currency
       uint64_t i;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(amount)                     DOC_DSCR("The specific amount of output to query.") DOC_END
-        KV_SERIALIZE(i)                          DOC_DSCR("The global index of the output amount to be queried.") DOC_END
+        KV_SERIALIZE(amount)                     DOC_DSCR("The specific amount of output to query.") DOC_EXMP(3000000000000) DOC_END
+        KV_SERIALIZE(i)                          DOC_DSCR("The global index of the output amount to be queried.") DOC_EXMP(0) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -386,8 +386,8 @@ namespace currency
       uint64_t out_no;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Transaction ID where the queried output is present, if found.") DOC_END
-        KV_SERIALIZE(out_no)                     DOC_DSCR("Local output index within the transaction.") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Transaction ID where the queried output is present, if found.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+        KV_SERIALIZE(out_no)                     DOC_DSCR("Local output index within the transaction.") DOC_EXMP(7) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
