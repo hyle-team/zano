@@ -403,7 +403,7 @@ namespace currency
       crypto::hash ms_id;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(ms_id)    DOC_DSCR("The multisig output's unique identifier (hash).") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(ms_id)    DOC_DSCR("The multisig output's unique identifier (hash).") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -414,8 +414,8 @@ namespace currency
       uint64_t out_no;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Transaction ID where the multisig output is present, if found.")DOC_END
-        KV_SERIALIZE(out_no)                     DOC_DSCR("Local output index within the transaction.") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Transaction ID where the multisig output is present, if found.") DOC_EXMP("a88541e38d64f87c41b9153412d1d7667f6e4337fe429ed1374722355fa7b423") DOC_END
+        KV_SERIALIZE(out_no)                     DOC_DSCR("Local output index within the transaction.") DOC_EXMP(11) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -432,10 +432,10 @@ namespace currency
       uint64_t            height_upper_limit; // if nonzero, all the decoy outputs must be either older than, or the same age as this height
       bool                use_forced_mix_outs;
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(amounts)                    DOC_DSCR("List of amounts for which decoy outputs are requested.") DOC_END
-        KV_SERIALIZE(decoys_count)               DOC_DSCR("Number of decoy outputs required for each amount specified.") DOC_END
-        KV_SERIALIZE(height_upper_limit)         DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_END
-        KV_SERIALIZE(use_forced_mix_outs)        DOC_DSCR("If true, only outputs with a 'mix_attr' greater than 0 are used as decoys.") DOC_END
+        KV_SERIALIZE(amounts)                    DOC_DSCR("List of amounts for which decoy outputs are requested.") DOC_EXMP_AGGR(0, 10000000000, 5000000000000) DOC_END
+        KV_SERIALIZE(decoys_count)               DOC_DSCR("Number of decoy outputs required for each amount specified.") DOC_EXMP_AUTO(10) DOC_END
+        KV_SERIALIZE(height_upper_limit)         DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_EXMP_AUTO(2555000) DOC_END
+        KV_SERIALIZE(use_forced_mix_outs)        DOC_DSCR("If true, only outputs with a 'mix_attr' greater than 0 are used as decoys.") DOC_EXMP_AUTO(false) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
