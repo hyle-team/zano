@@ -116,7 +116,7 @@ namespace epee
       template<class t_stream>
       static void handle_obj_end(t_stream& strm, size_t indent)
       {
-        strm << "}";
+        strm << make_indent(indent) << "}";
       }
 
       template<class t_stream>
