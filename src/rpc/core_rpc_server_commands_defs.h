@@ -89,7 +89,7 @@ namespace currency
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                     DOC_DSCR("Status code, OK if succeeded.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
         KV_SERIALIZE(error_code)                 DOC_DSCR("Error code, if there's any error (optional).") DOC_EXMP_AUTO() DOC_END
-        KV_SERIALIZE(aliases_que)                DOC_DSCR("List of aliases from txs that are currently in the tx pool.") DOC_EXMP_AUTO() DOC_END
+        KV_SERIALIZE(aliases_que)                DOC_DSCR("List of aliases from txs that are currently in the tx pool.") DOC_EXMP_AUTO(1) DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -161,8 +161,8 @@ namespace currency
       uint64_t count = 100;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(offset)  DOC_DSCR("Offset for the item to start copying") DOC_EXMP(0)     DOC_END
-        KV_SERIALIZE(count)   DOC_DSCR("Number of items to recieve")           DOC_EXMP(100)   DOC_END
+        KV_SERIALIZE(offset)                     DOC_DSCR("Offset for the item to start copying") DOC_EXMP(0)     DOC_END
+        KV_SERIALIZE(count)                      DOC_DSCR("Number of items to recieve")           DOC_EXMP(100)   DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -172,8 +172,8 @@ namespace currency
       std::list<currency::asset_descriptor_with_id> assets;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(status)      DOC_DSCR("Status code of operation, OK if success")     DOC_EXMP(API_RETURN_CODE_OK)     DOC_END
-        KV_SERIALIZE(assets)      DOC_DSCR("List of assets registered in Zano blockchain")     DOC_EXMP_AUTO(1)     DOC_END
+        KV_SERIALIZE(status)                     DOC_DSCR("Status code of operation, OK if success")     DOC_EXMP(API_RETURN_CODE_OK)     DOC_END
+        KV_SERIALIZE(assets)                     DOC_DSCR("List of assets registered in Zano blockchain")     DOC_EXMP_AUTO(1)     DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -224,9 +224,9 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(blocks)                     DOC_DSCR("Bunch of blocks") DOC_END
-        KV_SERIALIZE(start_height)               DOC_DSCR("Starting height of the resulting bunch of blocks.") DOC_END
-        KV_SERIALIZE(current_height)             DOC_DSCR("Current height of the blockchain.") DOC_END
+        KV_SERIALIZE(blocks)                     DOC_DSCR("Bunch of blocks") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(start_height)               DOC_DSCR("Starting height of the resulting bunch of blocks.") DOC_EXMP(2000000) DOC_END
+        KV_SERIALIZE(current_height)             DOC_DSCR("Current height of the blockchain.") DOC_EXMP(2555000) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -245,7 +245,7 @@ namespace currency
       std::list<std::string> txs_hashes;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(txs_hashes)                 DOC_DSCR("List of transactions' IDs.") DOC_EXMP_AUTO() DOC_END // "146791c4f5ca94bcf423557e5eb859a3a69991bd33960d52f709d88bf5d1ac6d","ec4d913a40a9ac1fbd9d33b71ef507b5c85d1f503b89096618a18b08991b5171") DOC_END
+        KV_SERIALIZE(txs_hashes)                 DOC_DSCR("List of transactions' IDs.") DOC_EXMP_AGGR("146791c4f5ca94bcf423557e5eb859a3a69991bd33960d52f709d88bf5d1ac6d","ec4d913a40a9ac1fbd9d33b71ef507b5c85d1f503b89096618a18b08991b5171") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -257,7 +257,7 @@ namespace currency
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(txs_as_hex)                 DOC_DSCR("Transactions stored as blobs")   DOC_EXMP_AUTO(1, "7d914497d91442f8f3c2268397d914497d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc2f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
-        KV_SERIALIZE(missed_tx)                  DOC_DSCR("Missed transactions hashes")     DOC_EXMP_AUTO(1, "97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
+        KV_SERIALIZE(missed_tx)                  DOC_DSCR("Missed transactions hashes")     DOC_EXMP_AUTO(1, "ec4d913a40a9ac1fbd9d33b71ef507b5c85d1f503b89096618a18b08991b5171") DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -307,7 +307,7 @@ namespace currency
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(txs)                        DOC_DSCR("Transactions as blobs.") DOC_EXMP_AUTO(1, "7d914497d91442f8f3c2268397d914497d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc2f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
-        KV_SERIALIZE(tx_expiration_ts_median)    DOC_DSCR("Timestamp median value of last TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW blocks.") DOC_END
+        KV_SERIALIZE(tx_expiration_ts_median)    DOC_DSCR("Timestamp median value of last TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW blocks.") DOC_EXMP(1711021795) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -321,7 +321,7 @@ namespace currency
     {
       std::list<crypto::key_image> images;
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(images) //DOC_DSCR("List of key images.") DOC_END
+        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(images) //DOC_DSCR("List of key images.") DOC_EXMP_AGGR({{'\xd6', '\x32', '\x9b', '\x5b', '\x1f', '\x7c', '\x08', '\x05', '\xb5', '\xc3', '\x45', '\xf4', '\x95', '\x75', '\x54', '\x00', '\x2a', '\x2f', '\x55', '\x78', '\x45', '\xf6', '\x4d', '\x76', '\x45', '\xda', '\xe0', '\xe0', '\x51', '\xa6', '\x49', '\x8a'}}) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -374,8 +374,8 @@ namespace currency
       uint64_t i;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(amount)                     DOC_DSCR("The specific amount of output to query.") DOC_END
-        KV_SERIALIZE(i)                          DOC_DSCR("The global index of the output amount to be queried.") DOC_END
+        KV_SERIALIZE(amount)                     DOC_DSCR("The specific amount of output to query.") DOC_EXMP(3000000000000) DOC_END
+        KV_SERIALIZE(i)                          DOC_DSCR("The global index of the output amount to be queried.") DOC_EXMP(0) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -386,8 +386,8 @@ namespace currency
       uint64_t out_no;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Transaction ID where the queried output is present, if found.") DOC_END
-        KV_SERIALIZE(out_no)                     DOC_DSCR("Local output index within the transaction.") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Transaction ID where the queried output is present, if found.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+        KV_SERIALIZE(out_no)                     DOC_DSCR("Local output index within the transaction.") DOC_EXMP(7) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -403,7 +403,7 @@ namespace currency
       crypto::hash ms_id;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(ms_id)    DOC_DSCR("The multisig output's unique identifier (hash).") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(ms_id)    DOC_DSCR("The multisig output's unique identifier (hash).") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -414,8 +414,8 @@ namespace currency
       uint64_t out_no;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Transaction ID where the multisig output is present, if found.")DOC_END
-        KV_SERIALIZE(out_no)                     DOC_DSCR("Local output index within the transaction.") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Transaction ID where the multisig output is present, if found.") DOC_EXMP("a88541e38d64f87c41b9153412d1d7667f6e4337fe429ed1374722355fa7b423") DOC_END
+        KV_SERIALIZE(out_no)                     DOC_DSCR("Local output index within the transaction.") DOC_EXMP(11) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -432,10 +432,10 @@ namespace currency
       uint64_t            height_upper_limit; // if nonzero, all the decoy outputs must be either older than, or the same age as this height
       bool                use_forced_mix_outs;
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(amounts)                    DOC_DSCR("List of amounts for which decoy outputs are requested.") DOC_END
-        KV_SERIALIZE(decoys_count)               DOC_DSCR("Number of decoy outputs required for each amount specified.") DOC_END
-        KV_SERIALIZE(height_upper_limit)         DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_END
-        KV_SERIALIZE(use_forced_mix_outs)        DOC_DSCR("If true, only outputs with a 'mix_attr' greater than 0 are used as decoys.") DOC_END
+        KV_SERIALIZE(amounts)                    DOC_DSCR("List of amounts for which decoy outputs are requested.") DOC_EXMP_AGGR(0, 10000000000, 5000000000000) DOC_END
+        KV_SERIALIZE(decoys_count)               DOC_DSCR("Number of decoy outputs required for each amount specified.") DOC_EXMP_AUTO(10) DOC_END
+        KV_SERIALIZE(height_upper_limit)         DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_EXMP_AUTO(2555000) DOC_END
+        KV_SERIALIZE(use_forced_mix_outs)        DOC_DSCR("If true, only outputs with a 'mix_attr' greater than 0 are used as decoys.") DOC_EXMP_AUTO(false) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -469,7 +469,7 @@ namespace currency
       std::list<out_entry> outs;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(amount)                     DOC_DSCR("The amount for which decoys are returned.") DOC_END
+        KV_SERIALIZE(amount)                     DOC_DSCR("The amount for which decoys are returned.") DOC_EXMP_AUTO(10000000000) DOC_END
         KV_SERIALIZE_CONTAINER_POD_AS_BLOB(outs) //DOC_DSCR("List of 'out_entry' structures, serialized as a blob.") DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -479,7 +479,7 @@ namespace currency
       std::vector<outs_for_amount> outs;
       std::string status;
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(outs)                       DOC_DSCR("List of 'outs_for_amount' structures, each containing decoys for a specific amount.") DOC_END
+        KV_SERIALIZE(outs)                       DOC_DSCR("List of 'outs_for_amount' structures, each containing decoys for a specific amount.") DOC_EXMP_AUTO(1) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -495,8 +495,8 @@ namespace currency
       std::vector<uint64_t> global_offsets; //[i] = global_index to pick up
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(amount)                     DOC_DSCR("If set to 0, only ZC outputs are considered. If nonzero, only old bare outputs are considered.") DOC_END
-        KV_SERIALIZE(global_offsets)             DOC_DSCR("List of global indices for picking decoys. Each index corresponds to a potential decoy output.") DOC_END
+        KV_SERIALIZE(amount)                     DOC_DSCR("If set to 0, only ZC outputs are considered. If nonzero, only old bare outputs are considered.") DOC_EXMP_AUTO(0) DOC_END
+        KV_SERIALIZE(global_offsets)             DOC_DSCR("List of global indices for picking decoys. Each index corresponds to a potential decoy output.") DOC_EXMP_AGGR(1, 3, 5928, 2811) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -508,10 +508,10 @@ namespace currency
       bool                use_forced_mix_outs;
       uint64_t            coinbase_percents;     //from 0 to 100, estimate percents of coinbase outputs included in decoy sets  
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(amounts)                    DOC_DSCR("List of amount distributions specifying where to look for decoys, based on old bare outputs or ZC outputs.") DOC_END
-        KV_SERIALIZE(height_upper_limit)         DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_END
-        KV_SERIALIZE(use_forced_mix_outs)        DOC_DSCR("If true, only outputs with a 'mix_attr' greater than 0 are used as decoys.") DOC_END
-        KV_SERIALIZE(coinbase_percents)          DOC_DSCR("Specifies the estimated percentage of coinbase outputs to be included in the decoy sets, ranging from 0 to 100.") DOC_END
+        KV_SERIALIZE(amounts)                    DOC_DSCR("List of amount distributions specifying where to look for decoys, based on old bare outputs or ZC outputs.") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(height_upper_limit)         DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_EXMP(2555000) DOC_END
+        KV_SERIALIZE(use_forced_mix_outs)        DOC_DSCR("If true, only outputs with a 'mix_attr' greater than 0 are used as decoys.") DOC_EXMP(false) DOC_END
+        KV_SERIALIZE(coinbase_percents)          DOC_DSCR("Specifies the estimated percentage of coinbase outputs to be included in the decoy sets, ranging from 0 to 100.") DOC_EXMP(15) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -529,9 +529,9 @@ namespace currency
       bool use_forced_mix_outs;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(amounts)                    DOC_DSCR("List of amounts for which decoy outputs are requested.") DOC_END
-        KV_SERIALIZE(outs_count)                 DOC_DSCR("Number of decoy outputs requested for each amount.") DOC_END
-        KV_SERIALIZE(use_forced_mix_outs)        DOC_DSCR("If true, only outputs with a 'mix_attr' greater than 0 are used as decoys.") DOC_END
+        KV_SERIALIZE(amounts)                    DOC_DSCR("List of amounts for which decoy outputs are requested.") DOC_EXMP_AGGR(0, 10000000000) DOC_END
+        KV_SERIALIZE(outs_count)                 DOC_DSCR("Number of decoy outputs requested for each amount.") DOC_EXMP(2) DOC_END
+        KV_SERIALIZE(use_forced_mix_outs)        DOC_DSCR("If true, only outputs with a 'mix_attr' greater than 0 are used as decoys.") DOC_EXMP(false) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -549,7 +549,7 @@ namespace currency
       std::list<out_entry> outs;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(amount)                     DOC_DSCR("The amount for which decoys are returned.") DOC_END
+        KV_SERIALIZE(amount)                     DOC_DSCR("The amount for which decoys are returned.") DOC_EXMP(10000000000) DOC_END
         KV_SERIALIZE_CONTAINER_POD_AS_BLOB(outs) //DOC_DSCR("List of 'out_entry' structures serialized as a blob, representing the decoy outputs for the specified amount.") DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -560,7 +560,7 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(outs)                       DOC_DSCR("List of 'outs_for_amount' structures, each containing decoys for a specific amount.") DOC_END
+        KV_SERIALIZE(outs)                       DOC_DSCR("List of 'outs_for_amount' structures, each containing decoys for a specific amount.") DOC_EXMP_AUTO(1) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -595,7 +595,7 @@ namespace currency
 			explicit request(const transaction &);
 
 			BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(tx_as_hex)                  DOC_DSCR("The transaction data as a hexadecimal string, ready for network broadcast.") DOC_END
+        KV_SERIALIZE(tx_as_hex)                  DOC_DSCR("The transaction data as a hexadecimal string, ready for network broadcast.") DOC_EXMP("00018ed1535b8b4862e.....368cdc5a86") DOC_END
       END_KV_SERIALIZE_MAP()
 		};
 
@@ -619,7 +619,7 @@ namespace currency
       std::vector<std::string> txs_as_hex;
 
       BEGIN_KV_SERIALIZE_MAP()
-				KV_SERIALIZE(txs_as_hex)                 DOC_DSCR("List of transactions as a hexadecimal strings.") DOC_END
+				KV_SERIALIZE(txs_as_hex)                 DOC_DSCR("List of transactions as a hexadecimal strings.") DOC_EXMP_AGGR("000535b8b2e.....3685a86", "00087368b2e.....349b77f") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -644,8 +644,8 @@ namespace currency
       uint64_t    threads_count;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(miner_address)              DOC_DSCR("The address where the mining rewards will be deposited.") DOC_END
-        KV_SERIALIZE(threads_count)              DOC_DSCR("The number of CPU threads to use for mining.") DOC_END
+        KV_SERIALIZE(miner_address)              DOC_DSCR("The address where the mining rewards will be deposited.") DOC_EXMP("ZxCSpsGGeJsS8fwvQ4HktDU3qBeauoJTR6j73jAWWZxFXdF7XTbGm4YfS2kXJmAP4Rf5BVsSQ9iZ45XANXEYsrLN2L2W77dH7") DOC_END
+        KV_SERIALIZE(threads_count)              DOC_DSCR("The number of CPU threads to use for mining.") DOC_EXMP(2) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -850,7 +850,7 @@ namespace currency
       uint64_t flags;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(flags)                      DOC_DSCR("Combination of flags to request specific data elements that are computationally expensive to calculate.") DOC_END
+        KV_SERIALIZE(flags)                      DOC_DSCR("Combination of flags to request specific data elements that are computationally expensive to calculate.") DOC_EXMP(1048575) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -920,55 +920,55 @@ namespace currency
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
         // Always calculated and provided fields
-        KV_SERIALIZE(height)                     DOC_DSCR("The current size of the blockchain, equal to the height of the top block plus one.") DOC_END
-        KV_SERIALIZE(pos_allowed)                DOC_DSCR("Boolean value indicating whether PoS mining is currently allowed based on network rules and state.") DOC_END
-        KV_SERIALIZE(pos_difficulty)             DOC_DSCR("Current difficulty for Proof of Stake mining.") DOC_END
-        KV_SERIALIZE(pow_difficulty)             DOC_DSCR("Current difficulty for Proof of Work mining.") DOC_END
-        KV_SERIALIZE(tx_count)                   DOC_DSCR("Total number of transactions in the blockchain.") DOC_END
-        KV_SERIALIZE(tx_pool_size)               DOC_DSCR("Number of transactions currently in the pool.") DOC_END
-        KV_SERIALIZE(alt_blocks_count)           DOC_DSCR("Number of alternative blocks on the blockchain.") DOC_END
-        KV_SERIALIZE(outgoing_connections_count) DOC_DSCR("Number of outgoing P2P connections to other nodes.") DOC_END
-        KV_SERIALIZE(incoming_connections_count) DOC_DSCR("Number of incoming P2P connections established by other nodes.") DOC_END
-        KV_SERIALIZE(synchronized_connections_count) DOC_DSCR("Number of P2P connections to nodes that have a fully synchronized blockchain.") DOC_END
-        KV_SERIALIZE(white_peerlist_size)        DOC_DSCR("Size of the white peer list, which includes addresses of reliable nodes.") DOC_END
-        KV_SERIALIZE(grey_peerlist_size)         DOC_DSCR("Size of the grey peer list, which includes addresses of nodes with less consistent availability.") DOC_END
+        KV_SERIALIZE(height)                     DOC_DSCR("The current size of the blockchain, equal to the height of the top block plus one.") DOC_EXMP(2555000) DOC_END
+        KV_SERIALIZE(pos_allowed)                DOC_DSCR("Boolean value indicating whether PoS mining is currently allowed based on network rules and state.") DOC_EXMP(true) DOC_END
+        KV_SERIALIZE(pos_difficulty)             DOC_DSCR("Current difficulty for Proof of Stake mining.") DOC_EXMP("1848455949616658404658") DOC_END
+        KV_SERIALIZE(pow_difficulty)             DOC_DSCR("Current difficulty for Proof of Work mining.") DOC_EXMP(12777323347117) DOC_END
+        KV_SERIALIZE(tx_count)                   DOC_DSCR("Total number of transactions in the blockchain.") DOC_EXMP(767742) DOC_END
+        KV_SERIALIZE(tx_pool_size)               DOC_DSCR("Number of transactions currently in the pool.") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(alt_blocks_count)           DOC_DSCR("Number of alternative blocks on the blockchain.") DOC_EXMP(99) DOC_END
+        KV_SERIALIZE(outgoing_connections_count) DOC_DSCR("Number of outgoing P2P connections to other nodes.") DOC_EXMP(8) DOC_END
+        KV_SERIALIZE(incoming_connections_count) DOC_DSCR("Number of incoming P2P connections established by other nodes.") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(synchronized_connections_count) DOC_DSCR("Number of P2P connections to nodes that have a fully synchronized blockchain.") DOC_EXMP(8) DOC_END
+        KV_SERIALIZE(white_peerlist_size)        DOC_DSCR("Size of the white peer list, which includes addresses of reliable nodes.") DOC_EXMP(12) DOC_END
+        KV_SERIALIZE(grey_peerlist_size)         DOC_DSCR("Size of the grey peer list, which includes addresses of nodes with less consistent availability.") DOC_EXMP(321) DOC_END
         KV_SERIALIZE(current_blocks_median)      // TODO
-        KV_SERIALIZE(alias_count)                DOC_DSCR("The total number of unique aliases registered on the blockchain. Aliases are alternate, human-readable names associated with addresses.") DOC_END
-        KV_SERIALIZE(current_max_allowed_block_size) DOC_DSCR("Current maximum allowed cummulative block size in bytes.") DOC_END
-        KV_SERIALIZE(is_hardfok_active)          DOC_DSCR("A list of boolean values indicating whether each corresponding hardfork is active. For example, a list 'true, true, false' indicates that the first hardfork is activated, while the second is not. Hardfork #0 is always active as it is a stub.") DOC_END
-        KV_SERIALIZE(daemon_network_state)       DOC_DSCR("Current network state of the daemon, which could be connecting, synchronizing, online, loading core, internal error, unloading core, or downloading database.") DOC_END
-        KV_SERIALIZE(synchronization_start_height) DOC_DSCR("Blockchain height at which the current synchronization process started. Indicates the starting point for catching up to the network's latest state.") DOC_END
-        KV_SERIALIZE(max_net_seen_height)        DOC_DSCR("Maximum blockchain height observed in the network by this node.") DOC_END
-        KV_SERIALIZE(default_fee)                DOC_DSCR("Default fee for transactions.") DOC_END
-        KV_SERIALIZE(minimum_fee)                DOC_DSCR("Minimum fee for transactions.") DOC_END
-        KV_SERIALIZE(mi)                         DOC_DSCR("The most recent mainterner's info.") DOC_END
+        KV_SERIALIZE(alias_count)                DOC_DSCR("The total number of unique aliases registered on the blockchain. Aliases are alternate, human-readable names associated with addresses.") DOC_EXMP(1653) DOC_END
+        KV_SERIALIZE(current_max_allowed_block_size) DOC_DSCR("Current maximum allowed cummulative block size in bytes.") DOC_EXMP(250000) DOC_END
+        KV_SERIALIZE(is_hardfok_active)          DOC_DSCR("A list of boolean values indicating whether each corresponding hardfork is active. For example, a list 'true, true, false' indicates that the first hardfork is activated, while the second is not. Hardfork #0 is always active as it is a stub.") DOC_EXMP_AGGR(true,true,true,true,true,false) DOC_END
+        KV_SERIALIZE(daemon_network_state)       DOC_DSCR("Current network state of the daemon, which could be connecting, synchronizing, online, loading core, internal error, unloading core, or downloading database.") DOC_EXMP(2) DOC_END
+        KV_SERIALIZE(synchronization_start_height) DOC_DSCR("Blockchain height at which the current synchronization process started. Indicates the starting point for catching up to the network's latest state.") DOC_EXMP(2555000) DOC_END
+        KV_SERIALIZE(max_net_seen_height)        DOC_DSCR("Maximum blockchain height observed in the network by this node.") DOC_EXMP(2555743) DOC_END
+        KV_SERIALIZE(default_fee)                DOC_DSCR("Default fee for transactions.") DOC_EXMP(10000000000) DOC_END
+        KV_SERIALIZE(minimum_fee)                DOC_DSCR("Minimum fee for transactions.") DOC_EXMP(10000000000) DOC_END
+        KV_SERIALIZE(mi)                         DOC_DSCR("The most recent mainterner's info.") DOC_EXMP_AUTO() DOC_END
 
         // Fields dependent on flags for their inclusion
-        KV_SERIALIZE(net_time_delta_median)      DOC_DSCR("A value of 0 indicates no time synchronization issues, while a value of 1 indicates the presence of time sync issues. Only available if the COMMAND_RPC_GET_INFO_FLAG_NET_TIME_DELTA_MEDIAN flag is set.") DOC_END
-        KV_SERIALIZE(current_network_hashrate_50)DOC_DSCR("The PoW hash rate calculated over the last 50 blocks of any type. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_CURRENT_NETWORK_HASHRATE_50 flag is set.") DOC_END
-        KV_SERIALIZE(current_network_hashrate_350) DOC_DSCR("The PoW hash rate calculated over the last 350 blocks of any type. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_CURRENT_NETWORK_HASHRATE_350 flag is set.") DOC_END
-        KV_SERIALIZE(seconds_for_10_blocks)      DOC_DSCR("The time period in seconds between the most recent block and the 10th block older. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_SECONDS_FOR_10_BLOCKS flag is set.") DOC_END
-        KV_SERIALIZE(seconds_for_30_blocks)      DOC_DSCR("The time period in seconds between the most recent block and the 30th block older. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_SECONDS_FOR_30_BLOCKS flag is set.") DOC_END
-        KV_SERIALIZE(transactions_cnt_per_day)   DOC_DSCR("The number of non-mining transactions recorded over the last 24 hours. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_TRANSACTIONS_DAILY_STAT flag is set.") DOC_END
-        KV_SERIALIZE(transactions_volume_per_day)DOC_DSCR("The total sum of input amounts from all non-mining transactions over the last 24 hours. Only old bare inputs with explicit amounts are considered. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_TRANSACTIONS_DAILY_STAT flag is set.") DOC_END
-        KV_SERIALIZE(last_pos_timestamp)         DOC_DSCR("The timestamp of the most recent PoS block. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_LAST_POS_TIMESTAMP flag is set.") DOC_END
-        KV_SERIALIZE(last_pow_timestamp)         DOC_DSCR("The timestamp of the most recent PoW block. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_LAST_POW_TIMESTAMP flag is set.") DOC_END
-        KV_SERIALIZE(total_coins)                DOC_DSCR("The total amount of all emitted coins in the system. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS flag is set.") DOC_END
-        KV_SERIALIZE(last_block_size)            DOC_DSCR("The size of the last block in bytes. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_LAST_BLOCK_SIZE flag is set.") DOC_END
-        KV_SERIALIZE(tx_count_in_last_block)     DOC_DSCR("The number of non-mining transactions in the last block. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_TX_COUNT_IN_LAST_BLOCK flag is set.") DOC_END
-        KV_SERIALIZE(pos_sequence_factor)        DOC_DSCR("The current PoS sequence factor, representing the number of consecutive PoS blocks. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_POS_SEQUENCE_FACTOR flag is set.") DOC_END
-        KV_SERIALIZE(pow_sequence_factor)        DOC_DSCR("The current PoW sequence factor, representing the number of consecutive PoW blocks. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_POW_SEQUENCE_FACTOR flag is set.") DOC_END
-        KV_SERIALIZE(block_reward)               DOC_DSCR("The base block reward that is effective for the next block. Calculated only if either COMMAND_RPC_GET_INFO_FLAG_POS_DIFFICULTY or COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS flag is set.") DOC_END
-        KV_SERIALIZE(last_block_total_reward)    DOC_DSCR("Reward for the last block, including base reward and transaction fees. Calculated only if either COMMAND_RPC_GET_INFO_FLAG_POS_DIFFICULTY or COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS flag is set.") DOC_END
-        KV_SERIALIZE(pos_diff_total_coins_rate)  DOC_DSCR("PoS difficulty divided by the total amount of all coins in the system minus a premined amount (17,517,203). Calculated only if either COMMAND_RPC_GET_INFO_FLAG_POS_DIFFICULTY or COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS flag is set.") DOC_END
-        KV_SERIALIZE(last_block_timestamp)       DOC_DSCR("Timestamp of the last block. Calculated only if either COMMAND_RPC_GET_INFO_FLAG_POS_DIFFICULTY or COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS flag is set.") DOC_END
-        KV_SERIALIZE(last_block_hash)            DOC_DSCR("Hash of the last block. Calculated only if either COMMAND_RPC_GET_INFO_FLAG_POS_DIFFICULTY or COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS flag is set.") DOC_END
-        KV_SERIALIZE(pos_block_ts_shift_vs_actual) DOC_DSCR("The difference between the timestamp used in the last PoS block for mining purposes and its actual timestamp as stored in the miner's transaction extra data. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_POS_BLOCK_TS_SHIFT_VS_ACTUAL flag is set.") DOC_END
-        KV_SERIALIZE(outs_stat)                  DOC_DSCR("Statistics for the number of outputs that have a specific amount. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_OUTS_STAT flag is set.") DOC_END
-        KV_SERIALIZE(performance_data)           DOC_DSCR("Detailed technical performance data intended for developers. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_PERFORMANCE flag is set.") DOC_END
-        KV_SERIALIZE(tx_pool_performance_data)   DOC_DSCR("Detailed technical performance data intended for developers. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_PERFORMANCE flag is set.") DOC_END
-        KV_SERIALIZE(offers_count)               DOC_DSCR("Current number of offers in the offers service. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_PERFORMANCE flag is set.") DOC_END
-        KV_SERIALIZE(expiration_median_timestamp)DOC_DSCR("Median of timestamps of the last N blocks, used to determine the expiration status of transactions. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_EXPIRATIONS_MEDIAN flag is set.") DOC_END
+        KV_SERIALIZE(net_time_delta_median)      DOC_DSCR("A value of 0 indicates no time synchronization issues, while a value of 1 indicates the presence of time sync issues. Only available if the COMMAND_RPC_GET_INFO_FLAG_NET_TIME_DELTA_MEDIAN flag is set.") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(current_network_hashrate_50)DOC_DSCR("The PoW hash rate calculated over the last 50 blocks of any type. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_CURRENT_NETWORK_HASHRATE_50 flag is set.") DOC_EXMP(109575236643) DOC_END
+        KV_SERIALIZE(current_network_hashrate_350) DOC_DSCR("The PoW hash rate calculated over the last 350 blocks of any type. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_CURRENT_NETWORK_HASHRATE_350 flag is set.") DOC_EXMP(107939216153) DOC_END
+        KV_SERIALIZE(seconds_for_10_blocks)      DOC_DSCR("The time period in seconds between the most recent block and the 10th block older. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_SECONDS_FOR_10_BLOCKS flag is set.") DOC_EXMP(476) DOC_END
+        KV_SERIALIZE(seconds_for_30_blocks)      DOC_DSCR("The time period in seconds between the most recent block and the 30th block older. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_SECONDS_FOR_30_BLOCKS flag is set.") DOC_EXMP(1264) DOC_END
+        KV_SERIALIZE(transactions_cnt_per_day)   DOC_DSCR("The number of non-mining transactions recorded over the last 24 hours. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_TRANSACTIONS_DAILY_STAT flag is set.") DOC_EXMP(1325) DOC_END
+        KV_SERIALIZE(transactions_volume_per_day)DOC_DSCR("The total sum of input amounts from all non-mining transactions over the last 24 hours. Only old bare inputs with explicit amounts are considered. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_TRANSACTIONS_DAILY_STAT flag is set.") DOC_EXMP(6615220203700000) DOC_END
+        KV_SERIALIZE(last_pos_timestamp)         DOC_DSCR("The timestamp of the most recent PoS block. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_LAST_POS_TIMESTAMP flag is set.") DOC_EXMP(1719585105) DOC_END
+        KV_SERIALIZE(last_pow_timestamp)         DOC_DSCR("The timestamp of the most recent PoW block. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_LAST_POW_TIMESTAMP flag is set.") DOC_EXMP(1719586493) DOC_END
+        KV_SERIALIZE(total_coins)                DOC_DSCR("The total amount of all emitted coins in the system. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS flag is set.") DOC_EXMP("14308874719144585856") DOC_END
+        KV_SERIALIZE(last_block_size)            DOC_DSCR("The size of the last block in bytes. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_LAST_BLOCK_SIZE flag is set.") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(tx_count_in_last_block)     DOC_DSCR("The number of non-mining transactions in the last block. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_TX_COUNT_IN_LAST_BLOCK flag is set.") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(pos_sequence_factor)        DOC_DSCR("The current PoS sequence factor, representing the number of consecutive PoS blocks. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_POS_SEQUENCE_FACTOR flag is set.") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(pow_sequence_factor)        DOC_DSCR("The current PoW sequence factor, representing the number of consecutive PoW blocks. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_POW_SEQUENCE_FACTOR flag is set.") DOC_EXMP(1) DOC_END
+        KV_SERIALIZE(block_reward)               DOC_DSCR("The base block reward that is effective for the next block. Calculated only if either COMMAND_RPC_GET_INFO_FLAG_POS_DIFFICULTY or COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS flag is set.") DOC_EXMP(1000000000000) DOC_END
+        KV_SERIALIZE(last_block_total_reward)    DOC_DSCR("Reward for the last block, including base reward and transaction fees. Calculated only if either COMMAND_RPC_GET_INFO_FLAG_POS_DIFFICULTY or COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS flag is set.") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(pos_diff_total_coins_rate)  DOC_DSCR("PoS difficulty divided by the total amount of all coins in the system minus a premined amount (17,517,203). Calculated only if either COMMAND_RPC_GET_INFO_FLAG_POS_DIFFICULTY or COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS flag is set.") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(last_block_timestamp)       DOC_DSCR("Timestamp of the last block. Calculated only if either COMMAND_RPC_GET_INFO_FLAG_POS_DIFFICULTY or COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS flag is set.") DOC_EXMP(1719586493) DOC_END
+        KV_SERIALIZE(last_block_hash)            DOC_DSCR("Hash of the last block. Calculated only if either COMMAND_RPC_GET_INFO_FLAG_POS_DIFFICULTY or COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS flag is set.") DOC_EXMP("153af86fd0d7d0a427526258e30505a4d21b8f77261f5276c7669e0a6c83efa0") DOC_END
+        KV_SERIALIZE(pos_block_ts_shift_vs_actual) DOC_DSCR("The difference between the timestamp used in the last PoS block for mining purposes and its actual timestamp as stored in the miner's transaction extra data. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_POS_BLOCK_TS_SHIFT_VS_ACTUAL flag is set.") DOC_EXMP(-1387) DOC_END
+        KV_SERIALIZE(outs_stat)                  DOC_DSCR("Statistics for the number of outputs that have a specific amount. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_OUTS_STAT flag is set.") DOC_EXMP_AUTO() DOC_END
+        KV_SERIALIZE(performance_data)           DOC_DSCR("Detailed technical performance data intended for developers. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_PERFORMANCE flag is set.") DOC_EXMP_AUTO() DOC_END
+        KV_SERIALIZE(tx_pool_performance_data)   DOC_DSCR("Detailed technical performance data intended for developers. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_PERFORMANCE flag is set.") DOC_EXMP_AUTO() DOC_END
+        KV_SERIALIZE(offers_count)               DOC_DSCR("Current number of offers in the offers service. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_PERFORMANCE flag is set.") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(expiration_median_timestamp)DOC_DSCR("Median of timestamps of the last N blocks, used to determine the expiration status of transactions. This information is only provided if the COMMAND_RPC_GET_INFO_FLAG_EXPIRATIONS_MEDIAN flag is set.") DOC_EXMP(1719585827) DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };    
@@ -1011,7 +1011,7 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(count)                      DOC_DSCR("The total number of blocks in the blockchain, equivalent to the top block's height plus one.") DOC_END
+        KV_SERIALIZE(count)                      DOC_DSCR("The total number of blocks in the blockchain, equivalent to the top block's height plus one.") DOC_EXMP(2697388) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -1044,12 +1044,12 @@ namespace currency
       bool pos_block;                            // is pos block 
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_BLOB_AS_HEX_STRING(explicit_transaction) DOC_DSCR("A transaction blob that must be explicitly included in the block.") DOC_END
-        KV_SERIALIZE(extra_text)                 DOC_DSCR("Arbitrary data added to the extra field of the miner transaction.") DOC_END
-        KV_SERIALIZE(wallet_address)             DOC_DSCR("Address where mining rewards will be deposited.") DOC_END
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(explicit_transaction) DOC_DSCR("A transaction blob that must be explicitly included in the block.") DOC_EXMP("5fa8eaaf231a305053260ff91d69c6ef1ecbd0f5") DOC_END
+        KV_SERIALIZE(extra_text)                 DOC_DSCR("Arbitrary data added to the extra field of the miner transaction.") DOC_EXMP("OMG, you can't just ask people why they're PoW-maxi") DOC_END
+        KV_SERIALIZE(wallet_address)             DOC_DSCR("Address where mining rewards will be deposited.") DOC_EXMP("ZxCSpsGGeJsS8fwvQ4HktDU3qBeauoJTR6j73jAWWZxFXdF7XTbGm4YfS2kXJmAP4Rf5BVsSQ9iZ45XANXEYsrLN2L2W77dH7") DOC_END
         KV_SERIALIZE(stakeholder_address)        DOC_DSCR("Address where the stake is returned for PoS blocks (usually the same as 'wallet_address').") DOC_END
         KV_SERIALIZE(pe)                         DOC_DSCR("PoS entry details, relevant only for PoS block generation.") DOC_END
-        KV_SERIALIZE(pos_block)                  DOC_DSCR("Flag indicating whether the block is a PoS block.") DOC_END
+        KV_SERIALIZE(pos_block)                  DOC_DSCR("Flag indicating whether the block is a PoS block.") DOC_EXMP(false) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1067,15 +1067,15 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(difficulty)                 DOC_DSCR("The mining difficulty targeted by the block template.") DOC_END
-        KV_SERIALIZE(height)                     DOC_DSCR("The height of the block template in the blockchain.") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(seed)     DOC_DSCR("Seed value for the ProgPoWZ mining algorithm's epoch.") DOC_END
-        KV_SERIALIZE(blocktemplate_blob)         DOC_DSCR("Serialized block template blob.") DOC_END
-        KV_SERIALIZE(prev_hash)                  DOC_DSCR("Hash of the previous block in the chain.") DOC_END
-        KV_SERIALIZE(miner_tx_tgc)               DOC_DSCR("Miner transaction generation context. Intended for PoS blocks and Zarcanum.") DOC_END
-        KV_SERIALIZE(block_reward_without_fee)   DOC_DSCR("Base block reward excluding any transaction fees.") DOC_END
-        KV_SERIALIZE(block_reward)               DOC_DSCR("Total block reward, including transaction fees if they are given to the miner (legacy), or the base reward if fees are burnt (current state).") DOC_END
-        KV_SERIALIZE(txs_fee)                    DOC_DSCR("Total fees from transactions included in the block.") DOC_END
+        KV_SERIALIZE(difficulty)                 DOC_DSCR("The mining difficulty targeted by the block template.") DOC_EXMP("12936195379842") DOC_END
+        KV_SERIALIZE(height)                     DOC_DSCR("The height of the block template in the blockchain.") DOC_EXMP(2555002) DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(seed)     DOC_DSCR("Seed value for the ProgPoWZ mining algorithm's epoch.") DOC_EXMP("0518e1373ff88ccabb28493cac10cb0731313135d880dae0d846be6016ab9acf") DOC_END
+        KV_SERIALIZE(blocktemplate_blob)         DOC_DSCR("Serialized block template blob.") DOC_EXMP("030000000000000000ae73338b792......6258a2b5ee340700") DOC_END
+        KV_SERIALIZE(prev_hash)                  DOC_DSCR("Hash of the previous block in the chain.") DOC_EXMP("ae73338b7927df71b6ed477937625c230172219306750ba97995fb5109dda703") DOC_END
+        KV_SERIALIZE(miner_tx_tgc)               DOC_DSCR("Miner transaction generation context. Intended for PoS blocks and Zarcanum.") DOC_EXMP_AUTO() DOC_END
+        KV_SERIALIZE(block_reward_without_fee)   DOC_DSCR("Base block reward excluding any transaction fees.") DOC_EXMP(1000000000000) DOC_END
+        KV_SERIALIZE(block_reward)               DOC_DSCR("Total block reward, including transaction fees if they are given to the miner (legacy), or the base reward if fees are burnt (current state).") DOC_EXMP(1000000000000) DOC_END
+        KV_SERIALIZE(txs_fee)                    DOC_DSCR("Total fees from transactions included in the block.") DOC_EXMP(0) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -1111,8 +1111,8 @@ namespace currency
       std::list<epee::hexemizer> explicit_txs;    //hex encoded tx blobs
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_BLOB_AS_HEX_STRING(b)       DOC_DSCR("Hex-encoded serialized block.") DOC_END
-        KV_SERIALIZE(explicit_txs)               DOC_DSCR("List of hex-encoded transactions to be explicitly included in the block.") DOC_END
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(b)       DOC_DSCR("Hex-encoded serialized block.") DOC_EXMP("030000000000000000ae73338b7926258a2b5ee340700") DOC_END
+        KV_SERIALIZE(explicit_txs)               DOC_DSCR("List of hex-encoded transactions to be explicitly included in the block.") DOC_EXMP_AGGR({"6258a2b5ee7a9c20"}, {"8e0f0a2cee340700"}) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1143,17 +1143,17 @@ namespace currency
       uint64_t reward;
       
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(major_version)              DOC_DSCR("Major version of the block.") DOC_END
-        KV_SERIALIZE(minor_version)              DOC_DSCR("Minor version of the block.") DOC_END
-        KV_SERIALIZE(timestamp)                  DOC_DSCR("Timestamp of the block creation.") DOC_END
-        KV_SERIALIZE(prev_hash)                  DOC_DSCR("Hash of the previous block in the chain.") DOC_END
-        KV_SERIALIZE(nonce)                      DOC_DSCR("Nonce used for generating the block to meet the network difficulty.") DOC_END
-        KV_SERIALIZE(orphan_status)              DOC_DSCR("Indicates if the block is an orphan (true) or a normal block (false).") DOC_END
-        KV_SERIALIZE(height)                     DOC_DSCR("Height of the block in the blockchain.") DOC_END
-        KV_SERIALIZE(depth)                      DOC_DSCR("Depth of the block in the blockchain. Depth 0 indicates the most recent block.") DOC_END
-        KV_SERIALIZE(hash)                       DOC_DSCR("Hash of the block.") DOC_END
-        KV_SERIALIZE(difficulty)                 DOC_DSCR("Network difficulty target that the block met.") DOC_END
-        KV_SERIALIZE(reward)                     DOC_DSCR("Total mining reward of the block including transaction fees (if applicable).") DOC_END
+        KV_SERIALIZE(major_version)              DOC_DSCR("Major version of the block.") DOC_EXMP(3) DOC_END
+        KV_SERIALIZE(minor_version)              DOC_DSCR("Minor version of the block.") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(timestamp)                  DOC_DSCR("Timestamp of the block creation.") DOC_EXMP(1719588270) DOC_END
+        KV_SERIALIZE(prev_hash)                  DOC_DSCR("Hash of the previous block in the chain.") DOC_EXMP("a1b4359c02985720b0cf542678e08f0d4075e518fbd0cd54bd280269545e0e6f") DOC_END
+        KV_SERIALIZE(nonce)                      DOC_DSCR("Nonce used for generating the block to meet the network difficulty.") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(orphan_status)              DOC_DSCR("Indicates if the block is an orphan (true) or a normal block (false).") DOC_EXMP(false) DOC_END
+        KV_SERIALIZE(height)                     DOC_DSCR("Height of the block in the blockchain.") DOC_EXMP(2697404) DOC_END
+        KV_SERIALIZE(depth)                      DOC_DSCR("Depth of the block in the blockchain. Depth 0 indicates the most recent block.") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(hash)                       DOC_DSCR("Hash of the block.") DOC_EXMP("f5df39c4b1590394976aa6e72f04df7836e22dbdfc1e6f61f6cc1b624d83cd94") DOC_END
+        KV_SERIALIZE(difficulty)                 DOC_DSCR("Network difficulty target that the block met.") DOC_EXMP("1849593878843995770114") DOC_END
+        KV_SERIALIZE(reward)                     DOC_DSCR("Total mining reward of the block including transaction fees (if applicable).") DOC_EXMP(0) DOC_END
       END_KV_SERIALIZE_MAP()
   };
   
@@ -1168,7 +1168,7 @@ namespace currency
       block_header_response block_header;
       
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(block_header)
+        KV_SERIALIZE(block_header)               DOC_DSCR("Detailed header information of the block.") DOC_EXMP_AUTO() DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -1186,7 +1186,7 @@ namespace currency
       std::string hash;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(hash)                       DOC_DSCR("The hash of the block for which the header information is being requested.") DOC_END
+        KV_SERIALIZE(hash)                       DOC_DSCR("The hash of the block for which the header information is being requested.") DOC_EXMP("a1b4359c02985720b0cf542678e08f0d4075e518fbd0cd54bd280269545e0e6f") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1196,7 +1196,7 @@ namespace currency
       block_header_response block_header;
       
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(block_header)               DOC_DSCR("Detailed header information of the block.") DOC_END
+        KV_SERIALIZE(block_header)               DOC_DSCR("Detailed header information of the block.") DOC_EXMP_AUTO() DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -1213,7 +1213,7 @@ namespace currency
       uint64_t height;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(height)                     DOC_DSCR("The height of the block for which the header information is being requested.") DOC_END
+        KV_SERIALIZE(height)                     DOC_DSCR("The height of the block for which the header information is being requested.") DOC_EXMP(2555000) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1223,7 +1223,7 @@ namespace currency
       block_header_response block_header;
       
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(block_header)               DOC_DSCR("Detailed header information of the block.") DOC_END
+        KV_SERIALIZE(block_header)               DOC_DSCR("Detailed header information of the block.") DOC_EXMP_AUTO() DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -1239,7 +1239,7 @@ namespace currency
     {
       std::string alias;
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(alias)                      DOC_DSCR("The alias name for which details are being requested.") DOC_END
+        KV_SERIALIZE(alias)                      DOC_DSCR("The alias name for which details are being requested.") DOC_EXMP("gigabyted") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1249,7 +1249,7 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(alias_details)              DOC_DSCR("Contains the detailed information about the specified alias, including the associated wallet address, tracking key, comment etc..") DOC_END
+        KV_SERIALIZE(alias_details)              DOC_DSCR("Contains the detailed information about the specified alias, including the associated wallet address, tracking key, comment etc..") DOC_EXMP_AUTO() DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -1265,7 +1265,7 @@ namespace currency
     {
       std::string alias;
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(alias)                      DOC_DSCR("The alias name for which the registration cost is being queried.") DOC_END
+        KV_SERIALIZE(alias)                      DOC_DSCR("The alias name for which the registration cost is being queried.") DOC_EXMP("zxdya6q6whzwqjkmtcsjpc3ku") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1275,7 +1275,7 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(reward)                     DOC_DSCR("The registration cost for the specified alias.") DOC_END
+        KV_SERIALIZE(reward)                     DOC_DSCR("The registration cost for the specified alias.") DOC_EXMP(100000000000) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -1299,7 +1299,7 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(aliases)                    DOC_DSCR("List of alias_rpc_details objects, each containing information about an individual alias.") DOC_END
+        KV_SERIALIZE(aliases)                    DOC_DSCR("List of alias_rpc_details objects, each containing information about an individual alias.") DOC_EXMP_AUTO(2) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -1317,8 +1317,8 @@ namespace currency
       uint64_t count;  // The number of aliases to retrieve.
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(offset)                     DOC_DSCR("The offset in the list of all aliases from which to start retrieving.") DOC_END
-        KV_SERIALIZE(count)                      DOC_DSCR("The number of aliases to retrieve from the specified offset.") DOC_END
+        KV_SERIALIZE(offset)                     DOC_DSCR("The offset in the list of all aliases from which to start retrieving.") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(count)                      DOC_DSCR("The number of aliases to retrieve from the specified offset.") DOC_EXMP(2) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1328,7 +1328,7 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(aliases)                    DOC_DSCR("List of alias_rpc_details objects, each containing information about an individual alias retrieved based on the request parameters.") DOC_END
+        KV_SERIALIZE(aliases)                    DOC_DSCR("List of alias_rpc_details objects, each containing information about an individual alias retrieved based on the request parameters.") DOC_EXMP_AUTO(2) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -1348,7 +1348,7 @@ namespace currency
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(alias_info_list)            DOC_DSCR("List of alias_rpc_details objects, each containing detailed information about each alias registered to the specified address.") DOC_END
+        KV_SERIALIZE(alias_info_list)            DOC_DSCR("List of alias_rpc_details objects, each containing detailed information about each alias registered to the specified address.") DOC_EXMP_AUTO(1) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -1387,7 +1387,7 @@ namespace currency
       std::list<std::string> tx_to_remove;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(tx_to_remove)               DOC_DSCR("List of transaction IDs that are to be removed from the transaction pool.") DOC_END
+        KV_SERIALIZE(tx_to_remove)               DOC_DSCR("List of transaction IDs that are to be removed from the transaction pool.") DOC_EXMP_AGGR("c5efacd06128fc5a73f58392c84534cd1a146de7d47ffbe770486cce5130dc1f","c2f0de2ef4753dc0ec8dd2da5ebf8e77f07d2ac0791357a9e3f2537071b33762") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1445,11 +1445,11 @@ namespace currency
     bool is_spent;
     uint64_t global_index;
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(amount)                       DOC_DSCR("The output's amount, 0 for ZC outputs.") DOC_END
-      KV_SERIALIZE(pub_keys)                     DOC_DSCR("List of public keys associated with the output.") DOC_END
-      KV_SERIALIZE(minimum_sigs)                 DOC_DSCR("Minimum number of signatures required to spend the output, for multisig outputs only.") DOC_END
-      KV_SERIALIZE(is_spent)                     DOC_DSCR("Indicates whether the output has been spent.") DOC_END
-      KV_SERIALIZE(global_index)                 DOC_DSCR("Global index of the output for this specific amount.") DOC_END
+      KV_SERIALIZE(amount)                       DOC_DSCR("The output's amount, 0 for ZC outputs.") DOC_EXMP(9000000000) DOC_END
+      KV_SERIALIZE(pub_keys)                     DOC_DSCR("List of public keys associated with the output.") DOC_EXMP_AGGR("7d0c755e7e24a241847176c9a3cf4c970bcd6377018068abe6fe4535b23f5323") DOC_END
+      KV_SERIALIZE(minimum_sigs)                 DOC_DSCR("Minimum number of signatures required to spend the output, for multisig outputs only.") DOC_EXMP(0) DOC_END
+      KV_SERIALIZE(is_spent)                     DOC_DSCR("Indicates whether the output has been spent.") DOC_EXMP(false) DOC_END
+      KV_SERIALIZE(global_index)                 DOC_DSCR("Global index of the output for this specific amount.") DOC_EXMP(0) DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
@@ -1462,11 +1462,11 @@ namespace currency
     std::vector<uint64_t> global_indexes;
     std::vector<std::string> etc_options;
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(amount)                       DOC_DSCR("The amount of coins being transacted.") DOC_END
+      KV_SERIALIZE(amount)                       DOC_DSCR("The amount of coins being transacted.") DOC_EXMP(1000000000000) DOC_END
       KV_SERIALIZE(htlc_origin)                  DOC_DSCR("Origin hash for HTLC (Hash Time Locked Contract).") DOC_END
-      KV_SERIALIZE(kimage_or_ms_id)              DOC_DSCR("Contains either the key image for the input or the multisig output ID, depending on the input type.") DOC_END
-      KV_SERIALIZE(global_indexes)               DOC_DSCR("List of global indexes indicating the outputs referenced by this input, where only one is actually being spent.") DOC_END
-      KV_SERIALIZE(multisig_count)               DOC_DSCR("Number of multisig signatures used, relevant only for multisig outputs.") DOC_END
+      KV_SERIALIZE(kimage_or_ms_id)              DOC_DSCR("Contains either the key image for the input or the multisig output ID, depending on the input type.") DOC_EXMP("2540e0544b1fed3b104976f803dbd83681335c427f9d601d9d5aecf86ef276d2") DOC_END
+      KV_SERIALIZE(global_indexes)               DOC_DSCR("List of global indexes indicating the outputs referenced by this input, where only one is actually being spent.") DOC_EXMP_AGGR(0,2,12,27) DOC_END
+      KV_SERIALIZE(multisig_count)               DOC_DSCR("Number of multisig signatures used, relevant only for multisig outputs.") DOC_EXMP(0) DOC_END
       KV_SERIALIZE(etc_options)                  DOC_DSCR("Auxiliary options associated with the input, containing additional configuration or data.") DOC_END
     END_KV_SERIALIZE_MAP()
   };
@@ -1477,9 +1477,9 @@ namespace currency
     std::string short_view;
     std::string details_view;
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(type)                         DOC_DSCR("Type of the extra entry in the transaction.") DOC_END
-      KV_SERIALIZE(short_view)                   DOC_DSCR("A concise representation of the extra entry.") DOC_END
-      KV_SERIALIZE(details_view)                 DOC_DSCR("A detailed representation of the extra entry.") DOC_END
+      KV_SERIALIZE(type)                         DOC_DSCR("Type of the extra entry in the transaction.") DOC_EXMP("pub_key") DOC_END
+      KV_SERIALIZE(short_view)                   DOC_DSCR("A concise representation of the extra entry.") DOC_EXMP("0feef5e2ea0e88b592c0a0e6639ce73e12ea9b3136d89464748fcb60bb6f18f5") DOC_END
+      KV_SERIALIZE(details_view)                 DOC_DSCR("A detailed representation of the extra entry.") DOC_EXMP("") DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
@@ -1501,19 +1501,19 @@ namespace currency
     std::string object_in_json;
    
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE_BLOB_AS_BASE64_STRING(blob)  DOC_DSCR("Serialized form of the transaction, encoded in Base64.") DOC_END
-      KV_SERIALIZE(blob_size)                   DOC_DSCR("Size of the serialized transaction in bytes.") DOC_END
-      KV_SERIALIZE(timestamp)                   DOC_DSCR("Timestamp when the transaction was created.") DOC_END
-      KV_SERIALIZE(keeper_block)                DOC_DSCR("Block height where the transaction is confirmed, or -1 if it is unconfirmed.") DOC_END
-      KV_SERIALIZE(fee)                         DOC_DSCR("Transaction fee in the smallest currency unit.") DOC_END
-      KV_SERIALIZE(amount)                      DOC_DSCR("Total output amount of the transaction (legacy, for pre-Zarcanum txs).") DOC_END
-      KV_SERIALIZE(id)                          DOC_DSCR("Hash of the transaction.") DOC_END
-      KV_SERIALIZE(pub_key)                     DOC_DSCR("Public key associated with the transaction.") DOC_END
-      KV_SERIALIZE(outs)                        DOC_DSCR("Outputs of the transaction.") DOC_END
-      KV_SERIALIZE(ins)                         DOC_DSCR("Inputs of the transaction.") DOC_END
-      KV_SERIALIZE(extra)                       DOC_DSCR("Extra data associated with the transaction.") DOC_END
-      KV_SERIALIZE(attachments)                 DOC_DSCR("Additional attachments to the transaction.") DOC_END
-      KV_SERIALIZE_BLOB_AS_BASE64_STRING(object_in_json) DOC_DSCR("Serialized transaction represented in JSON, encoded in Base64.") DOC_END
+      KV_SERIALIZE_BLOB_AS_BASE64_STRING(blob)  DOC_DSCR("Serialized form of the transaction, encoded in Base64.") DOC_EXMP("ARMBgKCUpY0dBBoAAAAAAAAAABoCAAAAAAAAABoKAAAAAAAAABoPAAAAAAAAACVA4FRLH") DOC_END
+      KV_SERIALIZE(blob_size)                   DOC_DSCR("Size of the serialized transaction in bytes.") DOC_EXMP(6794) DOC_END
+      KV_SERIALIZE(timestamp)                   DOC_DSCR("Timestamp when the transaction was created.") DOC_EXMP(1557345925) DOC_END
+      KV_SERIALIZE(keeper_block)                DOC_DSCR("Block height where the transaction is confirmed, or -1 if it is unconfirmed.") DOC_EXMP(51) DOC_END
+      KV_SERIALIZE(fee)                         DOC_DSCR("Transaction fee in the smallest currency unit.") DOC_EXMP(1000000000) DOC_END
+      KV_SERIALIZE(amount)                      DOC_DSCR("Total output amount of the transaction (legacy, for pre-Zarcanum txs).") DOC_EXMP(18999000000000) DOC_END
+      KV_SERIALIZE(id)                          DOC_DSCR("Hash of the transaction.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+      KV_SERIALIZE(pub_key)                     DOC_DSCR("Public key associated with the transaction.") DOC_EXMP("0feef5e2ea0e88b592c0a0e6639ce73e12ea9b3136d89464748fcb60bb6f18f5") DOC_END
+      KV_SERIALIZE(outs)                        DOC_DSCR("Outputs of the transaction.") DOC_EXMP_AUTO(1) DOC_END
+      KV_SERIALIZE(ins)                         DOC_DSCR("Inputs of the transaction.") DOC_EXMP_AUTO(1) DOC_END
+      KV_SERIALIZE(extra)                       DOC_DSCR("Extra data associated with the transaction.") DOC_EXMP_AUTO(1) DOC_END
+      KV_SERIALIZE(attachments)                 DOC_DSCR("Additional attachments to the transaction.") DOC_EXMP_AUTO(1) DOC_END
+      KV_SERIALIZE_BLOB_AS_BASE64_STRING(object_in_json) DOC_DSCR("Serialized transaction represented in JSON, encoded in Base64.") DOC_EXMP("ewogICJ2ZXJzaW9uIjogMSwgCiAgInZpbiI6IFsgewogICAgIC") DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
@@ -1525,10 +1525,10 @@ namespace currency
    uint64_t sz;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(id)                           DOC_DSCR("Hash of the transaction.") DOC_END
-      KV_SERIALIZE(fee)                          DOC_DSCR("Transaction fee in the smallest currency unit.") DOC_END
-      KV_SERIALIZE(total_amount)                 DOC_DSCR("Total amount transferred in the transaction (legacy, for pre-Zarcanum txs).") DOC_END
-      KV_SERIALIZE(sz)                           DOC_DSCR("Size of the transaction in bytes.") DOC_END
+      KV_SERIALIZE(id)                           DOC_DSCR("Hash of the transaction.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+      KV_SERIALIZE(fee)                          DOC_DSCR("Transaction fee in the smallest currency unit.") DOC_EXMP(1000000000) DOC_END
+      KV_SERIALIZE(total_amount)                 DOC_DSCR("Total amount transferred in the transaction (legacy, for pre-Zarcanum txs).") DOC_EXMP(9000000000) DOC_END
+      KV_SERIALIZE(sz)                           DOC_DSCR("Size of the transaction in bytes.") DOC_EXMP(6142) DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
@@ -1561,30 +1561,30 @@ namespace currency
     std::string object_in_json;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(blob)                         DOC_DSCR("Serialized form of the block.") DOC_END
-      KV_SERIALIZE(height)                       DOC_DSCR("Height of the block in the blockchain.") DOC_END
-      KV_SERIALIZE(timestamp)                    DOC_DSCR("Timestamp when the block was created, in PoS blocks used for mining.") DOC_END
-      KV_SERIALIZE(actual_timestamp)             DOC_DSCR("Actual timestamp encoded in the block's extra data for PoS blocks.") DOC_END
-      KV_SERIALIZE(block_cumulative_size)        DOC_DSCR("Cumulative size of the block including all transactions.") DOC_END
-      KV_SERIALIZE(total_txs_size)               DOC_DSCR("Total size of all transactions included in the block.") DOC_END
+      KV_SERIALIZE(blob)                         DOC_DSCR("Serialized form of the block.") DOC_EXMP("") DOC_END
+      KV_SERIALIZE(height)                       DOC_DSCR("Height of the block in the blockchain.") DOC_EXMP(51) DOC_END
+      KV_SERIALIZE(timestamp)                    DOC_DSCR("Timestamp when the block was created, in PoS blocks used for mining.") DOC_EXMP(1557345925) DOC_END
+      KV_SERIALIZE(actual_timestamp)             DOC_DSCR("Actual timestamp encoded in the block's extra data for PoS blocks.") DOC_EXMP(1557345925) DOC_END
+      KV_SERIALIZE(block_cumulative_size)        DOC_DSCR("Cumulative size of the block including all transactions.") DOC_EXMP(6794) DOC_END
+      KV_SERIALIZE(total_txs_size)               DOC_DSCR("Total size of all transactions included in the block.") DOC_EXMP(6794) DOC_END
       KV_SERIALIZE(block_tself_size)             // TODO ?
-      KV_SERIALIZE(base_reward)                  DOC_DSCR("Base mining reward for the block.") DOC_END
-      KV_SERIALIZE(summary_reward)               DOC_DSCR("Total reward for the block, including base reward and transaction fees (legacy).") DOC_END
-      KV_SERIALIZE(total_fee)                    DOC_DSCR("Total transaction fees included in the block.") DOC_END
-      KV_SERIALIZE(penalty)                      DOC_DSCR("Penalty applied to the reward if the block is larger than median but not large enough to be rejected.") DOC_END
-      KV_SERIALIZE(id)                           DOC_DSCR("Unique identifier of the block.") DOC_END
-      KV_SERIALIZE(prev_id)                      DOC_DSCR("Hash of the previous block in the chain.") DOC_END
+      KV_SERIALIZE(base_reward)                  DOC_DSCR("Base mining reward for the block.") DOC_EXMP(1000000000000) DOC_END
+      KV_SERIALIZE(summary_reward)               DOC_DSCR("Total reward for the block, including base reward and transaction fees (legacy).") DOC_EXMP(1001000000000) DOC_END
+      KV_SERIALIZE(total_fee)                    DOC_DSCR("Total transaction fees included in the block.") DOC_EXMP(1000000000) DOC_END
+      KV_SERIALIZE(penalty)                      DOC_DSCR("Penalty applied to the reward if the block is larger than median but not large enough to be rejected.") DOC_EXMP(0) DOC_END
+      KV_SERIALIZE(id)                           DOC_DSCR("Unique identifier of the block.") DOC_EXMP("af05b814c75e10872afc0345108e830884bc4c32091db783505abe3dac9929cf") DOC_END
+      KV_SERIALIZE(prev_id)                      DOC_DSCR("Hash of the previous block in the chain.") DOC_EXMP("37fe382c755bb8869e4f5255f2aed6a8fb503e195bb4180b65b8e1450b84cafe") DOC_END
       KV_SERIALIZE(pow_seed)                     // TODO
-      KV_SERIALIZE(cumulative_diff_adjusted)     DOC_DSCR("Adjusted cumulative difficulty of the blockchain up to this block.") DOC_END
-      KV_SERIALIZE(cumulative_diff_precise)      DOC_DSCR("Precise cumulative difficulty of the blockchain up to this block.") DOC_END
-      KV_SERIALIZE(difficulty)                   DOC_DSCR("Mining difficulty of the block.") DOC_END
-      KV_SERIALIZE(already_generated_coins)      DOC_DSCR("Total amount of coins generated in the blockchain up to this block.") DOC_END
-      KV_SERIALIZE(this_block_fee_median)        DOC_DSCR("Median transaction fee of the transactions within this block.") DOC_END
+      KV_SERIALIZE(cumulative_diff_adjusted)     DOC_DSCR("Adjusted cumulative difficulty of the blockchain up to this block.") DOC_EXMP("42413051198") DOC_END
+      KV_SERIALIZE(cumulative_diff_precise)      DOC_DSCR("Precise cumulative difficulty of the blockchain up to this block.") DOC_EXMP("28881828324942") DOC_END
+      KV_SERIALIZE(difficulty)                   DOC_DSCR("Mining difficulty of the block.") DOC_EXMP("951296929031") DOC_END
+      KV_SERIALIZE(already_generated_coins)      DOC_DSCR("Total amount of coins generated in the blockchain up to this block.") DOC_EXMP("17517253670000000000") DOC_END
+      KV_SERIALIZE(this_block_fee_median)        DOC_DSCR("Median transaction fee of the transactions within this block.") DOC_EXMP(1000000000) DOC_END
       KV_SERIALIZE(effective_fee_median)         // TODO
       KV_SERIALIZE(transactions_details)         DOC_DSCR("Detailed information about each transaction included in the block.") DOC_EXMP_AUTO(1) DOC_END
-      KV_SERIALIZE(type)                         DOC_DSCR("Type of the block.") DOC_END
-      KV_SERIALIZE(is_orphan)                    DOC_DSCR("Indicates whether the block is an orphan.") DOC_END
-      KV_SERIALIZE(miner_text_info)              DOC_DSCR("Additional textual information provided by the miner of the block.") DOC_END
+      KV_SERIALIZE(type)                         DOC_DSCR("Type of the block.") DOC_EXMP(1) DOC_END
+      KV_SERIALIZE(is_orphan)                    DOC_DSCR("Indicates whether the block is an orphan.") DOC_EXMP(false) DOC_END
+      KV_SERIALIZE(miner_text_info)              DOC_DSCR("Additional textual information provided by the miner of the block.") DOC_EXMP("") DOC_END
       KV_SERIALIZE(object_in_json)               DOC_DSCR("Serialized representation of the block in JSON format.") DOC_END
     END_KV_SERIALIZE_MAP()
   };
@@ -1603,8 +1603,8 @@ namespace currency
       bool ignore_transactions;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(height_start)               DOC_DSCR("The starting block height from which block details are retrieved.") DOC_END
-        KV_SERIALIZE(count)                      DOC_DSCR("The number of blocks to retrieve from the starting height.") DOC_END
+        KV_SERIALIZE(height_start)               DOC_DSCR("The starting block height from which block details are retrieved.") DOC_EXMP(51) DOC_END
+        KV_SERIALIZE(count)                      DOC_DSCR("The number of blocks to retrieve from the starting height.") DOC_EXMP(1) DOC_END
         KV_SERIALIZE(ignore_transactions)        // TODO
       END_KV_SERIALIZE_MAP()
     };
@@ -1633,8 +1633,8 @@ namespace currency
       uint64_t count;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(offset)                     DOC_DSCR("The offset in the list of alternative blocks from which to start retrieval.") DOC_END
-        KV_SERIALIZE(count)                      DOC_DSCR("The number of alternative blocks to retrieve from the specified offset.") DOC_END
+        KV_SERIALIZE(offset)                     DOC_DSCR("The offset in the list of alternative blocks from which to start retrieval.") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(count)                      DOC_DSCR("The number of alternative blocks to retrieve from the specified offset.") DOC_EXMP(1) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1661,7 +1661,7 @@ namespace currency
       crypto::hash id;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(id)       DOC_DSCR("The hash ID of the block for which detailed information is being requested.") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(id)       DOC_DSCR("The hash ID of the block for which detailed information is being requested.") DOC_EXMP("4cf2c7c7e16d1a2a0771cd552c696dd94e7db4e1031982ed88eff99d5006ee4a") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1688,7 +1688,7 @@ namespace currency
       std::list<std::string> ids;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(ids)                        DOC_DSCR("List of transaction IDs.") DOC_END
+        KV_SERIALIZE(ids)                        DOC_DSCR("List of transaction IDs.") DOC_EXMP_AGGR("bd9a89f95c9115d29540c6778dab9d9798eb251143dcd4b8960fcd9730a1471c","1c938f04c935d976310c4338fc570ea20777951471609f3edecb341ea4932b0a") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1699,7 +1699,7 @@ namespace currency
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
-        KV_SERIALIZE(txs)                        DOC_DSCR("List of transactions with detailed information.") DOC_END
+        KV_SERIALIZE(txs)                        DOC_DSCR("List of transactions with detailed information.") DOC_EXMP_AUTO(1) DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -1715,7 +1715,7 @@ namespace currency
       std::list<std::string> ids;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(ids)                        DOC_DSCR("List of transaction IDs.") DOC_END
+        KV_SERIALIZE(ids)                        DOC_DSCR("List of transaction IDs.") DOC_EXMP_AGGR("bd9a89f95c9115d29540c6778dab9d9798eb251143dcd4b8960fcd9730a1471c","1c938f04c935d976310c4338fc570ea20777951471609f3edecb341ea4932b0a") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1726,7 +1726,7 @@ namespace currency
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
-        KV_SERIALIZE(txs)                        DOC_DSCR("List of transactions with detailed information.") DOC_END
+        KV_SERIALIZE(txs)                        DOC_DSCR("List of transactions with detailed information.") DOC_EXMP_AUTO(1) DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -1750,7 +1750,7 @@ namespace currency
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
-        KV_SERIALIZE(ids)                        DOC_DSCR("List of all transaction IDs currently in the transaction pool.") DOC_END
+        KV_SERIALIZE(ids)                        DOC_DSCR("List of all transaction IDs currently in the transaction pool.") DOC_EXMP_AUTO(1) DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -1796,7 +1796,7 @@ namespace currency
       std::string tx_hash;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(tx_hash)                    DOC_DSCR("The hash of the transaction for which detailed information is being requested.") DOC_END
+        KV_SERIALIZE(tx_hash)                    DOC_DSCR("The hash of the transaction for which detailed information is being requested.") DOC_EXMP("d46c415c3aa3f3e17bd0bf85ffb813cacf4d9595d2d5392f42dacbaffcffdc70")  DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1807,7 +1807,7 @@ namespace currency
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
-        KV_SERIALIZE(tx_info)                    DOC_DSCR("Detailed information about the transaction.") DOC_END
+        KV_SERIALIZE(tx_info)                    DOC_DSCR("Detailed information about the transaction.") DOC_EXMP_AUTO() DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -1828,7 +1828,7 @@ namespace currency
       std::string id;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(id)                         DOC_DSCR("The identifier used to search across various types of entities.") DOC_END
+        KV_SERIALIZE(id)                         DOC_DSCR("The identifier used to search across various types of entities.") DOC_EXMP("729811f9340537e8d5641949e6cc58261f91f109687a706f39bae9514757e819") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1839,7 +1839,7 @@ namespace currency
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
-        KV_SERIALIZE(types_found)                DOC_DSCR("List of entity types where the identifier was found.") DOC_END
+        KV_SERIALIZE(types_found)                DOC_DSCR("List of entity types where the identifier was found.") DOC_EXMP_AGGR("key_image") DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -1891,7 +1891,7 @@ namespace currency
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
-        KV_SERIALIZE(expiration_median)          DOC_DSCR("The median timestamp from the last N blocks, used to determine if transactions are expired based on their timestamp.") DOC_END
+        KV_SERIALIZE(expiration_median)          DOC_DSCR("The median timestamp from the last N blocks, used to determine if transactions are expired based on their timestamp.") DOC_EXMP(1719591540) DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -1910,10 +1910,10 @@ namespace currency
       std::string alias;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(buff)                       DOC_DSCR("Base64 encoded data for which the signature is to be validated.") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(sig)      DOC_DSCR("Schnorr signature to validate, encoded as a hexadecimal string.") DOC_END
+        KV_SERIALIZE(buff)                       DOC_DSCR("Base64 encoded data for which the signature is to be validated.") DOC_EXMP("SSBkaWRuJ3QgZXhwZWN0IGFueW9uZSB0byBkZWNyeXB0IHRoaXMgZGF0YSwgc2luY2UgaXQncyBqdXN0IGFuIGV4YW1wbGUuIEJ1dCB5b3UgZGVjcnlwdGVkIGl0ISBJJ20gYW1hemVkLg==") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(sig)      DOC_DSCR("Schnorr signature to validate, encoded as a hexadecimal string.") DOC_EXMP("5c202d4bf82c2dd3c6354e2f02826ca72c797950dbe8db5bc5e3b2e60290a407ac2ef85bfc905ace8fe3b3819217084c00faf7237fee3ad2f6a7f662636cd20f") DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(pkey)     DOC_DSCR("Public key used for signature verification, encoded as a hexadecimal string. If null or not set, the public key is retrieved using the provided alias.") DOC_END
-        KV_SERIALIZE(alias)                      DOC_DSCR("Alias to retrieve the associated public spend key if no explicit public key is provided for verification.") DOC_END
+        KV_SERIALIZE(alias)                      DOC_DSCR("Alias to retrieve the associated public spend key if no explicit public key is provided for verification.") DOC_EXMP("sowle") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
