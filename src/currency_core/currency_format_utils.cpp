@@ -793,8 +793,7 @@ namespace currency
     }
   }
   //---------------------------------------------------------------
-  // TODO: reverse order of arguments
-  bool parse_amount(uint64_t& amount, const std::string& str_amount_)
+  bool parse_amount(const std::string& str_amount_, uint64_t& amount, const size_t decimal_point /* = CURRENCY_DISPLAY_DECIMAL_POINT */)
   {
     std::string str_amount = str_amount_;
     boost::algorithm::trim(str_amount);
@@ -804,12 +803,12 @@ namespace currency
     if (std::string::npos != point_index)
     {
       fraction_size = str_amount.size() - point_index - 1;
-      while (CURRENCY_DISPLAY_DECIMAL_POINT < fraction_size && '0' == str_amount.back())
+      while (decimal_point < fraction_size && '0' == str_amount.back())
       {
         str_amount.erase(str_amount.size() - 1, 1);
         --fraction_size;
       }
-      if (CURRENCY_DISPLAY_DECIMAL_POINT < fraction_size)
+      if (decimal_point < fraction_size)
         return false;
       str_amount.erase(point_index, 1);
     }
@@ -821,9 +820,9 @@ namespace currency
     if (str_amount.empty())
       return false;
 
-    if (fraction_size < CURRENCY_DISPLAY_DECIMAL_POINT)
+    if (fraction_size < decimal_point)
     {
-      str_amount.append(CURRENCY_DISPLAY_DECIMAL_POINT - fraction_size, '0');
+      str_amount.append(decimal_point - fraction_size, '0');
     }
 
     return string_tools::get_xtype_from_string(amount, str_amount);

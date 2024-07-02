@@ -402,7 +402,7 @@ namespace currency
   uint64_t get_outs_money_amount(const transaction& tx, const currency::account_keys& acc_keys_for_hidden_amounts = currency::null_acc_keys);
   bool check_inputs_types_supported(const transaction& tx);
   bool check_outs_valid(const transaction& tx);
-  bool parse_amount(uint64_t& amount, const std::string& str_amount);
+  bool parse_amount(const std::string& str_amount, uint64_t& amount, const size_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT);
   bool parse_tracking_seed(const std::string& tracking_seed, account_public_address& address, crypto::secret_key& view_sec_key, uint64_t& creation_timestamp);
 
 

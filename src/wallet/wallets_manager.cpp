@@ -1539,7 +1539,7 @@ std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_p
     }
     
     
-    if(!currency::parse_amount(dsts.back().amount, d.amount))
+    if(!currency::parse_amount(d.amount, dsts.back().amount))
     {
       return API_RETURN_CODE_BAD_ARG_WRONG_AMOUNT;
     }

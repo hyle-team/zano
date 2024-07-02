@@ -2592,7 +2592,7 @@ bool simple_wallet::sweep_below(const std::vector<std::string> &args)
   }
 
   uint64_t amount = 0;
-  r = currency::parse_amount(amount, args[2]);
+  r = currency::parse_amount(args[2], amount);
   if (!r || amount == 0)
   {
     fail_msg_writer() << "incorrect amount: " << args[2];
@@ -3127,7 +3127,7 @@ int main(int argc, char* argv[])
           uint64_t max_amount = 0;
           CHECK_AND_ASSERT_MES(epee::string_tools::string_to_num_fast(params[0], outs_min) && outs_min > 0 && outs_min < 256, EXIT_FAILURE, "incorrect param: " << params[0]);
           CHECK_AND_ASSERT_MES(epee::string_tools::string_to_num_fast(params[1], outs_max) && outs_max > 0 && outs_max < 256, EXIT_FAILURE, "incorrect param: " << params[1]);
-          CHECK_AND_ASSERT_MES(currency::parse_amount(max_amount, params[2]), EXIT_FAILURE, "incorrect param: " << params[2]);
+          CHECK_AND_ASSERT_MES(currency::parse_amount(params[2], max_amount), EXIT_FAILURE, "incorrect param: " << params[2]);
           wal.set_defragmentation_tx_settings(true, outs_min, outs_max, max_amount);
         }
       }
