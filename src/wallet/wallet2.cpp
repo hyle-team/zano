@@ -7605,7 +7605,8 @@ void wallet2::finalize_transaction(currency::finalize_tx_param& ftp, currency::f
   }
   //TIME_MEASURE_FINISH_MS(sign_ms_input_time);
 
-  THROW_IF_FALSE_WALLET_EX(get_object_blobsize(result.tx) < CURRENCY_MAX_TRANSACTION_BLOB_SIZE, error::tx_too_big, result.tx, m_upper_transaction_size_limit);
+  size_t tx_blob_size = tx_to_blob(result.tx).size();
+  THROW_IF_FALSE_WALLET_EX(tx_blob_size < CURRENCY_MAX_TRANSACTION_BLOB_SIZE, error::tx_too_big, result.tx, m_upper_transaction_size_limit);
 
   if (store_tx_secret_key)
     m_tx_keys.insert(std::make_pair(get_transaction_hash(result.tx), result.one_time_key));
