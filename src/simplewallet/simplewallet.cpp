@@ -1577,7 +1577,10 @@ bool preprocess_asset_id(std::string& address_arg, crypto::public_key& asset_id)
 {
   auto p = address_arg.find(':');
   if (p == std::string::npos)
+  {
+    asset_id = currency::native_coin_asset_id;
     return true;
+  }
   std::string asset_id_str = address_arg.substr(0, p);
   std::string address_itself = address_arg.substr(p+1, address_arg.size());
   if (!epee::string_tools::parse_tpod_from_hex_string(asset_id_str, asset_id))
@@ -1636,19 +1639,28 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
     currency::tx_destination_entry de = AUTO_VAL_INIT(de);
     de.addr.resize(1);    
 
-    bool ok = currency::parse_amount(de.amount, local_args[i + 1]);
-    if (!ok || 0 == de.amount)
-    {
-      fail_msg_writer() << "amount is wrong: " << local_args[i] << ' ' << local_args[i + 1] <<
-        ", expected number from 0 to " << print_money(std::numeric_limits<uint64_t>::max());
-      return true;
-    }
-
     if (!preprocess_asset_id(local_args[i], de.asset_id))
     {
       fail_msg_writer() << "address is wrong: " << local_args[i];
       return true;
     }
+
+    uint32_t asset_flags = 0;
+    asset_descriptor_base asset_info{};
+    if (!m_wallet->get_asset_info(de.asset_id, asset_info, asset_flags))
+    {
+      fail_msg_writer() << "unknown asset id: " << de.asset_id;
+      return true;
+    }
+
+    bool ok = currency::parse_amount(local_args[i + 1], de.amount, asset_info.decimal_point);
+    if (!ok || 0 == de.amount)
+    {
+      fail_msg_writer() << "amount is wrong: " << local_args[i] << ' ' << local_args[i + 1] <<
+        ", expected number from 0 to " << print_money_brief(std::numeric_limits<uint64_t>::max(), asset_info.decimal_point) << " with maximum " << (int)asset_info.decimal_point << " digits after decimal point";
+      return true;
+    }
+
     
     //check if address looks like wrapped address
     if (is_address_like_wrapped(local_args[i]))
