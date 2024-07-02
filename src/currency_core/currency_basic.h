@@ -700,7 +700,7 @@ namespace currency
   {
     uint64_t            total_max_supply = 0;
     uint64_t            current_supply = 0;
-    uint8_t             decimal_point = 12;
+    uint8_t             decimal_point = 0;
     std::string         ticker;
     std::string         full_name;
     std::string         meta_info;

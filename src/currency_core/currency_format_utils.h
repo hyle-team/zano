@@ -610,20 +610,25 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
-  // outputs "1391306.970000000000"
+  // outputs "1391306.970000000000" (decimal_point = 12)
+  // outputs "1391306970000000000"  (decimal_point = 0)
   template<typename t_number>
   std::string print_fixed_decimal_point(t_number amount, size_t decimal_point)
   {
     return epee::string_tools::print_fixed_decimal_point(amount, decimal_point);
   }
   //---------------------------------------------------------------
-  // outputs "1391306.97          "
+  // outputs "1391306.97          " (decimal_point = 12)
+  // outputs "139130697          "  (decimal_point = 0)
   template<typename t_number>
   std::string print_fixed_decimal_point_with_trailing_spaces(t_number amount, size_t decimal_point)
   {
     std::string s = epee::string_tools::print_fixed_decimal_point(amount, decimal_point);
-    for(size_t n = s.size() - 1; n != 0 && s[n] == '0' && s[n-1] != '.'; --n)
-      s[n] = ' ';
+    if (s.find('.') != std::string::npos)
+    {
+      for(size_t n = s.size() - 1; n != 0 && s[n] == '0' && s[n-1] != '.'; --n)
+        s[n] = ' ';
+    }
     return s;
   }
   //---------------------------------------------------------------

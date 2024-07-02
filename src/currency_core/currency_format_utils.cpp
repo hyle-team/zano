@@ -3467,7 +3467,7 @@ namespace currency
     uint64_t remainder = amount % coin;
     amount /= coin;
     if (remainder == 0)
-      return std::to_string(amount) + ".0";
+      return std::to_string(amount) + (decimal_point > 0 ? ".0" : "");
     std::string r = std::to_string(remainder);
     if (r.size() < decimal_point)
       r.insert(0, decimal_point - r.size(), '0');

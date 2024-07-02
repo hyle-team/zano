@@ -3870,7 +3870,7 @@ size_t wallet2::get_asset_decimal_point(const crypto::public_key& asset_id) cons
   if (it_own != m_own_asset_descriptors.end())
     return it_own->second.decimal_point;
 
-  return CURRENCY_DISPLAY_DECIMAL_POINT; // fallback to the default
+  return 0; // fallback to the 0 decimal point (raw numbers) as the default
 }
 //----------------------------------------------------------------------------------------------------
 
@@ -7086,8 +7086,8 @@ bool wallet2::select_indices_for_transfer(assets_selection_context& needed_money
     const crypto::public_key asset_id = item.first;
     asset_descriptor_base asset_info{};
     uint32_t asset_flags = 0;
-    bool r = get_asset_info(asset_id, asset_info, asset_flags);
-    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "got unknown asset id: " << asset_id);
+    if (!get_asset_info(asset_id, asset_info, asset_flags))
+      WLT_LOG_L1("select_indices_for_transfer: unknown asset id: " << asset_id);
 
     auto asset_cache_it = m_found_free_amounts.find(asset_id);
     WLT_THROW_IF_FALSE_WALLET_EX_MES(asset_cache_it != m_found_free_amounts.end(), error::not_enough_money, "", item.second.found_amount, item.second.needed_amount, 0, asset_id, asset_info.decimal_point);

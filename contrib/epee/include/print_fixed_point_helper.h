@@ -1,3 +1,4 @@
+// Copyright (c) 2024, Zano Project
 // Copyright (c) 2006-2017, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 //
@@ -39,7 +40,8 @@ namespace epee
       {
         s.insert(0, decimal_point + 1 - s.size(), '0');
       }
-      s.insert(s.size() - decimal_point, ".");
+      if (decimal_point > 0)
+        s.insert(s.size() - decimal_point, ".");
       return s;
     }
   }
