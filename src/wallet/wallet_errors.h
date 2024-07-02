@@ -350,12 +350,13 @@ namespace tools
     //----------------------------------------------------------------------------------------------------
     struct not_enough_money : public transfer_error
     {
-      not_enough_money(std::string&& loc, uint64_t availbable, uint64_t tx_amount, uint64_t fee, const crypto::public_key& asset_id)
+      not_enough_money(std::string&& loc, uint64_t availbable, uint64_t tx_amount, uint64_t fee, const crypto::public_key& asset_id, size_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT)
         : transfer_error(std::move(loc), "")
         , m_available(availbable)
         , m_tx_amount(tx_amount)
         , m_fee(fee)
         , m_asset_id(asset_id)
+        , m_decimal_point(decimal_point)
       {
       }
 
@@ -367,9 +368,9 @@ namespace tools
       {
         std::ostringstream ss;
         ss << transfer_error::to_string() <<
-          "available: " << currency::print_money_brief(m_available) <<
-          ", required: " << currency::print_money_brief(m_tx_amount + m_fee) <<
-          " = " << currency::print_money_brief(m_tx_amount) << " + " << currency::print_money_brief(m_fee) << " (fee)";
+          "available: " << currency::print_money_brief(m_available, m_decimal_point) <<
+          ", required: " << currency::print_money_brief(m_tx_amount + m_fee, m_decimal_point) <<
+          " = " << currency::print_money_brief(m_tx_amount, m_decimal_point) << " + " << currency::print_money_brief(m_fee) << " (fee)";
         if (m_asset_id != currency::native_coin_asset_id)
           ss << ", asset_id: " << m_asset_id;
         return ss.str();
@@ -380,6 +381,7 @@ namespace tools
       uint64_t m_tx_amount;
       uint64_t m_fee;
       crypto::public_key m_asset_id;
+      size_t m_decimal_point;
     };
 
     struct no_zc_inputs : public transfer_error

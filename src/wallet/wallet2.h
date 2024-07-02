@@ -444,6 +444,7 @@ namespace tools
     
     enum asset_info_flags_t : uint32_t { aif_none = 0, aif_whitelisted = 1 << 0, aif_own = 1 << 1 };
     bool get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_info, uint32_t& asset_flags) const;
+    size_t get_asset_decimal_point(const crypto::public_key& asset_id) const;
     
     void transfer(uint64_t amount, const currency::account_public_address& acc, const crypto::public_key& asset_id = currency::native_coin_asset_id);
     void transfer(uint64_t amount, size_t fake_outs_count, const currency::account_public_address& acc, uint64_t fee = TX_DEFAULT_FEE, const crypto::public_key& asset_id = currency::native_coin_asset_id);
@@ -607,7 +608,7 @@ namespace tools
 
     bool is_transfer_ready_to_go(const transfer_details& td, uint64_t fake_outputs_count) const;
     bool is_transfer_able_to_go(const transfer_details& td, uint64_t fake_outputs_count) const;
-    uint64_t select_indices_for_transfer(std::vector<uint64_t>& ind, free_amounts_cache_type& found_free_amounts, uint64_t needed_money, uint64_t fake_outputs_count);
+    uint64_t select_indices_for_transfer(std::vector<uint64_t>& ind, free_amounts_cache_type& found_free_amounts, uint64_t needed_money, uint64_t fake_outputs_count, const crypto::public_key& asset_id, size_t decimal_point);
     bool select_indices_for_transfer(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes);
 
     //PoS
