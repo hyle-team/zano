@@ -1957,6 +1957,33 @@ TEST(crypto, secp256k1_ecdsa_native)
 }
 
 
+TEST(crypto, eth_signature_basics)
+{
+  eth_secret_key sk{};
+  eth_public_key pk{};
+
+  ASSERT_TRUE(generate_eth_key_pair(sk, pk));
+
+  eth_signature sig{};
+  hash m = hash_helper_t::h("How many of you have ever felt personally victimized by elliptic curves?");
+  
+  ASSERT_TRUE(generate_eth_signature(m, sk, sig));
+
+  const eth_signature const_sig = sig;
+  ASSERT_TRUE(verify_eth_signature(m, pk, const_sig));
+
+  for(size_t i = 0; i < sizeof sig; ++i)
+  {
+    eth_signature bad_sig = sig;
+    bad_sig.data[i] ^= 1 + (rand() % 254); // xor with a number fom [1; 255] to make sure this byte will change
+    ASSERT_FALSE(verify_eth_signature(m, pk, bad_sig));
+  }
+
+  return true;
+}
+
+
+
 
 //
 // test's runner
