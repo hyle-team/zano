@@ -3978,7 +3978,7 @@ bool wallet2::generate_utxo_defragmentation_transaction_if_needed(currency::tran
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/, bool show_only_unknown /*= false*/, const std::string& filter_asset_ticker /*= std::string{}*/) const
 {
-  static const char* header = "index                 amount  ticker  g_index  flags       block  tx                                                                out#  asset id";
+  static const char* header = " index                 amount  ticker  g_index  flags       block  tx                                                                out#  asset id";
   std::stringstream ss;
   ss << header << ENDL;
   size_t count = 0;
@@ -3990,6 +3990,7 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
     if ((td.is_spent() && !include_spent) || (!td.is_spent() && !include_unspent))
       continue;
 
+    bool is_locked = !is_transfer_unlocked(td);
     bool native_coin = td.is_native_coin();
     asset_descriptor_base adb{};
     uint32_t asset_info_flags{};
@@ -4003,7 +4004,7 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
     if (!filter_asset_ticker.empty() && adb.ticker != filter_asset_ticker)
       continue;
 
-    ss << std::right <<
+    ss << std::right << (is_locked ? "*" : " ") <<
       std::setw(5) << i << "  " <<
       std::setw(21) << print_asset_money(td.m_amount, adb.decimal_point) << "  " <<
       std::setw(6) << std::left << (native_coin ? std::string("      ") : adb.ticker) << "  " << std::right <<
