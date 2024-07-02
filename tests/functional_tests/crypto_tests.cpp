@@ -20,6 +20,7 @@
 #include "crypto/range_proofs.h"
 #include "../core_tests/random_helper.h"
 #include "crypto_torsion_elements.h"
+#include "crypto/eth_signature.h"
 
 using namespace crypto;
 
