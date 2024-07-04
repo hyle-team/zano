@@ -518,7 +518,7 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::c1(currency::core& c, size_t ev
   r = false;
   try
   {
-    alice_wlt->request_alias_update(ai_alice_update, res_tx, TESTS_DEFAULT_FEE, 0);
+    alice_wlt->request_alias_update(ai_alice_update, res_tx, TESTS_DEFAULT_FEE);
   }
   catch (...)
   {
@@ -540,7 +540,7 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::c1(currency::core& c, size_t ev
   // update alias, change comment and address
   ai.m_text_comment = "Update to normal";
   ai.m_address = m_accounts[MINER_ACC_IDX].get_public_address();
-  alice_wlt->request_alias_update(ai, res_tx, TESTS_DEFAULT_FEE, 0);
+  alice_wlt->request_alias_update(ai, res_tx, TESTS_DEFAULT_FEE);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
@@ -586,7 +586,7 @@ bool hard_fork_2_tx_extra_alias_entry_in_wallet::c1(currency::core& c, size_t ev
   
   // update alias once again, change comment and address to auditable
   // alias updated by miner, as he's the owner now
-  miner_wlt->request_alias_update(ai_alice_update, res_tx, TESTS_DEFAULT_FEE, 0);
+  miner_wlt->request_alias_update(ai_alice_update, res_tx, TESTS_DEFAULT_FEE);
 
   // after HF2: extra_alias_entry should be here, not extra_alias_entry_old
   r = have_type_in_variant_container<extra_alias_entry>(res_tx.extra);
@@ -1221,7 +1221,7 @@ bool hard_fork_2_alias_update_using_old_tx<before_hf_2>::c1(currency::core& c, s
   //
   {
     transaction tx_upd = AUTO_VAL_INIT(tx_upd);
-    alice_wlt->request_alias_update(ai_upd, tx_upd, TESTS_DEFAULT_FEE, 0);
+    alice_wlt->request_alias_update(ai_upd, tx_upd, TESTS_DEFAULT_FEE);
     std::string tx_upd_hex = epee::string_tools::buff_to_hex_nodelimer(t_serializable_object_to_blob(tx_upd));
     LOG_PRINT_L0("tx upd: " << ENDL << tx_upd_hex);
   }
@@ -1334,9 +1334,9 @@ bool hard_fork_2_incorrect_alias_update<before_hf_2>::c1(currency::core& c, size
   r = false;
   try
   {
-    alice_wlt->request_alias_update(ai_upd, tx_upd, TESTS_DEFAULT_FEE, 0);
+    alice_wlt->request_alias_update(ai_upd, tx_upd, TESTS_DEFAULT_FEE);
   }
-  catch (tools::error::tx_rejected&)
+  catch(std::runtime_error&)
   {
     // this should cause an exception with certain type
     r = true;

@@ -121,8 +121,13 @@ namespace epee
     boost::split(pod_items, a, boost::is_any_of(", ][\""));
 
     t_pod_container_type res;
+    if (!a.size())
+      return res;
     for (const auto& item : pod_items)
     {
+      if(!item.size())
+        continue;
+
       res.resize(res.size() + 1);
       typename t_pod_container_type::value_type& pod_val = res.back();
 

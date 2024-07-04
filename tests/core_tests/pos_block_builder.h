@@ -77,7 +77,7 @@ struct pos_block_builder
   //currency::stake_kernel  m_stake_kernel                  {};
   size_t                  m_height                        = 0;
   size_t                  m_pos_stake_output_gindex       = 0;
-  //uint64_t                m_pos_stake_amount              = 0;
+  uint64_t                m_block_reward                  = 0;
   currency::tx_generation_context m_miner_tx_tgc          {};
 
   currency::pos_mining_context m_context                  {};

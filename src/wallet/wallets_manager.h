@@ -126,7 +126,7 @@ public:
   std::string get_alias_info_by_address(const std::string& addr, currency::alias_rpc_details& res_details);
   std::string get_alias_info_by_name(const std::string& name, currency::alias_rpc_details& res_details);
   std::string request_alias_registration(const currency::alias_rpc_details& al, uint64_t wallet_id, uint64_t fee, currency::transaction& res_tx, uint64_t reward);
-  std::string request_alias_update(const currency::alias_rpc_details& al, uint64_t wallet_id, uint64_t fee, currency::transaction& res_tx, uint64_t reward);
+  std::string request_alias_update(const currency::alias_rpc_details& al, uint64_t wallet_id, uint64_t fee, currency::transaction& res_tx);
   std::string get_alias_coast(const std::string& a, uint64_t& coast);
   std::string validate_address(const std::string& addr, std::string& payment_id);
   std::string resync_wallet(uint64_t wallet_id);

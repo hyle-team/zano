@@ -398,14 +398,112 @@ namespace currency
     CATCH_ENTRY2(std::vector<tx_source_entry::output_entry>{});
   }
   //---------------------------------------------------------------
-  bool validate_tx_output_details_againt_tx_generation_context(const transaction& tx, const tx_generation_context& gen_context)
+  bool validate_tx_details_against_tx_generation_context(const transaction& tx, const tx_generation_context& tgc)
   {
-    //TODO: Implement this function before mainnet
-#ifdef TESTNET
+    CHECK_AND_ASSERT_MES(tx.version >= TRANSACTION_VERSION_POST_HF4, false, "validate_tx_details_against_tx_generation_context should never be called for pre-HF4 txs");
+
+    //
+    // outputs
+    // (all outputs are ZC outputs, because we require tx.version to be post-HF4)
+    size_t tx_outs_count = tx.vout.size();
+    CHECK_AND_ASSERT_EQ(tgc.asset_ids.size(),               tx_outs_count);
+    CHECK_AND_ASSERT_EQ(tgc.blinded_asset_ids.size(),       tx_outs_count);
+    CHECK_AND_ASSERT_EQ(tgc.amount_commitments.size(),      tx_outs_count);
+    CHECK_AND_ASSERT_EQ(tgc.asset_id_blinding_masks.size(), tx_outs_count);
+    CHECK_AND_ASSERT_EQ(tgc.amounts.size(),                 tx_outs_count);
+    CHECK_AND_ASSERT_EQ(tgc.amount_blinding_masks.size(),   tx_outs_count);
+
+    crypto::point_t amount_commitments_sum = crypto::c_point_0;
+    crypto::scalar_t amount_blinding_masks_sum{};
+    crypto::scalar_t asset_id_blinding_mask_x_amount_sum{};
+    for(size_t i = 0; i < tx_outs_count; ++i)
+    {
+      crypto::point_t calculated_T = tgc.asset_ids[i] + tgc.asset_id_blinding_masks[i] * crypto::c_point_X;
+      CHECK_AND_ASSERT_MES(calculated_T.is_in_main_subgroup(), false, "calculated_T isn't in the main subgroup");
+      CHECK_AND_ASSERT_EQ(tgc.blinded_asset_ids[i], calculated_T);
+
+      crypto::point_t calculated_A = tgc.amounts[i] * calculated_T + tgc.amount_blinding_masks[i] * crypto::c_point_G;
+      CHECK_AND_ASSERT_MES(calculated_A.is_in_main_subgroup(), false, "calculated_A isn't in the main subgroup");
+      CHECK_AND_ASSERT_EQ(tgc.amount_commitments[i], calculated_A);
+      
+      const tx_out_zarcanum& tx_out_zc = boost::get<tx_out_zarcanum>(tx.vout[i]);
+      crypto::point_t tx_T = crypto::point_t(tx_out_zc.blinded_asset_id).modify_mul8();
+      CHECK_AND_ASSERT_EQ(tgc.blinded_asset_ids[i], tx_T);
+      crypto::point_t tx_A = crypto::point_t(tx_out_zc.amount_commitment).modify_mul8();
+      CHECK_AND_ASSERT_EQ(tgc.amount_commitments[i], tx_A);
+      amount_commitments_sum += calculated_A;
+      amount_blinding_masks_sum += tgc.amount_blinding_masks[i];
+      asset_id_blinding_mask_x_amount_sum += tgc.asset_id_blinding_masks[i] * tgc.amounts[i];
+    }
+    CHECK_AND_ASSERT_EQ(tgc.amount_commitments_sum,               amount_commitments_sum);
+    CHECK_AND_ASSERT_EQ(tgc.amount_blinding_masks_sum,            amount_blinding_masks_sum);
+    CHECK_AND_ASSERT_EQ(tgc.asset_id_blinding_mask_x_amount_sum,  asset_id_blinding_mask_x_amount_sum);
+
+    //
+    // inputs
+    //
+
+    size_t tx_inputs_count = tx.vin.size();
+    size_t tx_zc_inputs_count = count_type_in_variant_container<txin_zc_input>(tx.vin);
+    size_t tx_bare_inputs_count = count_type_in_variant_container<txin_to_key>(tx.vin);
+    CHECK_AND_ASSERT_EQ(tx_inputs_count, tx_zc_inputs_count + tx_bare_inputs_count);
+    CHECK_AND_ASSERT_EQ(tx.signatures.size(), tx.vin.size()); // can do this because we shouldn't face additional signature so far
+
+    CHECK_AND_ASSERT_EQ(tgc.pseudo_outs_blinded_asset_ids.size(),             tx_zc_inputs_count);
+    CHECK_AND_ASSERT_EQ(tgc.pseudo_outs_plus_real_out_blinding_masks.size(),  tx_zc_inputs_count);
+    CHECK_AND_ASSERT_EQ(tgc.real_zc_ins_asset_ids.size(),                     tx_zc_inputs_count);
+    CHECK_AND_ASSERT_EQ(tgc.zc_input_amounts.size(),                          tx_zc_inputs_count);
+
+    crypto::point_t pseudo_out_amount_commitments_sum = crypto::c_point_0;
+
+    for(size_t input_index = 0, zc_input_index = 0; input_index < tx.vin.size(); ++input_index)
+    {
+      const txin_v& in_v = tx.vin[input_index];
+      if (in_v.type() == typeid(txin_zc_input))
+      {
+        CHECK_AND_ASSERT_EQ(tx.signatures[input_index].type(), typeid(ZC_sig));
+        const ZC_sig& sig = boost::get<ZC_sig>(tx.signatures[input_index]);
+
+        crypto::point_t sig_pseudo_out_amount_commitment = crypto::point_t(sig.pseudo_out_amount_commitment).modify_mul8();
+        crypto::point_t sig_pseudo_out_blinded_asset_id = crypto::point_t(sig.pseudo_out_blinded_asset_id).modify_mul8();
+
+        crypto::point_t pseudo_out_blinded_asset_id_calculated = tgc.real_zc_ins_asset_ids[zc_input_index] + tgc.pseudo_outs_plus_real_out_blinding_masks[zc_input_index] * crypto::c_point_X; // T^P = H_i + r_pi*X + r'_i*X
+        CHECK_AND_ASSERT_EQ(sig_pseudo_out_blinded_asset_id, pseudo_out_blinded_asset_id_calculated);
+        CHECK_AND_ASSERT_EQ(tgc.pseudo_outs_blinded_asset_ids[zc_input_index], pseudo_out_blinded_asset_id_calculated);
+        CHECK_AND_ASSERT_MES(pseudo_out_blinded_asset_id_calculated.is_in_main_subgroup(), false, "pseudo_out_blinded_asset_id_calculated isn't in the main subgroup");
+        // cannot be verified:
+        // tgc.zc_input_amounts[zc_input_index];                        // ZC only input amounts
+
+        pseudo_out_amount_commitments_sum += sig_pseudo_out_amount_commitment;
+        ++zc_input_index;
+      }
+      else if (in_v.type() == typeid(txin_to_key))
+      {
+        // do nothing
+      }
+      else
+      {
+        // should never get here
+        CHECK_AND_ASSERT_MES(false, false, "internal error, unexpected type: " << in_v.type().name());
+      }
+    }
+
+    // tx secret and public keys
+    CHECK_AND_ASSERT_MES(tgc.tx_pub_key_p.is_in_main_subgroup(), false, "tgc.tx_pub_key_p isn't in the main subgroup");
+    CHECK_AND_ASSERT_EQ(tgc.tx_pub_key_p.to_public_key(), tgc.tx_key.pub);
+    CHECK_AND_ASSERT_EQ(crypto::scalar_t(tgc.tx_key.sec) * crypto::c_point_G, tgc.tx_pub_key_p);
+
+    // no ongoing asset operation
+    CHECK_AND_ASSERT_EQ(tgc.ao_asset_id, currency::null_pkey);
+    CHECK_AND_ASSERT_EQ(tgc.ao_asset_id_pt, crypto::c_point_0);
+    CHECK_AND_ASSERT_EQ(tgc.ao_amount_commitment, crypto::c_point_0);
+    CHECK_AND_ASSERT_EQ(tgc.ao_amount_blinding_mask, crypto::c_scalar_0);
+
+    // cannot be verified:
+    // tgc.pseudo_out_amount_blinding_masks_sum
+    // tgc.real_in_asset_id_blinding_mask_x_amount_sum
+
     return true;
-#else
-    return true;
-#endif
   }
 
   //----------------------------------------------------------------------------------------------------

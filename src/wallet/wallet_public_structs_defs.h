@@ -633,6 +633,29 @@ namespace wallet_public
     };
   };
 
+  struct COMMAND_RPC_UPDATE_ALIAS
+  {
+    DOC_COMMAND("Update an alias details/transwer alias ownership");
+
+    struct request
+    {
+      currency::alias_rpc_details al;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(al)                              DOC_DSCR("Alias details")  DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      crypto::hash tx_id;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)     DOC_DSCR("If success - transactions that performs registration(alias becomes available after few confirmations)") DOC_EXMP("97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
   
   struct transfer_destination
   {

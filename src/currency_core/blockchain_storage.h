@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -165,15 +165,13 @@ namespace currency
     //   retrieve gindex from main chain gindex table     # not outputs having given amount are present after the given height
     //
 
-    typedef boost::variant<crypto::public_key, txout_htlc> output_key_or_htlc_v;
-
     struct alt_block_extended_info: public block_extended_info
     {
       // {amount -> gindex } output global index lookup table for this altblock (if an amount isn't present -- it's retreived from main outputs_container)
       std::map<uint64_t, uint64_t> gindex_lookup_table; 
       
-      // {amount -> pub_keys} map of outputs' pub_keys appeared in this alt block ( index_in_vector == output_gindex - gindex_lookup_table[output_amount] )
-      std::map<uint64_t, std::vector<output_key_or_htlc_v> > outputs_pub_keys;
+      // {amount -> outs} map of outputs' appeared in this alt block ( index_in_vector == output_gindex - gindex_lookup_table[output_amount] )
+      std::map<uint64_t, std::vector<tx_out_v> > outputs;
       
       //date added to alt chain storage
       uint64_t timestamp; 
@@ -638,6 +636,8 @@ namespace currency
       uint64_t split_height, 
       const alt_chain_type& alt_chain, 
       const std::unordered_set<crypto::hash>& alt_chain_block_ids, 
+      const uint64_t pos_block_timestamp,
+      const wide_difficulty_type& pos_difficulty,
       uint64_t& ki_lookuptime, 
       uint64_t* p_max_related_block_height = nullptr) const;
     bool validate_alt_block_ms_input(const transaction& input_tx, 
@@ -703,10 +703,10 @@ namespace currency
     void calculate_local_gindex_lookup_table_for_height(uint64_t split_height, std::map<uint64_t, uint64_t>& increments) const;
     void do_erase_altblock(alt_chain_container::iterator it);
     uint64_t get_blockchain_launch_timestamp()const;
-    bool is_output_allowed_for_input(const txout_target_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
-    bool is_output_allowed_for_input(const output_key_or_htlc_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
-    bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v)const;
-    bool is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
+    bool is_output_allowed_for_input(const tx_out_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height) const;
+    bool is_output_allowed_for_input(const txout_target_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height) const;
+    bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v) const;
+    bool is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height) const;
     bool is_output_allowed_for_input(const tx_out_zarcanum& out, const txin_v& in_v) const;
 
 
@@ -876,24 +876,26 @@ namespace currency
         TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
       }
       VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
-        bool r = is_output_allowed_for_input(out_zc, verified_input);
-      CHECK_AND_ASSERT_MES(r, false, "Input and output are incompatible");
-
-      r = is_mixattr_applicable_for_fake_outs_counter(tx_ptr->tx.version, out_zc.mix_attr, key_offsets.size() - 1, this->get_core_runtime_config());
-      CHECK_AND_ASSERT_MES(r, false, "tx input ref #" << output_index << " violates mixin restrictions: tx.version = " << tx_ptr->tx.version << ", mix_attr = " << static_cast<uint32_t>(out_zc.mix_attr) << ", key_offsets.size = " << key_offsets.size());
-
-      bool legit_output_key = validate_output_key_legit(out_zc.stealth_address);
-      CHECK_AND_ASSERT_MES(legit_output_key, false, "tx input ref #" << output_index << " violates public key restrictions: tx.version = " << tx_ptr->tx.version << ", outtk.key = " << out_zc.stealth_address);
-
-
-      TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
-      if (!vis.handle_output(tx_ptr->tx, validated_tx, out_zc, n))
       {
-        size_t verified_input_index = std::find(validated_tx.vin.begin(), validated_tx.vin.end(), verified_input) - validated_tx.vin.begin();
-        LOG_PRINT_RED_L0("handle_output failed for output #" << n << " in " << tx_id << " referenced by input #" << verified_input_index << " in tx " << get_transaction_hash(validated_tx));
-        return false;
+        bool r = is_output_allowed_for_input(out_zc, verified_input);
+        CHECK_AND_ASSERT_MES(r, false, "Input and output are incompatible");
+
+        r = is_mixattr_applicable_for_fake_outs_counter(tx_ptr->tx.version, out_zc.mix_attr, key_offsets.size() - 1, this->get_core_runtime_config());
+        CHECK_AND_ASSERT_MES(r, false, "tx input ref #" << output_index << " violates mixin restrictions: tx.version = " << tx_ptr->tx.version << ", mix_attr = " << static_cast<uint32_t>(out_zc.mix_attr) << ", key_offsets.size = " << key_offsets.size());
+
+        bool legit_output_key = validate_output_key_legit(out_zc.stealth_address);
+        CHECK_AND_ASSERT_MES(legit_output_key, false, "tx input ref #" << output_index << " violates public key restrictions: tx.version = " << tx_ptr->tx.version << ", outtk.key = " << out_zc.stealth_address);
+
+
+        TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
+        if (!vis.handle_output(tx_ptr->tx, validated_tx, out_zc, n))
+        {
+          size_t verified_input_index = std::find(validated_tx.vin.begin(), validated_tx.vin.end(), verified_input) - validated_tx.vin.begin();
+          LOG_PRINT_RED_L0("handle_output failed for output #" << n << " in " << tx_id << " referenced by input #" << verified_input_index << " in tx " << get_transaction_hash(validated_tx));
+          return false;
+        }
+        TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
       }
-      TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
       VARIANT_CASE_THROW_ON_OTHER();
       VARIANT_SWITCH_END();
 

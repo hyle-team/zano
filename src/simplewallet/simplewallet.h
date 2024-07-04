@@ -91,12 +91,13 @@ namespace currency
     bool tor_enable(const std::vector<std::string> &args);
     bool tor_disable(const std::vector<std::string> &args);
     bool deploy_new_asset(const std::vector<std::string> &args);
+    bool call_rpc(const std::vector<std::string>& args);
     bool add_custom_asset_id(const std::vector<std::string> &args);
     bool remove_custom_asset_id(const std::vector<std::string> &args);
     bool emit_asset(const std::vector<std::string> &args);
     bool burn_asset(const std::vector<std::string> &args);
     bool update_asset(const std::vector<std::string> &args);
-
+    bool transfer_asset_ownership(const std::vector<std::string>& args);
     //----------------------------------------------------------------------------------------------------
     bool generate_ionic_swap_proposal(const std::vector<std::string> &args);
     bool get_ionic_swap_proposal_info(const std::vector<std::string> &args);
@@ -109,7 +110,7 @@ namespace currency
 
     uint64_t get_daemon_blockchain_height(std::string& err);
     bool try_connect_to_daemon();
-    std::string get_tocken_info_string(const crypto::public_key& asset_id, uint64_t& decimal_point);
+    std::string get_token_info_string(const crypto::public_key& asset_id, uint64_t& decimal_point);
     bool print_wti(const tools::wallet_public::wallet_transfer_info& wti);
     bool check_password_for_operation();
     crypto::hash get_hash_from_pass_and_salt(const std::string& pass, uint64_t salt);

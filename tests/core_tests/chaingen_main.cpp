@@ -26,7 +26,7 @@ namespace
   const command_line::arg_descriptor<bool>        arg_play_test_data               ("play-test-data", "");
   const command_line::arg_descriptor<bool>        arg_generate_and_play_test_data  ("generate-and-play-test-data", "");
   const command_line::arg_descriptor<bool>        arg_test_transactions            ("test-transactions", "");
-  const command_line::arg_descriptor<std::string> arg_run_single_test              ("run-single-test", "" );
+  const command_line::arg_descriptor<std::string> arg_run_single_test              ("run-single-test", "<TEST_NAME[@HF]> TEST_NAME -- name of a single test to run, HF -- specific hardfork id to run the test for" );
   const command_line::arg_descriptor<bool>        arg_enable_debug_asserts         ("enable-debug-asserts", "" );
   const command_line::arg_descriptor<bool>        arg_stop_on_fail                 ("stop-on-fail", "");
 
@@ -428,6 +428,8 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
     CHECK_AND_ASSERT_MES(!hardforks.empty(), false, "invalid hardforks mask: " << hardfork_str_mask);      \
     for(size_t i = 0; i < hardforks.size() && !skip_all_till_the_end; ++i)                                 \
     {                                                                                                      \
+      if (run_single_test_hardfork != SIZE_MAX && hardforks[i] != run_single_test_hardfork)                \
+        continue;                                                                                          \
       std::string tns = std::string(#genclass) + " @ HF " + epee::string_tools::num_to_string_fast(hardforks[i]);  \
       const char* testname = tns.c_str();                                                                  \
       TIME_MEASURE_START_MS(t);                                                                            \
@@ -916,9 +918,20 @@ int main(int argc, char* argv[])
     epee::debug::get_set_enable_assert(true, command_line::get_arg(g_vm, arg_enable_debug_asserts)); // don't comment out this: many tests have normal-negative checks (i.e. tx with invalid amount shouldn't be created), so be ready for MANY assertion breaks
 
     std::string run_single_test;
+    size_t run_single_test_hardfork = SIZE_MAX; // SIZE_MAX means all hard forks, other values mean hardfork id
     if (command_line::has_arg(g_vm, arg_run_single_test))
     {
-      run_single_test = command_line::get_arg(g_vm, arg_run_single_test);
+      std::string arg = command_line::get_arg(g_vm, arg_run_single_test);
+      std::vector<std::string> items;
+      boost::split(items, arg, boost::is_any_of("@"));
+      CHECK_AND_ASSERT_MES(items.size() > 0, 2, "unable to parse arg_run_single_test");
+      run_single_test = items[0];
+      if (items.size() > 1)
+      {
+        int64_t val = 0;
+        epee::string_tools::string_to_num_fast(items[1], val);
+        run_single_test_hardfork = val;
+      }
     }
     
     if (run_single_test.empty())
@@ -1087,6 +1100,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(wallet_rpc_integrated_address);
     GENERATE_AND_PLAY(wallet_rpc_integrated_address_transfer);
     GENERATE_AND_PLAY(wallet_rpc_transfer);
+    GENERATE_AND_PLAY(wallet_rpc_alias_tests);
     GENERATE_AND_PLAY_HF(wallet_rpc_exchange_suite, "3,4");
     GENERATE_AND_PLAY(wallet_chain_switch_with_spending_the_same_ki);
     GENERATE_AND_PLAY(wallet_sending_to_integrated_address);
@@ -1109,7 +1123,7 @@ int main(int argc, char* argv[])
     //GENERATE_AND_PLAY(pos_emission_test); // Long test! by demand only
     GENERATE_AND_PLAY(pos_wallet_big_block_test);
     //GENERATE_AND_PLAY(block_template_against_txs_size); // Long test! by demand only
-    GENERATE_AND_PLAY(pos_altblocks_validation);
+    GENERATE_AND_PLAY_HF(pos_altblocks_validation, "3-*");
     GENERATE_AND_PLAY_HF(pos_mining_with_decoys, "3");
 
     // alternative blocks and generic chain-switching tests
@@ -1118,13 +1132,13 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_chain_switch_1);
     GENERATE_AND_PLAY(bad_chain_switching_with_rollback);
     GENERATE_AND_PLAY(chain_switching_and_tx_with_attachment_blobsize);
-    GENERATE_AND_PLAY(chain_switching_when_gindex_spent_in_both_chains);
+    GENERATE_AND_PLAY_HF(chain_switching_when_gindex_spent_in_both_chains, "3-*");
     GENERATE_AND_PLAY(alt_chain_coins_pow_mined_then_spent);
     GENERATE_AND_PLAY(gen_simple_chain_split_1);
-    GENERATE_AND_PLAY(alt_blocks_validation_and_same_new_amount_in_two_txs);
-    GENERATE_AND_PLAY(alt_blocks_with_the_same_txs);
-    GENERATE_AND_PLAY(chain_switching_when_out_spent_in_alt_chain_mixin);
-    GENERATE_AND_PLAY(chain_switching_when_out_spent_in_alt_chain_ref_id);
+    GENERATE_AND_PLAY_HF(alt_blocks_validation_and_same_new_amount_in_two_txs, "3-*");
+    GENERATE_AND_PLAY_HF(alt_blocks_with_the_same_txs, "3-*");
+    GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_mixin, "3-*");
+    GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_ref_id, "3-*");
 
 
     // miscellaneous tests

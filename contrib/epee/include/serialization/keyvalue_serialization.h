@@ -107,6 +107,7 @@ public: \
 //#define DOC_EXMP_AUTO_2(arg_1, arg_2)                            , KV_MAKE_ALIAS_NAME() (arg_1, arg_2)
 #define DOC_END                                                  ); }
 #define DOC_EXMP_AUTO(...)                                       , epee::create_t_object<KV_MAKE_ALIAS_NAME() >(__VA_ARGS__)
+#define DOC_EXMP_AGGR(...)                                       , epee::create_t_object<KV_MAKE_ALIAS_NAME() >(KV_MAKE_ALIAS_NAME(){__VA_ARGS__})
 
 
 // Function template to create an object with forwarded constructor arguments
