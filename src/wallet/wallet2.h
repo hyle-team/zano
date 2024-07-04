@@ -444,8 +444,9 @@ namespace tools
     
     enum asset_info_flags_t : uint32_t { aif_none = 0, aif_whitelisted = 1 << 0, aif_own = 1 << 1 };
     bool get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_info, uint32_t& asset_flags) const;
-    size_t get_asset_decimal_point(const crypto::public_key& asset_id) const;
-    
+    size_t get_asset_decimal_point(const crypto::public_key& asset_id, size_t result_if_not_found = 0) const;
+    bool get_asset_decimal_point(const crypto::public_key& asset_id, size_t* p_decimal_point_result) const;
+
     void transfer(uint64_t amount, const currency::account_public_address& acc, const crypto::public_key& asset_id = currency::native_coin_asset_id);
     void transfer(uint64_t amount, size_t fake_outs_count, const currency::account_public_address& acc, uint64_t fee = TX_DEFAULT_FEE, const crypto::public_key& asset_id = currency::native_coin_asset_id);
     void transfer(uint64_t amount, const currency::account_public_address& acc, currency::transaction& result_tx, const crypto::public_key& asset_id = currency::native_coin_asset_id);

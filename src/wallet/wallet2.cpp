@@ -3851,7 +3851,7 @@ bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset
   return false;
 }
 //----------------------------------------------------------------------------------------------------
-size_t wallet2::get_asset_decimal_point(const crypto::public_key& asset_id) const
+size_t wallet2::get_asset_decimal_point(const crypto::public_key& asset_id, size_t result_if_not_found /* = 0 */) const
 {
   if (asset_id == currency::native_coin_asset_id)
     return currency::get_native_coin_asset_descriptor().decimal_point;
@@ -3870,10 +3870,19 @@ size_t wallet2::get_asset_decimal_point(const crypto::public_key& asset_id) cons
   if (it_own != m_own_asset_descriptors.end())
     return it_own->second.decimal_point;
 
-  return 0; // fallback to the 0 decimal point (raw numbers) as the default
+  return result_if_not_found; // if not overriden, use the 0 decimal point (raw numbers) as the default
 }
 //----------------------------------------------------------------------------------------------------
-
+bool wallet2::get_asset_decimal_point(const crypto::public_key& asset_id, size_t* p_decimal_point_result) const
+{
+  size_t decimal_point = get_asset_decimal_point(asset_id, SIZE_MAX);
+  if (decimal_point == SIZE_MAX)
+    return false;
+  if (p_decimal_point_result != nullptr)
+    *p_decimal_point_result = decimal_point;
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 uint64_t wallet2::balance() const
 {
   uint64_t stub = 0;
@@ -4035,9 +4044,10 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
 std::string wallet2::get_balance_str() const
 {
   // balance unlocked     / [balance total]       ticker   asset id
-  // 1391306.970000000000 / 1391306.970000000000  ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
-  // 1391306.97                                   ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
-  //     106.971          /     206.4             ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
+  // 0.21                 / 98.51                 DP2      a6974d5874e97e5f4ed5ad0a62f0975edbccb1bb55502fc75c7fe808f12f44d3
+  // 190.123456789012     / 199.123456789012      ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
+  // 98.0                                         BGTVUW   af2b12f3033337f9aea1845a6bc3fc966ed4d13227a3ace7706fca7dbcdaa7e2
+  // 1000.034                                     DP3      d4aba1020f26927571771e04b585b4ffb211f52708d5e4c465bbdfa4a12e6271
 
   static const char* header = " balance unlocked     / [balance total]       ticker   asset id";
   std::stringstream ss;
@@ -4061,12 +4071,16 @@ std::string wallet2::get_balance_str() const
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::get_balance_str_raw() const
 {
-    // balance unlocked     / [balance total]       ticker   asset id
-  // 1391306.970000000000 / 1391306.970000000000  ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
-  // 1391306.97                                   ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
-  //     106.971          /     206.4             ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
+  // balance unlocked     / [balance total]     DP   asset id
+  // 0.21                 / 98.51                2   a6974d5874e97e5f4ed5ad0a62f0975edbccb1bb55502fc75c7fe808f12f44d3
+  // 190.123456789012     / 199.123456789012    12   d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
+  // 98.0                                       12   af2b12f3033337f9aea1845a6bc3fc966ed4d13227a3ace7706fca7dbcdaa7e2
+  // 1000.034                                    3   d4aba1020f26927571771e04b585b4ffb211f52708d5e4c465bbdfa4a12e6271
+  //WHITELIST:
+  // 7d3f348fbebfffc4e61a3686189cf870ea393e1c88b8f636acbfdacf9e4b2db2    CT
+  // ...
 
-  static const char* header = " balance unlocked     / [balance total]       asset id";
+  static const char* header = " balance unlocked     / [balance total]     DP   asset id";
   std::stringstream ss;
   ss << header << ENDL;
   
@@ -4076,32 +4090,39 @@ std::string wallet2::get_balance_str_raw() const
 
   for(const auto& entry : balances_map)
   {
-    ss << " " << std::left << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(entry.second.unlocked, 12);
+    size_t decimal_point = 0;
+    bool has_known_decimal_point = get_asset_decimal_point(entry.first, &decimal_point);
+    ss << " " << std::left << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(entry.second.unlocked, decimal_point);
     if(entry.second.total == entry.second.unlocked)
       ss << "                       ";
     else
-      ss << " / " << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(entry.second.total, 12);
-    ss << "  " << std::setw(8) << std::left << entry.first << ENDL;
+      ss << " / " << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(entry.second.total, decimal_point);
+
+    if (has_known_decimal_point)
+      ss << std::setw(2) << std::right << decimal_point;
+    else
+      ss << "??";
+    
+    ss << "   " << entry.first << ENDL;
   }
 
   //print whitelist
   ss << "WHITELIST: " << ENDL;
-
 
   for(const auto& entry : m_whitelisted_assets)
   {
     ss << " " << std::left << entry.first << "    " << entry.second.ticker << ENDL; 
   }
 
-    // print whitelist
+  // print custom list
   ss << "CUSTOM LIST: " << ENDL;
-
 
   for(const auto& entry : m_custom_assets)
   {
     ss << " " << std::left << entry.first << "    " << entry.second.ticker << ENDL;
   }
 
+  // print own list
   ss << "OWN DESCRIPTORS LIST: " << ENDL;
   
   for(const auto& entry : m_own_asset_descriptors)
