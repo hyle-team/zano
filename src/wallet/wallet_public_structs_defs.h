@@ -1989,7 +1989,7 @@ namespace wallet_public
       currency::asset_descriptor_base asset_descriptor;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(destinations)     DOC_DSCR("Addresses where to receive emitted coins. Asset id in destinations should be set to 0000000000000000000000000000000000000000000000000000000000000000") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(destinations)     DOC_DSCR("Addresses where to receive emitted coins. Asset id in the destinations is irreleant and can be omitted.") DOC_EXMP_AUTO(1) DOC_END
         KV_SERIALIZE(asset_descriptor) DOC_DSCR("Descriptor that holds all information about asset - ticker, emission, description etc") DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -2018,7 +2018,7 @@ namespace wallet_public
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Id of the asset to emit more coins") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
-        KV_SERIALIZE(destinations)     DOC_DSCR("Addresses where to receive emitted coins. Asset id in destinations should be set to 0000000000000000000000000000000000000000000000000000000000000000") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(destinations)     DOC_DSCR("Addresses where to receive emitted coins. Asset id in the destinations is irreleant and can be omitted.") DOC_EXMP_AUTO(1) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
