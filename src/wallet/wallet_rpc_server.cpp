@@ -1304,6 +1304,11 @@ namespace tools
     currency::transaction result_tx;
     std::vector<currency::tx_destination_entry> currency_destinations;
     rpc_destinations_to_currency_destination(req.destinations, currency_destinations);
+    //fix for default asset_id
+    for (auto& d : currency_destinations)
+    {
+      d.asset_id = currency::null_pkey;
+    }
 
     w.get_wallet()->emit_asset(req.asset_id, currency_destinations, result_tx);
     res.result_tx = currency::get_transaction_hash(result_tx);
