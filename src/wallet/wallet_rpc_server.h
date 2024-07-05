@@ -149,6 +149,8 @@ namespace tools
         MAP_JON_RPC_WE("deploy_asset",                        on_assets_deploy,                 wallet_public::COMMAND_ASSETS_DEPLOY)
         MAP_JON_RPC_WE("emit_asset",                          on_assets_emit,                   wallet_public::COMMAND_ASSETS_EMIT)
         MAP_JON_RPC_WE("update_asset",                        on_assets_update,                 wallet_public::COMMAND_ASSETS_UPDATE)
+        MAP_JON_RPC_WE("burn_asset",                          on_assets_burn,                   wallet_public::COMMAND_ASSETS_BURN)
+
 
         //MULTIWALLET APIs
         MAP_JON_RPC_WE("mw_get_wallets",                      on_mw_get_wallets,                wallet_public::COMMAND_MW_GET_WALLETS)
@@ -219,7 +221,7 @@ namespace tools
     bool on_assets_deploy(const wallet_public::COMMAND_ASSETS_DEPLOY::request& req, wallet_public::COMMAND_ASSETS_DEPLOY::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_assets_emit(const wallet_public::COMMAND_ASSETS_EMIT::request& req, wallet_public::COMMAND_ASSETS_EMIT::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_assets_update(const wallet_public::COMMAND_ASSETS_UPDATE::request& req, wallet_public::COMMAND_ASSETS_UPDATE::response& res, epee::json_rpc::error& er, connection_context& cntx);
-
+    bool on_assets_burn(const wallet_public::COMMAND_ASSETS_BURN::request& req, wallet_public::COMMAND_ASSETS_BURN::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
     bool on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS::request& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_mw_select_wallet(const wallet_public::COMMAND_MW_SELECT_WALLET::request& req, wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, connection_context& cntx);
