@@ -1288,6 +1288,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(zarcanum_block_with_txs);
     GENERATE_AND_PLAY(asset_depoyment_and_few_zc_utxos);
     GENERATE_AND_PLAY_HF(assets_and_pos_mining, "4-*");
+    // GENERATE_AND_PLAY_HF(asset_emission_and_unconfirmed_balance, "4-*");
     
     GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
     

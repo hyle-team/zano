@@ -823,3 +823,67 @@ bool assets_and_pos_mining::c1(currency::core& c, size_t ev_index, const std::ve
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+asset_emission_and_unconfirmed_balance::asset_emission_and_unconfirmed_balance()
+{
+  REGISTER_CALLBACK_METHOD(asset_emission_and_unconfirmed_balance, c1);
+}
+
+bool asset_emission_and_unconfirmed_balance::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  //account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  miner_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool asset_emission_and_unconfirmed_balance::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  miner_wlt->refresh();
+
+  asset_descriptor_base adb{};
+  adb.total_max_supply = UINT64_MAX;
+  adb.full_name = "2**64";
+  adb.ticker = "2POWER64";
+
+  std::vector<currency::tx_destination_entry> destinations;
+  destinations.emplace_back(adb.total_max_supply, m_accounts[MINER_ACC_IDX].get_public_address(), null_pkey);
+
+  currency::transaction tx{};
+  crypto::public_key asset_id = currency::null_pkey;
+  miner_wlt->deploy_new_asset(adb, destinations, tx, asset_id);
+  LOG_PRINT_L0("Deployed new asset: " << asset_id << ", tx_id: " << currency::get_transaction_hash(tx));
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  bool stub_bool = 0;
+  miner_wlt->refresh();
+  miner_wlt->scan_tx_pool(stub_bool);
+  uint64_t total, unlocked, awaiting_in, awaiting_out, mined;
+  balance_via_wallet(*miner_wlt, asset_id, &total, &unlocked, &awaiting_in, &awaiting_out, &mined);
+  CHECK_AND_ASSERT_EQ(total,        UINT64_MAX);
+  CHECK_AND_ASSERT_EQ(unlocked,     0);
+  CHECK_AND_ASSERT_EQ(awaiting_in,  UINT64_MAX);
+  CHECK_AND_ASSERT_EQ(awaiting_out, 0);
+  //CHECK_AND_ASSERT_EQ(mined,        0);
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  return true;
+}
