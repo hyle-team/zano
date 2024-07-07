@@ -2162,24 +2162,29 @@ bool simple_wallet::emit_asset(const std::vector<std::string> &args)
   bool r = epee::string_tools::parse_tpod_from_hex_string(args[0], asset_id);
   if (!r)
   {
-    fail_msg_writer() << "Failed to load asset_id from: " << args[0];
+    fail_msg_writer() << "Failed to load asset id: " << args[0];
+    return true;
+  }
+
+  currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
+  uint32_t asset_flags = 0;
+  r = m_wallet->get_asset_info(asset_id, adb, asset_flags);
+  if (!r)
+  {
+    fail_msg_writer() << "Unknown asset id: " << args[0];
+    return true;
+  }
+  if (!(asset_flags & tools::wallet2::aif_own))
+  {
+    fail_msg_writer() << "The wallet appears to have no control over asset " << args[0];
     return true;
   }
 
   uint64_t amount = 0;
-  r = epee::string_tools::get_xtype_from_string(amount, args[1]);
+  r = parse_amount(args[1], amount, adb.decimal_point);
   if (!r)
   {
-    fail_msg_writer() << "Failed to load amount from: " << args[1];
-    return true;
-  }
-
-
-  currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
-  r = m_wallet->daemon_get_asset_info(asset_id, adb);
-  if (!r)
-  {
-    fail_msg_writer() << "Wallet seems to don't have control over asset: " << args[0];
+    fail_msg_writer() << "Failed to read amount: " << args[1] << " (assuming decimal point is " << (int)adb.decimal_point << ")";
     return true;
   }
 
@@ -2192,12 +2197,14 @@ bool simple_wallet::emit_asset(const std::vector<std::string> &args)
   currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
   m_wallet->emit_asset(asset_id, destinations, result_tx);
 
-  success_msg_writer(true) << "Emitted " << get_transaction_hash(result_tx) << " (unconfirmed) : " << ENDL
-    << "Asset ID:     " << asset_id << ENDL
-    << "Title:        " << adb.full_name << ENDL
-    << "Ticker:       " << adb.ticker << ENDL
-    << "Emitted:      " << print_fixed_decimal_point(amount, adb.decimal_point) << ENDL
-    << "Max emission: " << print_fixed_decimal_point(adb.total_max_supply, adb.decimal_point) << ENDL
+  success_msg_writer(true) << "Emitted " << print_money_brief(amount, adb.decimal_point) << " in tx " << get_transaction_hash(result_tx) << " (unconfirmed) : " << ENDL
+    << "Asset ID:       " << asset_id << ENDL
+    << "Title:          " << adb.full_name << ENDL
+    << "Ticker:         " << adb.ticker << ENDL
+    << "Emitted now:    " << print_money_brief(amount, adb.decimal_point) << ENDL
+    << "Emitted before: " << print_money_brief(adb.current_supply, adb.decimal_point) << ENDL
+    << "Emitted total:  " << print_money_brief(adb.current_supply + amount, adb.decimal_point) << ENDL
+    << "Max emission:   " << print_money_brief(adb.total_max_supply, adb.decimal_point) << ENDL
     ;
 
   SIMPLE_WALLET_CATCH_TRY_ENTRY();
@@ -2217,36 +2224,40 @@ bool simple_wallet::burn_asset(const std::vector<std::string> &args)
   bool r = epee::string_tools::parse_tpod_from_hex_string(args[0], asset_id);
   if (!r)
   {
-    fail_msg_writer() << "Failed to load asset_id from: " << args[0];
+    fail_msg_writer() << "Failed to load asset id: " << args[0];
     return true;
   }
-
-  uint64_t amount = 0;
-  r = epee::string_tools::get_xtype_from_string(amount, args[1]);
-  if (!r)
-  {
-    fail_msg_writer() << "Failed to load amount from: " << args[1];
-    return true;
-  }
-
 
   currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
-  r = m_wallet->daemon_get_asset_info(asset_id, adb);
+  uint32_t asset_flags = 0;
+  r = m_wallet->get_asset_info(asset_id, adb, asset_flags);
   if (!r)
   {
-    fail_msg_writer() << "Wallet seems to don't have control over asset: " << args[0];
+    fail_msg_writer() << "Unknown asset id: " << args[0];
+    return true;
+  }
+
+  // as this is asset burning, its not necessary for the wallet to own this asset, so we don't check tools::wallet2::aif_own here
+
+  uint64_t amount = 0;
+  r = parse_amount(args[1], amount, adb.decimal_point);
+  if (!r)
+  {
+    fail_msg_writer() << "Failed to read amount: " << args[1] << " (assuming decimal point is " << (int)adb.decimal_point << ")";
     return true;
   }
 
   currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
   m_wallet->burn_asset(asset_id, amount, result_tx);
 
-  success_msg_writer(true) << "Burned " << get_transaction_hash(result_tx) << " (unconfirmed) : " << ENDL
-    << "Asset ID:     " << asset_id << ENDL
-    << "Title:        " << adb.full_name << ENDL
-    << "Ticker:       " << adb.ticker << ENDL
-    << "Burned:      " << print_fixed_decimal_point(amount, adb.decimal_point) << ENDL
-    << "Max emission: " << print_fixed_decimal_point(adb.total_max_supply, adb.decimal_point) << ENDL
+  success_msg_writer(true) << "Burned " << print_money_brief(amount, adb.decimal_point) << " in tx " << get_transaction_hash(result_tx) << " (unconfirmed) : " << ENDL
+    << "Asset ID:       " << asset_id << ENDL
+    << "Title:          " << adb.full_name << ENDL
+    << "Ticker:         " << adb.ticker << ENDL
+    << "Burned now:     " << print_money_brief(amount, adb.decimal_point) << ENDL
+    << "Emitted before: " << print_money_brief(adb.current_supply, adb.decimal_point) << ENDL
+    << "Current supply: " << print_money_brief(adb.current_supply - amount, adb.decimal_point) << ENDL
+    << "Max emission:   " << print_money_brief(adb.total_max_supply, adb.decimal_point) << ENDL
     ;
 
   SIMPLE_WALLET_CATCH_TRY_ENTRY();
@@ -2280,10 +2291,16 @@ bool simple_wallet::update_asset(const std::vector<std::string> &args)
   }
 
   currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
-  r = m_wallet->daemon_get_asset_info(asset_id, adb);
+  uint32_t asset_flags = 0;
+  r = m_wallet->get_asset_info(asset_id, adb, asset_flags);
   if (!r)
   {
-    fail_msg_writer() << "Wallet seems to don't have control over asset: " << args[0];
+    fail_msg_writer() << "Unknown asset id: " << args[0];
+    return true;
+  }
+  if (!(asset_flags & tools::wallet2::aif_own))
+  {
+    fail_msg_writer() << "The wallet appears to have no control over asset " << args[0];
     return true;
   }
 
@@ -2291,7 +2308,7 @@ bool simple_wallet::update_asset(const std::vector<std::string> &args)
   currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
   m_wallet->update_asset(asset_id, adb, result_tx);
 
-  success_msg_writer(true) << "Asset metainfo update tx sent: " << get_transaction_hash(result_tx) << " (unconfirmed) : " << ENDL
+  success_msg_writer(true) << "Asset metainfo successfully updated in tx " << get_transaction_hash(result_tx) << " (unconfirmed) : " << ENDL
     << "Asset ID:     " << asset_id << ENDL
     << "Title:        " << adb.full_name << ENDL
     << "Ticker:       " << adb.ticker << ENDL
