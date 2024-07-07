@@ -3823,6 +3823,15 @@ bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset
     return true;
   }
 
+  // own asset?
+  auto it_own = m_own_asset_descriptors.find(asset_id);
+  if (it_own != m_own_asset_descriptors.end())
+  {
+    asset_info = it_own->second;
+    asset_flags |= aif_own;
+    return true;
+  }
+
   // whitelisted?
   auto it_white = m_whitelisted_assets.find(asset_id);
   if (it_white != m_whitelisted_assets.end())
@@ -3837,14 +3846,6 @@ bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset
   if (it_cust != m_custom_assets.end())
   {
     asset_info = it_cust->second;
-    return true;
-  }
-
-  auto it_own = m_own_asset_descriptors.find(asset_id);
-  if (it_own != m_own_asset_descriptors.end())
-  {
-    asset_info = it_own->second;
-    asset_flags |= aif_own;
     return true;
   }
 
@@ -4049,7 +4050,7 @@ std::string wallet2::get_balance_str() const
   // 98.0                                         BGTVUW   af2b12f3033337f9aea1845a6bc3fc966ed4d13227a3ace7706fca7dbcdaa7e2
   // 1000.034                                     DP3      d4aba1020f26927571771e04b585b4ffb211f52708d5e4c465bbdfa4a12e6271
 
-  static const char* header = " balance unlocked     / [balance total]       ticker   asset id";
+  static const char* header = " balance unlocked      / [balance total]        ticker   asset id";
   std::stringstream ss;
   ss << header << ENDL;
 
@@ -4058,11 +4059,11 @@ std::string wallet2::get_balance_str() const
   balance(balances, mined);
   for (const tools::wallet_public::asset_balance_entry& b : balances)
   {
-    ss << " " << std::left << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(b.unlocked, b.asset_info.decimal_point);
+    ss << " " << std::left << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(b.unlocked, b.asset_info.decimal_point);
     if (b.total == b.unlocked)
-      ss << "                       ";
+      ss << std::string(21 + 3, ' ');
     else
-      ss << " / " << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(b.total, b.asset_info.decimal_point);
+      ss << " / " << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(b.total, b.asset_info.decimal_point);
     ss << "  " << std::setw(8) << std::left << b.asset_info.ticker << " " << b.asset_info.asset_id << ENDL;
   }
 
@@ -4080,7 +4081,7 @@ std::string wallet2::get_balance_str_raw() const
   // 7d3f348fbebfffc4e61a3686189cf870ea393e1c88b8f636acbfdacf9e4b2db2    CT
   // ...
 
-  static const char* header = " balance unlocked     / [balance total]     DP   asset id";
+  static const char* header = " balance unlocked      / [balance total]        DP   asset id";
   std::stringstream ss;
   ss << header << ENDL;
   
@@ -4092,11 +4093,13 @@ std::string wallet2::get_balance_str_raw() const
   {
     size_t decimal_point = 0;
     bool has_known_decimal_point = get_asset_decimal_point(entry.first, &decimal_point);
-    ss << " " << std::left << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(entry.second.unlocked, decimal_point);
+    ss << " " << std::left << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(entry.second.unlocked, decimal_point);
     if(entry.second.total == entry.second.unlocked)
-      ss << "                       ";
+      ss << std::string(21 + 3, ' ');
     else
-      ss << " / " << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(entry.second.total, decimal_point);
+      ss << " / " << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(entry.second.total, decimal_point);
+
+    ss << "  ";
 
     if (has_known_decimal_point)
       ss << std::setw(2) << std::right << decimal_point;
