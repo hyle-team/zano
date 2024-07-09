@@ -3463,6 +3463,27 @@ namespace currency
   //---------------------------------------------------------------
   std::string print_money_brief(uint64_t amount, size_t decimal_point /* = CURRENCY_DISPLAY_DECIMAL_POINT */)
   {
+    // TODO: temporary fix for insanely big decimal points
+    // TODO: remove it after setting the limit to 18 -- sowle
+    if (decimal_point > 32)
+      return std::string("!!") + std::to_string(amount);
+    if (decimal_point >= 20)
+    {
+      std::string r = std::to_string(amount);
+      if (decimal_point + 1 > r.size())
+        r.insert(0, decimal_point - r.size() + 1, '0');
+      r.insert(r.begin() + 1, '.');
+      size_t p = r.find_last_not_of('0');
+      if (p != r.npos)
+      {
+        if (r[p] != '.' && p + 1 < r.size())
+          r.erase(p + 1);
+        else if (p + 2 < r.size())
+          r.erase(p + 2);
+      }
+      return r;
+    }
+
     uint64_t coin = decimal_point == CURRENCY_DISPLAY_DECIMAL_POINT ? COIN : crypto::constexpr_pow(decimal_point, 10);
     uint64_t remainder = amount % coin;
     amount /= coin;

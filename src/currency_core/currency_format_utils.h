@@ -1089,17 +1089,24 @@ namespace currency
     bool operator()(const extra_user_data& ee)
     {
       tv.type = "user_data";
-      tv.short_view = std::to_string(ee.buff.size()) + " bytes";
       tv.details_view = epee::string_tools::buff_to_hex_nodelimer(ee.buff);
+      if (ee.buff.size() <= 8)
+        tv.short_view = tv.details_view;
+      else
+        tv.short_view = std::to_string(ee.buff.size()) + " bytes";
 
       return true;
     }
     bool operator()(const extra_padding& ee)
     {
       tv.type = "extra_padding";
-      tv.short_view = std::to_string(ee.buff.size()) + " bytes";
       if (!ee.buff.empty())
         tv.details_view = epee::string_tools::buff_to_hex_nodelimer(std::string(reinterpret_cast<const char*>(&ee.buff[0]), ee.buff.size()));
+      
+      if (ee.buff.size() <= 8)
+        tv.short_view = tv.details_view;
+      else
+        tv.short_view = std::to_string(ee.buff.size()) + " bytes";
 
       return true;
     }
@@ -1144,16 +1151,24 @@ namespace currency
     bool operator()(const tx_derivation_hint& ee)
     {
       tv.type = "derivation_hint";
-      tv.short_view = std::to_string(ee.msg.size()) + " bytes";
       tv.details_view = epee::string_tools::buff_to_hex_nodelimer(ee.msg);
+
+      if (ee.msg.size() <= 8)
+        tv.short_view = tv.details_view;
+      else
+        tv.short_view = std::to_string(ee.msg.size()) + " bytes";
 
       return true;
     }
     bool operator()(const std::string& ee)
     {
       tv.type = "string";
-      tv.short_view = std::to_string(ee.size()) + " bytes";
       tv.details_view = epee::string_tools::buff_to_hex_nodelimer(ee);
+
+      if (ee.size() <= 8)
+        tv.short_view = tv.details_view;
+      else
+        tv.short_view = std::to_string(ee.size()) + " bytes";
 
       return true;
     }
@@ -1182,6 +1197,15 @@ namespace currency
     bool operator()(const zc_balance_proof& bp)
     {
       tv.type = "zc_balance_proof";
+      return true;
+    }
+    bool operator()(const asset_descriptor_operation& ado)
+    {
+      tv.type = "asset operation";
+      tv.short_view = std::string("op:") + get_asset_operation_type_string(ado.operation_type, true);
+      if (ado.opt_asset_id.has_value())
+        tv.short_view += std::string(" , id:") + crypto::pod_to_hex(ado.opt_asset_id);
+      tv.details_view = tv.short_view + std::string(" , ticker:") + ado.descriptor.ticker + std::string(" , cur.supply:") + print_money_brief(ado.descriptor.current_supply, ado.descriptor.decimal_point);
       return true;
     }
     template<typename t_type>

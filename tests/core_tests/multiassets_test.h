@@ -41,3 +41,9 @@ struct assets_and_pos_mining : public wallet_test
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
+struct asset_emission_and_unconfirmed_balance : public wallet_test
+{
+  asset_emission_and_unconfirmed_balance();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
