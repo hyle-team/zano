@@ -5305,6 +5305,8 @@ void wallet2::request_alias_registration(currency::extra_alias_entry& ai, curren
 //----------------------------------------------------------------------------------------------------
 void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id)
 {
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(asset_info.decimal_point <= 18, "too big decimal point: " << asset_info.decimal_point);
+
   asset_descriptor_operation asset_reg_info = AUTO_VAL_INIT(asset_reg_info);
   asset_reg_info.descriptor = asset_info;
   asset_reg_info.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
