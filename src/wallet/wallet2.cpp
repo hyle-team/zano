@@ -5420,7 +5420,7 @@ void wallet2::burn_asset(const crypto::public_key asset_id, uint64_t amount_to_b
   asset_descriptor_operation asset_burn_info = AUTO_VAL_INIT(asset_burn_info);
   asset_burn_info.descriptor = rsp.asset_descriptor;
 
-  CHECK_AND_ASSERT_THROW_MES(asset_burn_info.descriptor.current_supply > amount_to_burn, "Wrong amount to burn (current_supply" << asset_burn_info.descriptor.current_supply << " is less then " << amount_to_burn << ")");
+  CHECK_AND_ASSERT_THROW_MES(asset_burn_info.descriptor.current_supply >= amount_to_burn, "Wrong amount to burn (current_supply" << asset_burn_info.descriptor.current_supply << " is less then " << amount_to_burn << ")");
 
   currency::tx_destination_entry dst_to_burn = AUTO_VAL_INIT(dst_to_burn);
   dst_to_burn.amount = amount_to_burn;
