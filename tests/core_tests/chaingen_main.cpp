@@ -1102,6 +1102,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(wallet_rpc_transfer);
     GENERATE_AND_PLAY(wallet_rpc_alias_tests);
     GENERATE_AND_PLAY_HF(wallet_rpc_exchange_suite, "3,4");
+    GENERATE_AND_PLAY_HF(wallet_true_rpc_pos_mining, "4-*");
     GENERATE_AND_PLAY(wallet_chain_switch_with_spending_the_same_ki);
     GENERATE_AND_PLAY(wallet_sending_to_integrated_address);
     GENERATE_AND_PLAY_HF(block_template_blacklist_test, "4-*");
