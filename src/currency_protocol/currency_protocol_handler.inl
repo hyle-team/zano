@@ -7,6 +7,7 @@
 #include <boost/interprocess/detail/atomic.hpp>
 #include "currency_core/currency_format_utils.h"
 #include "profile_tools.h"
+#include <version.h>
 namespace currency
 {
 

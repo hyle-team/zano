@@ -5052,7 +5052,7 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
     WLT_LOG_GREEN("Note: " << udtx.vin.size() << " inputs were aggregated into UTXO defragmentation tx " << get_transaction_hash(udtx), LOG_LEVEL_0);
   }
   m_core_proxy->call_COMMAND_RPC_GETBLOCKTEMPLATE(tmpl_req, tmpl_rsp);
-  WLT_CHECK_AND_ASSERT_MES(tmpl_rsp.status == API_RETURN_CODE_OK, false, "Failed to create block template after kernel hash found!");
+  WLT_CHECK_AND_ASSERT_MES(tmpl_rsp.status == API_RETURN_CODE_OK, false, "Failed to create block template after kernel hash found! Status: " << tmpl_rsp.status);
 
   currency::block b = AUTO_VAL_INIT(b);
   currency::blobdata block_blob;
