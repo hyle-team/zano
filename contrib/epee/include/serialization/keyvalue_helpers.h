@@ -105,7 +105,7 @@ namespace epee
     std::string res;
     for (const auto& item : a)
     {
-      res += epee::string_tools::pod_to_hex(a) + ", ";
+      res += epee::string_tools::pod_to_hex(item) + ", ";
     }
     if (a.size())
     {
