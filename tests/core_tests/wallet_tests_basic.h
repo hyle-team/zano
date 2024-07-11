@@ -1,10 +1,15 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once 
 #include "chaingen.h"
+#include "currency_protocol/currency_protocol_handler.h"
+#include "currency_core/currency_core.h"
+#include "p2p/net_node.h"
+#include "currency_core/bc_offers_service.h"
+#include "rpc/core_rpc_server.h"
 
 struct wallet_test : virtual public test_chain_unit_enchanced
 {
@@ -22,10 +27,29 @@ struct wallet_test : virtual public test_chain_unit_enchanced
   static std::string get_test_account_name_by_id(size_t acc_id);
 
   template<typename wallet_t>
-  std::shared_ptr<wallet_t> init_playtime_test_wallet_t(const std::vector<test_event_entry>& events, currency::core& c, const currency::account_base& acc) const
+  std::shared_ptr<wallet_t> init_playtime_test_wallet_t(const std::vector<test_event_entry>& events, currency::core& c, const currency::account_base& acc, bool true_http_rpc = false) const
   {
     CHECK_AND_ASSERT_THROW_MES(events.size() > 0 && events[0].type() == typeid(currency::block), "Invalid events queue, can't find genesis block at the beginning");
     crypto::hash genesis_hash = get_block_hash(boost::get<currency::block>(events[0]));
+
+    if (true_http_rpc)
+    {
+      m_core_proxy = std::make_shared<tools::default_http_core_proxy>();
+      m_core_proxy->set_connectivity(100, 1);
+      CHECK_AND_ASSERT_MES(m_core_proxy->set_connection_addr("127.0.0.1:33777"), false, "");
+      if (!m_core_proxy->check_connection())
+      {
+        // if there's not http rpc core server yet, create one
+        boost::program_options::options_description desc_options;
+        currency::core_rpc_server::init_options(desc_options);
+        boost::program_options::variables_map vm{};
+        char* argv[] = {"--rpc-bind-ip=127.0.0.1", "--rpc-bind-port=33777"};
+        boost::program_options::store(boost::program_options::parse_command_line(sizeof argv / sizeof argv[0], argv, desc_options), vm);
+        m_http_rpc_server = std::make_shared<core_http_rpc_server_details>(c, vm);
+      }
+      m_core_proxy->set_connectivity(30000, 1);
+      CHECK_AND_ASSERT_MES(m_core_proxy->check_connection(), false, "no connection");
+    }
 
     std::shared_ptr<wallet_t> w(new wallet_t);
     w->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
@@ -64,12 +88,42 @@ protected:
     size_t account_index;
   };
 
+  struct core_http_rpc_server_details
+  {
+    currency::t_currency_protocol_handler<currency::core> cph;
+    nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > p2p;
+    bc_services::bc_offers_service bos;
+    currency::core_rpc_server core_rpc_server;
+
+    core_http_rpc_server_details(currency::core& c, const boost::program_options::variables_map& vm)
+      : cph(c, nullptr)
+      , p2p(cph)
+      , bos(nullptr)
+      , core_rpc_server(c, p2p, bos)
+    {
+      bos.set_disabled(true);
+      core_rpc_server.set_ignore_connectivity_status(true);
+      
+      bool r = core_rpc_server.init(vm);
+      CRYPTO_CHECK_AND_THROW_MES(r, "core_http_rpc_server_details: rpc server init failed");
+      r = core_rpc_server.run(2, false);
+      CRYPTO_CHECK_AND_THROW_MES(r, "core_http_rpc_server_details: rpc server run failed");
+    }
+
+    ~core_http_rpc_server_details()
+    {
+      core_rpc_server.deinit();
+    }
+  };
+
   std::shared_ptr<tools::wallet2> init_playtime_test_wallet(const std::vector<test_event_entry>& events, currency::core& c, size_t account_index) const;
   std::shared_ptr<tools::wallet2> init_playtime_test_wallet(const std::vector<test_event_entry>& events, currency::core& c, const currency::account_base& acc) const;
+  std::shared_ptr<tools::wallet2> wallet_test::init_playtime_test_wallet_with_true_http_rpc(const std::vector<test_event_entry>& events, currency::core& c, size_t account_index) const;
 
   mutable std::vector<currency::account_base> m_accounts;
   mutable test_generator generator;
-  std::shared_ptr<tools::i_core_proxy> m_core_proxy;
+  mutable std::shared_ptr<tools::i_core_proxy> m_core_proxy;
+  mutable std::shared_ptr<core_http_rpc_server_details> m_http_rpc_server; // "True" RPC via http on localhost
 };
 
 
