@@ -575,7 +575,7 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_pos_mining_details(const COMMAND_RPC_GET_POS_MINING_DETAILS::request& req, COMMAND_RPC_GET_POS_MINING_DETAILS::response& res, connection_context& cntx)
   {
-    if (!m_p2p.get_connections_count())
+    if (!m_ignore_status && !m_p2p.get_connections_count())
     {
       res.status = API_RETURN_CODE_DISCONNECTED;
       return true;
@@ -793,7 +793,7 @@ namespace currency
       return true;
     }
 
-    if (!m_p2p.get_payload_object().get_synchronized_connections_count())
+    if (!m_ignore_status && !m_p2p.get_payload_object().get_synchronized_connections_count())
     {
       LOG_PRINT_L0("[on_send_raw_tx]: Failed to send, daemon not connected to net");
       res.status = API_RETURN_CODE_DISCONNECTED;
