@@ -36,7 +36,7 @@ struct wallet_test : virtual public test_chain_unit_enchanced
     {
       m_core_proxy = std::make_shared<tools::default_http_core_proxy>();
       m_core_proxy->set_connectivity(100, 1);
-      CHECK_AND_ASSERT_MES(m_core_proxy->set_connection_addr("127.0.0.1:33777"), false, "");
+      CHECK_AND_ASSERT_THROW_MES(m_core_proxy->set_connection_addr("127.0.0.1:33777"), "set_connection_addr failed");
       if (!m_core_proxy->check_connection())
       {
         // if there's not http rpc core server yet, create one
@@ -48,7 +48,7 @@ struct wallet_test : virtual public test_chain_unit_enchanced
         m_http_rpc_server = std::make_shared<core_http_rpc_server_details>(c, vm);
       }
       m_core_proxy->set_connectivity(30000, 1);
-      CHECK_AND_ASSERT_MES(m_core_proxy->check_connection(), false, "no connection");
+      CHECK_AND_ASSERT_THROW_MES(m_core_proxy->check_connection(), "m_core_proxy: no connection");
     }
 
     std::shared_ptr<wallet_t> w(new wallet_t);
@@ -118,7 +118,7 @@ protected:
 
   std::shared_ptr<tools::wallet2> init_playtime_test_wallet(const std::vector<test_event_entry>& events, currency::core& c, size_t account_index) const;
   std::shared_ptr<tools::wallet2> init_playtime_test_wallet(const std::vector<test_event_entry>& events, currency::core& c, const currency::account_base& acc) const;
-  std::shared_ptr<tools::wallet2> wallet_test::init_playtime_test_wallet_with_true_http_rpc(const std::vector<test_event_entry>& events, currency::core& c, size_t account_index) const;
+  std::shared_ptr<tools::wallet2> init_playtime_test_wallet_with_true_http_rpc(const std::vector<test_event_entry>& events, currency::core& c, size_t account_index) const;
 
   mutable std::vector<currency::account_base> m_accounts;
   mutable test_generator generator;
