@@ -286,15 +286,15 @@ namespace currency
 
     // consider redesign, some data may possibly be excluded from kv serialization -- sowle
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(asset_ids)
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(blinded_asset_ids)
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amount_commitments)
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(asset_id_blinding_masks)
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amounts)
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(amount_blinding_masks)
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(pseudo_outs_blinded_asset_ids)
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(pseudo_outs_plus_real_out_blinding_masks)
-      KV_SERIALIZE_CONTAINER_POD_AS_BLOB(real_zc_ins_asset_ids)
+      KV_SERIALIZE_CONTAINER_POD_AS_HEX(asset_ids)
+      KV_SERIALIZE_CONTAINER_POD_AS_HEX(blinded_asset_ids)
+      KV_SERIALIZE_CONTAINER_POD_AS_HEX(amount_commitments)
+      KV_SERIALIZE_CONTAINER_POD_AS_HEX(asset_id_blinding_masks)
+      KV_SERIALIZE_CONTAINER_POD_AS_HEX(amounts)
+      KV_SERIALIZE_CONTAINER_POD_AS_HEX(amount_blinding_masks)
+      KV_SERIALIZE_CONTAINER_POD_AS_HEX(pseudo_outs_blinded_asset_ids)
+      KV_SERIALIZE_CONTAINER_POD_AS_HEX(pseudo_outs_plus_real_out_blinding_masks)
+      KV_SERIALIZE_CONTAINER_POD_AS_HEX(real_zc_ins_asset_ids)
       KV_SERIALIZE(zc_input_amounts)
       KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_commitments_sum)
       KV_SERIALIZE_POD_AS_HEX_STRING(pseudo_out_amount_blinding_masks_sum)
@@ -344,7 +344,8 @@ namespace currency
     END_SERIALIZE()
   }; // struct tx_generation_context
 
-  bool validate_tx_output_details_againt_tx_generation_context(const transaction& tx, const tx_generation_context& gen_context);
+  bool validate_tx_details_against_tx_generation_context(const transaction& tx, const tx_generation_context& gen_context);
+
   std::string transform_tx_to_str(const transaction& tx);
   transaction transform_str_to_tx(const std::string& tx_str);
 

@@ -1,3 +1,4 @@
+// Copyright (c) 2024, Zano Project
 // Copyright (c) 2006-2017, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 //
@@ -35,11 +36,14 @@ namespace epee
     inline std::string print_fixed_decimal_point(t_number amount, size_t decimal_point)
     {
       std::string s = boost::lexical_cast<std::string>(amount);
+      if (decimal_point > 32)
+        return std::string("!!") + s; // avoiding overflow issues
       if (s.size() < decimal_point + 1)
       {
         s.insert(0, decimal_point + 1 - s.size(), '0');
       }
-      s.insert(s.size() - decimal_point, ".");
+      if (decimal_point > 0)
+        s.insert(s.size() - decimal_point, ".");
       return s;
     }
   }

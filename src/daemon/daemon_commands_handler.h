@@ -817,6 +817,7 @@ private:
                                        "     amount cmt * 1/8: " << aop.amount_commitment << ENDL <<
                                        "     hidden supply:    " << (aop.descriptor.hidden_supply ? "yes" : "no") << ENDL <<
         "";
+      ++idx;
     }
 
     LOG_PRINT_L0(ss.str());

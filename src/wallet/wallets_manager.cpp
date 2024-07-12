@@ -1459,7 +1459,7 @@ std::string wallets_manager::request_alias_registration(const currency::alias_rp
   return API_RETURN_CODE_ALREADY_EXISTS;
 }
 
-std::string wallets_manager::request_alias_update(const currency::alias_rpc_details& al, uint64_t wallet_id, uint64_t fee, currency::transaction& res_tx, uint64_t reward)
+std::string wallets_manager::request_alias_update(const currency::alias_rpc_details& al, uint64_t wallet_id, uint64_t fee, currency::transaction& res_tx)
 {
   currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
   if (!currency::alias_rpc_details_to_alias_info(al, ai))
@@ -1480,7 +1480,7 @@ std::string wallets_manager::request_alias_update(const currency::alias_rpc_deta
     std::string api_return_code_result = API_RETURN_CODE_FAIL;
     do_exception_safe_call(
       [&]() {
-        w->get()->request_alias_update(ai, res_tx, fee, reward);
+        w->get()->request_alias_update(ai, res_tx, fee);
         api_return_code_result = API_RETURN_CODE_OK;
       },
       [&]() { return get_wallet_log_prefix(wallet_id) + "request_alias_update error: "; },
@@ -1495,10 +1495,11 @@ std::string wallets_manager::request_alias_update(const currency::alias_rpc_deta
 
 std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx)
 {
-
   std::vector<currency::tx_destination_entry> dsts;
   if(!tp.destinations.size())
     return API_RETURN_CODE_BAD_ARG_EMPTY_DESTINATIONS;
+
+  GET_WALLET_BY_ID(wallet_id, w);
 
   uint64_t fee = tp.fee;
   //payment_id
@@ -1538,8 +1539,13 @@ std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_p
       return API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS;
     }
     
-    
-    if(!currency::parse_amount(dsts.back().amount, d.amount))
+    size_t decimal_point = 0;
+    if (!w->get()->get_asset_decimal_point(d.asset_id, &decimal_point))
+    {
+      return API_RETURN_CODE_BAD_ARG_UNKNOWN_DECIMAL_POINT;
+    }
+
+    if(!currency::parse_amount(d.amount, dsts.back().amount, decimal_point))
     {
       return API_RETURN_CODE_BAD_ARG_WRONG_AMOUNT;
     }
@@ -1551,8 +1557,6 @@ std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_p
     }
     dsts.back().asset_id = d.asset_id;
   }
-
-  GET_WALLET_BY_ID(wallet_id, w);
 
   if (payment_id.size())
   {

@@ -39,7 +39,7 @@ namespace currency
     
     void set_rpc_chain_handler(epee::net_utils::http::i_chain_handler* prpc_chain_handler) { m_prpc_chain_handler = prpc_chain_handler; }
     bool on_get_blocks_direct(const COMMAND_RPC_GET_BLOCKS_DIRECT::request& req, COMMAND_RPC_GET_BLOCKS_DIRECT::response& res, connection_context& cntx);
-    
+    void set_ignore_connectivity_status(bool ignore) { m_ignore_status = ignore;}
 
     bool on_get_height(const COMMAND_RPC_GET_HEIGHT::request& req, COMMAND_RPC_GET_HEIGHT::response& res, connection_context& cntx);
     bool on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res, connection_context& cntx);

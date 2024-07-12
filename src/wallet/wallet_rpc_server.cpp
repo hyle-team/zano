@@ -968,6 +968,31 @@ namespace tools
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_update_alias(const wallet_public::COMMAND_RPC_UPDATE_ALIAS::request& req, wallet_public::COMMAND_RPC_UPDATE_ALIAS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    currency::extra_alias_entry ai = AUTO_VAL_INIT(ai);
+    if (!alias_rpc_details_to_alias_info(req.al, ai))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
+      er.message = "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS";
+      return false;
+    }
+
+    if (!currency::validate_alias_name(ai.m_alias))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
+      er.message = "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS - Wrong alias name";
+      return false;
+    }    
+
+    currency::transaction tx = AUTO_VAL_INIT(tx);
+    w.get_wallet()->request_alias_update(ai, tx, w.get_wallet()->get_default_fee());
+    res.tx_id = get_transaction_hash(tx);
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_contracts_send_proposal(const wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL::request& req, wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();       
@@ -1199,7 +1224,7 @@ namespace tools
     currency::assets_map_to_assets_list(res.global_whitelist, w.get_wallet()->get_global_whitelist());
     currency::assets_map_to_assets_list(res.own_assets, w.get_wallet()->get_own_assets());
 
-    const auto global_whitelist = w.get_wallet()->get_global_whitelist();
+    //const auto global_whitelist = w.get_wallet()->get_global_whitelist();
 
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
@@ -1246,7 +1271,7 @@ namespace tools
       std::string embedded_payment_id;
       //check if address looks like wrapped address
       WLT_THROW_IF_FALSE_WITH_CODE(!currency::is_address_like_wrapped(it->address), "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS", "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS");
-      WLT_THROW_IF_FALSE_WITH_CODE(!w.get_wallet()->get_transfer_address(it->address, de.addr.back(), embedded_payment_id), "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS", "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS");
+      WLT_THROW_IF_FALSE_WITH_CODE(w.get_wallet()->get_transfer_address(it->address, de.addr.back(), embedded_payment_id), "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS", "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS");
       WLT_THROW_IF_FALSE_WITH_CODE(embedded_payment_id.size() == 0, "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS", "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS");
       de.amount = it->amount;
       de.asset_id = it->asset_id;
@@ -1257,9 +1282,16 @@ namespace tools
   bool wallet_rpc_server::on_assets_deploy(const wallet_public::COMMAND_ASSETS_DEPLOY::request& req, wallet_public::COMMAND_ASSETS_DEPLOY::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
+
     currency::transaction result_tx;
     std::vector<currency::tx_destination_entry> currency_destinations;
     rpc_destinations_to_currency_destination(req.destinations, currency_destinations);
+    //fix for default asset_id
+    for (auto& d : currency_destinations)
+    {
+      d.asset_id = currency::null_pkey;
+    }
+
     w.get_wallet()->deploy_new_asset(req.asset_descriptor, currency_destinations, result_tx, res.new_asset_id);
     res.result_tx = currency::get_transaction_hash(result_tx);
     return true;
@@ -1272,6 +1304,11 @@ namespace tools
     currency::transaction result_tx;
     std::vector<currency::tx_destination_entry> currency_destinations;
     rpc_destinations_to_currency_destination(req.destinations, currency_destinations);
+    //fix for default asset_id
+    for (auto& d : currency_destinations)
+    {
+      d.asset_id = currency::null_pkey;
+    }
 
     w.get_wallet()->emit_asset(req.asset_id, currency_destinations, result_tx);
     res.result_tx = currency::get_transaction_hash(result_tx);
@@ -1290,6 +1327,16 @@ namespace tools
 
     WALLET_RPC_CATCH_TRY_ENTRY();
   }  
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_assets_burn(const wallet_public::COMMAND_ASSETS_BURN::request& req, wallet_public::COMMAND_ASSETS_BURN::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    currency::transaction result_tx;
+    w.get_wallet()->burn_asset(req.asset_id, req.burn_amount, result_tx);
+    res.result_tx = currency::get_transaction_hash(result_tx);
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS::request& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {

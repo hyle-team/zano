@@ -116,6 +116,8 @@ namespace tools
         MAP_JON_RPC_WE("get_seed_phrase_info",      on_get_seed_phrase_info,      wallet_public::COMMAND_RPC_GET_SEED_PHRASE_INFO)
         MAP_JON_RPC_WE("get_mining_history",        on_get_mining_history,        wallet_public::COMMAND_RPC_GET_MINING_HISTORY)
         MAP_JON_RPC_WE("register_alias",            on_register_alias,            wallet_public::COMMAND_RPC_REGISTER_ALIAS)
+        MAP_JON_RPC_WE("update_alias",              on_update_alias,              wallet_public::COMMAND_RPC_UPDATE_ALIAS)
+
         //contracts API
         //MAP_JON_RPC_WE("contracts_send_proposal",             on_contracts_send_proposal,      wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL)
         //MAP_JON_RPC_WE("contracts_accept_proposal",           on_contracts_accept_proposal,    wallet_public::COMMAND_CONTRACTS_ACCEPT_PROPOSAL)
@@ -147,6 +149,8 @@ namespace tools
         MAP_JON_RPC_WE("deploy_asset",                        on_assets_deploy,                 wallet_public::COMMAND_ASSETS_DEPLOY)
         MAP_JON_RPC_WE("emit_asset",                          on_assets_emit,                   wallet_public::COMMAND_ASSETS_EMIT)
         MAP_JON_RPC_WE("update_asset",                        on_assets_update,                 wallet_public::COMMAND_ASSETS_UPDATE)
+        MAP_JON_RPC_WE("burn_asset",                          on_assets_burn,                   wallet_public::COMMAND_ASSETS_BURN)
+
 
         //MULTIWALLET APIs
         MAP_JON_RPC_WE("mw_get_wallets",                      on_mw_get_wallets,                wallet_public::COMMAND_MW_GET_WALLETS)
@@ -186,7 +190,8 @@ namespace tools
     bool on_search_for_transactions2(const wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::request& req, wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_get_mining_history(const wallet_public::COMMAND_RPC_GET_MINING_HISTORY::request& req, wallet_public::COMMAND_RPC_GET_MINING_HISTORY::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_register_alias(const wallet_public::COMMAND_RPC_REGISTER_ALIAS::request& req, wallet_public::COMMAND_RPC_REGISTER_ALIAS::response& res, epee::json_rpc::error& er, connection_context& cntx);
-      
+    bool on_update_alias(const wallet_public::COMMAND_RPC_UPDATE_ALIAS::request& req, wallet_public::COMMAND_RPC_UPDATE_ALIAS::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    
       
     bool on_contracts_send_proposal(const wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL::request& req, wallet_public::COMMAND_CONTRACTS_SEND_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_contracts_accept_proposal(const wallet_public::COMMAND_CONTRACTS_ACCEPT_PROPOSAL::request& req, wallet_public::COMMAND_CONTRACTS_ACCEPT_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx);
@@ -216,7 +221,7 @@ namespace tools
     bool on_assets_deploy(const wallet_public::COMMAND_ASSETS_DEPLOY::request& req, wallet_public::COMMAND_ASSETS_DEPLOY::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_assets_emit(const wallet_public::COMMAND_ASSETS_EMIT::request& req, wallet_public::COMMAND_ASSETS_EMIT::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_assets_update(const wallet_public::COMMAND_ASSETS_UPDATE::request& req, wallet_public::COMMAND_ASSETS_UPDATE::response& res, epee::json_rpc::error& er, connection_context& cntx);
-
+    bool on_assets_burn(const wallet_public::COMMAND_ASSETS_BURN::request& req, wallet_public::COMMAND_ASSETS_BURN::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
     bool on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS::request& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_mw_select_wallet(const wallet_public::COMMAND_MW_SELECT_WALLET::request& req, wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, connection_context& cntx);

@@ -1868,7 +1868,7 @@ bool gen_wallet_alias_via_special_wallet_funcs::c1(currency::core& c, size_t ev_
 
   ai.m_text_comment = "Update!";
   ai.m_address = m_accounts[MINER_ACC_IDX].get_public_address();
-  alice_wlt->request_alias_update(ai, res_tx, TESTS_DEFAULT_FEE, 0);
+  alice_wlt->request_alias_update(ai, res_tx, TESTS_DEFAULT_FEE);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool");
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);

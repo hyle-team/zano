@@ -105,7 +105,7 @@ namespace epee
     std::string res;
     for (const auto& item : a)
     {
-      res += epee::string_tools::pod_to_hex(a) + ", ";
+      res += epee::string_tools::pod_to_hex(item) + ", ";
     }
     if (a.size())
     {
@@ -121,8 +121,13 @@ namespace epee
     boost::split(pod_items, a, boost::is_any_of(", ][\""));
 
     t_pod_container_type res;
+    if (!a.size())
+      return res;
     for (const auto& item : pod_items)
     {
+      if(!item.size())
+        continue;
+
       res.resize(res.size() + 1);
       typename t_pod_container_type::value_type& pod_val = res.back();
 

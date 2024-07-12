@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -355,7 +355,7 @@ namespace currency
       CHECK_AND_ASSERT_MES(commitment_to_zero_is_sane, false, "internal error: commitment_to_zero is malformed (X)");
 #endif
       r = crypto::generate_double_schnorr_sig<crypto::gt_X, crypto::gt_G>(tx_id, commitment_to_zero, secret_x, ogc.tx_pub_key_p, ogc.tx_key.sec, proof.dss);
-      CHECK_AND_ASSERT_MES(r, false, "genergenerate_double_schnorr_sigate_schnorr_sig (X, G) failed");
+      CHECK_AND_ASSERT_MES(r, false, "generate_double_schnorr_sig (X, G) failed");
     }
 
     return true;
@@ -700,6 +700,14 @@ namespace currency
       // (sum(bare inputs' amounts) - fee) * H + sum(pseudo outs commitments for ZC inputs) - sum(outputs' commitments) = lin(X)  OR  = lin(G)
       crypto::point_t commitment_to_zero = (crypto::scalar_t(bare_inputs_sum) - crypto::scalar_t(fee)) * currency::native_coin_asset_id_pt + sum_of_pseudo_out_amount_commitments - outs_commitments_sum;
 
+      DBG_VAL_PRINT(tx_id);
+      DBG_VAL_PRINT(tx_pub_key);
+      DBG_VAL_PRINT(bare_inputs_sum);
+      DBG_VAL_PRINT(fee);
+      DBG_VAL_PRINT(sum_of_pseudo_out_amount_commitments);
+      DBG_VAL_PRINT(outs_commitments_sum);
+      DBG_VAL_PRINT(commitment_to_zero);
+
       CHECK_AND_ASSERT_MES(zc_inputs_count == zc_sigs_count, false, "zc inputs count (" << zc_inputs_count << ") and zc sigs count (" << zc_sigs_count << ") missmatch");
       if (zc_inputs_count > 0)
       {
@@ -785,8 +793,7 @@ namespace currency
     }
   }
   //---------------------------------------------------------------
-  // TODO: reverse order of arguments
-  bool parse_amount(uint64_t& amount, const std::string& str_amount_)
+  bool parse_amount(const std::string& str_amount_, uint64_t& amount, const size_t decimal_point /* = CURRENCY_DISPLAY_DECIMAL_POINT */)
   {
     std::string str_amount = str_amount_;
     boost::algorithm::trim(str_amount);
@@ -796,12 +803,12 @@ namespace currency
     if (std::string::npos != point_index)
     {
       fraction_size = str_amount.size() - point_index - 1;
-      while (CURRENCY_DISPLAY_DECIMAL_POINT < fraction_size && '0' == str_amount.back())
+      while (decimal_point < fraction_size && '0' == str_amount.back())
       {
         str_amount.erase(str_amount.size() - 1, 1);
         --fraction_size;
       }
-      if (CURRENCY_DISPLAY_DECIMAL_POINT < fraction_size)
+      if (decimal_point < fraction_size)
         return false;
       str_amount.erase(point_index, 1);
     }
@@ -813,9 +820,9 @@ namespace currency
     if (str_amount.empty())
       return false;
 
-    if (fraction_size < CURRENCY_DISPLAY_DECIMAL_POINT)
+    if (fraction_size < decimal_point)
     {
-      str_amount.append(CURRENCY_DISPLAY_DECIMAL_POINT - fraction_size, '0');
+      str_amount.append(decimal_point - fraction_size, '0');
     }
 
     return string_tools::get_xtype_from_string(amount, str_amount);
@@ -3456,11 +3463,32 @@ namespace currency
   //---------------------------------------------------------------
   std::string print_money_brief(uint64_t amount, size_t decimal_point /* = CURRENCY_DISPLAY_DECIMAL_POINT */)
   {
+    // TODO: temporary fix for insanely big decimal points
+    // TODO: remove it after setting the limit to 18 -- sowle
+    if (decimal_point > 32)
+      return std::string("!!") + std::to_string(amount);
+    if (decimal_point >= 20)
+    {
+      std::string r = std::to_string(amount);
+      if (decimal_point + 1 > r.size())
+        r.insert(0, decimal_point - r.size() + 1, '0');
+      r.insert(r.begin() + 1, '.');
+      size_t p = r.find_last_not_of('0');
+      if (p != r.npos)
+      {
+        if (r[p] != '.' && p + 1 < r.size())
+          r.erase(p + 1);
+        else if (p + 2 < r.size())
+          r.erase(p + 2);
+      }
+      return r;
+    }
+
     uint64_t coin = decimal_point == CURRENCY_DISPLAY_DECIMAL_POINT ? COIN : crypto::constexpr_pow(decimal_point, 10);
     uint64_t remainder = amount % coin;
     amount /= coin;
     if (remainder == 0)
-      return std::to_string(amount) + ".0";
+      return std::to_string(amount) + (decimal_point > 0 ? ".0" : "");
     std::string r = std::to_string(remainder);
     if (r.size() < decimal_point)
       r.insert(0, decimal_point - r.size(), '0');
@@ -4453,6 +4481,11 @@ namespace currency
   std::ostream& operator <<(std::ostream& o, const ref_by_id& r)
   {
     return o << "<" << r.n << ":" << r.tx_id << ">";
+  }
+  //--------------------------------------------------------------------------------
+  std::ostream& operator <<(std::ostream& o, const std::type_info& ti)
+  {
+    return o << ti.name();
   }
   //--------------------------------------------------------------------------------
 #ifndef MOBILE_WALLET_BUILD

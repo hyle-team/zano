@@ -402,7 +402,7 @@ namespace currency
   uint64_t get_outs_money_amount(const transaction& tx, const currency::account_keys& acc_keys_for_hidden_amounts = currency::null_acc_keys);
   bool check_inputs_types_supported(const transaction& tx);
   bool check_outs_valid(const transaction& tx);
-  bool parse_amount(uint64_t& amount, const std::string& str_amount);
+  bool parse_amount(const std::string& str_amount, uint64_t& amount, const size_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT);
   bool parse_tracking_seed(const std::string& tracking_seed, account_public_address& address, crypto::secret_key& view_sec_key, uint64_t& creation_timestamp);
 
 
@@ -610,20 +610,25 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
-  // outputs "1391306.970000000000"
+  // outputs "1391306.970000000000" (decimal_point = 12)
+  // outputs "1391306970000000000"  (decimal_point = 0)
   template<typename t_number>
   std::string print_fixed_decimal_point(t_number amount, size_t decimal_point)
   {
     return epee::string_tools::print_fixed_decimal_point(amount, decimal_point);
   }
   //---------------------------------------------------------------
-  // outputs "1391306.97          "
+  // outputs "1391306.97          " (decimal_point = 12)
+  // outputs "139130697          "  (decimal_point = 0)
   template<typename t_number>
   std::string print_fixed_decimal_point_with_trailing_spaces(t_number amount, size_t decimal_point)
   {
     std::string s = epee::string_tools::print_fixed_decimal_point(amount, decimal_point);
-    for(size_t n = s.size() - 1; n != 0 && s[n] == '0' && s[n-1] != '.'; --n)
-      s[n] = ' ';
+    if (s.find('.') != std::string::npos)
+    {
+      for(size_t n = s.size() - 1; n != 0 && s[n] == '0' && s[n-1] != '.'; --n)
+        s[n] = ' ';
+    }
     return s;
   }
   //---------------------------------------------------------------
@@ -945,6 +950,7 @@ namespace currency
   //---------------------------------------------------------------
   //---------------------------------------------------------------
   std::ostream& operator <<(std::ostream& o, const ref_by_id& r);
+  std::ostream& operator <<(std::ostream& o, const std::type_info& ti);
   //---------------------------------------------------------------
 #ifndef MOBILE_WALLET_BUILD
   std::string utf8_to_upper(const std::string& s);
@@ -1083,17 +1089,24 @@ namespace currency
     bool operator()(const extra_user_data& ee)
     {
       tv.type = "user_data";
-      tv.short_view = std::to_string(ee.buff.size()) + " bytes";
       tv.details_view = epee::string_tools::buff_to_hex_nodelimer(ee.buff);
+      if (ee.buff.size() <= 8)
+        tv.short_view = tv.details_view;
+      else
+        tv.short_view = std::to_string(ee.buff.size()) + " bytes";
 
       return true;
     }
     bool operator()(const extra_padding& ee)
     {
       tv.type = "extra_padding";
-      tv.short_view = std::to_string(ee.buff.size()) + " bytes";
       if (!ee.buff.empty())
         tv.details_view = epee::string_tools::buff_to_hex_nodelimer(std::string(reinterpret_cast<const char*>(&ee.buff[0]), ee.buff.size()));
+      
+      if (ee.buff.size() <= 8)
+        tv.short_view = tv.details_view;
+      else
+        tv.short_view = std::to_string(ee.buff.size()) + " bytes";
 
       return true;
     }
@@ -1138,16 +1151,24 @@ namespace currency
     bool operator()(const tx_derivation_hint& ee)
     {
       tv.type = "derivation_hint";
-      tv.short_view = std::to_string(ee.msg.size()) + " bytes";
       tv.details_view = epee::string_tools::buff_to_hex_nodelimer(ee.msg);
+
+      if (ee.msg.size() <= 8)
+        tv.short_view = tv.details_view;
+      else
+        tv.short_view = std::to_string(ee.msg.size()) + " bytes";
 
       return true;
     }
     bool operator()(const std::string& ee)
     {
       tv.type = "string";
-      tv.short_view = std::to_string(ee.size()) + " bytes";
       tv.details_view = epee::string_tools::buff_to_hex_nodelimer(ee);
+
+      if (ee.size() <= 8)
+        tv.short_view = tv.details_view;
+      else
+        tv.short_view = std::to_string(ee.size()) + " bytes";
 
       return true;
     }
@@ -1176,6 +1197,15 @@ namespace currency
     bool operator()(const zc_balance_proof& bp)
     {
       tv.type = "zc_balance_proof";
+      return true;
+    }
+    bool operator()(const asset_descriptor_operation& ado)
+    {
+      tv.type = "asset operation";
+      tv.short_view = std::string("op:") + get_asset_operation_type_string(ado.operation_type, true);
+      if (ado.opt_asset_id.has_value())
+        tv.short_view += std::string(" , id:") + crypto::pod_to_hex(ado.opt_asset_id);
+      tv.details_view = tv.short_view + std::string(" , ticker:") + ado.descriptor.ticker + std::string(" , cur.supply:") + print_money_brief(ado.descriptor.current_supply, ado.descriptor.decimal_point);
       return true;
     }
     template<typename t_type>

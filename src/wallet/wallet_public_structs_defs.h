@@ -633,6 +633,29 @@ namespace wallet_public
     };
   };
 
+  struct COMMAND_RPC_UPDATE_ALIAS
+  {
+    DOC_COMMAND("Update an alias details/transwer alias ownership");
+
+    struct request
+    {
+      currency::alias_rpc_details al;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(al)                              DOC_DSCR("Alias details")  DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      crypto::hash tx_id;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)     DOC_DSCR("If success - transactions that performs registration(alias becomes available after few confirmations)") DOC_EXMP("97d91442f8f3c22683585eaa60b53757d49bf046a96269cef45c1bc9ff7300cc") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
   
   struct transfer_destination
   {
@@ -1966,7 +1989,7 @@ namespace wallet_public
       currency::asset_descriptor_base asset_descriptor;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(destinations)     DOC_DSCR("Addresses where to receive emitted coins. Asset id in destinations should be set to 0000000000000000000000000000000000000000000000000000000000000000") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(destinations)     DOC_DSCR("Addresses where to receive emitted coins. Asset id in the destinations is irreleant and can be omitted.") DOC_EXMP_AUTO(1) DOC_END
         KV_SERIALIZE(asset_descriptor) DOC_DSCR("Descriptor that holds all information about asset - ticker, emission, description etc") DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -1995,7 +2018,7 @@ namespace wallet_public
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Id of the asset to emit more coins") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
-        KV_SERIALIZE(destinations)     DOC_DSCR("Addresses where to receive emitted coins. Asset id in destinations should be set to 0000000000000000000000000000000000000000000000000000000000000000") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(destinations)     DOC_DSCR("Addresses where to receive emitted coins. Asset id in the destinations is irreleant and can be omitted.") DOC_EXMP_AUTO(1) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -2035,6 +2058,30 @@ namespace wallet_public
     };
   };
 
+  struct COMMAND_ASSETS_BURN
+  {
+    DOC_COMMAND("Burn some owned amount of the coins for the given asset.");
+
+    struct request
+    {
+      crypto::public_key asset_id;
+      uint64_t burn_amount;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Id of the asset to burn") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
+        KV_SERIALIZE(burn_amount) DOC_DSCR("Amount to burn") DOC_EXMP(10000000) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      crypto::hash result_tx;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx)   DOC_DSCR("Id of transaction that carries asset burn operation") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
 
 } // namespace wallet_rpc
 } // namespace tools

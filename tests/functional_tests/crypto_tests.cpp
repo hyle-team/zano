@@ -1,5 +1,5 @@
-// Copyright (c) 2020-2023 Zano Project
-// Copyright (c) 2020-2023 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2020-2024 Zano Project
+// Copyright (c) 2020-2024 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -975,7 +975,7 @@ TEST(crypto, scalar_basics)
   return true;
 }
 
-TEST(crypto, sc_mul_performance)
+TEST(perf, sc_mul)
 {
   std::vector<scalar_t> scalars(100000);
   for (auto& s : scalars)
@@ -1070,7 +1070,7 @@ TEST(crypto, hp)
   return true;
 }
 
-TEST(crypto, cn_fast_hash_perf)
+TEST(perf, cn_fast_hash)
 {
   //return true;
   const crypto::hash h_initial = *(crypto::hash*)(&scalar_t::random());
@@ -1157,7 +1157,7 @@ TEST(crypto, cn_fast_hash_perf)
 
 
 
-TEST(crypto, sc_invert_performance)
+TEST(perf, sc_invert)
 {
   std::vector<scalar_t> scalars(10000);
   LOG_PRINT_L0("Running " << scalars.size() << " sc_invert tests...");

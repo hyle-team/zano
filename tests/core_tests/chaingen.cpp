@@ -2016,14 +2016,13 @@ bool find_global_index_for_output(const std::vector<test_event_entry>& events, c
   std::map<uint64_t, uint64_t> global_outputs; // amount -> outs count
   auto process_tx = [&reference_tx, &reference_tx_out_index, &global_outputs](const currency::transaction& tx) -> uint64_t
   {
-    for (size_t tx_out_index = 0; tx_out_index < tx.vout.size(); ++tx_out_index) {
-      const tx_out_bare &out = boost::get<tx_out_bare>(tx.vout[tx_out_index]);
-      if (out.target.type() == typeid(txout_to_key)) {
-        uint64_t global_out_index = global_outputs[out.amount]++;
+    for (size_t tx_out_index = 0; tx_out_index < tx.vout.size(); ++tx_out_index)
+    {
+      uint64_t amount = get_amount_from_variant(tx.vout[tx_out_index]);
+      uint64_t global_out_index = global_outputs[amount]++;
 
-        if (tx_out_index == reference_tx_out_index && tx == reference_tx)
-          return global_out_index;
-      }
+      if (tx_out_index == reference_tx_out_index && tx == reference_tx)
+        return global_out_index;
     }
     return UINT64_MAX;
   };
@@ -2238,32 +2237,105 @@ bool refresh_wallet_and_check_balance(const char* intro_log_message, const char*
   return true;
 }
 
-bool generate_pos_block_with_given_coinstake(test_generator& generator, const std::vector<test_event_entry> &events, const currency::account_base& miner, const currency::block& prev_block, const currency::transaction& stake_tx, size_t stake_output_idx, currency::block& result, uint64_t stake_output_gidx /* = UINT64_MAX */)
+bool decode_output_amount_and_asset_id(const crypto::secret_key& view_secret_key, const crypto::public_key& tx_pub_key, const tx_out_v& out_v, size_t output_index, uint64_t &amount, crypto::public_key* p_asset_id = nullptr)
 {
+  VARIANT_SWITCH_BEGIN(out_v)
+    VARIANT_CASE_CONST(currency::tx_out_bare, ob)
+      if (p_asset_id)
+        *p_asset_id = native_coin_asset_id;
+      amount = ob.amount;
+      return true;
+    VARIANT_CASE_CONST(currency::tx_out_zarcanum, oz)
+      crypto::key_derivation derivation{};
+      CHECK_AND_ASSERT_MES(crypto::generate_key_derivation(tx_pub_key, view_secret_key, derivation), false, "generate_key_derivation failed");
+      crypto::public_key decoded_asset_id{};
+      crypto::scalar_t amount_blinding_mask{};
+      crypto::scalar_t asset_id_blinding_mask{};
+      CHECK_AND_ASSERT_MES(decode_output_amount_and_asset_id(oz, derivation, output_index, amount, decoded_asset_id, amount_blinding_mask, asset_id_blinding_mask), false, "decode_output_amount_and_asset_id failed (wrong keys?)");
+      if (p_asset_id)
+        *p_asset_id = decoded_asset_id;
+      return true;
+    VARIANT_CASE_OTHER()
+      CHECK_AND_ASSERT_MES(false, false, "unexpected output type: " << VARIANT_OBJ_TYPENAME);
+  VARIANT_SWITCH_END()
+}
+
+bool decode_output_amount_and_asset_id(const account_base& acc, const transaction& tx, size_t output_index, uint64_t &amount, crypto::public_key* p_asset_id /*= nullptr*/)
+{
+  return decode_output_amount_and_asset_id(acc.get_keys().view_secret_key, get_tx_pub_key_from_extra(tx), tx.vout[output_index], output_index, amount, p_asset_id);
+}
+
+uint64_t decode_native_output_amount_or_throw(const account_base& acc, const transaction& tx, size_t output_index)
+{
+  crypto::public_key asset_id{};
+  uint64_t amount = UINT64_MAX;
+  bool r = decode_output_amount_and_asset_id(acc.get_keys().view_secret_key, get_tx_pub_key_from_extra(tx), tx.vout[output_index], output_index, amount, &asset_id);
+  CHECK_AND_ASSERT_THROW_MES(r, "decode_output_amount_and_asset_id failed");
+  r = (asset_id == native_coin_asset_id);
+  CHECK_AND_ASSERT_THROW_MES(r, "wrong asset_id: not native coin");
+  return amount;
+}
+
+bool generate_pos_block_with_given_coinstake(test_generator& generator, const std::vector<test_event_entry> &events, const currency::account_base& miner, const currency::block& prev_block,
+  const currency::transaction& stake_tx, size_t stake_output_idx, currency::block& result, uint64_t stake_output_gidx /* = UINT64_MAX */)
+{
+  bool r = false;
   crypto::hash prev_id = get_block_hash(prev_block);
   size_t height = get_block_height(prev_block) + 1;
-  currency::wide_difficulty_type diff = generator.get_difficulty_for_next_block(prev_id, false);
+  //currency::wide_difficulty_type diff = generator.get_difficulty_for_next_block(prev_id, false);
+
+  currency::wide_difficulty_type pos_diff{};
+  crypto::hash last_pow_block_hash{}, last_pos_block_kernel_hash{};
+  r = generator.get_params_for_next_pos_block(prev_id, pos_diff, last_pow_block_hash, last_pos_block_kernel_hash);
+  CHECK_AND_ASSERT_MES(r, false, "get_params_for_next_pos_block failed");
 
   try
   {
     crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake_tx);
     if (stake_output_gidx == UINT64_MAX)
     {
-      bool r = find_global_index_for_output(events, prev_id, stake_tx, stake_output_idx, stake_output_gidx);
+      r = find_global_index_for_output(events, prev_id, stake_tx, stake_output_idx, stake_output_gidx);
       CHECK_AND_ASSERT_MES(r, false, "find_global_index_for_output failed");
     }
-    uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake_tx.vout[stake_output_idx]).amount;
+    uint64_t stake_output_amount = decode_native_output_amount_or_throw(miner, stake_tx, stake_output_idx);
+
     crypto::key_image stake_output_key_image;
     keypair kp;
     generate_key_image_helper(miner.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-    crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake_tx.vout[stake_output_idx]).target).key;
 
     pos_block_builder pb;
     pb.step1_init_header(generator.get_hardforks(), height, prev_id);
     pb.step2_set_txs(std::vector<transaction>());
-    pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, prev_block.timestamp);
-    pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner.get_public_address());
-    pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, miner);
+
+    if (pb.m_context.zarcanum)
+    {
+      std::vector<tx_source_entry> sources;
+      r = fill_tx_sources(sources, events, prev_block, miner.get_keys(), UINT64_MAX /* <- to get all possible entries*/, 0 /* nmix */, false /* check_for_spends*/, false /* check_for_unlocktime*/, false);
+      //CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
+      bool found = false;
+      for(const auto& se : sources)
+      {
+        if (se.real_output_in_tx_index == stake_output_idx && se.real_out_tx_key == stake_tx_pub_key)
+        {
+          found = true;
+          pb.step3a(pos_diff, last_pow_block_hash, last_pos_block_kernel_hash);
+          pb.step3b(se.amount, stake_output_key_image, se.real_out_tx_key, se.real_output_in_tx_index, se.real_out_amount_blinding_mask, miner.get_keys().view_secret_key,
+            stake_output_gidx, prev_block.timestamp, POS_SCAN_WINDOW, POS_SCAN_STEP);
+          pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner.get_public_address());
+          pb.step5_sign(se, miner.get_keys());
+          break;
+        }
+      }
+      CHECK_AND_ASSERT_MES(found, false, "required source entry could not be found (difficult case, ask sowle)");
+    }
+    else
+    {
+      pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, pos_diff, last_pow_block_hash, last_pos_block_kernel_hash, prev_block.timestamp);
+      pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), miner.get_public_address());
+      crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake_tx.vout[stake_output_idx]).target).key;
+      pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, miner);
+    }
+    
     result = pb.m_block;
 
     return true;

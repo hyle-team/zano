@@ -110,7 +110,7 @@ public:
   QString get_version(const QString& param);
   QString get_os_version(const QString& param);
   QString get_network_type(const QString& param);
-  QString transfer(const QString& json_transfer_object);
+  QString transfer(const QString& param);
   QString have_secure_app_data(const QString& param);
   QString drop_secure_app_data(const QString& param);
   QString get_secure_app_data(const QString& param);
@@ -193,6 +193,9 @@ public:
 
   QString async_call(const QString& func_name, const QString& params);
   QString sync_call(const QString& func_name, const QString& params);
+ 
+  QString async_call_2a(const QString& func_name, const QString& params1, const QString& params2);
+  QString sync_call_2a(const QString& func_name, const QString& params1, const QString& params2);
 
   //for test purposes only
   QString request_dummy(const QString& param);
