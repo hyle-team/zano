@@ -1767,6 +1767,14 @@ QString MainWindow::validate_address(const QString& param)
   LOG_API_TIMING();
   view::address_validation_response ar = AUTO_VAL_INIT(ar);
   ar.error_code = m_backend.validate_address(param.toStdString(), ar.payment_id);
+
+  //@#@
+//#ifdef _DEBUG
+//  std::string json_body;
+//  bool r = epee::file_io_utils::load_file_to_string("C:\\Users\\roky\\home\\temp\\deploy_test.json", json_body);
+//  async_call_2a("call_wallet_rpc", "0", json_body.c_str());
+//#endif
+
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }

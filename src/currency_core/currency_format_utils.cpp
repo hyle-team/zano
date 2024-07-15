@@ -793,8 +793,7 @@ namespace currency
     }
   }
   //---------------------------------------------------------------
-  // TODO: reverse order of arguments
-  bool parse_amount(uint64_t& amount, const std::string& str_amount_)
+  bool parse_amount(const std::string& str_amount_, uint64_t& amount, const size_t decimal_point /* = CURRENCY_DISPLAY_DECIMAL_POINT */)
   {
     std::string str_amount = str_amount_;
     boost::algorithm::trim(str_amount);
@@ -804,12 +803,12 @@ namespace currency
     if (std::string::npos != point_index)
     {
       fraction_size = str_amount.size() - point_index - 1;
-      while (CURRENCY_DISPLAY_DECIMAL_POINT < fraction_size && '0' == str_amount.back())
+      while (decimal_point < fraction_size && '0' == str_amount.back())
       {
         str_amount.erase(str_amount.size() - 1, 1);
         --fraction_size;
       }
-      if (CURRENCY_DISPLAY_DECIMAL_POINT < fraction_size)
+      if (decimal_point < fraction_size)
         return false;
       str_amount.erase(point_index, 1);
     }
@@ -821,9 +820,9 @@ namespace currency
     if (str_amount.empty())
       return false;
 
-    if (fraction_size < CURRENCY_DISPLAY_DECIMAL_POINT)
+    if (fraction_size < decimal_point)
     {
-      str_amount.append(CURRENCY_DISPLAY_DECIMAL_POINT - fraction_size, '0');
+      str_amount.append(decimal_point - fraction_size, '0');
     }
 
     return string_tools::get_xtype_from_string(amount, str_amount);
@@ -3464,11 +3463,32 @@ namespace currency
   //---------------------------------------------------------------
   std::string print_money_brief(uint64_t amount, size_t decimal_point /* = CURRENCY_DISPLAY_DECIMAL_POINT */)
   {
+    // TODO: temporary fix for insanely big decimal points
+    // TODO: remove it after setting the limit to 18 -- sowle
+    if (decimal_point > 32)
+      return std::string("!!") + std::to_string(amount);
+    if (decimal_point >= 20)
+    {
+      std::string r = std::to_string(amount);
+      if (decimal_point + 1 > r.size())
+        r.insert(0, decimal_point - r.size() + 1, '0');
+      r.insert(r.begin() + 1, '.');
+      size_t p = r.find_last_not_of('0');
+      if (p != r.npos)
+      {
+        if (r[p] != '.' && p + 1 < r.size())
+          r.erase(p + 1);
+        else if (p + 2 < r.size())
+          r.erase(p + 2);
+      }
+      return r;
+    }
+
     uint64_t coin = decimal_point == CURRENCY_DISPLAY_DECIMAL_POINT ? COIN : crypto::constexpr_pow(decimal_point, 10);
     uint64_t remainder = amount % coin;
     amount /= coin;
     if (remainder == 0)
-      return std::to_string(amount) + ".0";
+      return std::to_string(amount) + (decimal_point > 0 ? ".0" : "");
     std::string r = std::to_string(remainder);
     if (r.size() < decimal_point)
       r.insert(0, decimal_point - r.size(), '0');

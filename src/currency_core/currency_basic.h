@@ -700,7 +700,7 @@ namespace currency
   {
     uint64_t            total_max_supply = 0;
     uint64_t            current_supply = 0;
-    uint8_t             decimal_point = 12;
+    uint8_t             decimal_point = 0;
     std::string         ticker;
     std::string         full_name;
     std::string         meta_info;
@@ -733,12 +733,12 @@ namespace currency
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(total_max_supply)  DOC_DSCR("Maximum possible supply for given asset, can't be changed after deployment") DOC_EXMP(1000000000000000000)   DOC_END
-      KV_SERIALIZE(current_supply)    DOC_DSCR("Currently emitted supply for given asset") DOC_EXMP(500000000000000000)   DOC_END
+      KV_SERIALIZE(current_supply)    DOC_DSCR("Currently emitted supply for given asset (ignored for REGISTER operation)") DOC_EXMP(500000000000000000)   DOC_END
       KV_SERIALIZE(decimal_point)     DOC_DSCR("Decimal point")                       DOC_EXMP(12)                        DOC_END
       KV_SERIALIZE(ticker)            DOC_DSCR("Ticker associated with asset")        DOC_EXMP("ZUSD")                    DOC_END
       KV_SERIALIZE(full_name)         DOC_DSCR("Full name of the asset")              DOC_EXMP("Zano wrapped USD")        DOC_END
       KV_SERIALIZE(meta_info)         DOC_DSCR("Any other information assetiaded with asset in a free form")              DOC_EXMP("Stable and private")        DOC_END
-      KV_SERIALIZE_POD_AS_HEX_STRING(owner) DOC_DSCR("Owner's key, used to validate any operations on the asset altering, could be changed in case of transfer ownership")  DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8")        DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(owner) DOC_DSCR("Owner's key, used only for EMIT and UPDATE validation, could be changed by transferring asset ownership")  DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8")        DOC_END
       KV_SERIALIZE(hidden_supply)    DOC_DSCR("This one reserved for future use, will be documented later") DOC_END
     END_KV_SERIALIZE_MAP()
   };

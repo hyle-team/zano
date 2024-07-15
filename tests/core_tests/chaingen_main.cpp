@@ -1070,7 +1070,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch_2);
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_tx_from_tx_pool);
     GENERATE_AND_PLAY_HF(gen_wallet_save_load_and_balance, "*");
-    GENERATE_AND_PLAY_HF(gen_wallet_mine_pos_block, "3");
+    GENERATE_AND_PLAY_HF(gen_wallet_mine_pos_block, "3-*");
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_outdated_tx);
     GENERATE_AND_PLAY(gen_wallet_unlock_by_block_and_by_time);
     GENERATE_AND_PLAY(gen_wallet_payment_id);
@@ -1102,6 +1102,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(wallet_rpc_transfer);
     GENERATE_AND_PLAY(wallet_rpc_alias_tests);
     GENERATE_AND_PLAY_HF(wallet_rpc_exchange_suite, "3,4");
+    GENERATE_AND_PLAY_HF(wallet_true_rpc_pos_mining, "4-*");
     GENERATE_AND_PLAY(wallet_chain_switch_with_spending_the_same_ki);
     GENERATE_AND_PLAY(wallet_sending_to_integrated_address);
     GENERATE_AND_PLAY_HF(block_template_blacklist_test, "4-*");
@@ -1288,6 +1289,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(zarcanum_block_with_txs);
     GENERATE_AND_PLAY(asset_depoyment_and_few_zc_utxos);
     GENERATE_AND_PLAY_HF(assets_and_pos_mining, "4-*");
+    // GENERATE_AND_PLAY_HF(asset_emission_and_unconfirmed_balance, "4-*");
     
     GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
     

@@ -3823,6 +3823,15 @@ bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset
     return true;
   }
 
+  // own asset?
+  auto it_own = m_own_asset_descriptors.find(asset_id);
+  if (it_own != m_own_asset_descriptors.end())
+  {
+    asset_info = it_own->second;
+    asset_flags |= aif_own;
+    return true;
+  }
+
   // whitelisted?
   auto it_white = m_whitelisted_assets.find(asset_id);
   if (it_white != m_whitelisted_assets.end())
@@ -3840,18 +3849,41 @@ bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset
     return true;
   }
 
-  auto it_own = m_own_asset_descriptors.find(asset_id);
-  if (it_own != m_own_asset_descriptors.end())
-  {
-    asset_info = it_own->second;
-    asset_flags |= aif_own;
-    return true;
-  }
-
   return false;
 }
 //----------------------------------------------------------------------------------------------------
+size_t wallet2::get_asset_decimal_point(const crypto::public_key& asset_id, size_t result_if_not_found /* = 0 */) const
+{
+  if (asset_id == currency::native_coin_asset_id)
+    return currency::get_native_coin_asset_descriptor().decimal_point;
 
+  // whitelisted?
+  auto it_white = m_whitelisted_assets.find(asset_id);
+  if (it_white != m_whitelisted_assets.end())
+    return it_white->second.decimal_point;
+
+  // custom asset?
+  auto it_cust = m_custom_assets.find(asset_id);
+  if (it_cust != m_custom_assets.end())
+    return it_cust->second.decimal_point;
+
+  auto it_own = m_own_asset_descriptors.find(asset_id);
+  if (it_own != m_own_asset_descriptors.end())
+    return it_own->second.decimal_point;
+
+  return result_if_not_found; // if not overriden, use the 0 decimal point (raw numbers) as the default
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::get_asset_decimal_point(const crypto::public_key& asset_id, size_t* p_decimal_point_result) const
+{
+  size_t decimal_point = get_asset_decimal_point(asset_id, SIZE_MAX);
+  if (decimal_point == SIZE_MAX)
+    return false;
+  if (p_decimal_point_result != nullptr)
+    *p_decimal_point_result = decimal_point;
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 uint64_t wallet2::balance() const
 {
   uint64_t stub = 0;
@@ -3956,7 +3988,7 @@ bool wallet2::generate_utxo_defragmentation_transaction_if_needed(currency::tran
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/, bool show_only_unknown /*= false*/, const std::string& filter_asset_ticker /*= std::string{}*/) const
 {
-  static const char* header = "index                 amount  ticker  g_index  flags       block  tx                                                                out#  asset id";
+  static const char* header = " index                 amount  ticker  g_index  flags       block  tx                                                                out#  asset id";
   std::stringstream ss;
   ss << header << ENDL;
   size_t count = 0;
@@ -3968,6 +4000,7 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
     if ((td.is_spent() && !include_spent) || (!td.is_spent() && !include_unspent))
       continue;
 
+    bool is_locked = !is_transfer_unlocked(td);
     bool native_coin = td.is_native_coin();
     asset_descriptor_base adb{};
     uint32_t asset_info_flags{};
@@ -3981,7 +4014,7 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
     if (!filter_asset_ticker.empty() && adb.ticker != filter_asset_ticker)
       continue;
 
-    ss << std::right <<
+    ss << std::right << (is_locked ? "*" : " ") <<
       std::setw(5) << i << "  " <<
       std::setw(21) << print_asset_money(td.m_amount, adb.decimal_point) << "  " <<
       std::setw(6) << std::left << (native_coin ? std::string("      ") : adb.ticker) << "  " << std::right <<
@@ -4012,11 +4045,12 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
 std::string wallet2::get_balance_str() const
 {
   // balance unlocked     / [balance total]       ticker   asset id
-  // 1391306.970000000000 / 1391306.970000000000  ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
-  // 1391306.97                                   ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
-  //     106.971          /     206.4             ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
+  // 0.21                 / 98.51                 DP2      a6974d5874e97e5f4ed5ad0a62f0975edbccb1bb55502fc75c7fe808f12f44d3
+  // 190.123456789012     / 199.123456789012      ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
+  // 98.0                                         BGTVUW   af2b12f3033337f9aea1845a6bc3fc966ed4d13227a3ace7706fca7dbcdaa7e2
+  // 1000.034                                     DP3      d4aba1020f26927571771e04b585b4ffb211f52708d5e4c465bbdfa4a12e6271
 
-  static const char* header = " balance unlocked     / [balance total]       ticker   asset id";
+  static const char* header = " balance unlocked      / [balance total]        ticker   asset id";
   std::stringstream ss;
   ss << header << ENDL;
 
@@ -4025,11 +4059,11 @@ std::string wallet2::get_balance_str() const
   balance(balances, mined);
   for (const tools::wallet_public::asset_balance_entry& b : balances)
   {
-    ss << " " << std::left << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(b.unlocked, b.asset_info.decimal_point);
+    ss << " " << std::left << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(b.unlocked, b.asset_info.decimal_point);
     if (b.total == b.unlocked)
-      ss << "                       ";
+      ss << std::string(21 + 3, ' ');
     else
-      ss << " / " << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(b.total, b.asset_info.decimal_point);
+      ss << " / " << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(b.total, b.asset_info.decimal_point);
     ss << "  " << std::setw(8) << std::left << b.asset_info.ticker << " " << b.asset_info.asset_id << ENDL;
   }
 
@@ -4038,12 +4072,16 @@ std::string wallet2::get_balance_str() const
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::get_balance_str_raw() const
 {
-    // balance unlocked     / [balance total]       ticker   asset id
-  // 1391306.970000000000 / 1391306.970000000000  ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
-  // 1391306.97                                   ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
-  //     106.971          /     206.4             ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
+  // balance unlocked     / [balance total]     DP   asset id
+  // 0.21                 / 98.51                2   a6974d5874e97e5f4ed5ad0a62f0975edbccb1bb55502fc75c7fe808f12f44d3
+  // 190.123456789012     / 199.123456789012    12   d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
+  // 98.0                                       12   af2b12f3033337f9aea1845a6bc3fc966ed4d13227a3ace7706fca7dbcdaa7e2
+  // 1000.034                                    3   d4aba1020f26927571771e04b585b4ffb211f52708d5e4c465bbdfa4a12e6271
+  //WHITELIST:
+  // 7d3f348fbebfffc4e61a3686189cf870ea393e1c88b8f636acbfdacf9e4b2db2    CT
+  // ...
 
-  static const char* header = " balance unlocked     / [balance total]       asset id";
+  static const char* header = " balance unlocked      / [balance total]        DP   asset id";
   std::stringstream ss;
   ss << header << ENDL;
   
@@ -4053,32 +4091,41 @@ std::string wallet2::get_balance_str_raw() const
 
   for(const auto& entry : balances_map)
   {
-    ss << " " << std::left << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(entry.second.unlocked, 12);
+    size_t decimal_point = 0;
+    bool has_known_decimal_point = get_asset_decimal_point(entry.first, &decimal_point);
+    ss << " " << std::left << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(entry.second.unlocked, decimal_point);
     if(entry.second.total == entry.second.unlocked)
-      ss << "                       ";
+      ss << std::string(21 + 3, ' ');
     else
-      ss << " / " << std::setw(20) << print_fixed_decimal_point_with_trailing_spaces(entry.second.total, 12);
-    ss << "  " << std::setw(8) << std::left << entry.first << ENDL;
+      ss << " / " << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(entry.second.total, decimal_point);
+
+    ss << "  ";
+
+    if (has_known_decimal_point)
+      ss << std::setw(2) << std::right << decimal_point;
+    else
+      ss << "??";
+    
+    ss << "   " << entry.first << ENDL;
   }
 
   //print whitelist
   ss << "WHITELIST: " << ENDL;
-
 
   for(const auto& entry : m_whitelisted_assets)
   {
     ss << " " << std::left << entry.first << "    " << entry.second.ticker << ENDL; 
   }
 
-    // print whitelist
+  // print custom list
   ss << "CUSTOM LIST: " << ENDL;
-
 
   for(const auto& entry : m_custom_assets)
   {
     ss << " " << std::left << entry.first << "    " << entry.second.ticker << ENDL;
   }
 
+  // print own list
   ss << "OWN DESCRIPTORS LIST: " << ENDL;
   
   for(const auto& entry : m_own_asset_descriptors)
@@ -5005,7 +5052,7 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
     WLT_LOG_GREEN("Note: " << udtx.vin.size() << " inputs were aggregated into UTXO defragmentation tx " << get_transaction_hash(udtx), LOG_LEVEL_0);
   }
   m_core_proxy->call_COMMAND_RPC_GETBLOCKTEMPLATE(tmpl_req, tmpl_rsp);
-  WLT_CHECK_AND_ASSERT_MES(tmpl_rsp.status == API_RETURN_CODE_OK, false, "Failed to create block template after kernel hash found!");
+  WLT_CHECK_AND_ASSERT_MES(tmpl_rsp.status == API_RETURN_CODE_OK, false, "Failed to create block template after kernel hash found! Status: " << tmpl_rsp.status);
 
   currency::block b = AUTO_VAL_INIT(b);
   currency::blobdata block_blob;
@@ -5258,6 +5305,8 @@ void wallet2::request_alias_registration(currency::extra_alias_entry& ai, curren
 //----------------------------------------------------------------------------------------------------
 void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id)
 {
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(asset_info.decimal_point <= 18, "too big decimal point: " << asset_info.decimal_point);
+
   asset_descriptor_operation asset_reg_info = AUTO_VAL_INIT(asset_reg_info);
   asset_reg_info.descriptor = asset_info;
   asset_reg_info.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
@@ -5371,7 +5420,7 @@ void wallet2::burn_asset(const crypto::public_key asset_id, uint64_t amount_to_b
   asset_descriptor_operation asset_burn_info = AUTO_VAL_INIT(asset_burn_info);
   asset_burn_info.descriptor = rsp.asset_descriptor;
 
-  CHECK_AND_ASSERT_THROW_MES(asset_burn_info.descriptor.current_supply > amount_to_burn, "Wrong amount to burn (current_supply" << asset_burn_info.descriptor.current_supply << " is less then " << amount_to_burn << ")");
+  CHECK_AND_ASSERT_THROW_MES(asset_burn_info.descriptor.current_supply >= amount_to_burn, "Wrong amount to burn (current_supply" << asset_burn_info.descriptor.current_supply << " is less then " << amount_to_burn << ")");
 
   currency::tx_destination_entry dst_to_burn = AUTO_VAL_INIT(dst_to_burn);
   dst_to_burn.amount = amount_to_burn;
@@ -6204,7 +6253,7 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
   {
     if (balances[item.asset_id].unlocked < item.amount)
     {
-      WLT_THROW_IF_FALSE_WALLET_EX_MES(false, error::not_enough_money, "", balances[item.asset_id].unlocked, item.amount, 0 /*fee*/, item.asset_id);
+      WLT_THROW_IF_FALSE_WALLET_EX_MES(false, error::not_enough_money, "", balances[item.asset_id].unlocked, item.amount, 0 /*fee*/, item.asset_id, get_asset_decimal_point(item.asset_id));
     }
     if (item.asset_id == currency::native_coin_asset_id)
     {
@@ -6557,10 +6606,13 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys
     src.real_output = interted_it - src.outputs.begin();
     src.real_output_in_tx_index = td.m_internal_output_index;
     
-    std::stringstream ss;
-    ss << "source entry [" << i << "], td_idx: " << J << ", ";
-    print_source_entry(ss, src);
-    WLT_LOG_L1(ss.str());
+    if (epee::log_space::get_set_log_detalisation_level() >= LOG_LEVEL_1)
+    {
+      std::stringstream ss;
+      ss << "source entry [" << i << "], td_idx: " << J << ", ";
+      print_source_entry(ss, src);
+      WLT_LOG_L1(ss.str());
+    }
     
     ++i;
   }
@@ -7056,10 +7108,17 @@ bool wallet2::select_indices_for_transfer(assets_selection_context& needed_money
   {
     if(item.second.needed_amount == 0)
       continue;
-    auto asset_cashe_it = m_found_free_amounts.find(item.first);
-    WLT_THROW_IF_FALSE_WALLET_EX_MES(asset_cashe_it != m_found_free_amounts.end(), error::not_enough_money, "", item.second.found_amount, item.second.needed_amount, 0, item.first);
-    item.second.found_amount = select_indices_for_transfer(selected_indexes, asset_cashe_it->second, item.second.needed_amount, fake_outputs_count);
-    WLT_THROW_IF_FALSE_WALLET_EX_MES(item.second.found_amount >= item.second.needed_amount, error::not_enough_money, "", item.second.found_amount, item.second.needed_amount, 0, item.first);
+
+    const crypto::public_key asset_id = item.first;
+    asset_descriptor_base asset_info{};
+    uint32_t asset_flags = 0;
+    if (!get_asset_info(asset_id, asset_info, asset_flags))
+      WLT_LOG_L1("select_indices_for_transfer: unknown asset id: " << asset_id);
+
+    auto asset_cache_it = m_found_free_amounts.find(asset_id);
+    WLT_THROW_IF_FALSE_WALLET_EX_MES(asset_cache_it != m_found_free_amounts.end(), error::not_enough_money, "", item.second.found_amount, item.second.needed_amount, 0, asset_id, asset_info.decimal_point);
+    item.second.found_amount = select_indices_for_transfer(selected_indexes, asset_cache_it->second, item.second.needed_amount, fake_outputs_count, asset_id, asset_info.decimal_point);
+    WLT_THROW_IF_FALSE_WALLET_EX_MES(item.second.found_amount >= item.second.needed_amount, error::not_enough_money, "", item.second.found_amount, item.second.needed_amount, 0, asset_id, asset_info.decimal_point);
   }
   if (m_current_context.pconstruct_tx_param && m_current_context.pconstruct_tx_param->need_at_least_1_zc)
   {
@@ -7081,11 +7140,13 @@ bool wallet2::select_indices_for_transfer(assets_selection_context& needed_money
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-uint64_t wallet2::select_indices_for_transfer(std::vector<uint64_t>& selected_indexes, free_amounts_cache_type& found_free_amounts, uint64_t needed_money, uint64_t fake_outputs_count_)
+uint64_t wallet2::select_indices_for_transfer(std::vector<uint64_t>& selected_indexes, free_amounts_cache_type& found_free_amounts, uint64_t needed_money, uint64_t fake_outputs_count_,
+  const crypto::public_key& asset_id, size_t decimal_point)
 {
-  WLT_LOG_GREEN("Selecting indices for transfer of " << print_money_brief(needed_money) << " with " << fake_outputs_count_ << " fake outs, found_free_amounts.size()=" << found_free_amounts.size() << "...", LOG_LEVEL_0);
+  WLT_LOG_GREEN("Selecting indices for transfer of " << print_money_brief(needed_money, decimal_point) << " with " << fake_outputs_count_ << " fake outs, found_free_amounts.size()=" << found_free_amounts.size() <<
+    (asset_id == native_coin_asset_id ? std::string() : std::string(", asset_id: ") + crypto::pod_to_hex(asset_id)) << "...", LOG_LEVEL_0);
   uint64_t found_money = 0;
-  //uint64_t found_zc_input = false;
+  size_t outputs_found = 0;
   std::string selected_amounts_str;
   while (found_money < needed_money && found_free_amounts.size())
   {
@@ -7105,7 +7166,8 @@ uint64_t wallet2::select_indices_for_transfer(std::vector<uint64_t>& selected_in
       found_money += it->first;
       selected_indexes.push_back(*it->second.begin());
       WLT_LOG_L2("Selected index: " << *it->second.begin() << ", transfer_details: " << ENDL << epee::serialization::store_t_to_json(m_transfers[*it->second.begin()]));
-      selected_amounts_str += (selected_amounts_str.empty() ? "" : "+") + print_money_brief(it->first);
+      selected_amounts_str += (selected_amounts_str.empty() ? "" : "+") + print_money_brief(it->first, decimal_point);
+      ++outputs_found;
     }
     it->second.erase(it->second.begin());
     if (!it->second.size())
@@ -7113,7 +7175,8 @@ uint64_t wallet2::select_indices_for_transfer(std::vector<uint64_t>& selected_in
 
   }
   
-  WLT_LOG_GREEN("Found " << print_money_brief(found_money) << " as " << selected_indexes.size() << " out(s): " << selected_amounts_str << ", found_free_amounts.size()=" << found_free_amounts.size(), LOG_LEVEL_0);
+  WLT_LOG_GREEN("Found " << print_money_brief(found_money, decimal_point) << " as " << outputs_found << " out(s): " << selected_amounts_str << ", found_free_amounts.size()=" << found_free_amounts.size() <<
+    (asset_id == native_coin_asset_id ? std::string() : std::string(", asset_id: ") + crypto::pod_to_hex(asset_id)), LOG_LEVEL_0);
   return found_money;
 }
 //----------------------------------------------------------------------------------------------------
@@ -7337,13 +7400,15 @@ void wallet2::print_source_entry(std::stringstream& output, const currency::tx_s
   for(auto& el : src.outputs)
     ss << el.out_reference << " ";
   
-  output << "amount: " << print_money_brief(src.amount) << (src.is_zc() ? " (hidden)" : "")
-    << ", real_output: " << src.real_output
+  output << "amount: " << print_money_brief(src.amount, get_asset_decimal_point(src.asset_id)) << (src.is_zc() ? "" : " (bare)");
+
+  if (src.asset_id != currency::native_coin_asset_id)
+    output << " (" << print16(src.asset_id) << ")";
+
+  output << ", real_output: " << src.real_output
     << ", real_output_in_tx_index: " << src.real_output_in_tx_index
     << ", indexes: " << ss.str();
 
-  if (src.asset_id != currency::native_coin_asset_id)
-    output << ", asset_id: " << print16(src.asset_id);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) const
@@ -7588,8 +7653,8 @@ void wallet2::finalize_transaction(currency::finalize_tx_param& ftp, currency::f
     ftp, result);
   //TIME_MEASURE_FINISH_MS(construct_tx_time);
   THROW_IF_FALSE_WALLET_EX(r, error::tx_not_constructed, ftp.sources, ftp.prepared_destinations, ftp.unlock_time);
-  uint64_t effective_fee = get_tx_fee(result.tx);
-  THROW_IF_FALSE_WALLET_CMN_ERR_EX(effective_fee <= WALLET_TX_MAX_ALLOWED_FEE, "tx fee is WAY too big: " << print_money_brief(effective_fee) << ", max allowed is " << print_money_brief(WALLET_TX_MAX_ALLOWED_FEE));
+  uint64_t effective_fee = 0;
+  THROW_IF_FALSE_WALLET_CMN_ERR_EX(!get_tx_fee(result.tx, effective_fee) || effective_fee <= WALLET_TX_MAX_ALLOWED_FEE, "tx fee is WAY too big: " << print_money_brief(effective_fee) << ", max allowed is " << print_money_brief(WALLET_TX_MAX_ALLOWED_FEE));
 
   //TIME_MEASURE_START_MS(sign_ms_input_time);
   if (ftp.multisig_id != currency::null_hash)
@@ -7605,7 +7670,8 @@ void wallet2::finalize_transaction(currency::finalize_tx_param& ftp, currency::f
   }
   //TIME_MEASURE_FINISH_MS(sign_ms_input_time);
 
-  THROW_IF_FALSE_WALLET_EX(get_object_blobsize(result.tx) < CURRENCY_MAX_TRANSACTION_BLOB_SIZE, error::tx_too_big, result.tx, m_upper_transaction_size_limit);
+  size_t tx_blob_size = tx_to_blob(result.tx).size();
+  THROW_IF_FALSE_WALLET_EX(tx_blob_size < CURRENCY_MAX_TRANSACTION_BLOB_SIZE, error::tx_too_big, result.tx, m_upper_transaction_size_limit);
 
   if (store_tx_secret_key)
     m_tx_keys.insert(std::make_pair(get_transaction_hash(result.tx), result.one_time_key));
@@ -7823,7 +7889,7 @@ void wallet2::transfer(construct_tx_param& ctp,
 void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
   uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx /* = nullptr */, std::string* p_filename_or_unsigned_tx_blob_str /* = nullptr */)
 {
-  static const size_t estimated_bytes_per_input = 78;
+  static const size_t estimated_bytes_per_input = 85;
   const size_t estimated_max_inputs = static_cast<size_t>(CURRENCY_MAX_TRANSACTION_BLOB_SIZE / (estimated_bytes_per_input * (fake_outs_count + 1.5))); // estimated number of maximum tx inputs under the tx size limit
   const size_t tx_sources_for_querying_random_outs_max = estimated_max_inputs * 2;
 
@@ -7838,9 +7904,10 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   for (uint64_t i = 0; i < m_transfers.size(); ++i)
   {
     const transfer_details& td = m_transfers[i];
+    size_t fake_outs_count_for_td = is_auditable() ? 0 : (td.is_zc() ? m_core_runtime_config.hf4_minimum_mixins : fake_outs_count);
     uint64_t amount = td.amount();
-    if (amount < threshold_amount &&
-      is_transfer_ready_to_go(td, fake_outs_count))
+    if (amount < threshold_amount && td.is_native_coin() &&
+      is_transfer_ready_to_go(td, fake_outs_count_for_td))
     {
       selected_transfers.push_back(i);
       outs_total += 1;
@@ -7916,9 +7983,12 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   auto try_construct_tx = [this, &selected_transfers, &rpc_get_random_outs_resp, &fake_outs_count, &fee, &destination_addr]
     (size_t st_index_upper_boundary, currency::finalize_tx_param& ftp, uint64_t& amount_swept) -> try_construct_result_t
   {
-    // prepare inputs
     amount_swept = 0;
+    ftp.gen_context = tx_generation_context{};
     ftp.sources.clear();
+    ftp.prepared_destinations.clear();
+
+    // prepare inputs
     ftp.sources.resize(st_index_upper_boundary);
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(st_index_upper_boundary <= selected_transfers.size(), "index_upper_boundary = " << st_index_upper_boundary << ", selected_transfers.size() = " << selected_transfers.size());
     for (size_t st_index = 0; st_index < st_index_upper_boundary; ++st_index)
@@ -8013,7 +8083,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
 
   size_t st_index_upper_boundary = std::min(selected_transfers.size(), estimated_max_inputs);
   try_construct_result_t res = try_construct_tx(st_index_upper_boundary, ftp, amount_swept);
-  
+
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(res != rc_too_few_outputs, st_index_upper_boundary << " biggest unspent outputs have total amount of " << print_money_brief(amount_swept)
     << " which is less than required fee: " << print_money_brief(fee) << ", transaction cannot be constructed");
   
@@ -8087,10 +8157,10 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
 
   transaction local_tx;
   transaction* p_tx = p_result_tx != nullptr ? p_result_tx : &local_tx;
-  *p_tx = AUTO_VAL_INIT_T(transaction);
+  *p_tx = transaction{};
   try
   {
-    crypto::secret_key sk = AUTO_VAL_INIT(sk);
+    crypto::secret_key sk{};
     finalize_transaction(ftp, *p_tx, sk, true);
   }
   catch (...)
