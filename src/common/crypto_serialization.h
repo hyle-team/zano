@@ -21,6 +21,7 @@
 #include "crypto/clsag.h"
 #include "crypto/zarcanum.h"
 #include "crypto/one_out_of_many_proofs.h"
+#include "crypto/eth_signature.h"
 #include "boost_serialization_maps.h"
 #include "serialization/keyvalue_enable_POD_serialize_as_string.h"
 //
@@ -230,6 +231,8 @@ BLOB_SERIALIZER(crypto::key_image);
 BLOB_SERIALIZER(crypto::signature);
 BLOB_SERIALIZER(crypto::scalar_t);
 BLOB_SERIALIZER(crypto::point_t);
+BLOB_SERIALIZER(crypto::eth_public_key);
+BLOB_SERIALIZER(crypto::eth_signature);
 
 VARIANT_TAG(debug_archive, crypto::hash, "hash");
 VARIANT_TAG(debug_archive, crypto::public_key, "public_key");
@@ -245,6 +248,8 @@ VARIANT_TAG(debug_archive, crypto::signature, "signature");
 
 KV_ENABLE_POD_SERIALIZATION_AS_HEX(crypto::scalar_t);
 KV_ENABLE_POD_SERIALIZATION_AS_HEX(crypto::hash);
+KV_ENABLE_POD_SERIALIZATION_AS_HEX(crypto::eth_public_key);
+KV_ENABLE_POD_SERIALIZATION_AS_HEX(crypto::eth_signature);
 
 //
 // Boost serialization
@@ -295,6 +300,16 @@ namespace boost
     inline void serialize(Archive &a, crypto::point_t &x, const boost::serialization::version_type ver)
     {
       a & reinterpret_cast<char (&)[sizeof(crypto::point_t)]>(x);
+    }    
+    template <class Archive>
+    inline void serialize(Archive &a, crypto::eth_public_key &x, const boost::serialization::version_type ver)
+    {
+      a & reinterpret_cast<char (&)[sizeof(crypto::eth_public_key)]>(x);
+    }    
+    template <class Archive>
+    inline void serialize(Archive &a, crypto::eth_signature &x, const boost::serialization::version_type ver)
+    {
+      a & reinterpret_cast<char (&)[sizeof(crypto::eth_signature)]>(x);
     }    
   } // namespace serialization
 } // namespace boost

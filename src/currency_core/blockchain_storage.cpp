@@ -4105,14 +4105,24 @@ bool blockchain_storage::pop_asset_info(const crypto::public_key& asset_id)
 //------------------------------------------------------------------
 bool validate_ado_ownership(asset_op_verification_context& avc)
 {
+  bool r = false;
+  CHECK_AND_ASSERT_MES(avc.asset_op_history->size() != 0, false, "asset with id " << avc.asset_id << " has empty history record");
+  const asset_descriptor_operation& last_ado = avc.asset_op_history->back();
+
+  if (last_ado.descriptor.owner_eth_pub_key.has_value())
+  {
+    asset_operation_ownership_proof_eth aoop_eth{};
+    r = get_type_in_variant_container(avc.tx.proofs, aoop_eth);
+    CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed - missing signature (asset_operation_ownership_proof)");
+    return crypto::verify_eth_signature(avc.tx_id, last_ado.descriptor.owner_eth_pub_key.value(), aoop_eth.eth_sig);
+  }
+
+  // owner_eth_pub_key has no value -- falback to default
   asset_operation_ownership_proof aoop = AUTO_VAL_INIT(aoop);
-  bool r = get_type_in_variant_container(avc.tx.proofs, aoop);
+  r = get_type_in_variant_container(avc.tx.proofs, aoop);
   CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed - missing signature (asset_operation_ownership_proof)");
 
-  CHECK_AND_ASSERT_MES(avc.asset_op_history->size() != 0, false, "asset with id " << avc.asset_id << " has invalid history size() == 0");
-
-  crypto::public_key owner_key = avc.asset_op_history->back().descriptor.owner;
-  return crypto::verify_schnorr_sig(avc.tx_id, owner_key, aoop.gss);
+  return crypto::verify_schnorr_sig(avc.tx_id, last_ado.descriptor.owner, aoop.gss);
 }
 //------------------------------------------------------------------
 bool blockchain_storage::validate_asset_operation_against_current_blochain_state(asset_op_verification_context& avc) const
