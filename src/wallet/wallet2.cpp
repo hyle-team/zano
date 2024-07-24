@@ -3703,12 +3703,13 @@ bool wallet2::balance(std::unordered_map<crypto::public_key, wallet_public::asse
         m_has_bare_unspent_outputs = true;
     }
   }
-
+  std::unordered_map<crypto::public_key, bool> subtransfers_by_assets_map;
   for(auto& utx : m_unconfirmed_txs)
   {
     for (auto& subtransfer : utx.second.subtransfers)
     {
       wallet_public::asset_balance_entry_base& e = balances[subtransfer.asset_id];
+      subtransfers_by_assets_map[subtransfer.asset_id] = subtransfer.is_income;
       if (subtransfer.is_income)
       {
         e.total += subtransfer.amount;
@@ -3729,16 +3730,27 @@ bool wallet2::balance(std::unordered_map<crypto::public_key, wallet_public::asse
         }
       }
     }
-    if (utx.second.has_outgoing_entries())
-    {
+    
+    //has outgoing entries for each asset 
+    //if (utx.second.has_outgoing_entries())
+    //{
       //collect change to unconfirmed
       for (const auto& emp_entry : utx.second.employed_entries.receive)
       {
-        wallet_public::asset_balance_entry_base& e = balances[emp_entry.asset_id];
-        e.total += emp_entry.amount;
+        auto it_employed_entry = subtransfers_by_assets_map.find(emp_entry.asset_id);
+        if (it_employed_entry == subtransfers_by_assets_map.end())
+        {
+          LOG_ERROR("Intenral error, check the wallet code at give location");
+          continue;
+        }
+        if (!(it_employed_entry->second)) // if is_incoming == false, then we need to check for change and add it to total
+        {
+          wallet_public::asset_balance_entry_base& e = balances[emp_entry.asset_id];
+          e.total += emp_entry.amount;
+        }
       }
-
-    }
+    //}
+    
   }
 
   return true;
