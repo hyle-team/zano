@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -350,7 +350,7 @@ namespace tools
     //----------------------------------------------------------------------------------------------------
     struct not_enough_money : public transfer_error
     {
-      not_enough_money(std::string&& loc, uint64_t availbable, uint64_t tx_amount, uint64_t fee, const crypto::public_key& asset_id, size_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT)
+      not_enough_money(std::string&& loc, uint64_t availbable, uint64_t tx_amount, uint64_t fee, const crypto::public_key& asset_id, uint8_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT)
         : transfer_error(std::move(loc), "")
         , m_available(availbable)
         , m_tx_amount(tx_amount)
@@ -381,12 +381,13 @@ namespace tools
       uint64_t m_tx_amount;
       uint64_t m_fee;
       crypto::public_key m_asset_id;
-      size_t m_decimal_point;
+      uint8_t m_decimal_point;
     };
 
     struct no_zc_inputs : public transfer_error
     {
-      no_zc_inputs(const std::string& /*v*/): transfer_error(std::string(""), API_RETURN_CODE_MISSING_ZC_INPUTS)
+      no_zc_inputs(std::string&& loc, const std::string&)
+        : transfer_error(std::move(loc), API_RETURN_CODE_MISSING_ZC_INPUTS)
       {}      
 
       virtual const char* what() const noexcept
@@ -566,34 +567,25 @@ namespace tools
     //----------------------------------------------------------------------------------------------------
     struct tx_too_big : public transfer_error
     {
-      explicit tx_too_big(std::string&& loc, const currency::transaction& tx, uint64_t tx_size_limit)
-        : transfer_error(std::move(loc), "transaction is too big")
-        , m_tx(tx)
-        , m_tx_size_limit(tx_size_limit)
+      explicit tx_too_big(std::string&& loc, const std::string& message)
+        : transfer_error(std::move(loc), API_RETURN_CODE_TX_IS_TOO_BIG)
+        , m_message(message)
       {
       }
 
-      const currency::transaction& tx() const { return m_tx; }
-      uint64_t tx_size_limit() const { return m_tx_size_limit; }
+      const std::string get_message() const { return m_message; }
 
+      // TODO the following overrides need to be redesigned (seems to be necessary for API, consider writing API tests and then refactor this) -- sowle
       std::string to_string() const
       {
-        std::ostringstream ss;
-        ss << API_RETURN_CODE_TX_IS_TOO_BIG;
-        //currency::transaction tx = m_tx;
-        //ss << transfer_error::to_string() <<
-        //  ", tx_size_limit = " << m_tx_size_limit <<
-        //  ", tx size = " << get_object_blobsize(m_tx) <<
-        //  ", tx:\n" << currency::obj_to_json_str(tx);
-        return ss.str();
+        return API_RETURN_CODE_TX_IS_TOO_BIG;
       }
       virtual const char* what() const noexcept
       {
         return API_RETURN_CODE_TX_IS_TOO_BIG;
       }
     private:
-      currency::transaction m_tx;
-      uint64_t m_tx_size_limit;
+      std::string m_message;
     };
     //----------------------------------------------------------------------------------------------------
     struct zero_destination : public transfer_error
@@ -668,8 +660,6 @@ namespace tools
     };
     //----------------------------------------------------------------------------------------------------
 
-#if !defined(_MSC_VER)
-
     template<typename TException, typename... TArgs>
     void throw_wallet_ex(std::string&& loc, const TArgs&... args)
     {
@@ -677,31 +667,6 @@ namespace tools
       LOG_PRINT_L0(e.to_string());
       throw e;
     }
-
-#else
-    #include <boost/preprocessor/repetition/enum_binary_params.hpp>
-    #include <boost/preprocessor/repetition/enum_params.hpp>
-    #include <boost/preprocessor/repetition/repeat_from_to.hpp>
-
-    template<typename TException>
-    void throw_wallet_ex(std::string&& loc)
-    {
-      TException e(std::move(loc));
-      LOG_PRINT_L0(e.to_string());
-      throw e;
-    }
-
-#define GEN_throw_wallet_ex(z, n, data)                                                       \
-    template<typename TException, BOOST_PP_ENUM_PARAMS(n, typename TArg)>                     \
-    void throw_wallet_ex(std::string&& loc, BOOST_PP_ENUM_BINARY_PARAMS(n, const TArg, &arg)) \
-    {                                                                                         \
-      TException e(std::move(loc), BOOST_PP_ENUM_PARAMS(n, arg));                             \
-      LOG_PRINT_L0(e.to_string());                                                            \
-      throw e;                                                                                \
-    }
-
-    BOOST_PP_REPEAT_FROM_TO(1, 6, GEN_throw_wallet_ex, ~)
-#endif
   }
 }
 
@@ -739,14 +704,14 @@ if (!(cond))                                                                    
 }
 
 
-#define THROW_IF_FALSE_WALLET_EX_MES(cond, err_type, mess, ...)                                            \
+#define THROW_IF_FALSE_WALLET_EX_MES(cond, err_type, mes, ...)                                             \
 if (!(cond))                                                                                               \
 {                                                                                                          \
   exception_handler();                                                                                     \
   std::stringstream ss;                                                                                    \
-  ss << std::endl << mess;                                                                                 \
-  LOG_ERROR(#cond << ". THROW EXCEPTION: " << #err_type);                                                  \
-  tools::error::throw_wallet_ex<err_type>(std::string(__FILE__ ":" STRINGIZE(__LINE__)) + ss.str(), ## __VA_ARGS__); \
+  ss << mes;                                                                                               \
+  LOG_ERROR(#cond << ". THROW EXCEPTION: " << #err_type << " : " << ss.str());                             \
+  tools::error::throw_wallet_ex<err_type>(std::string(__FILE__ ":" STRINGIZE(__LINE__)), ss.str(), ## __VA_ARGS__); \
 }
 
 

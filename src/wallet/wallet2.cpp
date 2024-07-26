@@ -6265,7 +6265,7 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
   {
     if (balances[item.asset_id].unlocked < item.amount)
     {
-      WLT_THROW_IF_FALSE_WALLET_EX_MES(false, error::not_enough_money, "", balances[item.asset_id].unlocked, item.amount, 0 /*fee*/, item.asset_id, get_asset_decimal_point(item.asset_id));
+      THROW_IF_FALSE_WALLET_EX(false, error::not_enough_money, balances[item.asset_id].unlocked, item.amount, 0 /*fee*/, item.asset_id, get_asset_decimal_point(item.asset_id));
     }
     if (item.asset_id == currency::native_coin_asset_id)
     {
@@ -6280,7 +6280,7 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
     additional_fee = m_core_runtime_config.tx_default_fee - msc.proposal_info.fee_paid_by_a;
     if (balances[currency::native_coin_asset_id].unlocked < additional_fee + native_amount_required)
     {
-      WLT_THROW_IF_FALSE_WALLET_EX_MES(false, error::not_enough_money, "", balances[currency::native_coin_asset_id].unlocked, native_amount_required, additional_fee, currency::native_coin_asset_id);
+      THROW_IF_FALSE_WALLET_EX(false, error::not_enough_money, balances[currency::native_coin_asset_id].unlocked, native_amount_required, additional_fee, currency::native_coin_asset_id);
     }
   }
 
@@ -7128,9 +7128,9 @@ bool wallet2::select_indices_for_transfer(assets_selection_context& needed_money
       WLT_LOG_L1("select_indices_for_transfer: unknown asset id: " << asset_id);
 
     auto asset_cache_it = m_found_free_amounts.find(asset_id);
-    WLT_THROW_IF_FALSE_WALLET_EX_MES(asset_cache_it != m_found_free_amounts.end(), error::not_enough_money, "", item.second.found_amount, item.second.needed_amount, 0, asset_id, asset_info.decimal_point);
+    THROW_IF_FALSE_WALLET_EX(asset_cache_it != m_found_free_amounts.end(), error::not_enough_money, item.second.found_amount, item.second.needed_amount, (uint64_t)0, asset_id, asset_info.decimal_point);
     item.second.found_amount = select_indices_for_transfer(selected_indexes, asset_cache_it->second, item.second.needed_amount, fake_outputs_count, asset_id, asset_info.decimal_point);
-    WLT_THROW_IF_FALSE_WALLET_EX_MES(item.second.found_amount >= item.second.needed_amount, error::not_enough_money, "", item.second.found_amount, item.second.needed_amount, 0, asset_id, asset_info.decimal_point);
+    THROW_IF_FALSE_WALLET_EX(item.second.found_amount >= item.second.needed_amount, error::not_enough_money, item.second.found_amount, item.second.needed_amount, (uint64_t)0, asset_id, asset_info.decimal_point);
   }
   if (m_current_context.pconstruct_tx_param && m_current_context.pconstruct_tx_param->need_at_least_1_zc)
   {
@@ -7661,12 +7661,14 @@ void wallet2::finalize_transaction(currency::finalize_tx_param& ftp, currency::f
   // broadcasting tx without secret key storing is forbidden to avoid lost key issues
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!broadcast_tx || store_tx_secret_key, "finalize_tx is requested to broadcast a tx without storing the key");
 
+  THROW_IF_FALSE_WALLET_EX_MES(ftp.sources.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, error::tx_too_big, "Too many inputs: " << ftp.sources.size() << ", maximum allowed is " << CURRENCY_TX_MAX_ALLOWED_INPUTS << ".");
+
   bool r = currency::construct_tx(m_account.get_keys(),
     ftp, result);
   //TIME_MEASURE_FINISH_MS(construct_tx_time);
   THROW_IF_FALSE_WALLET_EX(r, error::tx_not_constructed, ftp.sources, ftp.prepared_destinations, ftp.unlock_time);
   uint64_t effective_fee = 0;
-  THROW_IF_FALSE_WALLET_CMN_ERR_EX(!get_tx_fee(result.tx, effective_fee) || effective_fee <= WALLET_TX_MAX_ALLOWED_FEE, "tx fee is WAY too big: " << print_money_brief(effective_fee) << ", max allowed is " << print_money_brief(WALLET_TX_MAX_ALLOWED_FEE));
+  THROW_IF_FALSE_WALLET_CMN_ERR_EX(!get_tx_fee(result.tx, effective_fee) || effective_fee <= WALLET_TX_MAX_ALLOWED_FEE, "tx fee is WAY too big: " << print_money_brief(effective_fee) << ", maximum allowed is " << print_money_brief(WALLET_TX_MAX_ALLOWED_FEE) << ".");
 
   //TIME_MEASURE_START_MS(sign_ms_input_time);
   if (ftp.multisig_id != currency::null_hash)
@@ -7683,7 +7685,7 @@ void wallet2::finalize_transaction(currency::finalize_tx_param& ftp, currency::f
   //TIME_MEASURE_FINISH_MS(sign_ms_input_time);
 
   size_t tx_blob_size = tx_to_blob(result.tx).size();
-  THROW_IF_FALSE_WALLET_EX(tx_blob_size < CURRENCY_MAX_TRANSACTION_BLOB_SIZE, error::tx_too_big, result.tx, m_upper_transaction_size_limit);
+  THROW_IF_FALSE_WALLET_EX_MES(tx_blob_size < CURRENCY_MAX_TRANSACTION_BLOB_SIZE, error::tx_too_big, "Transaction size: " << tx_blob_size << " bytes, transaction size limit: " << CURRENCY_MAX_TRANSACTION_BLOB_SIZE << " bytes.");
 
   if (store_tx_secret_key)
     m_tx_keys.insert(std::make_pair(get_transaction_hash(result.tx), result.one_time_key));
