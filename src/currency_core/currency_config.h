@@ -19,6 +19,7 @@
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
 #define CURRENCY_MAX_BLOCK_SIZE                         500000000  // block header blob limit, never used!
+#define CURRENCY_TX_MAX_ALLOWED_INPUTS                  256        // limited primarily by asset surjection proof
 #define CURRENCY_TX_MAX_ALLOWED_OUTS                    2000
 #define CURRENCY_TX_MIN_ALLOWED_OUTS                    2      // effective starting HF4 Zarcanum
 #define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           0xc5   // addresses start with 'Zx'
