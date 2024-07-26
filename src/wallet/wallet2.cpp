@@ -147,7 +147,12 @@ void wallet2::init(const std::string& daemon_address)
 {
   //m_miner_text_info = PROJECT_VERSION_LONG;
   m_core_proxy->set_connection_addr(daemon_address);
-  m_core_proxy->check_connection();
+  bool connected = m_core_proxy->check_connection();
+  if (!daemon_address.empty())
+  {
+    WLT_LOG_L0("daemon address: " << daemon_address);
+    WLT_LOG_L1((connected ? "" : "not ") << "connected to daemon");
+  }
 
   std::stringstream ss;
   const tools::wallet_public::wallet_vote_config& votes = this->get_current_votes();
@@ -158,9 +163,8 @@ void wallet2::init(const std::string& daemon_address)
     {
       ss << "\t\t" << e.proposal_id << "\t\t" << (e.vote ? "1" : "0") << "\t\t(" << e.h_start << " - " << e.h_end << ")";
     }
+    WLT_LOG_L0(ss.str());
   }
-  WLT_LOG_L0(ss.str());
-
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy)
@@ -3433,8 +3437,8 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   m_current_wallet_file_size = boost::filesystem::file_size(wallet_, ec);
 
   WLT_LOG_L0("Loaded wallet file" << (m_watch_only ? " (WATCH ONLY) " : " ") << string_encoding::convert_to_ansii(m_wallet_file) 
-    << " with public address: " << m_account.get_public_address_str() 
-    << ", file_size=" << m_current_wallet_file_size
+    << " with public address " << m_account.get_public_address_str() 
+    << ", file_size: " << m_current_wallet_file_size
     << ", blockchain_size: " << m_chain.get_blockchain_current_size()
   );
   WLT_LOG_L1("[LOADING]Blockchain shortener state: " << ENDL << m_chain.get_internal_state_text());
@@ -7741,13 +7745,7 @@ void wallet2::finalize_transaction(currency::finalize_tx_param& ftp, currency::f
     add_sent_tx_detailed_info(result.tx, ftp.attachments, ftp.prepared_destinations, ftp.selected_transfers);
   //TIME_MEASURE_FINISH(add_sent_tx_detailed_info_time);
 
-  /* TODO
-  WLT_LOG_GREEN("[prepare_transaction]: get_needed_money_time: " << get_needed_money_time << " ms"
-  << ", prepare_tx_sources_time: " << prepare_tx_sources_time << " ms"
-  << ", prepare_tx_destinations_time: " << prepare_tx_destinations_time << " ms"
-  << ", construct_tx_time: " << construct_tx_time << " ms"
-  << ", sign_ms_input_time: " << sign_ms_input_time << " ms",
-  LOG_LEVEL_0);*/
+  // not logging success here because it's the caller's responsibility
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts, size_t fake_outputs_count,
