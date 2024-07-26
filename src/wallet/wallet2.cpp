@@ -4062,13 +4062,21 @@ std::string wallet2::get_balance_str() const
   // 98.0                                         BGTVUW   af2b12f3033337f9aea1845a6bc3fc966ed4d13227a3ace7706fca7dbcdaa7e2
   // 1000.034                                     DP3      d4aba1020f26927571771e04b585b4ffb211f52708d5e4c465bbdfa4a12e6271
 
-  static const char* header = " balance unlocked      / [balance total]        ticker   asset id";
+  static const char* header = " balance unlocked      / [balance total]        ticker    asset id";
   std::stringstream ss;
   ss << header << ENDL;
 
   std::list<tools::wallet_public::asset_balance_entry> balances;
   uint64_t mined = 0;
   balance(balances, mined);
+
+  auto native_coin_it = std::find_if(balances.begin(), balances.end(), [&](auto& v){ return v.asset_info.asset_id == currency::native_coin_asset_id; });
+  if (native_coin_it != balances.end())
+  {
+    balances.push_front(*native_coin_it);
+    balances.erase(native_coin_it);
+  }
+
   for (const tools::wallet_public::asset_balance_entry& b : balances)
   {
     ss << " " << std::left << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(b.unlocked, b.asset_info.decimal_point);
@@ -4076,7 +4084,10 @@ std::string wallet2::get_balance_str() const
       ss << std::string(21 + 3, ' ');
     else
       ss << " / " << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(b.total, b.asset_info.decimal_point);
-    ss << "  " << std::setw(8) << std::left << b.asset_info.ticker << " " << b.asset_info.asset_id << ENDL;
+    ss << "  " << std::setw(8) << std::left << b.asset_info.ticker << "  " << b.asset_info.asset_id;
+    if (b.asset_info.asset_id == native_coin_asset_id)
+      ss << "  NATIVE";
+    ss << ENDL;
   }
 
   return ss.str();
@@ -4093,33 +4104,63 @@ std::string wallet2::get_balance_str_raw() const
   // 7d3f348fbebfffc4e61a3686189cf870ea393e1c88b8f636acbfdacf9e4b2db2    CT
   // ...
 
-  static const char* header = " balance unlocked      / [balance total]        DP   asset id";
+  static const char* header = " balance unlocked      / [balance total]        ticker    asset id                                                          DP  flags";
   std::stringstream ss;
   ss << header << ENDL;
   
   uint64_t dummy = 0;
-  std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base> balances_map;
+  typedef std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base> balances_map_t;
+  balances_map_t balances_map;
   this->balance(balances_map, dummy);
 
-  for(const auto& entry : balances_map)
+  auto print_map = [&](const balances_map_t& map){
+    for(const auto& entry : map)
+    {
+      uint32_t asset_flags = 0;
+      asset_descriptor_base asset_info{};
+      bool has_info = get_asset_info(entry.first, asset_info, asset_flags);
+      ss << " " << std::left << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(entry.second.unlocked, asset_info.decimal_point);
+      if(entry.second.total == entry.second.unlocked)
+        ss << std::string(21 + 3, ' ');
+      else
+        ss << " / " << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(entry.second.total, asset_info.decimal_point);
+
+      ss << "  " << std::setw(8) << std::left << asset_info.ticker;
+      ss << "  " << entry.first << "  ";
+
+      if (has_info)
+        ss << std::setw(2) << std::right << (int)asset_info.decimal_point;
+      else
+        ss << "??";
+
+      ss << "  ";
+
+      if (entry.first == native_coin_asset_id)
+      {
+        ss << "NATIVE";
+      }
+      else if (asset_flags != aif_none)
+      {
+        if (asset_flags & aif_own)
+          ss << "own,";
+        if (asset_flags & aif_whitelisted)
+          ss << "whitelisted,";
+        ss.seekp(-1, ss.cur); // trim comma
+      }
+      ss << ENDL;
+    }
+  };
+
+  auto balances_map_it = balances_map.find(native_coin_asset_id);
+  if (balances_map_it != balances_map.end())
   {
-    size_t decimal_point = 0;
-    bool has_known_decimal_point = get_asset_decimal_point(entry.first, &decimal_point);
-    ss << " " << std::left << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(entry.second.unlocked, decimal_point);
-    if(entry.second.total == entry.second.unlocked)
-      ss << std::string(21 + 3, ' ');
-    else
-      ss << " / " << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(entry.second.total, decimal_point);
-
-    ss << "  ";
-
-    if (has_known_decimal_point)
-      ss << std::setw(2) << std::right << decimal_point;
-    else
-      ss << "??";
-    
-    ss << "   " << entry.first << ENDL;
+    balances_map_t native_coin_map;
+    native_coin_map.insert(*balances_map_it);
+    balances_map.erase(balances_map_it);
+    print_map(native_coin_map);
   }
+  print_map(balances_map);
+
 
   //print whitelist
   ss << "WHITELIST: " << ENDL;
