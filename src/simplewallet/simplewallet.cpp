@@ -87,9 +87,7 @@ namespace ph = boost::placeholders;
           } \
           catch (const tools::error::tx_too_big& e) \
           { \
-            currency::transaction tx = e.tx(); \
-            fail_msg_writer() << "transaction " << get_transaction_hash(e.tx()) << " is too big. Transaction size: " << \
-              get_object_blobsize(e.tx()) << " bytes, transaction size limit: " << e.tx_size_limit() << " bytes. Try to separate this payment into few smaller transfers."; \
+            fail_msg_writer() << "transaction is too big. " << e.get_message() << " Try to split this payment into a few smaller transfers."; \
           } \
           catch (const tools::error::zero_destination&) \
           { \
