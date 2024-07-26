@@ -7944,10 +7944,6 @@ void wallet2::transfer(construct_tx_param& ctp,
 void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
   uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx /* = nullptr */, std::string* p_filename_or_unsigned_tx_blob_str /* = nullptr */)
 {
-  static const size_t estimated_bytes_per_input = 85;
-  const size_t estimated_max_inputs = static_cast<size_t>(CURRENCY_MAX_TRANSACTION_BLOB_SIZE / (estimated_bytes_per_input * (fake_outs_count + 1.5))); // estimated number of maximum tx inputs under the tx size limit
-  const size_t tx_sources_for_querying_random_outs_max = estimated_max_inputs * 2;
-
   bool r = false;
   outs_total = 0;
   amount_total = 0;
@@ -7955,8 +7951,10 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   amount_swept = 0;
 
   std::vector<uint64_t> selected_transfers;
+  std::unordered_map<size_t, size_t> fake_outs_for_selected_transfers; // tr index -> fake outs count
   selected_transfers.reserve(m_transfers.size());
-  for (uint64_t i = 0; i < m_transfers.size(); ++i)
+  fake_outs_for_selected_transfers.reserve(m_transfers.size());
+  for (size_t i = 0; i < m_transfers.size(); ++i)
   {
     const transfer_details& td = m_transfers[i];
     size_t fake_outs_count_for_td = is_auditable() ? 0 : (td.is_zc() ? m_core_runtime_config.hf4_minimum_mixins : fake_outs_count);
@@ -7965,6 +7963,8 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
       is_transfer_ready_to_go(td, fake_outs_count_for_td))
     {
       selected_transfers.push_back(i);
+      r = fake_outs_for_selected_transfers.insert(std::make_pair(i, fake_outs_count_for_td)).second;
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "unable to insert: " << i << ", " << fake_outs_count_for_td);
       outs_total += 1;
       amount_total += amount;
     }
@@ -7976,21 +7976,29 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   std::sort(selected_transfers.begin(), selected_transfers.end(), [this](uint64_t a, uint64_t b) { return m_transfers[b].amount() < m_transfers[a].amount(); });
 
   // limit RPC request with reasonable number of sources
-  if (selected_transfers.size() > tx_sources_for_querying_random_outs_max)
-    selected_transfers.erase(selected_transfers.begin() + tx_sources_for_querying_random_outs_max, selected_transfers.end());
+  if (selected_transfers.size() > CURRENCY_TX_MAX_ALLOWED_INPUTS)
+    selected_transfers.erase(selected_transfers.begin() + CURRENCY_TX_MAX_ALLOWED_INPUTS, selected_transfers.end());
 
   prefetch_global_indicies_if_needed(selected_transfers);
+
+  size_t max_fake_outs_count = 0;
+  for(auto tr_idx : selected_transfers)
+    if (max_fake_outs_count < fake_outs_for_selected_transfers[tr_idx])
+      max_fake_outs_count = fake_outs_for_selected_transfers[tr_idx];
+
+  static const size_t estimated_bytes_per_input = 85;
+  const size_t estimated_max_inputs = static_cast<size_t>(CURRENCY_MAX_TRANSACTION_BLOB_SIZE / (estimated_bytes_per_input * (max_fake_outs_count + 1.5))); // estimated number of maximum tx inputs under the tx size limit
 
   typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry out_entry;
   typedef currency::tx_source_entry::output_entry tx_output_entry;
 
   COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response rpc_get_random_outs_resp = AUTO_VAL_INIT(rpc_get_random_outs_resp);
-  if (fake_outs_count > 0)
+  if (max_fake_outs_count > 0)
   {
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request req = AUTO_VAL_INIT(req);
     req.height_upper_limit = m_last_pow_block_h;
     req.use_forced_mix_outs = false;
-    req.decoys_count = fake_outs_count + 1;
+    req.decoys_count = max_fake_outs_count + 1;
     for (uint64_t i : selected_transfers)
       req.amounts.push_back(m_transfers[i].is_zc() ? 0 : m_transfers[i].m_amount);
 
@@ -8005,10 +8013,10 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
     std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount> scanty_outs;
     for (COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& amount_outs : rpc_get_random_outs_resp.outs)
     {
-      if (amount_outs.outs.size() < fake_outs_count)
+      if (amount_outs.outs.size() < max_fake_outs_count)
         scanty_outs.push_back(amount_outs);
     }
-    THROW_IF_FALSE_WALLET_EX(scanty_outs.empty(), error::not_enough_outs_to_mix, scanty_outs, fake_outs_count);
+    THROW_IF_FALSE_WALLET_EX(scanty_outs.empty(), error::not_enough_outs_to_mix, scanty_outs, max_fake_outs_count);
   }
 
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
@@ -8035,7 +8043,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   auto get_result_t_str = [](try_construct_result_t t) -> const char*
   { return t == rc_ok ? "rc_ok" : t == rc_too_few_outputs ? "rc_too_few_outputs" : t == rc_too_many_outputs ? "rc_too_many_outputs" : t == rc_create_tx_failed ? "rc_create_tx_failed" : "unknown"; };
 
-  auto try_construct_tx = [this, &selected_transfers, &rpc_get_random_outs_resp, &fake_outs_count, &fee, &destination_addr]
+  auto try_construct_tx = [this, &selected_transfers, &rpc_get_random_outs_resp, &fake_outs_for_selected_transfers, &fee, &destination_addr]
     (size_t st_index_upper_boundary, currency::finalize_tx_param& ftp, uint64_t& amount_swept) -> try_construct_result_t
   {
     amount_swept = 0;
@@ -8064,7 +8072,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
           if (td.m_global_output_index == daemon_oe.global_amount_index)
             continue;
           src.outputs.emplace_back(daemon_oe.global_amount_index, daemon_oe.stealth_address, daemon_oe.concealing_point, daemon_oe.amount_commitment, daemon_oe.blinded_asset_id);
-          if (src.outputs.size() >= fake_outs_count)
+          if (src.outputs.size() >= fake_outs_for_selected_transfers[tr_index])
             break;
         }
       }
@@ -8217,6 +8225,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   {
     crypto::secret_key sk{};
     finalize_transaction(ftp, *p_tx, sk, true);
+    print_tx_sent_message(*p_tx, "(sweep_below)", get_tx_fee(*p_tx));
   }
   catch (...)
   {
