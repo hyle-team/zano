@@ -155,3 +155,8 @@ struct tx_key_image_pool_conflict : public test_chain_unit_enchanced
   bool generate(std::vector<test_event_entry>& events) const;
   mutable currency::account_base m_miner_acc;
 };
+
+struct tx_version_against_hardfork : public test_chain_unit_enchanced
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};

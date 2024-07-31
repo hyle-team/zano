@@ -1217,6 +1217,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(tx_expiration_time_and_block_template);
     GENERATE_AND_PLAY(tx_expiration_time_and_chain_switching);
     GENERATE_AND_PLAY(tx_key_image_pool_conflict);
+    //GENERATE_AND_PLAY_HF(tx_version_against_hardfork, "4-*");
 
     // Double spend
     GENERATE_AND_PLAY(gen_double_spend_in_tx<false>);
