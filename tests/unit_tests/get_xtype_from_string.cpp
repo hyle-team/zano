@@ -26,14 +26,20 @@ namespace
   }
 }
 
-#define TEST_pos(int_type, expected, str)                                \
-  TEST(get_xtype_from_string, handles_pos_ ## int_type ## _ ## expected) \
-  {                                                                      \
-    do_pos_test<int_type>(expected, str);                                \
-  }
+#define MAKE_TEST_NAME(prefix, int_type, ln, test_type) \
+  test_type ## _ ## prefix ## _ ## int_type ## _ ## ln
 
-#define DO_MAKE_NEG_TEST_NAME(prefix, int_type, ln) prefix ## int_type ## _ ## ln
-#define MAKE_NEG_TEST_NAME(prefix, int_type, ln) DO_MAKE_NEG_TEST_NAME(prefix, int_type, ln)
+#define MAKE_POS_TEST_NAME(prefix, int_type, ln) \
+  MAKE_TEST_NAME(prefix, int_type, ln, POS)
+
+#define MAKE_NEG_TEST_NAME(prefix, int_type, ln) \
+  MAKE_TEST_NAME(prefix, int_type, ln, NEG)
+
+#define TEST_pos(int_type, expected, str)                                          \
+  TEST(get_xtype_from_string, MAKE_POS_TEST_NAME(handles_pos, int_type, __LINE__)) \
+  {                                                                                \
+    do_pos_test<int_type>(expected, str);                                          \
+  }
 
 #define TEST_neg(int_type, str)                                                    \
   TEST(get_xtype_from_string, MAKE_NEG_TEST_NAME(handles_neg, int_type, __LINE__)) \
