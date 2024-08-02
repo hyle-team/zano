@@ -6,7 +6,6 @@
 // Note: This file originates from tests/functional_tests/crypto_tests.cpp 
 #pragma once
 #include <string>
-#include <string.h>
 #include <boost/multiprecision/cpp_int.hpp>
 #include "crypto.h"
 #include "eth_signature.h"
@@ -1218,7 +1217,7 @@ namespace crypto
         m_elements.emplace_back(c_scalar_0);
         m_elements.emplace_back(c_scalar_0);
         char* p = m_elements[m_elements.size() - 2].c; // pointer to the first of the two added items
-        memcpy_s(p, 2 * sizeof(item_t), &epk.data, sizeof epk.data);
+        memcpy(p, &epk.data, sizeof epk.data);
       }
 
       void add_key_image(const crypto::key_image& ki)
