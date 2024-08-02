@@ -6,6 +6,7 @@
 #include "bitcoin-secp256k1/include/secp256k1.h"
 #include "random.h"
 #include "misc_language.h"
+#include <string_tools.h>
 
 
 namespace crypto
@@ -50,6 +51,32 @@ namespace crypto
     }
   }
 
+  bool eth_secret_key_to_public_key(const eth_secret_key& sec_key, eth_public_key& pub_key) noexcept
+  {
+    try
+    {
+      // TODO: do we need this? consider using static context
+      secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
+      auto slh = epee::misc_utils::create_scope_leave_handler([&ctx](){
+        secp256k1_context_destroy(ctx);
+        ctx = nullptr;
+        });
+
+      secp256k1_pubkey uncompressed_pub_key{};
+      if (!secp256k1_ec_pubkey_create(ctx, &uncompressed_pub_key, sec_key.data))
+        return false;
+
+      size_t output_len = sizeof pub_key;
+      if (!secp256k1_ec_pubkey_serialize(ctx, pub_key.data, &output_len, &uncompressed_pub_key, SECP256K1_EC_COMPRESSED))
+        return false;
+
+      return true;
+    }
+    catch(...)
+    {
+      return false;
+    }
+  }
 
   // generates secp256k1 ECDSA signature
   bool generate_eth_signature(const hash& m, const eth_secret_key& sec_key, eth_signature& sig) noexcept
@@ -91,8 +118,8 @@ namespace crypto
 
       secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
       auto slh = epee::misc_utils::create_scope_leave_handler([&ctx](){
-        secp256k1_context_destroy(ctx);
-        ctx = nullptr;
+          secp256k1_context_destroy(ctx);
+          ctx = nullptr;
         });
 
       uint8_t randomness[32];
@@ -119,6 +146,16 @@ namespace crypto
     {
       return false;
     }
+  }
+
+  std::ostream& operator<<(std::ostream& o, const eth_secret_key& v)
+  {
+    return o << epee::string_tools::pod_to_hex(v);
+  }
+
+  std::ostream& operator<<(std::ostream& o, const eth_public_key& v)
+  {
+    return o << epee::string_tools::pod_to_hex(v);
   }
 
 
