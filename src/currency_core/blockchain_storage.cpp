@@ -4113,14 +4113,14 @@ bool validate_ado_ownership(asset_op_verification_context& avc)
   {
     asset_operation_ownership_proof_eth aoop_eth{};
     r = get_type_in_variant_container(avc.tx.proofs, aoop_eth);
-    CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed - missing signature (asset_operation_ownership_proof)");
+    CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed: asset_operation_ownership_proof_eth is missing");
     return crypto::verify_eth_signature(avc.tx_id, last_ado.descriptor.owner_eth_pub_key.value(), aoop_eth.eth_sig);
   }
 
-  // owner_eth_pub_key has no value -- falback to default
+  // owner_eth_pub_key has no value -- fallback to default
   asset_operation_ownership_proof aoop = AUTO_VAL_INIT(aoop);
   r = get_type_in_variant_container(avc.tx.proofs, aoop);
-  CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed - missing signature (asset_operation_ownership_proof)");
+  CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed: asset_operation_ownership_proof is missing");
 
   return crypto::verify_schnorr_sig(avc.tx_id, last_ado.descriptor.owner, aoop.gss);
 }

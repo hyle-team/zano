@@ -708,7 +708,7 @@ namespace currency
     std::string         meta_info;
     crypto::public_key  owner = currency::null_pkey; // consider premultipling by 1/8
     bool                hidden_supply = false;
-    std::optional<crypto::eth_public_key> owner_eth_pub_key;
+    std::optional<crypto::eth_public_key> owner_eth_pub_key; // note: the size is 33 bytes (if present)
 
     uint8_t             version = ASSET_DESCRIPTOR_BASE_STRUCTURE_VER;
 
