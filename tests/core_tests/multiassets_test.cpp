@@ -887,3 +887,146 @@ bool asset_emission_and_unconfirmed_balance::c1(currency::core& c, size_t ev_ind
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+eth_signed_asset_basics::eth_signed_asset_basics()
+{
+  REGISTER_CALLBACK_METHOD(eth_signed_asset_basics, c1);
+}
+
+bool eth_signed_asset_basics::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  //account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  miner_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+template<typename T>
+struct eth_sign_cb_helper : public currency::asset_eth_signer_i
+{
+  eth_sign_cb_helper(T cb)
+    : m_cb(cb)
+  {}
+
+  virtual bool sign(const crypto::hash& h, const crypto::eth_public_key& asset_owner, crypto::eth_signature& sig) override
+  {
+    return m_cb(h, asset_owner, sig);
+  }
+
+  T m_cb;
+};
+
+template<typename T>
+std::shared_ptr<eth_sign_cb_helper<T>> construct_eth_sign_cb_helper(T&& cb)
+{
+  return std::make_shared<eth_sign_cb_helper<T>>(std::forward<T>(cb));
+}
+
+bool eth_signed_asset_basics::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  
+  crypto::eth_secret_key eth_sk{};
+  crypto::eth_public_key eth_pk{};
+  r = crypto::generate_eth_key_pair(eth_sk, eth_pk);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_key_pair failed");
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  miner_wlt->refresh();
+
+  asset_descriptor_base adb{};
+  adb.decimal_point = 2;
+  adb.total_max_supply = 10000;
+  adb.full_name = "Either";
+  adb.ticker = "EITH";
+  adb.owner_eth_pub_key = eth_pk; // note setting owner eth pub key here
+
+  uint64_t initial_emit_amount = adb.total_max_supply / 2;
+
+  //std::vector<currency::tx_destination_entry> destinations;
+  //destinations.emplace_back(initial_emit_amount, m_accounts[MINER_ACC_IDX].get_public_address(), null_pkey);
+  //currency::transaction tx{};
+
+  //
+  // custom deploy
+  //
+  tools::construct_tx_param ctp = miner_wlt->get_default_construct_tx_param();
+  ctp.dsts.emplace_back(initial_emit_amount, m_accounts[MINER_ACC_IDX].get_public_address(), null_pkey);
+  ctp.asset_owner = eth_pk; // note using eth pub key here
+  ctp.need_at_least_1_zc = true;
+
+  asset_descriptor_operation ado{};
+  ado.descriptor = adb;
+  ado.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+  ctp.extra.push_back(ado);
+
+  finalized_tx ft{};
+  miner_wlt->transfer(ctp, ft, true, nullptr);
+
+  crypto::public_key asset_id = currency::null_pkey;
+  CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, nullptr, &asset_id), false, "get_or_calculate_asset_id failed");
+
+  currency::asset_descriptor_operation ado2{};
+  r = get_type_in_variant_container(ft.tx.extra, ado2);
+  CHECK_AND_ASSERT_MES(r, false, "Failed find asset info in tx");
+  crypto::public_key new_asset_id{};
+  CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, nullptr, &new_asset_id), false, "get_or_calculate_asset_id failed");
+
+
+  miner_wlt->add_custom_asset_id(asset_id, adb);
+  //
+  // end of custom deploy
+  //
+
+  const transaction& tx = ft.tx;
+
+
+  LOG_PRINT_L0("Deployed new asset: " << asset_id << ", tx_id: " << currency::get_transaction_hash(tx));
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+
+  uint64_t emit_amount = adb.total_max_supply - initial_emit_amount;
+
+  //
+  // custom emit
+  //
+  ctp = miner_wlt->get_default_construct_tx_param();
+  ctp.dsts.emplace_back(emit_amount, m_accounts[MINER_ACC_IDX].get_public_address(), null_pkey);
+  ctp.need_at_least_1_zc = true;
+  ctp.asset_owner = eth_pk; // note using eth pub key here
+
+  ado = asset_descriptor_operation{};
+  ado.descriptor = adb;
+  ado.descriptor.current_supply = initial_emit_amount;
+  ado.operation_type = ASSET_DESCRIPTOR_OPERATION_EMIT;
+  ado.opt_asset_id = asset_id;
+  ctp.extra.push_back(ado);
+
+  auto signer = construct_eth_sign_cb_helper([&](const crypto::hash& h, const crypto::eth_public_key& asset_owner, crypto::eth_signature& sig)->bool {
+    CHECK_AND_ASSERT_EQ(asset_owner, eth_pk);
+    return crypto::generate_eth_signature(h, eth_sk, sig);
+  });
+
+  ctp.p_eth_signer = signer.get();
+
+  ft = finalized_tx{};
+  miner_wlt->transfer(ctp, ft, true, nullptr);
+  //
+  // end of custom emit
+  //
+
+  return true;
+}
