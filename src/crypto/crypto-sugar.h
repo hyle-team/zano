@@ -6,6 +6,7 @@
 // Note: This file originates from tests/functional_tests/crypto_tests.cpp 
 #pragma once
 #include <string>
+#include <string.h>
 #include <boost/multiprecision/cpp_int.hpp>
 #include "crypto.h"
 #include "eth_signature.h"
@@ -1212,6 +1213,7 @@ namespace crypto
 
       void add_eth_pub_key(const crypto::eth_public_key& epk)
       {
+        static_assert(sizeof(item_t)  == 32, "unexpected size of hs_t::item_t");
         static_assert(sizeof epk.data == 33, "unexpected size of eth_public_key");
         m_elements.emplace_back(c_scalar_0);
         m_elements.emplace_back(c_scalar_0);
