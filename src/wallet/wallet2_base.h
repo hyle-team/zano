@@ -224,9 +224,9 @@ namespace tools
     bool shuffle = false;
     bool create_utxo_defragmentation_tx = false;
     bool need_at_least_1_zc = false;
-    //crypto::secret_key asset_deploy_control_key = currency::null_skey;
-    currency::thirdparty_sign_handler* pthirdparty_sign_handler = nullptr;
-    crypto::public_key ado_current_asset_owner = currency::null_pkey;
+
+    currency::asset_eth_signer_i* p_eth_signer = nullptr;
+    currency::asset_owner_key_v asset_owner = currency::null_pkey;
   };
 
   struct mode_separate_context

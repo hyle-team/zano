@@ -139,10 +139,12 @@ namespace currency
     bool hltc_our_out_is_before_expiration;
   };
 
-  struct thirdparty_sign_handler
+  struct asset_eth_signer_i
   {
-    virtual bool sign(const crypto::hash& h, const crypto::public_key& owner_public_key, crypto::generic_schnorr_sig& sig);
+    virtual bool sign(const crypto::hash& h, const crypto::eth_public_key& asset_owner, crypto::eth_signature& sig) = 0;
   };
+
+  typedef boost::variant<crypto::public_key, crypto::eth_public_key> asset_owner_key_v;
 
   struct finalize_tx_param
   {
@@ -166,8 +168,8 @@ namespace currency
     tx_generation_context gen_context{}; // solely for consolidated txs
     
     //crypto::secret_key asset_control_key = currency::null_skey;
-    crypto::public_key ado_current_asset_owner = null_pkey;
-    thirdparty_sign_handler* pthirdparty_sign_handler = nullptr;
+    asset_owner_key_v asset_owner;
+    asset_eth_signer_i* p_eth_signer = nullptr;
     mutable bool need_to_generate_ado_proof = false;
 
 
@@ -191,7 +193,7 @@ namespace currency
       {
         FIELD(gen_context);
       }
-      FIELD(ado_current_asset_owner)
+      FIELD(asset_owner)
       FIELD(need_to_generate_ado_proof)
     END_SERIALIZE()
   };

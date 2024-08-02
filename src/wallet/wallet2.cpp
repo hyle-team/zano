@@ -5403,7 +5403,7 @@ void wallet2::emit_asset(const crypto::public_key asset_id, std::vector<currency
   ctp.dsts = destinations;
   ctp.extra.push_back(asset_emmit_info);
   ctp.need_at_least_1_zc = true;
-  ctp.ado_current_asset_owner = rsp.asset_descriptor.owner;
+  ctp.asset_owner = rsp.asset_descriptor.owner;
   //ctp.asset_deploy_control_key = own_asset_entry_it->second.control_key;
 
   for(auto& dst : ctp.dsts)
@@ -5432,7 +5432,7 @@ void wallet2::update_asset(const crypto::public_key asset_id, const currency::as
   currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
   bool r = this->daemon_get_asset_info(asset_id, adb);
   CHECK_AND_ASSERT_THROW_MES(r, "Failed to get asset info from daemon");
-  ctp.ado_current_asset_owner = adb.owner;
+  ctp.asset_owner = adb.owner;
 
   finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
@@ -5454,7 +5454,7 @@ void wallet2::transfer_asset_ownership(const crypto::public_key asset_id, const 
   asset_update_info.opt_asset_id = asset_id;
   asset_update_info.descriptor.owner = new_owner;
   construct_tx_param ctp = get_default_construct_tx_param();
-  ctp.ado_current_asset_owner = adb.owner;
+  ctp.asset_owner = adb.owner;
   ctp.extra.push_back(asset_update_info);
 
   finalized_tx ft = AUTO_VAL_INIT(ft);
@@ -5488,7 +5488,7 @@ void wallet2::burn_asset(const crypto::public_key asset_id, uint64_t amount_to_b
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.extra.push_back(asset_burn_info);
   ctp.need_at_least_1_zc = true;
-  ctp.ado_current_asset_owner = rsp.asset_descriptor.owner;
+  ctp.asset_owner = rsp.asset_descriptor.owner;
   ctp.dsts.push_back(dst_to_burn);
 
   finalized_tx ft = AUTO_VAL_INIT(ft);
@@ -7599,8 +7599,8 @@ bool wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
 
   const currency::transaction& tx_for_mode_separate = msc.tx_for_mode_separate;
   assets_selection_context needed_money_map = get_needed_money(ctp.fee, ctp.dsts);
-  ftp.ado_current_asset_owner = ctp.ado_current_asset_owner;
-  ftp.pthirdparty_sign_handler = ctp.pthirdparty_sign_handler;
+  ftp.asset_owner = ctp.asset_owner;
+  ftp.p_eth_signer = ctp.p_eth_signer;
   //
   // TODO @#@# need to do refactoring over this part to support hidden amounts and asset_id
   //
