@@ -5408,8 +5408,7 @@ void wallet2::emit_asset(const crypto::public_key asset_id, std::vector<currency
 
   for(auto& dst : ctp.dsts)
   {
-    if (dst.asset_id == asset_id)
-      dst.asset_id = null_pkey; // emit operation requires null_pkey for emitting asset outputs, fix it ad-hoc here
+    dst.asset_id = null_pkey; // emit operation requires null_pkey for emitting asset outputs, fix it ad-hoc here
   }
 
   finalized_tx ft = AUTO_VAL_INIT(ft);
