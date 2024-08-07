@@ -12,6 +12,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/join.hpp>
 #include "include_base_utils.h"
 #include "common/command_line.h"
 #include "common/util.h"
@@ -26,7 +27,7 @@
 #include "string_coding.h"
 #include "wallet/wrap_service.h"
 #include "common/general_purpose_commands_defs.h"
-
+#include "common/mnemonic-encoding.h"
 #include "wallet/wallet_helpers.h"
 
 
@@ -142,6 +143,7 @@ namespace
   const command_line::arg_descriptor<unsigned int>  arg_set_timeout("set-timeout", "Set timeout for the wallet");
   const command_line::arg_descriptor<std::string>   arg_voting_config_file("voting-config-file", "Set voting config instead of getting if from daemon", "");
   const command_line::arg_descriptor<bool>          arg_no_password_confirmations("no-password-confirmation", "Enable/Disable password confirmation for transactions", false);
+  const command_line::arg_descriptor<bool>          arg_seed_doctor("seed-doctor", "Experimental: if your seed is not working for recovery this is likely because you've made a mistake whene you were doing back up(typo, wrong words order, missing word). This experimental code will attempt to recover seed phrase from with few approaches.");
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command  ("command", "");
 
@@ -2870,6 +2872,210 @@ bool search_for_wallet_file(const std::wstring &search_here/*, const std::string
   return false;
 }
 
+
+
+int seed_doctor()
+{
+  success_msg_writer() <<
+    "**********************************************************************\n" <<
+    "This is experimental tool that might help you to recover your wallet's corrupted seed phrase. \n" <<
+    "It might help to sort out only trivial situations where one word was written wrong or \n" << 
+    "two word was written in wrong order\n" <<
+    "**********************************************************************";
+
+
+  success_msg_writer() << "Please enter problematic seed phrase:";
+  std::string seed;
+  std::getline(std::cin, seed);
+
+  success_msg_writer() << "Please enter wallet address if you have it(press enter if you don't know it):";
+  std::string address;
+  std::getline(std::cin, address);
+  address = epee::string_tools::trim(address);
+
+  std::string passphrase;  
+  bool check_summ_available = false;
+
+    //cut the last timestamp word from restore_dats
+  std::vector<std::string> words;
+  boost::split(words, seed, boost::is_space());
+
+  std::set<size_t> failed_words;
+  size_t i = 0;
+  //let's validate each word 
+  for (const auto& w : words)
+  {
+    if (!tools::mnemonic_encoding::valid_word(w))
+    {
+      success_msg_writer() << "Word " << i << " '" << w << "' is invalid, attempting to restore it";
+      failed_words.insert(i);
+    }
+    i++;
+  }
+
+  if (words.size() == SEED_PHRASE_V1_WORDS_COUNT)
+  {
+    // 24 seed words + one timestamp word = 25 total
+    success_msg_writer() << "SEED_PHRASE_V1_WORDS_COUNT, checksum is unavailable";
+    if (address.empty())
+    {
+      success_msg_writer() << "With SEED_PHRASE_V1_WORDS_COUNT and address unknown it's not enough information to recover it, sorry";
+      return EXIT_FAILURE;
+    }
+  }
+  else if (words.size() == SEED_PHRASE_V2_WORDS_COUNT)
+  {
+    // 24 seed words + one timestamp word + one flags & checksum = 26 total
+
+    success_msg_writer() << "SEED_PHRASE_V2_WORDS_COUNT, checksum is available";
+    check_summ_available = true;
+  }
+  else if (words.size() == 24)
+  {
+    //seed only with no date, add date to it
+    std::string zero_word = tools::mnemonic_encoding::word_by_num(0);  //zero_word is likely to be "like"
+    words.push_back(zero_word); //
+  }
+  else
+  {
+    success_msg_writer() << "Impossible to recover something with " << words.size() << " words only";
+    return EXIT_FAILURE;
+  }
+
+  bool pass_protected = false;
+  bool success = account_base::is_seed_password_protected(seed, pass_protected);
+  success_msg_writer() << "SECURED_SEED: " << (pass_protected ? "true" : "false");
+
+  if (pass_protected)
+  {
+    success_msg_writer() << "Please enter seed passphrase(if passphrase is wrong then chances to correct seed recovery is nearly zero):";
+    std::getline(std::cin, passphrase);
+  }
+
+  size_t global_candidates_count = 0;
+
+  auto brute_force_func = [&](size_t word_index) -> bool {
+    const map<string, uint32_t>& all_words = tools::mnemonic_encoding::get_words_map();
+    success_msg_writer() << "Brute forcing  word " << word_index << " ....";
+    size_t candidates_count = 0;
+    std::vector<std::string> words_local = words;
+
+    for (auto it = all_words.begin(); it != all_words.end(); it++)
+    {
+      words_local[word_index] = it->first;
+
+      std::string result = boost::algorithm::join(words_local, " ");
+      account_base acc;
+      bool r = acc.restore_from_seed_phrase(result, passphrase);
+      if (r)
+      {
+        if (!address.empty())
+        {
+          //check against address
+          if (acc.get_public_address_str() == address)
+          {
+            success_msg_writer(true) << "!!!SUCCESS!!!";
+            success_msg_writer() << "Seed recovered, please write down recovered seed and use it to restore the wallet:\n" << result;
+            return true;
+          }
+        }
+        else
+        {
+          success_msg_writer() << "Potential seed candidate:\n" << result << "\nAddress: " << acc.get_public_address_str();
+          candidates_count++;
+        }
+      }
+    }
+    global_candidates_count += candidates_count;
+    return false;
+    };
+
+
+  auto swap_func = [&](size_t word_index) -> bool {
+    size_t candidates_count = 0;
+    std::vector<std::string> words_local = words;
+
+    std::string tmp = words_local[word_index];
+    words_local[word_index] = words_local[word_index + 1];
+    words_local[word_index + 1] = tmp;
+    std::string result = boost::algorithm::join(words_local, " ");
+    account_base acc;
+    bool r = acc.restore_from_seed_phrase(result, passphrase);
+    if (r)
+    {
+      if (!address.empty())
+      {
+        //check against address
+        if (acc.get_public_address_str() == address)
+        {
+          success_msg_writer(true) << "!!!SUCCESS!!!";
+          success_msg_writer() << "Seed recovered, please write down recovered seed and use it to restore the wallet:\n" << result;
+          return true;
+        }
+      }
+      else
+      {
+        success_msg_writer() << "Potential seed candidate:\n" << result << "\nAddress: " << acc.get_public_address_str();
+        candidates_count++;
+      }
+    }
+    global_candidates_count += candidates_count;
+    return false;
+    };
+
+
+  if (failed_words.size())
+  {
+    if (failed_words.size() > 1)
+    {
+      success_msg_writer() << "Restoring more then 1 broken words not implemented yet, sorry";
+      return EXIT_FAILURE;
+    }
+    if (!check_summ_available && address.empty())
+    {
+      success_msg_writer() << "No address and no checksum, recovery is impossible, sorry";
+      return EXIT_FAILURE;
+    }
+
+    size_t broken_word_index = *failed_words.begin();
+    bool r = brute_force_func(broken_word_index);
+    success_msg_writer() << "Brute forcing finished, " << global_candidates_count << " potential candidates found";
+    return r ? EXIT_SUCCESS : EXIT_FAILURE;
+  }
+  else
+  {
+    if (!check_summ_available && address.empty())
+    {
+      success_msg_writer() << "No address and no checksum, recovery is limited only to date reset";
+      std::string result = boost::algorithm::join(words, " ");
+      account_base acc;
+      bool r = acc.restore_from_seed_phrase(result, passphrase);
+      success_msg_writer() << "Potential seed candidate:\n" << result << "\nAddress: " << acc.get_public_address_str();
+      return EXIT_FAILURE;
+    }
+    success_msg_writer() << "Brute forcing all each word";
+    for (size_t i = 0; i != words.size() && i != 24; i++)
+    {
+      bool r = brute_force_func(i);
+      if(r)
+        return EXIT_SUCCESS;
+    }
+  }
+
+  success_msg_writer() << "Brute forcing finished, " << global_candidates_count << " potential candidates found";
+
+  success_msg_writer() << "Swap check...";
+  
+  for (size_t i = 0; i != words.size() && i != 23; i++)
+  {
+    bool r = swap_func(i);
+    if (r)
+      return EXIT_SUCCESS;
+  }
+
+  return EXIT_FAILURE;
+}
+
 //----------------------------------------------------------------------------------------------------
 #ifdef WIN32
 int wmain( int argc, wchar_t* argv_w[ ], wchar_t* envp[ ] )
@@ -2934,7 +3140,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_set_timeout);
   command_line::add_arg(desc_params, arg_voting_config_file);
   command_line::add_arg(desc_params, arg_no_password_confirmations);
-  command_line::add_arg(desc_params, command_line::arg_generate_rpc_autodoc);    
+  command_line::add_arg(desc_params, command_line::arg_generate_rpc_autodoc); 
+  command_line::add_arg(desc_params, arg_seed_doctor);
 
   tools::wallet_rpc_server::init_options(desc_params);
 
@@ -3011,6 +3218,13 @@ int main(int argc, char* argv[])
   }
 
   bool offline_mode = command_line::get_arg(vm, arg_offline_mode);
+
+
+  if (command_line::has_arg(vm, arg_seed_doctor))
+  {
+    return seed_doctor();
+  }
+
 
   if (command_line::has_arg(vm, tools::wallet_rpc_server::arg_rpc_bind_port))
   {
@@ -3222,3 +3436,4 @@ int main(int argc, char* argv[])
   CATCH_ENTRY_L0(__func__, EXIT_FAILURE);
   return EXIT_SUCCESS;
 }
+

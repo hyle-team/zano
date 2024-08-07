@@ -7598,6 +7598,10 @@ bool wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
 
   const currency::transaction& tx_for_mode_separate = msc.tx_for_mode_separate;
   assets_selection_context needed_money_map = get_needed_money(ctp.fee, ctp.dsts);
+  if (this->is_auditable() && ctp.fake_outputs_count > 0)
+  {
+    WLT_THROW_IF_FALSE_WITH_CODE(false, "WALLET_RPC_ERROR_CODE_WRONG_MIXINS_FOR_AUDITABLE_WALLET", "WALLET_RPC_ERROR_CODE_WRONG_MIXINS_FOR_AUDITABLE_WALLET");
+  }
   ftp.ado_current_asset_owner = ctp.ado_current_asset_owner;
   ftp.pthirdparty_sign_handler = ctp.pthirdparty_sign_handler;
   //

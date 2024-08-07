@@ -194,6 +194,7 @@ namespace currency
     std::string m_restore_wallet;
     std::string m_voting_config_file;
     bool m_no_password_confirmations = false;
+   
     
     crypto::hash m_password_hash;
     uint64_t m_password_salt;
