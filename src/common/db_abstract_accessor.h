@@ -710,6 +710,16 @@ namespace tools
         CHECK_AND_ASSERT_THROW(r.get(), std::out_of_range("Out of range in basic_key_value_accessor"));
         return r;
       }
+
+      t_key get_empty_key() const
+      {
+        return t_key();
+      }
+
+      t_value get_empty_value() const
+      {
+        return t_value();
+      }
     };
 
 

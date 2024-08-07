@@ -183,6 +183,11 @@ namespace currency
     return m_blockchain_storage.reset_and_set_genesis_block(b);
   }
   //-----------------------------------------------------------------------------------------------
+  bool core::migrate_db_from(blockchain_storage& source_db)
+  {
+    return m_blockchain_storage.migrate_db_from(source_db);
+  }
+  //-----------------------------------------------------------------------------------------------
   bool core::load_state_data()
   {
     // may be some code later

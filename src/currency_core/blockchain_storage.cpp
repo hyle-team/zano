@@ -76,8 +76,9 @@ DISABLE_VS_WARNINGS(4267)
 
 namespace 
 {
-  const command_line::arg_descriptor<uint32_t>      arg_db_cache_l1  ( "db-cache-l1", "Specify size of memory mapped db cache file");
-  const command_line::arg_descriptor<uint32_t>      arg_db_cache_l2  ( "db-cache-l2", "Specify cached elements in db helpers");
+  const command_line::arg_descriptor<uint32_t>      arg_db_cache_l1  ( "db-cache-l1" , "Specify size of memory mapped db cache file");
+  const command_line::arg_descriptor<uint32_t>      arg_db_cache_l2  ( "db-cache-l2",  "Specify cached elements in db helpers");
+  const command_line::arg_descriptor<bool>          arg_db_noreinit  ( "db-no-reinit", "Specify to not reinit database when db and os page size are different");
 }
 
 //------------------------------------------------------------------
@@ -156,6 +157,7 @@ void blockchain_storage::init_options(boost::program_options::options_descriptio
 {
   command_line::add_arg(desc, arg_db_cache_l1);
   command_line::add_arg(desc, arg_db_cache_l2);
+  command_line::add_arg(desc, arg_db_noreinit);
 }
 //------------------------------------------------------------------
 uint64_t blockchain_storage::get_block_h_older_then(uint64_t timestamp) const 
@@ -327,7 +329,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         res = db_addr_to_alias_old.init(BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS);
         CHECK_AND_ASSERT_MES(res, false, "Unable to init db_addr_to_alias_old");
 
-        // temporary set db compatibility version to zero during migration in order to trigger db reinit on the next lanunch in case the process stops in the middle
+        // temporary set db compatibility version to zero during migration in order to trigger db reinit on the next launch in case the process stops in the middle
         m_db.begin_transaction();
         uint64_t tmp_db_maj_version = m_db_storage_major_compatibility_version;
         m_db_storage_major_compatibility_version = 0;
@@ -373,7 +375,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
           m_db_addr_to_alias.set(el.first, el.second);
         m_db.commit_transaction();
 
-        // restore db maj compartibility
+        // restore db maj compatibility
         m_db.begin_transaction();
         m_db_storage_major_compatibility_version = tmp_db_maj_version;
         m_db.commit_transaction();
@@ -412,12 +414,21 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         LOG_PRINT_MAGENTA("DB storage needs reinit because it has minor compatibility ver " << m_db_storage_minor_compatibility_version << " that is greater than BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION: " << BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION, LOG_LEVEL_0);
       }
       
+      tools::db::stat_info st_info;
+      m_db.get_backend()->get_stat_info(st_info);
+      size_t const os_pagesize = boost::interprocess::mapped_region::get_page_size();
+      if (st_info.page_size != os_pagesize && !command_line::get_arg(vm, arg_db_noreinit))
+      {
+        need_reinit = true;
+        LOG_PRINT_MAGENTA("DB storage needs reinit because database page size (" << st_info.page_size << ")" << " is different from system page size (" << os_pagesize << ")", LOG_LEVEL_0);
+      }
+
       if (!need_reinit && m_db_storage_major_compatibility_version == DB_MAJ_VERSION_FOR_PER_BLOCK_GINDEX_FIX && m_db_storage_minor_compatibility_version == 1)
       {
         // such version means that DB has unpopulated container m_db_per_block_gindex_incs, fix it now
         LOG_PRINT_MAGENTA("DB version is " << DB_MAJ_VERSION_FOR_PER_BLOCK_GINDEX_FIX << ".1, migrating m_db_per_block_gindex_incs to ver. " << DB_MAJ_VERSION_FOR_PER_BLOCK_GINDEX_FIX << ".2...", LOG_LEVEL_0);
 
-        // temporary set db compatibility version to zero during migration in order to trigger db reinit on the next lanunch in case the process stops in the middle
+        // temporary set db compatibility version to zero during migration in order to trigger db reinit on the next launch in case the process stops in the middle
         m_db.begin_transaction();
         uint64_t tmp_db_maj_version = m_db_storage_major_compatibility_version;
         m_db_storage_major_compatibility_version = 0;
@@ -662,7 +673,13 @@ bool blockchain_storage::prune_ring_signatures_and_attachments(uint64_t height, 
       "is mot equal to height = " << height << " in blockchain index, for block on height = " << height);
     
     transaction_chain_entry lolcal_chain_entry = *it;
-    signatures_pruned = lolcal_chain_entry.tx.signatures.size();
+    if(!lolcal_chain_entry.tx.signatures.size() && !lolcal_chain_entry.tx.attachment.size())
+    {
+      //nothing to prune
+      continue;
+    }
+
+    signatures_pruned += lolcal_chain_entry.tx.signatures.size();
     lolcal_chain_entry.tx.signatures.clear();
         
     attachments_pruned += lolcal_chain_entry.tx.attachment.size();
@@ -735,6 +752,62 @@ bool blockchain_storage::clear()
   
   return true;
 }
+
+bool blockchain_storage::migrate_db_from(blockchain_storage& source_db)
+{
+  clear();
+  // temporary set db compatibility version to zero during migration in order to trigger db reinit on the next launch in case the process stops in the middle
+  m_db.begin_transaction();
+  uint64_t temp_major = m_db_storage_major_compatibility_version;
+  m_db_storage_major_compatibility_version = 0;
+  m_db.commit_transaction();
+
+  if (temp_major != source_db.m_db_storage_major_compatibility_version || m_db_storage_minor_compatibility_version != source_db.m_db_storage_minor_compatibility_version)
+  {
+    LOG_ERROR("Source and target database have different versions");
+    return false;
+  }
+
+  bool r = source_db.migrate_items_to(BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS, source_db.get_blocks_container(), m_db_blocks, m_db);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to migrate db container " << BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS);
+
+  r = source_db.migrate_items_to(BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS_INDEX, source_db.get_blocks_index_container(), m_db_blocks_index, m_db);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to migrate db container " << BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS_INDEX);
+
+  r = source_db.migrate_items_to(BLOCKCHAIN_STORAGE_CONTAINER_TRANSACTIONS, source_db.get_transactions_container(), m_db_transactions, m_db);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to migrate db container " << BLOCKCHAIN_STORAGE_CONTAINER_TRANSACTIONS);
+
+  r = source_db.migrate_items_to(BLOCKCHAIN_STORAGE_CONTAINER_SPENT_KEYS, source_db.get_key_images_container(), m_db_spent_keys, m_db);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to migrate db container " << BLOCKCHAIN_STORAGE_CONTAINER_SPENT_KEYS);
+
+  r = source_db.migrate_subitems_to(BLOCKCHAIN_STORAGE_CONTAINER_OUTPUTS, source_db.get_outputs_container(), m_db_outputs, m_db);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to migrate db container " << BLOCKCHAIN_STORAGE_CONTAINER_OUTPUTS);
+
+  r = source_db.migrate_items_to(BLOCKCHAIN_STORAGE_CONTAINER_MULTISIG_OUTS, source_db.get_multisig_outs_container(), m_db_multisig_outs, m_db);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to migrate db container " << BLOCKCHAIN_STORAGE_CONTAINER_MULTISIG_OUTS);
+
+  r = source_db.migrate_items_to(BLOCKCHAIN_STORAGE_CONTAINER_ALIASES, source_db.get_aliases_container(), m_db_aliases, m_db);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to migrate db container " << BLOCKCHAIN_STORAGE_CONTAINER_ALIASES);
+
+  r = source_db.migrate_items_to(BLOCKCHAIN_STORAGE_CONTAINER_ASSETS, source_db.get_assets_container(), m_db_assets, m_db);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to migrate db container " << BLOCKCHAIN_STORAGE_CONTAINER_ASSETS);
+
+  r = source_db.migrate_items_to(BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS, source_db.get_address_to_aliases_container(), m_db_addr_to_alias, m_db);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to migrate db container " << BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS);
+
+  r = source_db.migrate_items_to(BLOCKCHAIN_STORAGE_CONTAINER_GINDEX_INCS, source_db.get_per_block_gindex_increments_container(), m_db_per_block_gindex_incs, m_db);
+  CHECK_AND_ASSERT_MES(r, false, "Failed to migrate db container " << BLOCKCHAIN_STORAGE_CONTAINER_GINDEX_INCS);
+
+  // restore db maj compatibility
+  m_db.begin_transaction();
+  m_db_storage_major_compatibility_version = temp_major;
+  uint64_t source_last_pruned = source_db.get_pruned_rs_height();
+  m_db_current_pruned_rs_height = source_last_pruned;
+  m_db.commit_transaction();
+
+  return true;
+}
+
 //------------------------------------------------------------------
 bool blockchain_storage::reset_and_set_genesis_block(const block& b)
 {

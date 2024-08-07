@@ -61,6 +61,7 @@ namespace currency
      static void init_options(boost::program_options::options_description& desc);
      bool init(const boost::program_options::variables_map& vm);
      bool set_genesis_block(const block& b);
+     bool migrate_db_from(blockchain_storage& source_db);
      bool deinit();
      uint64_t get_current_blockchain_size() const;
      uint64_t get_current_tx_version() const;

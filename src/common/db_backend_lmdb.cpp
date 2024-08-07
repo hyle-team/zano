@@ -379,8 +379,11 @@ namespace tools
       si = AUTO_VAL_INIT_T(tools::db::stat_info);
 
       MDB_envinfo ei = AUTO_VAL_INIT(ei);
+      MDB_stat mst = AUTO_VAL_INIT(mst);
       mdb_env_info(m_penv, &ei);
+      mdb_env_stat(m_penv, &mst);
       si.map_size = ei.me_mapsize;
+      si.page_size = mst.ms_psize;
       
       std::lock_guard<boost::recursive_mutex> lock(m_cs);
       for (auto& e : m_txs)

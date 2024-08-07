@@ -1281,6 +1281,15 @@ namespace currency
         LOG_PRINT_MAGENTA("Tx pool DB needs reinit because it has major compatibility ver is " << m_db_storage_major_compatibility_version << ", expected: " << TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION, LOG_LEVEL_0); 
       }
 
+      tools::db::stat_info st_info;
+      m_db.get_backend()->get_stat_info(st_info);
+      size_t const os_pagesize = boost::interprocess::mapped_region::get_page_size();
+      if (st_info.page_size != os_pagesize)
+      {
+        need_reinit = true;
+        LOG_PRINT_MAGENTA("Tx pool DB needs reinit because database page size (" << st_info.page_size << ")" << " is different from system page size (" << os_pagesize << ")", LOG_LEVEL_0);
+      }
+
       if (need_reinit)
       {
         LOG_PRINT_L1("DB at " << db_folder_path << " is about to be deleted and re-created...");

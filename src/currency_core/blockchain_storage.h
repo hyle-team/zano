@@ -210,6 +210,11 @@ namespace currency
     bool add_new_block(const block& bl_, block_verification_context& bvc);
     bool prevalidate_block(const block& bl);
     bool clear();
+    template<typename db_container>
+    bool migrate_items_to(std::string name, const db_container& source_container, db_container& target_container, tools::db::basic_db_accessor& target_mdb);
+    template<typename db_container>
+    bool migrate_subitems_to(std::string name, const db_container& source_container, db_container& target_container, tools::db::basic_db_accessor& target_mdb);
+    bool migrate_db_from(blockchain_storage& source_db);
     bool reset_and_set_genesis_block(const block& b);
     //debug function
     bool truncate_blockchain(uint64_t to_height);
@@ -394,7 +399,6 @@ namespace currency
       std::vector<uint64_t>& days)const;
 
     uint64_t get_alias_coast(const std::string& alias)const;
-    const outputs_container& get_outputs_container() const { return m_db_outputs; }
     std::shared_ptr<const transaction_chain_entry> get_tx_chain_entry(const crypto::hash& tx_hash) const;
     bool get_tx_chain_entry(const crypto::hash& tx_hash, transaction_chain_entry& entry) const;
     template<typename cb_t>
@@ -518,6 +522,17 @@ namespace currency
     
     typedef tools::db::cached_key_value_accessor<crypto::public_key, std::list<asset_descriptor_operation>, true, false> assets_container; // TODO @#@# consider storing tx_id as well for reference -- sowle 
 
+    const blocks_container& get_blocks_container() const { return m_db_blocks; }
+    const blocks_by_id_index& get_blocks_index_container() const { return m_db_blocks_index; }
+    const transactions_container& get_transactions_container() const { return m_db_transactions; }
+    const key_images_container& get_key_images_container() const { return m_db_spent_keys; }
+    const outputs_container& get_outputs_container() const { return m_db_outputs; }
+    const multisig_outs_container& get_multisig_outs_container() const { return m_db_multisig_outs; }
+    const aliases_container& get_aliases_container() const { return m_db_aliases; }
+    const address_to_aliases_container& get_address_to_aliases_container() const { return m_db_addr_to_alias; }
+    const per_block_gindex_increments_container& get_per_block_gindex_increments_container() const { return m_db_per_block_gindex_incs; }
+    const assets_container& get_assets_container() const { return m_db_assets; }
+    const tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container>& get_pruned_rs_height() const { return m_db_current_pruned_rs_height; }
 
     //-----------------------------------------
 
@@ -968,8 +983,52 @@ namespace currency
     return true;
   }
 
+  template<typename db_container>
+  bool blockchain_storage::migrate_items_to(std::string name, const db_container& source_container, db_container& target_container, tools::db::basic_db_accessor& target_mdb)
+  {
+    CRITICAL_REGION_LOCAL(m_read_lock);
+    LOG_PRINT_CYAN("Starting migrating " << source_container.size() << " entries for " << name << " container", LOG_LEVEL_0);
 
+    target_mdb.begin_transaction();
+    source_container.enumerate_items([&](const auto& count, const auto& key, const auto& value)
+    {
+      target_container.set(key, value);
+      return true;
+    });
+    target_mdb.commit_transaction();
 
+    CHECK_AND_ASSERT_MES(source_container.size() == target_container.size(), false, "source container size (" << source_container.size() << ") is different than target container size (" << target_container.size() << ")");
+    LOG_PRINT_CYAN("Finished migrating entries for " << name << " container", LOG_LEVEL_0);
+    return true;
+  }
+
+  template<typename db_container>
+  bool blockchain_storage::migrate_subitems_to(std::string name, const db_container& source_container, db_container& target_container, tools::db::basic_db_accessor& target_mdb)
+  {
+    CRITICAL_REGION_LOCAL(m_read_lock);
+    LOG_PRINT_CYAN("Starting migrating " << source_container.size() << " entries for " << name << " container", LOG_LEVEL_0);
+
+    target_mdb.begin_transaction();
+    std::unordered_map<decltype(source_container.get_empty_key().container_id), std::map<decltype(source_container.get_empty_key().sufix), decltype(source_container.get_empty_value())>> temp_container;
+    source_container.enumerate_subitems([&](const auto& count, const auto& key, const auto& key_index, const auto& value)
+    {
+      temp_container[key].insert(std::pair<decltype(key_index),decltype(value)>(key_index, value));
+      return true;
+    });
+
+    for (auto iter_keys = temp_container.begin(); iter_keys != temp_container.end(); ++iter_keys)
+    {
+      for (auto iter_values = iter_keys->second.begin(); iter_values != iter_keys->second.end(); ++iter_values)
+      {
+        target_container.push_back_item(iter_keys->first, iter_values->second);
+      }
+    }
+
+    target_mdb.commit_transaction();
+    CHECK_AND_ASSERT_MES(source_container.size() == target_container.size(), false, "source container size (" << source_container.size() << ") is different than target container size (" << target_container.size() << ")");
+    LOG_PRINT_CYAN("Finished migrating entries for " << name << " container", LOG_LEVEL_0);
+    return true;
+  }
 } // namespace currency
 
 
