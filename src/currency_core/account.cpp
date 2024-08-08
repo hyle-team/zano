@@ -127,11 +127,12 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------
-  bool account_base::restore_from_seed_phrase(const std::string& seed_phrase, const std::string& seed_password)
+  bool account_base::restore_from_seed_phrase(const std::string& seed_phrase_, const std::string& seed_password)
   {
     //cut the last timestamp word from restore_dats
     std::list<std::string> words;
-    boost::split(words, seed_phrase, boost::is_space());
+    std::string seed_phrase = epee::string_tools::trim(seed_phrase_);
+    boost::split(words, seed_phrase, boost::is_space(), boost::token_compress_on);
     
     std::string keys_seed_text, timestamp_word, auditable_flag_and_checksum_word;
     if (words.size() == SEED_PHRASE_V1_WORDS_COUNT)
@@ -230,11 +231,13 @@ namespace currency
     return seed_phrase.find(':') != std::string::npos;
   }
   //-----------------------------------------------------------------
-  bool account_base::is_seed_password_protected(const std::string& seed_phrase, bool& is_password_protected)
+  bool account_base::is_seed_password_protected(const std::string& seed_phrase_, bool& is_password_protected)
   {
     //cut the last timestamp word from restore_dats
     std::list<std::string> words;
-    boost::split(words, seed_phrase, boost::is_space());
+
+    std::string seed_phrase = epee::string_tools::trim(seed_phrase_);
+    boost::split(words, seed_phrase, boost::is_space(), boost::token_compress_on);
 
     //let's validate each word 
     for (const auto& w: words)
