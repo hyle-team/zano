@@ -35,7 +35,19 @@
 #include <iostream>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
+
+#if __has_include(<filesystem>)
 #include <filesystem>
+namespace fs = std::filesystem;
+#elif __has_include(<experimental/filesystem>)
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+#else
+	#error "Neither <filesystem> nor <experimental/filesystem> are available."
+#endif
+
+
+//#include <filesystem>
 
 #ifndef MAKE64
 	#define MAKE64(low,high)	((__int64)(((DWORD)(low)) | ((__int64)((DWORD)(high))) << 32))
@@ -562,10 +574,10 @@ namespace file_io_utils
 		try
 		{
 
-			std::filesystem::directory_iterator end_itr; // default construction yields past-the-end
-			for ( std::filesystem::directory_iterator itr( epee::string_encoding::utf8_to_wstring(path) ); itr != end_itr; ++itr )
+			fs::directory_iterator end_itr; // default construction yields past-the-end
+			for ( fs::directory_iterator itr( epee::string_encoding::utf8_to_wstring(path) ); itr != end_itr; ++itr )
 			{
-				if ( only_files && std::filesystem::is_directory(itr->status()) )
+				if ( only_files && fs::is_directory(itr->status()) )
 				{
 					continue;
 				}
