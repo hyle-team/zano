@@ -762,7 +762,7 @@ bool blockchain_storage::migrate_db_from(blockchain_storage& source_db)
   m_db_storage_major_compatibility_version = 0;
   m_db.commit_transaction();
 
-  if (temp_major != source_db.m_db_storage_major_compatibility_version || m_db_storage_minor_compatibility_version != source_db.m_db_storage_minor_compatibility_version)
+  if (temp_major != source_db.get_storage_major_compatibility_version() || m_db_storage_minor_compatibility_version != source_db.get_storage_minor_compatibility_version())
   {
     LOG_ERROR("Source and target database have different versions");
     return false;

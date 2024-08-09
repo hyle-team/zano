@@ -532,6 +532,8 @@ namespace currency
     const address_to_aliases_container& get_address_to_aliases_container() const { return m_db_addr_to_alias; }
     const per_block_gindex_increments_container& get_per_block_gindex_increments_container() const { return m_db_per_block_gindex_incs; }
     const assets_container& get_assets_container() const { return m_db_assets; }
+    const tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container>& get_storage_major_compatibility_version() const { return m_db_storage_major_compatibility_version; }
+    const tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container>& get_storage_minor_compatibility_version() const { return m_db_storage_minor_compatibility_version; }
     const tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container>& get_pruned_rs_height() const { return m_db_current_pruned_rs_height; }
 
     //-----------------------------------------
