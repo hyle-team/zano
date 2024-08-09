@@ -36,16 +36,16 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 
-#if __has_include(<filesystem>)
-#include <filesystem>
-namespace stdfs = std::filesystem;
-#elif __has_include(<experimental/filesystem>)
-#include <experimental/filesystem>
-namespace stdfs = std::experimental::filesystem;
-#else
-	#error "Neither <filesystem> nor <experimental/filesystem> are available."
-#endif
 
+#if __has_include(<filesystem>)
+	#include <filesystem>
+	namespace stdfs = std::filesystem;
+#else
+	#if TARGET_OS_IOS
+		#error "This should never happen on ios."	
+	#endif
+	namespace stdfs = boost::filesystem;	
+#endif
 
 //#include <filesystem>
 
