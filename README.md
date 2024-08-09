@@ -86,6 +86,26 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
 6. [*OPTIONAL*] Set global environment variables for convenient use\
 For instance, by adding the following lines to `~/.bashrc`
 
+    ### Ubuntu 22.04
+
+    [*server version*]
+
+       export Boost_INCLUDE_DIRS=/usr/include/boost
+       export ZANO_USE_SYSTEM_BOOST
+
+
+    [*GUI version*]
+
+       export Boost_INCLUDE_DIRS=/usr/include/boost
+       export ZANO_USE_SYSTEM_BOOST 
+       export QT_PREFIX_PATH=/home/user/Qt5.11.2/5.11.2/gcc_64
+
+      **NOTICE: Please edit the lines above according to your actual paths.**
+   
+      **NOTICE 2:** Make sure you've restarted your terminal session (by reopening the terminal window or reconnecting the server) to apply these changes.
+
+    ### Ubuntu 18.04 & 20.04
+
     [*server version*]
 
        export BOOST_ROOT=/home/user/boost_1_70_0  
