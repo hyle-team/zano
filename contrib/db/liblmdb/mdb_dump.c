@@ -1,6 +1,6 @@
 /* mdb_dump.c - memory-mapped database dump tool */
 /*
- * Copyright 2011-2015 Howard Chu, Symas Corp.
+ * Copyright 2011-2021 Howard Chu, Symas Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,15 +24,6 @@
 #define Z	"I"
 #else
 #define Z	"z"
-#endif
-#ifdef MDB_VL32
-#ifdef _WIN32
-#define	Y	"I64"
-#else
-#define	Y	"ll"
-#endif
-#else
-#define Y	Z
 #endif
 
 #define PRINT	1
@@ -77,6 +68,8 @@ static void text(MDB_val *v)
 	end = c + v->mv_size;
 	while (c < end) {
 		if (isprint(*c)) {
+			if (*c == '\\')
+				putchar('\\');
 			putchar(*c);
 		} else {
 			putchar('\\');
@@ -124,7 +117,7 @@ static int dumpit(MDB_txn *txn, MDB_dbi dbi, char *name)
 	if (name)
 		printf("database=%s\n", name);
 	printf("type=btree\n");
-	printf("mapsize=%" Y "u\n", info.me_mapsize);
+	printf("mapsize=%" Z "u\n", info.me_mapsize);
 	if (info.me_mapaddr)
 		printf("mapaddr=%p\n", info.me_mapaddr);
 	printf("maxreaders=%u\n", info.me_maxreaders);
@@ -164,7 +157,7 @@ static int dumpit(MDB_txn *txn, MDB_dbi dbi, char *name)
 
 static void usage(char *prog)
 {
-	fprintf(stderr, "usage: %s [-V] [-f output] [-l] [-n] [-p] [-v] [-a|-s subdb] dbpath\n", prog);
+	fprintf(stderr, "usage: %s [-V] [-f output] [-l] [-n] [-p] [-a|-s subdb] dbpath\n", prog);
 	exit(EXIT_FAILURE);
 }
 
@@ -188,7 +181,6 @@ int main(int argc, char *argv[])
 	 * -n: use NOSUBDIR flag on env_open
 	 * -p: use printable characters
 	 * -f: write to file instead of stdout
-	 * -v: use previous snapshot
 	 * -V: print version and exit
 	 * (default) dump only the main DB
 	 */
@@ -200,7 +192,7 @@ int main(int argc, char *argv[])
 			break;
 		case 'l':
 			list = 1;
-			/*FALLTHROUGH*/;
+			/*FALLTHROUGH*/
 		case 'a':
 			if (subname)
 				usage(prog);
@@ -215,9 +207,6 @@ int main(int argc, char *argv[])
 			break;
 		case 'n':
 			envflags |= MDB_NOSUBDIR;
-			break;
-		case 'v':
-			envflags |= MDB_PREVSNAPSHOT;
 			break;
 		case 'p':
 			mode |= PRINT;

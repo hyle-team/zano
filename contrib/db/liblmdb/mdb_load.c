@@ -1,6 +1,6 @@
 /* mdb_load.c - memory-mapped database load tool */
 /*
- * Copyright 2011-2015 Howard Chu, Symas Corp.
+ * Copyright 2011-2021 Howard Chu, Symas Corp.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -44,15 +44,6 @@ static MDB_val k0buf;
 #else
 #define Z	"z"
 #endif
-#ifdef MDB_VL32
-#ifdef _WIN32
-#define	Y	"I64"
-#else
-#define	Y	"ll"
-#endif
-#else
-#define Y	Z
-#endif
 
 #define STRLENOF(s)	(sizeof(s)-1)
 
@@ -78,6 +69,7 @@ static void readhdr(void)
 {
 	char *ptr;
 
+	flags = 0;
 	while (fgets(dbuf.mv_data, dbuf.mv_size, stdin) != NULL) {
 		lineno++;
 		if (!strncmp(dbuf.mv_data, "VERSION=", STRLENOF("VERSION="))) {
@@ -122,7 +114,7 @@ static void readhdr(void)
 			int i;
 			ptr = memchr(dbuf.mv_data, '\n', dbuf.mv_size);
 			if (ptr) *ptr = '\0';
-			i = sscanf((char *)dbuf.mv_data+STRLENOF("mapsize="), "%" Y "u", &info.me_mapsize);
+			i = sscanf((char *)dbuf.mv_data+STRLENOF("mapsize="), "%" Z "u", &info.me_mapsize);
 			if (i != 1) {
 				fprintf(stderr, "%s: line %" Z "d: invalid mapsize %s\n",
 					prog, lineno, (char *)dbuf.mv_data+STRLENOF("mapsize="));
@@ -247,7 +239,7 @@ badend:
 		while (c2 < end) {
 			if (*c2 == '\\') {
 				if (c2[1] == '\\') {
-					c1++; c2 += 2;
+					*c1++ = *c2;
 				} else {
 					if (c2+3 > end || !isxdigit(c2[1]) || !isxdigit(c2[2])) {
 						Eof = 1;
@@ -255,10 +247,11 @@ badend:
 						return EOF;
 					}
 					*c1++ = unhex(++c2);
-					c2 += 2;
 				}
+				c2 += 2;
 			} else {
-				c1++; c2++;
+				/* copies are redundant when no escapes were used */
+				*c1++ = *c2++;
 			}
 		}
 	} else {
@@ -303,7 +296,7 @@ int main(int argc, char *argv[])
 	MDB_cursor *mc;
 	MDB_dbi dbi;
 	char *envname;
-	int envflags = 0, putflags = 0;
+	int envflags = MDB_NOSYNC, putflags = 0;
 	int dohdr = 0, append = 0;
 	MDB_val prevk;
 
@@ -391,7 +384,6 @@ int main(int argc, char *argv[])
 	kbuf.mv_data = malloc(kbuf.mv_size * 2);
 	k0buf.mv_size = kbuf.mv_size;
 	k0buf.mv_data = (char *)kbuf.mv_data + kbuf.mv_size;
-	prevk.mv_size = 0;
 	prevk.mv_data = k0buf.mv_data;
 
 	while(!Eof) {
@@ -416,6 +408,7 @@ int main(int argc, char *argv[])
 			fprintf(stderr, "mdb_open failed, error %d %s\n", rc, mdb_strerror(rc));
 			goto txn_abort;
 		}
+		prevk.mv_size = 0;
 		if (append) {
 			mdb_set_compare(txn, dbi, greater);
 			if (flags & MDB_DUPSORT)
@@ -443,7 +436,7 @@ int main(int argc, char *argv[])
 				appflag = MDB_APPEND;
 				if (flags & MDB_DUPSORT) {
 					if (prevk.mv_size == key.mv_size && !memcmp(prevk.mv_data, key.mv_data, key.mv_size))
-						appflag = MDB_APPENDDUP;
+						appflag = MDB_CURRENT|MDB_APPENDDUP;
 					else {
 						memcpy(prevk.mv_data, key.mv_data, key.mv_size);
 						prevk.mv_size = key.mv_size;
@@ -456,7 +449,7 @@ int main(int argc, char *argv[])
 			if (rc == MDB_KEYEXIST && putflags)
 				continue;
 			if (rc) {
-				fprintf(stderr, "mdb_cursor_put failed, error %d %s\n", rc, mdb_strerror(rc));
+				fprintf(stderr, "%s: line %" Z "d: mdb_cursor_put failed, error %d %s\n", prog, lineno, rc, mdb_strerror(rc));
 				goto txn_abort;
 			}
 			batch++;
@@ -476,6 +469,12 @@ int main(int argc, char *argv[])
 				if (rc) {
 					fprintf(stderr, "mdb_cursor_open failed, error %d %s\n", rc, mdb_strerror(rc));
 					goto txn_abort;
+				}
+				if (append) {
+					MDB_val k, d;
+					mdb_cursor_get(mc, &k, &d, MDB_LAST);
+					memcpy(prevk.mv_data, k.mv_data, k.mv_size);
+					prevk.mv_size = k.mv_size;
 				}
 				batch = 0;
 			}

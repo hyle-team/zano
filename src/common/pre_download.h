@@ -113,7 +113,12 @@ namespace tools
       downloading_file_path = command_line::get_arg(vm, command_line::arg_process_predownload_from_path);
     }
 
-    if (!command_line::has_arg(vm, command_line::arg_validate_predownload))
+    // pre-download has 4k page size database, needs to convert it to os page size
+    bool need_migration = false;
+    size_t const os_pagesize = boost::interprocess::mapped_region::get_page_size();
+    if (os_pagesize != 4096) need_migration = true;
+
+    if (!command_line::has_arg(vm, command_line::arg_validate_predownload) && !need_migration)
     {
       boost::filesystem::remove(db_main_file_path, ec);
       if (ec)
@@ -176,6 +181,7 @@ namespace tools
     boost::program_options::variables_map source_core_vm;
     source_core_vm.insert(std::make_pair("data-dir", boost::program_options::variable_value(path_to_temp_datafolder, false)));
     source_core_vm.insert(std::make_pair("db-engine", boost::program_options::variable_value(dbbs.get_engine_name(), false)));
+    source_core_vm.insert(std::make_pair("db-no-reinit", boost::program_options::variable_value(true, false)));
     //source_core_vm.insert(std::make_pair("db-sync-mode", boost::program_options::variable_value(std::string("fast"), false)));
 
     r = source_core.init(source_core_vm);
@@ -215,34 +221,42 @@ namespace tools
     CHECK_AND_ASSERT_MES(target_core.get_top_block_height() == 0, false, "Target blockchain initialized not empty");
     uint64_t total_blocks = source_core.get_current_blockchain_size();
 
-    LOG_PRINT_GREEN("Manually processing blocks from 1 to " << total_blocks << "...", LOG_LEVEL_0);
+    if (command_line::has_arg(vm, command_line::arg_validate_predownload))
+    {
+      LOG_PRINT_GREEN("Manually processing blocks from 1 to " << total_blocks << "...", LOG_LEVEL_0);
 
-    for (uint64_t i = 1; i != total_blocks; i++)
-    { 
-      std::list<currency::block> blocks;
-      std::list<currency::transaction> txs;
-      bool r = source_core.get_blocks(i, 1, blocks, txs);
-      CHECK_AND_ASSERT_MES(r && blocks.size()==1, false, "Failed to get block " << i << " from core");
-      currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
-      crypto::hash tx_hash = AUTO_VAL_INIT(tx_hash);
-      for (auto& tx : txs)
+      for (uint64_t i = 1; i != total_blocks; i++)
       {
-        r = target_core.handle_incoming_tx(tx, tvc, true /* kept_by_block */);
-        CHECK_AND_ASSERT_MES(r && tvc.m_added_to_pool == true, false, "Failed to add a tx from block " << i << " from core");
-      }
-      currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
-      r = target_core.handle_incoming_block(*blocks.begin(), bvc);
-      CHECK_AND_ASSERT_MES(r && bvc.m_added_to_main_chain == true, false, "Failed to add block " << i << " to core");
-      if (!(i % 100))
-        std::cout << "Block " << i << "(" << (i * 100) / total_blocks << "%) \r";
+        std::list<currency::block> blocks;
+        std::list<currency::transaction> txs;
+        bool r = source_core.get_blocks(i, 1, blocks, txs);
+        CHECK_AND_ASSERT_MES(r && blocks.size()==1, false, "Failed to get block " << i << " from core");
+        currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
+        crypto::hash tx_hash = AUTO_VAL_INIT(tx_hash);
+        for (auto& tx : txs)
+        {
+          r = target_core.handle_incoming_tx(tx, tvc, true /* kept_by_block */);
+          CHECK_AND_ASSERT_MES(r && tvc.m_added_to_pool == true, false, "Failed to add a tx from block " << i << " from core");
+        }
+        currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
+        r = target_core.handle_incoming_block(*blocks.begin(), bvc);
+        CHECK_AND_ASSERT_MES(r && bvc.m_added_to_main_chain == true, false, "Failed to add block " << i << " to core");
+        if (!(i % 100))
+          std::cout << "Block " << i << "(" << (i * 100) / total_blocks << "%) \r";
 
-      if (cb_should_stop(total_blocks, i))
-      {
-        LOG_PRINT_MAGENTA(ENDL << "Interrupting updating db...", LOG_LEVEL_0);
-        return false;
+        if (cb_should_stop(total_blocks, i))
+        {
+          LOG_PRINT_MAGENTA(ENDL << "Interrupting updating db...", LOG_LEVEL_0);
+          return false;
+        }
       }
     }
-    
+    else
+    {
+      bool r = target_core.migrate_db_from(source_core.get_blockchain_storage());
+      CHECK_AND_ASSERT_MES(r, false, "Failed to migrate from downloaded db");
+    }
+
     LOG_PRINT_GREEN("Processing finished, " << total_blocks << " successfully added.", LOG_LEVEL_0);
     target_core.deinit();
     source_core.deinit();
