@@ -2182,8 +2182,10 @@ namespace currency
       return true;
     }
 
-    // otherwise, calculate asset id
+    // otherwise, it must be a register operation
+    CHECK_AND_ASSERT_MES(ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER, false, "unexpected asset operation type: " << (int)ado.operation_type << ", " << get_asset_operation_type_string(ado.operation_type));
 
+    // calculate asset id
     crypto::hash_helper_t::hs_t hsc;
     hsc.add_32_chars(CRYPTO_HDS_ASSET_ID);
     hsc.add_hash(crypto::hash_helper_t::h(ado.descriptor.ticker));
