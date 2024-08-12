@@ -240,6 +240,8 @@ VARIANT_TAG(debug_archive, crypto::secret_key, "secret_key");
 VARIANT_TAG(debug_archive, crypto::key_derivation, "key_derivation");
 VARIANT_TAG(debug_archive, crypto::key_image, "key_image");
 VARIANT_TAG(debug_archive, crypto::signature, "signature");
+VARIANT_TAG(debug_archive, crypto::eth_public_key, "eth_public_key");
+VARIANT_TAG(debug_archive, crypto::eth_signature, "eth_signature");
 
 
 //
