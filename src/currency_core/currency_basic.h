@@ -793,6 +793,13 @@ namespace currency
       BOOST_END_VERSION_UNDER(1)
       BOOST_SERIALIZE(opt_asset_id)
     END_BOOST_SERIALIZATION()
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(operation_type)    DOC_DSCR("Asset operation type identifier") DOC_EXMP(1) DOC_END
+      KV_SERIALIZE(descriptor)        DOC_DSCR("Asset descriptor") DOC_EXMP_AUTO() DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(amount_commitment) DOC_DSCR("Amount commitment") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(opt_asset_id)      DOC_DSCR("ID of an asset.") DOC_EXMP("cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6") DOC_END
+    END_KV_SERIALIZE_MAP()
   };
 
   struct asset_operation_proof
