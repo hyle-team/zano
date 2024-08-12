@@ -708,7 +708,7 @@ namespace currency
     std::string         meta_info;
     crypto::public_key  owner = currency::null_pkey; // consider premultipling by 1/8
     bool                hidden_supply = false;
-    std::optional<crypto::eth_public_key> owner_eth_pub_key; // note: the size is 33 bytes (if present)
+    boost::optional<crypto::eth_public_key> owner_eth_pub_key; // note: the size is 33 bytes (if present) // NOTE: using boost::optional instead of std::optional because of the Boost compilation issue: https://github.com/boostorg/serialization/issues/319 -- sowle
 
     uint8_t             version = ASSET_DESCRIPTOR_BASE_STRUCTURE_VER;
 
