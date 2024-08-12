@@ -10,7 +10,6 @@
 #include <boost/serialization/deque.hpp>
 #include <boost/serialization/singleton.hpp>
 #include <boost/serialization/extended_type_info.hpp>
-#include <boost/serialization/shared_ptr.hpp>
 #include <atomic>
 #include <map>
 

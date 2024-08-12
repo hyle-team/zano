@@ -11,7 +11,6 @@
 #include <boost/serialization/deque.hpp>
 #include <boost/serialization/singleton.hpp>
 #include <boost/serialization/extended_type_info.hpp>
-#include <boost/serialization/shared_ptr.hpp>
 #include <boost/serialization/optional.hpp>
 #include <atomic>
 
@@ -356,7 +355,7 @@ namespace tools
     uint64_t m_spent_height = 0;
     uint32_t m_flags = 0;
     uint64_t m_amount = 0;
-    boost::shared_ptr<ZC_out_info> m_zc_info_ptr;
+    std::shared_ptr<ZC_out_info> m_zc_info_ptr;
 
     uint64_t amount() const { return m_amount; }
     uint64_t amount_for_global_output_index() const { return is_zc() ? 0 : m_amount; } // amount value for global outputs index, it's zero for outputs with hidden amounts
