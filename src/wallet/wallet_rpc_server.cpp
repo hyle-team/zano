@@ -1260,13 +1260,46 @@ namespace tools
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  void wallet_rpc_server::rpc_destinations_to_currency_destination(const std::list<wallet_public::transfer_destination>& rpc_destinations, std::vector<currency::tx_destination_entry>& currency_destinations)
+  #define DESTINATIONS_COUNT_FOR_DEPLOY_OR_EMIT 10
+  static_assert(DESTINATIONS_COUNT_FOR_DEPLOY_OR_EMIT >= CURRENCY_TX_MIN_ALLOWED_OUTS, "DESTINATIONS_COUNT_FOR_DEPLOY_OR_EMIT must be >= min allowed tx outs");
+  void wallet_rpc_server::rpc_destinations_to_currency_destinations(const std::list<wallet_public::transfer_destination>& rpc_destinations, bool nullify_asset_id, bool try_to_split, std::vector<currency::tx_destination_entry>& result_destinations)
   {
     GET_WALLET();
-    std::vector<currency::tx_destination_entry>& dsts = currency_destinations;
-    for (auto it = rpc_destinations.begin(); it != rpc_destinations.end(); it++)
+
+    WLT_THROW_IF_FALSE_WITH_CODE(!rpc_destinations.empty(), "WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT", "WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT");
+
+    std::list<wallet_public::transfer_destination> local_destinations;
+    if (nullify_asset_id && try_to_split)
     {
-      currency::tx_destination_entry de;
+      bool do_split = true;
+      uint64_t total_amount     = rpc_destinations.front().amount;
+      std::string first_address = rpc_destinations.front().address;
+      for(auto it = std::next(rpc_destinations.begin()); it != rpc_destinations.end(); ++it)
+      {
+        total_amount += it->amount;
+        if (first_address != it->address)
+        {
+          do_split = false;
+          break;
+        }
+      }
+      if (do_split)
+      {
+        const uint64_t el_amount = total_amount / DESTINATIONS_COUNT_FOR_DEPLOY_OR_EMIT; // approximation, see below
+        wallet_public::transfer_destination td{};
+        td.address = first_address;
+        td.amount = el_amount;
+        for(size_t i = 0; i < DESTINATIONS_COUNT_FOR_DEPLOY_OR_EMIT - 1; ++i)
+          local_destinations.push_back(td);
+        td.amount = total_amount - (DESTINATIONS_COUNT_FOR_DEPLOY_OR_EMIT - 1) * el_amount; // the last element must account for division error
+        local_destinations.push_back(td);
+      }
+    }
+    const std::list<wallet_public::transfer_destination>& destinations = local_destinations.size() != 0 ? local_destinations : rpc_destinations;
+
+    for (auto it = destinations.begin(); it != destinations.end(); ++it)
+    {
+      currency::tx_destination_entry de{};
       de.addr.resize(1);
       std::string embedded_payment_id;
       //check if address looks like wrapped address
@@ -1274,8 +1307,8 @@ namespace tools
       WLT_THROW_IF_FALSE_WITH_CODE(w.get_wallet()->get_transfer_address(it->address, de.addr.back(), embedded_payment_id), "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS", "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS");
       WLT_THROW_IF_FALSE_WITH_CODE(embedded_payment_id.size() == 0, "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS", "WALLET_RPC_ERROR_CODE_WRONG_ADDRESS");
       de.amount = it->amount;
-      de.asset_id = it->asset_id;
-      dsts.push_back(de);
+      de.asset_id = nullify_asset_id ? currency::null_pkey : it->asset_id;
+      result_destinations.push_back(de);
     }
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1285,12 +1318,7 @@ namespace tools
 
     currency::transaction result_tx;
     std::vector<currency::tx_destination_entry> currency_destinations;
-    rpc_destinations_to_currency_destination(req.destinations, currency_destinations);
-    //fix for default asset_id
-    for (auto& d : currency_destinations)
-    {
-      d.asset_id = currency::null_pkey;
-    }
+    rpc_destinations_to_currency_destinations(req.destinations, true, !req.use_destinations_as_is, currency_destinations);
 
     w.get_wallet()->deploy_new_asset(req.asset_descriptor, currency_destinations, result_tx, res.new_asset_id);
     res.result_tx = currency::get_transaction_hash(result_tx);
@@ -1303,12 +1331,7 @@ namespace tools
     WALLET_RPC_BEGIN_TRY_ENTRY();
     currency::transaction result_tx;
     std::vector<currency::tx_destination_entry> currency_destinations;
-    rpc_destinations_to_currency_destination(req.destinations, currency_destinations);
-    //fix for default asset_id
-    for (auto& d : currency_destinations)
-    {
-      d.asset_id = currency::null_pkey;
-    }
+    rpc_destinations_to_currency_destinations(req.destinations, true, !req.use_destinations_as_is, currency_destinations);
 
     w.get_wallet()->emit_asset(req.asset_id, currency_destinations, result_tx);
     res.result_tx = currency::get_transaction_hash(result_tx);
