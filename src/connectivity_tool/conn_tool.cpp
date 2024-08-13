@@ -1222,7 +1222,10 @@ bool handle_pack_file(po::variables_map& vm)
   }
 
   if (!command_line::has_arg(vm, arg_target_file))
+  {
     std::cout << "Error: Parameter target_file is not set." << ENDL;
+    return false;
+  }
   path_target = command_line::get_arg(vm, arg_target_file);
 
   std::ifstream source;
