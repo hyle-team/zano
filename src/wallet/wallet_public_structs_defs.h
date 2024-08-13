@@ -1987,12 +1987,12 @@ namespace wallet_public
     {
       std::list<transfer_destination> destinations;
       currency::asset_descriptor_base asset_descriptor;
-      bool use_destinations_as_is = false;
+      bool do_not_split_destinations = false;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(destinations)                DOC_DSCR("Addresses where to receive emitted coins. Asset id in the destinations is irreleant and can be omitted.") DOC_EXMP_AUTO(1) DOC_END
         KV_SERIALIZE(asset_descriptor)            DOC_DSCR("Descriptor that holds all information about asset - ticker, emission, description etc") DOC_END
-        KV_SERIALIZE(use_destinations_as_is)      DOC_DSCR("If true, the provided destinations will be used as-is and won't be splitted (or altered) to avoid common issues. Default is false.") DOC_EXMP(false) DOC_END
+        KV_SERIALIZE(do_not_split_destinations)   DOC_DSCR("If true, the provided destinations will be used as-is and won't be splitted (or altered) to avoid common issues. Default is false.") DOC_EXMP(false) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -2017,12 +2017,12 @@ namespace wallet_public
     {
       crypto::public_key asset_id;
       std::list<transfer_destination> destinations;
-      bool use_destinations_as_is = false;
+      bool do_not_split_destinations = false;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_POD_AS_HEX_STRING(asset_id) DOC_DSCR("Id of the asset to emit more coins") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
         KV_SERIALIZE(destinations)               DOC_DSCR("Addresses where to receive emitted coins. Asset id in the destinations is irreleant and can be omitted.") DOC_EXMP_AUTO(1) DOC_END
-        KV_SERIALIZE(use_destinations_as_is)     DOC_DSCR("If true, the provided destinations will be used as-is and won't be splitted (or altered) to avoid common issues. Default is false.") DOC_EXMP(false) DOC_END
+        KV_SERIALIZE(do_not_split_destinations)  DOC_DSCR("If true, the provided destinations will be used as-is and won't be splitted (or altered) to avoid common issues. Default is false.") DOC_EXMP(false) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 

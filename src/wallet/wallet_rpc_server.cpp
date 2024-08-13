@@ -1318,7 +1318,7 @@ namespace tools
 
     currency::transaction result_tx;
     std::vector<currency::tx_destination_entry> currency_destinations;
-    rpc_destinations_to_currency_destinations(req.destinations, true, !req.use_destinations_as_is, currency_destinations);
+    rpc_destinations_to_currency_destinations(req.destinations, true, !req.do_not_split_destinations, currency_destinations);
 
     w.get_wallet()->deploy_new_asset(req.asset_descriptor, currency_destinations, result_tx, res.new_asset_id);
     res.result_tx = currency::get_transaction_hash(result_tx);
@@ -1331,7 +1331,7 @@ namespace tools
     WALLET_RPC_BEGIN_TRY_ENTRY();
     currency::transaction result_tx;
     std::vector<currency::tx_destination_entry> currency_destinations;
-    rpc_destinations_to_currency_destinations(req.destinations, true, !req.use_destinations_as_is, currency_destinations);
+    rpc_destinations_to_currency_destinations(req.destinations, true, !req.do_not_split_destinations, currency_destinations);
 
     w.get_wallet()->emit_asset(req.asset_id, currency_destinations, result_tx);
     res.result_tx = currency::get_transaction_hash(result_tx);
