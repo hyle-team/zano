@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2019 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -25,6 +25,7 @@ using namespace epee;
 #include "storages/http_abstract_invoke.h"
 #include "net/http_client.h"
 #include "currency_core/genesis_acc.h"
+#include "common/db_backend_lmdb.h"
 #include <cstdlib>
 
 namespace po = boost::program_options;
@@ -63,6 +64,7 @@ namespace
   const command_line::arg_descriptor<std::string> arg_pack_file           ("pack-file", "perform gzip-packing and calculate hash for a given file");
   const command_line::arg_descriptor<std::string> arg_unpack_file         ("unpack-file", "Perform gzip-unpacking and calculate hash for a given file");
   const command_line::arg_descriptor<std::string> arg_target_file         ("target-file", "Specify target file for pack-file and unpack-file commands");
+  const command_line::arg_descriptor<std::string> arg_lmdb_page_4to16          ("convert-lmdb-4to16", "Perform LMDB conversion from 4k page size to 16k page size");
   //const command_line::arg_descriptor<std::string> arg_send_ipc            ("send-ipc", "Send IPC request to UI");
 }
 
@@ -1251,6 +1253,34 @@ bool handle_pack_file(po::variables_map& vm)
   }
 }
 
+bool handle_lmdb_page_4to16(po::variables_map& vm)
+{
+  std::string path_source;
+  std::string path_target;
+
+  if (!command_line::has_arg(vm, arg_lmdb_page_4to16))
+    return false;
+
+  path_source = command_line::get_arg(vm, arg_lmdb_page_4to16);
+
+  if (!command_line::has_arg(vm, arg_target_file))
+  {
+    std::cout << "Error: Parameter target_file is not set." << ENDL;
+    return false;
+  }
+  path_target = command_line::get_arg(vm, arg_target_file);
+
+  if (tools::db::lmdb_db_backend::convert_db_4kb_page_to_16kb_page(path_source, path_target))
+  {
+    std::cout << "Conversion failed" << ENDL;
+    return false;
+  }
+  
+  std::cout << "Converted successfully" << ENDL;
+  return true;
+}
+
+
 //---------------------------------------------------------------------------------------------------------------
 
 int main(int argc, char* argv[])
@@ -1374,6 +1404,10 @@ int main(int argc, char* argv[])
   else if (command_line::has_arg(vm, arg_pack_file) || command_line::has_arg(vm, arg_unpack_file))
   {
     return handle_pack_file(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
+  }
+  else if (command_line::has_arg(vm, arg_lmdb_page_4to16))
+  {
+    return handle_lmdb_page_4to16(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   /*else if (command_line::has_arg(vm, arg_send_ipc))
   {
