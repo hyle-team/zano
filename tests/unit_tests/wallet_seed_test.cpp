@@ -2,10 +2,13 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <exception>
+
 #include "gtest/gtest.h"
 
 #include "include_base_utils.h"
 #include "currency_core/account.h"
+#include "currency_core/currency_format_utils.h"
 
 TEST(wallet_seed, store_restore_test) 
 {
@@ -210,4 +213,202 @@ TEST(wallet_seed, basic_test)
 
   }
 
+}
+
+TEST(wallet_seed, word_from_timestamp)
+{
+  {
+    /*
+      timestamp = 0
+      use_password = false
+    */
+
+    ASSERT_EQ("like", currency::get_word_from_timestamp(0, false));
+  }
+
+  {
+    /*
+      timestamp = 0
+      use_password = true
+    */
+
+    ASSERT_EQ("among", currency::get_word_from_timestamp(0, true));
+  }
+
+  {
+    /*
+      timestamp = WALLET_BRAIN_DATE_OFFSET = 1543622400
+      use_password = false
+    */
+
+    ASSERT_EQ("like", currency::get_word_from_timestamp(1543622400, false));
+  }
+
+  {
+    /*
+      timestamp = WALLET_BRAIN_DATE_OFFSET = 1543622400
+      use_password = true
+    */
+
+    ASSERT_EQ("among", currency::get_word_from_timestamp(1543622400, true));
+  }
+
+  {
+    /*
+      timestamp = WALLET_BRAIN_DATE_OFFSET - 1 = 1543622399
+      use_password = false
+    */
+
+    ASSERT_EQ("like", currency::get_word_from_timestamp(1543622399, false));
+  }
+
+  {
+    {
+      /*
+        timestamp = WALLET_BRAIN_DATE_OFFSET + 1 = 1543622401
+        use_password = false
+      */
+
+      ASSERT_EQ("like", currency::get_word_from_timestamp(1543622401, false));
+    }
+
+    {
+      /*
+        timestamp = WALLET_BRAIN_DATE_OFFSET + 1 = 1543622401
+        use_password = true
+      */
+
+      ASSERT_EQ("among", currency::get_word_from_timestamp(1543622401, true));
+    }
+
+    {
+      /*
+        Values get_word_from_timestamp(1, true),
+        get_word_from_timestamp(1543622401, true) must be equal.
+      */
+
+      ASSERT_EQ("among", currency::get_word_from_timestamp(1, true));
+      ASSERT_EQ(currency::get_word_from_timestamp(1, true),
+                currency::get_word_from_timestamp(1543622401, true));
+    }
+  }
+
+  /*
+    2027462399 is the largest timestamp argument value under which the
+    inequality weeks_count < WALLET_BRAIN_DATE_MAX_WEEKS_COUNT is satisfied.
+
+    timestamp = 2027462399
+    date_offset = timestamp - WALLET_BRAIN_DATE_OFFSET = 483839999
+    weeks_count = date_offset / WALLET_BRAIN_DATE_QUANTUM = 799
+    WALLET_BRAIN_DATE_MAX_WEEKS_COUNT = 800
+    WALLET_BRAIN_DATE_QUANTUM = 604800
+
+    floor(483839999 / 604800) = 799
+    floor(483840000 / 604800) = 800
+  */
+  {
+    // weeks_count_32 = 799
+    // wordsArray[799] = "ugly"
+    ASSERT_EQ("ugly", currency::get_word_from_timestamp(2027462399, false));
+
+    // weeks_count_32 = 799 + 800 = 1599
+    // wordsArray[1599] = "moan"
+    ASSERT_EQ("moan", currency::get_word_from_timestamp(2027462399, true));
+  }
+
+  /*
+    If you pass values ​​>= 2027462399 + 1, then the inequality
+    weeks_count < WALLET_BRAIN_DATE_MAX_WEEKS_COUNT is not satisfied. The
+    function throws an exception.
+  */
+  {
+    EXPECT_THROW(currency::get_word_from_timestamp(2027462400, false),
+                  std::runtime_error);
+
+    EXPECT_THROW(currency::get_word_from_timestamp(2027462400, true),
+                  std::runtime_error);
+  }
+}
+
+TEST(wallet_seed, timestamp_from_word)
+{
+  {
+    // WALLET_BRAIN_DATE_OFFSET = 1543622400
+
+    {
+      bool password_used{false};
+
+      ASSERT_EQ(1543622400,
+                currency::get_timestamp_from_word("like", password_used));
+      ASSERT_FALSE(password_used);
+    }
+
+    {
+      bool password_used{true};
+
+      ASSERT_EQ(1543622400,
+                currency::get_timestamp_from_word("like", password_used));
+      ASSERT_FALSE(password_used);
+    }
+  }
+
+  {
+    // WALLET_BRAIN_DATE_OFFSET = 1543622400
+
+    {
+      bool password_used{true};
+
+      ASSERT_EQ(1543622400,
+                currency::get_timestamp_from_word("among", password_used));
+      ASSERT_TRUE(password_used);
+    }
+
+    {
+      bool password_used{false};
+
+      ASSERT_EQ(1543622400,
+                currency::get_timestamp_from_word("among", password_used));
+      ASSERT_TRUE(password_used);
+    }
+  }
+
+  {
+    // (1625 - 800) * 604800 + 1543622400 = 2042582400
+
+    {
+      bool password_used{false};
+
+      ASSERT_EQ(2026857600,
+                currency::get_timestamp_from_word("ugly", password_used));
+      ASSERT_FALSE(password_used);
+    }
+
+    {
+      bool password_used{true};
+
+      ASSERT_EQ(2026857600,
+                currency::get_timestamp_from_word("ugly", password_used));
+      ASSERT_FALSE(password_used);
+    }
+  }
+
+  {
+    // (1625 - 800) * 604800 + 1543622400 = 2042582400
+
+    {
+      bool password_used{false};
+
+      ASSERT_EQ(2042582400,
+                currency::get_timestamp_from_word("weary", password_used));
+      ASSERT_TRUE(password_used);
+    }
+
+    {
+      bool password_used{true};
+
+      ASSERT_EQ(2042582400,
+                currency::get_timestamp_from_word("weary", password_used));
+      ASSERT_TRUE(password_used);
+    }
+  }
 }
