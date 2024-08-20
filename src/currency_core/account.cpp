@@ -84,11 +84,11 @@ namespace currency
     }
 
     std::string keys_seed_text = tools::mnemonic_encoding::binary2text(processed_seed_binary);
-    std::string timestamp_word = currency::get_word_from_timstamp(m_creation_timestamp, !password.empty());
+    std::string timestamp_word = currency::get_word_from_timestamp(m_creation_timestamp, !password.empty());
 
     // floor creation time to WALLET_BRAIN_DATE_QUANTUM to make checksum calculation stable
     bool self_check_is_password_used = false;
-    uint64_t creation_timestamp_rounded = get_timstamp_from_word(timestamp_word, self_check_is_password_used);
+    uint64_t creation_timestamp_rounded = get_timestamp_from_word(timestamp_word, self_check_is_password_used);
     CHECK_AND_ASSERT_THROW_MES(self_check_is_password_used == !password.empty(), "Account seed phrase internal error: password flag encoded wrong");
 
     constexpr uint16_t checksum_max = tools::mnemonic_encoding::NUMWORDS >> 1; // maximum value of checksum
@@ -177,7 +177,7 @@ namespace currency
 
     bool has_password = false;
     try {
-      m_creation_timestamp = get_timstamp_from_word(timestamp_word, has_password);
+      m_creation_timestamp = get_timestamp_from_word(timestamp_word, has_password);
     }
     catch (...)
     {
@@ -263,7 +263,7 @@ namespace currency
       return false;
     }
 
-    get_timstamp_from_word(timestamp_word, is_password_protected);
+    get_timestamp_from_word(timestamp_word, is_password_protected);
 
     return true;
   }
