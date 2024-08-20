@@ -217,81 +217,35 @@ TEST(wallet_seed, basic_test)
 
 TEST(wallet_seed, word_from_timestamp)
 {
-  {
-    /*
-      timestamp = 0
-      use_password = false
-    */
+  //timestamp = 0; use_password = false
+  ASSERT_EQ("like", currency::get_word_from_timestamp(0, false));
 
-    ASSERT_EQ("like", currency::get_word_from_timestamp(0, false));
-  }
+  // timestamp = 0; use_password = true
+  ASSERT_EQ("among", currency::get_word_from_timestamp(0, true));
 
-  {
-    /*
-      timestamp = 0
-      use_password = true
-    */
+  // timestamp = WALLET_BRAIN_DATE_OFFSET = 1543622400; use_password = false
+  ASSERT_EQ("like", currency::get_word_from_timestamp(1543622400, false));
 
-    ASSERT_EQ("among", currency::get_word_from_timestamp(0, true));
-  }
+  // timestamp = WALLET_BRAIN_DATE_OFFSET = 1543622400; use_password = true
+  ASSERT_EQ("among", currency::get_word_from_timestamp(1543622400, true));
 
-  {
-    /*
-      timestamp = WALLET_BRAIN_DATE_OFFSET = 1543622400
-      use_password = false
-    */
+  // timestamp = WALLET_BRAIN_DATE_OFFSET - 1 = 1543622399; use_password = false
+  ASSERT_EQ("like", currency::get_word_from_timestamp(1543622399, false));
 
-    ASSERT_EQ("like", currency::get_word_from_timestamp(1543622400, false));
-  }
+  // timestamp = WALLET_BRAIN_DATE_OFFSET + 1 = 1543622401; use_password = false
+  ASSERT_EQ("like", currency::get_word_from_timestamp(1543622401, false));
 
-  {
-    /*
-      timestamp = WALLET_BRAIN_DATE_OFFSET = 1543622400
-      use_password = true
-    */
+  // timestamp = WALLET_BRAIN_DATE_OFFSET + 1 = 1543622401; use_password = true
+  ASSERT_EQ("among", currency::get_word_from_timestamp(1543622401, true));
 
-    ASSERT_EQ("among", currency::get_word_from_timestamp(1543622400, true));
-  }
+  /*
+    Values get_word_from_timestamp(1, true),
+    get_word_from_timestamp(1543622401, true) must be equal.
+  */
 
-  {
-    /*
-      timestamp = WALLET_BRAIN_DATE_OFFSET - 1 = 1543622399
-      use_password = false
-    */
-
-    ASSERT_EQ("like", currency::get_word_from_timestamp(1543622399, false));
-  }
-
-  {
-    {
-      /*
-        timestamp = WALLET_BRAIN_DATE_OFFSET + 1 = 1543622401
-        use_password = false
-      */
-
-      ASSERT_EQ("like", currency::get_word_from_timestamp(1543622401, false));
-    }
-
-    {
-      /*
-        timestamp = WALLET_BRAIN_DATE_OFFSET + 1 = 1543622401
-        use_password = true
-      */
-
-      ASSERT_EQ("among", currency::get_word_from_timestamp(1543622401, true));
-    }
-
-    {
-      /*
-        Values get_word_from_timestamp(1, true),
-        get_word_from_timestamp(1543622401, true) must be equal.
-      */
-
-      ASSERT_EQ("among", currency::get_word_from_timestamp(1, true));
-      ASSERT_EQ(currency::get_word_from_timestamp(1, true),
-                currency::get_word_from_timestamp(1543622401, true));
-    }
-  }
+  ASSERT_EQ("among", currency::get_word_from_timestamp(1, true));
+  ASSERT_EQ(currency::get_word_from_timestamp(1, true),
+            currency::get_word_from_timestamp(1543622401, true));
 
   /*
     2027462399 is the largest timestamp argument value under which the
@@ -306,28 +260,24 @@ TEST(wallet_seed, word_from_timestamp)
     floor(483839999 / 604800) = 799
     floor(483840000 / 604800) = 800
   */
-  {
-    // weeks_count_32 = 799
-    // wordsArray[799] = "ugly"
-    ASSERT_EQ("ugly", currency::get_word_from_timestamp(2027462399, false));
 
-    // weeks_count_32 = 799 + 800 = 1599
-    // wordsArray[1599] = "moan"
-    ASSERT_EQ("moan", currency::get_word_from_timestamp(2027462399, true));
-  }
+  // weeks_count_32 = 799; wordsArray[799] = "ugly"
+  ASSERT_EQ("ugly", currency::get_word_from_timestamp(2027462399, false));
+
+  // weeks_count_32 = 799 + 800 = 1599; wordsArray[1599] = "moan"
+  ASSERT_EQ("moan", currency::get_word_from_timestamp(2027462399, true));
 
   /*
     If you pass values ​​>= 2027462399 + 1, then the inequality
     weeks_count < WALLET_BRAIN_DATE_MAX_WEEKS_COUNT is not satisfied. The
     function throws an exception.
   */
-  {
-    EXPECT_THROW(currency::get_word_from_timestamp(2027462400, false),
-                  std::runtime_error);
 
-    EXPECT_THROW(currency::get_word_from_timestamp(2027462400, true),
-                  std::runtime_error);
-  }
+  EXPECT_THROW(currency::get_word_from_timestamp(2027462400, false),
+               std::runtime_error);
+
+  EXPECT_THROW(currency::get_word_from_timestamp(2027462400, true),
+               std::runtime_error);
 }
 
 TEST(wallet_seed, timestamp_from_word)
