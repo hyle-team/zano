@@ -399,7 +399,7 @@ TEST(multiassets, get_or_calculate_asset_id_public_burn)
 
 TEST(multiassets, get_or_calculate_asset_id_undefined)
 {
-   bool success{false};
+  bool success{false};
 
   crypto::point_t pt_public_key{};
   success = pt_public_key.from_string(
