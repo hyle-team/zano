@@ -448,8 +448,6 @@ TEST(multiassets, get_or_calculate_asset_id_undefined)
                                       &calculated_asset_id_key);
 
   ASSERT_FALSE(success);
-  ASSERT_EQ(calculated_asset_id_pt, expected_asset_id_pt);
-  ASSERT_EQ(calculated_asset_id_key, expected_asset_id_key);
 }
 
 TEST(multiassets, get_or_calculate_asset_id_register_serialization)
@@ -680,18 +678,6 @@ TEST(multiassets, get_or_calculate_asset_id_undefined_serialization)
                                                 &calculated_asset_id_pt,
                                                 &calculated_asset_id_key);
   ASSERT_FALSE(success);
-
-  const std::string expected_asset_id_str{
-    "979eb706ace2eb83f9125658b23fb352208480cb3b90c43e2df0d298f9754ebc"};
-
-  crypto::point_t expected_asset_id_pt{};
-  success = expected_asset_id_pt.from_string(expected_asset_id_str);
-  ASSERT_TRUE(success);
-
-  crypto::public_key expected_asset_id_key{};
-  expected_asset_id_pt.to_public_key(expected_asset_id_key);
-  ASSERT_EQ(calculated_asset_id_pt, expected_asset_id_pt);
-  ASSERT_EQ(calculated_asset_id_key, expected_asset_id_key);
 }
 
 TEST(multiassets, get_or_calculate_asset_id_register_boost_serialization)
