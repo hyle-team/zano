@@ -3880,11 +3880,9 @@ uint64_t blockchain_storage::get_assets(uint64_t offset, uint64_t count, std::li
   m_db_assets.enumerate_items([&](uint64_t i, const crypto::public_key& asset_id, const std::list<asset_descriptor_operation>& asset_descriptor_history)
   {
     if (i < offset)
-    {
-      return true;
-    }
+      return true; // continue
 
-    CHECK_AND_ASSERT_THROW_MES(asset_descriptor_history.size(), "asset_descriptor_history unexpectedly have 0 size");
+    CHECK_AND_ASSERT_THROW_MES(asset_descriptor_history.size(), "asset_descriptor_history unexpectedly have 0 size, asset_id: " << asset_id);
     assets.push_back(asset_descriptor_with_id());
     static_cast<asset_descriptor_base&>(assets.back()) = asset_descriptor_history.back().descriptor;
     assets.back().asset_id = asset_id;
