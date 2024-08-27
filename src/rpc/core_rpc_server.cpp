@@ -1332,7 +1332,7 @@ namespace currency
     {
       uint64_t start_offset = resp.blockchain_top_block_height - req.blocks_limit + 1;
       std::list<block> recent_blocks;
-      LOCAL_CHECK_INT_ERR(bcs.get_blocks(start_offset, req.blocks_limit, recent_blocks), "cannot get recent blocks");
+      LOCAL_CHECK_INT_ERR(bcs.get_blocks(start_offset, static_cast<size_t>(req.blocks_limit), recent_blocks), "cannot get recent blocks");
       
       std::vector<crypto::hash> blockchain_tx_ids, missed_tx;
       for(auto& b : recent_blocks)
