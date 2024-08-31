@@ -510,7 +510,7 @@ namespace tools
 
   typedef std::unordered_multimap<std::string, payment_details> payment_container;
 
-  typedef std::deque<transfer_details> transfer_container;
+  typedef std::map<uint64_t, transfer_details> transfer_container; //typedef std::deque<transfer_details> transfer_container;
   typedef std::unordered_map<crypto::hash, transfer_details_base> multisig_transfer_container;
   typedef std::unordered_map<crypto::hash, tools::wallet_public::escrow_contract_details_basic> escrow_contracts_container;
   typedef std::map<uint64_t, std::set<size_t> > free_amounts_cache_type;

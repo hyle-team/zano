@@ -149,13 +149,15 @@ namespace tools
     uint64_t m_last_pow_block_h = 0;
     std::list<std::pair<uint64_t, wallet_event_t>> m_rollback_events;
     std::list<std::pair<uint64_t, uint64_t> > m_last_zc_global_indexs; // <height, last_zc_global_indexs>, biggest height comes in front
+    
+    std::atomic<bool> m_concise_mode = false; //in this mode the wallet don't keep spent entries in m_transfers as well as m_recent_transfers longer then 100 entries
 
     //variables that not being serialized
     std::atomic<uint64_t> m_last_bc_timestamp = 0;
     uint64_t m_height_of_start_sync = 0;
     std::atomic<uint64_t> m_last_sync_percent = 0;
     mutable uint64_t m_current_wallet_file_size = 0;
-    bool m_use_assets_whitelisting = true;
+    bool m_use_assets_whitelisting = true;    
     mutable std::optional<bool> m_has_bare_unspent_outputs; // recalculated each time the balance() is called
 
     // variables that should be part of state data object but should not be stored during serialization
@@ -201,7 +203,17 @@ namespace tools
       a & m_chain;
       a & m_minimum_height;
       a & m_amount_gindex_to_transfer_id;
-      a & m_transfers;
+      if (ver <= 167)
+      {
+        std::deque<transfer_details> transfer_container_old;
+        a& transfer_container_old;
+        for (size_t i = 0; i != transfer_container_old.size(); i++){m_transfers[i] = transfer_container_old[i];}
+      }
+      else
+      {
+        a& m_transfers;
+      }
+      
       a & m_multisig_transfers;
       a & m_key_images;
       a & m_unconfirmed_txs;
@@ -234,7 +246,12 @@ namespace tools
       {
         //workaround for m_last_zc_global_indexs holding invalid index for last item
         m_last_zc_global_indexs.pop_front();
-      }      
+      } 
+      if (ver <= 167)
+      {
+        return;
+      }
+      a& m_concise_mode;
     }
   };
   
@@ -257,7 +274,7 @@ namespace tools
       bool          is_pos_allowed = false;
       bool          is_pos_sequence_factor_good = false;
 
-      uint64_t      index = 0; // index in m_transfers 
+      //uint64_t      index = 0; // index in m_transfers 
       uint64_t      stake_unlock_time = 0;
       uint64_t      height = 0;
       uint64_t      starter_timestamp = 0;
@@ -382,7 +399,7 @@ namespace tools
     void get_recent_transfers_history(std::vector<wallet_public::wallet_transfer_info>& trs, size_t offset, size_t count, uint64_t& total, uint64_t& last_item_index, bool exclude_mining_txs = false, bool start_from_end = true);
     bool is_defragmentation_transaction(const wallet_public::wallet_transfer_info& wti);
     uint64_t get_recent_transfers_total_count();
-    uint64_t get_transfer_entries_count();
+    //uint64_t get_transfer_entries_count();
     void get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs, bool exclude_mining_txs = false);
     void init(const std::string& daemon_address = "http://localhost:8080");
     bool deinit();
@@ -559,10 +576,11 @@ namespace tools
       currency::transaction &escrow_template_tx);
 
     bool check_connection();
+    bool trim_transfers_and_history(const std::list<size_t>& items_to_remove);
 
     // PoS mining
-    void do_pos_mining_prepare_entry(mining_context& cxt, size_t transfer_index);
-    bool do_pos_mining_iteration(mining_context& cxt, size_t transfer_index, uint64_t ts);
+    void do_pos_mining_prepare_entry(mining_context& cxt, const transfer_details& td);
+    bool do_pos_mining_iteration(mining_context& cxt, uint64_t ts);
     template<typename idle_condition_cb_t> //do refresh as external callback
     bool scan_pos(mining_context& cxt, std::atomic<bool>& stop, idle_condition_cb_t idle_condition_cb, const currency::core_runtime_config &runtime_config);
     bool fill_mining_context(mining_context& ctx);
@@ -1064,7 +1082,7 @@ namespace tools
 
     if (tr_index != UINT64_MAX)
     {
-      transfer_details& td = m_transfers[tr_index];
+      transfer_details& td = m_transfers.at(tr_index);
       ptc.total_balance_change[td.get_asset_id()] -= td.amount();
       if (td.is_native_coin())
       {
@@ -1114,9 +1132,9 @@ namespace tools
     ts_middle -= ts_middle % POS_SCAN_STEP;
     uint64_t ts_window = std::min(ts_middle - ts_from, ts_to - ts_middle);
 
-    for (size_t transfer_index = 0; transfer_index != m_transfers.size(); transfer_index++)
+    for (auto it = m_transfers.begin(); it != m_transfers.end(); it++)//size_t transfer_index = 0; transfer_index != m_transfers.size(); transfer_index++)
     {
-      auto& tr = m_transfers[transfer_index];
+      auto& tr = it->second;
 
       uint64_t stake_unlock_time = 0;
       if (!is_transfer_okay_for_pos(tr, cxt.zarcanum, stake_unlock_time))
@@ -1142,7 +1160,7 @@ namespace tools
         }
       };
 
-      do_pos_mining_prepare_entry(cxt, transfer_index);
+      do_pos_mining_prepare_entry(cxt, tr);
       cxt.total_items_checked++;
       cxt.total_amount_checked += tr.amount();
       while(step <= ts_window)
@@ -1171,9 +1189,9 @@ namespace tools
           return false;
 
         cxt.iterations_processed++;
-        if (do_pos_mining_iteration(cxt, transfer_index, ts))
+        if (do_pos_mining_iteration(cxt, tr, ts))
         {
-          cxt.index = transfer_index;
+          cxt.index = it->first;
           cxt.stake_unlock_time = stake_unlock_time;
           cxt.status = API_RETURN_CODE_OK;
           return true;
