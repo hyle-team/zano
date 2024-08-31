@@ -47,3 +47,24 @@ struct asset_emission_and_unconfirmed_balance : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct asset_operation_and_hardfork_checks : public wallet_test
+{
+  public:
+    asset_operation_and_hardfork_checks();
+
+    bool generate(std::vector<test_event_entry>& events) const;
+    bool c1(currency::core& c,
+            size_t ev_index,
+            const std::vector<test_event_entry>& events);
+
+    bool c2(currency::core& c,
+            size_t ev_index,
+            const std::vector<test_event_entry>& events);
+
+  private:
+    mutable currency::asset_descriptor_base m_adb_hello{};
+    mutable currency::asset_descriptor_operation m_ado_hello{};
+    mutable currency::asset_descriptor_base m_adb_bye{};
+    mutable currency::asset_descriptor_operation m_ado_bye{};
+};
