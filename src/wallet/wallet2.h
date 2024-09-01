@@ -50,6 +50,8 @@
 
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               CURRENCY_HF4_MANDATORY_MIN_COINAGE
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
+#define WALLET_CONCISE_MODE_MAX_REORG_BLOCKS                          CURRENCY_BLOCKS_PER_DAY * 7 //week
+#define WALLET_CONCISE_MODE_MAX_HISTORY_SIZE                          500                         
 
 
 const uint64_t WALLET_MINIMUM_HEIGHT_UNSET_CONST = std::numeric_limits<uint64_t>::max();
@@ -274,7 +276,7 @@ namespace tools
       bool          is_pos_allowed = false;
       bool          is_pos_sequence_factor_good = false;
 
-      //uint64_t      index = 0; // index in m_transfers 
+      uint64_t      index = 0; // index in m_transfers 
       uint64_t      stake_unlock_time = 0;
       uint64_t      height = 0;
       uint64_t      starter_timestamp = 0;
@@ -577,6 +579,7 @@ namespace tools
 
     bool check_connection();
     bool trim_transfers_and_history(const std::list<size_t>& items_to_remove);
+    bool trim_wallet();
 
     // PoS mining
     void do_pos_mining_prepare_entry(mining_context& cxt, const transfer_details& td);
@@ -970,6 +973,8 @@ private:
     tools::wallet_public::wallet_vote_config m_votes_config;
 
     uint64_t m_last_known_daemon_height = 0;
+    uint64_t m_wallet_concise_mode_max_reorg_blocks = WALLET_CONCISE_MODE_MAX_REORG_BLOCKS;
+    
 
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;
@@ -1189,7 +1194,7 @@ namespace tools
           return false;
 
         cxt.iterations_processed++;
-        if (do_pos_mining_iteration(cxt, tr, ts))
+        if (do_pos_mining_iteration(cxt, ts))
         {
           cxt.index = it->first;
           cxt.stake_unlock_time = stake_unlock_time;

@@ -59,8 +59,6 @@ using namespace currency;
 #define WALLET_TX_MAX_ALLOWED_FEE                                     (COIN * 100)
 
 #define WALLET_FETCH_RANDOM_OUTS_SIZE                                 200  
-#define WALLET_CONCISE_MODE_MAX_REORG_BLOCKS                          CURRENCY_BLOCKS_PER_DAY * 7 //week
-#define WALLET_CONCISE_MODE_MAX_HISTORY_SIZE                          500                         
 
 
 
@@ -2897,8 +2895,8 @@ namespace tools
       uint64_t tx_expiration_ts_median = get_tx_expiration_median();
       handle_expiration_list(tx_expiration_ts_median);
       handle_contract_expirations(tx_expiration_ts_median);
-
       m_found_free_amounts.clear();
+      trim_wallet();
     }
 
 
@@ -2997,21 +2995,20 @@ namespace tools
 
     // rollback incoming transfers from detaching subchain
     {
-      auto it = std::find_if(m_transfers.begin(), m_transfers.end(), [&](const transfer_details& td){return td.m_ptx_wallet_info->m_block_height >= including_height; });
+      auto it = std::find_if(m_transfers.begin(), m_transfers.end(), [&](const transfer_container::value_type& tr_e){return tr_e.second.m_ptx_wallet_info->m_block_height >= including_height; });
       if (it != m_transfers.end())
       {
-        size_t i_start = it - m_transfers.begin();
 
-        for (const auto& tr : m_transfers)
+        for (; it!= m_transfers.end(); it++)
         {
-          uint64_t i = tr.first;
+          uint64_t i = it->first;
           //check for htlc
-          if (m_transfers.at(i).m_ptx_wallet_info->m_tx.vout[m_transfers.at(i).m_internal_output_index].type() == typeid(tx_out_bare) &&
-            boost::get<tx_out_bare>(m_transfers.at(i).m_ptx_wallet_info->m_tx.vout[m_transfers.at(i).m_internal_output_index]).target.type() == typeid(txout_htlc))
+          if (it->second.m_ptx_wallet_info->m_tx.vout[it->second.m_internal_output_index].type() == typeid(tx_out_bare) &&
+            boost::get<tx_out_bare>(it->second.m_ptx_wallet_info->m_tx.vout[it->second.m_internal_output_index]).target.type() == typeid(txout_htlc))
           {
             //need to find an entry in m_htlc and remove it
-            const txout_htlc& hltc = boost::get<txout_htlc>(boost::get<tx_out_bare>(m_transfers.at(i).m_ptx_wallet_info->m_tx.vout[m_transfers.at(i).m_internal_output_index]).target);
-            uint64_t expiration_height = m_transfers.at(i).m_ptx_wallet_info->m_block_height + hltc.expiration;
+            const txout_htlc& hltc = boost::get<txout_htlc>(boost::get<tx_out_bare>(it->second.m_ptx_wallet_info->m_tx.vout[it->second.m_internal_output_index]).target);
+            uint64_t expiration_height = it->second.m_ptx_wallet_info->m_block_height + hltc.expiration;
             auto pair_of_it = m_htlcs.equal_range(expiration_height);
             bool found = false;
             for (auto it = pair_of_it.first; it != pair_of_it.second; it++)
@@ -3027,11 +3024,11 @@ namespace tools
           }
 
 
-          if (!(m_transfers.at(i).m_key_image == null_ki && is_watch_only()))
+          if (!(it->second.m_key_image == null_ki && is_watch_only()))
           {
-            auto it_ki = m_key_images.find(m_transfers.at(i).m_key_image);
-            WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it_ki != m_key_images.end(), "key image " << m_transfers.at(i).m_key_image << " not found");
-            WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(m_transfers.at(i).m_ptx_wallet_info->m_block_height >= including_height, "transfer #" << i << " block height is less than " << including_height);
+            auto it_ki = m_key_images.find(it->second.m_key_image);
+            WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it_ki != m_key_images.end(), "key image " << it->second.m_key_image << " not found");
+            WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second.m_ptx_wallet_info->m_block_height >= including_height, "transfer #" << i << " block height is less than " << including_height);
             m_key_images.erase(it_ki);
           }
           remove_transfer_from_amount_gindex_map(i);
@@ -3050,10 +3047,10 @@ namespace tools
     //rollback spends
     // do not clear spent flag in spent transfers as corresponding txs are most likely in the pool
     // they will be moved into m_unconfirmed_txs for clearing in future (if tx will expire of removed from pool)
-    for (const auto& tr : m_transfers)
+    for (auto& tr_ : m_transfers)
     {
-      uint64_t i = tr.first;
-      auto& tr = m_transfers.at(i);
+      uint64_t i = tr_.first;
+      auto& tr = tr_.second;
       if (tr.m_spent_height >= including_height)
       {
         WLT_LOG_BLUE("Transfer [" << i << "] spent height: " << tr.m_spent_height << " -> 0, reason: detaching blockchain", LOG_LEVEL_1);
@@ -3616,7 +3613,7 @@ namespace tools
       const auto& td = tr.second;
       if (!td.is_spent())
         continue; // only spent transfers really need to be stored, because watch-only wallet will not be able to figure out they were spent otherwise
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.m_internal_output_index < td.m_ptx_wallet_info->m_tx.vout.size(), "invalid transfer #" << ti);
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.m_internal_output_index < td.m_ptx_wallet_info->m_tx.vout.size(), "invalid transfer #" << tr.first);
       if (td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].type() != typeid(tx_out_bare))
         continue;
       const currency::txout_target_v& out_t = boost::get<tx_out_bare>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]).target;
@@ -3691,19 +3688,12 @@ namespace tools
   {
     mined = 0;
     m_has_bare_unspent_outputs = false;
-    std::list<size_t> items_to_remove;
 
-    for (auto& td : m_transfers)
+    for (auto& tr : m_transfers)
     {
+      auto& td = tr.second;
 
-      if (td.is_spent())
-      {
-        if (m_concise_mode && m_spent_height + WALLET_CONCISE_MODE_MAX_REORG_BLOCKS < m_chain.get_top_block_height())
-        {
-          items_to_remove.push_back(td.first);
-        }
-      }
-      else if (td.is_spendable() || (td.is_reserved_for_escrow()))
+      if (td.is_spendable() || (td.is_reserved_for_escrow() && !td.is_spent()))
       {
         wallet_public::asset_balance_entry_base& e = balances[td.get_asset_id()];
         e.total += td.amount();
@@ -3776,11 +3766,27 @@ namespace tools
 
     }
 
+    return true;
+  }
+  //----------------------------------------------------------------------------------------------------
+  bool wallet2::trim_wallet()
+  {
     if (m_concise_mode)
     {
-      trim_transfers_and_history(items_to_remove);
-    }
+      std::list<size_t> items_to_remove;
+      for (auto& tr : m_transfers)
+      {
+        if (tr.second.is_spent())
+        {
+          if (m_concise_mode && tr.second.m_spent_height + m_wallet_concise_mode_max_reorg_blocks < m_chain.get_top_block_height())
+          {
+            items_to_remove.push_back(tr.first);
+          }
+        }
+      }
 
+      return trim_transfers_and_history(items_to_remove);
+    }
     return true;
   }
   //----------------------------------------------------------------------------------------------------
@@ -4253,7 +4259,7 @@ namespace tools
   void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& signed_tx_blob, currency::transaction& tx)
   {
     // assumed to be called from normal, non-watch-only wallet
-    x
+    THROW_IF_FALSE_WALLET_EX(!m_watch_only, error::wallet_common_error, "watch-only wallet is unable to sign transfers, you need to use normal wallet for that");
 
       // decrypt the blob
       std::string decrypted_src_blob = crypto::chacha_crypt(tx_sources_blob, m_account.get_keys().view_secret_key);
@@ -4668,10 +4674,10 @@ namespace tools
 
     for (const auto& tr : m_transfers)
     {
-      auto& tr = tr.second;
+      auto& td = tr.second;
 
       uint64_t stake_unlock_time = 0;
-      if (!is_transfer_okay_for_pos(tr, is_zarcanum_hf, stake_unlock_time))
+      if (!is_transfer_okay_for_pos(td, is_zarcanum_hf, stake_unlock_time))
         continue;
 
       ++counter;
@@ -4683,10 +4689,10 @@ namespace tools
   bool wallet2::get_pos_entries(std::vector<currency::pos_entry>& entries)
   {
     bool is_zarcanum_hf = is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM);
-    for (const auto& tr : m_transfers)
+    for (const auto& td : m_transfers)
     {
-      uint64_t i = tr.first;
-      auto& tr = tr.second;
+      uint64_t i = td.first;
+      auto& tr = td.second;
 
       uint64_t stake_unlock_time = 0;
       if (!is_transfer_okay_for_pos(tr, is_zarcanum_hf, stake_unlock_time))
@@ -5067,7 +5073,7 @@ namespace tools
       amount_blinding_mask, m_account.get_keys().view_secret_key);
   }
   //------------------------------------------------------------------
-  bool wallet2::do_pos_mining_iteration(mining_context& context, size_t transfer_index, uint64_t ts)
+  bool wallet2::do_pos_mining_iteration(mining_context& context, uint64_t ts)
   {
     return context.do_iteration(ts);
   }
@@ -5648,10 +5654,15 @@ namespace tools
   {
     if (verbose)
     {
-      std::string res_buff;
-      local_transfers_struct lt(const_cast<transfer_container&>(m_transfers));
-      epee::serialization::store_t_to_json(lt, res_buff);
-      ss << res_buff;
+
+      ss << "{ \"transfers\": [" << ENDL;
+      for (const auto& tr : m_transfers)
+      {
+        uint64_t i = tr.first;
+        const transfer_details& td = tr.second;
+        ss << "{ \"i\": " << i << "," << ENDL;
+        ss << "\"entry\": " << epee::serialization::store_t_to_json(td) << "}," << ENDL;
+      }
     }
     else
     {
@@ -6549,27 +6560,30 @@ namespace tools
         req.amounts.push_back(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution());
         COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution& rdisttib = req.amounts.back();
 
-        auto it = m_transfers.begin() + i;
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->m_ptx_wallet_info->m_tx.vout.size() > it->m_internal_output_index,
-          "m_internal_output_index = " << it->m_internal_output_index <<
-          " is greater or equal to outputs count = " << it->m_ptx_wallet_info->m_tx.vout.size());
+        auto it = m_transfers.find(i);
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_transfers.end(),
+          "internal error: index in m_tranfers  " << i << " not found");
+
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it->second.m_ptx_wallet_info->m_tx.vout.size() > it->second.m_internal_output_index,
+          "m_internal_output_index = " << it->second.m_internal_output_index <<
+          " is greater or equal to outputs count = " << it->second.m_ptx_wallet_info->m_tx.vout.size());
 
         //rdisttib.own_global_index = it->m_global_output_index;
         //check if we have Zarcanum era output of pre-Zarcanum
-        if (it->is_zc())
+        if (it->second.is_zc())
         {
           if (this->is_auditable())
             continue;
           //Zarcanum era
           rdisttib.amount = 0;
           //generate distribution in Zarcanum hardfork
-          build_distribution_for_input(rdisttib.global_offsets, it->m_global_output_index);
+          build_distribution_for_input(rdisttib.global_offsets, it->second.m_global_output_index);
           need_to_request = true;
         }
         else
         {
           //for prezarcanum era use flat distribution
-          rdisttib.amount = it->m_amount;
+          rdisttib.amount = it->second.m_amount;
           rdisttib.global_offsets.resize(fake_outputs_count + 1, 0);
         }
       }
@@ -6623,12 +6637,14 @@ namespace tools
     size_t i = 0;
     for (uint64_t J : selected_indicies)
     {
-      auto it = m_transfers.begin() + J;
+      auto it = m_transfers.find(J);
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_transfers.end(), "internal error: J " << J << " not found in m_transfers");
+
 
       sources.push_back(AUTO_VAL_INIT(currency::tx_source_entry()));
       currency::tx_source_entry& src = sources.back();
-      transfer_details& td = *it;
-      src.transfer_index = it - m_transfers.begin();
+      transfer_details& td = it->second;
+      src.transfer_index = J;
       src.amount = td.amount();
       src.asset_id = td.get_asset_id();
       size_t fake_outputs_count = fake_outputs_count_;
