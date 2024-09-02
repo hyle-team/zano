@@ -887,3 +887,323 @@ bool asset_emission_and_unconfirmed_balance::c1(currency::core& c, size_t ev_ind
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+asset_operation_and_hardfork_checks::asset_operation_and_hardfork_checks()
+{
+  m_adb_hello.total_max_supply = 1'000'000'000'000'000'000;
+  m_adb_hello.current_supply = 1'000'000'000'000'000'000;
+  m_adb_hello.ticker = "HLO";
+  m_adb_hello.full_name = "HELLO_WORLD";
+  m_adb_hello.meta_info = "Hello, world!";
+  m_adb_hello.hidden_supply = false;
+
+  m_ado_hello.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+  m_ado_hello.opt_asset_id = currency::null_pkey;
+
+  m_adb_bye.total_max_supply = 1'000'000'000'000'000'000;
+  m_adb_bye.current_supply = 1'000'000'000'000'000'000;
+  m_adb_bye.ticker = "BYE";
+  m_adb_bye.full_name = "BYE_WORLD";
+  m_adb_bye.meta_info = "Bye, world!";
+  m_adb_bye.hidden_supply = false;
+
+  m_ado_bye.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+  m_ado_hello.opt_asset_id = currency::null_pkey;
+
+  REGISTER_CALLBACK_METHOD(asset_operation_and_hardfork_checks, c1);
+  REGISTER_CALLBACK_METHOD(asset_operation_and_hardfork_checks, c2);
+}
+
+bool asset_operation_and_hardfork_checks::generate(
+  std::vector<test_event_entry>& events) const
+{
+  /*
+    0           10     11           21     22
+  ( 0) - ... - (0r) - ( 1) - ... - (1r) - ( 2)
+                       \                   \
+                        [tx_0]              [tx_1]
+  */
+
+  bool success{false};
+  std::vector<tx_source_entry> sources{};
+  std::vector<tx_destination_entry> destinations{};
+  transaction tx_0{}, tx_1{}, tx_2{}, tx_3{}, tx_4{};
+  uint64_t tx_version{};
+  crypto::secret_key stub{};
+
+  m_accounts.resize(2);
+  account_base& miner{m_accounts[MINER_ACC_IDX]};
+  miner.generate();
+  account_base& alice{m_accounts[ALICE_ACC_IDX]};
+  alice.generate();
+
+  m_adb_hello.owner = alice.get_public_address().spend_public_key;
+  m_ado_hello.descriptor = m_adb_hello;
+
+  m_adb_bye.owner = alice.get_public_address().spend_public_key;
+  m_ado_bye.descriptor = m_adb_bye;
+
+  MAKE_GENESIS_BLOCK(events,
+                     blk_0,
+                     miner,
+                     test_core_time::get_time());
+
+  DO_CALLBACK(events, "configure_core");
+
+  REWIND_BLOCKS_N_WITH_TIME(events,
+                            blk_0r,
+                            blk_0,
+                            miner,
+                            CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  success = fill_tx_sources_and_destinations(events,
+                                             /* head = */ blk_0r,
+                                             /* from = */ miner.get_keys(),
+                                             /* to = */ alice.get_public_address(),
+                                             /* amount = */ MK_TEST_COINS(12),
+                                             /* fee = */ TESTS_DEFAULT_FEE,
+                                             /* nmix = */ 0,
+                                             sources,
+                                             destinations);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to fill sources, destinations");
+
+  tx_version = get_tx_version(get_block_height(blk_0r),
+                              m_hardforks);
+
+  success = construct_tx(miner.get_keys(),
+                         sources,
+                         destinations,
+                         empty_attachment,
+                         tx_0,
+                         tx_version,
+                         0);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_0");
+
+  ADD_CUSTOM_EVENT(events, tx_0);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner, tx_0);
+
+  REWIND_BLOCKS_N_WITH_TIME(events,
+                            blk_1r,
+                            blk_1,
+                            miner,
+                            CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  sources.clear();
+  destinations.clear();
+
+  success = fill_tx_sources_and_destinations(events,
+                                             /* head = */ blk_1r,
+                                             /* from = */ alice,
+                                             /* to = */ alice,
+                                             /* amount = */ MK_TEST_COINS(5),
+                                             /* fee = */ TESTS_DEFAULT_FEE,
+                                             /* nmix = */ 0,
+                                             sources,
+                                             destinations);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to fill sources, destinations");
+
+  destinations.emplace_back(/* amount = */ 1'000'000'000'000'000'000,
+                            /* to = */ alice.get_public_address(),
+                            /* asset_id = */ currency::null_pkey);
+
+  tx_version = get_tx_version(get_block_height(blk_1r), m_hardforks);
+
+  success = construct_tx(alice.get_keys(),
+                         sources,
+                         destinations,
+                         /* extra = */ {m_ado_hello},
+                         empty_attachment,
+                         tx_1,
+                         tx_version,
+                         stub,
+                         0);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_1");
+  ADD_CUSTOM_EVENT(events, tx_1);
+
+  MAKE_NEXT_BLOCK_TX1(events,
+                      blk_2,
+                      blk_1r,
+                      alice,
+                      tx_1);
+
+  REWIND_BLOCKS_N_WITH_TIME(events,
+                            blk_2r,
+                            blk_2,
+                            miner,
+                            CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  /* A transaction that has at least 2 registration operation descriptors in its
+  extra is rejected by the core. */
+
+  sources.clear();
+  destinations.clear();
+
+  success = fill_tx_sources_and_destinations(events,
+                                             /* head = */ blk_2r,
+                                             /* from = */ alice,
+                                             /* to = */ alice,
+                                             /* amount = */ MK_TEST_COINS(2),
+                                             /* fee = */ TESTS_DEFAULT_FEE,
+                                             /* nmix = */ 0,
+                                             sources,
+                                             destinations);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to fill sources, destinations");
+
+  tx_version = get_tx_version(get_block_height(blk_2r),
+                              m_hardforks);
+
+  success = construct_tx(alice.get_keys(),
+                         sources,
+                         destinations,
+                         /* extra = */ {m_ado_hello, m_ado_hello},
+                         empty_attachment,
+                         tx_2,
+                         tx_version,
+                         stub,
+                         0);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_2");
+
+  DO_CALLBACK(events, "mark_invalid_tx");
+  ADD_CUSTOM_EVENT(events, tx_2);
+
+  sources.clear();
+  destinations.clear();
+
+  /* A transaction that contains a registration operation descriptor in its
+  attachement, but extra is empty, is valid, but doesn't register the asset. The
+  fact that the asset is not registered is checked in the assertions in the
+  callback с2. */
+
+  success = fill_tx_sources_and_destinations(events,
+                                             /* head = */ blk_2r,
+                                             /* from = */ alice,
+                                             /* to = */ alice,
+                                             /* amount = */ MK_TEST_COINS(2),
+                                             /* fee = */ TESTS_DEFAULT_FEE,
+                                             /* nmix = */ 0,
+                                             sources,
+                                             destinations);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to fill sources, destinations");
+
+  tx_version = get_tx_version(get_block_height(blk_2r),
+                              m_hardforks);
+
+  success = construct_tx(alice.get_keys(),
+                         sources,
+                         destinations,
+                         /* attachments = */ {m_ado_bye},
+                         tx_3,
+                         tx_version,
+                         0);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_3");
+
+  ADD_CUSTOM_EVENT(events, tx_3);
+  DO_CALLBACK(events, "c2");
+
+  sources.clear();
+  destinations.clear();
+
+  /* A transaction that contains a registration operation descriptor in its
+  attachement, but extra is empty, is valid, but doesn't register the asset. In
+  this case a different definition of the function construct_tx is used. */
+
+  success = fill_tx_sources_and_destinations(events,
+                                             /* head = */ blk_2r,
+                                             /* from = */ alice,
+                                             /* to = */ alice,
+                                             /* amount = */ MK_TEST_COINS(2),
+                                             /* fee = */ TESTS_DEFAULT_FEE,
+                                             /* nmix = */ 0,
+                                             sources,
+                                             destinations);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to fill sources, destinations");
+
+  tx_version = get_tx_version(get_block_height(blk_2r),
+                              m_hardforks);
+
+  success = construct_tx(alice.get_keys(),
+                         sources,
+                         destinations,
+                         empty_extra,
+                         /* attachments = */ {m_ado_bye},
+                         tx_4,
+                         tx_version,
+                         stub,
+                         0);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_4");
+
+  ADD_CUSTOM_EVENT(events, tx_4);
+  DO_CALLBACK(events, "c2");
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool asset_operation_and_hardfork_checks::c1(
+  currency::core& c,
+  size_t ev_index,
+  const std::vector<test_event_entry>& events)
+{
+  std::shared_ptr<tools::wallet2> wallet{
+    init_playtime_test_wallet_t<tools::wallet2>(events, c, ALICE_ACC_IDX)
+  };
+
+  wallet->refresh();
+
+  crypto::point_t asset_id_point{};
+  crypto::public_key asset_id_public_key{};
+  currency::get_or_calculate_asset_id(m_ado_hello,
+                                      &asset_id_point,
+                                      &asset_id_public_key);
+
+  CHECK_AND_ASSERT_MES(
+    check_balance_via_wallet(*wallet,
+                             /* name = */ "Alice",
+                             /* expected_total = */ 1'000'000'000'000'000'000,
+                             /* expected_mined = */ 0,
+                             /* expected_unlocked = */ 1'000'000'000'000'000'000,
+                             /* expected_awaiting_in = */ INVALID_BALANCE_VAL,
+                             /* expected_awaiting_out = */ INVALID_BALANCE_VAL,
+                             asset_id_public_key),
+    false,
+    "balance check failed");
+
+  return true;
+}
+
+bool asset_operation_and_hardfork_checks::c2(
+  currency::core& c,
+  size_t ev_index,
+  const std::vector<test_event_entry>& events)
+{
+  crypto::point_t asset_id_pt{};
+  crypto::public_key asset_id{};
+  currency::asset_descriptor_base stub{};
+
+  CHECK_AND_ASSERT_MES(
+    get_or_calculate_asset_id(m_ado_bye,
+                              &asset_id_pt,
+                              &asset_id),
+    false,
+    "fail to calculate asset id");
+
+  CHECK_AND_ASSERT_MES(
+    !c.get_blockchain_storage().get_asset_info(asset_id,
+                                               stub),
+    false,
+    "unregistered asset has info");
+
+  return true;
+}
