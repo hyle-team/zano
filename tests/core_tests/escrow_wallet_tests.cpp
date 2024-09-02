@@ -780,7 +780,7 @@ bool escrow_proposal_expiration::c1(currency::core& c, size_t ev_index, const st
   uint64_t alice_post_proposal_balance = alice_wlt->balance();
   uint64_t alice_post_proposal_balance_expected = alice_start_balance - TESTS_DEFAULT_FEE;
   CHECK_AND_ASSERT_MES(alice_post_proposal_balance == alice_post_proposal_balance_expected, false, "Incorrect alice_post_proposal_balance: " << print_money(alice_post_proposal_balance) << ", expected: " << print_money(alice_post_proposal_balance_expected));
-  std::deque<tools::transfer_details> transfers;
+  tools::transfer_container transfers;
   alice_wlt->get_transfers(transfers);
   CHECK_AND_ASSERT_MES(transfers.size() == 2 && (
       (transfers[0].is_spent() && (transfers[1].m_flags & (WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION))) ||
@@ -2283,7 +2283,7 @@ bool escrow_proposal_not_enough_money::c1(currency::core& c, size_t ev_index, co
 
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", MK_TEST_COINS(30), 0, MK_TEST_COINS(30), 0, 0), false, "");
 
-  std::deque<tools::transfer_details> transfers;
+  tools::transfer_container transfers;
   alice_wlt->get_transfers(transfers);
   CHECK_AND_ASSERT_MES(transfers.size() == 1, false, "Incorrect transfers size: " << transfers.size());
 

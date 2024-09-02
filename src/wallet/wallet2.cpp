@@ -802,7 +802,7 @@ namespace tools
             }
 
             ptc.employed_entries.receive.push_back(wallet_public::employed_tx_entry{ o , out.amount , out.asset_id });
-            uint64_t new_index = m_transfers.empty() ? 0 : (--m_transfers.end())->first;
+            uint64_t new_index = m_transfers.empty() ? 0 : (--m_transfers.end())->first+1;
             auto rsp = m_transfers.insert(std::make_pair(new_index, boost::value_initialized<transfer_details>()));
             transfer_details& td = rsp.first->second;
             td.m_ptx_wallet_info = pwallet_info;
@@ -2995,11 +2995,11 @@ namespace tools
 
     // rollback incoming transfers from detaching subchain
     {
-      auto it = std::find_if(m_transfers.begin(), m_transfers.end(), [&](const transfer_container::value_type& tr_e){return tr_e.second.m_ptx_wallet_info->m_block_height >= including_height; });
-      if (it != m_transfers.end())
+      auto it_start = std::find_if(m_transfers.begin(), m_transfers.end(), [&](const transfer_container::value_type& tr_e){return tr_e.second.m_ptx_wallet_info->m_block_height >= including_height; });
+      if (it_start != m_transfers.end())
       {
 
-        for (; it!= m_transfers.end(); it++)
+        for (auto it = it_start; it!= m_transfers.end(); it++)
         {
           uint64_t i = it->first;
           //check for htlc
@@ -3034,7 +3034,7 @@ namespace tools
           remove_transfer_from_amount_gindex_map(i);
           ++transfers_detached;
         }
-        m_transfers.erase(it, m_transfers.end());
+        m_transfers.erase(it_start, m_transfers.end());
       }
     }
 
@@ -4458,10 +4458,10 @@ namespace tools
     return m_transfer_history.size();
   }
   //----------------------------------------------------------------------------------------------------
-  //uint64_t wallet2::get_transfer_entries_count()
-  //{
-  //  return m_transfers.size();
-  //}
+  uint64_t wallet2::get_transfer_entries_count()
+  {
+    return m_transfers.size();
+  }
   //----------------------------------------------------------------------------------------------------
 
   template<typename callback_t, typename iterator_t>
