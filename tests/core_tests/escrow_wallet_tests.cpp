@@ -32,7 +32,7 @@ escrow_wallet_test::escrow_wallet_test()
 
 bool escrow_wallet_test::generate(std::vector<test_event_entry>& events) const
 {
-  epee::debug::get_set_enable_assert(true, true);
+  //epee::debug::get_set_enable_assert(true, true);
 
   currency::account_base genesis_acc;
   genesis_acc.generate();
@@ -47,7 +47,7 @@ bool escrow_wallet_test::generate(std::vector<test_event_entry>& events) const
 
   DO_CALLBACK(events, "c1");
 
-  epee::debug::get_set_enable_assert(true, false);
+  //epee::debug::get_set_enable_assert(true, false);
   return true;
 }
 
@@ -272,8 +272,8 @@ bool escrow_wallet_test::exec_test_with_cancel_release_type(currency::core& c, c
 
 bool escrow_wallet_test::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  epee::debug::get_set_enable_assert(true, true);
-  misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler([&](){epee::debug::get_set_enable_assert(true, false); });
+  //epee::debug::get_set_enable_assert(true, true);
+  //misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler([&](){epee::debug::get_set_enable_assert(true, false); });
 
   bool r = exec_test_with_cancel_release_type(c, events);
   if (!r)
@@ -287,7 +287,7 @@ bool escrow_wallet_test::c1(currency::core& c, size_t ev_index, const std::vecto
   if (!r)
     return false;
 
-  epee::debug::get_set_enable_assert(true, false);
+  //epee::debug::get_set_enable_assert(true, false);
   return r;
 }
 

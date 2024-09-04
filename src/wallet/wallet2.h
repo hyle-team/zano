@@ -151,8 +151,7 @@ namespace tools
     uint64_t m_last_pow_block_h = 0;
     std::list<std::pair<uint64_t, wallet_event_t>> m_rollback_events;
     std::list<std::pair<uint64_t, uint64_t> > m_last_zc_global_indexs; // <height, last_zc_global_indexs>, biggest height comes in front
-    
-    std::atomic<bool> m_concise_mode = false; //in this mode the wallet don't keep spent entries in m_transfers as well as m_recent_transfers longer then 100 entries
+   
 
     //variables that not being serialized
     std::atomic<uint64_t> m_last_bc_timestamp = 0;
@@ -253,7 +252,7 @@ namespace tools
       {
         return;
       }
-      a& m_concise_mode;
+      
     }
   };
   
@@ -754,6 +753,8 @@ namespace tools
     bool is_in_hardfork_zone(uint64_t hardfork_index) const;
     //performance inefficient call, suitable only for rare ocasions or super lazy developers
     bool proxy_to_daemon(const std::string& uri, const std::string& body, int& response_code, std::string& response_body);
+    void set_concise_mode(bool enabled) { m_concise_mode = enabled; }
+    void set_concise_mode_reorg_max_reorg_blocks(uint64_t max_blocks) { m_wallet_concise_mode_max_reorg_blocks = max_blocks; }
 
     construct_tx_param get_default_construct_tx_param();
 
@@ -788,7 +789,7 @@ private:
     bool on_idle();
     void unserialize_block_complete_entry(const currency::COMMAND_RPC_GET_BLOCKS_FAST::response& serialized,
       currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& unserialized);
-    void pull_blocks(size_t& blocks_added, std::atomic<bool>& stop);
+    void pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& full_reset_needed);
     bool prepare_free_transfers_cache(uint64_t fake_outputs_count);
     bool select_transfers(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t dust, std::vector<uint64_t>& selected_indicies);
     void add_transfers_to_transfers_cache(const std::vector<uint64_t>& indexs);
@@ -809,7 +810,7 @@ private:
     void add_to_last_zc_global_indexs(uint64_t h, uint64_t last_zc_output_index);
     uint64_t get_actual_zc_global_index();
     void handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop,
-      currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& blocks);
+      currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& blocks, bool& full_reset_needed);
     std::string get_alias_for_address(const std::string& addr);
     std::vector<std::string> get_aliases_for_address(const std::string& addr);
     bool is_connected_to_net();
@@ -972,8 +973,9 @@ private:
     std::string m_votes_config_path;
     tools::wallet_public::wallet_vote_config m_votes_config;
 
+    std::atomic<bool> m_concise_mode = true; //in this mode the wallet don't keep spent entries in m_transfers as well as m_recent_transfers longer then 100 entries
     uint64_t m_last_known_daemon_height = 0;
-    uint64_t m_wallet_concise_mode_max_reorg_blocks = WALLET_CONCISE_MODE_MAX_REORG_BLOCKS;
+    uint64_t m_wallet_concise_mode_max_reorg_blocks = 5;//WALLET_CONCISE_MODE_MAX_REORG_BLOCKS;
     
 
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions

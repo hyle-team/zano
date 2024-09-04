@@ -1977,7 +1977,7 @@ namespace tools
     return res.h;
   }
   //----------------------------------------------------------------------------------------------------
-  void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop)
+  void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& full_reset_needed)
   {
     blocks_added = 0;
     currency::COMMAND_RPC_GET_BLOCKS_DIRECT::request req = AUTO_VAL_INIT(req);
@@ -2028,12 +2028,16 @@ namespace tools
       "wrong daemon response: m_start_height=" + std::to_string(res.start_height) +
       " not less than local blockchain size=" + std::to_string(get_blockchain_current_size()));
 
-    handle_pulled_blocks(blocks_added, stop, res);
+    handle_pulled_blocks(blocks_added, stop, res, full_reset_needed);
+    if (full_reset_needed)
+    {
+      reset_all();
+    }
   }
 
   //----------------------------------------------------------------------------------------------------
   void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop,
-    currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& res)
+    currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& res, bool& wallet_reset_needed)
   {
     size_t current_index = res.start_height;
     m_last_known_daemon_height = res.current_height;
@@ -2116,6 +2120,11 @@ namespace tools
           }
           //TODO: take into account date of wallet creation
           //reorganize
+          if (m_concise_mode && m_chain.get_blockchain_current_size() - (last_matched_index+1) > m_wallet_concise_mode_max_reorg_blocks)
+          {
+            wallet_reset_needed = true;
+            return;
+          }
           detach_blockchain(last_matched_index + 1);
           process_new_blockchain_entry(bl, bl_entry, bl_id, height);
           ++blocks_added;
@@ -2853,6 +2862,7 @@ namespace tools
     blocks_fetched = 0;
     size_t added_blocks = 0;
     size_t try_count = 0;
+    size_t reset_count = 0;
     crypto::hash last_tx_hash_id = m_transfers.size() ? get_transaction_hash((--m_transfers.end())->second.m_ptx_wallet_info->m_tx) : null_hash;
     m_height_of_start_sync = get_blockchain_current_size();
     m_last_sync_percent = 0;
@@ -2860,7 +2870,20 @@ namespace tools
     {
       try
       {
-        pull_blocks(added_blocks, stop);
+        bool full_reset_needed = false;
+        pull_blocks(added_blocks, stop, full_reset_needed);
+        if (full_reset_needed)
+        {
+          if (reset_count > 1)
+          {
+            WLT_LOG_L0("Intenral error: reset_count infinit loop catch");
+            if (m_wcallback)
+              m_wcallback->on_message(tools::i_wallet2_callback::ms_red, "Internal error: reset_count infinite loop catch");
+            return;
+          }
+          reset_count++;
+          continue;
+        } 
         blocks_fetched += added_blocks;
         if (!added_blocks)
           break;
@@ -3802,10 +3825,10 @@ namespace tools
     }
 
     //delete from recent_history
-    if (m_transfer_history.size() > WALLET_CONCISE_MODE_MAX_HISTORY_SIZE)
-    {
-      m_transfer_history.erase(m_transfer_history.begin(), m_transfer_history.end() - WALLET_CONCISE_MODE_MAX_HISTORY_SIZE);
-    }
+    //if (m_transfer_history.size() > WALLET_CONCISE_MODE_MAX_HISTORY_SIZE)
+    //{
+    //  m_transfer_history.erase(m_transfer_history.begin(), m_transfer_history.end() - WALLET_CONCISE_MODE_MAX_HISTORY_SIZE);
+    //}
 
     return true;
   }
