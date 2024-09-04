@@ -1297,7 +1297,7 @@ int main(int argc, char* argv[])
 
 
     GENERATE_AND_PLAY_HF(attachment_isolation_test, "4-*");
-    
+    GENERATE_AND_PLAY_HF(alt_chain_and_block_tx_fee_median, "3-*");
 
     // GENERATE_AND_PLAY(gen_block_reward);
     // END OF TESTS  */
