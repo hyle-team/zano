@@ -1297,7 +1297,7 @@ int main(int argc, char* argv[])
 
 
     GENERATE_AND_PLAY_HF(attachment_isolation_test, "4-*");
-    
+    GENERATE_AND_PLAY_HF(asset_operation_and_hardfork_checks, "4-*");
 
     // GENERATE_AND_PLAY(gen_block_reward);
     // END OF TESTS  */
