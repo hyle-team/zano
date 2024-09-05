@@ -827,16 +827,25 @@ alt_chain_and_block_tx_fee_median::alt_chain_and_block_tx_fee_median()
 bool alt_chain_and_block_tx_fee_median::generate(
   std::vector<test_event_entry>& events) const
 {
-  /* Test idea: check chain switching rules. Rules before and after HF4 for PoW
-  blocks are different.
-   0      1            11     12
-  (0 ) - (1 ) - ... - (1r) - (2 )
-     |                   |    \
-     |                   |     [tx_0]
-     |                   |
-     \ - (1a)            \ - (2a)
-                              \
-                               [tx_1]
+  /* Test idea: check chain switching rules.
+  Rules before and after HF4 for PoW blocks are different. There're only PoW
+  blocks in the test situation. If the last blocks contain transactions (non
+  empty blocks), then the chain with the largest this_block_tx_fee_median on its
+  head becomes the main.
+   0            10     11           21     22
+  (0 ) - ... - (0r) - (1 ) - ... - (1r) - (2 )
+                  |   main            |    \
+                  |                   |     [tx_0]
+                  |                   |
+                  |                   |    main
+                  \ - (1a)            \ - (2a)
+                                           \
+                                            [tx_1]
+  Chain with head blk_1 versus chain with head blk_1a: chain with head blk_1
+  is the main, because blocks 1, 1a are empty.
+  Chain with head blk_2 versus chain with head blk_2a: chain with head blk_2a
+  is the main, because blocks 2, 2a aren't empty and the fee of tx_1 is larger
+  than the fee of tx_0.
   */
 
   bool success{};
