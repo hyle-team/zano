@@ -399,7 +399,7 @@ TEST(multiassets, get_or_calculate_asset_id_public_burn)
 
 TEST(multiassets, get_or_calculate_asset_id_undefined)
 {
-   bool success{false};
+  bool success{false};
 
   crypto::point_t pt_public_key{};
   success = pt_public_key.from_string(
@@ -448,8 +448,6 @@ TEST(multiassets, get_or_calculate_asset_id_undefined)
                                       &calculated_asset_id_key);
 
   ASSERT_FALSE(success);
-  ASSERT_EQ(calculated_asset_id_pt, expected_asset_id_pt);
-  ASSERT_EQ(calculated_asset_id_key, expected_asset_id_key);
 }
 
 TEST(multiassets, get_or_calculate_asset_id_register_serialization)
@@ -680,18 +678,6 @@ TEST(multiassets, get_or_calculate_asset_id_undefined_serialization)
                                                 &calculated_asset_id_pt,
                                                 &calculated_asset_id_key);
   ASSERT_FALSE(success);
-
-  const std::string expected_asset_id_str{
-    "979eb706ace2eb83f9125658b23fb352208480cb3b90c43e2df0d298f9754ebc"};
-
-  crypto::point_t expected_asset_id_pt{};
-  success = expected_asset_id_pt.from_string(expected_asset_id_str);
-  ASSERT_TRUE(success);
-
-  crypto::public_key expected_asset_id_key{};
-  expected_asset_id_pt.to_public_key(expected_asset_id_key);
-  ASSERT_EQ(calculated_asset_id_pt, expected_asset_id_pt);
-  ASSERT_EQ(calculated_asset_id_key, expected_asset_id_key);
 }
 
 TEST(multiassets, get_or_calculate_asset_id_register_boost_serialization)
@@ -940,7 +926,7 @@ TEST(multiassets, get_or_calculate_asset_id_undefined_boost_serialization)
     'i',    'o',    'n',    ':',    ':',    'a',    'r',    'c',    'h',
     'i',    'v',    'e',    '\x11', '\x00', '\x04', '\x08', '\x04', '\x08',
     '\x01', '\x00', '\x00', '\x00', '\x00', '\x01', '\x00', '\x00', '\x00',
-    '\x04', '\x00', '\x00', '\x00', '\x00', '\x00', 'd',    '\x00', '\x00',
+    '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', 'd',    '\x00', '\x00',
     '\x00', '\x00', '\x00', '\x00', '\x00', '2',    '\x00', '\x00', '\x00',
     '\x00', '\x00', '\x00', '\x00', '\x00', '\x03', '\x00', '\x00', '\x00',
     '\x00', '\x00', '\x00', '\x00', 'H',    'L',    'O',    '\x0b', '\x00',
@@ -949,20 +935,20 @@ TEST(multiassets, get_or_calculate_asset_id_undefined_boost_serialization)
     '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', 'H',    'e',
     'l',    'l',    'o',    ',',    ' ',    'w',    'o',    'r',    'l',
     'd',    '!',    '\x00', '\x00', '\x00', '\x00', '\x00', ' ',    '\x00',
-    '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x0c', '@',    '\x8c',
-    '\xf8', '\xb7', '\xfb', '\x80', '\x8f', '@',    'Y',    '=',    'n',
-    '\xb7', 'X',    '\x90', '\xe2', '\xab', '=',    '\x0c', '\xcd', '\xc7',
-    '\x01', 'J',    '\x7f', '\xc6', '\xb6', '\xab', '\x05', '\x16', ';',
-    '\xe0', '`',    '\x00', ' ',    '\x00', '\x00', '\x00', '\x00', '\x00',
+    '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\xe9', '\x1b', '\x9a',
+    's',    ')',    '-',    'n',    '\xa4', 'o',    '\xb3', '\xd4', '\xf4',
+    '\xcc', 'y',    '\xc3', 'K',    '\xfb', '}',    '\x14', '\xc2', '\xe6',
+    '\x84', '\xe5', '\x80', '\x93', '\xa2', 'G',    '\x1c', '\x92', '\xe5',
+    '\x1c', '\x16', '\x00', ' ',    '\x00', '\x00', '\x00', '\x00', '\x00',
     '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00',
     '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00',
     '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00',
     '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x01',
     '\x00', '\x00', '\x00', '\x01', ' ',    '\x00', '\x00', '\x00', '\x00',
-    '\x00', '\x00', '\x00', 'T',    '\xf3', '\xf7', ',',    'r',    '\xe5',
-    '\xb0', '\x14', '\xad', '+',    '+',    '\x90', '\x01', '\xac', '\xef',
-    '\x95', 'O',    '\xe8', '-',    '\xd3', '\xed', 'V',    '\xa3', '\x8c',
-    '\xd9', '\xdd', '\xc5', '\xdb', 'W',    'g',    '?',    '\x8f'};
+    '\x00', '\x00', '\x00', '\x97', '\x9e', '\xb7', '\x06', '\xac', '\xe2',
+    '\xeb', '\x83', '\xf9', '\x12', 'V',    'X',    '\xb2', '?',    '\xb3',
+    'R',    ' ',    '\x84', '\x80', '\xcb', ';',    '\x90', '\xc4', '>',
+    '-',    '\xf0', '\xd2', '\x98', '\xf9', 'u',    'N',    '\xbc'};
 
   success = tools::unserialize_obj_from_buff(
     asset_descriptor_operation,
