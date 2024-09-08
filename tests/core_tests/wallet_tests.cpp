@@ -1490,6 +1490,9 @@ bool gen_wallet_decrypted_attachments::generate(std::vector<test_event_entry>& e
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   CREATE_TEST_WALLET(alice_wlt, alice_acc, blk_0);
+  //disable concise because this test count on on_transfer callbacks and resync cause firing on_transfer() for previous transactions
+  alice_wlt->set_concise_mode(false);
+
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, alice_wlt, blk_0r, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   // these attachments will be used across all the transactions in this test

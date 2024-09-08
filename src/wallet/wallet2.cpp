@@ -842,7 +842,7 @@ namespace tools
             {
               const currency::txout_htlc& hltc = out_get_htlc(out_v);
               //mark this as spent
-              td.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_SPENT;
+              td.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_SPENT|WALLET_TRANSFER_DETAIL_CONCISE_MODE_PRESERVE;
               //create entry for htlc input
               htlc_expiration_trigger het = AUTO_VAL_INIT(het);
               het.is_wallet_owns_redeem = (out_key == hltc.pkey_redeem) ? true : false;
@@ -2028,10 +2028,27 @@ namespace tools
       "wrong daemon response: m_start_height=" + std::to_string(res.start_height) +
       " not less than local blockchain size=" + std::to_string(get_blockchain_current_size()));
 
-    handle_pulled_blocks(blocks_added, stop, res, full_reset_needed);
+    try
+    {
+      handle_pulled_blocks(blocks_added, stop, res, full_reset_needed);
+    }
+    catch (const tools::error::wallet_error_resync_needed& /*v*/)
+    {
+      full_reset_needed = true;
+      m_full_resync_requested_at_h = get_blockchain_current_size() - blocks_added;
+    }
+    
     if (full_reset_needed)
     {
+      //back up m_unconfirmed_txs
+      //back up std::unordered_map<crypto::hash, crypto::secret_key> m_tx_keys;
+      unconfirmed_txs_container tmp_unconfirmed = m_unconfirmed_txs;
+      tx_secrete_keys_container tmp_secrete_keys = m_tx_keys;
+      crypto::hash genesis = m_chain.get_genesis();
       reset_all();
+      m_chain.set_genesis(genesis);
+      m_unconfirmed_txs = tmp_unconfirmed;
+      m_tx_keys = tmp_secrete_keys;
     }
   }
 
@@ -2120,8 +2137,9 @@ namespace tools
           }
           //TODO: take into account date of wallet creation
           //reorganize
-          if (m_concise_mode && m_chain.get_blockchain_current_size() - (last_matched_index+1) > m_wallet_concise_mode_max_reorg_blocks)
+          if (m_concise_mode && m_chain.get_blockchain_current_size() - (last_matched_index) > m_wallet_concise_mode_max_reorg_blocks)
           {
+            m_full_resync_requested_at_h = m_chain.get_blockchain_current_size() - (last_matched_index + 1);
             wallet_reset_needed = true;
             return;
           }
@@ -2858,6 +2876,7 @@ namespace tools
   {
     load_whitelisted_tokens_if_not_loaded();
 
+    bool had_full_reset = false;
     received_money = false;
     blocks_fetched = 0;
     size_t added_blocks = 0;
@@ -2882,6 +2901,8 @@ namespace tools
             return;
           }
           reset_count++;
+          m_height_of_start_sync = 0;
+          had_full_reset = true;
           continue;
         } 
         blocks_fetched += added_blocks;
@@ -2919,7 +2940,12 @@ namespace tools
       handle_expiration_list(tx_expiration_ts_median);
       handle_contract_expirations(tx_expiration_ts_median);
       m_found_free_amounts.clear();
-      trim_wallet();
+      truncate_wallet();
+    }
+    if (had_full_reset)
+    {
+      blocks_fetched = get_blockchain_current_size() - m_full_resync_requested_at_h;
+      m_full_resync_requested_at_h = 0;
     }
 
 
@@ -3792,28 +3818,28 @@ namespace tools
     return true;
   }
   //----------------------------------------------------------------------------------------------------
-  bool wallet2::trim_wallet()
+  bool wallet2::truncate_wallet()
   {
     if (m_concise_mode)
     {
       std::list<size_t> items_to_remove;
       for (auto& tr : m_transfers)
       {
-        if (tr.second.is_spent())
+        if (tr.second.is_spent() && tr.second.m_spent_height != 0 &&  !(tr.second.m_flags & WALLET_TRANSFER_DETAIL_CONCISE_MODE_PRESERVE) )
         {
-          if (m_concise_mode && tr.second.m_spent_height + m_wallet_concise_mode_max_reorg_blocks < m_chain.get_top_block_height())
+          if (tr.second.m_spent_height + m_wallet_concise_mode_max_reorg_blocks < m_chain.get_top_block_height())
           {
             items_to_remove.push_back(tr.first);
           }
         }
       }
 
-      return trim_transfers_and_history(items_to_remove);
+      return truncate_transfers_and_history(items_to_remove);
     }
     return true;
   }
   //----------------------------------------------------------------------------------------------------
-  bool wallet2::trim_transfers_and_history(const std::list<size_t>& items_to_remove)
+  bool wallet2::truncate_transfers_and_history(const std::list<size_t>& items_to_remove)
   {
     //delete from m_transfers
     for (auto item : items_to_remove)
@@ -6070,6 +6096,10 @@ namespace tools
   {
     for (auto htlc_entry : m_active_htlcs_txid)
     {
+      //auto it = m_transfers.find(htlc_entry.second);
+      //if (it == m_transfers.end())
+      //  continue;
+      //const transfer_details& td = it->second;
       const transfer_details& td = m_transfers.at(htlc_entry.second);
       if (only_redeem_txs && !(td.m_flags & WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM))
       {

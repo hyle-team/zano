@@ -136,9 +136,9 @@ namespace tools
     std::unordered_map<crypto::key_image, size_t> m_key_images;
     std::vector<wallet_public::wallet_transfer_info> m_transfer_history;
     std::unordered_map<crypto::hash, currency::transaction> m_unconfirmed_in_transfers;
-    std::unordered_map<crypto::hash, tools::wallet_public::wallet_transfer_info> m_unconfirmed_txs;
+    unconfirmed_txs_container m_unconfirmed_txs;
     std::unordered_set<crypto::hash> m_unconfirmed_multisig_transfers;
-    std::unordered_map<crypto::hash, crypto::secret_key> m_tx_keys;
+    tx_secrete_keys_container m_tx_keys;
     std::unordered_map<crypto::public_key, wallet_own_asset_context> m_own_asset_descriptors;
     std::unordered_map<crypto::public_key, currency::asset_descriptor_base> m_custom_assets; //assets that manually added by user
     mutable std::unordered_map<crypto::public_key, currency::asset_descriptor_base> m_whitelisted_assets; //assets that whitelisted
@@ -577,8 +577,8 @@ namespace tools
       currency::transaction &escrow_template_tx);
 
     bool check_connection();
-    bool trim_transfers_and_history(const std::list<size_t>& items_to_remove);
-    bool trim_wallet();
+    bool truncate_transfers_and_history(const std::list<size_t>& items_to_remove);
+    bool truncate_wallet();
 
     // PoS mining
     void do_pos_mining_prepare_entry(mining_context& cxt, const transfer_details& td);
@@ -976,7 +976,7 @@ private:
     std::atomic<bool> m_concise_mode = true; //in this mode the wallet don't keep spent entries in m_transfers as well as m_recent_transfers longer then 100 entries
     uint64_t m_last_known_daemon_height = 0;
     uint64_t m_wallet_concise_mode_max_reorg_blocks = 5;//WALLET_CONCISE_MODE_MAX_REORG_BLOCKS;
-    
+    uint64_t m_full_resync_requested_at_h = 0;
 
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;
@@ -1089,7 +1089,13 @@ namespace tools
 
     if (tr_index != UINT64_MAX)
     {
-      transfer_details& td = m_transfers.at(tr_index);
+      auto it_tr = m_transfers.find(tr_index);
+      if (it_tr == m_transfers.end())
+      {
+        throw tools::error::wallet_error_resync_needed();
+      }
+      transfer_details& td = it_tr->second;
+            
       ptc.total_balance_change[td.get_asset_id()] -= td.amount();
       if (td.is_native_coin())
       {
