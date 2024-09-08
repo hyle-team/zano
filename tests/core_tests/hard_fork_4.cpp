@@ -9,20 +9,21 @@ using namespace currency;
 
 namespace currency
 {
-  bool construct_tx(const account_keys& sender_account_keys, const std::vector<tx_source_entry>& sources,
-    const std::vector<tx_destination_entry>& destinations,
-    const std::vector<extra_v>& extra,
-    const std::vector<attachment_v>& attachments,
-    transaction& tx,
-    uint64_t tx_version,
-    crypto::secret_key& one_time_secret_key,
-    uint64_t unlock_time,
-    uint64_t expiration_time,
-    uint8_t tx_outs_attr,
-    bool shuffle,
-    uint64_t flags,
-    uint64_t explicit_consolidated_tx_fee,
-    tx_generation_context& gen_context)
+  static bool construct_tx(const account_keys& sender_account_keys,
+                           const std::vector<tx_source_entry>& sources,
+                           const std::vector<tx_destination_entry>& destinations,
+                           const std::vector<extra_v>& extra,
+                           const std::vector<attachment_v>& attachments,
+                           transaction& tx,
+                           uint64_t tx_version,
+                           crypto::secret_key& one_time_secret_key,
+                           uint64_t unlock_time,
+                           uint64_t expiration_time,
+                           uint8_t tx_outs_attr,
+                           bool shuffle,
+                           uint64_t flags,
+                           uint64_t explicit_consolidated_tx_fee,
+                           tx_generation_context& gen_context)
   {
     //extra copy operation, but creating transaction is not sensitive to this
     finalize_tx_param ftp{};
@@ -51,7 +52,7 @@ namespace currency
   }
 } // namespace currency
 
-void add_flags_to_all_destination_entries(const uint64_t flags, std::vector<currency::tx_destination_entry>& destinations)
+static void add_flags_to_all_destination_entries(const uint64_t flags, std::vector<currency::tx_destination_entry>& destinations)
 {
   for(auto& de : destinations)
     de.flags |= flags;
