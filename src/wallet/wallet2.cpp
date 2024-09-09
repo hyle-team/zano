@@ -3851,10 +3851,10 @@ namespace tools
     }
 
     //delete from recent_history
-    //if (m_transfer_history.size() > WALLET_CONCISE_MODE_MAX_HISTORY_SIZE)
-    //{
-    //  m_transfer_history.erase(m_transfer_history.begin(), m_transfer_history.end() - WALLET_CONCISE_MODE_MAX_HISTORY_SIZE);
-    //}
+    if (m_truncate_history_max_entries != 0 && m_transfer_history.size() > m_truncate_history_max_entries)
+    {
+      m_transfer_history.erase(m_transfer_history.begin(), m_transfer_history.end() - m_truncate_history_max_entries);
+    }
 
     return true;
   }

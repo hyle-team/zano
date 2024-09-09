@@ -51,7 +51,7 @@
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               CURRENCY_HF4_MANDATORY_MIN_COINAGE
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
 #define WALLET_CONCISE_MODE_MAX_REORG_BLOCKS                          CURRENCY_BLOCKS_PER_DAY * 7 //week
-#define WALLET_CONCISE_MODE_MAX_HISTORY_SIZE                          500                         
+#define WALLET_CONCISE_MODE_MOBILE_MAX_HISTORY_SIZE                   500                         
 
 
 const uint64_t WALLET_MINIMUM_HEIGHT_UNSET_CONST = std::numeric_limits<uint64_t>::max();
@@ -755,6 +755,7 @@ namespace tools
     bool proxy_to_daemon(const std::string& uri, const std::string& body, int& response_code, std::string& response_body);
     void set_concise_mode(bool enabled) { m_concise_mode = enabled; }
     void set_concise_mode_reorg_max_reorg_blocks(uint64_t max_blocks) { m_wallet_concise_mode_max_reorg_blocks = max_blocks; }
+    void set_concise_mode_truncate_history(uint64_t max_entries) { m_truncate_history_max_entries = max_entries; }
 
     construct_tx_param get_default_construct_tx_param();
 
@@ -975,9 +976,14 @@ private:
 
     std::atomic<bool> m_concise_mode = true; //in this mode the wallet don't keep spent entries in m_transfers as well as m_recent_transfers longer then 100 entries
     uint64_t m_last_known_daemon_height = 0;
-    uint64_t m_wallet_concise_mode_max_reorg_blocks = 5;//WALLET_CONCISE_MODE_MAX_REORG_BLOCKS;
+    uint64_t m_wallet_concise_mode_max_reorg_blocks = WALLET_CONCISE_MODE_MAX_REORG_BLOCKS;
     uint64_t m_full_resync_requested_at_h = 0;
-
+    uint64_t m_truncate_history_max_entries 
+#ifdef MOBILE_WALLET_BUILD
+      = WALLET_CONCISE_MODE_MOBILE_MAX_HISTORY_SIZE;
+#else 
+      = 0;
+#endif
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;
   }; // class wallet2
