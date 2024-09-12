@@ -1291,13 +1291,14 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(asset_depoyment_and_few_zc_utxos);
     GENERATE_AND_PLAY_HF(assets_and_pos_mining, "4-*");
     GENERATE_AND_PLAY_HF(asset_emission_and_unconfirmed_balance, "4-*");
+    GENERATE_AND_PLAY_HF(asset_operation_in_consolidated_tx, "4-*");
+    GENERATE_AND_PLAY_HF(asset_operation_and_hardfork_checks, "4-*");
     
     GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
     
 
 
     GENERATE_AND_PLAY_HF(attachment_isolation_test, "4-*");
-    GENERATE_AND_PLAY_HF(asset_operation_and_hardfork_checks, "4-*");
 
     // GENERATE_AND_PLAY(gen_block_reward);
     // END OF TESTS  */

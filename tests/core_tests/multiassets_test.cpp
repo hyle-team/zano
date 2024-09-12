@@ -1207,3 +1207,122 @@ bool asset_operation_and_hardfork_checks::c2(
 
   return true;
 }
+
+asset_operation_in_consolidated_tx::asset_operation_in_consolidated_tx()
+{
+  m_adb_alice_currency.total_max_supply = 1'000'000'000'000'000'000;
+  m_adb_alice_currency.current_supply = 1'000'000'000'000'000'000;
+  m_adb_alice_currency.ticker = "ALC";
+  m_adb_alice_currency.full_name = "ALICE";
+  m_adb_alice_currency.meta_info = "Currency created by Alice";
+  m_adb_alice_currency.hidden_supply = false;
+
+  m_ado_alice_currency.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+  m_ado_alice_currency.opt_asset_id = currency::null_pkey;
+
+  REGISTER_CALLBACK_METHOD(asset_operation_in_consolidated_tx, assert_balances);
+  REGISTER_CALLBACK_METHOD(asset_operation_in_consolidated_tx, assert_alice_currency_not_registered);
+}
+
+bool asset_operation_in_consolidated_tx::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure that the core rule prohibiting operations with assets in TX_FLAG_SIGNATURE_MODE_SEPARATE transactions works.
+  bool success {};
+  transaction tx_2 {};
+  uint64_t tx_version {};
+  crypto::secret_key one_time {};
+  tx_generation_context context_tx_2 {};
+  GENERATE_ACCOUNT(miner);
+  GENERATE_ACCOUNT(alice);
+  GENERATE_ACCOUNT(bob);
+
+  m_accounts.push_back(miner);
+  m_accounts.push_back(alice);
+  m_accounts.push_back(bob);
+  m_adb_alice_currency.owner      = m_accounts.at(ALICE_ACC_IDX).get_public_address().spend_public_key;
+  m_ado_alice_currency.descriptor = m_adb_alice_currency;
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  MAKE_TX(events, tx_0, miner, bob, MK_TEST_COINS(10), blk_0r);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner, tx_0);
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  MAKE_TX(events, tx_1, miner, alice, MK_TEST_COINS(10), blk_1r);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner, tx_1);
+  REWIND_BLOCKS_N(events, blk_2r, blk_2, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  // Miner sent 10 coins to Alice, 10 coins to Bob.
+  DO_CALLBACK(events, "assert_balances");
+
+  {
+    std::vector<tx_source_entry> sources {};
+    std::vector<tx_destination_entry> destinations {};
+
+    success = fill_tx_sources(sources, events, blk_2r, alice.get_keys(), MK_TEST_COINS(5), 1);
+    CHECK_AND_ASSERT_MES(success, false, "failed to fill transaction sources on step 1");
+    destinations.emplace_back(MK_TEST_COINS(5), bob.get_public_address());
+    destinations.emplace_back(MK_TEST_COINS(/* 10 - 5 - 1 = */ 4), alice.get_public_address());
+    tx_version = get_tx_version(get_block_height(blk_2r), m_hardforks);
+    success    = construct_tx(alice.get_keys(), sources, destinations, empty_extra, empty_attachment, tx_2, tx_version, one_time, 0, 0, 0, true, TX_FLAG_SIGNATURE_MODE_SEPARATE, TESTS_DEFAULT_FEE,
+                              context_tx_2);
+    CHECK_AND_ASSERT_MES(success, false, "failed to construct transaction tx_2 on step 1");
+  }
+
+  // Transaction tx_2 hasn't been constructed completely yet. Core rejects tx_2.
+  DO_CALLBACK(events, "mark_invalid_tx");
+  ADD_CUSTOM_EVENT(events, tx_2);
+
+  {
+    std::vector<tx_source_entry> sources {};
+    std::vector<tx_destination_entry> destinations {};
+
+    success = fill_tx_sources(sources, events, blk_2r, bob.get_keys(), MK_TEST_COINS(5), 0);
+    CHECK_AND_ASSERT_MES(success, false, "failed to fill transaction sources on step 2");
+    for(tx_source_entry& source : sources)
+    {
+      source.separately_signed_tx_complete = true;
+    }
+    destinations.emplace_back(MK_TEST_COINS(5), alice.get_public_address());
+    destinations.emplace_back(MK_TEST_COINS(/* 10 - 5 - 0 = */ 5), bob.get_public_address());
+    destinations.emplace_back(m_adb_alice_currency.current_supply, alice.get_public_address(), null_pkey);
+    tx_version = get_tx_version(get_block_height(blk_2r), m_hardforks);
+    success    = construct_tx(bob.get_keys(), sources, destinations, { m_ado_alice_currency }, empty_attachment, tx_2, tx_version, one_time, 0, 0, 0, true, TX_FLAG_SIGNATURE_MODE_SEPARATE,
+                              /* fee = */ 0, context_tx_2);
+    CHECK_AND_ASSERT_MES(success, false, "failed to construct transaction tx_2 on step 2");
+  }
+
+  DO_CALLBACK(events, "mark_invalid_tx");
+  ADD_CUSTOM_EVENT(events, tx_2);
+  // Core rejects transaction tx_2. The balances of Alice, Bob haven't changed: Alice has 10 coins, Bob has 10 coins.
+  DO_CALLBACK(events, "assert_balances");
+  // Alice's asset hasn't registered, because transaction tx_2 was rejected.
+  DO_CALLBACK(events, "assert_alice_currency_not_registered");
+
+  return true;
+}
+
+bool asset_operation_in_consolidated_tx::assert_balances(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  std::shared_ptr<tools::wallet2> alice_wallet{init_playtime_test_wallet(events, c, ALICE_ACC_IDX)};
+  std::shared_ptr<tools::wallet2> bob_wallet{init_playtime_test_wallet(events, c, BOB_ACC_IDX)};
+
+  alice_wallet->refresh();
+  bob_wallet->refresh();
+
+  CHECK_AND_ASSERT_EQ(alice_wallet->balance(currency::native_coin_asset_id), MK_TEST_COINS(10));
+  CHECK_AND_ASSERT_EQ(bob_wallet->balance(currency::native_coin_asset_id), MK_TEST_COINS(10));
+
+  return true;
+}
+
+bool asset_operation_in_consolidated_tx::assert_alice_currency_not_registered(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  crypto::point_t asset_id_point{};
+  crypto::public_key asset_id{};
+  currency::asset_descriptor_base stub{};
+
+  CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(m_ado_alice_currency, &asset_id_point, &asset_id), false, "fail to calculate asset id");
+  CHECK_AND_ASSERT_MES(!c.get_blockchain_storage().get_asset_info(asset_id, stub), false, "unregistered asset has info");
+
+  return true;
+}

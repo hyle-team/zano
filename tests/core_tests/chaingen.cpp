@@ -1814,6 +1814,48 @@ bool construct_tx_with_many_outputs(const currency::hard_forks_descriptor& hf, s
   return construct_tx(keys_from, sources, destinations, empty_attachment, tx, tx_version, 0);
 }
 
+bool construct_tx(const account_keys& sender_account_keys,
+                  const std::vector<tx_source_entry>& sources,
+                  const std::vector<tx_destination_entry>& destinations,
+                  const std::vector<extra_v>& extra,
+                  const std::vector<attachment_v>& attachments,
+                  transaction& tx,
+                  uint64_t tx_version,
+                  crypto::secret_key& one_time_secret_key,
+                  uint64_t unlock_time,
+                  uint64_t expiration_time,
+                  uint8_t tx_outs_attr,
+                  bool shuffle,
+                  uint64_t flags,
+                  uint64_t explicit_consolidated_tx_fee,
+                  tx_generation_context& gen_context)
+{
+  // extra copy operation, but creating transaction is not sensitive to this
+  finalize_tx_param ftp {};
+  ftp.tx_version            = tx_version;
+  ftp.sources               = sources;
+  ftp.prepared_destinations = destinations;
+  ftp.extra                 = extra;
+  ftp.attachments           = attachments;
+  ftp.unlock_time           = unlock_time;
+  // ftp.crypt_address = crypt_destination_addr;
+  ftp.expiration_time   = expiration_time;
+  ftp.tx_outs_attr      = tx_outs_attr;
+  ftp.shuffle           = shuffle;
+  ftp.flags             = flags;
+  ftp.mode_separate_fee = explicit_consolidated_tx_fee;
+
+  finalized_tx ft     = AUTO_VAL_INIT(ft);
+  ft.tx               = tx;
+  ft.one_time_key     = one_time_secret_key;
+  ftp.gen_context     = gen_context;  // ftp, not ft here, this is UGLY -- sowle
+  bool r              = construct_tx(sender_account_keys, ftp, ft);
+  tx                  = ft.tx;
+  one_time_secret_key = ft.one_time_key;
+  gen_context         = ft.ftp.gen_context;
+  return r;
+}
+
 uint64_t get_balance(const currency::account_keys& addr, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, bool dbg_log)
 {
   uint64_t res = 0;
