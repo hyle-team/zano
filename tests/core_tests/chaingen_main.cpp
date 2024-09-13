@@ -1293,6 +1293,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(asset_emission_and_unconfirmed_balance, "4-*");
     GENERATE_AND_PLAY_HF(asset_operation_in_consolidated_tx, "4-*");
     GENERATE_AND_PLAY_HF(asset_operation_and_hardfork_checks, "4-*");
+    GENERATE_AND_PLAY_HF(current_supply_greater_than_total_supply, "4-*");
     
     GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
     

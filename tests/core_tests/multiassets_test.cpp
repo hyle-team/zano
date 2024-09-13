@@ -1326,3 +1326,248 @@ bool asset_operation_in_consolidated_tx::assert_alice_currency_not_registered(cu
 
   return true;
 }
+
+asset_current_supply_greater_than_total_supply::asset_current_supply_greater_than_total_supply()
+{
+  m_adbs.at(asset_position::alpha).full_name = "Alpha";
+  m_adbs.at(asset_position::alpha).ticker = "ALPH";
+  m_adbs.at(asset_position::alpha).current_supply = 1;
+  m_adbs.at(asset_position::alpha).total_max_supply = 0;
+  m_ados_register.at(asset_position::alpha).operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+  m_adbs.at(asset_position::beta).full_name = "Beta";
+  m_adbs.at(asset_position::beta).ticker = "BETA";
+  m_adbs.at(asset_position::beta).current_supply = m_adbs.at(asset_position::beta).total_max_supply = 1;
+  m_ados_register.at(asset_position::beta).operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+  m_ado_emit.operation_type = ASSET_DESCRIPTOR_OPERATION_EMIT;
+  m_ado_public_burn.operation_type = ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN;
+
+  REGISTER_CALLBACK_METHOD(asset_current_supply_greater_than_total_supply, assert_asset_alpha_not_registered);
+  REGISTER_CALLBACK_METHOD(asset_current_supply_greater_than_total_supply, assert_asset_beta_registered);
+  REGISTER_CALLBACK_METHOD(asset_current_supply_greater_than_total_supply, emit_asset_beta_with_incorrect_supply);
+  REGISTER_CALLBACK_METHOD(asset_current_supply_greater_than_total_supply, assert_asset_beta_not_emitted);
+  REGISTER_CALLBACK_METHOD(asset_current_supply_greater_than_total_supply, public_burn_asset_beta_with_incorrect_supply);
+}
+
+bool asset_current_supply_greater_than_total_supply::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: ensure that operations in which .current_supply is greater than .total_max_supply are not performed.
+
+  bool success{};
+  GENERATE_ACCOUNT(miner);
+  GENERATE_ACCOUNT(alice);
+  transaction tx_0{}, tx_1{}, tx_2{}, tx_3{};
+  crypto::public_key key_asset_beta_id{};
+  crypto::point_t point_asset_beta_id{};
+
+  m_accounts.push_back(miner);
+  m_accounts.push_back(alice);
+  m_adbs.at(asset_position::alpha).owner = m_adbs.at(asset_position::beta).owner = alice.get_public_address().spend_public_key;
+  m_ados_register.at(asset_position::alpha).descriptor = m_adbs.at(asset_position::alpha);
+  m_ados_register.at(asset_position::beta).descriptor = m_adbs.at(asset_position::beta);
+  m_ado_emit.descriptor = m_ado_public_burn.descriptor = m_adbs.at(asset_position::beta);
+  CHECK_AND_ASSERT(m_ado_emit.descriptor.current_supply <= m_ado_emit.descriptor.total_max_supply, false);
+  CHECK_AND_ASSERT(m_ado_public_burn.descriptor.current_supply <= m_ado_public_burn.descriptor.total_max_supply, false);
+  m_ado_public_burn.descriptor.current_supply = ++m_ado_emit.descriptor.current_supply;
+  CHECK_AND_ASSERT(m_ado_emit.descriptor.current_supply > m_ado_emit.descriptor.total_max_supply, false);
+  CHECK_AND_ASSERT(m_ado_public_burn.descriptor.current_supply > m_ado_public_burn.descriptor.total_max_supply, false);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  {
+    std::vector<tx_source_entry> sources{};
+    std::vector<tx_destination_entry> destinations{};
+    crypto::secret_key one_time{};
+
+    success = fill_tx_sources_and_destinations(events, blk_0r, miner.get_keys(), alice.get_public_address(), MK_TEST_COINS(5), TESTS_DEFAULT_FEE, 0, sources, destinations);
+    CHECK_AND_ASSERT_EQ(success, true);
+    success = construct_tx(miner.get_keys(), sources, destinations, empty_extra, empty_attachment, tx_0, get_tx_version(get_block_height(blk_0r), m_hardforks), one_time, 0);
+    CHECK_AND_ASSERT_EQ(success, true);
+  }
+
+  ADD_CUSTOM_EVENT(events, tx_0);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner, tx_0);
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  {
+    std::vector<tx_source_entry> sources{};
+    std::vector<tx_destination_entry> destinations{};
+    crypto::secret_key one_time{};
+    const auto& ado{m_ados_register.at(asset_position::alpha)};
+    const auto& top{blk_1r};
+
+    success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
+    CHECK_AND_ASSERT_EQ(success, true);
+    destinations.emplace_back(ado.descriptor.current_supply, alice.get_public_address(), null_pkey);
+    CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > ado.descriptor.total_max_supply, false, "current_supply <= total_max_supply");
+    success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_1, get_tx_version(get_block_height(top), m_hardforks), one_time, 0);
+    CHECK_AND_ASSERT_EQ(success, true);
+  }
+
+  DO_CALLBACK(events, "mark_invalid_tx");
+  ADD_CUSTOM_EVENT(events, tx_1);
+  DO_CALLBACK(events, "assert_asset_alpha_not_registered");
+
+  {
+    std::vector<tx_source_entry> sources{};
+    std::vector<tx_destination_entry> destinations{};
+    crypto::secret_key one_time{};
+    const auto& ado{m_ados_register.at(asset_position::beta)};
+    const auto& top{blk_1r};
+
+    success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
+    CHECK_AND_ASSERT_EQ(success, true);
+    destinations.emplace_back(ado.descriptor.current_supply, alice.get_public_address(), null_pkey);
+    CHECK_AND_ASSERT(ado.descriptor.current_supply <= ado.descriptor.total_max_supply, false);
+    success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_2, get_tx_version(get_block_height(top), m_hardforks), one_time, 0);
+    CHECK_AND_ASSERT_EQ(success, true);
+  }
+
+  ADD_CUSTOM_EVENT(events, tx_2);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, alice, tx_2);
+  REWIND_BLOCKS_N(events, blk_2r, blk_2, alice, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  DO_CALLBACK(events, "assert_asset_beta_registered");
+
+  CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(m_ados_register.at(asset_position::beta), &point_asset_beta_id, &key_asset_beta_id), false, "failed to calculate asset id");
+  m_ado_public_burn.opt_asset_id = m_ado_emit.opt_asset_id = key_asset_beta_id;
+
+  CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, m_ado_emit.descriptor.total_max_supply);
+  DO_CALLBACK(events, "emit_asset_beta_with_incorrect_supply");
+
+  {
+    std::vector<tx_source_entry> sources{};
+    std::vector<tx_destination_entry> destinations{};
+    crypto::secret_key one_time{};
+    tx_source_entry source{};
+    finalize_tx_param ftp{};
+    finalized_tx ftx{};
+    const auto& top{blk_2r};
+
+    success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
+    CHECK_AND_ASSERT_EQ(success, true);
+    CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, m_ados_register.at(asset_position::beta).descriptor.current_supply);
+    destinations.emplace_back(m_ado_emit.descriptor.current_supply - m_ados_register.at(asset_position::beta).descriptor.current_supply, alice.get_public_address(), null_pkey);
+    ftp.ado_current_asset_owner = ftp.spend_pub_key = alice.get_public_address().spend_public_key;
+    ftp.sources = sources;
+    ftp.prepared_destinations = destinations;
+    ftp.tx_version = get_tx_version(get_block_height(top), m_hardforks);
+    ftp.extra = {m_ado_emit};
+    ftp.shuffle = true;
+    ftp.need_to_generate_ado_proof = true;
+    CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, m_ado_emit.descriptor.total_max_supply);
+    success = construct_tx(alice.get_keys(), ftp, ftx);
+    CHECK_AND_ASSERT_EQ(success, true);
+    tx_3 = ftx.tx;
+  }
+
+  DO_CALLBACK(events, "mark_invalid_tx");
+  ADD_CUSTOM_EVENT(events, tx_3);
+  DO_CALLBACK(events, "assert_asset_beta_not_emitted");
+  DO_CALLBACK(events, "public_burn_asset_beta_with_incorrect_supply");
+
+  return true;
+}
+
+bool asset_current_supply_greater_than_total_supply::assert_asset_alpha_not_registered(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const
+{
+  const std::shared_ptr<tools::wallet2> alice_wallet{init_playtime_test_wallet_t<tools::wallet2>(events, c, ALICE_ACC_IDX)};
+  crypto::public_key key_asset_alpha_id{};
+  crypto::point_t point_asset_alpha_id{};
+  asset_descriptor_base alpha_adb{};
+  const std::string ticker{m_ados_register.at(asset_position::alpha).descriptor.ticker};
+
+  alice_wallet->refresh();
+  CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(m_ados_register.at(asset_position::alpha), &point_asset_alpha_id, &key_asset_alpha_id), false, "failed to calculate asset " + ticker + " id");
+  CHECK_AND_ASSERT_MES(!c.get_blockchain_storage().get_asset_info(key_asset_alpha_id, alpha_adb), false, "asset " + ticker + " must not be registered");
+
+  return true;
+}
+
+bool asset_current_supply_greater_than_total_supply::assert_asset_beta_registered(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const
+{
+  const std::shared_ptr<tools::wallet2> alice_wallet{init_playtime_test_wallet_t<tools::wallet2>(events, c, ALICE_ACC_IDX)};
+  crypto::public_key key_asset_beta_id{};
+  crypto::point_t point_asset_beta_id{};
+  asset_descriptor_base beta_adb{};
+  const std::string ticker{m_ados_register.at(asset_position::beta).descriptor.ticker};
+
+  alice_wallet->refresh();
+  CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(m_ados_register.at(asset_position::beta), &point_asset_beta_id, &key_asset_beta_id), false, "failed to calculate asset id");
+  CHECK_AND_ASSERT_MES(c.get_blockchain_storage().get_asset_info(key_asset_beta_id, beta_adb), false, "asset " + ticker + " must not be registered");
+  CHECK_AND_ASSERT_MES(alice_wallet->balance(key_asset_beta_id) == 1, false, "Alice has got not exactly 1 " + ticker);
+
+  return true;
+}
+
+bool asset_current_supply_greater_than_total_supply::emit_asset_beta_with_incorrect_supply(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const
+{
+  const std::shared_ptr<tools::wallet2> alice_wallet{init_playtime_test_wallet_t<tools::wallet2>(events, c, ALICE_ACC_IDX)};
+  std::vector<tx_destination_entry> destinations{};
+  transaction tx{};
+  block head{};
+  uint64_t version_tx{};
+  asset_descriptor_base adb{};
+  crypto::public_key key_asset_id{};
+  crypto::point_t point_asset_id{};
+
+  CHECK_AND_ASSERT_EQ(c.get_blockchain_storage().get_asset_info(*m_ado_emit.opt_asset_id, adb), true);
+  CHECK_AND_ASSERT_EQ(get_or_calculate_asset_id(m_ado_emit, &point_asset_id, &key_asset_id), true);
+  CHECK_AND_ASSERT_EQ(*m_ado_emit.opt_asset_id, key_asset_id);
+  alice_wallet->refresh();
+  CHECK_AND_ASSERT_EQ(c.get_blockchain_storage().get_top_block(head), true);
+  version_tx = get_tx_version(get_block_height(head), m_hardforks);
+  CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, m_ados_register.at(asset_position::beta).descriptor.current_supply);
+  destinations.emplace_back(m_ado_emit.descriptor.current_supply - m_ados_register.at(asset_position::beta).descriptor.current_supply, alice_wallet->get_account().get_public_address(), key_asset_id);
+  CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, m_ado_emit.descriptor.total_max_supply);
+
+  try
+  {
+    alice_wallet->emit_asset(key_asset_id, destinations, tx);
+  }
+  catch (const tools::error::tx_rejected&)
+  {
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+    return true;
+  }
+  catch (...)
+  {
+    return false;
+  }
+
+  return false;
+}
+
+bool asset_current_supply_greater_than_total_supply::assert_asset_beta_not_emitted(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const
+{
+  const std::shared_ptr<tools::wallet2> alice_wallet{init_playtime_test_wallet_t<tools::wallet2>(events, c, ALICE_ACC_IDX)};
+  crypto::public_key key_asset_beta_id{};
+  crypto::point_t point_asset_beta_id{};
+
+  alice_wallet->refresh();
+  CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(m_ados_register.at(asset_position::beta), &point_asset_beta_id, &key_asset_beta_id), false, "failed to calculate asset id");
+  CHECK_AND_ASSERT_MES(alice_wallet->balance(key_asset_beta_id) == 1, false, "Alice has got not exactly 1 " + m_ados_register.at(asset_position::beta).descriptor.ticker);
+}
+
+bool asset_current_supply_greater_than_total_supply::public_burn_asset_beta_with_incorrect_supply(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const
+{
+  const std::shared_ptr<tools::wallet2> alice_wallet{init_playtime_test_wallet_t<tools::wallet2>(events, c, ALICE_ACC_IDX)};
+  crypto::public_key key_asset_beta_id{};
+  crypto::point_t point_asset_beta_id{};
+  transaction tx{};
+
+  alice_wallet->refresh();
+  CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(m_ados_register.at(asset_position::beta), &point_asset_beta_id, &key_asset_beta_id), false, "failed to calculate asset id");
+
+  try
+  {
+    alice_wallet->burn_asset(key_asset_beta_id, m_ado_emit.descriptor.current_supply, tx);
+  }
+  catch (const std::runtime_error&)
+  {
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+    return true;
+  }
+
+  return false;
+}
