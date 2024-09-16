@@ -82,3 +82,21 @@ struct chain_switching_when_out_spent_in_alt_chain_ref_id : public test_chain_un
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
+
+struct alt_chain_and_block_tx_fee_median : public test_chain_unit_enchanced
+{
+  alt_chain_and_block_tx_fee_median();
+
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool check_after_hf4(currency::core& c,
+                       size_t ev_index,
+                       const std::vector<test_event_entry>& events);
+
+  bool check_before_hf4(currency::core& c,
+                        size_t ev_index,
+                        const std::vector<test_event_entry>& events);
+
+private:
+  const uint64_t m_fee_tx_0_blk_2{TESTS_DEFAULT_FEE};
+  const uint64_t m_fee_tx_1_blk_2a{2 * m_fee_tx_0_blk_2};
+};
