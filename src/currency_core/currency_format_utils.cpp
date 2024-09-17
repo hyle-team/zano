@@ -474,7 +474,7 @@ namespace currency
     }
 
     CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS || height == 0, false, "Too many outs (" << destinations.size() << ")! Miner tx can't be constructed.");
-    tx = AUTO_VAL_INIT_T(transaction);
+    // tx is not cleared intentionally to allow passing additional args in the extra/attachments
     tx.version = tx_version;
 
     tx_generation_context tx_gen_context{};
