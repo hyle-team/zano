@@ -836,7 +836,7 @@ private:
 
     uint64_t get_tx_expiration_median() const;
 
-    void print_tx_sent_message(const currency::transaction& tx, const std::string& description, uint64_t fee = UINT64_MAX);
+    void print_tx_sent_message(const currency::transaction& tx, const std::string& description, bool broadcasted, uint64_t fee = UINT64_MAX);
 
     // Validates escrow template tx in assumption it's related to wallet's account (wallet's account is either A or B party in escrow process)
     bool validate_escrow_proposal(const wallet_public::wallet_transfer_info& wti, const bc_services::proposal_body& prop,

@@ -51,6 +51,7 @@
 #define   WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER                   uint32_t(1 << 3)
 #define   WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION             uint32_t(1 << 4) // transfer is reserved for cold-signing (unsigned tx was created and passed for signing)
 #define   WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM                      uint32_t(1 << 5) // for htlc keeps info if this htlc belong as redeem or as refund
+#define   WALLET_TRANSFER_DETAIL_FLAG_ASSET_OP_RESERVATION             uint32_t(1 << 6) // transfer is reserved for an ongoing asset operation with external signing
 
 
 

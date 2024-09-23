@@ -129,7 +129,7 @@ namespace tools
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::transfer_flags_to_str(uint32_t flags)
 {
-  std::string result(5, ' ');
+  std::string result(7, ' ');
   if (flags & WALLET_TRANSFER_DETAIL_FLAG_SPENT)
     result[0] = 's';
   if (flags & WALLET_TRANSFER_DETAIL_FLAG_BLOCKED)
@@ -140,6 +140,10 @@ std::string wallet2::transfer_flags_to_str(uint32_t flags)
     result[3] = 'm';
   if (flags & WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION)
     result[4] = 'c';
+  if (flags & WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM)
+    result[5] = 'h';
+  if (flags & WALLET_TRANSFER_DETAIL_FLAG_ASSET_OP_RESERVATION)
+    result[6] = 'a';
   return result;
 }
 //----------------------------------------------------------------------------------------------------
@@ -465,8 +469,8 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
       }
       else
       {
-        //update event for asset that we control, check if ownership is still ours
-        if (ado.descriptor.owner != m_account.get_public_address().spend_public_key && !it->second.thirdparty_custody)
+        // check our ownership status: we lost it if the asset has new non-null owner (null means a third-party ownership, and in such a case we retain it in the own list whatever happens)
+        if (ado.descriptor.owner != null_pkey && ado.descriptor.owner != m_account.get_public_address().spend_public_key)
         {
           //ownership of the asset had been transfered
           add_rollback_event(ptc.height, asset_unown_event{ it->first, it->second });
@@ -475,7 +479,7 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
           std::stringstream ss;
           ss << "Asset ownership lost:"
             << ENDL << "asset id:         " << asset_id
-            << ENDL << "New owner:        " << ado.descriptor.owner
+            << ENDL << "New owner:        " << print_ado_owner
             << ENDL << "Name:             " << ado.descriptor.full_name
             << ENDL << "Ticker:           " << ado.descriptor.ticker
             << ENDL << "Total Max Supply: " << print_asset_money(ado.descriptor.total_max_supply, ado.descriptor.decimal_point)
@@ -1149,7 +1153,7 @@ void wallet2::accept_proposal(const crypto::hash& contract_id, uint64_t b_accept
     throw;
   }
 
-  print_tx_sent_message(tx, "(contract <" + epee::string_tools::pod_to_hex(contract_id) + ">)", construct_param.fee);
+  print_tx_sent_message(tx, "contract <" + epee::string_tools::pod_to_hex(contract_id) + ">", true, construct_param.fee);
 
   if (p_acceptance_tx != nullptr)
     *p_acceptance_tx = tx;
@@ -1288,7 +1292,7 @@ void wallet2::request_cancel_contract(const crypto::hash& contract_id, uint64_t 
     throw;
   }
 
-  print_tx_sent_message(tx, "(transport for cancel proposal)", fee);
+  print_tx_sent_message(tx, "transport for cancel proposal", true, fee);
 
   if (p_cancellation_proposal_tx != nullptr)
     *p_cancellation_proposal_tx = tx;
@@ -4002,7 +4006,7 @@ bool wallet2::generate_utxo_defragmentation_transaction_if_needed(currency::tran
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/, bool show_only_unknown /*= false*/, const std::string& filter_asset_ticker /*= std::string{}*/) const
 {
-  static const char* header = " index                 amount  ticker  g_index  flags       block  tx                                                                out#  asset id";
+  static const char* header = " index                 amount  ticker  g_index  flags         block  tx                                                                out#  asset id";
   std::stringstream ss;
   ss << header << ENDL;
   size_t count = 0;
@@ -4034,7 +4038,7 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
       std::setw(6) << std::left << (native_coin ? std::string("      ") : adb.ticker) << "  " << std::right <<
       std::setw(7) << td.m_global_output_index << "  " <<
       std::setw(2) << std::setfill('0') << td.m_flags << std::setfill(' ') << ":" <<
-      std::setw(5) << transfer_flags_to_str(td.m_flags) << "  " <<
+      std::setw(7) << transfer_flags_to_str(td.m_flags) << "  " <<
       std::setw(7) << td.m_ptx_wallet_info->m_block_height << "  " <<
       get_transaction_hash(td.m_ptx_wallet_info->m_tx) << "  " <<
       std::setw(4) << td.m_internal_output_index << "  ";
@@ -4388,7 +4392,7 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
   }
 
   // TODO: print inputs' key images
-  print_tx_sent_message(tx, "(from submit_transfer)");
+  print_tx_sent_message(tx, "from submit_transfer", true);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::submit_transfer_files(const std::string& signed_tx_file, currency::transaction& tx)
@@ -5960,7 +5964,7 @@ void wallet2::send_escrow_proposal(const bc_services::contract_private_details& 
   mark_transfers_as_spent(ftp.selected_transfers, std::string("escrow proposal sent, tx <") + epee::string_tools::pod_to_hex(get_transaction_hash(tx)) + ">, contract: " + epee::string_tools::pod_to_hex(ms_id));
   add_sent_tx_detailed_info(tx, ftp.attachments, ftp.prepared_destinations, ftp.selected_transfers);
 
-  print_tx_sent_message(tx, "(from multisig)", fee);
+  print_tx_sent_message(tx, "from multisig", true, fee);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::create_htlc_proposal(uint64_t amount, const currency::account_public_address& addr, uint64_t lock_blocks_count, currency::transaction &tx, const crypto::hash& htlc_hash,  std::string &origin)
@@ -7417,20 +7421,20 @@ void wallet2::set_genesis(const crypto::hash& genesis_hash)
   m_chain.set_genesis(genesis_hash);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::print_tx_sent_message(const currency::transaction& tx, const std::string& description, uint64_t fee /* = UINT64_MAX */)
+void wallet2::print_tx_sent_message(const currency::transaction& tx, const std::string& description, bool broadcasted, uint64_t fee /* = UINT64_MAX */)
 {
   //uint64_t balance_unlocked = 0;
   //uint64_t balance_total = balance(balance_unlocked);
 
   std::stringstream ss;
   if (fee != UINT64_MAX)
-    ss << "Commission: " << std::setw(21) << std::right << print_money(fee) << ENDL;
+    ss << "Fee: " << std::setw(21) << std::right << print_money_brief(fee) << ENDL;
 
-  WLT_LOG_CYAN("Transaction " << get_transaction_hash(tx) << " was successfully sent " << description << ENDL
+  WLT_LOG_CYAN("Transaction " << get_transaction_hash(tx) << " was successfully " << (broadcasted ? "sent" : "created") << " (" << description << ")" << ENDL
     << ss.str()
 //    << "Balance:    " << std::setw(21) << print_money(balance_total) << ENDL
 //    << "Unlocked:   " << std::setw(21) << print_money(balance_unlocked) << ENDL
-    << "Please, wait for confirmation for your balance to be unlocked.",
+    << (broadcasted ? "Please wait for the transaction to be confirmed before your balance is unlocked." : ""),
     LOG_LEVEL_0);
 }
 //----------------------------------------------------------------------------------------------------
@@ -7933,7 +7937,7 @@ void wallet2::transfer(construct_tx_param& ctp,
     << ", mark_transfers_as_spent_time: " << print_fixed_decimal_point(mark_transfers_as_spent_time, 3)
     , LOG_LEVEL_0);
 
-  print_tx_sent_message(result.tx, std::string() + "(transfer)", ctp.fee);
+  print_tx_sent_message(result.tx, tx_description, send_to_network, ctp.fee);
 }
 
 //----------------------------------------------------------------------------------------------------
@@ -8221,7 +8225,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   {
     crypto::secret_key sk{};
     finalize_transaction(ftp, *p_tx, sk, true);
-    print_tx_sent_message(*p_tx, "(sweep_below)", get_tx_fee(*p_tx));
+    print_tx_sent_message(*p_tx, "sweep_below", true, get_tx_fee(*p_tx));
   }
   catch (...)
   {
