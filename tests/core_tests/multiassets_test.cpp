@@ -1288,7 +1288,7 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
   // make sure this is an ownership transfer transaction and the ownership is correctly transferred:
   // Note: this check could also be done by examination of decrypt_resp.tx_in_json
   asset_descriptor_operation* pado = get_type_in_variant_container<asset_descriptor_operation>(to_tx.extra);
-  CHECK_AND_ASSERT_NEQ(pado, nullptr);
+  CHECK_AND_ASSERT_NEQ(pado, 0);
   CHECK_AND_ASSERT_EQ(pado->operation_type, ASSET_DESCRIPTOR_OPERATION_UPDATE);
   CHECK_AND_ASSERT_EQ(pado->opt_asset_id.has_value(), true);
   CHECK_AND_ASSERT_EQ(pado->opt_asset_id.get(), asset_id);
