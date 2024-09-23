@@ -2091,11 +2091,11 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
   td.asset_id = currency::null_pkey;
   std::vector<currency::tx_destination_entry> destinations;
   destinations.push_back(td);
-  currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
+  currency::finalized_tx ft{};
   crypto::public_key result_asset_id = currency::null_pkey;
-  m_wallet->deploy_new_asset(adb, destinations, result_tx, result_asset_id);
+  m_wallet->deploy_new_asset(adb, destinations, ft, result_asset_id);
 
-  success_msg_writer(true) << "New asset successfully deployed with tx " << get_transaction_hash(result_tx) << " (unconfirmed) : " << ENDL
+  success_msg_writer(true) << "New asset successfully deployed with tx " << ft.tx_id << " (unconfirmed) : " << ENDL
     << "Asset ID:     " << result_asset_id << ENDL
     << "Title:        " << adb.full_name << ENDL
     << "Ticker:       " << adb.ticker << ENDL
@@ -3222,3 +3222,4 @@ int main(int argc, char* argv[])
   CATCH_ENTRY_L0(__func__, EXIT_FAILURE);
   return EXIT_SUCCESS;
 }
+
