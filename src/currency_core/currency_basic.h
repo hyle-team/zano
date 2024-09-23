@@ -698,6 +698,8 @@ namespace currency
 
 #define ASSET_DESCRIPTOR_BASE_STRUCTURE_VER  1
 
+  typedef boost::variant<crypto::public_key, crypto::eth_public_key> asset_owner_pub_key_v;
+
   struct asset_descriptor_base
   {
     uint64_t            total_max_supply = 0;

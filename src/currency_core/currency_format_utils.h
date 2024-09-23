@@ -167,10 +167,6 @@ namespace currency
     epee::misc_utils::events_dispatcher* pevents_dispatcher;
     tx_generation_context gen_context{}; // solely for consolidated txs
     
-    //crypto::secret_key asset_control_key = currency::null_skey;
-    asset_owner_key_v asset_owner;
-    asset_eth_signer_i* p_eth_signer = nullptr;
-    mutable bool need_to_generate_ado_proof = false;
 
 
     BEGIN_SERIALIZE_OBJECT()
@@ -193,14 +189,13 @@ namespace currency
       {
         FIELD(gen_context);
       }
-      FIELD(asset_owner)
-      FIELD(need_to_generate_ado_proof)
     END_SERIALIZE()
   };
 
   struct finalized_tx
   {
     currency::transaction tx;
+    crypto::hash          tx_id;
     crypto::secret_key    one_time_key;
     finalize_tx_param     ftp;
     std::string           htlc_origin;
@@ -210,6 +205,7 @@ namespace currency
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(tx)
+      FIELD(tx_id)
       FIELD(one_time_key)
       FIELD(ftp)
       FIELD(htlc_origin)
