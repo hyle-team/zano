@@ -1982,29 +1982,47 @@ namespace wallet_public
   struct COMMAND_ASSETS_DEPLOY
   {
     DOC_COMMAND("Deploy new asset in the system.");
-    
+
     struct request
     {
       std::list<transfer_destination> destinations;
       currency::asset_descriptor_base asset_descriptor;
+      bool do_not_split_destinations = false;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(destinations)     DOC_DSCR("Addresses where to receive emitted coins. Asset id in the destinations is irreleant and can be omitted.") DOC_EXMP_AUTO(1) DOC_END
-        KV_SERIALIZE(asset_descriptor) DOC_DSCR("Descriptor that holds all information about asset - ticker, emission, description etc") DOC_END
+        KV_SERIALIZE(destinations)                DOC_DSCR("Addresses where to receive emitted coins. Asset id in the destinations is irreleant and can be omitted.") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(asset_descriptor)            DOC_DSCR("Descriptor that holds all information about asset - ticker, emission, description etc") DOC_END
+        KV_SERIALIZE(do_not_split_destinations)   DOC_DSCR("If true, the provided destinations will be used as-is and won't be splitted (or altered) to avoid common issues. Default is false.") DOC_EXMP(false) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
 
     struct response
     {
-      crypto::hash result_tx;
+      crypto::hash tx_id;
       crypto::public_key new_asset_id;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx)   DOC_DSCR("Id of transaction that carries asset registration command, asset would be registered as soon as transaction got confirmed") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Id of transaction that carries asset registration command, asset would be registered as soon as transaction got confirmed") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(new_asset_id)  DOC_DSCR("Issued asset id") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
       END_KV_SERIALIZE_MAP()
     };
+  };
+
+  // contains data for external checking & signing asset-emitting/-updating transaction by a third-party
+  struct data_for_external_asset_signing_tx
+  {
+    currency::blobdata unsigned_tx;
+    crypto::secret_key tx_secret_key;
+    std::vector<std::string> outputs_addresses;
+    currency::blobdata finalized_tx;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE_BLOB_AS_BASE64_STRING(unsigned_tx) DOC_DSCR("Base64-encoded unsigned transaction blob.") DOC_EXMP("ewogICJ2ZXJzaW9uIjogMSwgC....iAgInZpbiI6IFsgewogICAgIC") DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(tx_secret_key)   DOC_DSCR("Hex-encoded transaction secret key.") DOC_EXMP("2e0b840e70dba386effd64c5d988622dea8c064040566e6bf035034cbb54a5c08") DOC_END
+      KV_SERIALIZE(outputs_addresses)                 DOC_DSCR("Target address for each of the transaction zoutput.") DOC_EXMP_AGGR("ZxDNaMeZjwCjnHuU5gUNyrP1pM3U5vckbakzzV6dEHyDYeCpW8XGLBFTshcaY8LkG9RQn7FsQx8w2JeJzJwPwuDm2NfixPAXf", "ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp") DOC_END
+      KV_SERIALIZE_BLOB_AS_BASE64_STRING(finalized_tx)DOC_DSCR("Base64-encoded finalized_tx data structure, which should be passed along with submitting the transaction.") DOC_EXMP("ewogICJ2ZXJzaW9uIjogMSwgC....iAgInZpbiI6IFsgewogICAgIC") DOC_END
+    END_KV_SERIALIZE_MAP()
   };
 
   struct COMMAND_ASSETS_EMIT
@@ -2015,20 +2033,23 @@ namespace wallet_public
     {
       crypto::public_key asset_id;
       std::list<transfer_destination> destinations;
+      bool do_not_split_destinations = false;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Id of the asset to emit more coins") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
-        KV_SERIALIZE(destinations)     DOC_DSCR("Addresses where to receive emitted coins. Asset id in the destinations is irreleant and can be omitted.") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id) DOC_DSCR("Id of the asset to emit more coins") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
+        KV_SERIALIZE(destinations)               DOC_DSCR("Addresses where to receive emitted coins. Asset id in the destinations is irreleant and can be omitted.") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(do_not_split_destinations)  DOC_DSCR("If true, the provided destinations will be used as-is and won't be splitted (or altered) to avoid common issues. Default is false.") DOC_EXMP(false) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
-
     struct response
     {
-      crypto::hash result_tx;
-
+      crypto::hash tx_id;
+      std::optional<data_for_external_asset_signing_tx> data_for_external_signing;
+    
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx)   DOC_DSCR("Id of transaction that carries asset registration command, asset would be registered as soon as transaction got confirmed") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Id of transaction that emits the required asset.") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE(data_for_external_signing)  DOC_DSCR("[optional] Additional data for external asset tx signing.") DOC_EXMP_AGGR() DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -2050,10 +2071,12 @@ namespace wallet_public
 
     struct response
     {
-      crypto::hash result_tx;
+      crypto::hash tx_id;
+      std::optional<data_for_external_asset_signing_tx> data_for_external_signing;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx)   DOC_DSCR("Id of transaction that carries asset registration command, asset would be registered as soon as transaction got confirmed") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Id of transaction that carries asset registration command, asset would be registered as soon as transaction got confirmed") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE(data_for_external_signing)  DOC_DSCR("[optional] Hex-encoded transaction for external signing. ") DOC_EXMP_AGGR() DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -2075,10 +2098,10 @@ namespace wallet_public
 
     struct response
     {
-      crypto::hash result_tx;
+      crypto::hash tx_id;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx)   DOC_DSCR("Id of transaction that carries asset burn operation") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Id of transaction that carries asset burn operation") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
