@@ -455,9 +455,9 @@ namespace currency
 
   bool fill_block_rpc_details(block_rpc_extended_info& pei_rpc, const block_extended_info& bei_chain, const crypto::hash& h);
   void append_per_block_increments_for_tx(const transaction& tx, std::unordered_map<uint64_t, uint32_t>& gindices);
-  std::string get_word_from_timstamp(uint64_t timestamp, bool use_password);
-  uint64_t get_timstamp_from_word(std::string word, bool& password_used, const std::string& buff);
-  uint64_t get_timstamp_from_word(std::string word, bool& password_used);
+  std::string get_word_from_timestamp(uint64_t timestamp, bool use_password);
+  uint64_t get_timestamp_from_word(std::string word, bool& password_used, const std::string& buff);
+  uint64_t get_timestamp_from_word(std::string word, bool& password_used);
   bool parse_vote(const std::string& buff, std::list<std::pair<std::string, bool>>& votes);
 
   std::string generate_origin_for_htlc(const txout_htlc& htlc, const account_keys& acc_keys);

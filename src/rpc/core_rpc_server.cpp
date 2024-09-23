@@ -1369,6 +1369,110 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_find_outs_in_recent_blocks(const COMMAND_RPC_FIND_OUTS_IN_RECENT_BLOCKS::request& req, COMMAND_RPC_FIND_OUTS_IN_RECENT_BLOCKS::response& resp, epee::json_rpc::error& error_resp, connection_context& cntx)
+  {
+#define LOCAL_CHECK(cond, msg)         if (!(cond)) { error_resp.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;    error_resp.message = msg; LOG_PRINT_L1("on_find_outs_in_recent_blocks: " << msg); return false; }
+#define LOCAL_CHECK_INT_ERR(cond, msg) if (!(cond)) { error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR; error_resp.message = msg; LOG_PRINT_L1("on_find_outs_in_recent_blocks: " << msg); return false; }
+
+    LOCAL_CHECK(req.address != account_public_address{}, "address is missing");
+    LOCAL_CHECK(req.viewkey != null_skey, "viewkey is missing");
+    LOCAL_CHECK(0 <= req.blocks_limit && req.blocks_limit <= 5, "blocks_limit is out of allowed bounds");
+
+    // verify addess keys
+    crypto::point_t view_pk, spend_pk;
+    LOCAL_CHECK(view_pk.from_public_key(req.address.view_public_key), "cannon load point from address.view_public_key");
+    LOCAL_CHECK(view_pk.is_in_main_subgroup(), "address.view_public_key isn't in main subgroup");
+    LOCAL_CHECK(spend_pk.from_public_key(req.address.spend_public_key), "cannon load point from address.spend_public_key");
+    LOCAL_CHECK(spend_pk.is_in_main_subgroup(), "address.spend_public_key isn't in main subgroup");
+
+    // verify viewkey
+    crypto::scalar_t view_sc = req.viewkey;
+    LOCAL_CHECK(view_sc.is_reduced(), "viewkey is invalid");
+    LOCAL_CHECK(view_sc * crypto::c_point_G == view_pk, "viewkey doesn't correspond to the given address");
+
+    const blockchain_storage& bcs = m_core.get_blockchain_storage();
+    resp.blockchain_top_block_height = bcs.get_top_block_height();
+    resp.blocks_limit = req.blocks_limit;
+
+    // get blockchain transactions
+    std::unordered_map<uint64_t, std::pair<std::vector<crypto::hash>, std::list<transaction>>> blockchain_txs; // block height -> (vector of tx_ids, list of txs)
+    if (req.blocks_limit > 0)
+    {
+      uint64_t start_offset = resp.blockchain_top_block_height - req.blocks_limit + 1;
+      std::list<block> recent_blocks;
+      LOCAL_CHECK_INT_ERR(bcs.get_blocks(start_offset, static_cast<size_t>(req.blocks_limit), recent_blocks), "cannot get recent blocks");
+      
+      std::vector<crypto::hash> blockchain_tx_ids, missed_tx;
+      for(auto& b : recent_blocks)
+      {
+        blockchain_tx_ids.insert(blockchain_tx_ids.end(), b.tx_hashes.begin(), b.tx_hashes.end());
+        uint64_t height = get_block_height(b);
+        auto& el = blockchain_txs[height];
+        el.first = b.tx_hashes;
+        missed_tx.clear();
+        LOCAL_CHECK_INT_ERR(bcs.get_transactions(b.tx_hashes, el.second, missed_tx), "bcs.get_transactions failed");
+        LOCAL_CHECK_INT_ERR(missed_tx.empty(), "missed_tx is not empty");
+        LOCAL_CHECK_INT_ERR(el.first.size() == el.second.size(), "el.first.size() != el.second.size()");
+      }
+    }
+
+    // get pool transactions
+    std::list<transaction> pool_txs;
+    LOCAL_CHECK_INT_ERR(m_core.get_tx_pool().get_transactions(pool_txs), "cannot get txs from pool");
+
+    // processor lambda
+    auto process_tx = [&](const transaction& tx, const crypto::hash& tx_id, const int64_t height) {
+      crypto::key_derivation derivation{};
+      LOCAL_CHECK(generate_key_derivation(get_tx_pub_key_from_extra(tx), req.viewkey, derivation), "generate_key_derivation failed");
+
+      for(size_t i = 0, sz = tx.vout.size(); i < sz; ++i)
+      {
+        const tx_out_v& outv = tx.vout[i];
+        if (outv.type() != typeid(tx_out_zarcanum))
+          continue;
+
+        uint64_t decoded_amount = 0;
+        crypto::public_key decoded_asset_id{};
+        crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
+        if (!is_out_to_acc(req.address, boost::get<tx_out_zarcanum>(outv), derivation, i, decoded_amount, decoded_asset_id, amount_blinding_mask, asset_id_blinding_mask))
+          continue;
+
+        auto& el = resp.outputs.emplace_back();
+        el.amount           = decoded_amount;
+        el.asset_id         = decoded_asset_id;
+        el.tx_id            = tx_id;
+        el.tx_block_height  = height;
+        el.output_tx_index  = i;
+      }
+      return true;
+    };
+
+    // process blockchain txs
+    for(auto& [height, pair] : blockchain_txs)
+    {
+      LOCAL_CHECK(pair.first.size() == pair.second.size(), "container size inconsistency");
+      auto tx_it = pair.second.begin();
+      for(size_t i = 0, sz = pair.first.size(); i < sz; ++i, ++tx_it)
+      {
+        const crypto::hash& tx_id = pair.first[i];
+        LOCAL_CHECK(process_tx(*tx_it, tx_id, height), "process blockchain tx failed for tx " + crypto::pod_to_hex(tx_id));
+      }
+    }
+
+    // process pool txs
+    for(auto& tx : pool_txs)
+    {
+      crypto::hash tx_id = get_transaction_hash(tx);
+      LOCAL_CHECK(process_tx(tx, tx_id, -1), "process pool tx failed for tx " + crypto::pod_to_hex(tx_id));
+    }
+
+    resp.status = resp.outputs.empty() ? API_RETURN_CODE_NOT_FOUND : API_RETURN_CODE_OK;
+    return true;
+
+#undef LOCAL_CHECK_INT_ERR
+#undef LOCAL_CHECK
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_aliases_by_address(const COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& req, COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
     account_public_address addr = AUTO_VAL_INIT(addr);

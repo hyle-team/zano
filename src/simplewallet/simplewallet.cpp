@@ -12,6 +12,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/join.hpp>
 #include "include_base_utils.h"
 #include "common/command_line.h"
 #include "common/util.h"
@@ -26,7 +27,7 @@
 #include "string_coding.h"
 #include "wallet/wrap_service.h"
 #include "common/general_purpose_commands_defs.h"
-
+#include "common/mnemonic-encoding.h"
 #include "wallet/wallet_helpers.h"
 
 
@@ -143,6 +144,7 @@ namespace
   const command_line::arg_descriptor<unsigned int>  arg_set_timeout("set-timeout", "Set timeout for the wallet");
   const command_line::arg_descriptor<std::string>   arg_voting_config_file("voting-config-file", "Set voting config instead of getting if from daemon", "");
   const command_line::arg_descriptor<bool>          arg_no_password_confirmations("no-password-confirmation", "Enable/Disable password confirmation for transactions", false);
+  const command_line::arg_descriptor<bool>          arg_seed_doctor("seed-doctor", "Experimental: if your seed is not working for recovery this is likely because you've made a mistake whene you were doing back up(typo, wrong words order, missing word). This experimental code will attempt to recover seed phrase from with few approaches.");
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command  ("command", "");
 
