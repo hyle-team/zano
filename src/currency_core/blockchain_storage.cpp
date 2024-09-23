@@ -4134,11 +4134,12 @@ bool blockchain_storage::validate_asset_operation_against_current_blochain_state
 
   const asset_descriptor_operation& ado = avc.ado;
 
+  bool need_to_validate_ao_amount_commitment = true;
+
   if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
   {
     CHECK_AND_ASSERT_MES(!avc.asset_op_history, false, "asset with id " << avc.asset_id << " has already been registered");
     avc.amount_to_validate = ado.descriptor.current_supply;
-    CHECK_AND_ASSERT_MES(validate_asset_operation_amount_commitment(avc), false, "validate_asset_operation_amount_commitment failed!");
     if(this->is_hardfork_active(ZANO_HARDFORK_05))
     {
       CHECK_AND_ASSERT_MES(validate_ado_initial(ado.descriptor), false, "validate_ado_initial failed!");
@@ -4156,13 +4157,12 @@ bool blockchain_storage::validate_asset_operation_against_current_blochain_state
     }
 
     avc.amount_to_validate = 0;
-    bool need_to_validate_balance_proof = true;
     if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
     {
       //check that total current_supply haven't changed
       CHECK_AND_ASSERT_MES(ado.descriptor.current_supply == last_ado.descriptor.current_supply, false, "update operation attempted to change emission, failed");
       CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_ado.descriptor), false, "update operation attempted to change fileds that shouldn't be modified, failed");
-      need_to_validate_balance_proof = false;
+      need_to_validate_ao_amount_commitment = false;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
     {
@@ -4183,12 +4183,12 @@ bool blockchain_storage::validate_asset_operation_against_current_blochain_state
       LOG_ERROR("Unknown operation type: " << (int)ado.operation_type);
       return false;
     }
+  }
 
-    if (need_to_validate_balance_proof)
-    {
-      bool r = validate_asset_operation_amount_commitment(avc);
-      CHECK_AND_ASSERT_MES(r, false, "Balance proof validation failed for asset_descriptor_operation");
-    }
+  if (need_to_validate_ao_amount_commitment)
+  {
+    bool r = validate_asset_operation_amount_commitment(avc);
+    CHECK_AND_ASSERT_MES(r, false, "Balance proof validation failed for asset_descriptor_operation");
   }
 
   return true;
