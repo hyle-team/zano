@@ -420,10 +420,16 @@ namespace tools
     bool check_available_sources(std::list<uint64_t>& amounts);
 
     void deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id);
-    void emit_asset(const crypto::public_key asset_id, std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx);
-    void update_asset(const crypto::public_key asset_id, const currency::asset_descriptor_base new_descriptor, currency::transaction& result_tx);
-    void burn_asset(const crypto::public_key asset_id, uint64_t amount_to_burn, currency::transaction& result_tx);
-    void transfer_asset_ownership(const crypto::public_key asset_id, const crypto::public_key& new_owner, currency::transaction& result_tx);
+    void emit_asset(const crypto::public_key& asset_id, std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx);
+    void update_asset(const crypto::public_key& asset_id, const currency::asset_descriptor_base new_descriptor, currency::transaction& result_tx);
+    void burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::transaction& result_tx);
+    void transfer_asset_ownership(const crypto::public_key& asset_id, const currency::asset_owner_pub_key_v& new_owner_v, currency::transaction& result_tx);
+
+    void deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::finalized_tx& ft, crypto::public_key& new_asset_id);
+    void emit_asset(const crypto::public_key& asset_id, const std::vector<currency::tx_destination_entry>& destinations, currency::finalized_tx& ft);
+    void update_asset(const crypto::public_key& asset_id, const currency::asset_descriptor_base& new_descriptor, currency::finalized_tx& ft);
+    void burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::finalized_tx& ft);
+    void transfer_asset_ownership(const crypto::public_key& asset_id, const currency::asset_owner_pub_key_v& new_owner_v, currency::finalized_tx& ft);
 
     bool daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb);
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);

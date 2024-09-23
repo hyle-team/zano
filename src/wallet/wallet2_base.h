@@ -224,9 +224,10 @@ namespace tools
     bool shuffle = false;
     bool create_utxo_defragmentation_tx = false;
     bool need_at_least_1_zc = false;
-
-    currency::asset_eth_signer_i* p_eth_signer = nullptr;
-    currency::asset_owner_key_v asset_owner = currency::null_pkey;
+    
+    // misc
+    std::string tx_meaning_for_logs; // used to correctly log things, e.g. "escrow" or "asset emission".
+    uint32_t additional_transfer_flags_to_mark = 0;
   };
 
   struct mode_separate_context

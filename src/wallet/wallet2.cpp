@@ -394,6 +394,10 @@ const crypto::public_key& wallet2::out_get_pub_key(const currency::tx_out_v& out
 //----------------------------------------------------------------------------------------------------
 void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_operation& ado, process_transaction_context& ptc)
 {
+  auto print_ado_owner = [ado](std::ostream& o){
+    ado.descriptor.owner_eth_pub_key.has_value() ? o << ado.descriptor.owner_eth_pub_key.get() << " (ETH)" : o << ado.descriptor.owner;
+  };
+
   do
   {
     crypto::public_key asset_id{};
@@ -402,7 +406,12 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
 
     if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
     {
-      if (ado.descriptor.owner != m_account.get_public_address().spend_public_key)
+      // Add an asset to ownership list if either:
+      // 1) we're the owner of the asset;
+      //   or
+      // 2) we spent native coins in the tx (i.e. we sent it) AND it registers an asset with third-party ownership.
+      if (ado.descriptor.owner != m_account.get_public_address().spend_public_key && 
+         (!ado.descriptor.owner_eth_pub_key.has_value() || !ptc.spent_own_native_inputs))
         break;
 
       WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(m_own_asset_descriptors.count(asset_id) == 0, "asset with asset_id " << asset_id << " has already been registered in the wallet as own asset");
@@ -412,6 +421,7 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
       std::stringstream ss;
       ss << "New Asset Registered:"
         << ENDL << "asset id:         " << asset_id
+        << ENDL << "Owner:            " << print_ado_owner
         << ENDL << "Name:             " << asset_context.full_name
         << ENDL << "Ticker:           " << asset_context.ticker
         << ENDL << "Total Max Supply: " << print_asset_money(asset_context.total_max_supply, asset_context.decimal_point)
@@ -5362,126 +5372,162 @@ void wallet2::request_alias_registration(currency::extra_alias_entry& ai, curren
   transfer(destinations, 0, 0, fee, extra, attachments, get_current_split_strategy(), tx_dust_policy(DEFAULT_DUST_THRESHOLD), res_tx, CURRENCY_TO_KEY_OUT_RELAXED, false);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id)
+void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::finalized_tx& ft, crypto::public_key& new_asset_id)
 {
-  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(asset_info.decimal_point <= 18, "too big decimal point: " << asset_info.decimal_point);
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(asset_info.decimal_point <= 18, "too big decimal point: " << (int)asset_info.decimal_point);
 
-  asset_descriptor_operation asset_reg_info = AUTO_VAL_INIT(asset_reg_info);
+  asset_descriptor_operation asset_reg_info{};
   asset_reg_info.descriptor = asset_info;
   asset_reg_info.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.dsts = destinations;
   ctp.extra.push_back(asset_reg_info);
   ctp.need_at_least_1_zc = true;
+  ctp.tx_meaning_for_logs = "asset registration";
 
-  finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
-  result_tx = ft.tx;
   //get generated asset id
-  currency::asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
-  bool r = get_type_in_variant_container(result_tx.extra, ado);
-  CHECK_AND_ASSERT_THROW_MES(r, "Failed find asset info in tx");
+  currency::asset_descriptor_operation ado{};
+  bool r = get_type_in_variant_container(ft.tx.extra, ado);
+  CHECK_AND_ASSERT_THROW_MES(r, "asset_descriptor_operation cannot be found in tx extra as expected");
   CHECK_AND_ASSERT_THROW_MES(get_or_calculate_asset_id(ado, nullptr, &new_asset_id), "get_or_calculate_asset_id failed");
 
   m_custom_assets[new_asset_id] = ado.descriptor;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::emit_asset(const crypto::public_key asset_id, std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx)
+void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id)
 {
-
+  finalized_tx ft{};
+  deploy_new_asset(asset_info, destinations, ft, new_asset_id);
+  result_tx = ft.tx;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::emit_asset(const crypto::public_key& asset_id, const std::vector<currency::tx_destination_entry>& destinations, currency::finalized_tx& ft)
+{
   auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
   CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
-  COMMAND_RPC_GET_ASSET_INFO::request req;
-  req.asset_id = asset_id;
-  COMMAND_RPC_GET_ASSET_INFO::response rsp;
-  bool r = m_core_proxy->call_COMMAND_RPC_GET_ASSET_INFO(req, rsp);
-  CHECK_AND_ASSERT_THROW_MES(r, "Failed to call_COMMAND_RPC_GET_ASSET_INFO");
- 
-  asset_descriptor_operation asset_emmit_info = AUTO_VAL_INIT(asset_emmit_info);
-  asset_emmit_info.descriptor = rsp.asset_descriptor;
+  currency::asset_descriptor_base last_adb{};
+  bool r = daemon_get_asset_info(asset_id, last_adb);
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed to get asset info from daemon");
+
+  asset_descriptor_operation asset_emmit_info{};
+  asset_emmit_info.descriptor = last_adb;
   asset_emmit_info.operation_type = ASSET_DESCRIPTOR_OPERATION_EMIT;
   asset_emmit_info.opt_asset_id = asset_id;
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.dsts = destinations;
   ctp.extra.push_back(asset_emmit_info);
   ctp.need_at_least_1_zc = true;
-  ctp.asset_owner = rsp.asset_descriptor.owner;
-  //ctp.asset_deploy_control_key = own_asset_entry_it->second.control_key;
+  ctp.tx_meaning_for_logs = "asset emission";
 
   for(auto& dst : ctp.dsts)
+    dst.asset_id = null_pkey; // emit operation requires null_pkey for emitting asset outputs, fix it ad-hoc here
+
+  bool send_to_network = true;
+  if (last_adb.owner_eth_pub_key.has_value())
   {
-    if (dst.asset_id == asset_id)
-      dst.asset_id = null_pkey; // emit operation requires null_pkey for emitting asset outputs, fix it ad-hoc here
+    send_to_network = false;
+    ctp.additional_transfer_flags_to_mark = WALLET_TRANSFER_DETAIL_FLAG_ASSET_OP_RESERVATION;
+    ctp.tx_meaning_for_logs = "asset eth emission";
   }
 
-  finalized_tx ft = AUTO_VAL_INIT(ft);
-  this->transfer(ctp, ft, true, nullptr);
+  this->transfer(ctp, ft, send_to_network, nullptr);
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::emit_asset(const crypto::public_key& asset_id, std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx)
+{
+  finalized_tx ft{};
+  emit_asset(asset_id, destinations, ft);
   result_tx = ft.tx;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::update_asset(const crypto::public_key asset_id, const currency::asset_descriptor_base new_descriptor, currency::transaction& result_tx)
+void wallet2::update_asset(const crypto::public_key& asset_id, const currency::asset_descriptor_base& new_descriptor, currency::finalized_tx& ft)
 {
   auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
   CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
+  currency::asset_descriptor_base last_adb{};
+  bool r = daemon_get_asset_info(asset_id, last_adb);
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed to get asset info from daemon");
 
-  asset_descriptor_operation asset_update_info = AUTO_VAL_INIT(asset_update_info);
+  asset_descriptor_operation asset_update_info{};
   asset_update_info.descriptor = new_descriptor;
   asset_update_info.operation_type = ASSET_DESCRIPTOR_OPERATION_UPDATE;
   asset_update_info.opt_asset_id = asset_id;
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.extra.push_back(asset_update_info);
   ctp.need_at_least_1_zc = true;
-  currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
-  bool r = this->daemon_get_asset_info(asset_id, adb);
-  CHECK_AND_ASSERT_THROW_MES(r, "Failed to get asset info from daemon");
-  ctp.asset_owner = adb.owner;
+  ctp.tx_meaning_for_logs = "asset update";
 
-  finalized_tx ft = AUTO_VAL_INIT(ft);
-  this->transfer(ctp, ft, true, nullptr);
+  bool send_to_network = true;
+  if (last_adb.owner_eth_pub_key.has_value())
+  {
+    send_to_network = false;
+    ctp.additional_transfer_flags_to_mark = WALLET_TRANSFER_DETAIL_FLAG_ASSET_OP_RESERVATION;
+    ctp.tx_meaning_for_logs = "asset eth update";
+  }
+
+  this->transfer(ctp, ft, send_to_network, nullptr);
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::update_asset(const crypto::public_key& asset_id, const currency::asset_descriptor_base new_descriptor, currency::transaction& result_tx)
+{
+  currency::finalized_tx ft{};
+  update_asset(asset_id, new_descriptor, ft);
   result_tx = ft.tx;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::transfer_asset_ownership(const crypto::public_key asset_id, const crypto::public_key& new_owner, currency::transaction& result_tx)
+void wallet2::transfer_asset_ownership(const crypto::public_key& asset_id, const currency::asset_owner_pub_key_v& new_owner_v, currency::finalized_tx& ft)
 {
   auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
   CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
-
-  currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
-  bool r = this->daemon_get_asset_info(asset_id, adb);
+  currency::asset_descriptor_base last_adb{};
+  bool r = this->daemon_get_asset_info(asset_id, last_adb);
   CHECK_AND_ASSERT_THROW_MES(r, "Failed to get asset info from daemon");
 
-  asset_descriptor_operation asset_update_info = AUTO_VAL_INIT(asset_update_info);
-  asset_update_info.descriptor = adb;
+  asset_descriptor_operation asset_update_info{};
+  asset_update_info.descriptor = last_adb;
   asset_update_info.operation_type = ASSET_DESCRIPTOR_OPERATION_UPDATE;
   asset_update_info.opt_asset_id = asset_id;
-  asset_update_info.descriptor.owner = new_owner;
-  construct_tx_param ctp = get_default_construct_tx_param();
-  ctp.asset_owner = adb.owner;
-  ctp.extra.push_back(asset_update_info);
 
-  finalized_tx ft = AUTO_VAL_INIT(ft);
-  this->transfer(ctp, ft, true, nullptr);
+  if (new_owner_v.type() == typeid(crypto::public_key))
+    asset_update_info.descriptor.owner = boost::get<crypto::public_key>(new_owner_v);
+  else
+    asset_update_info.descriptor.owner_eth_pub_key = boost::get<crypto::eth_public_key>(new_owner_v);
+
+  construct_tx_param ctp = get_default_construct_tx_param();
+  ctp.extra.push_back(asset_update_info);
+  ctp.tx_meaning_for_logs = "transfer asset ownership";
+
+  bool send_to_network = true;
+  if (last_adb.owner_eth_pub_key.has_value())
+  {
+    send_to_network = false;
+    ctp.additional_transfer_flags_to_mark = WALLET_TRANSFER_DETAIL_FLAG_ASSET_OP_RESERVATION;
+    ctp.tx_meaning_for_logs = "transfer asset eth ownership";
+  }
+
+  this->transfer(ctp, ft, send_to_network, nullptr);
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::transfer_asset_ownership(const crypto::public_key& asset_id, const currency::asset_owner_pub_key_v& new_owner_v, currency::transaction& result_tx)
+{
+  finalized_tx ft{};
+  transfer_asset_ownership(asset_id, new_owner_v, ft);
   result_tx = ft.tx;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::burn_asset(const crypto::public_key asset_id, uint64_t amount_to_burn, currency::transaction& result_tx)
+void wallet2::burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::finalized_tx& ft)
 {
-  //auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
-  //CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
-  COMMAND_RPC_GET_ASSET_INFO::request req;
-  req.asset_id = asset_id;
-  COMMAND_RPC_GET_ASSET_INFO::response rsp;
-  bool r = m_core_proxy->call_COMMAND_RPC_GET_ASSET_INFO(req, rsp);
-  CHECK_AND_ASSERT_THROW_MES(r, "Failed to call_COMMAND_RPC_GET_ASSET_INFO");
+  currency::asset_descriptor_base last_adb{};
+  bool r = this->daemon_get_asset_info(asset_id, last_adb);
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed to get asset info from daemon");
 
+  asset_descriptor_operation asset_burn_info{};
+  asset_burn_info.descriptor = last_adb;
 
+  CHECK_AND_ASSERT_THROW_MES(last_adb.current_supply >= amount_to_burn, "amount_to_burn is incorrect: " << print_money_brief(amount_to_burn, last_adb.decimal_point) << ", current_supply: " << print_money_brief(last_adb.current_supply, last_adb.decimal_point));
 
-  asset_descriptor_operation asset_burn_info = AUTO_VAL_INIT(asset_burn_info);
-  asset_burn_info.descriptor = rsp.asset_descriptor;
-
-  CHECK_AND_ASSERT_THROW_MES(asset_burn_info.descriptor.current_supply >= amount_to_burn, "Wrong amount to burn (current_supply" << asset_burn_info.descriptor.current_supply << " is less then " << amount_to_burn << ")");
-
-  currency::tx_destination_entry dst_to_burn = AUTO_VAL_INIT(dst_to_burn);
+  currency::tx_destination_entry dst_to_burn{};
   dst_to_burn.amount = amount_to_burn;
   dst_to_burn.asset_id = asset_id;
 
@@ -5490,11 +5536,16 @@ void wallet2::burn_asset(const crypto::public_key asset_id, uint64_t amount_to_b
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.extra.push_back(asset_burn_info);
   ctp.need_at_least_1_zc = true;
-  ctp.asset_owner = rsp.asset_descriptor.owner;
   ctp.dsts.push_back(dst_to_burn);
+  ctp.tx_meaning_for_logs = "asset burn";
 
-  finalized_tx ft = AUTO_VAL_INIT(ft);
   this->transfer(ctp, ft, true, nullptr);
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::transaction& result_tx)
+{
+  finalized_tx ft{};
+  burn_asset(asset_id, amount_to_burn, ft);
   result_tx = ft.tx;
 }
 //----------------------------------------------------------------------------------------------------
@@ -7601,8 +7652,12 @@ bool wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
 
   const currency::transaction& tx_for_mode_separate = msc.tx_for_mode_separate;
   assets_selection_context needed_money_map = get_needed_money(ctp.fee, ctp.dsts);
-  ftp.asset_owner = ctp.asset_owner;
-  ftp.p_eth_signer = ctp.p_eth_signer;
+  if (this->is_auditable() && ctp.fake_outputs_count > 0)
+  {
+    WLT_THROW_IF_FALSE_WITH_CODE(false, "WALLET_RPC_ERROR_CODE_WRONG_MIXINS_FOR_AUDITABLE_WALLET", "WALLET_RPC_ERROR_CODE_WRONG_MIXINS_FOR_AUDITABLE_WALLET");
+  }
+  //ftp.asset_owner = ctp.asset_owner;
+  //ftp.p_eth_signer = ctp.p_eth_signer;
   //
   // TODO @#@# need to do refactoring over this part to support hidden amounts and asset_id
   //
@@ -7735,7 +7790,7 @@ void wallet2::finalize_transaction(currency::finalize_tx_param& ftp, currency::f
   THROW_IF_FALSE_WALLET_EX_MES(tx_blob_size < CURRENCY_MAX_TRANSACTION_BLOB_SIZE, error::tx_too_big, "Transaction size: " << tx_blob_size << " bytes, transaction size limit: " << CURRENCY_MAX_TRANSACTION_BLOB_SIZE << " bytes.");
 
   if (store_tx_secret_key)
-    m_tx_keys.insert(std::make_pair(get_transaction_hash(result.tx), result.one_time_key));
+    m_tx_keys.insert(std::make_pair(result.tx_id, result.one_time_key));
 
   //TIME_MEASURE_START(send_transaction_to_network_time);
   if (broadcast_tx)
@@ -7913,8 +7968,11 @@ void wallet2::transfer(construct_tx_param& ctp,
     return;
   }
 
+  std::string tx_description = ctp.tx_meaning_for_logs.empty() ? std::string("transfer") : ctp.tx_meaning_for_logs;
+  uint32_t transfers_flags = ctp.additional_transfer_flags_to_mark | WALLET_TRANSFER_DETAIL_FLAG_SPENT;
+
   TIME_MEASURE_START(mark_transfers_as_spent_time);
-  mark_transfers_as_spent(ftp.selected_transfers, std::string("money transfer, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(result.tx)));
+  mark_transfers_with_flag(ftp.selected_transfers, transfers_flags, std::string("preparing for ") + tx_description);
   TIME_MEASURE_FINISH(mark_transfers_as_spent_time);
 
   TIME_MEASURE_START(finalize_transaction_time);
@@ -7924,7 +7982,7 @@ void wallet2::transfer(construct_tx_param& ctp,
   }
   catch (...)
   {
-    clear_transfers_from_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_SPENT, std::string("exception on money transfer, tx: ") + epee::string_tools::pod_to_hex(get_transaction_hash(result.tx)));
+    clear_transfers_from_flag(ftp.selected_transfers, transfers_flags, std::string("exception during") + tx_description + ", tx (maybe incorrect if tx is incomplete): " + epee::string_tools::pod_to_hex(get_transaction_hash(result.tx)));
     throw;
   }
   TIME_MEASURE_FINISH(finalize_transaction_time);
