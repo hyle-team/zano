@@ -1945,22 +1945,27 @@ void balance_via_wallet(const tools::wallet2& w, const crypto::public_key& asset
 }
 
 bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name,
-  uint64_t expected_total, uint64_t expected_mined, uint64_t expected_unlocked, uint64_t expected_awaiting_in, uint64_t expected_awaiting_out, const crypto::public_key& asset_id /* = currency::native_coin_asset_id */)
+  uint64_t expected_total, uint64_t expected_mined, uint64_t expected_unlocked, uint64_t expected_awaiting_in, uint64_t expected_awaiting_out,
+  const crypto::public_key& asset_id /* = currency::native_coin_asset_id */, size_t asset_decimal_point /* = CURRENCY_DISPLAY_DECIMAL_POINT */)
 {
   uint64_t total, unlocked, awaiting_in, awaiting_out, mined;
   balance_via_wallet(w, asset_id, &total, &unlocked, &awaiting_in, &awaiting_out, &mined);
 
   std::string asset_id_str;
   if (asset_id != currency::native_coin_asset_id)
+  {
     asset_id_str = std::string(", asset_id: ") + epee::string_tools::pod_to_hex(asset_id).erase(4, 56).insert(4, "...");
+    if (asset_decimal_point == CURRENCY_DISPLAY_DECIMAL_POINT)
+      asset_decimal_point = w.get_asset_decimal_point(asset_id, asset_decimal_point);
+  }
 
   LOG_PRINT_CYAN("Balance for wallet " << account_name << " @ height " << w.get_top_block_height() << asset_id_str << ":" << ENDL <<
-    "unlocked:     " << print_money(unlocked) << ENDL <<
-    "awaiting in:  " << print_money(awaiting_in) << ENDL <<
-    "awaiting out: " << print_money(awaiting_out) << ENDL <<
-    "mined:        " << print_money(mined) << ENDL <<
+    "unlocked:     " << print_money(unlocked,     asset_decimal_point) << ENDL <<
+    "awaiting in:  " << print_money(awaiting_in,  asset_decimal_point) << ENDL <<
+    "awaiting out: " << print_money(awaiting_out, asset_decimal_point) << ENDL <<
+    "mined:        " << print_money(mined,        asset_decimal_point) << ENDL <<
     "-----------------------------------------" << ENDL <<
-    "total:        " << print_money(total) << ENDL,
+    "total:        " << print_money(total,        asset_decimal_point) << ENDL,
     LOG_LEVEL_0);
 
   bool r = true;
@@ -1980,6 +1985,12 @@ bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name,
 
   return r;
 }
+
+bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name, uint64_t expected_total, const crypto::public_key& asset_id, size_t asset_decimal_point /* = CURRENCY_DISPLAY_DECIMAL_POINT */)
+{
+  return check_balance_via_wallet(w, account_name, expected_total, INVALID_BALANCE_VAL, INVALID_BALANCE_VAL, INVALID_BALANCE_VAL, INVALID_BALANCE_VAL, asset_id, asset_decimal_point);
+}
+
 
 // In assumption we have only genesis and few blocks with the same reward (==first_blocks_reward),
 // this function helps to calculate such amount that many outputs have it, and amount, no output has it.

@@ -715,7 +715,9 @@ bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name,
                               uint64_t expected_unlocked = INVALID_BALANCE_VAL,
                               uint64_t expected_awaiting_in = INVALID_BALANCE_VAL,
                               uint64_t expected_awaiting_out = INVALID_BALANCE_VAL,
-                              const crypto::public_key& asset_id = currency::native_coin_asset_id);
+                              const crypto::public_key& asset_id = currency::native_coin_asset_id,
+                              size_t asset_decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT);
+bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name, uint64_t expected_total, const crypto::public_key& asset_id, size_t asset_decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT);
 
 bool calculate_amounts_many_outs_have_and_no_outs_have(const uint64_t first_blocks_reward, uint64_t& amount_many_outs_have, uint64_t& amount_no_outs_have);
 bool find_global_index_for_output(const std::vector<test_event_entry>& events, const crypto::hash& head_block_hash, const currency::transaction& reference_tx, const size_t reference_tx_out_index, uint64_t& global_index);
