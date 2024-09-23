@@ -2759,7 +2759,7 @@ namespace currency
       CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
       tx.proofs.emplace_back(std::move(balance_proof));
 
-      // asset operation proofs (if necessary)
+      // optional asset operation proofs: amount commitment proof (required for register, emit, public burn)
       if (gen_context.ao_asset_id != currency::null_pkey)
       {
         // asset amount commitment g proof   (TODO @#@# add support for hidden supply)
@@ -2768,15 +2768,17 @@ namespace currency
         asset_operation_proof aop{};
         aop.opt_amount_commitment_g_proof = aop_g_sig;
         tx.proofs.emplace_back(std::move(aop));
+      }
 
-        // asset ownership proof for standard (non-eth) owner (using generic Shnorr signature with the spend secret key)
-        const asset_descriptor_operation* pado = get_type_in_variant_container<asset_descriptor_operation>(tx.extra);
-        CHECK_AND_ASSERT_MES(pado != nullptr, false, "pado is null");
+      // optional asset operation proofs: ownership proof for standard (non-eth) owner (using generic Shnorr signature with the spend secret key)
+      const asset_descriptor_operation* pado = get_type_in_variant_container<asset_descriptor_operation>(tx.extra);
+      if (pado != nullptr)
+      {
         if ((pado->operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || pado->operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE) &&
             !pado->descriptor.owner_eth_pub_key.has_value())
         {
           asset_operation_ownership_proof aoop{};
-          r = crypto::generate_schnorr_sig(tx_prefix_hash, pado->descriptor.owner, sender_account_keys.spend_secret_key, aoop.gss); // owner will be checked against spend secret key within this call
+          r = crypto::generate_schnorr_sig(tx_prefix_hash, sender_account_keys.spend_secret_key, aoop.gss);
           CHECK_AND_ASSERT_MES(r, false, "Failed to sign ado proof");
           if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_after_asset_ownership_proof_generated{ &aoop });
           tx.proofs.emplace_back(aoop);
