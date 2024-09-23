@@ -843,7 +843,7 @@ namespace currency
 
   struct asset_operation_ownership_proof_eth
   {
-    crypto::eth_signature eth_sig;
+    crypto::eth_signature eth_sig;            // 64 bytes
     uint8_t version = 0;
 
     BEGIN_VERSIONED_SERIALIZE(0, version)

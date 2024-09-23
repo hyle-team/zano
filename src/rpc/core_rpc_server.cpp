@@ -75,7 +75,8 @@ namespace currency
     return true;
   }
 #define check_core_ready() check_core_ready_(LOCAL_FUNCTION_DEF__)
-#define CHECK_CORE_READY() if(!check_core_ready()){res.status =  API_RETURN_CODE_BUSY;return true;}
+#define CHECK_CORE_READY()    if (!check_core_ready()) {res.status =  API_RETURN_CODE_BUSY; return true; }
+#define CHECK_CORE_READY_WE() if (!check_core_ready()) {error_resp.code = CORE_RPC_ERROR_CODE_CORE_BUSY; error_resp.message = "Core is busy."; return false; }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_height(const COMMAND_RPC_GET_HEIGHT::request& req, COMMAND_RPC_GET_HEIGHT::response& res, connection_context& cntx)
   {
@@ -1001,7 +1002,7 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_submitblock(const COMMAND_RPC_SUBMITBLOCK::request& req, COMMAND_RPC_SUBMITBLOCK::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
-    CHECK_CORE_READY();
+    CHECK_CORE_READY_WE();
     if(req.size()!=1)
     {
       error_resp.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
@@ -1044,8 +1045,7 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_submitblock2(const COMMAND_RPC_SUBMITBLOCK2::request& req, COMMAND_RPC_SUBMITBLOCK2::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
-    CHECK_CORE_READY();
-
+    CHECK_CORE_READY_WE();
 
     block b = AUTO_VAL_INIT(b);
     if (!parse_and_validate_block_from_blob(req.b, b))

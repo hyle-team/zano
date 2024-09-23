@@ -950,6 +950,12 @@ namespace currency
     }
   }
   //---------------------------------------------------------------
+  template<typename invocable_t>
+  typename std::enable_if_t<std::is_invocable_v<invocable_t, std::ostream&>, std::ostream&> operator<<(std::ostream& o, invocable_t callee)
+  {
+    callee(o);
+    return o;
+  }
   //---------------------------------------------------------------
   std::ostream& operator <<(std::ostream& o, const ref_by_id& r);
   std::ostream& operator <<(std::ostream& o, const std::type_info& ti);
