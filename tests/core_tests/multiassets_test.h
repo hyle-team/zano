@@ -55,3 +55,10 @@ struct eth_signed_asset_basics : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct eth_signed_asset_via_rpc : public wallet_test
+{
+  eth_signed_asset_via_rpc();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
