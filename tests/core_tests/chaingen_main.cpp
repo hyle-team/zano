@@ -264,13 +264,13 @@ bool generate_and_play(const char* const genclass_name, size_t hardfork_id = SIZ
 
   if (result)
   {
-    LOG_PRINT_GREEN(std::string(100, '=') << std::endl <<
+    LOG_PRINT_GREEN(std::string(72, '=') << std::endl <<
       "#TEST# >>>> " << genclass_name << " <<<< Succeeded" << std::endl <<
       std::string(100, '=') << std::endl, LOG_LEVEL_0 );
   }
   else
   {
-    LOG_PRINT_RED( std::string(100, '=') << std::endl <<
+    LOG_PRINT_RED( std::string(72, '=') << std::endl <<
       "#TEST# >>>> " << genclass_name << " <<<< FAILED" << std::endl <<
       std::string(100, '=') << std::endl, LOG_LEVEL_0);
     result = false;

@@ -4161,20 +4161,20 @@ bool blockchain_storage::validate_asset_operation_against_current_blochain_state
     {
       //check that total current_supply haven't changed
       CHECK_AND_ASSERT_MES(ado.descriptor.current_supply == last_ado.descriptor.current_supply, false, "update operation attempted to change emission, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_ado.descriptor), false, "update operation attempted to change fileds that shouldn't be modified, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_ado.descriptor), false, "update operation modifies asset descriptor in a prohibited manner");
       need_to_validate_ao_amount_commitment = false;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
     {
       CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > last_ado.descriptor.current_supply, false, "emit operation does not increase the current supply, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_ado.descriptor), false, "emit operation is not allowed to update fields");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_ado.descriptor), false, "emit operation modifies asset descriptor in a prohibited manner");
       CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == last_ado.descriptor.meta_info, false, "emit operation is not allowed to update meta info");
       avc.amount_to_validate = ado.descriptor.current_supply - last_ado.descriptor.current_supply;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
     {
       CHECK_AND_ASSERT_MES(ado.descriptor.current_supply < last_ado.descriptor.current_supply, false, "burn operation does not decrease the current supply, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_ado.descriptor), false, "burn operation is not allowed to update fields");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_ado.descriptor), false, "burn operation modifies asset descriptor in a prohibited manner");
       CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == last_ado.descriptor.meta_info, false, "burn operation is not allowed to update meta info");
       avc.amount_to_validate =  last_ado.descriptor.current_supply - ado.descriptor.current_supply;
     }
