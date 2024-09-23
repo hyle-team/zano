@@ -4111,6 +4111,7 @@ bool validate_ado_ownership(asset_op_verification_context& avc)
 
   if (last_ado.descriptor.owner_eth_pub_key.has_value())
   {
+    CHECK_AND_ASSERT_MES(last_ado.descriptor.owner == null_pkey, false, "owner_eth_pub_key is set but owner pubkey is nonzero");
     asset_operation_ownership_proof_eth aoop_eth{};
     r = get_type_in_variant_container(avc.tx.proofs, aoop_eth);
     CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed: asset_operation_ownership_proof_eth is missing");
