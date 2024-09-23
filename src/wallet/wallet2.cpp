@@ -403,8 +403,7 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
 
       WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(m_own_asset_descriptors.count(asset_id) == 0, "asset with asset_id " << asset_id << " has already been registered in the wallet as own asset");
       wallet_own_asset_context& asset_context = m_own_asset_descriptors[asset_id];
-      epee::misc_utils::cast_assign_a_to_b(asset_context, ado.descriptor);
-      //*static_cast<asset_descriptor_base*>(&asset_context) = ado.descriptor;
+      epee::misc_utils::cast_assign_a_to_b(ado.descriptor, asset_context);
 
       std::stringstream ss;
       ss << "New Asset Registered:"
@@ -428,7 +427,7 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
         break;
       //asset had been updated
       add_rollback_event(ptc.height, asset_update_event{ it->first, it->second });
-      epee::misc_utils::cast_assign_a_to_b(it->second, ado.descriptor);
+      epee::misc_utils::cast_assign_a_to_b(ado.descriptor, it->second);
       
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE )
@@ -441,7 +440,7 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
           // ownership of the asset acquired
 
           wallet_own_asset_context& asset_context = m_own_asset_descriptors[asset_id];
-          epee::misc_utils::cast_assign_a_to_b(asset_context, ado.descriptor);
+          epee::misc_utils::cast_assign_a_to_b(ado.descriptor, asset_context);
 
           std::stringstream ss;
           ss << "Asset ownership acquired:"
@@ -492,8 +491,7 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
         {
           //just an update of the asset
           add_rollback_event(ptc.height, asset_update_event{ it->first, it->second });
-          epee::misc_utils::cast_assign_a_to_b(it->second, ado.descriptor);
-          
+          epee::misc_utils::cast_assign_a_to_b(ado.descriptor, it->second);
         }
       }
     }

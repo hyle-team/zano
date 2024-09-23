@@ -548,7 +548,7 @@ namespace currency
     {
       assets_list.push_back(currency::asset_descriptor_with_id());
       assets_list.back().asset_id = pr.first;
-      epee::misc_utils::cast_assign_a_to_b(assets_list.back(), static_cast<currency::asset_descriptor_base>(pr.second));
+      epee::misc_utils::cast_assign_a_to_b(static_cast<currency::asset_descriptor_base>(pr.second), assets_list.back());
       //*static_cast<currency::asset_descriptor_base*>(&assets_list.back()) = pr.second;
     }
   }
