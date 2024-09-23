@@ -190,6 +190,7 @@ public:
   void    on_menu_show(const QString& param);
   QString is_remnotenode_mode_preconfigured(const QString& param);
   QString start_backend(const QString& params);
+  void    show_notification(const QString& title, const QString& message);
 
   QString async_call(const QString& func_name, const QString& params);
   QString sync_call(const QString& func_name, const QString& params);

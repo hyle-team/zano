@@ -116,7 +116,7 @@ namespace currency
           secret_index = ring.size() - 1;
       }
 
-      CHECK_AND_ASSERT_MES(secret_index != SIZE_MAX, false, "out #" << j << ": can't find a corresponding asset id in inputs, asset id: " << H);
+      CHECK_AND_ASSERT_MES(secret_index != SIZE_MAX, false, "out #" << j << ": cannot find a corresponding asset id in inputs or asset operations; asset id: " << H);
 
       result.bge_proofs.emplace_back(crypto::BGE_proof_s{});
       uint8_t err = 0;
@@ -322,7 +322,7 @@ namespace currency
       CHECK_AND_ASSERT_MES(ogc.asset_id_blinding_mask_x_amount_sum.is_zero(), false, "it's expected that all asset ids for this tx are obvious and thus explicit"); // because this tx has no ZC inputs => all outs clearly have native asset id
       CHECK_AND_ASSERT_MES(ogc.ao_amount_blinding_mask.is_zero(), false, "asset emmission is not allowed for txs without ZC inputs");
 
-      // (sum(bare inputs' amounts) - fee) * H + sum(pseudo out amount commitments) - sum(outputs' commitments) = lin(G)
+      // (sum(bare inputs' amounts) - fee) * H - sum(outputs' commitments) = lin(G)
 
       crypto::point_t commitment_to_zero = (crypto::scalar_t(bare_inputs_sum) - crypto::scalar_t(fee)) * currency::native_coin_asset_id_pt - ogc.amount_commitments_sum;
       crypto::scalar_t secret_x = -ogc.amount_blinding_masks_sum;
@@ -335,6 +335,8 @@ namespace currency
     else // i.e. zc_inputs_count != 0
     {
       // there're ZC inputs => in main balance equation we only need to cancel out X-component, because G-component cancelled out by choosing blinding mask for the last pseudo out amount commitment
+
+      // (sum(bare inputs' amounts) - fee) * H + sum(pseudo out amount commitments) + asset_op_commitment - sum(outputs' commitments) = lin(X)
 
       crypto::point_t commitment_to_zero = (crypto::scalar_t(bare_inputs_sum) - crypto::scalar_t(fee)) * currency::native_coin_asset_id_pt + ogc.pseudo_out_amount_commitments_sum + (ogc.ao_commitment_in_outputs ? -ogc.ao_amount_commitment : ogc.ao_amount_commitment) - ogc.amount_commitments_sum;
       crypto::scalar_t secret_x = ogc.real_in_asset_id_blinding_mask_x_amount_sum - ogc.asset_id_blinding_mask_x_amount_sum;
@@ -472,7 +474,7 @@ namespace currency
     }
 
     CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS || height == 0, false, "Too many outs (" << destinations.size() << ")! Miner tx can't be constructed.");
-    tx = AUTO_VAL_INIT_T(transaction);
+    // tx is not cleared intentionally to allow passing additional args in the extra/attachments
     tx.version = tx_version;
 
     tx_generation_context tx_gen_context{};

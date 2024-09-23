@@ -1140,7 +1140,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(alt_blocks_with_the_same_txs, "3-*");
     GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_mixin, "3-*");
     GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_ref_id, "3-*");
-
+    GENERATE_AND_PLAY_HF(alt_chain_and_block_tx_fee_median, "3-*");
 
     // miscellaneous tests
     GENERATE_AND_PLAY(test_blockchain_vs_spent_keyimges);
@@ -1291,15 +1291,16 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(asset_depoyment_and_few_zc_utxos);
     GENERATE_AND_PLAY_HF(assets_and_pos_mining, "4-*");
     GENERATE_AND_PLAY_HF(asset_emission_and_unconfirmed_balance, "4-*");
+    GENERATE_AND_PLAY_HF(asset_operation_in_consolidated_tx, "4-*");
+    GENERATE_AND_PLAY_HF(asset_operation_and_hardfork_checks, "4-*");
     GENERATE_AND_PLAY_HF(eth_signed_asset_basics, "4-*"); // TODO
     GENERATE_AND_PLAY_HF(eth_signed_asset_via_rpc, "4-*");
-    
+
     GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
     
 
 
     GENERATE_AND_PLAY_HF(attachment_isolation_test, "4-*");
-    
 
     // GENERATE_AND_PLAY(gen_block_reward);
     // END OF TESTS  */

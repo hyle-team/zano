@@ -48,6 +48,39 @@ struct asset_emission_and_unconfirmed_balance : public wallet_test
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
 
+struct asset_operation_and_hardfork_checks : public wallet_test
+{
+  public:
+    asset_operation_and_hardfork_checks();
+
+    bool generate(std::vector<test_event_entry>& events) const;
+    bool c1(currency::core& c,
+            size_t ev_index,
+            const std::vector<test_event_entry>& events);
+
+    bool c2(currency::core& c,
+            size_t ev_index,
+            const std::vector<test_event_entry>& events);
+
+  private:
+    mutable currency::asset_descriptor_base m_adb_hello{};
+    mutable currency::asset_descriptor_operation m_ado_hello{};
+    mutable currency::asset_descriptor_base m_adb_bye{};
+    mutable currency::asset_descriptor_operation m_ado_bye{};
+};
+
+struct asset_operation_in_consolidated_tx : public wallet_test
+{
+public:
+  asset_operation_in_consolidated_tx();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool assert_balances(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool assert_alice_currency_not_registered(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+private:
+  mutable currency::asset_descriptor_base m_adb_alice_currency{};
+  mutable currency::asset_descriptor_operation m_ado_alice_currency{};
+};
 
 struct eth_signed_asset_basics : public wallet_test
 {
