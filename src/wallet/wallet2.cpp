@@ -5453,9 +5453,6 @@ void wallet2::emit_asset(const crypto::public_key& asset_id, const std::vector<c
   ctp.need_at_least_1_zc = true;
   ctp.tx_meaning_for_logs = "asset emission";
 
-  for(auto& dst : ctp.dsts)
-    dst.asset_id = null_pkey; // emit operation requires null_pkey for emitting asset outputs, fix it ad-hoc here
-
   bool send_to_network = true;
   if (last_adb.owner_eth_pub_key.has_value())
   {
