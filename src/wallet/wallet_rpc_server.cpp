@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -1334,6 +1334,46 @@ namespace tools
     currency::transaction result_tx;
     w.get_wallet()->burn_asset(req.asset_id, req.burn_amount, result_tx);
     res.result_tx = currency::get_transaction_hash(result_tx);
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_asset_send_ext_signed_tx(const wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::request& req, wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+
+    currency::finalized_tx ft{};
+    if (!t_unserializable_object_from_blob(ft, req.finalized_tx))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "finalized_tx couldn't be deserialized";
+      return false;
+    }
+
+    if (t_serializable_object_to_blob(ft.tx) != req.unsigned_tx)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "unsigned_tx doesn't match finalized_tx";
+      return false;
+    }
+
+    crypto::hash tx_id = currency::get_transaction_hash(ft.tx);
+    if (req.expected_tx_id != tx_id)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = std::string("expected_tx_id mismatch, real tx id is ") + epee::string_tools::pod_to_hex(tx_id);
+      return false;
+    }
+
+    try
+    {
+      currency::transaction result_tx{};
+      w.get_wallet()->submit_externally_signed_asset_tx(ft, req.eth_sig, req.unlock_transfers_on_fail, result_tx, res.transfers_were_unlocked);
+    }
+    catch(std::exception& e)
+    {
+      // doing this to be able to return 'transfers_were_unlocked' to the caller even in the case of exception
+      res.status = e.what();
+      return true;
+    }
+
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }

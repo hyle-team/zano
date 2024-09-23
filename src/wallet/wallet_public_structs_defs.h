@@ -13,7 +13,7 @@
 #include "currency_core/offers_service_basics.h"
 #include "currency_core/bc_escrow_service.h"
 #include "rpc/core_rpc_server_commands_defs.h"
-
+#include "currency_protocol/blobdatatype.h"
 
 
 const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64_t>::max();
@@ -2082,6 +2082,40 @@ namespace wallet_public
       END_KV_SERIALIZE_MAP()
     };
   };
+
+  struct COMMAND_ASSET_SEND_EXT_SIGNED_TX
+  {
+    DOC_COMMAND("Inserts externally made asset ownership signature into the given transaction and broadcasts it.");
+
+    struct request
+    {
+      currency::blobdata    finalized_tx;
+      currency::blobdata    unsigned_tx;
+      crypto::eth_signature eth_sig;
+      crypto::hash          expected_tx_id;
+      bool                  unlock_transfers_on_fail = false;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(finalized_tx)DOC_DSCR("Base64-encoded finalized_tx data structure, which was received from emit_asset call.") DOC_EXMP("ewogICJ2ZXJzaW9uIjogMSwgC....iAgInZpbiI6IFsgewogICAgIC") DOC_END
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(unsigned_tx) DOC_DSCR("Base64-encoded unsigned transaction blob, which was received from emit_asset call.") DOC_EXMP("083737bcfd826a973f74bb56a52b4fa562e6579ccaadd2697463498a66de4f1760b2cd40f11c3a00a7a80000") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(eth_sig)         DOC_DSCR("HEX-encoded ETH signature (64 bytes)") DOC_EXMP("674bb56a5b4fa562e679ccacc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6add697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(expected_tx_id)  DOC_DSCR("The expected transaction id. Tx won't be sent if the calculated one doesn't match this one. Consider using 'verified_tx_id' returned by 'decrypt_tx_details' call.") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
+        KV_SERIALIZE(unlock_transfers_on_fail)          DOC_DSCR("If true, all locked wallet transfers, corresponding to the transaction, will be unlocked on sending failure. False by default.") DOC_EXMP(false) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string           status;
+      bool                  transfers_were_unlocked;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)                     DOC_DSCR("Status of the call") DOC_EXMP("OK") DOC_END
+        KV_SERIALIZE(transfers_were_unlocked)    DOC_DSCR("If true, all input transfers that were locked when preparing this transaction, are now unlocked and may be spent. Can be true only upon sending failure and if requested.") DOC_EXMP(false) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
 
 } // namespace wallet_rpc
 } // namespace tools

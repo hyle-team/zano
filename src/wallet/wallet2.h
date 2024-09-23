@@ -595,6 +595,7 @@ namespace tools
     void sign_transfer_files(const std::string& tx_sources_file, const std::string& signed_tx_file, currency::transaction& tx);
     void submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx);
     void submit_transfer_files(const std::string& signed_tx_file, currency::transaction& tx);
+    void submit_externally_signed_asset_tx(const currency::finalized_tx& ft, const crypto::eth_signature& eth_sig, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked);
 
     void sweep_below(size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
       uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
