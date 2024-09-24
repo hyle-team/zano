@@ -4102,22 +4102,25 @@ bool blockchain_storage::pop_asset_info(const crypto::public_key& asset_id)
   return true;
 }
 //------------------------------------------------------------------
-bool validate_ado_ownership(asset_op_verification_context& avc)
+bool blockchain_storage::validate_ado_ownership(asset_op_verification_context& avc) const
 {
   bool r = false;
   CHECK_AND_ASSERT_MES(avc.asset_op_history->size() != 0, false, "asset with id " << avc.asset_id << " has empty history record");
   const asset_descriptor_operation& last_ado = avc.asset_op_history->back();
 
-  if (last_ado.descriptor.owner_eth_pub_key.has_value())
+  if (is_hardfork_active(ZANO_HARDFORK_05)) // TODO: consider changing to height-specific check
   {
-    CHECK_AND_ASSERT_MES(last_ado.descriptor.owner == null_pkey, false, "owner_eth_pub_key is set but owner pubkey is nonzero");
-    asset_operation_ownership_proof_eth aoop_eth{};
-    r = get_type_in_variant_container(avc.tx.proofs, aoop_eth);
-    CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed: asset_operation_ownership_proof_eth is missing");
-    return crypto::verify_eth_signature(avc.tx_id, last_ado.descriptor.owner_eth_pub_key.value(), aoop_eth.eth_sig);
+    if (last_ado.descriptor.owner_eth_pub_key.has_value())
+    {
+      CHECK_AND_ASSERT_MES(last_ado.descriptor.owner == null_pkey, false, "owner_eth_pub_key is set but owner pubkey is nonzero");
+      asset_operation_ownership_proof_eth aoop_eth{};
+      r = get_type_in_variant_container(avc.tx.proofs, aoop_eth);
+      CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed: asset_operation_ownership_proof_eth is missing");
+      return crypto::verify_eth_signature(avc.tx_id, last_ado.descriptor.owner_eth_pub_key.value(), aoop_eth.eth_sig);
+    }
+    // owner_eth_pub_key has no value -- fallback to default
   }
 
-  // owner_eth_pub_key has no value -- fallback to default
   asset_operation_ownership_proof aoop{};
   r = get_type_in_variant_container(avc.tx.proofs, aoop);
   CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed: asset_operation_ownership_proof is missing");
@@ -5814,6 +5817,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   bool var_is_after_hardfork_2_zone = m_core_runtime_config.is_hardfork_active_for_height(2, block_height);
   bool var_is_after_hardfork_3_zone = m_core_runtime_config.is_hardfork_active_for_height(3, block_height);
   bool var_is_after_hardfork_4_zone = m_core_runtime_config.is_hardfork_active_for_height(4, block_height);
+  bool var_is_after_hardfork_5_zone = m_core_runtime_config.is_hardfork_active_for_height(5, block_height);
 
   auto is_allowed_before_hardfork1 = [&](const auto& el) -> bool
   {
@@ -5943,10 +5947,20 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       LOG_ERROR("asset_descriptor_operation not allowed in tx with TX_FLAG_SIGNATURE_MODE_SEPARATE");
       return false;
     }
-
   }
 
-  // TODO @#@#: add check for descriptor.owner_eth_pub_key
+  if (var_is_after_hardfork_5_zone)
+  {
+    // additional checks here
+  }
+  else
+  {
+    if (count_type_in_variant_container<asset_operation_ownership_proof_eth>(tx.proofs) != 0)
+    {
+      LOG_ERROR("asset_operation_ownership_proof_eth is not allowed prior to HF5");
+      return false;
+    }
+  }
 
 
   return true;
