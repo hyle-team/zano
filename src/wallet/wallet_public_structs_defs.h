@@ -13,7 +13,7 @@
 #include "currency_core/offers_service_basics.h"
 #include "currency_core/bc_escrow_service.h"
 #include "rpc/core_rpc_server_commands_defs.h"
-
+#include "currency_protocol/blobdatatype.h"
 
 
 const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64_t>::max();
@@ -1982,7 +1982,7 @@ namespace wallet_public
   struct COMMAND_ASSETS_DEPLOY
   {
     DOC_COMMAND("Deploy new asset in the system.");
-    
+
     struct request
     {
       std::list<transfer_destination> destinations;
@@ -1999,14 +1999,30 @@ namespace wallet_public
 
     struct response
     {
-      crypto::hash result_tx;
+      crypto::hash tx_id;
       crypto::public_key new_asset_id;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx)   DOC_DSCR("Id of transaction that carries asset registration command, asset would be registered as soon as transaction got confirmed") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Id of transaction that carries asset registration command, asset would be registered as soon as transaction got confirmed") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(new_asset_id)  DOC_DSCR("Issued asset id") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
       END_KV_SERIALIZE_MAP()
     };
+  };
+
+  // contains data for external checking & signing asset-emitting/-updating transaction by a third-party
+  struct data_for_external_asset_signing_tx
+  {
+    currency::blobdata unsigned_tx;
+    crypto::secret_key tx_secret_key;
+    std::vector<std::string> outputs_addresses;
+    currency::blobdata finalized_tx;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE_BLOB_AS_BASE64_STRING(unsigned_tx) DOC_DSCR("Base64-encoded unsigned transaction blob.") DOC_EXMP("ewogICJ2ZXJzaW9uIjogMSwgC....iAgInZpbiI6IFsgewogICAgIC") DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(tx_secret_key)   DOC_DSCR("Hex-encoded transaction secret key.") DOC_EXMP("2e0b840e70dba386effd64c5d988622dea8c064040566e6bf035034cbb54a5c08") DOC_END
+      KV_SERIALIZE(outputs_addresses)                 DOC_DSCR("Target address for each of the transaction zoutput.") DOC_EXMP_AGGR("ZxDNaMeZjwCjnHuU5gUNyrP1pM3U5vckbakzzV6dEHyDYeCpW8XGLBFTshcaY8LkG9RQn7FsQx8w2JeJzJwPwuDm2NfixPAXf", "ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp") DOC_END
+      KV_SERIALIZE_BLOB_AS_BASE64_STRING(finalized_tx)DOC_DSCR("Base64-encoded finalized_tx data structure, which should be passed along with submitting the transaction.") DOC_EXMP("ewogICJ2ZXJzaW9uIjogMSwgC....iAgInZpbiI6IFsgewogICAgIC") DOC_END
+    END_KV_SERIALIZE_MAP()
   };
 
   struct COMMAND_ASSETS_EMIT
@@ -2026,13 +2042,14 @@ namespace wallet_public
       END_KV_SERIALIZE_MAP()
     };
 
-
     struct response
     {
-      crypto::hash result_tx;
-
+      crypto::hash tx_id;
+      std::optional<data_for_external_asset_signing_tx> data_for_external_signing;
+    
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx)   DOC_DSCR("Id of transaction that carries asset registration command, asset would be registered as soon as transaction got confirmed") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Id of transaction that emits the required asset.") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE(data_for_external_signing)  DOC_DSCR("[optional] Additional data for external asset tx signing.") DOC_EXMP_AGGR() DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -2054,10 +2071,12 @@ namespace wallet_public
 
     struct response
     {
-      crypto::hash result_tx;
+      crypto::hash tx_id;
+      std::optional<data_for_external_asset_signing_tx> data_for_external_signing;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx)   DOC_DSCR("Id of transaction that carries asset registration command, asset would be registered as soon as transaction got confirmed") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Id of transaction that carries asset registration command, asset would be registered as soon as transaction got confirmed") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE(data_for_external_signing)  DOC_DSCR("[optional] Hex-encoded transaction for external signing. ") DOC_EXMP_AGGR() DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -2079,13 +2098,47 @@ namespace wallet_public
 
     struct response
     {
-      crypto::hash result_tx;
+      crypto::hash tx_id;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(result_tx)   DOC_DSCR("Id of transaction that carries asset burn operation") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Id of transaction that carries asset burn operation") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
+
+  struct COMMAND_ASSET_SEND_EXT_SIGNED_TX
+  {
+    DOC_COMMAND("Inserts externally made asset ownership signature into the given transaction and broadcasts it.");
+
+    struct request
+    {
+      currency::blobdata    finalized_tx;
+      currency::blobdata    unsigned_tx;
+      crypto::eth_signature eth_sig;
+      crypto::hash          expected_tx_id;
+      bool                  unlock_transfers_on_fail = false;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(finalized_tx)DOC_DSCR("Base64-encoded finalized_tx data structure, which was received from emit_asset call.") DOC_EXMP("ewogICJ2ZXJzaW9uIjogMSwgC....iAgInZpbiI6IFsgewogICAgIC") DOC_END
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(unsigned_tx) DOC_DSCR("Base64-encoded unsigned transaction blob, which was received from emit_asset call.") DOC_EXMP("083737bcfd826a973f74bb56a52b4fa562e6579ccaadd2697463498a66de4f1760b2cd40f11c3a00a7a80000") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(eth_sig)         DOC_DSCR("HEX-encoded ETH signature (64 bytes)") DOC_EXMP("674bb56a5b4fa562e679ccacc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6add697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(expected_tx_id)  DOC_DSCR("The expected transaction id. Tx won't be sent if the calculated one doesn't match this one. Consider using 'verified_tx_id' returned by 'decrypt_tx_details' call.") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
+        KV_SERIALIZE(unlock_transfers_on_fail)          DOC_DSCR("If true, all locked wallet transfers, corresponding to the transaction, will be unlocked on sending failure. False by default.") DOC_EXMP(false) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string           status;
+      bool                  transfers_were_unlocked;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)                     DOC_DSCR("Status of the call") DOC_EXMP("OK") DOC_END
+        KV_SERIALIZE(transfers_were_unlocked)    DOC_DSCR("If true, all input transfers that were locked when preparing this transaction, are now unlocked and may be spent. Can be true only upon sending failure and if requested.") DOC_EXMP(false) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
 
 } // namespace wallet_rpc
 } // namespace tools

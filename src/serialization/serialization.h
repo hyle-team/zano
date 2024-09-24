@@ -238,8 +238,7 @@ bool t_unserializable_object_from_blob(t_object& to, const std::string& blob)
   ss << blob;
   binary_archive<false> ba(ss);
   bool r = ::serialization::serialize(ba, to);
-  CHECK_AND_ASSERT_MES(r, false, "Failed to parse block from blob");
-  return true;
+  return r;
 }
 //---------------------------------------------------------------
 template<class t_object>

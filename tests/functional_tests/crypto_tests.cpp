@@ -20,6 +20,7 @@
 #include "crypto/range_proofs.h"
 #include "../core_tests/random_helper.h"
 #include "crypto_torsion_elements.h"
+#include "crypto/eth_signature.h"
 
 using namespace crypto;
 
@@ -1895,6 +1896,93 @@ TEST(crypto, generators_precomp)
 
 #undef CHECK_PRECOMP
 }
+
+#include "bitcoin-secp256k1/include/secp256k1.h"
+TEST(crypto, secp256k1_ecdsa_native)
+{
+  bool r = false;
+
+  secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
+  uint8_t randomness[32];
+  crypto::generate_random_bytes(sizeof randomness, randomness);
+  secp256k1_context_randomize(ctx, randomness);
+
+  uint8_t seckey[32] = {};
+  while(true)
+  {
+    crypto::generate_random_bytes(sizeof seckey, seckey);
+    if (secp256k1_ec_seckey_verify(ctx, seckey))
+      break;
+  }
+
+  secp256k1_pubkey pubkey{};
+  ASSERT_TRUE(secp256k1_ec_pubkey_create(ctx, &pubkey, seckey));
+  
+  uint8_t compressed_pubkey[33] = {};
+  size_t output_len = sizeof compressed_pubkey;
+  ASSERT_TRUE(secp256k1_ec_pubkey_serialize(ctx, compressed_pubkey, &output_len, &pubkey, SECP256K1_EC_COMPRESSED));
+  ASSERT_TRUE(output_len == sizeof compressed_pubkey);
+
+
+  secp256k1_ecdsa_signature secp256k1_ecdsa_sig{};
+  hash msg_hash = hash_helper_t::h("message");
+  ASSERT_TRUE(secp256k1_ecdsa_sign(ctx, &secp256k1_ecdsa_sig, (const unsigned char*)&msg_hash, seckey, NULL, NULL));
+
+  // Serialize the signature in a compact form.
+  unsigned char secp256k1_ecdsa_sig_serialized[64] = {};
+  ASSERT_TRUE(secp256k1_ecdsa_signature_serialize_compact(ctx, secp256k1_ecdsa_sig_serialized, &secp256k1_ecdsa_sig));
+
+  //
+  // Verification
+  //
+
+  secp256k1_ecdsa_sig = secp256k1_ecdsa_signature{};
+  pubkey = secp256k1_pubkey{};
+
+  // Deserialize the signature.
+  ASSERT_TRUE(secp256k1_ecdsa_signature_parse_compact(ctx, &secp256k1_ecdsa_sig, secp256k1_ecdsa_sig_serialized));
+
+  // Deserialize the public key. This will return 0 if the public key can't be parsed correctly. */
+  ASSERT_TRUE(secp256k1_ec_pubkey_parse(ctx, &pubkey, compressed_pubkey, sizeof(compressed_pubkey)));
+
+  // verify a signature
+  ASSERT_TRUE(secp256k1_ecdsa_verify(ctx, &secp256k1_ecdsa_sig, (const unsigned char*)&msg_hash, &pubkey));
+
+  // verify using a static context
+  ASSERT_TRUE(secp256k1_ecdsa_verify(secp256k1_context_static, &secp256k1_ecdsa_sig, (const unsigned char*)&msg_hash, &pubkey));
+
+  
+  // Epilogue
+  secp256k1_context_destroy(ctx);
+  return true;
+}
+
+
+TEST(crypto, eth_signature_basics)
+{
+  eth_secret_key sk{};
+  eth_public_key pk{};
+
+  ASSERT_TRUE(generate_eth_key_pair(sk, pk));
+
+  eth_signature sig{};
+  hash m = hash_helper_t::h("How many of you have ever felt personally victimized by elliptic curves?");
+  
+  ASSERT_TRUE(generate_eth_signature(m, sk, sig));
+
+  const eth_signature const_sig = sig;
+  ASSERT_TRUE(verify_eth_signature(m, pk, const_sig));
+
+  for(size_t i = 0; i < sizeof sig; ++i)
+  {
+    eth_signature bad_sig = sig;
+    bad_sig.data[i] ^= 1 + (rand() % 254); // xor with a number fom [1; 255] to make sure this byte will change
+    ASSERT_FALSE(verify_eth_signature(m, pk, bad_sig));
+  }
+
+  return true;
+}
+
 
 
 

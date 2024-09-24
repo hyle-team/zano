@@ -1,3 +1,4 @@
+// Copyright (c) 2024, Zano Project
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
@@ -473,6 +474,29 @@ namespace epee
       return r;
     }
     //-------------------------------------------------------------------------------------------------------------------
+    //std::optional 
+    template<class t_type, class t_storage>
+    bool kv_serialize(const std::optional<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+    {
+      if(d.has_value())
+      {
+        return kv_serialize(*d, stg, hparent_section, pname);
+      }
+      return true;
+    }
+    //-------------------------------------------------------------------------------------------------------------------
+    template<class t_type, class t_storage>
+    bool kv_unserialize(std::optional<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+    {
+      d = t_type{};
+      bool r = kv_unserialize(*d, stg, hparent_section, pname);
+      if (!r)
+      {
+        d = std::nullopt;
+      }
+      return r;
+    }
+    //-------------------------------------------------------------------------------------------------------------------
     //boost::shared_ptr 
     template<class t_type, class t_storage>
     bool kv_serialize(const boost::shared_ptr<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
@@ -486,6 +510,30 @@ namespace epee
     //-------------------------------------------------------------------------------------------------------------------
     template<class t_type, class t_storage>
     bool kv_unserialize(boost::shared_ptr<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+    {
+      d.reset();
+      t_type* ptr = new t_type();
+      bool r = kv_unserialize(*ptr, stg, hparent_section, pname);
+      if (!r)
+      {
+        d.reset(ptr);
+      }
+      return r;
+    }
+    //-------------------------------------------------------------------------------------------------------------------
+    //std::shared_ptr 
+    template<class t_type, class t_storage>
+    bool kv_serialize(const std::shared_ptr<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+    {
+      if (d.get())
+      {
+        return kv_serialize(*d, stg, hparent_section, pname);
+      }
+      return true;
+    }
+    //-------------------------------------------------------------------------------------------------------------------
+    template<class t_type, class t_storage>
+    bool kv_unserialize(std::shared_ptr<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
     {
       d.reset();
       t_type* ptr = new t_type();

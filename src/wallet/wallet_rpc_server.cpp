@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -1312,51 +1312,128 @@ namespace tools
     }
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_assets_deploy(const wallet_public::COMMAND_ASSETS_DEPLOY::request& req, wallet_public::COMMAND_ASSETS_DEPLOY::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_asset_deploy(const wallet_public::COMMAND_ASSETS_DEPLOY::request& req, wallet_public::COMMAND_ASSETS_DEPLOY::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
 
-    currency::transaction result_tx;
     std::vector<currency::tx_destination_entry> currency_destinations;
     rpc_destinations_to_currency_destinations(req.destinations, true, !req.do_not_split_destinations, currency_destinations);
 
-    w.get_wallet()->deploy_new_asset(req.asset_descriptor, currency_destinations, result_tx, res.new_asset_id);
-    res.result_tx = currency::get_transaction_hash(result_tx);
+    currency::finalized_tx ft{};
+    w.get_wallet()->deploy_new_asset(req.asset_descriptor, currency_destinations, ft, res.new_asset_id);
+    res.tx_id = ft.tx_id;
+
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_assets_emit(const wallet_public::COMMAND_ASSETS_EMIT::request& req, wallet_public::COMMAND_ASSETS_EMIT::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_asset_emit(const wallet_public::COMMAND_ASSETS_EMIT::request& req, wallet_public::COMMAND_ASSETS_EMIT::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
-    currency::transaction result_tx;
+    currency::asset_descriptor_base last_adb{};
+    CHECK_AND_ASSERT_THROW_MES(w.get_wallet()->daemon_get_asset_info(req.asset_id, last_adb), "unknown asset_id"); // TODO: bad design, consider refactoring -- sowle
+
     std::vector<currency::tx_destination_entry> currency_destinations;
     rpc_destinations_to_currency_destinations(req.destinations, true, !req.do_not_split_destinations, currency_destinations);
 
-    w.get_wallet()->emit_asset(req.asset_id, currency_destinations, result_tx);
-    res.result_tx = currency::get_transaction_hash(result_tx);
-    return true;
+    currency::finalized_tx ft{};
+    w.get_wallet()->emit_asset(req.asset_id, currency_destinations, ft);
+    res.tx_id = ft.tx_id;
 
+    if (last_adb.owner_eth_pub_key.has_value())
+    {
+      // include additonal info into response, if it's an external signing asset operation
+      wallet_public::data_for_external_asset_signing_tx data{};
+      data.unsigned_tx = t_serializable_object_to_blob(ft.tx);
+      data.tx_secret_key = ft.one_time_key;
+      std::vector<std::string>& outs_addr = data.outputs_addresses;
+      for(auto d : ft.ftp.prepared_destinations)
+        outs_addr.push_back(currency::get_account_address_as_str(d.addr.back()));
+      data.finalized_tx = t_serializable_object_to_blob(ft);
+
+      res.data_for_external_signing = data;
+    }
+
+    return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_assets_update(const wallet_public::COMMAND_ASSETS_UPDATE::request& req, wallet_public::COMMAND_ASSETS_UPDATE::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_asset_update(const wallet_public::COMMAND_ASSETS_UPDATE::request& req, wallet_public::COMMAND_ASSETS_UPDATE::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
-    currency::transaction result_tx;
-    w.get_wallet()->update_asset(req.asset_id, req.asset_descriptor, result_tx);
-    res.result_tx = currency::get_transaction_hash(result_tx);
-    return true;
+    currency::finalized_tx ft{};
+    w.get_wallet()->update_asset(req.asset_id, req.asset_descriptor, ft);
+    res.tx_id = ft.tx_id;
 
+    if (req.asset_descriptor.owner_eth_pub_key.has_value())
+    {
+      // include additonal info into response, if it's an external signing asset operation
+      wallet_public::data_for_external_asset_signing_tx data{};
+      data.unsigned_tx = t_serializable_object_to_blob(ft.tx);
+      data.tx_secret_key = ft.one_time_key;
+      std::vector<std::string>& outs_addr = data.outputs_addresses;
+      for(auto d : ft.ftp.prepared_destinations)
+        outs_addr.push_back(currency::get_account_address_as_str(d.addr.back()));
+      data.finalized_tx = t_serializable_object_to_blob(ft);
+
+      res.data_for_external_signing = data;
+    }
+
+    return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }  
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_assets_burn(const wallet_public::COMMAND_ASSETS_BURN::request& req, wallet_public::COMMAND_ASSETS_BURN::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_asset_burn(const wallet_public::COMMAND_ASSETS_BURN::request& req, wallet_public::COMMAND_ASSETS_BURN::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
-    currency::transaction result_tx;
-    w.get_wallet()->burn_asset(req.asset_id, req.burn_amount, result_tx);
-    res.result_tx = currency::get_transaction_hash(result_tx);
+
+    currency::finalized_tx ft{};
+    w.get_wallet()->burn_asset(req.asset_id, req.burn_amount, ft);
+    res.tx_id = ft.tx_id;
+
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_asset_send_ext_signed_tx(const wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::request& req, wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+
+    currency::finalized_tx ft{};
+    if (!t_unserializable_object_from_blob(ft, req.finalized_tx))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "finalized_tx couldn't be deserialized";
+      return false;
+    }
+
+    if (t_serializable_object_to_blob(ft.tx) != req.unsigned_tx)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "unsigned_tx doesn't match finalized_tx";
+      return false;
+    }
+
+    crypto::hash tx_id = currency::get_transaction_hash(ft.tx);
+    if (req.expected_tx_id != tx_id)
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = std::string("expected_tx_id mismatch, real tx id is ") + epee::string_tools::pod_to_hex(tx_id);
+      return false;
+    }
+
+    try
+    {
+      currency::transaction result_tx{};
+      w.get_wallet()->submit_externally_signed_asset_tx(ft, req.eth_sig, req.unlock_transfers_on_fail, result_tx, res.transfers_were_unlocked);
+    }
+    catch(std::exception& e)
+    {
+      // doing this to be able to return 'transfers_were_unlocked' to the caller even in the case of exception
+      res.status = e.what();
+      return true;
+    }
+
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }

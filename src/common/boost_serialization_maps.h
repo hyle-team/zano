@@ -4,7 +4,7 @@
 
 #pragma once
 
-#define BEGIN_BOOST_SERIALIZATION()     template <class t_archive> inline void serialize(t_archive &_arch, const unsigned int ver) {
+#define BEGIN_BOOST_SERIALIZATION()     template <class t_archive> void serialize(t_archive &_arch, const unsigned int ver) {
 
 template<size_t A, size_t B> struct TAssertEquality {
   static_assert(A == B, "Serialization map is not updated, sizeof() missmatch");

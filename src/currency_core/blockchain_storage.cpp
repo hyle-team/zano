@@ -4008,7 +4008,8 @@ bool blockchain_storage::put_alias_info(const transaction & tx, extra_alias_entr
     //@@ remove get_tx_fee_median();
     LOG_PRINT_MAGENTA("[ALIAS_REGISTERED]: " << ai.m_alias << ": " << get_account_address_as_str(ai.m_address) << ", fee median: " << get_tx_fee_median(), LOG_LEVEL_1);
     rise_core_event(CORE_EVENT_ADD_ALIAS, alias_info_to_rpc_alias_info(ai));
-  }else
+  }
+  else
   {
     //update procedure
     CHECK_AND_ASSERT_MES(ai.m_sign.size() == 1, false, "alias " << ai.m_alias << " can't be update, wrong ai.m_sign.size() count: " << ai.m_sign.size());
@@ -4103,14 +4104,25 @@ bool blockchain_storage::pop_asset_info(const crypto::public_key& asset_id)
 //------------------------------------------------------------------
 bool validate_ado_ownership(asset_op_verification_context& avc)
 {
-  asset_operation_ownership_proof aoop = AUTO_VAL_INIT(aoop);
-  bool r = get_type_in_variant_container(avc.tx.proofs, aoop);
-  CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed - missing signature (asset_operation_ownership_proof)");
+  bool r = false;
+  CHECK_AND_ASSERT_MES(avc.asset_op_history->size() != 0, false, "asset with id " << avc.asset_id << " has empty history record");
+  const asset_descriptor_operation& last_ado = avc.asset_op_history->back();
 
-  CHECK_AND_ASSERT_MES(avc.asset_op_history->size() != 0, false, "asset with id " << avc.asset_id << " has invalid history size() == 0");
+  if (last_ado.descriptor.owner_eth_pub_key.has_value())
+  {
+    CHECK_AND_ASSERT_MES(last_ado.descriptor.owner == null_pkey, false, "owner_eth_pub_key is set but owner pubkey is nonzero");
+    asset_operation_ownership_proof_eth aoop_eth{};
+    r = get_type_in_variant_container(avc.tx.proofs, aoop_eth);
+    CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed: asset_operation_ownership_proof_eth is missing");
+    return crypto::verify_eth_signature(avc.tx_id, last_ado.descriptor.owner_eth_pub_key.value(), aoop_eth.eth_sig);
+  }
 
-  crypto::public_key owner_key = avc.asset_op_history->back().descriptor.owner;
-  return crypto::verify_schnorr_sig(avc.tx_id, owner_key, aoop.gss);
+  // owner_eth_pub_key has no value -- fallback to default
+  asset_operation_ownership_proof aoop{};
+  r = get_type_in_variant_container(avc.tx.proofs, aoop);
+  CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed: asset_operation_ownership_proof is missing");
+
+  return crypto::verify_schnorr_sig(avc.tx_id, last_ado.descriptor.owner, aoop.gss);
 }
 //------------------------------------------------------------------
 bool blockchain_storage::validate_asset_operation_against_current_blochain_state(asset_op_verification_context& avc) const
@@ -4122,11 +4134,12 @@ bool blockchain_storage::validate_asset_operation_against_current_blochain_state
 
   const asset_descriptor_operation& ado = avc.ado;
 
+  bool need_to_validate_ao_amount_commitment = true;
+
   if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
   {
     CHECK_AND_ASSERT_MES(!avc.asset_op_history, false, "asset with id " << avc.asset_id << " has already been registered");
     avc.amount_to_validate = ado.descriptor.current_supply;
-    CHECK_AND_ASSERT_MES(validate_asset_operation_amount_commitment(avc), false, "validate_asset_operation_amount_commitment failed!");
     if(this->is_hardfork_active(ZANO_HARDFORK_05))
     {
       CHECK_AND_ASSERT_MES(validate_ado_initial(ado.descriptor), false, "validate_ado_initial failed!");
@@ -4134,48 +4147,48 @@ bool blockchain_storage::validate_asset_operation_against_current_blochain_state
   }
   else
   {
-    CHECK_AND_ASSERT_MES(avc.asset_op_history && avc.asset_op_history->size(), false, "asset with id " << avc.asset_id << " has not been registered");
+    CHECK_AND_ASSERT_MES(avc.asset_op_history && avc.asset_op_history->size() > 0, false, "asset with id " << avc.asset_id << " has not been registered");
+    const asset_descriptor_operation& last_ado = avc.asset_op_history->back();
     // check ownership permission
-    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE /*|| ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN*/)
+    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
     {
       bool r = validate_ado_ownership(avc);
-      CHECK_AND_ASSERT_MES(r, false, "Faild to validate ownership of asset_descriptor_operation, rejecting");
+      CHECK_AND_ASSERT_MES(r, false, "Failed to validate ownership of asset_descriptor_operation, rejecting");
     }
 
     avc.amount_to_validate = 0;
-    bool need_to_validate_balance_proof = true;
     if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
     {
       //check that total current_supply haven't changed
-      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply == avc.asset_op_history->back().descriptor.current_supply, false, "update operation attempted to change emission, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, avc.asset_op_history->back().descriptor), false, "update operation attempted to change fileds that shouldn't be modified, failed");
-      need_to_validate_balance_proof = false;
+      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply == last_ado.descriptor.current_supply, false, "update operation attempted to change emission, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_ado.descriptor), false, "update operation modifies asset descriptor in a prohibited manner");
+      need_to_validate_ao_amount_commitment = false;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
     {
-      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > avc.asset_op_history->back().descriptor.current_supply, false, "emit operation does not increase the current supply, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, avc.asset_op_history->back().descriptor), false, "emit operation is not allowed to update fields");
-      CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == avc.asset_op_history->back().descriptor.meta_info, false, "emit operation is not allowed to update meta info");
-      avc.amount_to_validate = ado.descriptor.current_supply - avc.asset_op_history->back().descriptor.current_supply;
+      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > last_ado.descriptor.current_supply, false, "emit operation does not increase the current supply, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_ado.descriptor), false, "emit operation modifies asset descriptor in a prohibited manner");
+      CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == last_ado.descriptor.meta_info, false, "emit operation is not allowed to update meta info");
+      avc.amount_to_validate = ado.descriptor.current_supply - last_ado.descriptor.current_supply;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
     {
-      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply < avc.asset_op_history->back().descriptor.current_supply, false, "burn operation does not decrease the current supply, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, avc.asset_op_history->back().descriptor), false, "burn operation is not allowed to update fields");
-      CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == avc.asset_op_history->back().descriptor.meta_info, false, "burn operation is not allowed to update meta info");
-      avc.amount_to_validate =  avc.asset_op_history->back().descriptor.current_supply - ado.descriptor.current_supply;
+      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply < last_ado.descriptor.current_supply, false, "burn operation does not decrease the current supply, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_ado.descriptor), false, "burn operation modifies asset descriptor in a prohibited manner");
+      CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == last_ado.descriptor.meta_info, false, "burn operation is not allowed to update meta info");
+      avc.amount_to_validate =  last_ado.descriptor.current_supply - ado.descriptor.current_supply;
     }
     else
     {
       LOG_ERROR("Unknown operation type: " << (int)ado.operation_type);
       return false;
     }
+  }
 
-    if (need_to_validate_balance_proof)
-    {
-      bool r = validate_asset_operation_amount_commitment(avc);
-      CHECK_AND_ASSERT_MES(r, false, "Balance proof validation failed for asset_descriptor_operation");
-    }
+  if (need_to_validate_ao_amount_commitment)
+  {
+    bool r = validate_asset_operation_amount_commitment(avc);
+    CHECK_AND_ASSERT_MES(r, false, "Balance proof validation failed for asset_descriptor_operation");
   }
 
   return true;
@@ -5932,6 +5945,10 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     }
 
   }
+
+  // TODO @#@#: add check for descriptor.owner_eth_pub_key
+
+
   return true;
 }
 //------------------------------------------------------------------

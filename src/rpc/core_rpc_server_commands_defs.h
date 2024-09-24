@@ -179,6 +179,58 @@ namespace currency
     };
   };
 
+
+  struct COMMAND_RPC_DECRYPT_TX_DETAILS
+  {
+    DOC_COMMAND("Decrypts transaction private information. Should be used only with your own local daemon for security reasons.");
+
+    struct request
+    {
+      std::string tx_id;
+      currency::blobdata tx_blob;
+      crypto::secret_key tx_secret_key;
+      std::vector<std::string> outputs_addresses;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tx_id)                      DOC_DSCR("[either] ID for a transaction if it is already in the blockchain. Can be ommited if tx_blob is provided.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+        KV_SERIALIZE(tx_blob)                    DOC_DSCR("[or] base64-encoded or hex-encoded tx blob. Can be ommited if tx_id is provided.") DOC_EXMP("ewogICJ2ZXJzaW9uIjogMSwgC....iAgInZpbiI6IFsgewogICAgIC") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_secret_key) DOC_DSCR("Hex-encoded transaction secret key.") DOC_EXMP("2e0b840e70dba386effd64c5d988622dea8c064040566e6bf035034cbb54a5c08") DOC_END
+        KV_SERIALIZE(outputs_addresses)          DOC_DSCR("Address of each of tx's output. Order is important and should correspond to order of tx's outputs. Empty strings are ignored.") DOC_EXMP_AGGR("ZxDNaMeZjwCjnHuU5gUNyrP1pM3U5vckbakzzV6dEHyDYeCpW8XGLBFTshcaY8LkG9RQn7FsQx8w2JeJzJwPwuDm2NfixPAXf", "ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    // TODO consider reusing existing structure transfer_destination -- sowle
+    struct decoded_output
+    {
+      uint64_t amount = 0;
+      std::string address;
+      crypto::public_key asset_id;
+      uint64_t out_index;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(amount)                      DOC_DSCR("Amount begin transferred.") DOC_EXMP(10000000000000)     DOC_END
+        KV_SERIALIZE(address)                     DOC_DSCR("Destination address.") DOC_EXMP("ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp")     DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Asset id.") DOC_EXMP("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852")     DOC_END
+        KV_SERIALIZE(out_index)                   DOC_DSCR("Index of the corresponding output in the transaction.") DOC_EXMP(1) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+      std::vector<decoded_output> decoded_outputs;
+      std::string tx_in_json;
+      crypto::hash verified_tx_id;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)                     DOC_DSCR("Status code of operation, OK if success") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE(decoded_outputs)            DOC_DSCR("Transaction's decoded outputs") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(tx_in_json) DOC_DSCR("Serialized transaction represented in JSON, encoded in Base64.") DOC_EXMP("ewogICJ2ZXJzaW9uIjogMSwgC....iAgInZpbiI6IFsgewogICAgIC") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(verified_tx_id) DOC_DSCR("(Re)calculated transaction id. Can be used in third-party proof generation.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
   struct COMMAND_RPC_GET_HEIGHT
   {
     DOC_COMMAND("Return current blockchain height");
@@ -643,12 +695,14 @@ namespace currency
     struct request
 		{
 			std::string tx_as_hex;
+      std::string tx_as_json;
 
 			request() {}
 			explicit request(const transaction &);
 
 			BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(tx_as_hex)                  DOC_DSCR("The transaction data as a hexadecimal string, ready for network broadcast.") DOC_EXMP("00018ed1535b8b4862e.....368cdc5a86") DOC_END
+        KV_SERIALIZE(tx_as_hex)                  DOC_DSCR("[either] The transaction data as a hexadecimal string, ready for network broadcast.") DOC_EXMP("00018ed1535b8b4862e.....368cdc5a86") DOC_END
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(tx_as_json) DOC_DSCR("[or] The transaction data as a base64-encoded json, ready for network broadcast.") DOC_EXMP("ARMBgKCUpY0dBBoAAAAAAAAAABoCAAAAA.......AAAAAAAAABoPAAAAAAAAACVA4FRLH") DOC_END
       END_KV_SERIALIZE_MAP()
 		};
 

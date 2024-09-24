@@ -264,13 +264,13 @@ bool generate_and_play(const char* const genclass_name, size_t hardfork_id = SIZ
 
   if (result)
   {
-    LOG_PRINT_GREEN(std::string(100, '=') << std::endl <<
+    LOG_PRINT_GREEN(std::string(72, '=') << std::endl <<
       "#TEST# >>>> " << genclass_name << " <<<< Succeeded" << std::endl <<
       std::string(100, '=') << std::endl, LOG_LEVEL_0 );
   }
   else
   {
-    LOG_PRINT_RED( std::string(100, '=') << std::endl <<
+    LOG_PRINT_RED( std::string(72, '=') << std::endl <<
       "#TEST# >>>> " << genclass_name << " <<<< FAILED" << std::endl <<
       std::string(100, '=') << std::endl, LOG_LEVEL_0);
     result = false;
@@ -1293,7 +1293,9 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(asset_emission_and_unconfirmed_balance, "4-*");
     GENERATE_AND_PLAY_HF(asset_operation_in_consolidated_tx, "4-*");
     GENERATE_AND_PLAY_HF(asset_operation_and_hardfork_checks, "4-*");
-    
+    GENERATE_AND_PLAY_HF(eth_signed_asset_basics, "4-*"); // TODO
+    GENERATE_AND_PLAY_HF(eth_signed_asset_via_rpc, "4-*");
+
     GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
     
 

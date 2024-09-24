@@ -125,7 +125,7 @@ namespace
 {
   const command_line::arg_descriptor<std::string>   arg_wallet_file  ("wallet-file", "Use wallet <arg>", "");
   const command_line::arg_descriptor<std::string>   arg_generate_new_wallet  ("generate-new-wallet", "Generate new wallet and save it to <arg> or <address>.wallet by default", "");
-  const command_line::arg_descriptor<bool>   arg_derive_custom_seed("derive_custom_seed", "Derive seed phrase from custom 24-words secret(advanced option, do it on your own risk)", "");
+  const command_line::arg_descriptor<bool>          arg_derive_custom_seed("derive_custom_seed", "Derive seed phrase from custom 24-words secret(advanced option, do it on your own risk)", "");
   const command_line::arg_descriptor<std::string>   arg_generate_new_auditable_wallet  ("generate-new-auditable-wallet", "Generate new auditable wallet and store it to <arg>", "");
   const command_line::arg_descriptor<std::string>   arg_daemon_address  ("daemon-address", "Use daemon instance at <host>:<port>", "");
   const command_line::arg_descriptor<std::string>   arg_daemon_host  ("daemon-host", "Use daemon instance at host <arg> instead of localhost", "");
@@ -2094,11 +2094,11 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
   td.asset_id = currency::null_pkey;
   std::vector<currency::tx_destination_entry> destinations;
   destinations.push_back(td);
-  currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
+  currency::finalized_tx ft{};
   crypto::public_key result_asset_id = currency::null_pkey;
-  m_wallet->deploy_new_asset(adb, destinations, result_tx, result_asset_id);
+  m_wallet->deploy_new_asset(adb, destinations, ft, result_asset_id);
 
-  success_msg_writer(true) << "New asset successfully deployed with tx " << get_transaction_hash(result_tx) << " (unconfirmed) : " << ENDL
+  success_msg_writer(true) << "New asset successfully deployed with tx " << ft.tx_id << " (unconfirmed) : " << ENDL
     << "Asset ID:     " << result_asset_id << ENDL
     << "Title:        " << adb.full_name << ENDL
     << "Ticker:       " << adb.ticker << ENDL
@@ -3200,7 +3200,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, command_line::arg_generate_rpc_autodoc); 
   command_line::add_arg(desc_params, arg_seed_doctor);
   command_line::add_arg(desc_params, arg_derive_custom_seed);
-  
+
 
   tools::wallet_rpc_server::init_options(desc_params);
 
@@ -3277,7 +3277,6 @@ int main(int argc, char* argv[])
   }
 
   bool offline_mode = command_line::get_arg(vm, arg_offline_mode);
-
 
   if (command_line::has_arg(vm, arg_seed_doctor))
   {
