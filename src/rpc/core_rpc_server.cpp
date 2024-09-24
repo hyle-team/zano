@@ -1376,7 +1376,7 @@ namespace currency
 
     LOCAL_CHECK(req.address != account_public_address{}, "address is missing");
     LOCAL_CHECK(req.viewkey != null_skey, "viewkey is missing");
-    LOCAL_CHECK(0 <= req.blocks_limit && req.blocks_limit <= 5, "blocks_limit is out of allowed bounds");
+    LOCAL_CHECK(req.blocks_limit <= 5, "blocks_limit is out of allowed bounds");
 
     // verify addess keys
     crypto::point_t view_pk, spend_pk;
