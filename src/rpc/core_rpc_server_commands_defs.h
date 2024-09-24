@@ -688,34 +688,32 @@ namespace currency
   };
 
   //-----------------------------------------------
-	struct COMMAND_RPC_SEND_RAW_TX
-	{
+  struct COMMAND_RPC_SEND_RAW_TX
+  {
     DOC_COMMAND("Broadcasts a raw transaction encoded in hexadecimal format to the network.");
 
     struct request
-		{
-			std::string tx_as_hex;
-      std::string tx_as_json;
+    {
+      std::string tx_as_hex;
 
-			request() {}
-			explicit request(const transaction &);
+      request() {}
+      explicit request(const transaction &);
 
-			BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(tx_as_hex)                  DOC_DSCR("[either] The transaction data as a hexadecimal string, ready for network broadcast.") DOC_EXMP("00018ed1535b8b4862e.....368cdc5a86") DOC_END
-        KV_SERIALIZE_BLOB_AS_BASE64_STRING(tx_as_json) DOC_DSCR("[or] The transaction data as a base64-encoded json, ready for network broadcast.") DOC_EXMP("ARMBgKCUpY0dBBoAAAAAAAAAABoCAAAAA.......AAAAAAAAABoPAAAAAAAAACVA4FRLH") DOC_END
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tx_as_hex)                  DOC_DSCR("The transaction data as a hexadecimal string, ready for network broadcast.") DOC_EXMP("00018ed1535b8b4862e.....368cdc5a86") DOC_END
       END_KV_SERIALIZE_MAP()
-		};
+    };
 
 
-		struct response
-		{
-			std::string status;
+    struct response
+    {
+      std::string status;
 
-			BEGIN_KV_SERIALIZE_MAP()
-				KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
-			END_KV_SERIALIZE_MAP()
-		};
-	};
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
 
   //-----------------------------------------------
 
@@ -726,7 +724,7 @@ namespace currency
       std::vector<std::string> txs_as_hex;
 
       BEGIN_KV_SERIALIZE_MAP()
-				KV_SERIALIZE(txs_as_hex)                 DOC_DSCR("List of transactions as a hexadecimal strings.") DOC_EXMP_AGGR("000535b8b2e.....3685a86", "00087368b2e.....349b77f") DOC_END
+        KV_SERIALIZE(txs_as_hex)                 DOC_DSCR("List of transactions as a hexadecimal strings.") DOC_EXMP_AGGR("000535b8b2e.....3685a86", "00087368b2e.....349b77f") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
