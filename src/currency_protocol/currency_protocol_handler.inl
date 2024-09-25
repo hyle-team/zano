@@ -1020,7 +1020,7 @@ namespace currency
     if (min_allowed_build_number == SIZE_MAX)
       min_allowed_build_number = m_core.get_blockchain_storage().get_core_runtime_config().get_min_allowed_build_version_for_height(m_core.get_top_block_height() + 1);
 
-    if (build_number < min_allowed_build_number)
+    if (build_number < static_cast<int>(min_allowed_build_number))
       return false;
 
     return true;
