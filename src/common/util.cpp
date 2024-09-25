@@ -658,31 +658,68 @@ std::string get_nix_version_display_string()
     return static_cast<uint64_t>(in.tellg());
   }
 
-  bool check_remote_client_version(const std::string& client_ver)
+  bool parse_client_version(const std::string& str, int& major, int& minor, int& revision, int& build_number, std::string& commit_id, bool& dirty)
   {
-    std::string v = client_ver.substr(0, client_ver.find('[')); // remove commit id
-    v = v.substr(0, v.rfind('.')); // remove build number
+    // "10.101.999.28391"
+    // "10.101.999.28391[deadbeef31337]"
+    // "10.101.999.28391[deadbeef31337-dirty]"
+    //  0123456789012345678901234567890123456
 
-    int v_major = 0, v_minor = 0, v_revision = 0;
-
-    size_t dot_pos = v.find('.');
-    if (dot_pos == std::string::npos || !epee::string_tools::string_to_num_fast(v.substr(0, dot_pos), v_major))
+    if (str.size() == 0)
       return false;
 
-    v = v.substr(dot_pos + 1);
-    dot_pos = v.find('.');
-    if (!epee::string_tools::string_to_num_fast(v.substr(0, dot_pos), v_minor))
-      return false;
-
-    if (dot_pos != std::string::npos)
+    auto bracket_pos = str.find('[');
+    if (bracket_pos != std::string::npos)
     {
-      // revision
-      v = v.substr(dot_pos + 1);
-      if (!epee::string_tools::string_to_num_fast(v, v_revision))
+      if (str[str.size() - 1] != ']')
         return false;
+
+      commit_id = str.substr(bracket_pos + 1, str.size() - bracket_pos - 2);
+      auto d_pos = commit_id.find("-dirty");
+      if (d_pos != std::string::npos)
+      {
+        dirty = true;
+        commit_id.erase(d_pos);
+      }
     }
 
-    // got v_major, v_minor, v_revision
+    std::string ver_str = str.substr(0, bracket_pos);
+    std::vector<std::string> versions;
+    boost::split(versions, ver_str, boost::is_any_of("."));
+    if (versions.size() != 4)
+      return false;
+
+    if (!epee::string_tools::string_to_num_fast(versions[0], major))
+      return false;
+
+    if (!epee::string_tools::string_to_num_fast(versions[1], minor))
+      return false;
+
+    if (!epee::string_tools::string_to_num_fast(versions[2], revision))
+      return false;
+
+    if (!epee::string_tools::string_to_num_fast(versions[3], build_number))
+      return false;
+
+    return true;
+  }
+
+  bool parse_client_version_build_number(const std::string& str, int& build_number)
+  {
+    int major = -1, minor = -1, revision = -1;
+    std::string commit_id;
+    bool dirty = false;
+    return tools::parse_client_version(str, major, minor, revision, build_number, commit_id, dirty);
+  }
+
+  bool check_remote_client_version(const std::string& client_ver)
+  {
+    int v_major = 0, v_minor = 0, v_revision = 0, v_build_number = 0;
+    std::string commit_id;
+    bool dirty_flag = false;
+
+    if (!parse_client_version(client_ver, v_major, v_minor, v_revision, v_build_number, commit_id, dirty_flag))
+      return false;
 
     // allow 2.x and greater
     if (v_major < 2)
