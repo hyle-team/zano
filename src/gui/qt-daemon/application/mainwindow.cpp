@@ -1721,7 +1721,7 @@ QString MainWindow::have_secure_app_data(const QString& param)
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString MainWindow::drop_secure_app_data(const QString& param)
+QString MainWindow::drop_secure_app_data()
 {
   TRY_ENTRY();
   LOG_API_TIMING();
