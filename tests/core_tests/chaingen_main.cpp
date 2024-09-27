@@ -264,13 +264,13 @@ bool generate_and_play(const char* const genclass_name, size_t hardfork_id = SIZ
 
   if (result)
   {
-    LOG_PRINT_GREEN(std::string(100, '=') << std::endl <<
+    LOG_PRINT_GREEN(std::string(72, '=') << std::endl <<
       "#TEST# >>>> " << genclass_name << " <<<< Succeeded" << std::endl <<
       std::string(100, '=') << std::endl, LOG_LEVEL_0 );
   }
   else
   {
-    LOG_PRINT_RED( std::string(100, '=') << std::endl <<
+    LOG_PRINT_RED( std::string(72, '=') << std::endl <<
       "#TEST# >>>> " << genclass_name << " <<<< FAILED" << std::endl <<
       std::string(100, '=') << std::endl, LOG_LEVEL_0);
     result = false;
@@ -1070,7 +1070,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch_2);
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_tx_from_tx_pool);
     GENERATE_AND_PLAY_HF(gen_wallet_save_load_and_balance, "*");
-    GENERATE_AND_PLAY_HF(gen_wallet_mine_pos_block, "3");
+    GENERATE_AND_PLAY_HF(gen_wallet_mine_pos_block, "3-*");
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_outdated_tx);
     GENERATE_AND_PLAY(gen_wallet_unlock_by_block_and_by_time);
     GENERATE_AND_PLAY(gen_wallet_payment_id);
@@ -1102,6 +1102,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(wallet_rpc_transfer);
     GENERATE_AND_PLAY(wallet_rpc_alias_tests);
     GENERATE_AND_PLAY_HF(wallet_rpc_exchange_suite, "3,4");
+    GENERATE_AND_PLAY_HF(wallet_true_rpc_pos_mining, "4-*");
     GENERATE_AND_PLAY(wallet_chain_switch_with_spending_the_same_ki);
     GENERATE_AND_PLAY(wallet_sending_to_integrated_address);
     GENERATE_AND_PLAY_HF(block_template_blacklist_test, "4-*");
@@ -1139,7 +1140,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(alt_blocks_with_the_same_txs, "3-*");
     GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_mixin, "3-*");
     GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_ref_id, "3-*");
-
+    GENERATE_AND_PLAY_HF(alt_chain_and_block_tx_fee_median, "3-*");
 
     // miscellaneous tests
     GENERATE_AND_PLAY(test_blockchain_vs_spent_keyimges);
@@ -1216,6 +1217,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(tx_expiration_time_and_block_template);
     GENERATE_AND_PLAY(tx_expiration_time_and_chain_switching);
     GENERATE_AND_PLAY(tx_key_image_pool_conflict);
+    //GENERATE_AND_PLAY_HF(tx_version_against_hardfork, "4-*");
 
     // Double spend
     GENERATE_AND_PLAY(gen_double_spend_in_tx<false>);
@@ -1288,14 +1290,17 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(zarcanum_block_with_txs);
     GENERATE_AND_PLAY(asset_depoyment_and_few_zc_utxos);
     GENERATE_AND_PLAY_HF(assets_and_pos_mining, "4-*");
-    // GENERATE_AND_PLAY_HF(asset_emission_and_unconfirmed_balance, "4-*");
-    
+    GENERATE_AND_PLAY_HF(asset_emission_and_unconfirmed_balance, "4-*");
+    GENERATE_AND_PLAY_HF(asset_operation_in_consolidated_tx, "4-*");
+    GENERATE_AND_PLAY_HF(asset_operation_and_hardfork_checks, "4-*");
+    GENERATE_AND_PLAY_HF(eth_signed_asset_basics, "5-*");  // TODO: make HF4 version
+    GENERATE_AND_PLAY_HF(eth_signed_asset_via_rpc, "5-*"); // TODO: make HF4 version
+
     GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
     
 
 
     GENERATE_AND_PLAY_HF(attachment_isolation_test, "4-*");
-    
 
     // GENERATE_AND_PLAY(gen_block_reward);
     // END OF TESTS  */

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Boolberry developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -714,9 +714,12 @@ bool MainWindow::show_inital()
 {
   TRY_ENTRY();
   if (load_app_config())
+  {
     restore_pos(true);
+  }
   else
   {
+    LOG_PRINT_L1("set defaults values to config");
     m_config = AUTO_VAL_INIT(m_config);
     this->show();
     QSize sz = AUTO_VAL_INIT(sz);
@@ -976,6 +979,11 @@ QString MainWindow::start_backend(const QString& params)
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
+void MainWindow::show_notification(const QString& title, const QString& message)
+{
+  show_notification(title.toStdString(), message.toStdString());
+}
+
 QString MainWindow::sync_call(const QString& func_name, const QString& params)
 {
   if (func_name == "test_call")
@@ -1107,6 +1115,7 @@ bool MainWindow::get_is_disabled_notifications(const QString& param)
 }
 bool MainWindow::set_is_disabled_notifications(const bool& param)
 {
+  LOG_PRINT_L1("set_is_disabled_notifications: notifications were " << (m_config.disable_notifications ? "DISABLED" : "ENABLED") << "  ->  now " << (param ? "DISABLED" : "ENABLED"));
   m_config.disable_notifications = param;
   return m_config.disable_notifications;
 }
@@ -1712,7 +1721,7 @@ QString MainWindow::have_secure_app_data(const QString& param)
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString MainWindow::drop_secure_app_data(const QString& param)
+QString MainWindow::drop_secure_app_data()
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -2468,6 +2477,10 @@ QString MainWindow::print_log(const QString& param)
 void MainWindow::show_notification(const std::string& title, const std::string& message)
 {
   TRY_ENTRY();
+
+  if (m_config.disable_notifications)
+    return;
+
   LOG_PRINT_L1("system notification: \"" << title << "\", \"" << message << "\"");
   
   // it's expected that title and message are utf-8 encoded!
@@ -2482,5 +2495,3 @@ void MainWindow::show_notification(const std::string& title, const std::string& 
 #endif
   CATCH_ENTRY2(void());
 }
-
-

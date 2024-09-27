@@ -60,7 +60,7 @@ namespace currency
     return m_keys;
   }
   //-----------------------------------------------------------------
-  void crypt_with_pass(const void* scr_data, std::size_t src_length, void* dst_data, const std::string& password)
+  void account_base::crypt_with_pass(const void* scr_data, std::size_t src_length, void* dst_data, const std::string& password)
   {
     crypto::chacha8_key key = AUTO_VAL_INIT(key);
     crypto::generate_chacha8_key(password, key);
@@ -71,28 +71,35 @@ namespace currency
     crypto::chacha8(scr_data, src_length, key, iv, (char*)dst_data);
   }
   //-----------------------------------------------------------------
-  std::string account_base::get_seed_phrase(const std::string& password) const 
+  std::string account_base::get_seed_phrase(const std::string& password) const
   {
     if (m_keys_seed_binary.empty())
       return "";
+    return get_seed_phrase(password, m_keys_seed_binary);
+  }
+  //-----------------------------------------------------------------
+  std::string account_base::get_seed_phrase(const std::string& password, const std::vector<unsigned char>& keys_seed_binary) const
+  {
+    if (keys_seed_binary.empty())
+      return "";
 
-    std::vector<unsigned char> processed_seed_binary = m_keys_seed_binary;
+    std::vector<unsigned char> processed_seed_binary = keys_seed_binary;
     if (!password.empty())
     {
       //encrypt seed phrase binary data
-      crypt_with_pass(&m_keys_seed_binary[0], m_keys_seed_binary.size(), &processed_seed_binary[0], password);      
+      crypt_with_pass(&keys_seed_binary[0], keys_seed_binary.size(), &processed_seed_binary[0], password);      
     }
 
     std::string keys_seed_text = tools::mnemonic_encoding::binary2text(processed_seed_binary);
-    std::string timestamp_word = currency::get_word_from_timstamp(m_creation_timestamp, !password.empty());
+    std::string timestamp_word = currency::get_word_from_timestamp(m_creation_timestamp, !password.empty());
 
     // floor creation time to WALLET_BRAIN_DATE_QUANTUM to make checksum calculation stable
     bool self_check_is_password_used = false;
-    uint64_t creation_timestamp_rounded = get_timstamp_from_word(timestamp_word, self_check_is_password_used);
+    uint64_t creation_timestamp_rounded = get_timestamp_from_word(timestamp_word, self_check_is_password_used);
     CHECK_AND_ASSERT_THROW_MES(self_check_is_password_used == !password.empty(), "Account seed phrase internal error: password flag encoded wrong");
 
     constexpr uint16_t checksum_max = tools::mnemonic_encoding::NUMWORDS >> 1; // maximum value of checksum
-    std::string binary_for_check_sum((const char*)&m_keys_seed_binary[0], m_keys_seed_binary.size());
+    std::string binary_for_check_sum((const char*)&keys_seed_binary[0], keys_seed_binary.size());
     binary_for_check_sum.append(password);
     crypto::hash h = crypto::cn_fast_hash(binary_for_check_sum.data(), binary_for_check_sum.size());
     *reinterpret_cast<uint64_t*>(&h) = creation_timestamp_rounded;
@@ -127,11 +134,12 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------
-  bool account_base::restore_from_seed_phrase(const std::string& seed_phrase, const std::string& seed_password)
+  bool account_base::restore_from_seed_phrase(const std::string& seed_phrase_, const std::string& seed_password)
   {
     //cut the last timestamp word from restore_dats
     std::list<std::string> words;
-    boost::split(words, seed_phrase, boost::is_space());
+    std::string seed_phrase = epee::string_tools::trim(seed_phrase_);
+    boost::split(words, seed_phrase, boost::is_space(), boost::token_compress_on);
     
     std::string keys_seed_text, timestamp_word, auditable_flag_and_checksum_word;
     if (words.size() == SEED_PHRASE_V1_WORDS_COUNT)
@@ -176,7 +184,7 @@ namespace currency
 
     bool has_password = false;
     try {
-      m_creation_timestamp = get_timstamp_from_word(timestamp_word, has_password);
+      m_creation_timestamp = get_timestamp_from_word(timestamp_word, has_password);
     }
     catch (...)
     {
@@ -230,11 +238,13 @@ namespace currency
     return seed_phrase.find(':') != std::string::npos;
   }
   //-----------------------------------------------------------------
-  bool account_base::is_seed_password_protected(const std::string& seed_phrase, bool& is_password_protected)
+  bool account_base::is_seed_password_protected(const std::string& seed_phrase_, bool& is_password_protected)
   {
     //cut the last timestamp word from restore_dats
     std::list<std::string> words;
-    boost::split(words, seed_phrase, boost::is_space());
+
+    std::string seed_phrase = epee::string_tools::trim(seed_phrase_);
+    boost::split(words, seed_phrase, boost::is_space(), boost::token_compress_on);
 
     //let's validate each word 
     for (const auto& w: words)
@@ -260,7 +270,7 @@ namespace currency
       return false;
     }
 
-    get_timstamp_from_word(timestamp_word, is_password_protected);
+    get_timestamp_from_word(timestamp_word, is_password_protected);
 
     return true;
   }

@@ -8,6 +8,7 @@
 #include <string>
 #include <boost/multiprecision/cpp_int.hpp>
 #include "crypto.h"
+#include "eth_signature.h"
 
 namespace crypto
 {
@@ -1207,6 +1208,16 @@ namespace crypto
       void add_pub_key(const crypto::public_key& pk)
       {
         m_elements.emplace_back(pk);
+      }
+
+      void add_eth_pub_key(const crypto::eth_public_key& epk)
+      {
+        static_assert(sizeof(item_t)  == 32, "unexpected size of hs_t::item_t");
+        static_assert(sizeof epk.data == 33, "unexpected size of eth_public_key");
+        m_elements.emplace_back(c_scalar_0);
+        m_elements.emplace_back(c_scalar_0);
+        char* p = m_elements[m_elements.size() - 2].c; // pointer to the first of the two added items
+        memcpy(p, &epk.data, sizeof epk.data);
       }
 
       void add_key_image(const crypto::key_image& ki)

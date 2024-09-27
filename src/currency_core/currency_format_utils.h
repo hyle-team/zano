@@ -139,10 +139,12 @@ namespace currency
     bool hltc_our_out_is_before_expiration;
   };
 
-  struct thirdparty_sign_handler
+  struct asset_eth_signer_i
   {
-    virtual bool sign(const crypto::hash& h, const crypto::public_key& owner_public_key, crypto::generic_schnorr_sig& sig);
+    virtual bool sign(const crypto::hash& h, const crypto::eth_public_key& asset_owner, crypto::eth_signature& sig) = 0;
   };
+
+  typedef boost::variant<crypto::public_key, crypto::eth_public_key> asset_owner_key_v;
 
   struct finalize_tx_param
   {
@@ -165,10 +167,6 @@ namespace currency
     epee::misc_utils::events_dispatcher* pevents_dispatcher;
     tx_generation_context gen_context{}; // solely for consolidated txs
     
-    //crypto::secret_key asset_control_key = currency::null_skey;
-    crypto::public_key ado_current_asset_owner = null_pkey;
-    thirdparty_sign_handler* pthirdparty_sign_handler = nullptr;
-    mutable bool need_to_generate_ado_proof = false;
 
 
     BEGIN_SERIALIZE_OBJECT()
@@ -191,14 +189,13 @@ namespace currency
       {
         FIELD(gen_context);
       }
-      FIELD(ado_current_asset_owner)
-      FIELD(need_to_generate_ado_proof)
     END_SERIALIZE()
   };
 
   struct finalized_tx
   {
     currency::transaction tx;
+    crypto::hash          tx_id;
     crypto::secret_key    one_time_key;
     finalize_tx_param     ftp;
     std::string           htlc_origin;
@@ -208,6 +205,7 @@ namespace currency
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(tx)
+      FIELD(tx_id)
       FIELD(one_time_key)
       FIELD(ftp)
       FIELD(htlc_origin)
@@ -457,9 +455,9 @@ namespace currency
 
   bool fill_block_rpc_details(block_rpc_extended_info& pei_rpc, const block_extended_info& bei_chain, const crypto::hash& h);
   void append_per_block_increments_for_tx(const transaction& tx, std::unordered_map<uint64_t, uint32_t>& gindices);
-  std::string get_word_from_timstamp(uint64_t timestamp, bool use_password);
-  uint64_t get_timstamp_from_word(std::string word, bool& password_used, const std::string& buff);
-  uint64_t get_timstamp_from_word(std::string word, bool& password_used);
+  std::string get_word_from_timestamp(uint64_t timestamp, bool use_password);
+  uint64_t get_timestamp_from_word(std::string word, bool& password_used, const std::string& buff);
+  uint64_t get_timestamp_from_word(std::string word, bool& password_used);
   bool parse_vote(const std::string& buff, std::list<std::pair<std::string, bool>>& votes);
 
   std::string generate_origin_for_htlc(const txout_htlc& htlc, const account_keys& acc_keys);
@@ -546,7 +544,7 @@ namespace currency
     {
       assets_list.push_back(currency::asset_descriptor_with_id());
       assets_list.back().asset_id = pr.first;
-      epee::misc_utils::cast_assign_a_to_b(assets_list.back(), static_cast<currency::asset_descriptor_base>(pr.second));
+      epee::misc_utils::cast_assign_a_to_b(static_cast<currency::asset_descriptor_base>(pr.second), assets_list.back());
       //*static_cast<currency::asset_descriptor_base*>(&assets_list.back()) = pr.second;
     }
   }
@@ -948,6 +946,12 @@ namespace currency
     }
   }
   //---------------------------------------------------------------
+  template<typename invocable_t>
+  typename std::enable_if_t<std::is_invocable_v<invocable_t, std::ostream&>, std::ostream&> operator<<(std::ostream& o, invocable_t callee)
+  {
+    callee(o);
+    return o;
+  }
   //---------------------------------------------------------------
   std::ostream& operator <<(std::ostream& o, const ref_by_id& r);
   std::ostream& operator <<(std::ostream& o, const std::type_info& ti);

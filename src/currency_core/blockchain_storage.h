@@ -380,6 +380,7 @@ namespace currency
       bool for_altchain,
       const alt_chain_type& alt_chain = alt_chain_type(),
       uint64_t split_height = 0)const;
+    bool validate_ado_ownership(asset_op_verification_context& avc) const;
     bool validate_asset_operation_against_current_blochain_state(asset_op_verification_context& avc) const;
 
     void set_core_runtime_config(const core_runtime_config& pc) const;

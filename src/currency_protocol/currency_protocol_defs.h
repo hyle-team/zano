@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -135,7 +135,7 @@ namespace currency
 
   struct CORE_SYNC_DATA
   {
-    uint64_t current_height;
+    uint64_t current_height;          // height of the top block + 1
     crypto::hash  top_id;
     uint64_t last_checkpoint_height;
     uint64_t core_time;

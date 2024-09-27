@@ -56,6 +56,7 @@ namespace currency
     std::string get_public_address_str() const;
     
     std::string get_seed_phrase(const std::string& seed_password) const;
+    std::string get_seed_phrase(const std::string& password, const std::vector<unsigned char>& keys_seed_binary) const;
     std::string get_tracking_seed() const;
     bool restore_from_seed_phrase(const std::string& seed_phrase, const std::string& seed_password);
     bool restore_from_tracking_seed(const std::string& tracking_seed);
@@ -82,6 +83,8 @@ namespace currency
     static std::vector<unsigned char> string_to_vector_of_chars(const std::string& v) { return std::vector<unsigned char>(v.begin(), v.end()); }
     static bool is_seed_password_protected(const std::string& seed_phrase, bool& is_password_protected);
     static bool is_seed_tracking(const std::string& seed_phrase);
+    static void crypt_with_pass(const void* scr_data, std::size_t src_length, void* dst_data, const std::string& password);
+
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(m_keys)

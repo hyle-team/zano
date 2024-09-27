@@ -9,6 +9,8 @@
 
 #include "random_helper.h"
 #include "wallet/wallet_debug_events_definitions.h"
+#include "wallet/wallet_rpc_server.h"
+#include "wallet/wallet_public_structs_defs.h"
 using namespace currency;
 
 //------------------------------------------------------------------------------
@@ -884,6 +886,1069 @@ bool asset_emission_and_unconfirmed_balance::c1(currency::core& c, size_t ev_ind
   CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+asset_operation_and_hardfork_checks::asset_operation_and_hardfork_checks()
+{
+  m_adb_hello.total_max_supply = 1'000'000'000'000'000'000;
+  m_adb_hello.current_supply = 1'000'000'000'000'000'000;
+  m_adb_hello.ticker = "HLO";
+  m_adb_hello.full_name = "HELLO_WORLD";
+  m_adb_hello.meta_info = "Hello, world!";
+  m_adb_hello.hidden_supply = false;
+
+  m_ado_hello.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+  m_ado_hello.opt_asset_id = currency::null_pkey;
+
+  m_adb_bye.total_max_supply = 1'000'000'000'000'000'000;
+  m_adb_bye.current_supply = 1'000'000'000'000'000'000;
+  m_adb_bye.ticker = "BYE";
+  m_adb_bye.full_name = "BYE_WORLD";
+  m_adb_bye.meta_info = "Bye, world!";
+  m_adb_bye.hidden_supply = false;
+
+  m_ado_bye.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+  m_ado_hello.opt_asset_id = currency::null_pkey;
+
+  REGISTER_CALLBACK_METHOD(asset_operation_and_hardfork_checks, c1);
+  REGISTER_CALLBACK_METHOD(asset_operation_and_hardfork_checks, c2);
+}
+
+bool asset_operation_and_hardfork_checks::generate(
+  std::vector<test_event_entry>& events) const
+{
+  /*
+    0           10     11           21     22
+  ( 0) - ... - (0r) - ( 1) - ... - (1r) - ( 2)
+                       \                   \
+                        [tx_0]              [tx_1]
+  */
+
+  bool success{false};
+  std::vector<tx_source_entry> sources{};
+  std::vector<tx_destination_entry> destinations{};
+  transaction tx_0{}, tx_1{}, tx_2{}, tx_3{}, tx_4{};
+  uint64_t tx_version{};
+  crypto::secret_key stub{};
+
+  m_accounts.resize(2);
+  account_base& miner{m_accounts[MINER_ACC_IDX]};
+  miner.generate();
+  account_base& alice{m_accounts[ALICE_ACC_IDX]};
+  alice.generate();
+
+  m_adb_hello.owner = alice.get_public_address().spend_public_key;
+  m_ado_hello.descriptor = m_adb_hello;
+
+  m_adb_bye.owner = alice.get_public_address().spend_public_key;
+  m_ado_bye.descriptor = m_adb_bye;
+
+  MAKE_GENESIS_BLOCK(events,
+                     blk_0,
+                     miner,
+                     test_core_time::get_time());
+
+  DO_CALLBACK(events, "configure_core");
+
+  REWIND_BLOCKS_N_WITH_TIME(events,
+                            blk_0r,
+                            blk_0,
+                            miner,
+                            CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  success = fill_tx_sources_and_destinations(events,
+                                             /* head = */ blk_0r,
+                                             /* from = */ miner.get_keys(),
+                                             /* to = */ alice.get_public_address(),
+                                             /* amount = */ MK_TEST_COINS(12),
+                                             /* fee = */ TESTS_DEFAULT_FEE,
+                                             /* nmix = */ 0,
+                                             sources,
+                                             destinations);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to fill sources, destinations");
+
+  tx_version = get_tx_version(get_block_height(blk_0r),
+                              m_hardforks);
+
+  success = construct_tx(miner.get_keys(),
+                         sources,
+                         destinations,
+                         empty_attachment,
+                         tx_0,
+                         tx_version,
+                         0);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_0");
+
+  ADD_CUSTOM_EVENT(events, tx_0);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner, tx_0);
+
+  REWIND_BLOCKS_N_WITH_TIME(events,
+                            blk_1r,
+                            blk_1,
+                            miner,
+                            CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  sources.clear();
+  destinations.clear();
+
+  success = fill_tx_sources_and_destinations(events,
+                                             /* head = */ blk_1r,
+                                             /* from = */ alice,
+                                             /* to = */ alice,
+                                             /* amount = */ MK_TEST_COINS(5),
+                                             /* fee = */ TESTS_DEFAULT_FEE,
+                                             /* nmix = */ 0,
+                                             sources,
+                                             destinations);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to fill sources, destinations");
+
+  destinations.emplace_back(/* amount = */ 1'000'000'000'000'000'000,
+                            /* to = */ alice.get_public_address(),
+                            /* asset_id = */ currency::null_pkey);
+
+  tx_version = get_tx_version(get_block_height(blk_1r), m_hardforks);
+
+  success = construct_tx(alice.get_keys(),
+                         sources,
+                         destinations,
+                         /* extra = */ {m_ado_hello},
+                         empty_attachment,
+                         tx_1,
+                         tx_version,
+                         stub,
+                         0);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_1");
+  ADD_CUSTOM_EVENT(events, tx_1);
+
+  MAKE_NEXT_BLOCK_TX1(events,
+                      blk_2,
+                      blk_1r,
+                      alice,
+                      tx_1);
+
+  REWIND_BLOCKS_N_WITH_TIME(events,
+                            blk_2r,
+                            blk_2,
+                            miner,
+                            CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  /* A transaction that has at least 2 registration operation descriptors in its
+  extra is rejected by the core. */
+
+  sources.clear();
+  destinations.clear();
+
+  success = fill_tx_sources_and_destinations(events,
+                                             /* head = */ blk_2r,
+                                             /* from = */ alice,
+                                             /* to = */ alice,
+                                             /* amount = */ MK_TEST_COINS(2),
+                                             /* fee = */ TESTS_DEFAULT_FEE,
+                                             /* nmix = */ 0,
+                                             sources,
+                                             destinations);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to fill sources, destinations");
+
+  tx_version = get_tx_version(get_block_height(blk_2r),
+                              m_hardforks);
+
+  success = construct_tx(alice.get_keys(),
+                         sources,
+                         destinations,
+                         /* extra = */ {m_ado_hello, m_ado_hello},
+                         empty_attachment,
+                         tx_2,
+                         tx_version,
+                         stub,
+                         0);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_2");
+
+  DO_CALLBACK(events, "mark_invalid_tx");
+  ADD_CUSTOM_EVENT(events, tx_2);
+
+  sources.clear();
+  destinations.clear();
+
+  /* A transaction that contains a registration operation descriptor in its
+  attachement, but extra is empty, is valid, but doesn't register the asset. The
+  fact that the asset is not registered is checked in the assertions in the
+  callback с2. */
+
+  success = fill_tx_sources_and_destinations(events,
+                                             /* head = */ blk_2r,
+                                             /* from = */ alice,
+                                             /* to = */ alice,
+                                             /* amount = */ MK_TEST_COINS(2),
+                                             /* fee = */ TESTS_DEFAULT_FEE,
+                                             /* nmix = */ 0,
+                                             sources,
+                                             destinations);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to fill sources, destinations");
+
+  tx_version = get_tx_version(get_block_height(blk_2r),
+                              m_hardforks);
+
+  success = construct_tx(alice.get_keys(),
+                         sources,
+                         destinations,
+                         /* attachments = */ {m_ado_bye},
+                         tx_3,
+                         tx_version,
+                         0);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_3");
+
+  ADD_CUSTOM_EVENT(events, tx_3);
+  DO_CALLBACK(events, "c2");
+
+  sources.clear();
+  destinations.clear();
+
+  /* A transaction that contains a registration operation descriptor in its
+  attachement, but extra is empty, is valid, but doesn't register the asset. In
+  this case a different definition of the function construct_tx is used. */
+
+  success = fill_tx_sources_and_destinations(events,
+                                             /* head = */ blk_2r,
+                                             /* from = */ alice,
+                                             /* to = */ alice,
+                                             /* amount = */ MK_TEST_COINS(2),
+                                             /* fee = */ TESTS_DEFAULT_FEE,
+                                             /* nmix = */ 0,
+                                             sources,
+                                             destinations);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to fill sources, destinations");
+
+  tx_version = get_tx_version(get_block_height(blk_2r),
+                              m_hardforks);
+
+  success = construct_tx(alice.get_keys(),
+                         sources,
+                         destinations,
+                         empty_extra,
+                         /* attachments = */ {m_ado_bye},
+                         tx_4,
+                         tx_version,
+                         stub,
+                         0);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_4");
+
+  ADD_CUSTOM_EVENT(events, tx_4);
+  DO_CALLBACK(events, "c2");
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool asset_operation_and_hardfork_checks::c1(
+  currency::core& c,
+  size_t ev_index,
+  const std::vector<test_event_entry>& events)
+{
+  std::shared_ptr<tools::wallet2> wallet{
+    init_playtime_test_wallet_t<tools::wallet2>(events, c, ALICE_ACC_IDX)
+  };
+
+  wallet->refresh();
+
+  crypto::point_t asset_id_point{};
+  crypto::public_key asset_id_public_key{};
+  currency::get_or_calculate_asset_id(m_ado_hello,
+                                      &asset_id_point,
+                                      &asset_id_public_key);
+
+  CHECK_AND_ASSERT_MES(
+    check_balance_via_wallet(*wallet,
+                             /* name = */ "Alice",
+                             /* expected_total = */ 1'000'000'000'000'000'000,
+                             /* expected_mined = */ 2 * COIN,
+                             /* expected_unlocked = */ 1'000'000'000'000'000'000,
+                             /* expected_awaiting_in = */ INVALID_BALANCE_VAL,
+                             /* expected_awaiting_out = */ INVALID_BALANCE_VAL,
+                             asset_id_public_key),
+    false,
+    "balance check failed");
+
+  return true;
+}
+
+bool asset_operation_and_hardfork_checks::c2(
+  currency::core& c,
+  size_t ev_index,
+  const std::vector<test_event_entry>& events)
+{
+  crypto::point_t asset_id_pt{};
+  crypto::public_key asset_id{};
+  currency::asset_descriptor_base stub{};
+
+  CHECK_AND_ASSERT_MES(
+    get_or_calculate_asset_id(m_ado_bye,
+                              &asset_id_pt,
+                              &asset_id),
+    false,
+    "fail to calculate asset id");
+
+  CHECK_AND_ASSERT_MES(
+    !c.get_blockchain_storage().get_asset_info(asset_id,
+                                               stub),
+    false,
+    "unregistered asset has info");
+
+  return true;
+}
+
+asset_operation_in_consolidated_tx::asset_operation_in_consolidated_tx()
+{
+  m_adb_alice_currency.total_max_supply = 1'000'000'000'000'000'000;
+  m_adb_alice_currency.current_supply = 1'000'000'000'000'000'000;
+  m_adb_alice_currency.ticker = "ALC";
+  m_adb_alice_currency.full_name = "ALICE";
+  m_adb_alice_currency.meta_info = "Currency created by Alice";
+  m_adb_alice_currency.hidden_supply = false;
+
+  m_ado_alice_currency.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+  m_ado_alice_currency.opt_asset_id = currency::null_pkey;
+
+  REGISTER_CALLBACK_METHOD(asset_operation_in_consolidated_tx, assert_balances);
+  REGISTER_CALLBACK_METHOD(asset_operation_in_consolidated_tx, assert_alice_currency_not_registered);
+}
+
+bool asset_operation_in_consolidated_tx::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure that the core rule prohibiting operations with assets in TX_FLAG_SIGNATURE_MODE_SEPARATE transactions works.
+  bool success {};
+  transaction tx_2 {};
+  uint64_t tx_version {};
+  crypto::secret_key one_time {};
+  tx_generation_context context_tx_2 {};
+  GENERATE_ACCOUNT(miner);
+  GENERATE_ACCOUNT(alice);
+  GENERATE_ACCOUNT(bob);
+
+  m_accounts.push_back(miner);
+  m_accounts.push_back(alice);
+  m_accounts.push_back(bob);
+  m_adb_alice_currency.owner      = m_accounts.at(ALICE_ACC_IDX).get_public_address().spend_public_key;
+  m_ado_alice_currency.descriptor = m_adb_alice_currency;
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  MAKE_TX(events, tx_0, miner, bob, MK_TEST_COINS(10), blk_0r);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner, tx_0);
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  MAKE_TX(events, tx_1, miner, alice, MK_TEST_COINS(10), blk_1r);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner, tx_1);
+  REWIND_BLOCKS_N(events, blk_2r, blk_2, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  // Miner sent 10 coins to Alice, 10 coins to Bob.
+  DO_CALLBACK(events, "assert_balances");
+
+  {
+    std::vector<tx_source_entry> sources {};
+    std::vector<tx_destination_entry> destinations {};
+
+    success = fill_tx_sources(sources, events, blk_2r, alice.get_keys(), MK_TEST_COINS(5), 1);
+    CHECK_AND_ASSERT_MES(success, false, "failed to fill transaction sources on step 1");
+    destinations.emplace_back(MK_TEST_COINS(5), bob.get_public_address());
+    destinations.emplace_back(MK_TEST_COINS(/* 10 - 5 - 1 = */ 4), alice.get_public_address());
+    tx_version = get_tx_version(get_block_height(blk_2r), m_hardforks);
+    success    = construct_tx(alice.get_keys(), sources, destinations, empty_extra, empty_attachment, tx_2, tx_version, one_time, 0, 0, 0, true, TX_FLAG_SIGNATURE_MODE_SEPARATE, TESTS_DEFAULT_FEE,
+                              context_tx_2);
+    CHECK_AND_ASSERT_MES(success, false, "failed to construct transaction tx_2 on step 1");
+  }
+
+  // Transaction tx_2 hasn't been constructed completely yet. Core rejects tx_2.
+  DO_CALLBACK(events, "mark_invalid_tx");
+  ADD_CUSTOM_EVENT(events, tx_2);
+
+  {
+    std::vector<tx_source_entry> sources {};
+    std::vector<tx_destination_entry> destinations {};
+
+    success = fill_tx_sources(sources, events, blk_2r, bob.get_keys(), MK_TEST_COINS(5), 0);
+    CHECK_AND_ASSERT_MES(success, false, "failed to fill transaction sources on step 2");
+    for(tx_source_entry& source : sources)
+    {
+      source.separately_signed_tx_complete = true;
+    }
+    destinations.emplace_back(MK_TEST_COINS(5), alice.get_public_address());
+    destinations.emplace_back(MK_TEST_COINS(/* 10 - 5 - 0 = */ 5), bob.get_public_address());
+    destinations.emplace_back(m_adb_alice_currency.current_supply, alice.get_public_address(), null_pkey);
+    tx_version = get_tx_version(get_block_height(blk_2r), m_hardforks);
+    success    = construct_tx(bob.get_keys(), sources, destinations, { m_ado_alice_currency }, empty_attachment, tx_2, tx_version, one_time, 0, 0, 0, true, TX_FLAG_SIGNATURE_MODE_SEPARATE,
+                              /* fee = */ 0, context_tx_2);
+    CHECK_AND_ASSERT_MES(success, false, "failed to construct transaction tx_2 on step 2");
+  }
+
+  DO_CALLBACK(events, "mark_invalid_tx");
+  ADD_CUSTOM_EVENT(events, tx_2);
+  // Core rejects transaction tx_2. The balances of Alice, Bob haven't changed: Alice has 10 coins, Bob has 10 coins.
+  DO_CALLBACK(events, "assert_balances");
+  // Alice's asset hasn't registered, because transaction tx_2 was rejected.
+  DO_CALLBACK(events, "assert_alice_currency_not_registered");
+
+  return true;
+}
+
+bool asset_operation_in_consolidated_tx::assert_balances(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  std::shared_ptr<tools::wallet2> alice_wallet{init_playtime_test_wallet(events, c, ALICE_ACC_IDX)};
+  std::shared_ptr<tools::wallet2> bob_wallet{init_playtime_test_wallet(events, c, BOB_ACC_IDX)};
+
+  alice_wallet->refresh();
+  bob_wallet->refresh();
+
+  CHECK_AND_ASSERT_EQ(alice_wallet->balance(currency::native_coin_asset_id), MK_TEST_COINS(10));
+  CHECK_AND_ASSERT_EQ(bob_wallet->balance(currency::native_coin_asset_id), MK_TEST_COINS(10));
+
+  return true;
+}
+
+bool asset_operation_in_consolidated_tx::assert_alice_currency_not_registered(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  crypto::point_t asset_id_point{};
+  crypto::public_key asset_id{};
+  currency::asset_descriptor_base stub{};
+
+  CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(m_ado_alice_currency, &asset_id_point, &asset_id), false, "fail to calculate asset id");
+  CHECK_AND_ASSERT_MES(!c.get_blockchain_storage().get_asset_info(asset_id, stub), false, "unregistered asset has info");
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+eth_signed_asset_basics::eth_signed_asset_basics()
+{
+  REGISTER_CALLBACK_METHOD(eth_signed_asset_basics, c1);
+}
+
+bool eth_signed_asset_basics::generate(std::vector<test_event_entry>& events) const
+{
+  //
+  // Test idea: register an asset, then emit, public burn, transfer ownership, and then emit it once again.
+  // Update (ownership transferring) and emit operations are done using third-party external asset operation signing (ETH signature)
+  // Public burn operation is done by an entity, who isn't controlling the asset.
+  //
+
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  miner_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool eth_signed_asset_basics::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+
+  crypto::eth_secret_key eth_sk{};
+  crypto::eth_public_key eth_pk{};
+  r = crypto::generate_eth_key_pair(eth_sk, eth_pk);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_key_pair failed");
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  miner_wlt->refresh();
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  alice_wlt->refresh();
+
+  //
+  // register
+  //
+  asset_descriptor_base adb{};
+  adb.decimal_point = 2;
+  adb.total_max_supply = 10000;
+  adb.full_name = "Either";
+  adb.ticker = "EITH";
+  adb.owner_eth_pub_key = eth_pk; // note setting owner eth pub key here
+
+  uint64_t initial_emit_amount = adb.total_max_supply / 2;
+
+  std::vector<tx_destination_entry> destinations{tx_destination_entry{initial_emit_amount, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey}};
+  finalized_tx ft{};
+  crypto::public_key asset_id = currency::null_pkey;
+  miner_wlt->deploy_new_asset(adb, destinations, ft, asset_id);
+
+  const transaction& tx = ft.tx;
+
+  LOG_PRINT_L0("Deployed new asset: " << asset_id << ", tx_id: " << ft.tx_id);
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  miner_wlt->refresh();
+
+  //
+  // emit
+  //
+  destinations.clear();
+  destinations.emplace_back(initial_emit_amount, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey); // asset
+  destinations.emplace_back(MK_TEST_COINS(100), m_accounts[ALICE_ACC_IDX].get_public_address()); // some native coins for fee
+  uint64_t emit_amount = adb.total_max_supply - initial_emit_amount;
+  ft = finalized_tx{};
+  miner_wlt->emit_asset(asset_id, destinations, ft);
+
+  // make sure the transaction didn't get into tx pool (as it's not fully signed)
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // make sure emit transaction cannot be added to the transaction pool (it's not fully signed atm)
+  tx_verification_context tvc{};
+  r = c.get_tx_pool().add_tx(ft.tx, tvc, false);
+  CHECK_AND_ASSERT_MES(!r, false, "unsigned emit tx was able to be added to the pool");
+
+  // sign asset emit operation with ETH signature
+  crypto::eth_signature eth_sig{};
+  r = crypto::generate_eth_signature(ft.tx_id, eth_sk, eth_sig);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_signature failed");
+
+  transaction emit_tx{};
+  bool transfers_unlocked = false;
+  miner_wlt->submit_externally_signed_asset_tx(ft, eth_sig, true, emit_tx, transfers_unlocked);
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // Alice checks her asset balance
+  size_t blocks_fetched = 0;
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 2);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", adb.total_max_supply, asset_id, adb.decimal_point), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", MK_TEST_COINS(100)), false, "");
+
+
+  //
+  // public burn (by Alice, as anyone can do public burn)
+  //
+  uint64_t amount_to_burn = initial_emit_amount / 2;
+  uint64_t total_amount_expected = adb.total_max_supply - amount_to_burn;
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  miner_wlt->refresh();
+  alice_wlt->refresh();
+
+  ft = finalized_tx{};
+  alice_wlt->burn_asset(asset_id, amount_to_burn, ft);
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  asset_descriptor_base adb_recent{};
+  r = c.get_blockchain_storage().get_asset_info(asset_id, adb_recent);
+  CHECK_AND_ASSERT_MES(r, false, "get_asset_info failed");
+
+  // make sure the current supply of the asset did change accordingly
+  CHECK_AND_ASSERT_EQ(adb_recent.current_supply, total_amount_expected);
+
+
+  //
+  // ownership transfer (to another ETH key)
+  //
+  crypto::eth_secret_key eth_sk_2{};
+  crypto::eth_public_key eth_pk_2{};
+  r = crypto::generate_eth_key_pair(eth_sk_2, eth_pk_2);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_key_pair failed");
+
+  ft = finalized_tx{};
+  miner_wlt->transfer_asset_ownership(asset_id, eth_pk_2, ft);
+
+  // make sure the transaction didn't get into tx pool (as it's not fully signed)
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // make sure ownership transaction cannot be added to the transaction pool (it's not fully signed atm)
+  tvc = tx_verification_context{};
+  r = c.get_tx_pool().add_tx(ft.tx, tvc, false);
+  CHECK_AND_ASSERT_MES(!r, false, "unsigned tx was able to be added to the pool");
+
+  // sign asset emit operation with ETH signature
+  eth_sig = crypto::eth_signature{};
+  r = crypto::generate_eth_signature(ft.tx_id, eth_sk, eth_sig); // signing with old eth key
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_signature failed");
+
+  transaction to_tx{};
+  transfers_unlocked = false;
+  miner_wlt->submit_externally_signed_asset_tx(ft, eth_sig, true, to_tx, transfers_unlocked);
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  miner_wlt->refresh();
+
+  //
+  // emit #2
+  //
+  emit_amount = adb.total_max_supply - total_amount_expected; // up to max
+  destinations.clear();
+  destinations.emplace_back(emit_amount, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey); // asset
+  ft = finalized_tx{};
+  miner_wlt->emit_asset(asset_id, destinations, ft);
+
+  // make sure the transaction didn't get into tx pool (as it's not fully signed)
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // make sure emit transaction cannot be added to the transaction pool (it's not fully signed atm)
+  r = c.get_tx_pool().add_tx(ft.tx, tvc, false);
+  CHECK_AND_ASSERT_MES(!r, false, "unsigned emit tx was able to be added to the pool");
+
+  // sign asset emit operation with ETH signature
+  eth_sig = crypto::eth_signature{};
+  r = crypto::generate_eth_signature(ft.tx_id, eth_sk_2, eth_sig); // note using ETH key #2 here
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_signature failed");
+
+  emit_tx = transaction{};
+  transfers_unlocked = false;
+  miner_wlt->submit_externally_signed_asset_tx(ft, eth_sig, true, emit_tx, transfers_unlocked);
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // Alice checks her asset balance
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 3);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", adb.total_max_supply, asset_id, adb.decimal_point), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", MK_TEST_COINS(100) - TESTS_DEFAULT_FEE), false, "");
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+eth_signed_asset_via_rpc::eth_signed_asset_via_rpc()
+{
+  REGISTER_CALLBACK_METHOD(eth_signed_asset_via_rpc, c1);
+}
+
+bool eth_signed_asset_via_rpc::generate(std::vector<test_event_entry>& events) const
+{
+  //
+  // Test idea: make sure register, emit, and ownership transfer operations with external signing (ETH signature)
+  // can be done entirely using JSON RPC calls (both, the core RPC and the wallet RPC)
+  //
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+  miner_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+
+  crypto::eth_secret_key eth_sk{};
+  crypto::eth_public_key eth_pk{};
+  r = crypto::generate_eth_key_pair(eth_sk, eth_pk);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_key_pair failed");
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  miner_wlt->refresh();
+  alice_wlt->refresh();
+
+  // wallet RPC server
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
+  epee::json_rpc::error jerr{};
+  tools::wallet_rpc_server::connection_context ctx{};
+
+  // core RPC server
+  currency::t_currency_protocol_handler<currency::core> m_cprotocol(c, nullptr);
+  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > p2p(m_cprotocol);
+  bc_services::bc_offers_service of(nullptr);
+  currency::core_rpc_server core_rpc_wrapper(c, p2p, of);
+  core_rpc_wrapper.set_ignore_connectivity_status(true);
+
+  // asset description
+  asset_descriptor_base adb{};
+  adb.decimal_point = 2;
+  adb.total_max_supply = 45000;
+  adb.full_name = "P450";
+  adb.ticker = "P450";
+  adb.owner_eth_pub_key = eth_pk; // note setting owner eth pub key here
+
+  uint64_t initial_register_amount = 10000;
+
+  // 1. Miner deploys initial amount of the asset (all go to Alice)
+  // deploy operation don't require eth proof and therefore the corresponding tx will be generated and added to the tx pool as usual
+
+  tools::wallet_public::COMMAND_ASSETS_DEPLOY::request deploy_req{};
+  deploy_req.asset_descriptor = adb;
+  deploy_req.destinations.push_back(tools::wallet_public::transfer_destination{initial_register_amount, m_accounts[ALICE_ACC_IDX].get_public_address_str(), null_pkey});
+  deploy_req.do_not_split_destinations = false;
+  tools::wallet_public::COMMAND_ASSETS_DEPLOY::response deploy_resp{};
+  r = miner_wlt_rpc.on_asset_deploy(deploy_req, deploy_resp, jerr, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "RPC on_asset_deploy failed");
+
+  const crypto::public_key asset_id = deploy_resp.new_asset_id;
+  LOG_PRINT_GREEN_L0("Asset " << asset_id << " was successfully deployed with tx " << deploy_resp.tx_id);
+
+  // make sure tx was added to the pool
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // confirm the tx with a block
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  size_t blocks_fetched = 0;
+  miner_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
+
+  // Alice checks her asset balance
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", initial_register_amount, asset_id, adb.decimal_point), false, "");
+
+
+  //
+  // 2. Miner emits additional amount of the asset and transfers it to Alice
+  //
+  uint64_t additional_emit_amount = 20000;
+  uint64_t total_asset_amount = initial_register_amount + additional_emit_amount;
+
+  tools::wallet_public::COMMAND_ASSETS_EMIT::request emit_req{};
+  emit_req.asset_id = asset_id;
+  emit_req.destinations.push_back(tools::wallet_public::transfer_destination{additional_emit_amount, m_accounts[ALICE_ACC_IDX].get_public_address_str(), asset_id});
+  emit_req.do_not_split_destinations = false;
+
+  tools::wallet_public::COMMAND_ASSETS_EMIT::response emit_resp{};
+  r = miner_wlt_rpc.on_asset_emit(emit_req, emit_resp, jerr, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "RPC on_asset_emit failed: " << jerr.message);
+
+  // make sure tx was NOT added to the pool (because it's only partially signed)
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // unserialize transaction that we got from RPC
+  transaction emit_tx{};
+  CHECK_AND_ASSERT_MES(emit_resp.data_for_external_signing.has_value(), false, "data_for_external_signing has no value");
+  r = t_unserializable_object_from_blob(emit_tx, emit_resp.data_for_external_signing->unsigned_tx);
+  CHECK_AND_ASSERT_MES(r, false, "t_unserializable_object_from_blob failed");
+  CHECK_AND_ASSERT_EQ(get_transaction_hash(emit_tx), emit_resp.tx_id);
+
+  // make sure emit transaction cannot be added to the transaction pool (it's not fully signed atm)
+  tx_verification_context tvc{};
+  r = c.get_tx_pool().add_tx(emit_tx, tvc, false);
+  CHECK_AND_ASSERT_MES(!r, false, "emit tx was able to be added to the pool");
+
+  //
+  // decrypt emission transaction outputs prior to ETH signing to make sure it's valid
+  //
+  currency::COMMAND_RPC_DECRYPT_TX_DETAILS::request decrypt_req{};
+  decrypt_req.tx_secret_key = emit_resp.data_for_external_signing->tx_secret_key;
+  decrypt_req.tx_blob = epee::string_encoding::base64_encode(emit_resp.data_for_external_signing->unsigned_tx);
+  // note: decrypt_req.outputs_addresses can be populated using emit_resp.data_for_external_signing->outputs_addresses but we fill it manually here
+  decrypt_req.outputs_addresses.push_back(m_accounts[MINER_ACC_IDX].get_public_address_str()); // we expect that the first output is the cashback and addressed to miner
+  for(size_t i = 0, size = emit_tx.vout.size() - 1; i < size; ++i)
+    decrypt_req.outputs_addresses.push_back(m_accounts[ALICE_ACC_IDX].get_public_address_str()); // we expect all other outputs are asset emission and addresses to Alice
+  currency::COMMAND_RPC_DECRYPT_TX_DETAILS::response decrypt_resp{};
+  r = core_rpc_wrapper.on_decrypt_tx_details(decrypt_req, decrypt_resp, jerr, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "RPC on_decrypt_tx_details failed: " << jerr.message);
+  // make sure that verified_tx_id is the one we expect
+  CHECK_AND_ASSERT_EQ(decrypt_resp.verified_tx_id, emit_resp.tx_id);
+
+  // after a successfull tx outputs decryption, examine them
+  CHECK_AND_ASSERT_EQ(decrypt_resp.decoded_outputs.size(), emit_tx.vout.size());
+  uint64_t decrypted_emission_sum = 0;
+  for(auto& el : decrypt_resp.decoded_outputs)
+  {
+    if (el.asset_id == asset_id)
+      decrypted_emission_sum += el.amount;
+    else
+      CHECK_AND_ASSERT_EQ(el.asset_id, native_coin_asset_id);
+  }
+  // make sure the transaction emits the expected amount of asset
+  CHECK_AND_ASSERT_EQ(decrypted_emission_sum, additional_emit_amount);
+
+  LOG_PRINT_YELLOW(decrypt_resp.tx_in_json, LOG_LEVEL_0); // tx with still missing ownership proof
+
+  //
+  // as everything is allright, sign emit_tx with ETH signature.
+  //
+  crypto::eth_signature eth_sig{};
+  crypto::generate_eth_signature(emit_resp.tx_id, eth_sk, eth_sig);
+  // instant verification, just in case
+  r = crypto::verify_eth_signature(emit_resp.tx_id, eth_pk, eth_sig);
+  CHECK_AND_ASSERT_MES(r, false, "verify_eth_signature failed");
+
+  //
+  // send ETH signature alogn with all previous data to a wallet RPC call for final tx assembling and broadcasting
+  //
+  tools::wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::request send_signed_req{};
+  send_signed_req.unsigned_tx     = emit_resp.data_for_external_signing->unsigned_tx;
+  send_signed_req.eth_sig         = eth_sig;
+  send_signed_req.expected_tx_id  = decrypt_resp.verified_tx_id;
+  send_signed_req.finalized_tx    = emit_resp.data_for_external_signing->finalized_tx;
+  send_signed_req.unlock_transfers_on_fail = true;
+  tools::wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::response send_signed_resp{};
+  r = miner_wlt_rpc.on_asset_send_ext_signed_tx(send_signed_req, send_signed_resp, jerr, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: " << jerr.message);
+
+  // make sure tx was broadcasted
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // confirm the tx with a block
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // Alice checks her asset balance
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
+
+
+  //
+  // 3. Miner transfer ownership of the asset to another ETH key (#2)
+  //
+  crypto::eth_secret_key eth_sk_2{};
+  crypto::eth_public_key eth_pk_2{};
+  r = crypto::generate_eth_key_pair(eth_sk_2, eth_pk_2);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_key_pair failed");
+
+  tools::wallet_public::COMMAND_ASSETS_UPDATE::request to_req{}; // 'to' means transfer of ownership
+  to_req.asset_id = asset_id;
+  {
+    // request the most recent asset info from core to correctly fill to_req
+    currency::COMMAND_RPC_GET_ASSET_INFO::request req{};
+    req.asset_id = asset_id;
+    currency::COMMAND_RPC_GET_ASSET_INFO::response resp{};
+    CHECK_AND_ASSERT_MES(core_rpc_wrapper.on_get_asset_info(req, resp, ctx), false, "on_get_asset_info failed");
+    to_req.asset_descriptor = resp.asset_descriptor;
+  }
+  to_req.asset_descriptor.owner_eth_pub_key = eth_pk_2; // new owner, note using another ETH pub key
+  to_req.asset_descriptor.meta_info = "owner: eth_pk_2"; // it's also possible to change meta_info with this update operation
+  tools::wallet_public::COMMAND_ASSETS_UPDATE::response to_resp{};
+  r = miner_wlt_rpc.on_asset_update(to_req, to_resp, jerr, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: " << jerr.message);
+
+  // make sure tx was NOT added to the pool (because it's only partially signed)
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  CHECK_AND_ASSERT_MES(to_resp.data_for_external_signing.has_value(), false, "data_for_external_signing has no value");
+  transaction to_tx{};
+  r = t_unserializable_object_from_blob(to_tx, to_resp.data_for_external_signing->unsigned_tx);
+  CHECK_AND_ASSERT_MES(r, false, "t_unserializable_object_from_blob failed");
+  CHECK_AND_ASSERT_EQ(get_transaction_hash(to_tx), to_resp.tx_id);
+
+  // make sure ownership transferring transaction cannot be added to the transaction pool (it's not fully signed atm)
+  tvc = tx_verification_context{};
+  r = c.get_tx_pool().add_tx(to_tx, tvc, false);
+  CHECK_AND_ASSERT_MES(!r, false, "ownership transferring tx was able to be added to the pool");
+
+  //
+  // decrypt ownership transfer transaction prior to ETH signing to make sure it's valid
+  //
+  decrypt_req = currency::COMMAND_RPC_DECRYPT_TX_DETAILS::request{};
+  decrypt_req.tx_secret_key = to_resp.data_for_external_signing->tx_secret_key;
+  decrypt_req.tx_blob = epee::string_encoding::base64_encode(to_resp.data_for_external_signing->unsigned_tx);
+  // note: decrypt_req.outputs_addresses can be populated using to_resp.data_for_external_signing->outputs_addresses but we fill it manually here
+  for(size_t i = 0, size = to_tx.vout.size(); i < size; ++i)
+    decrypt_req.outputs_addresses.push_back(m_accounts[MINER_ACC_IDX].get_public_address_str()); // we expect all outputs goes to Miner
+  decrypt_resp = currency::COMMAND_RPC_DECRYPT_TX_DETAILS::response{};
+  r = core_rpc_wrapper.on_decrypt_tx_details(decrypt_req, decrypt_resp, jerr, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "RPC on_decrypt_tx_details failed: " << jerr.message);
+  // make sure that verified_tx_id is the one we expect
+  CHECK_AND_ASSERT_EQ(decrypt_resp.verified_tx_id, to_resp.tx_id);
+
+  // after a successfull tx outputs decryption, examine them
+  CHECK_AND_ASSERT_EQ(decrypt_resp.decoded_outputs.size(), to_tx.vout.size());
+  uint64_t asset_sum = 0;
+  for(auto& el : decrypt_resp.decoded_outputs)
+  {
+    if (el.asset_id != native_coin_asset_id)
+      asset_sum += el.amount;
+  }
+  // make sure the transaction don't send assets
+  CHECK_AND_ASSERT_EQ(asset_sum, 0);
+
+  // make sure this is an ownership transfer transaction and the ownership is correctly transferred:
+  // Note: this check could also be done by examination of decrypt_resp.tx_in_json
+  asset_descriptor_operation* pado = get_type_in_variant_container<asset_descriptor_operation>(to_tx.extra);
+  CHECK_AND_ASSERT_NEQ(pado, 0);
+  CHECK_AND_ASSERT_EQ(pado->operation_type, ASSET_DESCRIPTOR_OPERATION_UPDATE);
+  CHECK_AND_ASSERT_EQ(pado->opt_asset_id.has_value(), true);
+  CHECK_AND_ASSERT_EQ(pado->opt_asset_id.get(), asset_id);
+  CHECK_AND_ASSERT_EQ(pado->descriptor.owner_eth_pub_key.has_value(), true);
+  CHECK_AND_ASSERT_EQ(pado->descriptor.owner_eth_pub_key.get(), eth_pk_2); // the most important condition for an ownership transfer
+  // other fileds of pado->descriptor may also be checked here
+
+  //
+  // as everything is allright, sign to_tx with ETH signature.
+  //
+  crypto::eth_signature to_eth_sig{};
+  crypto::generate_eth_signature(to_resp.tx_id, eth_sk, to_eth_sig); // note using old ETH secret key here, because this tx must be signed with the original owner
+  // instant verification, just in case
+  r = crypto::verify_eth_signature(to_resp.tx_id, eth_pk, to_eth_sig);
+  CHECK_AND_ASSERT_MES(r, false, "verify_eth_signature failed");
+
+  //
+  // send ETH signature along with all previous data to a wallet RPC call for final tx assembling and broadcasting
+  //
+  send_signed_req = tools::wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::request{};
+  send_signed_req.unsigned_tx     = to_resp.data_for_external_signing->unsigned_tx;
+  send_signed_req.eth_sig         = to_eth_sig;
+  send_signed_req.expected_tx_id  = decrypt_resp.verified_tx_id;
+  send_signed_req.finalized_tx    = to_resp.data_for_external_signing->finalized_tx;
+  send_signed_req.unlock_transfers_on_fail = true;
+  send_signed_resp = tools::wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::response{};
+  r = miner_wlt_rpc.on_asset_send_ext_signed_tx(send_signed_req, send_signed_resp, jerr, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: " << jerr.message);
+
+  // make sure tx was broadcasted
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // confirm the tx with a block
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // Alice checks her asset balance, it shouldn't change
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
+
+  miner_wlt->refresh();
+
+  //
+  // 4. Miner emits additional amount of the asset (signing it with ETH key #2) and transfers it to Bob
+  //
+  additional_emit_amount = 15000;
+  uint64_t alice_amount = total_asset_amount;
+  total_asset_amount += additional_emit_amount;
+
+  emit_req = tools::wallet_public::COMMAND_ASSETS_EMIT::request{};
+  emit_req.asset_id = asset_id;
+  emit_req.destinations.push_back(tools::wallet_public::transfer_destination{additional_emit_amount, m_accounts[BOB_ACC_IDX].get_public_address_str(), asset_id});
+  emit_req.do_not_split_destinations = false;
+
+  emit_resp = tools::wallet_public::COMMAND_ASSETS_EMIT::response{};
+  r = miner_wlt_rpc.on_asset_emit(emit_req, emit_resp, jerr, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "RPC on_asset_emit failed: " << jerr.message);
+
+  // make sure tx was NOT added to the pool (because it's only partially signed)
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // unserialize transaction that we got from RPC
+  emit_tx = transaction{};
+  CHECK_AND_ASSERT_MES(emit_resp.data_for_external_signing.has_value(), false, "data_for_external_signing has no value");
+  r = t_unserializable_object_from_blob(emit_tx, emit_resp.data_for_external_signing->unsigned_tx);
+  CHECK_AND_ASSERT_MES(r, false, "t_unserializable_object_from_blob failed");
+  CHECK_AND_ASSERT_EQ(get_transaction_hash(emit_tx), emit_resp.tx_id);
+
+  // make sure emit transaction cannot be added to the transaction pool (it's not fully signed atm)
+  tvc = tx_verification_context{};
+  r = c.get_tx_pool().add_tx(emit_tx, tvc, false);
+  CHECK_AND_ASSERT_MES(!r, false, "emit tx was able to be added to the pool");
+
+  //
+  // decrypt emission transaction outputs prior to ETH signing to make sure it's valid
+  //
+  decrypt_req = currency::COMMAND_RPC_DECRYPT_TX_DETAILS::request{};
+  decrypt_req.tx_secret_key = emit_resp.data_for_external_signing->tx_secret_key;
+  decrypt_req.tx_blob = epee::string_encoding::base64_encode(emit_resp.data_for_external_signing->unsigned_tx);
+  // note: decrypt_req.outputs_addresses can be populated using emit_resp.data_for_external_signing->outputs_addresses but we fill it manually here
+  decrypt_req.outputs_addresses.push_back(m_accounts[MINER_ACC_IDX].get_public_address_str()); // we expect that the first output is the cashback and addressed to miner
+  for(size_t i = 0, size = emit_tx.vout.size() - 1; i < size; ++i)
+    decrypt_req.outputs_addresses.push_back(m_accounts[BOB_ACC_IDX].get_public_address_str()); // we expect all other outputs are asset emission and addresses to Bob
+  decrypt_resp = currency::COMMAND_RPC_DECRYPT_TX_DETAILS::response{};
+  r = core_rpc_wrapper.on_decrypt_tx_details(decrypt_req, decrypt_resp, jerr, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "RPC on_decrypt_tx_details failed: " << jerr.message);
+  // make sure that verified_tx_id is the one we expect
+  CHECK_AND_ASSERT_EQ(decrypt_resp.verified_tx_id, emit_resp.tx_id);
+
+  // after a successfull tx outputs decryption, examine them
+  CHECK_AND_ASSERT_EQ(decrypt_resp.decoded_outputs.size(), emit_tx.vout.size());
+  decrypted_emission_sum = 0;
+  for(auto& el : decrypt_resp.decoded_outputs)
+  {
+    if (el.asset_id == asset_id)
+      decrypted_emission_sum += el.amount;
+    else
+      CHECK_AND_ASSERT_EQ(el.asset_id, native_coin_asset_id);
+  }
+  // make sure the transaction emits the expected amount of asset
+  CHECK_AND_ASSERT_EQ(decrypted_emission_sum, additional_emit_amount);
+
+  //
+  // as everything is allright, sign emit_tx with ETH signature.
+  //
+  eth_sig = crypto::eth_signature{};
+  crypto::generate_eth_signature(emit_resp.tx_id, eth_sk_2, eth_sig); // note using ETH key #2
+  // instant verification, just in case
+  r = crypto::verify_eth_signature(emit_resp.tx_id, eth_pk_2, eth_sig);
+  CHECK_AND_ASSERT_MES(r, false, "verify_eth_signature failed");
+
+  //
+  // send ETH signature alogn with all previous data to a wallet RPC call for final tx assembling and broadcasting
+  //
+  send_signed_req = tools::wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::request{};
+  send_signed_req.unsigned_tx     = emit_resp.data_for_external_signing->unsigned_tx;
+  send_signed_req.eth_sig         = eth_sig;
+  send_signed_req.expected_tx_id  = decrypt_resp.verified_tx_id;
+  send_signed_req.finalized_tx    = emit_resp.data_for_external_signing->finalized_tx;
+  send_signed_req.unlock_transfers_on_fail = true;
+  send_signed_resp = tools::wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::response{};
+  r = miner_wlt_rpc.on_asset_send_ext_signed_tx(send_signed_req, send_signed_resp, jerr, ctx);
+  CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: " << jerr.message);
+
+  // make sure tx was broadcasted
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // confirm the tx with a block
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // Alice checks her asset balance, it shouldn't change
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", alice_amount, asset_id, adb.decimal_point), false, "");
+
+  // Bob checks his asset balance
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  bob_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt, "Bob", additional_emit_amount, asset_id, adb.decimal_point), false, "");
+
+  // finally, check asset's current supply
+  asset_descriptor_base adb_temp{};
+  r = c.get_blockchain_storage().get_asset_info(asset_id, adb_temp);
+  CHECK_AND_ASSERT_MES(r, false, "get_asset_info failed");
+  CHECK_AND_ASSERT_EQ(adb_temp.current_supply, total_asset_amount);
 
   return true;
 }

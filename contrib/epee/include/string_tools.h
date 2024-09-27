@@ -444,7 +444,7 @@ POP_GCC_WARNINGS
 	inline bool string_to_num_fast(const std::string& buff, int& val)
 	{
 		val = atoi(buff.c_str());
-		if(buff != "0" && val == 0)
+		if (val == 0 && buff.find_first_not_of('0') != std::string::npos)
 			return false;
 
 		return true;

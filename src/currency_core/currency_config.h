@@ -19,6 +19,7 @@
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
 #define CURRENCY_MAX_BLOCK_SIZE                         500000000  // block header blob limit, never used!
+#define CURRENCY_TX_MAX_ALLOWED_INPUTS                  256        // limited primarily by asset surjection proof
 #define CURRENCY_TX_MAX_ALLOWED_OUTS                    2000
 #define CURRENCY_TX_MIN_ALLOWED_OUTS                    2      // effective starting HF4 Zarcanum
 #define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           0xc5   // addresses start with 'Zx'
@@ -257,25 +258,29 @@
 
 #define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)
 
-//hard forks section
 #define BLOCK_MAJOR_VERSION_GENESIS                     1
 #define BLOCK_MINOR_VERSION_GENESIS                     0
 #define BLOCK_MAJOR_VERSION_INITIAL                     0
+
+/////// Hard forks setup //////////////////////////////
 #ifndef TESTNET
+// Mainnet
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   194624    // 2019-09-21 20:25:16
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   999999    // 2021-04-05 09:11:45
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   1082577   // 2021-06-01 23:28:10
 #define ZANO_HARDFORK_04_AFTER_HEIGHT                   2555000   // 2024-03-21 11:49:55
-#define ZANO_HARDFORK_05_AFTER_HEIGHT                   999999999999999999  
 #define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1711021795ull // block 2555000, 2024-03-21 11:49:55 UTC
+#define ZANO_HARDFORK_05_AFTER_HEIGHT                   999999999999999999  
+#define ZANO_HARDFORK_05_MIN_BUILD_VER                  343
 #else
-/////// Zarcanum Testnet //////////////////////////////
+// Testnet
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_04_AFTER_HEIGHT                   200  
-#define ZANO_HARDFORK_05_AFTER_HEIGHT                   200  
 #define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1712785801ull // block 200, 2024-04-10 21:50:01 UTC
+#define ZANO_HARDFORK_05_AFTER_HEIGHT                   241750  
+#define ZANO_HARDFORK_05_MIN_BUILD_VER                  343
 #endif
 
 

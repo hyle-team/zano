@@ -1620,3 +1620,84 @@ bool tx_key_image_pool_conflict::generate(std::vector<test_event_entry>& events)
 
   return true;
 }
+
+//------------------------------------------------------------------
+
+bool tx_version_against_hardfork::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure that tx with incorrect for the activated HF version won't be accepted.
+
+  bool r = false;
+  GENERATE_ACCOUNT(miner_acc);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  //  0 ... 10    11    12    13    14          <- height
+  // (0 )- (0r)- (1 )- !2b!-                    <- chain A, block 2b is invalid
+  //             tx_0  tx_1                     tx_0 is accepted, tx_1 is rejected
+  //                 \
+  //                  \(2 )                     <- chain B
+  //                   tx_1                     tx_1 is accepted
+
+  uint64_t tx_version_good = 0, tx_version_bad = 0;
+
+  // select good and bad tx versions based on active hardfork
+  size_t most_recent_hardfork_id = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_0r));
+  switch(most_recent_hardfork_id)
+  {
+  case ZANO_HARDFORK_04_ZARCANUM:
+  case ZANO_HARDFORK_05:
+    tx_version_good = TRANSACTION_VERSION_POST_HF4;
+    tx_version_bad = TRANSACTION_VERSION_PRE_HF4;
+    break;
+  default:
+    LOG_ERROR("hardfork " << most_recent_hardfork_id << " is not supported by this test");
+    return false;
+  }
+
+  std::vector<tx_source_entry> sources;
+  std::vector<tx_destination_entry> destinations;
+
+  //
+  // 1/2 tx with good version, should go okay
+  //
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), miner_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
+  transaction tx_0{};
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, tx_version_good, 0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  events.push_back(tx_0);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+
+  sources.clear();
+  destinations.clear();
+
+  //
+  // 2/2 tx with bad version, should be rejected by tx pool and by the core
+  //
+  r = fill_tx_sources_and_destinations(events, blk_0, miner_acc.get_keys(), miner_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
+  transaction tx_1{};
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, tx_version_bad, 0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  // check tx pool rejection
+  DO_CALLBACK(events, "mark_invalid_tx");
+  events.push_back(tx_1);
+
+  // now add tx_1 as onboard transaction (directly to a block, skipping tx pool)
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
+  events.push_back(tx_1);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
+
+  // make sure the block with tx_1 is invalid
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_BLOCK_TX1(events, blk_2b, blk_1, miner_acc, tx_1);
+
+
+  // just one more block to make sure everyting is okay
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
+
+  return true;
+}
