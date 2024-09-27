@@ -95,3 +95,22 @@ struct eth_signed_asset_via_rpc : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct asset_current_and_total_supplies_comparative_constraints : public wallet_test
+{
+public:
+  asset_current_and_total_supplies_comparative_constraints();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool assert_asset_alpha_not_registered(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const;
+  bool assert_asset_beta_registered(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const;
+  bool emit_asset_beta_with_incorrect_supply(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const;
+  bool assert_asset_beta_not_emitted(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const;
+  bool public_burn_asset_beta_with_incorrect_supply(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const;
+  bool assert_alice_final_balance_native_asset(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const;
+
+private:
+  enum asset_position { alpha = 0, beta = 1 };
+  mutable std::array<currency::asset_descriptor_base, 2> m_adbs{};
+  mutable std::array<currency::asset_descriptor_operation, 2> m_ados_register{};
+  mutable currency::asset_descriptor_operation m_ado_emit{};
+};
