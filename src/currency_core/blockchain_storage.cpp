@@ -4116,7 +4116,15 @@ bool blockchain_storage::validate_ado_ownership(asset_op_verification_context& a
       asset_operation_ownership_proof_eth aoop_eth{};
       r = get_type_in_variant_container(avc.tx.proofs, aoop_eth);
       CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed: asset_operation_ownership_proof_eth is missing");
-      return crypto::verify_eth_signature(avc.tx_id, last_ado.descriptor.owner_eth_pub_key.value(), aoop_eth.eth_sig);
+      if (!crypto::verify_eth_signature(avc.tx_id, last_ado.descriptor.owner_eth_pub_key.value(), aoop_eth.eth_sig))
+      {
+        LOG_ERROR("Failed to validate secp256k1 signature for hash: " << avc.tx_id << ", signature: " << aoop_eth.eth_sig);
+        return false;
+      }
+      else
+      {
+        return true;
+      }
     }
     // owner_eth_pub_key has no value -- fallback to default
   }

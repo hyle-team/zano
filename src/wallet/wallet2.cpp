@@ -395,7 +395,7 @@ const crypto::public_key& wallet2::out_get_pub_key(const currency::tx_out_v& out
 void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_operation& ado, process_transaction_context& ptc)
 {
   auto print_ado_owner = [ado](std::ostream& o){
-    ado.descriptor.owner_eth_pub_key.has_value() ? o << ado.descriptor.owner_eth_pub_key.get() << " (ETH)" : o << ado.descriptor.owner;
+    ado.descriptor.owner_eth_pub_key.has_value() ? o << ado.descriptor.owner_eth_pub_key.value() << " (ETH)" : o << ado.descriptor.owner;
   };
 
   do
