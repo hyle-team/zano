@@ -106,9 +106,9 @@ namespace epee
       return res;
     if constexpr (is_std_optional<t_pod_type>::value)
     {
-      t_pod_type::value_type v = AUTO_VAL_INIT(v);
+      typename t_pod_type::value_type v = AUTO_VAL_INIT(v);
       if (!epee::string_tools::hex_to_pod(a, v))
-        throw std::runtime_error(std::string("Unable to transform \"") + a + "\" to pod type " + typeid(t_pod_type::value_type).name());
+        throw std::runtime_error(std::string("Unable to transform \"") + a + "\" to pod type " + typeid(typename t_pod_type::value_type).name());
       return v;
     }
 
