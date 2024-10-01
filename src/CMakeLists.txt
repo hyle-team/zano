@@ -116,6 +116,8 @@ else()
 endif()
 
 add_library(crypto ${CRYPTO})
+add_dependencies(crypto secp256k1)
+target_link_libraries(crypto secp256k1)
 
 add_library(currency_core ${CURRENCY_CORE})
 add_dependencies(currency_core version  ${PCH_LIB_NAME})

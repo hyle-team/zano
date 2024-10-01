@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -80,4 +80,18 @@ public:
 private:
   mutable currency::asset_descriptor_base m_adb_alice_currency{};
   mutable currency::asset_descriptor_operation m_ado_alice_currency{};
+};
+
+struct eth_signed_asset_basics : public wallet_test
+{
+  eth_signed_asset_basics();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct eth_signed_asset_via_rpc : public wallet_test
+{
+  eth_signed_asset_via_rpc();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };

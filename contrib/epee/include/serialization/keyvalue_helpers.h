@@ -25,6 +25,8 @@
 // 
 
 #pragma once
+#include <type_traits>
+#include <optional>
 #include "misc_language.h"
 namespace epee
 {
@@ -51,23 +53,72 @@ namespace epee
     }
   };
 
+  template<typename T>
+  struct is_std_optional : std::false_type {};
+
+  template<typename T>
+  struct is_std_optional<std::optional<T>> : std::true_type {};
+
+
+  template<typename T>
+  struct is_std_optional<boost::optional<T>> : std::true_type {};
+
+
+  //basic helpers for pod-to-hex serialization 
+  template<class t_pod_type>
+  std::string transform_t_pod_to_str_internal(const t_pod_type& a)
+  {
+    return epee::string_tools::pod_to_hex(a);
+  }
+
+  template<class t_pod_type>
+  std::string transform_t_pod_to_str_internal(const std::optional<t_pod_type>& a)
+  {
+    if (a.has_value())
+      return epee::string_tools::pod_to_hex(*a);
+    else
+      return "";
+  }
+
+  template<class t_pod_type>
+  std::string transform_t_pod_to_str_internal(const boost::optional<t_pod_type>& a)
+  {
+    if (a.has_value())
+      return epee::string_tools::pod_to_hex(*a);
+    else
+      return "";
+  }
 
 	//basic helpers for pod-to-hex serialization 
 	template<class t_pod_type>
 	std::string transform_t_pod_to_str(const t_pod_type & a)
 	{
-		return epee::string_tools::pod_to_hex(a);
+		return transform_t_pod_to_str_internal(a);
 	}
-	template<class t_pod_type>
+
+
+  
+  template<class t_pod_type>
 	t_pod_type transform_str_to_t_pod(const std::string& a)
 	{
-		t_pod_type res = AUTO_VAL_INIT(res);
+    t_pod_type res = AUTO_VAL_INIT(res);
     if (a.empty())
       return res;
+    if constexpr (is_std_optional<t_pod_type>::value)
+    {
+      typename t_pod_type::value_type v = AUTO_VAL_INIT(v);
+      if (!epee::string_tools::hex_to_pod(a, v))
+        throw std::runtime_error(std::string("Unable to transform \"") + a + "\" to pod type " + typeid(typename t_pod_type::value_type).name());
+      return v;
+    }
+
+
     if (!epee::string_tools::hex_to_pod(a, res))
       throw std::runtime_error(std::string("Unable to transform \"") + a + "\" to pod type " + typeid(t_pod_type).name());
 		return res;
 	}
+
+
 
   //basic helpers for blob-to-hex serialization 
   

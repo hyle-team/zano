@@ -2196,6 +2196,8 @@ namespace currency
     hsc.add_scalar(crypto::scalar_t(ado.descriptor.total_max_supply));
     hsc.add_scalar(crypto::scalar_t(ado.descriptor.decimal_point));
     hsc.add_pub_key(ado.descriptor.owner);
+    if (ado.descriptor.owner_eth_pub_key.has_value())
+      hsc.add_eth_pub_key(ado.descriptor.owner_eth_pub_key.value());
     crypto::hash h = hsc.calc_hash_no_reduce();
 
     // this hash function needs to be computationally expensive (s.a. the whitepaper)
@@ -2248,7 +2250,8 @@ namespace currency
       // asset_control_key = Hs(CRYPTO_HDS_ASSET_CONTROL_KEY, 8 * tx_key.sec * sender_account_keys.account_address.spend_public_key, 0)
       // ado.descriptor.owner = asset_control_key * G
       
-      ado.descriptor.owner = sender_account_keys.account_address.spend_public_key;
+      if (!ado.descriptor.owner_eth_pub_key.has_value())
+        ado.descriptor.owner = sender_account_keys.account_address.spend_public_key;
 
       CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id), false, "get_or_calculate_asset_id failed");
 
@@ -2337,25 +2340,6 @@ namespace currency
       }
       if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation_before_seal{ &ado });
 
-      ftp.need_to_generate_ado_proof = true;
-      /*
-      //seal it with owners signature
-      crypto::signature sig = currency::null_sig;
-      crypto::hash h = get_signature_hash_for_asset_operation(ado);
-      if (ftp.pthirdparty_sign_handler)
-      {
-        bool r = ftp.pthirdparty_sign_handler->sign(h, ftp.ado_current_asset_owner, sig);
-        CHECK_AND_ASSERT_MES(r, false, "asset thirparty sign failed");
-      }
-      else
-      {
-        crypto::public_key pub_k = currency::null_pkey;
-        crypto::secret_key_to_public_key(sender_account_keys.spend_secret_key, pub_k);
-        CHECK_AND_ASSERT_MES(ftp.ado_current_asset_owner == pub_k, false, "asset owner key not matched with provided private key for asset operation signing");
-        crypto::generate_signature(h, pub_k, account_keys.spend_secret_key, sig);
-      }
-      ado.opt_proof = sig;
-      */
     }
     return true;
   }
@@ -2605,8 +2589,7 @@ namespace currency
     // ASSET oprations handling
     if (tx.version > TRANSACTION_VERSION_PRE_HF4)
     {
-      asset_descriptor_operation* pado = nullptr;
-      pado = get_type_in_variant_container<asset_descriptor_operation>(tx.extra);
+      asset_descriptor_operation* pado = get_type_in_variant_container<asset_descriptor_operation>(tx.extra);
       if (pado)
       {
         bool r = construct_tx_handle_ado(sender_account_keys, ftp, *pado, gen_context, gen_context.tx_key, shuffled_dsts);
@@ -2719,7 +2702,8 @@ namespace currency
     // generate proofs and signatures
     // (any changes made below should only affect the signatures/proofs and should not impact the prefix hash calculation)
     //
-    crypto::hash tx_prefix_hash = get_transaction_prefix_hash(tx);
+    result.tx_id = get_transaction_prefix_hash(tx);
+    const crypto::hash &tx_prefix_hash = result.tx_id;
 
     // ring signatures (per-input proofs)
     r = false;
@@ -2775,35 +2759,30 @@ namespace currency
       CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
       tx.proofs.emplace_back(std::move(balance_proof));
 
-      // asset operation proof (if necessary)
+      // optional asset operation proofs: amount commitment proof (required for register, emit, public burn)
       if (gen_context.ao_asset_id != currency::null_pkey)
       {
-        // construct the asset operation proof
-        // TODO @#@# add support for hidden supply
+        // asset amount commitment g proof   (TODO @#@# add support for hidden supply)
         crypto::signature aop_g_sig{};
         crypto::generate_signature(tx_prefix_hash, crypto::point_t(gen_context.ao_amount_blinding_mask * crypto::c_point_G).to_public_key(), gen_context.ao_amount_blinding_mask, aop_g_sig);
         asset_operation_proof aop{};
         aop.opt_amount_commitment_g_proof = aop_g_sig;
         tx.proofs.emplace_back(std::move(aop));
       }
-      if(ftp.need_to_generate_ado_proof)        
-      { 
-        asset_operation_ownership_proof aoop = AUTO_VAL_INIT(aoop);
 
-        if (ftp.pthirdparty_sign_handler)
+      // optional asset operation proofs: ownership proof for standard (non-eth) owner (using generic Shnorr signature with the spend secret key)
+      const asset_descriptor_operation* pado = get_type_in_variant_container<asset_descriptor_operation>(tx.extra);
+      if (pado != nullptr)
+      {
+        if ((pado->operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || pado->operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE) &&
+            !pado->descriptor.owner_eth_pub_key.has_value())
         {
-          //ask third party to generate proof
-          r = ftp.pthirdparty_sign_handler->sign(tx_prefix_hash, ftp.ado_current_asset_owner, aoop.gss);
-          CHECK_AND_ASSERT_MES(r, false, "Failed to sign ado by thirdparty");
-        }
-        else
-        {
-          //generate signature by wallet account 
-          r = crypto::generate_schnorr_sig(tx_prefix_hash, ftp.ado_current_asset_owner, sender_account_keys.spend_secret_key, aoop.gss);
+          asset_operation_ownership_proof aoop{};
+          r = crypto::generate_schnorr_sig(tx_prefix_hash, sender_account_keys.spend_secret_key, aoop.gss);
           CHECK_AND_ASSERT_MES(r, false, "Failed to sign ado proof");
+          if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_after_asset_ownership_proof_generated{ &aoop });
+          tx.proofs.emplace_back(aoop);
         }
-        if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_after_asset_ownership_proof_generated{ &aoop });
-        tx.proofs.emplace_back(aoop);
       }
     }
 

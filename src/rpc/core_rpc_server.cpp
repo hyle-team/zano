@@ -75,7 +75,8 @@ namespace currency
     return true;
   }
 #define check_core_ready() check_core_ready_(LOCAL_FUNCTION_DEF__)
-#define CHECK_CORE_READY() if(!check_core_ready()){res.status =  API_RETURN_CODE_BUSY;return true;}
+#define CHECK_CORE_READY()    if (!check_core_ready()) {res.status =  API_RETURN_CODE_BUSY; return true; }
+#define CHECK_CORE_READY_WE() if (!check_core_ready()) {error_resp.code = CORE_RPC_ERROR_CODE_CORE_BUSY; error_resp.message = "Core is busy."; return false; }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_height(const COMMAND_RPC_GET_HEIGHT::request& req, COMMAND_RPC_GET_HEIGHT::response& res, connection_context& cntx)
   {
@@ -750,6 +751,74 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_decrypt_tx_details(const COMMAND_RPC_DECRYPT_TX_DETAILS::request& req, COMMAND_RPC_DECRYPT_TX_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
+  {
+#define LOCAL_CHECK(cond, msg)         if (!(cond)) { error_resp.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;    error_resp.message = msg; LOG_PRINT_L1("on_decrypt_tx_details: " << error_resp.message); return false; }
+#define LOCAL_CHECK_INT_ERR(cond, msg) if (!(cond)) { error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR; error_resp.message = msg; LOG_PRINT_L1("on_decrypt_tx_details: " << error_resp.message); return false; }
+
+    LOCAL_CHECK(req.tx_id.empty() != req.tx_blob.empty(), "One of either tx_id or tx_blob must be specified.");
+
+    transaction tx{};
+    if (!req.tx_id.empty())
+    {
+      CHECK_CORE_READY_WE();
+
+      crypto::hash tx_id{};
+      LOCAL_CHECK(crypto::parse_tpod_from_hex_string(req.tx_id, tx_id), "tx_id is given, but it's invalid");
+      LOCAL_CHECK(m_core.get_transaction(tx_id, tx), "tx with the given tx_id could be found in the blockchain");
+    }
+    else
+    {
+      blobdata decoded_blob = string_encoding::base64_decode(req.tx_blob);
+      if (!t_unserializable_object_from_blob(tx, decoded_blob))
+      {
+        // unable to decode tx_blob as base64, try once again as hex-encoding
+        decoded_blob.clear();
+        string_tools::parse_hexstr_to_binbuff(req.tx_blob, decoded_blob);
+        LOCAL_CHECK(t_unserializable_object_from_blob(tx, decoded_blob), "tx_id is not given, and tx_blob is invalid");
+      }
+    }
+
+    crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(tx);
+    crypto::point_t R{};
+    LOCAL_CHECK(tx_pub_key != null_pkey && R.from_public_key(tx_pub_key) && R.is_in_main_subgroup(), "unsigned_tx: tx public key is missing or invalid");
+
+    LOCAL_CHECK(tx_pub_key == (crypto::scalar_t(req.tx_secret_key) * crypto::c_point_G).to_public_key(), "tx_secret_key doesn't match the transaction public key");
+
+    LOCAL_CHECK(req.outputs_addresses.size() == tx.vout.size(), "outputs_addresses count (" + epee::string_tools::num_to_string_fast(req.outputs_addresses.size()) + " doesn't match tx.vout size (" + epee::string_tools::num_to_string_fast(tx.vout.size()) + ")");
+
+    for(size_t i = 0; i < req.outputs_addresses.size(); ++i)
+    {
+      if (req.outputs_addresses[i].empty())
+        continue; // skip this output if the given address is empty string
+
+      account_public_address addr{};
+      payment_id_t payment_id{};
+      LOCAL_CHECK(currency::get_account_address_and_payment_id_from_str(addr, payment_id, req.outputs_addresses[i]) && payment_id.empty(), "output address #" + epee::string_tools::num_to_string_fast(i) + " couldn't be parsed or it is an integrated address (which is not supported)");
+
+      tx_out_v& out_v = tx.vout[i];
+      LOCAL_CHECK(out_v.type() == typeid(tx_out_zarcanum), "tx output #" + epee::string_tools::num_to_string_fast(i) + " has wrong type");
+      const tx_out_zarcanum& zo = boost::get<tx_out_zarcanum>(out_v);
+
+      crypto::key_derivation derivation{};
+      LOCAL_CHECK_INT_ERR(crypto::generate_key_derivation(addr.view_public_key, req.tx_secret_key, derivation), "output #" + epee::string_tools::num_to_string_fast(i) + ": generate_key_derivation failed");
+      
+      auto& decoded_out = res.decoded_outputs.emplace_back();
+      decoded_out.out_index = i;
+      decoded_out.address = req.outputs_addresses[i];
+      crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
+      LOCAL_CHECK(currency::decode_output_amount_and_asset_id(zo, derivation, i, decoded_out.amount, decoded_out.asset_id, amount_blinding_mask, asset_id_blinding_mask), "output #" + epee::string_tools::num_to_string_fast(i) + ": cannot be decoded");
+    }
+
+    res.tx_in_json = currency::obj_to_json_str(tx);
+    res.verified_tx_id = get_transaction_hash(tx);
+
+    res.status = API_RETURN_CODE_OK;
+    return true;
+#undef LOCAL_CHECK
+#undef LOCAL_CHECK_INT_ERR
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_main_block_details(const COMMAND_RPC_GET_BLOCK_DETAILS::request& req, COMMAND_RPC_GET_BLOCK_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
     if (!m_core.get_blockchain_storage().get_main_block_rpc_details(req.id, res.block_details))
@@ -1001,7 +1070,7 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_submitblock(const COMMAND_RPC_SUBMITBLOCK::request& req, COMMAND_RPC_SUBMITBLOCK::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
-    CHECK_CORE_READY();
+    CHECK_CORE_READY_WE();
     if(req.size()!=1)
     {
       error_resp.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
@@ -1044,8 +1113,7 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_submitblock2(const COMMAND_RPC_SUBMITBLOCK2::request& req, COMMAND_RPC_SUBMITBLOCK2::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
-    CHECK_CORE_READY();
-
+    CHECK_CORE_READY_WE();
 
     block b = AUTO_VAL_INIT(b);
     if (!parse_and_validate_block_from_blob(req.b, b))
@@ -1308,7 +1376,7 @@ namespace currency
 
     LOCAL_CHECK(req.address != account_public_address{}, "address is missing");
     LOCAL_CHECK(req.viewkey != null_skey, "viewkey is missing");
-    LOCAL_CHECK(0 <= req.blocks_limit && req.blocks_limit <= 5, "blocks_limit is out of allowed bounds");
+    LOCAL_CHECK(req.blocks_limit <= 5, "blocks_limit is out of allowed bounds");
 
     // verify addess keys
     crypto::point_t view_pk, spend_pk;
