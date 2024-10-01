@@ -1433,7 +1433,7 @@ namespace tools
       res.status = e.what();
       return true;
     }
-    res.status = API_RETURN_CODE_OK;
+    res.status = API_RETURN_CODE_OK;  
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
