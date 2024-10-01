@@ -116,6 +116,11 @@ async function emmit_asset()
     console.log("Public key:", loadedWallet.signingKey.compressedPublicKey);
     const owner_eth_pub_key = loadedWallet.signingKey.compressedPublicKey.substring(2);
     console.log("Generated Public key HEX:", owner_eth_pub_key);
+
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    //this part is performed on coordinator node: 
+
     var res_emmit;
     //if(!use_pregenerated_files)
     //{
@@ -143,6 +148,12 @@ async function emmit_asset()
     //  res_emmit = JSON.parse(data);
     //}
     
+
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    //this part is performed on validator node: 
+
+
     var res_decrypt;
     //if(!use_pregenerated_files)
     //{
@@ -162,6 +173,7 @@ async function emmit_asset()
       fs.writeFileSync('decrypt_response.json', JSON.stringify(res_decrypt, null, 2));
       console.log("decrypt_response : " + JSON.stringify(res_decrypt, null, 2));
       
+      //TODO: response holds all information about what this transaction actually transfer and to what addresses
   
     //}else
     //{
@@ -169,8 +181,17 @@ async function emmit_asset()
     //  res_decrypt = JSON.parse(data);
     //}
   
+
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    //this part is performed with TSS scheme: 
     const bytesToSign = ethers.getBytes('0x' + res_decrypt.result.verified_tx_id);
     const signature = loadedWallet.signingKey.sign(bytesToSign).serialized;
+
+    //////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////
+    //this part is performed on coordinator node with given signature: 
+
     const signature_without_0x = signature.substring(2);
     console.log("Generated signature: " + signature_without_0x);
     // Strip the last byte (recovery parameter) to get 64 bytes    
