@@ -163,6 +163,5 @@ struct tx_version_against_hardfork : public test_chain_unit_enchanced
 
 struct tx_pool_semantic_validation :  public test_chain_unit_enchanced
 {
-  tx_pool_semantic_validation();
   bool generate(std::vector<test_event_entry>& events) const;
 };

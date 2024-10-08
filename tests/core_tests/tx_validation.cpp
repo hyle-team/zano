@@ -1703,12 +1703,6 @@ bool tx_version_against_hardfork::generate(std::vector<test_event_entry>& events
   return true;
 }
 
-tx_pool_semantic_validation::tx_pool_semantic_validation()
-{
-  // blk_0r is on the height 10.
-  m_hardforks.set_hardfork_height(ZANO_HARDFORK_03, 9);
-}
-
 bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events) const
 {
   // Test idea: ensure that the checks contained in the function "validate_tx_semantic" body are performed.
