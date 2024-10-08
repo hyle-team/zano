@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -89,6 +89,7 @@ namespace currency
     bool on_get_votes(const COMMAND_RPC_GET_VOTES::request& req, COMMAND_RPC_GET_VOTES::response& res, connection_context& cntx);
     bool on_get_asset_info(const COMMAND_RPC_GET_ASSET_INFO::request& req, COMMAND_RPC_GET_ASSET_INFO::response& res, connection_context& cntx);
     bool on_get_assets_list(const COMMAND_RPC_GET_ASSETS_LIST::request& req, COMMAND_RPC_GET_ASSETS_LIST::response& res, connection_context& cntx);
+    bool on_decrypt_tx_details(const COMMAND_RPC_DECRYPT_TX_DETAILS::request& req, COMMAND_RPC_DECRYPT_TX_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
 
     bool on_get_main_block_details(const COMMAND_RPC_GET_BLOCK_DETAILS::request& req, COMMAND_RPC_GET_BLOCK_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_get_alt_block_details(const COMMAND_RPC_GET_BLOCK_DETAILS::request& req, COMMAND_RPC_GET_BLOCK_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
@@ -153,9 +154,11 @@ namespace currency
         MAP_JON_RPC   ("getrandom_outs1",             on_get_random_outs1,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS)
         MAP_JON_RPC   ("getrandom_outs3",             on_get_random_outs3,            COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3)
         MAP_JON_RPC   ("get_votes",                   on_get_votes,                   COMMAND_RPC_GET_VOTES)
+        
         //assets api
         MAP_JON_RPC   ("get_asset_info",              on_get_asset_info,             COMMAND_RPC_GET_ASSET_INFO)
         MAP_JON_RPC   ("get_assets_list",             on_get_assets_list,            COMMAND_RPC_GET_ASSETS_LIST)
+        MAP_JON_RPC_WE("decrypt_tx_details",          on_decrypt_tx_details,         COMMAND_RPC_DECRYPT_TX_DETAILS)
 
         MAP_JON_RPC_WE("get_main_block_details",      on_get_main_block_details,      COMMAND_RPC_GET_BLOCK_DETAILS)
         MAP_JON_RPC_WE("get_alt_block_details",       on_get_alt_block_details,       COMMAND_RPC_GET_BLOCK_DETAILS)

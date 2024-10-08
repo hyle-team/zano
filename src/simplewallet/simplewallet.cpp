@@ -125,6 +125,7 @@ namespace
 {
   const command_line::arg_descriptor<std::string>   arg_wallet_file  ("wallet-file", "Use wallet <arg>", "");
   const command_line::arg_descriptor<std::string>   arg_generate_new_wallet  ("generate-new-wallet", "Generate new wallet and save it to <arg> or <address>.wallet by default", "");
+  const command_line::arg_descriptor<bool>          arg_derive_custom_seed("derive_custom_seed", "Derive seed phrase from custom 24-words secret(advanced option, do it on your own risk)", "");
   const command_line::arg_descriptor<std::string>   arg_generate_new_auditable_wallet  ("generate-new-auditable-wallet", "Generate new auditable wallet and store it to <arg>", "");
   const command_line::arg_descriptor<std::string>   arg_daemon_address  ("daemon-address", "Use daemon instance at <host>:<port>", "");
   const command_line::arg_descriptor<std::string>   arg_daemon_host  ("daemon-host", "Use daemon instance at host <arg> instead of localhost", "");
@@ -2095,11 +2096,11 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
   td.asset_id = currency::null_pkey;
   std::vector<currency::tx_destination_entry> destinations;
   destinations.push_back(td);
-  currency::transaction result_tx = AUTO_VAL_INIT(result_tx);
+  currency::finalized_tx ft{};
   crypto::public_key result_asset_id = currency::null_pkey;
-  m_wallet->deploy_new_asset(adb, destinations, result_tx, result_asset_id);
+  m_wallet->deploy_new_asset(adb, destinations, ft, result_asset_id);
 
-  success_msg_writer(true) << "New asset successfully deployed with tx " << get_transaction_hash(result_tx) << " (unconfirmed) : " << ENDL
+  success_msg_writer(true) << "New asset successfully deployed with tx " << ft.tx_id << " (unconfirmed) : " << ENDL
     << "Asset ID:     " << result_asset_id << ENDL
     << "Title:        " << adb.full_name << ENDL
     << "Ticker:       " << adb.ticker << ENDL
@@ -2874,7 +2875,63 @@ bool search_for_wallet_file(const std::wstring &search_here/*, const std::string
   return false;
 }
 
+int custom_seed_builder()
+{
+  success_msg_writer() <<
+    "**********************************************************************\n" <<
+    "This is an experimental tool that helps you create a custom seed phrase \n"
+    "based on your own 24 words. It can be extremely unsafe, so only use it \n"
+    "if you're confident in what you're doing.\n"
+    "**********************************************************************";
 
+  success_msg_writer() << "Please enter 24 words that you want to use as base for the seed:";
+  std::string seed_24;
+  std::getline(std::cin, seed_24);
+
+
+  std::list<std::string> words;
+  std::string trimed_seed_24 = epee::string_tools::trim(seed_24);
+  boost::split(words, trimed_seed_24, boost::is_space(), boost::token_compress_on);
+  seed_24 = boost::algorithm::join(words, " ");
+
+  std::string passphrase;
+  success_msg_writer() << "Please enter seed passphrase(it's highly recommended to use passphrase for custom seed):";
+  std::getline(std::cin, passphrase);
+  if (passphrase.empty())
+  {
+    success_msg_writer() << "Using unsecured seed(no passphrase)";
+  }
+  else
+  {
+    std::string passphrase_confirmation;
+    success_msg_writer() << "Please confirm passphrase:";
+    std::getline(std::cin, passphrase_confirmation);
+    if (passphrase_confirmation != passphrase)
+    {
+      success_msg_writer() << "Passphrase mismatched, try again";
+      return EXIT_FAILURE;
+    }
+  }
+
+  account_base acc;
+  acc.generate();
+  std::string pass_protected_or_not = "";
+  std::vector<unsigned char> binary_from_seed = tools::mnemonic_encoding::text2binary(seed_24);
+  std::vector<unsigned char> processed_binary_from_seed = binary_from_seed;
+  if (!passphrase.empty())
+  {
+    //encrypt seed phrase binary data
+    account_base::crypt_with_pass(&binary_from_seed[0], binary_from_seed.size(), &processed_binary_from_seed[0], passphrase);
+    pass_protected_or_not = "(secured with passphrase)";
+  }
+  {
+    pass_protected_or_not = "(!without passphrase!)";
+  }
+  const std::string new_seed = acc.get_seed_phrase(passphrase, processed_binary_from_seed);
+  
+  success_msg_writer() << "Here is your seed"  << pass_protected_or_not << "\n " << new_seed;
+  return EXIT_SUCCESS;
+}
 
 int seed_doctor()
 {
@@ -3144,6 +3201,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_no_password_confirmations);
   command_line::add_arg(desc_params, command_line::arg_generate_rpc_autodoc); 
   command_line::add_arg(desc_params, arg_seed_doctor);
+  command_line::add_arg(desc_params, arg_derive_custom_seed);
+
 
   tools::wallet_rpc_server::init_options(desc_params);
 
@@ -3221,12 +3280,15 @@ int main(int argc, char* argv[])
 
   bool offline_mode = command_line::get_arg(vm, arg_offline_mode);
 
-
   if (command_line::has_arg(vm, arg_seed_doctor))
   {
     return seed_doctor();
   }
 
+  if (command_line::has_arg(vm, arg_derive_custom_seed))
+  {
+    return custom_seed_builder();
+  }
 
   if (command_line::has_arg(vm, tools::wallet_rpc_server::arg_rpc_bind_port))
   {

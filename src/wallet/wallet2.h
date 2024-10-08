@@ -438,10 +438,16 @@ namespace tools
     bool check_available_sources(std::list<uint64_t>& amounts);
 
     void deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id);
-    void emit_asset(const crypto::public_key asset_id, std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx);
-    void update_asset(const crypto::public_key asset_id, const currency::asset_descriptor_base new_descriptor, currency::transaction& result_tx);
-    void burn_asset(const crypto::public_key asset_id, uint64_t amount_to_burn, currency::transaction& result_tx);
-    void transfer_asset_ownership(const crypto::public_key asset_id, const crypto::public_key& new_owner, currency::transaction& result_tx);
+    void emit_asset(const crypto::public_key& asset_id, std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx);
+    void update_asset(const crypto::public_key& asset_id, const currency::asset_descriptor_base new_descriptor, currency::transaction& result_tx);
+    void burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::transaction& result_tx);
+    void transfer_asset_ownership(const crypto::public_key& asset_id, const currency::asset_owner_pub_key_v& new_owner_v, currency::transaction& result_tx);
+
+    void deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::finalized_tx& ft, crypto::public_key& new_asset_id);
+    void emit_asset(const crypto::public_key& asset_id, const std::vector<currency::tx_destination_entry>& destinations, currency::finalized_tx& ft);
+    void update_asset(const crypto::public_key& asset_id, const currency::asset_descriptor_base& new_descriptor, currency::finalized_tx& ft);
+    void burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::finalized_tx& ft);
+    void transfer_asset_ownership(const crypto::public_key& asset_id, const currency::asset_owner_pub_key_v& new_owner_v, currency::finalized_tx& ft);
 
     bool daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb);
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
@@ -609,6 +615,7 @@ namespace tools
     void sign_transfer_files(const std::string& tx_sources_file, const std::string& signed_tx_file, currency::transaction& tx);
     void submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx);
     void submit_transfer_files(const std::string& signed_tx_file, currency::transaction& tx);
+    void submit_externally_signed_asset_tx(const currency::finalized_tx& ft, const crypto::eth_signature& eth_sig, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked);
 
     void sweep_below(size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
       uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
@@ -859,7 +866,7 @@ private:
 
     uint64_t get_tx_expiration_median() const;
 
-    void print_tx_sent_message(const currency::transaction& tx, const std::string& description, uint64_t fee = UINT64_MAX);
+    void print_tx_sent_message(const currency::transaction& tx, const std::string& description, bool broadcasted, uint64_t fee = UINT64_MAX);
 
     // Validates escrow template tx in assumption it's related to wallet's account (wallet's account is either A or B party in escrow process)
     bool validate_escrow_proposal(const wallet_public::wallet_transfer_info& wti, const bc_services::proposal_body& prop,

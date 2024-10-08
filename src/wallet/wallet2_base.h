@@ -11,7 +11,6 @@
 #include <boost/serialization/deque.hpp>
 #include <boost/serialization/singleton.hpp>
 #include <boost/serialization/extended_type_info.hpp>
-#include <boost/serialization/shared_ptr.hpp>
 #include <boost/serialization/optional.hpp>
 #include <atomic>
 
@@ -53,6 +52,7 @@
 #define   WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION             uint32_t(1 << 4) // transfer is reserved for cold-signing (unsigned tx was created and passed for signing)
 #define   WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM                      uint32_t(1 << 5) // for htlc keeps info if this htlc belong as redeem or as refund
 #define   WALLET_TRANSFER_DETAIL_CONCISE_MODE_PRESERVE                 uint32_t(1 << 6) // do not truncate this output with CONCISE mode
+#define   WALLET_TRANSFER_DETAIL_FLAG_ASSET_OP_RESERVATION             uint32_t(1 << 7) // transfer is reserved for an ongoing asset operation with external signing
 
 
 
@@ -225,9 +225,10 @@ namespace tools
     bool shuffle = false;
     bool create_utxo_defragmentation_tx = false;
     bool need_at_least_1_zc = false;
-    //crypto::secret_key asset_deploy_control_key = currency::null_skey;
-    currency::thirdparty_sign_handler* pthirdparty_sign_handler = nullptr;
-    crypto::public_key ado_current_asset_owner = currency::null_pkey;
+    
+    // misc
+    std::string tx_meaning_for_logs; // used to correctly log things, e.g. "escrow" or "asset emission".
+    uint32_t additional_transfer_flags_to_mark = 0;
   };
 
   struct mode_separate_context
@@ -357,7 +358,7 @@ namespace tools
     uint64_t m_spent_height = 0;
     uint32_t m_flags = 0;
     uint64_t m_amount = 0;
-    boost::shared_ptr<ZC_out_info> m_zc_info_ptr;
+    std::shared_ptr<ZC_out_info> m_zc_info_ptr;
 
     uint64_t amount() const { return m_amount; }
     uint64_t amount_for_global_output_index() const { return is_zc() ? 0 : m_amount; } // amount value for global outputs index, it's zero for outputs with hidden amounts

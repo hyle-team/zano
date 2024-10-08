@@ -29,6 +29,9 @@ struct wallet_test : virtual public test_chain_unit_enchanced
   template<typename wallet_t>
   std::shared_ptr<wallet_t> init_playtime_test_wallet_t(const std::vector<test_event_entry>& events, currency::core& c, const currency::account_base& acc, bool true_http_rpc = false) const
   {
+#define LOCAL_HOST_CSTR "127.0.0.1"
+#define LOCAL_PORT_CSTR "33777"
+
     CHECK_AND_ASSERT_THROW_MES(events.size() > 0 && events[0].type() == typeid(currency::block), "Invalid events queue, can't find genesis block at the beginning");
     crypto::hash genesis_hash = get_block_hash(boost::get<currency::block>(events[0]));
 
@@ -36,14 +39,14 @@ struct wallet_test : virtual public test_chain_unit_enchanced
     {
       m_core_proxy = std::make_shared<tools::default_http_core_proxy>();
       m_core_proxy->set_connectivity(100, 1);
-      CHECK_AND_ASSERT_THROW_MES(m_core_proxy->set_connection_addr("127.0.0.1:33777"), "set_connection_addr failed");
+      CHECK_AND_ASSERT_THROW_MES(m_core_proxy->set_connection_addr(LOCAL_HOST_CSTR ":" LOCAL_PORT_CSTR), "set_connection_addr failed");
       if (!m_core_proxy->check_connection())
       {
         // if there's not http rpc core server yet, create one
         boost::program_options::options_description desc_options;
         currency::core_rpc_server::init_options(desc_options);
         boost::program_options::variables_map vm{};
-        char* argv[] = {"--rpc-bind-ip=127.0.0.1", "--rpc-bind-port=33777"};
+        const char* const argv[] = {"--rpc-bind-ip=" LOCAL_HOST_CSTR, "--rpc-bind-port=" LOCAL_PORT_CSTR};
         boost::program_options::store(boost::program_options::parse_command_line(sizeof argv / sizeof argv[0], argv, desc_options), vm);
         m_http_rpc_server = std::make_shared<core_http_rpc_server_details>(c, vm);
       }
@@ -60,6 +63,9 @@ struct wallet_test : virtual public test_chain_unit_enchanced
     w->set_concise_mode(true);
     w->set_concise_mode_reorg_max_reorg_blocks(TESTS_CONCISE_MODE_REORG_MAX_REORG_BLOCK);
     return w;
+
+#undef LOCAL_HOST_CSTR
+#undef LOCAL_PORT_CSTR
   }
 
 

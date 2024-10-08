@@ -817,3 +817,241 @@ bool chain_switching_when_out_spent_in_alt_chain_ref_id::generate(std::vector<te
 
   return true;
 }
+
+alt_chain_and_block_tx_fee_median::alt_chain_and_block_tx_fee_median()
+{
+  REGISTER_CALLBACK_METHOD(alt_chain_and_block_tx_fee_median, check_after_hf4);
+  REGISTER_CALLBACK_METHOD(alt_chain_and_block_tx_fee_median, check_before_hf4);
+}
+
+bool alt_chain_and_block_tx_fee_median::generate(
+  std::vector<test_event_entry>& events) const
+{
+  /* Test idea: check chain switching rules.
+  Rules before and after HF4 for PoW blocks are different. There're only PoW
+  blocks in the test situation. If the last blocks contain transactions (non
+  empty blocks), then the chain with the largest this_block_tx_fee_median on its
+  head becomes the main.
+   0            10     11           21     22
+  (0 ) - ... - (0r) - (1 ) - ... - (1r) - (2 )
+                  |   main            |    \
+                  |                   |     [tx_0]
+                  |                   |
+                  |                   |    main
+                  \ - (1a)            \ - (2a)
+                                           \
+                                            [tx_1]
+  Chain with head blk_1 versus chain with head blk_1a: chain with head blk_1
+  is the main, because blocks 1, 1a are empty.
+  Chain with head blk_2 versus chain with head blk_2a: chain with head blk_2a
+  is the main, because blocks 2, 2a aren't empty and the fee of tx_1 is larger
+  than the fee of tx_0.
+  */
+
+  bool success{};
+  bool hf4_active{};
+  std::vector<tx_source_entry> sources{};
+  std::vector<tx_destination_entry> destinations{};
+  transaction tx_0{}, tx_1{};
+  uint64_t tx_version{};
+  crypto::hash top_block{};
+
+  GENERATE_ACCOUNT(miner);
+
+  MAKE_GENESIS_BLOCK(events,
+                     blk_0,
+                     miner,
+                     test_core_time::get_time());
+
+  DO_CALLBACK(events, "configure_core");
+
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner,
+                  CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner);
+  MAKE_NEXT_BLOCK(events, blk_1a, blk_0r, miner);
+
+  /* It is decided which chain will be the main: with the head blk_1 or with the
+  head blk_1a.
+   0            10     11
+                  / - (1 )
+                  |
+  (0 ) - ... - (0r)
+                  |
+                  \ - (1a)
+  */
+
+  CHECK_AND_ASSERT_EQ(is_pos_block(blk_1), false);
+  CHECK_AND_ASSERT_EQ(is_pos_block(blk_1a), false);
+  CHECK_AND_ASSERT_EQ(get_block_height(blk_1), 11);
+  CHECK_AND_ASSERT_EQ(get_block_height(blk_1), get_block_height(blk_1a));
+
+  /* Blocks blk_1, blk_1a do not contain transactions (they are empty blocks).
+  Switching to the alternative chain with head blk_1a will not occur. The main
+  chain is the chain with the head blk_1. */
+
+  DO_CALLBACK_PARAMS(events,
+                     "check_top_block",
+                     params_top_block(get_block_height(blk_1),
+                                      get_block_hash(blk_1)));
+
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner,
+                  CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // Transaction tx_0 is constructed and placed in block blk_2.
+
+  success = fill_tx_sources_and_destinations(
+    events,
+    /* head = */ blk_1r,
+    /* from = */ miner.get_keys(),
+    /* to = */ miner.get_public_address(),
+    /* amount = */ MK_TEST_COINS(10),
+    /* fee = */ m_fee_tx_0_blk_2,
+    /* nmix = */ 0,
+    sources,
+    destinations);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to fill sources, destinations");
+
+  tx_version = get_tx_version(get_block_height(blk_1r),
+                              m_hardforks);
+
+  success = construct_tx(miner.get_keys(),
+                         sources,
+                         destinations,
+                         empty_attachment,
+                         tx_0,
+                         tx_version,
+                         0);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_0");
+
+  ADD_CUSTOM_EVENT(events, tx_0);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner, tx_0);
+
+  sources.clear();
+  destinations.clear();
+
+  // Transaction tx_1 is constructed and placed in block blk_2a.
+
+  tx_version = get_tx_version(get_block_height(blk_1r),
+                              m_hardforks);
+
+  success = fill_tx_sources_and_destinations(
+    events,
+    /* head = */ blk_1r,
+    /* from = */ miner.get_keys(),
+    /* to = */ miner.get_public_address(),
+    /* amount = */ MK_TEST_COINS(10),
+    /* fee = */ m_fee_tx_1_blk_2a,
+    /* nmix = */ 0,
+    sources,
+    destinations);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to fill sources, destinations");
+
+  success = construct_tx(miner.get_keys(),
+                         sources,
+                         destinations,
+                         empty_attachment,
+                         tx_1,
+                         tx_version,
+                         0);
+
+  CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_1");
+
+  ADD_CUSTOM_EVENT(events, tx_1);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2a, blk_1r, miner, tx_1);
+
+  /* It is decided which chain will be the main: with the head blk_2 or with the
+  head blk_2a.
+   0            21     22
+                  / - (2 )
+                  |    \
+                  |     [tx_0]
+                  |
+  (0 ) - ... - (1r)
+                  |
+                  |
+                  |
+                  \ - (2a)
+                       \
+                        [tx_1]
+  */
+
+  CHECK_AND_ASSERT_EQ(is_pos_block(blk_2), false);
+  CHECK_AND_ASSERT_EQ(is_pos_block(blk_2a), false);
+  CHECK_AND_ASSERT_GREATER(m_fee_tx_1_blk_2a, m_fee_tx_0_blk_2);
+  CHECK_AND_ASSERT_EQ(get_block_height(blk_2), 22);
+  CHECK_AND_ASSERT_EQ(get_block_height(blk_2), get_block_height(blk_2a));
+
+  hf4_active =
+    m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM,
+                                              get_block_height(blk_2) + 1);
+
+  if (hf4_active)
+  {
+    /* With HF4 active, the chain with head blk_2a wins because transaction tx_1
+    has a greater fee than transaction tx_0. The main chain is the chain with
+    the head blk_2a. */
+
+    DO_CALLBACK(events, "check_after_hf4");
+    top_block = get_block_hash(blk_2a);
+  }
+
+  else
+  {
+    /* The chains have the same commulative difficulty. Therefore, with HF4
+    inactive, switching to the chain with the blk_2a head will not occur. The
+    main chain is the chain with the head blk_2. */
+
+    DO_CALLBACK(events, "check_before_hf4");
+    top_block = get_block_hash(blk_2);
+  }
+
+  DO_CALLBACK_PARAMS(events,
+                     "check_top_block",
+                     params_top_block(/* height = */ 22, top_block));
+
+  return true;
+}
+
+bool alt_chain_and_block_tx_fee_median::check_after_hf4(
+  currency::core& c,
+  size_t ev_index,
+  const std::vector<test_event_entry>& events)
+{
+  block_extended_info bei{};
+  const uint64_t height_block{22};
+
+  CHECK_AND_ASSERT_EQ(
+    m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM,
+                                              height_block),
+    true);
+
+  c.get_blockchain_storage().get_block_extended_info_by_height(height_block,
+                                                               bei);
+  CHECK_AND_ASSERT_EQ(bei.this_block_tx_fee_median, m_fee_tx_1_blk_2a);
+
+  return true;
+}
+
+bool alt_chain_and_block_tx_fee_median::check_before_hf4(
+  currency::core& c,
+  size_t ev_index,
+  const std::vector<test_event_entry>& events)
+{
+  block_extended_info bei{};
+  const uint64_t height_block{22};
+
+  CHECK_AND_ASSERT_EQ(
+    m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM,
+                                              height_block),
+    false);
+
+  c.get_blockchain_storage().get_block_extended_info_by_height(height_block,
+                                                               bei);
+  CHECK_AND_ASSERT_EQ(bei.this_block_tx_fee_median, m_fee_tx_0_blk_2);
+
+  return true;
+}

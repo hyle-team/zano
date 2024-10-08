@@ -757,30 +757,30 @@ struct A
 struct A_v1 : public A
 {
   std::vector<std::string> vector_two;
-
+  uint8_t current_version = 1;
 
   BEGIN_SERIALIZE()
     FIELD(one)
     FIELD(two)
     FIELD(vector_one)
-    VERSION(1)
-    if (s_version < 1) return true;
+    VERSION_TO_MEMBER(1, current_version)
     FIELD(vector_two)
   END_SERIALIZE()
 };
+
 
 struct A_v2 : public A_v1
 {
   std::vector<std::string> vector_3;
   std::vector<std::string> vector_4;
-
+  uint8_t current_version = 2;
 
   BEGIN_SERIALIZE()
     //CURRENT_VERSION(2)
     FIELD(one)
     FIELD(two)
     FIELD(vector_one)
-    VERSION(2)
+    VERSION_TO_MEMBER(2, current_version)
     if (s_version < 1) return true;
     FIELD(vector_two)
     if (s_version < 2) return true;
@@ -792,13 +792,14 @@ struct A_v2 : public A_v1
 struct A_v3 : public A_v2
 {
   std::vector<std::string> vector_5;
+  uint8_t current_version = 3;
 
   BEGIN_SERIALIZE()
     //CURRENT_VERSION(3)
     FIELD(one)
     FIELD(two)
     FIELD(vector_one)
-    VERSION(3)
+    VERSION_TO_MEMBER(3, current_version)
     if (s_version < 1) return true;
     FIELD(vector_two)
     if (s_version < 2) return true;
