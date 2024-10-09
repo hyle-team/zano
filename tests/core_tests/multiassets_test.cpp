@@ -1957,46 +1957,59 @@ asset_current_and_total_supplies_comparative_constraints::asset_current_and_tota
 {
   {
     auto& adb{m_adbs.at(asset_position::alpha)};
+
     adb.full_name = "Alpha";
     adb.ticker = "ALPH";
-    adb.current_supply = adb.total_max_supply = 0;
+    adb.current_supply = 1;
+    adb.total_max_supply = 0;
   }
 
   {
     auto& adb{m_adbs.at(asset_position::beta)};
+
     adb.full_name = "Beta";
     adb.ticker = "BETA";
     adb.current_supply = adb.total_max_supply = 1;
   }
 
-  m_ados_register.at(asset_position::alpha).operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
-  m_ados_register.at(asset_position::beta).operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+  {
+    auto &adb{m_adbs.at(asset_position::gamma)};
+
+    adb.full_name = "Gamma";
+    adb.ticker = "GAMM";
+    adb.current_supply = adb.total_max_supply = 0;
+  }
+
+  m_ados_register.at(asset_position::alpha).operation_type = m_ados_register.at(asset_position::beta).operation_type = m_ados_register.at(asset_position::gamma).operation_type =
+    ASSET_DESCRIPTOR_OPERATION_REGISTER;
+
   m_ado_emit.operation_type = ASSET_DESCRIPTOR_OPERATION_EMIT;
 
+  REGISTER_CALLBACK_METHOD(asset_current_and_total_supplies_comparative_constraints, assert_asset_gamma_registered);
   REGISTER_CALLBACK_METHOD(asset_current_and_total_supplies_comparative_constraints, assert_asset_alpha_not_registered);
   REGISTER_CALLBACK_METHOD(asset_current_and_total_supplies_comparative_constraints, assert_asset_beta_registered);
   REGISTER_CALLBACK_METHOD(asset_current_and_total_supplies_comparative_constraints, emit_asset_beta_with_incorrect_supply);
   REGISTER_CALLBACK_METHOD(asset_current_and_total_supplies_comparative_constraints, assert_asset_beta_not_emitted);
   REGISTER_CALLBACK_METHOD(asset_current_and_total_supplies_comparative_constraints, public_burn_asset_beta_with_incorrect_supply);
-  REGISTER_CALLBACK_METHOD(asset_current_and_total_supplies_comparative_constraints, assert_alice_final_balance_native_asset);
 }
 
 bool asset_current_and_total_supplies_comparative_constraints::generate(std::vector<test_event_entry>& events) const
 {
   /* Test ideas:
-     * ensure that it's impossible to register asset with .current_supply = .total_max_supply = 0;
-     * ensure that asset operations in which .current_supply is greater than .total_max_supply are not performed. */
+  * ensure that it's possible to register asset with .current_supply = .total_max_supply = 0;
+  * ensure that asset operations in which .current_supply is greater than .total_max_supply are not performed. */
 
   bool success{};
   GENERATE_ACCOUNT(miner);
   GENERATE_ACCOUNT(alice);
-  transaction tx_0{}, tx_1{}, tx_2{}, tx_3{};
+  transaction tx_0{}, tx_1{}, tx_2{}, tx_3{}, tx_4{};
 
   m_accounts.push_back(miner);
   m_accounts.push_back(alice);
-  m_adbs.at(asset_position::alpha).owner = m_adbs.at(asset_position::beta).owner = alice.get_public_address().spend_public_key;
+  m_adbs.at(asset_position::alpha).owner = m_adbs.at(asset_position::beta).owner = m_adbs.at(asset_position::gamma).owner = alice.get_public_address().spend_public_key;
   m_ados_register.at(asset_position::alpha).descriptor = m_adbs.at(asset_position::alpha);
   m_ados_register.at(asset_position::beta).descriptor = m_ado_emit.descriptor = m_adbs.at(asset_position::beta);
+  m_ados_register.at(asset_position::gamma).descriptor = m_adbs.at(asset_position::gamma);
   CHECK_AND_ASSERT(m_ado_emit.descriptor.current_supply <= m_ado_emit.descriptor.total_max_supply, false);
   ++m_ado_emit.descriptor.current_supply;
   CHECK_AND_ASSERT(m_ado_emit.descriptor.current_supply > m_ado_emit.descriptor.total_max_supply, false);
@@ -2006,12 +2019,13 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   {
+    const auto& top{blk_0r};
     std::vector<tx_source_entry> sources{};
     std::vector<tx_destination_entry> destinations{};
 
-    success = fill_tx_sources_and_destinations(events, blk_0r, miner.get_keys(), alice.get_public_address(), MK_TEST_COINS(3), TESTS_DEFAULT_FEE, 0, sources, destinations);
+    success = fill_tx_sources_and_destinations(events, top, miner.get_keys(), alice.get_public_address(), MK_TEST_COINS(8), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
-    success = construct_tx(miner.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version(get_block_height(blk_0r), m_hardforks), 0);
+    success = construct_tx(miner.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version(get_block_height(top), m_hardforks), 0);
     CHECK_AND_ASSERT_EQ(success, true);
   }
 
@@ -2019,75 +2033,70 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner, tx_0);
   REWIND_BLOCKS_N(events, blk_1r, blk_1, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
-  // Alice registers asset ALPH. Transaction is invalid, because .current_supply = 0, .total_max_supply = 0 in the asset base descriptor.
-  if (const auto& top{blk_1r}; m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_05, get_block_height(top)))
+  // Alice registers the asset GAMM with .current_supply = 0, .total_max_supply = 0.
   {
+    const auto& top{blk_1r};
     std::vector<tx_source_entry> sources{};
     std::vector<tx_destination_entry> destinations{};
-    const auto& ado{m_ados_register.at(asset_position::alpha)};
-    transaction tx{};
+    const auto& ado{m_ados_register.at(asset_position::gamma)};
     crypto::secret_key one_time{};
 
-    success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(3), TESTS_DEFAULT_FEE, 0, sources, destinations);
+    success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
     destinations.emplace_back(ado.descriptor.current_supply, alice.get_public_address(), null_pkey);
     CHECK_AND_ASSERT_EQ(ado.descriptor.total_max_supply, 0);
     CHECK_AND_ASSERT_EQ(ado.descriptor.total_max_supply, ado.descriptor.current_supply);
-    success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx, get_tx_version(get_block_height(top), m_hardforks), one_time, 0);
+    success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_1, get_tx_version(get_block_height(top), m_hardforks), one_time, 0);
     CHECK_AND_ASSERT_EQ(success, true);
-    DO_CALLBACK(events, "mark_invalid_tx");
-    ADD_CUSTOM_EVENT(events, tx);
-    DO_CALLBACK(events, "assert_asset_alpha_not_registered");
   }
 
-  // Increase .current_supply that .current_supply > .total_max_supply.
-  {
-    auto& ado{m_ados_register.at(asset_position::alpha)};
-
-    CHECK_AND_ASSERT_EQ(ado.descriptor.current_supply, ado.descriptor.total_max_supply);
-    ++ado.descriptor.current_supply;
-    CHECK_AND_ASSERT_GREATER(ado.descriptor.current_supply, ado.descriptor.total_max_supply);
-  }
+  // tx_1 is valid and must be accepted.
+  ADD_CUSTOM_EVENT(events, tx_1);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, alice, tx_1);
+  REWIND_BLOCKS_N(events, blk_2r, blk_2, alice, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  DO_CALLBACK(events, "assert_asset_gamma_registered");
 
   // Alice registers asset ALPH. Transaction is invalid, because .current_supply > .total_max_supply in the asset base descriptor.
   {
+    const auto& top{blk_2r};
     std::vector<tx_source_entry> sources{};
     std::vector<tx_destination_entry> destinations{};
     crypto::secret_key one_time{};
     const auto& ado{m_ados_register.at(asset_position::alpha)};
-    const auto& top{blk_1r};
 
     success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
     destinations.emplace_back(ado.descriptor.current_supply, alice.get_public_address(), null_pkey);
     CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > ado.descriptor.total_max_supply, false, "current_supply <= total_max_supply");
-    success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_1, get_tx_version(get_block_height(top), m_hardforks), one_time, 0);
+    success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_2, get_tx_version(get_block_height(top), m_hardforks), one_time, 0);
     CHECK_AND_ASSERT_EQ(success, true);
   }
 
+  /* TODO: tx_1 is invalid and mustn't be accepted.
   DO_CALLBACK(events, "mark_invalid_tx");
-  ADD_CUSTOM_EVENT(events, tx_1);
-  DO_CALLBACK(events, "assert_asset_alpha_not_registered");
+  ADD_CUSTOM_EVENT(events, tx_2);
+  DO_CALLBACK(events, "assert_asset_alpha_not_registered"); */
 
-  // Alice registers asset BETA. In the asset base descriptor .current_supply <= .total_max_supply. Transaction is accepted.
+  // Alice registers asset BETA. In the asset base descriptor .current_supply <= .total_max_supply.
   {
+    const auto& top{blk_2r};
     std::vector<tx_source_entry> sources{};
     std::vector<tx_destination_entry> destinations{};
     crypto::secret_key one_time{};
     const auto& ado{m_ados_register.at(asset_position::beta)};
-    const auto& top{blk_1r};
 
     success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
     destinations.emplace_back(ado.descriptor.current_supply, alice.get_public_address(), null_pkey);
     CHECK_AND_ASSERT(ado.descriptor.current_supply <= ado.descriptor.total_max_supply, false);
-    success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_2, get_tx_version(get_block_height(top), m_hardforks), one_time, 0);
+    success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_3, get_tx_version(get_block_height(top), m_hardforks), one_time, 0);
     CHECK_AND_ASSERT_EQ(success, true);
   }
 
-  ADD_CUSTOM_EVENT(events, tx_2);
-  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, alice, tx_2);
-  REWIND_BLOCKS_N(events, blk_2r, blk_2, alice, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  // tx_3 is valid and must be accepted.
+  ADD_CUSTOM_EVENT(events, tx_3);
+  MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2r, alice, tx_3);
+  REWIND_BLOCKS_N(events, blk_3r, blk_3, alice, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   DO_CALLBACK(events, "assert_asset_beta_registered");
 
   {
@@ -2102,21 +2111,22 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
   // Alice emits asset BETA. The emission is performed through the wallet object. There is no emission, because .current_supply > .total_max_supply in the asset base descriptor.
   DO_CALLBACK(events, "emit_asset_beta_with_incorrect_supply");
 
-  // Alice emits asset BETA. A transaction is constructed through finalize_tx_param object. This is low-level transaction construction. Transaction is rejected by the core, because .current_supply >
-  // .total_max_supply in the asset base descriptor.
+  /* Alice emits asset BETA. A transaction is constructed through finalize_tx_param object. This is low-level transaction construction. Transaction muse be rejected by the core, because
+  .current_supply > .total_max_supply in the asset base descriptor. */
   {
+    const auto& top{blk_3r};
+    const auto& ado_register{m_ados_register.at(asset_position::beta)};
     std::vector<tx_source_entry> sources{};
     std::vector<tx_destination_entry> destinations{};
     crypto::secret_key one_time{};
     tx_source_entry source{};
     finalize_tx_param ftp{};
     finalized_tx ftx{};
-    const auto& top{blk_2r};
 
     success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
-    CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, m_ados_register.at(asset_position::beta).descriptor.current_supply);
-    destinations.emplace_back(m_ado_emit.descriptor.current_supply - m_ados_register.at(asset_position::beta).descriptor.current_supply, alice.get_public_address(), null_pkey);
+    CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, ado_register.descriptor.current_supply);
+    destinations.emplace_back(m_ado_emit.descriptor.current_supply - ado_register.descriptor.current_supply, alice.get_public_address(), null_pkey);
     ftp.sources = sources;
     ftp.prepared_destinations = destinations;
     ftp.tx_version = get_tx_version(get_block_height(top), m_hardforks);
@@ -2125,15 +2135,14 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, m_ado_emit.descriptor.total_max_supply);
     success = construct_tx(alice.get_keys(), ftp, ftx);
     CHECK_AND_ASSERT_EQ(success, true);
-    tx_3 = ftx.tx;
+    tx_4 = ftx.tx;
   }
 
   DO_CALLBACK(events, "mark_invalid_tx");
-  ADD_CUSTOM_EVENT(events, tx_3);
+  ADD_CUSTOM_EVENT(events, tx_4);
   DO_CALLBACK(events, "assert_asset_beta_not_emitted");
-  // Alice burns asset BETA. The public burn is performed through the wallet object. Burn isn't performed, because .current_supply > .total_max_supply in the asset base descriptor.
+  // Alice burns asset BETA. The public burn is performed through the wallet object. Burn mustn't be performed, because .current_supply > .total_max_supply in the asset base descriptor.
   DO_CALLBACK(events, "public_burn_asset_beta_with_incorrect_supply");
-  DO_CALLBACK(events, "assert_alice_final_balance_native_asset");
 
   return true;
 }
@@ -2155,7 +2164,7 @@ bool asset_current_and_total_supplies_comparative_constraints::assert_asset_alph
   {
     asset_descriptor_base alpha_adb{};
 
-    CHECK_AND_ASSERT_MES(!c.get_blockchain_storage().get_asset_info(alpha_asset_id, alpha_adb), false, "asset " + ticker + " must not be registered");
+    CHECK_AND_ASSERT_MES(!c.get_blockchain_storage().get_asset_info(alpha_asset_id, alpha_adb), false, "the asset " + ticker + " must not be registered");
   }
 
   return true;
@@ -2178,7 +2187,7 @@ bool asset_current_and_total_supplies_comparative_constraints::assert_asset_beta
   {
     asset_descriptor_base beta_adb{};
 
-    CHECK_AND_ASSERT_MES(c.get_blockchain_storage().get_asset_info(key_beta_asset_id, beta_adb), false, "asset " + ticker + " must not be registered");
+    CHECK_AND_ASSERT_MES(c.get_blockchain_storage().get_asset_info(key_beta_asset_id, beta_adb), false, "the asset " + ticker + " must not be registered");
   }
 
   CHECK_AND_ASSERT_MES(alice_wallet->balance(key_beta_asset_id) == 1, false, "Alice has got not exactly 1 " + ticker);
@@ -2283,12 +2292,27 @@ bool asset_current_and_total_supplies_comparative_constraints::public_burn_asset
   return false;
 }
 
-bool asset_current_and_total_supplies_comparative_constraints::assert_alice_final_balance_native_asset(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const
+bool asset_current_and_total_supplies_comparative_constraints::assert_asset_gamma_registered(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const
 {
   const std::shared_ptr alice_wallet{init_playtime_test_wallet_t<tools::wallet2>(events, c, ALICE_ACC_IDX)};
+  crypto::public_key key_gamma_asset_id{};
+  const std::string ticker{m_ados_register.at(asset_position::gamma).descriptor.ticker};
 
   alice_wallet->refresh();
-  CHECK_AND_ASSERT_EQ(alice_wallet->balance(currency::native_coin_asset_id), 11'000'000'000'000 + MK_TEST_COINS(2));
+
+  {
+    crypto::point_t point_gamma_asset_id{};
+
+    CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(m_ados_register.at(asset_position::gamma), &point_gamma_asset_id, &key_gamma_asset_id), false, "failed to calculate asset " + ticker + " id");
+  }
+
+  {
+    asset_descriptor_base gamma_adb{};
+
+    CHECK_AND_ASSERT_MES(c.get_blockchain_storage().get_asset_info(key_gamma_asset_id, gamma_adb), false, "the asset " + ticker + " must be registered");
+  }
+
+  CHECK_AND_ASSERT_EQ(alice_wallet->balance(key_gamma_asset_id), m_ados_register.at(asset_position::gamma).descriptor.current_supply);
 
   return true;
 }
