@@ -129,7 +129,7 @@ namespace tools
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::transfer_flags_to_str(uint32_t flags)
 {
-  std::string result(7, ' ');
+  std::string result(8, ' ');
   if (flags & WALLET_TRANSFER_DETAIL_FLAG_SPENT)
     result[0] = 's';
   if (flags & WALLET_TRANSFER_DETAIL_FLAG_BLOCKED)
@@ -142,8 +142,11 @@ std::string wallet2::transfer_flags_to_str(uint32_t flags)
     result[4] = 'c';
   if (flags & WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM)
     result[5] = 'h';
+  if (flags & WALLET_TRANSFER_DETAIL_CONCISE_MODE_PRESERVE)
+    result[6] = 'p';
   if (flags & WALLET_TRANSFER_DETAIL_FLAG_ASSET_OP_RESERVATION)
-    result[6] = 'a';
+    result[7] = 'a';
+
   return result;
 }
 //----------------------------------------------------------------------------------------------------
@@ -4112,7 +4115,7 @@ bool wallet2::generate_utxo_defragmentation_transaction_if_needed(currency::tran
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/, bool show_only_unknown /*= false*/, const std::string& filter_asset_ticker /*= std::string{}*/) const
 {
-  static const char* header = " index                 amount  ticker  g_index  flags         block  tx                                                                out#  asset id";
+  static const char* header = " index                 amount  ticker  g_index  flags          block  tx                                                                out#  asset id";
   std::stringstream ss;
   ss << header << ENDL;
   size_t count = 0;
@@ -4145,7 +4148,7 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
       std::setw(6) << std::left << (native_coin ? std::string("      ") : adb.ticker) << "  " << std::right <<
       std::setw(7) << td.m_global_output_index << "  " <<
       std::setw(2) << std::setfill('0') << td.m_flags << std::setfill(' ') << ":" <<
-      std::setw(7) << transfer_flags_to_str(td.m_flags) << "  " <<
+      std::setw(8) << transfer_flags_to_str(td.m_flags) << "  " <<
       std::setw(7) << td.m_ptx_wallet_info->m_block_height << "  " <<
       get_transaction_hash(td.m_ptx_wallet_info->m_tx) << "  " <<
       std::setw(4) << td.m_internal_output_index << "  ";
