@@ -302,3 +302,10 @@ struct block_template_blacklist_test : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct wallet_reorganize_and_trim_test : public wallet_test
+{
+  wallet_reorganize_and_trim_test();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};

@@ -60,6 +60,8 @@ struct wallet_test : virtual public test_chain_unit_enchanced
     w->set_genesis(genesis_hash);
     w->set_core_proxy(m_core_proxy);
     w->set_disable_tor_relay(true);
+    w->set_concise_mode(true);
+    w->set_concise_mode_reorg_max_reorg_blocks(TESTS_CONCISE_MODE_REORG_MAX_REORG_BLOCK);
     return w;
 
 #undef LOCAL_HOST_CSTR

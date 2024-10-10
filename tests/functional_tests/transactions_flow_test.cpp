@@ -197,9 +197,9 @@ uint64_t got_money_in_first_transfers(const tools::transfer_container& incoming_
 {
   uint64_t summ = 0;
   size_t count = 0;
-  BOOST_FOREACH(const tools::transfer_details& td, incoming_transfers)
+  for(auto& tr : incoming_transfers)
   {
-    summ += boost::get<tx_out_bare>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]).amount;
+    summ += boost::get<tx_out_bare>(tr.second.m_ptx_wallet_info->m_tx.vout[tr.second.m_internal_output_index]).amount;
     if(++count >= n_transfers)
       return summ;
   }
@@ -245,9 +245,9 @@ std::string get_incoming_transfers_str(tools::wallet2& w)
 
   uint64_t spent_count = 0;
   uint64_t unspent_count = 0;
-  for (const auto& td : transfers)
+  for (const auto& tr : transfers)
   {
-    if (td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_SPENT)
+    if (tr.second.m_flags&WALLET_TRANSFER_DETAIL_FLAG_SPENT)
     {
       ++spent_count;
     }
@@ -469,8 +469,9 @@ bool transactions_flow_test(
       //lets go!
       size_t count = 0;
       prepared_transfers = 0;
-      BOOST_FOREACH(tools::transfer_details& td, incoming_transfers)
+      for(const auto& tr : incoming_transfers)
       {
+        const tools::transfer_details& td = tr.second;
         if (td.is_spent())
           continue;
 

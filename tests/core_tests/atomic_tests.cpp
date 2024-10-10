@@ -52,7 +52,7 @@ bool atomic_base_test::generate(std::vector<test_event_entry>& events) const
   test_core_time::adjust(m_genesis_timestamp);
 
 
-  epee::debug::get_set_enable_assert(true, true);
+  //epee::debug::get_set_enable_assert(true, true);
 
   currency::account_base genesis_acc;
   genesis_acc.generate();
@@ -68,7 +68,7 @@ bool atomic_base_test::generate(std::vector<test_event_entry>& events) const
   REWIND_BLOCKS_N(events, blk_0r, blk_0, m_mining_accunt, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
 
   DO_CALLBACK(events, "c1");
-  epee::debug::get_set_enable_assert(true, false);
+  //epee::debug::get_set_enable_assert(true, false);
   return true;
 }
 
@@ -78,8 +78,8 @@ bool atomic_base_test::generate(std::vector<test_event_entry>& events) const
 
 bool atomic_simple_test::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  epee::debug::get_set_enable_assert(true, true);
-  misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler([&](){epee::debug::get_set_enable_assert(true, false); });
+  //epee::debug::get_set_enable_assert(true, true);
+  //misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler([&](){epee::debug::get_set_enable_assert(true, false); });
 
 
   /*
