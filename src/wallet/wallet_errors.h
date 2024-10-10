@@ -323,9 +323,7 @@ namespace tools
     //----------------------------------------------------------------------------------------------------
     struct wallet_error_resync_needed : public std::exception
     {
-      wallet_error_resync_needed()
-       : std::exception("wallet_error_resync_needed")
-      {}
+      virtual const char* what() const noexcept override { return "wallet_error_resync_needed"; }
     };
     //----------------------------------------------------------------------------------------------------
     struct tx_parse_error : public refresh_error
