@@ -2080,6 +2080,7 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
   // Alice registers asset BETA. In the asset base descriptor .current_supply <= .total_max_supply.
   {
     const auto& top{blk_2r};
+
     std::vector<tx_source_entry> sources{};
     std::vector<tx_destination_entry> destinations{};
     crypto::secret_key one_time{};
@@ -2127,6 +2128,7 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     CHECK_AND_ASSERT_EQ(success, true);
     CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, ado_register.descriptor.current_supply);
     destinations.emplace_back(m_ado_emit.descriptor.current_supply - ado_register.descriptor.current_supply, alice.get_public_address(), null_pkey);
+
     ftp.sources = sources;
     ftp.prepared_destinations = destinations;
     ftp.tx_version = get_tx_version(get_block_height(top), m_hardforks);
