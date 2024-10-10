@@ -3822,6 +3822,7 @@ bool wallet_and_sweep_below::c1(currency::core& c, size_t ev_index, const std::v
 
 
 //------------------------------------------------------------------------------
+
 block_template_blacklist_test::block_template_blacklist_test()
 {
   REGISTER_CALLBACK_METHOD(block_template_blacklist_test, c1);
@@ -3912,11 +3913,12 @@ bool block_template_blacklist_test::c1(currency::core& c, size_t ev_index, const
   return true;
 }
 
+//------------------------------------------------------------------------------
+
 wallet_reorganize_and_trim_test::wallet_reorganize_and_trim_test()
 {
   REGISTER_CALLBACK_METHOD(wallet_reorganize_and_trim_test, c1);
 }
-
 
 bool wallet_reorganize_and_trim_test::generate(std::vector<test_event_entry>& events) const
 {
@@ -3937,6 +3939,7 @@ bool wallet_reorganize_and_trim_test::generate(std::vector<test_event_entry>& ev
   return true;
 
 }
+
 bool wallet_reorganize_and_trim_test::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
@@ -3970,5 +3973,3 @@ bool wallet_reorganize_and_trim_test::c1(currency::core& c, size_t ev_index, con
   }
   return true;
 }
-
-
