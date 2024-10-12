@@ -157,6 +157,10 @@ namespace crypto
   {
     return o << epee::string_tools::pod_to_hex(v);
   }
+  std::ostream& operator<<(std::ostream& o, const eth_signature& v)
+  {
+    return o << epee::string_tools::pod_to_hex(v);
+  }
 
 
 } // namespace crypto

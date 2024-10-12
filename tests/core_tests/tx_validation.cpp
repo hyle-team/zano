@@ -9,7 +9,7 @@
 #include "offers_tests_common.h"
 #include "tx_builder.h"
 #include "chaingen_helpers.h"
-#include "..\..\src\currency_core\tx_semantic_validation.h"
+#include "../../src/currency_core/tx_semantic_validation.h"
 
 using namespace epee;
 using namespace crypto;

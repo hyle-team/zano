@@ -62,5 +62,6 @@ namespace crypto
 
   std::ostream& operator<<(std::ostream& o, const eth_secret_key& v);
   std::ostream& operator<<(std::ostream& o, const eth_public_key& v);
+  std::ostream& operator<<(std::ostream& o, const eth_signature& v);
 
 } // namespace crypto

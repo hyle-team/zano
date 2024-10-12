@@ -395,7 +395,7 @@ const crypto::public_key& wallet2::out_get_pub_key(const currency::tx_out_v& out
 void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_operation& ado, process_transaction_context& ptc)
 {
   auto print_ado_owner = [ado](std::ostream& o){
-    ado.descriptor.owner_eth_pub_key.has_value() ? o << ado.descriptor.owner_eth_pub_key.get() << " (ETH)" : o << ado.descriptor.owner;
+    ado.descriptor.owner_eth_pub_key.has_value() ? o << ado.descriptor.owner_eth_pub_key.value() << " (ETH)" : o << ado.descriptor.owner;
   };
 
   do
@@ -3754,13 +3754,10 @@ bool wallet2::balance(std::unordered_map<crypto::public_key, wallet_public::asse
       for (const auto& emp_entry : utx.second.employed_entries.receive)
       {
         auto it_employed_entry = subtransfers_by_assets_map.find(emp_entry.asset_id);
-        if (it_employed_entry == subtransfers_by_assets_map.end())
+        if (it_employed_entry == subtransfers_by_assets_map.end() || !(it_employed_entry->second)) // if is_incoming == false, then we need to check for change and add it to total
         {
-          LOG_ERROR("Intenral error, check the wallet code at give location");
-          continue;
-        }
-        if (!(it_employed_entry->second)) // if is_incoming == false, then we need to check for change and add it to total
-        {
+          //it_employed_entry == subtransfers_by_assets_map.end() is a case when amount sent exactly equal amount received (someone producing more outputs for example)
+          //still need to add to total as it is a change 
           wallet_public::asset_balance_entry_base& e = balances[emp_entry.asset_id];
           e.total += emp_entry.amount;
         }
