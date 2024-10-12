@@ -812,26 +812,7 @@ namespace crypto
 
     friend bool operator==(const point_t& lhs, const point_t& rhs)
     {
-      // TODO: @#@# (performance) consider checking (lhs - rhs).is_zero() instead
-
-      // convert to xy form, then compare components (because (x, y, z, t) representation is not unique)
-      fe lrecip, lx, ly;
-      fe rrecip, rx, ry;
-
-      fe_invert(lrecip, lhs.m_p3.Z);
-      fe_invert(rrecip, rhs.m_p3.Z);
-
-      fe_mul(lx, lhs.m_p3.X, lrecip);
-      fe_mul(rx, rhs.m_p3.X, rrecip);
-      if (memcmp(&lx, &rx, sizeof lx) != 0)
-        return false;
-
-      fe_mul(ly, lhs.m_p3.Y, lrecip);
-      fe_mul(ry, rhs.m_p3.Y, rrecip);
-      if (memcmp(&ly, &ry, sizeof ly) != 0)
-        return false;
-
-      return true;
+      return (lhs - rhs).is_zero();
     }
 
     friend bool operator!=(const point_t& lhs, const point_t& rhs)
