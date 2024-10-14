@@ -1750,7 +1750,6 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
     point_t point_public_key{};
     txout_to_key target{};
     std::array<txin_to_key, 2> inputs{};
-    tx_out_bare output{};
     transaction tx{};
 
     CHECK_AND_ASSERT_EQ(point_public_key.from_string("499790c3302b9f0514e2db09b390679283d43d971383d33dc24c7991ea4cf6d7"), true);
@@ -1762,10 +1761,6 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
     {
       tx.vin.push_back(input);
     }
-
-    output.amount = 1;
-    output.target = target;
-    tx.vout.push_back(output);
 
     CHECK_AND_ASSERT_GREATER(inputs.at(0).amount, inputs.at(0).amount + inputs.at(1).amount);
     CHECK_AND_ASSERT_GREATER(inputs.at(1).amount, inputs.at(0).amount + inputs.at(1).amount);
@@ -1833,14 +1828,10 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
 
   // Two entries of the same type in extra.
   {
-    tx_out_bare output{};
     transaction tx{};
     std::array<txin_to_key, 2> inputs{};
     std::array<point_t, 2> key_image_points{};
-    key_image image{};
 
-    output.amount = 1;
-    tx.vout.push_back(output);
     CHECK_AND_ASSERT_EQ(key_image_points.at(0).from_string("de3c22a62f15e6de8abe6b217085b2aead196daf5ddd67d9c4b366330736fbeb"), true);
     CHECK_AND_ASSERT_EQ(key_image_points.at(1).from_string("9f3eef913921ca35239e696725595e3686bb0d69e3e805791c5aa93d5754aa5c"), true);
 
@@ -1959,7 +1950,6 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
     point_t point_public_key{};
     txout_to_key target{};
     std::array<txin_to_key, 2> inputs{};
-    tx_out_bare output{};
     MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
 
     CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
@@ -1973,9 +1963,6 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
       tx.vin.push_back(input);
     }
 
-    output.amount = 1;
-    output.target = target;
-    tx.vout.push_back(output);
     CHECK_AND_ASSERT_GREATER(inputs.at(0).amount, inputs.at(0).amount + inputs.at(1).amount);
     CHECK_AND_ASSERT_GREATER(inputs.at(1).amount, inputs.at(0).amount + inputs.at(1).amount);
     CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
