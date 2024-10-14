@@ -2046,25 +2046,11 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
 
   // Two entries of the same type in extra.
   {
-    tx_out_bare output{};
-    std::array<txin_to_key, 2> inputs{};
-    std::array<point_t, 2> key_image_points{};
-    key_image image{};
     MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
 
     CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
-    output.amount = 1;
-    tx.vout.push_back(output);
     tx.extra.push_back(null_pkey);
     tx.extra.push_back(null_pkey);
-    CHECK_AND_ASSERT_EQ(key_image_points.at(0).from_string("de3c22a62f15e6de8abe6b217085b2aead196daf5ddd67d9c4b366330736fbeb"), true);
-    CHECK_AND_ASSERT_EQ(key_image_points.at(1).from_string("9f3eef913921ca35239e696725595e3686bb0d69e3e805791c5aa93d5754aa5c"), true);
-
-    for (int position{}; position < 2; ++position)
-    {
-      inputs.at(position).k_image = key_image_points.at(position).to_key_image();
-      tx.vin.push_back(inputs.at(position));
-    }
 
     CHECK_AND_ASSERT_GREATER(tx.extra.size(), 2);
     CHECK_AND_ASSERT_EQ(typeid(tx.extra.back()), typeid(tx.extra.at(tx.extra.size() - 2)));
