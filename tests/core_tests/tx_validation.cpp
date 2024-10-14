@@ -1728,7 +1728,7 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
   {
     transaction tx{};
 
-    tx.vin.emplace_back();
+    tx.vin.emplace_back(txin_gen{});
     CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
     DO_CALLBACK(events, "mark_invalid_tx");
     ADD_CUSTOM_EVENT(events, tx);
@@ -1937,7 +1937,7 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
     MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
 
     CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
-    tx.vin.emplace_back();
+    tx.vin.emplace_back(txin_gen{});
     CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
     DO_CALLBACK(events, "mark_invalid_tx");
     ADD_CUSTOM_EVENT(events, tx);
