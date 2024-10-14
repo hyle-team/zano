@@ -2082,34 +2082,26 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
       tx.vin.push_back(input);
     }
 
-    const auto inputs_sum{[](uint64_t sum, const txin_v& input)
+    const auto inputs_sum{[](const uint64_t sum, const txin_v& input) -> uint64_t
       {
-        uint64_t amount{};
-
         if (input.type() == typeid(txin_to_key))
         {
-          amount = boost::get<txin_to_key>(input).amount;
+          return sum + boost::get<txin_to_key>(input).amount;
         }
 
         if (input.type() == typeid(txin_multisig))
         {
-          amount = boost::get<txin_multisig>(input).amount;
+          return sum + boost::get<txin_multisig>(input).amount;
         }
-
-        return sum + amount;
       }
     };
 
-    const auto outputs_sum{[](uint64_t sum, const tx_out_v& output)
+    const auto outputs_sum{[](const uint64_t sum, const tx_out_v& output) -> uint64_t
       {
-        uint64_t amount{};
-
         if (output.type() == typeid(tx_out_bare))
         {
-          amount = boost::get<tx_out_bare>(output).amount;
+          return sum + boost::get<tx_out_bare>(output).amount;
         }
-
-        return sum + amount;
       }
     };
 
