@@ -1802,18 +1802,16 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
     transaction tx{};
     std::array<txin_to_key, 2> inputs{};
     point_t key_image_point{};
-    key_image image{};
 
     output.amount = 1;
     tx.vout.push_back(output);
     CHECK_AND_ASSERT_EQ(key_image_point.from_string("8fc7cbfd1054690767d0c20917a68371b34b190aac5997581641f064b93d1b96"), true);
-    image = key_image_point.to_key_image();
 
     for (int position{}; position < 2; ++position)
     {
       auto& input{inputs.at(position)};
 
-      input.k_image = image;
+      input.k_image = key_image_point.to_key_image();
       tx.vin.push_back(input);
     }
 
@@ -2003,18 +2001,16 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
     tx_out_bare output{};
     std::array<txin_to_key, 2> inputs{};
     point_t key_image_point{};
-    key_image image{};
     MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
 
     CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
     output.amount = 1;
     tx.vout.push_back(output);
     CHECK_AND_ASSERT_EQ(key_image_point.from_string("8fc7cbfd1054690767d0c20917a68371b34b190aac5997581641f064b93d1b96"), true);
-    image = key_image_point.to_key_image();
 
     for (int position{}; position < 2; ++position)
     {
-      inputs.at(position).k_image = image;
+      inputs.at(position).k_image = key_image_point.to_key_image();
       tx.vin.push_back(inputs.at(position));
     }
 
