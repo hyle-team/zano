@@ -535,7 +535,7 @@ bool assets_and_explicit_native_coins_in_outs::c2_alice_deploys_asset(currency::
   // make sure Alice has two UTXO now
   tools::transfer_container transfers{};
   alice_wlt->get_transfers(transfers);
-  size_t unspent_transfers = std::count_if(transfers.begin(), transfers.end(), [](const tools::transfer_details& tr){ return !tr.is_spent(); });
+  size_t unspent_transfers = std::count_if(transfers.begin(), transfers.end(), [](const auto& tr){ return !tr.second.is_spent(); });
   CHECK_AND_ASSERT_MES(unspent_transfers == 2, false, "unexpected number of Alice's unspent transfers: " << unspent_transfers);
 
   asset_descriptor_base adb{};
@@ -694,15 +694,15 @@ bool asset_depoyment_and_few_zc_utxos::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", m_alice_initial_balance, 0, m_alice_initial_balance, 0, 0), false, "");
 
   // make sure Alice has correct UTXO wallet structure
-  tools::transfer_container transfers{};
+  tools::transfer_container transfers;
   alice_wlt->get_transfers(transfers);
   size_t zc_unspent_outs = 0, unspent_outs = 0;
   for(auto& td : transfers)
   {
-    if (!td.is_spent())
+    if (!td.second.is_spent())
     {
       ++unspent_outs;
-      if (td.is_zc())
+      if (td.second.is_zc())
         ++zc_unspent_outs;
     }
   }

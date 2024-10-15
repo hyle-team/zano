@@ -1218,7 +1218,9 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(tx_expiration_time_and_chain_switching);
     GENERATE_AND_PLAY(tx_key_image_pool_conflict);
     //GENERATE_AND_PLAY_HF(tx_version_against_hardfork, "4-*");
-    GENERATE_AND_PLAY_HF(tx_pool_semantic_validation, "4-*");
+    /* To execute the check of bare balance (function "check_tx_bare_balance") we need to run the test "tx_pool_semantic_validation" on the HF 3. By default behaviour bare outputs are disallowed on
+    the heights >= 10. */
+    GENERATE_AND_PLAY_HF(tx_pool_semantic_validation, "3");
 
     // Double spend
     GENERATE_AND_PLAY(gen_double_spend_in_tx<false>);
@@ -1299,6 +1301,7 @@ int main(int argc, char* argv[])
     //GENERATE_AND_PLAY_HF(asset_current_and_total_supplies_comparative_constraints, "4-*"); <-- temporary disabled, waiting for Stepan's fix -- sowle
 
     GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
+    GENERATE_AND_PLAY_HF(wallet_reorganize_and_trim_test, "4-*");
     
 
 

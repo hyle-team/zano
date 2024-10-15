@@ -321,6 +321,11 @@ namespace tools
       const currency::transaction m_tx;
     };
     //----------------------------------------------------------------------------------------------------
+    struct wallet_error_resync_needed : public std::exception
+    {
+      virtual const char* what() const noexcept override { return "wallet_error_resync_needed"; }
+    };
+    //----------------------------------------------------------------------------------------------------
     struct tx_parse_error : public refresh_error
     {
       explicit tx_parse_error(std::string&& loc, const currency::blobdata& tx_blob)

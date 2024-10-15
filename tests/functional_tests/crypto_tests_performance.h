@@ -1,6 +1,8 @@
-// Copyright (c) 2021 Zano Project
+// Copyright (c) 2021-2024 Zano Project
+// Copyright (c) 2021-2024 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+//
 #pragma once
 #include <numeric>
 
@@ -1230,6 +1232,109 @@ TEST(perf, generators)
   TEST_GENERATOR(c_point_X);
   TEST_GENERATOR(c_point_H_plus_G);
   TEST_GENERATOR(c_point_H_minus_G);
+
+  return true;
+}
+
+bool old_point_eq_operator_bugous(const point_t& lhs, const point_t& rhs)
+{
+  // convert to xy form, then compare components (because (x, y, z, t) representation is not unique)
+  fe lrecip, lx, ly;
+  fe rrecip, rx, ry;
+
+  fe_invert(lrecip, lhs.m_p3.Z);
+  fe_invert(rrecip, rhs.m_p3.Z);
+
+  fe_mul(lx, lhs.m_p3.X, lrecip);
+  fe_mul(rx, rhs.m_p3.X, rrecip);
+  if (memcmp(&lx, &rx, sizeof lx) != 0)
+    return false;
+
+  fe_mul(ly, lhs.m_p3.Y, lrecip);
+  fe_mul(ry, rhs.m_p3.Y, rrecip);
+  if (memcmp(&ly, &ry, sizeof ly) != 0)
+    return false;
+
+  return true;
+}
+
+bool old_point_eq_operator(const point_t& lhs, const point_t& rhs)
+{
+  // convert to xy form, then compare components (because (x, y, z, t) representation is not unique)
+  fe lrecip, lx, ly, dx;
+  fe rrecip, rx, ry, dy;
+
+  fe_invert(lrecip, lhs.m_p3.Z);
+  fe_invert(rrecip, rhs.m_p3.Z);
+
+  fe_mul(lx, lhs.m_p3.X, lrecip);
+  fe_mul(rx, rhs.m_p3.X, rrecip);
+  fe_sub(dx, lx, rx);
+  if (fe_isnonzero(dx) != 0)
+    return false;
+
+  fe_mul(ly, lhs.m_p3.Y, lrecip);
+  fe_mul(ry, rhs.m_p3.Y, rrecip);
+  fe_sub(dy, ly, ry);
+  if (fe_isnonzero(dy) != 0)
+    return false;
+
+  return true;
+}
+
+
+TEST(perf, point_eq_vs_iszero)
+{
+  const size_t warmup_rounds = 20;
+  const size_t rounds = 200;
+  const size_t inner_rounds = 64;
+  std::vector<uint64_t> timings1, timings2;
+
+  size_t N = inner_rounds - twin_point_pairs.size() * 2; // number of random points
+  scalar_vec_t scalars;
+  scalars.resize_and_make_random(N);
+  std::vector<point_t> points(N);
+  std::transform(scalars.cbegin(), scalars.cend(), points.begin(), [](const scalar_t& s){ return s * c_point_G; });
+
+  // add twin points
+  for(auto& p : twin_point_pairs)
+    points.push_back(p.first), points.push_back(p.second);
+  
+  ASSERT_EQ(points.size(), inner_rounds);
+  
+  // and shuffle
+  std::shuffle(points.begin(), points.end(), crypto::uniform_random_bit_generator{});
+
+  for(size_t i = 0; i < rounds + warmup_rounds; ++i)
+  {
+    std::vector<uint8_t> results1(inner_rounds), results2(inner_rounds);
+
+    TIME_MEASURE_START(t1);
+    for(size_t j = 0; j < inner_rounds; ++j)
+      for(size_t k = j + 1; k < inner_rounds; ++k)
+        results1[j] ^= uint8_t(old_point_eq_operator(points[j], points[k]) ? j : k);
+    TIME_MEASURE_FINISH(t1);
+    uint64_t h1 = hash_64(results1.data(), results1.size() * sizeof(results1[0]));
+
+    TIME_MEASURE_START(t2);
+    for(size_t j = 0; j < inner_rounds; ++j)
+      for(size_t k = j + 1; k < inner_rounds; ++k)
+        results2[j] ^= uint8_t((points[j] - points[k]).is_zero() ? j : k);
+    TIME_MEASURE_FINISH(t2);
+    uint64_t h2 = hash_64(results2.data(), results2.size() * sizeof(results2[0]));
+
+    ASSERT_EQ(h1, h2);
+
+    if (i >= warmup_rounds)
+    {
+      timings1.push_back(t1);
+      timings2.push_back(t2);
+    }
+  }
+
+  std::cout << "After " << rounds << " rounds:" << ENDL <<
+    "point_t operator== : " << epee::misc_utils::median(timings1) << " mcs" << ENDL <<
+    "point_t is_zero()  : " << epee::misc_utils::median(timings2) << " mcs" << ENDL;
 
   return true;
 }
