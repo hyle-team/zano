@@ -5543,7 +5543,7 @@ void wallet2::transfer_asset_ownership(const crypto::public_key& asset_id, const
   result_tx = ft.tx;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::finalized_tx& ft)
+void wallet2::burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::finalized_tx& ft, const std::vector<currency::tx_service_attachment>& service_entries, const std::string& address_to_point/* = const std::string()*/, uint64_t native_amount_to_point/* = 0*/)
 {
   currency::asset_descriptor_base last_adb{};
   bool r = this->daemon_get_asset_info(asset_id, last_adb);
@@ -5565,14 +5565,30 @@ void wallet2::burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_
   ctp.need_at_least_1_zc = true;
   ctp.dsts.push_back(dst_to_burn);
   ctp.tx_meaning_for_logs = "asset burn";
+  if (service_entries.size())
+  {
+    //put it to extra
+    ctp.extra.insert(ctp.extra.end(), service_entries.begin(), service_entries.end());
+  }
+  if (address_to_point.size())
+  {
+    currency::account_public_address addr = AUTO_VAL_INIT(addr);
+    bool r = currency::get_account_address_from_str(addr, address_to_point);
+    CHECK_AND_ASSERT_THROW_MES(r, "WRONG_ADDRESS");
+    currency::tx_destination_entry dst_to_point = AUTO_VAL_INIT(dst_to_point);
+    dst_to_point.asset_id = native_coin_asset_id;
+    dst_to_point.amount = native_amount_to_point;
+    dst_to_point.addr.push_back(addr);
+    ctp.dsts.push_back(dst_to_point);
+  }
 
   this->transfer(ctp, ft, true, nullptr);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::transaction& result_tx)
+void wallet2::burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::transaction& result_tx, const std::vector<currency::tx_service_attachment>& service_entries, const std::string& address_to_point/* = const std::string()*/, uint64_t native_amount_to_point /*= 0*/)
 {
   finalized_tx ft{};
-  burn_asset(asset_id, amount_to_burn, ft);
+  burn_asset(asset_id, amount_to_burn, ft, service_entries, address_to_point, native_amount_to_point);
   result_tx = ft.tx;
 }
 //----------------------------------------------------------------------------------------------------

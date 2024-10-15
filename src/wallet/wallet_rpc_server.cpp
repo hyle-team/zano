@@ -1388,7 +1388,7 @@ namespace tools
     WALLET_RPC_BEGIN_TRY_ENTRY();
 
     currency::finalized_tx ft{};
-    w.get_wallet()->burn_asset(req.asset_id, req.burn_amount, ft);
+    w.get_wallet()->burn_asset(req.asset_id, req.burn_amount, ft, req.service_entries, req.point_tx_to_address, req.native_amount);
     res.tx_id = ft.tx_id;
 
     return true;

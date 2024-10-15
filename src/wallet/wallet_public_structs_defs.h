@@ -153,8 +153,8 @@ namespace wallet_public
     std::vector<currency::tx_service_attachment> service_entries;
     std::vector<std::string> remote_addresses;  //optional
     std::vector<std::string> remote_aliases; //optional, describe only if there only one remote address
-
     std::vector<wallet_sub_transfer_info> subtransfers;
+    boost::optional<currency::asset_descriptor_operation> data_for_external_signing;
 
     //not included in streaming serialization
     uint64_t      fee = 0;
@@ -2087,12 +2087,19 @@ namespace wallet_public
 
     struct request
     {
-      crypto::public_key asset_id;
-      uint64_t burn_amount;
+      crypto::public_key asset_id = currency::null_pkey;
+      uint64_t burn_amount = 0;
+      //optional params
+      std::string point_tx_to_address;
+      uint64_t native_amount = 0;
+      std::vector<currency::tx_service_attachment> service_entries;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Id of the asset to burn") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
         KV_SERIALIZE(burn_amount) DOC_DSCR("Amount to burn") DOC_EXMP(10000000) DOC_END
+        KV_SERIALIZE(point_tx_to_address) DOC_DSCR("Optional, if we need this transaction to be seen by particular wallet") DOC_EXMP("ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp") DOC_END
+        KV_SERIALIZE(native_amount) DOC_DSCR("Optional, if we need this transaction to be seen by particular wallet") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(service_entries) DOC_DSCR("Optional, if we need to include service entries for burn transaction") DOC_EXMP_AUTO(1) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
