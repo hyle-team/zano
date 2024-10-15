@@ -5,6 +5,7 @@
 //
 #pragma once
 #include <numeric>
+#include "crypto/crypto-sugar.h" // just for intellysense
 
 uint64_t get_bits_v1(const scalar_t& s, uint8_t bit_index_first, uint8_t bits_count)
 {
@@ -1335,6 +1336,64 @@ TEST(perf, point_eq_vs_iszero)
   std::cout << "After " << rounds << " rounds:" << ENDL <<
     "point_t operator== : " << epee::misc_utils::median(timings1) << " mcs" << ENDL <<
     "point_t is_zero()  : " << epee::misc_utils::median(timings2) << " mcs" << ENDL;
+
+  return true;
+}
+
+
+TEST(perf, buff_to_hex)
+{
+  std::vector<std::string> in_buffs;
+  std::vector<std::string> out_hexs;
+  std::vector<uint64_t> timings1, timings2;
+
+  size_t N = 10000;
+  in_buffs.reserve(N);
+  out_hexs.reserve(N);
+
+  for(size_t i = 0; i < N; ++i)
+  {
+    size_t len = (crypto::rand<uint32_t>() % 128) + 1; // [1; 128]
+    std::string& buff = in_buffs.emplace_back();
+    buff.resize(len);
+    generate_random_bytes(len, buff.data());
+  }
+
+  size_t rounds = 100, warmup_rounds = 20;
+  for(size_t i = 0; i < warmup_rounds + rounds; ++i)
+  {
+    out_hexs.clear();
+    TIME_MEASURE_START(t1);
+    for(size_t j = 0; j < N; ++j)
+      out_hexs.push_back(epee::string_tools::buff_to_hex_nodelimer(in_buffs[j]));
+    TIME_MEASURE_FINISH(t1);
+
+    uint64_t h1 = 0;
+    for(size_t j = 0; j < N; ++j)
+      h1 ^= hash_64(out_hexs[j].data(), out_hexs[j].size());
+
+    out_hexs.clear();
+    TIME_MEASURE_START(t2);
+    for(size_t j = 0; j < N; ++j)
+      out_hexs.push_back(crypto::buff_to_hex(in_buffs[j].data(), in_buffs[j].size()));
+    TIME_MEASURE_FINISH(t2);
+
+    uint64_t h2 = 0;
+    for(size_t j = 0; j < N; ++j)
+      h2 ^= hash_64(out_hexs[j].data(), out_hexs[j].size());
+
+    ASSERT_EQ(h1, h2);
+
+    if (i >= warmup_rounds)
+    {
+      timings1.push_back(t1);
+      timings2.push_back(t2);
+    }
+  }
+
+  std::cout << "After " << rounds << " rounds:" << ENDL <<
+    "epee::string_tools::buff_to_hex_nodelimer : " << epee::misc_utils::median(timings1) << " mcs" << ENDL <<
+    "crypto::buff_to_hex                       : " << epee::misc_utils::median(timings2) << " mcs" << ENDL;
 
   return true;
 }

@@ -51,38 +51,42 @@ namespace crypto
   }
 
 
-  template<class pod_t>
-  std::string pod_to_hex_reversed(const pod_t &h)
+  inline std::string buff_to_hex(const void* pdata, size_t len, bool reversed = false)
   {
     constexpr char hexmap[] = "0123456789abcdef";
-    const unsigned char* data = reinterpret_cast<const unsigned char*>(&h);
-    size_t len = sizeof h;
+    const unsigned char* data = reinterpret_cast<const unsigned char*>(pdata);
 
     std::string s(len * 2, ' ');
-    for (size_t i = 0; i < len; ++i)
+    if (!reversed)
     {
-      s[2 * i] = hexmap[data[len - 1 - i] >> 4];
-      s[2 * i + 1] = hexmap[data[len - 1 - i] & 0x0F];
+      for (size_t i = 0; i < len; ++i)
+      {
+        s[2 * i] = hexmap[data[i] >> 4];
+        s[2 * i + 1] = hexmap[data[i] & 0x0F];
+      }
+    }
+    else
+    {
+      for (size_t i = 0; i < len; ++i)
+      {
+        s[2 * i] = hexmap[data[len - 1 - i] >> 4];
+        s[2 * i + 1] = hexmap[data[len - 1 - i] & 0x0F];
+      }
     }
 
     return s;
   }
 
   template<class pod_t>
+  std::string pod_to_hex_reversed(const pod_t &h)
+  {
+    return buff_to_hex(&h, sizeof h, true);
+  }
+
+  template<class pod_t>
   std::string pod_to_hex(const pod_t &h)
   {
-    constexpr char hexmap[] = "0123456789abcdef";
-    const unsigned char* data = reinterpret_cast<const unsigned char*>(&h);
-    size_t len = sizeof h;
-
-    std::string s(len * 2, ' ');
-    for (size_t i = 0; i < len; ++i)
-    {
-      s[2 * i] = hexmap[data[i] >> 4];
-      s[2 * i + 1] = hexmap[data[i] & 0x0F];
-    }
-
-    return s;
+    return buff_to_hex(&h, sizeof h);
   }
 
   template<class pod_t>
