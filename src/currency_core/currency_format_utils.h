@@ -276,6 +276,11 @@ namespace currency
   bool validate_asset_operation_amount_commitment(asset_op_verification_context& context);
   
   const char* get_asset_operation_type_string(size_t asset_operation_type, bool short_name = false);
+  bool validate_asset_ticker(const std::string& ticker);
+  bool validate_asset_full_name(const std::string& full_name);
+  bool validate_asset_ticker_and_full_name(const asset_descriptor_base& adb);
+  void replace_asset_ticker_and_full_name_if_invalid(asset_descriptor_base& adb, const crypto::public_key& asset_id);
+
   //---------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 
                                                              size_t current_block_size, 

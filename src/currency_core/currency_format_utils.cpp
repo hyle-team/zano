@@ -4,7 +4,7 @@
 // Copyright (c) 2012-2013 The Boolberry developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
+#include <regex>
 #include "include_base_utils.h"
 #include <boost/foreach.hpp>
 #ifndef MOBILE_WALLET_BUILD
@@ -4439,6 +4439,45 @@ namespace currency
       return short_name ? "burn"      : "ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN";
     default:
       return "unknown";
+    }
+  }
+  //------------------------------------------------------------------
+#define ASSET_TICKER_REGEXP     "[A-Za-z0-9]{1,14}"
+#define ASSET_FULL_NAME_REGEXP  "[A-Za-z0-9.,:!?\\-() ]{0,400}"
+  bool validate_asset_ticker(const std::string& ticker)
+  {
+    static std::regex asset_ticker_regexp(ASSET_TICKER_REGEXP);
+    return std::regex_match(ticker, asset_ticker_regexp);
+  }
+  //------------------------------------------------------------------
+  bool validate_asset_full_name(const std::string& full_name)
+  {
+    static std::regex asset_full_name_regexp(ASSET_FULL_NAME_REGEXP);
+    return std::regex_match(full_name, asset_full_name_regexp);
+  }
+  //------------------------------------------------------------------
+  bool validate_asset_ticker_and_full_name(const asset_descriptor_base& adb)
+  {
+    if (!validate_asset_ticker(adb.ticker))
+      return false;
+
+    if (!validate_asset_full_name(adb.full_name))
+      return false;
+
+    //CHECK_AND_ASSERT_MES(validate_asset_ticker(adb.ticker), false, "asset's ticker isn't valid: " << adb.ticker);
+    //CHECK_AND_ASSERT_MES(validate_asset_full_name(adb.full_name), false, "asset's full_name isn't valid: " << adb.full_name);
+    return true;
+  }
+  //------------------------------------------------------------------
+  void replace_asset_ticker_and_full_name_if_invalid(asset_descriptor_base& adb, const crypto::public_key& asset_id)
+  {
+    if (!validate_asset_ticker(adb.ticker))
+      adb.ticker = "#BADASSET#";
+
+    if (!validate_asset_full_name(adb.full_name))
+    {
+      std::string abcd = crypto::pod_to_hex(asset_id).substr(60, 4); // last 4 hex chars
+      adb.full_name = "#bad asset name " + abcd + "#";
     }
   }
   //------------------------------------------------------------------
