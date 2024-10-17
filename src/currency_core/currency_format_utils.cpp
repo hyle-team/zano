@@ -4442,8 +4442,8 @@ namespace currency
     }
   }
   //------------------------------------------------------------------
-#define ASSET_TICKER_REGEXP     "[A-Z0-9]{1,10}"
-#define ASSET_FULL_NAME_REGEXP  "[A-Za-z0-9.,:!\\-() ]{0,400}"
+#define ASSET_TICKER_REGEXP     "[A-Za-z0-9]{1,14}"
+#define ASSET_FULL_NAME_REGEXP  "[A-Za-z0-9.,:!?\\-() ]{0,400}"
   bool validate_asset_ticker(const std::string& ticker)
   {
     static std::regex asset_ticker_regexp(ASSET_TICKER_REGEXP);
