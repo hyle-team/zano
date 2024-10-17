@@ -1209,7 +1209,13 @@ namespace currency
       tv.short_view = std::string("op:") + get_asset_operation_type_string(ado.operation_type, true);
       if (ado.opt_asset_id.has_value())
         tv.short_view += std::string(" , id:") + crypto::pod_to_hex(ado.opt_asset_id);
-      tv.details_view = tv.short_view + std::string(" , ticker:") + ado.descriptor.ticker + std::string(" , cur.supply:") + print_money_brief(ado.descriptor.current_supply, ado.descriptor.decimal_point);
+      tv.details_view = tv.short_view;
+      if (ado.opt_descriptor.has_value())
+      {
+        tv.details_view += std::string(" , ticker:") + ado.opt_descriptor->ticker + std::string(" , cur.supply:") + print_money_brief(ado.opt_descriptor->current_supply, ado.opt_descriptor->decimal_point);
+      }
+      //@#@ TODO: add other info from asset_descriptor_operation v2+
+      
       return true;
     }
     template<typename t_type>

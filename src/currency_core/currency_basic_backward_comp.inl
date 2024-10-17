@@ -116,3 +116,74 @@ bool transition_convert(const transaction_v1& from, transaction_current_t& to)
   }
   return true;
 }
+
+struct asset_descriptor_operation_v1
+{
+  uint8_t                         operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
+  asset_descriptor_base           descriptor;
+  crypto::public_key              amount_commitment;     // premultiplied by 1/8
+  boost::optional<crypto::public_key> opt_asset_id;      // target asset_id - for update/emit
+  uint8_t verion = 1;
+
+  BEGIN_VERSIONED_SERIALIZE(1, verion)
+    FIELD(operation_type)
+    FIELD(descriptor)
+    FIELD(amount_commitment)
+    END_VERSION_UNDER(1)
+    FIELD(opt_asset_id)
+  END_SERIALIZE()
+  
+
+  //this map doesn't store internal version member, but it set it by default to val "1", which then transfered via transition_convert() to destination struct
+  BEGIN_BOOST_SERIALIZATION()
+    BOOST_SERIALIZE(operation_type)
+    BOOST_SERIALIZE(descriptor)
+    BOOST_SERIALIZE(amount_commitment)
+    BOOST_END_VERSION_UNDER(1)
+    BOOST_SERIALIZE(opt_asset_id)
+  END_BOOST_SERIALIZATION()
+};
+
+template<typename asset_descriptor_operation_t>
+bool transition_convert(const asset_descriptor_operation_t& from, asset_descriptor_operation_v1& to)
+{
+  to.verion = from.version;
+  to.operation_type = from.operation_type;
+  if(from.opt_descriptor.has_value())
+  {
+    to.descriptor = *from.opt_descriptor;
+  }
+  else
+  {
+    throw std::runtime_error(std::string("Unexpected:  missing descriptor in from transaction_current_t"));
+  }
+
+  if (from.opt_amount_commitment.has_value())
+  {
+    to.amount_commitment = *from.opt_amount_commitment;
+  }
+  else
+  {
+    throw std::runtime_error(std::string("Unexpected:  missing amount_commitment in from transaction_current_t"));
+  }
+
+  to.opt_asset_id = from.opt_asset_id;
+
+  if(from.opt_amount.has_value() || from.etc.size())
+  {
+    throw std::runtime_error(std::string("Unexpected: opt_amount or etc have values during convention, looks like object slicing with information getting lost"));
+  }
+
+  return true;
+}
+
+template<typename asset_descriptor_operation_t>
+bool transition_convert(const asset_descriptor_operation_v1& from, asset_descriptor_operation_t& to)
+{
+  to.operation_type = from.operation_type;
+  to.opt_descriptor = from.descriptor;
+  to.opt_amount_commitment = from.amount_commitment;     
+  to.opt_asset_id = to.opt_asset_id;      // target asset_id - for update/emit
+  to.version = from.verion;
+  return true;
+}

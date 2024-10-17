@@ -124,6 +124,14 @@ namespace currency
   //-----------------------------------------------------------------------------------------------------
   void miner::do_print_hashrate(bool do_hr)
   {
+#ifdef _DEBUG
+    currency::asset_descriptor_operation ado;
+    std::stringstream ss;
+    bool r = tools::portble_serialize_obj_to_stream(ado, ss);
+    std::cout << r;
+#endif
+
+    
     m_do_print_hashrate = do_hr;
   }
   //-----------------------------------------------------------------------------------------------------

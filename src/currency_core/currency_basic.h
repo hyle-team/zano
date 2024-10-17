@@ -696,9 +696,17 @@ namespace currency
     }
   };
 
-#define ASSET_DESCRIPTOR_BASE_STRUCTURE_VER  1
+#define ASSET_DESCRIPTOR_BASE_STRUCTURE_LAST_VER  2
 
-  typedef boost::variant<crypto::public_key, crypto::eth_public_key> asset_owner_pub_key_v;
+  struct dummy{
+      BEGIN_SERIALIZE() 
+      END_SERIALIZE()
+
+      BEGIN_BOOST_SERIALIZATION()
+      END_BOOST_SERIALIZATION_TOTAL_FIELDS(0)
+  };
+
+  typedef boost::variant<dummy> asset_descriptor_base_etc_fields;
 
   struct asset_descriptor_base
   {
@@ -710,11 +718,14 @@ namespace currency
     std::string         meta_info;
     crypto::public_key  owner = currency::null_pkey; // consider premultipling by 1/8
     bool                hidden_supply = false;
+    uint8_t             version = 0;
+    //version 1 members
     boost::optional<crypto::eth_public_key> owner_eth_pub_key; // note: the size is 33 bytes (if present) // NOTE: using boost::optional instead of std::optional because of the Boost compilation issue: https://github.com/boostorg/serialization/issues/319 -- sowle
+    //version 2 members
+    std::vector<asset_descriptor_base_etc_fields> etc;  //container for future use if we would be adding some optional parameters that is not known yet, but without mess related to format version
 
-    uint8_t             version = ASSET_DESCRIPTOR_BASE_STRUCTURE_VER;
 
-    BEGIN_VERSIONED_SERIALIZE(ASSET_DESCRIPTOR_BASE_STRUCTURE_VER, version)
+    BEGIN_VERSIONED_SERIALIZE(ASSET_DESCRIPTOR_BASE_STRUCTURE_LAST_VER, version)
       FIELD(total_max_supply)
       FIELD(current_supply)
       FIELD(decimal_point)
@@ -725,8 +736,11 @@ namespace currency
       FIELD(hidden_supply)
       END_VERSION_UNDER(1)
       FIELD(owner_eth_pub_key)
+      END_VERSION_UNDER(2)
+      FIELD(etc)
     END_SERIALIZE()
 
+    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(2)
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(total_max_supply)
       BOOST_SERIALIZE(current_supply)
@@ -738,7 +752,10 @@ namespace currency
       BOOST_SERIALIZE(hidden_supply)
       BOOST_END_VERSION_UNDER(1)
       BOOST_SERIALIZE(owner_eth_pub_key)
-    END_BOOST_SERIALIZATION()
+      BOOST_END_VERSION_UNDER(2)
+      BOOST_SERIALIZE(etc)
+      BOOST_SERIALIZE(version)
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(11)
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(total_max_supply)  DOC_DSCR("Maximum possible supply for a given asset, cannot be changed after deployment.") DOC_EXMP(1000000000000000000)   DOC_END
@@ -778,38 +795,56 @@ namespace currency
 #define ASSET_DESCRIPTOR_OPERATION_UPDATE        3
 #define ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN   4
 
-#define ASSET_DESCRIPTOR_OPERATION_STRUCTURE_VER  1
+#define ASSET_DESCRIPTOR_OPERATION_LAST_VER      2
+
+  typedef boost::variant<dummy> asset_descriptor_operator_etc_fields;
 
   struct asset_descriptor_operation
   {
-    uint8_t                         operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
-    asset_descriptor_base           descriptor;
-    crypto::public_key              amount_commitment;     // premultiplied by 1/8
-    boost::optional<crypto::public_key> opt_asset_id;      // target asset_id - for update/emit
-    uint8_t verion = ASSET_DESCRIPTOR_OPERATION_STRUCTURE_VER;
+    uint8_t                                     operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
+    uint8_t version = 1;
 
-    BEGIN_VERSIONED_SERIALIZE(ASSET_DESCRIPTOR_OPERATION_STRUCTURE_VER, verion)
+    boost::optional<crypto::public_key>         opt_amount_commitment;     // premultiplied by 1/8
+    boost::optional<crypto::public_key>         opt_asset_id;      // target asset_id - for update/emit
+    boost::optional<asset_descriptor_base>      opt_descriptor;    //used in deploy/update
+    boost::optional<uint64_t>                   opt_amount;        //used in burn/emit
+    std::vector<asset_descriptor_operator_etc_fields> etc;         //reserved for future use
+
+
+    BEGIN_VERSIONED_SERIALIZE(ASSET_DESCRIPTOR_OPERATION_LAST_VER, version)
+      CHAIN_TRANSITION_VER(0, asset_descriptor_operation_v1)
+      CHAIN_TRANSITION_VER(1, asset_descriptor_operation_v1)
       FIELD(operation_type)
-      FIELD(descriptor)
-      FIELD(amount_commitment)
-      END_VERSION_UNDER(1)
+      FIELD(opt_amount_commitment)
       FIELD(opt_asset_id)
+      FIELD(opt_descriptor)
+      FIELD(opt_amount)
+      FIELD(etc)
     END_SERIALIZE()
 
+    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(2)
     BEGIN_BOOST_SERIALIZATION()
+      BOOST_CHAIN_TRANSITION_VER(1, asset_descriptor_operation_v1)
+      BOOST_CHAIN_TRANSITION_VER(0, asset_descriptor_operation_v1)
+      BOOST_SERIALIZE(version)
       BOOST_SERIALIZE(operation_type)
-      BOOST_SERIALIZE(descriptor)
-      BOOST_SERIALIZE(amount_commitment)
-      BOOST_END_VERSION_UNDER(1)
+      BOOST_SERIALIZE(opt_amount_commitment)
       BOOST_SERIALIZE(opt_asset_id)
-    END_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(opt_descriptor)
+      BOOST_SERIALIZE(opt_amount)
+      BOOST_SERIALIZE(etc)
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(7)
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(operation_type)    DOC_DSCR("Asset operation type identifier") DOC_EXMP(1) DOC_END
-      KV_SERIALIZE(descriptor)        DOC_DSCR("Asset descriptor") DOC_EXMP_AUTO() DOC_END
-      KV_SERIALIZE_POD_AS_HEX_STRING(amount_commitment) DOC_DSCR("Amount commitment") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
-      KV_SERIALIZE_POD_AS_HEX_STRING(opt_asset_id)      DOC_DSCR("ID of an asset.") DOC_EXMP("cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6") DOC_END
+      KV_SERIALIZE(version)                                     DOC_DSCR("Asset operation type struct version") DOC_EXMP(2) DOC_END
+      KV_SERIALIZE(operation_type)                              DOC_DSCR("Asset operation type identifier") DOC_EXMP(1) DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(opt_amount_commitment)     DOC_DSCR("Asset operation amount commitment(optional)") DOC_EXMP("5688b56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(opt_asset_id)              DOC_DSCR("ID of an asset.(optional)") DOC_EXMP("cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6") DOC_END
+      KV_SERIALIZE(opt_descriptor)                              DOC_DSCR("Asset operation amount commitment(optional)") DOC_EXMP_AUTO()   DOC_END
+      KV_SERIALIZE(opt_amount)                                  DOC_DSCR("Asset operation amount(optional, needed only for burn/emit)") DOC_EXMP_AUTO()   DOC_END
+      //KV_SERIALIZE(etc)                                         DOC_DSCR("Extra operations") DOC_EXMP_AUTO() DOC_END <---- serialization for variant not supported yet
     END_KV_SERIALIZE_MAP()
+
   };
 
   struct asset_operation_proof
@@ -824,6 +859,7 @@ namespace currency
       FIELD(opt_amount_commitment_g_proof)
     END_SERIALIZE()
 
+    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(1)
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(opt_amount_commitment_composition_proof)
       BOOST_SERIALIZE(opt_amount_commitment_g_proof)
@@ -842,6 +878,7 @@ namespace currency
       FIELD(gss)
     END_SERIALIZE()
 
+    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(1)
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(gss)
       BOOST_END_VERSION_UNDER(1)
@@ -1023,6 +1060,19 @@ namespace currency
       FIELD(signatures)
       FIELD(proofs)
     END_SERIALIZE()
+
+
+    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(0)
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(version)
+      BOOST_SERIALIZE(vin)
+      BOOST_SERIALIZE(vout)
+      BOOST_SERIALIZE(extra)
+      BOOST_SERIALIZE(signatures)
+      BOOST_SERIALIZE(attachment)
+      BOOST_END_VERSION_UNDER(1)
+      BOOST_SERIALIZE(proofs)
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(4)
   };
 
   
@@ -1158,9 +1208,12 @@ BLOB_SERIALIZER(currency::txout_to_key);
   VARIANT_TAG(json_archive, type_name, json_tag)
 
 
-BOOST_CLASS_VERSION(currency::asset_descriptor_operation, 1);
-BOOST_CLASS_VERSION(currency::asset_operation_proof, 1);
-BOOST_CLASS_VERSION(currency::asset_operation_ownership_proof, 1);
+
+LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_descriptor_operation);
+LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_descriptor_base);
+LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_operation_proof);
+LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_operation_ownership_proof);
+LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::transaction);
 
 
 // txin_v variant currency
@@ -1235,7 +1288,8 @@ SET_VARIANT_TAGS(currency::asset_operation_ownership_proof, 51, "asset_operation
 SET_VARIANT_TAGS(currency::asset_operation_ownership_proof_eth, 52, "asset_operation_ownership_proof_eth");
 
 SET_VARIANT_TAGS(crypto::eth_public_key, 60, "eth_public_key");
-//SET_VARIANT_TAGS(crypto::eth_signature, 61, "eth_signature");s
+//SET_VARIANT_TAGS(crypto::eth_signature, 61, "eth_signature");
+SET_VARIANT_TAGS(currency::dummy, 62, "dummy");
 
 
 
