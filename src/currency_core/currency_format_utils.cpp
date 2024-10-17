@@ -609,7 +609,7 @@ namespace currency
     CHECK_AND_ASSERT_MES(count_type_in_variant_container<asset_operation_proof>(context.tx.proofs) == 1, false, "asset_operation_proof not present or present more than once");
     const asset_operation_proof& aop = get_type_in_variant_container_by_ref<const asset_operation_proof>(context.tx.proofs);
 
-    if (context.ado.descriptor.hidden_supply)
+    if (context.ado.opt_descriptor.has_value() && context.ado.opt_descriptor->hidden_supply)
     {
       CHECK_AND_ASSERT_MES(aop.opt_amount_commitment_composition_proof.has_value(), false, "opt_amount_commitment_composition_proof is absent");
       // TODO @#@# if asset is hidden -- check composition proof

@@ -797,7 +797,7 @@ namespace currency
 
 #define ASSET_DESCRIPTOR_OPERATION_LAST_VER      2
 
-  typedef boost::variant<dummy> asset_descriptor_operator_etc_fields;
+  typedef boost::variant<dummy> asset_descriptor_operation_etc_fields;
 
   struct asset_descriptor_operation
   {
@@ -808,7 +808,7 @@ namespace currency
     boost::optional<crypto::public_key>         opt_asset_id;      // target asset_id - for update/emit
     boost::optional<asset_descriptor_base>      opt_descriptor;    //used in deploy/update
     boost::optional<uint64_t>                   opt_amount;        //used in burn/emit
-    std::vector<asset_descriptor_operator_etc_fields> etc;         //reserved for future use
+    std::vector<asset_descriptor_operation_etc_fields> etc;         //reserved for future use
 
 
     BEGIN_VERSIONED_SERIALIZE(ASSET_DESCRIPTOR_OPERATION_LAST_VER, version)
