@@ -2264,6 +2264,8 @@ bool asset_current_and_total_supplies_comparative_constraints::assert_asset_beta
 
     CHECK_AND_ASSERT_MES(alice_wallet->balance(beta_asset_id) == current_supply, false, "Alice has got not exactly " + std::to_string(current_supply) + ' ' + register_ado.descriptor.ticker);
   }
+
+  return true;
 }
 
 bool asset_current_and_total_supplies_comparative_constraints::public_burn_asset_beta_with_incorrect_supply(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const
