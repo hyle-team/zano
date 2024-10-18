@@ -50,7 +50,10 @@ static reponse_check_parse_client_version check_parse_client_version(const std::
 
   if (expected_commit_id.has_value() && !expected_commit_id.value().empty())
   {
-    commit_id = std::string(expected_commit_id.value().size(), '\0');
+    const auto length{expected_commit_id.value().length()};
+
+    assert(length + 1 > length);
+    commit_id = std::string(length + 1, '\0');
   }
 
   bool dirty{};
