@@ -803,12 +803,13 @@ namespace currency
   {
     uint8_t                                     operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
     uint8_t version = 1;
-
-    boost::optional<crypto::public_key>         opt_amount_commitment;     // premultiplied by 1/8
-    boost::optional<crypto::public_key>         opt_asset_id;      // target asset_id - for update/emit
-    boost::optional<asset_descriptor_base>      opt_descriptor;    //used in deploy/update
-    boost::optional<uint64_t>                   opt_amount;        //used in burn/emit
-    std::vector<asset_descriptor_operation_etc_fields> etc;         //reserved for future use
+                                                                       // register  emit  burn  update
+    boost::optional<crypto::public_key>         opt_amount_commitment; //    +       +     +      -      (premultiplied by 1/8)
+    boost::optional<crypto::public_key>         opt_asset_id;          //    -       +     +      +
+    boost::optional<asset_descriptor_base>      opt_descriptor;        //    +       -     -      +
+    boost::optional<uint64_t>                   opt_amount;            //    ?       ?     ?      -      (only for non-hidden supply)
+    boost::optional<uint32_t>                   opt_asset_id_salt;     //    ?       -     -      -      (optional)
+    std::vector<asset_descriptor_operation_etc_fields> etc;            //                                (reserved for future use)
 
 
     BEGIN_VERSIONED_SERIALIZE(ASSET_DESCRIPTOR_OPERATION_LAST_VER, version)
@@ -819,6 +820,7 @@ namespace currency
       FIELD(opt_asset_id)
       FIELD(opt_descriptor)
       FIELD(opt_amount)
+      FIELD(opt_asset_id_salt)
       FIELD(etc)
     END_SERIALIZE()
 
@@ -832,16 +834,18 @@ namespace currency
       BOOST_SERIALIZE(opt_asset_id)
       BOOST_SERIALIZE(opt_descriptor)
       BOOST_SERIALIZE(opt_amount)
+      BOOST_SERIALIZE(opt_asset_id_salt)
       BOOST_SERIALIZE(etc)
     END_BOOST_SERIALIZATION_TOTAL_FIELDS(7)
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(version)                                     DOC_DSCR("Asset operation type struct version") DOC_EXMP(2) DOC_END
       KV_SERIALIZE(operation_type)                              DOC_DSCR("Asset operation type identifier") DOC_EXMP(1) DOC_END
-      KV_SERIALIZE_POD_AS_HEX_STRING(opt_amount_commitment)     DOC_DSCR("Asset operation amount commitment(optional)") DOC_EXMP("5688b56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
-      KV_SERIALIZE_POD_AS_HEX_STRING(opt_asset_id)              DOC_DSCR("ID of an asset.(optional)") DOC_EXMP("cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6") DOC_END
-      KV_SERIALIZE(opt_descriptor)                              DOC_DSCR("Asset operation amount commitment(optional)") DOC_EXMP_AUTO()   DOC_END
-      KV_SERIALIZE(opt_amount)                                  DOC_DSCR("Asset operation amount(optional, needed only for burn/emit)") DOC_EXMP_AUTO()   DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(opt_amount_commitment)     DOC_DSCR("(optional) Asset operation amount commitment (register/emit/burn).") DOC_EXMP("5688b56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(opt_asset_id)              DOC_DSCR("(optional) ID of an asset (emit/burn/update).") DOC_EXMP("cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6") DOC_END
+      KV_SERIALIZE(opt_descriptor)                              DOC_DSCR("(optional) Asset operation descriptor (register/update).") DOC_EXMP_AUTO()   DOC_END
+      KV_SERIALIZE(opt_amount)                                  DOC_DSCR("(optional) Asset operation amount (register/emit/burn when supply is non-hidden).") DOC_EXMP_AUTO() DOC_END
+      KV_SERIALIZE(opt_asset_id_salt)                           DOC_DSCR("(optional) Asset ID salt. May only be used for asset registration.") DOC_EXMP_AUTO() DOC_END
       //KV_SERIALIZE(etc)                                         DOC_DSCR("Extra operations") DOC_EXMP_AUTO() DOC_END <---- serialization for variant not supported yet
     END_KV_SERIALIZE_MAP()
 

@@ -259,6 +259,7 @@ namespace currency
     const transaction& tx;
     const crypto::hash& tx_id;
     const asset_descriptor_operation& ado;
+    uint64_t height = UINT64_MAX; // default value means the height of the upcoming block (top_block + 1)
     crypto::public_key asset_id = currency::null_pkey;
     crypto::point_t asset_id_pt = crypto::c_point_0;
     uint64_t amount_to_validate = 0;

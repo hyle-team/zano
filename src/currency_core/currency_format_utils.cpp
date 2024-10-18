@@ -619,7 +619,8 @@ namespace currency
     {
       // make sure that amount commitment corresponds to opt_amount_commitment_g_proof
       CHECK_AND_ASSERT_MES(aop.opt_amount_commitment_g_proof.has_value(), false, "opt_amount_commitment_g_proof is absent");
-      crypto::point_t A = crypto::point_t(context.ado.amount_commitment).modify_mul8() - context.amount_to_validate * context.asset_id_pt;
+      CHECK_AND_ASSERT_MES(context.ado.opt_amount_commitment.has_value(), false, "amount_commitment is absent");
+      crypto::point_t A = crypto::point_t(context.ado.opt_amount_commitment.get()).modify_mul8() - context.amount_to_validate * context.asset_id_pt;
 
       bool r = crypto::check_signature(context.tx_id, A.to_public_key(), aop.opt_amount_commitment_g_proof.get());
       CHECK_AND_ASSERT_MES(r, false, "opt_amount_commitment_g_proof check failed");
@@ -675,12 +676,14 @@ namespace currency
       {
         if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
         {
+          CHECK_AND_ASSERT_MES(ado.opt_amount_commitment.has_value(), false, "opt_amount_commitment is missing");
           // amount_commitment supposed to be validated earlier in validate_asset_operation_amount_commitment()
-          sum_of_pseudo_out_amount_commitments += crypto::point_t(ado.amount_commitment); // *1/8
+          sum_of_pseudo_out_amount_commitments += crypto::point_t(ado.opt_amount_commitment.get()); // *1/8
         }
         else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
         {
-          outs_commitments_sum += crypto::point_t(ado.amount_commitment); // *1/8
+          CHECK_AND_ASSERT_MES(ado.opt_amount_commitment.has_value(), false, "opt_amount_commitment is missing");
+          outs_commitments_sum += crypto::point_t(ado.opt_amount_commitment.get()); // *1/8
         }
       }
       size_t zc_sigs_count = 0;
@@ -2186,18 +2189,23 @@ namespace currency
 
     // otherwise, it must be a register operation
     CHECK_AND_ASSERT_MES(ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER, false, "unexpected asset operation type: " << (int)ado.operation_type << ", " << get_asset_operation_type_string(ado.operation_type));
+    CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing: " << (int)ado.operation_type << ", " << get_asset_operation_type_string(ado.operation_type));
+    const asset_descriptor_base &adb = ado.opt_descriptor.get();
 
     // calculate asset id
     crypto::hash_helper_t::hs_t hsc;
     hsc.add_32_chars(CRYPTO_HDS_ASSET_ID);
-    hsc.add_hash(crypto::hash_helper_t::h(ado.descriptor.ticker));
-    hsc.add_hash(crypto::hash_helper_t::h(ado.descriptor.full_name));
-    hsc.add_hash(crypto::hash_helper_t::h(ado.descriptor.meta_info));
-    hsc.add_scalar(crypto::scalar_t(ado.descriptor.total_max_supply));
-    hsc.add_scalar(crypto::scalar_t(ado.descriptor.decimal_point));
-    hsc.add_pub_key(ado.descriptor.owner);
-    if (ado.descriptor.owner_eth_pub_key.has_value())
-      hsc.add_eth_pub_key(ado.descriptor.owner_eth_pub_key.value());
+    hsc.add_hash(crypto::hash_helper_t::h(adb.ticker));
+    hsc.add_hash(crypto::hash_helper_t::h(adb.full_name));
+    hsc.add_hash(crypto::hash_helper_t::h(adb.meta_info));
+    hsc.add_scalar(crypto::scalar_t(adb.total_max_supply));
+    hsc.add_scalar(crypto::scalar_t(adb.decimal_point));
+    hsc.add_pub_key(adb.owner);
+    if (adb.owner_eth_pub_key.has_value())
+      hsc.add_eth_pub_key(adb.owner_eth_pub_key.value());
+    if (ado.opt_asset_id_salt.has_value())
+      hsc.add_scalar(crypto::scalar_t(ado.opt_asset_id_salt.get()));
+    
     crypto::hash h = hsc.calc_hash_no_reduce();
 
     // this hash function needs to be computationally expensive (s.a. the whitepaper)
@@ -2242,16 +2250,11 @@ namespace currency
   {
     if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
     {
-      //crypto::secret_key asset_control_key{};
-      //bool r = derive_key_pair_from_key_pair(sender_account_keys.account_address.spend_public_key, tx_key.sec, asset_control_key, ado.descriptor.owner, CRYPTO_HDS_ASSET_CONTROL_KEY);
-      //CHECK_AND_ASSERT_MES(r, false, "derive_key_pair_from_key_pair failed");
-      //
-      // old:
-      // asset_control_key = Hs(CRYPTO_HDS_ASSET_CONTROL_KEY, 8 * tx_key.sec * sender_account_keys.account_address.spend_public_key, 0)
-      // ado.descriptor.owner = asset_control_key * G
+      CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing (register)");
+      asset_descriptor_base& adb = ado.opt_descriptor.get();
       
-      if (!ado.descriptor.owner_eth_pub_key.has_value())
-        ado.descriptor.owner = sender_account_keys.account_address.spend_public_key;
+      if (!adb.owner_eth_pub_key.has_value())
+        adb.owner = sender_account_keys.account_address.spend_public_key;
 
       CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, &gen_context.ao_asset_id_pt, &gen_context.ao_asset_id), false, "get_or_calculate_asset_id failed");
 
@@ -2268,10 +2271,11 @@ namespace currency
           amount_of_emitted_asset += item.amount;
         }
       }
-      ado.descriptor.current_supply = amount_of_emitted_asset; // TODO: consider setting current_supply beforehand, not setting it hear in ad-hoc manner -- sowle
+      adb.current_supply = amount_of_emitted_asset;
+      ado.opt_amount     = amount_of_emitted_asset;       // TODO: support hidden supply -- sowle
 
       gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
-      ado.amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
+      ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
     {
@@ -2298,10 +2302,10 @@ namespace currency
           amount_of_burned_assets -= item.amount;
         }
       }
-      ado.descriptor.current_supply -= amount_of_burned_assets;
+      ado.opt_amount = amount_of_burned_assets;       // TODO: support hidden supply -- sowle
 
       gen_context.ao_amount_commitment = amount_of_burned_assets * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
-      ado.amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
+      ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
 
       if (ftp.pevents_dispatcher) ftp.pevents_dispatcher->RAISE_DEBUG_EVENT(wde_construct_tx_handle_asset_descriptor_operation_before_burn{ &ado });
     
@@ -2325,10 +2329,10 @@ namespace currency
             item.asset_id = gen_context.ao_asset_id;
           }
         }
-        ado.descriptor.current_supply += amount_of_emitted_asset;
+        ado.opt_amount = amount_of_emitted_asset;       // TODO: support hidden supply -- sowle
 
         gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
-        ado.amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
+        ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
 
       }
       else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)

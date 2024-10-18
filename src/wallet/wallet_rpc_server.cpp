@@ -1316,6 +1316,13 @@ namespace tools
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
 
+    if (!currency::validate_asset_ticker_and_full_name(req.asset_descriptor))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "asset ticker or full_name is invalid";
+      return false;
+    }
+
     std::vector<currency::tx_destination_entry> currency_destinations;
     rpc_destinations_to_currency_destinations(req.destinations, true, !req.do_not_split_destinations, currency_destinations);
 

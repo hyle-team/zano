@@ -830,7 +830,7 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
   fee = get_tx_fee(tx_res_ptr->tx);
   purge_transaction_keyimages_from_blockchain(tx, true);
   
-  bool r = unprocess_blockchain_tx_extra(tx);
+  bool r = unprocess_blockchain_tx_extra(tx, tx_res_ptr->m_keeper_block_height);
   CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra for tx " << tx_id);
  
   r = unprocess_blockchain_tx_attachments(tx, get_current_blockchain_size(), 0/*TODO: add valid timestamp here in future if need*/);
@@ -3805,7 +3805,7 @@ bool blockchain_storage::pop_transaction_from_global_index(const transaction& tx
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx)
+bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx, const uint64_t height)
 {
   tx_extra_info ei = AUTO_VAL_INIT(ei);
   bool r = parse_and_validate_tx_extra(tx, ei);
@@ -3818,9 +3818,7 @@ bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx)
 
   if (ei.m_asset_operation.operation_type != ASSET_DESCRIPTOR_OPERATION_UNDEFINED)
   {
-    crypto::public_key asset_id = currency::null_pkey;
-    CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ei.m_asset_operation, nullptr, &asset_id), false, "get_or_calculate_asset_id failed");
-    r = pop_asset_info(asset_id);
+    r = pop_asset_info(ei.m_asset_operation, height);
     CHECK_AND_ASSERT_MES(r, false, "failed to pop_alias_info");
   }
   return true;
@@ -3862,15 +3860,16 @@ bool blockchain_storage::get_asset_info(const crypto::public_key& asset_id, asse
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   auto as_ptr = m_db_assets.find(asset_id);
-  if (as_ptr)
-  {
-    if (as_ptr->size())
-    {
-      result = as_ptr->back().descriptor;
-      return true;
-    }
-  }
-  return false;
+  if (!as_ptr)
+    return false;
+  if (as_ptr->empty())
+    return false;
+  // the last history item must have opt_descriptor, but we check it just to be sure
+  if (!as_ptr->back().opt_descriptor.has_value())
+    return false;
+
+  result = as_ptr->back().opt_descriptor.get();
+  return true;
 }
 //------------------------------------------------------------------
 uint64_t blockchain_storage::get_assets(uint64_t offset, uint64_t count, std::list<asset_descriptor_with_id>& assets) const
@@ -3882,15 +3881,19 @@ uint64_t blockchain_storage::get_assets(uint64_t offset, uint64_t count, std::li
     if (i < offset)
       return true; // continue
 
-    CHECK_AND_ASSERT_THROW_MES(asset_descriptor_history.size(), "asset_descriptor_history unexpectedly have 0 size, asset_id: " << asset_id);
-    assets.push_back(asset_descriptor_with_id());
-    static_cast<asset_descriptor_base&>(assets.back()) = asset_descriptor_history.back().descriptor;
-    assets.back().asset_id = asset_id;
+    CHECK_AND_ASSERT_THROW_MES(asset_descriptor_history.size(), "unexpectedly, the asset_descriptor_history is empty; asset_id: " << asset_id);
+    CHECK_AND_ASSERT_THROW_MES(asset_descriptor_history.back().opt_descriptor.has_value(), "the last element of asset_descriptor_history doesn't have descriptor; asset_id: " << asset_id);
+    asset_descriptor_with_id& added_item = assets.emplace_back();
+    asset_descriptor_base& added_item_adb = static_cast<asset_descriptor_base&>(added_item);
+    added_item_adb = asset_descriptor_history.back().opt_descriptor.get();
+    replace_asset_ticker_and_full_name_if_invalid(added_item_adb, asset_id);
+    added_item.asset_id = asset_id;
+
     if (assets.size() >= count)
     {
-      return false;
+      return false; // stop
     }
-    return true;
+    return true; // continue
   });
   return assets.size();
 }
@@ -4084,21 +4087,71 @@ bool blockchain_storage::put_alias_info(const transaction & tx, extra_alias_entr
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::pop_asset_info(const crypto::public_key& asset_id)
+bool blockchain_storage::pop_asset_info(const asset_descriptor_operation& ado, const uint64_t height)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
+  crypto::public_key asset_id = currency::null_pkey;
+  CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, nullptr, &asset_id), false, "get_or_calculate_asset_id failed");
+
   auto asset_history_ptr = m_db_assets.find(asset_id);
   CHECK_AND_ASSERT_MES(asset_history_ptr && asset_history_ptr->size(), false, "empty name list in pop_asset_info");
-
+  
   assets_container::t_value_type local_asset_hist = *asset_history_ptr;
-  local_asset_hist.pop_back();
+
+  if (is_hardfork_active_for_height(ZANO_HARDFORK_05, height))
+  {
+    // NEW HF5 handling
+    assets_container::t_value_type local_asset_hist = *asset_history_ptr;
+    asset_descriptor_operation& last_ado = local_asset_hist.back(); // above we made sure that the history isn't empty
+    CHECK_AND_ASSERT_MES(last_ado.opt_descriptor.has_value(), false, "opt_descriptor is missing during asset pop, op: " << (int)ado.operation_type);
+    asset_descriptor_base& last_adb = last_ado.opt_descriptor.get();
+
+    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
+    {
+      // just change the most recent history record, don't pop
+      CHECK_AND_ASSERT_MES(last_ado.opt_amount_commitment.has_value() && ado.opt_amount_commitment.has_value(), false, "last_ado.opt_amount_commitment or ado.opt_amount_commitment is missing (emit)");
+      last_ado.opt_amount_commitment.get() = (crypto::point_t(last_ado.opt_amount_commitment.get()) - crypto::point_t(ado.opt_amount_commitment.get())).to_public_key();
+      if (!last_adb.hidden_supply)
+      {
+        CHECK_AND_ASSERT_MES(last_ado.opt_amount.has_value() && ado.opt_amount.has_value(), false, "last_ado.opt_amount or ado.opt_amount is missing (emit)");
+        last_ado.opt_amount.get() -= ado.opt_amount.get();
+      }
+    }
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+    {
+      // just change the most recent history record, don't pop
+      CHECK_AND_ASSERT_MES(last_ado.opt_amount_commitment.has_value() && ado.opt_amount_commitment.has_value(), false, "last_ado.opt_amount_commitment or ado.opt_amount_commitment is missing (burn)");
+      last_ado.opt_amount_commitment.get() = (crypto::point_t(last_ado.opt_amount_commitment.get()) + crypto::point_t(ado.opt_amount_commitment.get())).to_public_key();
+      if (!last_adb.hidden_supply)
+      {
+        CHECK_AND_ASSERT_MES(last_ado.opt_amount.has_value() && ado.opt_amount.has_value(), false, "last_ado.opt_amount or ado.opt_amount is missing (burn)");
+        last_ado.opt_amount.get() += ado.opt_amount.get();
+      }
+    }
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
+    {
+      // just pop the most recent history record
+      local_asset_hist.pop_back();
+    }
+    else
+    {
+      CHECK_AND_ASSERT_MES(false, false, "invalid operation: " << (int)ado.operation_type);
+    }
+  }
+  else
+  {
+    // HF4
+    local_asset_hist.pop_back();
+  }
+
+  // both HF4 and HF5
   if (local_asset_hist.size())
     m_db_assets.set(asset_id, local_asset_hist);
   else
     m_db_assets.erase(asset_id);
-
   LOG_PRINT_MAGENTA("[ASSET_POP]: " << asset_id << ": " << (!local_asset_hist.empty() ? "(prev)" : "(erased)"), LOG_LEVEL_1);
+
   return true;
 }
 //------------------------------------------------------------------
@@ -4107,16 +4160,18 @@ bool blockchain_storage::validate_ado_ownership(asset_op_verification_context& a
   bool r = false;
   CHECK_AND_ASSERT_MES(avc.asset_op_history->size() != 0, false, "asset with id " << avc.asset_id << " has empty history record");
   const asset_descriptor_operation& last_ado = avc.asset_op_history->back();
+  CHECK_AND_ASSERT_MES(last_ado.opt_descriptor.has_value(), false, "last ado is missing opt_descriptor; asset id: " << avc.asset_id);
+  const asset_descriptor_base& last_adb = last_ado.opt_descriptor.get();
 
-  if (is_hardfork_active(ZANO_HARDFORK_05)) // TODO: consider changing to height-specific check
+  if (is_hardfork_active_for_height(ZANO_HARDFORK_05, avc.height))
   {
-    if (last_ado.descriptor.owner_eth_pub_key.has_value())
+    if (last_adb.owner_eth_pub_key.has_value())
     {
-      CHECK_AND_ASSERT_MES(last_ado.descriptor.owner == null_pkey, false, "owner_eth_pub_key is set but owner pubkey is nonzero");
+      CHECK_AND_ASSERT_MES(last_adb.owner == null_pkey, false, "owner_eth_pub_key is set but owner pubkey is nonzero");
       asset_operation_ownership_proof_eth aoop_eth{};
       r = get_type_in_variant_container(avc.tx.proofs, aoop_eth);
       CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed: asset_operation_ownership_proof_eth is missing");
-      if (!crypto::verify_eth_signature(avc.tx_id, last_ado.descriptor.owner_eth_pub_key.value(), aoop_eth.eth_sig))
+      if (!crypto::verify_eth_signature(avc.tx_id, last_adb.owner_eth_pub_key.value(), aoop_eth.eth_sig))
       {
         LOG_ERROR("Failed to validate secp256k1 signature for hash: " << avc.tx_id << ", signature: " << aoop_eth.eth_sig);
         return false;
@@ -4133,12 +4188,13 @@ bool blockchain_storage::validate_ado_ownership(asset_op_verification_context& a
   r = get_type_in_variant_container(avc.tx.proofs, aoop);
   CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed: asset_operation_ownership_proof is missing");
 
-  return crypto::verify_schnorr_sig(avc.tx_id, last_ado.descriptor.owner, aoop.gss);
+  return crypto::verify_schnorr_sig(avc.tx_id, last_adb.owner, aoop.gss);
 }
 //------------------------------------------------------------------
-bool blockchain_storage::validate_asset_operation_against_current_blochain_state(asset_op_verification_context& avc) const
+bool blockchain_storage::validate_asset_operation_hf4(asset_op_verification_context& avc) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
+  CHECK_AND_ASSERT_MES(!is_hardfork_active_for_height(ZANO_HARDFORK_05, avc.height), false, "validate_asset_operation_hf4 was called in HF5");
 
   CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(avc.ado, &avc.asset_id_pt, &avc.asset_id), false, "get_or_calculate_asset_id failed");
   avc.asset_op_history = m_db_assets.find(avc.asset_id);
@@ -4150,16 +4206,25 @@ bool blockchain_storage::validate_asset_operation_against_current_blochain_state
   if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
   {
     CHECK_AND_ASSERT_MES(!avc.asset_op_history, false, "asset with id " << avc.asset_id << " has already been registered");
-    avc.amount_to_validate = ado.descriptor.current_supply;
-    if(this->is_hardfork_active(ZANO_HARDFORK_05))
-    {
-      CHECK_AND_ASSERT_MES(validate_ado_initial(ado.descriptor), false, "validate_ado_initial failed!");
-    }
+    CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing while registering asset " << avc.asset_id);
+
+    // CZ please review the following two added lines, do we need them _here_? I think they should go to hardfork_specific_terms...
+    // anyway, we musn't miss these checks for the sake of consensus
+    CHECK_AND_ASSERT_MES(!ado.opt_descriptor.get().owner_eth_pub_key.has_value(), false, "owner_eth_pub_key is prohibited before HF5");
+    CHECK_AND_ASSERT_MES(!ado.opt_asset_id_salt.has_value(), false, "opt_asset_id_salt is prohibited before HF5");
+
+    CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing while registering asset " << avc.asset_id);
+    avc.amount_to_validate = ado.opt_descriptor.get().current_supply;
   }
   else
   {
     CHECK_AND_ASSERT_MES(avc.asset_op_history && avc.asset_op_history->size() > 0, false, "asset with id " << avc.asset_id << " has not been registered");
     const asset_descriptor_operation& last_ado = avc.asset_op_history->back();
+    CHECK_AND_ASSERT_MES(last_ado.opt_descriptor.has_value(), false, "opt_descriptor is missing in last ado, op: " << (int)ado.operation_type);
+    const asset_descriptor_base& last_adb = last_ado.opt_descriptor.get();
+    CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing in ado, op: " << (int)ado.operation_type);
+    const asset_descriptor_base adb = ado.opt_descriptor.get();
+
     // check ownership permission
     if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
     {
@@ -4171,23 +4236,23 @@ bool blockchain_storage::validate_asset_operation_against_current_blochain_state
     if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
     {
       //check that total current_supply haven't changed
-      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply == last_ado.descriptor.current_supply, false, "update operation attempted to change emission, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_ado.descriptor), false, "update operation modifies asset descriptor in a prohibited manner");
+      CHECK_AND_ASSERT_MES(adb.current_supply == last_adb.current_supply, false, "update operation attempted to change emission, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(adb, last_adb), false, "update operation modifies asset descriptor in a prohibited manner");
       need_to_validate_ao_amount_commitment = false;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
     {
-      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > last_ado.descriptor.current_supply, false, "emit operation does not increase the current supply, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_ado.descriptor), false, "emit operation modifies asset descriptor in a prohibited manner");
-      CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == last_ado.descriptor.meta_info, false, "emit operation is not allowed to update meta info");
-      avc.amount_to_validate = ado.descriptor.current_supply - last_ado.descriptor.current_supply;
+      CHECK_AND_ASSERT_MES(adb.current_supply > last_adb.current_supply, false, "emit operation does not increase the current supply, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(adb, last_adb), false, "emit operation modifies asset descriptor in a prohibited manner");
+      CHECK_AND_ASSERT_MES(adb.meta_info == last_adb.meta_info, false, "emit operation is not allowed to update meta info");
+      avc.amount_to_validate = adb.current_supply - last_adb.current_supply;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
     {
-      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply < last_ado.descriptor.current_supply, false, "burn operation does not decrease the current supply, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_ado.descriptor), false, "burn operation modifies asset descriptor in a prohibited manner");
-      CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == last_ado.descriptor.meta_info, false, "burn operation is not allowed to update meta info");
-      avc.amount_to_validate =  last_ado.descriptor.current_supply - ado.descriptor.current_supply;
+      CHECK_AND_ASSERT_MES(adb.current_supply < last_adb.current_supply, false, "burn operation does not decrease the current supply, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(adb, last_adb), false, "burn operation modifies asset descriptor in a prohibited manner");
+      CHECK_AND_ASSERT_MES(adb.meta_info == last_adb.meta_info, false, "burn operation is not allowed to update meta info");
+      avc.amount_to_validate = last_adb.current_supply - adb.current_supply;
     }
     else
     {
@@ -4205,35 +4270,182 @@ bool blockchain_storage::validate_asset_operation_against_current_blochain_state
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado)
+bool blockchain_storage::validate_asset_operation(asset_op_verification_context& avc) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  CHECK_AND_ASSERT_MES(is_hardfork_active_for_height(ZANO_HARDFORK_05, avc.height), false, "validate_asset_operation was called before HF5");
+
+  CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(avc.ado, &avc.asset_id_pt, &avc.asset_id), false, "get_or_calculate_asset_id failed");
+  avc.asset_op_history = m_db_assets.find(avc.asset_id);
+
+  const asset_descriptor_operation& ado = avc.ado;
+
+  bool need_to_validate_ao_amount_commitment = true;
+
+  if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
+  {
+    CHECK_AND_ASSERT_MES(!avc.asset_op_history, false, "asset with id " << avc.asset_id << " has already been registered");
+    CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing while registering asset " << avc.asset_id);
+    avc.amount_to_validate = ado.opt_descriptor.get().current_supply;
+    // HF5 specific
+    CHECK_AND_ASSERT_MES(validate_ado_initial(ado.opt_descriptor.get()), false, "validate_ado_initial failed!");
+    CHECK_AND_ASSERT_MES(ado.opt_amount.has_value() && avc.amount_to_validate == ado.opt_amount.get(), false, "opt_amount is missing or incorrect");
+  }
+  else
+  {
+    CHECK_AND_ASSERT_MES(avc.asset_op_history && avc.asset_op_history->size() > 0, false, "asset with id " << avc.asset_id << " has not been registered");
+    const asset_descriptor_operation& last_ado = avc.asset_op_history->back();
+    CHECK_AND_ASSERT_MES(last_ado.opt_descriptor.has_value(), false, "opt_descriptor is missing in last ado, op: " << (int)ado.operation_type);
+    const asset_descriptor_base& last_adb = last_ado.opt_descriptor.get();
+
+    // check ownership permission
+    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
+    {
+      bool r = validate_ado_ownership(avc);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to validate ownership of asset_descriptor_operation, rejecting");
+    }
+
+    avc.amount_to_validate = 0;
+    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
+    {
+      CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing (update)");
+      //check that total current_supply haven't changed
+      CHECK_AND_ASSERT_MES(ado.opt_descriptor.get().current_supply == last_adb.current_supply, false, "update operation attempted to change emission, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.opt_descriptor.get(), last_adb), false, "update operation modifies asset descriptor in a prohibited manner");
+      need_to_validate_ao_amount_commitment = false;
+    }
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
+    {
+      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > last_adb.current_supply, false, "emit operation does not increase the current supply, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_adb), false, "emit operation modifies asset descriptor in a prohibited manner");
+      CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == last_adb.meta_info, false, "emit operation is not allowed to update meta info");
+
+      if (!last_adb.hidden_supply)
+      {
+        CHECK_AND_ASSERT_MES(ado.opt_amount.has_value(), false, "opt_amount is missing (emit)");
+        avc.amount_to_validate = ado.opt_amount.get();
+      }
+    }
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+    {
+      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply < last_adb.current_supply, false, "burn operation does not decrease the current supply, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_adb), false, "burn operation modifies asset descriptor in a prohibited manner");
+      CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == last_adb.meta_info, false, "burn operation is not allowed to update meta info");
+
+      if (!last_adb.hidden_supply)
+      {
+        CHECK_AND_ASSERT_MES(ado.opt_amount.has_value(), false, "opt_amount is missing (burn)");
+        avc.amount_to_validate = ado.opt_amount.get();
+      }
+    }
+    else
+    {
+      LOG_ERROR("Unknown operation type: " << (int)ado.operation_type);
+      return false;
+    }
+  }
+
+  if (need_to_validate_ao_amount_commitment)
+  {
+    bool r = validate_asset_operation_amount_commitment(avc);
+    CHECK_AND_ASSERT_MES(r, false, "Balance proof validation failed for asset_descriptor_operation");
+  }
+
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, const uint64_t height)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
-  asset_op_verification_context avc = { tx, tx_id, ado };
-  CHECK_AND_ASSERT_MES(validate_asset_operation_against_current_blochain_state(avc), false, "asset operation validation failed");
-
-  assets_container::t_value_type local_asset_history{};
-  if (avc.asset_op_history)
-    local_asset_history = *avc.asset_op_history;
-  local_asset_history.push_back(ado);
-  m_db_assets.set(avc.asset_id, local_asset_history);
-
-  switch(ado.operation_type)
+  asset_op_verification_context avc = { tx, tx_id, ado, height };
+  if (is_hardfork_active_for_height(ZANO_HARDFORK_05, height))
   {
-  case ASSET_DESCRIPTOR_OPERATION_REGISTER:
-    LOG_PRINT_MAGENTA("[ASSET_REGISTERED]: " << print_money_brief(ado.descriptor.current_supply, ado.descriptor.decimal_point) << ", " << avc.asset_id << ": " << ado.descriptor.ticker << ", \"" << ado.descriptor.full_name << "\"", LOG_LEVEL_1);
-    break;
-  case ASSET_DESCRIPTOR_OPERATION_UPDATE:
-    LOG_PRINT_MAGENTA("[ASSET_UPDATED]: " << avc.asset_id << ": " << ado.descriptor.ticker << ", \"" << ado.descriptor.full_name << "\"", LOG_LEVEL_1);
-    break;
-  case ASSET_DESCRIPTOR_OPERATION_EMIT:
-    LOG_PRINT_MAGENTA("[ASSET_EMITTED]: " << print_money_brief(avc.amount_to_validate, ado.descriptor.decimal_point) << ", " << avc.asset_id << ": " << ado.descriptor.ticker << ", \"" << ado.descriptor.full_name << "\"", LOG_LEVEL_1);
-    break;
-  case ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN:
-    LOG_PRINT_MAGENTA("[ASSET_BURNT]: " << print_money_brief(avc.amount_to_validate, ado.descriptor.decimal_point) << ", " << avc.asset_id << ": " << ado.descriptor.ticker << ", \"" << ado.descriptor.full_name << "\"", LOG_LEVEL_1);
-    break;
-  default:
-    LOG_ERROR("Unknown operation type: " << (int)ado.operation_type);
+    CHECK_AND_ASSERT_MES(validate_asset_operation(avc), false, "asset operation validation failed (HF5)");
+    // NEW HF5 handling here
+
+    assets_container::t_value_type local_asset_history{};
+    if (avc.asset_op_history)
+      local_asset_history = *avc.asset_op_history;
+    
+    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
+    {
+      CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing (register)"); // validated in validate_asset_operation(), just in case
+      const asset_descriptor_base& adb = ado.opt_descriptor.get();
+      local_asset_history.push_back(ado);
+      LOG_PRINT_MAGENTA("[ASSET_REGISTERED]: " << print_money_brief(adb.current_supply, adb.decimal_point) << ", " << avc.asset_id << ": " << adb.ticker << ", \"" << adb.full_name << "\"", LOG_LEVEL_1);
+    }
+    else
+    {
+      CHECK_AND_ASSERT_MES(!local_asset_history.empty(), false, "local_asset_history is empty (update/emit/burn)");
+      asset_descriptor_operation& last_ado = local_asset_history.back();
+      CHECK_AND_ASSERT_MES(last_ado.opt_descriptor.has_value(), false, "last_ado.opt_descriptor is missing (update/emit/burn)");
+      asset_descriptor_base& last_adb = local_asset_history.back().opt_descriptor.get();
+
+      if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
+      {
+        local_asset_history.push_back(ado);
+        LOG_PRINT_MAGENTA("[ASSET_UPDATED]: " << avc.asset_id << ": " << last_adb.ticker << ", \"" << last_adb.full_name << "\"", LOG_LEVEL_1);
+      }
+      else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
+      {
+        // just change the most recent history record, don't push
+        CHECK_AND_ASSERT_MES(last_ado.opt_amount_commitment.has_value() && ado.opt_amount_commitment.has_value(), false, "last_ado.opt_amount_commitment or ado.opt_amount_commitment is missing (emit)");
+        last_ado.opt_amount_commitment.get() = (crypto::point_t(last_ado.opt_amount_commitment.get()) + crypto::point_t(ado.opt_amount_commitment.get())).to_public_key();
+        if (!last_adb.hidden_supply)
+        {
+          CHECK_AND_ASSERT_MES(last_ado.opt_amount.has_value() && ado.opt_amount.has_value(), false, "last_ado.opt_amount or ado.opt_amount is missing (emit)");
+          last_ado.opt_amount.get() += ado.opt_amount.get();
+        }
+        LOG_PRINT_MAGENTA("[ASSET_EMITTED]: " << print_money_brief(avc.amount_to_validate, last_adb.decimal_point) << ", " << avc.asset_id << ": " << last_adb.ticker << ", \"" << last_adb.full_name << "\"", LOG_LEVEL_1);
+      }
+      else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+      {
+        // just change the most recent history record, don't push
+        CHECK_AND_ASSERT_MES(last_ado.opt_amount_commitment.has_value() && ado.opt_amount_commitment.has_value(), false, "last_ado.opt_amount_commitment or ado.opt_amount_commitment is missing (burn)");
+        last_ado.opt_amount_commitment.get() = (crypto::point_t(last_ado.opt_amount_commitment.get()) - crypto::point_t(ado.opt_amount_commitment.get())).to_public_key();
+        if (!last_adb.hidden_supply)
+        {
+          CHECK_AND_ASSERT_MES(last_ado.opt_amount.has_value() && ado.opt_amount.has_value(), false, "last_ado.opt_amount or ado.opt_amount is missing (burn)");
+          last_ado.opt_amount.get() -= ado.opt_amount.get();
+        }
+        LOG_PRINT_MAGENTA("[ASSET_BURNT]: " << print_money_brief(avc.amount_to_validate, last_adb.decimal_point) << ", " << avc.asset_id << ": " << last_adb.ticker << ", \"" << last_adb.full_name << "\"", LOG_LEVEL_1);
+      }
+      else
+        CHECK_AND_ASSERT_MES(false, false, "Unknown operation type: " << (int)ado.operation_type);
+    }
+    
+    m_db_assets.set(avc.asset_id, local_asset_history);
+  }
+  else
+  {
+    // HF4
+    CHECK_AND_ASSERT_MES(validate_asset_operation_hf4(avc), false, "asset operation validation failed (HF4)");
+
+    assets_container::t_value_type local_asset_history{};
+    if (avc.asset_op_history)
+      local_asset_history = *avc.asset_op_history;
+    local_asset_history.push_back(ado);
+    m_db_assets.set(avc.asset_id, local_asset_history);
+
+    const asset_descriptor_base& adb = ado.opt_descriptor.get(); // in HF4 descriptor must always be present, validated in validate_asset_operation_hf4()
+    switch(ado.operation_type)
+    {
+    case ASSET_DESCRIPTOR_OPERATION_REGISTER:
+      LOG_PRINT_MAGENTA("[ASSET_REGISTERED]: " << print_money_brief(adb.current_supply, adb.decimal_point) << ", " << avc.asset_id << ": " << adb.ticker << ", \"" << adb.full_name << "\"", LOG_LEVEL_1);
+      break;
+    case ASSET_DESCRIPTOR_OPERATION_UPDATE:
+      LOG_PRINT_MAGENTA("[ASSET_UPDATED]: " << avc.asset_id << ": " << adb.ticker << ", \"" << adb.full_name << "\"", LOG_LEVEL_1);
+      break;
+    case ASSET_DESCRIPTOR_OPERATION_EMIT:
+      LOG_PRINT_MAGENTA("[ASSET_EMITTED]: " << print_money_brief(avc.amount_to_validate, adb.decimal_point) << ", " << avc.asset_id << ": " << adb.ticker << ", \"" << adb.full_name << "\"", LOG_LEVEL_1);
+      break;
+    case ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN:
+      LOG_PRINT_MAGENTA("[ASSET_BURNT]: " << print_money_brief(avc.amount_to_validate, adb.decimal_point) << ", " << avc.asset_id << ": " << adb.ticker << ", \"" << adb.full_name << "\"", LOG_LEVEL_1);
+      break;
+    default:
+      LOG_ERROR("Unknown operation type: " << (int)ado.operation_type);
+    }
   }
 
   return true;
@@ -4309,7 +4521,7 @@ bool blockchain_storage::prevalidate_alias_info(const transaction& tx, const ext
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx, const crypto::hash& tx_id)
+bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx, const crypto::hash& tx_id, const uint64_t height)
 {
   //check transaction extra
   tx_extra_info ei = AUTO_VAL_INIT(ei);
@@ -4325,7 +4537,7 @@ bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx, cons
   }
   if (ei.m_asset_operation.operation_type != ASSET_DESCRIPTOR_OPERATION_UNDEFINED)
   {
-    r = put_asset_info(tx, tx_id, ei.m_asset_operation);
+    r = put_asset_info(tx, tx_id, ei.m_asset_operation, height);
     CHECK_AND_ASSERT_MES(r, false, "failed to put_asset_info");
   }
 
@@ -4525,7 +4737,7 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   CHECK_AND_ASSERT_MES(validate_tx_for_hardfork_specific_terms(tx, tx_id, bl_height), false, "tx " << tx_id << ": hardfork-specific validation failed");
   
   TIME_MEASURE_START_PD(tx_process_extra);
-  bool r = process_blockchain_tx_extra(tx, tx_id);
+  bool r = process_blockchain_tx_extra(tx, tx_id, bl_height);
   CHECK_AND_ASSERT_MES(r, false, "failed to process_blockchain_tx_extra");
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_process_extra);
 
@@ -4541,7 +4753,7 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
     {
       LOG_ERROR("critical internal error: add_transaction_input_visitor failed. but key_images should be already checked");
       purge_transaction_keyimages_from_blockchain(tx, false);
-      bool r = unprocess_blockchain_tx_extra(tx);
+      bool r = unprocess_blockchain_tx_extra(tx, bl_height);
       CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra");
       
       unprocess_blockchain_tx_attachments(tx, bl_height, timestamp);
@@ -4562,7 +4774,7 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   {
     LOG_ERROR("critical internal error: tx with id: " << tx_id << " in block id: " << bl_id << " already in blockchain");
     purge_transaction_keyimages_from_blockchain(tx, true);
-    bool r = unprocess_blockchain_tx_extra(tx);
+    bool r = unprocess_blockchain_tx_extra(tx, bl_height);
     CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra");
 
     unprocess_blockchain_tx_attachments(tx, bl_height, timestamp);
@@ -6967,7 +7179,7 @@ bool blockchain_storage::is_hardfork_active(size_t hardfork_id) const
 //------------------------------------------------------------------
 bool blockchain_storage::is_hardfork_active_for_height(size_t hardfork_id, uint64_t height) const
 {
-  return m_core_runtime_config.is_hardfork_active_for_height(hardfork_id, height);
+  return m_core_runtime_config.is_hardfork_active_for_height(hardfork_id, height != UINT64_MAX ? height : m_db_blocks.size());
 }
 //------------------------------------------------------------------
 bool blockchain_storage::prevalidate_block(const block& bl)
