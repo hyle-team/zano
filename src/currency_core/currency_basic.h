@@ -698,7 +698,8 @@ namespace currency
 
 #define ASSET_DESCRIPTOR_BASE_STRUCTURE_LAST_VER  2
 
-  struct dummy{
+  struct dummy
+  {
       BEGIN_SERIALIZE() 
       END_SERIALIZE()
 
@@ -707,6 +708,7 @@ namespace currency
   };
 
   typedef boost::variant<dummy> asset_descriptor_base_etc_fields;
+  typedef boost::variant<crypto::public_key, crypto::eth_public_key> asset_owner_pub_key_v;
 
   struct asset_descriptor_base
   {
