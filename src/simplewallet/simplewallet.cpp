@@ -1202,7 +1202,7 @@ bool simple_wallet::show_staking_history(const std::vector<std::string>& args)
   bool transfers_found = false;
   for (auto it = transfers.rbegin(); it != transfers.rend(); it++)
   {
-    const auto& td = *it;
+    const auto& td = it->second;
 
     if (timestamp && td.m_ptx_wallet_info->m_block_timestamp < timestamp)
       break;
@@ -1264,8 +1264,9 @@ bool simple_wallet::show_incoming_transfers(const std::vector<std::string>& args
   m_wallet->get_transfers(transfers);
 
   bool transfers_found = false;
-  for (const auto& td : transfers)
+  for (const auto& tr : transfers)
   {
+    const auto& td = tr.second;
     if (!filter || available != static_cast<bool>(td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_SPENT))
     {
       if (!transfers_found)
@@ -1308,8 +1309,9 @@ bool simple_wallet::show_incoming_transfers_counts(const std::vector<std::string
 
   uint64_t spent_count = 0;
   uint64_t unspent_count = 0;
-  for (const auto& td : transfers)
+  for (const auto& tr : transfers)
   {
+    const auto& td = tr.second;
     if (td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_SPENT)
     {
       ++spent_count;
