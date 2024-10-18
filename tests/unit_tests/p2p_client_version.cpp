@@ -17,8 +17,6 @@ static reponse_check_parse_client_version check_parse_client_version(const std::
                                                                      const std::optional<std::string>& expected_commit_id, const std::optional<bool>& expected_dirty)
 {
   enum class version_integer_component : uint8_t { major, minor, revision, build_number };
-  // 3 not in {0; 1} and low-order bit doesn't equals to 0.
-  constexpr uint8_t out_of_logicals_value{3};
   std::array<int32_t, 4> values_on_not_written{INT32_MIN, INT32_MIN, INT32_MIN, INT32_MIN};
   int32_t major{}, minor{}, revision{}, build_number{};
   std::string commit_id{};
@@ -110,9 +108,12 @@ static reponse_check_parse_client_version check_parse_client_version(const std::
     }
   }
 
-  if (expected_commit_id.has_value() && commit_id != expected_commit_id.value())
+  if (expected_commit_id.has_value())
   {
-    return reponse_check_parse_client_version::parsed_unexpect;
+    if (commit_id != expected_commit_id.value())
+    {
+      return reponse_check_parse_client_version::parsed_unexpect;
+    }
   }
 
   else
@@ -133,10 +134,7 @@ static reponse_check_parse_client_version check_parse_client_version(const std::
 
   else
   {
-    if (dirty != out_of_logicals_value)
-    {
-      return reponse_check_parse_client_version::parsed_unexpect;
-    }
+    return reponse_check_parse_client_version::parsed_unexpect;
   }
 
   return reponse_check_parse_client_version::parsed;
