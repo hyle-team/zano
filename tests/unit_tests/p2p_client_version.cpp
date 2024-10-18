@@ -12,63 +12,57 @@ enum class reponse_check_parse_client_version : uint8_t
   parsed_unexpect
 };
 
-reponse_check_parse_client_version check_parse_client_version(const std::string& str, const std::optional<int>& expected_major, const std::optional<int>& expected_minor,
-                                                              const std::optional<int>& expected_revision, const std::optional<int>& expected_build_number,
-                                                              const std::optional<std::string>& expected_commit_id, const std::optional<bool>& expected_dirty)
+static reponse_check_parse_client_version check_parse_client_version(const std::string& str, const std::optional<int>& expected_major, const std::optional<int>& expected_minor,
+                                                                     const std::optional<int>& expected_revision, const std::optional<int>& expected_build_number,
+                                                                     const std::optional<std::string>& expected_commit_id, const std::optional<bool>& expected_dirty)
 {
   enum class version_integer_component : uint8_t { major, minor, revision, build_number };
-  // 3 not in {0; 1} and low-order bit not equsl to 0.
+  // 3 not in {0; 1} and low-order bit doesn't equals to 0.
   constexpr uint8_t out_of_logicals_value{3};
-  std::array<int64_t, 4> out_of_int32_bounds_values{};
+  std::array<int32_t, 4> values_on_not_written{INT32_MIN, INT32_MIN, INT32_MIN, INT32_MIN};
 
+  if (expected_major.has_value() && expected_major.value() == INT32_MIN)
   {
-    // (1 ** 32) > INT32_MAX
-    constexpr auto out_of_int32_bounds_value{static_cast<int64_t>(1) << 32};
-
-    if (expected_major.has_value() && expected_major.value() == 0)
-    {
-      ++out_of_int32_bounds_values.at(static_cast<uint8_t>(version_integer_component::major));
-    }
-
-    if (expected_minor.has_value() && expected_minor.value() == 0)
-    {
-      ++out_of_int32_bounds_values.at(static_cast<uint8_t>(version_integer_component::minor));
-    }
-
-    if (expected_revision.has_value() && expected_revision.value() == 0)
-    {
-      ++out_of_int32_bounds_values.at(static_cast<uint8_t>(version_integer_component::revision));
-    }
-
-    if (expected_build_number.has_value() && expected_build_number.value() == 0)
-    {
-      ++out_of_int32_bounds_values.at(static_cast<uint8_t>(version_integer_component::build_number));
-    }
+    values_on_not_written.at(static_cast<uint8_t>(version_integer_component::major)) = INT32_MAX;
   }
 
-  int64_t major_pass{out_of_int32_bounds_values.at(static_cast<uint8_t>(version_integer_component::major))},
-          minor_pass{out_of_int32_bounds_values.at(static_cast<uint8_t>(version_integer_component::minor))},
-          revision_pass{out_of_int32_bounds_values.at(static_cast<uint8_t>(version_integer_component::revision))},
-          build_number_pass{out_of_int32_bounds_values.at(static_cast<uint8_t>(version_integer_component::build_number))};
-  std::string commit_id{};
-  uint8_t dirty_pass{out_of_logicals_value};
+  if (expected_minor.has_value() && expected_minor.value() == INT32_MIN)
+  {
+    values_on_not_written.at(static_cast<uint8_t>(version_integer_component::minor)) = INT32_MAX;
+  }
 
-  if (!tools::parse_client_version(str, reinterpret_cast<int32_t&>(major_pass), reinterpret_cast<int32_t&>(minor_pass), reinterpret_cast<int32_t&>(revision_pass),
-                                   reinterpret_cast<int32_t&>(build_number_pass), commit_id, reinterpret_cast<bool&>(dirty_pass)))
+  if (expected_revision.has_value() && expected_revision.value() == INT32_MIN)
+  {
+    values_on_not_written.at(static_cast<uint8_t>(version_integer_component::revision)) = INT32_MAX;
+  }
+
+  if (expected_build_number.has_value() && expected_build_number.value() == INT32_MIN)
+  {
+    values_on_not_written.at(static_cast<uint8_t>(version_integer_component::build_number)) = INT32_MAX;
+  }
+
+  int32_t major{values_on_not_written.at(static_cast<uint8_t>(version_integer_component::major))},
+          minor{values_on_not_written.at(static_cast<uint8_t>(version_integer_component::minor))},
+          revision{values_on_not_written.at(static_cast<uint8_t>(version_integer_component::revision))},
+          build_number{values_on_not_written.at(static_cast<uint8_t>(version_integer_component::build_number))};
+
+  std::string commit_id{};
+
+  if (expected_commit_id.has_value() && !expected_commit_id.value().empty())
+  {
+    commit_id = std::string(1024, '\0');
+  }
+
+  bool dirty{};
+
+  if (!tools::parse_client_version(str, major, minor, revision, build_number, commit_id, dirty))
   {
     return reponse_check_parse_client_version::not_parsed;
   }
 
-  constexpr uint64_t mask_to_fit_value_int32{0x00000000FFFFFFFF};
-  const auto major{static_cast<int32_t>(major_pass & mask_to_fit_value_int32)};
-  const auto minor{static_cast<int32_t>(minor_pass & mask_to_fit_value_int32)};
-  const auto revision{static_cast<int32_t>(revision_pass & mask_to_fit_value_int32)};
-  const auto build_number{static_cast<int32_t>(build_number_pass & mask_to_fit_value_int32)};
-  const bool dirty{dirty_pass != 2 && dirty_pass != out_of_logicals_value};
-
   if (expected_major.has_value())
   {
-    if (major_pass == out_of_int32_bounds_values.at(static_cast<uint8_t>(version_integer_component::major)) || major != expected_major.value())
+    if (major == values_on_not_written.at(static_cast<uint8_t>(version_integer_component::major)) || major != expected_major.value())
     {
       return reponse_check_parse_client_version::parsed_unexpect;
     }
@@ -76,7 +70,7 @@ reponse_check_parse_client_version check_parse_client_version(const std::string&
 
   else
   {
-    if (major_pass != out_of_int32_bounds_values.at(static_cast<uint8_t>(version_integer_component::major)))
+    if (major != values_on_not_written.at(static_cast<uint8_t>(version_integer_component::major)))
     {
       return reponse_check_parse_client_version::parsed_unexpect;
     }
@@ -84,7 +78,7 @@ reponse_check_parse_client_version check_parse_client_version(const std::string&
 
   if (expected_minor.has_value())
   {
-    if (minor_pass == out_of_int32_bounds_values.at(static_cast<uint8_t>(version_integer_component::minor)) || minor != expected_minor.value())
+    if (minor == values_on_not_written.at(static_cast<uint8_t>(version_integer_component::minor)) || minor != expected_minor.value())
     {
       return reponse_check_parse_client_version::parsed_unexpect;
     }
@@ -92,7 +86,7 @@ reponse_check_parse_client_version check_parse_client_version(const std::string&
 
   else
   {
-    if (minor_pass != out_of_int32_bounds_values.at(static_cast<uint8_t>(version_integer_component::minor)))
+    if (minor != values_on_not_written.at(static_cast<uint8_t>(version_integer_component::minor)))
     {
       return reponse_check_parse_client_version::parsed_unexpect;
     }
@@ -100,7 +94,7 @@ reponse_check_parse_client_version check_parse_client_version(const std::string&
 
   if (expected_revision.has_value())
   {
-    if (revision_pass == out_of_int32_bounds_values.at(static_cast<uint8_t>(version_integer_component::revision)) || revision != expected_revision.value())
+    if (revision == values_on_not_written.at(static_cast<uint8_t>(version_integer_component::revision)) || revision != expected_revision.value())
     {
       return reponse_check_parse_client_version::parsed_unexpect;
     }
@@ -108,7 +102,7 @@ reponse_check_parse_client_version check_parse_client_version(const std::string&
 
   else
   {
-    if (revision_pass != out_of_int32_bounds_values.at(static_cast<uint8_t>(version_integer_component::revision)))
+    if (revision != values_on_not_written.at(static_cast<uint8_t>(version_integer_component::revision)))
     {
       return reponse_check_parse_client_version::parsed_unexpect;
     }
@@ -140,7 +134,7 @@ reponse_check_parse_client_version check_parse_client_version(const std::string&
 
   else
   {
-    if (dirty_pass != out_of_logicals_value)
+    if (dirty != out_of_logicals_value)
     {
       return reponse_check_parse_client_version::parsed_unexpect;
     }
