@@ -20,6 +20,9 @@ static reponse_check_parse_client_version check_parse_client_version(const std::
   // 3 not in {0; 1} and low-order bit doesn't equals to 0.
   constexpr uint8_t out_of_logicals_value{3};
   std::array<int32_t, 4> values_on_not_written{INT32_MIN, INT32_MIN, INT32_MIN, INT32_MIN};
+  int32_t major{}, minor{}, revision{}, build_number{};
+  std::string commit_id{};
+  bool dirty{};
 
   if (expected_major.has_value() && expected_major.value() == INT32_MIN)
   {
@@ -41,12 +44,10 @@ static reponse_check_parse_client_version check_parse_client_version(const std::
     values_on_not_written.at(static_cast<uint8_t>(version_integer_component::build_number)) = INT32_MAX;
   }
 
-  int32_t major{values_on_not_written.at(static_cast<uint8_t>(version_integer_component::major))},
-          minor{values_on_not_written.at(static_cast<uint8_t>(version_integer_component::minor))},
-          revision{values_on_not_written.at(static_cast<uint8_t>(version_integer_component::revision))},
-          build_number{values_on_not_written.at(static_cast<uint8_t>(version_integer_component::build_number))};
-
-  std::string commit_id{};
+  major = values_on_not_written.at(static_cast<uint8_t>(version_integer_component::major));
+  minor = values_on_not_written.at(static_cast<uint8_t>(version_integer_component::minor));
+  revision = values_on_not_written.at(static_cast<uint8_t>(version_integer_component::revision));
+  build_number = values_on_not_written.at(static_cast<uint8_t>(version_integer_component::build_number));
 
   if (expected_commit_id.has_value() && !expected_commit_id.value().empty())
   {
@@ -55,8 +56,6 @@ static reponse_check_parse_client_version check_parse_client_version(const std::
     assert(length + 1 > length);
     commit_id = std::string(length + 1, '\0');
   }
-
-  bool dirty{};
 
   if (!tools::parse_client_version(str, major, minor, revision, build_number, commit_id, dirty))
   {
@@ -111,12 +110,9 @@ static reponse_check_parse_client_version check_parse_client_version(const std::
     }
   }
 
-  if (expected_commit_id.has_value())
+  if (expected_commit_id.has_value() && commit_id != expected_commit_id.value())
   {
-    if (commit_id != expected_commit_id.value())
-    {
-      return reponse_check_parse_client_version::parsed_unexpect;
-    }
+    return reponse_check_parse_client_version::parsed_unexpect;
   }
 
   else
