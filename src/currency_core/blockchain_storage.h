@@ -382,7 +382,8 @@ namespace currency
       uint64_t split_height = 0)const;
     bool validate_ado_ownership(asset_op_verification_context& avc) const;
     bool validate_asset_operation_hf4(asset_op_verification_context& avc) const;
-    bool validate_asset_operation(asset_op_verification_context& avc) const;
+    bool validate_asset_operation_hf5(asset_op_verification_context& avc) const;
+    bool validate_asset_operation(asset_op_verification_context& avc, uint64_t height) const;
 
     void set_core_runtime_config(const core_runtime_config& pc) const;
     const core_runtime_config& get_core_runtime_config()const;

@@ -4270,7 +4270,7 @@ bool blockchain_storage::validate_asset_operation_hf4(asset_op_verification_cont
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::validate_asset_operation(asset_op_verification_context& avc) const
+bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_context& avc) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   CHECK_AND_ASSERT_MES(is_hardfork_active_for_height(ZANO_HARDFORK_05, avc.height), false, "validate_asset_operation was called before HF5");
@@ -4316,9 +4316,9 @@ bool blockchain_storage::validate_asset_operation(asset_op_verification_context&
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
     {
-      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > last_adb.current_supply, false, "emit operation does not increase the current supply, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_adb), false, "emit operation modifies asset descriptor in a prohibited manner");
-      CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == last_adb.meta_info, false, "emit operation is not allowed to update meta info");
+      //CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > last_adb.current_supply, false, "emit operation does not increase the current supply, failed");
+      //CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_adb), false, "emit operation modifies asset descriptor in a prohibited manner");
+      //CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == last_adb.meta_info, false, "emit operation is not allowed to update meta info");
 
       if (!last_adb.hidden_supply)
       {
@@ -4328,9 +4328,9 @@ bool blockchain_storage::validate_asset_operation(asset_op_verification_context&
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
     {
-      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply < last_adb.current_supply, false, "burn operation does not decrease the current supply, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_adb), false, "burn operation modifies asset descriptor in a prohibited manner");
-      CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == last_adb.meta_info, false, "burn operation is not allowed to update meta info");
+      //CHECK_AND_ASSERT_MES(ado.descriptor.current_supply < last_adb.current_supply, false, "burn operation does not decrease the current supply, failed");
+      //CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_adb), false, "burn operation modifies asset descriptor in a prohibited manner");
+      //CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == last_adb.meta_info, false, "burn operation is not allowed to update meta info");
 
       if (!last_adb.hidden_supply)
       {
@@ -4354,14 +4354,27 @@ bool blockchain_storage::validate_asset_operation(asset_op_verification_context&
   return true;
 }
 //------------------------------------------------------------------
+bool blockchain_storage::validate_asset_operation(asset_op_verification_context& avc, uint64_t height) const
+{
+  if (is_hardfork_active_for_height(ZANO_HARDFORK_05, height))
+  {
+    return validate_asset_operation_hf5(avc);
+  }
+  else
+  {
+    return validate_asset_operation_hf4(avc);
+  }
+}
+//------------------------------------------------------------------
 bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, const uint64_t height)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
   asset_op_verification_context avc = { tx, tx_id, ado, height };
+  CHECK_AND_ASSERT_MES(validate_asset_operation(avc, height), false, "asset operation validation failed (HF5)");
+
   if (is_hardfork_active_for_height(ZANO_HARDFORK_05, height))
   {
-    CHECK_AND_ASSERT_MES(validate_asset_operation(avc), false, "asset operation validation failed (HF5)");
     // NEW HF5 handling here
 
     assets_container::t_value_type local_asset_history{};
@@ -4420,8 +4433,6 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
   else
   {
     // HF4
-    CHECK_AND_ASSERT_MES(validate_asset_operation_hf4(avc), false, "asset operation validation failed (HF4)");
-
     assets_container::t_value_type local_asset_history{};
     if (avc.asset_op_history)
       local_asset_history = *avc.asset_op_history;
