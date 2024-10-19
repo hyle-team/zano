@@ -696,7 +696,7 @@ namespace currency
     }
   };
 
-#define ASSET_DESCRIPTOR_BASE_STRUCTURE_LAST_VER  2
+#define ASSET_DESCRIPTOR_BASE_LAST_VER  2
 
   struct dummy
   {
@@ -727,7 +727,7 @@ namespace currency
     std::vector<asset_descriptor_base_etc_fields> etc;  //container for future use if we would be adding some optional parameters that is not known yet, but without mess related to format version
 
 
-    BEGIN_VERSIONED_SERIALIZE(ASSET_DESCRIPTOR_BASE_STRUCTURE_LAST_VER, version)
+    BEGIN_VERSIONED_SERIALIZE(ASSET_DESCRIPTOR_BASE_LAST_VER, version)
       FIELD(total_max_supply)
       FIELD(current_supply)
       FIELD(decimal_point)
@@ -838,7 +838,7 @@ namespace currency
       BOOST_SERIALIZE(opt_amount)
       BOOST_SERIALIZE(opt_asset_id_salt)
       BOOST_SERIALIZE(etc)
-    END_BOOST_SERIALIZATION_TOTAL_FIELDS(7)
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(8)
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(version)                                     DOC_DSCR("Asset operation type struct version") DOC_EXMP(2) DOC_END
@@ -1078,7 +1078,7 @@ namespace currency
       BOOST_SERIALIZE(attachment)
       BOOST_END_VERSION_UNDER(1)
       BOOST_SERIALIZE(proofs)
-    END_BOOST_SERIALIZATION_TOTAL_FIELDS(4)
+      END_BOOST_SERIALIZATION()
   };
 
   

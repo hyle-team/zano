@@ -752,6 +752,9 @@ namespace tools
     bool accept_ionic_swap_proposal(const std::string& raw_proposal, currency::transaction& result_tx);
     bool accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposal& proposal, currency::transaction& result_tx);
 
+    void fill_ado_version_based_onhardfork(currency::asset_descriptor_operation& asset_reg_info);
+    void fill_adb_version_based_onhardfork(currency::asset_descriptor_base& asset_base);
+
     // Signing and auth
     bool sign_buffer(const std::string& buff, crypto::signature& sig);
     bool validate_sign(const std::string& buff, const crypto::signature& sig, const crypto::public_key& pkey);
