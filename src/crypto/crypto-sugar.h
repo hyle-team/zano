@@ -1083,7 +1083,6 @@ namespace crypto
       make_random();
     }
 
-
   }; // scalar_vec_t
 
 

@@ -313,5 +313,16 @@ namespace boost
     {
       a & reinterpret_cast<char (&)[sizeof(crypto::eth_signature)]>(x);
     }    
+
+    //TODO: @sowle please add serialization here
+#ifndef _DEBUG
+    static_assert(false, "todo")
+#endif
+    template <class Archive>
+    inline void serialize(Archive& a, crypto::scalar_vec_t& x, const boost::serialization::version_type ver)
+    {
+      
+    }
+
   } // namespace serialization
 } // namespace boost
