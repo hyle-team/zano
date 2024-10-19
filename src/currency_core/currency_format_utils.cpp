@@ -2302,8 +2302,17 @@ namespace currency
           amount_of_burned_assets -= item.amount;
         }
       }
-      ado.opt_amount = amount_of_burned_assets;       // TODO: support hidden supply -- sowle
-
+      if (ado.version < ASSET_DESCRIPTOR_BASE_HF5_VER)
+      {
+        CHECK_AND_ASSERT_THROW_MES(ado.opt_descriptor.has_value(), "Internal error: opt_descriptor unset during ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN for version less then 2");
+        ado.opt_descriptor->current_supply -= amount_of_burned_assets;
+      }
+      else
+      {
+        CHECK_AND_ASSERT_THROW_MES(!ado.opt_descriptor.has_value(), "Internal error: opt_descriptor unset during ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN for version less then 2");
+        ado.opt_amount = amount_of_burned_assets;       // TODO: support hidden supply -- sowle
+      }
+      
       gen_context.ao_amount_commitment = amount_of_burned_assets * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
       ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
 
@@ -2329,7 +2338,16 @@ namespace currency
             item.asset_id = gen_context.ao_asset_id;
           }
         }
-        ado.opt_amount = amount_of_emitted_asset;       // TODO: support hidden supply -- sowle
+        if (ado.version < ASSET_DESCRIPTOR_BASE_HF5_VER)
+        {
+          CHECK_AND_ASSERT_THROW_MES(ado.opt_descriptor.has_value(), "Internal error: opt_descriptor unset during ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN for version less then 2");
+          ado.opt_descriptor->current_supply += amount_of_emitted_asset;
+        }
+        else
+        {
+          CHECK_AND_ASSERT_THROW_MES(!ado.opt_descriptor.has_value(), "Internal error: opt_descriptor unset during ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN for version less then 2");
+          ado.opt_amount = amount_of_emitted_asset;       // TODO: support hidden supply -- sowle
+        }
 
         gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
         ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
@@ -2778,8 +2796,7 @@ namespace currency
       const asset_descriptor_operation* pado = get_type_in_variant_container<asset_descriptor_operation>(tx.extra);
       if (pado != nullptr)
       {
-        if ((pado->operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || pado->operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE) &&
-            !pado->descriptor.owner_eth_pub_key.has_value())
+        if ((pado->operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || pado->operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE) && (!ftp.ado_sign_thirdparty))
         {
           asset_operation_ownership_proof aoop{};
           r = crypto::generate_schnorr_sig(tx_prefix_hash, sender_account_keys.spend_secret_key, aoop.gss);

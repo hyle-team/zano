@@ -5600,6 +5600,7 @@ void wallet2::emit_asset(const crypto::public_key& asset_id, const std::vector<c
     send_to_network = false;
     ctp.additional_transfer_flags_to_mark = WALLET_TRANSFER_DETAIL_FLAG_ASSET_OP_RESERVATION;
     ctp.tx_meaning_for_logs = "asset thirdparty/eth emission";
+    ctp.ado_sign_thirdparty = true;
   }
 
   this->transfer(ctp, ft, send_to_network, nullptr);
@@ -7949,6 +7950,7 @@ bool wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   ftp.flags = ctp.flags;
   ftp.multisig_id = ctp.multisig_id;
   ftp.spend_pub_key = m_account.get_public_address().spend_public_key;
+  ftp.ado_sign_thirdparty = ctp.ado_sign_thirdparty;
 
   /* TODO
   WLT_LOG_GREEN("[prepare_transaction]: get_needed_money_time: " << get_needed_money_time << " ms"

@@ -29,6 +29,7 @@
 #include "currency_format_utils_transactions.h"
 #include "core_runtime_config.h"
 #include "wallet/wallet_public_structs_defs.h"
+#include "wallet/wallet_public_structs_defs.h"
 #include "bc_attachments_helpers.h"
 #include "bc_payments_id_service.h"
 #include "bc_offers_service_basic.h"
@@ -164,9 +165,11 @@ namespace currency
     uint64_t tx_version;
     uint64_t mode_separate_fee = 0;
     
-    epee::misc_utils::events_dispatcher* pevents_dispatcher;
+    epee::misc_utils::events_dispatcher* pevents_dispatcher = nullptr;
     tx_generation_context gen_context{}; // solely for consolidated txs
+
     
+    bool ado_sign_thirdparty = false;//@#@ TODO: add to serialization map @zoidberg
 
 
     BEGIN_SERIALIZE_OBJECT()

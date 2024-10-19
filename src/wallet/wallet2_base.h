@@ -229,6 +229,9 @@ namespace tools
     // misc
     std::string tx_meaning_for_logs; // used to correctly log things, e.g. "escrow" or "asset emission".
     uint32_t additional_transfer_flags_to_mark = 0;
+
+    //ado
+    bool ado_sign_thirdparty = false;
   };
 
   struct mode_separate_context

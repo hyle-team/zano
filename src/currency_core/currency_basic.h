@@ -696,6 +696,7 @@ namespace currency
     }
   };
 
+#define ASSET_DESCRIPTOR_BASE_HF5_VER  2
 #define ASSET_DESCRIPTOR_BASE_LAST_VER  2
 
   struct dummy
