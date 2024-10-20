@@ -90,7 +90,7 @@ DISABLE_VS_WARNINGS(4100)
 #define LOG_JOURNAL_MAX_ELEMENTS 100
 
 #ifdef _DEBUG 
-  #define _ASSERTE__(expr)   if(!expr) {__debugbreak();}
+  #define _ASSERTE__(expr)   if(!(expr)) {__debugbreak();}
 #else
   #define _ASSERTE__(expr)  
 #endif

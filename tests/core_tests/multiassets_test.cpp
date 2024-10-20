@@ -310,10 +310,19 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   //miner_wlt->refresh();
 
 
+
   // check emit_asset() with modified 'current_supply'
   miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_seal>([&](const wde_construct_tx_handle_asset_descriptor_operation_before_seal& o)
   {
-    o.pado->descriptor.current_supply += 1000000;
+    if(o.pado->version < ASSET_DESCRIPTOR_OPERATION_HF5_VER)
+    {
+      //hf4
+      o.pado->opt_descriptor->current_supply += 1000000;
+    }
+    else
+    {
+      *o.pado->opt_amount += 1000000;
+    }
   });
   //test emit function but re-adjust current_supply to wrong amount
   r = false;
@@ -345,7 +354,15 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
   miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_burn>([&](const wde_construct_tx_handle_asset_descriptor_operation_before_burn& o)
   {
-    o.pado->descriptor.current_supply -= 1000000;
+    if (o.pado->version < ASSET_DESCRIPTOR_OPERATION_HF5_VER)
+    {
+      //hf4
+      o.pado->opt_descriptor->current_supply -= 1000000;
+    }
+    else
+    {
+      *o.pado->opt_amount -= 1000000;
+    }
   });
 
 
@@ -894,6 +911,7 @@ bool asset_emission_and_unconfirmed_balance::c1(currency::core& c, size_t ev_ind
 
 asset_operation_and_hardfork_checks::asset_operation_and_hardfork_checks()
 {
+  m_adb_hello.version = ASSET_DESCRIPTOR_BASE_HF4_VER;
   m_adb_hello.total_max_supply = 1'000'000'000'000'000'000;
   m_adb_hello.current_supply = 1'000'000'000'000'000'000;
   m_adb_hello.ticker = "HLO";
@@ -903,6 +921,7 @@ asset_operation_and_hardfork_checks::asset_operation_and_hardfork_checks()
 
   m_ado_hello.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
   m_ado_hello.opt_asset_id = currency::null_pkey;
+  m_ado_hello.version = ASSET_DESCRIPTOR_OPERATION_HF4_VER;
 
   m_adb_bye.total_max_supply = 1'000'000'000'000'000'000;
   m_adb_bye.current_supply = 1'000'000'000'000'000'000;
@@ -913,6 +932,7 @@ asset_operation_and_hardfork_checks::asset_operation_and_hardfork_checks()
 
   m_ado_bye.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
   m_ado_hello.opt_asset_id = currency::null_pkey;
+  m_ado_hello.version = ASSET_DESCRIPTOR_OPERATION_HF4_VER;
 
   REGISTER_CALLBACK_METHOD(asset_operation_and_hardfork_checks, c1);
   REGISTER_CALLBACK_METHOD(asset_operation_and_hardfork_checks, c2);
@@ -942,10 +962,10 @@ bool asset_operation_and_hardfork_checks::generate(
   alice.generate();
 
   m_adb_hello.owner = alice.get_public_address().spend_public_key;
-  m_ado_hello.descriptor = m_adb_hello;
+  m_ado_hello.opt_descriptor = m_adb_hello;
 
   m_adb_bye.owner = alice.get_public_address().spend_public_key;
-  m_ado_bye.descriptor = m_adb_bye;
+  m_ado_bye.opt_descriptor = m_adb_bye;
 
   MAKE_GENESIS_BLOCK(events,
                      blk_0,
@@ -1212,6 +1232,7 @@ bool asset_operation_and_hardfork_checks::c2(
 
 asset_operation_in_consolidated_tx::asset_operation_in_consolidated_tx()
 {
+  m_adb_alice_currency.version = ASSET_DESCRIPTOR_BASE_HF4_VER;
   m_adb_alice_currency.total_max_supply = 1'000'000'000'000'000'000;
   m_adb_alice_currency.current_supply = 1'000'000'000'000'000'000;
   m_adb_alice_currency.ticker = "ALC";
@@ -1221,6 +1242,7 @@ asset_operation_in_consolidated_tx::asset_operation_in_consolidated_tx()
 
   m_ado_alice_currency.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
   m_ado_alice_currency.opt_asset_id = currency::null_pkey;
+  m_ado_alice_currency.version = ASSET_DESCRIPTOR_OPERATION_HF4_VER;
 
   REGISTER_CALLBACK_METHOD(asset_operation_in_consolidated_tx, assert_balances);
   REGISTER_CALLBACK_METHOD(asset_operation_in_consolidated_tx, assert_alice_currency_not_registered);
@@ -1242,7 +1264,7 @@ bool asset_operation_in_consolidated_tx::generate(std::vector<test_event_entry>&
   m_accounts.push_back(alice);
   m_accounts.push_back(bob);
   m_adb_alice_currency.owner      = m_accounts.at(ALICE_ACC_IDX).get_public_address().spend_public_key;
-  m_ado_alice_currency.descriptor = m_adb_alice_currency;
+  m_ado_alice_currency.opt_descriptor = m_adb_alice_currency;
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
   DO_CALLBACK(events, "configure_core");
@@ -1805,8 +1827,8 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
   CHECK_AND_ASSERT_EQ(pado->operation_type, ASSET_DESCRIPTOR_OPERATION_UPDATE);
   CHECK_AND_ASSERT_EQ(pado->opt_asset_id.has_value(), true);
   CHECK_AND_ASSERT_EQ(pado->opt_asset_id.get(), asset_id);
-  CHECK_AND_ASSERT_EQ(pado->descriptor.owner_eth_pub_key.has_value(), true);
-  CHECK_AND_ASSERT_EQ(pado->descriptor.owner_eth_pub_key.get(), eth_pk_2); // the most important condition for an ownership transfer
+  CHECK_AND_ASSERT_EQ(pado->opt_descriptor->owner_eth_pub_key.has_value(), true);
+  CHECK_AND_ASSERT_EQ(pado->opt_descriptor->owner_eth_pub_key.get(), eth_pk_2); // the most important condition for an ownership transfer
   // other fileds of pado->descriptor may also be checked here
 
   //
@@ -2007,12 +2029,13 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
   m_accounts.push_back(miner);
   m_accounts.push_back(alice);
   m_adbs.at(asset_position::alpha).owner = m_adbs.at(asset_position::beta).owner = m_adbs.at(asset_position::gamma).owner = alice.get_public_address().spend_public_key;
-  m_ados_register.at(asset_position::alpha).descriptor = m_adbs.at(asset_position::alpha);
-  m_ados_register.at(asset_position::beta).descriptor = m_ado_emit.descriptor = m_adbs.at(asset_position::beta);
-  m_ados_register.at(asset_position::gamma).descriptor = m_adbs.at(asset_position::gamma);
-  CHECK_AND_ASSERT(m_ado_emit.descriptor.current_supply <= m_ado_emit.descriptor.total_max_supply, false);
-  ++m_ado_emit.descriptor.current_supply;
-  CHECK_AND_ASSERT(m_ado_emit.descriptor.current_supply > m_ado_emit.descriptor.total_max_supply, false);
+  m_ados_register.at(asset_position::alpha).opt_descriptor = m_adbs.at(asset_position::alpha);
+  m_ados_register.at(asset_position::beta).opt_descriptor = m_ado_emit.opt_descriptor = m_adbs.at(asset_position::beta);
+  m_ados_register.at(asset_position::gamma).opt_descriptor = m_adbs.at(asset_position::gamma);
+
+  CHECK_AND_ASSERT((*m_ado_emit.opt_descriptor).current_supply <= (*m_ado_emit.opt_descriptor).total_max_supply, false);
+  ++(m_ado_emit.opt_descriptor->current_supply);
+  CHECK_AND_ASSERT(m_ado_emit.opt_descriptor->current_supply > m_ado_emit.opt_descriptor->total_max_supply, false);
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
   DO_CALLBACK(events, "configure_core");
@@ -2043,9 +2066,9 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
 
     success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
-    destinations.emplace_back(ado.descriptor.current_supply, alice.get_public_address(), null_pkey);
-    CHECK_AND_ASSERT_EQ(ado.descriptor.total_max_supply, 0);
-    CHECK_AND_ASSERT_EQ(ado.descriptor.total_max_supply, ado.descriptor.current_supply);
+    destinations.emplace_back(ado.opt_descriptor->current_supply, alice.get_public_address(), null_pkey);
+    CHECK_AND_ASSERT_EQ(ado.opt_descriptor->total_max_supply, 0);
+    CHECK_AND_ASSERT_EQ(ado.opt_descriptor->total_max_supply, ado.opt_descriptor->current_supply);
     success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_1, get_tx_version(get_block_height(top), m_hardforks), one_time, 0);
     CHECK_AND_ASSERT_EQ(success, true);
   }
@@ -2066,8 +2089,8 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
 
     success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
-    destinations.emplace_back(ado.descriptor.current_supply, alice.get_public_address(), null_pkey);
-    CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > ado.descriptor.total_max_supply, false, "current_supply <= total_max_supply");
+    destinations.emplace_back(ado.opt_descriptor->current_supply, alice.get_public_address(), null_pkey);
+    CHECK_AND_ASSERT_MES(ado.opt_descriptor->current_supply > ado.opt_descriptor->total_max_supply, false, "current_supply <= total_max_supply");
     success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_2, get_tx_version(get_block_height(top), m_hardforks), one_time, 0);
     CHECK_AND_ASSERT_EQ(success, true);
   }
@@ -2088,8 +2111,8 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
 
     success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
-    destinations.emplace_back(ado.descriptor.current_supply, alice.get_public_address(), null_pkey);
-    CHECK_AND_ASSERT(ado.descriptor.current_supply <= ado.descriptor.total_max_supply, false);
+    destinations.emplace_back(ado.opt_descriptor->current_supply, alice.get_public_address(), null_pkey);
+    CHECK_AND_ASSERT(ado.opt_descriptor->current_supply <= ado.opt_descriptor->total_max_supply, false);
     success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_3, get_tx_version(get_block_height(top), m_hardforks), one_time, 0);
     CHECK_AND_ASSERT_EQ(success, true);
   }
@@ -2108,7 +2131,7 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     m_ado_emit.opt_asset_id = beta_asset_id;
   }
 
-  CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, m_ado_emit.descriptor.total_max_supply);
+  CHECK_AND_ASSERT_GREATER(m_ado_emit.opt_descriptor->current_supply, m_ado_emit.opt_descriptor->total_max_supply);
   // Alice emits asset BETA. The emission is performed through the wallet object. There is no emission, because .current_supply > .total_max_supply in the asset base descriptor.
   DO_CALLBACK(events, "emit_asset_beta_with_incorrect_supply");
 
@@ -2126,15 +2149,15 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
 
     success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
-    CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, ado_register.descriptor.current_supply);
-    destinations.emplace_back(m_ado_emit.descriptor.current_supply - ado_register.descriptor.current_supply, alice.get_public_address(), null_pkey);
+    CHECK_AND_ASSERT_GREATER(m_ado_emit.opt_descriptor->current_supply, ado_register.opt_descriptor->current_supply);
+    destinations.emplace_back(m_ado_emit.opt_descriptor->current_supply - ado_register.opt_descriptor->current_supply, alice.get_public_address(), null_pkey);
 
     ftp.sources = sources;
     ftp.prepared_destinations = destinations;
     ftp.tx_version = get_tx_version(get_block_height(top), m_hardforks);
     ftp.extra = {m_ado_emit};
     ftp.shuffle = true;
-    CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, m_ado_emit.descriptor.total_max_supply);
+    CHECK_AND_ASSERT_GREATER(m_ado_emit.opt_descriptor->current_supply, m_ado_emit.opt_descriptor->total_max_supply);
     success = construct_tx(alice.get_keys(), ftp, ftx);
     CHECK_AND_ASSERT_EQ(success, true);
     tx_4 = ftx.tx;
@@ -2153,7 +2176,7 @@ bool asset_current_and_total_supplies_comparative_constraints::assert_asset_alph
 {
   const std::shared_ptr alice_wallet{init_playtime_test_wallet_t<tools::wallet2>(events, c, ALICE_ACC_IDX)};
   crypto::public_key alpha_asset_id{};
-  const std::string ticker{m_ados_register.at(asset_position::alpha).descriptor.ticker};
+  const std::string ticker{m_ados_register.at(asset_position::alpha).opt_descriptor->ticker};
 
   alice_wallet->refresh();
 
@@ -2176,7 +2199,7 @@ bool asset_current_and_total_supplies_comparative_constraints::assert_asset_beta
 {
   const std::shared_ptr alice_wallet{init_playtime_test_wallet_t<tools::wallet2>(events, c, ALICE_ACC_IDX)};
   crypto::public_key key_beta_asset_id{};
-  const std::string ticker{m_ados_register.at(asset_position::beta).descriptor.ticker};
+  const std::string ticker{m_ados_register.at(asset_position::beta).opt_descriptor->ticker};
 
   alice_wallet->refresh();
 
@@ -2220,11 +2243,11 @@ bool asset_current_and_total_supplies_comparative_constraints::emit_asset_beta_w
   {
     const auto& ado_register{m_ados_register.at(asset_position::beta)};
 
-    CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, ado_register.descriptor.current_supply);
-    destinations.emplace_back(m_ado_emit.descriptor.current_supply - ado_register.descriptor.current_supply, alice_wallet->get_account().get_public_address(), beta_asset_id);
+    CHECK_AND_ASSERT_GREATER(m_ado_emit.opt_descriptor->current_supply, ado_register.opt_descriptor->current_supply);
+    destinations.emplace_back(m_ado_emit.opt_descriptor->current_supply - ado_register.opt_descriptor->current_supply, alice_wallet->get_account().get_public_address(), beta_asset_id);
   }
 
-  CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, m_ado_emit.descriptor.total_max_supply);
+  CHECK_AND_ASSERT_GREATER(m_ado_emit.opt_descriptor->current_supply, m_ado_emit.opt_descriptor->total_max_supply);
 
   try
   {
@@ -2260,10 +2283,11 @@ bool asset_current_and_total_supplies_comparative_constraints::assert_asset_beta
   }
 
   {
-    const uint64_t& current_supply{register_ado.descriptor.current_supply};
+    const uint64_t& current_supply{register_ado.opt_descriptor->current_supply};
 
-    CHECK_AND_ASSERT_MES(alice_wallet->balance(beta_asset_id) == current_supply, false, "Alice has got not exactly " + std::to_string(current_supply) + ' ' + register_ado.descriptor.ticker);
+    CHECK_AND_ASSERT_MES(alice_wallet->balance(beta_asset_id) == current_supply, false, "Alice has got not exactly " + std::to_string(current_supply) + ' ' + register_ado.opt_descriptor->ticker);
   }
+  return true;
 }
 
 bool asset_current_and_total_supplies_comparative_constraints::public_burn_asset_beta_with_incorrect_supply(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const
@@ -2283,7 +2307,7 @@ bool asset_current_and_total_supplies_comparative_constraints::public_burn_asset
   {
     transaction tx{};
 
-    alice_wallet->burn_asset(beta_asset_id, m_ado_emit.descriptor.current_supply, tx);
+    alice_wallet->burn_asset(beta_asset_id, m_ado_emit.opt_descriptor->current_supply, tx);
   }
   catch (const std::runtime_error&)
   {
@@ -2298,7 +2322,7 @@ bool asset_current_and_total_supplies_comparative_constraints::assert_asset_gamm
 {
   const std::shared_ptr alice_wallet{init_playtime_test_wallet_t<tools::wallet2>(events, c, ALICE_ACC_IDX)};
   crypto::public_key key_gamma_asset_id{};
-  const std::string ticker{m_ados_register.at(asset_position::gamma).descriptor.ticker};
+  const std::string ticker{m_ados_register.at(asset_position::gamma).opt_descriptor->ticker};
 
   alice_wallet->refresh();
 
@@ -2314,7 +2338,7 @@ bool asset_current_and_total_supplies_comparative_constraints::assert_asset_gamm
     CHECK_AND_ASSERT_MES(c.get_blockchain_storage().get_asset_info(key_gamma_asset_id, gamma_adb), false, "the asset " + ticker + " must be registered");
   }
 
-  CHECK_AND_ASSERT_EQ(alice_wallet->balance(key_gamma_asset_id), m_ados_register.at(asset_position::gamma).descriptor.current_supply);
+  CHECK_AND_ASSERT_EQ(alice_wallet->balance(key_gamma_asset_id), m_ados_register.at(asset_position::gamma).opt_descriptor->current_supply);
 
   return true;
 }

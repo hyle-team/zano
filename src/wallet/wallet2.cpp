@@ -5517,7 +5517,7 @@ void wallet2::fill_ado_version_based_onhardfork(currency::asset_descriptor_opera
 {
   if (!is_in_hardfork_zone(ZANO_HARDFORK_05))
   {
-    asset_reg_info.version = 1;
+    asset_reg_info.version = ASSET_DESCRIPTOR_OPERATION_HF4_VER;
   }
   else
   {
@@ -5529,7 +5529,7 @@ void wallet2::fill_adb_version_based_onhardfork(currency::asset_descriptor_base&
 {
   if (!is_in_hardfork_zone(ZANO_HARDFORK_05))
   {
-    asset_base.version = 0;
+    asset_base.version = ASSET_DESCRIPTOR_BASE_HF4_VER;
   }
   else
   {

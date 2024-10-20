@@ -696,8 +696,9 @@ namespace currency
     }
   };
 
-#define ASSET_DESCRIPTOR_BASE_HF5_VER  2
-#define ASSET_DESCRIPTOR_BASE_LAST_VER  2
+#define ASSET_DESCRIPTOR_BASE_HF4_VER    0
+#define ASSET_DESCRIPTOR_BASE_HF5_VER    2
+#define ASSET_DESCRIPTOR_BASE_LAST_VER   2
 
   struct dummy
   {
@@ -721,7 +722,7 @@ namespace currency
     std::string         meta_info;
     crypto::public_key  owner = currency::null_pkey; // consider premultipling by 1/8
     bool                hidden_supply = false;
-    uint8_t             version = 0;
+    uint8_t             version = ASSET_DESCRIPTOR_BASE_HF4_VER;
     //version 1 members
     boost::optional<crypto::eth_public_key> owner_eth_pub_key; // note: the size is 33 bytes (if present) // NOTE: using boost::optional instead of std::optional because of the Boost compilation issue: https://github.com/boostorg/serialization/issues/319 -- sowle
     //version 2 members
@@ -798,6 +799,8 @@ namespace currency
 #define ASSET_DESCRIPTOR_OPERATION_UPDATE        3
 #define ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN   4
 
+#define ASSET_DESCRIPTOR_OPERATION_HF4_VER       1
+#define ASSET_DESCRIPTOR_OPERATION_HF5_VER       2
 #define ASSET_DESCRIPTOR_OPERATION_LAST_VER      2
 
   typedef boost::variant<dummy> asset_descriptor_operation_etc_fields;
@@ -805,7 +808,7 @@ namespace currency
   struct asset_descriptor_operation
   {
     uint8_t                                     operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
-    uint8_t version = 1;
+    uint8_t                                     version = ASSET_DESCRIPTOR_OPERATION_HF4_VER;
                                                                        // register  emit  burn  update
     boost::optional<crypto::public_key>         opt_amount_commitment; //    +       +     +      -      (premultiplied by 1/8)
     boost::optional<crypto::public_key>         opt_asset_id;          //    -       +     +      +
