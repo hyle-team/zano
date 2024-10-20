@@ -424,6 +424,31 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 }
 
 //------------------------------------------------------------------------------
+//@#@  TODO: subject for refactoring: this fill_ado*/fill_adb* are copy/paste clones of wallet's, need to be implemented in one place at some point
+//----------------------------------------------------------------------------------------------------
+void fill_ado_version_based_onhardfork(currency::asset_descriptor_operation& asset_reg_info, size_t current_latest_hf)
+{
+  if (current_latest_hf < ZANO_HARDFORK_05)
+  {
+    asset_reg_info.version = ASSET_DESCRIPTOR_OPERATION_HF4_VER;
+  }
+  else
+  {
+    asset_reg_info.version = ASSET_DESCRIPTOR_OPERATION_LAST_VER;
+  }
+}
+//----------------------------------------------------------------------------------------------------
+void fill_adb_version_based_onhardfork(currency::asset_descriptor_base& asset_base, size_t current_latest_hf)
+{
+  if (current_latest_hf < ZANO_HARDFORK_05)
+  {
+    asset_base.version = ASSET_DESCRIPTOR_BASE_HF4_VER;
+  }
+  else
+  {
+    asset_base.version = ASSET_DESCRIPTOR_BASE_LAST_VER;
+  }
+}
 
 assets_and_explicit_native_coins_in_outs::assets_and_explicit_native_coins_in_outs()
 {
@@ -1034,7 +1059,9 @@ bool asset_operation_and_hardfork_checks::generate(
                             /* asset_id = */ currency::null_pkey);
 
   tx_version = get_tx_version(get_block_height(blk_1r), m_hardforks);
-
+  size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_1r));
+  fill_ado_version_based_onhardfork(m_ado_hello, hf_n);
+  fill_adb_version_based_onhardfork(*m_ado_hello.opt_descriptor, hf_n);
   success = construct_tx(alice.get_keys(),
                          sources,
                          destinations,
@@ -1081,6 +1108,9 @@ bool asset_operation_and_hardfork_checks::generate(
   tx_version = get_tx_version(get_block_height(blk_2r),
                               m_hardforks);
 
+  hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
+  fill_ado_version_based_onhardfork(m_ado_hello, hf_n);
+  fill_adb_version_based_onhardfork(*m_ado_hello.opt_descriptor, hf_n);
   success = construct_tx(alice.get_keys(),
                          sources,
                          destinations,
@@ -1119,6 +1149,10 @@ bool asset_operation_and_hardfork_checks::generate(
   tx_version = get_tx_version(get_block_height(blk_2r),
                               m_hardforks);
 
+  hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
+  fill_ado_version_based_onhardfork(m_ado_bye, hf_n);
+  fill_adb_version_based_onhardfork(*m_ado_bye.opt_descriptor, hf_n);
+
   success = construct_tx(alice.get_keys(),
                          sources,
                          destinations,
@@ -1153,6 +1187,10 @@ bool asset_operation_and_hardfork_checks::generate(
 
   tx_version = get_tx_version(get_block_height(blk_2r),
                               m_hardforks);
+
+  hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
+  fill_ado_version_based_onhardfork(m_ado_bye, hf_n);
+  fill_adb_version_based_onhardfork(*m_ado_bye.opt_descriptor, hf_n);
 
   success = construct_tx(alice.get_keys(),
                          sources,
@@ -1310,6 +1348,11 @@ bool asset_operation_in_consolidated_tx::generate(std::vector<test_event_entry>&
     destinations.emplace_back(MK_TEST_COINS(/* 10 - 5 - 0 = */ 5), bob.get_public_address());
     destinations.emplace_back(m_adb_alice_currency.current_supply, alice.get_public_address(), null_pkey);
     tx_version = get_tx_version(get_block_height(blk_2r), m_hardforks);
+    size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
+    fill_ado_version_based_onhardfork(m_ado_alice_currency, hf_n);
+    fill_adb_version_based_onhardfork(*m_ado_alice_currency.opt_descriptor, hf_n);
+
+
     success    = construct_tx(bob.get_keys(), sources, destinations, { m_ado_alice_currency }, empty_attachment, tx_2, tx_version, one_time, 0, 0, 0, true, TX_FLAG_SIGNATURE_MODE_SEPARATE,
                               /* fee = */ 0, context_tx_2);
     CHECK_AND_ASSERT_MES(success, false, "failed to construct transaction tx_2 on step 2");
@@ -2063,6 +2106,9 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     std::vector<tx_destination_entry> destinations{};
     const auto& ado{m_ados_register.at(asset_position::gamma)};
     crypto::secret_key one_time{};
+    size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_1r));
+    //fill_ado_version_based_onhardfork(ado, hf_n);
+    //fill_adb_version_based_onhardfork(*ado.opt_descriptor, hf_n);
 
     success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
@@ -2086,6 +2132,9 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     std::vector<tx_destination_entry> destinations{};
     crypto::secret_key one_time{};
     const auto& ado{m_ados_register.at(asset_position::alpha)};
+    size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
+    //fill_ado_version_based_onhardfork(ado, hf_n);
+    //fill_adb_version_based_onhardfork(*ado.opt_descriptor, hf_n);
 
     success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
@@ -2108,6 +2157,9 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     std::vector<tx_destination_entry> destinations{};
     crypto::secret_key one_time{};
     const auto& ado{m_ados_register.at(asset_position::beta)};
+    size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
+    //fill_ado_version_based_onhardfork(ado, hf_n);
+    //fill_adb_version_based_onhardfork(*ado.opt_descriptor, hf_n);
 
     success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
@@ -2146,11 +2198,18 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     tx_source_entry source{};
     finalize_tx_param ftp{};
     finalized_tx ftx{};
+    
+    size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_3r));
+    //fill_ado_version_based_onhardfork(ado_register, hf_n);
+    //fill_adb_version_based_onhardfork(*ado_register.opt_descriptor, hf_n);
 
     success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
     CHECK_AND_ASSERT_GREATER(m_ado_emit.opt_descriptor->current_supply, ado_register.opt_descriptor->current_supply);
     destinations.emplace_back(m_ado_emit.opt_descriptor->current_supply - ado_register.opt_descriptor->current_supply, alice.get_public_address(), null_pkey);
+
+    fill_ado_version_based_onhardfork(m_ado_emit, hf_n);
+    if (m_ado_emit.opt_descriptor.has_value())  fill_adb_version_based_onhardfork(*m_ado_emit.opt_descriptor, hf_n);
 
     ftp.sources = sources;
     ftp.prepared_destinations = destinations;

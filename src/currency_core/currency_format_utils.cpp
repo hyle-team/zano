@@ -2272,7 +2272,10 @@ namespace currency
         }
       }
       adb.current_supply = amount_of_emitted_asset;
-      ado.opt_amount     = amount_of_emitted_asset;       // TODO: support hidden supply -- sowle
+      if (ado.version >= ASSET_DESCRIPTOR_BASE_HF5_VER)
+      {
+        ado.opt_amount = amount_of_emitted_asset;       // TODO: support hidden supply -- sowle
+      }
 
       gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
       ado.opt_amount_commitment = (crypto::c_scalar_1div8 * gen_context.ao_amount_commitment).to_public_key();
