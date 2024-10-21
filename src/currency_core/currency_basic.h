@@ -74,7 +74,9 @@ namespace currency
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
-  
+
+  struct asset_descriptor_operation_v1;
+
 //since structure used in blockchain as a key accessor, then be sure that there is no padding inside
 #pragma pack(push, 1)
   struct account_public_address_old
