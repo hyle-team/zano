@@ -1,4 +1,4 @@
-// Copyright (c) 2019, Zano Project
+// Copyright (c) 2019-2024, Zano Project
 // Copyright (c) 2019, anonimal <anonimal@zano.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
