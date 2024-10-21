@@ -169,3 +169,14 @@ To build GUI application:
 2. Revise building script, comment out unwanted steps and run it:  `utils/build_script_mac_osx.sh`
 3. The application should be here: `/buid_mac_osx_64/release/src`
 
+<br />
+<br />
+
+## Supporting project/donations
+
+ZANO @dev<br />
+BTC bc1qpa8w8eaehlplfepmnzpd7v9j046899nktxnkxp<br />
+BCH qqgq078vww5exd9kt3frx6krdyznmp80hcygzlgqzd<br />
+ETH 0x206c52b78141498e74FF074301ea90888C40c178<br />
+XMR 45gp9WTobeB5Km3kLQgVmPJkvm9rSmg4gdyHheXqXijXYMjUY48kLgL7QEz5Ar8z9vQioQ68WYDKsQsjAEonSeFX4UeLSiX<br />
+
