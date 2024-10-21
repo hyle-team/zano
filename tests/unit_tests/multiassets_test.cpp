@@ -92,9 +92,9 @@ struct currency::asset_descriptor_operation_v0
   asset_descriptor_base_v0            descriptor;
   crypto::public_key                  amount_commitment; // premultiplied by 1/8
   boost::optional<crypto::public_key> opt_asset_id; // target asset_id - for update/emit
-  uint8_t                             verion = ASSET_DESCRIPTOR_OPERATION_STRUCTURE_VER;
+  uint8_t                             verion = 1;                                                  // ASSET_DESCRIPTOR_OPERATION_STRUCTURE_VER = 1 in 0c90262e8a1c4e5e5d052f8db84c60a36691414d
 
-  BEGIN_VERSIONED_SERIALIZE(ASSET_DESCRIPTOR_OPERATION_STRUCTURE_VER, verion)
+  BEGIN_VERSIONED_SERIALIZE(1, verion)                                                             // ASSET_DESCRIPTOR_OPERATION_STRUCTURE_VER = 1 in 0c90262e8a1c4e5e5d052f8db84c60a36691414d
     FIELD(operation_type)
     FIELD(descriptor)
     FIELD(amount_commitment)
@@ -121,10 +121,10 @@ struct currency::asset_descriptor_operation_v0
   {
     currency::asset_descriptor_operation operation_descriptor{};
     operation_descriptor.operation_type = operation_type;
-    operation_descriptor.descriptor = descriptor;
-    operation_descriptor.amount_commitment = amount_commitment;
+    operation_descriptor.opt_descriptor = descriptor;
+    operation_descriptor.opt_amount_commitment = amount_commitment;
     operation_descriptor.opt_asset_id = opt_asset_id;
-    operation_descriptor.verion = verion;
+    operation_descriptor.version = verion;
 
     return operation_descriptor;
   }
@@ -172,8 +172,8 @@ currency::asset_descriptor_operation get_asset_descriptor_operation_for_test(
 {
   currency::asset_descriptor_operation descriptor_operation{};
   descriptor_operation.operation_type = operation;
-  descriptor_operation.descriptor = asset_descriptor;
-  descriptor_operation.amount_commitment = currency::null_pkey;
+  descriptor_operation.opt_descriptor = asset_descriptor;
+  descriptor_operation.opt_amount_commitment = currency::null_pkey;
 
   return descriptor_operation;
 }
