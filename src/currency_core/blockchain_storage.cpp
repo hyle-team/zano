@@ -4110,23 +4110,31 @@ bool blockchain_storage::pop_asset_info(const asset_descriptor_operation& ado, c
     if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
     {
       // just change the most recent history record, don't pop
-      CHECK_AND_ASSERT_MES(last_ado.opt_amount_commitment.has_value() && ado.opt_amount_commitment.has_value(), false, "last_ado.opt_amount_commitment or ado.opt_amount_commitment is missing (emit)");
-      last_ado.opt_amount_commitment.get() = (crypto::point_t(last_ado.opt_amount_commitment.get()) - crypto::point_t(ado.opt_amount_commitment.get())).to_public_key();
-      if (!last_adb.hidden_supply)
+      if (last_adb.hidden_supply)
       {
-        CHECK_AND_ASSERT_MES(last_ado.opt_amount.has_value() && ado.opt_amount.has_value(), false, "last_ado.opt_amount or ado.opt_amount is missing (emit)");
-        last_ado.opt_amount.get() -= ado.opt_amount.get();
+        //CHECK_AND_ASSERT_MES(last_ado.opt_amount_commitment.has_value() && ado.opt_amount_commitment.has_value(), false, "last_ado.opt_amount_commitment or ado.opt_amount_commitment is missing (emit)");
+        //last_ado.opt_amount_commitment.get() = (crypto::point_t(last_ado.opt_amount_commitment.get()) - crypto::point_t(ado.opt_amount_commitment.get())).to_public_key();
+        return false; // not supported atm
+      }
+      else
+      {
+        CHECK_AND_ASSERT_MES(ado.opt_amount.has_value(), false, "last_ado.opt_amount or ado.opt_amount is missing (emit)");
+        last_adb.current_supply -= ado.opt_amount.get();
       }
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
     {
       // just change the most recent history record, don't pop
-      CHECK_AND_ASSERT_MES(last_ado.opt_amount_commitment.has_value() && ado.opt_amount_commitment.has_value(), false, "last_ado.opt_amount_commitment or ado.opt_amount_commitment is missing (burn)");
-      last_ado.opt_amount_commitment.get() = (crypto::point_t(last_ado.opt_amount_commitment.get()) + crypto::point_t(ado.opt_amount_commitment.get())).to_public_key();
-      if (!last_adb.hidden_supply)
+      if (last_adb.hidden_supply)
       {
-        CHECK_AND_ASSERT_MES(last_ado.opt_amount.has_value() && ado.opt_amount.has_value(), false, "last_ado.opt_amount or ado.opt_amount is missing (burn)");
-        last_ado.opt_amount.get() += ado.opt_amount.get();
+        //CHECK_AND_ASSERT_MES(last_ado.opt_amount_commitment.has_value() && ado.opt_amount_commitment.has_value(), false, "last_ado.opt_amount_commitment or ado.opt_amount_commitment is missing (burn)");
+        //last_ado.opt_amount_commitment.get() = (crypto::point_t(last_ado.opt_amount_commitment.get()) + crypto::point_t(ado.opt_amount_commitment.get())).to_public_key();
+        return false; // not supported atm
+      }
+      else
+      {
+        CHECK_AND_ASSERT_MES(ado.opt_amount.has_value(), false, "last_ado.opt_amount or ado.opt_amount is missing (burn)");
+        last_adb.current_supply += ado.opt_amount.get();
       }
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
@@ -4323,7 +4331,11 @@ bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_cont
       if (!last_adb.hidden_supply)
       {
         CHECK_AND_ASSERT_MES(ado.opt_amount.has_value(), false, "opt_amount is missing (emit)");
-        avc.amount_to_validate = ado.opt_amount.get();
+        uint64_t amount = ado.opt_amount.get();
+
+        CHECK_AND_ASSERT_MES(last_adb.current_supply + amount >= last_adb.current_supply, false, "current_supply overflow: " << last_adb.current_supply << ", amount: " << amount << " (emit)");
+        CHECK_AND_ASSERT_MES(last_adb.current_supply + amount <= last_adb.total_max_supply, false, "current_supply overflow: " << last_adb.current_supply << ", amount: " << amount << ", max supply: " << last_adb.total_max_supply << " (emit)");
+        avc.amount_to_validate = amount;
       }
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
@@ -4335,7 +4347,10 @@ bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_cont
       if (!last_adb.hidden_supply)
       {
         CHECK_AND_ASSERT_MES(ado.opt_amount.has_value(), false, "opt_amount is missing (burn)");
-        avc.amount_to_validate = ado.opt_amount.get();
+        uint64_t amount = ado.opt_amount.get();
+
+        CHECK_AND_ASSERT_MES(last_adb.current_supply - amount <= last_adb.current_supply, false, "current_supply overflow: " << last_adb.current_supply << ", amount: " << amount << " (burn)");
+        avc.amount_to_validate = amount;
       }
     }
     else
@@ -4371,7 +4386,7 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
   CRITICAL_REGION_LOCAL(m_read_lock);
 
   asset_op_verification_context avc = { tx, tx_id, ado, height };
-  CHECK_AND_ASSERT_MES(validate_asset_operation(avc, height), false, "asset operation validation failed (HF5)");
+  CHECK_AND_ASSERT_MES(validate_asset_operation(avc, height), false, "asset operation validation failed");
 
   if (is_hardfork_active_for_height(ZANO_HARDFORK_05, height))
   {
@@ -4403,24 +4418,32 @@ bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::has
       else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
       {
         // just change the most recent history record, don't push
-        CHECK_AND_ASSERT_MES(last_ado.opt_amount_commitment.has_value() && ado.opt_amount_commitment.has_value(), false, "last_ado.opt_amount_commitment or ado.opt_amount_commitment is missing (emit)");
-        last_ado.opt_amount_commitment.get() = (crypto::point_t(last_ado.opt_amount_commitment.get()) + crypto::point_t(ado.opt_amount_commitment.get())).to_public_key();
-        if (!last_adb.hidden_supply)
+        if (last_adb.hidden_supply)
         {
-          CHECK_AND_ASSERT_MES(last_ado.opt_amount.has_value() && ado.opt_amount.has_value(), false, "last_ado.opt_amount or ado.opt_amount is missing (emit)");
-          last_ado.opt_amount.get() += ado.opt_amount.get();
+          //CHECK_AND_ASSERT_MES(last_ado.opt_amount_commitment.has_value() && ado.opt_amount_commitment.has_value(), false, "last_ado.opt_amount_commitment or ado.opt_amount_commitment is missing (emit)");
+          //last_ado.opt_amount_commitment.get() = (crypto::point_t(last_ado.opt_amount_commitment.get()) + crypto::point_t(ado.opt_amount_commitment.get())).to_public_key();
+          return false; // not supported atm
+        }
+        else
+        {
+          CHECK_AND_ASSERT_MES(ado.opt_amount.has_value(), false, "last_ado.opt_amount or ado.opt_amount is missing (emit)");
+          last_adb.current_supply += ado.opt_amount.get();
         }
         LOG_PRINT_MAGENTA("[ASSET_EMITTED]: " << print_money_brief(avc.amount_to_validate, last_adb.decimal_point) << ", " << avc.asset_id << ": " << last_adb.ticker << ", \"" << last_adb.full_name << "\"", LOG_LEVEL_1);
       }
       else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
       {
         // just change the most recent history record, don't push
-        CHECK_AND_ASSERT_MES(last_ado.opt_amount_commitment.has_value() && ado.opt_amount_commitment.has_value(), false, "last_ado.opt_amount_commitment or ado.opt_amount_commitment is missing (burn)");
-        last_ado.opt_amount_commitment.get() = (crypto::point_t(last_ado.opt_amount_commitment.get()) - crypto::point_t(ado.opt_amount_commitment.get())).to_public_key();
-        if (!last_adb.hidden_supply)
+        if (last_adb.hidden_supply)
         {
-          CHECK_AND_ASSERT_MES(last_ado.opt_amount.has_value() && ado.opt_amount.has_value(), false, "last_ado.opt_amount or ado.opt_amount is missing (burn)");
-          last_ado.opt_amount.get() -= ado.opt_amount.get();
+          //CHECK_AND_ASSERT_MES(last_ado.opt_amount_commitment.has_value() && ado.opt_amount_commitment.has_value(), false, "last_ado.opt_amount_commitment or ado.opt_amount_commitment is missing (burn)");
+          //last_ado.opt_amount_commitment.get() = (crypto::point_t(last_ado.opt_amount_commitment.get()) - crypto::point_t(ado.opt_amount_commitment.get())).to_public_key();
+          return false; // not supported atm
+        }
+        else
+        {
+          CHECK_AND_ASSERT_MES(ado.opt_amount.has_value(), false, "last_ado.opt_amount or ado.opt_amount is missing (burn)");
+          last_adb.current_supply -= ado.opt_amount.get();
         }
         LOG_PRINT_MAGENTA("[ASSET_BURNT]: " << print_money_brief(avc.amount_to_validate, last_adb.decimal_point) << ", " << avc.asset_id << ": " << last_adb.ticker << ", \"" << last_adb.full_name << "\"", LOG_LEVEL_1);
       }
