@@ -123,13 +123,13 @@ struct asset_descriptor_operation_v1
   asset_descriptor_base           descriptor;
   crypto::public_key              amount_commitment = currency::null_pkey;     // premultiplied by 1/8
   boost::optional<crypto::public_key> opt_asset_id;      // target asset_id - for update/emit
-  uint8_t verion = 1;
+  uint8_t verion = ASSET_DESCRIPTOR_OPERATION_HF4_VER;
 
-  BEGIN_VERSIONED_SERIALIZE(1, verion)
+  BEGIN_SERIALIZE()
     FIELD(operation_type)
     FIELD(descriptor)
     FIELD(amount_commitment)
-    END_VERSION_UNDER(1)
+    //END_VERSION_UNDER(1)
     FIELD(opt_asset_id)
   END_SERIALIZE()
   
@@ -139,7 +139,7 @@ struct asset_descriptor_operation_v1
     BOOST_SERIALIZE(operation_type)
     BOOST_SERIALIZE(descriptor)
     BOOST_SERIALIZE(amount_commitment)
-    BOOST_END_VERSION_UNDER(1)
+    //BOOST_END_VERSION_UNDER(1)
     BOOST_SERIALIZE(opt_asset_id)
   END_BOOST_SERIALIZATION()
 };
@@ -183,7 +183,7 @@ bool transition_convert(const asset_descriptor_operation_v1& from, asset_descrip
   to.operation_type = from.operation_type;
   to.opt_descriptor = from.descriptor;
   to.opt_amount_commitment = from.amount_commitment;     
-  to.opt_asset_id = to.opt_asset_id;      // target asset_id - for update/emit
+  to.opt_asset_id = from.opt_asset_id;      // target asset_id - for update/emit
   to.version = from.verion;
   return true;
 }

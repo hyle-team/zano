@@ -5640,18 +5640,7 @@ void wallet2::update_asset(const crypto::public_key& asset_id, const currency::a
     ctp.tx_meaning_for_logs = "asset eth update";
   }
 
-  // old:
-  //this->transfer(ctp, ft, send_to_network, nullptr);
-  
-  //// test code -- TODO remove this -- sowle
-  this->transfer(ctp, ft, false, nullptr);
-  crypto::hash h1 = get_transaction_hash(ft.tx);
-  blobdata tx_blob = t_serializable_object_to_blob(ft.tx);
-  transaction tx{};
-  parse_and_validate_tx_from_blob(tx_blob, tx);
-  crypto::hash h2 = get_transaction_hash(tx);
-  CHECK_AND_ASSERT_THROW_MES(h1 == h2, "h1 != h2");
-  //// end of test code
+  this->transfer(ctp, ft, send_to_network, nullptr);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::update_asset(const crypto::public_key& asset_id, const currency::asset_descriptor_base new_descriptor, currency::transaction& result_tx)
