@@ -2320,3 +2320,169 @@ bool asset_current_and_total_supplies_comparative_constraints::assert_asset_gamm
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+several_asset_emit_burn_txs_in_pool::several_asset_emit_burn_txs_in_pool()
+{
+  REGISTER_CALLBACK_METHOD(several_asset_emit_burn_txs_in_pool, c1);
+}
+
+bool several_asset_emit_burn_txs_in_pool::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  miner_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  // rebuild genesis miner tx
+  std::vector<tx_destination_entry> destinations;
+  destinations.emplace_back(MK_TEST_COINS(1), alice_acc.get_public_address());
+  destinations.emplace_back(MK_TEST_COINS(1), alice_acc.get_public_address());
+  CHECK_AND_ASSERT_MES(replace_coinbase_in_genesis_block(destinations, generator, events, blk_0), false, ""); // leftover amount will be also send to miner
+
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool several_asset_emit_burn_txs_in_pool::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  miner_wlt->refresh();
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  alice_wlt->refresh();
+
+  // asset description
+  asset_descriptor_base adb{};
+  adb.decimal_point = 3;
+  adb.total_max_supply = 10'000;
+  adb.full_name = "Lets gooo!";
+  adb.ticker = "BRNDN";
+
+  uint64_t initial_register_amount = 5'000;
+
+  // 1. Miner registers an asset and sends some initial amount to Alice
+  std::vector<tx_destination_entry> destinations;
+  destinations.emplace_back(initial_register_amount, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey);
+  finalized_tx ft{};
+  crypto::public_key asset_id{};
+  miner_wlt->deploy_new_asset(adb, destinations, ft, asset_id);
+  LOG_PRINT_GREEN_L0("Asset " << asset_id << " was successfully deployed with tx " << ft.tx_id);
+
+  // make sure tx was added to the pool, then mine a block to confirm it
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  size_t blocks_fetched = 0;
+  miner_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
+
+  // Alice checks her asset balance
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", initial_register_amount, asset_id, adb.decimal_point), false, "");
+
+
+  //
+  // 2. Miner emits additional amount of the asset in two transactions (all goes to Alice)
+  //
+
+  // 2.1 the first emit
+  uint64_t additional_emit_amount = 2'500;
+  uint64_t total_asset_amount = initial_register_amount + additional_emit_amount;
+
+  destinations.clear();
+  destinations.emplace_back(additional_emit_amount, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey);
+  ft = finalized_tx{};
+  miner_wlt->emit_asset(asset_id, destinations, ft);
+
+  // make sure tx was added to the pool
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // Alice checks her asset balance (including unconfirmed txs)
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 0);
+  bool stub{};
+  alice_wlt->scan_tx_pool(stub);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
+
+  // 2.2 the second emit
+  //additional_emit_amount = 2'500;
+  //total_asset_amount += additional_emit_amount;
+
+  //destinations.clear();
+  //destinations.emplace_back(additional_emit_amount, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey);
+  //ft = finalized_tx{};
+  //miner_wlt->emit_asset(asset_id, destinations, ft);
+
+  //// make sure the second tx was added to the pool
+  //CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  //// Alice checks her asset balance (including unconfirmed txs)
+  //alice_wlt->refresh(blocks_fetched);
+  //CHECK_AND_ASSERT_EQ(blocks_fetched, 0);
+  //alice_wlt->scan_tx_pool(stub);
+  //CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
+
+  // 2.3
+  // mine a block to confirm both txs to make sure everything is alright
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
+
+
+  // make sure these txs are fully confirmed
+  CHECK_AND_ASSERT_MES(mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW), false, "");
+
+
+  //
+  // 3. Alice burns amount of the asset in two transactions
+  //
+  alice_wlt->refresh();
+
+  // 3.1, the first burn
+  uint64_t burn_amount = 2'500;
+  total_asset_amount -= burn_amount;
+
+  ft = finalized_tx{};
+  alice_wlt->burn_asset(asset_id, burn_amount, ft);
+
+  // make sure tx was added to the pool
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 0);
+  alice_wlt->scan_tx_pool(stub);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
+
+  // 3.2, the second burn
+  burn_amount = 2'500;
+  total_asset_amount -= burn_amount;
+
+  ft = finalized_tx{};
+  alice_wlt->burn_asset(asset_id, burn_amount, ft);
+
+  // make sure both txs are now in the pool
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 0);
+  alice_wlt->scan_tx_pool(stub);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
+
+
+  return true;
+}

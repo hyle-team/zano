@@ -114,3 +114,10 @@ private:
   mutable std::array<currency::asset_descriptor_operation, 3> m_ados_register{};
   mutable currency::asset_descriptor_operation m_ado_emit{};
 };
+
+struct several_asset_emit_burn_txs_in_pool : public wallet_test
+{
+  several_asset_emit_burn_txs_in_pool();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
