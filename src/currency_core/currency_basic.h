@@ -815,7 +815,7 @@ namespace currency
     boost::optional<crypto::public_key>         opt_amount_commitment; //    +       +     +      -      (premultiplied by 1/8)
     boost::optional<crypto::public_key>         opt_asset_id;          //    -       +     +      +
     boost::optional<asset_descriptor_base>      opt_descriptor;        //    +       -     -      +
-    boost::optional<uint64_t>                   opt_amount;            //    ?       ?     ?      -      (only for non-hidden supply)
+    boost::optional<uint64_t>                   opt_amount;            //    ?       +     +      -      (only for non-hidden supply)
     boost::optional<uint32_t>                   opt_asset_id_salt;     //    ?       -     -      -      (optional)
     std::vector<asset_descriptor_operation_etc_fields> etc;            //                                (reserved for future use)
 
