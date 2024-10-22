@@ -397,8 +397,10 @@ const crypto::public_key& wallet2::out_get_pub_key(const currency::tx_out_v& out
 //----------------------------------------------------------------------------------------------------
 void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_operation& ado, process_transaction_context& ptc)
 {
-  auto print_ado_owner = [ado](std::ostream& o){
-    (ado.opt_descriptor.has_value() && ado.opt_descriptor->owner_eth_pub_key.has_value()) ? o << ado.opt_descriptor->owner_eth_pub_key.value() << " (ETH)" : o << ado.opt_descriptor->owner;
+  auto print_ado_owner = [ado](/*std::ostream& o*/) { // temporary reverted to boring std::string, until operator<<(std::ostream& o, invocable_t callee) is fixed for C++17/Android
+    std::stringstream o;
+    if (ado.opt_descriptor.has_value()) { ado.opt_descriptor->owner_eth_pub_key.has_value() ? o << ado.opt_descriptor->owner_eth_pub_key.value() << " (ETH)" : o << ado.opt_descriptor->owner; }
+    return o.str();
   };
 
   do
@@ -426,7 +428,7 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
       std::stringstream ss;
       ss << "New Asset Registered:"
         << ENDL << "asset id:         " << asset_id
-        << ENDL << "Owner:            " << print_ado_owner
+        << ENDL << "Owner:            " << print_ado_owner()
         << ENDL << "Name:             " << asset_context.full_name
         << ENDL << "Ticker:           " << asset_context.ticker
         << ENDL << "Total Max Supply: " << print_asset_money(asset_context.total_max_supply, asset_context.decimal_point)
@@ -499,7 +501,7 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
           std::stringstream ss;
           ss << "Asset ownership lost:"
             << ENDL << "asset id:         " << asset_id
-            << ENDL << "New owner:        " << print_ado_owner
+            << ENDL << "New owner:        " << print_ado_owner()
             << ENDL << "Name:             " << ado.opt_descriptor->full_name
             << ENDL << "Ticker:           " << ado.opt_descriptor->ticker
             << ENDL << "Total Max Supply: " << print_asset_money(ado.opt_descriptor->total_max_supply, ado.opt_descriptor->decimal_point)
