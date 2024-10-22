@@ -2076,6 +2076,8 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
         {
           return sum + boost::get<txin_multisig>(input).amount;
         }
+
+        return sum;
       }
     };
 
@@ -2085,6 +2087,8 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
         {
           return sum + boost::get<tx_out_bare>(output).amount;
         }
+
+        return sum;
       }
     };
 
