@@ -154,7 +154,6 @@ namespace wallet_public
     std::vector<std::string> remote_addresses;  //optional
     std::vector<std::string> remote_aliases; //optional, describe only if there only one remote address
     std::vector<wallet_sub_transfer_info> subtransfers;
-    boost::optional<currency::asset_descriptor_operation> data_for_external_signing;
 
     //not included in streaming serialization
     uint64_t      fee = 0;
@@ -191,6 +190,8 @@ namespace wallet_public
       KV_SERIALIZE(remote_addresses)              DOC_DSCR("Remote addresses of this transfer(destination if it's outgoing transfer or sender if it's incoming transaction)")  DOC_EXMP_AUTO(1, "ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp")   DOC_END
       KV_SERIALIZE(remote_aliases)                DOC_DSCR("Aliases for remot addresses, of discovered")  DOC_EXMP_AUTO(1, "roger")    DOC_END
       KV_SERIALIZE(subtransfers)                  DOC_DSCR("Essential part of transfer entry: amounts that been transfered in this transaction grouped by asset id")  DOC_EXMP_AUTO(1)   DOC_END
+      
+      KV_SERIALIZE_EPHEMERAL_N(currency::asset_descriptor_operation, wallet_transfer_info_get_ado, "ado")   DOC_DSCR("\"Asset Descriptor Operation\" if it was present in transaction")   DOC_END
     END_KV_SERIALIZE_MAP()
 
     BEGIN_BOOST_SERIALIZATION()
@@ -277,6 +278,13 @@ namespace wallet_public
       subtransfers.back().is_income = true;
       return subtransfers.back().amount;
     }
+    static inline bool wallet_transfer_info_get_ado(const wallet_transfer_info& tdb, currency::asset_descriptor_operation& val)
+    {
+      if (currency::get_type_in_variant_container(tdb.tx.extra, val))
+        return true;
+       
+      return false;
+    }
   };
 
   struct wallet_transfer_info_old : public wallet_transfer_info
@@ -291,14 +299,16 @@ namespace wallet_public
       KV_CHAIN_BASE(wallet_transfer_info)
     END_KV_SERIALIZE_MAP()
 
-    static uint64_t wallet_transfer_info_to_amount(const wallet_transfer_info_old& wtio)
+    static bool wallet_transfer_info_to_amount(const wallet_transfer_info_old& wtio, uint64_t &val)
     {
-      return wtio.get_native_amount();
+      val = wtio.get_native_amount();
+      return true;
     }
 
-    static bool wallet_transfer_info_to_is_income(const wallet_transfer_info_old& wtio)
+    static bool wallet_transfer_info_to_is_income(const wallet_transfer_info_old& wtio, bool& val)
     {
-      return wtio.get_native_is_income();
+      val = wtio.get_native_is_income();
+      return true;
     }
 
   };

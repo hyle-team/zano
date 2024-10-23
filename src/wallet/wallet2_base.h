@@ -386,14 +386,16 @@ namespace tools
         return true;
       return false;
     }
-    static inline uint64_t transfer_details_base_to_amount(const transfer_details_base& tdb)
+    static inline bool transfer_details_base_to_amount(const transfer_details_base& tdb, uint64_t& val)
     {
-      return tdb.amount();
+      val = tdb.amount();
+      return true;
     }
     //----------------------------------------------------------------------------------------------------
-    static inline std::string transfer_details_base_to_tx_hash(const transfer_details_base& tdb)
+    static inline bool transfer_details_base_to_tx_hash(const transfer_details_base& tdb, std::string& val)
     {
-      return epee::string_tools::pod_to_hex(currency::get_transaction_hash(tdb.m_ptx_wallet_info->m_tx));
+      val = epee::string_tools::pod_to_hex(currency::get_transaction_hash(tdb.m_ptx_wallet_info->m_tx));
+      return true;
     }
 
 
