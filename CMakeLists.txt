@@ -89,6 +89,7 @@ endif()
 if(CAKEWALLET)
   message("NOTICE: Building libraries for CAKEWALLET")  
   add_definitions(-DCAKEWALLET)  
+  add_definitions(-DDISABLE_PFR_SERIALIZATION_SELFCHECK)  
 endif()
 
 set(OPENSSL_USE_STATIC_LIBS TRUE) # link statically
