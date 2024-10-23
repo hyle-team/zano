@@ -806,17 +806,21 @@ private:
     size_t idx = 0;
     for(auto& aop: asset_history)
     {
-      ss << "[" << std::setw(2) << idx << "] operation:        " << currency::get_asset_operation_type_string(aop.operation_type) << " (" << (int)aop.operation_type << ")" << ENDL <<
-                                       "     ticker:           \"" << aop.descriptor.ticker << "\"" << ENDL <<
-                                       "     full name:        \"" << aop.descriptor.full_name << "\"" << ENDL <<
-                                       "     meta info:        \"" << aop.descriptor.meta_info << "\"" << ENDL <<
-                                       "     current supply:   " << currency::print_money_brief(aop.descriptor.current_supply, aop.descriptor.decimal_point) << ENDL <<
-                                       "     max supply:       " << currency::print_money_brief(aop.descriptor.total_max_supply, aop.descriptor.decimal_point) << ENDL <<
-                                       "     decimal point:    " << (int)aop.descriptor.decimal_point << ENDL <<
-                                       "     owner * 1/8:      " << aop.descriptor.owner << ENDL <<
-                                       "     amount cmt * 1/8: " << aop.amount_commitment << ENDL <<
-                                       "     hidden supply:    " << (aop.descriptor.hidden_supply ? "yes" : "no") << ENDL <<
-        "";
+      if (aop.opt_descriptor.has_value())
+      {
+        const currency::asset_descriptor_base& adb = aop.opt_descriptor.value();
+        ss << "[" << std::setw(2) << idx << "] operation:        " << currency::get_asset_operation_type_string(aop.operation_type) << " (" << (int)aop.operation_type << ")" << ENDL <<
+                                         "     ticker:           \"" << adb.ticker << "\"" << ENDL <<
+                                         "     full name:        \"" << adb.full_name << "\"" << ENDL <<
+                                         "     meta info:        \"" << adb.meta_info << "\"" << ENDL <<
+                                         "     current supply:   " << currency::print_money_brief(adb.current_supply, adb.decimal_point) << ENDL <<
+                                         "     max supply:       " << currency::print_money_brief(adb.total_max_supply, adb.decimal_point) << ENDL <<
+                                         "     decimal point:    " << (int)adb.decimal_point << ENDL <<
+                                         "     owner * 1/8:      " << adb.owner << ENDL <<
+                                         "     amount cmt * 1/8: " << (aop.opt_amount_commitment.has_value() ? aop.opt_amount_commitment.value() : currency::null_pkey) << ENDL <<
+                                         "     hidden supply:    " << (adb.hidden_supply ? "yes" : "no") << ENDL <<
+          "";
+      }
       ++idx;
     }
 
