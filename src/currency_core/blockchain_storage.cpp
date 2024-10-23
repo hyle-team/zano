@@ -1553,8 +1553,21 @@ bool blockchain_storage::create_block_template(const create_block_template_param
   }
 
   diffic = get_next_diff_conditional(pos);
+  CHECK_AND_ASSERT_MES(diffic, false, "get_next_diff_conditional failed");
 
-  CHECK_AND_ASSERT_MES(diffic, false, "difficulty owverhead.");
+  // check PoW block timestamp against the current blockchain timestamp median -- if it's not okay, don't create a new block
+  // TODO (performance) both get_next_diff_conditional and get_last_n_blocks_timestamps obtains last N blocks, consider data reusing -- sowle
+  if (!pos)
+  {
+    std::vector<uint64_t> timestamps = get_last_n_blocks_timestamps(BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW);
+    uint64_t median_ts = epee::misc_utils::median(timestamps);
+    if(b.timestamp < median_ts)
+    {
+      LOG_PRINT_YELLOW("Block template construction failed because current core timestamp, " << b.timestamp << ", is less than median of last " << BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW << " blocks, " << median_ts, LOG_LEVEL_2);
+      return false;
+    }
+  }
+
 
 
   
