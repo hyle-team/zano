@@ -282,8 +282,15 @@ namespace epee {
     namespace http {
       struct i_chain_handler
       {
+        virtual bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response_info,
+          epee::net_utils::connection_context_base& conn_context, bool& call_found, documentation& docs = epee::net_utils::http::i_chain_handler::m_empty_documentation)
+        {
+          return this->handle_http_request_map(query_info, response_info, conn_context, call_found, docs);
+        }
+
         virtual bool handle_http_request_map(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response_info,
           epee::net_utils::connection_context_base& m_conn_context, bool& call_found, documentation& docs = epee::net_utils::http::i_chain_handler::m_empty_documentation) = 0;
+        
 
         static inline documentation m_empty_documentation;
       };
@@ -365,7 +372,7 @@ namespace epee {
       LOG_PRINT( "[HTTP/BIN][" << epee::string_tools::get_ip_string_from_int32(m_conn_context.m_remote_ip ) << "][" << query_info.m_URI << "] processed with " << ticks1-ticks << "/"<< ticks2-ticks1 << "/" << ticks3-ticks2 << "ms", LOG_LEVEL_2); \
     }
 
-#define CHAIN_TO_PHANDLER(pi_chain_handler) else if (pi_chain_handler && pi_chain_handler->handle_http_request_map(query_info, response_info, m_conn_context, call_found, docs) && call_found) { return true;}
+#define CHAIN_TO_PHANDLER(pi_chain_handler) else if (pi_chain_handler && pi_chain_handler->handle_http_request(query_info, response_info, m_conn_context, call_found, docs) && call_found) { return true;}
 
 #define CHAIN_URI_MAP2(callback) else {callback(query_info, response_info, m_conn_context);call_found = true;}
 

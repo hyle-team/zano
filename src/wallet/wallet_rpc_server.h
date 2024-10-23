@@ -88,7 +88,15 @@ namespace tools
     static void init_options(boost::program_options::options_description& desc);
     bool init(const boost::program_options::variables_map& vm);
     bool run(bool do_mint, bool offline_mode, const currency::account_public_address& miner_address);
-    bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context);
+
+    virtual bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response_info,
+      connection_context& conn_context) {
+      bool  call_found = false;
+      return this->handle_http_request(query_info, response_info, conn_context, call_found, epee::net_utils::http::i_chain_handler::m_empty_documentation);
+    }
+
+    virtual bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response_info,
+      epee::net_utils::connection_context_base& conn_context, bool& call_found, documentation& docs = epee::net_utils::http::i_chain_handler::m_empty_documentation);
     void set_jwt_secret(const std::string& jwt);
     const std::string& get_jwt_secret();
 
