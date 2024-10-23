@@ -18,7 +18,7 @@ Be sure to clone the repository properly:\
 | [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2017 (15.9.30) | 2019 (16.11.34) | 2022 (17.11.5) |
 | [XCode](https://developer.apple.com/downloads/) (macOS) | 12.3 | 14.3 | 15.2 |
 | [CMake](https://cmake.org/download/) | 3.15.5 | 3.26.3 | 3.29.0 |
-| [Boost](https://www.boost.org/users/download/) | 1.75 | 1.75 | 1.84 |
+| [Boost](https://www.boost.org/users/download/) | 1.75 | 1.84 | 1.84 |
 | [OpenSSL](https://www.openssl.org/source/) [(win)](https://slproweb.com/products/Win32OpenSSL.html) | 1.1.1n | 1.1.1w | 1.1.1w | 
 | [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.11.2 | 5.15.2 |
 
@@ -52,10 +52,9 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
 3. Download and build Boost\
     (Assuming you have cloned Zano into the 'zano' folder. If you used a different location for Zano, **edit line 4** accordingly.)
 
-       curl -OL https://boostorg.jfrog.io/artifactory/main/release/1.70.0/source/boost_1_70_0.tar.bz2
-       echo "430ae8354789de4fd19ee52f3b1f739e1fba576f0aded0897c3c2bc00fb38778  boost_1_70_0.tar.bz2" | shasum -c && tar -xjf boost_1_70_0.tar.bz2
-       rm boost_1_70_0.tar.bz2 && cd boost_1_70_0
-       patch -p0 < ../zano/utils/boost_1.70_gcc_8.patch || cd ..
+       curl -OL https://boostorg.jfrog.io/artifactory/main/release/1.84.0/source/boost_1_84_0.tar.bz2
+       echo "cc4b893acf645c9d4b698e9a0f08ca8846aa5d6c68275c14c3e7949c24109454  boost_1_84_0.tar.bz2" | shasum -c && tar -xjf boost_1_84_0.tar.bz2
+       rm boost_1_84_0.tar.bz2 && cd boost_1_84_0
        ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
        ./b2 && cd ..
     Make sure that you see "The Boost C++ Libraries were successfully built!" message at the end.
