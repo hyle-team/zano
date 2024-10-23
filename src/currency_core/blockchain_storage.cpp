@@ -1559,8 +1559,7 @@ bool blockchain_storage::create_block_template(const create_block_template_param
   // TODO (performance) both get_next_diff_conditional and get_last_n_blocks_timestamps obtains last N blocks, consider data reusing -- sowle
   if (!pos)
   {
-    std::vector<uint64_t> timestamps = get_last_n_blocks_timestamps(BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW);
-    uint64_t median_ts = epee::misc_utils::median(timestamps);
+    uint64_t median_ts = get_last_n_blocks_timestamps_median(BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW);
     if(b.timestamp < median_ts)
     {
       LOG_PRINT_YELLOW("Block template construction failed because current core timestamp, " << b.timestamp << ", is less than median of last " << BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW << " blocks, " << median_ts, LOG_LEVEL_2);
