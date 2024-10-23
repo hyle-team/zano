@@ -118,7 +118,7 @@
 #define P2P_MAINTAINERS_PUB_KEY                         "8f138bb73f6d663a3746a542770781a09579a7b84cb4125249e95530824ee607"
 #define DIFFICULTY_POS_STARTER                          1
 #else 
-#define P2P_DEFAULT_PORT                                (11112 + CURRENCY_FORMATION_VERSION)
+#define P2P_DEFAULT_PORT                                (11211 + CURRENCY_FORMATION_VERSION)
 #define RPC_DEFAULT_PORT                                12111
 #define STRATUM_DEFAULT_PORT                            11888
 #define STRARUM_DEFAULT_PORT                            51113
