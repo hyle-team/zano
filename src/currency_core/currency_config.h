@@ -271,16 +271,16 @@
 #define ZANO_HARDFORK_04_AFTER_HEIGHT                   2555000   // 2024-03-21 11:49:55
 #define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1711021795ull // block 2555000, 2024-03-21 11:49:55 UTC
 #define ZANO_HARDFORK_05_AFTER_HEIGHT                   999999999999999999  
-#define ZANO_HARDFORK_05_MIN_BUILD_VER                  343
+#define ZANO_HARDFORK_05_MIN_BUILD_VER                  354
 #else
 // Testnet
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_04_AFTER_HEIGHT                   200  
-#define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1712785801ull // block 200, 2024-04-10 21:50:01 UTC
+#define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1712800000ull // block 200, 2024-00-00 00:00:00 UTC
 #define ZANO_HARDFORK_05_AFTER_HEIGHT                   241750  
-#define ZANO_HARDFORK_05_MIN_BUILD_VER                  343
+#define ZANO_HARDFORK_05_MIN_BUILD_VER                  354
 #endif
 
 
