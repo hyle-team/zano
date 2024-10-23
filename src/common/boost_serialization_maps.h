@@ -4,7 +4,7 @@
 
 #pragma once
 #include <type_traits>
-#ifdef DISABLE_PFR_SERIALIZATION_SELFCHECK
+#ifndef DISABLE_PFR_SERIALIZATION_SELFCHECK
   #include <boost/pfr.hpp>
 #endif
 #define BEGIN_BOOST_SERIALIZATION()     template <class t_archive> void serialize(t_archive &_arch, const unsigned int ver) {
@@ -38,7 +38,7 @@ template<size_t A, size_t B> struct TAssertEquality {
   fields to the structure but forgets to update the serialization map, the compilation will fail. Any update to "num_fields" must
   be accompanied by a thorough review of the serialization map to ensure no fields are omitted.
 **********************************************************************************************************************************/
-#ifdef DISABLE_PFR_SERIALIZATION_SELFCHECK
+#ifndef DISABLE_PFR_SERIALIZATION_SELFCHECK
   #define END_BOOST_SERIALIZATION_TOTAL_FIELDS(num_fields)  static_assert(num_fields == boost::pfr::tuple_size<std::remove_reference<decltype(*this)>::type>::value, "Unexpected number of fields!"); }
 #else
   #define END_BOOST_SERIALIZATION_TOTAL_FIELDS(num_fields) END_BOOST_SERIALIZATION()
