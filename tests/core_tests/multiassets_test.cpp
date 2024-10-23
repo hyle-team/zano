@@ -2411,6 +2411,9 @@ several_asset_emit_burn_txs_in_pool::several_asset_emit_burn_txs_in_pool()
 
 bool several_asset_emit_burn_txs_in_pool::generate(std::vector<test_event_entry>& events) const
 {
+  //
+  // Test idea: make sure two asset emit or two asset burn tx can be added to the pool for the same asset.
+  //
   uint64_t ts = test_core_time::get_time();
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
@@ -2497,22 +2500,22 @@ bool several_asset_emit_burn_txs_in_pool::c1(currency::core& c, size_t ev_index,
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
 
   // 2.2 the second emit
-  //additional_emit_amount = 2'500;
-  //total_asset_amount += additional_emit_amount;
+  additional_emit_amount = 2'500;
+  total_asset_amount += additional_emit_amount;
 
-  //destinations.clear();
-  //destinations.emplace_back(additional_emit_amount, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey);
-  //ft = finalized_tx{};
-  //miner_wlt->emit_asset(asset_id, destinations, ft);
+  destinations.clear();
+  destinations.emplace_back(additional_emit_amount, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey);
+  ft = finalized_tx{};
+  miner_wlt->emit_asset(asset_id, destinations, ft);
 
-  //// make sure the second tx was added to the pool
-  //CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  // make sure the second tx was added to the pool
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
 
-  //// Alice checks her asset balance (including unconfirmed txs)
-  //alice_wlt->refresh(blocks_fetched);
-  //CHECK_AND_ASSERT_EQ(blocks_fetched, 0);
-  //alice_wlt->scan_tx_pool(stub);
-  //CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
+  // Alice checks her asset balance (including unconfirmed txs)
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 0);
+  alice_wlt->scan_tx_pool(stub);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
 
   // 2.3
   // mine a block to confirm both txs to make sure everything is alright
@@ -2564,6 +2567,20 @@ bool several_asset_emit_burn_txs_in_pool::c1(currency::core& c, size_t ev_index,
   alice_wlt->scan_tx_pool(stub);
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
 
+  // 3.3
+  // mine a block to confirm both txs to make sure everything is alright
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
+
+  // make sure these txs are fully confirmed
+  CHECK_AND_ASSERT_MES(mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW), false, "");
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
 
   return true;
 }
