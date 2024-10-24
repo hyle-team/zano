@@ -1557,7 +1557,7 @@ bool blockchain_storage::create_block_template(const create_block_template_param
 
   // check PoW block timestamp against the current blockchain timestamp median -- if it's not okay, don't create a new block
   // TODO (performance) both get_next_diff_conditional and get_last_n_blocks_timestamps obtains last N blocks, consider data reusing -- sowle
-  if (!pos)
+  if (!pos && !params.ignore_pow_ts_check)
   {
     uint64_t median_ts = get_last_n_blocks_timestamps_median(BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW);
     if(b.timestamp < median_ts)

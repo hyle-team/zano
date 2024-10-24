@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -17,25 +17,26 @@
 template<typename t_callbacktype>
 inline bool mine_next_pow_block_in_playtime(const currency::account_public_address& miner_addr, currency::core& c, t_callbacktype modify_block_cb, currency::block* output = nullptr)
 {
-  currency::block b = AUTO_VAL_INIT(b);
-  currency::wide_difficulty_type diff;
-  uint64_t height;
-  currency::blobdata extra = AUTO_VAL_INIT(extra);
-  bool r = c.get_block_template(b, miner_addr, miner_addr, diff, height, extra);
+  currency::create_block_template_params cbtp{};
+  cbtp.ignore_pow_ts_check = true;
+  cbtp.miner_address = miner_addr;
+  currency::create_block_template_response cbtr{};
+  bool r = c.get_block_template(cbtp, cbtr);
   CHECK_AND_ASSERT_MES(r, false, "get_block_template failed");
+  currency::block& b = cbtr.b;
 
   // adjust block's timestamp to keep difficulty low
-  currency::block last_block = AUTO_VAL_INIT(last_block);
+  currency::block last_block{};
   c.get_blockchain_storage().get_top_block(last_block);
   b.timestamp = last_block.timestamp + DIFFICULTY_POW_TARGET;
   // keep global time up with blocks' timestamps
   test_core_time::adjust(b.timestamp);
 
   modify_block_cb(b);
-  r = currency::miner::find_nonce_for_given_block(b, diff, height);
+  r = currency::miner::find_nonce_for_given_block(b, cbtr.diffic, cbtr.height);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
-  currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
+  currency::block_verification_context bvc{};
   c.handle_incoming_block(t_serializable_object_to_blob(b), bvc);
   CHECK_AND_NO_ASSERT_MES(!bvc.m_verification_failed && !bvc.m_marked_as_orphaned && !bvc.m_already_exists, false, "block verification context check failed");
 
@@ -79,21 +80,23 @@ inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::accou
   static epee::critical_section s_locker;
 
   CHECK_AND_ASSERT_MES((height == SIZE_MAX) == (prev_id == currency::null_hash), false, "invalid agruments: height and prev_id should be specified or not specified together");
-  currency::block b = AUTO_VAL_INIT(b);
-  currency::wide_difficulty_type diff;
-  uint64_t height_from_template = 0;
-  currency::blobdata extra = AUTO_VAL_INIT(extra);
-  currency::pos_entry pe = AUTO_VAL_INIT(pe);
+  currency::create_block_template_params cbtp{};
+  cbtp.ignore_pow_ts_check = true;
+  cbtp.miner_address = miner_addr;
+  cbtp.pcustom_fill_block_template_func = loc_helper::fill_block_template_func;
+  currency::create_block_template_response cbtr{};
   bool r = false;
   {
     CRITICAL_REGION_LOCAL(s_locker);
     loc_helper::txs_accessor() = &txs;
-    r = c.get_blockchain_storage().create_block_template(miner_addr, miner_addr, extra, false, pe, loc_helper::fill_block_template_func, b, diff, height_from_template);
+    r = c.get_block_template(cbtp, cbtr);
+
   }
   CHECK_AND_ASSERT_MES(r, false, "get_block_template failed");
+  currency::block& b = cbtr.b;
 
   // adjust block's timestamp to keep difficulty low
-  currency::block last_block = AUTO_VAL_INIT(last_block);
+  currency::block last_block{};
   if (prev_id == currency::null_hash)
     r = c.get_blockchain_storage().get_top_block(last_block);
   else
@@ -109,17 +112,17 @@ inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::accou
     CHECK_AND_ASSERT_MES(b.miner_tx.vin.size() > 0, false, "invalid miner_tx.vin");
     CHECKED_GET_SPECIFIC_VARIANT(b.miner_tx.vin[0], currency::txin_gen, in, false);
     in.height = height;
-    set_tx_unlock_time(b.miner_tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+    set_tx_unlock_time(b.miner_tx, cbtr.height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   }
   else
   {
-    height = height_from_template;
+    height = cbtr.height;
   }
 
-  r = currency::miner::find_nonce_for_given_block(b, diff, height);
+  r = currency::miner::find_nonce_for_given_block(b, cbtr.diffic, cbtr.height);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
-  currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
+  currency::block_verification_context bvc{};
   for (auto& tx : txs)
   {
     crypto::hash tx_id = currency::get_transaction_hash(tx);
@@ -153,7 +156,7 @@ inline bool mine_next_pow_blocks_in_playtime_with_given_txs(const currency::acco
   std::vector<currency::transaction> txs_local = txs;
 
   crypto::hash prev_id_internal = prev_id;
-  currency::block prv_block = AUTO_VAL_INIT(prv_block);
+  currency::block prv_block{};
   bool r = c.get_blockchain_storage().get_block_by_hash(prev_id, prv_block);
   CHECK_AND_ASSERT_MES(r, false, "block with id " << prev_id  << " not found");
 
@@ -172,7 +175,7 @@ inline bool mine_next_pow_blocks_in_playtime_with_given_txs(const currency::acco
 // NOTE: stake coins return back to the wallet, newly generated coins go to miner_address (by default they are the same destinations)
 inline bool mine_next_pos_block_in_playtime_with_wallet(tools::wallet2& w, const currency::account_public_address& miner_address, size_t& pos_entries_count)
 {
-  tools::wallet2::mining_context ctx = AUTO_VAL_INIT(ctx);
+  tools::wallet2::mining_context ctx{};
   w.fill_mining_context(ctx);
   if (!ctx.is_pos_allowed)
     return false;
