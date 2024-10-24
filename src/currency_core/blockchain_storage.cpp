@@ -5709,7 +5709,8 @@ uint64_t blockchain_storage::get_last_n_blocks_timestamps_median(size_t n) const
 
   std::vector<uint64_t> timestamps = get_last_n_blocks_timestamps(n);
   uint64_t median_res = epee::misc_utils::median(timestamps);
-  m_timestamps_median_cache[n] = median_res;
+  if (timestamps.size() == n)
+    m_timestamps_median_cache[n] = median_res;
   return median_res;
 }
 //------------------------------------------------------------------
