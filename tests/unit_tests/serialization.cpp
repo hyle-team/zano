@@ -26,12 +26,6 @@ struct Struct
   char blob[8];
 };
 
-
-std::ostream& operator <<(std::ostream& o, const currency::signature_v& v)
-{
-  return o;
-}
-
 template <class Archive>
 struct serializer<Archive, Struct>
 {

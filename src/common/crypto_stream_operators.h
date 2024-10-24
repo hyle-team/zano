@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 Zano Project
+// Copyright (c) 2018-2024 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -9,6 +9,7 @@
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
 #include "crypto/RIPEMD160_helper.h"
+#include "currency_core/currency_basic.h"
 
 bool parse_hash256(const std::string str_hash, crypto::hash& hash);
 
@@ -42,3 +43,8 @@ namespace crypto
   inline std::ostream &operator <<(std::ostream &o, const crypto::hash &v)            { return print_t(o, v); }
   inline std::ostream &operator <<(std::ostream &o, const crypto::hash160 &v)         { return print_t(o, v); }
 } // namespace crypto
+
+namespace currency
+{
+  inline std::ostream& operator<<(std::ostream& o, const signature_v& v) { return print_t(o, v); }
+}
