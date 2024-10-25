@@ -11,6 +11,11 @@ option(SECP256K1_BUILD_EXHAUSTIVE_TESTS "Build exhaustive tests." OFF)
 option(SECP256K1_BUILD_CTIME_TESTS "Build constant-time tests." OFF)
 option(SECP256K1_BUILD_EXAMPLES "Build examples." OFF)
 set_property(GLOBAL PROPERTY CTEST_TARGETS_ADDED 1)
+
+if(STATIC)
+  set(SECP256K1_DISABLE_SHARED ON CACHE BOOL "Disable shared library for secp256k1")
+  set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build static libraries by default" FORCE) 
+endif()
 add_subdirectory(bitcoin-secp256k1)
 
 if( NOT DISABLE_TOR)
