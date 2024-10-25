@@ -5548,6 +5548,10 @@ void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info
   asset_reg_info.opt_descriptor = asset_info;
   fill_adb_version_based_onhardfork(*asset_reg_info.opt_descriptor);
   asset_reg_info.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+  if (is_in_hardfork_zone(ZANO_HARDFORK_05))
+  {
+    asset_reg_info.opt_asset_id_salt = crypto::rand<uint32_t>();
+  }
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.dsts = destinations;
   ctp.extra.push_back(asset_reg_info);
