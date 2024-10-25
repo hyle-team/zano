@@ -26,10 +26,12 @@ struct Struct
   char blob[8];
 };
 
-
-std::ostream& operator <<(std::ostream& o, const currency::signature_v& v)
+namespace currency
 {
-  return o;
+  ostream& operator<<(ostream& stream, [[maybe_unused]] const currency::signature_v& signature)
+  {
+    return stream;
+  }
 }
 
 template <class Archive>
