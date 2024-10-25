@@ -1488,7 +1488,9 @@ bool eth_signed_asset_basics::c1(currency::core& c, size_t ev_index, const std::
   crypto::eth_signature eth_sig{};
   r = crypto::generate_eth_signature(ft.tx_id, eth_sk, eth_sig);
   CHECK_AND_ASSERT_MES(r, false, "generate_eth_signature failed");
-
+  r = crypto::verify_eth_signature(ft.tx_id, eth_pk, eth_sig);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_signature self validation failed");
+  
   transaction emit_tx{};
   bool transfers_unlocked = false;
   miner_wlt->submit_externally_signed_asset_tx(ft, eth_sig, true, emit_tx, transfers_unlocked);
