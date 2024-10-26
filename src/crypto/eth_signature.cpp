@@ -11,8 +11,6 @@
 #include <string_tools.h>
 
 
-#define USE_OPEN_SSL_FOR_ECDSA
-
 #ifdef USE_OPEN_SSL_FOR_ECDSA
   #include <openssl/ec.h>
   #include <openssl/ecdsa.h>

@@ -1966,9 +1966,9 @@ TEST(crypto, generators_precomp)
 
 #undef CHECK_PRECOMP
 }
-
-#include "bitcoin-secp256k1/include/secp256k1.h"
-TEST(crypto, secp256k1_ecdsa_native)
+#ifndef USE_OPEN_SSL_FOR_ECDSA
+  #include "bitcoin-secp256k1/include/secp256k1.h"
+  TEST(crypto, secp256k1_ecdsa_native)
 {
   bool r = false;
 
@@ -2026,7 +2026,7 @@ TEST(crypto, secp256k1_ecdsa_native)
   secp256k1_context_destroy(ctx);
   return true;
 }
-
+#endif
 
 TEST(crypto, eth_signature_basics)
 {
