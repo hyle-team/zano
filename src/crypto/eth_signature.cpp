@@ -3,23 +3,23 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "eth_signature.h"
 #include "crypto.h"
-#include "bitcoin-secp256k1/include/secp256k1.h"
+#ifndef USE_OPEN_SSL_FOR_ECDSA
+  #include "bitcoin-secp256k1/include/secp256k1.h"
+#endif
 #include "random.h"
 #include "misc_language.h"
 #include <string_tools.h>
 
 
-#define USE_OPEN_SSL_FOR_ETH
+#define USE_OPEN_SSL_FOR_ECDSA
 
-#ifdef USE_OPEN_SSL_FOR_ETH
-#include <openssl/ec.h>
-#include <openssl/ecdsa.h>
-#include <openssl/obj_mac.h>
-#include <openssl/bn.h>
+#ifdef USE_OPEN_SSL_FOR_ECDSA
+  #include <openssl/ec.h>
+  #include <openssl/ecdsa.h>
+  #include <openssl/obj_mac.h>
+  #include <openssl/bn.h>
+  #include <openssl/rand.h>
 #endif
-
-
-
 
 
 // Function to create EC_KEY from raw 32 - byte private key
@@ -100,23 +100,9 @@ bool generate_ethereum_signature(const unsigned char* hash, const unsigned char*
   BIGNUM* s_canonical = BN_dup(s);
   ensure_canonical_s(s_canonical, EC_KEY_get0_group(ec_key));
 
-  //std::vector<unsigned char> r_bytes(32);
-  //std::vector<unsigned char> s_bytes(32);
-
-  //BN_bn2binpad(r, r_bytes.data(), 32);
-  //BN_bn2binpad(s_canonical, s_bytes.data(), 32);
   BN_bn2binpad(r, (unsigned char* )&sig_res.data[0], 32);
   BN_bn2binpad(s_canonical, (unsigned char*)&sig_res.data[32], 32);
 
-
-
-  // To determine the recovery ID (v), you'd need to use custom logic to determine this.
-  //unsigned char v = 27; // Placeholder
-
-  //std::vector<unsigned char> eth_signature(65);
-  //std::copy(r_bytes.begin(), r_bytes.end(), eth_signature.begin());
-  //std::copy(s_bytes.begin(), s_bytes.end(), eth_signature.begin() + 32);
-  //eth_signature[64] = v;
 
   ECDSA_SIG_free(sig);
   BN_free(s_canonical);
@@ -192,11 +178,63 @@ bool verify_ethereum_signature(const crypto::hash& m, const crypto::eth_signatur
 
   ECDSA_SIG_free(sig);
   EC_KEY_free(ec_key);
-  //BN_free(bn_r);
-  //BN_free(bn_s);
+
 
   return verification_result == 1;
 }
+
+
+// 
+// struct KeyPair {
+//   std::vector<unsigned char> private_key;  // 32 bytes
+//   std::vector<unsigned char> public_key;   // 33 bytes (compressed format)
+// };
+
+// Function to generate an Ethereum-compatible key pair
+bool generate_ethereum_key_pair(crypto::eth_secret_key& sec_key, crypto::eth_public_key& pub_key) {
+  /*KeyPair keypair;*/
+
+  // Create a new EC_KEY object with the secp256k1 curve
+  EC_KEY* key = EC_KEY_new_by_curve_name(NID_secp256k1);
+  if (!key) {
+    throw std::runtime_error("Failed to create new EC_KEY object");
+  }
+
+  // Generate the key pair
+  if (EC_KEY_generate_key(key) == 0) {
+    EC_KEY_free(key);
+    throw std::runtime_error("Failed to generate key pair");
+  }
+
+  // Extract the private key
+  const BIGNUM* priv_bn = EC_KEY_get0_private_key(key);
+  if (!priv_bn) {
+    EC_KEY_free(key);
+    throw std::runtime_error("Failed to get private key");
+  }
+
+  BN_bn2binpad(priv_bn, (unsigned char*)&sec_key.data[0], 32);
+
+  // Extract the public key in compressed format
+  const EC_POINT* pub_point = EC_KEY_get0_public_key(key);
+  if (!pub_point) {
+    EC_KEY_free(key);
+    throw std::runtime_error("Failed to get public key");
+  }
+
+  //keypair.public_key.resize(33);  // Compressed format
+  if (EC_POINT_point2oct(EC_KEY_get0_group(key), pub_point, POINT_CONVERSION_COMPRESSED,
+    (unsigned char*)&pub_key.data[0], sizeof(pub_key.data), nullptr) == 0) {
+    EC_KEY_free(key);
+    throw std::runtime_error("Failed to convert public key to compressed format");
+  }
+
+  EC_KEY_free(key);
+  return true;
+}
+
+
+
 
 
 namespace crypto
@@ -205,6 +243,7 @@ namespace crypto
   {
     try
     {
+#ifndef USE_OPEN_SSL_FOR_ECDSA
       secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
       auto slh = epee::misc_utils::create_scope_leave_handler([&ctx](){
           secp256k1_context_destroy(ctx);
@@ -234,6 +273,9 @@ namespace crypto
         return false;
 
       return true;
+#else
+      return generate_ethereum_key_pair(sec_key, pub_key);
+#endif
     }
     catch(...)
     {
@@ -241,6 +283,7 @@ namespace crypto
     }
   }
 
+#ifndef USE_OPEN_SSL_FOR_ECDSA
   bool eth_secret_key_to_public_key(const eth_secret_key& sec_key, eth_public_key& pub_key) noexcept
   {
     try
@@ -267,13 +310,13 @@ namespace crypto
       return false;
     }
   }
-
+#endif
   // generates secp256k1 ECDSA signature
   bool generate_eth_signature(const hash& m, const eth_secret_key& sec_key, eth_signature& sig) noexcept
   {
     try
     {
-#ifndef USE_OPEN_SSL_FOR_ETH___
+#ifndef USE_OPEN_SSL_FOR_ECDSA
       secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
       auto slh = epee::misc_utils::create_scope_leave_handler([&ctx](){
           secp256k1_context_destroy(ctx);
@@ -309,7 +352,7 @@ namespace crypto
     try
     {
       // TODO (performance) consider using secp256k1_context_static for verification -- sowle
-#ifndef USE_OPEN_SSL_FOR_ETH
+#ifndef USE_OPEN_SSL_FOR_ECDSA
       secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_NONE);
       auto slh = epee::misc_utils::create_scope_leave_handler([&ctx](){
           secp256k1_context_destroy(ctx);
