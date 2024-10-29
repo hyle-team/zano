@@ -252,7 +252,7 @@ namespace tools
       m_jwt_used_salts.add(salt, ticks_now + JWT_TOKEN_EXPIRATION_MAXIMUM);
       m_jwt_used_salts.remove_if_expiration_less_than(ticks_now);
 
-      LOG_PRINT_L0("JWT token OK");
+      LOG_PRINT_L3("JWT token OK");
       return true;
     }
     catch(const std::exception& e)
