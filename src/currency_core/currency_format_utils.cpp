@@ -3633,13 +3633,13 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------
+  #define PASSWORD_REGEXP  R"([A-Za-z0-9~!?@#$%^&*_+|{}\[\]()<>:;"'\-=\\/.,]{0,40})"
   bool validate_password(const std::string& password)
   {
-    static const std::string allowed_password_symbols = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz~!?@#$%^&*_+|{}[]()<>:;\"'-=\\/.,";
-    size_t n = password.find_first_not_of(allowed_password_symbols, 0);
-    return n == std::string::npos;
+    // OLD: static const std::string allowed_password_symbols = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz~!?@#$%^&*_+|{}[]()<>:;\"'-=\\/.,";
+    static std::regex password_regexp(PASSWORD_REGEXP);
+    return std::regex_match(password, password_regexp);
   }
-
   //------------------------------------------------------------------
 #define ANTI_OVERFLOW_AMOUNT       1000000
 #define GET_PERECENTS_BIG_NUMBERS(per, total) (per/ANTI_OVERFLOW_AMOUNT)*100 / (total/ANTI_OVERFLOW_AMOUNT) 
@@ -4466,8 +4466,8 @@ namespace currency
     }
   }
   //------------------------------------------------------------------
-#define ASSET_TICKER_REGEXP     "[A-Za-z0-9]{1,14}"
-#define ASSET_FULL_NAME_REGEXP  "[A-Za-z0-9.,:!?\\-() ]{0,400}"
+#define ASSET_TICKER_REGEXP     R"([A-Za-z0-9]{1,14})"
+#define ASSET_FULL_NAME_REGEXP  R"([A-Za-z0-9.,:!?\-() ]{0,400})"
   bool validate_asset_ticker(const std::string& ticker)
   {
     static std::regex asset_ticker_regexp(ASSET_TICKER_REGEXP);

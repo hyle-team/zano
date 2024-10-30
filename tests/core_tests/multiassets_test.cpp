@@ -900,7 +900,7 @@ bool asset_emission_and_unconfirmed_balance::c1(currency::core& c, size_t ev_ind
 
   asset_descriptor_base adb{};
   adb.total_max_supply = UINT64_MAX;
-  adb.full_name = "2**64";
+  adb.full_name = "2 xx 64";
   adb.ticker = "2POWER64";
 
   std::vector<currency::tx_destination_entry> destinations;

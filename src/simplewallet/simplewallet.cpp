@@ -591,6 +591,12 @@ bool simple_wallet::try_connect_to_daemon()
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::new_wallet(const string &wallet_file, const std::string& password, bool create_auditable_wallet)
 {
+  if (!currency::validate_password(password))
+  {
+    fail_msg_writer() << R"(Provided password contains invalid characters. Only letters, numbers and ~!?@#$%^&*_+|{}[]()<>:;"'-=\/., symbols are allowed.)" << ENDL;
+    return false;
+  }
+
   m_wallet_file = wallet_file;
 
   m_wallet.reset(new tools::wallet2());
@@ -2090,6 +2096,13 @@ bool simple_wallet::deploy_new_asset(const std::vector<std::string> &args)
     fail_msg_writer() << "Failed to load json file with asset specification: " << args[0];
     return true;
   }
+
+  if (!validate_asset_ticker_and_full_name(adb))
+  {
+    fail_msg_writer() << "ticker or full_name are invalid (perhaps they contain invalid symbols)";
+    return true;
+  }
+
   tx_destination_entry td = AUTO_VAL_INIT(td);
   td.addr.push_back(m_wallet->get_account().get_public_address());
   td.amount = adb.current_supply;
@@ -3474,7 +3487,7 @@ int main(int argc, char* argv[])
     //runs wallet with console interface
     sw->set_offline_mode(offline_mode);
     r = sw->init(vm);
-    CHECK_AND_ASSERT_MES(r, 1, "Failed to initialize wallet");
+    CHECK_AND_ASSERT_MES(r, EXIT_FAILURE, "Failed to initialize wallet");
     if (command_line::get_arg(vm, arg_generate_new_wallet).size() || command_line::get_arg(vm, arg_generate_new_auditable_wallet).size())
       return EXIT_FAILURE;
 
