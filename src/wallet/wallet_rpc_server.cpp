@@ -1448,7 +1448,7 @@ namespace tools
   bool wallet_rpc_server::on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS::request& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
-    i_wallet2_callback* pcallback = w.get_wallet()->get_callback();
+    std::shared_ptr<i_wallet2_callback> pcallback = w.get_wallet()->get_callback();
     if (!pcallback)
     {
       er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
@@ -1463,7 +1463,7 @@ namespace tools
   bool wallet_rpc_server::on_mw_select_wallet(const wallet_public::COMMAND_MW_SELECT_WALLET::request& req, wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
-    i_wallet2_callback* pcallback = w.get_wallet()->get_callback();
+    std::shared_ptr<i_wallet2_callback> pcallback = w.get_wallet()->get_callback();
     if (!pcallback)
     {
       er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;

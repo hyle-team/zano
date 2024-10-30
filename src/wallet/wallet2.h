@@ -411,7 +411,7 @@ namespace tools
     //i_wallet2_callback* callback() const { return m_wcallback; }
     //void callback(i_wallet2_callback* callback) { m_callback = callback; }
     void callback(std::shared_ptr<i_wallet2_callback> callback) { m_wcallback = callback; m_do_rise_transfer = (callback != nullptr); }
-    i_wallet2_callback* get_callback() { return m_wcallback.get(); }
+    std::shared_ptr<i_wallet2_callback> get_callback() { return m_wcallback.lock(); }
     void set_do_rise_transfer(bool do_rise) { m_do_rise_transfer = do_rise; }
 
     bool has_related_alias_entry_unconfirmed(const currency::transaction& tx);
@@ -968,7 +968,7 @@ private:
 
     std::atomic<bool> m_stop;
     std::shared_ptr<i_core_proxy> m_core_proxy;
-    std::shared_ptr<i_wallet2_callback> m_wcallback;
+    std::weak_ptr<i_wallet2_callback> m_wcallback;
 
 
     currency::core_runtime_config m_core_runtime_config;    

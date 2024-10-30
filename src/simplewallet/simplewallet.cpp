@@ -3155,7 +3155,7 @@ int wmain( int argc, wchar_t* argv_w[ ], wchar_t* envp[ ] )
 int main(int argc, char* argv[])
 #endif
 {
-#ifdef WIN32
+#if defined(WIN32) && defined(_DEBUG)
   _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
   //_CrtSetBreakAlloc(9594);
 #endif

@@ -69,7 +69,6 @@ namespace tools
 {
   wallet2::wallet2()
     : m_stop(false)
-    , m_wcallback(new i_wallet2_callback()) //stub
     , m_core_proxy(new default_http_core_proxy())
     , m_upper_transaction_size_limit(0)
     , m_fake_outputs_count(0)
@@ -438,8 +437,8 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
 
       add_rollback_event(ptc.height, asset_register_event{ asset_id });
       WLT_LOG_MAGENTA(ss.str(), LOG_LEVEL_0);
-      if (m_wcallback)
-        m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
+      if (auto wcb = m_wcallback.lock())
+        wcb->on_message(i_wallet2_callback::ms_yellow, ss.str());
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
     {
@@ -480,8 +479,8 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
 
           add_rollback_event(ptc.height, asset_register_event{ asset_id });
           WLT_LOG_MAGENTA(ss.str(), LOG_LEVEL_0);
-          if (m_wcallback)
-            m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
+          if (auto wcb = m_wcallback.lock())
+            wcb->on_message(i_wallet2_callback::ms_yellow, ss.str());
         }
         else
         {
@@ -510,8 +509,8 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
 
           add_rollback_event(ptc.height, asset_register_event{ asset_id });
           WLT_LOG_MAGENTA(ss.str(), LOG_LEVEL_0);
-          if (m_wcallback)
-            m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
+          if (auto wcb = m_wcallback.lock())
+            wcb->on_message(i_wallet2_callback::ms_yellow, ss.str());
         }
         else
         {
@@ -793,8 +792,8 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
               ss << "and key image " << ki << " that has already been seen in output #" << local_td.m_internal_output_index << " in tx " << get_transaction_hash(local_td.m_ptx_wallet_info->m_tx)
                 << " @ block " << local_td.m_spent_height << ". This output can't ever be spent and will be skipped.";
               WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
-              if (m_wcallback)
-                m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
+              if (auto wcb = m_wcallback.lock())
+                wcb->on_message(i_wallet2_callback::ms_yellow, ss.str());
               //if (out.is_native_coin())
               //{
                 //WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(sum_of_native_outs >= out.amount, "sum_of_native_outs: " << sum_of_native_outs << ", out.amount:" << out.amount);
@@ -815,8 +814,8 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
             ss << " with amount " << print_money_brief(out.amount)
               << " is targeted to this auditable wallet and has INCORRECT mix_attr = " << (uint64_t)mix_attr << ". Output is IGNORED.";
             WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
-            if (m_wcallback)
-              m_wcallback->on_message(i_wallet2_callback::ms_red, ss.str());
+            if (auto wcb = m_wcallback.lock())
+              wcb->on_message(i_wallet2_callback::ms_red, ss.str());
             //if (out.is_native_coin())
             //{
               //WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(sum_of_native_outs >= out.amount, "sum_of_native_outs: " << sum_of_native_outs << ", out.amount:" << out.amount);
@@ -1690,43 +1689,9 @@ void wallet2::rise_on_transfer2(const wallet_public::wallet_transfer_info& wti)
   std::list<wallet_public::asset_balance_entry> balances;
   uint64_t mined_balance = 0;
   this->balance(balances, mined_balance);
-  m_wcallback->on_transfer2(wti, balances, mined_balance);
-  // second call for legacy callback handlers
-  //m_wcallback->on_transfer2(wti, balances, mined_balance);
+  if (auto wcb = m_wcallback.lock())
+    wcb->on_transfer2(wti, balances, mined_balance);
 }
-//----------------------------------------------------------------------------------------------------
-/*
-void wallet2::handle_money_spent2(const currency::block& b,
-                                  const currency::transaction& in_tx,
-                                  uint64_t amount,
-                                  const money_transfer2_details& td,
-                                  const std::vector<std::string>& recipients,
-                                  const std::vector<std::string>& remote_aliases)
-{
-  m_transfer_history.push_back(AUTO_VAL_INIT(wallet_public::wallet_transfer_info()));
-  wallet_public::wallet_transfer_info& wti = m_transfer_history.back();
-  wti.is_income = false;
-
-  wti.remote_addresses = recipients;
-  wti.remote_aliases = remote_aliases;
-  prepare_wti(wti, get_block_height(b), get_block_datetime(b), in_tx, amount, td);
-  WLT_LOG_L1("[MONEY SPENT]: " << epee::serialization::store_t_to_json(wti));
-  rise_on_transfer2(wti);
-}
-//----------------------------------------------------------------------------------------------------
-void wallet2::handle_money_received2(const currency::block& b, const currency::transaction& tx, uint64_t amount, const money_transfer2_details& td)
-{
-  //decrypt attachments
-  m_transfer_history.push_back(AUTO_VAL_INIT(wallet_public::wallet_transfer_info()));
-  wallet_public::wallet_transfer_info& wti = m_transfer_history.back();
-  wti.is_income = true;
-  // TODO @#@# this function is only able to handle native coins atm, consider changing -- sowle
-  wti.asset_id = native_coin_asset_id;
-  prepare_wti(wti, get_block_height(b), get_block_datetime(b), tx, amount, td);
-  WLT_LOG_L1("[MONEY RECEIVED]: " << epee::serialization::store_t_to_json(wti));
-  rise_on_transfer2(wti);
-}
-*/
 //----------------------------------------------------------------------------------------------------
 void wallet2::load_wti_from_process_transaction_context(wallet_public::wallet_transfer_info& wti, const process_transaction_context& tx_process_context)
 {
@@ -1948,7 +1913,8 @@ void wallet2::process_new_blockchain_entry(const currency::block& b, const curre
 
 
   process_htlc_triggers_on_block_added(height);
-  m_wcallback->on_new_block(height, b);
+  if (auto wcb = m_wcallback.lock())
+    wcb->on_new_block(height, b);
 }
 //----------------------------------------------------------------------------------------------------
 
@@ -2182,7 +2148,8 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
       uint64_t next_percent = (100 * (current_index - m_height_of_start_sync)) / (res.current_height - m_height_of_start_sync);
       if (next_percent != m_last_sync_percent)
       {
-        m_wcallback->on_sync_progress(next_percent);
+        if (auto wcb = m_wcallback.lock())
+          wcb->on_sync_progress(next_percent);
         m_last_sync_percent = next_percent;
       }
     }
@@ -2524,8 +2491,8 @@ uint64_t wallet2::get_directly_spent_transfer_index_by_input_in_tracking_wallet(
         std::stringstream ss;
         ss << "own transfer tid=" << tid << " tx=" << td.tx_hash() << " mix_attr=" << td.mix_attr() << ", is referenced by a transaction with mixins, ref from input with amount: " << amount << ", gindex: " << gindex;
         WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
-        if (m_wcallback)
-          m_wcallback->on_message(i_wallet2_callback::ms_yellow, ss.str());
+        if (auto wcb = m_wcallback.lock())
+          wcb->on_message(i_wallet2_callback::ms_yellow, ss.str());
         WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.mix_attr() != CURRENCY_TO_KEY_OUT_FORCED_NO_MIX, ss.str()); // if mix_attr == 1 this should never happen (mixing in an output with mix_attr = 1) as the core must reject such txs
         // our own output has mix_attr != 1 for some reason (a sender did not set correct mix_attr e.g.)
         // but mixin count > 1 so we can't say it is spent for sure
@@ -2852,7 +2819,8 @@ bool wallet2::scan_not_compliant_unconfirmed_txs()
         }
       }
       //fire some event
-      m_wcallback->on_transfer_canceled(it->second);
+      if (auto wcb = m_wcallback.lock())
+        wcb->on_transfer_canceled(it->second);
       m_unconfirmed_txs.erase(it++);
     }
     else
@@ -2922,8 +2890,8 @@ void wallet2::refresh(size_t& blocks_fetched, bool& received_money, std::atomic<
         if (reset_count > 1)
         {
           WLT_LOG_L0("Intenral error: reset_count infinit loop catch");
-          if (m_wcallback)
-            m_wcallback->on_message(tools::i_wallet2_callback::ms_red, "Internal error: reset_count infinite loop catch");
+          if (auto wcb = m_wcallback.lock())
+            wcb->on_message(tools::i_wallet2_callback::ms_red, "Internal error: reset_count infinite loop catch");
           return;
         }
         reset_count++;
@@ -2941,16 +2909,16 @@ void wallet2::refresh(size_t& blocks_fetched, bool& received_money, std::atomic<
       if (++try_count > 3)
         return;
       WLT_LOG_L2("no connection to the daemon, wait and try pull_blocks again (try_count: " << try_count << ", blocks_fetched: " << blocks_fetched << ")");
-      if (m_wcallback)
-        m_wcallback->on_message(tools::i_wallet2_callback::ms_red, "no connection to daemon");
+      if (auto wcb = m_wcallback.lock())
+        wcb->on_message(tools::i_wallet2_callback::ms_red, "no connection to daemon");
       std::this_thread::sleep_for(std::chrono::seconds(3));
     }
     catch (const std::exception& e)
     {
       blocks_fetched += added_blocks;
       WLT_LOG_ERROR("refresh->pull_blocks failed, try_count: " << try_count << ", blocks_fetched: " << blocks_fetched << ", exception: " << e.what());
-      if (m_wcallback)
-        m_wcallback->on_message(tools::i_wallet2_callback::ms_red, std::string("error on pulling blocks: ") + e.what());
+      if (auto wcb = m_wcallback.lock())
+        wcb->on_message(tools::i_wallet2_callback::ms_red, std::string("error on pulling blocks: ") + e.what());
       return;
     }
   }
@@ -5306,7 +5274,8 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
     return false;
   }
   WLT_LOG_GREEN("PoS block " << print16(block_hash) << " generated and accepted, congrats!", LOG_LEVEL_0);
-  m_wcallback->on_pos_block_found(b);
+  if (auto wcb = m_wcallback.lock())
+    wcb->on_pos_block_found(b);
 
   gracefull_leaving = true; // to prevent source transfer flags be cleared in scope leave handler
   return true;
@@ -7138,7 +7107,8 @@ void wallet2::set_disable_tor_relay(bool disable)
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::notify_state_change(const std::string& state_code, const std::string& details)
 {
-  m_wcallback->on_tor_status_change(state_code);
+  if (auto wcb = m_wcallback.lock())
+    wcb->on_tor_status_change(state_code);
 }
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::send_transaction_to_network(const transaction& tx)
