@@ -5048,7 +5048,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
 
   // range proofs
   currency::zc_outs_range_proof range_proofs{};
-  r = generate_zc_outs_range_proof(miner_tx_id, 0, miner_tx_tgc, b.miner_tx.vout, range_proofs);
+  r = generate_zc_outs_range_proof(miner_tx_id, miner_tx_tgc, b.miner_tx.vout, range_proofs);
   WLT_CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
   b.miner_tx.proofs.emplace_back(std::move(range_proofs));
 

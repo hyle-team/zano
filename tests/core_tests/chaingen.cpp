@@ -1115,7 +1115,7 @@ bool test_generator::construct_pow_block_with_alias_info_in_coinbase(const accou
       miner_tx.proofs.emplace_back(std::move(currency::zc_asset_surjection_proof{}));
       // range proofs
       currency::zc_outs_range_proof range_proofs{};
-      r = generate_zc_outs_range_proof(tx_id, 0, tx_gen_context, miner_tx.vout, range_proofs);
+      r = generate_zc_outs_range_proof(tx_id, tx_gen_context, miner_tx.vout, range_proofs);
       CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
       miner_tx.proofs.emplace_back(std::move(range_proofs));
       // balance proof

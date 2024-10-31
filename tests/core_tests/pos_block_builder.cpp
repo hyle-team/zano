@@ -282,7 +282,7 @@ void pos_block_builder::step5_sign(const currency::tx_source_entry& se, const cu
 
     // range proofs
     currency::zc_outs_range_proof range_proofs{};
-    r = generate_zc_outs_range_proof(miner_tx_id, 0, m_miner_tx_tgc, m_block.miner_tx.vout, range_proofs);
+    r = generate_zc_outs_range_proof(miner_tx_id, m_miner_tx_tgc, m_block.miner_tx.vout, range_proofs);
     CHECK_AND_ASSERT_THROW_MES(r, "Failed to generate zc_outs_range_proof()");
     m_block.miner_tx.proofs.emplace_back(std::move(range_proofs));
 
