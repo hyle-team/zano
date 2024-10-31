@@ -197,17 +197,17 @@ namespace currency
     return true;
   }
   //--------------------------------------------------------------------------------
-  bool generate_zc_outs_range_proof(const crypto::hash& context_hash, size_t out_index_start, const tx_generation_context& outs_gen_context,
+  bool generate_zc_outs_range_proof(const crypto::hash& context_hash, const tx_generation_context& outs_gen_context,
     const std::vector<tx_out_v>& vouts, zc_outs_range_proof& result)
   {
     size_t outs_count = outs_gen_context.amounts.size();
     // TODO @#@# reconsider this check CHECK_AND_ASSERT_MES(gen_context.check_sizes(outs_count), false, "");
-    CHECK_AND_ASSERT_MES(out_index_start + outs_count == vouts.size(), false, "");
+    CHECK_AND_ASSERT_MES(outs_count == vouts.size(), false, "");
 
     // prepare data for aggregation proof
     std::vector<crypto::point_t> amount_commitments_for_rp_aggregation; // E' = amount * U + y' * G
     crypto::scalar_vec_t y_primes; // y'
-    for (size_t out_index = out_index_start, i = 0; i < outs_count; ++out_index, ++i)
+    for (size_t i = 0; i < outs_count; ++i)
     {
       crypto::scalar_t y_prime = crypto::scalar_t::random();
       amount_commitments_for_rp_aggregation.emplace_back(outs_gen_context.amounts[i] * crypto::c_point_U + y_prime * crypto::c_point_G); // E'_j = e_j * U + y'_j * G
@@ -564,7 +564,7 @@ namespace currency
 
       // range proofs
       currency::zc_outs_range_proof range_proofs{};
-      r = generate_zc_outs_range_proof(tx_id, 0, tx_gen_context, tx.vout, range_proofs);
+      r = generate_zc_outs_range_proof(tx_id, tx_gen_context, tx.vout, range_proofs);
       CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
       tx.proofs.emplace_back(std::move(range_proofs));
 
@@ -2632,7 +2632,6 @@ namespace currency
     // construct outputs
     uint64_t native_coins_output_sum = 0;
     size_t output_index = tx.vout.size(); // in case of append mode we need to start output indexing from the last one + 1
-    uint64_t range_proof_start_index = 0;
     std::set<uint16_t> existing_derivation_hints, new_derivation_hints;
     CHECK_AND_ASSERT_MES(copy_all_derivation_hints_from_tx_to_container(tx, existing_derivation_hints), false, "move_all_derivation_hints_from_tx_to_container failed");
     for(size_t destination_index = 0; destination_index < shuffled_dsts.size(); ++destination_index, ++output_index)
@@ -2774,7 +2773,7 @@ namespace currency
 
       // range proofs
       currency::zc_outs_range_proof range_proofs{};
-      r = generate_zc_outs_range_proof(tx_prefix_hash, range_proof_start_index, gen_context, tx.vout, range_proofs);
+      r = generate_zc_outs_range_proof(tx_prefix_hash, gen_context, tx.vout, range_proofs);
       CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
       tx.proofs.emplace_back(std::move(range_proofs));
 
