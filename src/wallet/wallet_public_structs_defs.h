@@ -1012,92 +1012,6 @@ namespace wallet_public
     END_KV_SERIALIZE_MAP()
   };
 
-  struct COMMAND_RPC_MAKETELEPOD
-  {
-    struct request
-    {
-      uint64_t amount;
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(amount)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      std::string status; //"OK", "INSUFFICIENT_COINS", "INTERNAL_ERROR"
-      telepod tpd;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(status)
-        KV_SERIALIZE(tpd)
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-
-
-  struct COMMAND_RPC_TELEPODSTATUS
-  {
-    struct request
-    {
-      telepod tpd;
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(tpd)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      std::string status;  //"OK", "UNCONFIRMED", "BAD", "SPENT", "INTERNAL_ERROR"
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(status)
-     END_KV_SERIALIZE_MAP()
-    };
-  };
-
-  struct COMMAND_RPC_CLONETELEPOD
-  {
-    struct request
-    {
-      telepod tpd;
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(tpd)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      std::string status;//"OK", "UNCONFIRMED", "BAD", "SPENT", "INTERNAL_ERROR:"
-      telepod tpd;
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(status)
-        KV_SERIALIZE(tpd)
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-
-  struct COMMAND_RPC_WITHDRAWTELEPOD
-  {
-    struct request
-    {
-      telepod tpd;
-      std::string addr;
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(tpd)
-        KV_SERIALIZE(addr)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      std::string status;  //"OK", "UNCONFIRMED", "BAD", "SPENT", "INTERNAL_ERROR", "BAD_ADDRESS"
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(status)
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-
-
   struct create_proposal_param
   {
 //    uint64_t wallet_id;
@@ -2131,8 +2045,8 @@ namespace wallet_public
     {
       currency::blobdata    finalized_tx;
       currency::blobdata    unsigned_tx;
-      crypto::eth_signature eth_sig;
-      crypto::hash          expected_tx_id;
+      crypto::eth_signature eth_sig; //TODO: add value initialization here 
+      crypto::hash          expected_tx_id = currency::null_hash;
       bool                  unlock_transfers_on_fail = false;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -2147,7 +2061,7 @@ namespace wallet_public
     struct response
     {
       std::string           status;
-      bool                  transfers_were_unlocked;
+      bool                  transfers_were_unlocked = false;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call") DOC_EXMP("OK") DOC_END

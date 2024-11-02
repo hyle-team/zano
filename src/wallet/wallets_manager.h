@@ -147,6 +147,7 @@ public:
   std::string get_tx_pool_info(currency::COMMAND_RPC_GET_POOL_INFO::response& res);
   std::string export_wallet_history(const view::export_wallet_info& ewi);
   std::string setup_wallet_rpc(const std::string& jwt_secret);
+  std::string set_remote_node_url(const std::string& url);
 
 #ifndef MOBILE_WALLET_BUILD
   currency::core_rpc_server& get_rpc_server() { return m_rpc_server; }

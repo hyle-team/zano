@@ -395,7 +395,13 @@ bool wallets_manager::start()
   CATCH_ENTRY_L0("main", false);
  }
 
-
+std::string wallets_manager::set_remote_node_url(const std::string& url)
+{
+  if (m_rpc_proxy)
+    m_rpc_proxy->set_connection_addr(url);
+  
+  return API_RETURN_CODE_OK;
+}
 
 bool wallets_manager::stop()
 {
@@ -1921,7 +1927,10 @@ std::string wallets_manager::stop_pos_mining(uint64_t wallet_id)
 std::string wallets_manager::run_wallet(uint64_t wallet_id)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
-  wo.miner_thread = std::thread(boost::bind(&wallets_manager::wallet_vs_options::worker_func, &wo));
+  if (!wo.major_stop && !wo.miner_thread.joinable())
+  {
+    wo.miner_thread = std::thread(boost::bind(&wallets_manager::wallet_vs_options::worker_func, &wo));
+  }  
   return API_RETURN_CODE_OK;
 }
 

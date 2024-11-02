@@ -56,6 +56,9 @@ void static_destroy_handler()
   LOG_PRINT_L0("[DESTROY CALLBACK HANDLER FINISHED]: ");
 }
 
+
+
+
 namespace plain_wallet
 {
   struct plain_wallet_instance
@@ -63,7 +66,9 @@ namespace plain_wallet
     plain_wallet_instance() :initialized(false), gjobs_counter(1)
     {}
     wallets_manager gwm;
-    std::atomic<bool> initialized;
+    std::atomic<bool> initialized = false;
+    std::atomic<bool> postponed_run_wallet = false;
+    std::atomic<bool> postponed_main_worked_started = false;
 
     std::atomic<uint64_t> gjobs_counter;
     std::map<uint64_t, std::string> gjobs;
@@ -71,7 +76,6 @@ namespace plain_wallet
   };
 
   std::shared_ptr<plain_wallet::plain_wallet_instance> ginstance_ptr;
-
 
 
   typedef epee::json_rpc::response<epee::json_rpc::dummy_result, error> error_response;
@@ -182,8 +186,11 @@ namespace plain_wallet
   }
 
 
-  std::string init(const std::string& ip, const std::string& port, const std::string& working_dir, int log_level)
+  std::string init(const std::string& ip_, const std::string& port_, const std::string& working_dir, int log_level)
   {
+    std::string ip = ip_;
+    std::string port = port_;
+
     auto local_ptr = std::atomic_load(&ginstance_ptr);
     if (local_ptr)
     {
@@ -196,6 +203,14 @@ namespace plain_wallet
     epee::static_helpers::set_or_call_on_destruct(true, static_destroy_handler);
 
     std::shared_ptr<plain_wallet_instance> ptr(new plain_wallet_instance());
+
+    if (ip.empty())
+    {
+      ip = "0.0.0.0";
+      port = "0";
+      ptr->postponed_run_wallet = true;
+    }
+
 
     set_bundle_working_dir(working_dir);
 
@@ -217,10 +232,14 @@ namespace plain_wallet
     
     ptr->gwm.set_use_deffered_global_outputs(true);
 
-    if(!ptr->gwm.start())
+    if (!ptr->postponed_run_wallet && !ptr->postponed_main_worked_started)
     {
-      LOG_ERROR("Failed to start wallets_manager");
-      return GENERAL_INTERNAL_ERRROR_INIT;
+      if (!ptr->gwm.start())
+      {
+        LOG_ERROR("Failed to start wallets_manager");
+        return GENERAL_INTERNAL_ERRROR_INIT;
+      }
+      ptr->postponed_main_worked_started = true;
     }
 
     LOG_PRINT_L0("[INIT PLAIN_WALLET_INSTANCE] Ver:" << PROJECT_VERSION_LONG << "(" << BUILD_TYPE << ")");
@@ -261,11 +280,12 @@ namespace plain_wallet
   std::string init(const std::string& address, const std::string& working_dir, int log_level)
   {
     epee::net_utils::http::url_content url_data = AUTO_VAL_INIT(url_data);
-    if(!epee::net_utils::parse_url(address, url_data))
+    if(!address.empty() && !epee::net_utils::parse_url(address, url_data))
     {
         LOG_ERROR("Failed to parse address");
         return API_RETURN_CODE_BAD_ARG;
     }
+
     return init(url_data.host, std::to_string(url_data.port), working_dir, log_level);
   }
 
@@ -438,7 +458,10 @@ namespace plain_wallet
       {
         ok_response.result.recovered = true;
       }
-      inst_ptr->gwm.run_wallet(ok_response.result.wallet_id);
+      if (!inst_ptr->postponed_run_wallet)
+      {
+        inst_ptr->gwm.run_wallet(ok_response.result.wallet_id);
+      }      
 
       return epee::serialization::store_t_to_json(ok_response);
     }
@@ -460,7 +483,10 @@ namespace plain_wallet
       {
         ok_response.result.recovered = true;
       }
-      inst_ptr->gwm.run_wallet(ok_response.result.wallet_id);
+      if (!inst_ptr->postponed_run_wallet)
+      {
+        inst_ptr->gwm.run_wallet(ok_response.result.wallet_id);
+      }
       return epee::serialization::store_t_to_json(ok_response);
     }
     error_response err_result = AUTO_VAL_INIT(err_result);
@@ -481,7 +507,10 @@ namespace plain_wallet
       {
         ok_response.result.recovered = true;
       }
-      inst_ptr->gwm.run_wallet(ok_response.result.wallet_id);
+      if (!inst_ptr->postponed_run_wallet)
+      {
+        inst_ptr->gwm.run_wallet(ok_response.result.wallet_id);
+      }
       return epee::serialization::store_t_to_json(ok_response);
     }
     error_response err_result = AUTO_VAL_INIT(err_result);
@@ -550,6 +579,52 @@ namespace plain_wallet
     return std::string("{ \"job_id\": ") + std::to_string(job_id) + "}";
   }
 
+  std::string handle_reset_connection_url(const std::string& url)
+  {
+    GET_INSTANCE_PTR(inst_ptr);
+    inst_ptr->gwm.set_remote_node_url(url);
+
+    view::api_response ar = AUTO_VAL_INIT(ar);
+    ar.error_code = API_RETURN_CODE_OK;
+    return epee::serialization::store_t_to_json(ar);
+  }
+
+  std::string handle_run_wallet(uint64_t instance_id)
+  {
+    GET_INSTANCE_PTR(inst_ptr);
+
+
+    //postponed worker loop launch
+    if (!inst_ptr->postponed_main_worked_started)
+    {
+      if (!inst_ptr->gwm.start())
+      {
+        LOG_ERROR("Failed to start wallets_manager");
+        return API_RETURN_CODE_INTERNAL_ERROR;
+      }
+      inst_ptr->postponed_main_worked_started = true;
+    }
+
+    view::api_response ar = AUTO_VAL_INIT(ar);
+    ar.error_code = inst_ptr->gwm.run_wallet(instance_id);
+    return epee::serialization::store_t_to_json(ar);
+  }
+
+  std::string handle_configure(const std::string& settings_json)
+  {
+    GET_INSTANCE_PTR(inst_ptr);
+    configure_object conf = AUTO_VAL_INIT(conf);
+    configure_response conf_resp = AUTO_VAL_INIT(conf_resp);
+    bool res = epee::serialization::load_t_from_json(conf, settings_json);
+    if (!res)
+    {
+      conf_resp.status = API_RETURN_CODE_BAD_ARG;
+      return epee::serialization::store_t_to_json(conf_resp);
+    }
+    inst_ptr->postponed_run_wallet = conf.postponed_run_wallet;
+    conf_resp.status = API_RETURN_CODE_OK;
+    return epee::serialization::store_t_to_json(conf_resp);
+  }
 
   std::string sync_call(const std::string& method_name, uint64_t instance_id, const std::string& params)
   {
@@ -612,6 +687,18 @@ namespace plain_wallet
     {
       res = get_wallet_status(instance_id);
     }
+    else if (method_name == "configure")
+    {
+      res = handle_configure(params);
+    }
+    else if (method_name == "reset_connection_url")
+    {
+      res = handle_reset_connection_url(params);
+    }
+    else if (method_name == "run_wallet")
+    {
+      res = handle_run_wallet(instance_id);
+    }
     else
     {
       view::api_response ar = AUTO_VAL_INIT(ar);
@@ -620,9 +707,6 @@ namespace plain_wallet
     }
     return res;
   }
-
-
-
 
   std::string try_pull_result(uint64_t job_id)
   {
