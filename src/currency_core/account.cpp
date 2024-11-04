@@ -86,6 +86,7 @@ namespace currency
     std::vector<unsigned char> processed_seed_binary = keys_seed_binary;
     if (!password.empty())
     {
+      CHECK_AND_ASSERT_THROW_MES(currency::validate_password(password), "seed phrase password contains invalid characters, seed phrase cannot be created with such a password");
       //encrypt seed phrase binary data
       crypt_with_pass(&keys_seed_binary[0], keys_seed_binary.size(), &processed_seed_binary[0], password);      
     }
