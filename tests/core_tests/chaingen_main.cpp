@@ -1177,6 +1177,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_timestamp_in_future, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_height_is_low, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_height_is_high, "0,3");
+    GENERATE_AND_PLAY_HF(block_with_correct_prev_id_on_wrong_height, "3-*");
     GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_tx_gen_in, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_in, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_miner_tx_with_txin_to_key, "0,3");
