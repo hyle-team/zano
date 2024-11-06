@@ -2288,7 +2288,7 @@ namespace currency
       gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, tx_key.sec);
       gen_context.ao_commitment_in_outputs = true;
 
-      // set correct asset_id to the corresponding destination entries
+      // calculate the amount of asset being burnt using asset_id field in inputs and outputs (sources and destinations)
       uint64_t amount_of_burned_assets = 0;
       for (auto& item : ftp.sources)
       {
@@ -2343,7 +2343,7 @@ namespace currency
         }
         if (ado.version < ASSET_DESCRIPTOR_BASE_HF5_VER)
         {
-          CHECK_AND_ASSERT_THROW_MES(ado.opt_descriptor.has_value(), "Internal error: opt_descriptor unset during ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN for version less then 2");
+          CHECK_AND_ASSERT_THROW_MES(ado.opt_descriptor.has_value(), "Internal error: opt_descriptor unset during ASSET_DESCRIPTOR_OPERATION_EMIT for version less then 2");
           ado.opt_descriptor->current_supply += amount_of_emitted_asset;
         }
         else
