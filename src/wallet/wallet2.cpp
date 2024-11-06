@@ -5552,25 +5552,32 @@ void wallet2::emit_asset(const crypto::public_key& asset_id, const std::vector<c
   auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
   CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
 
+  currency::asset_descriptor_base last_adb{};
+  bool r = daemon_get_asset_info(asset_id, last_adb);
+  CHECK_AND_ASSERT_THROW_MES(r, "Failed to get asset info from daemon");
+
+  construct_tx_param ctp = get_default_construct_tx_param();
+  ctp.dsts = destinations;
+  ctp.need_at_least_1_zc = true;
+  ctp.tx_meaning_for_logs = "asset emission";
+
   asset_descriptor_operation asset_emmit_info{};
   fill_ado_version_based_onhardfork(asset_emmit_info);
-  if (!is_in_hardfork_zone(ZANO_HARDFORK_05))
+  if (asset_emmit_info.version >= ASSET_DESCRIPTOR_OPERATION_HF5_VER)
   {
-    //pre hard fork5
-    currency::asset_descriptor_base last_adb{};
-    bool r = daemon_get_asset_info(asset_id, last_adb);
-    CHECK_AND_ASSERT_THROW_MES(r, "Failed to get asset info from daemon");
+    ctp.ado_hidden_supply = last_adb.hidden_supply;
+  }
+  else
+  {
+    // HF4
     asset_emmit_info.opt_descriptor = last_adb;
     fill_adb_version_based_onhardfork(*asset_emmit_info.opt_descriptor);
   }
 
   asset_emmit_info.operation_type = ASSET_DESCRIPTOR_OPERATION_EMIT;
   asset_emmit_info.opt_asset_id = asset_id;
-  construct_tx_param ctp = get_default_construct_tx_param();
-  ctp.dsts = destinations;
+  
   ctp.extra.push_back(asset_emmit_info);
-  ctp.need_at_least_1_zc = true;
-  ctp.tx_meaning_for_logs = "asset emission";
 
   bool send_to_network = true;
   if (own_asset_entry_it->second.thirdparty_custody || own_asset_entry_it->second.owner_eth_pub_key.has_value() )
@@ -7930,6 +7937,8 @@ bool wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
   ftp.multisig_id = ctp.multisig_id;
   ftp.spend_pub_key = m_account.get_public_address().spend_public_key;
   ftp.ado_sign_thirdparty = ctp.ado_sign_thirdparty;
+  ftp.ado_hidden_supply = ctp.ado_hidden_supply;
+
 
   /* TODO
   WLT_LOG_GREEN("[prepare_transaction]: get_needed_money_time: " << get_needed_money_time << " ms"

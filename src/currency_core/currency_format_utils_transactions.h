@@ -276,6 +276,7 @@ namespace currency
     // data for ongoing asset operation in tx (if applicable, tx extra should contain asset_descriptor_operation)
     crypto::public_key  ao_asset_id                         {};
     crypto::point_t     ao_asset_id_pt                      = crypto::c_point_0;
+    uint64_t            ao_amount                           = 0;
     crypto::point_t     ao_amount_commitment                = crypto::c_point_0;
     crypto::scalar_t    ao_amount_blinding_mask             {};                       //                                                   generate_tx_balance_proof  generate_ZC_sig
     bool                ao_commitment_in_outputs            = false;
@@ -304,6 +305,7 @@ namespace currency
       KV_SERIALIZE_POD_AS_HEX_STRING(asset_id_blinding_mask_x_amount_sum)
       KV_SERIALIZE_POD_AS_HEX_STRING(ao_asset_id)
       KV_SERIALIZE_POD_AS_HEX_STRING(ao_asset_id_pt)
+      KV_SERIALIZE(ao_amount)
       KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_commitment)
       KV_SERIALIZE_POD_AS_HEX_STRING(ao_amount_blinding_mask)
       KV_SERIALIZE_POD_AS_HEX_STRING(ao_commitment_in_outputs)
@@ -334,6 +336,7 @@ namespace currency
       // no asset operation fields here
       //ao_asset_id
       //ao_asset_id_pt
+      //ao_amount
       //ao_amount_commitment
       //ao_amount_blinding_mask
       //ao_commitment_in_outputs

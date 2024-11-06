@@ -2271,10 +2271,18 @@ namespace currency
           amount_of_emitted_asset += item.amount;
         }
       }
-      adb.current_supply = amount_of_emitted_asset;
       if (ado.version >= ASSET_DESCRIPTOR_BASE_HF5_VER)
       {
-        ado.opt_amount = amount_of_emitted_asset;       // TODO: support hidden supply -- sowle
+        CHECK_AND_ASSERT_MES(adb.hidden_supply == ftp.ado_hidden_supply, false, "inconsistency in adb.hidden_supply and ftp.ado_hidden_supply values");
+        if (ftp.ado_hidden_supply)
+          gen_context.ao_amount = amount_of_emitted_asset;
+        else
+          ado.opt_amount = amount_of_emitted_asset;
+      }
+      else
+      {
+        // HF4
+        adb.current_supply = amount_of_emitted_asset;
       }
 
       gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
@@ -2297,7 +2305,7 @@ namespace currency
           amount_of_burned_assets += item.amount;
         }
       }
-      for (auto& item : ftp.prepared_destinations)
+      for (auto& item : ftp.prepared_destinations) // why not shuffled_dsts? -- sowle
       {
         if (item.asset_id == gen_context.ao_asset_id)
         {
@@ -2305,6 +2313,7 @@ namespace currency
           amount_of_burned_assets -= item.amount;
         }
       }
+
       if (ado.version < ASSET_DESCRIPTOR_BASE_HF5_VER)
       {
         CHECK_AND_ASSERT_THROW_MES(ado.opt_descriptor.has_value(), "Internal error: opt_descriptor unset during ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN for version less then 2");
@@ -2312,8 +2321,11 @@ namespace currency
       }
       else
       {
-        CHECK_AND_ASSERT_THROW_MES(!ado.opt_descriptor.has_value(), "Internal error: opt_descriptor unset during ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN for version less then 2");
-        ado.opt_amount = amount_of_burned_assets;       // TODO: support hidden supply -- sowle
+        CHECK_AND_ASSERT_THROW_MES(!ado.opt_descriptor.has_value(), "Internal error: opt_descriptor is set during ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN for ado.version >= 2");
+        if (ftp.ado_hidden_supply)
+          gen_context.ao_amount = amount_of_burned_assets;
+        else
+          ado.opt_amount = amount_of_burned_assets;
       }
       
       gen_context.ao_amount_commitment = amount_of_burned_assets * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;
@@ -2331,7 +2343,7 @@ namespace currency
         // calculate amount blinding mask
         gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, tx_key.sec);
 
-        // set correct asset_id to the corresponding destination entries
+        // calculate the amount of asset being emitted using asset_id field in inputs and outputs (sources and destinations)
         uint64_t amount_of_emitted_asset = 0;
         for (auto& item : shuffled_dsts)
         {
@@ -2341,6 +2353,15 @@ namespace currency
             item.asset_id = gen_context.ao_asset_id;
           }
         }
+        for (auto& item : ftp.sources)
+        {
+          if (item.asset_id == gen_context.ao_asset_id)
+          {
+            CHECK_AND_ASSERT_THROW_MES(amount_of_emitted_asset >= item.amount, "Failed to find emit amount, failed condition: amount_of_emitted_asset(" << amount_of_emitted_asset << ") >= item.amount(" << item.amount << ")");
+            amount_of_emitted_asset -= item.amount;
+          }
+        }
+
         if (ado.version < ASSET_DESCRIPTOR_BASE_HF5_VER)
         {
           CHECK_AND_ASSERT_THROW_MES(ado.opt_descriptor.has_value(), "Internal error: opt_descriptor unset during ASSET_DESCRIPTOR_OPERATION_EMIT for version less then 2");
@@ -2348,8 +2369,11 @@ namespace currency
         }
         else
         {
-          CHECK_AND_ASSERT_THROW_MES(!ado.opt_descriptor.has_value(), "Internal error: opt_descriptor unset during ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN for version less then 2");
-          ado.opt_amount = amount_of_emitted_asset;       // TODO: support hidden supply -- sowle
+          CHECK_AND_ASSERT_THROW_MES(!ado.opt_descriptor.has_value(), "Internal error: opt_descriptor is set during ASSET_DESCRIPTOR_OPERATION_EMIT for ado.version >= 2");
+          if (ftp.ado_hidden_supply)
+            gen_context.ao_amount = amount_of_emitted_asset;
+          else
+            ado.opt_amount = amount_of_emitted_asset;
         }
 
         gen_context.ao_amount_commitment = amount_of_emitted_asset * gen_context.ao_asset_id_pt + gen_context.ao_amount_blinding_mask * crypto::c_point_G;

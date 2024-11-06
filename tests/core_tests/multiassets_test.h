@@ -121,3 +121,11 @@ struct several_asset_emit_burn_txs_in_pool : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct asset_with_hidden_supply_basics : public wallet_test
+{
+  asset_with_hidden_supply_basics();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+

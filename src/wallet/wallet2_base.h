@@ -232,6 +232,7 @@ namespace tools
 
     //ado
     bool ado_sign_thirdparty = false;
+    bool ado_hidden_supply = false;
   };
 
   struct mode_separate_context

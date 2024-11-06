@@ -170,6 +170,7 @@ namespace currency
 
     
     bool ado_sign_thirdparty = false;//@#@ TODO: add to serialization map @zoidberg
+    bool ado_hidden_supply = false;
 
 
     BEGIN_SERIALIZE_OBJECT()

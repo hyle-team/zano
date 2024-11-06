@@ -2583,3 +2583,83 @@ bool several_asset_emit_burn_txs_in_pool::c1(currency::core& c, size_t ev_index,
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+asset_with_hidden_supply_basics::asset_with_hidden_supply_basics()
+{
+  REGISTER_CALLBACK_METHOD(asset_with_hidden_supply_basics, c1);
+}
+
+bool asset_with_hidden_supply_basics::generate(std::vector<test_event_entry>& events) const
+{
+  //
+  // Test idea: make sure an asset with hidden supply can be created
+  //
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  CHECK_AND_ASSERT_MES(replace_coinbase_in_genesis_block({{MK_TEST_COINS(1), alice_acc.get_public_address()}, {MK_TEST_COINS(1), alice_acc.get_public_address()}}, generator, events, blk_0), false, "");
+
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool asset_with_hidden_supply_basics::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  miner_wlt->refresh();
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  alice_wlt->refresh();
+
+  // asset description
+  asset_descriptor_base adb{};
+  adb.decimal_point = 0;
+  adb.total_max_supply = 10'000; // for assets with hidden supply the max supply is unlimited, so setting it to nonzero value
+  adb.ticker = "PNDR";
+  adb.full_name = "Panderverse";
+  adb.hidden_supply = true;
+
+  uint64_t initial_register_amount = 5'000;
+
+  //
+  // 1. Miner registers an asset and sends some initial amount to Alice
+  std::vector<tx_destination_entry> destinations;
+  destinations.emplace_back(initial_register_amount, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey);
+  finalized_tx ft{};
+  crypto::public_key asset_id{};
+  miner_wlt->deploy_new_asset(adb, destinations, ft, asset_id);
+  LOG_PRINT_GREEN_L0("Asset " << asset_id << " was successfully deployed with tx " << ft.tx_id);
+
+  //
+  // 2. Miner emits additional amount and sends it to Alice as well
+  uint64_t additional_emit_amount = 500;
+  uint64_t total_asset_amount = initial_register_amount + additional_emit_amount;
+
+  destinations.clear();
+  destinations.emplace_back(additional_emit_amount, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey);
+  ft = finalized_tx{};
+  miner_wlt->emit_asset(asset_id, destinations, ft);
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  size_t blocks_fetched = 0;
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
+
+
+  return true;
+}
