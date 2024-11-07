@@ -1711,7 +1711,6 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
   DO_CALLBACK(events, "configure_core");
-
   CHECK_AND_ASSERT_EQ(validate_tx_semantic(transaction{}, CURRENCY_MAX_TRANSACTION_BLOB_SIZE), false);
 
   // No inputs.
@@ -1798,30 +1797,42 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
 
   // Equal key images in inputs.
   {
-    tx_out_bare output{};
     transaction tx{};
-    std::array<txin_to_key, 2> inputs{};
-    point_t key_image_point{};
 
-    output.amount = 1;
-    tx.vout.push_back(output);
-    CHECK_AND_ASSERT_EQ(key_image_point.from_string("8fc7cbfd1054690767d0c20917a68371b34b190aac5997581641f064b93d1b96"), true);
-
-    for (int position{}; position < 2; ++position)
     {
-      auto& input{inputs.at(position)};
+      txin_zc_input input_zc{};
+      txin_htlc input_htlc{};
+      txin_to_key input_to_key{};
+      point_t point_key_image{};
 
-      input.k_image = key_image_point.to_key_image();
+      CHECK_AND_ASSERT_EQ(point_key_image.from_string("93fa59f43fb9cff98e6867d20cf200c98b29cae406acdbde798ffb3e30d3503a"), true);
+      input_zc.k_image = point_key_image.to_key_image();
+      CHECK_AND_ASSERT_EQ(point_key_image.from_string("ad1226e3fd1be15e26b119fa80380e580a498e5fa3421b63fded89672b526a44"), true);
+      input_htlc.k_image = point_key_image.to_key_image();
+      CHECK_AND_ASSERT_EQ(point_key_image.from_string("8fc7cbfd1054690767d0c20917a68371b34b190aac5997581641f064b93d1b96"), true);
+      input_to_key.k_image = point_key_image.to_key_image();
+      tx.vin.push_back(input_zc);
+      tx.vin.push_back(input_htlc);
+      tx.vin.push_back(input_to_key);
+    }
+
+    {
+      txin_to_key input{};
+
+      input.amount = 0;
       tx.vin.push_back(input);
     }
 
-    CHECK_AND_ASSERT_EQ(tx.vin.at(0).type(), typeid(txin_to_key));
-    CHECK_AND_ASSERT_EQ(tx.vin.at(0).type(), tx.vin.at(1).type());
-    CHECK_AND_ASSERT_EQ(boost::get<txin_to_key>(tx.vin.at(0)).k_image, boost::get<txin_to_key>(tx.vin.at(1)).k_image);
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    for (int8_t step{}; step < 3; ++step)
+    {
+      tx.vin.push_back(tx.vin.front());
+      CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+      DO_CALLBACK(events, "mark_invalid_tx");
+      ADD_CUSTOM_EVENT(events, tx);
+      tx.vin.erase(tx.vin.begin(), tx.vin.begin() + 1);
+    }
 
-    DO_CALLBACK(events, "mark_invalid_tx");
-    ADD_CUSTOM_EVENT(events, tx);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
   }
 
   // Two entries of the same type in extra.
@@ -1998,33 +2009,35 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
 
   // Equal key images in inputs.
   {
-    tx_out_bare output{};
-    std::array<txin_to_key, 2> inputs{};
-    point_t key_image_point{};
     MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
 
+    {
+      txin_zc_input input_zc{};
+      txin_htlc input_htlc{};
+      txin_to_key input_to_key{};
+      point_t point_key_image{};
+
+      CHECK_AND_ASSERT_EQ(point_key_image.from_string("93fa59f43fb9cff98e6867d20cf200c98b29cae406acdbde798ffb3e30d3503a"), true);
+      input_zc.k_image = point_key_image.to_key_image();
+      CHECK_AND_ASSERT_EQ(point_key_image.from_string("ad1226e3fd1be15e26b119fa80380e580a498e5fa3421b63fded89672b526a44"), true);
+      input_htlc.k_image = point_key_image.to_key_image();
+      CHECK_AND_ASSERT_EQ(point_key_image.from_string("8fc7cbfd1054690767d0c20917a68371b34b190aac5997581641f064b93d1b96"), true);
+      input_to_key.k_image = point_key_image.to_key_image();
+      tx.vin.push_back(input_zc);
+      tx.vin.push_back(input_htlc);
+      tx.vin.push_back(input_to_key);
+    }
+
+    for (int8_t step{}; step < 3; ++step)
+    {
+      tx.vin.push_back(tx.vin.front());
+      CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+      DO_CALLBACK(events, "mark_invalid_tx");
+      ADD_CUSTOM_EVENT(events, tx);
+      tx.vin.erase(tx.vin.begin(), tx.vin.begin() + 1);
+    }
+
     CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
-    output.amount = 1;
-    tx.vout.push_back(output);
-    CHECK_AND_ASSERT_EQ(key_image_point.from_string("8fc7cbfd1054690767d0c20917a68371b34b190aac5997581641f064b93d1b96"), true);
-
-    for (int position{}; position < 2; ++position)
-    {
-      inputs.at(position).k_image = key_image_point.to_key_image();
-      tx.vin.push_back(inputs.at(position));
-    }
-
-    {
-      const auto& input_preceding_last{tx.vin.at(tx.vin.size() - 2u)};
-
-      CHECK_AND_ASSERT_EQ(tx.vin.back().type(), typeid(txin_to_key));
-      CHECK_AND_ASSERT_EQ(tx.vin.back().type(), input_preceding_last.type());
-      CHECK_AND_ASSERT_EQ(boost::get<txin_to_key>(tx.vin.back()).k_image, boost::get<txin_to_key>(input_preceding_last).k_image);
-    }
-
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
-    DO_CALLBACK(events, "mark_invalid_tx");
-    ADD_CUSTOM_EVENT(events, tx);
   }
 
   // Two entries of the same type in extra.
