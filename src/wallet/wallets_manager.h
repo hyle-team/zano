@@ -207,10 +207,10 @@ private:
   virtual bool on_mw_select_wallet(uint64_t wallet_id) override;
   
   //----- i_wallet_provider ------
-  virtual void lock();
-  virtual void unlock();
+  virtual void lock() override;
+  virtual void unlock() override;
 //#ifndef MOBILE_WALLET_BUILD
-  virtual std::shared_ptr<tools::wallet2> get_wallet();
+  virtual std::shared_ptr<tools::wallet2> get_wallet() override;
 //#endif
   //--------
 
