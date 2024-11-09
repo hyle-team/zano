@@ -55,6 +55,7 @@ public:
   {
     currency::core_runtime_config core_conf;
     epee::locked_object<std::shared_ptr<tools::wallet2>, wallet_lock_time_watching_policy> w;
+    std::shared_ptr<tools::i_wallet2_callback> w_cb; // not using locked_object here, cuz w_cb is accessed only via it's wallet -- sowle
     typedef epee::locked_object<std::shared_ptr<tools::wallet2>, wallet_lock_time_watching_policy>::lock_shared_ptr wallet_lock_object;
     std::shared_ptr<tools::wallet_rpc_server> rpc_wrapper; //500 bytes of extra data, we can afford it, to have rpc-like invoke map
     std::atomic<bool> do_mining;
