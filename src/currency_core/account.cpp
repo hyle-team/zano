@@ -108,6 +108,9 @@ namespace currency
     uint64_t h_64 = *reinterpret_cast<uint64_t*>(&h);
     uint16_t checksum = h_64 % (checksum_max + 1);
     
+    if (checksum == checksum_max) // workaround for incorrect checksum calculation (trying to keep the whole scheme untouched) -- sowle
+      checksum = 0;
+    
     uint8_t auditable_flag = 0;
     if (m_keys.account_address.flags & ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE)
       auditable_flag = 1;
@@ -216,6 +219,10 @@ namespace currency
       h = crypto::cn_fast_hash(&h, sizeof h);
       uint64_t h_64 = *reinterpret_cast<uint64_t*>(&h);
       uint16_t checksum_calculated = h_64 % (checksum_max + 1);
+      
+      if (checksum_calculated == checksum_max) // workaround for incorrect checksum calculation (trying to keep the whole scheme untouched) -- sowle
+        checksum_calculated = 0;
+
       if (checksum != checksum_calculated)
       {
         LOG_PRINT_L0("seed phase has invalid checksum: " << checksum_calculated << ", while " << checksum << " is expected, check your words");
@@ -230,6 +237,8 @@ namespace currency
 
     if (auditable_flag)
       m_keys.account_address.flags |= ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE;
+    else
+      m_keys.account_address.flags &= ~ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE;
 
     return true;
   }
