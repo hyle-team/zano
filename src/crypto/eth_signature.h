@@ -31,7 +31,7 @@ namespace crypto
   bool generate_eth_key_pair(eth_secret_key& sec_key, eth_public_key& pub_key) noexcept;
 
   // converts eth_secret_key to eth_public_key
-  bool eth_secret_key_to_public_key(const eth_secret_key& sec_key, eth_public_key& pub_key) noexcept;
+  //bool _eth_secret_key_to_public_key(const eth_secret_key& sec_key, eth_public_key& pub_key) noexcept;
 
   // generates secp256k1 ECDSA signature
   bool generate_eth_signature(const hash& m, const eth_secret_key& sec_key, eth_signature& sig) noexcept;

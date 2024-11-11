@@ -51,7 +51,8 @@
 #define   WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER                   uint32_t(1 << 3)
 #define   WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION             uint32_t(1 << 4) // transfer is reserved for cold-signing (unsigned tx was created and passed for signing)
 #define   WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM                      uint32_t(1 << 5) // for htlc keeps info if this htlc belong as redeem or as refund
-#define   WALLET_TRANSFER_DETAIL_FLAG_ASSET_OP_RESERVATION             uint32_t(1 << 6) // transfer is reserved for an ongoing asset operation with external signing
+#define   WALLET_TRANSFER_DETAIL_CONCISE_MODE_PRESERVE                 uint32_t(1 << 6) // do not truncate this output with CONCISE mode
+#define   WALLET_TRANSFER_DETAIL_FLAG_ASSET_OP_RESERVATION             uint32_t(1 << 7) // transfer is reserved for an ongoing asset operation with external signing
 
 
 
@@ -228,6 +229,9 @@ namespace tools
     // misc
     std::string tx_meaning_for_logs; // used to correctly log things, e.g. "escrow" or "asset emission".
     uint32_t additional_transfer_flags_to_mark = 0;
+
+    //ado
+    bool ado_sign_thirdparty = false;
   };
 
   struct mode_separate_context
@@ -382,14 +386,16 @@ namespace tools
         return true;
       return false;
     }
-    static inline uint64_t transfer_details_base_to_amount(const transfer_details_base& tdb)
+    static inline bool transfer_details_base_to_amount(const transfer_details_base& tdb, uint64_t& val)
     {
-      return tdb.amount();
+      val = tdb.amount();
+      return true;
     }
     //----------------------------------------------------------------------------------------------------
-    static inline std::string transfer_details_base_to_tx_hash(const transfer_details_base& tdb)
+    static inline bool transfer_details_base_to_tx_hash(const transfer_details_base& tdb, std::string& val)
     {
-      return epee::string_tools::pod_to_hex(currency::get_transaction_hash(tdb.m_ptx_wallet_info->m_tx));
+      val = epee::string_tools::pod_to_hex(currency::get_transaction_hash(tdb.m_ptx_wallet_info->m_tx));
+      return true;
     }
 
 
@@ -511,12 +517,14 @@ namespace tools
 
   typedef std::unordered_multimap<std::string, payment_details> payment_container;
 
-  typedef std::deque<transfer_details> transfer_container;
+  typedef std::map<uint64_t, transfer_details> transfer_container; //typedef std::deque<transfer_details> transfer_container;
   typedef std::unordered_map<crypto::hash, transfer_details_base> multisig_transfer_container;
   typedef std::unordered_map<crypto::hash, tools::wallet_public::escrow_contract_details_basic> escrow_contracts_container;
   typedef std::map<uint64_t, std::set<size_t> > free_amounts_cache_type;
   typedef std::unordered_map<crypto::public_key, free_amounts_cache_type> free_assets_amounts_cache_type;
   typedef std::unordered_map<std::pair<uint64_t, uint64_t>, uint64_t> amount_gindex_to_transfer_id_container; // maps [amount; gindex] -> tid
+  typedef std::unordered_map<crypto::hash, crypto::secret_key> tx_secrete_keys_container;
+  typedef std::unordered_map<crypto::hash, tools::wallet_public::wallet_transfer_info> unconfirmed_txs_container;
 
 }// namespace tools
 

@@ -212,7 +212,7 @@ namespace tools
     return epee::http_server_impl_base<wallet_rpc_server, connection_context>::init(m_port, m_bind_ip);
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::auth_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context)
+  bool wallet_rpc_server::auth_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& conn_context)
   {
 
     auto it = std::find_if(query_info.m_header_info.m_etc_fields.begin(), query_info.m_header_info.m_etc_fields.end(), [](const auto& element)
@@ -252,7 +252,7 @@ namespace tools
       m_jwt_used_salts.add(salt, ticks_now + JWT_TOKEN_EXPIRATION_MAXIMUM);
       m_jwt_used_salts.remove_if_expiration_less_than(ticks_now);
 
-      LOG_PRINT_L0("JWT token OK");
+      LOG_PRINT_L3("JWT token OK");
       return true;
     }
     catch(const std::exception& e)
@@ -266,12 +266,13 @@ namespace tools
 
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context)
+  bool wallet_rpc_server::handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, epee::net_utils::connection_context_base& conn_context, bool& call_found, documentation& docs)
   {
-    if (m_jwt_secret.size() && m_conn_context.m_connection_id != RPC_INTERNAL_UI_CONTEXT)
+    if (m_jwt_secret.size() && conn_context.m_connection_id != RPC_INTERNAL_UI_CONTEXT)
     {
-      if (!auth_http_request(query_info, response, m_conn_context))
+      if (!auth_http_request(query_info, response, conn_context))
       {
+        call_found = true;
         response.m_response_code    = 401;
         response.m_response_comment = "Unauthorized";
         return true;
@@ -281,14 +282,13 @@ namespace tools
     response.m_response_code = 200;
     response.m_response_comment = "Ok";
     std::string reference_stub;
-    bool call_found = false;
     if (m_deaf)
     {
       response.m_response_code = 500;
       response.m_response_comment = "Internal Server Error";
       return true;
     }
-    if (!handle_http_request_map(query_info, response, m_conn_context, call_found) && response.m_response_code == 200)
+    if (!handle_http_request_map(query_info, response, conn_context, call_found, docs) && response.m_response_code == 200)
     {
       response.m_response_code = 500;
       response.m_response_comment = "Internal Server Error";
@@ -1316,6 +1316,13 @@ namespace tools
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
 
+    if (!currency::validate_asset_ticker_and_full_name(req.asset_descriptor))
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "asset ticker or full_name is invalid";
+      return false;
+    }
+
     std::vector<currency::tx_destination_entry> currency_destinations;
     rpc_destinations_to_currency_destinations(req.destinations, true, !req.do_not_split_destinations, currency_destinations);
 
@@ -1388,7 +1395,7 @@ namespace tools
     WALLET_RPC_BEGIN_TRY_ENTRY();
 
     currency::finalized_tx ft{};
-    w.get_wallet()->burn_asset(req.asset_id, req.burn_amount, ft);
+    w.get_wallet()->burn_asset(req.asset_id, req.burn_amount, ft, req.service_entries, req.point_tx_to_address, req.native_amount);
     res.tx_id = ft.tx_id;
 
     return true;
@@ -1441,7 +1448,7 @@ namespace tools
   bool wallet_rpc_server::on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS::request& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
-    i_wallet2_callback* pcallback = w.get_wallet()->get_callback();
+    std::shared_ptr<i_wallet2_callback> pcallback = w.get_wallet()->get_callback();
     if (!pcallback)
     {
       er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
@@ -1456,7 +1463,7 @@ namespace tools
   bool wallet_rpc_server::on_mw_select_wallet(const wallet_public::COMMAND_MW_SELECT_WALLET::request& req, wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
-    i_wallet2_callback* pcallback = w.get_wallet()->get_callback();
+    std::shared_ptr<i_wallet2_callback> pcallback = w.get_wallet()->get_callback();
     if (!pcallback)
     {
       er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;

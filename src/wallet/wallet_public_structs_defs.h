@@ -153,7 +153,6 @@ namespace wallet_public
     std::vector<currency::tx_service_attachment> service_entries;
     std::vector<std::string> remote_addresses;  //optional
     std::vector<std::string> remote_aliases; //optional, describe only if there only one remote address
-
     std::vector<wallet_sub_transfer_info> subtransfers;
 
     //not included in streaming serialization
@@ -191,6 +190,8 @@ namespace wallet_public
       KV_SERIALIZE(remote_addresses)              DOC_DSCR("Remote addresses of this transfer(destination if it's outgoing transfer or sender if it's incoming transaction)")  DOC_EXMP_AUTO(1, "ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp")   DOC_END
       KV_SERIALIZE(remote_aliases)                DOC_DSCR("Aliases for remot addresses, of discovered")  DOC_EXMP_AUTO(1, "roger")    DOC_END
       KV_SERIALIZE(subtransfers)                  DOC_DSCR("Essential part of transfer entry: amounts that been transfered in this transaction grouped by asset id")  DOC_EXMP_AUTO(1)   DOC_END
+      
+      KV_SERIALIZE_EPHEMERAL_N(currency::asset_descriptor_operation, wallet_transfer_info_get_ado, "ado")   DOC_DSCR("\"Asset Descriptor Operation\" if it was present in transaction")   DOC_END
     END_KV_SERIALIZE_MAP()
 
     BEGIN_BOOST_SERIALIZATION()
@@ -277,6 +278,13 @@ namespace wallet_public
       subtransfers.back().is_income = true;
       return subtransfers.back().amount;
     }
+    static inline bool wallet_transfer_info_get_ado(const wallet_transfer_info& tdb, currency::asset_descriptor_operation& val)
+    {
+      if (currency::get_type_in_variant_container(tdb.tx.extra, val))
+        return true;
+       
+      return false;
+    }
   };
 
   struct wallet_transfer_info_old : public wallet_transfer_info
@@ -291,14 +299,16 @@ namespace wallet_public
       KV_CHAIN_BASE(wallet_transfer_info)
     END_KV_SERIALIZE_MAP()
 
-    static uint64_t wallet_transfer_info_to_amount(const wallet_transfer_info_old& wtio)
+    static bool wallet_transfer_info_to_amount(const wallet_transfer_info_old& wtio, uint64_t &val)
     {
-      return wtio.get_native_amount();
+      val = wtio.get_native_amount();
+      return true;
     }
 
-    static bool wallet_transfer_info_to_is_income(const wallet_transfer_info_old& wtio)
+    static bool wallet_transfer_info_to_is_income(const wallet_transfer_info_old& wtio, bool& val)
     {
-      return wtio.get_native_is_income();
+      val = wtio.get_native_is_income();
+      return true;
     }
 
   };
@@ -1001,92 +1011,6 @@ namespace wallet_public
       KV_SERIALIZE(basement_tx_id_hex)
     END_KV_SERIALIZE_MAP()
   };
-
-  struct COMMAND_RPC_MAKETELEPOD
-  {
-    struct request
-    {
-      uint64_t amount;
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(amount)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      std::string status; //"OK", "INSUFFICIENT_COINS", "INTERNAL_ERROR"
-      telepod tpd;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(status)
-        KV_SERIALIZE(tpd)
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-
-
-  struct COMMAND_RPC_TELEPODSTATUS
-  {
-    struct request
-    {
-      telepod tpd;
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(tpd)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      std::string status;  //"OK", "UNCONFIRMED", "BAD", "SPENT", "INTERNAL_ERROR"
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(status)
-     END_KV_SERIALIZE_MAP()
-    };
-  };
-
-  struct COMMAND_RPC_CLONETELEPOD
-  {
-    struct request
-    {
-      telepod tpd;
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(tpd)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      std::string status;//"OK", "UNCONFIRMED", "BAD", "SPENT", "INTERNAL_ERROR:"
-      telepod tpd;
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(status)
-        KV_SERIALIZE(tpd)
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-
-  struct COMMAND_RPC_WITHDRAWTELEPOD
-  {
-    struct request
-    {
-      telepod tpd;
-      std::string addr;
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(tpd)
-        KV_SERIALIZE(addr)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      std::string status;  //"OK", "UNCONFIRMED", "BAD", "SPENT", "INTERNAL_ERROR", "BAD_ADDRESS"
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(status)
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-
 
   struct create_proposal_param
   {
@@ -2087,12 +2011,19 @@ namespace wallet_public
 
     struct request
     {
-      crypto::public_key asset_id;
-      uint64_t burn_amount;
+      crypto::public_key asset_id = currency::null_pkey;
+      uint64_t burn_amount = 0;
+      //optional params
+      std::string point_tx_to_address;
+      uint64_t native_amount = 0;
+      std::vector<currency::tx_service_attachment> service_entries;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Id of the asset to burn") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
         KV_SERIALIZE(burn_amount) DOC_DSCR("Amount to burn") DOC_EXMP(10000000) DOC_END
+        KV_SERIALIZE(point_tx_to_address) DOC_DSCR("Optional, if we need this transaction to be seen by particular wallet") DOC_EXMP("ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp") DOC_END
+        KV_SERIALIZE(native_amount) DOC_DSCR("Optional, if we need this transaction to be seen by particular wallet") DOC_EXMP(0) DOC_END
+        KV_SERIALIZE(service_entries) DOC_DSCR("Optional, if we need to include service entries for burn transaction") DOC_EXMP_AUTO(1) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -2114,8 +2045,8 @@ namespace wallet_public
     {
       currency::blobdata    finalized_tx;
       currency::blobdata    unsigned_tx;
-      crypto::eth_signature eth_sig;
-      crypto::hash          expected_tx_id;
+      crypto::eth_signature eth_sig; //TODO: add value initialization here 
+      crypto::hash          expected_tx_id = currency::null_hash;
       bool                  unlock_transfers_on_fail = false;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -2130,7 +2061,7 @@ namespace wallet_public
     struct response
     {
       std::string           status;
-      bool                  transfers_were_unlocked;
+      bool                  transfers_were_unlocked = false;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call") DOC_EXMP("OK") DOC_END

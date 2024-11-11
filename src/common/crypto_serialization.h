@@ -313,5 +313,18 @@ namespace boost
     {
       a & reinterpret_cast<char (&)[sizeof(crypto::eth_signature)]>(x);
     }    
+    template <class Archive>
+    inline void serialize(Archive& a, crypto::scalar_vec_t& x, const boost::serialization::version_type ver)
+    {
+      static_assert(sizeof(std::vector<crypto::scalar_t>) == sizeof(crypto::scalar_vec_t));
+      a & static_cast<std::vector<crypto::scalar_t>&>(x);
+    }
+    template <class Archive, size_t N>
+    inline void serialize(Archive& a, crypto::scalar_mat_t<N>& x, const boost::serialization::version_type ver)
+    {
+      static_assert(sizeof(std::vector<crypto::scalar_t>) == sizeof(crypto::scalar_mat_t<N>));
+      a & static_cast<std::vector<crypto::scalar_t>&>(x);
+    }
+
   } // namespace serialization
 } // namespace boost

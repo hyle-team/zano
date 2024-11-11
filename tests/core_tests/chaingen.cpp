@@ -997,6 +997,8 @@ bool test_generator::init_test_wallet(const currency::account_base& account, con
   w->set_genesis(genesis_hash);
   w->set_core_proxy(m_wallet_test_core_proxy);
   w->set_disable_tor_relay(true);
+  w->set_concise_mode(true);
+  w->set_concise_mode_reorg_max_reorg_blocks(TESTS_CONCISE_MODE_REORG_MAX_REORG_BLOCK);
 
   result = w;
   return true;
@@ -1113,7 +1115,7 @@ bool test_generator::construct_pow_block_with_alias_info_in_coinbase(const accou
       miner_tx.proofs.emplace_back(std::move(currency::zc_asset_surjection_proof{}));
       // range proofs
       currency::zc_outs_range_proof range_proofs{};
-      r = generate_zc_outs_range_proof(tx_id, 0, tx_gen_context, miner_tx.vout, range_proofs);
+      r = generate_zc_outs_range_proof(tx_id, tx_gen_context, miner_tx.vout, range_proofs);
       CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
       miner_tx.proofs.emplace_back(std::move(range_proofs));
       // balance proof
@@ -2225,12 +2227,13 @@ bool make_tx_multisig_to_key(const currency::transaction& source_tx,
 
 bool estimate_wallet_balance_blocked_for_escrow(const tools::wallet2& w, uint64_t& result, bool substruct_change_from_result /* = true */)
 {
-  std::deque<tools::transfer_details> transfers;
+  tools::transfer_container transfers;
   w.get_transfers(transfers);
 
   result = 0;
-  for (const tools::transfer_details& td : transfers)
+  for (const auto& tr : transfers)
   {
+    const tools::transfer_details& td = tr.second;
     if (td.m_flags == (WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION))
       result += td.amount();
   }

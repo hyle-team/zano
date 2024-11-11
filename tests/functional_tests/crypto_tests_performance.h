@@ -1340,7 +1340,6 @@ TEST(perf, point_eq_vs_iszero)
   return true;
 }
 
-
 TEST(perf, buff_to_hex)
 {
   std::vector<std::string> in_buffs;

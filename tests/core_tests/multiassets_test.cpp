@@ -310,10 +310,19 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   //miner_wlt->refresh();
 
 
+
   // check emit_asset() with modified 'current_supply'
   miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_seal>([&](const wde_construct_tx_handle_asset_descriptor_operation_before_seal& o)
   {
-    o.pado->descriptor.current_supply += 1000000;
+    if(o.pado->version < ASSET_DESCRIPTOR_OPERATION_HF5_VER)
+    {
+      //hf4
+      o.pado->opt_descriptor->current_supply += 1000000;
+    }
+    else
+    {
+      *o.pado->opt_amount += 1000000;
+    }
   });
   //test emit function but re-adjust current_supply to wrong amount
   r = false;
@@ -345,7 +354,15 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 
   miner_wlt->get_debug_events_dispatcher().SUBSCIRBE_DEBUG_EVENT<wde_construct_tx_handle_asset_descriptor_operation_before_burn>([&](const wde_construct_tx_handle_asset_descriptor_operation_before_burn& o)
   {
-    o.pado->descriptor.current_supply -= 1000000;
+    if (o.pado->version < ASSET_DESCRIPTOR_OPERATION_HF5_VER)
+    {
+      //hf4
+      o.pado->opt_descriptor->current_supply -= 1000000;
+    }
+    else
+    {
+      *o.pado->opt_amount -= 1000000;
+    }
   });
 
 
@@ -407,6 +424,31 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
 }
 
 //------------------------------------------------------------------------------
+//@#@  TODO: subject for refactoring: this fill_ado*/fill_adb* are copy/paste clones of wallet's, need to be implemented in one place at some point
+//----------------------------------------------------------------------------------------------------
+void fill_ado_version_based_onhardfork(currency::asset_descriptor_operation& asset_reg_info, size_t current_latest_hf)
+{
+  if (current_latest_hf < ZANO_HARDFORK_05)
+  {
+    asset_reg_info.version = ASSET_DESCRIPTOR_OPERATION_HF4_VER;
+  }
+  else
+  {
+    asset_reg_info.version = ASSET_DESCRIPTOR_OPERATION_LAST_VER;
+  }
+}
+//----------------------------------------------------------------------------------------------------
+void fill_adb_version_based_onhardfork(currency::asset_descriptor_base& asset_base, size_t current_latest_hf)
+{
+  if (current_latest_hf < ZANO_HARDFORK_05)
+  {
+    asset_base.version = ASSET_DESCRIPTOR_BASE_HF4_VER;
+  }
+  else
+  {
+    asset_base.version = ASSET_DESCRIPTOR_BASE_LAST_VER;
+  }
+}
 
 assets_and_explicit_native_coins_in_outs::assets_and_explicit_native_coins_in_outs()
 {
@@ -535,7 +577,7 @@ bool assets_and_explicit_native_coins_in_outs::c2_alice_deploys_asset(currency::
   // make sure Alice has two UTXO now
   tools::transfer_container transfers{};
   alice_wlt->get_transfers(transfers);
-  size_t unspent_transfers = std::count_if(transfers.begin(), transfers.end(), [](const tools::transfer_details& tr){ return !tr.is_spent(); });
+  size_t unspent_transfers = std::count_if(transfers.begin(), transfers.end(), [](const auto& tr){ return !tr.second.is_spent(); });
   CHECK_AND_ASSERT_MES(unspent_transfers == 2, false, "unexpected number of Alice's unspent transfers: " << unspent_transfers);
 
   asset_descriptor_base adb{};
@@ -694,15 +736,15 @@ bool asset_depoyment_and_few_zc_utxos::c1(currency::core& c, size_t ev_index, co
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", m_alice_initial_balance, 0, m_alice_initial_balance, 0, 0), false, "");
 
   // make sure Alice has correct UTXO wallet structure
-  tools::transfer_container transfers{};
+  tools::transfer_container transfers;
   alice_wlt->get_transfers(transfers);
   size_t zc_unspent_outs = 0, unspent_outs = 0;
   for(auto& td : transfers)
   {
-    if (!td.is_spent())
+    if (!td.second.is_spent())
     {
       ++unspent_outs;
-      if (td.is_zc())
+      if (td.second.is_zc())
         ++zc_unspent_outs;
     }
   }
@@ -858,7 +900,7 @@ bool asset_emission_and_unconfirmed_balance::c1(currency::core& c, size_t ev_ind
 
   asset_descriptor_base adb{};
   adb.total_max_supply = UINT64_MAX;
-  adb.full_name = "2**64";
+  adb.full_name = "2 xx 64";
   adb.ticker = "2POWER64";
 
   std::vector<currency::tx_destination_entry> destinations;
@@ -894,6 +936,7 @@ bool asset_emission_and_unconfirmed_balance::c1(currency::core& c, size_t ev_ind
 
 asset_operation_and_hardfork_checks::asset_operation_and_hardfork_checks()
 {
+  m_adb_hello.version = ASSET_DESCRIPTOR_BASE_HF4_VER;
   m_adb_hello.total_max_supply = 1'000'000'000'000'000'000;
   m_adb_hello.current_supply = 1'000'000'000'000'000'000;
   m_adb_hello.ticker = "HLO";
@@ -903,6 +946,7 @@ asset_operation_and_hardfork_checks::asset_operation_and_hardfork_checks()
 
   m_ado_hello.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
   m_ado_hello.opt_asset_id = currency::null_pkey;
+  m_ado_hello.version = ASSET_DESCRIPTOR_OPERATION_HF4_VER;
 
   m_adb_bye.total_max_supply = 1'000'000'000'000'000'000;
   m_adb_bye.current_supply = 1'000'000'000'000'000'000;
@@ -913,6 +957,7 @@ asset_operation_and_hardfork_checks::asset_operation_and_hardfork_checks()
 
   m_ado_bye.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
   m_ado_hello.opt_asset_id = currency::null_pkey;
+  m_ado_hello.version = ASSET_DESCRIPTOR_OPERATION_HF4_VER;
 
   REGISTER_CALLBACK_METHOD(asset_operation_and_hardfork_checks, c1);
   REGISTER_CALLBACK_METHOD(asset_operation_and_hardfork_checks, c2);
@@ -942,10 +987,10 @@ bool asset_operation_and_hardfork_checks::generate(
   alice.generate();
 
   m_adb_hello.owner = alice.get_public_address().spend_public_key;
-  m_ado_hello.descriptor = m_adb_hello;
+  m_ado_hello.opt_descriptor = m_adb_hello;
 
   m_adb_bye.owner = alice.get_public_address().spend_public_key;
-  m_ado_bye.descriptor = m_adb_bye;
+  m_ado_bye.opt_descriptor = m_adb_bye;
 
   MAKE_GENESIS_BLOCK(events,
                      blk_0,
@@ -1014,7 +1059,9 @@ bool asset_operation_and_hardfork_checks::generate(
                             /* asset_id = */ currency::null_pkey);
 
   tx_version = get_tx_version(get_block_height(blk_1r), m_hardforks);
-
+  size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_1r));
+  fill_ado_version_based_onhardfork(m_ado_hello, hf_n);
+  fill_adb_version_based_onhardfork(*m_ado_hello.opt_descriptor, hf_n);
   success = construct_tx(alice.get_keys(),
                          sources,
                          destinations,
@@ -1061,6 +1108,9 @@ bool asset_operation_and_hardfork_checks::generate(
   tx_version = get_tx_version(get_block_height(blk_2r),
                               m_hardforks);
 
+  hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
+  fill_ado_version_based_onhardfork(m_ado_hello, hf_n);
+  fill_adb_version_based_onhardfork(*m_ado_hello.opt_descriptor, hf_n);
   success = construct_tx(alice.get_keys(),
                          sources,
                          destinations,
@@ -1099,6 +1149,10 @@ bool asset_operation_and_hardfork_checks::generate(
   tx_version = get_tx_version(get_block_height(blk_2r),
                               m_hardforks);
 
+  hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
+  fill_ado_version_based_onhardfork(m_ado_bye, hf_n);
+  fill_adb_version_based_onhardfork(*m_ado_bye.opt_descriptor, hf_n);
+
   success = construct_tx(alice.get_keys(),
                          sources,
                          destinations,
@@ -1133,6 +1187,10 @@ bool asset_operation_and_hardfork_checks::generate(
 
   tx_version = get_tx_version(get_block_height(blk_2r),
                               m_hardforks);
+
+  hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
+  fill_ado_version_based_onhardfork(m_ado_bye, hf_n);
+  fill_adb_version_based_onhardfork(*m_ado_bye.opt_descriptor, hf_n);
 
   success = construct_tx(alice.get_keys(),
                          sources,
@@ -1212,6 +1270,7 @@ bool asset_operation_and_hardfork_checks::c2(
 
 asset_operation_in_consolidated_tx::asset_operation_in_consolidated_tx()
 {
+  m_adb_alice_currency.version = ASSET_DESCRIPTOR_BASE_HF4_VER;
   m_adb_alice_currency.total_max_supply = 1'000'000'000'000'000'000;
   m_adb_alice_currency.current_supply = 1'000'000'000'000'000'000;
   m_adb_alice_currency.ticker = "ALC";
@@ -1221,6 +1280,7 @@ asset_operation_in_consolidated_tx::asset_operation_in_consolidated_tx()
 
   m_ado_alice_currency.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
   m_ado_alice_currency.opt_asset_id = currency::null_pkey;
+  m_ado_alice_currency.version = ASSET_DESCRIPTOR_OPERATION_HF4_VER;
 
   REGISTER_CALLBACK_METHOD(asset_operation_in_consolidated_tx, assert_balances);
   REGISTER_CALLBACK_METHOD(asset_operation_in_consolidated_tx, assert_alice_currency_not_registered);
@@ -1242,7 +1302,7 @@ bool asset_operation_in_consolidated_tx::generate(std::vector<test_event_entry>&
   m_accounts.push_back(alice);
   m_accounts.push_back(bob);
   m_adb_alice_currency.owner      = m_accounts.at(ALICE_ACC_IDX).get_public_address().spend_public_key;
-  m_ado_alice_currency.descriptor = m_adb_alice_currency;
+  m_ado_alice_currency.opt_descriptor = m_adb_alice_currency;
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
   DO_CALLBACK(events, "configure_core");
@@ -1288,6 +1348,11 @@ bool asset_operation_in_consolidated_tx::generate(std::vector<test_event_entry>&
     destinations.emplace_back(MK_TEST_COINS(/* 10 - 5 - 0 = */ 5), bob.get_public_address());
     destinations.emplace_back(m_adb_alice_currency.current_supply, alice.get_public_address(), null_pkey);
     tx_version = get_tx_version(get_block_height(blk_2r), m_hardforks);
+    size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
+    fill_ado_version_based_onhardfork(m_ado_alice_currency, hf_n);
+    fill_adb_version_based_onhardfork(*m_ado_alice_currency.opt_descriptor, hf_n);
+
+
     success    = construct_tx(bob.get_keys(), sources, destinations, { m_ado_alice_currency }, empty_attachment, tx_2, tx_version, one_time, 0, 0, 0, true, TX_FLAG_SIGNATURE_MODE_SEPARATE,
                               /* fee = */ 0, context_tx_2);
     CHECK_AND_ASSERT_MES(success, false, "failed to construct transaction tx_2 on step 2");
@@ -1348,7 +1413,6 @@ bool eth_signed_asset_basics::generate(std::vector<test_event_entry>& events) co
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
-  miner_acc.generate();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
   DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
@@ -1423,7 +1487,9 @@ bool eth_signed_asset_basics::c1(currency::core& c, size_t ev_index, const std::
   crypto::eth_signature eth_sig{};
   r = crypto::generate_eth_signature(ft.tx_id, eth_sk, eth_sig);
   CHECK_AND_ASSERT_MES(r, false, "generate_eth_signature failed");
-
+  r = crypto::verify_eth_signature(ft.tx_id, eth_pk, eth_sig);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_signature self validation failed");
+   
   transaction emit_tx{};
   bool transfers_unlocked = false;
   miner_wlt->submit_externally_signed_asset_tx(ft, eth_sig, true, emit_tx, transfers_unlocked);
@@ -1560,7 +1626,6 @@ bool eth_signed_asset_via_rpc::generate(std::vector<test_event_entry>& events) c
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
-  miner_acc.generate();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
   DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
@@ -1805,8 +1870,8 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
   CHECK_AND_ASSERT_EQ(pado->operation_type, ASSET_DESCRIPTOR_OPERATION_UPDATE);
   CHECK_AND_ASSERT_EQ(pado->opt_asset_id.has_value(), true);
   CHECK_AND_ASSERT_EQ(pado->opt_asset_id.get(), asset_id);
-  CHECK_AND_ASSERT_EQ(pado->descriptor.owner_eth_pub_key.has_value(), true);
-  CHECK_AND_ASSERT_EQ(pado->descriptor.owner_eth_pub_key.get(), eth_pk_2); // the most important condition for an ownership transfer
+  CHECK_AND_ASSERT_EQ(pado->opt_descriptor->owner_eth_pub_key.has_value(), true);
+  CHECK_AND_ASSERT_EQ(pado->opt_descriptor->owner_eth_pub_key.get(), eth_pk_2); // the most important condition for an ownership transfer
   // other fileds of pado->descriptor may also be checked here
 
   //
@@ -2007,12 +2072,13 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
   m_accounts.push_back(miner);
   m_accounts.push_back(alice);
   m_adbs.at(asset_position::alpha).owner = m_adbs.at(asset_position::beta).owner = m_adbs.at(asset_position::gamma).owner = alice.get_public_address().spend_public_key;
-  m_ados_register.at(asset_position::alpha).descriptor = m_adbs.at(asset_position::alpha);
-  m_ados_register.at(asset_position::beta).descriptor = m_ado_emit.descriptor = m_adbs.at(asset_position::beta);
-  m_ados_register.at(asset_position::gamma).descriptor = m_adbs.at(asset_position::gamma);
-  CHECK_AND_ASSERT(m_ado_emit.descriptor.current_supply <= m_ado_emit.descriptor.total_max_supply, false);
-  ++m_ado_emit.descriptor.current_supply;
-  CHECK_AND_ASSERT(m_ado_emit.descriptor.current_supply > m_ado_emit.descriptor.total_max_supply, false);
+  m_ados_register.at(asset_position::alpha).opt_descriptor = m_adbs.at(asset_position::alpha);
+  m_ados_register.at(asset_position::beta).opt_descriptor = m_ado_emit.opt_descriptor = m_adbs.at(asset_position::beta);
+  m_ados_register.at(asset_position::gamma).opt_descriptor = m_adbs.at(asset_position::gamma);
+
+  CHECK_AND_ASSERT((*m_ado_emit.opt_descriptor).current_supply <= (*m_ado_emit.opt_descriptor).total_max_supply, false);
+  ++(m_ado_emit.opt_descriptor->current_supply);
+  CHECK_AND_ASSERT(m_ado_emit.opt_descriptor->current_supply > m_ado_emit.opt_descriptor->total_max_supply, false);
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
   DO_CALLBACK(events, "configure_core");
@@ -2040,12 +2106,15 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     std::vector<tx_destination_entry> destinations{};
     const auto& ado{m_ados_register.at(asset_position::gamma)};
     crypto::secret_key one_time{};
+    size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_1r));
+    //fill_ado_version_based_onhardfork(ado, hf_n);
+    //fill_adb_version_based_onhardfork(*ado.opt_descriptor, hf_n);
 
     success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
-    destinations.emplace_back(ado.descriptor.current_supply, alice.get_public_address(), null_pkey);
-    CHECK_AND_ASSERT_EQ(ado.descriptor.total_max_supply, 0);
-    CHECK_AND_ASSERT_EQ(ado.descriptor.total_max_supply, ado.descriptor.current_supply);
+    destinations.emplace_back(ado.opt_descriptor->current_supply, alice.get_public_address(), null_pkey);
+    CHECK_AND_ASSERT_EQ(ado.opt_descriptor->total_max_supply, 0);
+    CHECK_AND_ASSERT_EQ(ado.opt_descriptor->total_max_supply, ado.opt_descriptor->current_supply);
     success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_1, get_tx_version(get_block_height(top), m_hardforks), one_time, 0);
     CHECK_AND_ASSERT_EQ(success, true);
   }
@@ -2063,11 +2132,14 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     std::vector<tx_destination_entry> destinations{};
     crypto::secret_key one_time{};
     const auto& ado{m_ados_register.at(asset_position::alpha)};
+    size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
+    //fill_ado_version_based_onhardfork(ado, hf_n);
+    //fill_adb_version_based_onhardfork(*ado.opt_descriptor, hf_n);
 
     success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
-    destinations.emplace_back(ado.descriptor.current_supply, alice.get_public_address(), null_pkey);
-    CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > ado.descriptor.total_max_supply, false, "current_supply <= total_max_supply");
+    destinations.emplace_back(ado.opt_descriptor->current_supply, alice.get_public_address(), null_pkey);
+    CHECK_AND_ASSERT_MES(ado.opt_descriptor->current_supply > ado.opt_descriptor->total_max_supply, false, "current_supply <= total_max_supply");
     success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_2, get_tx_version(get_block_height(top), m_hardforks), one_time, 0);
     CHECK_AND_ASSERT_EQ(success, true);
   }
@@ -2085,11 +2157,14 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     std::vector<tx_destination_entry> destinations{};
     crypto::secret_key one_time{};
     const auto& ado{m_ados_register.at(asset_position::beta)};
+    size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
+    //fill_ado_version_based_onhardfork(ado, hf_n);
+    //fill_adb_version_based_onhardfork(*ado.opt_descriptor, hf_n);
 
     success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
-    destinations.emplace_back(ado.descriptor.current_supply, alice.get_public_address(), null_pkey);
-    CHECK_AND_ASSERT(ado.descriptor.current_supply <= ado.descriptor.total_max_supply, false);
+    destinations.emplace_back(ado.opt_descriptor->current_supply, alice.get_public_address(), null_pkey);
+    CHECK_AND_ASSERT(ado.opt_descriptor->current_supply <= ado.opt_descriptor->total_max_supply, false);
     success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_3, get_tx_version(get_block_height(top), m_hardforks), one_time, 0);
     CHECK_AND_ASSERT_EQ(success, true);
   }
@@ -2108,7 +2183,7 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     m_ado_emit.opt_asset_id = beta_asset_id;
   }
 
-  CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, m_ado_emit.descriptor.total_max_supply);
+  CHECK_AND_ASSERT_GREATER(m_ado_emit.opt_descriptor->current_supply, m_ado_emit.opt_descriptor->total_max_supply);
   // Alice emits asset BETA. The emission is performed through the wallet object. There is no emission, because .current_supply > .total_max_supply in the asset base descriptor.
   DO_CALLBACK(events, "emit_asset_beta_with_incorrect_supply");
 
@@ -2123,18 +2198,25 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     tx_source_entry source{};
     finalize_tx_param ftp{};
     finalized_tx ftx{};
+    
+    size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_3r));
+    //fill_ado_version_based_onhardfork(ado_register, hf_n);
+    //fill_adb_version_based_onhardfork(*ado_register.opt_descriptor, hf_n);
 
     success = fill_tx_sources_and_destinations(events, top, alice.get_keys(), alice.get_public_address(), MK_TEST_COINS(2), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
-    CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, ado_register.descriptor.current_supply);
-    destinations.emplace_back(m_ado_emit.descriptor.current_supply - ado_register.descriptor.current_supply, alice.get_public_address(), null_pkey);
+    CHECK_AND_ASSERT_GREATER(m_ado_emit.opt_descriptor->current_supply, ado_register.opt_descriptor->current_supply);
+    destinations.emplace_back(m_ado_emit.opt_descriptor->current_supply - ado_register.opt_descriptor->current_supply, alice.get_public_address(), null_pkey);
+
+    fill_ado_version_based_onhardfork(m_ado_emit, hf_n);
+    if (m_ado_emit.opt_descriptor.has_value())  fill_adb_version_based_onhardfork(*m_ado_emit.opt_descriptor, hf_n);
 
     ftp.sources = sources;
     ftp.prepared_destinations = destinations;
     ftp.tx_version = get_tx_version(get_block_height(top), m_hardforks);
     ftp.extra = {m_ado_emit};
     ftp.shuffle = true;
-    CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, m_ado_emit.descriptor.total_max_supply);
+    CHECK_AND_ASSERT_GREATER(m_ado_emit.opt_descriptor->current_supply, m_ado_emit.opt_descriptor->total_max_supply);
     success = construct_tx(alice.get_keys(), ftp, ftx);
     CHECK_AND_ASSERT_EQ(success, true);
     tx_4 = ftx.tx;
@@ -2153,7 +2235,7 @@ bool asset_current_and_total_supplies_comparative_constraints::assert_asset_alph
 {
   const std::shared_ptr alice_wallet{init_playtime_test_wallet_t<tools::wallet2>(events, c, ALICE_ACC_IDX)};
   crypto::public_key alpha_asset_id{};
-  const std::string ticker{m_ados_register.at(asset_position::alpha).descriptor.ticker};
+  const std::string ticker{m_ados_register.at(asset_position::alpha).opt_descriptor->ticker};
 
   alice_wallet->refresh();
 
@@ -2176,7 +2258,7 @@ bool asset_current_and_total_supplies_comparative_constraints::assert_asset_beta
 {
   const std::shared_ptr alice_wallet{init_playtime_test_wallet_t<tools::wallet2>(events, c, ALICE_ACC_IDX)};
   crypto::public_key key_beta_asset_id{};
-  const std::string ticker{m_ados_register.at(asset_position::beta).descriptor.ticker};
+  const std::string ticker{m_ados_register.at(asset_position::beta).opt_descriptor->ticker};
 
   alice_wallet->refresh();
 
@@ -2220,11 +2302,11 @@ bool asset_current_and_total_supplies_comparative_constraints::emit_asset_beta_w
   {
     const auto& ado_register{m_ados_register.at(asset_position::beta)};
 
-    CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, ado_register.descriptor.current_supply);
-    destinations.emplace_back(m_ado_emit.descriptor.current_supply - ado_register.descriptor.current_supply, alice_wallet->get_account().get_public_address(), beta_asset_id);
+    CHECK_AND_ASSERT_GREATER(m_ado_emit.opt_descriptor->current_supply, ado_register.opt_descriptor->current_supply);
+    destinations.emplace_back(m_ado_emit.opt_descriptor->current_supply - ado_register.opt_descriptor->current_supply, alice_wallet->get_account().get_public_address(), beta_asset_id);
   }
 
-  CHECK_AND_ASSERT_GREATER(m_ado_emit.descriptor.current_supply, m_ado_emit.descriptor.total_max_supply);
+  CHECK_AND_ASSERT_GREATER(m_ado_emit.opt_descriptor->current_supply, m_ado_emit.opt_descriptor->total_max_supply);
 
   try
   {
@@ -2260,10 +2342,11 @@ bool asset_current_and_total_supplies_comparative_constraints::assert_asset_beta
   }
 
   {
-    const uint64_t& current_supply{register_ado.descriptor.current_supply};
+    const uint64_t& current_supply{register_ado.opt_descriptor->current_supply};
 
-    CHECK_AND_ASSERT_MES(alice_wallet->balance(beta_asset_id) == current_supply, false, "Alice has got not exactly " + std::to_string(current_supply) + ' ' + register_ado.descriptor.ticker);
+    CHECK_AND_ASSERT_MES(alice_wallet->balance(beta_asset_id) == current_supply, false, "Alice has got not exactly " + std::to_string(current_supply) + ' ' + register_ado.opt_descriptor->ticker);
   }
+  return true;
 }
 
 bool asset_current_and_total_supplies_comparative_constraints::public_burn_asset_beta_with_incorrect_supply(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const
@@ -2283,7 +2366,7 @@ bool asset_current_and_total_supplies_comparative_constraints::public_burn_asset
   {
     transaction tx{};
 
-    alice_wallet->burn_asset(beta_asset_id, m_ado_emit.descriptor.current_supply, tx);
+    alice_wallet->burn_asset(beta_asset_id, m_ado_emit.opt_descriptor->current_supply, tx);
   }
   catch (const std::runtime_error&)
   {
@@ -2298,7 +2381,7 @@ bool asset_current_and_total_supplies_comparative_constraints::assert_asset_gamm
 {
   const std::shared_ptr alice_wallet{init_playtime_test_wallet_t<tools::wallet2>(events, c, ALICE_ACC_IDX)};
   crypto::public_key key_gamma_asset_id{};
-  const std::string ticker{m_ados_register.at(asset_position::gamma).descriptor.ticker};
+  const std::string ticker{m_ados_register.at(asset_position::gamma).opt_descriptor->ticker};
 
   alice_wallet->refresh();
 
@@ -2314,7 +2397,189 @@ bool asset_current_and_total_supplies_comparative_constraints::assert_asset_gamm
     CHECK_AND_ASSERT_MES(c.get_blockchain_storage().get_asset_info(key_gamma_asset_id, gamma_adb), false, "the asset " + ticker + " must be registered");
   }
 
-  CHECK_AND_ASSERT_EQ(alice_wallet->balance(key_gamma_asset_id), m_ados_register.at(asset_position::gamma).descriptor.current_supply);
+  CHECK_AND_ASSERT_EQ(alice_wallet->balance(key_gamma_asset_id), m_ados_register.at(asset_position::gamma).opt_descriptor->current_supply);
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+several_asset_emit_burn_txs_in_pool::several_asset_emit_burn_txs_in_pool()
+{
+  REGISTER_CALLBACK_METHOD(several_asset_emit_burn_txs_in_pool, c1);
+}
+
+bool several_asset_emit_burn_txs_in_pool::generate(std::vector<test_event_entry>& events) const
+{
+  //
+  // Test idea: make sure two asset emit or two asset burn tx can be added to the pool for the same asset.
+  //
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  // rebuild genesis miner tx
+  std::vector<tx_destination_entry> destinations;
+  destinations.emplace_back(MK_TEST_COINS(1), alice_acc.get_public_address());
+  destinations.emplace_back(MK_TEST_COINS(1), alice_acc.get_public_address());
+  CHECK_AND_ASSERT_MES(replace_coinbase_in_genesis_block(destinations, generator, events, blk_0), false, ""); // leftover amount will be also send to miner
+
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool several_asset_emit_burn_txs_in_pool::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  miner_wlt->refresh();
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  alice_wlt->refresh();
+
+  // asset description
+  asset_descriptor_base adb{};
+  adb.decimal_point = 3;
+  adb.total_max_supply = 10'000;
+  adb.full_name = "Lets gooo!";
+  adb.ticker = "BRNDN";
+
+  uint64_t initial_register_amount = 5'000;
+
+  // 1. Miner registers an asset and sends some initial amount to Alice
+  std::vector<tx_destination_entry> destinations;
+  destinations.emplace_back(initial_register_amount, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey);
+  finalized_tx ft{};
+  crypto::public_key asset_id{};
+  miner_wlt->deploy_new_asset(adb, destinations, ft, asset_id);
+  LOG_PRINT_GREEN_L0("Asset " << asset_id << " was successfully deployed with tx " << ft.tx_id);
+
+  // make sure tx was added to the pool, then mine a block to confirm it
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  size_t blocks_fetched = 0;
+  miner_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
+
+  // Alice checks her asset balance
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", initial_register_amount, asset_id, adb.decimal_point), false, "");
+
+
+  //
+  // 2. Miner emits additional amount of the asset in two transactions (all goes to Alice)
+  //
+
+  // 2.1 the first emit
+  uint64_t additional_emit_amount = 2'500;
+  uint64_t total_asset_amount = initial_register_amount + additional_emit_amount;
+
+  destinations.clear();
+  destinations.emplace_back(additional_emit_amount, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey);
+  ft = finalized_tx{};
+  miner_wlt->emit_asset(asset_id, destinations, ft);
+
+  // make sure tx was added to the pool
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // Alice checks her asset balance (including unconfirmed txs)
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 0);
+  bool stub{};
+  alice_wlt->scan_tx_pool(stub);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
+
+  // 2.2 the second emit
+  additional_emit_amount = 2'500;
+  total_asset_amount += additional_emit_amount;
+
+  destinations.clear();
+  destinations.emplace_back(additional_emit_amount, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey);
+  ft = finalized_tx{};
+  miner_wlt->emit_asset(asset_id, destinations, ft);
+
+  // make sure the second tx was added to the pool
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // Alice checks her asset balance (including unconfirmed txs)
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 0);
+  alice_wlt->scan_tx_pool(stub);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
+
+  // 2.3
+  // mine a block to confirm both txs to make sure everything is alright
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
+
+
+  // make sure these txs are fully confirmed
+  CHECK_AND_ASSERT_MES(mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW), false, "");
+
+
+  //
+  // 3. Alice burns amount of the asset in two transactions
+  //
+  alice_wlt->refresh();
+
+  // 3.1, the first burn
+  uint64_t burn_amount = 2'500;
+  total_asset_amount -= burn_amount;
+
+  ft = finalized_tx{};
+  alice_wlt->burn_asset(asset_id, burn_amount, ft);
+
+  // make sure tx was added to the pool
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 0);
+  alice_wlt->scan_tx_pool(stub);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
+
+  // 3.2, the second burn
+  burn_amount = 2'500;
+  total_asset_amount -= burn_amount;
+
+  ft = finalized_tx{};
+  alice_wlt->burn_asset(asset_id, burn_amount, ft);
+
+  // make sure both txs are now in the pool
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 0);
+  alice_wlt->scan_tx_pool(stub);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
+
+  // 3.3
+  // mine a block to confirm both txs to make sure everything is alright
+  CHECK_AND_ASSERT_MES(mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c), false, "");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
+
+  // make sure these txs are fully confirmed
+  CHECK_AND_ASSERT_MES(mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW), false, "");
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
 
   return true;
 }

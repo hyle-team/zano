@@ -121,6 +121,7 @@ namespace nodetool
     peerlist_manager& get_peerlist_manager(){return m_peerlist;}
     bool handle_maintainers_entry(const maintainers_entry& me);
     bool get_maintainers_info(maintainers_info_external& me);
+    void get_ip_block_list(std::map<uint32_t, time_t>& blocklist);
     typedef COMMAND_REQUEST_STAT_INFO_T<typename t_payload_net_handler::stat_info> COMMAND_REQUEST_STAT_INFO;
   private:
 

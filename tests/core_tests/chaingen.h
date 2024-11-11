@@ -19,8 +19,10 @@
 
 #define TESTS_DEFAULT_FEE                   ((uint64_t)TX_DEFAULT_FEE)
 #define MK_TEST_COINS(amount)               (static_cast<uint64_t>(amount) * TX_DEFAULT_FEE)
-#define TESTS_POS_CONFIG_MIN_COINSTAKE_AGE  4
-#define TESTS_POS_CONFIG_POS_MINIMUM_HEIGH  4
+#define TESTS_POS_CONFIG_MIN_COINSTAKE_AGE        4
+#define TESTS_POS_CONFIG_POS_MINIMUM_HEIGH        4
+#define TESTS_CONCISE_MODE_REORG_MAX_REORG_BLOCK  5
+
 
 namespace concolor
 {

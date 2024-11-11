@@ -55,6 +55,7 @@ public:
   {
     currency::core_runtime_config core_conf;
     epee::locked_object<std::shared_ptr<tools::wallet2>, wallet_lock_time_watching_policy> w;
+    std::shared_ptr<tools::i_wallet2_callback> w_cb; // not using locked_object here, cuz w_cb is accessed only via it's wallet -- sowle
     typedef epee::locked_object<std::shared_ptr<tools::wallet2>, wallet_lock_time_watching_policy>::lock_shared_ptr wallet_lock_object;
     std::shared_ptr<tools::wallet_rpc_server> rpc_wrapper; //500 bytes of extra data, we can afford it, to have rpc-like invoke map
     std::atomic<bool> do_mining;
@@ -147,6 +148,7 @@ public:
   std::string get_tx_pool_info(currency::COMMAND_RPC_GET_POOL_INFO::response& res);
   std::string export_wallet_history(const view::export_wallet_info& ewi);
   std::string setup_wallet_rpc(const std::string& jwt_secret);
+  std::string set_remote_node_url(const std::string& url);
 
 #ifndef MOBILE_WALLET_BUILD
   currency::core_rpc_server& get_rpc_server() { return m_rpc_server; }
@@ -206,10 +208,10 @@ private:
   virtual bool on_mw_select_wallet(uint64_t wallet_id) override;
   
   //----- i_wallet_provider ------
-  virtual void lock();
-  virtual void unlock();
+  virtual void lock() override;
+  virtual void unlock() override;
 //#ifndef MOBILE_WALLET_BUILD
-  virtual std::shared_ptr<tools::wallet2> get_wallet();
+  virtual std::shared_ptr<tools::wallet2> get_wallet() override;
 //#endif
   //--------
 

@@ -50,6 +50,8 @@
 
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               CURRENCY_HF4_MANDATORY_MIN_COINAGE
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
+#define WALLET_CONCISE_MODE_MAX_REORG_BLOCKS                          CURRENCY_BLOCKS_PER_DAY * 7 //week
+#define WALLET_CONCISE_MODE_MOBILE_MAX_HISTORY_SIZE                   500                         
 
 
 const uint64_t WALLET_MINIMUM_HEIGHT_UNSET_CONST = std::numeric_limits<uint64_t>::max();
@@ -134,9 +136,9 @@ namespace tools
     std::unordered_map<crypto::key_image, size_t> m_key_images;
     std::vector<wallet_public::wallet_transfer_info> m_transfer_history;
     std::unordered_map<crypto::hash, currency::transaction> m_unconfirmed_in_transfers;
-    std::unordered_map<crypto::hash, tools::wallet_public::wallet_transfer_info> m_unconfirmed_txs;
+    unconfirmed_txs_container m_unconfirmed_txs;
     std::unordered_set<crypto::hash> m_unconfirmed_multisig_transfers;
-    std::unordered_map<crypto::hash, crypto::secret_key> m_tx_keys;
+    tx_secrete_keys_container m_tx_keys;
     std::unordered_map<crypto::public_key, wallet_own_asset_context> m_own_asset_descriptors;
     std::unordered_map<crypto::public_key, currency::asset_descriptor_base> m_custom_assets; //assets that manually added by user
     mutable std::unordered_map<crypto::public_key, currency::asset_descriptor_base> m_whitelisted_assets; //assets that whitelisted
@@ -149,13 +151,14 @@ namespace tools
     uint64_t m_last_pow_block_h = 0;
     std::list<std::pair<uint64_t, wallet_event_t>> m_rollback_events;
     std::list<std::pair<uint64_t, uint64_t> > m_last_zc_global_indexs; // <height, last_zc_global_indexs>, biggest height comes in front
+   
 
     //variables that not being serialized
     std::atomic<uint64_t> m_last_bc_timestamp = 0;
     uint64_t m_height_of_start_sync = 0;
     std::atomic<uint64_t> m_last_sync_percent = 0;
     mutable uint64_t m_current_wallet_file_size = 0;
-    bool m_use_assets_whitelisting = true;
+    bool m_use_assets_whitelisting = true;    
     mutable std::optional<bool> m_has_bare_unspent_outputs; // recalculated each time the balance() is called
 
     // variables that should be part of state data object but should not be stored during serialization
@@ -201,7 +204,17 @@ namespace tools
       a & m_chain;
       a & m_minimum_height;
       a & m_amount_gindex_to_transfer_id;
-      a & m_transfers;
+      if (ver <= 167)
+      {
+        std::deque<transfer_details> transfer_container_old;
+        a& transfer_container_old;
+        for (size_t i = 0; i != transfer_container_old.size(); i++){m_transfers[i] = transfer_container_old[i];}
+      }
+      else
+      {
+        a& m_transfers;
+      }
+      
       a & m_multisig_transfers;
       a & m_key_images;
       a & m_unconfirmed_txs;
@@ -234,7 +247,12 @@ namespace tools
       {
         //workaround for m_last_zc_global_indexs holding invalid index for last item
         m_last_zc_global_indexs.pop_front();
-      }      
+      } 
+      if (ver <= 167)
+      {
+        return;
+      }
+      
     }
   };
   
@@ -393,7 +411,7 @@ namespace tools
     //i_wallet2_callback* callback() const { return m_wcallback; }
     //void callback(i_wallet2_callback* callback) { m_callback = callback; }
     void callback(std::shared_ptr<i_wallet2_callback> callback) { m_wcallback = callback; m_do_rise_transfer = (callback != nullptr); }
-    i_wallet2_callback* get_callback() { return m_wcallback.get(); }
+    std::shared_ptr<i_wallet2_callback> get_callback() { return m_wcallback.lock(); }
     void set_do_rise_transfer(bool do_rise) { m_do_rise_transfer = do_rise; }
 
     bool has_related_alias_entry_unconfirmed(const currency::transaction& tx);
@@ -422,13 +440,13 @@ namespace tools
     void deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx, crypto::public_key& new_asset_id);
     void emit_asset(const crypto::public_key& asset_id, std::vector<currency::tx_destination_entry>& destinations, currency::transaction& result_tx);
     void update_asset(const crypto::public_key& asset_id, const currency::asset_descriptor_base new_descriptor, currency::transaction& result_tx);
-    void burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::transaction& result_tx);
+    void burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::transaction& result_tx, const std::vector<currency::tx_service_attachment>& service_entries = std::vector<currency::tx_service_attachment>(), const std::string& address_to_point = std::string(), uint64_t native_amount_to_point = 0);
     void transfer_asset_ownership(const crypto::public_key& asset_id, const currency::asset_owner_pub_key_v& new_owner_v, currency::transaction& result_tx);
 
     void deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::finalized_tx& ft, crypto::public_key& new_asset_id);
     void emit_asset(const crypto::public_key& asset_id, const std::vector<currency::tx_destination_entry>& destinations, currency::finalized_tx& ft);
     void update_asset(const crypto::public_key& asset_id, const currency::asset_descriptor_base& new_descriptor, currency::finalized_tx& ft);
-    void burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::finalized_tx& ft);
+    void burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::finalized_tx& ft, const std::vector<currency::tx_service_attachment>& service_entries = std::vector<currency::tx_service_attachment>(), const std::string& address_to_point = std::string(), uint64_t native_amount_to_point = 0);
     void transfer_asset_ownership(const crypto::public_key& asset_id, const currency::asset_owner_pub_key_v& new_owner_v, currency::finalized_tx& ft);
 
     bool daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb);
@@ -565,10 +583,12 @@ namespace tools
       currency::transaction &escrow_template_tx);
 
     bool check_connection();
+    bool truncate_transfers_and_history(const std::list<size_t>& items_to_remove);
+    bool truncate_wallet();
 
     // PoS mining
-    void do_pos_mining_prepare_entry(mining_context& cxt, size_t transfer_index);
-    bool do_pos_mining_iteration(mining_context& cxt, size_t transfer_index, uint64_t ts);
+    void do_pos_mining_prepare_entry(mining_context& cxt, const transfer_details& td);
+    bool do_pos_mining_iteration(mining_context& cxt, uint64_t ts);
     template<typename idle_condition_cb_t> //do refresh as external callback
     bool scan_pos(mining_context& cxt, std::atomic<bool>& stop, idle_condition_cb_t idle_condition_cb, const currency::core_runtime_config &runtime_config);
     bool fill_mining_context(mining_context& ctx);
@@ -732,6 +752,9 @@ namespace tools
     bool accept_ionic_swap_proposal(const std::string& raw_proposal, currency::transaction& result_tx);
     bool accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposal& proposal, currency::transaction& result_tx);
 
+    void fill_ado_version_based_onhardfork(currency::asset_descriptor_operation& asset_reg_info);
+    void fill_adb_version_based_onhardfork(currency::asset_descriptor_base& asset_base);
+
     // Signing and auth
     bool sign_buffer(const std::string& buff, crypto::signature& sig);
     bool validate_sign(const std::string& buff, const crypto::signature& sig, const crypto::public_key& pkey);
@@ -740,6 +763,9 @@ namespace tools
     bool is_in_hardfork_zone(uint64_t hardfork_index) const;
     //performance inefficient call, suitable only for rare ocasions or super lazy developers
     bool proxy_to_daemon(const std::string& uri, const std::string& body, int& response_code, std::string& response_body);
+    void set_concise_mode(bool enabled) { m_concise_mode = enabled; }
+    void set_concise_mode_reorg_max_reorg_blocks(uint64_t max_blocks) { m_wallet_concise_mode_max_reorg_blocks = max_blocks; }
+    void set_concise_mode_truncate_history(uint64_t max_entries) { m_truncate_history_max_entries = max_entries; }
 
     construct_tx_param get_default_construct_tx_param();
 
@@ -774,7 +800,7 @@ private:
     bool on_idle();
     void unserialize_block_complete_entry(const currency::COMMAND_RPC_GET_BLOCKS_FAST::response& serialized,
       currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& unserialized);
-    void pull_blocks(size_t& blocks_added, std::atomic<bool>& stop);
+    void pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& full_reset_needed);
     bool prepare_free_transfers_cache(uint64_t fake_outputs_count);
     bool select_transfers(assets_selection_context& needed_money_map, size_t fake_outputs_count, uint64_t dust, std::vector<uint64_t>& selected_indicies);
     void add_transfers_to_transfers_cache(const std::vector<uint64_t>& indexs);
@@ -795,7 +821,7 @@ private:
     void add_to_last_zc_global_indexs(uint64_t h, uint64_t last_zc_output_index);
     uint64_t get_actual_zc_global_index();
     void handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop,
-      currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& blocks);
+      currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& blocks, bool& full_reset_needed);
     std::string get_alias_for_address(const std::string& addr);
     std::vector<std::string> get_aliases_for_address(const std::string& addr);
     bool is_connected_to_net();
@@ -942,7 +968,7 @@ private:
 
     std::atomic<bool> m_stop;
     std::shared_ptr<i_core_proxy> m_core_proxy;
-    std::shared_ptr<i_wallet2_callback> m_wcallback;
+    std::weak_ptr<i_wallet2_callback> m_wcallback;
 
 
     currency::core_runtime_config m_core_runtime_config;    
@@ -958,8 +984,16 @@ private:
     std::string m_votes_config_path;
     tools::wallet_public::wallet_vote_config m_votes_config;
 
+    std::atomic<bool> m_concise_mode = true; //in this mode the wallet don't keep spent entries in m_transfers as well as m_recent_transfers longer then 100 entries
     uint64_t m_last_known_daemon_height = 0;
-
+    uint64_t m_wallet_concise_mode_max_reorg_blocks = WALLET_CONCISE_MODE_MAX_REORG_BLOCKS;
+    uint64_t m_full_resync_requested_at_h = 0;
+    uint64_t m_truncate_history_max_entries 
+#ifdef MOBILE_WALLET_BUILD
+      = WALLET_CONCISE_MODE_MOBILE_MAX_HISTORY_SIZE;
+#else 
+      = 0;
+#endif
     //this needed to access wallets state in coretests, for creating abnormal blocks and tranmsactions
     friend class test_generator;
   }; // class wallet2
@@ -1071,7 +1105,13 @@ namespace tools
 
     if (tr_index != UINT64_MAX)
     {
-      transfer_details& td = m_transfers[tr_index];
+      auto it_tr = m_transfers.find(tr_index);
+      if (it_tr == m_transfers.end())
+      {
+        throw tools::error::wallet_error_resync_needed();
+      }
+      transfer_details& td = it_tr->second;
+            
       ptc.total_balance_change[td.get_asset_id()] -= td.amount();
       if (td.is_native_coin())
       {
@@ -1121,9 +1161,9 @@ namespace tools
     ts_middle -= ts_middle % POS_SCAN_STEP;
     uint64_t ts_window = std::min(ts_middle - ts_from, ts_to - ts_middle);
 
-    for (size_t transfer_index = 0; transfer_index != m_transfers.size(); transfer_index++)
+    for (auto it = m_transfers.begin(); it != m_transfers.end(); it++)//size_t transfer_index = 0; transfer_index != m_transfers.size(); transfer_index++)
     {
-      auto& tr = m_transfers[transfer_index];
+      auto& tr = it->second;
 
       uint64_t stake_unlock_time = 0;
       if (!is_transfer_okay_for_pos(tr, cxt.zarcanum, stake_unlock_time))
@@ -1149,7 +1189,7 @@ namespace tools
         }
       };
 
-      do_pos_mining_prepare_entry(cxt, transfer_index);
+      do_pos_mining_prepare_entry(cxt, tr);
       cxt.total_items_checked++;
       cxt.total_amount_checked += tr.amount();
       while(step <= ts_window)
@@ -1178,9 +1218,9 @@ namespace tools
           return false;
 
         cxt.iterations_processed++;
-        if (do_pos_mining_iteration(cxt, transfer_index, ts))
+        if (do_pos_mining_iteration(cxt, ts))
         {
-          cxt.index = transfer_index;
+          cxt.index = it->first;
           cxt.stake_unlock_time = stake_unlock_time;
           cxt.status = API_RETURN_CODE_OK;
           return true;

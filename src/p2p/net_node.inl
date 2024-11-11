@@ -448,6 +448,13 @@ namespace nodetool
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
+  void node_server<t_payload_net_handler>::get_ip_block_list(std::map<uint32_t, time_t>& blocklist)
+  {
+    CRITICAL_REGION_LOCAL(m_blocked_ips_lock);
+    blocklist = m_blocked_ips;
+  }
+  //-----------------------------------------------------------------------------------
+  template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::on_maintainers_entry_update()
   {
     LOG_PRINT_CHANNEL_COLOR2(NULL, NULL, "Fresh maintainers info recieved(timestamp: " << m_maintainers_info_local.timestamp << ")", LOG_LEVEL_0, epee::log_space::console_color_magenta);

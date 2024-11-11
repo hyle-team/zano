@@ -360,8 +360,12 @@ namespace epee
       template< class t_type_stored, class t_type, class t_storage, typename cb_serialize>
       static bool serialize_ephemeral(const t_type& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname, cb_serialize cb_s)
       {
-        t_type_stored a = cb_s(d);
-        return epee::serialization::selector<true>::serialize(a, stg, hparent_section, pname);
+        t_type_stored a = AUTO_VAL_INIT(a);
+        bool add_val = cb_s(d, a);
+        if (add_val)
+          return epee::serialization::selector<true>::serialize(a, stg, hparent_section, pname);
+        else
+          return true;
       }
 
     };

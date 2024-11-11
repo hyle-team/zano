@@ -89,7 +89,7 @@ bool wallet_test_core_proxy::call_COMMAND_RPC_GET_BLOCKS_FAST(const currency::CO
 
   rsp.current_height = m_blocks.size();
   rsp.status = API_RETURN_CODE_OK;
-  if (!m_first_call)
+  if (!m_first_call && rsp.start_height != 0 /*second condition needed for re-sync in concise_mode*/)
   {
     m_first_call = true;
     return true; // respond with empty blocks on second call to gracefully stop wallet refreshing
