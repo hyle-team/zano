@@ -24,9 +24,10 @@
 #include "free_space_check.h"
 #include "htlc_hash_tests.h"
 #include "threads_pool_tests.h"
-#include "wallet/plain_wallet_api.h"
+#include "wallet/plain_wallet_api.h"  
 #include "wallet/view_iface.h"
-
+#include "wallet/plain_wallet_api_defs.h"
+  
 PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4244)
 #include "jwt-cpp/jwt.h"
@@ -34,9 +35,15 @@ POP_VS_WARNINGS
 
 void test_plain_wallet()
 {
-  std::string res = plain_wallet::init("195.201.107.230", "33340", "C:\\Users\\roky\\home\\", 0);
+  //std::string res = plain_wallet::init("195.201.107.230", "33340", "C:\\Users\\roky\\home\\", 0);
+  std::string res = plain_wallet::init("", "", "C:\\Users\\roky\\home\\", 0);
   //std::string res = plain_wallet::init("127.0.0.1", "12111", "C:\\Users\\roky\\home22\\", 0);
   
+  plain_wallet::configure_object conf = AUTO_VAL_INIT(conf);
+  //plain_wallet::configure_response conf_resp = AUTO_VAL_INIT(conf_resp);
+  conf.postponed_run_wallet = true;
+  std::string r = plain_wallet::sync_call("configure", 0, epee::serialization::store_t_to_json(conf));
+
 
   std::string res___ = plain_wallet::get_wallet_files();
 
@@ -46,6 +53,10 @@ void test_plain_wallet()
   //res = plain_wallet::restore("",
   //  "test_restored_2.zan", "111", "");
 
+  epee::misc_utils::sleep_no_w(2000);
+
+  res = plain_wallet::sync_call("reset_connection_url", 0, "195.201.107.230:33336");
+  r = plain_wallet::sync_call("run_wallet", instance_id, "");
 
   while(true)
   {
@@ -53,6 +64,7 @@ void test_plain_wallet()
     res = plain_wallet::sync_call("get_wallet_status", instance_id, "");
     view::wallet_sync_status_info wsi = AUTO_VAL_INIT(wsi);
     epee::serialization::load_t_from_json(wsi, res);
+    LOG_PRINT_L0("Progress: " << wsi.progress);
     if (wsi.wallet_state == 2)
       break;
   }

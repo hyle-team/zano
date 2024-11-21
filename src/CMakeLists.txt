@@ -116,6 +116,13 @@ else()
 endif()
 
 add_library(crypto ${CRYPTO})
+if(USE_BITCOIN_SECP256K1_FOR_ECDSA)
+  add_dependencies(crypto secp256k1)
+  target_link_libraries(crypto secp256k1)
+else()
+  add_dependencies(crypto OpenSSL::Crypto)
+  target_link_libraries(crypto OpenSSL::Crypto)  
+endif()
 
 add_library(currency_core ${CURRENCY_CORE})
 add_dependencies(currency_core version  ${PCH_LIB_NAME})

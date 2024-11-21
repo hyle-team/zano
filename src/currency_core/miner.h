@@ -101,6 +101,7 @@ namespace currency
     volatile uint32_t m_thread_index; 
     volatile uint32_t m_threads_total;
     std::atomic<int32_t> m_pausers_count;
+    std::atomic<bool> m_block_template_ready;
     epee::critical_section m_miners_count_lock;    
 
     std::list<boost::thread> m_threads;

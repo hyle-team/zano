@@ -136,6 +136,7 @@ namespace currency
     account_public_address stakeholder_address;
     blobdata ex_nonce;
     bool pos = false;
+    bool ignore_pow_ts_check = false;
     pos_entry pe;
     std::list<transaction> explicit_txs;
     fill_block_template_func_t *pcustom_fill_block_template_func;

@@ -552,6 +552,7 @@ namespace currency
           if (hardfork_id_for_prev_block != hardfork_id_for_curr_block)
           {
             LOG_PRINT_GREEN("Hardfork " << hardfork_id_for_curr_block << " has been activated after the block at height " << h, LOG_LEVEL_0);
+            m_pprotocol->on_hardfork_activated(hardfork_id_for_curr_block);
           }
         }
 

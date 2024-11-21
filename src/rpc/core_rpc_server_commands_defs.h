@@ -23,6 +23,7 @@
 #include <list>
 #include <string>
 #include <vector>
+#include <currency_core/account.h>
 //#include "currency_core/basic_api_response_codes.h"
 
 namespace currency
@@ -178,6 +179,58 @@ namespace currency
     };
   };
 
+
+  struct COMMAND_RPC_DECRYPT_TX_DETAILS
+  {
+    DOC_COMMAND("Decrypts transaction private information. Should be used only with your own local daemon for security reasons.");
+
+    struct request
+    {
+      std::string tx_id;
+      currency::blobdata tx_blob;
+      crypto::secret_key tx_secret_key;
+      std::vector<std::string> outputs_addresses;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tx_id)                      DOC_DSCR("[either] ID for a transaction if it is already in the blockchain. Can be ommited if tx_blob is provided.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+        KV_SERIALIZE(tx_blob)                    DOC_DSCR("[or] base64-encoded or hex-encoded tx blob. Can be ommited if tx_id is provided.") DOC_EXMP("ewogICJ2ZXJzaW9uIjogMSwgC....iAgInZpbiI6IFsgewogICAgIC") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_secret_key) DOC_DSCR("Hex-encoded transaction secret key.") DOC_EXMP("2e0b840e70dba386effd64c5d988622dea8c064040566e6bf035034cbb54a5c08") DOC_END
+        KV_SERIALIZE(outputs_addresses)          DOC_DSCR("Address of each of tx's output. Order is important and should correspond to order of tx's outputs. Empty strings are ignored.") DOC_EXMP_AGGR("ZxDNaMeZjwCjnHuU5gUNyrP1pM3U5vckbakzzV6dEHyDYeCpW8XGLBFTshcaY8LkG9RQn7FsQx8w2JeJzJwPwuDm2NfixPAXf", "ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    // TODO consider reusing existing structure transfer_destination -- sowle
+    struct decoded_output
+    {
+      uint64_t amount = 0;
+      std::string address;
+      crypto::public_key asset_id;
+      uint64_t out_index;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(amount)                      DOC_DSCR("Amount begin transferred.") DOC_EXMP(10000000000000)     DOC_END
+        KV_SERIALIZE(address)                     DOC_DSCR("Destination address.") DOC_EXMP("ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp")     DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Asset id.") DOC_EXMP("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852")     DOC_END
+        KV_SERIALIZE(out_index)                   DOC_DSCR("Index of the corresponding output in the transaction.") DOC_EXMP(1) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+      std::vector<decoded_output> decoded_outputs;
+      std::string tx_in_json;
+      crypto::hash verified_tx_id;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)                     DOC_DSCR("Status code of operation, OK if success") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE(decoded_outputs)            DOC_DSCR("Transaction's decoded outputs") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(tx_in_json) DOC_DSCR("Serialized transaction represented in JSON, encoded in Base64.") DOC_EXMP("ewogICJ2ZXJzaW9uIjogMSwgC....iAgInZpbiI6IFsgewogICAgIC") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(verified_tx_id) DOC_DSCR("(Re)calculated transaction id. Can be used in third-party proof generation.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
   struct COMMAND_RPC_GET_HEIGHT
   {
     DOC_COMMAND("Return current blockchain height");
@@ -284,6 +337,58 @@ namespace currency
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(h)                          DOC_DSCR("Estimated height of a block.") DOC_EXMP(2555000) DOC_END
+        KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+  //-----------------------------------------------
+  struct COMMAND_RPC_FIND_OUTS_IN_RECENT_BLOCKS
+  {
+    DOC_COMMAND("Retrieves information about outputs in recent blocks that are targeted for the given address with the corresponding secret view key.")
+  
+    static constexpr uint64_t blocks_limit_default = 5;
+
+    struct request
+    {
+      account_public_address  address;
+      crypto::secret_key      viewkey;
+      uint64_t                blocks_limit = blocks_limit_default;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_ADDRESS_AS_TEXT(address)    DOC_DSCR("Target address for which outputs are being searched") DOC_EXMP("ZxCSpsGGeJsS8fwvQ4HktDU3qBeauoJTR6j73jAWWZxFXdF7XTbGm4YfS2kXJmAP4Rf5BVsSQ9iZ45XANXEYsrLN2L2W77dH7") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(viewkey)  DOC_DSCR("Secret view key corresponding to the given address.") DOC_EXMP("5fa8eaaf231a305053260ff91d69c6ef1ecbd0f5") DOC_END
+        KV_SERIALIZE(blocks_limit)               DOC_DSCR("Block count limit. If 0, only the transaction pool will be searched. Maximum and default is " + epee::string_tools::num_to_string_fast(blocks_limit_default) + ".") DOC_EXMP(1711021795) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct out_entry
+    {
+      uint64_t            amount;
+      crypto::public_key  asset_id;
+      crypto::hash        tx_id;
+      int64_t             tx_block_height;
+      uint64_t            output_tx_index;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(amount)                     DOC_DSCR("The amount of the output.") DOC_EXMP(1000000000000) DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id) DOC_DSCR("Asset ID of the output.") DOC_EXMP("cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Transaction ID where the output is present, if found.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+        KV_SERIALIZE(tx_block_height)            DOC_DSCR("Block height where the transaction is present.") DOC_EXMP(2555000) DOC_END
+        KV_SERIALIZE(output_tx_index)            DOC_DSCR("Index of the output in the transaction.") DOC_EXMP(2) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::vector<out_entry> outputs;
+      uint64_t blockchain_top_block_height;
+      uint64_t                blocks_limit;
+      std::string status;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(outputs)                    DOC_DSCR("List of found outputs.") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(blockchain_top_block_height) DOC_DSCR("Height of the most recent block in the blockchain.") DOC_EXMP(2555000) DOC_END
+        KV_SERIALIZE(blocks_limit)               DOC_DSCR("Used limit for block count.") DOC_EXMP(5) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -583,32 +688,32 @@ namespace currency
   };
 
   //-----------------------------------------------
-	struct COMMAND_RPC_SEND_RAW_TX
-	{
+  struct COMMAND_RPC_SEND_RAW_TX
+  {
     DOC_COMMAND("Broadcasts a raw transaction encoded in hexadecimal format to the network.");
 
     struct request
-		{
-			std::string tx_as_hex;
+    {
+      std::string tx_as_hex;
 
-			request() {}
-			explicit request(const transaction &);
+      request() {}
+      explicit request(const transaction &);
 
-			BEGIN_KV_SERIALIZE_MAP()
+      BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(tx_as_hex)                  DOC_DSCR("The transaction data as a hexadecimal string, ready for network broadcast.") DOC_EXMP("00018ed1535b8b4862e.....368cdc5a86") DOC_END
       END_KV_SERIALIZE_MAP()
-		};
+    };
 
 
-		struct response
-		{
-			std::string status;
+    struct response
+    {
+      std::string status;
 
-			BEGIN_KV_SERIALIZE_MAP()
-				KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
-			END_KV_SERIALIZE_MAP()
-		};
-	};
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
 
   //-----------------------------------------------
 
@@ -619,7 +724,7 @@ namespace currency
       std::vector<std::string> txs_as_hex;
 
       BEGIN_KV_SERIALIZE_MAP()
-				KV_SERIALIZE(txs_as_hex)                 DOC_DSCR("List of transactions as a hexadecimal strings.") DOC_EXMP_AGGR("000535b8b2e.....3685a86", "00087368b2e.....349b77f") DOC_END
+        KV_SERIALIZE(txs_as_hex)                 DOC_DSCR("List of transactions as a hexadecimal strings.") DOC_EXMP_AGGR("000535b8b2e.....3685a86", "00087368b2e.....349b77f") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 

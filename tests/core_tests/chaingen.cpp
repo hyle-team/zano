@@ -997,6 +997,8 @@ bool test_generator::init_test_wallet(const currency::account_base& account, con
   w->set_genesis(genesis_hash);
   w->set_core_proxy(m_wallet_test_core_proxy);
   w->set_disable_tor_relay(true);
+  w->set_concise_mode(true);
+  w->set_concise_mode_reorg_max_reorg_blocks(TESTS_CONCISE_MODE_REORG_MAX_REORG_BLOCK);
 
   result = w;
   return true;
@@ -1113,7 +1115,7 @@ bool test_generator::construct_pow_block_with_alias_info_in_coinbase(const accou
       miner_tx.proofs.emplace_back(std::move(currency::zc_asset_surjection_proof{}));
       // range proofs
       currency::zc_outs_range_proof range_proofs{};
-      r = generate_zc_outs_range_proof(tx_id, 0, tx_gen_context, miner_tx.vout, range_proofs);
+      r = generate_zc_outs_range_proof(tx_id, tx_gen_context, miner_tx.vout, range_proofs);
       CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
       miner_tx.proofs.emplace_back(std::move(range_proofs));
       // balance proof
@@ -1814,6 +1816,48 @@ bool construct_tx_with_many_outputs(const currency::hard_forks_descriptor& hf, s
   return construct_tx(keys_from, sources, destinations, empty_attachment, tx, tx_version, 0);
 }
 
+bool construct_tx(const account_keys& sender_account_keys,
+                  const std::vector<tx_source_entry>& sources,
+                  const std::vector<tx_destination_entry>& destinations,
+                  const std::vector<extra_v>& extra,
+                  const std::vector<attachment_v>& attachments,
+                  transaction& tx,
+                  uint64_t tx_version,
+                  crypto::secret_key& one_time_secret_key,
+                  uint64_t unlock_time,
+                  uint64_t expiration_time,
+                  uint8_t tx_outs_attr,
+                  bool shuffle,
+                  uint64_t flags,
+                  uint64_t explicit_consolidated_tx_fee,
+                  tx_generation_context& gen_context)
+{
+  // extra copy operation, but creating transaction is not sensitive to this
+  finalize_tx_param ftp {};
+  ftp.tx_version            = tx_version;
+  ftp.sources               = sources;
+  ftp.prepared_destinations = destinations;
+  ftp.extra                 = extra;
+  ftp.attachments           = attachments;
+  ftp.unlock_time           = unlock_time;
+  // ftp.crypt_address = crypt_destination_addr;
+  ftp.expiration_time   = expiration_time;
+  ftp.tx_outs_attr      = tx_outs_attr;
+  ftp.shuffle           = shuffle;
+  ftp.flags             = flags;
+  ftp.mode_separate_fee = explicit_consolidated_tx_fee;
+
+  finalized_tx ft     = AUTO_VAL_INIT(ft);
+  ft.tx               = tx;
+  ft.one_time_key     = one_time_secret_key;
+  ftp.gen_context     = gen_context;  // ftp, not ft here, this is UGLY -- sowle
+  bool r              = construct_tx(sender_account_keys, ftp, ft);
+  tx                  = ft.tx;
+  one_time_secret_key = ft.one_time_key;
+  gen_context         = ft.ftp.gen_context;
+  return r;
+}
+
 uint64_t get_balance(const currency::account_keys& addr, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, bool dbg_log)
 {
   uint64_t res = 0;
@@ -1945,22 +1989,27 @@ void balance_via_wallet(const tools::wallet2& w, const crypto::public_key& asset
 }
 
 bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name,
-  uint64_t expected_total, uint64_t expected_mined, uint64_t expected_unlocked, uint64_t expected_awaiting_in, uint64_t expected_awaiting_out, const crypto::public_key& asset_id /* = currency::native_coin_asset_id */)
+  uint64_t expected_total, uint64_t expected_mined, uint64_t expected_unlocked, uint64_t expected_awaiting_in, uint64_t expected_awaiting_out,
+  const crypto::public_key& asset_id /* = currency::native_coin_asset_id */, size_t asset_decimal_point /* = CURRENCY_DISPLAY_DECIMAL_POINT */)
 {
   uint64_t total, unlocked, awaiting_in, awaiting_out, mined;
   balance_via_wallet(w, asset_id, &total, &unlocked, &awaiting_in, &awaiting_out, &mined);
 
   std::string asset_id_str;
   if (asset_id != currency::native_coin_asset_id)
+  {
     asset_id_str = std::string(", asset_id: ") + epee::string_tools::pod_to_hex(asset_id).erase(4, 56).insert(4, "...");
+    if (asset_decimal_point == CURRENCY_DISPLAY_DECIMAL_POINT)
+      asset_decimal_point = w.get_asset_decimal_point(asset_id, asset_decimal_point);
+  }
 
   LOG_PRINT_CYAN("Balance for wallet " << account_name << " @ height " << w.get_top_block_height() << asset_id_str << ":" << ENDL <<
-    "unlocked:     " << print_money(unlocked) << ENDL <<
-    "awaiting in:  " << print_money(awaiting_in) << ENDL <<
-    "awaiting out: " << print_money(awaiting_out) << ENDL <<
-    "mined:        " << print_money(mined) << ENDL <<
+    "unlocked:     " << print_money(unlocked,     asset_decimal_point) << ENDL <<
+    "awaiting in:  " << print_money(awaiting_in,  asset_decimal_point) << ENDL <<
+    "awaiting out: " << print_money(awaiting_out, asset_decimal_point) << ENDL <<
+    "mined:        " << print_money(mined,        asset_decimal_point) << ENDL <<
     "-----------------------------------------" << ENDL <<
-    "total:        " << print_money(total) << ENDL,
+    "total:        " << print_money(total,        asset_decimal_point) << ENDL,
     LOG_LEVEL_0);
 
   bool r = true;
@@ -1980,6 +2029,12 @@ bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name,
 
   return r;
 }
+
+bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name, uint64_t expected_total, const crypto::public_key& asset_id, size_t asset_decimal_point /* = CURRENCY_DISPLAY_DECIMAL_POINT */)
+{
+  return check_balance_via_wallet(w, account_name, expected_total, INVALID_BALANCE_VAL, INVALID_BALANCE_VAL, INVALID_BALANCE_VAL, INVALID_BALANCE_VAL, asset_id, asset_decimal_point);
+}
+
 
 // In assumption we have only genesis and few blocks with the same reward (==first_blocks_reward),
 // this function helps to calculate such amount that many outputs have it, and amount, no output has it.
@@ -2172,12 +2227,13 @@ bool make_tx_multisig_to_key(const currency::transaction& source_tx,
 
 bool estimate_wallet_balance_blocked_for_escrow(const tools::wallet2& w, uint64_t& result, bool substruct_change_from_result /* = true */)
 {
-  std::deque<tools::transfer_details> transfers;
+  tools::transfer_container transfers;
   w.get_transfers(transfers);
 
   result = 0;
-  for (const tools::transfer_details& td : transfers)
+  for (const auto& tr : transfers)
   {
+    const tools::transfer_details& td = tr.second;
     if (td.m_flags == (WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION))
       result += td.amount();
   }

@@ -32,7 +32,7 @@ escrow_wallet_test::escrow_wallet_test()
 
 bool escrow_wallet_test::generate(std::vector<test_event_entry>& events) const
 {
-  epee::debug::get_set_enable_assert(true, true);
+  //epee::debug::get_set_enable_assert(true, true);
 
   currency::account_base genesis_acc;
   genesis_acc.generate();
@@ -47,7 +47,7 @@ bool escrow_wallet_test::generate(std::vector<test_event_entry>& events) const
 
   DO_CALLBACK(events, "c1");
 
-  epee::debug::get_set_enable_assert(true, false);
+  //epee::debug::get_set_enable_assert(true, false);
   return true;
 }
 
@@ -272,8 +272,8 @@ bool escrow_wallet_test::exec_test_with_cancel_release_type(currency::core& c, c
 
 bool escrow_wallet_test::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  epee::debug::get_set_enable_assert(true, true);
-  misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler([&](){epee::debug::get_set_enable_assert(true, false); });
+  //epee::debug::get_set_enable_assert(true, true);
+  //misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler([&](){epee::debug::get_set_enable_assert(true, false); });
 
   bool r = exec_test_with_cancel_release_type(c, events);
   if (!r)
@@ -287,7 +287,7 @@ bool escrow_wallet_test::c1(currency::core& c, size_t ev_index, const std::vecto
   if (!r)
     return false;
 
-  epee::debug::get_set_enable_assert(true, false);
+  //epee::debug::get_set_enable_assert(true, false);
   return r;
 }
 
@@ -780,7 +780,7 @@ bool escrow_proposal_expiration::c1(currency::core& c, size_t ev_index, const st
   uint64_t alice_post_proposal_balance = alice_wlt->balance();
   uint64_t alice_post_proposal_balance_expected = alice_start_balance - TESTS_DEFAULT_FEE;
   CHECK_AND_ASSERT_MES(alice_post_proposal_balance == alice_post_proposal_balance_expected, false, "Incorrect alice_post_proposal_balance: " << print_money(alice_post_proposal_balance) << ", expected: " << print_money(alice_post_proposal_balance_expected));
-  std::deque<tools::transfer_details> transfers;
+  tools::transfer_container transfers;
   alice_wlt->get_transfers(transfers);
   CHECK_AND_ASSERT_MES(transfers.size() == 2 && (
       (transfers[0].is_spent() && (transfers[1].m_flags & (WALLET_TRANSFER_DETAIL_FLAG_BLOCKED | WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION))) ||
@@ -2283,7 +2283,7 @@ bool escrow_proposal_not_enough_money::c1(currency::core& c, size_t ev_index, co
 
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", MK_TEST_COINS(30), 0, MK_TEST_COINS(30), 0, 0), false, "");
 
-  std::deque<tools::transfer_details> transfers;
+  tools::transfer_container transfers;
   alice_wlt->get_transfers(transfers);
   CHECK_AND_ASSERT_MES(transfers.size() == 1, false, "Incorrect transfers size: " << transfers.size());
 
