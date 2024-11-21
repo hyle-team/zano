@@ -1,14 +1,109 @@
 LMDB 0.9 Change Log
 
-LMDB 0.9.18 Release Engineering
+LMDB 0.9.33 Release (2024/05/21)
+	ITS#9037 mdb_page_search: fix error code when DBI record is missing
+	ITS#10198 For win32, stop passing ignored parameter
+	ITS#10212 Fix meta page usage by read only tools
+
+LMDB 0.9.32 Release (2024/01/29)
+	ITS#9378 - Add ability to replay log and replay log tool
+	ITS#10095 - partial revert of ITS#9278. The patch was incorrect and introduced numerous race conditions.
+	ITS#10125 - mdb_load: fix cursor reinit in Append mode
+	ITS#10137 - Allow users to define MDB_IDL_LOGN
+
+LMDB 0.9.31 Release (2023/07/10)
+	ITS#8447 - Fix cursor_put(MDB_CURRENT) on DUPSORT DB with different sized data
+
+LMDB 0.9.30 Release (2023/02/08)
+	ITS#9806 - LMDB page_split: key threshold depends on page size
+	ITS#9916 - avoid gcc optimization bug on sparc64 linux
+	ITS#9919 - Mark infrequently used functions as cold
+	ITS#9723 - clear C_EOF on cursor with MDB_FIRST_DUP
+	ITS#9030 - Use sys/cachectl.h rather than asm/cachectl.h on mips
+
+LMDB 0.9.29 Release (2021/03/16)
+	ITS#9461 refix ITS#9376
+	ITS#9500 fix regression from ITS#8662
+
+LMDB 0.9.28 Release (2021/02/04)
+	ITS#8662 add -a append option to mdb_load
+
+LMDB 0.9.27 Release (2020/10/26)
+	ITS#9376 fix repeated DUPSORT cursor deletes
+
+LMDB 0.9.26 Release (2020/08/11)
+	ITS#9278 fix robust mutex cleanup for FreeBSD
+
+LMDB 0.9.25 Release (2020/01/30)
+	ITS#9068 fix mdb_dump/load backslashes in printable content
+	ITS#9118 add MAP_NOSYNC for FreeBSD
+	ITS#9155 free mt_spill_pgs in non-nested txn on end
+
+LMDB 0.9.24 Release (2019/07/24)
+	ITS#8969 Tweak mdb_page_split
+	ITS#8975 WIN32 fix writemap set_mapsize crash
+	ITS#9007 Fix loose pages in WRITEMAP
+
+LMDB 0.9.23 Release (2018/12/19)
+	ITS#8756 Fix loose pages in dirty list
+	ITS#8831 Fix mdb_load flag init
+	ITS#8844 Fix mdb_env_close in forked process
+	Documentation
+		ITS#8857 mdb_cursor_del doesn't invalidate cursor
+		ITS#8908 GET_MULTIPLE etc don't change passed in key
+
+LMDB 0.9.22 Release (2018/03/22)
+	Fix MDB_DUPSORT alignment bug (ITS#8819)
+	Fix regression with new db from 0.9.19 (ITS#8760)
+	Fix liblmdb to build on Solaris (ITS#8612)
+	Fix delete behavior with DUPSORT DB (ITS#8622)
+	Fix mdb_cursor_get/mdb_cursor_del behavior (ITS#8722)
+
+LMDB 0.9.21 Release (2017/06/01)
+	Fix xcursor after cursor_del (ITS#8622)
+
+LMDB 0.9.20 (Withdrawn)
+	Fix mdb_load with escaped plaintext (ITS#8558)
+	Fix mdb_cursor_last / mdb_put interaction (ITS#8557)
+
+LMDB 0.9.19 Release (2016/12/28)
+	Fix mdb_env_cwalk cursor init (ITS#8424)
+	Fix robust mutexes on Solaris 10/11 (ITS#8339)
+	Tweak Win32 error message buffer
+	Fix MDB_GET_BOTH on non-dup record (ITS#8393)
+	Optimize mdb_drop
+	Fix xcursors after mdb_cursor_del (ITS#8406)
+	Fix MDB_NEXT_DUP after mdb_cursor_del (ITS#8412)
+	Fix mdb_cursor_put resetting C_EOF (ITS#8489)
+	Fix mdb_env_copyfd2 to return EPIPE on SIGPIPE (ITS#8504)
+	Fix mdb_env_copy with empty DB (ITS#8209)
+	Fix behaviors with fork (ITS#8505)
+	Fix mdb_dbi_open with mainDB cursors (ITS#8542)
+	Fix robust mutexes on kFreeBSD (ITS#8554)
+	Fix utf8_to_utf16 error checks (ITS#7992)
+	Fix F_NOCACHE on MacOS, error is non-fatal (ITS#7682)
+	Build
+		Make shared lib suffix overridable (ITS#8481)
+	Documentation
+		Cleanup doxygen nits
+		Note reserved vs actual mem/disk usage
+
+
+LMDB 0.9.18 Release (2016/02/05)
 	Fix robust mutex detection on glibc 2.10-11 (ITS#8330)
+	Fix page_search_root assert on FreeDB (ITS#8336)
+	Fix MDB_APPENDDUP vs. rewrite(single item) (ITS#8334)
+	Fix mdb_copy of large files on Windows
+	Fix subcursor move after delete (ITS#8355)
+	Fix mdb_midl_shirnk off-by-one (ITS#8363)
 	Check for utf8_to_utf16 failures (ITS#7992)
 	Catch strdup failure in mdb_dbi_open
 	Build
 		Additional makefile var tweaks (ITS#8169)
 	Documentation
 		Add Getting Started page
-
+		Update WRITEMAP description
+	
 
 LMDB 0.9.17 Release (2015/11/30)
 	Fix ITS#7377 catch calloc failure

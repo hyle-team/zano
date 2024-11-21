@@ -13023,9 +13023,11 @@ static int mdbx_page_split(MDBX_cursor *mc, const MDBX_val *newkey,
         mc->mc_ki[mc->mc_top] = (indx_t)x;
       }
     } else {
-      size_t psize, nsize, k;
+      size_t psize, nsize, k, keythresh;
       /* Maximum free space in an empty page */
       const unsigned pmax = page_space(env);
+      /* Threshold number of keys considered "small" */
+      keythresh = env->me_psize >> 7;
       nsize = IS_LEAF(mp) ? leaf_size(env, newkey, newdata)
                           : branch_size(env, newkey);
 
@@ -13063,7 +13065,7 @@ static int mdbx_page_split(MDBX_cursor *mc, const MDBX_val *newkey,
        * This yields better packing during sequential inserts.
        */
       int dir;
-      if (nkeys < 32 || nsize > pmax / 16 || newindx >= nkeys) {
+      if (nkeys < keythresh || nsize > pmax / 16 || newindx >= nkeys) {
         /* Find split point */
         psize = 0;
         if (newindx <= split_indx || newindx >= nkeys) {
