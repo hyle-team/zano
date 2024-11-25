@@ -1493,7 +1493,7 @@ namespace currency
       return true;
     }
 
-    for (auto it = aliases.begin(); it != aliases.end(); it++)
+    for (auto it = aliases.rbegin(); it != aliases.rend(); it++)
     {
       req2.alias = *it;
       bool r = this->on_get_alias_details(req2, res2, error_resp, cntx);
