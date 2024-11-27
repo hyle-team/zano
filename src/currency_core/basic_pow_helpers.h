@@ -37,12 +37,14 @@ namespace currency
   inline uint64_t get_nonce_from_blockblob(const blobdata& bd)
   {
     uint64_t nonce = 0;
+    CHECK_AND_ASSERT_MES(bd.size() >= CURRENCY_MINER_BLOCK_BLOB_NONCE_OFFSET + sizeof(nonce), 0, "Unexpected block buffer size = " << bd.size());
     std::memcpy(&nonce, &bd[CURRENCY_MINER_BLOCK_BLOB_NONCE_OFFSET], sizeof(nonce));
     return nonce;
   }
 
   inline void set_nonce_to_blockblob(blobdata& bd, const uint64_t nonce)
   {
+    CHECK_AND_ASSERT_MES(bd.size() >= CURRENCY_MINER_BLOCK_BLOB_NONCE_OFFSET + sizeof(nonce), void(), "Unexpected block buffer size = " << bd.size());
     std::memcpy(&bd[CURRENCY_MINER_BLOCK_BLOB_NONCE_OFFSET], &nonce, sizeof(nonce));
   }
 }
