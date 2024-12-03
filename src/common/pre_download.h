@@ -22,7 +22,7 @@ namespace tools
 
 #ifndef TESTNET
   static constexpr pre_download_entry c_pre_download_mdbx = { "http://95.217.42.247/pre-download/zano_mdbx_95_2892700.pak", "68e819cd119e4af1b81f1852e42978d662f1e6355124352f3e835db32b5a8230", 6414724487, 10468823040 };
-  static constexpr pre_download_entry c_pre_download_lmdb = { "http://95.217.42.247/pre-download/zano_lmdb_95_2892700.pak", "605eb4eb0903aa7b3a2a046514ef349d45c7de31d2702fd9dc104ca65705d6eb", 7860127140, 10204872704 };
+  static constexpr pre_download_entry c_pre_download_lmdb = { "https://f005.backblazeb2.com/file/zano-predownload/zano_lmdb_95_2892700.pak", "605eb4eb0903aa7b3a2a046514ef349d45c7de31d2702fd9dc104ca65705d6eb", 7860127140, 10204872704 };
 #else
   static constexpr pre_download_entry c_pre_download_mdbx = { "", "", 0, 0 };
   static constexpr pre_download_entry c_pre_download_lmdb = { "", "", 0, 0 };
