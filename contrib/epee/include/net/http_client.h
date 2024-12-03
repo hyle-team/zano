@@ -899,19 +899,25 @@ namespace epee
       template<class t_transport>
       bool invoke_request(const std::string& url, t_transport& tr, unsigned int timeout, const http_response_info** ppresponse_info, const std::string& method = "GET", const std::string& body = std::string(), const fields_list& additional_params = fields_list())
       {
-        http::url_content u_c;
-        bool res = parse_url(url, u_c);
+        http::url_content u_c{};
+        bool r = parse_url(url, u_c);
+        CHECK_AND_ASSERT_MES(!tr.is_connected() && r && !u_c.host.empty(), false, "failed to parse url: " << url);
+        r = invoke_request(u_c, tr, timeout, ppresponse_info, method, body, additional_params);
+        return r;
+      }
 
+      template<class t_transport>
+      bool invoke_request(const http::url_content& u_c, t_transport& tr, unsigned int timeout, const http_response_info** ppresponse_info, const std::string& method = "GET", const std::string& body = std::string(), const fields_list& additional_params = fields_list())
+      {
         if (!tr.is_connected() && !u_c.host.empty())
         {
-          CHECK_AND_ASSERT_MES(res, false, "failed to parse url: " << url);
+          int port = static_cast<int>(u_c.port);
+          if (!port)
+            port = 80;//default for http
 
-          if (!u_c.port)
-            u_c.port = 80;//default for http
-
-          if (!tr.connect(u_c.host, static_cast<int>(u_c.port), timeout))
+          if (!tr.connect(u_c.host, port, timeout))
           {
-            LOG_PRINT_L2("invoke_request: cannot connect to " << u_c.host << ":" << u_c.port);
+            LOG_PRINT_L2("invoke_request: cannot connect to " << u_c.host << ":" << port);
             return false;
           }
         }
@@ -937,14 +943,20 @@ namespace epee
         }
       };
 
-      class interruptible_http_client : public http_simple_client
+      class interruptible_http_client : virtual public http_simple_client, virtual public https_simple_client
       {
         std::shared_ptr<idle_handler_base> m_pcb;
         bool m_permanent_error = false;
+        bool m_ssl = false;
 
-        virtual bool handle_target_data(std::string& piece_of_transfer)
+        // class i_target_handler
+        virtual bool handle_target_data(std::string& piece_of_transfer) override
         {
-          bool r = m_pcb->do_call(piece_of_transfer, m_len_in_summary, m_len_in_summary - m_len_in_remain);
+          bool r = false;
+          if (m_ssl)
+            r = m_pcb->do_call(piece_of_transfer, https_simple_client::m_len_in_summary, https_simple_client::m_len_in_summary - https_simple_client::m_len_in_remain);
+          else
+            r = m_pcb->do_call(piece_of_transfer, http_simple_client::m_len_in_summary, http_simple_client::m_len_in_summary - http_simple_client::m_len_in_remain);
           piece_of_transfer.clear();
           return r;
         }
@@ -955,10 +967,24 @@ namespace epee
         {
           m_pcb.reset(new idle_handler<callback_t>(cb));
           const http_response_info* p_hri = nullptr;
-          bool r = invoke_request(url, *this, timeout, &p_hri, method, body, additional_params);
+          http::url_content uc{};
+          if (!parse_url(url, uc))
+          {
+            LOG_PRINT_L0("HTTP request to " << url << " failed because the URL couldn't be parsed.");
+            m_permanent_error = true;
+            return false;
+          }
+
+          bool r = false;
+          m_ssl = uc.schema == "https";
+          if (m_ssl)
+            r = invoke_request(uc, static_cast<https_simple_client&>(*this), timeout, &p_hri, method, body, additional_params);
+          else 
+            r = invoke_request(uc, static_cast<http_simple_client&>(*this), timeout, &p_hri, method, body, additional_params);
+
           if (p_hri && !(p_hri->m_response_code >= 200 && p_hri->m_response_code < 300))
           {
-            LOG_PRINT_L0("HTTP request to " << url << " failed with code: " << p_hri->m_response_code);
+            LOG_PRINT_L0(boost::to_upper_copy(uc.schema) << " request to " << url << " failed with code: " << p_hri->m_response_code);
             m_permanent_error = true;
             return false;
           }
