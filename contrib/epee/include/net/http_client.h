@@ -943,30 +943,50 @@ namespace epee
         }
       };
 
-      class interruptible_http_client : virtual public http_simple_client, virtual public https_simple_client
-      {
-        std::shared_ptr<idle_handler_base> m_pcb;
-        bool m_permanent_error = false;
-        bool m_ssl = false;
 
+      class http_https_simple_client_wrapper : virtual public http_simple_client, virtual public https_simple_client
+      {
+      public:
+        http_https_simple_client_wrapper(bool is_ssl, std::shared_ptr<idle_handler_base> ihb_cb)
+          : m_ssl(is_ssl)
+          , m_ihb_cb(ihb_cb)
+        {}
+
+        bool invoke_request(const http::url_content& u_c, unsigned int timeout, const http_response_info** ppresponse_info, const std::string& method = "GET", const std::string& body = std::string(), const fields_list& additional_params = fields_list())
+        {
+          bool r = false;
+          if (m_ssl)
+            r = epee::net_utils::http::invoke_request(u_c, static_cast<https_simple_client&>(*this), timeout, ppresponse_info, method, body, additional_params);
+          else 
+            r = epee::net_utils::http::invoke_request(u_c, static_cast<http_simple_client&>(*this), timeout, ppresponse_info, method, body, additional_params);
+          return r;
+        }
+
+      private:
         // class i_target_handler
         virtual bool handle_target_data(std::string& piece_of_transfer) override
         {
           bool r = false;
           if (m_ssl)
-            r = m_pcb->do_call(piece_of_transfer, https_simple_client::m_len_in_summary, https_simple_client::m_len_in_summary - https_simple_client::m_len_in_remain);
+            r = m_ihb_cb->do_call(piece_of_transfer, https_simple_client::m_len_in_summary, https_simple_client::m_len_in_summary - https_simple_client::m_len_in_remain);
           else
-            r = m_pcb->do_call(piece_of_transfer, http_simple_client::m_len_in_summary, http_simple_client::m_len_in_summary - http_simple_client::m_len_in_remain);
+            r = m_ihb_cb->do_call(piece_of_transfer, http_simple_client::m_len_in_summary, http_simple_client::m_len_in_summary - http_simple_client::m_len_in_remain);
           piece_of_transfer.clear();
           return r;
         }
 
+        bool m_ssl;
+        std::shared_ptr<idle_handler_base> m_ihb_cb;
+      };
+
+
+      class interruptible_http_client
+      {
+        bool m_permanent_error = false;
       public:
         template<typename callback_t>
         bool invoke_cb(callback_t cb, const std::string& url, uint64_t timeout, const std::string& method = "GET", const std::string& body = std::string(), const fields_list& additional_params = fields_list())
         {
-          m_pcb.reset(new idle_handler<callback_t>(cb));
-          const http_response_info* p_hri = nullptr;
           http::url_content uc{};
           if (!parse_url(url, uc))
           {
@@ -974,13 +994,12 @@ namespace epee
             m_permanent_error = true;
             return false;
           }
+          bool is_ssl = uc.schema == "https";
 
-          bool r = false;
-          m_ssl = uc.schema == "https";
-          if (m_ssl)
-            r = invoke_request(uc, static_cast<https_simple_client&>(*this), timeout, &p_hri, method, body, additional_params);
-          else 
-            r = invoke_request(uc, static_cast<http_simple_client&>(*this), timeout, &p_hri, method, body, additional_params);
+          http_https_simple_client_wrapper wrapper(is_ssl, std::make_shared<idle_handler<callback_t>>(cb));
+
+          const http_response_info* p_hri = nullptr;
+          bool r = wrapper.invoke_request(uc, timeout, &p_hri, method, body, additional_params);
 
           if (p_hri && !(p_hri->m_response_code >= 200 && p_hri->m_response_code < 300))
           {
