@@ -901,7 +901,7 @@ namespace epee
       {
         http::url_content u_c{};
         bool r = parse_url(url, u_c);
-        CHECK_AND_ASSERT_MES(!tr.is_connected() && r && !u_c.host.empty(), false, "failed to parse url: " << url);
+        CHECK_AND_ASSERT_MES(tr.is_connected() || u_c.host.empty() || r, false, "failed to parse url: " << url);
         r = invoke_request(u_c, tr, timeout, ppresponse_info, method, body, additional_params);
         return r;
       }
