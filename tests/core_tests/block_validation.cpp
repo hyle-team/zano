@@ -693,3 +693,40 @@ bool gen_block_wrong_version_agains_hardfork::generate(std::vector<test_event_en
   DO_CALLBACK(events, "c1");
   return true;
 }
+
+block_with_correct_prev_id_on_wrong_height::block_with_correct_prev_id_on_wrong_height()
+{
+  REGISTER_CALLBACK("assert_blk_2_has_wrong_height", block_with_correct_prev_id_on_wrong_height::assert_blk_2_has_wrong_height);
+}
+
+bool block_with_correct_prev_id_on_wrong_height::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure that a block with correct previous block identifier that is at the wrong height won't be accepted by the core.
+
+  GENERATE_ACCOUNT(miner);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
+
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  MAKE_TX(events, tx_0, miner, miner, MK_TEST_COINS(2), blk_0r);
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner);
+  m_blk_2.prev_id = currency::get_block_hash(blk_1);
+  m_blk_2.miner_tx = blk_0r.miner_tx;
+  m_blk_2.major_version = blk_0r.major_version;
+  // blk_1 is the previous for blk_2, but height(blk_2) < height(blk_1).
+  CHECK_AND_ASSERT_EQ(currency::get_block_height(blk_1), 11);
+  CHECK_AND_ASSERT_EQ(currency::get_block_height(m_blk_2), 10);
+  DO_CALLBACK(events, "assert_blk_2_has_wrong_height");
+
+  return true;
+}
+
+bool block_with_correct_prev_id_on_wrong_height::assert_blk_2_has_wrong_height(currency::core& c, [[maybe_unused]] size_t ev_index, [[maybe_unused]] const std::vector<test_event_entry>& events) const
+{
+  currency::block_verification_context context_blk_2{};
+
+  CHECK_AND_ASSERT_EQ(boost::get<txin_gen>(m_blk_2.miner_tx.vin.front()).height, 10);
+  CHECK_AND_ASSERT_EQ(c.get_blockchain_storage().add_new_block(m_blk_2, context_blk_2), false);
+
+  return true;
+}
