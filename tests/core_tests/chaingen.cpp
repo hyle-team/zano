@@ -299,6 +299,8 @@ bool test_generator::construct_block(currency::block& blk,
   tx_generation_context miner_tx_tgc{};
   uint64_t block_reward_without_fee = 0;
   uint64_t block_reward = 0;
+  size_t tx_hardfork_id = 0;
+  uint64_t tx_version = get_tx_version_and_hardfork_id(height, m_hardforks, tx_hardfork_id);
   while (true)
   {
     r = construct_miner_tx(height, misc_utils::median(block_sizes),
@@ -310,7 +312,8 @@ bool test_generator::construct_block(currency::block& blk,
                                     blk.miner_tx,
                                     block_reward_without_fee,
                                     block_reward,
-                                    get_tx_version(height, m_hardforks),
+                                    tx_version,
+                                    tx_hardfork_id,
                                     blobdata(),
                                     test_generator::get_test_gentime_settings().miner_tx_max_outs,
                                     static_cast<bool>(coin_stake_sources.size()),
@@ -956,10 +959,12 @@ bool test_generator::construct_block(int64_t manual_timestamp_adjustment,
   {
     uint64_t base_block_reward = 0;
     uint64_t block_reward = 0;
+    size_t tx_hardfork_id = 0;
+    uint64_t tx_version = get_tx_version_and_hardfork_id(height, m_hardforks, tx_hardfork_id);
     size_t current_block_size = txs_sizes + get_object_blobsize(blk.miner_tx);
     // TODO: This will work, until size of constructed block is less then CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE
     if (!construct_miner_tx(height, misc_utils::median(block_sizes), already_generated_coins, current_block_size, 0,
-      miner_acc.get_public_address(), miner_acc.get_public_address(), blk.miner_tx, base_block_reward, block_reward, get_tx_version(height, m_hardforks), blobdata(), 1))
+      miner_acc.get_public_address(), miner_acc.get_public_address(), blk.miner_tx, base_block_reward, block_reward, tx_version, tx_hardfork_id, blobdata(), 1))
       return false;
   }
 

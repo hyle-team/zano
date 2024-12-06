@@ -42,17 +42,17 @@ bool test_transaction_generation_and_ring_signature()
   account_base rv_acc2;
   rv_acc2.generate();
   transaction tx_mine_1;
-  construct_miner_tx(0, 0, 0, 10, 0, miner_acc1.get_keys().account_address, miner_acc1.get_keys().account_address, tx_mine_1, block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4);
+  construct_miner_tx(0, 0, 0, 10, 0, miner_acc1.get_keys().account_address, miner_acc1.get_keys().account_address, tx_mine_1, block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4, 0);
   transaction tx_mine_2;
-  construct_miner_tx(0, 0, 0, 0, 0, miner_acc2.get_keys().account_address, miner_acc2.get_keys().account_address, tx_mine_2, block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4);
+  construct_miner_tx(0, 0, 0, 0, 0, miner_acc2.get_keys().account_address, miner_acc2.get_keys().account_address, tx_mine_2, block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4, 0);
   transaction tx_mine_3;
-  construct_miner_tx(0, 0, 0, 0, 0, miner_acc3.get_keys().account_address, miner_acc3.get_keys().account_address, tx_mine_3, block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4);
+  construct_miner_tx(0, 0, 0, 0, 0, miner_acc3.get_keys().account_address, miner_acc3.get_keys().account_address, tx_mine_3, block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4, 0);
   transaction tx_mine_4;
-  construct_miner_tx(0, 0, 0, 0, 0, miner_acc4.get_keys().account_address, miner_acc4.get_keys().account_address, tx_mine_4, block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4);
+  construct_miner_tx(0, 0, 0, 0, 0, miner_acc4.get_keys().account_address, miner_acc4.get_keys().account_address, tx_mine_4, block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4, 0);
   transaction tx_mine_5;
-  construct_miner_tx(0, 0, 0, 0, 0, miner_acc5.get_keys().account_address, miner_acc5.get_keys().account_address, tx_mine_5, block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4);
+  construct_miner_tx(0, 0, 0, 0, 0, miner_acc5.get_keys().account_address, miner_acc5.get_keys().account_address, tx_mine_5, block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4, 0);
   transaction tx_mine_6;
-  construct_miner_tx(0, 0, 0, 0, 0, miner_acc6.get_keys().account_address, miner_acc6.get_keys().account_address, tx_mine_6, block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4);
+  construct_miner_tx(0, 0, 0, 0, 0, miner_acc6.get_keys().account_address, miner_acc6.get_keys().account_address, tx_mine_6, block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4, 0);
 
   //fill inputs entry
   typedef tx_source_entry::output_entry tx_output_entry;
@@ -139,7 +139,7 @@ bool test_block_creation()
   uint64_t block_reward_without_fee = 0;
   uint64_t block_reward = 0;
   block b;
-  r = construct_miner_tx(90, epee::misc_utils::median(szs), 3553616528562147, 33094, 10000000, adr, adr, b.miner_tx, block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4);
+  r = construct_miner_tx(90, epee::misc_utils::median(szs), 3553616528562147, 33094, 10000000, adr, adr, b.miner_tx, block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4, 0);
   return r;
 }
 

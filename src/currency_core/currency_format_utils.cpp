@@ -393,6 +393,7 @@ namespace currency
     uint64_t& block_reward_without_fee,
     uint64_t& block_reward,
     uint64_t tx_version,
+    size_t tx_hadrfork_id,
     const blobdata& extra_nonce               /* = blobdata() */,
     size_t max_outs                           /* = CURRENCY_MINER_TX_MAX_OUTS */,
     bool pos                                  /* = false */,
@@ -476,6 +477,8 @@ namespace currency
     CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS || height == 0, false, "Too many outs (" << destinations.size() << ")! Miner tx can't be constructed.");
     // tx is not cleared intentionally to allow passing additional args in the extra/attachments
     tx.version = tx_version;
+    if (tx.version >= TRANSACTION_VERSION_POST_HF5)
+      tx.hardfork_id = tx_hadrfork_id;
 
     tx_generation_context tx_gen_context{};
     tx_gen_context.set_tx_key(tx_one_time_key_to_use ? *tx_one_time_key_to_use : keypair::generate());
@@ -2819,13 +2822,24 @@ namespace currency
 
 
   //---------------------------------------------------------------
-  uint64_t get_tx_version(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd)
+  uint64_t get_tx_version_and_hardfork_id(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd, size_t& tx_hardfork_id)
   {
+    tx_hardfork_id = hfd.get_the_most_recent_hardfork_id_for_height(tx_expected_block_height);
     if (!hfd.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, tx_expected_block_height))
     {
       return TRANSACTION_VERSION_PRE_HF4;
     }
+    if (!hfd.is_hardfork_active_for_height(ZANO_HARDFORK_05, tx_expected_block_height))
+    {
+      return TRANSACTION_VERSION_POST_HF4;
+    }
     return CURRENT_TRANSACTION_VERSION;
+  }
+  //---------------------------------------------------------------
+  uint64_t get_tx_version(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd)
+  {
+    [[maybe_unused]] size_t tx_hardfork_id{};
+    return get_tx_version_and_hardfork_id(tx_expected_block_height, hfd, tx_hardfork_id);
   }
   //---------------------------------------------------------------
   // TODO @#@# this function is obsolete and needs to be re-written

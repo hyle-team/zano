@@ -295,6 +295,7 @@ namespace currency
                                                              uint64_t& block_reward_without_fee,
                                                              uint64_t& block_reward,
                                                              uint64_t tx_version,
+                                                             size_t tx_hadrfork_id,
                                                              const blobdata& extra_nonce            = blobdata(), 
                                                              size_t max_outs                        = CURRENCY_MINER_TX_MAX_OUTS, 
                                                              bool pos                               = false,
@@ -348,6 +349,7 @@ namespace currency
     bool shuffle = true,
     uint64_t flags = 0);
 
+  uint64_t get_tx_version_and_hardfork_id(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd, size_t& tx_hardfork_id); // returns tx version and tx hardfork id based on the height of the block where the transaction is expected to be
   uint64_t get_tx_version(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd); // returns tx version based on the height of the block where the transaction is expected to be
   bool construct_tx(const account_keys& sender_account_keys,  const finalize_tx_param& param, finalized_tx& result);
   bool get_or_calculate_asset_id(const asset_descriptor_operation& ado, crypto::point_t* p_result_point, crypto::public_key* p_result_pub_key);

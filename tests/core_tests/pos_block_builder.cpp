@@ -161,6 +161,8 @@ void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
   CHECK_AND_ASSERT_THROW_MES(m_step == 3, "pos_block_builder: incorrect step sequence");
 
   uint64_t tx_version = m_context.zarcanum ? TRANSACTION_VERSION_POST_HF4 : TRANSACTION_VERSION_PRE_HF4;
+  // TODO @#@# tx_hardfork_id
+
   pos_entry pe{};
   pe.stake_unlock_time = 0; // TODO
   pe.amount = m_context.stake_amount;
@@ -171,7 +173,7 @@ void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
   size_t estimated_block_size = m_txs_total_size;
   m_block.miner_tx = transaction{};
   bool r = construct_miner_tx(m_height, median_size, already_generated_coins, estimated_block_size, m_total_fee,
-    reward_receiver_address, stakeholder_address, m_block.miner_tx, block_reward_without_fee, m_block_reward, tx_version, extra_nonce, max_outs, true, pe, &m_miner_tx_tgc, tx_one_time_key_to_use);
+    reward_receiver_address, stakeholder_address, m_block.miner_tx, block_reward_without_fee, m_block_reward, tx_version, 0, extra_nonce, max_outs, true, pe, &m_miner_tx_tgc, tx_one_time_key_to_use);
   CHECK_AND_ASSERT_THROW_MES(r, "construct_miner_tx failed");
 
   estimated_block_size = m_txs_total_size + get_object_blobsize(m_block.miner_tx);
@@ -180,7 +182,7 @@ void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
   {
     m_block.miner_tx = transaction{};
     r = construct_miner_tx(m_height, median_size, already_generated_coins, estimated_block_size, m_total_fee,
-    reward_receiver_address, stakeholder_address, m_block.miner_tx, block_reward_without_fee, m_block_reward, tx_version, extra_nonce, max_outs, true, pe, &m_miner_tx_tgc, tx_one_time_key_to_use);
+    reward_receiver_address, stakeholder_address, m_block.miner_tx, block_reward_without_fee, m_block_reward, tx_version, 0, extra_nonce, max_outs, true, pe, &m_miner_tx_tgc, tx_one_time_key_to_use);
     CHECK_AND_ASSERT_THROW_MES(r, "construct_homemade_pos_miner_tx failed");
 
     cumulative_size = m_txs_total_size + get_object_blobsize(m_block.miner_tx);
