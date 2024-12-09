@@ -387,7 +387,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
 
 
 #define GENERATE_AND_PLAY(genclass)                                                                        \
-  if (!skip_all_till_the_end && ((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string::npos != std::string(#genclass).find(run_single_test)))) \
+  if (!skip_all_till_the_end && ((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string(#genclass) == run_single_test))) \
   {                                                                                                        \
     TIME_MEASURE_START_MS(t);                                                                              \
     ++tests_count;                                                                                         \
@@ -422,7 +422,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
   }
 
 #define GENERATE_AND_PLAY_HF(genclass, hardfork_str_mask)                                                  \
-  if (!skip_all_till_the_end && ((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string::npos != std::string(#genclass).find(run_single_test)))) \
+  if (!skip_all_till_the_end && ((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string(#genclass) == run_single_test))) \
   {                                                                                                        \
     std::vector<size_t> hardforks = parse_hardfork_str_mask(hardfork_str_mask);                            \
     CHECK_AND_ASSERT_MES(!hardforks.empty(), false, "invalid hardforks mask: " << hardfork_str_mask);      \
