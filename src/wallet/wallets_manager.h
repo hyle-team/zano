@@ -178,6 +178,7 @@ public:
   std::string add_custom_asset_id(uint64_t wallet_id, const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_descriptor);
   std::string delete_custom_asset_id(uint64_t wallet_id, const crypto::public_key& asset_id);
   bool is_core_initialized() { return m_core_initialized;}
+  bool is_remote_node_mode() const { return m_remote_node_mode; }
 
 private:
   void main_worker(const po::variables_map& vm);

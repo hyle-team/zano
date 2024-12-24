@@ -187,3 +187,13 @@ struct gen_block_invalid_binary_format : public test_chain_unit_base
 private:
   size_t m_corrupt_blocks_begin_idx;
 };
+
+struct block_with_correct_prev_id_on_wrong_height : public gen_block_verification_base<1 + CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3>
+{
+  block_with_correct_prev_id_on_wrong_height();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool assert_blk_2_has_wrong_height(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const;
+
+private:
+  mutable currency::block m_blk_2{};
+};

@@ -1154,6 +1154,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(one_block);
     GENERATE_AND_PLAY(gen_ring_signature_1);
     GENERATE_AND_PLAY(gen_ring_signature_2);
+    GENERATE_AND_PLAY(fill_tx_rpc_inputs);
     //GENERATE_AND_PLAY(gen_ring_signature_big); // Takes up to XXX hours (if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10)
 
     // tests for outputs mixing in
@@ -1177,6 +1178,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_timestamp_in_future, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_height_is_low, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_height_is_high, "0,3");
+    GENERATE_AND_PLAY_HF(block_with_correct_prev_id_on_wrong_height, "3-*");
     GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_tx_gen_in, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_in, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_miner_tx_with_txin_to_key, "0,3");
@@ -1221,6 +1223,7 @@ int main(int argc, char* argv[])
     /* To execute the check of bare balance (function "check_tx_bare_balance") we need to run the test "tx_pool_semantic_validation" on the HF 3. By default behaviour bare outputs are disallowed on
     the heights >= 10. */
     GENERATE_AND_PLAY_HF(tx_pool_semantic_validation, "3");
+    GENERATE_AND_PLAY(input_refers_to_incompatible_by_type_output);
 
     // Double spend
     GENERATE_AND_PLAY(gen_double_spend_in_tx<false>);
