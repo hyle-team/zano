@@ -7,6 +7,11 @@
 
 #pragma once 
 
+#ifdef TESTNET
+#define CPU_MINING_ENABLED // disable CPU mining capabilities in mainnet
+#endif // #ifndef TESTNET
+
+
 #include <boost/atomic.hpp>
 #include <boost/program_options.hpp>
 #include <atomic>
@@ -123,6 +128,4 @@ namespace currency
     
   };
 }
-
-
 
