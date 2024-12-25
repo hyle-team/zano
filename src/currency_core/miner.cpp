@@ -33,7 +33,8 @@ namespace currency
 
 #ifndef CPU_MINING_ENABLED
  
-  // miner stub
+  // CPU mining disabled
+  // currency::miner stub implementation
 
   miner::miner(i_miner_handler* phandler, blockchain_storage& bc)
   {}
@@ -82,7 +83,7 @@ namespace currency
     return false;
   }
 
-
+  // end of currency::miner stub implementation
 
 #else
 

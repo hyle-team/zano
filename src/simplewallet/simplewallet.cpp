@@ -288,8 +288,10 @@ simple_wallet::simple_wallet()
   m_refresh_progress_reporter(*this),
   m_offline_mode(false)
 {
+#ifdef CPU_MINING_ENABLED
   m_cmd_binder.set_handler("start_mining", boost::bind(&simple_wallet::start_mining, this, ph::_1), "start_mining <threads_count> - Start mining in daemon");
   m_cmd_binder.set_handler("stop_mining", boost::bind(&simple_wallet::stop_mining, this, ph::_1), "Stop mining in daemon");
+#endif // #ifdef CPU_MINING_ENABLED
   m_cmd_binder.set_handler("refresh", boost::bind(&simple_wallet::refresh, this, ph::_1), "Resynchronize transactions and balance");
   m_cmd_binder.set_handler("balance", boost::bind(&simple_wallet::show_balance, this, ph::_1), "[raw] Show current wallet balance, with 'raw' param it displays all assets without filtering against whitelists"); 
   m_cmd_binder.set_handler("show_staking_history", boost::bind(&simple_wallet::show_staking_history, this, ph::_1), "show_staking_history [2] - Show staking transfers, if option provided - number of days for history to display");
@@ -761,6 +763,7 @@ bool simple_wallet::save(const std::vector<std::string> &args)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+#ifdef CPU_MINING_ENABLED
 bool simple_wallet::start_mining(const std::vector<std::string>& args)
 {
   if (!try_connect_to_daemon())
@@ -815,6 +818,7 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
     fail_msg_writer() << "mining has NOT been stopped: " << err;
   return true;
 }
+#endif // #ifdef CPU_MINING_ENABLED
 //----------------------------------------------------------------------------------------------------
 void simple_wallet::on_new_block(uint64_t height, const currency::block& block)
 {

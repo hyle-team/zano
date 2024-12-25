@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2022 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -925,6 +925,7 @@ namespace currency
 		return call_res;
 	}
   //------------------------------------------------------------------------------------------------------------------------------
+#ifdef CPU_MINING_ENABLED
   bool core_rpc_server::on_start_mining(const COMMAND_RPC_START_MINING::request& req, COMMAND_RPC_START_MINING::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
@@ -955,6 +956,7 @@ namespace currency
     res.status = API_RETURN_CODE_OK;
     return true;
   }
+#endif // #ifdef CPU_MINING_ENABLED
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_getblockcount(const COMMAND_RPC_GETBLOCKCOUNT::request& req, COMMAND_RPC_GETBLOCKCOUNT::response& res, connection_context& cntx)
   {
