@@ -6,7 +6,9 @@
 #include "wallet_tests_basic.h"
 
 
-struct hard_fork_5_tx_version : public test_chain_unit_enchanced
+struct hard_fork_5_tx_version : public wallet_test
 {
+  hard_fork_5_tx_version();
   bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry> &events);
 };
