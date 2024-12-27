@@ -77,7 +77,8 @@ bool create_block_template_manually(const currency::block& prev_block, boost::mu
     result.miner_tx,
     block_reward_without_fee,
     block_reward,
-    TRANSACTION_VERSION_PRE_HF4);
+    TRANSACTION_VERSION_PRE_HF4,
+    0);
   CHECK_AND_ASSERT_MES(r, false, "construct_miner_tx failed");
 
   size_t coinbase_size = get_object_blobsize(result.miner_tx);
