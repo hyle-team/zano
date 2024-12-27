@@ -495,7 +495,8 @@ bool assets_and_explicit_native_coins_in_outs::generate(std::vector<test_event_e
   std::vector<tx_destination_entry> destinations;
   r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc, alice_acc, m_alice_initial_balance, TESTS_DEFAULT_FEE, 0, sources, destinations, true /* spends */, false /* unlock time */);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0);
+  size_t tx_hardfork_id{};
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id), tx_hardfork_id, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   
   ADD_CUSTOM_EVENT(events, tx_0);
@@ -701,7 +702,8 @@ bool asset_depoyment_and_few_zc_utxos::generate(std::vector<test_event_entry>& e
   m_alice_initial_balance = TESTS_DEFAULT_FEE * 100;
   r = fill_tx_sources(sources, events, blk_0r, miner_acc.get_keys(), m_alice_initial_balance + TESTS_DEFAULT_FEE, 0);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0);
+  size_t tx_hardfork_id{};
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id), tx_hardfork_id, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   ADD_CUSTOM_EVENT(events, tx_0);
@@ -1017,16 +1019,10 @@ bool asset_operation_and_hardfork_checks::generate(
 
   CHECK_AND_ASSERT_MES(success, false, "fail to fill sources, destinations");
 
-  tx_version = get_tx_version(get_block_height(blk_0r),
-                              m_hardforks);
+  size_t tx_hardfork_id{};
+  tx_version = get_tx_version_and_hardfork_id(get_block_height(blk_0r), m_hardforks, tx_hardfork_id);
 
-  success = construct_tx(miner.get_keys(),
-                         sources,
-                         destinations,
-                         empty_attachment,
-                         tx_0,
-                         tx_version,
-                         0);
+  success = construct_tx(miner.get_keys(), sources, destinations, empty_attachment, tx_0, tx_version, tx_hardfork_id, 0);
 
   CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_0");
 
@@ -1058,7 +1054,7 @@ bool asset_operation_and_hardfork_checks::generate(
                             /* to = */ alice.get_public_address(),
                             /* asset_id = */ currency::null_pkey);
 
-  tx_version = get_tx_version(get_block_height(blk_1r), m_hardforks);
+  tx_version = get_tx_version_and_hardfork_id(get_block_height(blk_1r), m_hardforks, tx_hardfork_id);
   size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_1r));
   fill_ado_version_based_onhardfork(m_ado_hello, hf_n);
   fill_adb_version_based_onhardfork(*m_ado_hello.opt_descriptor, hf_n);
@@ -1069,6 +1065,7 @@ bool asset_operation_and_hardfork_checks::generate(
                          empty_attachment,
                          tx_1,
                          tx_version,
+                         tx_hardfork_id,
                          stub,
                          0);
 
@@ -1105,8 +1102,7 @@ bool asset_operation_and_hardfork_checks::generate(
 
   CHECK_AND_ASSERT_MES(success, false, "fail to fill sources, destinations");
 
-  tx_version = get_tx_version(get_block_height(blk_2r),
-                              m_hardforks);
+  tx_version = get_tx_version_and_hardfork_id(get_block_height(blk_2r), m_hardforks, tx_hardfork_id);
 
   hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
   fill_ado_version_based_onhardfork(m_ado_hello, hf_n);
@@ -1118,6 +1114,7 @@ bool asset_operation_and_hardfork_checks::generate(
                          empty_attachment,
                          tx_2,
                          tx_version,
+                         tx_hardfork_id,
                          stub,
                          0);
 
@@ -1159,6 +1156,7 @@ bool asset_operation_and_hardfork_checks::generate(
                          /* attachments = */ {m_ado_bye},
                          tx_3,
                          tx_version,
+                         hf_n,
                          0);
 
   CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_3");
@@ -1199,6 +1197,7 @@ bool asset_operation_and_hardfork_checks::generate(
                          /* attachments = */ {m_ado_bye},
                          tx_4,
                          tx_version,
+                         hf_n,
                          stub,
                          0);
 
@@ -2068,6 +2067,7 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
   GENERATE_ACCOUNT(miner);
   GENERATE_ACCOUNT(alice);
   transaction tx_0{}, tx_1{}, tx_2{}, tx_3{}, tx_4{};
+  size_t tx_hardfork_id{};
 
   m_accounts.push_back(miner);
   m_accounts.push_back(alice);
@@ -2091,7 +2091,7 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
 
     success = fill_tx_sources_and_destinations(events, top, miner.get_keys(), alice.get_public_address(), MK_TEST_COINS(8), TESTS_DEFAULT_FEE, 0, sources, destinations);
     CHECK_AND_ASSERT_EQ(success, true);
-    success = construct_tx(miner.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version(get_block_height(top), m_hardforks), 0);
+    success = construct_tx(miner.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_and_hardfork_id(get_block_height(top), m_hardforks, tx_hardfork_id), tx_hardfork_id, 0);
     CHECK_AND_ASSERT_EQ(success, true);
   }
 
@@ -2115,7 +2115,7 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     destinations.emplace_back(ado.opt_descriptor->current_supply, alice.get_public_address(), null_pkey);
     CHECK_AND_ASSERT_EQ(ado.opt_descriptor->total_max_supply, 0);
     CHECK_AND_ASSERT_EQ(ado.opt_descriptor->total_max_supply, ado.opt_descriptor->current_supply);
-    success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_1, get_tx_version(get_block_height(top), m_hardforks), one_time, 0);
+    success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_1, get_tx_version_and_hardfork_id(get_block_height(top), m_hardforks, tx_hardfork_id), tx_hardfork_id, one_time, 0);
     CHECK_AND_ASSERT_EQ(success, true);
   }
 
@@ -2140,7 +2140,7 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     CHECK_AND_ASSERT_EQ(success, true);
     destinations.emplace_back(ado.opt_descriptor->current_supply, alice.get_public_address(), null_pkey);
     CHECK_AND_ASSERT_MES(ado.opt_descriptor->current_supply > ado.opt_descriptor->total_max_supply, false, "current_supply <= total_max_supply");
-    success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_2, get_tx_version(get_block_height(top), m_hardforks), one_time, 0);
+    success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_2, get_tx_version_and_hardfork_id(get_block_height(top), m_hardforks, tx_hardfork_id), tx_hardfork_id, one_time, 0);
     CHECK_AND_ASSERT_EQ(success, true);
   }
 
@@ -2165,7 +2165,7 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     CHECK_AND_ASSERT_EQ(success, true);
     destinations.emplace_back(ado.opt_descriptor->current_supply, alice.get_public_address(), null_pkey);
     CHECK_AND_ASSERT(ado.opt_descriptor->current_supply <= ado.opt_descriptor->total_max_supply, false);
-    success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_3, get_tx_version(get_block_height(top), m_hardforks), one_time, 0);
+    success = construct_tx(alice.get_keys(), sources, destinations, {ado}, empty_attachment, tx_3, get_tx_version_and_hardfork_id(get_block_height(top), m_hardforks, tx_hardfork_id), tx_hardfork_id, one_time, 0);
     CHECK_AND_ASSERT_EQ(success, true);
   }
 

@@ -257,6 +257,7 @@ public:
   bool need_core_proxy() const { return false; }  // tests can override this in order to obtain core proxy (e.g. for wallet)
   void set_core_proxy(std::shared_ptr<tools::i_core_proxy>) { /* do nothing */ }
   uint64_t get_tx_version_from_events(const std::vector<test_event_entry> &events) const;
+  uint64_t get_tx_version_and_harfork_id_from_events(const std::vector<test_event_entry> &events, size_t& tx_hardfork_id) const;
 
   virtual void on_test_constructed() {} // called right after test class is constructed by the chaingen 
   void on_test_generator_created(test_generator& generator) const; // tests can override this for special initialization
@@ -690,6 +691,41 @@ bool construct_tx(const currency::account_keys& sender_account_keys,
                   uint64_t flags,
                   uint64_t explicit_consolidated_tx_fee,
                   currency::tx_generation_context& gen_context);
+
+bool construct_tx(const currency::account_keys& sender_account_keys,
+                  const std::vector<currency::tx_source_entry>& sources,
+                  const std::vector<currency::tx_destination_entry>& destinations,
+                  const std::vector<currency::extra_v>& extra,
+                  const std::vector<currency::attachment_v>& attachments,
+                  currency::transaction& tx,
+                  uint64_t tx_version,
+                  size_t tx_hardfork_id,
+                  crypto::secret_key& one_time_secret_key,
+                  uint64_t unlock_time,
+                  uint64_t expiration_time,
+                  uint8_t tx_outs_attr,
+                  bool shuffle,
+                  uint64_t flags,
+                  uint64_t explicit_consolidated_tx_fee,
+                  currency::tx_generation_context& gen_context);
+
+bool construct_tx(const currency::account_keys& sender_account_keys,
+                  const std::vector<currency::tx_source_entry>& sources,
+                  const std::vector<currency::tx_destination_entry>& destinations,
+                  const std::vector<currency::extra_v>& extra,
+                  const std::vector<currency::attachment_v>& attachments,
+                  currency::transaction& tx,
+                  uint64_t tx_version,
+                  crypto::secret_key& one_time_secret_key,
+                  uint64_t unlock_time);
+
+bool construct_tx(const currency::account_keys& sender_account_keys,
+                  const std::vector<currency::tx_source_entry>& sources,
+                  const std::vector<currency::tx_destination_entry>& destinations,
+                  const std::vector<currency::extra_v>& extra,
+                  const std::vector<currency::attachment_v>& attachments,
+                  currency::transaction& tx,
+                  uint64_t tx_version);
 
 void get_confirmed_txs(const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, map_hash2tx_t& confirmed_txs);
 bool find_block_chain(const std::vector<test_event_entry>& events, std::vector<currency::block>& blockchain, map_hash2tx_t& mtx, const crypto::hash& head);

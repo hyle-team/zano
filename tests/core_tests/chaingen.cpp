@@ -1750,8 +1750,9 @@ bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
   std::vector<tx_destination_entry> destinations;
   if (!fill_tx_sources_and_destinations(events, blk_head, from.get_keys(), to.get_public_address(), amount, fee, nmix, sources, destinations, check_for_spends, check_for_unlocktime))
     return false;
-  uint64_t tx_version = currency::get_tx_version(get_block_height(blk_head) + 1, hf); // assuming the tx will be in the next block (blk_head + 1)
-  return construct_tx(from.get_keys(), sources, destinations, extr, att, tx, tx_version, sk, 0, mix_attr);
+  size_t tx_hardfork_id = 0;
+  uint64_t tx_version = currency::get_tx_version_and_hardfork_id(get_block_height(blk_head) + 1, hf, tx_hardfork_id); // assuming the tx will be in the next block (blk_head + 1)
+  return construct_tx(from.get_keys(), sources, destinations, extr, att, tx, tx_version, tx_hardfork_id, sk, 0, mix_attr);
 }
 
 bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
@@ -1779,16 +1780,17 @@ bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
     return false;
 
   uint64_t tx_expected_block_height = get_block_height(blk_head) + 1;
-  uint64_t tx_version = currency::get_tx_version(tx_expected_block_height, hf);
+  size_t tx_hardfork_id = 0;
+  uint64_t tx_version = currency::get_tx_version_and_hardfork_id(tx_expected_block_height, hf, tx_hardfork_id);
   boost::multiprecision::int128_t change = get_sources_total_amount(sources);
   change -= spending_amount;
   if (change < 0)
     return false; // should never happen if fill_tx_sources succeded
   if (change == 0)
-    return construct_tx(from.get_keys(), sources, destinations, extr, att, tx, tx_version, sk, 0, mix_attr);
+    return construct_tx(from.get_keys(), sources, destinations, extr, att, tx, tx_version, tx_hardfork_id, sk, 0, mix_attr);
   std::vector<tx_destination_entry> local_dst = destinations;
   local_dst.push_back(tx_destination_entry(change.convert_to<uint64_t>(), from.get_public_address()));
-  return construct_tx(from.get_keys(), sources, local_dst, extr, att, tx, tx_version, sk, 0, mix_attr);
+  return construct_tx(from.get_keys(), sources, local_dst, extr, att, tx, tx_version, tx_hardfork_id, sk, 0, mix_attr);
 }
 
 
@@ -1817,8 +1819,53 @@ bool construct_tx_with_many_outputs(const currency::hard_forks_descriptor& hf, s
   uint64_t sources_amount = get_sources_total_amount(sources);
   if (sources_amount > total_amount + fee)
     destinations.push_back(tx_destination_entry(sources_amount - (total_amount + fee), keys_from.account_address)); // change
-  uint64_t tx_version = currency::get_tx_version(currency::get_block_height(blk_head), hf);
-  return construct_tx(keys_from, sources, destinations, empty_attachment, tx, tx_version, 0);
+  size_t tx_hardfork_id = 0;
+  uint64_t tx_version = currency::get_tx_version_and_hardfork_id(currency::get_block_height(blk_head), hf, tx_hardfork_id);
+  return construct_tx(keys_from, sources, destinations, empty_attachment, tx, tx_version, tx_hardfork_id, 0);
+}
+
+bool construct_tx(const account_keys& sender_account_keys,
+                  const std::vector<tx_source_entry>& sources,
+                  const std::vector<tx_destination_entry>& destinations,
+                  const std::vector<extra_v>& extra,
+                  const std::vector<attachment_v>& attachments,
+                  transaction& tx,
+                  uint64_t tx_version,
+                  size_t tx_hardfork_id,
+                  crypto::secret_key& one_time_secret_key,
+                  uint64_t unlock_time,
+                  uint64_t expiration_time,
+                  uint8_t tx_outs_attr,
+                  bool shuffle,
+                  uint64_t flags,
+                  uint64_t explicit_consolidated_tx_fee,
+                  tx_generation_context& gen_context)
+{
+  // extra copy operation, but creating transaction is not sensitive to this
+  finalize_tx_param ftp {};
+  ftp.tx_version            = tx_version;
+  ftp.tx_hardfork_id        = tx_hardfork_id;
+  ftp.sources               = sources;
+  ftp.prepared_destinations = destinations;
+  ftp.extra                 = extra;
+  ftp.attachments           = attachments;
+  ftp.unlock_time           = unlock_time;
+  // ftp.crypt_address = crypt_destination_addr;
+  ftp.expiration_time   = expiration_time;
+  ftp.tx_outs_attr      = tx_outs_attr;
+  ftp.shuffle           = shuffle;
+  ftp.flags             = flags;
+  ftp.mode_separate_fee = explicit_consolidated_tx_fee;
+
+  finalized_tx ft{};
+  ft.tx               = tx;
+  ft.one_time_key     = one_time_secret_key;
+  ftp.gen_context     = gen_context;  // ftp, not ft here, this is UGLY -- sowle
+  bool r              = construct_tx(sender_account_keys, ftp, ft);
+  tx                  = ft.tx;
+  one_time_secret_key = ft.one_time_key;
+  gen_context         = ft.ftp.gen_context;
+  return r;
 }
 
 bool construct_tx(const account_keys& sender_account_keys,
@@ -1840,6 +1887,9 @@ bool construct_tx(const account_keys& sender_account_keys,
   // extra copy operation, but creating transaction is not sensitive to this
   finalize_tx_param ftp {};
   ftp.tx_version            = tx_version;
+  if (tx_version >= TRANSACTION_VERSION_POST_HF5)
+    LOG_PRINT_YELLOW("warning: tx_hardfork_id not set for tx, while it seems to be HF5", LOG_LEVEL_0);
+  ftp.tx_hardfork_id        = 0;
   ftp.sources               = sources;
   ftp.prepared_destinations = destinations;
   ftp.extra                 = extra;
@@ -1852,7 +1902,7 @@ bool construct_tx(const account_keys& sender_account_keys,
   ftp.flags             = flags;
   ftp.mode_separate_fee = explicit_consolidated_tx_fee;
 
-  finalized_tx ft     = AUTO_VAL_INIT(ft);
+  finalized_tx ft{};
   ft.tx               = tx;
   ft.one_time_key     = one_time_secret_key;
   ftp.gen_context     = gen_context;  // ftp, not ft here, this is UGLY -- sowle
@@ -1861,6 +1911,60 @@ bool construct_tx(const account_keys& sender_account_keys,
   one_time_secret_key = ft.one_time_key;
   gen_context         = ft.ftp.gen_context;
   return r;
+}
+
+bool construct_tx(const currency::account_keys& sender_account_keys,
+                  const std::vector<currency::tx_source_entry>& sources,
+                  const std::vector<currency::tx_destination_entry>& destinations,
+                  const std::vector<currency::extra_v>& extra,
+                  const std::vector<currency::attachment_v>& attachments,
+                  currency::transaction& tx,
+                  uint64_t tx_version,
+                  crypto::secret_key& one_time_secret_key,
+                  uint64_t unlock_time)
+{
+  return construct_tx(sender_account_keys,
+                      sources,
+                      destinations,
+                      extra,
+                      attachments,
+                      tx,
+                      tx_version,
+                      one_time_secret_key,
+                      unlock_time,
+                      0,                            /* expiration_time */
+                      CURRENCY_TO_KEY_OUT_RELAXED,  /* tx_outs_attr */
+                      true,                         /* shuffle */
+                      0,                            /* flags */
+                      0,                            /* explicit_consolidated_tx_fee */
+                      tx_generation_context{}
+  );
+}
+
+bool construct_tx(const currency::account_keys& sender_account_keys,
+                  const std::vector<currency::tx_source_entry>& sources,
+                  const std::vector<currency::tx_destination_entry>& destinations,
+                  const std::vector<currency::extra_v>& extra,
+                  const std::vector<currency::attachment_v>& attachments,
+                  currency::transaction& tx,
+                  uint64_t tx_version)
+{
+  return construct_tx(sender_account_keys,
+                      sources,
+                      destinations,
+                      extra,
+                      attachments,
+                      tx,
+                      tx_version,
+                      crypto::secret_key{},         /* one_time_secret_key */
+                      0,                            /* unlock_time */
+                      0,                            /* expiration_time */
+                      CURRENCY_TO_KEY_OUT_RELAXED,  /* tx_outs_attr */
+                      true,                         /* shuffle */
+                      0,                            /* flags */
+                      0,                            /* explicit_consolidated_tx_fee */
+                      tx_generation_context{}
+  );
 }
 
 uint64_t get_balance(const currency::account_keys& addr, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, bool dbg_log)
@@ -2565,18 +2669,25 @@ void test_chain_unit_base::register_callback(const std::string& cb_name, verify_
   m_callbacks[cb_name] = cb;
 }
 
-uint64_t test_chain_unit_base::get_tx_version_from_events(const std::vector<test_event_entry> &events)const
+uint64_t test_chain_unit_base::get_tx_version_from_events(const std::vector<test_event_entry> &events) const
+{
+  [[maybe_unused]] size_t tx_hardfork_id{};
+  return get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id);
+}
+
+uint64_t test_chain_unit_base::get_tx_version_and_harfork_id_from_events(const std::vector<test_event_entry> &events, size_t& tx_hardfork_id) const
 {
   for (auto it = events.rbegin(); it!= events.rend(); it++)
   {
     if(it->type() == typeid(currency::block))
     {
       const currency::block& b = boost::get<currency::block>(*it);
-      return currency::get_tx_version(get_block_height(b), m_hardforks);
+      return currency::get_tx_version_and_hardfork_id(get_block_height(b), m_hardforks, tx_hardfork_id);
     }
   }
-  return currency::get_tx_version(0, m_hardforks);
+  return currency::get_tx_version_and_hardfork_id(0, m_hardforks, tx_hardfork_id);
 }
+
 
 bool test_chain_unit_base::verify(const std::string& cb_name, currency::core& c, size_t ev_index, const std::vector<test_event_entry> &events)
 {

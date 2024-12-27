@@ -163,6 +163,7 @@ namespace currency
     uint64_t expiration_time;
     crypto::public_key spend_pub_key;  // only for validations
     uint64_t tx_version;
+    uint8_t  tx_hardfork_id = 0;
     uint64_t mode_separate_fee = 0;
     
     epee::misc_utils::events_dispatcher* pevents_dispatcher = nullptr;
@@ -187,6 +188,7 @@ namespace currency
       FIELD(expiration_time)
       FIELD(spend_pub_key)
       FIELD(tx_version)
+      FIELD(tx_hardfork_id)
       FIELD(mode_separate_fee)
       if (flags & TX_FLAG_SIGNATURE_MODE_SEPARATE)
       {
@@ -318,9 +320,11 @@ namespace currency
     const std::vector<attachment_v>& attachments,
     transaction& tx, 
     uint64_t tx_version,
+    size_t tx_hardfork_id,
     uint64_t unlock_time, 
     uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED, 
     bool shuffle = true);
+
   bool construct_tx(const account_keys& sender_account_keys, 
     const std::vector<tx_source_entry>& sources, 
     const std::vector<tx_destination_entry>& destinations,
@@ -328,6 +332,7 @@ namespace currency
     const std::vector<attachment_v>& attachments,
     transaction& tx, 
     uint64_t tx_version,
+    size_t tx_hardfork_id,
     crypto::secret_key& one_time_secret_key,
     uint64_t unlock_time,
     uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED, 
@@ -341,6 +346,7 @@ namespace currency
     const std::vector<attachment_v>& attachments,
     transaction& tx,
     uint64_t tx_version,
+    size_t tx_hardfork_id,
     crypto::secret_key& one_time_secret_key,
     uint64_t unlock_time,
     const account_public_address& crypt_account,

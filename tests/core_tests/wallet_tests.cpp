@@ -2306,7 +2306,7 @@ bool generate_oversized_offer(size_t min_size, size_t max_size, bc_services::off
     // construct fake tx to estimate it's size
     transaction tx = AUTO_VAL_INIT(tx);
     crypto::secret_key one_time_secret_key;
-    if (!construct_tx(account_keys(), std::vector<tx_source_entry>(), std::vector<tx_destination_entry>(), empty_extra, att_container, tx, tx_version, one_time_secret_key, 0, 0, true, 0))
+    if (!construct_tx(account_keys(), std::vector<tx_source_entry>(), std::vector<tx_destination_entry>(), empty_extra, att_container, tx, tx_version, 0, one_time_secret_key, 0, 0, true, 0))
       return false;
 
     size_t sz = get_object_blobsize(tx);

@@ -1442,12 +1442,13 @@ namespace currency
     const std::vector<attachment_v>& attachments,    
     transaction& tx,
     uint64_t tx_version,
+    size_t tx_hardfork_id,
     uint64_t unlock_time,
     uint8_t tx_outs_attr, 
     bool shuffle)
   {
-    crypto::secret_key one_time_secret_key = AUTO_VAL_INIT(one_time_secret_key);
-    return construct_tx(sender_account_keys, sources, destinations, std::vector<extra_v>(), attachments, tx, tx_version, one_time_secret_key, unlock_time, tx_outs_attr, shuffle);
+    crypto::secret_key one_time_secret_key{};
+    return construct_tx(sender_account_keys, sources, destinations, std::vector<extra_v>(), attachments, tx, tx_version, tx_hardfork_id, one_time_secret_key, unlock_time, tx_outs_attr, shuffle);
   }
   //---------------------------------------------------------------
 
@@ -1967,6 +1968,7 @@ namespace currency
     const std::vector<attachment_v>& attachments,
     transaction& tx,
     uint64_t tx_version,
+    size_t tx_hardfork_id,
     crypto::secret_key& one_time_secret_key,
     uint64_t unlock_time,
     uint8_t tx_outs_attr,
@@ -1979,7 +1981,7 @@ namespace currency
     //in case if there is no real targets we use sender credentials to encrypt attachments
     account_public_address crypt_destination_addr = get_crypt_address_from_destinations(sender_account_keys, destinations);
 
-    return construct_tx(sender_account_keys, sources, destinations, extra, attachments, tx, tx_version, one_time_secret_key, unlock_time,
+    return construct_tx(sender_account_keys, sources, destinations, extra, attachments, tx, tx_version, tx_hardfork_id, one_time_secret_key, unlock_time,
       crypt_destination_addr,
       0,
       tx_outs_attr,
@@ -1993,6 +1995,7 @@ namespace currency
     const std::vector<attachment_v>& attachments,
     transaction& tx,
     uint64_t tx_version,
+    size_t tx_hardfork_id,
     crypto::secret_key& one_time_secret_key,
     uint64_t unlock_time,
     const account_public_address& crypt_destination_addr,
@@ -2002,8 +2005,9 @@ namespace currency
     uint64_t flags)
   {
     //extra copy operation, but creating transaction is not sensitive to this
-    finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+    finalize_tx_param ftp{};
     ftp.tx_version = tx_version;
+    ftp.tx_hardfork_id = tx_hardfork_id;
     ftp.sources = sources;
     ftp.prepared_destinations = destinations;
     ftp.extra = extra;
@@ -2015,7 +2019,7 @@ namespace currency
     ftp.shuffle = shuffle;
     ftp.flags = flags;
 
-    finalized_tx ft = AUTO_VAL_INIT(ft);
+    finalized_tx ft{};
     ft.tx = tx;
     ft.one_time_key = one_time_secret_key;
     bool r = construct_tx(sender_account_keys, ftp, ft);
@@ -2405,6 +2409,9 @@ namespace currency
       tx.signatures.clear();
 
       tx.version = ftp.tx_version;
+      if (tx.version >= TRANSACTION_VERSION_POST_HF5)
+        tx.hardfork_id = ftp.tx_hardfork_id;
+
       if (unlock_time != 0)
         set_tx_unlock_time(tx, unlock_time);
 
