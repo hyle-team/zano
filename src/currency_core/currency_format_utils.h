@@ -163,7 +163,7 @@ namespace currency
     uint64_t expiration_time;
     crypto::public_key spend_pub_key;  // only for validations
     uint64_t tx_version;
-    uint8_t  tx_hardfork_id = 0;
+    size_t tx_hardfork_id = 0;
     uint64_t mode_separate_fee = 0;
     
     epee::misc_utils::events_dispatcher* pevents_dispatcher = nullptr;
