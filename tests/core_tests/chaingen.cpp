@@ -1923,6 +1923,7 @@ bool construct_tx(const currency::account_keys& sender_account_keys,
                   crypto::secret_key& one_time_secret_key,
                   uint64_t unlock_time)
 {
+  [[maybe_unused]] tx_generation_context gen_context{};
   return construct_tx(sender_account_keys,
                       sources,
                       destinations,
@@ -1937,7 +1938,7 @@ bool construct_tx(const currency::account_keys& sender_account_keys,
                       true,                         /* shuffle */
                       0,                            /* flags */
                       0,                            /* explicit_consolidated_tx_fee */
-                      tx_generation_context{}
+                      gen_context                   /* tx_generation_context */
   );
 }
 
@@ -1949,6 +1950,8 @@ bool construct_tx(const currency::account_keys& sender_account_keys,
                   currency::transaction& tx,
                   uint64_t tx_version)
 {
+  [[maybe_unused]] tx_generation_context gen_context{};
+  [[maybe_unused]] crypto::secret_key tx_sec_key{};
   return construct_tx(sender_account_keys,
                       sources,
                       destinations,
@@ -1956,14 +1959,14 @@ bool construct_tx(const currency::account_keys& sender_account_keys,
                       attachments,
                       tx,
                       tx_version,
-                      crypto::secret_key{},         /* one_time_secret_key */
+                      tx_sec_key,                   /* one_time_secret_key */
                       0,                            /* unlock_time */
                       0,                            /* expiration_time */
                       CURRENCY_TO_KEY_OUT_RELAXED,  /* tx_outs_attr */
                       true,                         /* shuffle */
                       0,                            /* flags */
                       0,                            /* explicit_consolidated_tx_fee */
-                      tx_generation_context{}
+                      gen_context                   /* tx_generation_context */
   );
 }
 
