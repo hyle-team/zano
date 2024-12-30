@@ -82,7 +82,9 @@ bool hard_fork_4_consolidated_txs::generate(std::vector<test_event_entry>& event
     destinations.push_back(tx_destination_entry(m_bob_amount, bob_acc.get_public_address()));
 
     add_flags_to_all_destination_entries(tx_destination_entry_flags::tdef_explicit_native_asset_id, destinations);
-    r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_extra, empty_attachment, tx_1, get_tx_version_from_events(events), one_time_secret_key,
+    size_t tx_hardfork_id{};
+    uint64_t tx_version = get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id);
+    r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_extra, empty_attachment, tx_1, tx_version, tx_hardfork_id, one_time_secret_key,
       0, 0, 0, true, TX_FLAG_SIGNATURE_MODE_SEPARATE, TX_DEFAULT_FEE, gen_context);
     CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
@@ -119,7 +121,9 @@ bool hard_fork_4_consolidated_txs::generate(std::vector<test_event_entry>& event
 
     std::vector<tx_destination_entry> destinations;
 
-    r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_extra, empty_attachment, tx_1, get_tx_version_from_events(events), one_time_secret_key,
+    size_t tx_hardfork_id{};
+    uint64_t tx_version = get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id);
+    r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_extra, empty_attachment, tx_1, tx_version, tx_hardfork_id, one_time_secret_key,
       0, 0, 0, true, TX_FLAG_SIGNATURE_MODE_SEPARATE, 0 /* note zero fee here */, gen_context);
     CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 

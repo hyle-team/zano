@@ -1202,7 +1202,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   uint64_t unlock_time_2 = blk_0r.timestamp + DIFFICULTY_TOTAL_TARGET * 6 + CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS;
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), unlock_time, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0, unlock_time, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   CHECK_AND_ASSERT_MES(get_tx_max_unlock_time(tx_1) == unlock_time, false, "Unlock time was not correctly set");
   events.push_back(tx_1);
@@ -1232,7 +1232,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   // tx_2 should be created ok, but rejected by the core, as one of input refers to a locked tx
   // Note: tx_2 has unlock_time_2 specified
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
-  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_2, get_tx_version_from_events(events), unlock_time_2, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_2, get_tx_version_from_events(events), 0, unlock_time_2, CURRENCY_TO_KEY_OUT_RELAXED, true);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   bool tx_fully_signed = false;
@@ -1256,7 +1256,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   r = fill_tx_sources_and_destinations(events, blk_2, alice_acc, bob_acc, amount - TESTS_DEFAULT_FEE * 2, TESTS_DEFAULT_FEE, 0 /*nmix*/, sources, destinations, true, false /* check_for_unlocktime */);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_3{};
-  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_3, get_tx_version_from_events(events), 0, 0);
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_3, get_tx_version_from_events(events), 0, 0 /* unlock time */, 0 /* mix attib */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   ADD_CUSTOM_EVENT(events, tx_3);
 
@@ -1459,7 +1459,7 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
     r = fill_tx_sources_and_destinations(events, prev_block, miner_acc.get_keys(), ms_addr_list, blk_2_reward, TESTS_DEFAULT_FEE, 0, sources, destinations, false, false, 1);
     CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
     transaction miner_tx = AUTO_VAL_INIT(miner_tx);
-    r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, miner_tx, get_tx_version_from_events(events), height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW, CURRENCY_TO_KEY_OUT_RELAXED, true);
+    r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, miner_tx, get_tx_version_from_events(events), 0, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW, CURRENCY_TO_KEY_OUT_RELAXED, true);
     CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
     // replace vin with coinbase input
@@ -1477,7 +1477,7 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
     r = generator.construct_block_manually(b, prev_block, miner_acc, test_generator::bf_miner_tx, 0, 0, 0, null_hash, 1, miner_tx);
     CHECK_AND_ASSERT_MES(r, false, "construct_block_manually failed");
   }
-  events.push_back(blk_3);
+  ADD_CUSTOM_EVENT(events, blk_3);
 
   // rewind blocks to be able to spend mined money
   REWIND_BLOCKS_N(events, blk_3r, blk_3, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
@@ -1638,7 +1638,7 @@ multisig_and_checkpoints::multisig_and_checkpoints()
 bool multisig_and_checkpoints::set_cp(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   currency::checkpoints checkpoints;
-  checkpoints.add_checkpoint(15, "fda3e645fbfd0f4852aa68e6ad021c9005c9faf2d7ba6b1b3c8e24efb9c0e8d0");
+  checkpoints.add_checkpoint(15, "a78fa870608991aa773d5d5aaf684ac77fea30c3e103b00d3c05c15912215c31");
   c.set_checkpoints(std::move(checkpoints));
 
   return true;
