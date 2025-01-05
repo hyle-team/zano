@@ -52,7 +52,7 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
 3. Download and build Boost\
     (Assuming you have cloned Zano into the 'zano' folder. If you used a different location for Zano, **edit line 4** accordingly.)
 
-       curl -OL https://boostorg.jfrog.io/artifactory/main/release/1.84.0/source/boost_1_84_0.tar.bz2
+       curl -OL https://archives.boost.io/release/1.84.0/source/boost_1_84_0.tar.bz2
        echo "cc4b893acf645c9d4b698e9a0f08ca8846aa5d6c68275c14c3e7949c24109454  boost_1_84_0.tar.bz2" | shasum -c && tar -xjf boost_1_84_0.tar.bz2
        rm boost_1_84_0.tar.bz2 && cd boost_1_84_0
        ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
