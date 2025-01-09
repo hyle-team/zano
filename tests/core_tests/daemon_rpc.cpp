@@ -1,3 +1,7 @@
+// Copyright (c) 2025 Zano Project
+// Distributed under the MIT/X11 software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include "chaingen.h"
 #include "daemon_rpc.h"
 
@@ -534,7 +538,7 @@ bool fill_tx_rpc_inputs::c7(const currency::core& core, const size_t event_posit
       {
         const auto pointer_entry{core.get_blockchain_storage().get_tx_chain_entry(reference.tx_id)};
 
-        CHECK_AND_ASSERT_NEQ(pointer_entry, nullptr);
+        CHECK_AND_ASSERT(pointer_entry, false);
         CHECK_AND_ASSERT(reference.n >= pointer_entry->m_global_output_indexes.size(), false);
       }
     }
@@ -563,7 +567,8 @@ bool fill_tx_rpc_inputs::c8(const currency::core& core, const size_t event_posit
 
       CHECK_AND_ASSERT_EQ(reference.tx_id, currency::null_hash);
       CHECK_AND_ASSERT_EQ(reference.n, 0u);
-      CHECK_AND_ASSERT_EQ(core.get_blockchain_storage().get_tx_chain_entry(reference.tx_id), nullptr);
+
+      CHECK_AND_ASSERT(core.get_blockchain_storage().get_tx_chain_entry(reference.tx_id), false);
     }
   }
 

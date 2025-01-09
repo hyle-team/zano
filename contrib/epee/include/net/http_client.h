@@ -899,19 +899,25 @@ namespace epee
       template<class t_transport>
       bool invoke_request(const std::string& url, t_transport& tr, unsigned int timeout, const http_response_info** ppresponse_info, const std::string& method = "GET", const std::string& body = std::string(), const fields_list& additional_params = fields_list())
       {
-        http::url_content u_c;
-        bool res = parse_url(url, u_c);
+        http::url_content u_c{};
+        bool r = parse_url(url, u_c);
+        CHECK_AND_ASSERT_MES(tr.is_connected() || u_c.host.empty() || r, false, "failed to parse url: " << url);
+        r = invoke_request(u_c, tr, timeout, ppresponse_info, method, body, additional_params);
+        return r;
+      }
 
+      template<class t_transport>
+      bool invoke_request(const http::url_content& u_c, t_transport& tr, unsigned int timeout, const http_response_info** ppresponse_info, const std::string& method = "GET", const std::string& body = std::string(), const fields_list& additional_params = fields_list())
+      {
         if (!tr.is_connected() && !u_c.host.empty())
         {
-          CHECK_AND_ASSERT_MES(res, false, "failed to parse url: " << url);
+          int port = static_cast<int>(u_c.port);
+          if (!port)
+            port = 80;//default for http
 
-          if (!u_c.port)
-            u_c.port = 80;//default for http
-
-          if (!tr.connect(u_c.host, static_cast<int>(u_c.port), timeout))
+          if (!tr.connect(u_c.host, port, timeout))
           {
-            LOG_PRINT_L2("invoke_request: cannot connect to " << u_c.host << ":" << u_c.port);
+            LOG_PRINT_L2("invoke_request: cannot connect to " << u_c.host << ":" << port);
             return false;
           }
         }
@@ -937,28 +943,67 @@ namespace epee
         }
       };
 
-      class interruptible_http_client : public http_simple_client
-      {
-        std::shared_ptr<idle_handler_base> m_pcb;
-        bool m_permanent_error = false;
 
-        virtual bool handle_target_data(std::string& piece_of_transfer)
+      class http_https_simple_client_wrapper : virtual public http_simple_client, virtual public https_simple_client
+      {
+      public:
+        http_https_simple_client_wrapper(bool is_ssl, std::shared_ptr<idle_handler_base> ihb_cb)
+          : m_ssl(is_ssl)
+          , m_ihb_cb(ihb_cb)
+        {}
+
+        bool invoke_request(const http::url_content& u_c, unsigned int timeout, const http_response_info** ppresponse_info, const std::string& method = "GET", const std::string& body = std::string(), const fields_list& additional_params = fields_list())
         {
-          bool r = m_pcb->do_call(piece_of_transfer, m_len_in_summary, m_len_in_summary - m_len_in_remain);
+          bool r = false;
+          if (m_ssl)
+            r = epee::net_utils::http::invoke_request(u_c, static_cast<https_simple_client&>(*this), timeout, ppresponse_info, method, body, additional_params);
+          else 
+            r = epee::net_utils::http::invoke_request(u_c, static_cast<http_simple_client&>(*this), timeout, ppresponse_info, method, body, additional_params);
+          return r;
+        }
+
+      private:
+        // class i_target_handler
+        virtual bool handle_target_data(std::string& piece_of_transfer) override
+        {
+          bool r = false;
+          if (m_ssl)
+            r = m_ihb_cb->do_call(piece_of_transfer, https_simple_client::m_len_in_summary, https_simple_client::m_len_in_summary - https_simple_client::m_len_in_remain);
+          else
+            r = m_ihb_cb->do_call(piece_of_transfer, http_simple_client::m_len_in_summary, http_simple_client::m_len_in_summary - http_simple_client::m_len_in_remain);
           piece_of_transfer.clear();
           return r;
         }
 
+        bool m_ssl;
+        std::shared_ptr<idle_handler_base> m_ihb_cb;
+      };
+
+
+      class interruptible_http_client
+      {
+        bool m_permanent_error = false;
       public:
         template<typename callback_t>
         bool invoke_cb(callback_t cb, const std::string& url, uint64_t timeout, const std::string& method = "GET", const std::string& body = std::string(), const fields_list& additional_params = fields_list())
         {
-          m_pcb.reset(new idle_handler<callback_t>(cb));
+          http::url_content uc{};
+          if (!parse_url(url, uc))
+          {
+            LOG_PRINT_L0("HTTP request to " << url << " failed because the URL couldn't be parsed.");
+            m_permanent_error = true;
+            return false;
+          }
+          bool is_ssl = uc.schema == "https";
+
+          http_https_simple_client_wrapper wrapper(is_ssl, std::make_shared<idle_handler<callback_t>>(cb));
+
           const http_response_info* p_hri = nullptr;
-          bool r = invoke_request(url, *this, timeout, &p_hri, method, body, additional_params);
+          bool r = wrapper.invoke_request(uc, timeout, &p_hri, method, body, additional_params);
+
           if (p_hri && !(p_hri->m_response_code >= 200 && p_hri->m_response_code < 300))
           {
-            LOG_PRINT_L0("HTTP request to " << url << " failed with code: " << p_hri->m_response_code);
+            LOG_PRINT_L0(boost::to_upper_copy(uc.schema) << " request to " << url << " failed with code: " << p_hri->m_response_code);
             m_permanent_error = true;
             return false;
           }

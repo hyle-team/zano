@@ -973,6 +973,57 @@ bool blockchain_storage::get_block_by_hash(const crypto::hash &h, block &blk)  c
 
   return false;
 }
+//------------------------------------------------------------------
+bool blockchain_storage::get_block_reward_by_main_chain_height(const uint64_t height, uint64_t& reward_with_fee) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  static const boost::multiprecision::uint128_t amount_max_mp = UINT64_MAX;
+
+  if (height >= m_db_blocks.size())
+    return false;
+
+  boost::multiprecision::uint128_t reward_with_fee_mp{};
+  if (height != 0)
+    reward_with_fee_mp = m_db_blocks[height]->already_generated_coins - m_db_blocks[height - 1]->already_generated_coins;
+  else
+    reward_with_fee_mp = m_db_blocks[height]->already_generated_coins;
+  
+  if (reward_with_fee_mp > amount_max_mp)
+    return false;
+
+  reward_with_fee = reward_with_fee_mp.convert_to<uint64_t>();
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::get_block_reward_by_hash(const crypto::hash &h, uint64_t& reward_with_fee) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  static const boost::multiprecision::uint128_t amount_max_mp = UINT64_MAX;
+
+  block_extended_info bei{};
+  if (!get_block_extended_info_by_hash(h, bei))
+    return false;
+
+  boost::multiprecision::uint128_t reward_with_fee_mp{};
+  if (bei.height != 0)
+  {
+    block_extended_info bei_prev{};
+    if (!get_block_extended_info_by_hash(bei.bl.prev_id, bei_prev))
+      return false;
+    reward_with_fee_mp = bei.already_generated_coins - bei_prev.already_generated_coins;
+  }
+  else
+  {
+    reward_with_fee_mp = bei.already_generated_coins;
+  }
+
+  if (reward_with_fee_mp > amount_max_mp)
+    return false;
+
+  reward_with_fee = reward_with_fee_mp.convert_to<uint64_t>();
+  return true;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::is_tx_related_to_altblock(crypto::hash tx_id) const
 {
   CRITICAL_REGION_LOCAL1(m_alternative_chains_lock);
