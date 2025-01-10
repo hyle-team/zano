@@ -568,7 +568,9 @@ bool fill_tx_rpc_inputs::c8(const currency::core& core, const size_t event_posit
       CHECK_AND_ASSERT_EQ(reference.tx_id, currency::null_hash);
       CHECK_AND_ASSERT_EQ(reference.n, 0u);
 
-      CHECK_AND_ASSERT(core.get_blockchain_storage().get_tx_chain_entry(reference.tx_id), false);
+      const auto pointer_entry{core.get_blockchain_storage().get_tx_chain_entry(reference.tx_id)};
+
+      CHECK_AND_ASSERT(pointer_entry == nullptr, false);
     }
   }
 
