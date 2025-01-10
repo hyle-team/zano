@@ -1051,7 +1051,8 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
   owr.wallet_id = m_wallet_id_counter++;
 
-  w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
+  std::shared_ptr<tools::i_wallet2_callback> w_cb{new i_wallet_to_i_backend_adapter(this, owr.wallet_id)};
+  w->callback(w_cb);
   if (m_remote_node_mode)
   {
     w->set_core_proxy(m_rpc_proxy);
@@ -1112,6 +1113,7 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
   EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
+  wo.w_cb = w_cb;
   owr.wallet_file_size = w->get_wallet_file_size();
   get_wallet_info(wo, owr.wi);
   init_wallet_entry(wo, owr.wallet_id);
@@ -1633,10 +1635,11 @@ bool wallets_manager::get_is_remote_daemon_connected()
 
 std::string wallets_manager::get_connectivity_status()
 {
-  view::general_connectivity_info gci = AUTO_VAL_INIT(gci);
+  view::general_connectivity_info gci{};
   gci.is_online = get_is_remote_daemon_connected();
   gci.last_daemon_is_disconnected = m_pproxy_diganostic_info->last_daemon_is_disconnected;
   gci.is_server_busy = m_pproxy_diganostic_info->is_busy;
+  gci.is_remote_node_mode = m_remote_node_mode;
   gci.last_proxy_communicate_timestamp = m_rpc_proxy->get_last_success_interract_time();
   return epee::serialization::store_t_to_json(gci);
 }
