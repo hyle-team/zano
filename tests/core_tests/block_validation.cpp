@@ -817,22 +817,24 @@ bool block_reward_in_main_chain_basic::generate(std::vector<test_event_entry>& e
   argument_assert argument{this, get_block_height(blk_0)};
 
   m_accounts.push_back(miner);
+  // A genesis block case: blk_0 reward equals to PREMINE_AMOUNT. The balance equals to PREMINE_AMOUNT.
   assert_reward(argument);
-  // Make sure the balance equals to the PREMINE_AMOUNT.
   assert_balance(argument);
   DO_CALLBACK(events, "configure_core");
 
   MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner);
 
   argument = argument_assert{this, get_block_height(blk_1), {0}, argument};
-  assert_balance(argument);
+  // Check, that a reward for blk_1 equals to a coin.
   assert_reward(argument);
+  assert_balance(argument);
 
   REWIND_BLOCKS_N(events, blk_1r, blk_1, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW - 1);
 
+  // Check rewards, balance for inserted empty blocks on heights 2, ..., 10.
   argument = argument_assert{this, get_block_height(blk_1r), std::list<uint64_t>(CURRENCY_MINED_MONEY_UNLOCK_WINDOW - 1), argument};
-  assert_balance(argument);
   assert_reward(argument);
+  assert_balance(argument);
 
   MAKE_TX_FEE(events, tx_0, miner, miner, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, blk_1r);
   MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner, tx_0);
