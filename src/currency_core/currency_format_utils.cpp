@@ -612,7 +612,7 @@ namespace currency
     if (context.ado.opt_descriptor.has_value() && context.ado.opt_descriptor->hidden_supply)
     {
       CHECK_AND_ASSERT_MES(aop.opt_amount_commitment_composition_proof.has_value(), false, "opt_amount_commitment_composition_proof is absent");
-      // TODO @#@# if asset is hidden -- check composition proof
+      // TODO @#@# if asset is hidden -- check linear composition proof for the fact that amount_commitment = lin(asset_id, G)
       return false;
     }
     else

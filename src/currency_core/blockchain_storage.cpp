@@ -4344,7 +4344,7 @@ bool blockchain_storage::validate_asset_operation_hf4(asset_op_verification_cont
 bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_context& avc) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  CHECK_AND_ASSERT_MES(is_hardfork_active_for_height(ZANO_HARDFORK_05, avc.height), false, "validate_asset_operation was called before HF5");
+  CHECK_AND_ASSERT_MES(is_hardfork_active_for_height(ZANO_HARDFORK_05, avc.height), false, "validate_asset_operation_hf5 was called before HF5");
 
   CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(avc.ado, &avc.asset_id_pt, &avc.asset_id), false, "get_or_calculate_asset_id failed");
   avc.asset_op_history = m_db_assets.find(avc.asset_id);
