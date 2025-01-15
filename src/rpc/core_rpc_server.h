@@ -182,7 +182,7 @@ namespace currency
     bool check_core_ready_(const std::string& calling_method);
 
     //utils
-    uint64_t get_block_reward(const block& blk);
+    uint64_t get_block_reward(const block& blk, const crypto::hash& h);
     bool fill_block_header_response(const block& blk, bool orphan_status, block_header_response& response);
     void set_session_blob(const std::string& session_id, const currency::block& blob);
     bool get_session_blob(const std::string& session_id, currency::block& blob);

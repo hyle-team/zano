@@ -158,17 +158,18 @@ TEST(wallet_seed, basic_test)
         {
           //generate random password
           std::string pass = epee::string_tools::pod_to_hex(crypto::cn_fast_hash(&j, sizeof(j)));          
-          if (j!= 0 && j < 64)
-          {
-            pass.resize(j);
-          }
+          pass.resize(std::min(j, (size_t)40));
+
           //get secured seed
           std::string secured_seed = acc.get_seed_phrase(pass);
 
-          //try to restore it without password(should fail)
-          currency::account_base acc2;
-          bool r_fail = acc2.restore_from_seed_phrase(secured_seed, "");
-          ASSERT_EQ(r_fail, false);
+          currency::account_base acc2{};
+          if (!pass.empty())
+          {
+            //try to restore it without password(should fail)
+            bool r_fail = acc2.restore_from_seed_phrase(secured_seed, "");
+            ASSERT_EQ(r_fail, false);
+          }
 
           //try to restore it with wrong password
           bool r_fake_pass = acc2.restore_from_seed_phrase(secured_seed, "fake_password");
@@ -182,7 +183,8 @@ TEST(wallet_seed, basic_test)
           currency::account_base acc3;
           bool r_true_res = acc3.restore_from_seed_phrase(secured_seed, pass);
           ASSERT_EQ(true, r_true_res);
-          ASSERT_EQ(true, acc3.get_keys() == acc.get_keys());
+          r = acc3.get_keys() == acc.get_keys();
+          ASSERT_TRUE(r);
 
         }
       }

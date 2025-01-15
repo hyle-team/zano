@@ -3756,6 +3756,10 @@ bool wallet2::balance(std::unordered_map<crypto::public_key, wallet_public::asse
 
       if (!td.is_zc())
         m_has_bare_unspent_outputs = true;
+
+      e.outs_amount_min = (e.outs_count == 0) ? td.amount() : std::min(e.outs_amount_min, td.amount());
+      e.outs_amount_max = (e.outs_count == 0) ? td.amount() : std::max(e.outs_amount_max, td.amount());
+      e.outs_count += 1;
     }
   }
 

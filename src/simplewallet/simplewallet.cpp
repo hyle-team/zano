@@ -593,7 +593,7 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
 {
   if (!currency::validate_password(password))
   {
-    fail_msg_writer() << R"(Provided password contains invalid characters. Only letters, numbers and ~!?@#$%^&*_+|{}[]()<>:;"'-=\/., symbols are allowed.)" << ENDL;
+    fail_msg_writer() << R"(Provided password contains invalid characters. Only letters, numbers and ~!?@#$%^&*_+|{}[]()<>:;"'-=/., symbols are allowed.)" << ENDL;
     return false;
   }
 

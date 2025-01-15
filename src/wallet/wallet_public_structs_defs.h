@@ -321,13 +321,21 @@ namespace wallet_public
     uint64_t unlocked = 0;
     uint64_t awaiting_in = 0;
     uint64_t awaiting_out = 0;
+    
+    uint64_t outs_count = 0;
+    uint64_t outs_amount_min = 0;
+    uint64_t outs_amount_max = 0;
 
     //v2
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(total)         DOC_DSCR("Total coins available(including locked)") DOC_EXMP(100000000000000)    DOC_END
-      KV_SERIALIZE(unlocked)      DOC_DSCR("Unlocked coins available(the ones that could be used right now)") DOC_EXMP(50000000000000)    DOC_END
-      KV_SERIALIZE(awaiting_in)   DOC_DSCR("Unconfirmed amount for receive") DOC_EXMP(1000000000000)    DOC_END
-      KV_SERIALIZE(awaiting_out)  DOC_DSCR("Unconfirmed amount for send")    DOC_EXMP(2000000000000)    DOC_END
+      KV_SERIALIZE(total)               DOC_DSCR("Total coins available(including locked)") DOC_EXMP(100000000000000)    DOC_END
+      KV_SERIALIZE(unlocked)            DOC_DSCR("Unlocked coins available(the ones that could be used right now)") DOC_EXMP(50000000000000)    DOC_END
+      KV_SERIALIZE(awaiting_in)         DOC_DSCR("Unconfirmed amount for receive") DOC_EXMP(1000000000000)    DOC_END
+      KV_SERIALIZE(awaiting_out)        DOC_DSCR("Unconfirmed amount for send")    DOC_EXMP(2000000000000)    DOC_END
+    
+      KV_SERIALIZE(outs_count)          DOC_DSCR("Number of total unspent outputs (including locked)")    DOC_EXMP(7)    DOC_END
+      KV_SERIALIZE(outs_amount_min)     DOC_DSCR("Output's minimum amount")    DOC_EXMP(2000000000000)    DOC_END
+      KV_SERIALIZE(outs_amount_max)     DOC_DSCR("Output's maximum amount")    DOC_EXMP(2000000000000)    DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
