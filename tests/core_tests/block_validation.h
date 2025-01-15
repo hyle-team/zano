@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -193,7 +193,4 @@ struct block_with_correct_prev_id_on_wrong_height : public gen_block_verificatio
   block_with_correct_prev_id_on_wrong_height();
   bool generate(std::vector<test_event_entry>& events) const;
   bool assert_blk_2_has_wrong_height(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const;
-
-private:
-  mutable currency::block m_blk_2{};
 };
