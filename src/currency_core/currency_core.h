@@ -136,8 +136,8 @@ namespace currency
      void check_free_space();
      
 
-     blockchain_storage m_blockchain_storage;
      tx_memory_pool m_mempool;
+     blockchain_storage m_blockchain_storage;
      i_currency_protocol* m_pprotocol;
      i_critical_error_handler* m_critical_error_handler;
      epee::critical_section m_incoming_tx_lock;
