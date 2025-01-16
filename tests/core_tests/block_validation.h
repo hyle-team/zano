@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -6,6 +6,7 @@
 
 #pragma once 
 #include "chaingen.h"
+#include "wallet_tests_basic.h"
 
 template<size_t invalid_block_idx = 0>
 class gen_block_verification_base : public test_chain_unit_enchanced
@@ -196,4 +197,26 @@ struct block_with_correct_prev_id_on_wrong_height : public gen_block_verificatio
 
 private:
   mutable currency::block m_blk_2{};
+};
+
+struct block_reward_in_main_chain_basic : wallet_test
+{
+  block_reward_in_main_chain_basic();
+  bool generate(std::vector<test_event_entry>& events) const;
+
+private:
+  bool assert_balance(currency::core& core, size_t event_index, const std::vector<test_event_entry>& events) const;
+  bool assert_reward(currency::core& core, size_t event_index, const std::vector<test_event_entry>& events) const;
+  struct argument_assert;
+};
+
+struct block_reward_in_alt_chain_basic : wallet_test
+{
+  block_reward_in_alt_chain_basic();
+  bool generate(std::vector<test_event_entry>& events) const;
+
+private:
+  bool assert_balance(currency::core& core, size_t event_index, const std::vector<test_event_entry>& events) const;
+  bool assert_reward(currency::core& core, size_t event_index, const std::vector<test_event_entry>& events) const;
+  struct argument_assert;
 };
