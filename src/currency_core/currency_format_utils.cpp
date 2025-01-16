@@ -4274,7 +4274,7 @@ namespace currency
   {
     payment_id.clear();
     blobdata blob;
-    uint64_t prefix;
+    uint64_t prefix{};
     if (!tools::base58::decode_addr(str, prefix, blob))
     {
       LOG_PRINT_L1("Invalid address format: base58 decoding failed for \"" << str << "\"");
