@@ -1,6 +1,7 @@
-// Copyright (c) 2024 Zano Project
+// Copyright (c) 2025 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include "chaingen.h"
 #include "daemon_rpc.h"
 
@@ -47,7 +48,7 @@ bool fill_tx_rpc_inputs::generate(std::vector<test_event_entry>& events) const
       tx.vin.push_back(std::move(input));
     }
 
-    DO_CALLBACK_PARAMS_STR(events, "c6", t_serializable_object_to_blob(tx));
+    DO_CALLBACK_PARAMS_STR(events, "c3", t_serializable_object_to_blob(tx));
   }
 
   // A transaction with several "txin_to_key" inputs those have different .amount values.
@@ -77,7 +78,7 @@ bool fill_tx_rpc_inputs::generate(std::vector<test_event_entry>& events) const
       tx.vin.push_back(std::move(input));
     }
 
-    DO_CALLBACK_PARAMS_STR(events, "c3", t_serializable_object_to_blob(tx));
+    DO_CALLBACK_PARAMS_STR(events, "c4", t_serializable_object_to_blob(tx));
   }
 
   // A transaction with inputs of all possible types.
@@ -98,7 +99,7 @@ bool fill_tx_rpc_inputs::generate(std::vector<test_event_entry>& events) const
 
     tx.vin.push_back(std::move(currency::txin_multisig{}));
 
-    DO_CALLBACK_PARAMS_STR(events, "c4", t_serializable_object_to_blob(tx));
+    DO_CALLBACK_PARAMS_STR(events, "c5", t_serializable_object_to_blob(tx));
   }
 
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
@@ -162,7 +163,7 @@ bool fill_tx_rpc_inputs::generate(std::vector<test_event_entry>& events) const
       tx.vin.push_back(std::move(input));
     }
 
-    DO_CALLBACK_PARAMS_STR(events, "c5", t_serializable_object_to_blob(tx));
+    DO_CALLBACK_PARAMS_STR(events, "c6", t_serializable_object_to_blob(tx));
   }
 
   /* A wrong reference by an object of the type "ref_by_id": a value of the attribute ".n" representing an offset is greater than a length of a container of outputs.The function "fill_tx_rpc_inputs"
@@ -279,6 +280,44 @@ bool fill_tx_rpc_inputs::c3(const currency::core& core, const size_t event_posit
   CHECK_AND_ASSERT_EQ(info.outs.empty(), true);
 
   {
+    CHECK_AND_ASSERT_EQ(info.ins.size(), 1);
+
+    {
+      CHECK_AND_ASSERT_EQ(info.ins.front().amount, 0);
+      CHECK_AND_ASSERT_EQ(info.ins.front().multisig_count, 0);
+      CHECK_AND_ASSERT_EQ(info.ins.front().htlc_origin.empty(), true);
+      CHECK_AND_ASSERT_EQ(info.ins.front().kimage_or_ms_id, epee::string_tools::pod_to_hex(currency::null_ki));
+      CHECK_AND_ASSERT_EQ(info.ins.front().global_indexes.empty(), true);
+      CHECK_AND_ASSERT_EQ(info.ins.front().etc_options.empty(), true);
+    }
+  }
+
+  CHECK_AND_ASSERT_EQ(info.id.empty(), true);
+  CHECK_AND_ASSERT_EQ(info.extra.empty(), true);
+  CHECK_AND_ASSERT_EQ(info.attachments.empty(), true);
+  CHECK_AND_ASSERT_EQ(info.object_in_json.empty(), true);
+
+  return true;
+}
+
+bool fill_tx_rpc_inputs::c4(const currency::core& core, const size_t event_position, const std::vector<test_event_entry>& events) const
+{
+  currency::transaction tx{};
+  currency::tx_rpc_extended_info info{};
+
+  CHECK_AND_ASSERT_EQ(t_unserializable_object_from_blob(tx, boost::get<const callback_entry>(events.at(event_position)).callback_params), true);
+  CHECK_AND_ASSERT_EQ(core.get_blockchain_storage().fill_tx_rpc_inputs(info, tx), true);
+  CHECK_AND_ASSERT_EQ(info.blob.empty(), true);
+  CHECK_AND_ASSERT_EQ(info.blob_size, 0);
+  CHECK_AND_ASSERT_EQ(info.fee, 0);
+  CHECK_AND_ASSERT_EQ(info.amount, 0);
+  CHECK_AND_ASSERT_EQ(info.timestamp, 0);
+  CHECK_AND_ASSERT_EQ(info.keeper_block, 0);
+  CHECK_AND_ASSERT_EQ(info.id.empty(), true);
+  CHECK_AND_ASSERT_EQ(info.pub_key.empty(), true);
+  CHECK_AND_ASSERT_EQ(info.outs.empty(), true);
+
+  {
     CHECK_AND_ASSERT_EQ(info.ins.size(), 3);
 
     {
@@ -317,7 +356,7 @@ bool fill_tx_rpc_inputs::c3(const currency::core& core, const size_t event_posit
   return true;
 }
 
-bool fill_tx_rpc_inputs::c4(const currency::core& core, const size_t event_position, const std::vector<test_event_entry>& events) const
+bool fill_tx_rpc_inputs::c5(const currency::core& core, const size_t event_position, const std::vector<test_event_entry>& events) const
 {
   currency::transaction tx{};
   currency::tx_rpc_extended_info info{};
@@ -366,7 +405,7 @@ bool fill_tx_rpc_inputs::c4(const currency::core& core, const size_t event_posit
   return true;
 }
 
-bool fill_tx_rpc_inputs::c5(const currency::core& core, const size_t event_position, const std::vector<test_event_entry>& events) const
+bool fill_tx_rpc_inputs::c6(const currency::core& core, const size_t event_position, const std::vector<test_event_entry>& events) const
 {
   currency::transaction tx{};
   currency::tx_rpc_extended_info info{};
@@ -478,44 +517,6 @@ bool fill_tx_rpc_inputs::c5(const currency::core& core, const size_t event_posit
   return true;
 }
 
-bool fill_tx_rpc_inputs::c6(const currency::core& core, const size_t event_position, const std::vector<test_event_entry>& events) const
-{
-  currency::transaction tx{};
-  currency::tx_rpc_extended_info info{};
-
-  CHECK_AND_ASSERT_EQ(t_unserializable_object_from_blob(tx, boost::get<const callback_entry>(events.at(event_position)).callback_params), true);
-  CHECK_AND_ASSERT_EQ(core.get_blockchain_storage().fill_tx_rpc_inputs(info, tx), true);
-  CHECK_AND_ASSERT_EQ(info.blob.empty(), true);
-  CHECK_AND_ASSERT_EQ(info.blob_size, 0);
-  CHECK_AND_ASSERT_EQ(info.fee, 0);
-  CHECK_AND_ASSERT_EQ(info.amount, 0);
-  CHECK_AND_ASSERT_EQ(info.timestamp, 0);
-  CHECK_AND_ASSERT_EQ(info.keeper_block, 0);
-  CHECK_AND_ASSERT_EQ(info.id.empty(), true);
-  CHECK_AND_ASSERT_EQ(info.pub_key.empty(), true);
-  CHECK_AND_ASSERT_EQ(info.outs.empty(), true);
-
-  {
-    CHECK_AND_ASSERT_EQ(info.ins.size(), 1);
-
-    {
-      CHECK_AND_ASSERT_EQ(info.ins.front().amount, 0);
-      CHECK_AND_ASSERT_EQ(info.ins.front().multisig_count, 0);
-      CHECK_AND_ASSERT_EQ(info.ins.front().htlc_origin.empty(), true);
-      CHECK_AND_ASSERT_EQ(info.ins.front().kimage_or_ms_id, epee::string_tools::pod_to_hex(currency::null_ki));
-      CHECK_AND_ASSERT_EQ(info.ins.front().global_indexes.empty(), true);
-      CHECK_AND_ASSERT_EQ(info.ins.front().etc_options.empty(), true);
-    }
-  }
-
-  CHECK_AND_ASSERT_EQ(info.id.empty(), true);
-  CHECK_AND_ASSERT_EQ(info.extra.empty(), true);
-  CHECK_AND_ASSERT_EQ(info.attachments.empty(), true);
-  CHECK_AND_ASSERT_EQ(info.object_in_json.empty(), true);
-
-  return true;
-}
-
 bool fill_tx_rpc_inputs::c7(const currency::core& core, const size_t event_position, const std::vector<test_event_entry>& events) const
 {
   currency::transaction tx{};
@@ -566,7 +567,10 @@ bool fill_tx_rpc_inputs::c8(const currency::core& core, const size_t event_posit
 
       CHECK_AND_ASSERT_EQ(reference.tx_id, currency::null_hash);
       CHECK_AND_ASSERT_EQ(reference.n, 0u);
-      CHECK_AND_ASSERT(core.get_blockchain_storage().get_tx_chain_entry(reference.tx_id), false);
+
+      const auto pointer_entry{core.get_blockchain_storage().get_tx_chain_entry(reference.tx_id)};
+
+      CHECK_AND_ASSERT(pointer_entry == nullptr, false);
     }
   }
 
