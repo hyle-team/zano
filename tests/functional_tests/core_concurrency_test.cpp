@@ -450,7 +450,7 @@ namespace boost
 bool core_concurrency_test(boost::program_options::variables_map& vm, size_t wthreads, size_t rthreads, size_t blocks_count)
 {
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
-  //epee::debug::get_set_enable_assert(true, false);
+  epee::debug::get_set_enable_assert(true, false);
   log_space::get_set_need_thread_id(true, true);
 
   cct_accounts_t accounts(s_wallets_total_count);

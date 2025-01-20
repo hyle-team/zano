@@ -60,7 +60,7 @@ namespace currency
     return m_keys;
   }
   //-----------------------------------------------------------------
-  void crypt_with_pass(const void* scr_data, std::size_t src_length, void* dst_data, const std::string& password)
+  void account_base::crypt_with_pass(const void* scr_data, std::size_t src_length, void* dst_data, const std::string& password)
   {
     crypto::chacha8_key key = AUTO_VAL_INIT(key);
     crypto::generate_chacha8_key(password, key);
@@ -71,16 +71,24 @@ namespace currency
     crypto::chacha8(scr_data, src_length, key, iv, (char*)dst_data);
   }
   //-----------------------------------------------------------------
-  std::string account_base::get_seed_phrase(const std::string& password) const 
+  std::string account_base::get_seed_phrase(const std::string& password) const
   {
     if (m_keys_seed_binary.empty())
       return "";
+    return get_seed_phrase(password, m_keys_seed_binary);
+  }
+  //-----------------------------------------------------------------
+  std::string account_base::get_seed_phrase(const std::string& password, const std::vector<unsigned char>& keys_seed_binary) const
+  {
+    if (keys_seed_binary.empty())
+      return "";
 
-    std::vector<unsigned char> processed_seed_binary = m_keys_seed_binary;
+    std::vector<unsigned char> processed_seed_binary = keys_seed_binary;
     if (!password.empty())
     {
+      CHECK_AND_ASSERT_THROW_MES(currency::validate_password(password), "seed phrase password contains invalid characters, seed phrase cannot be created with such a password");
       //encrypt seed phrase binary data
-      crypt_with_pass(&m_keys_seed_binary[0], m_keys_seed_binary.size(), &processed_seed_binary[0], password);      
+      crypt_with_pass(&keys_seed_binary[0], keys_seed_binary.size(), &processed_seed_binary[0], password);      
     }
 
     std::string keys_seed_text = tools::mnemonic_encoding::binary2text(processed_seed_binary);
@@ -92,13 +100,16 @@ namespace currency
     CHECK_AND_ASSERT_THROW_MES(self_check_is_password_used == !password.empty(), "Account seed phrase internal error: password flag encoded wrong");
 
     constexpr uint16_t checksum_max = tools::mnemonic_encoding::NUMWORDS >> 1; // maximum value of checksum
-    std::string binary_for_check_sum((const char*)&m_keys_seed_binary[0], m_keys_seed_binary.size());
+    std::string binary_for_check_sum((const char*)&keys_seed_binary[0], keys_seed_binary.size());
     binary_for_check_sum.append(password);
     crypto::hash h = crypto::cn_fast_hash(binary_for_check_sum.data(), binary_for_check_sum.size());
     *reinterpret_cast<uint64_t*>(&h) = creation_timestamp_rounded;
     h = crypto::cn_fast_hash(&h, sizeof h);
     uint64_t h_64 = *reinterpret_cast<uint64_t*>(&h);
     uint16_t checksum = h_64 % (checksum_max + 1);
+    
+    if (checksum == checksum_max) // workaround for incorrect checksum calculation (trying to keep the whole scheme untouched) -- sowle
+      checksum = 0;
     
     uint8_t auditable_flag = 0;
     if (m_keys.account_address.flags & ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE)
@@ -208,6 +219,10 @@ namespace currency
       h = crypto::cn_fast_hash(&h, sizeof h);
       uint64_t h_64 = *reinterpret_cast<uint64_t*>(&h);
       uint16_t checksum_calculated = h_64 % (checksum_max + 1);
+      
+      if (checksum_calculated == checksum_max) // workaround for incorrect checksum calculation (trying to keep the whole scheme untouched) -- sowle
+        checksum_calculated = 0;
+
       if (checksum != checksum_calculated)
       {
         LOG_PRINT_L0("seed phase has invalid checksum: " << checksum_calculated << ", while " << checksum << " is expected, check your words");
@@ -222,6 +237,8 @@ namespace currency
 
     if (auditable_flag)
       m_keys.account_address.flags |= ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE;
+    else
+      m_keys.account_address.flags &= ~ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE;
 
     return true;
   }

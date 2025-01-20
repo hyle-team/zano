@@ -46,3 +46,4 @@
 #include "ionic_swap_tests.h"
 #include "attachment_isolation_encryption_test.h"
 #include "pos_fuse_test.h"
+#include "daemon_rpc.h"

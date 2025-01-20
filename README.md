@@ -13,14 +13,14 @@ Be sure to clone the repository properly:\
 ### Dependencies
 | component / version | minimum <br>(not recommended but may work) | recommended | most recent of what we have ever tested |
 |--|--|--|--|
-| gcc (Linux) | 5.4.0 | 9.4.0 | 12.3.0 |
+| gcc (Linux) | 8.4.0 | 9.4.0 | 12.3.0 |
 | llvm/clang (Linux) | UNKNOWN | 7.0.1 | 8.0.0 |
-| [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2017 (15.9.30) | 2019 (16.11.34) | 2022 (17.9.5) |
+| [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2017 (15.9.30) | 2022 (17.11.5) | 2022 (17.12.3) |
 | [XCode](https://developer.apple.com/downloads/) (macOS) | 12.3 | 14.3 | 15.2 |
 | [CMake](https://cmake.org/download/) | 3.15.5 | 3.26.3 | 3.29.0 |
-| [Boost](https://www.boost.org/users/download/) | 1.70 | 1.70 | 1.84 |
-| [OpenSSL](https://www.openssl.org/source/) [(win)](https://slproweb.com/products/Win32OpenSSL.html) | 1.1.1n | 1.1.1w | 1.1.1w | 
-| [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.11.2 | 5.15.2 |
+| [Boost](https://www.boost.org/users/download/) | 1.75 | 1.84 | 1.84 |
+| [OpenSSL](https://www.openssl.org/source/) [(win)](https://slproweb.com/products/Win32OpenSSL.html) | 1.1.1n | 1.1.1w | 3.4 | 
+| [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.15.2 | 5.15.2 |
 
 Note:\
 [*server version*] denotes steps required for building command-line tools (daemon, simplewallet, etc.).\
@@ -52,10 +52,9 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
 3. Download and build Boost\
     (Assuming you have cloned Zano into the 'zano' folder. If you used a different location for Zano, **edit line 4** accordingly.)
 
-       curl -OL https://boostorg.jfrog.io/artifactory/main/release/1.70.0/source/boost_1_70_0.tar.bz2
-       echo "430ae8354789de4fd19ee52f3b1f739e1fba576f0aded0897c3c2bc00fb38778  boost_1_70_0.tar.bz2" | shasum -c && tar -xjf boost_1_70_0.tar.bz2
-       rm boost_1_70_0.tar.bz2 && cd boost_1_70_0
-       patch -p0 < ../zano/utils/boost_1.70_gcc_8.patch || cd ..
+       curl -OL https://archives.boost.io/release/1.84.0/source/boost_1_84_0.tar.bz2
+       echo "cc4b893acf645c9d4b698e9a0f08ca8846aa5d6c68275c14c3e7949c24109454  boost_1_84_0.tar.bz2" | shasum -c && tar -xjf boost_1_84_0.tar.bz2
+       rm boost_1_84_0.tar.bz2 && cd boost_1_84_0
        ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
        ./b2 && cd ..
     Make sure that you see "The Boost C++ Libraries were successfully built!" message at the end.
@@ -88,13 +87,13 @@ For instance, by adding the following lines to `~/.bashrc`
 
     [*server version*]
 
-       export BOOST_ROOT=/home/user/boost_1_70_0  
+       export BOOST_ROOT=/home/user/boost_1_84_0  
        export OPENSSL_ROOT_DIR=/home/user/openssl
 
 
     [*GUI version*]
 
-       export BOOST_ROOT=/home/user/boost_1_70_0
+       export BOOST_ROOT=/home/user/boost_1_84_0
        export OPENSSL_ROOT_DIR=/home/user/openssl  
        export QT_PREFIX_PATH=/home/user/Qt5.11.2/5.11.2/gcc_64
 
@@ -168,4 +167,15 @@ To build GUI application:
     h. Unfold the certificate in Keychain Access window and double click the underlying private key "Zano". Select "Access Control" tab, then select "Allow all applications to access this item". Click "Save Changes".
 2. Revise building script, comment out unwanted steps and run it:  `utils/build_script_mac_osx.sh`
 3. The application should be here: `/buid_mac_osx_64/release/src`
+
+<br />
+<br />
+
+## Supporting project/donations
+
+ZANO @dev<br />
+BTC bc1qpa8w8eaehlplfepmnzpd7v9j046899nktxnkxp<br />
+BCH qqgq078vww5exd9kt3frx6krdyznmp80hcygzlgqzd<br />
+ETH 0x206c52b78141498e74FF074301ea90888C40c178<br />
+XMR 45gp9WTobeB5Km3kLQgVmPJkvm9rSmg4gdyHheXqXijXYMjUY48kLgL7QEz5Ar8z9vQioQ68WYDKsQsjAEonSeFX4UeLSiX<br />
 

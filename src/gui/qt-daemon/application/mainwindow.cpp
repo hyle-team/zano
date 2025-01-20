@@ -959,7 +959,12 @@ bool MainWindow::init_backend(int argc, char* argv[])
 QString    MainWindow::is_remnotenode_mode_preconfigured(const QString& param)
 {
   TRY_ENTRY();
-  return API_RETURN_CODE_FALSE;
+  view::api_response ar{};
+  if (m_backend.is_remote_node_mode())
+    ar.error_code = API_RETURN_CODE_TRUE;
+  else
+    ar.error_code = API_RETURN_CODE_FALSE;
+  return MAKE_RESPONSE(ar);
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
@@ -1721,7 +1726,7 @@ QString MainWindow::have_secure_app_data(const QString& param)
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString MainWindow::drop_secure_app_data(const QString& param)
+QString MainWindow::drop_secure_app_data()
 {
   TRY_ENTRY();
   LOG_API_TIMING();

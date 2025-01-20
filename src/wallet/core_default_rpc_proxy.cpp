@@ -20,7 +20,11 @@ namespace tools
 {
   bool default_http_core_proxy::set_connection_addr(const std::string& url)
   {
-    m_daemon_address = url;
+    if (m_daemon_address != url)
+    {
+      m_daemon_address = url;
+      m_http_client.disconnect();
+    }
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------

@@ -2571,7 +2571,7 @@ bool multisig_unconfirmed_transfer_and_multiple_scan_pool_calls::c1(currency::co
   LOG_PRINT_YELLOW("%%%%% tx " << get_transaction_hash(tx) << " is spending multisig output " << multisig_id, LOG_LEVEL_0);
   
   bool stub;
-  std::deque<tools::transfer_details> transfers;
+  tools::transfer_container transfers;
   std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed_transfers;
 
   alice_wlt->scan_tx_pool(stub);

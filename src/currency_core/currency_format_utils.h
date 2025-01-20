@@ -29,6 +29,7 @@
 #include "currency_format_utils_transactions.h"
 #include "core_runtime_config.h"
 #include "wallet/wallet_public_structs_defs.h"
+#include "wallet/wallet_public_structs_defs.h"
 #include "bc_attachments_helpers.h"
 #include "bc_payments_id_service.h"
 #include "bc_offers_service_basic.h"
@@ -139,10 +140,12 @@ namespace currency
     bool hltc_our_out_is_before_expiration;
   };
 
-  struct thirdparty_sign_handler
+  struct asset_eth_signer_i
   {
-    virtual bool sign(const crypto::hash& h, const crypto::public_key& owner_public_key, crypto::generic_schnorr_sig& sig);
+    virtual bool sign(const crypto::hash& h, const crypto::eth_public_key& asset_owner, crypto::eth_signature& sig) = 0;
   };
+
+  typedef boost::variant<crypto::public_key, crypto::eth_public_key> asset_owner_key_v;
 
   struct finalize_tx_param
   {
@@ -162,13 +165,11 @@ namespace currency
     uint64_t tx_version;
     uint64_t mode_separate_fee = 0;
     
-    epee::misc_utils::events_dispatcher* pevents_dispatcher;
+    epee::misc_utils::events_dispatcher* pevents_dispatcher = nullptr;
     tx_generation_context gen_context{}; // solely for consolidated txs
+
     
-    //crypto::secret_key asset_control_key = currency::null_skey;
-    crypto::public_key ado_current_asset_owner = null_pkey;
-    thirdparty_sign_handler* pthirdparty_sign_handler = nullptr;
-    mutable bool need_to_generate_ado_proof = false;
+    bool ado_sign_thirdparty = false;//@#@ TODO: add to serialization map @zoidberg
 
 
     BEGIN_SERIALIZE_OBJECT()
@@ -191,14 +192,13 @@ namespace currency
       {
         FIELD(gen_context);
       }
-      FIELD(ado_current_asset_owner)
-      FIELD(need_to_generate_ado_proof)
     END_SERIALIZE()
   };
 
   struct finalized_tx
   {
     currency::transaction tx;
+    crypto::hash          tx_id;
     crypto::secret_key    one_time_key;
     finalize_tx_param     ftp;
     std::string           htlc_origin;
@@ -208,6 +208,7 @@ namespace currency
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(tx)
+      FIELD(tx_id)
       FIELD(one_time_key)
       FIELD(ftp)
       FIELD(htlc_origin)
@@ -261,6 +262,7 @@ namespace currency
     const transaction& tx;
     const crypto::hash& tx_id;
     const asset_descriptor_operation& ado;
+    uint64_t height = UINT64_MAX; // default value means the height of the upcoming block (top_block + 1)
     crypto::public_key asset_id = currency::null_pkey;
     crypto::point_t asset_id_pt = crypto::c_point_0;
     uint64_t amount_to_validate = 0;
@@ -271,13 +273,18 @@ namespace currency
   bool generate_asset_surjection_proof(const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, zc_asset_surjection_proof& result);
   bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id);
   bool generate_tx_balance_proof(const transaction &tx, const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, zc_balance_proof& proof);
-  bool generate_zc_outs_range_proof(const crypto::hash& context_hash, size_t out_index_start, const tx_generation_context& outs_gen_context,
+  bool generate_zc_outs_range_proof(const crypto::hash& context_hash, const tx_generation_context& outs_gen_context,
     const std::vector<tx_out_v>& vouts, zc_outs_range_proof& result);
   bool check_tx_bare_balance(const transaction& tx, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
   bool check_tx_balance(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
   bool validate_asset_operation_amount_commitment(asset_op_verification_context& context);
   
   const char* get_asset_operation_type_string(size_t asset_operation_type, bool short_name = false);
+  bool validate_asset_ticker(const std::string& ticker);
+  bool validate_asset_full_name(const std::string& full_name);
+  bool validate_asset_ticker_and_full_name(const asset_descriptor_base& adb);
+  void replace_asset_ticker_and_full_name_if_invalid(asset_descriptor_base& adb, const crypto::public_key& asset_id);
+
   //---------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 
                                                              size_t current_block_size, 
@@ -546,7 +553,7 @@ namespace currency
     {
       assets_list.push_back(currency::asset_descriptor_with_id());
       assets_list.back().asset_id = pr.first;
-      epee::misc_utils::cast_assign_a_to_b(assets_list.back(), static_cast<currency::asset_descriptor_base>(pr.second));
+      epee::misc_utils::cast_assign_a_to_b(static_cast<currency::asset_descriptor_base>(pr.second), assets_list.back());
       //*static_cast<currency::asset_descriptor_base*>(&assets_list.back()) = pr.second;
     }
   }
@@ -947,7 +954,15 @@ namespace currency
       }
     }
   }
+  /*
   //---------------------------------------------------------------
+  template<typename invocable_t>
+  typename std::enable_if_t<std::is_invocable_v<invocable_t, std::ostream&>, std::ostream&> operator<<(std::ostream& o, invocable_t callee)
+  {
+    callee(o);
+    return o;
+  }
+  */
   //---------------------------------------------------------------
   std::ostream& operator <<(std::ostream& o, const ref_by_id& r);
   std::ostream& operator <<(std::ostream& o, const std::type_info& ti);
@@ -1205,7 +1220,13 @@ namespace currency
       tv.short_view = std::string("op:") + get_asset_operation_type_string(ado.operation_type, true);
       if (ado.opt_asset_id.has_value())
         tv.short_view += std::string(" , id:") + crypto::pod_to_hex(ado.opt_asset_id);
-      tv.details_view = tv.short_view + std::string(" , ticker:") + ado.descriptor.ticker + std::string(" , cur.supply:") + print_money_brief(ado.descriptor.current_supply, ado.descriptor.decimal_point);
+      tv.details_view = tv.short_view;
+      if (ado.opt_descriptor.has_value())
+      {
+        tv.details_view += std::string(" , ticker:") + ado.opt_descriptor->ticker + std::string(" , cur.supply:") + print_money_brief(ado.opt_descriptor->current_supply, ado.opt_descriptor->decimal_point);
+      }
+      //@#@ TODO: add other info from asset_descriptor_operation v2+
+      
       return true;
     }
     template<typename t_type>

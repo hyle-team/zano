@@ -29,7 +29,7 @@ namespace currency
     typedef std::vector<std::string> command_type;
 
     simple_wallet();
-    ~simple_wallet();
+    virtual ~simple_wallet();
     bool init(const boost::program_options::variables_map& vm);
     bool deinit();
     bool run();
@@ -194,7 +194,6 @@ namespace currency
     std::string m_restore_wallet;
     std::string m_voting_config_file;
     bool m_no_password_confirmations = false;
-   
     
     crypto::hash m_password_hash;
     uint64_t m_password_salt;

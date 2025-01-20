@@ -48,6 +48,7 @@ public:
     m_cmd_binder.set_handler("print_tx_prun_info", boost::bind(&daemon_commands_handler::print_tx_prun_info, this, ph::_1), "Print tx prunning info");
     m_cmd_binder.set_handler("print_tx", boost::bind(&daemon_commands_handler::print_tx, this, ph::_1), "Print transaction, print_tx <transaction_hash>");
     m_cmd_binder.set_handler("print_asset_info", boost::bind(&daemon_commands_handler::print_asset_info, this, ph::_1), "Print information about the given asset by its id");
+    m_cmd_binder.set_handler("print_blocked_ips", boost::bind(&daemon_commands_handler::print_blocked_ips, this, ph::_1), "Print ip address blacklists");
     m_cmd_binder.set_handler("start_mining", boost::bind(&daemon_commands_handler::start_mining, this, ph::_1), "Start mining for specified address, start_mining <addr> [threads=1]");
     m_cmd_binder.set_handler("stop_mining", boost::bind(&daemon_commands_handler::stop_mining, this, ph::_1), "Stop mining");
     m_cmd_binder.set_handler("print_pool", boost::bind(&daemon_commands_handler::print_pool, this, ph::_1), "Print transaction pool (long format)");
@@ -232,6 +233,20 @@ private:
   bool print_cn(const std::vector<std::string>& args)
   {
     m_srv.get_payload_object().log_connections();
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool print_blocked_ips(const std::vector<std::string>& args)
+  {
+    std::map<uint32_t, time_t> blocklist;
+    m_srv.get_ip_block_list(blocklist);
+    std::stringstream ss;
+    ss << "BLOCKED IPS:" << ENDL;
+    for (const auto& e : blocklist)
+    {
+      ss << string_tools::get_ip_string_from_int32(e.first) << ", time: " << std::put_time(std::localtime(&e.second), "%Y-%m-%d %H:%M:%S") << ENDL;
+    }
+    LOG_PRINT_L0(ss.str());
     return true;
   }
   //--------------------------------------------------------------------------------
@@ -806,17 +821,21 @@ private:
     size_t idx = 0;
     for(auto& aop: asset_history)
     {
-      ss << "[" << std::setw(2) << idx << "] operation:        " << currency::get_asset_operation_type_string(aop.operation_type) << " (" << (int)aop.operation_type << ")" << ENDL <<
-                                       "     ticker:           \"" << aop.descriptor.ticker << "\"" << ENDL <<
-                                       "     full name:        \"" << aop.descriptor.full_name << "\"" << ENDL <<
-                                       "     meta info:        \"" << aop.descriptor.meta_info << "\"" << ENDL <<
-                                       "     current supply:   " << currency::print_money_brief(aop.descriptor.current_supply, aop.descriptor.decimal_point) << ENDL <<
-                                       "     max supply:       " << currency::print_money_brief(aop.descriptor.total_max_supply, aop.descriptor.decimal_point) << ENDL <<
-                                       "     decimal point:    " << (int)aop.descriptor.decimal_point << ENDL <<
-                                       "     owner * 1/8:      " << aop.descriptor.owner << ENDL <<
-                                       "     amount cmt * 1/8: " << aop.amount_commitment << ENDL <<
-                                       "     hidden supply:    " << (aop.descriptor.hidden_supply ? "yes" : "no") << ENDL <<
-        "";
+      if (aop.opt_descriptor.has_value())
+      {
+        const currency::asset_descriptor_base& adb = aop.opt_descriptor.value();
+        ss << "[" << std::setw(2) << idx << "] operation:        " << currency::get_asset_operation_type_string(aop.operation_type) << " (" << (int)aop.operation_type << ")" << ENDL <<
+                                         "     ticker:           \"" << adb.ticker << "\"" << ENDL <<
+                                         "     full name:        \"" << adb.full_name << "\"" << ENDL <<
+                                         "     meta info:        \"" << adb.meta_info << "\"" << ENDL <<
+                                         "     current supply:   " << currency::print_money_brief(adb.current_supply, adb.decimal_point) << ENDL <<
+                                         "     max supply:       " << currency::print_money_brief(adb.total_max_supply, adb.decimal_point) << ENDL <<
+                                         "     decimal point:    " << (int)adb.decimal_point << ENDL <<
+                                         "     owner * 1/8:      " << adb.owner << ENDL <<
+                                         "     amount cmt * 1/8: " << (aop.opt_amount_commitment.has_value() ? aop.opt_amount_commitment.value() : currency::null_pkey) << ENDL <<
+                                         "     hidden supply:    " << (adb.hidden_supply ? "yes" : "no") << ENDL <<
+          "";
+      }
       ++idx;
     }
 

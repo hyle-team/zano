@@ -233,6 +233,8 @@ namespace currency
     size_t get_alternative_blocks_count() const;
     crypto::hash get_block_id_by_height(uint64_t height) const;
     bool get_block_by_hash(const crypto::hash &h, block &blk) const;
+    bool get_block_reward_by_main_chain_height(const uint64_t height, uint64_t& reward_with_fee) const; // only for main chain blocks
+    bool get_block_reward_by_hash(const crypto::hash &h, uint64_t& reward_with_fee) const; // works for main chain and alt chain blocks
     bool get_block_extended_info_by_height(uint64_t h, block_extended_info &blk) const;
     bool get_block_extended_info_by_hash(const crypto::hash &h, block_extended_info &blk) const;
     bool get_block_by_height(uint64_t h, block &blk) const;
@@ -380,7 +382,10 @@ namespace currency
       bool for_altchain,
       const alt_chain_type& alt_chain = alt_chain_type(),
       uint64_t split_height = 0)const;
-    bool validate_asset_operation_against_current_blochain_state(asset_op_verification_context& avc) const;
+    bool validate_ado_ownership(asset_op_verification_context& avc) const;
+    bool validate_asset_operation_hf4(asset_op_verification_context& avc) const;
+    bool validate_asset_operation_hf5(asset_op_verification_context& avc) const;
+    bool validate_asset_operation(asset_op_verification_context& avc, uint64_t height) const;
 
     void set_core_runtime_config(const core_runtime_config& pc) const;
     const core_runtime_config& get_core_runtime_config()const;
@@ -678,14 +683,14 @@ namespace currency
     uint64_t get_adjusted_time()const;
     bool complete_timestamps_vector(uint64_t start_height, std::vector<uint64_t>& timestamps);
     bool update_next_comulative_size_limit();
-    bool process_blockchain_tx_extra(const transaction& tx, const crypto::hash& tx_id);
-    bool unprocess_blockchain_tx_extra(const transaction& tx);
+    bool process_blockchain_tx_extra(const transaction& tx, const crypto::hash& tx_id, const uint64_t height);
+    bool unprocess_blockchain_tx_extra(const transaction& tx, const uint64_t height);
     bool process_blockchain_tx_attachments(const transaction& tx, uint64_t h, const crypto::hash& bl_id, uint64_t timestamp);
     bool unprocess_blockchain_tx_attachments(const transaction& tx, uint64_t h, uint64_t timestamp);
     bool pop_alias_info(const extra_alias_entry& ai);
     bool put_alias_info(const transaction& tx, extra_alias_entry& ai);
-    bool pop_asset_info(const crypto::public_key& asset_id);
-    bool put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado);
+    bool pop_asset_info(const asset_descriptor_operation& ado, const uint64_t height);
+    bool put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, const uint64_t height);
     void fill_addr_to_alias_dict();
     //bool resync_spent_tx_flags();
     bool prune_ring_signatures_and_attachments_if_need();

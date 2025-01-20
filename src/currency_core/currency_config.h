@@ -10,7 +10,7 @@
 #ifndef TESTNET
 #define CURRENCY_FORMATION_VERSION                      84
 #else
-#define CURRENCY_FORMATION_VERSION                      98
+#define CURRENCY_FORMATION_VERSION                      99
 #endif
 
 #define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121) //bender's nightmare
@@ -118,7 +118,7 @@
 #define P2P_MAINTAINERS_PUB_KEY                         "8f138bb73f6d663a3746a542770781a09579a7b84cb4125249e95530824ee607"
 #define DIFFICULTY_POS_STARTER                          1
 #else 
-#define P2P_DEFAULT_PORT                                (11112 + CURRENCY_FORMATION_VERSION)
+#define P2P_DEFAULT_PORT                                (11211 + CURRENCY_FORMATION_VERSION)
 #define RPC_DEFAULT_PORT                                12111
 #define STRATUM_DEFAULT_PORT                            11888
 #define STRARUM_DEFAULT_PORT                            51113
@@ -253,30 +253,34 @@
 #define BC_OFFERS_CURRENCY_MARKET_FILENAME              "market.bin"
 
 
-#define WALLET_FILE_SERIALIZATION_VERSION               167
+#define WALLET_FILE_SERIALIZATION_VERSION               168
 #define WALLET_FILE_LAST_SUPPORTED_VERSION              165
 
 #define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)
 
-//hard forks section
 #define BLOCK_MAJOR_VERSION_GENESIS                     1
 #define BLOCK_MINOR_VERSION_GENESIS                     0
 #define BLOCK_MAJOR_VERSION_INITIAL                     0
+
+/////// Hard forks setup //////////////////////////////
 #ifndef TESTNET
+// Mainnet
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   194624    // 2019-09-21 20:25:16
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   999999    // 2021-04-05 09:11:45
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   1082577   // 2021-06-01 23:28:10
 #define ZANO_HARDFORK_04_AFTER_HEIGHT                   2555000   // 2024-03-21 11:49:55
-#define ZANO_HARDFORK_05_AFTER_HEIGHT                   999999999999999999  
 #define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1711021795ull // block 2555000, 2024-03-21 11:49:55 UTC
+#define ZANO_HARDFORK_05_AFTER_HEIGHT                   999999999999999999  
+#define ZANO_HARDFORK_05_MIN_BUILD_VER                  354
 #else
-/////// Zarcanum Testnet //////////////////////////////
+// Testnet
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   0
-#define ZANO_HARDFORK_04_AFTER_HEIGHT                   200  
-#define ZANO_HARDFORK_05_AFTER_HEIGHT                   200  
-#define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1712785801ull // block 200, 2024-04-10 21:50:01 UTC
+#define ZANO_HARDFORK_04_AFTER_HEIGHT                   100
+#define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1712800000ull // block 100, 2024-00-00 00:00:00 UTC
+#define ZANO_HARDFORK_05_AFTER_HEIGHT                   200
+#define ZANO_HARDFORK_05_MIN_BUILD_VER                  356
 #endif
 
 
