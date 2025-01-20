@@ -1013,7 +1013,9 @@ bool block_reward_in_alt_chain_basic::generate(std::vector<test_event_entry>& ev
      (blk_0) */
 
   m_accounts.push_back(miner);
+  // Make sure a reward for the blk_0 equals to PREMINE_AMOUNT.
   assert_reward(argument);
+  // Make sure the balance equals to the PREMINE_AMOUNT.
   assert_balance(argument);
   DO_CALLBACK(events, "configure_core");
 
@@ -1022,8 +1024,11 @@ bool block_reward_in_alt_chain_basic::generate(std::vector<test_event_entry>& ev
   /* 0               10
      (blk_0) - ... - (blk_0r) */
 
-  argument_alt = argument = {this, blk_0r, std::list<uint64_t>(CURRENCY_MINED_MONEY_UNLOCK_WINDOW), argument};
+  // A case of a 10 sequentally inserted empty sblocks.
+  argument_alt = argument = argument_assert{this, blk_0r, std::list<uint64_t>(CURRENCY_MINED_MONEY_UNLOCK_WINDOW), argument};
+  // Miner inserted 10 empty blocks. A sum of the rewards for them equals to 10 coins.
   assert_reward(argument);
+  // Make sure the balance equals to PREMINE_AMOUNT + 10 * COIN.
   assert_balance(argument);
 
   MAKE_TX_FEE(events, tx_0, miner, miner, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, blk_0r);
@@ -1045,22 +1050,27 @@ bool block_reward_in_alt_chain_basic::generate(std::vector<test_event_entry>& ev
                                  {tx_0}
 
   height(blk_1a) = height(blk_1)
-  fee(tx_1) > fee(tx_0) */
+  fee(tx_1) > fee(tx_0). */
 
   CHECK_AND_ASSERT_EQ(get_block_height(blk_1), get_block_height(blk_1a));
 
-  argument_alt = {this, blk_1a, {33 * TESTS_DEFAULT_FEE}, argument_alt};
-  argument = {this, blk_1, {TESTS_DEFAULT_FEE}, argument};
+  // Case of an alt block on the height 11 with greater total fee than total fee of blk_1 - the top of the main chain.
+  argument_alt = argument_assert{this, blk_1a, {33 * TESTS_DEFAULT_FEE}, argument_alt};
+  argument = argument_assert{this, blk_1, {TESTS_DEFAULT_FEE}, argument};
 
   if (m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, get_block_height(blk_1)))
   {
+    // Make sure that a reward for blk_1 equals to COIN.
     assert_reward(argument_alt);
+    // Make sure that the balance equals to PREMINE_AMOUNT + 11 * COIN - 33 * TESTS_DEFAULT_FEE.
     assert_balance(argument_alt);
   }
 
   else
   {
+    // Make sure that a reward for blk_1a equals to COIN.
     assert_reward(argument);
+    // Make sure that the balance equals to PREMINE_AMOUNT + 11 * COIN.
     assert_balance(argument);
   }
 
@@ -1080,8 +1090,12 @@ bool block_reward_in_alt_chain_basic::generate(std::vector<test_event_entry>& ev
 
   height(blk_2) > height(blk_1a). */
 
-  argument = {this, blk_2, {(8 + 57) * TESTS_DEFAULT_FEE}, argument};
+  // A case of block on the height 12 in the main chain.
+  argument = argument_assert{this, blk_2, {(8 + 57) * TESTS_DEFAULT_FEE}, argument};
+  // A reward of blk_2 equals to coin.
   assert_reward(argument);
+  /* HF3: The balance equals to PREMINE_AMOUNT + 12 * COIN.
+  HF4: The balance equals to PREMINE_AMOUNT + 12 * COIN - 65 * TESTS_DEFAULT_FEE. */
   assert_balance(argument);
 
   const auto& head_blk_for_txs_on_height_12{m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, get_block_height(blk_2)) ? blk_1a : blk_0r};
@@ -1104,18 +1118,23 @@ bool block_reward_in_alt_chain_basic::generate(std::vector<test_event_entry>& ev
   height(blk_2a) = height(blk_2) = 12
   fee(tx_2) + fee(tx_3) = (8 + 57) * TESTS_DEFAULT_FEE = 65 * TESTS_DEFAULT_FEE
   fee(tx_4) + fee(tx_5) + fee(tx_6) = (15 + 29 + 22) * TESTS_DEFAULT_FEE = 66 * TESTS_DEFAULT_FEE
-  66 > 65 */
+  66 > 65. */
 
   if (m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, get_block_height(blk_2)))
   {
-    argument_alt = {this, blk_2a, {(15 + 29 + 22) * TESTS_DEFAULT_FEE}, argument_alt};
+    // Case of an alt block on the height 12 with greater total fee than total fee of blk_2 - the top of the main chain.
+    argument_alt = argument_assert{this, blk_2a, {(15 + 29 + 22) * TESTS_DEFAULT_FEE}, argument_alt};
+    // Make sure a reward for blk_2a is equals to COIN.
     assert_reward(argument_alt);
+    // Make sure the balance equals to PREMINE_AMOUNT + 12 * COIN - 99 * TESTS_DEFAULT_FEE.
     assert_balance(argument_alt);
   }
 
   else
   {
+    // Make sure a reward for blk_2 is equals to COIN.
     assert_reward(argument);
+    // Make sure the balance equals to PREMINE_AMOUNT + 12 * COIN.
     assert_balance(argument);
   }
 
