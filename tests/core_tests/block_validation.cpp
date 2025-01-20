@@ -1013,8 +1013,8 @@ bool block_reward_in_alt_chain_basic::generate(std::vector<test_event_entry>& ev
      (blk_0) */
 
   m_accounts.push_back(miner);
-  assert_balance(argument);
   assert_reward(argument);
+  assert_balance(argument);
   DO_CALLBACK(events, "configure_core");
 
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
@@ -1023,8 +1023,8 @@ bool block_reward_in_alt_chain_basic::generate(std::vector<test_event_entry>& ev
      (blk_0) - ... - (blk_0r) */
 
   argument_alt = argument = {this, blk_0r, std::list<uint64_t>(CURRENCY_MINED_MONEY_UNLOCK_WINDOW), argument};
-  assert_balance(argument);
   assert_reward(argument);
+  assert_balance(argument);
 
   MAKE_TX_FEE(events, tx_0, miner, miner, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, blk_0r);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner, tx_0);
@@ -1054,14 +1054,14 @@ bool block_reward_in_alt_chain_basic::generate(std::vector<test_event_entry>& ev
 
   if (m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, get_block_height(blk_1)))
   {
-    assert_balance(argument_alt);
     assert_reward(argument_alt);
+    assert_balance(argument_alt);
   }
 
   else
   {
-    assert_balance(argument);
     assert_reward(argument);
+    assert_balance(argument);
   }
 
   MAKE_TX_FEE(events, tx_2, miner, miner, MK_TEST_COINS(1), 8 * TESTS_DEFAULT_FEE, blk_1);
@@ -1081,8 +1081,8 @@ bool block_reward_in_alt_chain_basic::generate(std::vector<test_event_entry>& ev
   height(blk_2) > height(blk_1a). */
 
   argument = {this, blk_2, {(8 + 57) * TESTS_DEFAULT_FEE}, argument};
-  assert_balance(argument);
   assert_reward(argument);
+  assert_balance(argument);
 
   const auto& head_blk_for_txs_on_height_12{m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, get_block_height(blk_2)) ? blk_1a : blk_0r};
   MAKE_TX_FEE(events, tx_4, miner, miner, MK_TEST_COINS(2), 15 * TESTS_DEFAULT_FEE, head_blk_for_txs_on_height_12);
@@ -1109,14 +1109,14 @@ bool block_reward_in_alt_chain_basic::generate(std::vector<test_event_entry>& ev
   if (m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, get_block_height(blk_2)))
   {
     argument_alt = {this, blk_2a, {(15 + 29 + 22) * TESTS_DEFAULT_FEE}, argument_alt};
-    assert_balance(argument_alt);
     assert_reward(argument_alt);
+    assert_balance(argument_alt);
   }
 
   else
   {
-    assert_balance(argument);
     assert_reward(argument);
+    assert_balance(argument);
   }
 
   return true;
