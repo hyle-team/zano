@@ -707,7 +707,7 @@ bool block_with_correct_prev_id_on_wrong_height::generate(std::vector<test_event
   MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
 
   DO_CALLBACK(events, "configure_core");
-
+  
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   MAKE_TX(events, tx_0, miner, miner, MK_TEST_COINS(2), blk_0r);
   MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner);

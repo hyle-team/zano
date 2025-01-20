@@ -34,13 +34,17 @@ namespace currency
   void get_block_longhash(const block& b, crypto::hash& res);
   crypto::hash get_block_longhash(const block& b);
 
-  inline uint64_t& access_nonce_in_block_blob(blobdata& bd)
+  inline uint64_t get_nonce_from_blockblob(const blobdata& bd)
   {
-    return *reinterpret_cast<uint64_t*>(&bd[CURRENCY_MINER_BLOCK_BLOB_NONCE_OFFSET]);
+    uint64_t nonce = 0;
+    CHECK_AND_ASSERT_MES(bd.size() >= CURRENCY_MINER_BLOCK_BLOB_NONCE_OFFSET + sizeof(nonce), 0, "Unexpected block buffer size = " << bd.size());
+    std::memcpy(&nonce, &bd[CURRENCY_MINER_BLOCK_BLOB_NONCE_OFFSET], sizeof(nonce));
+    return nonce;
   }
 
-  inline const uint64_t& access_nonce_in_block_blob(const blobdata& bd)
+  inline void set_nonce_to_blockblob(blobdata& bd, const uint64_t nonce)
   {
-    return *reinterpret_cast<const uint64_t*>(&bd[CURRENCY_MINER_BLOCK_BLOB_NONCE_OFFSET]);
+    CHECK_AND_ASSERT_MES(bd.size() >= CURRENCY_MINER_BLOCK_BLOB_NONCE_OFFSET + sizeof(nonce), void(), "Unexpected block buffer size = " << bd.size());
+    std::memcpy(&bd[CURRENCY_MINER_BLOCK_BLOB_NONCE_OFFSET], &nonce, sizeof(nonce));
   }
 }

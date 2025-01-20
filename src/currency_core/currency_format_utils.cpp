@@ -2288,7 +2288,7 @@ namespace currency
       gen_context.ao_amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_ASSET_CONTROL_ABM, tx_key.sec);
       gen_context.ao_commitment_in_outputs = true;
 
-      // set correct asset_id to the corresponding destination entries
+      // calculate the amount of asset being burnt using asset_id field in inputs and outputs (sources and destinations)
       uint64_t amount_of_burned_assets = 0;
       for (auto& item : ftp.sources)
       {
@@ -2343,7 +2343,7 @@ namespace currency
         }
         if (ado.version < ASSET_DESCRIPTOR_BASE_HF5_VER)
         {
-          CHECK_AND_ASSERT_THROW_MES(ado.opt_descriptor.has_value(), "Internal error: opt_descriptor unset during ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN for version less then 2");
+          CHECK_AND_ASSERT_THROW_MES(ado.opt_descriptor.has_value(), "Internal error: opt_descriptor unset during ASSET_DESCRIPTOR_OPERATION_EMIT for version less then 2");
           ado.opt_descriptor->current_supply += amount_of_emitted_asset;
         }
         else
@@ -3632,7 +3632,7 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------
-  #define PASSWORD_REGEXP  R"([A-Za-z0-9~!?@#$%^&*_+|{}\[\]()<>:;"'\-=\\/.,]{0,40})"
+  #define PASSWORD_REGEXP  R"([A-Za-z0-9~!?@#$%^&*_+|{}\[\]()<>:;"'\-=/.,]{0,40})"
   bool validate_password(const std::string& password)
   {
     // OLD: static const std::string allowed_password_symbols = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz~!?@#$%^&*_+|{}[]()<>:;\"'-=\\/.,";
@@ -4274,7 +4274,7 @@ namespace currency
   {
     payment_id.clear();
     blobdata blob;
-    uint64_t prefix;
+    uint64_t prefix{};
     if (!tools::base58::decode_addr(str, prefix, blob))
     {
       LOG_PRINT_L1("Invalid address format: base58 decoding failed for \"" << str << "\"");

@@ -1,11 +1,10 @@
-// Copyright (c) 2014-2020 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
-
 #pragma once
 
 #include <string>
+#include <cstdint>
 #include "../common/error_codes.h"
 
 namespace plain_wallet

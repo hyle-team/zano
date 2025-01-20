@@ -1413,7 +1413,6 @@ bool eth_signed_asset_basics::generate(std::vector<test_event_entry>& events) co
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
-  miner_acc.generate();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
   DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
@@ -1627,7 +1626,6 @@ bool eth_signed_asset_via_rpc::generate(std::vector<test_event_entry>& events) c
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
-  miner_acc.generate();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
   DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
@@ -2420,7 +2418,6 @@ bool several_asset_emit_burn_txs_in_pool::generate(std::vector<test_event_entry>
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
-  miner_acc.generate();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
   // rebuild genesis miner tx

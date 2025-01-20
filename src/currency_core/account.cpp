@@ -86,6 +86,7 @@ namespace currency
     std::vector<unsigned char> processed_seed_binary = keys_seed_binary;
     if (!password.empty())
     {
+      CHECK_AND_ASSERT_THROW_MES(currency::validate_password(password), "seed phrase password contains invalid characters, seed phrase cannot be created with such a password");
       //encrypt seed phrase binary data
       crypt_with_pass(&keys_seed_binary[0], keys_seed_binary.size(), &processed_seed_binary[0], password);      
     }
@@ -106,6 +107,9 @@ namespace currency
     h = crypto::cn_fast_hash(&h, sizeof h);
     uint64_t h_64 = *reinterpret_cast<uint64_t*>(&h);
     uint16_t checksum = h_64 % (checksum_max + 1);
+    
+    if (checksum == checksum_max) // workaround for incorrect checksum calculation (trying to keep the whole scheme untouched) -- sowle
+      checksum = 0;
     
     uint8_t auditable_flag = 0;
     if (m_keys.account_address.flags & ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE)
@@ -215,6 +219,10 @@ namespace currency
       h = crypto::cn_fast_hash(&h, sizeof h);
       uint64_t h_64 = *reinterpret_cast<uint64_t*>(&h);
       uint16_t checksum_calculated = h_64 % (checksum_max + 1);
+      
+      if (checksum_calculated == checksum_max) // workaround for incorrect checksum calculation (trying to keep the whole scheme untouched) -- sowle
+        checksum_calculated = 0;
+
       if (checksum != checksum_calculated)
       {
         LOG_PRINT_L0("seed phase has invalid checksum: " << checksum_calculated << ", while " << checksum << " is expected, check your words");
@@ -229,6 +237,8 @@ namespace currency
 
     if (auditable_flag)
       m_keys.account_address.flags |= ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE;
+    else
+      m_keys.account_address.flags &= ~ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE;
 
     return true;
   }
