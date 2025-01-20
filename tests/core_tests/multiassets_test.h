@@ -74,12 +74,8 @@ struct asset_operation_in_consolidated_tx : public wallet_test
 public:
   asset_operation_in_consolidated_tx();
   bool generate(std::vector<test_event_entry>& events) const;
-  bool assert_balances(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
-  bool assert_alice_currency_not_registered(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
-
-private:
-  mutable currency::asset_descriptor_base m_adb_alice_currency{};
-  mutable currency::asset_descriptor_operation m_ado_alice_currency{};
+  bool assert_balances(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const;
+  bool assert_alice_currency_not_registered(const currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const;
 };
 
 struct eth_signed_asset_basics : public wallet_test
