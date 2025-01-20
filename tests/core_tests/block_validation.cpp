@@ -934,7 +934,8 @@ struct block_reward_in_alt_chain_basic::argument_assert
   {
     CHECK_AND_ASSERT_THROW(instance, std::runtime_error{"Pointer to an instance of the test equals to the nullptr."});
 
-    uint64_t height{get_block_height(block)};
+    auto height{get_block_height(block)};
+
     m_height = height;
 
     if (height == 0)
@@ -1154,7 +1155,7 @@ bool block_reward_in_alt_chain_basic::assert_reward(currency::core& core, size_t
   }
 
   {
-    crypto::hash blk_id{argument.blk_id};
+    auto blk_id{argument.blk_id};
 
     for (const auto expected_reward : argument.m_rewards)
     {
