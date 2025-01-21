@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -49,12 +49,14 @@ public:
     m_cmd_binder.set_handler("print_tx", boost::bind(&daemon_commands_handler::print_tx, this, ph::_1), "Print transaction, print_tx <transaction_hash>");
     m_cmd_binder.set_handler("print_asset_info", boost::bind(&daemon_commands_handler::print_asset_info, this, ph::_1), "Print information about the given asset by its id");
     m_cmd_binder.set_handler("print_blocked_ips", boost::bind(&daemon_commands_handler::print_blocked_ips, this, ph::_1), "Print ip address blacklists");
+#ifdef CPU_MINING_ENABLED
     m_cmd_binder.set_handler("start_mining", boost::bind(&daemon_commands_handler::start_mining, this, ph::_1), "Start mining for specified address, start_mining <addr> [threads=1]");
     m_cmd_binder.set_handler("stop_mining", boost::bind(&daemon_commands_handler::stop_mining, this, ph::_1), "Stop mining");
-    m_cmd_binder.set_handler("print_pool", boost::bind(&daemon_commands_handler::print_pool, this, ph::_1), "Print transaction pool (long format)");
-    m_cmd_binder.set_handler("print_pool_sh", boost::bind(&daemon_commands_handler::print_pool_sh, this, ph::_1), "Print transaction pool (short format)");
     m_cmd_binder.set_handler("show_hr", boost::bind(&daemon_commands_handler::show_hr, this, ph::_1), "Start showing hash rate");
     m_cmd_binder.set_handler("hide_hr", boost::bind(&daemon_commands_handler::hide_hr, this, ph::_1), "Stop showing hash rate");
+#endif
+    m_cmd_binder.set_handler("print_pool", boost::bind(&daemon_commands_handler::print_pool, this, ph::_1), "Print transaction pool (long format)");
+    m_cmd_binder.set_handler("print_pool_sh", boost::bind(&daemon_commands_handler::print_pool_sh, this, ph::_1), "Print transaction pool (short format)");
     m_cmd_binder.set_handler("save", boost::bind(&daemon_commands_handler::save, this, ph::_1), "Save blockchain");
     m_cmd_binder.set_handler("print_daemon_stat", boost::bind(&daemon_commands_handler::print_daemon_stat, this, ph::_1), "Print daemon stat");
     m_cmd_binder.set_handler("print_debug_stat", boost::bind(&daemon_commands_handler::print_debug_stat, this, ph::_1), "Print debug stat info");
@@ -184,25 +186,6 @@ private:
     return true;
   }
 
-  //--------------------------------------------------------------------------------
-  bool show_hr(const std::vector<std::string>& args)
-  {
-    if (!m_srv.get_payload_object().get_core().get_miner().is_mining())
-    {
-      std::cout << "Mining is not started. You need start mining before you can see hash rate." << ENDL;
-    }
-    else
-    {
-      m_srv.get_payload_object().get_core().get_miner().do_print_hashrate(true);
-    }
-    return true;
-  }
-  //--------------------------------------------------------------------------------
-  bool hide_hr(const std::vector<std::string>& args)
-  {
-    m_srv.get_payload_object().get_core().get_miner().do_print_hashrate(false);
-    return true;
-  }
   //--------------------------------------------------------------------------------
   bool print_bc_outs(const std::vector<std::string>& args)
   {
@@ -910,7 +893,9 @@ private:
   {
     LOG_PRINT_L0("Pool state: " << ENDL << m_srv.get_payload_object().get_core().print_pool(true));
     return true;
-  }  //--------------------------------------------------------------------------------
+  }
+  //--------------------------------------------------------------------------------
+#ifdef CPU_MINING_ENABLED
   bool start_mining(const std::vector<std::string>& args)
   {
     if (!args.size())
@@ -941,6 +926,26 @@ private:
     m_srv.get_payload_object().get_core().get_miner().stop();
     return true;
   }
+  //--------------------------------------------------------------------------------
+  bool show_hr(const std::vector<std::string>& args)
+  {
+    if (!m_srv.get_payload_object().get_core().get_miner().is_mining())
+    {
+      std::cout << "Mining is not started. You need start mining before you can see hash rate." << ENDL;
+    }
+    else
+    {
+      m_srv.get_payload_object().get_core().get_miner().do_print_hashrate(true);
+    }
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool hide_hr(const std::vector<std::string>& args)
+  {
+    m_srv.get_payload_object().get_core().get_miner().do_print_hashrate(false);
+    return true;
+  }
+#endif // #ifdef CPU_MINING_ENABLED
   //--------------------------------------------------------------------------------
   bool forecast_difficulty(const std::vector<std::string>& args)
   {

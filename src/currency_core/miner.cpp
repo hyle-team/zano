@@ -31,6 +31,63 @@ using namespace epee;
 namespace currency
 {
 
+#ifndef CPU_MINING_ENABLED
+ 
+  // CPU mining disabled
+  // currency::miner stub implementation
+
+  miner::miner(i_miner_handler* phandler, blockchain_storage& bc)
+  {}
+  miner::~miner()
+  {}
+  bool miner::init(const boost::program_options::variables_map& vm)
+  {
+    return false;
+  }
+  bool miner::deinit()
+  {
+    return false;
+  }
+  void miner::init_options(boost::program_options::options_description& desc)
+  {}
+  bool miner::start(const account_public_address& adr, size_t threads_count)
+  {
+    return false;
+  }
+  bool miner::stop()
+  {
+    return false;
+  }
+  bool miner::is_mining()
+  {
+    return false;
+  }
+  void miner::do_print_hashrate(bool do_hr)
+  {}
+  void miner::pause()
+  {}
+  void miner::resume()
+  {}
+  bool miner::on_block_chain_update()
+  {
+    return false;
+  }
+  uint64_t miner::get_speed()
+  {
+    return 0;
+  }
+  void miner::on_synchronized()
+  {}
+  bool miner::on_idle()
+  {
+    return false;
+  }
+
+  // end of currency::miner stub implementation
+
+#else
+
+
   namespace
   {
     const command_line::arg_descriptor<std::string>   arg_extra_messages      ("extra-messages-file", "Specify file for extra messages to include into coinbase transactions");
@@ -379,5 +436,8 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------------------------------------------
-}
+
+#endif // #ifndef CPU_MINING_ENABLED
+
+} // namespace currency
 
