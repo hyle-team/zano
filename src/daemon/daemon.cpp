@@ -126,7 +126,6 @@ int main(int argc, char* argv[])
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
   log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
   log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,wallet", false);
-  LOG_PRINT_L0("Starting...");
 
   tools::signal_handler::install_fatal([](int sig_number, void* address) {
     LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
@@ -184,6 +183,7 @@ int main(int argc, char* argv[])
   desc_options.add(desc_cmd_only).add(desc_cmd_sett);
 
   po::variables_map vm;
+  bool exit_requested = false;
   bool r = command_line::handle_error_helper(desc_options, [&]()
   {
     po::store(po::parse_command_line(argc, argv, desc_options), vm);
@@ -192,7 +192,14 @@ int main(int argc, char* argv[])
     {
       std::cout << CURRENCY_NAME << " v" << PROJECT_VERSION_LONG << ENDL << ENDL;
       std::cout << desc_options << std::endl;
-      return false;
+      exit_requested = true;
+      return true;
+    }
+    else if (command_line::get_arg(vm, command_line::arg_version))
+    {
+      std::cout << CURRENCY_NAME << " v" << PROJECT_VERSION_LONG << ENDL << ENDL;
+      exit_requested = true;
+      return true;
     }
 
     std::string data_dir = command_line::get_arg(vm, command_line::arg_data_dir);
@@ -214,8 +221,12 @@ int main(int argc, char* argv[])
 
     return true;
   });
+
   if (!r)
     return EXIT_FAILURE;
+
+  if (exit_requested)
+    return EXIT_SUCCESS;
 
   //set up logging options
   std::string log_dir;
@@ -238,6 +249,7 @@ int main(int argc, char* argv[])
     return EXIT_SUCCESS;
   }
 
+  LOG_PRINT_L0("Starting...");
 
   // stratum server is enabled if any of its options present
   bool stratum_enabled = currency::stratum_server::should_start(vm);
