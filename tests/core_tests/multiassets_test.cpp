@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -1270,18 +1270,6 @@ bool asset_operation_and_hardfork_checks::c2(
 
 asset_operation_in_consolidated_tx::asset_operation_in_consolidated_tx()
 {
-  m_adb_alice_currency.version = ASSET_DESCRIPTOR_BASE_HF4_VER;
-  m_adb_alice_currency.total_max_supply = 1'000'000'000'000'000'000;
-  m_adb_alice_currency.current_supply = 1'000'000'000'000'000'000;
-  m_adb_alice_currency.ticker = "ALC";
-  m_adb_alice_currency.full_name = "ALICE";
-  m_adb_alice_currency.meta_info = "Currency created by Alice";
-  m_adb_alice_currency.hidden_supply = false;
-
-  m_ado_alice_currency.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
-  m_ado_alice_currency.opt_asset_id = currency::null_pkey;
-  m_ado_alice_currency.version = ASSET_DESCRIPTOR_OPERATION_HF4_VER;
-
   REGISTER_CALLBACK_METHOD(asset_operation_in_consolidated_tx, assert_balances);
   REGISTER_CALLBACK_METHOD(asset_operation_in_consolidated_tx, assert_alice_currency_not_registered);
 }
@@ -1289,11 +1277,13 @@ asset_operation_in_consolidated_tx::asset_operation_in_consolidated_tx()
 bool asset_operation_in_consolidated_tx::generate(std::vector<test_event_entry>& events) const
 {
   // Test idea: make sure that the core rule prohibiting operations with assets in TX_FLAG_SIGNATURE_MODE_SEPARATE transactions works.
-  bool success {};
-  transaction tx_2 {};
-  uint64_t tx_version {};
-  crypto::secret_key one_time {};
-  tx_generation_context context_tx_2 {};
+  bool success{};
+  transaction tx_2{};
+  uint64_t tx_version{};
+  crypto::secret_key one_time{};
+  tx_generation_context context_tx_2{};
+  asset_descriptor_base adb_alice_currency{};
+  asset_descriptor_operation ado_alice_currency{};
   GENERATE_ACCOUNT(miner);
   GENERATE_ACCOUNT(alice);
   GENERATE_ACCOUNT(bob);
@@ -1301,8 +1291,19 @@ bool asset_operation_in_consolidated_tx::generate(std::vector<test_event_entry>&
   m_accounts.push_back(miner);
   m_accounts.push_back(alice);
   m_accounts.push_back(bob);
-  m_adb_alice_currency.owner      = m_accounts.at(ALICE_ACC_IDX).get_public_address().spend_public_key;
-  m_ado_alice_currency.opt_descriptor = m_adb_alice_currency;
+
+  adb_alice_currency.version = ASSET_DESCRIPTOR_BASE_HF4_VER;
+  adb_alice_currency.total_max_supply = 1'000'000'000'000'000'000;
+  adb_alice_currency.current_supply = 1'000'000'000'000'000'000;
+  adb_alice_currency.ticker = "ALC";
+  adb_alice_currency.full_name = "ALICE";
+  adb_alice_currency.meta_info = "Currency created by Alice";
+  adb_alice_currency.hidden_supply = false;
+  adb_alice_currency.owner = m_accounts.at(ALICE_ACC_IDX).get_public_address().spend_public_key;
+  ado_alice_currency.opt_descriptor = adb_alice_currency;
+  ado_alice_currency.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+  ado_alice_currency.opt_asset_id = currency::null_pkey;
+  ado_alice_currency.version = ASSET_DESCRIPTOR_OPERATION_HF4_VER;
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
   DO_CALLBACK(events, "configure_core");
@@ -1317,16 +1318,16 @@ bool asset_operation_in_consolidated_tx::generate(std::vector<test_event_entry>&
   DO_CALLBACK(events, "assert_balances");
 
   {
-    std::vector<tx_source_entry> sources {};
-    std::vector<tx_destination_entry> destinations {};
+    std::vector<tx_source_entry> sources{};
+    std::vector<tx_destination_entry> destinations{};
 
     success = fill_tx_sources(sources, events, blk_2r, alice.get_keys(), MK_TEST_COINS(5), 1);
     CHECK_AND_ASSERT_MES(success, false, "failed to fill transaction sources on step 1");
     destinations.emplace_back(MK_TEST_COINS(5), bob.get_public_address());
     destinations.emplace_back(MK_TEST_COINS(/* 10 - 5 - 1 = */ 4), alice.get_public_address());
     tx_version = get_tx_version(get_block_height(blk_2r), m_hardforks);
-    success    = construct_tx(alice.get_keys(), sources, destinations, empty_extra, empty_attachment, tx_2, tx_version, one_time, 0, 0, 0, true, TX_FLAG_SIGNATURE_MODE_SEPARATE, TESTS_DEFAULT_FEE,
-                              context_tx_2);
+    success = construct_tx(alice.get_keys(), sources, destinations, empty_extra, empty_attachment, tx_2, tx_version, one_time, 0, 0, 0, true, TX_FLAG_SIGNATURE_MODE_SEPARATE, TESTS_DEFAULT_FEE,
+      context_tx_2);
     CHECK_AND_ASSERT_MES(success, false, "failed to construct transaction tx_2 on step 1");
   }
 
@@ -1335,26 +1336,26 @@ bool asset_operation_in_consolidated_tx::generate(std::vector<test_event_entry>&
   ADD_CUSTOM_EVENT(events, tx_2);
 
   {
-    std::vector<tx_source_entry> sources {};
-    std::vector<tx_destination_entry> destinations {};
+    std::vector<tx_source_entry> sources{};
+    std::vector<tx_destination_entry> destinations{};
 
     success = fill_tx_sources(sources, events, blk_2r, bob.get_keys(), MK_TEST_COINS(5), 0);
     CHECK_AND_ASSERT_MES(success, false, "failed to fill transaction sources on step 2");
-    for(tx_source_entry& source : sources)
+
+    for (tx_source_entry& source : sources)
     {
       source.separately_signed_tx_complete = true;
     }
+
     destinations.emplace_back(MK_TEST_COINS(5), alice.get_public_address());
     destinations.emplace_back(MK_TEST_COINS(/* 10 - 5 - 0 = */ 5), bob.get_public_address());
-    destinations.emplace_back(m_adb_alice_currency.current_supply, alice.get_public_address(), null_pkey);
+    destinations.emplace_back(adb_alice_currency.current_supply, alice.get_public_address(), null_pkey);
     tx_version = get_tx_version(get_block_height(blk_2r), m_hardforks);
     size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
-    fill_ado_version_based_onhardfork(m_ado_alice_currency, hf_n);
-    fill_adb_version_based_onhardfork(*m_ado_alice_currency.opt_descriptor, hf_n);
-
-
-    success    = construct_tx(bob.get_keys(), sources, destinations, { m_ado_alice_currency }, empty_attachment, tx_2, tx_version, one_time, 0, 0, 0, true, TX_FLAG_SIGNATURE_MODE_SEPARATE,
-                              /* fee = */ 0, context_tx_2);
+    fill_ado_version_based_onhardfork(ado_alice_currency, hf_n);
+    fill_adb_version_based_onhardfork(*ado_alice_currency.opt_descriptor, hf_n);
+    success = construct_tx(bob.get_keys(), sources, destinations, {ado_alice_currency}, empty_attachment, tx_2, tx_version, one_time, 0, 0, 0, true, TX_FLAG_SIGNATURE_MODE_SEPARATE,
+      /* fee = */ 0, context_tx_2);
     CHECK_AND_ASSERT_MES(success, false, "failed to construct transaction tx_2 on step 2");
   }
 
@@ -1363,15 +1364,15 @@ bool asset_operation_in_consolidated_tx::generate(std::vector<test_event_entry>&
   // Core rejects transaction tx_2. The balances of Alice, Bob haven't changed: Alice has 10 coins, Bob has 10 coins.
   DO_CALLBACK(events, "assert_balances");
   // Alice's asset hasn't registered, because transaction tx_2 was rejected.
-  DO_CALLBACK(events, "assert_alice_currency_not_registered");
+  DO_CALLBACK_PARAMS_STR(events, "assert_alice_currency_not_registered", t_serializable_object_to_blob(ado_alice_currency));
 
   return true;
 }
 
-bool asset_operation_in_consolidated_tx::assert_balances(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+bool asset_operation_in_consolidated_tx::assert_balances(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const
 {
-  std::shared_ptr<tools::wallet2> alice_wallet{init_playtime_test_wallet(events, c, ALICE_ACC_IDX)};
-  std::shared_ptr<tools::wallet2> bob_wallet{init_playtime_test_wallet(events, c, BOB_ACC_IDX)};
+  const auto alice_wallet{init_playtime_test_wallet_t<tools::wallet2>(events, c, ALICE_ACC_IDX)};
+  const auto bob_wallet{init_playtime_test_wallet_t<tools::wallet2>(events, c, BOB_ACC_IDX)};
 
   alice_wallet->refresh();
   bob_wallet->refresh();
@@ -1382,14 +1383,28 @@ bool asset_operation_in_consolidated_tx::assert_balances(currency::core& c, size
   return true;
 }
 
-bool asset_operation_in_consolidated_tx::assert_alice_currency_not_registered(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+bool asset_operation_in_consolidated_tx::assert_alice_currency_not_registered(const currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const
 {
-  crypto::point_t asset_id_point{};
   crypto::public_key asset_id{};
-  currency::asset_descriptor_base stub{};
+  asset_descriptor_operation ado{};
 
-  CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(m_ado_alice_currency, &asset_id_point, &asset_id), false, "fail to calculate asset id");
-  CHECK_AND_ASSERT_MES(!c.get_blockchain_storage().get_asset_info(asset_id, stub), false, "unregistered asset has info");
+  {
+    const auto serialized_ado{boost::get<callback_entry>(events.at(ev_index)).callback_params};
+
+    CHECK_AND_ASSERT_MES(t_unserializable_object_from_blob(ado, serialized_ado), false, "ADO deserialization failed");
+  }
+
+  {
+    crypto::point_t point_asset_id{};
+
+    CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, &point_asset_id, &asset_id), false, "fail to calculate asset id");
+  }
+
+  {
+    currency::asset_descriptor_base adb_stub{};
+
+    CHECK_AND_ASSERT_MES(!c.get_blockchain_storage().get_asset_info(asset_id, adb_stub), false, "unregistered asset has info");
+  }
 
   return true;
 }
