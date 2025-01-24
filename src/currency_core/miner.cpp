@@ -36,17 +36,18 @@ namespace currency
   // CPU mining disabled
   // currency::miner stub implementation
 
+  /*
   miner::miner(i_miner_handler* phandler, blockchain_storage& bc)
   {}
   miner::~miner()
   {}
   bool miner::init(const boost::program_options::variables_map& vm)
   {
-    return false;
+    return true;
   }
   bool miner::deinit()
   {
-    return false;
+    return true;
   }
   void miner::init_options(boost::program_options::options_description& desc)
   {}
@@ -84,7 +85,7 @@ namespace currency
   }
 
   // end of currency::miner stub implementation
-
+  */
 #else
 
 

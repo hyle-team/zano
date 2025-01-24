@@ -381,7 +381,7 @@ bool gen_alias_tests::check_too_many_aliases_registration(currency::core& c, siz
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == total_alias_to_gen, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count() << ", expected: " << total_alias_to_gen);
 
   // complete block template and try to process it
-  r = miner::find_nonce_for_given_block(b, diff, height);
+  r = find_nonce_for_given_block(b, diff, height);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
   currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
@@ -1317,7 +1317,7 @@ bool gen_alias_switch_and_check_block_template::add_block_from_template(currency
   bool r = c.get_block_template(b, acc.get_public_address(), acc.get_public_address(), diff, height, extra);
   CHECK_AND_ASSERT_MES(r, false, "get_block_template failed");
 
-  r = miner::find_nonce_for_given_block(b, diff, height);
+  r = find_nonce_for_given_block(b, diff, height);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
   currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
@@ -1439,7 +1439,7 @@ bool gen_alias_too_many_regs_in_block_template::add_block_from_template(currency
   bool r = c.get_block_template(b, acc.get_public_address(), acc.get_public_address(), diff, height, extra);
   CHECK_AND_ASSERT_MES(r, false, "get_block_template failed");
 
-  r = miner::find_nonce_for_given_block(b, diff, height);
+  r = find_nonce_for_given_block(b, diff, height);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
   currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);

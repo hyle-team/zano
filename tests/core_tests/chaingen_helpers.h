@@ -33,7 +33,7 @@ inline bool mine_next_pow_block_in_playtime(const currency::account_public_addre
   test_core_time::adjust(b.timestamp);
 
   modify_block_cb(b);
-  r = currency::miner::find_nonce_for_given_block(b, cbtr.diffic, cbtr.height);
+  r = currency::find_nonce_for_given_block(b, cbtr.diffic, cbtr.height);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
   currency::block_verification_context bvc{};
@@ -119,7 +119,7 @@ inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::accou
     height = cbtr.height;
   }
 
-  r = currency::miner::find_nonce_for_given_block(b, cbtr.diffic, cbtr.height);
+  r = currency::find_nonce_for_given_block(b, cbtr.diffic, cbtr.height);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
   currency::block_verification_context bvc{};

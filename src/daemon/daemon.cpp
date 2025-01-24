@@ -174,7 +174,9 @@ int main(int argc, char* argv[])
   currency::core_rpc_server::init_options(desc_cmd_sett);
   typedef nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > p2psrv_t;
   p2psrv_t::init_options(desc_cmd_sett);
+#ifdef CPU_MINING_ENABLED
   currency::miner::init_options(desc_cmd_sett);
+#endif
   bc_services::bc_offers_service::init_options(desc_cmd_sett);
   currency::stratum_server::init_options(desc_cmd_sett);
   tools::db::db_backend_selector::init_options(desc_cmd_sett);

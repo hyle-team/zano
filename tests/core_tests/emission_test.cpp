@@ -69,7 +69,7 @@ bool emission_test::c1(currency::core& c, size_t ev_index, const std::vector<tes
       uint64_t height_from_template = 0;
       r = c.get_block_template(b, m_miner_acc.get_public_address(), m_miner_acc.get_public_address(), difficulty, height_from_template, extra);
       CHECK_AND_ASSERT_MES(r || height_from_template != height, false, "get_block_template failed");
-      r = miner::find_nonce_for_given_block(b, difficulty, height);
+      r = find_nonce_for_given_block(b, difficulty, height);
       CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
       c.handle_incoming_block(t_serializable_object_to_blob(b), bvc);
       CHECK_AND_NO_ASSERT_MES(!bvc.m_verification_failed && !bvc.m_marked_as_orphaned && !bvc.m_already_exists, false, "block verification context check failed");

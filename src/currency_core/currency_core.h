@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -57,7 +57,9 @@ namespace currency
      virtual bool get_block_template(const create_block_template_params& params, create_block_template_response& resp);
      bool get_block_template(block& b, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos = false, const pos_entry& pe = pos_entry());
 
+#ifdef CPU_MINING_ENABLED
      miner& get_miner(){ return m_miner; }
+#endif
      static void init_options(boost::program_options::options_description& desc);
      bool init(const boost::program_options::variables_map& vm);
      bool set_genesis_block(const block& b);
@@ -141,8 +143,10 @@ namespace currency
      i_currency_protocol* m_pprotocol;
      i_critical_error_handler* m_critical_error_handler;
      epee::critical_section m_incoming_tx_lock;
+#ifdef CPU_MINING_ENABLED
      miner m_miner;
-     account_public_address m_miner_address;
+#endif
+     //account_public_address m_miner_address;
      std::string m_config_folder;
      uint64_t m_stop_after_height;
      currency_protocol_stub m_protocol_stub;
