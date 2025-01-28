@@ -40,6 +40,7 @@
 #include "crypto/hash.h"
 #include "crypto/range_proofs.h"
 #include "crypto/zarcanum.h"
+#include "crypto/eth_signature.h"
 #include "misc_language.h"
 #include "block_flags.h"
 #include "etc_custom_serialization.h"
@@ -73,7 +74,9 @@ namespace currency
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
-  
+
+  struct asset_descriptor_operation_v1;
+
 //since structure used in blockchain as a key accessor, then be sure that there is no padding inside
 #pragma pack(push, 1)
   struct account_public_address_old
@@ -695,6 +698,21 @@ namespace currency
     }
   };
 
+#define ASSET_DESCRIPTOR_BASE_HF4_VER    0
+#define ASSET_DESCRIPTOR_BASE_HF5_VER    2
+#define ASSET_DESCRIPTOR_BASE_LAST_VER   2
+
+  struct dummy
+  {
+      BEGIN_SERIALIZE() 
+      END_SERIALIZE()
+
+      BEGIN_BOOST_SERIALIZATION()
+      END_BOOST_SERIALIZATION_TOTAL_FIELDS(0)
+  };
+
+  typedef boost::variant<dummy> asset_descriptor_base_etc_fields;
+  typedef boost::variant<crypto::public_key, crypto::eth_public_key> asset_owner_pub_key_v;
 
   struct asset_descriptor_base
   {
@@ -706,9 +724,14 @@ namespace currency
     std::string         meta_info;
     crypto::public_key  owner = currency::null_pkey; // consider premultipling by 1/8
     bool                hidden_supply = false;
-    uint8_t             version = 0;
+    uint8_t             version = ASSET_DESCRIPTOR_BASE_HF4_VER;
+    //version 1 members
+    boost::optional<crypto::eth_public_key> owner_eth_pub_key; // note: the size is 33 bytes (if present) // NOTE: using boost::optional instead of std::optional because of the Boost compilation issue: https://github.com/boostorg/serialization/issues/319 -- sowle
+    //version 2 members
+    std::vector<asset_descriptor_base_etc_fields> etc;  //container for future use if we would be adding some optional parameters that is not known yet, but without mess related to format version
 
-    BEGIN_VERSIONED_SERIALIZE(0, version)
+
+    BEGIN_VERSIONED_SERIALIZE(ASSET_DESCRIPTOR_BASE_LAST_VER, version)
       FIELD(total_max_supply)
       FIELD(current_supply)
       FIELD(decimal_point)
@@ -717,9 +740,13 @@ namespace currency
       FIELD(meta_info)
       FIELD(owner)
       FIELD(hidden_supply)
+      END_VERSION_UNDER(1)
+      FIELD(owner_eth_pub_key)
+      END_VERSION_UNDER(2)
+      FIELD(etc)
     END_SERIALIZE()
 
-
+    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(2)
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(total_max_supply)
       BOOST_SERIALIZE(current_supply)
@@ -729,17 +756,23 @@ namespace currency
       BOOST_SERIALIZE(meta_info)
       BOOST_SERIALIZE(owner)
       BOOST_SERIALIZE(hidden_supply)
-    END_BOOST_SERIALIZATION()
+      BOOST_END_VERSION_UNDER(1)
+      BOOST_SERIALIZE(owner_eth_pub_key)
+      BOOST_END_VERSION_UNDER(2)
+      BOOST_SERIALIZE(etc)
+      BOOST_SERIALIZE(version)
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(11)
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(total_max_supply)  DOC_DSCR("Maximum possible supply for given asset, can't be changed after deployment") DOC_EXMP(1000000000000000000)   DOC_END
-      KV_SERIALIZE(current_supply)    DOC_DSCR("Currently emitted supply for given asset (ignored for REGISTER operation)") DOC_EXMP(500000000000000000)   DOC_END
-      KV_SERIALIZE(decimal_point)     DOC_DSCR("Decimal point")                       DOC_EXMP(12)                        DOC_END
-      KV_SERIALIZE(ticker)            DOC_DSCR("Ticker associated with asset")        DOC_EXMP("ZUSD")                    DOC_END
-      KV_SERIALIZE(full_name)         DOC_DSCR("Full name of the asset")              DOC_EXMP("Zano wrapped USD")        DOC_END
-      KV_SERIALIZE(meta_info)         DOC_DSCR("Any other information assetiaded with asset in a free form")              DOC_EXMP("Stable and private")        DOC_END
-      KV_SERIALIZE_POD_AS_HEX_STRING(owner) DOC_DSCR("Owner's key, used only for EMIT and UPDATE validation, could be changed by transferring asset ownership")  DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8")        DOC_END
-      KV_SERIALIZE(hidden_supply)    DOC_DSCR("This one reserved for future use, will be documented later") DOC_END
+      KV_SERIALIZE(total_max_supply)  DOC_DSCR("Maximum possible supply for a given asset, cannot be changed after deployment.") DOC_EXMP(1000000000000000000)   DOC_END
+      KV_SERIALIZE(current_supply)    DOC_DSCR("Currently emitted supply for the given asset (ignored for REGISTER operation).") DOC_EXMP(500000000000000000)    DOC_END
+      KV_SERIALIZE(decimal_point)     DOC_DSCR("Decimal point.")                      DOC_EXMP(12)                        DOC_END
+      KV_SERIALIZE(ticker)            DOC_DSCR("Ticker associated with the asset.")   DOC_EXMP("ZABC")                    DOC_END
+      KV_SERIALIZE(full_name)         DOC_DSCR("Full name of the asset.")             DOC_EXMP("Zano wrapped ABC")        DOC_END
+      KV_SERIALIZE(meta_info)         DOC_DSCR("Any other information associated with the asset in free form.")           DOC_EXMP("Stable and private")      DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(owner) DOC_DSCR("Owner's key, used only for EMIT and UPDATE validation, can be changed by transferring asset ownership.")   DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8")        DOC_END
+      KV_SERIALIZE(hidden_supply)     DOC_DSCR("This field is reserved for future use and will be documented later.") DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(owner_eth_pub_key) DOC_DSCR("[Optional] Owner's key in the case when ETH signature is used.") DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
@@ -768,31 +801,62 @@ namespace currency
 #define ASSET_DESCRIPTOR_OPERATION_UPDATE        3
 #define ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN   4
 
-#define ASSET_DESCRIPTOR_OPERATION_STRUCTURE_VER  1
+#define ASSET_DESCRIPTOR_OPERATION_HF4_VER       1
+#define ASSET_DESCRIPTOR_OPERATION_HF5_VER       2
+#define ASSET_DESCRIPTOR_OPERATION_LAST_VER      2
+
+  typedef boost::variant<dummy> asset_descriptor_operation_etc_fields;
 
   struct asset_descriptor_operation
   {
-    uint8_t                         operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
-    asset_descriptor_base           descriptor;
-    crypto::public_key              amount_commitment;     // premultiplied by 1/8
-    boost::optional<crypto::public_key> opt_asset_id;      // target asset_id - for update/emit
-    uint8_t verion = ASSET_DESCRIPTOR_OPERATION_STRUCTURE_VER;
+    uint8_t                                     operation_type = ASSET_DESCRIPTOR_OPERATION_UNDEFINED;
+    uint8_t                                     version = ASSET_DESCRIPTOR_OPERATION_HF4_VER;
+                                                                       // register  emit  burn  update
+    boost::optional<crypto::public_key>         opt_amount_commitment; //    +       +     +      -      (premultiplied by 1/8)
+    boost::optional<crypto::public_key>         opt_asset_id;          //    -       +     +      +
+    boost::optional<asset_descriptor_base>      opt_descriptor;        //    +       -     -      +
+    boost::optional<uint64_t>                   opt_amount;            //    ?       ?     ?      -      (only for non-hidden supply)
+    boost::optional<uint32_t>                   opt_asset_id_salt;     //    ?       -     -      -      (optional)
+    std::vector<asset_descriptor_operation_etc_fields> etc;            //                                (reserved for future use)
 
-    BEGIN_VERSIONED_SERIALIZE(ASSET_DESCRIPTOR_OPERATION_STRUCTURE_VER, verion)
+
+    BEGIN_VERSIONED_SERIALIZE(ASSET_DESCRIPTOR_OPERATION_LAST_VER, version)
+      CHAIN_TRANSITION_VER(0, asset_descriptor_operation_v1)
+      CHAIN_TRANSITION_VER(1, asset_descriptor_operation_v1)
       FIELD(operation_type)
-      FIELD(descriptor)
-      FIELD(amount_commitment)
-      END_VERSION_UNDER(1)
+      FIELD(opt_amount_commitment)
       FIELD(opt_asset_id)
+      FIELD(opt_descriptor)
+      FIELD(opt_amount)
+      FIELD(opt_asset_id_salt)
+      FIELD(etc)
     END_SERIALIZE()
 
+    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(2)
     BEGIN_BOOST_SERIALIZATION()
+      BOOST_CHAIN_TRANSITION_VER(1, asset_descriptor_operation_v1)
+      BOOST_CHAIN_TRANSITION_VER(0, asset_descriptor_operation_v1)
+      BOOST_SERIALIZE(version)
       BOOST_SERIALIZE(operation_type)
-      BOOST_SERIALIZE(descriptor)
-      BOOST_SERIALIZE(amount_commitment)
-      BOOST_END_VERSION_UNDER(1)
+      BOOST_SERIALIZE(opt_amount_commitment)
       BOOST_SERIALIZE(opt_asset_id)
-    END_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(opt_descriptor)
+      BOOST_SERIALIZE(opt_amount)
+      BOOST_SERIALIZE(opt_asset_id_salt)
+      BOOST_SERIALIZE(etc)
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(8)
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(version)                                     DOC_DSCR("Asset operation type struct version") DOC_EXMP(2) DOC_END
+      KV_SERIALIZE(operation_type)                              DOC_DSCR("Asset operation type identifier") DOC_EXMP(1) DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(opt_amount_commitment)     DOC_DSCR("(optional) Asset operation amount commitment (register/emit/burn).") DOC_EXMP("5688b56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(opt_asset_id)              DOC_DSCR("(optional) ID of an asset (emit/burn/update).") DOC_EXMP("cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6") DOC_END
+      KV_SERIALIZE(opt_descriptor)                              DOC_DSCR("(optional) Asset operation descriptor (register/update).") DOC_EXMP_AUTO()   DOC_END
+      KV_SERIALIZE(opt_amount)                                  DOC_DSCR("(optional) Asset operation amount (register/emit/burn when supply is non-hidden).") DOC_EXMP_AUTO() DOC_END
+      KV_SERIALIZE(opt_asset_id_salt)                           DOC_DSCR("(optional) Asset ID salt. May only be used for asset registration.") DOC_EXMP_AUTO() DOC_END
+      //KV_SERIALIZE(etc)                                         DOC_DSCR("Extra operations") DOC_EXMP_AUTO() DOC_END <---- serialization for variant not supported yet
+    END_KV_SERIALIZE_MAP()
+
   };
 
   struct asset_operation_proof
@@ -807,6 +871,7 @@ namespace currency
       FIELD(opt_amount_commitment_g_proof)
     END_SERIALIZE()
 
+    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(1)
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(opt_amount_commitment_composition_proof)
       BOOST_SERIALIZE(opt_amount_commitment_g_proof)
@@ -825,6 +890,7 @@ namespace currency
       FIELD(gss)
     END_SERIALIZE()
 
+    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(1)
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(gss)
       BOOST_END_VERSION_UNDER(1)
@@ -832,6 +898,26 @@ namespace currency
     END_BOOST_SERIALIZATION()
   };
 
+
+  struct asset_operation_ownership_proof_eth
+  {
+    crypto::eth_signature eth_sig;            // 64 bytes
+    uint8_t version = 0;
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(eth_sig)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(eth_sig)
+      BOOST_SERIALIZE(version)
+    END_BOOST_SERIALIZATION()
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE_POD_AS_HEX_STRING(eth_sig)    DOC_DSCR("HEX-encoded ETH signature (64 bytes)") DOC_EXMP("674bb56a5b4fa562e679ccacc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6add697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+      KV_SERIALIZE(version)                      DOC_DSCR("Structure version") DOC_EXMP(0) DOC_END
+    END_KV_SERIALIZE_MAP()
+  };
 
   struct extra_padding
   {
@@ -936,7 +1022,7 @@ namespace currency
 
   typedef boost::variant<NLSAG_sig, void_sig, ZC_sig, zarcanum_sig> signature_v;
 
-  typedef boost::variant<zc_asset_surjection_proof, zc_outs_range_proof, zc_balance_proof, asset_operation_proof, asset_operation_ownership_proof> proof_v;
+  typedef boost::variant<zc_asset_surjection_proof, zc_outs_range_proof, zc_balance_proof, asset_operation_proof, asset_operation_ownership_proof, asset_operation_ownership_proof_eth> proof_v;
 
 
   //include backward compatibility defintions
@@ -986,6 +1072,19 @@ namespace currency
       FIELD(signatures)
       FIELD(proofs)
     END_SERIALIZE()
+
+
+    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(0)
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(version)
+      BOOST_SERIALIZE(vin)
+      BOOST_SERIALIZE(vout)
+      BOOST_SERIALIZE(extra)
+      BOOST_SERIALIZE(signatures)
+      BOOST_SERIALIZE(attachment)
+      BOOST_END_VERSION_UNDER(1)
+      BOOST_SERIALIZE(proofs)
+      END_BOOST_SERIALIZATION()
   };
 
   
@@ -1121,9 +1220,12 @@ BLOB_SERIALIZER(currency::txout_to_key);
   VARIANT_TAG(json_archive, type_name, json_tag)
 
 
-BOOST_CLASS_VERSION(currency::asset_descriptor_operation, 1);
-BOOST_CLASS_VERSION(currency::asset_operation_proof, 1);
-BOOST_CLASS_VERSION(currency::asset_operation_ownership_proof, 1);
+
+LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_descriptor_operation);
+LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_descriptor_base);
+LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_operation_proof);
+LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_operation_ownership_proof);
+LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::transaction);
 
 
 // txin_v variant currency
@@ -1195,6 +1297,11 @@ SET_VARIANT_TAGS(currency::zc_balance_proof, 48, "zc_balance_proof");
 SET_VARIANT_TAGS(currency::asset_descriptor_operation, 49, "asset_descriptor_base");
 SET_VARIANT_TAGS(currency::asset_operation_proof, 50, "asset_operation_proof");
 SET_VARIANT_TAGS(currency::asset_operation_ownership_proof, 51, "asset_operation_ownership_proof");
+SET_VARIANT_TAGS(currency::asset_operation_ownership_proof_eth, 52, "asset_operation_ownership_proof_eth");
+
+SET_VARIANT_TAGS(crypto::eth_public_key, 60, "eth_public_key");
+//SET_VARIANT_TAGS(crypto::eth_signature, 61, "eth_signature");
+SET_VARIANT_TAGS(currency::dummy, 62, "dummy");
 
 
 

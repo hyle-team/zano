@@ -47,5 +47,6 @@ namespace tools
     std::string word_by_num(uint32_t n);
     uint64_t num_by_word(const std::string& w);
     bool valid_word(const std::string& w);
+		const std::map<std::string, uint32_t>& get_words_map();
 	}
 }

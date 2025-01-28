@@ -37,6 +37,9 @@ namespace tools
   std::string get_current_username();
   std::string get_os_version_string();
   bool copy_dir(boost::filesystem::path const & source, boost::filesystem::path const & destination);
+  
+  bool parse_client_version(const std::string& str, int& major, int& minor, int& revision, int& build_number, std::string& commit_id, bool& dirty);
+  bool parse_client_version_build_number(const std::string& str, int& build_number);
   bool check_remote_client_version(const std::string& client_ver);
 
   bool create_directories_if_necessary(const std::string& path);

@@ -61,7 +61,7 @@ struct core_critical_error_handler_t : public currency::i_critical_error_handler
     if (dont_stop_on_time_error)
       return false; // ignore such errors
     
-    LOG_ERROR(ENDL << ENDL << "Serious time sync problem detected, daemon will stop immediately" << ENDL << ENDL);
+    LOG_ERROR(ENDL << ENDL << "Serious TIME sync problem detected, daemon will stop immediately" << ENDL << ENDL);
 
     // stop handling
     dch.stop_handling();

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2019 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project 
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -36,6 +36,7 @@ namespace tools
       boost::recursive_mutex m_write_exclusive_lock;
       std::map<std::thread::id, transactions_list> m_txs; // size_t -> count of nested read_only transactions
       bool pop_tx_entry(tx_entry& txe);
+
     public:
       lmdb_db_backend();
       ~lmdb_db_backend();
@@ -59,6 +60,8 @@ namespace tools
       //-------------------------------------------------------------------------------------
       bool have_tx();
       MDB_txn* get_current_tx();
+
+      static bool convert_db_4kb_page_to_16kb_page(const std::string& source_path, const std::string& destination_path);
 
     };
   }

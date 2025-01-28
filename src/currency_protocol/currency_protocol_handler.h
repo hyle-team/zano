@@ -74,6 +74,10 @@ namespace currency
                                                                                                                              //-----------------------------------------------------------------------------------
     void set_to_debug_mode(uint32_t ip);
 
+    bool is_remote_client_version_allowed(int build_number, size_t min_allowed_build_number = SIZE_MAX) const;
+    bool is_remote_client_version_allowed(const std::string& client_version) const;
+    void check_all_client_versions_are_okay();
+
   private:
     //----------------- commands handlers ----------------------------------------------
     int handle_notify_new_block(int command, NOTIFY_NEW_BLOCK::request& arg, currency_connection_context& context);
@@ -86,11 +90,12 @@ namespace currency
    
     
 
-    //----------------- i_bc_protocol_layout ---------------------------------------
-    virtual bool relay_block(NOTIFY_NEW_BLOCK::request& arg, currency_connection_context& exclude_context);
-    virtual bool relay_transactions(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& arg, currency_connection_context& exclude_context);
+    //----------------- i_currency_protocol ---------------------------------------
+    virtual bool relay_block(NOTIFY_NEW_BLOCK::request& arg, currency_connection_context& exclude_context) override;
+    virtual bool relay_transactions(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& arg, currency_connection_context& exclude_context) override;
+    virtual void on_hardfork_activated(size_t hardfork_id) override;
     //----------------------------------------------------------------------------------
-    //bool get_payload_sync_data(HANDSHAKE_DATA::request& hshd, currency_connection_context& context);
+
     bool request_missing_objects(currency_connection_context& context, bool check_having_blocks);
     bool on_connection_synchronized(); 
     void relay_que_worker();

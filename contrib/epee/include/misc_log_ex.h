@@ -1,4 +1,4 @@
-// Copyright (c) 2019, Zano Project
+// Copyright (c) 2019-2024, Zano Project
 // Copyright (c) 2019, anonimal <anonimal@zano.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
@@ -90,7 +90,7 @@ DISABLE_VS_WARNINGS(4100)
 #define LOG_JOURNAL_MAX_ELEMENTS 100
 
 #ifdef _DEBUG 
-  #define _ASSERTE__(expr)   if(!expr) {__debugbreak();}
+  #define _ASSERTE__(expr)   if(!(expr)) {__debugbreak();}
 #else
   #define _ASSERTE__(expr)  
 #endif

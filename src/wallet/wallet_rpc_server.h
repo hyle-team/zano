@@ -57,7 +57,9 @@ namespace tools
   {
     wallet_provider_simple(std::shared_ptr<wallet2> wallet_ptr) : m_wallet_ptr(wallet_ptr)
     {}
-    virtual std::shared_ptr<wallet2> get_wallet()
+
+    // interface i_wallet_provider
+    virtual std::shared_ptr<wallet2> get_wallet() override
     {
       return m_wallet_ptr;
     }
@@ -88,7 +90,18 @@ namespace tools
     static void init_options(boost::program_options::options_description& desc);
     bool init(const boost::program_options::variables_map& vm);
     bool run(bool do_mint, bool offline_mode, const currency::account_public_address& miner_address);
-    bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, connection_context& m_conn_context);
+
+    virtual bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response_info,
+      connection_context& conn_context)
+    {
+      bool  call_found = false;
+      return this->handle_http_request(query_info, response_info, conn_context, call_found, epee::net_utils::http::i_chain_handler::m_empty_documentation);
+    }
+
+    // interface i_chain_handler
+    virtual bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response_info,
+      epee::net_utils::connection_context_base& conn_context, bool& call_found, documentation& docs = epee::net_utils::http::i_chain_handler::m_empty_documentation) override;
+
     void set_jwt_secret(const std::string& jwt);
     const std::string& get_jwt_secret();
 
@@ -146,11 +159,11 @@ namespace tools
         MAP_JON_RPC_WE("assets_whitelist_add",                on_assets_whitelist_add,          wallet_public::COMMAND_ASSETS_WHITELIST_ADD)
         MAP_JON_RPC_WE("assets_whitelist_remove",             on_assets_whitelist_remove,       wallet_public::COMMAND_ASSETS_WHITELIST_REMOVE)
         
-        MAP_JON_RPC_WE("deploy_asset",                        on_assets_deploy,                 wallet_public::COMMAND_ASSETS_DEPLOY)
-        MAP_JON_RPC_WE("emit_asset",                          on_assets_emit,                   wallet_public::COMMAND_ASSETS_EMIT)
-        MAP_JON_RPC_WE("update_asset",                        on_assets_update,                 wallet_public::COMMAND_ASSETS_UPDATE)
-        MAP_JON_RPC_WE("burn_asset",                          on_assets_burn,                   wallet_public::COMMAND_ASSETS_BURN)
-
+        MAP_JON_RPC_WE("deploy_asset",                        on_asset_deploy,                  wallet_public::COMMAND_ASSETS_DEPLOY)
+        MAP_JON_RPC_WE("emit_asset",                          on_asset_emit,                    wallet_public::COMMAND_ASSETS_EMIT)
+        MAP_JON_RPC_WE("update_asset",                        on_asset_update,                  wallet_public::COMMAND_ASSETS_UPDATE)
+        MAP_JON_RPC_WE("burn_asset",                          on_asset_burn,                    wallet_public::COMMAND_ASSETS_BURN)
+        MAP_JON_RPC_WE("send_ext_signed_asset_tx",            on_asset_send_ext_signed_tx,      wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX)
 
         //MULTIWALLET APIs
         MAP_JON_RPC_WE("mw_get_wallets",                      on_mw_get_wallets,                wallet_public::COMMAND_MW_GET_WALLETS)
@@ -218,10 +231,11 @@ namespace tools
     bool on_assets_whitelist_add(const wallet_public::COMMAND_ASSETS_WHITELIST_ADD::request& req, wallet_public::COMMAND_ASSETS_WHITELIST_ADD::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_assets_whitelist_remove(const wallet_public::COMMAND_ASSETS_WHITELIST_REMOVE::request& req, wallet_public::COMMAND_ASSETS_WHITELIST_REMOVE::response& res, epee::json_rpc::error& er, connection_context& cntx);
     
-    bool on_assets_deploy(const wallet_public::COMMAND_ASSETS_DEPLOY::request& req, wallet_public::COMMAND_ASSETS_DEPLOY::response& res, epee::json_rpc::error& er, connection_context& cntx);
-    bool on_assets_emit(const wallet_public::COMMAND_ASSETS_EMIT::request& req, wallet_public::COMMAND_ASSETS_EMIT::response& res, epee::json_rpc::error& er, connection_context& cntx);
-    bool on_assets_update(const wallet_public::COMMAND_ASSETS_UPDATE::request& req, wallet_public::COMMAND_ASSETS_UPDATE::response& res, epee::json_rpc::error& er, connection_context& cntx);
-    bool on_assets_burn(const wallet_public::COMMAND_ASSETS_BURN::request& req, wallet_public::COMMAND_ASSETS_BURN::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_asset_deploy(const wallet_public::COMMAND_ASSETS_DEPLOY::request& req, wallet_public::COMMAND_ASSETS_DEPLOY::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_asset_emit(const wallet_public::COMMAND_ASSETS_EMIT::request& req, wallet_public::COMMAND_ASSETS_EMIT::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_asset_update(const wallet_public::COMMAND_ASSETS_UPDATE::request& req, wallet_public::COMMAND_ASSETS_UPDATE::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_asset_burn(const wallet_public::COMMAND_ASSETS_BURN::request& req, wallet_public::COMMAND_ASSETS_BURN::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_asset_send_ext_signed_tx(const wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::request& req, wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
     bool on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS::request& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_mw_select_wallet(const wallet_public::COMMAND_MW_SELECT_WALLET::request& req, wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, connection_context& cntx);
@@ -238,7 +252,8 @@ namespace tools
     //bool reset_active_wallet(std::shared_ptr<wallet2> w);
 
     bool handle_command_line(const boost::program_options::variables_map& vm);
-    void rpc_destinations_to_currency_destination(const std::list<wallet_public::transfer_destination>& rpc_destinations, std::vector<currency::tx_destination_entry>& currency_destinations);
+    void rpc_destinations_to_currency_destinations(const std::list<wallet_public::transfer_destination>& rpc_destinations, bool nullify_asset_id, bool try_to_split, std::vector<currency::tx_destination_entry>& currency_destinations);
+
 
   private:
     std::shared_ptr<i_wallet_provider> m_pwallet_provider_sh_ptr;

@@ -1,10 +1,11 @@
-// Copyright (c) 2023 Zano Project
-// Copyright (c) 2023 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2023-2024 Zano Project
+// Copyright (c) 2023-2024 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 //
 #include "one_out_of_many_proofs.h"
 #include "../currency_core/crypto_config.h"
+#include "../currency_core/currency_config.h" // for static asset checks
 #include "epee/include/misc_log_ex.h"
 
 //DISABLE_GCC_AND_CLANG_WARNING(unused-function)
@@ -21,6 +22,8 @@ namespace crypto
 {
   static const size_t N_max = 256;
   static const size_t mn_max = 16;
+
+  static_assert(CURRENCY_TX_MAX_ALLOWED_INPUTS <= N_max, "CURRENCY_TX_MAX_ALLOWED_INPUTS is inconsistent with one-out-of-many proof limits"); // TODO: consider moving this check out -- sowle
 
   const point_t& get_BGE_generator(size_t index, bool& ok)
   {

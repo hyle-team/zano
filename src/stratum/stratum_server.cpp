@@ -590,7 +590,8 @@ namespace
           error_str << "wallet address " << user_str << " doesn't match the address previously set in daemon and/or other workers.";
         }
 
-        set_miner_address(address);
+        if (!error)
+          set_miner_address(address);
       }
 
       if (error)

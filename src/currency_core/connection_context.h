@@ -51,6 +51,8 @@ namespace currency
     uint64_t m_last_response_height;
     int64_t m_time_delta;
     std::string m_remote_version;
+    int m_build_number = 0;
+
   private:
     template<class t_core> friend class t_currency_protocol_handler;
     uncopybale_currency_context m_priv;

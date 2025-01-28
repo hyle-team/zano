@@ -29,7 +29,7 @@ namespace currency
     typedef std::vector<std::string> command_type;
 
     simple_wallet();
-    ~simple_wallet();
+    virtual ~simple_wallet();
     bool init(const boost::program_options::variables_map& vm);
     bool deinit();
     bool run();

@@ -35,7 +35,19 @@
 #include <iostream>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
-#include <filesystem>
+
+
+#if __has_include(<filesystem>)
+	#include <filesystem>
+	namespace stdfs = std::filesystem;
+#else
+	#if TARGET_OS_IOS
+		#error "This should never happen on ios."	
+	#endif
+	namespace stdfs = boost::filesystem;	
+#endif
+
+//#include <filesystem>
 
 #ifndef MAKE64
 	#define MAKE64(low,high)	((__int64)(((DWORD)(low)) | ((__int64)((DWORD)(high))) << 32))
@@ -562,10 +574,10 @@ namespace file_io_utils
 		try
 		{
 
-			std::filesystem::directory_iterator end_itr; // default construction yields past-the-end
-			for ( std::filesystem::directory_iterator itr( epee::string_encoding::utf8_to_wstring(path) ); itr != end_itr; ++itr )
+			stdfs::directory_iterator end_itr; // default construction yields past-the-end
+			for (stdfs::directory_iterator itr( epee::string_encoding::utf8_to_wstring(path) ); itr != end_itr; ++itr )
 			{
-				if ( only_files && std::filesystem::is_directory(itr->status()) )
+				if ( only_files && stdfs::is_directory(itr->status()) )
 				{
 					continue;
 				}

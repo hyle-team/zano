@@ -9,6 +9,7 @@
 #include "offers_tests_common.h"
 #include "tx_builder.h"
 #include "chaingen_helpers.h"
+#include "../../src/currency_core/tx_semantic_validation.h"
 
 using namespace epee;
 using namespace crypto;
@@ -1617,6 +1618,506 @@ bool tx_key_image_pool_conflict::generate(std::vector<test_event_entry>& events)
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
 
   DO_CALLBACK(events, "print_tx_pool");
+
+  return true;
+}
+
+//------------------------------------------------------------------
+
+bool tx_version_against_hardfork::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure that tx with incorrect for the activated HF version won't be accepted.
+
+  bool r = false;
+  GENERATE_ACCOUNT(miner_acc);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  //  0 ... 10    11    12    13    14          <- height
+  // (0 )- (0r)- (1 )- !2b!-                    <- chain A, block 2b is invalid
+  //             tx_0  tx_1                     tx_0 is accepted, tx_1 is rejected
+  //                 \
+  //                  \(2 )                     <- chain B
+  //                   tx_1                     tx_1 is accepted
+
+  uint64_t tx_version_good = 0, tx_version_bad = 0;
+
+  // select good and bad tx versions based on active hardfork
+  size_t most_recent_hardfork_id = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_0r));
+  switch(most_recent_hardfork_id)
+  {
+  case ZANO_HARDFORK_04_ZARCANUM:
+  case ZANO_HARDFORK_05:
+    tx_version_good = TRANSACTION_VERSION_POST_HF4;
+    tx_version_bad = TRANSACTION_VERSION_PRE_HF4;
+    break;
+  default:
+    LOG_ERROR("hardfork " << most_recent_hardfork_id << " is not supported by this test");
+    return false;
+  }
+
+  std::vector<tx_source_entry> sources;
+  std::vector<tx_destination_entry> destinations;
+
+  //
+  // 1/2 tx with good version, should go okay
+  //
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), miner_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
+  transaction tx_0{};
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, tx_version_good, 0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  events.push_back(tx_0);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+
+  sources.clear();
+  destinations.clear();
+
+  //
+  // 2/2 tx with bad version, should be rejected by tx pool and by the core
+  //
+  r = fill_tx_sources_and_destinations(events, blk_0, miner_acc.get_keys(), miner_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
+  transaction tx_1{};
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, tx_version_bad, 0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  // check tx pool rejection
+  DO_CALLBACK(events, "mark_invalid_tx");
+  events.push_back(tx_1);
+
+  // now add tx_1 as onboard transaction (directly to a block, skipping tx pool)
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, true));
+  events.push_back(tx_1);
+  events.push_back(event_visitor_settings(event_visitor_settings::set_txs_kept_by_block, false));
+
+  // make sure the block with tx_1 is invalid
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_BLOCK_TX1(events, blk_2b, blk_1, miner_acc, tx_1);
+
+
+  // just one more block to make sure everyting is okay
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
+
+  return true;
+}
+
+bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: ensure that the checks contained in the function "validate_tx_semantic" body are performed.
+
+  GENERATE_ACCOUNT(miner);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  CHECK_AND_ASSERT_EQ(validate_tx_semantic(transaction{}, CURRENCY_MAX_TRANSACTION_BLOB_SIZE), false);
+
+  // No inputs.
+  {
+    transaction tx{};
+
+    tx.vin = {};
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx);
+  }
+
+  // Unsupported input type.
+  {
+    transaction tx{};
+
+    tx.vin.emplace_back(txin_gen{});
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx);
+  }
+
+  // Unsupported output type.
+  {
+    transaction tx{};
+
+    tx.vin.push_back(txin_to_key{});
+    tx.vout.emplace_back();
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx);
+  }
+
+  // Inputs amount overflow.
+  {
+    point_t point_public_key{};
+    txout_to_key target{};
+    std::array<txin_to_key, 2> inputs{};
+    transaction tx{};
+
+    CHECK_AND_ASSERT_EQ(point_public_key.from_string("499790c3302b9f0514e2db09b390679283d43d971383d33dc24c7991ea4cf6d7"), true);
+    target.key = point_public_key.to_public_key();
+    inputs.at(0).amount = 1;
+    inputs.at(1).amount = UINT64_MAX;
+
+    for (const auto& input : inputs)
+    {
+      tx.vin.push_back(input);
+    }
+
+    CHECK_AND_ASSERT_GREATER(inputs.at(0).amount, inputs.at(0).amount + inputs.at(1).amount);
+    CHECK_AND_ASSERT_GREATER(inputs.at(1).amount, inputs.at(0).amount + inputs.at(1).amount);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx);
+  }
+
+  // Outputs amount overflow.
+  {
+    point_t point_public_key{};
+    txout_to_key target{};
+    std::array<tx_out_bare, 2> outputs{};
+    transaction tx{};
+
+    CHECK_AND_ASSERT_EQ(point_public_key.from_string("78ef3d9af7b5e3d09556d57820cf68c2b3553a9d8205c01fe40fc70aae86bb4f"), true);
+    target.key = point_public_key.to_public_key();
+    outputs.at(0).amount = 1;
+    outputs.at(1).amount = UINT64_MAX;
+
+    for (auto& output : outputs)
+    {
+      output.target = target;
+      tx.vout.push_back(output);
+    }
+
+    tx.vin.push_back(txin_to_key{});
+
+    CHECK_AND_ASSERT_GREATER(outputs.at(0).amount, outputs.at(0).amount + outputs.at(1).amount);
+    CHECK_AND_ASSERT_GREATER(outputs.at(1).amount, outputs.at(0).amount + outputs.at(1).amount);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx);
+  }
+
+  // Equal key images in inputs.
+  {
+    transaction tx{};
+
+    {
+      txin_zc_input input_zc{};
+      txin_htlc input_htlc{};
+      txin_to_key input_to_key{};
+      point_t point_key_image{};
+
+      CHECK_AND_ASSERT_EQ(point_key_image.from_string("93fa59f43fb9cff98e6867d20cf200c98b29cae406acdbde798ffb3e30d3503a"), true);
+      input_zc.k_image = point_key_image.to_key_image();
+      CHECK_AND_ASSERT_EQ(point_key_image.from_string("ad1226e3fd1be15e26b119fa80380e580a498e5fa3421b63fded89672b526a44"), true);
+      input_htlc.k_image = point_key_image.to_key_image();
+      CHECK_AND_ASSERT_EQ(point_key_image.from_string("8fc7cbfd1054690767d0c20917a68371b34b190aac5997581641f064b93d1b96"), true);
+      input_to_key.k_image = point_key_image.to_key_image();
+      tx.vin.push_back(input_zc);
+      tx.vin.push_back(input_htlc);
+      tx.vin.push_back(input_to_key);
+    }
+
+    {
+      txin_to_key input{};
+
+      input.amount = 0;
+      tx.vin.push_back(input);
+    }
+
+    for (int8_t step{}; step < 3; ++step)
+    {
+      tx.vin.push_back(tx.vin.front());
+      CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+      DO_CALLBACK(events, "mark_invalid_tx");
+      ADD_CUSTOM_EVENT(events, tx);
+      tx.vin.erase(tx.vin.begin(), tx.vin.begin() + 1);
+    }
+
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+  }
+
+  // Two entries of the same type in extra.
+  {
+    transaction tx{};
+    std::array<txin_to_key, 2> inputs{};
+    std::array<point_t, 2> key_image_points{};
+
+    CHECK_AND_ASSERT_EQ(key_image_points.at(0).from_string("de3c22a62f15e6de8abe6b217085b2aead196daf5ddd67d9c4b366330736fbeb"), true);
+    CHECK_AND_ASSERT_EQ(key_image_points.at(1).from_string("9f3eef913921ca35239e696725595e3686bb0d69e3e805791c5aa93d5754aa5c"), true);
+
+    for (int position{}; position < 2; ++position)
+    {
+      inputs.at(position).k_image = key_image_points.at(position).to_key_image();
+      tx.vin.push_back(inputs.at(position));
+    }
+
+    tx.extra.push_back(null_pkey);
+    tx.extra.push_back(null_pkey);
+
+    CHECK_AND_ASSERT_EQ(tx.extra.size(), 2);
+    CHECK_AND_ASSERT_EQ(typeid(tx.extra.front()), typeid(tx.extra.back()));
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx);
+  }
+
+  // tx.version <= TRANSACTION_VERSION_PRE_HF4. Balance check fail: sum of inputs <= sum of outputs.
+  {
+    tx_out_bare output{};
+    transaction tx{};
+    std::array<point_t, 2> key_image_points{};
+    std::array<txin_to_key, 2> inputs{};
+
+    output.amount = 3;
+    tx.vout.push_back(output);
+    tx.version = 0;
+    CHECK_AND_ASSERT_EQ(key_image_points.at(0).from_string("8fc7cbfd1054690767d0c20917a68371b34b190aac5997581641f064b93d1b96"), true);
+    CHECK_AND_ASSERT_EQ(key_image_points.at(1).from_string("dc48b741dacda5ac026ad0a7d193b816049eb08724907a1ff6f95839cfb0efa5"), true);
+
+    for (int position{}; position < 2; ++position)
+    {
+      auto& input{inputs.at(position)};
+
+      input.amount = 1;
+      input.k_image = key_image_points.at(position).to_key_image();
+      tx.vin.push_back(input);
+    }
+
+    const uint64_t sum_inputs{std::accumulate(inputs.begin(), inputs.end(), std::uint64_t{}, [](uint64_t sum, const txin_to_key& input) { return sum + input.amount; })};
+
+    CHECK_AND_ASSERT_LESS(sum_inputs, output.amount);
+    CHECK_AND_ASSERT_EQ(output.amount - sum_inputs, 1);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx);
+  }
+
+  // Semantically valid transaction.
+  {
+    tx_out_bare output;
+    transaction tx{};
+    std::array<point_t, 2> key_image_points{};
+    std::array<txin_to_key, 2> inputs{};
+
+    output.amount = 3'000'000'000'000;
+    tx.version = 0;
+    tx.vout.push_back(output);
+    CHECK_AND_ASSERT_EQ(key_image_points.at(0).from_string("fe1ef4a48a69804652324dc071cb72f49c22cd97479583950eaff746c936f72c"), true);
+    CHECK_AND_ASSERT_EQ(key_image_points.at(1).from_string("0bf1d8bb0988069f2c2b4f0dc89c81830c1178e04450d1da31ef020660732279"), true);
+    for (int position{}; position < 2; ++position)
+    {
+      auto& input{inputs.at(position)};
+
+      input.amount = 2'000'000'000'000;
+      input.k_image = key_image_points.at(position).to_key_image();
+      tx.vin.push_back(input);
+    }
+
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx);
+  }
+
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // Construct a valid transaction and then modify it so that the transaction is no longer semantically correct.
+
+  // No inputs.
+  {
+    MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
+
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    tx.vin = {};
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx);
+  }
+
+  // Unsupported input type.
+  {
+    MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
+
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    tx.vin.emplace_back(txin_gen{});
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx);
+  }
+
+  // Unsupported output type.
+  {
+    MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
+
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    tx.vout.emplace_back();
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx);
+  }
+
+  // Inputs amount overflow.
+  {
+    point_t point_public_key{};
+    txout_to_key target{};
+    std::array<txin_to_key, 2> inputs{};
+    MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
+
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    CHECK_AND_ASSERT_EQ(point_public_key.from_string("499790c3302b9f0514e2db09b390679283d43d971383d33dc24c7991ea4cf6d7"), true);
+    target.key = point_public_key.to_public_key();
+    inputs.at(0).amount = 1;
+    inputs.at(1).amount = UINT64_MAX;
+
+    for (const auto& input : inputs)
+    {
+      tx.vin.push_back(input);
+    }
+
+    CHECK_AND_ASSERT_GREATER(inputs.at(0).amount, inputs.at(0).amount + inputs.at(1).amount);
+    CHECK_AND_ASSERT_GREATER(inputs.at(1).amount, inputs.at(0).amount + inputs.at(1).amount);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx);
+  }
+
+  // Outputs amount overflow.
+  {
+    point_t point_public_key{};
+    txout_to_key target{};
+    std::array<tx_out_bare, 2> outputs{};
+    MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
+
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    CHECK_AND_ASSERT_EQ(point_public_key.from_string("78ef3d9af7b5e3d09556d57820cf68c2b3553a9d8205c01fe40fc70aae86bb4f"), true);
+    target.key = point_public_key.to_public_key();
+    outputs.at(0).amount = 1;
+    outputs.at(1).amount = UINT64_MAX;
+
+    for (auto& output : outputs)
+    {
+      output.target = target;
+      tx.vout.push_back(output);
+    }
+
+    tx.vin.push_back(txin_to_key{});
+
+    CHECK_AND_ASSERT_GREATER(outputs.at(0).amount, outputs.at(0).amount + outputs.at(1).amount);
+    CHECK_AND_ASSERT_GREATER(outputs.at(1).amount, outputs.at(0).amount + outputs.at(1).amount);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx);
+  }
+
+  // Equal key images in inputs.
+  {
+    MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
+
+    {
+      txin_zc_input input_zc{};
+      txin_htlc input_htlc{};
+      txin_to_key input_to_key{};
+      point_t point_key_image{};
+
+      CHECK_AND_ASSERT_EQ(point_key_image.from_string("93fa59f43fb9cff98e6867d20cf200c98b29cae406acdbde798ffb3e30d3503a"), true);
+      input_zc.k_image = point_key_image.to_key_image();
+      CHECK_AND_ASSERT_EQ(point_key_image.from_string("ad1226e3fd1be15e26b119fa80380e580a498e5fa3421b63fded89672b526a44"), true);
+      input_htlc.k_image = point_key_image.to_key_image();
+      CHECK_AND_ASSERT_EQ(point_key_image.from_string("8fc7cbfd1054690767d0c20917a68371b34b190aac5997581641f064b93d1b96"), true);
+      input_to_key.k_image = point_key_image.to_key_image();
+      tx.vin.push_back(input_zc);
+      tx.vin.push_back(input_htlc);
+      tx.vin.push_back(input_to_key);
+    }
+
+    for (int8_t step{}; step < 3; ++step)
+    {
+      tx.vin.push_back(tx.vin.front());
+      CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+      DO_CALLBACK(events, "mark_invalid_tx");
+      ADD_CUSTOM_EVENT(events, tx);
+      tx.vin.erase(tx.vin.begin(), tx.vin.begin() + 1);
+    }
+
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+  }
+
+  // Two entries of the same type in extra.
+  {
+    MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
+
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    tx.extra.push_back(null_pkey);
+    tx.extra.push_back(null_pkey);
+
+    CHECK_AND_ASSERT_GREATER(tx.extra.size(), 2);
+    CHECK_AND_ASSERT_EQ(typeid(tx.extra.back()), typeid(tx.extra.at(tx.extra.size() - 2)));
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx);
+  }
+
+  // tx.version <= TRANSACTION_VERSION_PRE_HF4. Balance check fail: sum of inputs <= sum of outputs.
+  {
+    tx_out_bare output{};
+    std::array<point_t, 2> key_image_points{};
+    std::array<txin_to_key, 2> inputs{};
+    MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, blk_0r);
+
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    output.amount = 10'000'000'003;
+    tx.vout.push_back(output);
+    tx.version = 0;
+    CHECK_AND_ASSERT_EQ(key_image_points.at(0).from_string("8fc7cbfd1054690767d0c20917a68371b34b190aac5997581641f064b93d1b96"), true);
+    CHECK_AND_ASSERT_EQ(key_image_points.at(1).from_string("dc48b741dacda5ac026ad0a7d193b816049eb08724907a1ff6f95839cfb0efa5"), true);
+
+    for (int position{}; position < 2; ++position)
+    {
+      auto& input{inputs.at(position)};
+
+      input.amount = 1;
+      input.k_image = key_image_points.at(position).to_key_image();
+      tx.vin.push_back(input);
+    }
+
+    const auto inputs_sum{[](const uint64_t sum, const txin_v& input) -> uint64_t
+      {
+        if (input.type() == typeid(txin_to_key))
+        {
+          return sum + boost::get<txin_to_key>(input).amount;
+        }
+
+        if (input.type() == typeid(txin_multisig))
+        {
+          return sum + boost::get<txin_multisig>(input).amount;
+        }
+
+        return sum;
+      }
+    };
+
+    const auto outputs_sum{[](const uint64_t sum, const tx_out_v& output) -> uint64_t
+      {
+        if (output.type() == typeid(tx_out_bare))
+        {
+          return sum + boost::get<tx_out_bare>(output).amount;
+        }
+
+        return sum;
+      }
+    };
+
+    const uint64_t inputs_amount{std::accumulate(tx.vin.begin(), tx.vin.end(), std::uint64_t{}, inputs_sum)};
+    const uint64_t outputs_amount{std::accumulate(tx.vout.begin(), tx.vout.end(), std::uint64_t{}, outputs_sum)};
+
+    CHECK_AND_ASSERT_LESS(inputs_amount, outputs_amount);
+    CHECK_AND_ASSERT_EQ(outputs_amount - inputs_amount, 1);
+    CHECK_AND_ASSERT(tx.version <= TRANSACTION_VERSION_PRE_HF4, false);
+    CHECK_AND_ASSERT_EQ(get_block_height(blk_0r), 10);
+    CHECK_AND_ASSERT_EQ(m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_03, 10), true);
+    CHECK_AND_ASSERT_EQ(m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, 10), false);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx);
+  }
 
   return true;
 }

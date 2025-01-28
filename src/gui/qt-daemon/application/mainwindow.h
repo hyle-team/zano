@@ -112,7 +112,7 @@ public:
   QString get_network_type(const QString& param);
   QString transfer(const QString& param);
   QString have_secure_app_data(const QString& param);
-  QString drop_secure_app_data(const QString& param);
+  QString drop_secure_app_data();
   QString get_secure_app_data(const QString& param);
   QString store_secure_app_data(const QString& param, const QString& password);
   QString set_master_password(const QString& param);
@@ -190,6 +190,7 @@ public:
   void    on_menu_show(const QString& param);
   QString is_remnotenode_mode_preconfigured(const QString& param);
   QString start_backend(const QString& params);
+  void    show_notification(const QString& title, const QString& message);
 
   QString async_call(const QString& func_name, const QString& params);
   QString sync_call(const QString& func_name, const QString& params);

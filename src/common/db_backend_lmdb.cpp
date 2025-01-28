@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2019 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project 
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -394,10 +394,67 @@ namespace tools
       }
       return true;
     }
+
     const char* lmdb_db_backend::name()
     {
       return "lmdb";
     }
+
+    bool lmdb_db_backend::convert_db_4kb_page_to_16kb_page(const std::string& source_path, const std::string& destination_path)
+    {
+      #define MDB_CHECK(x, msg) {int rc = x; CHECK_AND_ASSERT_MES(rc == MDB_SUCCESS, false, "LMDB 4k->16k error: " << msg << ": " << mdb_strerror(rc));}
+
+      MDB_env *env_src = nullptr, *env_dst = nullptr;
+
+      // source
+      MDB_CHECK(mdb_env_create(&env_src), "failed to create LMDB environment");
+      MDB_CHECK(mdb_env_set_mapsize(env_src, 4 * 1024 * 1024), "failed to set mapsize"); // mapsize ?
+      MDB_CHECK(mdb_env_open(env_src, source_path.c_str(), 0, 0664), "failed to open source LMDB");
+
+      // destination (16k page size)
+      MDB_CHECK(mdb_env_create(&env_dst), "failed to create LMDB environment");
+      MDB_CHECK(mdb_env_set_mapsize(env_dst, 16 * 1024 * 1024), "failed to set mapsize"); // mapsize ?
+      
+      // TODO uncomment after mdb_env_set_pagesize is supported
+      // MDB_CHECK(mdb_env_set_pagesize(env_dst, 16 * 1024), "failed to set page size to 16K");
+      
+      MDB_CHECK(mdb_env_open(env_dst, destination_path.c_str(), 0, 0664), "failed to open destination LMDB");
+
+      // begin transactions
+      MDB_txn *txn_src = nullptr, *txn_dst = nullptr;
+      MDB_dbi dbi_src, dbi_dst;
+      MDB_CHECK(mdb_txn_begin(env_src, nullptr, MDB_RDONLY, &txn_src), "failed to begin source transaction");
+      MDB_CHECK(mdb_dbi_open(txn_src, nullptr, 0, &dbi_src), "failed to open source database");
+      MDB_CHECK(mdb_txn_begin(env_dst, nullptr, 0, &txn_dst), "failed to begin destination transaction");
+      MDB_CHECK(mdb_dbi_open(txn_dst, nullptr, MDB_CREATE, &dbi_dst), "failed to open destination database");
+
+      MDB_cursor *cursor;
+      MDB_val key, data;
+
+      // Iterate over the source database and copy all key-value pairs to the destination database
+      MDB_CHECK(mdb_cursor_open(txn_src, dbi_src, &cursor), "failed to open cursor");
+
+      while (mdb_cursor_get(cursor, &key, &data, MDB_NEXT) == MDB_SUCCESS)
+      {
+        MDB_CHECK(mdb_put(txn_dst, dbi_dst, &key, &data, 0), "failed to put data in destination database");
+      }
+
+      mdb_cursor_close(cursor);
+
+      // commit transactions
+      MDB_CHECK(mdb_txn_commit(txn_src), "failed to commit source transaction");
+      MDB_CHECK(mdb_txn_commit(txn_dst), "failed to commit destination transaction");
+
+      mdb_dbi_close(env_src, dbi_src);
+      mdb_dbi_close(env_dst, dbi_dst);
+      mdb_env_close(env_src);
+      mdb_env_close(env_dst);
+
+      return true;
+
+      #undef MDB_CHECK
+    }
+
   }
 }
 

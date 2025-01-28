@@ -801,3 +801,126 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+wallet_true_rpc_pos_mining::wallet_true_rpc_pos_mining()
+{
+  REGISTER_CALLBACK_METHOD(wallet_true_rpc_pos_mining, c1);
+}
+
+bool wallet_true_rpc_pos_mining::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+#include <boost/program_options/detail/parsers.hpp>
+
+bool wallet_true_rpc_pos_mining::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet_with_true_http_rpc(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet_with_true_http_rpc(events, c, ALICE_ACC_IDX);
+
+  /*currency::t_currency_protocol_handler<currency::core> m_cprotocol(c, nullptr);
+  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > p2p(m_cprotocol);
+  bc_services::bc_offers_service bos(nullptr);
+  bos.set_disabled(true);
+  currency::core_rpc_server core_rpc_wrapper(c, p2p, bos);
+  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  
+  boost::program_options::options_description desc_options;
+  currency::core_rpc_server::init_options(desc_options);
+  boost::program_options::variables_map vm{};
+  char* argv[] = {"--rpc-bind-ip=127.0.0.1", "--rpc-bind-port=33777"};
+  boost::program_options::store(boost::program_options::parse_command_line(sizeof argv / sizeof argv[0], argv, desc_options), vm);
+  r = core_rpc_wrapper.init(vm);
+  CHECK_AND_ASSERT_MES(r, false, "rpc server init failed");
+  r = core_rpc_wrapper.run(1, false);
+  CHECK_AND_ASSERT_MES(r, 1, "rpc server run failed");
+  auto slh = epee::misc_utils::create_scope_leave_handler([&](){
+      core_rpc_wrapper.deinit();
+    });
+
+
+  auto http_core_proxy = std::shared_ptr<tools::i_core_proxy>(new tools::default_http_core_proxy());
+  http_core_proxy->set_connectivity(5000, 1);
+  CHECK_AND_ASSERT_MES(http_core_proxy->set_connection_addr("127.0.0.1:33777"), false, "");
+  CHECK_AND_ASSERT_MES(http_core_proxy->check_connection(), false, "no connection");
+
+  miner_wlt->set_core_proxy(http_core_proxy);*/
+
+  uint64_t top_height = c.get_top_block_height();
+
+  size_t blocks_fetched = 0;
+  miner_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, top_height);
+
+  alice_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, top_height);
+
+  //uint64_t balance_unlocked = 1, balance_awaiting_in = 1, balance_awaiting_out = 1, balance_mined = 1;
+  //uint64_t miner_initial_balance = miner_wlt->balance(balance_unlocked, balance_awaiting_in, balance_awaiting_out, balance_mined);
+  //CHECK_AND_ASSERT_EQ(miner_initial_balance, PREMINE_AMOUNT + CURRENCY_BLOCK_REWARD * top_height);
+  uint64_t miner_amount = PREMINE_AMOUNT + CURRENCY_BLOCK_REWARD * top_height;
+  uint64_t expected_unlocked = miner_amount - (CURRENCY_MINED_MONEY_UNLOCK_WINDOW - 1) * COIN;
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*miner_wlt, "miner", miner_amount, INVALID_BALANCE_VAL, expected_unlocked, 0, 0), false, "");
+
+  CHECK_AND_ASSERT_MES(miner_wlt->try_mint_pos(), false, "try_mint_pos failed");
+
+  CHECK_AND_ASSERT_EQ(c.get_top_block_height(), top_height + 1);
+
+  miner_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*miner_wlt, "miner", miner_amount + COIN), false, "");
+
+  uint64_t amount_to_alice = MK_TEST_COINS(500);
+  miner_wlt->transfer(amount_to_alice, m_accounts[ALICE_ACC_IDX].get_public_address());
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "enexpected pool txs count: " << c.get_pool_transactions_count());
+  CHECK_AND_ASSERT_MES(miner_wlt->try_mint_pos(), false, "try_mint_pos failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "enexpected pool txs count: " << c.get_pool_transactions_count());
+
+  miner_wlt->refresh(blocks_fetched);
+  CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*miner_wlt, "miner", miner_amount + 2 * COIN - amount_to_alice - TESTS_DEFAULT_FEE), false, "");
+
+  // Alice
+
+  //alice_wlt->refresh(blocks_fetched);
+  //CHECK_AND_ASSERT_EQ(blocks_fetched, 2);
+
+  //CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", amount_to_alice, 0, 0, 0, 0), false, "");
+
+  //r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  //CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
+  //alice_wlt->refresh(blocks_fetched);
+  //CHECK_AND_ASSERT_EQ(blocks_fetched, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  //
+  //CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", amount_to_alice, 0, amount_to_alice, 0, 0), false, "");
+
+  //std::this_thread::yield();
+  //std::this_thread::sleep_for( std::chrono::milliseconds(1) );
+  //CHECK_AND_ASSERT_MES(alice_wlt->try_mint_pos(), false, "try_mint_pos failed");
+
+  //alice_wlt->refresh(blocks_fetched);
+  //CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
+
+  //CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", amount_to_alice + CURRENCY_BLOCK_REWARD, 0, 0, 0, 0), false, "");
+
+  return true;
+}
