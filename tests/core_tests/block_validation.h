@@ -194,9 +194,6 @@ struct block_with_correct_prev_id_on_wrong_height : public gen_block_verificatio
   block_with_correct_prev_id_on_wrong_height();
   bool generate(std::vector<test_event_entry>& events) const;
   bool assert_blk_2_has_wrong_height(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) const;
-
-private:
-  mutable currency::block m_blk_2{};
 };
 
 struct block_reward_in_main_chain_basic : wallet_test
