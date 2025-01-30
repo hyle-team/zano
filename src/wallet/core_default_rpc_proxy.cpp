@@ -167,6 +167,15 @@ namespace tools
     epee::net_utils::parse_url(m_daemon_address, u);
     if (!u.port)
       u.port = 8081;
+    if (u.schema == "https")
+    {
+      m_http_client.set_is_ssl(true);
+    }
+    else
+    {
+      m_http_client.set_is_ssl(false);
+    }
+
     bool r = m_http_client.connect(u.host, std::to_string(u.port), m_connection_timeout);
     if (r)
     {

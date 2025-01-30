@@ -134,7 +134,7 @@ namespace tools
     }
 
     epee::critical_section m_lock;
-    epee::net_utils::http::http_simple_client m_http_client;
+    epee::net_utils::http::http_universal_client m_http_client;
     std::string m_daemon_address;
 
     unsigned int m_connection_timeout;
