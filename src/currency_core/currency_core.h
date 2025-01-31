@@ -68,7 +68,7 @@ namespace currency
      uint64_t get_current_tx_version() const;
      uint64_t get_top_block_height() const;
      std::string get_config_folder();
-     bool get_blockchain_top(uint64_t& heeight, crypto::hash& top_id) const;
+     bool get_blockchain_top(uint64_t& height, crypto::hash& top_id) const;
      bool get_blocks(uint64_t start_offset, size_t count, std::list<block>& blocks, std::list<transaction>& txs);
      bool get_blocks(uint64_t start_offset, size_t count, std::list<block>& blocks);
      template<class t_ids_container, class t_blocks_container, class t_missed_container>
