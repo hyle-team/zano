@@ -1639,6 +1639,9 @@ bool blockchain_storage::create_block_template(const create_block_template_param
 
   resp.txs_fee = fee;
 
+  size_t tx_hardfork_id = 0;
+  size_t tx_version = get_tx_version_and_hardfork_id(height, m_core_runtime_config.hard_forks, tx_hardfork_id);
+
   /* 
       instead of complicated two-phase template construction and adjustment of cumulative size with block reward we
       use CURRENCY_COINBASE_BLOB_RESERVED_SIZE as penalty-free coinbase transaction reservation.
@@ -1651,7 +1654,8 @@ bool blockchain_storage::create_block_template(const create_block_template_param
                                                    b.miner_tx,
                                                    resp.block_reward_without_fee,
                                                    resp.block_reward,
-                                                   get_tx_version(height, m_core_runtime_config.hard_forks),
+                                                   tx_version,
+                                                   tx_hardfork_id,
                                                    ex_nonce, 
                                                    CURRENCY_MINER_TX_MAX_OUTS, 
                                                    pos,
@@ -6130,6 +6134,7 @@ struct visitor_proxy : public boost::static_visitor<const x_type*>
 
 bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
 {
+  size_t most_recent_hardfork_id_for_height = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(block_height);
   bool var_is_after_hardfork_1_zone = m_core_runtime_config.is_hardfork_active_for_height(1, block_height);
   bool var_is_after_hardfork_2_zone = m_core_runtime_config.is_hardfork_active_for_height(2, block_height);
   bool var_is_after_hardfork_3_zone = m_core_runtime_config.is_hardfork_active_for_height(3, block_height);
@@ -6268,7 +6273,9 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
 
   if (var_is_after_hardfork_5_zone)
   {
-    // additional checks here
+    CHECK_AND_ASSERT_MES(tx.version >= TRANSACTION_VERSION_POST_HF5, false, "HF5: tx with version " << tx.version << " is not allowed");
+    // starting from HF5 each tx must have hardfork_id corresponding to the current active hardfork
+    CHECK_AND_ASSERT_MES(tx.hardfork_id == most_recent_hardfork_id_for_height, false, "tx's hardfork_id is " << (int)tx.hardfork_id << ", but the current hardfork is " << most_recent_hardfork_id_for_height << ", rejected");
   }
   else
   {

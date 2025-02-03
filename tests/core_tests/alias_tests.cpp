@@ -975,7 +975,9 @@ bool gen_alias_too_much_reward::generate(std::vector<test_event_entry>& events) 
       d.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask;
   transaction tx_0{};
   crypto::secret_key sk{};
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<currency::extra_v>({ ai }), empty_attachment, tx_0, get_tx_version_from_events(events), sk, 0);
+  size_t tx_hardfork_id{};
+  uint64_t tx_version = get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<currency::extra_v>({ ai }), empty_attachment, tx_0, tx_version, tx_hardfork_id, sk, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   
   if (tx_0.version <= TRANSACTION_VERSION_PRE_HF4)
@@ -1166,8 +1168,9 @@ bool gen_alias_too_small_reward::make_tx_reg_alias(std::vector<test_event_entry>
     destinations.push_back(tx_destination_entry(sources_amount - (alias_reward + TESTS_DEFAULT_FEE), miner_acc.get_public_address())); // change
   
   crypto::secret_key stub = AUTO_VAL_INIT(stub);
-  uint64_t tx_version = get_tx_version(get_block_height(prev_block), m_hardforks);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx, tx_version, stub, uint64_t(0));
+  size_t tx_hardfork_id{};
+  uint64_t tx_version = get_tx_version_and_hardfork_id(get_block_height(prev_block), m_hardforks, tx_hardfork_id);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx, tx_version, tx_hardfork_id, stub, uint64_t(0));
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   PRINT_EVENT_N_TEXT(events, "make_tx_reg_alias -> construct_tx()");
   events.push_back(tx);
@@ -1382,8 +1385,9 @@ bool gen_alias_too_many_regs_in_block_template::generate(std::vector<test_event_
     destinations.push_back(tx_destination_entry(sources_amount - total_alias_cost, preminer_acc.get_public_address())); // return the change in order to keep median_fee low
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  uint64_t tx_version = get_tx_version(get_block_height(blk_0r), m_hardforks);
-  r = construct_tx(preminer_acc.get_keys(), sources, destinations, empty_attachment, tx_1, tx_version, 0);
+  size_t tx_hardfork_id{};
+  uint64_t tx_version = get_tx_version_and_hardfork_id(get_block_height(blk_0r), m_hardforks, tx_hardfork_id);
+  r = construct_tx(preminer_acc.get_keys(), sources, destinations, empty_attachment, tx_1, tx_version, tx_hardfork_id, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   events.push_back(tx_1);
@@ -1494,9 +1498,10 @@ bool gen_alias_update_for_free::generate(std::vector<test_event_entry>& events) 
   }
 
   transaction tx{};
-  uint64_t tx_version = currency::get_tx_version(get_block_height(blk_0r) + 1, generator.get_hardforks());
+  size_t tx_hardfork_id{};
+  uint64_t tx_version = currency::get_tx_version_and_hardfork_id(get_block_height(blk_0r) + 1, generator.get_hardforks(), tx_hardfork_id);
   crypto::secret_key sk{};
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<extra_v>({ ai }), empty_attachment, tx, tx_version, sk, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<extra_v>({ ai }), empty_attachment, tx, tx_version, tx_hardfork_id, sk, 0);
 
   /*tx_builder tb;
   tb.step1_init();

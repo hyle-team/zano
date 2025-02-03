@@ -1032,6 +1032,7 @@ namespace currency
   {
   public:
     uint64_t version = 0;
+    uint8_t hardfork_id = 0;
     std::vector<txin_v> vin;
     std::vector<extra_v> extra;
     std::vector<tx_out_v> vout;
@@ -1044,6 +1045,8 @@ namespace currency
       FIELD(vin)
       FIELD(extra)
       FIELD(vout)
+      if(version < TRANSACTION_VERSION_POST_HF5) return true;
+      FIELD(hardfork_id)
     END_SERIALIZE()
   };
 

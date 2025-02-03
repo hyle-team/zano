@@ -39,6 +39,7 @@
 #include "hard_fork_1.h"
 #include "hard_fork_2.h"
 #include "hard_fork_4.h"
+#include "hard_fork_5.h"
 #include "atomic_tests.h"
 #include "isolate_auditable_and_proof.h"
 #include "zarcanum_test.h"

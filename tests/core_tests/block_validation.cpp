@@ -321,10 +321,9 @@ bool gen_block_miner_tx_has_2_in::generate(std::vector<test_event_entry>& events
   destinations.push_back(de);
 
   transaction tmp_tx;
-  std::vector<currency::attachment_v> attachments;
 
   uint64_t tx_version = get_tx_version(get_block_height(blk_0r), m_hardforks);
-  if (!construct_tx(miner_account.get_keys(), sources, destinations, attachments, tmp_tx, tx_version, 0))
+  if (!construct_tx(miner_account.get_keys(), sources, destinations, empty_extra, empty_attachment, tmp_tx, tx_version))
     return false;
 
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
@@ -369,9 +368,8 @@ bool gen_block_miner_tx_with_txin_to_key::generate(std::vector<test_event_entry>
   destinations.push_back(de);
 
   transaction tmp_tx = AUTO_VAL_INIT(tmp_tx);
-  std::vector<currency::attachment_v> attachments;
   uint64_t tx_version = get_tx_version(get_block_height(blk_1r), m_hardforks);
-  if (!construct_tx(miner_account.get_keys(), sources, destinations, attachments, tmp_tx, tx_version, 0))
+  if (!construct_tx(miner_account.get_keys(), sources, destinations, empty_extra, empty_attachment, tmp_tx, tx_version))
     return false;
 
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_1);

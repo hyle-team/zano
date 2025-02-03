@@ -520,7 +520,8 @@ bool zarcanum_txs_with_big_shuffled_decoy_set_shuffled::generate(std::vector<tes
   CHECK_AND_ASSERT_MES(shuffle_source_entries(sources), false, "shuffle_source_entries failed");
 
   transaction tx_1_a{};
-  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_1_a, get_tx_version_from_events(events), 0 /* unlock time */);
+  size_t tx_hardfork_id{};
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_1_a, get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id), tx_hardfork_id, 0 /* unlock time */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   ADD_CUSTOM_EVENT(events, tx_1_a);
   MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_1_a);
@@ -532,7 +533,7 @@ bool zarcanum_txs_with_big_shuffled_decoy_set_shuffled::generate(std::vector<tes
   CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_2, alice_acc, miner_acc, alice_amount - TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, nmix, sources, destinations), false, "");
   CHECK_AND_ASSERT_MES(shuffle_source_entries(sources), false, "shuffle_source_entries failed");
   transaction tx_1_b{};
-  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_1_b, get_tx_version_from_events(events), 0 /* unlock time */);
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_1_b, get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id), tx_hardfork_id, 0 /* unlock time */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   ADD_CUSTOM_EVENT(events, tx_1_b);
   MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_1_b);
@@ -571,7 +572,7 @@ bool zarcanum_txs_with_big_shuffled_decoy_set_shuffled::generate(std::vector<tes
   CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_5r, alice_acc, miner_acc, alice_amount - TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, nmix, sources, destinations), false, "");
   CHECK_AND_ASSERT_MES(shuffle_source_entries(sources), false, "shuffle_source_entries failed");
   transaction tx_3_a{};
-  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_3_a, get_tx_version_from_events(events), 0 /* unlock time */);
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_3_a, get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id), tx_hardfork_id, 0 /* unlock time */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   ADD_CUSTOM_EVENT(events, tx_3_a);
   MAKE_NEXT_BLOCK_TX1(events, blk_6, blk_5r, miner_acc, tx_3_a);
@@ -583,7 +584,7 @@ bool zarcanum_txs_with_big_shuffled_decoy_set_shuffled::generate(std::vector<tes
   CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_6, alice_acc, miner_acc, alice_amount - TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, nmix, sources, destinations), false, "");
   CHECK_AND_ASSERT_MES(shuffle_source_entries(sources), false, "shuffle_source_entries failed");
   transaction tx_3_b{};
-  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_3_b, get_tx_version_from_events(events), 0 /* unlock time */);
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_3_b, get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id), tx_hardfork_id, 0 /* unlock time */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   ADD_CUSTOM_EVENT(events, tx_3_b);
   MAKE_NEXT_BLOCK_TX1(events, blk_7, blk_6, miner_acc, tx_3_b);

@@ -437,7 +437,7 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(alice_acc.get_keys(), sources, std::vector<tx_destination_entry>{ tx_destination_entry(MK_TEST_COINS(90) - TESTS_DEFAULT_FEE, miner_acc.get_public_address()) },
-    empty_attachment, tx_1, get_tx_version_from_events(events), stake_lock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
+    empty_attachment, tx_1, get_tx_version_from_events(events), 0, stake_lock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   
   DO_CALLBACK(events, "mark_invalid_tx");
@@ -882,7 +882,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(alice_acc.get_keys(), sources, std::vector<tx_destination_entry>{ tx_destination_entry(stake_amount / 2, miner_acc.get_public_address()) },
-    empty_attachment, tx_1, get_tx_version_from_events(events), stake_unlock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
+    empty_attachment, tx_1, get_tx_version_from_events(events), 0, stake_unlock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   
   DO_CALLBACK(events, "mark_invalid_tx");

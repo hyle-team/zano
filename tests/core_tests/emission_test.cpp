@@ -181,8 +181,9 @@ bool pos_emission_test::generate(std::vector<test_event_entry> &events)
   for (size_t i = 0; i < m_pos_entries_to_generate; ++i)
     destinations.push_back(tx_destination_entry(pos_entry_amount, alice_acc.get_public_address()));
 
-  transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(preminer_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0);
+  transaction tx_1{};
+  size_t tx_hardfork_id{};
+  r = construct_tx(preminer_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id), tx_hardfork_id, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_1);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);
