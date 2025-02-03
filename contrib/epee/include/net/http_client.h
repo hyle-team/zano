@@ -200,8 +200,26 @@ namespace epee
 
     namespace http
     {
+
+
+      struct i_http_client
+      {
+        virtual void set_host_name(const std::string& name) = 0;
+        virtual boost::asio::ip::tcp::socket& get_socket() = 0;
+        virtual bool connect(const std::string& host, int port, unsigned int timeout) = 0;
+        virtual bool set_timeouts(unsigned int connection_timeout, unsigned int recv_timeout) = 0;
+        virtual bool connect(const std::string& host, std::string port) = 0;
+        virtual bool connect(const std::string& host, const std::string& port, unsigned int timeout) = 0;
+        virtual bool disconnect() = 0;
+        virtual bool is_connected() = 0;
+        virtual bool invoke_get(const std::string& uri, const std::string& body = std::string(), const http_response_info** ppresponse_info = NULL, const fields_list& additional_params = fields_list()) = 0;
+        virtual bool invoke(const std::string& uri, const std::string& method, const std::string& body, const http_response_info** ppresponse_info = NULL, const fields_list& additional_params = fields_list()) = 0;
+        virtual bool invoke_post(const std::string& uri, const std::string& body, const http_response_info** ppresponse_info = NULL, const fields_list& additional_params = fields_list()) = 0;
+      };
+
       template<bool is_ssl>
-      class http_simple_client_t : public i_target_handler
+      class http_simple_client_t : public i_target_handler, 
+                                   public i_http_client
       {
       public:
 
@@ -893,6 +911,64 @@ namespace epee
       typedef http_simple_client_t<true> https_simple_client;
 
 
+      //suitable for both http and https
+      class http_universal_client: public i_http_client
+      {
+      public:
+        http_universal_client(): m_pclient(new http_simple_client())
+        {}
+        // Forward all calls to m_pclient
+        void set_host_name(const std::string& name) override 
+        {
+          m_pclient->set_host_name(name); 
+        }
+        bool connect(const std::string& host, int port, unsigned int timeout) override 
+        { 
+          return m_pclient->connect(host, port, timeout); 
+        }
+        boost::asio::ip::tcp::socket& get_socket() override { return m_pclient->get_socket(); }        
+        bool set_timeouts(unsigned int connection_timeout, unsigned int recv_timeout) override { return m_pclient->set_timeouts(connection_timeout, recv_timeout); }
+        bool connect(const std::string& host, std::string port) override { return m_pclient->connect(host, port); }
+        bool connect(const std::string& host, const std::string& port, unsigned int timeout) override { return m_pclient->connect(host, port, timeout); }
+        bool disconnect() override { return m_pclient->disconnect(); }
+        bool is_connected() override { return m_pclient->is_connected(); }
+        bool invoke_get(const std::string& uri, const std::string& body = std::string(), const http_response_info** ppresponse_info = nullptr, const fields_list& additional_params = fields_list()) override { return m_pclient->invoke_get(uri, body, ppresponse_info, additional_params); }
+        bool invoke(const std::string& uri, const std::string& method, const std::string& body, const http_response_info** ppresponse_info = nullptr, const fields_list& additional_params = fields_list()) override { return m_pclient->invoke(uri, method, body, ppresponse_info, additional_params); }
+        bool invoke_post(const std::string& uri, const std::string& body, const http_response_info** ppresponse_info = nullptr, const fields_list& additional_params = fields_list()) override { return m_pclient->invoke_post(uri, body, ppresponse_info, additional_params); }
+
+        void set_is_ssl(bool is_ssl)
+        {
+          if (m_is_ssl != is_ssl)
+          {
+            if (is_ssl)
+            {
+              m_pclient.reset(new https_simple_client());
+            }
+            else
+            {
+              m_pclient.reset(new http_simple_client());
+            }
+            m_is_ssl = is_ssl;
+          }
+        }
+      private:
+        bool m_is_ssl = false;
+        std::shared_ptr<i_http_client> m_pclient;
+      };
+
+
+      template<typename transport>
+      void configure_transport(const std::string schema, transport& tr)
+      {}
+      inline void configure_transport(const std::string schema, http_universal_client& tr)
+      {
+        if (schema == "https")
+          tr.set_is_ssl(true);
+        else
+          tr.set_is_ssl(false);
+      }
+
+
       /************************************************************************/
       /*                                                                      */
       /************************************************************************/
@@ -915,6 +991,7 @@ namespace epee
           if (!port)
             port = 80;//default for http
 
+          configure_transport(u_c.schema, tr);
           if (!tr.connect(u_c.host, port, timeout))
           {
             LOG_PRINT_L2("invoke_request: cannot connect to " << u_c.host << ":" << port);

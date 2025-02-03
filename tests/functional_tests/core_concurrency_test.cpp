@@ -156,7 +156,7 @@ bool generate_events(currency::core& c, cct_events_t& events, const cct_wallets_
     test_core_time::adjust(b.timestamp);
 
     currency::wide_difficulty_type diff = 0;
-    r = currency::miner::find_nonce_for_given_block(b, diff, height);
+    r = currency::find_nonce_for_given_block(b, diff, height);
     CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
     currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);

@@ -2116,6 +2116,12 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
       }
       else
       {
+        //if first synchronized block in the wallet accidently became orphaned we need to force wallet to resync
+        if(this->m_minimum_height == height)
+        {
+          full_reset_needed = true;
+        }
+
         //this should happen ONLY after block been matched, if not then is internal error
         if (full_reset_needed)
         {

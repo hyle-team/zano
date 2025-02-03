@@ -1154,7 +1154,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(one_block);
     GENERATE_AND_PLAY(gen_ring_signature_1);
     GENERATE_AND_PLAY(gen_ring_signature_2);
-    //GENERATE_AND_PLAY(fill_tx_rpc_inputs); temporary disable, waiting for fix from @stepan-dolgorukov
+    GENERATE_AND_PLAY(fill_tx_rpc_inputs);
     //GENERATE_AND_PLAY(gen_ring_signature_big); // Takes up to XXX hours (if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10)
 
     // tests for outputs mixing in
@@ -1179,6 +1179,8 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(gen_block_height_is_low, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_height_is_high, "0,3");
     GENERATE_AND_PLAY_HF(block_with_correct_prev_id_on_wrong_height, "3-*");
+    GENERATE_AND_PLAY_HF(block_reward_in_main_chain_basic, "3-*");
+    GENERATE_AND_PLAY_HF(block_reward_in_alt_chain_basic, "3-*");
     GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_tx_gen_in, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_in, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_miner_tx_with_txin_to_key, "0,3");

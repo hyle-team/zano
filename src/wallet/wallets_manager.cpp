@@ -201,7 +201,9 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   currency::core::init_options(desc_cmd_sett);
   currency::core_rpc_server::init_options(desc_cmd_sett);
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >::init_options(desc_cmd_sett);
+#ifdef CPU_MINING_ENABLED
   currency::miner::init_options(desc_cmd_sett);
+#endif
   bc_services::bc_offers_service::init_options(desc_cmd_sett);
   tools::db::db_backend_selector::init_options(desc_cmd_sett);
 #endif

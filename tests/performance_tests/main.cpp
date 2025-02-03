@@ -56,6 +56,8 @@ void test_plain_wallet()
   epee::misc_utils::sleep_no_w(2000);
 
   res = plain_wallet::sync_call("reset_connection_url", 0, "195.201.107.230:33336");
+  //res = plain_wallet::sync_call("reset_connection_url", 0, "https://node.zano.org:443");
+  
   r = plain_wallet::sync_call("run_wallet", instance_id, "");
 
   while(true)

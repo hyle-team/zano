@@ -239,7 +239,7 @@ bool hard_fork_1_unlock_time_2_in_coinbase::generate(std::vector<test_event_entr
   ut2.unlock_time_array.resize(blk_5.miner_tx.vout.size());
   ut2.unlock_time_array[0] = get_block_height(blk_5) + CURRENCY_MINED_MONEY_UNLOCK_WINDOW;
   blk_5.miner_tx.extra.push_back(ut2);
-  miner::find_nonce_for_given_block(blk_5, diff, get_block_height(blk_5));
+  find_nonce_for_given_block(blk_5, diff, get_block_height(blk_5));
 
   // add blk_5 with modified miner tx
   events.push_back(blk_5);
