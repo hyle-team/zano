@@ -245,7 +245,7 @@ static std::optional<asset_operation_descriptor> deserialize(serialization_metho
   return {};
 }
 
-static std::string get_string_presentation(const std::string& data)
+[[maybe_unused]] static std::string get_string_presentation(const std::string& data)
 {
   std::string presentation{};
 

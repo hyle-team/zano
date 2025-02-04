@@ -1661,7 +1661,9 @@ bool gen_wallet_alias_and_unconfirmed_txs::generate(std::vector<test_event_entry
       d.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask;
   transaction tx_alice_alias{};
   crypto::secret_key sk{};
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<currency::extra_v>({ ai }), empty_attachment, tx_alice_alias, get_tx_version_from_events(events), sk, 0);
+  size_t tx_hardfork_id{};
+  uint64_t tx_version = get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<currency::extra_v>({ ai }), empty_attachment, tx_alice_alias, tx_version, tx_hardfork_id, sk, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   ADD_CUSTOM_EVENT(events, tx_alice_alias);
 
@@ -2306,7 +2308,7 @@ bool generate_oversized_offer(size_t min_size, size_t max_size, bc_services::off
     // construct fake tx to estimate it's size
     transaction tx = AUTO_VAL_INIT(tx);
     crypto::secret_key one_time_secret_key;
-    if (!construct_tx(account_keys(), std::vector<tx_source_entry>(), std::vector<tx_destination_entry>(), empty_extra, att_container, tx, tx_version, one_time_secret_key, 0, 0, true, 0))
+    if (!construct_tx(account_keys(), std::vector<tx_source_entry>(), std::vector<tx_destination_entry>(), empty_extra, att_container, tx, tx_version, 0, one_time_secret_key, 0, 0, true, 0))
       return false;
 
     size_t sz = get_object_blobsize(tx);

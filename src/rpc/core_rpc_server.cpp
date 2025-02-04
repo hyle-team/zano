@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2022 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -925,6 +925,7 @@ namespace currency
 		return call_res;
 	}
   //------------------------------------------------------------------------------------------------------------------------------
+#ifdef CPU_MINING_ENABLED
   bool core_rpc_server::on_start_mining(const COMMAND_RPC_START_MINING::request& req, COMMAND_RPC_START_MINING::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
@@ -955,6 +956,7 @@ namespace currency
     res.status = API_RETURN_CODE_OK;
     return true;
   }
+#endif // #ifdef CPU_MINING_ENABLED
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_getblockcount(const COMMAND_RPC_GETBLOCKCOUNT::request& req, COMMAND_RPC_GETBLOCKCOUNT::response& res, connection_context& cntx)
   {
@@ -1156,16 +1158,22 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  uint64_t core_rpc_server::get_block_reward(const block& blk)
+  uint64_t core_rpc_server::get_block_reward(const block& blk, const crypto::hash& h)
   {
+    if (blk.miner_tx.version >= TRANSACTION_VERSION_POST_HF4)
+    {
+      uint64_t reward_with_fee = 0;
+      m_core.get_blockchain_storage().get_block_reward_by_hash(h, reward_with_fee);
+      return reward_with_fee;
+    }
+
+    // legacy version, pre HF4
     uint64_t reward = 0;
     BOOST_FOREACH(const auto& out, blk.miner_tx.vout)
     {
       VARIANT_SWITCH_BEGIN(out);
       VARIANT_CASE_CONST(tx_out_bare, out)
         reward += out.amount;
-      VARIANT_CASE_CONST(tx_out_zarcanum, out)
-        //@#@      
       VARIANT_SWITCH_END();
     }
     return reward;
@@ -1173,6 +1181,7 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::fill_block_header_response(const block& blk, bool orphan_status, block_header_response& response)
   {
+    crypto::hash block_hash = get_block_hash(blk);
     response.major_version = blk.major_version;
     response.minor_version = blk.minor_version;
     response.timestamp = blk.timestamp;
@@ -1181,9 +1190,9 @@ namespace currency
     response.orphan_status = orphan_status;
     response.height = get_block_height(blk);
     response.depth = m_core.get_current_blockchain_size() - response.height - 1;
-    response.hash = string_tools::pod_to_hex(get_block_hash(blk));
+    response.hash = string_tools::pod_to_hex(block_hash);
     response.difficulty = m_core.get_blockchain_storage().block_difficulty(response.height).convert_to<std::string>();
-    response.reward = get_block_reward(blk);
+    response.reward = get_block_reward(blk, block_hash);
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------

@@ -633,7 +633,7 @@ bool offer_removing_and_selected_output::generate(std::vector<test_event_entry>&
   std::vector<tx_source_entry> sources;
   r = fill_tx_sources(sources, events, blk_0r, miner_acc.get_keys(), destinations_amount + TESTS_DEFAULT_FEE, 0);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_0);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);                                   

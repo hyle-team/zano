@@ -30,7 +30,6 @@
 #include "common/boost_serialization_helper.h"
 #include "warnings.h"
 #include "crypto/hash.h"
-#include "miner_common.h"
 #include "storages/portable_storage_template_helper.h"
 #include "basic_pow_helpers.h"
 #include "version.h"
@@ -973,6 +972,57 @@ bool blockchain_storage::get_block_by_hash(const crypto::hash &h, block &blk)  c
 
   return false;
 }
+//------------------------------------------------------------------
+bool blockchain_storage::get_block_reward_by_main_chain_height(const uint64_t height, uint64_t& reward_with_fee) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  static const boost::multiprecision::uint128_t amount_max_mp = UINT64_MAX;
+
+  if (height >= m_db_blocks.size())
+    return false;
+
+  boost::multiprecision::uint128_t reward_with_fee_mp{};
+  if (height != 0)
+    reward_with_fee_mp = m_db_blocks[height]->already_generated_coins - m_db_blocks[height - 1]->already_generated_coins;
+  else
+    reward_with_fee_mp = m_db_blocks[height]->already_generated_coins;
+  
+  if (reward_with_fee_mp > amount_max_mp)
+    return false;
+
+  reward_with_fee = reward_with_fee_mp.convert_to<uint64_t>();
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::get_block_reward_by_hash(const crypto::hash &h, uint64_t& reward_with_fee) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  static const boost::multiprecision::uint128_t amount_max_mp = UINT64_MAX;
+
+  block_extended_info bei{};
+  if (!get_block_extended_info_by_hash(h, bei))
+    return false;
+
+  boost::multiprecision::uint128_t reward_with_fee_mp{};
+  if (bei.height != 0)
+  {
+    block_extended_info bei_prev{};
+    if (!get_block_extended_info_by_hash(bei.bl.prev_id, bei_prev))
+      return false;
+    reward_with_fee_mp = bei.already_generated_coins - bei_prev.already_generated_coins;
+  }
+  else
+  {
+    reward_with_fee_mp = bei.already_generated_coins;
+  }
+
+  if (reward_with_fee_mp > amount_max_mp)
+    return false;
+
+  reward_with_fee = reward_with_fee_mp.convert_to<uint64_t>();
+  return true;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::is_tx_related_to_altblock(crypto::hash tx_id) const
 {
   CRITICAL_REGION_LOCAL1(m_alternative_chains_lock);
@@ -1589,6 +1639,9 @@ bool blockchain_storage::create_block_template(const create_block_template_param
 
   resp.txs_fee = fee;
 
+  size_t tx_hardfork_id = 0;
+  size_t tx_version = get_tx_version_and_hardfork_id(height, m_core_runtime_config.hard_forks, tx_hardfork_id);
+
   /* 
       instead of complicated two-phase template construction and adjustment of cumulative size with block reward we
       use CURRENCY_COINBASE_BLOB_RESERVED_SIZE as penalty-free coinbase transaction reservation.
@@ -1601,7 +1654,8 @@ bool blockchain_storage::create_block_template(const create_block_template_param
                                                    b.miner_tx,
                                                    resp.block_reward_without_fee,
                                                    resp.block_reward,
-                                                   get_tx_version(height, m_core_runtime_config.hard_forks),
+                                                   tx_version,
+                                                   tx_hardfork_id,
                                                    ex_nonce, 
                                                    CURRENCY_MINER_TX_MAX_OUTS, 
                                                    pos,
@@ -6080,6 +6134,7 @@ struct visitor_proxy : public boost::static_visitor<const x_type*>
 
 bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
 {
+  size_t most_recent_hardfork_id_for_height = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(block_height);
   bool var_is_after_hardfork_1_zone = m_core_runtime_config.is_hardfork_active_for_height(1, block_height);
   bool var_is_after_hardfork_2_zone = m_core_runtime_config.is_hardfork_active_for_height(2, block_height);
   bool var_is_after_hardfork_3_zone = m_core_runtime_config.is_hardfork_active_for_height(3, block_height);
@@ -6218,7 +6273,9 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
 
   if (var_is_after_hardfork_5_zone)
   {
-    // additional checks here
+    CHECK_AND_ASSERT_MES(tx.version >= TRANSACTION_VERSION_POST_HF5, false, "HF5: tx with version " << tx.version << " is not allowed");
+    // starting from HF5 each tx must have hardfork_id corresponding to the current active hardfork
+    CHECK_AND_ASSERT_MES(tx.hardfork_id == most_recent_hardfork_id_for_height, false, "tx's hardfork_id is " << (int)tx.hardfork_id << ", but the current hardfork is " << most_recent_hardfork_id_for_height << ", rejected");
   }
   else
   {

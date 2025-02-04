@@ -69,7 +69,7 @@ bool emission_test::c1(currency::core& c, size_t ev_index, const std::vector<tes
       uint64_t height_from_template = 0;
       r = c.get_block_template(b, m_miner_acc.get_public_address(), m_miner_acc.get_public_address(), difficulty, height_from_template, extra);
       CHECK_AND_ASSERT_MES(r || height_from_template != height, false, "get_block_template failed");
-      r = miner::find_nonce_for_given_block(b, difficulty, height);
+      r = find_nonce_for_given_block(b, difficulty, height);
       CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
       c.handle_incoming_block(t_serializable_object_to_blob(b), bvc);
       CHECK_AND_NO_ASSERT_MES(!bvc.m_verification_failed && !bvc.m_marked_as_orphaned && !bvc.m_already_exists, false, "block verification context check failed");
@@ -181,8 +181,9 @@ bool pos_emission_test::generate(std::vector<test_event_entry> &events)
   for (size_t i = 0; i < m_pos_entries_to_generate; ++i)
     destinations.push_back(tx_destination_entry(pos_entry_amount, alice_acc.get_public_address()));
 
-  transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(preminer_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0);
+  transaction tx_1{};
+  size_t tx_hardfork_id{};
+  r = construct_tx(preminer_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id), tx_hardfork_id, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_1);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);

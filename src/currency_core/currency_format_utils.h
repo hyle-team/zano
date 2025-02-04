@@ -163,6 +163,7 @@ namespace currency
     uint64_t expiration_time;
     crypto::public_key spend_pub_key;  // only for validations
     uint64_t tx_version;
+    size_t tx_hardfork_id = 0;
     uint64_t mode_separate_fee = 0;
     
     epee::misc_utils::events_dispatcher* pevents_dispatcher = nullptr;
@@ -187,6 +188,7 @@ namespace currency
       FIELD(expiration_time)
       FIELD(spend_pub_key)
       FIELD(tx_version)
+      FIELD(tx_hardfork_id)
       FIELD(mode_separate_fee)
       if (flags & TX_FLAG_SIGNATURE_MODE_SEPARATE)
       {
@@ -295,6 +297,7 @@ namespace currency
                                                              uint64_t& block_reward_without_fee,
                                                              uint64_t& block_reward,
                                                              uint64_t tx_version,
+                                                             size_t tx_hadrfork_id,
                                                              const blobdata& extra_nonce            = blobdata(), 
                                                              size_t max_outs                        = CURRENCY_MINER_TX_MAX_OUTS, 
                                                              bool pos                               = false,
@@ -317,9 +320,11 @@ namespace currency
     const std::vector<attachment_v>& attachments,
     transaction& tx, 
     uint64_t tx_version,
+    size_t tx_hardfork_id,
     uint64_t unlock_time, 
     uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED, 
     bool shuffle = true);
+
   bool construct_tx(const account_keys& sender_account_keys, 
     const std::vector<tx_source_entry>& sources, 
     const std::vector<tx_destination_entry>& destinations,
@@ -327,6 +332,7 @@ namespace currency
     const std::vector<attachment_v>& attachments,
     transaction& tx, 
     uint64_t tx_version,
+    size_t tx_hardfork_id,
     crypto::secret_key& one_time_secret_key,
     uint64_t unlock_time,
     uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED, 
@@ -340,6 +346,7 @@ namespace currency
     const std::vector<attachment_v>& attachments,
     transaction& tx,
     uint64_t tx_version,
+    size_t tx_hardfork_id,
     crypto::secret_key& one_time_secret_key,
     uint64_t unlock_time,
     const account_public_address& crypt_account,
@@ -348,6 +355,7 @@ namespace currency
     bool shuffle = true,
     uint64_t flags = 0);
 
+  uint64_t get_tx_version_and_hardfork_id(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd, size_t& tx_hardfork_id); // returns tx version and tx hardfork id based on the height of the block where the transaction is expected to be
   uint64_t get_tx_version(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd); // returns tx version based on the height of the block where the transaction is expected to be
   bool construct_tx(const account_keys& sender_account_keys,  const finalize_tx_param& param, finalized_tx& result);
   bool get_or_calculate_asset_id(const asset_descriptor_operation& ado, crypto::point_t* p_result_point, crypto::public_key* p_result_pub_key);

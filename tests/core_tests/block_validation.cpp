@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -321,10 +321,9 @@ bool gen_block_miner_tx_has_2_in::generate(std::vector<test_event_entry>& events
   destinations.push_back(de);
 
   transaction tmp_tx;
-  std::vector<currency::attachment_v> attachments;
 
   uint64_t tx_version = get_tx_version(get_block_height(blk_0r), m_hardforks);
-  if (!construct_tx(miner_account.get_keys(), sources, destinations, attachments, tmp_tx, tx_version, 0))
+  if (!construct_tx(miner_account.get_keys(), sources, destinations, empty_extra, empty_attachment, tmp_tx, tx_version))
     return false;
 
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_0);
@@ -369,9 +368,8 @@ bool gen_block_miner_tx_with_txin_to_key::generate(std::vector<test_event_entry>
   destinations.push_back(de);
 
   transaction tmp_tx = AUTO_VAL_INIT(tmp_tx);
-  std::vector<currency::attachment_v> attachments;
   uint64_t tx_version = get_tx_version(get_block_height(blk_1r), m_hardforks);
-  if (!construct_tx(miner_account.get_keys(), sources, destinations, attachments, tmp_tx, tx_version, 0))
+  if (!construct_tx(miner_account.get_keys(), sources, destinations, empty_extra, empty_attachment, tmp_tx, tx_version))
     return false;
 
   MAKE_MINER_TX_MANUALLY(miner_tx, blk_1);
@@ -691,5 +689,516 @@ bool gen_block_wrong_version_agains_hardfork::generate(std::vector<test_event_en
 {
   BLOCK_VALIDATION_INIT_GENERATE();
   DO_CALLBACK(events, "c1");
+  return true;
+}
+
+block_with_correct_prev_id_on_wrong_height::block_with_correct_prev_id_on_wrong_height()
+{
+  REGISTER_CALLBACK_METHOD(block_with_correct_prev_id_on_wrong_height, assert_blk_2_has_wrong_height);
+}
+
+bool block_with_correct_prev_id_on_wrong_height::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: make sure that a block with correct previous block identifier that is at the wrong height won't be accepted by the core.
+
+  GENERATE_ACCOUNT(miner);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
+
+  DO_CALLBACK(events, "configure_core");
+  
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  MAKE_TX(events, tx_0, miner, miner, MK_TEST_COINS(2), blk_0r);
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner);
+  block blk_2{};
+
+  blk_2.prev_id = currency::get_block_hash(blk_1);
+  blk_2.miner_tx = blk_0r.miner_tx;
+  blk_2.major_version = blk_0r.major_version;
+  CHECK_AND_ASSERT_EQ(currency::get_block_height(blk_1), 11);
+  CHECK_AND_ASSERT_EQ(currency::get_block_height(blk_2), 10);
+  // blk_1 is the previous for blk_2, but height(blk_2) < height(blk_1).
+  DO_CALLBACK_PARAMS_STR(events, "assert_blk_2_has_wrong_height", t_serializable_object_to_blob(blk_2));
+
+  return true;
+}
+
+bool block_with_correct_prev_id_on_wrong_height::assert_blk_2_has_wrong_height(currency::core& c, [[maybe_unused]] size_t ev_index, [[maybe_unused]] const std::vector<test_event_entry>& events) const
+{
+  block blk_2{};
+
+  {
+    const auto serialized_block{boost::get<callback_entry>(events.at(ev_index)).callback_params};
+
+    CHECK_AND_ASSERT_EQ(t_unserializable_object_from_blob(blk_2, serialized_block), true);
+  }
+
+  {
+    currency::block_verification_context context_blk_2{};
+
+    CHECK_AND_ASSERT_EQ(boost::get<txin_gen>(blk_2.miner_tx.vin.front()).height, 10);
+    // Make sure, that it's impossible to insert blk_2.
+    CHECK_AND_ASSERT_EQ(c.get_blockchain_storage().add_new_block(blk_2, context_blk_2), false);
+  }
+
+  return true;
+}
+
+struct block_reward_in_main_chain_basic::argument_assert
+{
+  uint64_t m_height{}, m_balance{};
+  std::list<uint64_t> m_rewards{};
+
+  argument_assert() = default;
+
+  template<typename test>
+  argument_assert(const test* instance, uint64_t height, const std::list<uint64_t>& blk_tx_fees = {}, const argument_assert previous = {}) : m_height{height}
+  {
+    CHECK_AND_ASSERT_THROW(instance, std::runtime_error{"Pointer to an instance of the test equals to the nullptr."});
+    CHECK_AND_ASSERT_THROW(m_height >= previous.m_height, std::runtime_error{"A height specified in the previous argument is greather than current height."});
+
+    if (height == 0)
+    {
+      m_rewards.push_back(PREMINE_AMOUNT);
+      m_balance = m_rewards.back();
+    }
+
+    else
+    {
+      m_balance = previous.m_balance;
+
+      for (auto fee_iterator{blk_tx_fees.rbegin()}; fee_iterator != blk_tx_fees.rend(); ++fee_iterator)
+      {
+        if (height != 0)
+        {
+          m_rewards.push_back(COIN);
+
+          if (const auto& fee{*fee_iterator}; fee <= m_rewards.back())
+          {
+            if (instance->m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, height))
+            {
+              m_rewards.back() -= fee;
+            }
+          }
+
+          m_balance += m_rewards.back();
+        }
+
+        else
+        {
+          m_balance += PREMINE_AMOUNT;
+        }
+
+        --height;
+      }
+    }
+
+    CHECK_AND_ASSERT_THROW(m_rewards.size() > 0, std::runtime_error{"A list of the rewards is empty."});
+  }
+
+  BEGIN_SERIALIZE()
+    FIELD(m_height)
+    FIELD(m_balance)
+    FIELD(m_rewards)
+  END_SERIALIZE()
+};
+
+block_reward_in_main_chain_basic::block_reward_in_main_chain_basic()
+{
+  REGISTER_CALLBACK_METHOD(block_reward_in_main_chain_basic, assert_balance);
+  REGISTER_CALLBACK_METHOD(block_reward_in_main_chain_basic, assert_reward);
+}
+
+bool block_reward_in_main_chain_basic::generate(std::vector<test_event_entry>& events) const
+{
+  // The test idea: make sure that receiving rewards for block insertion is counted correctly.
+
+  const auto assert_balance{[&events](const argument_assert& argument) -> void
+    {
+      DO_CALLBACK_PARAMS_STR(events, "assert_balance", t_serializable_object_to_blob(argument));
+    }
+  };
+
+  const auto assert_reward{[&events](const argument_assert& argument) -> void
+    {
+      DO_CALLBACK_PARAMS_STR(events, "assert_reward", t_serializable_object_to_blob(argument));
+    }
+  };
+
+  GENERATE_ACCOUNT(miner);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
+  argument_assert argument{this, get_block_height(blk_0)};
+
+  m_accounts.push_back(miner);
+  assert_reward(argument);
+  // Make sure the balance equals to the PREMINE_AMOUNT.
+  assert_balance(argument);
+  DO_CALLBACK(events, "configure_core");
+
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner);
+
+  argument = argument_assert{this, get_block_height(blk_1), {0}, argument};
+  assert_balance(argument);
+  assert_reward(argument);
+
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW - 1);
+
+  argument = argument_assert{this, get_block_height(blk_1r), std::list<uint64_t>(CURRENCY_MINED_MONEY_UNLOCK_WINDOW - 1), argument};
+  assert_balance(argument);
+  assert_reward(argument);
+
+  MAKE_TX_FEE(events, tx_0, miner, miner, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, blk_1r);
+  MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner, tx_0);
+
+  argument = {this, get_block_height(blk_2), {TESTS_DEFAULT_FEE}, argument};
+  assert_reward(argument);
+  // Make sure in the balance change in the case of a transaction with the default fee.
+  assert_balance(argument);
+
+  MAKE_TX_FEE(events, tx_1, miner, miner, MK_TEST_COINS(3), 2 * TESTS_DEFAULT_FEE, blk_2);
+  MAKE_TX_FEE(events, tx_2, miner, miner, MK_TEST_COINS(2), 3 * TESTS_DEFAULT_FEE, blk_2);
+
+  const std::list txs{tx_1, tx_2};
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_3, blk_2, miner, txs);
+
+  argument = argument_assert{this, get_block_height(blk_3), {(2 + 3) * TESTS_DEFAULT_FEE}, argument};
+  assert_reward(argument);
+  // A case of one inserted block with a several transactions with a non default fees.
+  assert_balance(argument);
+
+  MAKE_TX_FEE(events, tx_3, miner, miner, MK_TEST_COINS(1), COIN + TESTS_DEFAULT_FEE, blk_3);
+  MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner);
+
+  argument = argument_assert{this, get_block_height(blk_4), {COIN + TESTS_DEFAULT_FEE}, argument};
+  assert_reward(argument);
+  // A transaction inside blk_4 has a fee greater than a block reward. blk_4 includes only one transaction.
+  assert_balance(argument);
+
+  MAKE_TX_FEE(events, tx_4, miner, miner, MK_TEST_COINS(1), 76 * COIN + 14 * TESTS_DEFAULT_FEE, blk_4);
+  MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner);
+
+  argument = argument_assert{this, get_block_height(blk_5), {76 * COIN + 14 * TESTS_DEFAULT_FEE}, argument};
+  assert_reward(argument);
+  // A transaction inside blk_5 has a fee greater than a block reward. blk_5 includes only one transaction.
+  assert_balance(argument);
+
+  REWIND_BLOCKS_N(events, blk_5r, blk_5, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  argument = argument_assert{this, get_block_height(blk_5r), std::list<uint64_t>(CURRENCY_MINED_MONEY_UNLOCK_WINDOW), argument};
+  assert_reward(argument);
+  assert_balance(argument);
+
+  return true;
+}
+
+bool block_reward_in_main_chain_basic::assert_balance(currency::core& core, size_t event_index, const std::vector<test_event_entry>& events) const
+{
+  argument_assert argument{};
+
+  {
+    const auto serialized_argument{boost::get<callback_entry>(events.at(event_index)).callback_params};
+
+    CHECK_AND_ASSERT_EQ(t_unserializable_object_from_blob(argument, serialized_argument), true);
+  }
+
+  CHECK_AND_ASSERT_EQ(core.get_blockchain_storage().get_top_block_height(), argument.m_height);
+
+  const auto wallet{init_playtime_test_wallet(events, core, m_accounts.front())};
+
+  CHECK_AND_ASSERT(wallet, false);
+  wallet->refresh();
+  CHECK_AND_ASSERT_EQ(wallet->balance(), argument.m_balance);
+
+  return true;
+}
+
+bool block_reward_in_main_chain_basic::assert_reward(currency::core& core, size_t event_index, const std::vector<test_event_entry>& events) const
+{
+  argument_assert argument{};
+
+  {
+    const auto serialized_argument{boost::get<callback_entry>(events.at(event_index)).callback_params};
+
+    CHECK_AND_ASSERT_EQ(t_unserializable_object_from_blob(argument, serialized_argument), true);
+  }
+
+  for (const auto expected_reward : argument.m_rewards)
+  {
+    uint64_t reward{};
+
+    CHECK_AND_ASSERT_EQ(core.get_blockchain_storage().get_block_reward_by_main_chain_height(argument.m_height, reward), true);
+    CHECK_AND_ASSERT_EQ(reward, expected_reward);
+    --argument.m_height;
+  }
+
+  return true;
+}
+
+struct block_reward_in_alt_chain_basic::argument_assert
+{
+  uint64_t m_height{}, m_balance{};
+  crypto::hash blk_id{};
+  std::list<uint64_t> m_rewards{};
+
+  argument_assert() = default;
+
+  template<typename test>
+  argument_assert(const test* instance, const block& block, const std::list<uint64_t>& blk_tx_fees = {}, const argument_assert previous = {}) : blk_id{get_block_hash(block)}
+  {
+    CHECK_AND_ASSERT_THROW(instance, std::runtime_error{"Pointer to an instance of the test equals to the nullptr."});
+
+    auto height{get_block_height(block)};
+
+    m_height = height;
+
+    if (height == 0)
+    {
+      m_rewards.push_back(PREMINE_AMOUNT);
+      m_balance = m_rewards.back();
+      return;
+    }
+
+    m_balance = previous.m_balance;
+
+    for (auto fee_iterator{blk_tx_fees.rbegin()}; fee_iterator != blk_tx_fees.rend(); ++fee_iterator)
+    {
+      if (height != 0)
+      {
+        m_rewards.push_back(COIN);
+
+        if (const auto& fee{*fee_iterator}; fee <= m_rewards.back())
+        {
+          if (instance->m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, height))
+          {
+            m_rewards.back() -= fee;
+          }
+        }
+
+        m_balance += m_rewards.back();
+      }
+
+      else
+      {
+        m_balance += PREMINE_AMOUNT;
+      }
+
+      --height;
+    }
+
+    CHECK_AND_ASSERT_THROW(m_rewards.size() > 0, std::runtime_error{"A list of the rewards is empty."});
+  }
+
+  BEGIN_SERIALIZE()
+    FIELD(m_height)
+    FIELD(m_balance)
+    FIELD(m_rewards)
+    FIELD(blk_id)
+  END_SERIALIZE()
+};
+
+block_reward_in_alt_chain_basic::block_reward_in_alt_chain_basic()
+{
+  REGISTER_CALLBACK_METHOD(block_reward_in_alt_chain_basic, assert_balance);
+  REGISTER_CALLBACK_METHOD(block_reward_in_alt_chain_basic, assert_reward);
+}
+
+bool block_reward_in_alt_chain_basic::generate(std::vector<test_event_entry>& events) const
+{
+  // The test idea: make sure that receiving rewards for block insertion is counted correctly.
+
+  const auto assert_balance{[&events](const argument_assert& argument) -> void
+    {
+      DO_CALLBACK_PARAMS_STR(events, "assert_balance", t_serializable_object_to_blob(argument));
+    }
+  };
+
+  const auto assert_reward{[&events](const argument_assert& argument) -> void
+    {
+      DO_CALLBACK_PARAMS_STR(events, "assert_reward", t_serializable_object_to_blob(argument));
+    }
+  };
+
+  GENERATE_ACCOUNT(miner);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
+  argument_assert argument{this, blk_0}, argument_alt{};
+
+  /* 0
+     (blk_0) */
+
+  m_accounts.push_back(miner);
+  // Make sure a reward for the blk_0 equals to PREMINE_AMOUNT.
+  assert_reward(argument);
+  // Make sure the balance equals to the PREMINE_AMOUNT.
+  assert_balance(argument);
+  DO_CALLBACK(events, "configure_core");
+
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  /* 0               10
+     (blk_0) - ... - (blk_0r) */
+
+  // A case of a 10 sequentally inserted empty sblocks.
+  argument_alt = argument = argument_assert{this, blk_0r, std::list<uint64_t>(CURRENCY_MINED_MONEY_UNLOCK_WINDOW), argument};
+  // Miner inserted 10 empty blocks. A sum of the rewards for them equals to 10 coins.
+  assert_reward(argument);
+  // Make sure the balance equals to PREMINE_AMOUNT + 10 * COIN.
+  assert_balance(argument);
+
+  MAKE_TX_FEE(events, tx_0, miner, miner, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, blk_0r);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner, tx_0);
+
+  /* 0               10         11
+     (blk_0) - ... - (blk_0r) - (blk_1)
+                                 {tx_0} */
+
+  MAKE_TX_FEE(events, tx_1, miner, miner, MK_TEST_COINS(1), 33 * TESTS_DEFAULT_FEE, blk_0r);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1a, blk_0r, miner, tx_1);
+
+  /* 0               10         11
+     (blk_0) - ... - (blk_0r) - (blk_1a)
+                            |    {tx_1}
+                            |
+                            \   11
+                              - (blk_1)
+                                 {tx_0}
+
+  height(blk_1a) = height(blk_1)
+  fee(tx_1) > fee(tx_0). */
+
+  CHECK_AND_ASSERT_EQ(get_block_height(blk_1), get_block_height(blk_1a));
+
+  // Case of an alt block on the height 11 with greater total fee than total fee of blk_1 - the top of the main chain.
+  argument_alt = argument_assert{this, blk_1a, {33 * TESTS_DEFAULT_FEE}, argument_alt};
+  argument = argument_assert{this, blk_1, {TESTS_DEFAULT_FEE}, argument};
+
+  if (m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, get_block_height(blk_1)))
+  {
+    // Make sure that a reward for blk_1 equals to COIN.
+    assert_reward(argument_alt);
+    // Make sure that the balance equals to PREMINE_AMOUNT + 11 * COIN - 33 * TESTS_DEFAULT_FEE.
+    assert_balance(argument_alt);
+  }
+
+  else
+  {
+    // Make sure that a reward for blk_1a equals to COIN.
+    assert_reward(argument);
+    // Make sure that the balance equals to PREMINE_AMOUNT + 11 * COIN.
+    assert_balance(argument);
+  }
+
+  MAKE_TX_FEE(events, tx_2, miner, miner, MK_TEST_COINS(1), 8 * TESTS_DEFAULT_FEE, blk_1);
+  MAKE_TX_FEE(events, tx_3, miner, miner, MK_TEST_COINS(1), 57 * TESTS_DEFAULT_FEE, blk_1);
+  const std::list txs_0{tx_2, tx_3};
+
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1, miner, txs_0);
+
+  /* 0               10         11        12
+     (blk_0) - ... - (blk_0r) - (blk_1) - (blk_2)
+                            |    {tx_0}    {tx_2, tx_3}
+                            |
+                            \   11
+                              - (blk_1a)
+                                 {tx_1}
+
+  height(blk_2) > height(blk_1a). */
+
+  // A case of block on the height 12 in the main chain.
+  argument = argument_assert{this, blk_2, {(8 + 57) * TESTS_DEFAULT_FEE}, argument};
+  // A reward of blk_2 equals to coin.
+  assert_reward(argument);
+  /* HF3: The balance equals to PREMINE_AMOUNT + 12 * COIN.
+  HF4: The balance equals to PREMINE_AMOUNT + 12 * COIN - 65 * TESTS_DEFAULT_FEE. */
+  assert_balance(argument);
+
+  const auto& head_blk_for_txs_on_height_12{m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, get_block_height(blk_2)) ? blk_1a : blk_0r};
+  MAKE_TX_FEE(events, tx_4, miner, miner, MK_TEST_COINS(2), 15 * TESTS_DEFAULT_FEE, head_blk_for_txs_on_height_12);
+  MAKE_TX_FEE(events, tx_5, miner, miner, MK_TEST_COINS(5), 29 * TESTS_DEFAULT_FEE, head_blk_for_txs_on_height_12);
+  MAKE_TX_FEE(events, tx_6, miner, miner, MK_TEST_COINS(7), 22 * TESTS_DEFAULT_FEE, head_blk_for_txs_on_height_12);
+  const std::list txs_1{tx_4, tx_5, tx_6};
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_2a, blk_1a, miner, txs_1);
+
+  CHECK_AND_ASSERT_EQ(get_block_height(blk_2a), get_block_height(blk_2));
+
+  /* 0               10         11         12
+     (blk_0) - ... - (blk_0r) - (blk_1a) - (blk_2a)
+                            |    {tx_1}     {tx_4, tx_5, tx_6}
+                            |
+                            \   11        12
+                              - (blk_1) - (blk_2)
+                                 {tx_0}    {tx_2, tx_3}
+
+  height(blk_2a) = height(blk_2) = 12
+  fee(tx_2) + fee(tx_3) = (8 + 57) * TESTS_DEFAULT_FEE = 65 * TESTS_DEFAULT_FEE
+  fee(tx_4) + fee(tx_5) + fee(tx_6) = (15 + 29 + 22) * TESTS_DEFAULT_FEE = 66 * TESTS_DEFAULT_FEE
+  66 > 65. */
+
+  if (m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, get_block_height(blk_2)))
+  {
+    // Case of an alt block on the height 12 with greater total fee than total fee of blk_2 - the top of the main chain.
+    argument_alt = argument_assert{this, blk_2a, {(15 + 29 + 22) * TESTS_DEFAULT_FEE}, argument_alt};
+    // Make sure a reward for blk_2a is equals to COIN.
+    assert_reward(argument_alt);
+    // Make sure the balance equals to PREMINE_AMOUNT + 12 * COIN - 99 * TESTS_DEFAULT_FEE.
+    assert_balance(argument_alt);
+  }
+
+  else
+  {
+    // Make sure a reward for blk_2 is equals to COIN.
+    assert_reward(argument);
+    // Make sure the balance equals to PREMINE_AMOUNT + 12 * COIN.
+    assert_balance(argument);
+  }
+
+  return true;
+}
+
+bool block_reward_in_alt_chain_basic::assert_balance(currency::core& core, size_t event_index, const std::vector<test_event_entry>& events) const
+{
+  argument_assert argument{};
+
+  {
+    const auto serialized_argument{boost::get<callback_entry>(events.at(event_index)).callback_params};
+
+    CHECK_AND_ASSERT_EQ(t_unserializable_object_from_blob(argument, serialized_argument), true);
+  }
+
+  CHECK_AND_ASSERT_EQ(core.get_blockchain_storage().get_top_block_height(), argument.m_height);
+  CHECK_AND_ASSERT_EQ(core.get_blockchain_storage().get_top_block_id(), argument.blk_id);
+
+  const auto wallet{init_playtime_test_wallet(events, core, m_accounts.front())};
+
+  CHECK_AND_ASSERT(wallet, false);
+  wallet->refresh();
+  CHECK_AND_ASSERT_EQ(wallet->balance(), argument.m_balance);
+
+  return true;
+}
+
+bool block_reward_in_alt_chain_basic::assert_reward(currency::core& core, size_t event_index, const std::vector<test_event_entry>& events) const
+{
+  argument_assert argument{};
+
+  {
+    const auto serialized_argument{boost::get<callback_entry>(events.at(event_index)).callback_params};
+
+    CHECK_AND_ASSERT_EQ(t_unserializable_object_from_blob(argument, serialized_argument), true);
+  }
+
+  {
+    auto blk_id{argument.blk_id};
+
+    for (const auto expected_reward : argument.m_rewards)
+    {
+      uint64_t reward{};
+      block blk{};
+
+      CHECK_AND_ASSERT_EQ(core.get_blockchain_storage().get_block_reward_by_hash(blk_id, reward), true);
+      CHECK_AND_ASSERT_EQ(reward, expected_reward);
+      CHECK_AND_ASSERT_EQ(core.get_blockchain_storage().get_block_by_hash(blk_id, blk), true);
+      blk_id = blk.prev_id;
+    }
+  }
+
   return true;
 }

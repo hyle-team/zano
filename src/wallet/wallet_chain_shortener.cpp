@@ -217,7 +217,7 @@ void wallet_chain_shortener::check_if_block_matched(uint64_t i, const crypto::ha
     }
     return;
   }
-  if (!m_last_20_blocks.empty() && i > m_last_20_blocks.begin()->first)
+  if (!m_last_20_blocks.empty() && i >= m_last_20_blocks.begin()->first)
   {
     //must be in short sequence (m_last_20_blocks)
     //self check

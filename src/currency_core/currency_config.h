@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -10,7 +10,7 @@
 #ifndef TESTNET
 #define CURRENCY_FORMATION_VERSION                      84
 #else
-#define CURRENCY_FORMATION_VERSION                      99
+#define CURRENCY_FORMATION_VERSION                      100
 #endif
 
 #define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121) //bender's nightmare
@@ -28,10 +28,11 @@
 #define CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX 0x98c8 // auditable addresses start with 'aZx'
 #define CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX 0x8a49 // auditable integrated addresses start with 'aiZX'
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
-#define CURRENT_TRANSACTION_VERSION                     2
+#define CURRENT_TRANSACTION_VERSION                     3
 #define TRANSACTION_VERSION_INITAL                      0
 #define TRANSACTION_VERSION_PRE_HF4                     1
-#define TRANSACTION_VERSION_POST_HF4                    2 
+#define TRANSACTION_VERSION_POST_HF4                    2
+#define TRANSACTION_VERSION_POST_HF5                    3
 #define HF1_BLOCK_MAJOR_VERSION                         1
 #define HF3_BLOCK_MAJOR_VERSION                         2
 #define HF3_BLOCK_MINOR_VERSION                         0
@@ -278,9 +279,9 @@
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_04_AFTER_HEIGHT                   100
-#define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1712800000ull // block 100, 2024-00-00 00:00:00 UTC
+#define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1738659600ull // block 100, 2025-00-00 00:00:00 UTC
 #define ZANO_HARDFORK_05_AFTER_HEIGHT                   200
-#define ZANO_HARDFORK_05_MIN_BUILD_VER                  356
+#define ZANO_HARDFORK_05_MIN_BUILD_VER                  379
 #endif
 
 

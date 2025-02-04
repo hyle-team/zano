@@ -45,9 +45,11 @@ namespace currency
     bool on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res, connection_context& cntx);
     bool on_get_transactions(const COMMAND_RPC_GET_TRANSACTIONS::request& req, COMMAND_RPC_GET_TRANSACTIONS::response& res, connection_context& cntx);
     bool on_get_indexes(const COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request& req, COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::response& res, connection_context& cntx);
-    bool on_send_raw_tx(const COMMAND_RPC_SEND_RAW_TX::request& req, COMMAND_RPC_SEND_RAW_TX::response& res, connection_context& cntx);		
+    bool on_send_raw_tx(const COMMAND_RPC_SEND_RAW_TX::request& req, COMMAND_RPC_SEND_RAW_TX::response& res, connection_context& cntx);
+#ifdef CPU_MINING_ENABLED
     bool on_start_mining(const COMMAND_RPC_START_MINING::request& req, COMMAND_RPC_START_MINING::response& res, connection_context& cntx);
     bool on_stop_mining(const COMMAND_RPC_STOP_MINING::request& req, COMMAND_RPC_STOP_MINING::response& res, connection_context& cntx);
+#endif
     bool on_get_random_outs(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY::response& res, connection_context& cntx);
     bool on_get_random_outs1(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res, connection_context& cntx);
     bool on_get_random_outs3(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& res, connection_context& cntx);
@@ -56,7 +58,7 @@ namespace currency
     bool on_get_tx_pool(const COMMAND_RPC_GET_TX_POOL::request& req, COMMAND_RPC_GET_TX_POOL::response& res, connection_context& cntx);
     bool on_check_keyimages(const COMMAND_RPC_CHECK_KEYIMAGES::request& req, COMMAND_RPC_CHECK_KEYIMAGES::response& res, connection_context& cntx);
     bool on_rpc_get_blocks_details(const COMMAND_RPC_GET_BLOCKS_DETAILS::request& req, COMMAND_RPC_GET_BLOCKS_DETAILS::response& res, connection_context& cntx);
-		bool on_force_relaey_raw_txs(const COMMAND_RPC_FORCE_RELAY_RAW_TXS::request& req, COMMAND_RPC_FORCE_RELAY_RAW_TXS::response& res, connection_context& cntx);
+    bool on_force_relaey_raw_txs(const COMMAND_RPC_FORCE_RELAY_RAW_TXS::request& req, COMMAND_RPC_FORCE_RELAY_RAW_TXS::response& res, connection_context& cntx);
     bool on_get_offers_ex(const COMMAND_RPC_GET_OFFERS_EX::request& req, COMMAND_RPC_GET_OFFERS_EX::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     
 
@@ -107,9 +109,11 @@ namespace currency
       MAP_URI_AUTO_JON2("/getheight",                 on_get_height,                  COMMAND_RPC_GET_HEIGHT)
       MAP_URI_AUTO_JON2("/gettransactions",           on_get_transactions,            COMMAND_RPC_GET_TRANSACTIONS)
       MAP_URI_AUTO_JON2("/sendrawtransaction",        on_send_raw_tx,                 COMMAND_RPC_SEND_RAW_TX)
-			MAP_URI_AUTO_JON2("/force_relay",               on_force_relaey_raw_txs,        COMMAND_RPC_FORCE_RELAY_RAW_TXS)
+      MAP_URI_AUTO_JON2("/force_relay",               on_force_relaey_raw_txs,        COMMAND_RPC_FORCE_RELAY_RAW_TXS)
+#ifdef CPU_MINING_ENABLED
       MAP_URI_AUTO_JON2("/start_mining",              on_start_mining,                COMMAND_RPC_START_MINING)
       MAP_URI_AUTO_JON2("/stop_mining",               on_stop_mining,                 COMMAND_RPC_STOP_MINING)
+#endif
       MAP_URI_AUTO_JON2("/getinfo",                   on_get_info,                    COMMAND_RPC_GET_INFO)
       // binary RPCs
       MAP_URI_AUTO_BIN2("/getblocks.bin",             on_get_blocks,                  COMMAND_RPC_GET_BLOCKS_FAST)
@@ -182,7 +186,7 @@ namespace currency
     bool check_core_ready_(const std::string& calling_method);
 
     //utils
-    uint64_t get_block_reward(const block& blk);
+    uint64_t get_block_reward(const block& blk, const crypto::hash& h);
     bool fill_block_header_response(const block& blk, bool orphan_status, block_header_response& response);
     void set_session_blob(const std::string& session_id, const currency::block& blob);
     bool get_session_blob(const std::string& session_id, currency::block& blob);

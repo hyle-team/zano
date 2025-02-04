@@ -98,8 +98,9 @@ bool random_outs_and_burnt_coins::generate(std::vector<test_event_entry>& events
   r = fill_tx_sources(sources, events, blk_0r, miner_acc.get_keys(), m_amount * m_fake_amounts_count + TESTS_DEFAULT_FEE, 0);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
 
-  transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0);
+  transaction tx_0{};
+  size_t tx_hardfork_id{};
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id), tx_hardfork_id, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   uint64_t burned_tx_amount_total = get_burned_amount(tx_0);
