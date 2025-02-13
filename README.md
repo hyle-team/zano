@@ -105,7 +105,7 @@ For instance, by adding the following lines to `~/.bashrc`
    1. If you skipped step 6 and did not set the environment variables:
 
           cd zano && mkdir build && cd build
-          BOOST_ROOT=$HOME/boost_1_70_0 OPENSSL_ROOT_DIR=$HOME/openssl cmake ..
+          BOOST_ROOT=$HOME/boost_1_84_0 OPENSSL_ROOT_DIR=$HOME/openssl cmake ..
           make -j1 daemon simplewallet
 
    2. If you set the variables in step 6:
