@@ -36,11 +36,11 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
 
    [*server version*]
    
-       sudo apt-get install -y build-essential g++ curl autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev
+       sudo apt-get install -y build-essential g++ curl autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev libssl-dev bzip2
           
    [*GUI version*]
 
-       sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev mesa-common-dev libglu1-mesa-dev
+       sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev libssl-dev bzip2 mesa-common-dev libglu1-mesa-dev
 
 2. Clone Zano into a local folder\
    (If for some reason you need to use alternative Zano branch, change 'master' to the required branch name.)
