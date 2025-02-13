@@ -19,7 +19,7 @@ Be sure to clone the repository properly:\
 | [XCode](https://developer.apple.com/downloads/) (macOS) | 12.3 | 14.3 | 15.2 |
 | [CMake](https://cmake.org/download/) | 3.15.5 | 3.26.3 | 3.29.0 |
 | [Boost](https://www.boost.org/users/download/) | 1.75 | 1.84 | 1.84 |
-| [OpenSSL](https://www.openssl.org/source/) [(win)](https://slproweb.com/products/Win32OpenSSL.html) | 1.1.1n | 1.1.1w | 3.4 | 
+| [OpenSSL](https://www.openssl.org/source/) [(win)](https://slproweb.com/products/Win32OpenSSL.html) | 1.1.1n | 1.1.1w | 3.4 |
 | [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.15.2 | 5.15.2 |
 
 Note:\
@@ -35,19 +35,19 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
 1. Prerequisites
 
    [*server version*]
-   
+
        sudo apt-get install -y build-essential g++ curl autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev
-          
+
    [*GUI version*]
 
        sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev mesa-common-dev libglu1-mesa-dev
 
 2. Clone Zano into a local folder\
    (If for some reason you need to use alternative Zano branch, change 'master' to the required branch name.)
-   
+
        git clone --recursive https://github.com/hyle-team/zano.git -b master
 
-   In the following steps we assume that you cloned Zano into '~/zano' folder in your home directory. 
+   In the following steps we assume that you cloned Zano into '~/zano' folder in your home directory.
 
 3. Download and build Boost\
     (Assuming you have cloned Zano into the 'zano' folder. If you used a different location for Zano, **edit line 4** accordingly.)
@@ -76,7 +76,7 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
    (Assuming that `$HOME` environment variable is set to your home directory. Otherwise, edit line 4 accordingly.)
 
        curl -OL https://www.openssl.org/source/openssl-1.1.1w.tar.gz
-       echo "cf3098950cb4d853ad95c0841f1f9c6d3dc102dccfcacd521d93925208b76ac8  openssl-1.1.1w.tar.gz" | shasum -c && tar xaf openssl-1.1.1w.tar.gz 
+       echo "cf3098950cb4d853ad95c0841f1f9c6d3dc102dccfcacd521d93925208b76ac8  openssl-1.1.1w.tar.gz" | shasum -c && tar xaf openssl-1.1.1w.tar.gz
        cd openssl-1.1.1w/
        ./config --prefix=$HOME/openssl --openssldir=$HOME/openssl shared zlib
        make && make test && make install && cd ..
@@ -87,25 +87,25 @@ For instance, by adding the following lines to `~/.bashrc`
 
     [*server version*]
 
-       export BOOST_ROOT=/home/user/boost_1_84_0  
+       export BOOST_ROOT=/home/user/boost_1_84_0
        export OPENSSL_ROOT_DIR=/home/user/openssl
 
 
     [*GUI version*]
 
        export BOOST_ROOT=/home/user/boost_1_84_0
-       export OPENSSL_ROOT_DIR=/home/user/openssl  
+       export OPENSSL_ROOT_DIR=/home/user/openssl
        export QT_PREFIX_PATH=/home/user/Qt5.11.2/5.11.2/gcc_64
 
       **NOTICE: Please edit the lines above according to your actual paths.**
-   
+
       **NOTICE 2:** Make sure you've restarted your terminal session (by reopening the terminal window or reconnecting the server) to apply these changes.
 
 8. Build the binaries
    1. If you skipped step 6 and did not set the environment variables:
 
           cd zano && mkdir build && cd build
-          BOOST_ROOT=$HOME/boost_1_70_0 OPENSSL_ROOT_DIR=$HOME/openssl cmake ..
+          BOOST_ROOT=$HOME/boost_1_84_0 OPENSSL_ROOT_DIR=$HOME/openssl cmake ..
           make -j1 daemon simplewallet
 
    2. If you set the variables in step 6:
@@ -117,11 +117,11 @@ For instance, by adding the following lines to `~/.bashrc`
       or simply:
 
           cd zano && make -j1
-   
+
       **NOTICE**: If you are building on a machine with a relatively high amount of RAM or with the proper setting of virtual memory, then you can use `-j2` or `-j` option to speed up the building process. Use with caution.
-      
+
       **NOTICE 2**: If you'd like to build binaries for the testnet, use `cmake -D TESTNET=TRUE ..` instead of `cmake ..` .
-   
+
    1. Build GUI:
 
           cd zano
@@ -141,7 +141,7 @@ Recommended OS version: Windows 7 x64, Windows 11 x64.
 
 In order to correctly deploy Qt GUI application, you also need to do the following:
 
-6. Copy Zano.exe to a folder (e.g. `depoy`). 
+6. Copy Zano.exe to a folder (e.g. `depoy`).
 7. Run  `PATH_TO_QT\bin\windeployqt.exe deploy\Zano.exe`.
 8. Copy folder `\src\gui\qt-daemon\html` to `deploy\html`.
 9. Now you can run `Zano.exe`
@@ -178,4 +178,3 @@ BTC bc1qpa8w8eaehlplfepmnzpd7v9j046899nktxnkxp<br />
 BCH qqgq078vww5exd9kt3frx6krdyznmp80hcygzlgqzd<br />
 ETH 0x206c52b78141498e74FF074301ea90888C40c178<br />
 XMR 45gp9WTobeB5Km3kLQgVmPJkvm9rSmg4gdyHheXqXijXYMjUY48kLgL7QEz5Ar8z9vQioQ68WYDKsQsjAEonSeFX4UeLSiX<br />
-
