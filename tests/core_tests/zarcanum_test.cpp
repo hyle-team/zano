@@ -55,14 +55,14 @@ bool invalidate_zarcanum_sig(size_t n, zarcanum_sig& sig)
 }
 
 bool make_next_pos_block(test_generator& generator, std::vector<test_event_entry>& events, const block& prev_block, const account_base& stake_acc,
-  uint64_t amount_to_find, size_t nmix, const std::vector<transaction>& transactions, block& result)
+  uint64_t amount_to_find, size_t nmix, const std::vector<transaction>& transactions, uint64_t fts_flags, block& result)
 {
   bool r = false;
   std::vector<tx_source_entry> sources;
 
   size_t height = get_block_height(prev_block) + 1;
   crypto::hash prev_id = get_block_hash(prev_block);
-  r = fill_tx_sources(sources, events, prev_block, stake_acc.get_keys(), amount_to_find, nmix, true, true, false);
+  r = fill_tx_sources(sources, events, prev_block, stake_acc.get_keys(), amount_to_find, nmix, std::vector<tx_source_entry>{}, fts_flags);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   CHECK_AND_ASSERT_MES(shuffle_source_entries(sources), false, "");
   auto it = std::max_element(sources.begin(), sources.end(), [&](const tx_source_entry& lhs, const tx_source_entry& rhs){ return lhs.amount < rhs.amount; });
@@ -439,7 +439,7 @@ bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) co
   for(size_t i = 1; ; ++i)
   {
     block blk_1_pos_bad;
-    CHECK_AND_ASSERT_MES(make_next_pos_block(generator, events, blk_1r, miner_acc, COIN, 10, std::vector<transaction>(), blk_1_pos_bad), false, "");
+    CHECK_AND_ASSERT_MES(make_next_pos_block(generator, events, blk_1r, miner_acc, COIN, 10, std::vector<transaction>(), fts_default, blk_1_pos_bad), false, "");
     LOG_PRINT_CYAN("i = " << i, LOG_LEVEL_0);
     if (!invalidate_zarcanum_sig(i, boost::get<zarcanum_sig>(blk_1_pos_bad.miner_tx.signatures[0])))
       break;
