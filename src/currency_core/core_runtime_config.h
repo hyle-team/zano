@@ -107,6 +107,7 @@ namespace currency
     core_time_func_t get_core_time;
     uint64_t hf4_minimum_mixins;
     wide_difficulty_type max_pos_difficulty;
+    uint64_t pre_hardfork_tx_freeze_period; // number of blocks before the hardfork activatio when no new txs are accepted (effective from HF5); 0 means feature is switched off
 
     hard_forks_descriptor hard_forks;
     std::array<int, ZANO_HARDFORKS_TOTAL> min_build_numbers_for_hard_forks;
@@ -137,6 +138,7 @@ namespace currency
     pc.max_alt_blocks = CURRENCY_ALT_BLOCK_MAX_COUNT;
     pc.hf4_minimum_mixins = CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE;
     pc.max_pos_difficulty = wide_difficulty_type(POS_MAX_DIFFICULTY_ALLOWED);
+    pc.pre_hardfork_tx_freeze_period = CURRENCY_PRE_HARDFORK_TX_FREEZE_PERIOD;
     
     // TODO: refactor the following
     pc.hard_forks.set_hardfork_height(1, ZANO_HARDFORK_01_AFTER_HEIGHT);
@@ -144,7 +146,8 @@ namespace currency
     pc.hard_forks.set_hardfork_height(3, ZANO_HARDFORK_03_AFTER_HEIGHT);
     pc.hard_forks.set_hardfork_height(4, ZANO_HARDFORK_04_AFTER_HEIGHT);
     pc.hard_forks.set_hardfork_height(5, ZANO_HARDFORK_05_AFTER_HEIGHT); pc.min_build_numbers_for_hard_forks[5] = ZANO_HARDFORK_05_MIN_BUILD_VER;
-    static_assert(5 + 1 == ZANO_HARDFORKS_TOTAL);
+    pc.hard_forks.set_hardfork_height(6, ZANO_HARDFORK_06_AFTER_HEIGHT); pc.min_build_numbers_for_hard_forks[6] = ZANO_HARDFORK_06_MIN_BUILD_VER;
+    static_assert(6 + 1 == ZANO_HARDFORKS_TOTAL);
 
     pc.get_core_time = &core_runtime_config::_default_core_time_function;
     bool r = epee::string_tools::hex_to_pod(ALIAS_SHORT_NAMES_VALIDATION_PUB_KEY, pc.alias_validation_pubkey);

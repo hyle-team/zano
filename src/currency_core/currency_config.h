@@ -41,6 +41,7 @@
 #define CURRENCY_DEFAULT_DECOY_SET_SIZE                 10
 #define CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE           15
 #define CURRENCY_HF4_MANDATORY_MIN_COINAGE              10
+#define CURRENCY_PRE_HARDFORK_TX_FREEZE_PERIOD          60 // number of blocks before the hardfork activation when no new txs are accepted (effective from HF5)
 
 #define CURRENT_BLOCK_MINOR_VERSION                     0
 #define CURRENCY_BLOCK_FUTURE_TIME_LIMIT                60*60*2
@@ -269,19 +270,29 @@
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   194624    // 2019-09-21 20:25:16
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   999999    // 2021-04-05 09:11:45
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   1082577   // 2021-06-01 23:28:10
+
 #define ZANO_HARDFORK_04_AFTER_HEIGHT                   2555000   // 2024-03-21 11:49:55
 #define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1711021795ull // block 2555000, 2024-03-21 11:49:55 UTC
+
 #define ZANO_HARDFORK_05_AFTER_HEIGHT                   999999999999999999  
-#define ZANO_HARDFORK_05_MIN_BUILD_VER                  354
+#define ZANO_HARDFORK_05_MIN_BUILD_VER                  380
+
+#define ZANO_HARDFORK_06_AFTER_HEIGHT                   999999999999999999  
+#define ZANO_HARDFORK_06_MIN_BUILD_VER                  380
 #else
 // Testnet
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   0
+
 #define ZANO_HARDFORK_04_AFTER_HEIGHT                   100
 #define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1738659600ull // block 100, 2025-00-00 00:00:00 UTC
+
 #define ZANO_HARDFORK_05_AFTER_HEIGHT                   200
 #define ZANO_HARDFORK_05_MIN_BUILD_VER                  379
+
+#define ZANO_HARDFORK_06_AFTER_HEIGHT                   999999999999999999
+#define ZANO_HARDFORK_06_MIN_BUILD_VER                  379
 #endif
 
 
@@ -291,7 +302,8 @@
 #define ZANO_HARDFORK_03                                3
 #define ZANO_HARDFORK_04_ZARCANUM                       4
 #define ZANO_HARDFORK_05                                5
-#define ZANO_HARDFORKS_TOTAL                            6
+#define ZANO_HARDFORK_06                                6
+#define ZANO_HARDFORKS_TOTAL                            7
 
 
 
