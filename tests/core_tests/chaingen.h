@@ -729,12 +729,28 @@ bool construct_tx(const currency::account_keys& sender_account_keys,
 
 void get_confirmed_txs(const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, map_hash2tx_t& confirmed_txs);
 bool find_block_chain(const std::vector<test_event_entry>& events, std::vector<currency::block>& blockchain, map_hash2tx_t& mtx, const crypto::hash& head);
+
+enum fill_tx_sources_flag_t
+{
+  fts_none                      = 0,
+  fts_check_for_spends          = 1 << 0,
+  fts_check_for_unlocktime      = 1 << 1,
+  fts_use_ref_by_id             = 1 << 2,
+  fts_check_for_hf4_min_coinage = 1 << 3,
+  // keep the following line at the end
+  fts_default                   = (fts_check_for_spends | fts_check_for_unlocktime | fts_check_for_hf4_min_coinage)
+};
+
 bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
                      const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix, bool check_for_spends = true, bool check_for_unlocktime = true, bool use_ref_by_id = false);
 bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
                      const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix,
                      const std::vector<currency::tx_source_entry>& sources_to_avoid, bool check_for_spends = true, bool check_for_unlocktime = true,
                      bool use_ref_by_id = false, uint64_t* p_sources_amount_found = nullptr);
+bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
+                     const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix, const std::vector<currency::tx_source_entry>& sources_to_avoid,
+                     uint64_t fts_flags, uint64_t* p_sources_amount_found = nullptr);
+
 bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& events, const currency::block& blk_head,
                                       const currency::account_keys& from, const std::list<currency::account_public_address>& to,
                                       uint64_t amount, uint64_t fee, size_t nmix, std::vector<currency::tx_source_entry>& sources,
