@@ -107,6 +107,7 @@ namespace currency
      void resume_mine();
      blockchain_storage& get_blockchain_storage() { return m_blockchain_storage; }
      const blockchain_storage& get_blockchain_storage() const { return m_blockchain_storage; }
+     const core_runtime_config& get_runtime_config() const { return m_blockchain_storage.get_core_runtime_config(); }
      //debug functions
      void print_blockchain(uint64_t start_index, uint64_t end_index);
      void print_blockchain_index();

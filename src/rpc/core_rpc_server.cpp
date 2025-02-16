@@ -22,16 +22,16 @@ namespace currency
 {
   namespace
   {
-    const command_line::arg_descriptor<std::string> arg_rpc_bind_ip    ("rpc-bind-ip", "", "127.0.0.1");
-    const command_line::arg_descriptor<std::string> arg_rpc_bind_port  ("rpc-bind-port", "", std::to_string(RPC_DEFAULT_PORT));
-    const command_line::arg_descriptor<bool> arg_rpc_ignore_status     ("rpc-ignore-offline", "Let rpc calls despite online/offline status");
+    const command_line::arg_descriptor<std::string> arg_rpc_bind_ip         ("rpc-bind-ip",         "", "127.0.0.1");
+    const command_line::arg_descriptor<std::string> arg_rpc_bind_port       ("rpc-bind-port",       "", std::to_string(RPC_DEFAULT_PORT));
+    const command_line::arg_descriptor<bool> arg_rpc_ignore_offline_status  ("rpc-ignore-offline",  "Let rpc calls despite online/offline status");
   }
   //-----------------------------------------------------------------------------------
   void core_rpc_server::init_options(boost::program_options::options_description& desc)
   {
     command_line::add_arg(desc, arg_rpc_bind_ip);
     command_line::add_arg(desc, arg_rpc_bind_port);
-    command_line::add_arg(desc, arg_rpc_ignore_status);
+    command_line::add_arg(desc, arg_rpc_ignore_offline_status);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   core_rpc_server::core_rpc_server(core& cr, nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >& p2p,
@@ -39,16 +39,16 @@ namespace currency
     : m_core(cr)
     , m_p2p(p2p)
     , m_of(of)
-    , m_ignore_status(false)
+    , m_ignore_offline_status(false)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::handle_command_line(const boost::program_options::variables_map& vm)
   {
     m_bind_ip = command_line::get_arg(vm, arg_rpc_bind_ip);
     m_port = command_line::get_arg(vm, arg_rpc_bind_port);
-    if (command_line::has_arg(vm, arg_rpc_ignore_status))
+    if (command_line::has_arg(vm, arg_rpc_ignore_offline_status))
     {
-      m_ignore_status = command_line::get_arg(vm, arg_rpc_ignore_status);
+      m_ignore_offline_status = command_line::get_arg(vm, arg_rpc_ignore_offline_status);
     }
     return true;
   }
@@ -64,7 +64,7 @@ namespace currency
   bool core_rpc_server::check_core_ready_(const std::string& calling_method)
   {
 #ifndef TESTNET
-    if (m_ignore_status)
+    if (m_ignore_offline_status)
       return true;
     if(!m_p2p.get_payload_object().is_synchronized())
     {
@@ -576,7 +576,7 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_pos_mining_details(const COMMAND_RPC_GET_POS_MINING_DETAILS::request& req, COMMAND_RPC_GET_POS_MINING_DETAILS::response& res, connection_context& cntx)
   {
-    if (!m_ignore_status && !m_p2p.get_connections_count())
+    if (!m_ignore_offline_status && !m_p2p.get_connections_count())
     {
       res.status = API_RETURN_CODE_DISCONNECTED;
       return true;
@@ -862,10 +862,17 @@ namespace currency
       return true;
     }
 
-    if (!m_ignore_status && !m_p2p.get_payload_object().get_synchronized_connections_count())
+    if (!m_ignore_offline_status && !m_p2p.get_payload_object().get_synchronized_connections_count())
     {
       LOG_PRINT_L0("[on_send_raw_tx]: Failed to send, daemon not connected to net");
       res.status = API_RETURN_CODE_DISCONNECTED;
+      return true;
+    }
+
+    if (m_p2p.get_payload_object().get_core().get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active())
+    {
+      LOG_PRINT_L0("[on_send_raw_tx]: pre hardfork freeze period is in effect, sending transactions is not allowed till the next hardfork. Please, try again after the hardfork activation.");
+      res.status = API_RETURN_CODE_BUSY;
       return true;
     }
 

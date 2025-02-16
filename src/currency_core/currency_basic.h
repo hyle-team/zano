@@ -769,7 +769,7 @@ namespace currency
       KV_SERIALIZE(decimal_point)     DOC_DSCR("Decimal point.")                      DOC_EXMP(12)                        DOC_END
       KV_SERIALIZE(ticker)            DOC_DSCR("Ticker associated with the asset.")   DOC_EXMP("ZABC")                    DOC_END
       KV_SERIALIZE(full_name)         DOC_DSCR("Full name of the asset.")             DOC_EXMP("Zano wrapped ABC")        DOC_END
-      KV_SERIALIZE(meta_info)         DOC_DSCR("Any other information associated with the asset in free form.")           DOC_EXMP("Stable and private")      DOC_END
+      KV_SERIALIZE(meta_info)         DOC_DSCR("Any other information associated with the asset, by default in a json format.")           DOC_EXMP("{ \"logo_url\": \"https://some.nice.logo.png\"}")      DOC_END
       KV_SERIALIZE_POD_AS_HEX_STRING(owner) DOC_DSCR("Owner's key, used only for EMIT and UPDATE validation, can be changed by transferring asset ownership.")   DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8")        DOC_END
       KV_SERIALIZE(hidden_supply)     DOC_DSCR("This field is reserved for future use and will be documented later.") DOC_END
       KV_SERIALIZE_POD_AS_HEX_STRING(owner_eth_pub_key) DOC_DSCR("[Optional] Owner's key in the case when ETH signature is used.") DOC_END

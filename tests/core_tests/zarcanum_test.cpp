@@ -55,14 +55,14 @@ bool invalidate_zarcanum_sig(size_t n, zarcanum_sig& sig)
 }
 
 bool make_next_pos_block(test_generator& generator, std::vector<test_event_entry>& events, const block& prev_block, const account_base& stake_acc,
-  uint64_t amount_to_find, size_t nmix, const std::vector<transaction>& transactions, block& result)
+  uint64_t amount_to_find, size_t nmix, const std::vector<transaction>& transactions, uint64_t fts_flags, block& result)
 {
   bool r = false;
   std::vector<tx_source_entry> sources;
 
   size_t height = get_block_height(prev_block) + 1;
   crypto::hash prev_id = get_block_hash(prev_block);
-  r = fill_tx_sources(sources, events, prev_block, stake_acc.get_keys(), amount_to_find, nmix, true, true, false);
+  r = fill_tx_sources(sources, events, prev_block, stake_acc.get_keys(), amount_to_find, nmix, std::vector<tx_source_entry>{}, fts_flags);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   CHECK_AND_ASSERT_MES(shuffle_source_entries(sources), false, "");
   auto it = std::max_element(sources.begin(), sources.end(), [&](const tx_source_entry& lhs, const tx_source_entry& rhs){ return lhs.amount < rhs.amount; });
@@ -439,7 +439,7 @@ bool zarcanum_pos_block_math::generate(std::vector<test_event_entry>& events) co
   for(size_t i = 1; ; ++i)
   {
     block blk_1_pos_bad;
-    CHECK_AND_ASSERT_MES(make_next_pos_block(generator, events, blk_1r, miner_acc, COIN, 10, std::vector<transaction>(), blk_1_pos_bad), false, "");
+    CHECK_AND_ASSERT_MES(make_next_pos_block(generator, events, blk_1r, miner_acc, COIN, 10, std::vector<transaction>(), fts_default, blk_1_pos_bad), false, "");
     LOG_PRINT_CYAN("i = " << i, LOG_LEVEL_0);
     if (!invalidate_zarcanum_sig(i, boost::get<zarcanum_sig>(blk_1_pos_bad.miner_tx.signatures[0])))
       break;
@@ -824,6 +824,190 @@ bool zarcanum_block_with_txs::generate(std::vector<test_event_entry>& events) co
 }
 
 bool zarcanum_block_with_txs::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+zarcanum_in_alt_chain_2::zarcanum_in_alt_chain_2()
+{
+  REGISTER_CALLBACK_METHOD(zarcanum_in_alt_chain_2, c1);
+  REGISTER_CALLBACK_METHOD(zarcanum_in_alt_chain_2, configure_core);
+}
+
+bool zarcanum_in_alt_chain_2::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  if (!wallet_test::configure_core(c, ev_index, events))
+    return false;
+
+  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
+  pc.min_coinstake_age = POS_MINIMUM_COINSTAKE_AGE; // note using main chain setting here
+  c.get_blockchain_storage().set_core_runtime_config(pc);
+
+  return true;
+}
+
+bool zarcanum_in_alt_chain_2::generate(std::vector<test_event_entry>& events) const
+{
+  //
+  // Test idea:
+  // (test is intended to be used for >= HF4)
+  // 
+
+  // if any of the following constants changed in future this test sould be carefully reviewed
+  static_assert(CURRENCY_HF4_MANDATORY_MIN_COINAGE == 10);
+  static_assert(POS_MINIMUM_COINSTAKE_AGE == 10);
+  static_assert(CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10);
+
+  bool r = false;
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc =   m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+  account_base& carol_acc = m_accounts[CAROL_ACC_IDX]; carol_acc.generate(); carol_acc.set_createtime(ts);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // this test requires at least HF4
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_04_ZARCANUM));
+
+  // transfer some coins to Alice, Bob and Carol in a single tx
+  std::vector<tx_destination_entry> destinations;
+  destinations.emplace_back(MK_TEST_COINS(99), alice_acc.get_public_address());
+  destinations.emplace_back(MK_TEST_COINS(98), bob_acc.get_public_address());
+  destinations.emplace_back(MK_TEST_COINS(97), carol_acc.get_public_address());
+  transaction tx_0{};
+  r = construct_tx_to_key(m_hardforks, events, tx_0, blk_0r, miner_acc, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  ADD_CUSTOM_EVENT(events, tx_0);
+
+  // create blk_1 (height 11), note that all stake sources originate from this block
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+
+  //std::list<currency::account_base> alice_stake_sources({ alice_acc });
+
+  //
+  // main chain checks
+  //
+
+  // rewind 8 blocks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, 8);
+
+  {
+    // PoS block at height 20 cannot use stake output from block 11 (20 - 11 = 9, 9 < 10)
+    block blk_2_pos_bad{};
+    CHECK_AND_ASSERT_MES(make_next_pos_block(generator, events, blk_1r, alice_acc, MK_TEST_COINS(1), 0, std::vector<transaction>{}, fts_none, blk_2_pos_bad), false, "");
+    generator.add_block_info(blk_2_pos_bad, std::list<transaction>{});
+    DO_CALLBACK(events, "mark_invalid_block");
+    ADD_CUSTOM_EVENT(events, blk_2_pos_bad);
+  }
+
+  // rewind 1 block
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1r, miner_acc);
+
+  // PoS block at height 21 CAN use stake output from block 11 (21 - 11 = 10)
+  block blk_3{};
+  CHECK_AND_ASSERT_MES(make_next_pos_block(generator, events, blk_2, alice_acc, MK_TEST_COINS(1), 0, std::vector<transaction>{}, fts_none, blk_3), false, "");
+  generator.add_block_info(blk_3, std::list<transaction>{});
+  ADD_CUSTOM_EVENT(events, blk_3);
+
+  // PoS block at height 22 CAN use stake output from block 11 (22 - 11 = 11)
+  // note using Bob account for staking
+  block blk_4{};
+  CHECK_AND_ASSERT_MES(make_next_pos_block(generator, events, blk_3, bob_acc, MK_TEST_COINS(1), 0, std::vector<transaction>{}, fts_none, blk_4), false, "");
+  generator.add_block_info(blk_4, std::list<transaction>{});
+  ADD_CUSTOM_EVENT(events, blk_4);
+
+
+  //
+  // alt chain checks
+  //
+
+  // make an alt chain
+  MAKE_NEXT_BLOCK(events, blk_2a, blk_1r, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_3a, blk_2a, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_4a, blk_3a, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_5a, blk_4a, miner_acc);
+  // this altchain should win and previous PoS block are now in alt chain
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block{blk_5a});
+
+  {
+    // alt PoS block at height 20 cannot use stake output from block 11 (20 - 11 = 9, 9 < 10)
+    // note using carol_acc
+    block blk_2a_pos_bad{};
+    CHECK_AND_ASSERT_MES(make_next_pos_block(generator, events, blk_1r, carol_acc, MK_TEST_COINS(1), 0, std::vector<transaction>{}, fts_none, blk_2a_pos_bad), false, "");
+    generator.add_block_info(blk_2a_pos_bad, std::list<transaction>{});
+    DO_CALLBACK(events, "mark_invalid_block");
+    ADD_CUSTOM_EVENT(events, blk_2a_pos_bad);
+  }
+
+  // rewind 1 block
+  MAKE_NEXT_BLOCK(events, blk_2b, blk_1r, miner_acc);
+
+  // alt PoS block at height 21 CAN use stake output from block 11 (21 - 11 = 10)
+  block blk_3b{};
+  CHECK_AND_ASSERT_MES(make_next_pos_block(generator, events, blk_2b, carol_acc, MK_TEST_COINS(1), 0, std::vector<transaction>{}, fts_none, blk_3b), false, "");
+  generator.add_block_info(blk_3b, std::list<transaction>{});
+  ADD_CUSTOM_EVENT(events, blk_3b);
+
+  // alt PoS block at height 22 CAN use stake output from block 11 (22 - 11 = 11)
+  // note using Bob account for staking
+  block blk_4b{};
+  CHECK_AND_ASSERT_MES(make_next_pos_block(generator, events, blk_3b, bob_acc, MK_TEST_COINS(1), 0, std::vector<transaction>{}, fts_none, blk_4b), false, "");
+  generator.add_block_info(blk_4b, std::list<transaction>{});
+  ADD_CUSTOM_EVENT(events, blk_4b);
+
+
+  // make sure the chain switching did not occured
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block{blk_5a});
+
+
+  // in 10th block we can stake the output
+  //MAKE_NEXT_POS_BLOCK(events, blk_2, blk_1r, alice_acc, alice_stake_sources);
+
+  //DO_CALLBACK_PARAMS(events, "check_hardfork_inactive", static_cast<size_t>(ZANO_HARDFORK_04_ZARCANUM));
+  //MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
+  //DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_04_ZARCANUM));
+
+  //uint64_t bob_amount = COIN * 100;
+  //MAKE_TX(events, tx_1, miner_acc, bob_acc, bob_amount, blk_3);
+  ////make another tx just to create more decoys to fit hf4 rules of 16 decoys
+  //account_base carol_acc; carol_acc.generate();
+  //MAKE_TX(events, tx_1_1, miner_acc, carol_acc, bob_amount, blk_3);
+  //MAKE_NEXT_BLOCK_TX_LIST(events, blk_4, blk_3, miner_acc, std::list<transaction>({ tx_1, tx_1_1 }));
+
+  //                                   HF4
+  //                                    |
+  //  0     10    11    21    22    23  | 24    34    35    36   <- blockchain height
+  // (0 )..(0r)- (1 )..(1r)- !2 !- (3 )- (4 )..(4r)- (5 )        <- main chain
+  //             tx_0                    tx_1    \   tx_2a
+  //                                              \  tx_2b
+  //                                                -!5a!- (6a)  <- alt chain
+
+  //REWIND_BLOCKS_N_WITH_TIME(events, blk_4r, blk_4, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  //// Bob: move all to miner
+  //MAKE_TX(events, tx_2a, bob_acc, miner_acc, bob_amount - TESTS_DEFAULT_FEE, blk_4r);
+  //// Miner: a little to Alice
+  //MAKE_TX(events, tx_2b, miner_acc, alice_acc, COIN, blk_4r);
+  //MAKE_NEXT_BLOCK_TX_LIST(events, blk_5, blk_4r, miner_acc, std::list<transaction>({ tx_2a, tx_2b }));
+
+  //// now in the main chain Bob has zero coins
+  //// check it in gen time ...
+  //CREATE_TEST_WALLET(bob_wlt, bob_acc, blk_0);
+  //REFRESH_TEST_WALLET_AT_GEN_TIME(events, bob_wlt, blk_5, 3 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 5);
+  //CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(bob_wlt, 0);
+  //// ... and in play time
+  //DO_CALLBACK_PARAMS(events, "check_balance", params_check_balance(BOB_ACC_IDX, 0));
+
+
+  return true;
+}
+
+bool zarcanum_in_alt_chain_2::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   return true;
 }

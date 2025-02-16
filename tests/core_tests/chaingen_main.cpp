@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2022 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -1297,6 +1297,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(zarcanum_txs_with_big_shuffled_decoy_set_shuffled);
     GENERATE_AND_PLAY(zarcanum_pos_block_math);
     GENERATE_AND_PLAY(zarcanum_in_alt_chain);
+    GENERATE_AND_PLAY_HF(zarcanum_in_alt_chain_2, "4-*");
     GENERATE_AND_PLAY(assets_and_explicit_native_coins_in_outs);
     GENERATE_AND_PLAY(zarcanum_block_with_txs);
     GENERATE_AND_PLAY(asset_depoyment_and_few_zc_utxos);

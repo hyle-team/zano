@@ -1029,7 +1029,24 @@ bool blockchain_storage::is_tx_related_to_altblock(crypto::hash tx_id) const
   auto it = m_alternative_chains_txs.find(tx_id);
   return it != m_alternative_chains_txs.end();
 }
+//------------------------------------------------------------------
+bool blockchain_storage::is_pre_hardfork_tx_freeze_period_active() const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  if (!is_hardfork_active(ZANO_HARDFORK_05))
+    return false;
 
+  uint64_t next_block_height = m_db_blocks.size(); // top block height + 1
+  size_t current_hardfork_id = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(next_block_height);
+  size_t next_hardfork_id = current_hardfork_id + 1;
+  if (next_hardfork_id >= ZANO_HARDFORKS_TOTAL)
+    return false;
+
+  uint64_t next_hf_height_active_after = m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[next_hardfork_id];
+  
+  bool result = (next_block_height + m_core_runtime_config.pre_hardfork_tx_freeze_period > next_hf_height_active_after);
+  return result;
+}
 //------------------------------------------------------------------
 bool blockchain_storage::get_block_extended_info_by_hash(const crypto::hash &h, block_extended_info &blk) const
 {
@@ -8356,10 +8373,19 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     CHECK_AND_ASSERT_MES(r, false, "miner tx " << get_transaction_hash(b.miner_tx) << ": validation failed");
 
     ki_lookup_time_total += ki_lookup;
-    // check stake age
-    uint64_t coinstake_age = height - max_related_block_height - 1;
-    CHECK_AND_ASSERT_MES(coinstake_age >= m_core_runtime_config.min_coinstake_age, false,
-      "miner tx's coinstake age is " << coinstake_age << ", that is less than minimum required " << m_core_runtime_config.min_coinstake_age << "; max_related_block_height == " << max_related_block_height);
+
+    if (is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, height))
+    {
+      CHECK_AND_ASSERT_MES(height - max_related_block_height >= CURRENCY_HF4_MANDATORY_MIN_COINAGE, false, "Coinage rule broken (altblock): h = " <<
+        abei.height << ", max_related_block_height=" << max_related_block_height << ", miner tx: " << get_transaction_hash(b.miner_tx));
+    }
+    else
+    {
+      // legacy check of stake age (consider removing old hardforks alt block checks -- sowle)
+      uint64_t coinstake_age = height - max_related_block_height - 1;
+      CHECK_AND_ASSERT_MES(coinstake_age >= m_core_runtime_config.min_coinstake_age, false,
+        "miner tx's coinstake age is " << coinstake_age << ", that is less than minimum required " << m_core_runtime_config.min_coinstake_age << "; max_related_block_height == " << max_related_block_height);
+    }
   }
   update_alt_out_indexes_for_tx_in_block(b.miner_tx, abei);
 

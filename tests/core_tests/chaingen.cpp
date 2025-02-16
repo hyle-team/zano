@@ -1420,8 +1420,21 @@ bool fill_tx_sources(std::vector<tx_source_entry>& sources, const std::vector<te
 }
 
 bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
+  const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix, const std::vector<currency::tx_source_entry>& sources_to_avoid,
+  bool check_for_spends, bool check_for_unlocktime, bool use_ref_by_id, uint64_t* p_sources_amount_found /* = nullptr */)
+{
+  uint64_t fts_flags =
+    (check_for_spends     ? fts_check_for_spends      : fts_none) |
+    (check_for_unlocktime ? fts_check_for_unlocktime  : fts_none) |
+    (use_ref_by_id        ? fts_use_ref_by_id         : fts_none) |
+    fts_check_for_hf4_min_coinage;
+
+  return fill_tx_sources(sources, events, blk_head, from, amount, nmix, sources_to_avoid, fts_flags, p_sources_amount_found);
+}
+
+bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
                      const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix, const std::vector<currency::tx_source_entry>& sources_to_avoid,
-                     bool check_for_spends, bool check_for_unlocktime, bool use_ref_by_id, uint64_t* p_sources_amount_found /* = nullptr */)
+                     uint64_t fts_flags, uint64_t* p_sources_amount_found /* = nullptr */)
 {
   map_output_idx_t outs;
   map_output_t outs_mine;
@@ -1434,7 +1447,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
   if (!init_output_indices(outs, outs_mine, blockchain, mtx, from))
     return false;
 
-  if(check_for_spends)
+  if (fts_flags & fts_check_for_spends)
   {
     if (!init_spent_output_indices(outs, outs_mine, blockchain, mtx, from))
       return false;
@@ -1494,7 +1507,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
       const output_index& oi = outs[o.first][sender_out];
       if (oi.spent)
           continue;
-      if (check_for_unlocktime)
+      if (fts_flags & fts_check_for_unlocktime)
       {
         uint64_t unlock_time = currency::get_tx_max_unlock_time(*oi.p_tx);
         if (unlock_time < CURRENCY_MAX_BLOCK_NUMBER)
@@ -1509,8 +1522,10 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
           if (unlock_time > head_block_ts + DIFFICULTY_TOTAL_TARGET)
             continue;
         }
-      } 
-      if (blk_head.miner_tx.version >= TRANSACTION_VERSION_POST_HF4 && next_block_height - get_block_height(*oi.p_blk) < CURRENCY_HF4_MANDATORY_MIN_COINAGE)
+      }
+
+      if ((fts_flags & fts_check_for_hf4_min_coinage) && blk_head.miner_tx.version >= TRANSACTION_VERSION_POST_HF4
+        && next_block_height - get_block_height(*oi.p_blk) < CURRENCY_HF4_MANDATORY_MIN_COINAGE)
       {
         //ignore outs that doesn't fit the HF4 rule
         continue;
@@ -1524,8 +1539,11 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
       ts.real_out_amount_blinding_mask = oi.amount_blinding_mask;
       ts.real_output_in_tx_index = oi.out_no;
       ts.real_out_tx_key = get_tx_pub_key_from_extra(*oi.p_tx); // source tx public key
-      if (!fill_output_entries(outs[o.first], sender_out, nmix, check_for_unlocktime, use_ref_by_id, next_block_height, head_block_ts, ts.real_output, ts.outputs))
+      if (!fill_output_entries(outs[o.first], sender_out, nmix, fts_flags & fts_check_for_unlocktime, fts_flags & fts_use_ref_by_id,
+        next_block_height, head_block_ts, ts.real_output, ts.outputs))
+      {
         continue;
+      }
 
       sources.push_back(ts);
 
@@ -1770,7 +1788,7 @@ bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
                          bool check_for_unlocktime /* = true */,
                          bool use_ref_by_id /* = false */)
 {
-  crypto::secret_key sk; // stub
+  [[maybe_unused]] crypto::secret_key sk; // stub
   uint64_t spending_amount = fee;
   for(auto& el: destinations)
     spending_amount += el.amount;
@@ -1782,14 +1800,13 @@ bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
   uint64_t tx_expected_block_height = get_block_height(blk_head) + 1;
   size_t tx_hardfork_id = 0;
   uint64_t tx_version = currency::get_tx_version_and_hardfork_id(tx_expected_block_height, hf, tx_hardfork_id);
-  boost::multiprecision::int128_t change = get_sources_total_amount(sources);
-  change -= spending_amount;
-  if (change < 0)
+  uint64_t sources_amount = get_sources_total_amount(sources);
+  if (sources_amount < spending_amount)
     return false; // should never happen if fill_tx_sources succeded
-  if (change == 0)
+  if (sources_amount == spending_amount)
     return construct_tx(from.get_keys(), sources, destinations, extr, att, tx, tx_version, tx_hardfork_id, sk, 0, mix_attr);
   std::vector<tx_destination_entry> local_dst = destinations;
-  local_dst.push_back(tx_destination_entry(change.convert_to<uint64_t>(), from.get_public_address()));
+  local_dst.push_back(tx_destination_entry(sources_amount - spending_amount, from.get_public_address()));
   return construct_tx(from.get_keys(), sources, local_dst, extr, att, tx, tx_version, tx_hardfork_id, sk, 0, mix_attr);
 }
 
