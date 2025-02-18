@@ -1675,9 +1675,26 @@ std::string wallets_manager::get_wallet_status(uint64_t wallet_id)
   return epee::serialization::store_t_to_json(wsi);
 }
 
+struct json_just_method
+{
+  std::string method;
+  BEGIN_KV_SERIALIZE_MAP()
+    KV_SERIALIZE(method)
+  END_KV_SERIALIZE_MAP()
+};
+
 std::string wallets_manager::invoke(uint64_t wallet_id, std::string params)
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
+
+  json_just_method req = {};
+  if (!epee::serialization::load_t_from_json(req, params))
+  {
+    epee::json_rpc::response<epee::json_rpc::dummy_result, epee::json_rpc::error> error_response = AUTO_VAL_INIT(error_response);
+    error_response.error.code = -1;
+    error_response.error.message = API_RETURN_CODE_BAD_JSON;
+    return epee::serialization::store_t_to_json(error_response);
+  }
 
   CRITICAL_REGION_LOCAL1(wo.long_refresh_in_progress_lock);
   if (wo.long_refresh_in_progress)
@@ -1688,16 +1705,28 @@ std::string wallets_manager::invoke(uint64_t wallet_id, std::string params)
     return epee::serialization::store_t_to_json(error_response);
   }
 
-
-  auto locker_object = wo.w.lock();
-
   epee::net_utils::http::http_request_info query_info = AUTO_VAL_INIT(query_info);
   epee::net_utils::http::http_response_info response_info = AUTO_VAL_INIT(response_info);
   epee::net_utils::connection_context_base stub_conn_context = AUTO_VAL_INIT(stub_conn_context);
   bool call_found = false;
   query_info.m_URI = "/json_rpc";
   query_info.m_body = params;
-  wo.rpc_wrapper->handle_http_request_map(query_info, response_info, stub_conn_context, call_found);
+
+  if (req.method != "assets_whitelist_get" &&
+      req.method != "decrypt_data" &&
+      req.method != "encrypt_data" &&
+      req.method != "get_restore_info" &&
+      req.method != "get_seed_phrase_info" &&
+      req.method != "get_wallet_info" &&
+      req.method != "getaddress" &&
+      req.method != "getbalance" &&
+      req.method != "sign_message") {
+    auto locker_object = wo.w.lock();
+    wo.rpc_wrapper->handle_http_request_map(query_info, response_info, stub_conn_context, call_found);
+  } else {
+    wo.rpc_wrapper->handle_http_request_map(query_info, response_info, stub_conn_context, call_found);
+  }
+
   return response_info.m_body;
 }
 
