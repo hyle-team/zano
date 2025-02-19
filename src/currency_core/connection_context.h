@@ -33,7 +33,8 @@ namespace currency
     std::list<block_context_info> m_needed_objects;
     std::unordered_set<crypto::hash> m_requested_objects;
     std::atomic<uint32_t> m_callback_request_count; //in debug purpose: problem with double callback rise
-
+    //
+    std::list<crypto::hash> m_last_10_fetched_block_ids;
   };
 
   struct currency_connection_context: public epee::net_utils::connection_context_base

@@ -744,10 +744,26 @@ namespace currency
     {//we have to fetch more objects ids, request blockchain entry
      
       NOTIFY_REQUEST_CHAIN::request r = boost::value_initialized<NOTIFY_REQUEST_CHAIN::request>();
-      m_core.get_short_chain_history(r.block_ids);
-      LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_CHAIN: m_block_ids.size()=" << r.block_ids.size() );
-      LOG_PRINT_L3("[NOTIFY]NOTIFY_REQUEST_CHAIN: " << ENDL << print_kv_structure(r) );
+      if (context.m_priv.m_last_10_fetched_block_ids.size())
+      {
+        block_extended_info blk = AUTO_VAL_INIT(blk);
+        //in this case we're likely facing situation where remote daemon is in alt chain with the network split deeper then 2000 blocks
+        //and we still want to fetch full alternative chain from this remote daemon, because we never know if this alt chain is actually "stronger" in terms of consensus.
+        //For that reason we have to feed last ten block that was returned by it in NOTIFY_REQUEST_CHAIN request, and expect next portion of alt blocks
+        r.block_ids = context.m_priv.m_last_10_fetched_block_ids;
+        //add genesis to the latest
+        r.block_ids.push_back(m_core.get_blockchain_storage().get_block_id_by_height(0));
+        LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_CHAIN: requesting alt version starting from " << r.block_ids.front());
+      }
+
+      if (!r.block_ids.size())
+      {
+        m_core.get_short_chain_history(r.block_ids);
+      }
+      LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_CHAIN: m_block_ids.size()=" << r.block_ids.size());
+      LOG_PRINT_L3("[NOTIFY]NOTIFY_REQUEST_CHAIN: " << ENDL << print_kv_structure(r));
       post_notify<NOTIFY_REQUEST_CHAIN>(r, context);
+
     }else
     { 
       CHECK_AND_ASSERT_MES(context.m_last_response_height == context.m_remote_blockchain_height-1 
@@ -980,6 +996,10 @@ namespace currency
     {
       if (!m_core.have_block(bl_details.h))
         context.m_priv.m_needed_objects.push_back(bl_details);
+
+      context.m_priv.m_last_10_fetched_block_ids.push_front(bl_details.h);
+      if (context.m_priv.m_last_10_fetched_block_ids.size() > 10)
+        context.m_priv.m_last_10_fetched_block_ids.pop_back();
     }
 
     request_missing_objects(context, false);
