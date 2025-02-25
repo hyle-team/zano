@@ -260,6 +260,10 @@ namespace net_utils
       m_pcb.reset(new abstract_callback<callback_t>(cb));
       return content_encoding_gzip::update_in(piece_of_transfer);
     }
+
+    virtual void stop(std::string& OUT collect_remains) override
+    {}
+
     template<class callback_t>
     bool stop(callback_t cb)
     {return true;}

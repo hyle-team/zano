@@ -229,7 +229,8 @@ namespace currency
   template<class t_core>
   uint64_t t_currency_protocol_handler<t_core>::get_max_seen_height()
   {
-    return m_max_height_seen;
+    uint64_t max_seen = m_max_height_seen;
+    return std::max(max_seen, m_core.get_blockchain_storage().get_top_block_height());
   }
   //------------------------------------------------------------------------------------------------------------------------  
   template<class t_core> 

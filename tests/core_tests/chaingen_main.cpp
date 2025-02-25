@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2022 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -387,7 +387,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
 
 
 #define GENERATE_AND_PLAY(genclass)                                                                        \
-  if (!skip_all_till_the_end && ((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string::npos != std::string(#genclass).find(run_single_test)))) \
+  if (!skip_all_till_the_end && ((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string(#genclass) == run_single_test))) \
   {                                                                                                        \
     TIME_MEASURE_START_MS(t);                                                                              \
     ++tests_count;                                                                                         \
@@ -422,7 +422,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
   }
 
 #define GENERATE_AND_PLAY_HF(genclass, hardfork_str_mask)                                                  \
-  if (!skip_all_till_the_end && ((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string::npos != std::string(#genclass).find(run_single_test)))) \
+  if (!skip_all_till_the_end && ((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string(#genclass) == run_single_test))) \
   {                                                                                                        \
     std::vector<size_t> hardforks = parse_hardfork_str_mask(hardfork_str_mask);                            \
     CHECK_AND_ASSERT_MES(!hardforks.empty(), false, "invalid hardforks mask: " << hardfork_str_mask);      \
@@ -1154,6 +1154,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(one_block);
     GENERATE_AND_PLAY(gen_ring_signature_1);
     GENERATE_AND_PLAY(gen_ring_signature_2);
+    GENERATE_AND_PLAY(fill_tx_rpc_inputs);
     //GENERATE_AND_PLAY(gen_ring_signature_big); // Takes up to XXX hours (if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10)
 
     // tests for outputs mixing in
@@ -1177,6 +1178,9 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_timestamp_in_future, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_height_is_low, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_height_is_high, "0,3");
+    GENERATE_AND_PLAY_HF(block_with_correct_prev_id_on_wrong_height, "3-*");
+    GENERATE_AND_PLAY_HF(block_reward_in_main_chain_basic, "3-*");
+    GENERATE_AND_PLAY_HF(block_reward_in_alt_chain_basic, "3-*");
     GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_tx_gen_in, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_in, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_miner_tx_with_txin_to_key, "0,3");
@@ -1221,6 +1225,7 @@ int main(int argc, char* argv[])
     /* To execute the check of bare balance (function "check_tx_bare_balance") we need to run the test "tx_pool_semantic_validation" on the HF 3. By default behaviour bare outputs are disallowed on
     the heights >= 10. */
     GENERATE_AND_PLAY_HF(tx_pool_semantic_validation, "3");
+    GENERATE_AND_PLAY(input_refers_to_incompatible_by_type_output);
 
     // Double spend
     GENERATE_AND_PLAY(gen_double_spend_in_tx<false>);
@@ -1271,6 +1276,9 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(hardfork_4_wallet_sweep_bare_outs);
     GENERATE_AND_PLAY_HF(hardfork_4_pop_tx_from_global_index, "4-*");
 
+    // HF5
+    GENERATE_AND_PLAY_HF(hard_fork_5_tx_version, "5-*");
+
     // atomics
     GENERATE_AND_PLAY(atomic_simple_test);
     GENERATE_AND_PLAY(atomic_test_wrong_redeem_wrong_refund);    
@@ -1289,6 +1297,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(zarcanum_txs_with_big_shuffled_decoy_set_shuffled);
     GENERATE_AND_PLAY(zarcanum_pos_block_math);
     GENERATE_AND_PLAY(zarcanum_in_alt_chain);
+    GENERATE_AND_PLAY_HF(zarcanum_in_alt_chain_2, "4-*");
     GENERATE_AND_PLAY(assets_and_explicit_native_coins_in_outs);
     GENERATE_AND_PLAY(zarcanum_block_with_txs);
     GENERATE_AND_PLAY(asset_depoyment_and_few_zc_utxos);

@@ -81,7 +81,7 @@ namespace epee
         m_run.store(false, std::memory_order_relaxed);
 
 #if defined(WIN32)
-        ::CloseHandle(::GetStdHandle(STD_INPUT_HANDLE));
+        // ::CloseHandle(::GetStdHandle(STD_INPUT_HANDLE)); -- commented out by sowle, I belive we don't need to close this handle here
 #endif
 
         m_request_cv.notify_one();

@@ -1162,7 +1162,7 @@ void wallet2::accept_proposal(const crypto::hash& contract_id, uint64_t b_accept
 
   //build transaction
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
-  ftp.tx_version = this->get_current_tx_version();
+  ftp.tx_version = get_current_tx_version_and_hardfork_id(ftp.tx_hardfork_id);
   prepare_transaction(construct_param, ftp, msc);
   mark_transfers_as_spent(ftp.selected_transfers, std::string("contract <") + epee::string_tools::pod_to_hex(contract_id) + "> has been accepted with tx <" + epee::string_tools::pod_to_hex(get_transaction_hash(tx)) + ">");
 
@@ -1182,10 +1182,10 @@ void wallet2::accept_proposal(const crypto::hash& contract_id, uint64_t b_accept
     *p_acceptance_tx = tx;
 }
 //---------------------------------------------------------------------------------
-uint64_t wallet2::get_current_tx_version()
+uint64_t wallet2::get_current_tx_version_and_hardfork_id(size_t& tx_hardfork_id)
 {
   uint64_t tx_expected_block_height = get_top_block_height() + 1;
-  return currency::get_tx_version(tx_expected_block_height, this->m_core_runtime_config.hard_forks);
+  return currency::get_tx_version_and_hardfork_id(tx_expected_block_height, this->m_core_runtime_config.hard_forks, tx_hardfork_id);
 }
 //---------------------------------------------------------------------------------
 void wallet2::finish_contract(const crypto::hash& contract_id, const std::string& release_type, currency::transaction* p_release_tx /* = nullptr */)
@@ -1299,7 +1299,7 @@ void wallet2::request_cancel_contract(const crypto::hash& contract_id, uint64_t 
   construct_param.split_strategy_id = get_current_split_strategy();
 
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
-  ftp.tx_version = this->get_current_tx_version();
+  ftp.tx_version = get_current_tx_version_and_hardfork_id(ftp.tx_hardfork_id);
   prepare_transaction(construct_param, ftp);
   currency::transaction tx = AUTO_VAL_INIT(tx);
   crypto::secret_key sk = AUTO_VAL_INIT(sk);
@@ -2116,6 +2116,12 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
       }
       else
       {
+        //if first synchronized block in the wallet accidently became orphaned we need to force wallet to resync
+        if(this->m_minimum_height == height)
+        {
+          full_reset_needed = true;
+        }
+
         //this should happen ONLY after block been matched, if not then is internal error
         if (full_reset_needed)
         {
@@ -2393,7 +2399,7 @@ bool wallet2::sweep_bare_unspent_outputs(const currency::account_public_address&
     currency::finalized_tx ftx{};
     currency::finalize_tx_param ftp{};
     ftp.pevents_dispatcher = &m_debug_events_dispatcher;
-    ftp.tx_version = this->get_current_tx_version();
+    ftp.tx_version = get_current_tx_version_and_hardfork_id(ftp.tx_hardfork_id);
 
     if (!prepare_tx_sources(decoys_count, /*use_all_decoys_if_found_less_than_required*/ true, ftp.sources, group.tids))
     {
@@ -3756,6 +3762,10 @@ bool wallet2::balance(std::unordered_map<crypto::public_key, wallet_public::asse
 
       if (!td.is_zc())
         m_has_bare_unspent_outputs = true;
+
+      e.outs_amount_min = (e.outs_count == 0) ? td.amount() : std::min(e.outs_amount_min, td.amount());
+      e.outs_amount_max = (e.outs_count == 0) ? td.amount() : std::max(e.outs_amount_max, td.amount());
+      e.outs_count += 1;
     }
   }
 
@@ -5920,7 +5930,7 @@ void wallet2::build_escrow_release_templates(crypto::hash multisig_id,
   construct_params.extra.push_back(tsa);
   {
     currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
-    ftp.tx_version = this->get_current_tx_version();
+    ftp.tx_version = get_current_tx_version_and_hardfork_id(ftp.tx_hardfork_id);
     prepare_transaction(construct_params, ftp);
     crypto::secret_key sk = AUTO_VAL_INIT(sk);
     finalize_transaction(ftp, tx_release_template, sk, false);
@@ -5937,7 +5947,7 @@ void wallet2::build_escrow_release_templates(crypto::hash multisig_id,
   construct_params.extra.push_back(tsa);
   {
     currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
-    ftp.tx_version = this->get_current_tx_version();
+    ftp.tx_version = get_current_tx_version_and_hardfork_id(ftp.tx_hardfork_id);
     prepare_transaction(construct_params, ftp);
     crypto::secret_key sk = AUTO_VAL_INIT(sk);
     finalize_transaction(ftp, tx_burn_template, sk, false);
@@ -5958,7 +5968,7 @@ void wallet2::build_escrow_cancel_template(crypto::hash multisig_id,
 
   construct_tx_param construct_params = AUTO_VAL_INIT(construct_params);
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
-  ftp.tx_version = this->get_current_tx_version();
+  ftp.tx_version = get_current_tx_version_and_hardfork_id(ftp.tx_hardfork_id);
   construct_params.fee = it->second.amount() - (ecrow_details.amount_a_pledge + ecrow_details.amount_to_pay + ecrow_details.amount_b_pledge);
   construct_params.multisig_id = multisig_id;
   construct_params.split_strategy_id = get_current_split_strategy();
@@ -6041,7 +6051,7 @@ void wallet2::build_escrow_template(const bc_services::contract_private_details&
   }
 
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
-  ftp.tx_version = this->get_current_tx_version();
+  ftp.tx_version = get_current_tx_version_and_hardfork_id(ftp.tx_hardfork_id);
   prepare_transaction(ctp, ftp);
 
   selected_transfers = ftp.selected_transfers;
@@ -6177,7 +6187,7 @@ void wallet2::send_escrow_proposal(const bc_services::contract_private_details& 
   ctp.unlock_time = unlock_time;
 
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
-  ftp.tx_version = this->get_current_tx_version();
+  ftp.tx_version = get_current_tx_version_and_hardfork_id(ftp.tx_hardfork_id);
   try
   {
     prepare_transaction(ctp, ftp);
@@ -6351,7 +6361,7 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
 
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   ftp.mode_separate_fee = ctp.fee;
-  ftp.tx_version = this->get_current_tx_version();
+  ftp.tx_version = get_current_tx_version_and_hardfork_id(ftp.tx_hardfork_id);
   prepare_transaction(ctp, ftp);
 
   selected_transfers = ftp.selected_transfers;
@@ -6580,7 +6590,7 @@ bool wallet2::accept_ionic_swap_proposal(const wallet_public::ionic_swap_proposa
 
   //build transaction
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
-  ftp.tx_version = this->get_current_tx_version();
+  ftp.tx_version = get_current_tx_version_and_hardfork_id(ftp.tx_hardfork_id);
   ftp.gen_context = ionic_context.gen_context;
   prepare_transaction(construct_param, ftp, msc);
 
@@ -8149,7 +8159,7 @@ void wallet2::transfer(construct_tx_param& ctp,
   TIME_MEASURE_START(prepare_transaction_time);
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
   ftp.pevents_dispatcher = &m_debug_events_dispatcher;
-  ftp.tx_version = this->get_current_tx_version();
+  ftp.tx_version = get_current_tx_version_and_hardfork_id(ftp.tx_hardfork_id);
   if (!prepare_transaction(ctp, ftp))
   {
     result.was_not_prepared = true;
@@ -8276,7 +8286,7 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   }
 
   currency::finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
-  ftp.tx_version = this->get_current_tx_version();
+  ftp.tx_version = get_current_tx_version_and_hardfork_id(ftp.tx_hardfork_id);
   bool is_hf4 = this->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM);
   if (!payment_id.empty())
     set_payment_id_to_tx(ftp.attachments, payment_id, is_hf4);

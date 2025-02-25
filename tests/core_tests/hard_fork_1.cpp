@@ -239,7 +239,7 @@ bool hard_fork_1_unlock_time_2_in_coinbase::generate(std::vector<test_event_entr
   ut2.unlock_time_array.resize(blk_5.miner_tx.vout.size());
   ut2.unlock_time_array[0] = get_block_height(blk_5) + CURRENCY_MINED_MONEY_UNLOCK_WINDOW;
   blk_5.miner_tx.extra.push_back(ut2);
-  miner::find_nonce_for_given_block(blk_5, diff, get_block_height(blk_5));
+  find_nonce_for_given_block(blk_5, diff, get_block_height(blk_5));
 
   // add blk_5 with modified miner tx
   events.push_back(blk_5);
@@ -437,7 +437,7 @@ bool hard_fork_1_checkpoint_basic_test::generate(std::vector<test_event_entry>& 
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(alice_acc.get_keys(), sources, std::vector<tx_destination_entry>{ tx_destination_entry(MK_TEST_COINS(90) - TESTS_DEFAULT_FEE, miner_acc.get_public_address()) },
-    empty_attachment, tx_1, get_tx_version_from_events(events), stake_lock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
+    empty_attachment, tx_1, get_tx_version_from_events(events), 0, stake_lock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   
   DO_CALLBACK(events, "mark_invalid_tx");
@@ -882,7 +882,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx(alice_acc.get_keys(), sources, std::vector<tx_destination_entry>{ tx_destination_entry(stake_amount / 2, miner_acc.get_public_address()) },
-    empty_attachment, tx_1, get_tx_version_from_events(events), stake_unlock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
+    empty_attachment, tx_1, get_tx_version_from_events(events), 0, stake_unlock_time /* try to use stake unlock time -- should not work as it is not a coinbase */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   
   DO_CALLBACK(events, "mark_invalid_tx");

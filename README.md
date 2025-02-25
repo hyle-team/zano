@@ -36,11 +36,11 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
 
    [*server version*]
    
-       sudo apt-get install -y build-essential g++ curl autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev
+       sudo apt-get install -y build-essential g++ curl autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev libssl-dev bzip2
           
    [*GUI version*]
 
-       sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev mesa-common-dev libglu1-mesa-dev
+       sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev libssl-dev bzip2 mesa-common-dev libglu1-mesa-dev
 
 2. Clone Zano into a local folder\
    (If for some reason you need to use alternative Zano branch, change 'master' to the required branch name.)
@@ -105,7 +105,7 @@ For instance, by adding the following lines to `~/.bashrc`
    1. If you skipped step 6 and did not set the environment variables:
 
           cd zano && mkdir build && cd build
-          BOOST_ROOT=$HOME/boost_1_70_0 OPENSSL_ROOT_DIR=$HOME/openssl cmake ..
+          BOOST_ROOT=$HOME/boost_1_84_0 OPENSSL_ROOT_DIR=$HOME/openssl cmake ..
           make -j1 daemon simplewallet
 
    2. If you set the variables in step 6:

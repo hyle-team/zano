@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -6,6 +6,10 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once 
+
+#ifdef TESTNET
+#define CPU_MINING_ENABLED // disable CPU mining capabilities in mainnet
+#endif // #ifndef TESTNET
 
 #include <boost/atomic.hpp>
 #include <boost/program_options.hpp>
@@ -30,6 +34,29 @@ namespace currency
     ~i_miner_handler(){};
   };
 
+  inline
+  static bool find_nonce_for_given_block(block& bl, const wide_difficulty_type& diffic, uint64_t height)
+  {      
+    bl.nonce = 0;
+    blobdata bd = get_block_hashing_blob(bl);
+    crypto::hash bd_hash = crypto::cn_fast_hash(bd.data(), bd.size());
+    //uint64_t& nonce_ref = access_nonce_in_block_blob(bd);
+    //nonce_ref = 0;
+
+    for(; bl.nonce != std::numeric_limits<uint64_t>::max(); bl.nonce++)
+    {
+      crypto::hash h = get_block_longhash(height, bd_hash, bl.nonce);
+      if(check_hash(h, diffic))
+      {
+        LOG_PRINT_L1("Found nonce for block: " << get_block_hash(bl) << "[" << height << "]: PoW:" << h << " (diff:" << diffic << "), ts: " << bl.timestamp);
+        return true;
+      }
+    }
+    return false;
+  }
+
+#ifdef CPU_MINING_ENABLED
+
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
@@ -53,27 +80,6 @@ namespace currency
     void pause();
     void resume();
     void do_print_hashrate(bool do_hr);
-
-    inline
-    static bool find_nonce_for_given_block(block& bl, const wide_difficulty_type& diffic, uint64_t height)
-    {      
-      bl.nonce = 0;
-      blobdata bd = get_block_hashing_blob(bl);
-      crypto::hash bd_hash = crypto::cn_fast_hash(bd.data(), bd.size());
-      //uint64_t& nonce_ref = access_nonce_in_block_blob(bd);
-      //nonce_ref = 0;
-
-      for(; bl.nonce != std::numeric_limits<uint64_t>::max(); bl.nonce++)
-      {
-        crypto::hash h = get_block_longhash(height, bd_hash, bl.nonce);
-        if(check_hash(h, diffic))
-        {
-          LOG_PRINT_L1("Found nonce for block: " << get_block_hash(bl) << "[" << height << "]: PoW:" << h << " (diff:" << diffic << "), ts: " << bl.timestamp);
-          return true;
-        }
-      }
-      return false;
-    }
 
   private:
     bool set_block_template(const block& bl, const wide_difficulty_type& diffic, uint64_t height);
@@ -122,7 +128,7 @@ namespace currency
     bool m_do_mining;
     
   };
-}
 
+#endif // #ifdef CPU_MINING_ENABLED
 
-
+} // namespace currency

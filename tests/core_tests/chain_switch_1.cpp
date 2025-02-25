@@ -532,9 +532,10 @@ bool alt_blocks_validation_and_same_new_amount_in_two_txs::generate(std::vector<
   std::vector<tx_destination_entry> destinations;
   destinations.push_back(tx_destination_entry(new_amount, miner_acc.get_public_address()));
   destinations.push_back(tx_destination_entry(TESTS_DEFAULT_FEE, miner_acc.get_public_address())); //just to make two outputs (to please HF4 rules)
-  transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  uint64_t tx_version = get_tx_version(get_block_height(blk_3), m_hardforks);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, tx_version, 0);
+  transaction tx_1{};
+  size_t tx_hardfork_id{};
+  uint64_t tx_version = get_tx_version_and_hardfork_id(get_block_height(blk_3), m_hardforks, tx_hardfork_id);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, tx_version, tx_hardfork_id, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   ADD_CUSTOM_EVENT(events, tx_1);
 
@@ -544,8 +545,8 @@ bool alt_blocks_validation_and_same_new_amount_in_two_txs::generate(std::vector<
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
   // use the same destinations
-  tx_version = get_tx_version(get_block_height(blk_3), m_hardforks);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_2, tx_version, 0);
+  tx_version = get_tx_version_and_hardfork_id(get_block_height(blk_3), m_hardforks, tx_hardfork_id);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_2, tx_version, tx_hardfork_id, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   ADD_CUSTOM_EVENT(events, tx_2);
   
@@ -913,16 +914,10 @@ bool alt_chain_and_block_tx_fee_median::generate(
 
   CHECK_AND_ASSERT_MES(success, false, "fail to fill sources, destinations");
 
-  tx_version = get_tx_version(get_block_height(blk_1r),
-                              m_hardforks);
+  size_t tx_hardfork_id{};
+  tx_version = get_tx_version_and_hardfork_id(get_block_height(blk_1r), m_hardforks, tx_hardfork_id);
 
-  success = construct_tx(miner.get_keys(),
-                         sources,
-                         destinations,
-                         empty_attachment,
-                         tx_0,
-                         tx_version,
-                         0);
+  success = construct_tx(miner.get_keys(), sources, destinations, empty_attachment, tx_0, tx_version, tx_hardfork_id, 0);
 
   CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_0");
 
@@ -934,8 +929,7 @@ bool alt_chain_and_block_tx_fee_median::generate(
 
   // Transaction tx_1 is constructed and placed in block blk_2a.
 
-  tx_version = get_tx_version(get_block_height(blk_1r),
-                              m_hardforks);
+  tx_version = get_tx_version_and_hardfork_id(get_block_height(blk_1r), m_hardforks, tx_hardfork_id);
 
   success = fill_tx_sources_and_destinations(
     events,
@@ -950,13 +944,7 @@ bool alt_chain_and_block_tx_fee_median::generate(
 
   CHECK_AND_ASSERT_MES(success, false, "fail to fill sources, destinations");
 
-  success = construct_tx(miner.get_keys(),
-                         sources,
-                         destinations,
-                         empty_attachment,
-                         tx_1,
-                         tx_version,
-                         0);
+  success = construct_tx(miner.get_keys(), sources, destinations, empty_attachment, tx_1, tx_version, tx_hardfork_id, 0);
 
   CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_1");
 

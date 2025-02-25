@@ -288,8 +288,10 @@ simple_wallet::simple_wallet()
   m_refresh_progress_reporter(*this),
   m_offline_mode(false)
 {
+#ifdef CPU_MINING_ENABLED
   m_cmd_binder.set_handler("start_mining", boost::bind(&simple_wallet::start_mining, this, ph::_1), "start_mining <threads_count> - Start mining in daemon");
   m_cmd_binder.set_handler("stop_mining", boost::bind(&simple_wallet::stop_mining, this, ph::_1), "Stop mining in daemon");
+#endif // #ifdef CPU_MINING_ENABLED
   m_cmd_binder.set_handler("refresh", boost::bind(&simple_wallet::refresh, this, ph::_1), "Resynchronize transactions and balance");
   m_cmd_binder.set_handler("balance", boost::bind(&simple_wallet::show_balance, this, ph::_1), "[raw] Show current wallet balance, with 'raw' param it displays all assets without filtering against whitelists"); 
   m_cmd_binder.set_handler("show_staking_history", boost::bind(&simple_wallet::show_staking_history, this, ph::_1), "show_staking_history [2] - Show staking transfers, if option provided - number of days for history to display");
@@ -761,6 +763,7 @@ bool simple_wallet::save(const std::vector<std::string> &args)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+#ifdef CPU_MINING_ENABLED
 bool simple_wallet::start_mining(const std::vector<std::string>& args)
 {
   if (!try_connect_to_daemon())
@@ -815,6 +818,7 @@ bool simple_wallet::stop_mining(const std::vector<std::string>& args)
     fail_msg_writer() << "mining has NOT been stopped: " << err;
   return true;
 }
+#endif // #ifdef CPU_MINING_ENABLED
 //----------------------------------------------------------------------------------------------------
 void simple_wallet::on_new_block(uint64_t height, const currency::block& block)
 {
@@ -3227,20 +3231,23 @@ int main(int argc, char* argv[])
   po::options_description desc_all;
   desc_all.add(desc_general).add(desc_params);
   po::variables_map vm;
+  bool exit_requested = false;
   bool r = command_line::handle_error_helper(desc_all, [&]()
   {
     po::store(command_line::parse_command_line(argc, argv, desc_general, true), vm);
 
     if (command_line::get_arg(vm, command_line::arg_help))
     {
-      success_msg_writer() << "Usage: simplewallet [--wallet-file=<file>|--generate-new-wallet=<file>] [--daemon-address=<host>:<port>] [<COMMAND>]";
+      success_msg_writer() << "Usage: simplewallet [--wallet-file=<file>|--generate-new[-auditable]-wallet=<file>] [--daemon-address=<host>:<port>] [<COMMAND>]";
       success_msg_writer() << desc_all << '\n' << sw->get_commands_str();
-      return false;
+      exit_requested = true;
+      return true;
     }
     else if (command_line::get_arg(vm, command_line::arg_version))
     {
       success_msg_writer() << CURRENCY_NAME << " wallet v" << PROJECT_VERSION_LONG;
-      return false;
+      exit_requested = true;
+      return true;
     }
 
     auto parser = po::command_line_parser(argc, argv).options(desc_params).positional(positional_options);
@@ -3248,8 +3255,13 @@ int main(int argc, char* argv[])
     po::notify(vm);
     return true;
   });
+  
   if (!r)
     return EXIT_FAILURE;
+  
+  if (exit_requested)
+    return EXIT_SUCCESS;
+
 
   //set up logging options
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);

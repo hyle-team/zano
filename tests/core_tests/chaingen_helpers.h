@@ -33,7 +33,7 @@ inline bool mine_next_pow_block_in_playtime(const currency::account_public_addre
   test_core_time::adjust(b.timestamp);
 
   modify_block_cb(b);
-  r = currency::miner::find_nonce_for_given_block(b, cbtr.diffic, cbtr.height);
+  r = currency::find_nonce_for_given_block(b, cbtr.diffic, cbtr.height);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
   currency::block_verification_context bvc{};
@@ -119,7 +119,7 @@ inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::accou
     height = cbtr.height;
   }
 
-  r = currency::miner::find_nonce_for_given_block(b, cbtr.diffic, cbtr.height);
+  r = currency::find_nonce_for_given_block(b, cbtr.diffic, cbtr.height);
   CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
   currency::block_verification_context bvc{};
@@ -313,9 +313,10 @@ inline bool put_alias_via_tx_to_list(const currency::hard_forks_descriptor& hf, 
       el.flags |= currency::tx_destination_entry_flags::tdef_explicit_native_asset_id | currency::tx_destination_entry_flags::tdef_zero_amount_blinding_mask; // all alias-burn outputs must have explicit native asset id and zero amount mask
   }
 
-  uint64_t tx_version = currency::get_tx_version(get_block_height(head_block) + 1, generator.get_hardforks()); // assuming the tx will be in the next block (head_block + 1)
+  size_t tx_hardfork_id{};
+  uint64_t tx_version = currency::get_tx_version_and_hardfork_id(get_block_height(head_block) + 1, generator.get_hardforks(), tx_hardfork_id); // assuming the tx will be in the next block (head_block + 1)
   tx_set.emplace_back();
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_set.back(), tx_version, generator.last_tx_generated_secret_key, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_set.back(), tx_version, tx_hardfork_id, generator.last_tx_generated_secret_key, 0);
   PRINT_EVENT_N_TEXT(events, "put_alias_via_tx_to_list()");
   events.push_back(tx_set.back());
 

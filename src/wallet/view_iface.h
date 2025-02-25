@@ -492,12 +492,14 @@ public:
     bool is_online;
     bool last_daemon_is_disconnected;
     bool is_server_busy;
+    bool is_remote_node_mode;
     uint64_t last_proxy_communicate_timestamp;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(is_online)
-      KV_SERIALIZE(is_server_busy)
       KV_SERIALIZE(last_daemon_is_disconnected)
+      KV_SERIALIZE(is_server_busy)
+      KV_SERIALIZE(is_remote_node_mode)
       KV_SERIALIZE(last_proxy_communicate_timestamp)
     END_KV_SERIALIZE_MAP()
   };

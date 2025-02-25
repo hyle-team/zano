@@ -201,7 +201,9 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   currency::core::init_options(desc_cmd_sett);
   currency::core_rpc_server::init_options(desc_cmd_sett);
   nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >::init_options(desc_cmd_sett);
+#ifdef CPU_MINING_ENABLED
   currency::miner::init_options(desc_cmd_sett);
+#endif
   bc_services::bc_offers_service::init_options(desc_cmd_sett);
   tools::db::db_backend_selector::init_options(desc_cmd_sett);
 #endif
@@ -1654,10 +1656,11 @@ bool wallets_manager::get_is_remote_daemon_connected()
 
 std::string wallets_manager::get_connectivity_status()
 {
-  view::general_connectivity_info gci = AUTO_VAL_INIT(gci);
+  view::general_connectivity_info gci{};
   gci.is_online = get_is_remote_daemon_connected();
   gci.last_daemon_is_disconnected = m_pproxy_diganostic_info->last_daemon_is_disconnected;
   gci.is_server_busy = m_pproxy_diganostic_info->is_busy;
+  gci.is_remote_node_mode = m_remote_node_mode;
   gci.last_proxy_communicate_timestamp = m_rpc_proxy->get_last_success_interract_time();
   return epee::serialization::store_t_to_json(gci);
 }

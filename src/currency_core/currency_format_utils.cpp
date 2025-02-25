@@ -393,6 +393,7 @@ namespace currency
     uint64_t& block_reward_without_fee,
     uint64_t& block_reward,
     uint64_t tx_version,
+    size_t tx_hadrfork_id,
     const blobdata& extra_nonce               /* = blobdata() */,
     size_t max_outs                           /* = CURRENCY_MINER_TX_MAX_OUTS */,
     bool pos                                  /* = false */,
@@ -476,6 +477,8 @@ namespace currency
     CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS || height == 0, false, "Too many outs (" << destinations.size() << ")! Miner tx can't be constructed.");
     // tx is not cleared intentionally to allow passing additional args in the extra/attachments
     tx.version = tx_version;
+    if (tx.version >= TRANSACTION_VERSION_POST_HF5)
+      tx.hardfork_id = tx_hadrfork_id;
 
     tx_generation_context tx_gen_context{};
     tx_gen_context.set_tx_key(tx_one_time_key_to_use ? *tx_one_time_key_to_use : keypair::generate());
@@ -1439,12 +1442,13 @@ namespace currency
     const std::vector<attachment_v>& attachments,    
     transaction& tx,
     uint64_t tx_version,
+    size_t tx_hardfork_id,
     uint64_t unlock_time,
     uint8_t tx_outs_attr, 
     bool shuffle)
   {
-    crypto::secret_key one_time_secret_key = AUTO_VAL_INIT(one_time_secret_key);
-    return construct_tx(sender_account_keys, sources, destinations, std::vector<extra_v>(), attachments, tx, tx_version, one_time_secret_key, unlock_time, tx_outs_attr, shuffle);
+    crypto::secret_key one_time_secret_key{};
+    return construct_tx(sender_account_keys, sources, destinations, std::vector<extra_v>(), attachments, tx, tx_version, tx_hardfork_id, one_time_secret_key, unlock_time, tx_outs_attr, shuffle);
   }
   //---------------------------------------------------------------
 
@@ -1964,6 +1968,7 @@ namespace currency
     const std::vector<attachment_v>& attachments,
     transaction& tx,
     uint64_t tx_version,
+    size_t tx_hardfork_id,
     crypto::secret_key& one_time_secret_key,
     uint64_t unlock_time,
     uint8_t tx_outs_attr,
@@ -1976,7 +1981,7 @@ namespace currency
     //in case if there is no real targets we use sender credentials to encrypt attachments
     account_public_address crypt_destination_addr = get_crypt_address_from_destinations(sender_account_keys, destinations);
 
-    return construct_tx(sender_account_keys, sources, destinations, extra, attachments, tx, tx_version, one_time_secret_key, unlock_time,
+    return construct_tx(sender_account_keys, sources, destinations, extra, attachments, tx, tx_version, tx_hardfork_id, one_time_secret_key, unlock_time,
       crypt_destination_addr,
       0,
       tx_outs_attr,
@@ -1990,6 +1995,7 @@ namespace currency
     const std::vector<attachment_v>& attachments,
     transaction& tx,
     uint64_t tx_version,
+    size_t tx_hardfork_id,
     crypto::secret_key& one_time_secret_key,
     uint64_t unlock_time,
     const account_public_address& crypt_destination_addr,
@@ -1999,8 +2005,9 @@ namespace currency
     uint64_t flags)
   {
     //extra copy operation, but creating transaction is not sensitive to this
-    finalize_tx_param ftp = AUTO_VAL_INIT(ftp);
+    finalize_tx_param ftp{};
     ftp.tx_version = tx_version;
+    ftp.tx_hardfork_id = tx_hardfork_id;
     ftp.sources = sources;
     ftp.prepared_destinations = destinations;
     ftp.extra = extra;
@@ -2012,7 +2019,7 @@ namespace currency
     ftp.shuffle = shuffle;
     ftp.flags = flags;
 
-    finalized_tx ft = AUTO_VAL_INIT(ft);
+    finalized_tx ft{};
     ft.tx = tx;
     ft.one_time_key = one_time_secret_key;
     bool r = construct_tx(sender_account_keys, ftp, ft);
@@ -2402,6 +2409,9 @@ namespace currency
       tx.signatures.clear();
 
       tx.version = ftp.tx_version;
+      if (tx.version >= TRANSACTION_VERSION_POST_HF5)
+        tx.hardfork_id = ftp.tx_hardfork_id;
+
       if (unlock_time != 0)
         set_tx_unlock_time(tx, unlock_time);
 
@@ -2819,13 +2829,24 @@ namespace currency
 
 
   //---------------------------------------------------------------
-  uint64_t get_tx_version(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd)
+  uint64_t get_tx_version_and_hardfork_id(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd, size_t& tx_hardfork_id)
   {
+    tx_hardfork_id = hfd.get_the_most_recent_hardfork_id_for_height(tx_expected_block_height);
     if (!hfd.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, tx_expected_block_height))
     {
       return TRANSACTION_VERSION_PRE_HF4;
     }
+    if (!hfd.is_hardfork_active_for_height(ZANO_HARDFORK_05, tx_expected_block_height))
+    {
+      return TRANSACTION_VERSION_POST_HF4;
+    }
     return CURRENT_TRANSACTION_VERSION;
+  }
+  //---------------------------------------------------------------
+  uint64_t get_tx_version(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd)
+  {
+    [[maybe_unused]] size_t tx_hardfork_id{};
+    return get_tx_version_and_hardfork_id(tx_expected_block_height, hfd, tx_hardfork_id);
   }
   //---------------------------------------------------------------
   // TODO @#@# this function is obsolete and needs to be re-written

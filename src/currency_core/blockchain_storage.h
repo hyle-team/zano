@@ -233,11 +233,14 @@ namespace currency
     size_t get_alternative_blocks_count() const;
     crypto::hash get_block_id_by_height(uint64_t height) const;
     bool get_block_by_hash(const crypto::hash &h, block &blk) const;
+    bool get_block_reward_by_main_chain_height(const uint64_t height, uint64_t& reward_with_fee) const; // only for main chain blocks
+    bool get_block_reward_by_hash(const crypto::hash &h, uint64_t& reward_with_fee) const; // works for main chain and alt chain blocks
     bool get_block_extended_info_by_height(uint64_t h, block_extended_info &blk) const;
     bool get_block_extended_info_by_hash(const crypto::hash &h, block_extended_info &blk) const;
     bool get_block_by_height(uint64_t h, block &blk) const;
     bool is_tx_related_to_altblock(crypto::hash tx_id) const;
     //void get_all_known_block_ids(std::list<crypto::hash> &main, std::list<crypto::hash> &alt, std::list<crypto::hash> &invalid) const;
+    bool is_pre_hardfork_tx_freeze_period_active() const;
 
     bc_attachment_services_manager& get_attachment_services_manager(){ return m_services_mgr; }
 
