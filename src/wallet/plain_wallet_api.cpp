@@ -242,7 +242,7 @@ namespace plain_wallet
       ptr->postponed_main_worked_started = true;
     }
 
-    LOG_PRINT_L0("[INIT PLAIN_WALLET_INSTANCE] Ver:" << PROJECT_VERSION_LONG << "(" << BUILD_TYPE << ")");
+    LOG_PRINT_L0("[INIT PLAIN_WALLET_INSTANCE] Ver:" << PROJECT_VERSION_LONG << "(" << BUILD_TYPE << ")" << ENDL << "Working dir: " << working_dir << ENDL << "URL: " << ip << ",  port: " << port);
 
 
 #ifndef CAKEWALLET
@@ -583,6 +583,8 @@ namespace plain_wallet
   {
     GET_INSTANCE_PTR(inst_ptr);
     inst_ptr->gwm.set_remote_node_url(url);
+
+    LOG_PRINT_L0("[RESET URL] URL:" << url);
 
     view::api_response ar = AUTO_VAL_INIT(ar);
     ar.error_code = API_RETURN_CODE_OK;
