@@ -36,7 +36,8 @@ POP_VS_WARNINGS
 void test_plain_wallet()
 {
   //std::string res = plain_wallet::init("195.201.107.230", "33340", "C:\\Users\\roky\\home\\", 0);
-  std::string res = plain_wallet::init("", "", "C:\\Users\\roky\\home\\", 0);
+  //std::string res = plain_wallet::init("", "", "C:\\Users\\roky\\home\\", 0);
+  std::string res = plain_wallet::init("http://zano.api.puffin.systems", "80", "C:\\Users\\roky\\home\\", 0);
   //std::string res = plain_wallet::init("127.0.0.1", "12111", "C:\\Users\\roky\\home22\\", 0);
   
   plain_wallet::configure_object conf = AUTO_VAL_INIT(conf);

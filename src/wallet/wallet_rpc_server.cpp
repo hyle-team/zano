@@ -23,7 +23,7 @@ DISABLE_VS_WARNINGS(4244)
 POP_VS_WARNINGS
 #include "crypto/bitcoin/sha256_helper.h"
 
-#define JWT_TOKEN_EXPIRATION_MAXIMUM          (60 * 60)
+#define JWT_TOKEN_EXPIRATION_MAXIMUM          (60 * 60 * 1000)
 #define JWT_TOKEN_CLAIM_NAME_BODY_HASH        "body_hash"
 #define JWT_TOKEN_CLAIM_NAME_SALT             "salt"
 #define JWT_TOKEN_CLAIM_NAME_EXPIRATION       "exp"     
