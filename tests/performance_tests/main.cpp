@@ -58,6 +58,7 @@ void test_plain_wallet()
 
   //res = plain_wallet::sync_call("reset_connection_url", 0, "195.201.107.230:33336");
   //res = plain_wallet::sync_call("reset_connection_url", 0, "https://node.zano.org:443");
+  res = plain_wallet::sync_call("reset_connection_url", 0, "https://zano.cakewallet.com");
   
   r = plain_wallet::sync_call("run_wallet", instance_id, "");
 

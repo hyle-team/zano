@@ -744,10 +744,40 @@ namespace currency
     {//we have to fetch more objects ids, request blockchain entry
      
       NOTIFY_REQUEST_CHAIN::request r = boost::value_initialized<NOTIFY_REQUEST_CHAIN::request>();
-      m_core.get_short_chain_history(r.block_ids);
-      LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_CHAIN: m_block_ids.size()=" << r.block_ids.size() );
-      LOG_PRINT_L3("[NOTIFY]NOTIFY_REQUEST_CHAIN: " << ENDL << print_kv_structure(r) );
+      if (context.m_priv.m_last_fetched_block_ids.get_top_block_height() > 0)
+      {
+        bool last_received_block_is_in_mainchain = m_core.get_blockchain_storage().have_block_main(context.m_priv.m_last_fetched_block_ids.get_top_block_id());
+        bool far_from_top = context.m_priv.m_last_fetched_block_ids.get_top_block_height() + BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT < m_core.get_blockchain_storage().get_current_blockchain_size();
+        if (!last_received_block_is_in_mainchain || (last_received_block_is_in_mainchain && far_from_top))
+        {          
+          block_extended_info blk = AUTO_VAL_INIT(blk);
+          // In this scenario, it's likely the remote daemon is on an alternate chain 
+          // where the network split goes deeper than 2000 blocks. The NOTIFY_REQUEST_GET_OBJECTS 
+          // call returns a batch of BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT IDs, which may 
+          // start well beyond the original split point.
+          //
+          // If we repeatedly call NOTIFY_REQUEST_GET_OBJECTS with the IDs obtained from 
+          // get_short_chain_history, it would create an endless loop. However, we still need 
+          // to retrieve the full alternate chain from the remote daemon because it could 
+          // potentially be “heavier” (in terms of consensus).
+          //
+          // Therefore, we provide only the last ten blocks returned by the remote daemon 
+          // in the NOTIFY_REQUEST_CHAIN request, expecting to receive the subsequent batch 
+          // of alternate blocks next.
+          context.m_priv.m_last_fetched_block_ids.get_short_chain_history(r.block_ids);
+          //add genesis to the latest
+          LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_CHAIN: requesting alt version starting from " << r.block_ids.front());
+        }
+      }
+
+      if (!r.block_ids.size())
+      {
+        m_core.get_short_chain_history(r.block_ids);
+      }
+      LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_CHAIN: m_block_ids.size()=" << r.block_ids.size());
+      LOG_PRINT_L3("[NOTIFY]NOTIFY_REQUEST_CHAIN: " << ENDL << print_kv_structure(r));
       post_notify<NOTIFY_REQUEST_CHAIN>(r, context);
+
     }else
     { 
       CHECK_AND_ASSERT_MES(context.m_last_response_height == context.m_remote_blockchain_height-1 
@@ -976,10 +1006,16 @@ namespace currency
       m_p2p->add_ip_fail(context.m_remote_ip);
     }
 
+    uint64_t height = arg.start_height;
     BOOST_FOREACH(auto& bl_details, arg.m_block_ids)
     {
       if (!m_core.have_block(bl_details.h))
+      {
         context.m_priv.m_needed_objects.push_back(bl_details);
+      }
+
+      context.m_priv.m_last_fetched_block_ids.push_new_block_id(bl_details.h, height);
+      height++;
     }
 
     request_missing_objects(context, false);
