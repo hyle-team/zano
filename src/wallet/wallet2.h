@@ -41,7 +41,7 @@
 #include "currency_core/bc_offers_serialization.h"
 #include "currency_core/bc_escrow_service.h"
 #include "common/pod_array_file_container.h"
-#include "wallet_chain_shortener.h"
+#include "currency_core/block_chain_shortener.h"
 #include "tor-connect/torlib/tor_lib_iface.h"
 #include "currency_core/pos_mining.h"
 #include "view_iface.h"
@@ -127,7 +127,7 @@ namespace tools
   */
   struct wallet2_base_state
   {
-    wallet_chain_shortener m_chain;
+    block_chain_shortener m_chain;
     uint64_t m_minimum_height = WALLET_MINIMUM_HEIGHT_UNSET_CONST;
     amount_gindex_to_transfer_id_container m_amount_gindex_to_transfer_id;
     transfer_container m_transfers;
