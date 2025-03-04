@@ -6,7 +6,7 @@
 # Usage:
 # (make sure you have correct permission for /var/data/zano-data prior to run!)
 #
-#   docker run --restart=always -v /var/data/zano-data:/home/zano/.Zano -p 11121:11121 -p 11211:11211 --name=zanod -dit zanoproject/remote-note
+#   docker run --restart=always -v /var/data/zano-data:/home/zano/.Zano -p 11121:11121 -p 11211:11211 --name=zanod -dit zanoproject/remote-node
 #
 # To get into container and interact with the daemon:
 #   docker attach zanod
