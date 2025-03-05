@@ -59,7 +59,7 @@ namespace tools
     }
 
     // okay, let's download
-
+    LOG_PRINT_MAGENTA("Pre-download required: local db size: " << sz << ", pre_download.unpacked_size = " << pre_download.unpacked_size << ", flag_force_predownload: " << (flag_force_predownload ? "true":"false"), LOG_LEVEL_0);
     std::string downloading_file_path = db_main_file_path + ".download";
     if (!command_line::has_arg(vm, command_line::arg_process_predownload_from_path))
     {

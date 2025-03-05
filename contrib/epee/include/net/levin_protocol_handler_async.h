@@ -252,6 +252,7 @@ public:
     LOG_PRINT_CC(m_connection_context, "[LEVIN_PROTOCOL" << this << "] CONSTRUCTED", LOG_LEVEL_4);
   }
 
+
   virtual ~async_protocol_handler()
   {
     NESTED_TRY_ENTRY();
@@ -276,6 +277,11 @@ public:
     VALIDATE_MUTEX_IS_FREE(m_invoke_response_handlers_lock);
 
     NESTED_CATCH_ENTRY(__func__);
+  }
+
+  void on_pre_destroy()
+  {
+    m_config.del_connection(this);
   }
 
   bool start_outer_call()
