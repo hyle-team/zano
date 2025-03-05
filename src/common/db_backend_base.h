@@ -5,6 +5,8 @@
 
 #pragma once
 
+#include <boost/interprocess/mapped_region.hpp>
+
 #ifndef ENV32BIT
 #define CACHE_SIZE uint64_t(uint64_t(1UL * 128UL) * 1024UL * 1024UL * 1024UL)
 #else
@@ -28,6 +30,7 @@ namespace tools
       uint64_t tx_count;
       uint64_t write_tx_count;
       uint64_t map_size;
+      uint64_t page_size;
     };
 
     struct i_db_backend
