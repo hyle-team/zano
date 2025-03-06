@@ -3710,6 +3710,8 @@ uint64_t wallet2::balance(uint64_t& unlocked, uint64_t& awaiting_in, uint64_t& a
     awaiting_in = it->second.awaiting_in;
     awaiting_out = it->second.awaiting_out;
   }
+  if (asset_id != native_coin_asset_id)
+    mined = 0;
   return total;
 }
 //----------------------------------------------------------------------------------------------------
@@ -5836,8 +5838,10 @@ struct local_transfers_struct
   END_KV_SERIALIZE_MAP()
 };
 
-void wallet2::dump_trunsfers(std::stringstream& ss, bool verbose) const
+void wallet2::dump_trunsfers(std::stringstream& ss, bool verbose, const crypto::public_key& asset_id) const
 {
+  bool filter_by_asset_id = asset_id != currency::null_pkey;
+
   if (verbose)
   {
 
@@ -5846,6 +5850,8 @@ void wallet2::dump_trunsfers(std::stringstream& ss, bool verbose) const
     {
       uint64_t i = tr.first;
       const transfer_details& td = tr.second;
+      if (filter_by_asset_id && td.get_asset_id() != asset_id)
+        continue;
       ss << "{ \"i\": " << i << "," << ENDL;
       ss << "\"entry\": " << epee::serialization::store_t_to_json(td) << "}," << ENDL;
     }
@@ -5858,6 +5864,8 @@ void wallet2::dump_trunsfers(std::stringstream& ss, bool verbose) const
     {
       uint64_t i = tr.first;
       const transfer_details& td = tr.second;
+      if (filter_by_asset_id && td.get_asset_id() != asset_id)
+        continue;
       ss << std::right <<
         std::setw(5) << i << "  " <<
         std::setw(21) << print_money(td.amount()) << "  " <<
@@ -5873,10 +5881,10 @@ void wallet2::dump_trunsfers(std::stringstream& ss, bool verbose) const
   }
 }
 //----------------------------------------------------------------------------------------------------
-std::string wallet2::dump_trunsfers(bool verbose) const
+std::string wallet2::dump_trunsfers(bool verbose, const crypto::public_key& asset_id) const
 {
   std::stringstream ss;
-  dump_trunsfers(ss, verbose);
+  dump_trunsfers(ss, verbose, asset_id);
   return ss.str();
 }
 //----------------------------------------------------------------------------------------------------

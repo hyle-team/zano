@@ -681,8 +681,9 @@ namespace tools
     void accept_cancel_contract(const crypto::hash& contract_id, currency::transaction* p_cancellation_acceptance_tx = nullptr);
 
     void scan_tx_to_key_inputs(std::vector<uint64_t>& found_transfers, const currency::transaction& tx);
-    void dump_trunsfers(std::stringstream& ss, bool verbose = true) const;
-    std::string dump_trunsfers(bool verbose = false) const;
+    // asset_id = null_pkey means no filtering by asset id
+    void dump_trunsfers(std::stringstream& ss, bool verbose = true, const crypto::public_key& asset_id = currency::null_pkey) const;
+    std::string dump_trunsfers(bool verbose = false, const crypto::public_key& asset_id = currency::null_pkey) const;
     void dump_key_images(std::stringstream& ss);
     void get_multisig_transfers(multisig_transfer_container& ms_transfers);
     const multisig_transfer_container& get_multisig_transfers() const { return m_multisig_transfers; }

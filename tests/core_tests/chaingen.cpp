@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -2153,7 +2153,7 @@ bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name,
 
   if (!r)
   {
-    LOG_PRINT(account_name << "'s transfers: " << ENDL << w.dump_trunsfers(), LOG_LEVEL_0);
+    LOG_PRINT(account_name << "'s transfers for asset_id " << asset_id << ": " << ENDL << w.dump_trunsfers(false, asset_id), LOG_LEVEL_0);
   }
 
   return r;
