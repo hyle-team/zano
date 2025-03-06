@@ -1309,6 +1309,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(eth_signed_asset_via_rpc, "5-*"); // TODO: make HF4 version
     //GENERATE_AND_PLAY_HF(asset_current_and_total_supplies_comparative_constraints, "4-*"); <-- temporary disabled, waiting for Stepan's fix -- sowle
     GENERATE_AND_PLAY_HF(several_asset_emit_burn_txs_in_pool, "5-*");
+    GENERATE_AND_PLAY_HF(assets_transfer_with_smallest_amount, "4-*");
 
     GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
     GENERATE_AND_PLAY_HF(wallet_reorganize_and_trim_test, "4-*");

@@ -117,3 +117,12 @@ struct several_asset_emit_burn_txs_in_pool : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct assets_transfer_with_smallest_amount : public wallet_test
+{
+  assets_transfer_with_smallest_amount();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  mutable uint64_t m_alice_initial_balance = 0;
+};

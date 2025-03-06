@@ -437,7 +437,9 @@ void fill_ado_version_based_onhardfork(currency::asset_descriptor_operation& ass
     asset_reg_info.version = ASSET_DESCRIPTOR_OPERATION_LAST_VER;
   }
 }
+
 //----------------------------------------------------------------------------------------------------
+
 void fill_adb_version_based_onhardfork(currency::asset_descriptor_base& asset_base, size_t current_latest_hf)
 {
   if (current_latest_hf < ZANO_HARDFORK_05)
@@ -2595,6 +2597,118 @@ bool several_asset_emit_burn_txs_in_pool::c1(currency::core& c, size_t ev_index,
   CHECK_AND_ASSERT_MES(mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW), false, "");
 
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", total_asset_amount, asset_id, adb.decimal_point), false, "");
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+assets_transfer_with_smallest_amount::assets_transfer_with_smallest_amount()
+{
+  REGISTER_CALLBACK_METHOD(assets_transfer_with_smallest_amount, c1);
+}
+
+bool assets_transfer_with_smallest_amount::generate(std::vector<test_event_entry>& events) const
+{
+  // 
+  // Test idea: make sure wallet correctly handles cases when there's smallest amount being transferred (so it cannot be divided to maintain the mininum required outputs count).
+  // Only for HF >= 4
+  //
+
+  bool r = false;
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core"); // necessary to set m_hardforks
+
+  // HF4 requires tests_random_split_strategy (for 2 outputs minimum)
+  test_gentime_settings tgts = generator.get_test_gentime_settings();
+  tgts.split_strategy = tests_random_split_strategy;
+  generator.set_test_gentime_settings(tgts);
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // make sure HF4 has been activated
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_04_ZARCANUM));
+
+  // tx_0: miner -> Alice (1 * fee + 2 * fee)
+  MAKE_TX(events, tx_0, miner_acc, alice_acc, TESTS_DEFAULT_FEE, blk_0r);
+  MAKE_TX(events, tx_1, miner_acc, alice_acc, 2 * TESTS_DEFAULT_FEE, blk_0r);
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({tx_0, tx_1}));
+
+  m_alice_initial_balance = TESTS_DEFAULT_FEE + 2 * TESTS_DEFAULT_FEE;
+
+  // rewind blocks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool assets_transfer_with_smallest_amount::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false, stub = false;;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
+  miner_wlt->refresh();
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
+  alice_wlt->refresh();
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", m_alice_initial_balance, 0, m_alice_initial_balance, 0, 0), false, "");
+
+  // miner deploys new asset
+  asset_descriptor_base adb{};
+  adb.total_max_supply = 1;
+  adb.full_name = "Patrzcie co spotkalem!";
+  adb.ticker = "BOBR";
+  adb.decimal_point = 0;
+  adb.current_supply = 1;
+
+  std::vector<tx_destination_entry> destinations;
+  destinations.emplace_back(adb.total_max_supply, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey);
+
+  transaction asset_emission_tx{};
+  crypto::public_key asset_id = null_pkey;
+
+  miner_wlt->deploy_new_asset(adb, destinations, asset_emission_tx, asset_id);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", 1, 0, 1, 0, 0, asset_id), false, "");
+
+  // now Alice has undividable output with amount=1 of the asset
+  // and two native outputs: fee (which is exactly what is necessary to a normal transfer) and 2 x fee
+  // usually, wallet choose the most apropriate amount for native coins, which is 'fee' for transferring an asset.
+  // however, in such a case, asset amount cannot be divided any further, and thus, to maintain the min limit for outputs
+  // wallet should choose 2 x fee output instead
+
+  alice_wlt->transfer(1, m_accounts[MINER_ACC_IDX].get_public_address(), asset_id);
+
+  // make sure Alice doesn't have this asset anymore
+  alice_wlt->scan_tx_pool(stub);
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", 0, 0, 0, 0, 1, asset_id), false, "");
+
+  // but miner does
+  miner_wlt->scan_tx_pool(stub);
+  miner_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*miner_wlt, "Miner", 1, 0, 0, 1, 0, asset_id), false, "");
+
+  // mine some block to unlock
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+
+  // and check balances again
+  alice_wlt->scan_tx_pool(stub);
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", 0, 0, 0, 0, 0, asset_id), false, "");
+
+  miner_wlt->scan_tx_pool(stub);
+  miner_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*miner_wlt, "Miner", 1, 0, 1, 0, 0, asset_id), false, "");
 
   return true;
 }
