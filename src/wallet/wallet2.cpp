@@ -7096,25 +7096,45 @@ bool wallet2::prepare_tx_sources_htlc(crypto::hash htlc_tx_id, const std::string
 assets_selection_context wallet2::get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts)
 {
   assets_selection_context amounts_map;
-  amounts_map[currency::native_coin_asset_id].needed_amount = fee;
+  auto& native_coin_item = amounts_map[currency::native_coin_asset_id];
+  native_coin_item.needed_amount = native_coin_item.requested_amount = fee;
+  uint64_t raw_amount_sum_of_non_native_assets = 0;
   for (auto& dt : dsts)
   {
     if (dt.asset_id == currency::null_pkey)
-      continue;     //this destination for emmition only
+      continue; // asset emission output, don't need to take into account
 
     THROW_IF_TRUE_WALLET_EX(0 == dt.amount, error::zero_destination);
     uint64_t money_to_add = dt.amount;
-    if (dt.amount_to_provide || dt.flags & tx_destination_entry_flags::tdef_explicit_amount_to_provide)
+    if (dt.amount_to_provide || (dt.flags & tx_destination_entry_flags::tdef_explicit_amount_to_provide))
       money_to_add = dt.amount_to_provide;
 
-    amounts_map[dt.asset_id].needed_amount += money_to_add;
-    THROW_IF_TRUE_WALLET_EX(amounts_map[dt.asset_id].needed_amount < money_to_add, error::tx_sum_overflow, dsts, fee);
-    //clean up empty entries
-    if (amounts_map[dt.asset_id].needed_amount == 0)
+    auto& amount_item = amounts_map[dt.asset_id];
+
+    amount_item.needed_amount += money_to_add;
+    THROW_IF_TRUE_WALLET_EX(amount_item.needed_amount < money_to_add, error::tx_sum_overflow, dsts, fee);
+    if (amount_item.needed_amount == 0)
     {
-      amounts_map.erase(amounts_map.find(dt.asset_id));
+      amounts_map.erase(amounts_map.find(dt.asset_id)); // clean up empty entries
+    }
+    else
+    {
+      amount_item.requested_amount = amount_item.needed_amount;
+      if (dt.asset_id != native_coin_asset_id)
+        raw_amount_sum_of_non_native_assets += amount_item.needed_amount;
     }
   }
+
+  // handle a case when the total amount of assets being transferred is too small to satisfy CURRENCY_TX_MIN_ALLOWED_OUTS limit
+  // AND there will be no change output in native coins => increase the needed_amount to enforce creating the change output
+  // (Note: in case we will be okay with zero-amount outputs at some point, this could be simplified and get rid of requested_amount field -- sowle)
+  if (raw_amount_sum_of_non_native_assets != 0 &&
+      raw_amount_sum_of_non_native_assets < CURRENCY_TX_MIN_ALLOWED_OUTS &&
+      amounts_map[currency::native_coin_asset_id].requested_amount == fee)
+  {
+    amounts_map[currency::native_coin_asset_id].requested_amount += CURRENCY_TX_MIN_ALLOWED_OUTS - 1;
+  }
+
   return amounts_map;
 }
 //----------------------------------------------------------------------------------------------------------------
@@ -7429,7 +7449,7 @@ bool wallet2::select_indices_for_transfer(assets_selection_context& needed_money
 {
   for (auto& item : needed_money_map)
   {
-    if (item.second.needed_amount == 0)
+    if (item.second.requested_amount == 0)
       continue;
 
     const crypto::public_key asset_id = item.first;
@@ -7439,9 +7459,9 @@ bool wallet2::select_indices_for_transfer(assets_selection_context& needed_money
       WLT_LOG_L1("select_indices_for_transfer: unknown asset id: " << asset_id);
 
     auto asset_cache_it = m_found_free_amounts.find(asset_id);
-    THROW_IF_FALSE_WALLET_EX(asset_cache_it != m_found_free_amounts.end(), error::not_enough_money, item.second.found_amount, item.second.needed_amount, (uint64_t)0, asset_id, asset_info.decimal_point);
-    item.second.found_amount = select_indices_for_transfer(selected_indexes, asset_cache_it->second, item.second.needed_amount, fake_outputs_count, asset_id, asset_info.decimal_point);
-    THROW_IF_FALSE_WALLET_EX(item.second.found_amount >= item.second.needed_amount, error::not_enough_money, item.second.found_amount, item.second.needed_amount, (uint64_t)0, asset_id, asset_info.decimal_point);
+    THROW_IF_FALSE_WALLET_EX(asset_cache_it != m_found_free_amounts.end(), error::not_enough_money, item.second.found_amount, item.second.requested_amount, (uint64_t)0, asset_id, asset_info.decimal_point);
+    item.second.found_amount = select_indices_for_transfer(selected_indexes, asset_cache_it->second, item.second.requested_amount, fake_outputs_count, asset_id, asset_info.decimal_point);
+    THROW_IF_FALSE_WALLET_EX(item.second.found_amount >= item.second.requested_amount, error::not_enough_money, item.second.found_amount, item.second.requested_amount, (uint64_t)0, asset_id, asset_info.decimal_point);
   }
   if (m_current_context.pconstruct_tx_param && m_current_context.pconstruct_tx_param->need_at_least_1_zc)
   {
