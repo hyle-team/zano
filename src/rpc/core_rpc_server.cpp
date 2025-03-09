@@ -311,7 +311,7 @@ namespace currency
   bool core_rpc_server::on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
-
+    LOG_PRINT_L2("[on_get_blocks]: Prevalidating....");
     if (req.block_ids.back() != m_core.get_blockchain_storage().get_block_id_by_height(0))
     {
       //genesis mismatch, return specific
@@ -325,7 +325,7 @@ namespace currency
       res.status = API_RETURN_CODE_BAD_ARG;
       return true;
     }
-
+    LOG_PRINT_L2("[on_get_blocks]: find_blockchain_supplement ....");
     blockchain_storage::blocks_direct_container bs;
     if (!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT, req.minimum_height))
     {
@@ -333,6 +333,7 @@ namespace currency
       return false;
     }
 
+    LOG_PRINT_L2("[on_get_blocks]: Enumerating over blocks ....");
     for (auto& b : bs)
     {
       res.blocks.resize(res.blocks.size()+1);
@@ -349,7 +350,7 @@ namespace currency
         i++;
       }
     }
-
+    LOG_PRINT_L2("[on_get_blocks]: Finished");
     res.status = API_RETURN_CODE_OK;
     return true;
   }

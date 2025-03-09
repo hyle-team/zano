@@ -37,12 +37,12 @@ void test_plain_wallet()
 {
   //std::string res = plain_wallet::init("195.201.107.230", "33340", "C:\\Users\\roky\\home\\", 0);
   //std::string res = plain_wallet::init("", "", "C:\\Users\\roky\\home\\", 0);
-  std::string res = plain_wallet::init("http://zano.api.puffin.systems", "80", "C:\\Users\\roky\\home\\", 0);
+  std::string res = plain_wallet::init("http://127.0.0.1:11211", "C:\\Users\\roky\\home\\", 0);
   //std::string res = plain_wallet::init("127.0.0.1", "12111", "C:\\Users\\roky\\home22\\", 0);
   
   plain_wallet::configure_object conf = AUTO_VAL_INIT(conf);
   //plain_wallet::configure_response conf_resp = AUTO_VAL_INIT(conf_resp);
-  conf.postponed_run_wallet = true;
+  //conf.postponed_run_wallet = true;
   std::string r = plain_wallet::sync_call("configure", 0, epee::serialization::store_t_to_json(conf));
 
 
@@ -58,7 +58,10 @@ void test_plain_wallet()
 
   //res = plain_wallet::sync_call("reset_connection_url", 0, "195.201.107.230:33336");
   //res = plain_wallet::sync_call("reset_connection_url", 0, "https://node.zano.org:443");
-  res = plain_wallet::sync_call("reset_connection_url", 0, "https://zano.cakewallet.com");
+  //res = plain_wallet::sync_call("reset_connection_url", 0, "https://zano.cakewallet.com");
+  //res = plain_wallet::sync_call("reset_connection_url", 0, "https://zano.api.wombat.systems:443");
+  //res = plain_wallet::sync_call("reset_connection_url", 0, "http://127.0.0.1:11211");
+
   
   r = plain_wallet::sync_call("run_wallet", instance_id, "");
 

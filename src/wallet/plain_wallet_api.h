@@ -47,6 +47,10 @@ namespace plain_wallet
   std::string get_wallet_info(hwallet h);
   std::string reset_wallet_password(hwallet h, const std::string& password);
   uint64_t get_current_tx_fee(uint64_t priority); // 0 (default), 1 (unimportant), 2 (normal), 3 (elevated), 4 (priority)
+  
+
+  typedef void (*callback_type)(uint64_t job_id, const std::string& job_response);
+  void set_callback(callback_type callback);
 }
 
 
