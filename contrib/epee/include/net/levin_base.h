@@ -33,6 +33,25 @@
 
 #define LEVIN_SIGNATURE  0x0101010101012101LL  //Bender's nightmare
 
+
+
+#define LEVIN_OK                                        0
+#define LEVIN_ERROR_CONNECTION                         -1
+#define LEVIN_ERROR_CONNECTION_NOT_FOUND               -2
+#define LEVIN_ERROR_CONNECTION_DESTROYED               -3
+#define LEVIN_ERROR_CONNECTION_TIMEDOUT                -4
+#define LEVIN_ERROR_CONNECTION_NO_DUPLEX_PROTOCOL      -5
+#define LEVIN_ERROR_CONNECTION_HANDLER_NOT_DEFINED     -6
+#define LEVIN_ERROR_FORMAT                             -7
+#define LEVIN_ERROR_EXCEPTION                          -8
+#define LEVIN_ERROR_UNKNOWN_ERROR                      -9
+#define LEVIN_ERROR_INTERNAL                           -10
+#define LEVIN_ERROR_PROTOCOL_INCONSISTENT              -11
+#define LEVIN_ERROR_NET_ERROR                          -12
+#define LEVIN_ERROR_SIGNATURE_MISMATCH                 -13
+
+
+
 namespace epee
 {
 namespace levin
@@ -95,21 +114,6 @@ namespace levin
     virtual int notify(int command, const std::string& in_buff, t_connection_context& context) { return LEVIN_OK; }
   };
 
-
-#define LEVIN_OK                                        0
-#define LEVIN_ERROR_CONNECTION                         -1
-#define LEVIN_ERROR_CONNECTION_NOT_FOUND               -2
-#define LEVIN_ERROR_CONNECTION_DESTROYED               -3
-#define LEVIN_ERROR_CONNECTION_TIMEDOUT                -4
-#define LEVIN_ERROR_CONNECTION_NO_DUPLEX_PROTOCOL      -5
-#define LEVIN_ERROR_CONNECTION_HANDLER_NOT_DEFINED     -6
-#define LEVIN_ERROR_FORMAT                             -7
-#define LEVIN_ERROR_EXCEPTION                          -8
-#define LEVIN_ERROR_UNKNOWN_ERROR                      -9
-#define LEVIN_ERROR_INTERNAL                           -10
-#define LEVIN_ERROR_PROTOCOL_INCONSISTENT              -11
-#define LEVIN_ERROR_NET_ERROR                          -12
-#define LEVIN_ERROR_SIGNATURE_MISMATCH                 -13
 
 #define DESCRIBE_RET_CODE(code) case code: return #code;
   inline
