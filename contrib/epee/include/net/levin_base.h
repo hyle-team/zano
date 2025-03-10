@@ -86,8 +86,15 @@ namespace levin
 
     virtual void on_connection_new(t_connection_context& context){};
     virtual void on_connection_close(t_connection_context& context){};
-
   };
+
+  template<class t_connection_context = net_utils::connection_context_base>
+  struct levin_commands_handler_dummy: public levin_commands_handler<t_connection_context>
+  {
+    virtual int invoke(int command, const std::string& in_buff, std::string& buff_out, t_connection_context& context) { return LEVIN_OK; }
+    virtual int notify(int command, const std::string& in_buff, t_connection_context& context) { return LEVIN_OK; }
+  };
+
 
 #define LEVIN_OK                                        0
 #define LEVIN_ERROR_CONNECTION                         -1

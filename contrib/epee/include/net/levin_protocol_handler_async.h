@@ -59,6 +59,7 @@ class async_protocol_handler_config
   critical_section m_connects_lock;
   std::atomic<bool> m_is_in_sendstop_loop;
   connections_map m_connects;
+  levin_commands_handler_dummy<t_connection_context> m_commands_handler_dummy;
 
   void add_connection(async_protocol_handler<t_connection_context>* pc);
   void del_connection(async_protocol_handler<t_connection_context>* pc);
@@ -87,7 +88,7 @@ public:
   bool foreach_connection(callback_t cb);
   size_t get_connections_count();
 
-  async_protocol_handler_config() :m_pcommands_handler(NULL), m_max_packet_size(LEVIN_DEFAULT_MAX_PACKET_SIZE), m_is_in_sendstop_loop(false), m_invoke_timeout{}
+  async_protocol_handler_config() :m_pcommands_handler(&m_commands_handler_dummy), m_max_packet_size(LEVIN_DEFAULT_MAX_PACKET_SIZE), m_is_in_sendstop_loop(false), m_invoke_timeout{}
   {}
   ~async_protocol_handler_config()
   {
