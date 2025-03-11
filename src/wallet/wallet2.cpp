@@ -2409,7 +2409,7 @@ bool wallet2::sweep_bare_unspent_outputs(const currency::account_public_address&
     }
     uint64_t fee = TX_DEFAULT_FEE;
     std::vector<tx_destination_entry> destinations{ tx_destination_entry(group.total_amount + group.additional_tid_amount - fee, target_address) };
-    assets_selection_context needed_money_map{ std::make_pair(native_coin_asset_id, selection_for_amount{group.total_amount + group.additional_tid_amount, group.total_amount + group.additional_tid_amount}) };
+    assets_selection_context needed_money_map{ std::make_pair(native_coin_asset_id, selection_for_amount{group.total_amount + group.additional_tid_amount, group.total_amount + group.additional_tid_amount, group.total_amount + group.additional_tid_amount}) };
     try
     {
       prepare_tx_destinations(needed_money_map, get_current_split_strategy(), tx_dust_policy{}, destinations, 0 /* tx_flags */, ftp.prepared_destinations);
@@ -7901,11 +7901,11 @@ bool wallet2::prepare_transaction(construct_tx_param& ctp, currency::finalize_tx
     if (ftp.tx_version > TRANSACTION_VERSION_PRE_HF4)
     {
       for (const auto& el : msc.proposal_info.to_initiator)
-        needed_money_map[el.asset_id].needed_amount += el.amount;
+        needed_money_map[el.asset_id].add_to_needed_and_requested_amount(el.amount);
     }
 
     if (msc.escrow)
-      needed_money_map[currency::native_coin_asset_id].needed_amount += (currency::get_outs_money_amount(tx_for_mode_separate) - get_inputs_money_amount(tx_for_mode_separate));
+      needed_money_map[currency::native_coin_asset_id].add_to_needed_and_requested_amount(currency::get_outs_money_amount(tx_for_mode_separate) - get_inputs_money_amount(tx_for_mode_separate));
   }
   TIME_MEASURE_FINISH_MS(get_needed_money_time);
 
