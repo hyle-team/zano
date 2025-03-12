@@ -776,7 +776,7 @@ namespace tools
         return m_cache.get_max_elements();
       }
 
-      void set_cache_size(uint64_t max_cache_size)
+      void set_cache_size(uint64_t max_cache_size) const
       {
         m_cache.set_max_elements(max_cache_size);
       }

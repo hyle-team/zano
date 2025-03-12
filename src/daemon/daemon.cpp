@@ -37,10 +37,14 @@ using namespace epee;
 #endif
 
 
+const uint64_t min_ram_for_full_warp_mode = 32ULL * 1024ULL * 1024ULL * 1024ULL;
+const uint64_t recommended_ram_for_full_warp_mode = 64ULL * 1024ULL * 1024ULL * 1024ULL;
+
 //TODO: need refactoring here. (template classes can't be used in BOOST_CLASS_VERSION) 
 BOOST_CLASS_VERSION(nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >, CURRENT_P2P_STORAGE_ARCHIVE_VER);
 
 const command_line::arg_descriptor<uint32_t>    arg_rpc_server_threads("rpc-server-threads", "Specify number of RPC server threads. Default: 10", RPC_SERVER_DEFAULT_THREADS_NUM);
+const command_line::arg_descriptor<bool>        arg_do_warp_mode("do-warp-mode", "This option pre-loads and unserialize all data into RAM and provide significant speed increase in RPC-handling, requires 32GB psychical RAM at least(64GB recommended). Might be helpful for production servers(like remote nodes or public nodes for mobile apps).");
 
 namespace po = boost::program_options;
 
@@ -166,8 +170,9 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_ntp);
+
   command_line::add_arg(desc_cmd_sett, arg_rpc_server_threads);
- 
+  command_line::add_arg(desc_cmd_sett, arg_do_warp_mode); 
 
   arg_market_disable.default_value = true;
   arg_market_disable.use_default = true;
@@ -371,6 +376,43 @@ int main(int argc, char* argv[])
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize checkpoints");
   res = ccore.set_checkpoints(std::move(checkpoints));
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core");
+
+
+  //do full warp mode if needed
+  if (command_line::has_arg(vm, arg_do_warp_mode))
+  {
+    LOG_PRINT_MAGENTA("Initializing full warp-mode", LOG_LEVEL_0);
+    //let's check if cache size were specifically set 
+    if (!command_line::has_arg(vm, arg_db_cache_l2))
+    {
+      //overriding caching settings
+      uint64_t cache_size = ccore.get_blockchain_storage().get_total_transactions() * 10;
+      ccore.get_blockchain_storage().set_db_l2_cache_size(cache_size);
+      
+      LOG_PRINT_MAGENTA("[Warp]: Setting up db cache to " << tools::pretty_print_big_nums(cache_size) << " items.....", LOG_LEVEL_0);
+    }
+    uint64_t phisical_ram_detected = tools::get_total_system_memory();
+    if (phisical_ram_detected < min_ram_for_full_warp_mode)
+    {
+      LOG_PRINT_RED_L0("[Warp]: Detected only " << tools::pretty_print_big_nums(phisical_ram_detected) << "B of RAM, it's not recommended to run daemon in full warm up mode under " << tools::pretty_print_big_nums(min_ram_for_full_warp_mode) << "B, stopping...");
+      return 1;
+    }
+    else
+    {
+      if(phisical_ram_detected < recommended_ram_for_full_warp_mode)
+      {
+        LOG_PRINT_MAGENTA("[Warp]: Detected only " << tools::pretty_print_big_nums(phisical_ram_detected) << "B RAM, might be not optimal, recommended above " << tools::pretty_print_big_nums(recommended_ram_for_full_warp_mode) << "B", LOG_LEVEL_0);
+      }
+      else
+      {
+        LOG_PRINT_GREEN("[Warp]: Detected " << tools::pretty_print_big_nums(phisical_ram_detected) << "B RAM", LOG_LEVEL_0);
+      }
+    }
+
+    LOG_PRINT_MAGENTA("[Warp]: Launching warm up....", LOG_LEVEL_0);
+    ccore.get_blockchain_storage().do_full_db_warm_up();
+    LOG_PRINT_MAGENTA("[Warp]: Warm up finished!", LOG_LEVEL_0);
+  }
 
   // start components
   if (!command_line::has_arg(vm, command_line::arg_console))

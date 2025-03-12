@@ -65,4 +65,5 @@ namespace currency
       txs_ids.push_back(th);
     return get_tx_tree_hash(txs_ids);
   }
+
 }

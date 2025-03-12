@@ -73,6 +73,10 @@ namespace currency
       FIELD(this_block_tx_fee_median)
       FIELD(effective_tx_fee_median)
     END_SERIALIZE()
+
+    // This is an optional data fields, It is not included in serialization and therefore is never stored in the database.
+    // It might be calculated “on the fly” to speed up access operations.
+    mutable std::shared_ptr<crypto::hash> m_cache_coinbase_id;
   };
 
   struct gindex_increment
@@ -185,4 +189,20 @@ namespace currency
     END_KV_SERIALIZE_MAP()
   };
 
+
+
+
+
+  inline crypto::hash get_coinbase_hash_cached(const block_extended_info& bei)
+  {    
+    if (bei.m_cache_coinbase_id)
+    {
+      return *bei.m_cache_coinbase_id;
+    }
+    else
+    {
+      bei.m_cache_coinbase_id = std::make_shared<crypto::hash>(get_transaction_hash(bei.bl.miner_tx));
+      return *bei.m_cache_coinbase_id;
+    }
+  }
 } // namespace currency

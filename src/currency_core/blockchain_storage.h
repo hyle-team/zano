@@ -8,13 +8,13 @@
 #pragma once
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/variables_map.hpp>
+#include <boost/program_options.hpp>
 
 #include <boost/interprocess/sync/named_mutex.hpp>
 
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/version.hpp>
 #include <boost/serialization/list.hpp>
-
 #include <boost/foreach.hpp>
 #include <atomic>
 
@@ -23,6 +23,7 @@
 #include "serialization/string.h"
 #include "serialization/multiprecision.h"
 
+#include "common/command_line.h"
 #include "tx_pool.h"
 #include "blockchain_storage_basic.h"
 #include "common/util.h"
@@ -48,6 +49,8 @@ MARK_AS_POD_C11(macro_alias_1);
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "core"
+
+extern const command_line::arg_descriptor<uint32_t>      arg_db_cache_l2;
 
 namespace currency
 {
@@ -507,7 +510,7 @@ namespace currency
     bool print_tx_outputs_lookup(const crypto::hash& tx_id) const;
     uint64_t get_last_x_block_height(bool pos)const;
     bool is_tx_spendtime_unlocked(uint64_t unlock_time)const;
-
+    void set_db_l2_cache_size(uint64_t ceched_elements) const;
     //experimental
     void do_full_db_warm_up() const;
 

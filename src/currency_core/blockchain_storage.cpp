@@ -73,11 +73,8 @@ using namespace currency;
 
 DISABLE_VS_WARNINGS(4267)
 
-namespace 
-{
-  const command_line::arg_descriptor<uint32_t>      arg_db_cache_l1  ( "db-cache-l1", "Specify size of memory mapped db cache file");
-  const command_line::arg_descriptor<uint32_t>      arg_db_cache_l2  ( "db-cache-l2", "Specify cached elements in db helpers");
-}
+const command_line::arg_descriptor<uint32_t>      arg_db_cache_l1  ( "db-cache-l1", "Specify size of memory mapped db cache file");
+const command_line::arg_descriptor<uint32_t>      arg_db_cache_l2  ( "db-cache-l2", "Specify cached elements in db helpers");
 
 //------------------------------------------------------------------
 blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m_rw_lock),
@@ -205,6 +202,21 @@ bool blockchain_storage::validate_instance(const std::string& path)
   }
 }
 //------------------------------------------------------------------
+void blockchain_storage::set_db_l2_cache_size(uint64_t ceched_elements) const
+{
+  LOG_PRINT_GREEN("Using db items cache size(L2): " << tools::pretty_print_big_nums(ceched_elements) << " items", LOG_LEVEL_0);
+  m_db_blocks_index.set_cache_size(ceched_elements);
+  m_db_blocks.set_cache_size(ceched_elements);
+  m_db_blocks_index.set_cache_size(ceched_elements);
+  m_db_transactions.set_cache_size(ceched_elements);
+  m_db_spent_keys.set_cache_size(ceched_elements);
+  //m_db_outputs.set_cache_size(ceched_elements);
+  m_db_multisig_outs.set_cache_size(ceched_elements);
+  m_db_solo_options.set_cache_size(ceched_elements);
+  m_db_aliases.set_cache_size(ceched_elements);
+  m_db_assets.set_cache_size(ceched_elements);
+  m_db_addr_to_alias.set_cache_size(ceched_elements);
+}
 bool blockchain_storage::init(const std::string& config_folder, const boost::program_options::variables_map& vm)
 {
 //  CRITICAL_REGION_LOCAL(m_read_lock);
@@ -285,18 +297,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     if (command_line::has_arg(vm, arg_db_cache_l2))
     {
       uint64_t cache_size = command_line::get_arg(vm, arg_db_cache_l2);
-      LOG_PRINT_GREEN("Using db items cache size(L2): " << cache_size, LOG_LEVEL_0);
-      m_db_blocks_index.set_cache_size(cache_size);
-      m_db_blocks.set_cache_size(cache_size);
-      m_db_blocks_index.set_cache_size(cache_size);
-      m_db_transactions.set_cache_size(cache_size);
-      m_db_spent_keys.set_cache_size(cache_size);
-      //m_db_outputs.set_cache_size(cache_size);
-      m_db_multisig_outs.set_cache_size(cache_size);
-      m_db_solo_options.set_cache_size(cache_size);
-      m_db_aliases.set_cache_size(cache_size);
-      m_db_assets.set_cache_size(cache_size);
-      m_db_addr_to_alias.set_cache_size(cache_size);
+      set_db_l2_cache_size(cache_size);
     }
 
     LOG_PRINT_L0("Opened DB ver " << m_db_storage_major_compatibility_version << "." << m_db_storage_minor_compatibility_version);
@@ -2423,7 +2424,7 @@ bool blockchain_storage::get_main_block_rpc_details(uint64_t i, block_rpc_extend
   bei.total_txs_size = 0;
   if (true/*!ignore_transactions*/)
   {
-    crypto::hash coinbase_id = get_transaction_hash(core_bei_ptr->bl.miner_tx);
+    crypto::hash coinbase_id = get_coinbase_hash_cached(*core_bei_ptr);
     //load transactions details
     bei.transactions_details.push_back(tx_rpc_extended_info());
     get_tx_rpc_details(coinbase_id, bei.transactions_details.back(), get_block_datetime(core_bei_ptr->bl), true);
@@ -2508,7 +2509,7 @@ bool blockchain_storage::get_alt_block_rpc_details(const block_extended_info& be
 
   bei.is_orphan = true;
 
-  crypto::hash coinbase_id = get_transaction_hash(bei_core.bl.miner_tx);
+  crypto::hash coinbase_id = get_coinbase_hash_cached(bei_core);
   //load transactions details
   bei.transactions_details.push_back(tx_rpc_extended_info());
   fill_tx_rpc_details(bei.transactions_details.back(), bei_core.bl.miner_tx, nullptr, coinbase_id, get_block_datetime(bei_core.bl));
@@ -3300,7 +3301,7 @@ void blockchain_storage::print_blockchain_with_tx(uint64_t start_index, uint64_t
       << ", id: " << get_block_hash(m_db_blocks[i]->bl)
       << ", difficulty: " << block_difficulty(i) << ", nonce " << m_db_blocks[i]->bl.nonce << ", tx_count " << m_db_blocks[i]->bl.tx_hashes.size() << ENDL;
 
-    ss << "[miner id]: " << get_transaction_hash(m_db_blocks[i]->bl.miner_tx) << ENDL << currency::obj_to_json_str(m_db_blocks[i]->bl.miner_tx) << ENDL;
+    ss << "[miner id]: " << get_coinbase_hash_cached(*m_db_blocks[i]) << ENDL << currency::obj_to_json_str(m_db_blocks[i]->bl.miner_tx) << ENDL;
 
     for (size_t j = 0; j != m_db_blocks[i]->bl.tx_hashes.size(); j++)
     {
@@ -3696,7 +3697,7 @@ bool blockchain_storage::find_blockchain_supplement(const std::list<crypto::hash
     std::list<crypto::hash> mis;
     get_transactions_direct(m_db_blocks[i]->bl.tx_hashes, blocks.back().second, mis);
     CHECK_AND_ASSERT_MES(!mis.size(), false, "internal error, block " << get_block_hash(m_db_blocks[i]->bl) << " [" << i << "] contains missing transactions: " << mis);
-    blocks.back().third = m_db_transactions.find(get_transaction_hash(m_db_blocks[i]->bl.miner_tx));
+    blocks.back().third = m_db_transactions.find(get_coinbase_hash_cached(*m_db_blocks[i]));
   }
   return true;
 }
@@ -5350,7 +5351,7 @@ void blockchain_storage::do_full_db_warm_up() const
       LOG_ERROR("some tx's not found");
       return;
     }
-    auto coinbase_tx_ptr = m_db_transactions.find(get_transaction_hash(m_db_blocks[i]->bl.miner_tx));
+    auto coinbase_tx_ptr = m_db_transactions.find(get_coinbase_hash_cached(*m_db_blocks[i]));
     if (!coinbase_tx_ptr)
     {
       LOG_ERROR("Coinbase not found");
@@ -5374,7 +5375,7 @@ void blockchain_storage::do_full_db_warm_up() const
       PRINT_CONTAINER(m_db_aliases);
       PRINT_CONTAINER(m_db_assets);
       PRINT_CONTAINER(m_db_addr_to_alias);
-      LOG_PRINT_CYAN("CACHE STATE: " << ENDL << strm.str(), LOG_LEVEL_0);
+      LOG_PRINT_CYAN("CACHE STATE: " << ENDL << strm.str(), LOG_LEVEL_2);
     }
   }
 }
@@ -5910,7 +5911,7 @@ std::shared_ptr<const transaction_chain_entry> blockchain_storage::find_key_imag
     {
       if (boost::get<txin_to_key>(in).k_image == ki)
       {
-        id_result = get_transaction_hash(block_entry->bl.miner_tx);
+        id_result = get_coinbase_hash_cached(*block_entry);
         return get_tx_chain_entry(id_result);
       }
     }
@@ -8400,7 +8401,7 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
         alt_chain_tx_ids.insert(txs_by_id_and_height_altchain::value_type(on_board_tx.first, txs_by_id_and_height_altchain::value_type::second_type(on_board_tx.second, ch->second.height)));
       }
       //TODO: consider performance optimization (get_transaction_hash might slow down deep reorganizations )
-      alt_chain_tx_ids.insert(txs_by_id_and_height_altchain::value_type(get_transaction_hash(ch->second.bl.miner_tx), txs_by_id_and_height_altchain::value_type::second_type(ch->second.bl.miner_tx, ch->second.height)));
+      alt_chain_tx_ids.insert(txs_by_id_and_height_altchain::value_type(get_coinbase_hash_cached(ch->second), txs_by_id_and_height_altchain::value_type::second_type(ch->second.bl.miner_tx, ch->second.height)));
     }
   }
   else

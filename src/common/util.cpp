@@ -784,4 +784,61 @@ std::string get_nix_version_display_string()
     return true;
   }
 
+  uint64_t get_total_system_memory()
+  {
+#if defined(_WIN32) || defined(_WIN64)
+    // Windows
+    MEMORYSTATUSEX status;
+    status.dwLength = sizeof(status);
+    if (GlobalMemoryStatusEx(&status)) {
+      return static_cast<std::uint64_t>(status.ullTotalPhys);
+    }
+    return 0;
+
+#elif defined(__APPLE__) || defined(__MACH__) || defined(__linux__) || defined(__unix__)
+    // POSIX (Linux, macOS, etc.)
+    // On most Unix-like systems, sysconf(_SC_PHYS_PAGES) and sysconf(_SC_PAGE_SIZE)
+    // will give total number of pages and page size in bytes.
+    long pages = sysconf(_SC_PHYS_PAGES);
+    long page_size = sysconf(_SC_PAGE_SIZE);
+    if (pages == -1 || page_size == -1) {
+      return 0;
+    }
+    return static_cast<std::uint64_t>(pages) * static_cast<std::uint64_t>(page_size);
+#else
+    // Fallback for other OS
+    return 0;
+#endif
+  }
+
+  std::pair<std::string, std::string> pretty_print_big_nums_to_pair(std::uint64_t num)
+  {
+    // 1024-based suffixes
+    static const char* suffixes[] = { "", "K", "M", "G", "T", "P", "E" };
+
+    double count = static_cast<double>(num);
+    int i = 0;
+    // Loop until we find the largest suffix that fits
+    while (count >= 1024.0 && i < (static_cast<int>(sizeof(suffixes) / sizeof(suffixes[0])) - 1))
+    {
+      count /= 1024.0;
+      i++;
+    }
+
+    // Format with 2 decimal places (you can adjust as you like)
+    std::ostringstream os;
+    std::pair<std::string, std::string> res;
+    os << std::fixed << std::setprecision(2) << count;
+    res.first = os.str();
+    res.second = suffixes[i];
+    return res;
+  }
+
+  std::string pretty_print_big_nums(std::uint64_t num)
+  {
+    auto pr = pretty_print_big_nums_to_pair(num);
+    return pr.first + " " + pr.second;
+  }
+
+
 } // namespace tools
