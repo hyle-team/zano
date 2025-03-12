@@ -2,7 +2,8 @@
 script_dir=$( dirname "$(readlink -f "$0")" )
 
 out_dir=~/.local/share/applications
-out_file_name="${out_dir}/Zano.desktop"
+version="$(echo ${APPIMAGE} | rev | cut -d '-' -f1,2 | rev | sed 's/\.AppImage$//')"
+out_file_name="${out_dir}/Zano-${version}.desktop"
 
 export QTWEBENGINE_DISABLE_SANDBOX=1
 
