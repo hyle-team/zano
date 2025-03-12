@@ -766,6 +766,16 @@ namespace tools
         m_cache.clear();
       }
 
+      uint64_t get_cacheed_items_count() const
+      {
+        return m_cache.size();
+      }
+
+      uint64_t get_cache_size() const
+      {
+        return m_cache.get_max_elements();
+      }
+
       void set_cache_size(uint64_t max_cache_size)
       {
         m_cache.set_max_elements(max_cache_size);
@@ -805,6 +815,11 @@ namespace tools
           TIME_MEASURE_FINISH_PD(update_cache_microsec);
         }          
         return res;
+      }
+     
+      std::shared_ptr<const t_value> find(const t_key& k) const
+      {
+        return get(k);
       }
 
       size_t clear()

@@ -102,12 +102,19 @@ namespace currency
     res.current_blocks_median = m_core.get_blockchain_storage().get_current_comulative_blocksize_limit() / 2;
     res.alias_count = m_core.get_blockchain_storage().get_aliases_count();
     res.current_max_allowed_block_size = m_core.get_blockchain_storage().get_current_comulative_blocksize_limit();
-    if (!res.outgoing_connections_count)
-      res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_connecting;
-    else if (m_p2p.get_payload_object().is_synchronized())
+    if(m_ignore_offline_status)
+    { 
       res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_online;
+    }
     else
-      res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_synchronizing;
+    {
+      if (!res.outgoing_connections_count)
+        res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_connecting;
+      else if (m_p2p.get_payload_object().is_synchronized())
+        res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_online;
+      else
+        res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_synchronizing;
+    }
     res.synchronization_start_height = m_p2p.get_payload_object().get_core_inital_height();
     res.max_net_seen_height = m_p2p.get_payload_object().get_max_seen_height();
     m_p2p.get_maintainers_info(res.mi);
@@ -311,7 +318,7 @@ namespace currency
   bool core_rpc_server::on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
-
+    LOG_PRINT_L2("[on_get_blocks]: Prevalidating....");
     if (req.block_ids.back() != m_core.get_blockchain_storage().get_block_id_by_height(0))
     {
       //genesis mismatch, return specific
@@ -325,7 +332,7 @@ namespace currency
       res.status = API_RETURN_CODE_BAD_ARG;
       return true;
     }
-
+    LOG_PRINT_L2("[on_get_blocks]: find_blockchain_supplement ....");
     blockchain_storage::blocks_direct_container bs;
     if (!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT, req.minimum_height))
     {
@@ -333,23 +340,24 @@ namespace currency
       return false;
     }
 
+    LOG_PRINT_L2("[on_get_blocks]: Enumerating over blocks ....");
     for (auto& b : bs)
     {
-      res.blocks.resize(res.blocks.size()+1);
+      res.blocks.resize(res.blocks.size() + 1);
       res.blocks.back().block = block_to_blob(b.first->bl);
       CHECK_AND_ASSERT_MES(b.third.get(), false, "Internal error on handling COMMAND_RPC_GET_BLOCKS_FAST: b.third is empty, ie coinbase info is not prepared");
       res.blocks.back().coinbase_global_outs = b.third->m_global_output_indexes;
       res.blocks.back().tx_global_outs.resize(b.second.size());
       size_t i = 0;
-      
-      BOOST_FOREACH(auto& t, b.second)
+
+      BOOST_FOREACH(auto & t, b.second)
       {
         res.blocks.back().txs.push_back(tx_to_blob(t->tx));
         res.blocks.back().tx_global_outs[i].v = t->m_global_output_indexes;
         i++;
       }
     }
-
+    LOG_PRINT_L2("[on_get_blocks]: Finished");
     res.status = API_RETURN_CODE_OK;
     return true;
   }

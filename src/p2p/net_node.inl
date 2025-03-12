@@ -38,6 +38,7 @@ namespace nodetool
     const command_line::arg_descriptor<bool>                      arg_p2p_offline_mode               ( "offline-mode", "Don't connect to any node and reject any connections");
     const command_line::arg_descriptor<bool>                      arg_p2p_disable_debug_reqs         ( "disable-debug-p2p-requests", "Disable p2p debug requests");
     const command_line::arg_descriptor<uint32_t>                  arg_p2p_ip_auto_blocking           ( "p2p-ip-auto-blocking", "Enable (1) or disable (0) peers auto-blocking by IP <0|1>. Default: 0", 1);
+    const command_line::arg_descriptor<uint32_t>                  arg_p2p_server_threads             ( "p2p-server-threads", "Specify number of p2p server threads. Default: 10", P2P_SERVER_DEFAULT_THREADS_NUM);
   }
 
   //-----------------------------------------------------------------------------------
@@ -56,6 +57,7 @@ namespace nodetool
     command_line::add_arg(desc, arg_p2p_disable_debug_reqs);
     command_line::add_arg(desc, arg_p2p_use_only_priority_nodes);
     command_line::add_arg(desc, arg_p2p_ip_auto_blocking);
+    command_line::add_arg(desc, arg_p2p_server_threads);
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
@@ -195,6 +197,21 @@ namespace nodetool
     m_offline_mode = command_line::get_arg(vm, arg_p2p_offline_mode);
     m_debug_requests_enabled = !command_line::get_arg(vm, arg_p2p_disable_debug_reqs);
     m_ip_auto_blocking_enabled = (command_line::get_arg(vm, arg_p2p_ip_auto_blocking) != 0);
+    
+    if (command_line::has_arg(vm, arg_p2p_server_threads))
+    {
+      m_threads_count = command_line::get_arg(vm, arg_p2p_server_threads);
+      if (m_threads_count < 2)
+      {
+        LOG_ERROR("P2P server threads number number is too low: " << m_threads_count << "(why would you do that?!)");
+        return false;
+      }
+      LOG_PRINT_L0("P2P server threads number is overridden with " << m_threads_count);
+      if (m_threads_count < P2P_SERVER_DEFAULT_THREADS_NUM)
+      {
+        LOG_PRINT_RED_L0("Warning: P2P server threads number is overridden with low number: " << m_threads_count << "(why would you do that?!)");
+      }
+    }
 
     LOG_PRINT_L0("p2p peers auto-blocking is " << (m_ip_auto_blocking_enabled ? "enabled" : "disabled"));
 

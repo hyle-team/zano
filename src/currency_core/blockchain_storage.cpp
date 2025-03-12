@@ -5331,6 +5331,54 @@ bool blockchain_storage::is_tx_spendtime_unlocked(uint64_t unlock_time) const
   return currency::is_tx_spendtime_unlocked(unlock_time, get_current_blockchain_size(), m_core_runtime_config.get_core_time());
 }
 //------------------------------------------------------------------
+void blockchain_storage::do_full_db_warm_up() const
+{
+
+  uint64_t ticks_last_print = 0;
+  uint64_t current_sz = get_current_blockchain_size();
+  LOG_PRINT_CYAN("Warming up starting, total blocks..." << current_sz, LOG_LEVEL_0);
+  for (uint64_t i = current_sz - 1; i != 0; --i)
+  {
+    CRITICAL_REGION_LOCAL(m_read_lock);
+    auto blk_ptr = m_db_blocks[i];
+    std::list<crypto::hash> mis;
+    std::list<std::shared_ptr<const transaction_chain_entry> > txs;
+    get_transactions_direct(blk_ptr->bl.tx_hashes, txs, mis);
+    CHECK_AND_ASSERT_MES(!mis.size(), void(), "internal error, block " << get_block_hash(m_db_blocks[i]->bl) << " [" << i << "] contains missing transactions: " << mis);
+    if (txs.size() != blk_ptr->bl.tx_hashes.size())
+    {
+      LOG_ERROR("some tx's not found");
+      return;
+    }
+    auto coinbase_tx_ptr = m_db_transactions.find(get_transaction_hash(m_db_blocks[i]->bl.miner_tx));
+    if (!coinbase_tx_ptr)
+    {
+      LOG_ERROR("Coinbase not found");
+      return;
+    }
+    if (epee::misc_utils::get_tick_count() - ticks_last_print > 1000)
+    {
+      ticks_last_print = epee::misc_utils::get_tick_count();
+      LOG_PRINT_CYAN("Warming up: " <<  ( ( (current_sz - i) * 100)/ current_sz) << "%, " << (current_sz - i) << " of " << current_sz, LOG_LEVEL_0);
+
+#define PRINT_CONTAINER(cont_name)  strm << #cont_name"[" << cont_name.get_cache_size() << "]:" << (cont_name.get_cacheed_items_count() * 100) / cont_name.get_cache_size() << " %, items: " << cont_name.get_cacheed_items_count() << ENDL
+
+      std::stringstream strm;
+      PRINT_CONTAINER(m_db_blocks_index);
+      PRINT_CONTAINER(m_db_blocks);
+      PRINT_CONTAINER(m_db_blocks_index);
+      PRINT_CONTAINER(m_db_transactions);
+      PRINT_CONTAINER(m_db_spent_keys);
+      PRINT_CONTAINER(m_db_multisig_outs);
+      PRINT_CONTAINER(m_db_solo_options);
+      PRINT_CONTAINER(m_db_aliases);
+      PRINT_CONTAINER(m_db_assets);
+      PRINT_CONTAINER(m_db_addr_to_alias);
+      LOG_PRINT_CYAN("CACHE STATE: " << ENDL << strm.str(), LOG_LEVEL_0);
+    }
+  }
+}
+//------------------------------------------------------------------
 bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);

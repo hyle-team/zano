@@ -79,6 +79,7 @@ public:
     m_cmd_binder.set_handler("print_tx_outputs_usage", boost::bind(&daemon_commands_handler::print_tx_outputs_usage, this, ph::_1), "Analyse if tx outputs for involved in subsequent transactions");
     m_cmd_binder.set_handler("print_difficulties_of_last_n_blocks", boost::bind(&daemon_commands_handler::print_difficulties_of_last_n_blocks, this, ph::_1), "Print difficulties of last n blocks");
     m_cmd_binder.set_handler("debug_remote_node_mode", boost::bind(&daemon_commands_handler::debug_remote_node_mode, this, ph::_1), "<ip-address> - If node got connected put node into 'debug mode' i.e. no sync process of other communication except ping responses, maintenance secrete key will be requested"); 
+    m_cmd_binder.set_handler("full_db_cache_warmup", boost::bind(&daemon_commands_handler::full_db_cache_warmup, this, ph::_1), "(Experimental) Perform full DB loading to RAM cache(make sense only with big numbers passed to --db-cache-l2 option)");
 #ifdef _DEBUG
     m_cmd_binder.set_handler("debug_set_time_adj", boost::bind(&daemon_commands_handler::debug_set_time_adj, this, ph::_1), "DEBUG: set core time adjustment");
 #endif
@@ -879,6 +880,14 @@ private:
       return true;
     }
     m_srv.get_payload_object().set_to_debug_mode(ip);
+
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool full_db_cache_warmup(const std::vector<std::string>& args)
+  {
+    
+    m_srv.get_payload_object().get_core().get_blockchain_storage().do_full_db_warm_up();
 
     return true;
   }

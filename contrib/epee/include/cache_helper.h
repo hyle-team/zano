@@ -70,10 +70,15 @@ namespace epee
       cache_base() : mac_allowed_elements(max_elements)
       {}
 
-      size_t size()
+      size_t size() const
       {
         
         return data.size();
+      }
+
+      uint64_t get_max_elements() const
+      {
+        return mac_allowed_elements;
       }
 
       void set_max_elements(uint64_t e)

@@ -40,6 +40,7 @@ using namespace epee;
 //TODO: need refactoring here. (template classes can't be used in BOOST_CLASS_VERSION) 
 BOOST_CLASS_VERSION(nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >, CURRENT_P2P_STORAGE_ARCHIVE_VER);
 
+const command_line::arg_descriptor<uint32_t>    arg_rpc_server_threads("rpc-server-threads", "Specify number of RPC server threads. Default: 10", RPC_SERVER_DEFAULT_THREADS_NUM);
 
 namespace po = boost::program_options;
 
@@ -165,7 +166,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_ntp);
-
+  command_line::add_arg(desc_cmd_sett, arg_rpc_server_threads);
+ 
 
   arg_market_disable.default_value = true;
   arg_market_disable.use_default = true;
@@ -183,6 +185,8 @@ int main(int argc, char* argv[])
 
   po::options_description desc_options("Allowed options");
   desc_options.add(desc_cmd_only).add(desc_cmd_sett);
+
+  
 
   po::variables_map vm;
   bool exit_requested = false;
@@ -374,8 +378,28 @@ int main(int argc, char* argv[])
     dch.start_handling();
   }
 
+  uint32_t rpc_threads_count = RPC_SERVER_DEFAULT_THREADS_NUM;
+  if (command_line::has_arg(vm, arg_rpc_server_threads))
+  {
+    rpc_threads_count = command_line::get_arg(vm, arg_rpc_server_threads);
+
+    if (rpc_threads_count < 2)
+    {
+      LOG_ERROR("RPC server threads number number is too low: " << rpc_threads_count << "(why would you do that?!)");
+      return false;
+    }
+    LOG_PRINT_L0("RPC server threads number is overridden with " << rpc_threads_count);
+    if (rpc_threads_count < RPC_SERVER_DEFAULT_THREADS_NUM)
+    {
+      LOG_PRINT_RED_L0("Warning: RPC server threads number is overridden with low number: " << rpc_threads_count << "(why would you do that?!)");
+    }
+
+
+  }
+  
+   
   LOG_PRINT_L0("Starting core rpc server...");
-  res = rpc_server.run(2, false);
+  res = rpc_server.run(rpc_threads_count, false);
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core rpc server.");
   LOG_PRINT_L0("Core rpc server started ok");
 

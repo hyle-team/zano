@@ -508,6 +508,9 @@ namespace currency
     uint64_t get_last_x_block_height(bool pos)const;
     bool is_tx_spendtime_unlocked(uint64_t unlock_time)const;
 
+    //experimental
+    void do_full_db_warm_up() const;
+
   private:
 
     //-------------- DB containers --------------

@@ -16,7 +16,7 @@
 #include "currency_protocol/currency_protocol_handler.h"
 #include "currency_core/bc_offers_service.h"
 
-
+#define RPC_SERVER_DEFAULT_THREADS_NUM                              10
   
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "rpc"

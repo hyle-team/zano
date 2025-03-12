@@ -36,6 +36,8 @@ ENABLE_CHANNEL_BY_DEFAULT(LOG_DEFAULT_CHANNEL);
 
 #define CURRENT_P2P_STORAGE_ARCHIVE_VER    (CURRENCY_FORMATION_VERSION+13)
 
+#define P2P_SERVER_DEFAULT_THREADS_NUM                                       10
+
 PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4355)
 
@@ -249,8 +251,9 @@ namespace nodetool
     bool m_hide_my_port;
     bool m_offline_mode;
     bool m_debug_requests_enabled;
-    bool m_ip_auto_blocking_enabled;
+    bool m_ip_auto_blocking_enabled = false;
     uint64_t m_startup_time;
+    uint32_t m_threads_count = P2P_SERVER_DEFAULT_THREADS_NUM;
 
 
     //critical_section m_connections_lock;
