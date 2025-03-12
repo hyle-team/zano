@@ -32,7 +32,8 @@ create_desktop_icon()
     echo GenericName=Zano | tee -a $target_file_name  > /dev/null
     echo Comment=Privacy blockchain | tee -a $target_file_name > /dev/null
     echo Icon=${out_dir}/Zano.png | tee -a $target_file_name > /dev/null
-    echo Exec=$APPIMAGE --deeplink-params=\\\\\"%u\\\\\" | tee -a $target_file_name  > /dev/null
+    echo TryExec="${APPIMAGE}" | tee -a "${target_file_name}" >/dev/null
+    echo Exec=$APPIMAGE --deeplink-params=\\\\\\\"%u\\\\\\\" | tee -a $target_file_name  > /dev/null
     echo Terminal=false | tee -a $target_file_name  > /dev/null
     echo Type=Application | tee -a $target_file_name  > /dev/null
     echo "Categories=Qt;Utility;" | tee -a $target_file_name  > /dev/null
@@ -44,5 +45,6 @@ create_desktop_icon()
 create_desktop_icon $out_file_name
 
 xdg-mime default Zano.desktop x-scheme-handler/zano
+xdg-desktop-menu install --novendor "${out_file_name}"
 
 call_app "$@"
