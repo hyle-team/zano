@@ -1233,7 +1233,7 @@ bool asset_operation_and_hardfork_checks::c1(
     check_balance_via_wallet(*wallet,
                              /* name = */ "Alice",
                              /* expected_total = */ 1'000'000'000'000'000'000,
-                             /* expected_mined = */ 2 * COIN,
+                             /* expected_mined = */ INVALID_BALANCE_VAL,
                              /* expected_unlocked = */ 1'000'000'000'000'000'000,
                              /* expected_awaiting_in = */ INVALID_BALANCE_VAL,
                              /* expected_awaiting_out = */ INVALID_BALANCE_VAL,

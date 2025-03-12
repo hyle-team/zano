@@ -244,9 +244,10 @@ namespace tools
 
   struct selection_for_amount
   {
-    uint64_t needed_amount = 0;
-    uint64_t found_amount = 0;
-    //std::vector<uint64_t> selected_indicies;
+    uint64_t needed_amount = 0;         // amount that is necessary (sum of outputs + fee)
+    uint64_t requested_amount = 0;      // amount that is used when looking for outputs to spend (requested_amount >= needed_amount)
+    uint64_t found_amount = 0;          // sum amount that was found in the wallet, (found_amount >= requested_amount); found_amount - needed_amount = change
+    void add_to_needed_and_requested_amount(uint64_t v) { needed_amount += v; requested_amount += v; } // consider removing this and 'requested_amount' when we start using zero-amount outputs -- sowle
   };
   typedef std::unordered_map<crypto::public_key, selection_for_amount> assets_selection_context;
 
