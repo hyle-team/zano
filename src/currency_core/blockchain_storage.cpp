@@ -5338,7 +5338,7 @@ void blockchain_storage::do_full_db_warm_up() const
   uint64_t ticks_last_print = 0;
   uint64_t current_sz = get_current_blockchain_size();
   LOG_PRINT_CYAN("Warming up starting, total blocks..." << current_sz, LOG_LEVEL_0);
-  for (uint64_t i = current_sz - 1; i != 0; --i)
+  for (uint64_t i =  1; i != current_sz; ++i)
   {
     CRITICAL_REGION_LOCAL(m_read_lock);
     auto blk_ptr = m_db_blocks[i];
@@ -5360,7 +5360,7 @@ void blockchain_storage::do_full_db_warm_up() const
     if (epee::misc_utils::get_tick_count() - ticks_last_print > 1000)
     {
       ticks_last_print = epee::misc_utils::get_tick_count();
-      LOG_PRINT_CYAN("Warming up: " <<  ( ( (current_sz - i) * 100)/ current_sz) << "%, " << (current_sz - i) << " of " << current_sz, LOG_LEVEL_0);
+      LOG_PRINT_CYAN("Warming up: " <<  ( ( (i) * 100)/ current_sz) << "%, " << (i) << " of " << current_sz, LOG_LEVEL_0);
 
 #define PRINT_CONTAINER(cont_name)  strm << #cont_name"[" << cont_name.get_cache_size() << "]:" << (cont_name.get_cacheed_items_count() * 100) / cont_name.get_cache_size() << " %, items: " << cont_name.get_cacheed_items_count() << ENDL
 
