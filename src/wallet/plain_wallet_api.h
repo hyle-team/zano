@@ -5,7 +5,7 @@
 
 #include <string>
 #include <cstdint>
-#include "../common/error_codes.h"
+//#include "../common/error_codes.h"
 
 namespace plain_wallet
 {
