@@ -116,7 +116,9 @@ namespace epee
 
       void on_after_connect()
       {
+        LOG_PRINT_L2("SSL Handshake....");
         m_socket.handshake(boost::asio::ssl::stream_base::client);
+        LOG_PRINT_L2("SSL Handshake OK");
       }
 
     private: 
@@ -149,10 +151,51 @@ namespace epee
       {
 
       }
+
+      void reset()
+      {
+
+      }
     private:
       boost::asio::ip::tcp::socket m_socket;
     };
 
+
+    template<bool is_ssl>
+    struct socket_backend_resetable
+    {
+      socket_backend_resetable(boost::asio::io_service& _io_service) : mr_io_service(_io_service), m_pbackend(std::make_shared<socket_backend<is_ssl>>(_io_service))
+      {}
+
+      boost::asio::ip::tcp::socket& get_socket()
+      {
+        return m_pbackend->get_socket();
+      }
+
+      void set_domain(const std::string& domain_name)
+      {
+        return m_pbackend->set_domain(domain_name);
+      }
+
+      auto& get_stream()
+      {
+        return m_pbackend->get_stream();
+      }
+
+      void on_after_connect()
+      {
+        return m_pbackend->on_after_connect();
+      }
+
+      void reset()
+      {
+        m_pbackend = std::make_shared<socket_backend<is_ssl>>(mr_io_service);
+      }
+
+    private: 
+      boost::asio::io_service& mr_io_service;
+      std::shared_ptr<socket_backend<is_ssl>> m_pbackend;
+    };
 
 
 
@@ -227,6 +270,7 @@ namespace epee
       inline
         bool connect(const std::string& addr, const std::string& port, unsigned int connect_timeout, unsigned int reciev_timeout, const std::string& bind_ip = "0.0.0.0")
       {
+        LOG_PRINT_L1("Connecting to " << addr << ":" << port << ", cn_timeout: " << connect_timeout << ", rv_timeout: " << reciev_timeout);
         m_connect_timeout = connect_timeout;
         m_reciev_timeout = reciev_timeout;
         m_connected = false;
@@ -238,7 +282,7 @@ namespace epee
           m_sct_back.get_socket().close();
           // Get a list of endpoints corresponding to the server name.
 
-
+          m_sct_back.reset();
           //////////////////////////////////////////////////////////////////////////
 
           boost::asio::ip::tcp::resolver resolver(m_io_service);
@@ -281,13 +325,14 @@ namespace epee
           if (!ec && m_sct_back.get_socket().is_open())
           {
             m_sct_back.on_after_connect();
-            m_connected = true;
+            m_connected = true;       
             m_deadline.expires_at(boost::posix_time::pos_infin);
+            LOG_PRINT_L1("Connected OK: " << addr << ":" << port);
             return true;
           }
           else
           {
-            LOG_PRINT("Some problems at connect, message: " << ec.message(), LOG_LEVEL_3);
+            LOG_PRINT("Error on connect to " << addr << ":" << port << ", message: " << ec.message(), LOG_LEVEL_3);
             return false;
           }
 
@@ -652,7 +697,7 @@ namespace epee
           // The deadline has passed. The socket is closed so that any outstanding
           // asynchronous operations are cancelled. This allows the blocked
           // connect(), read_line() or write_line() functions to return.
-          LOG_PRINT_L3("Timed out socket");
+          LOG_PRINT_L2("Timed out socket");
           m_connected = false;
           m_sct_back.get_socket().close();
 
@@ -669,7 +714,7 @@ namespace epee
 
     protected:
       boost::asio::io_service m_io_service;
-      socket_backend<is_ssl> m_sct_back;
+      socket_backend_resetable<is_ssl> m_sct_back;//socket_backend<is_ssl> m_sct_back;
       int m_connect_timeout;
       int m_reciev_timeout;
       bool m_initialized;

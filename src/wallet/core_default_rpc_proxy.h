@@ -87,13 +87,9 @@ namespace tools
     inline bool invoke_http_json_rpc_update_is_disconnect(const std::string& method_name, const t_request& req, t_response& res)
     {
       return call_request([&](){
-#ifdef MOBILE_WALLET_BUILD
-        LOG_PRINT_L0("[INVOKE_JSON_METHOD] ---> " << method_name)
-#endif
+        LOG_PRINT_L2("[INVOKE_JSON_METHOD] ---> " << method_name)
         bool r = epee::net_utils::invoke_http_json_rpc("/json_rpc", method_name, req, res, m_http_client);
-#ifdef MOBILE_WALLET_BUILD
-        LOG_PRINT_L0("[INVOKE_JSON_METHOD] <---" << method_name)
-#endif
+        LOG_PRINT_L2("[INVOKE_JSON_METHOD] <---" << method_name)
         return r;
       });
     }
@@ -102,13 +98,9 @@ namespace tools
     inline bool invoke_http_bin_remote_command2_update_is_disconnect(const std::string& url, const t_request& req, t_response& res)
     {
       return call_request([&](){
-#ifdef MOBILE_WALLET_BUILD
-        LOG_PRINT_L0("[INVOKE_BIN] --->" << typeid(t_request).name())
-#endif
+        LOG_PRINT_L2("[INVOKE_BIN] --->" << typeid(t_request).name())
         bool r = epee::net_utils::invoke_http_bin_remote_command2(m_daemon_address + url, req, res, m_http_client, m_connection_timeout);
-#ifdef MOBILE_WALLET_BUILD
-        LOG_PRINT_L0("[INVOKE_BIN] <---" << typeid(t_request).name())
-#endif
+        LOG_PRINT_L2("[INVOKE_BIN] <---" << typeid(t_request).name())
         return r;
       });
     }
@@ -117,13 +109,9 @@ namespace tools
     inline bool invoke_http_json_remote_command2_update_is_disconnect(const std::string& url, const t_request& req, t_response& res)
     {
       return call_request([&](){
-#ifdef MOBILE_WALLET_BUILD
-        LOG_PRINT_L0("[INVOKE_JSON_URL] --->" << typeid(t_request).name() )
-#endif
+        LOG_PRINT_L2("[INVOKE_JSON_URL] --->" << typeid(t_request).name() )
         bool r = epee::net_utils::invoke_http_json_remote_command2(m_daemon_address + url, req, res, m_http_client, m_connection_timeout);
-#ifdef MOBILE_WALLET_BUILD
-        LOG_PRINT_L0("[INVOKE_JSON_URL] <---" << typeid(t_request).name())
-#endif
+        LOG_PRINT_L2("[INVOKE_JSON_URL] <---" << typeid(t_request).name())
         return r;
       });
     }

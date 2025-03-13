@@ -33,26 +33,30 @@ DISABLE_VS_WARNINGS(4244)
 #include "jwt-cpp/jwt.h"
 POP_VS_WARNINGS
 
+
 void test_plain_wallet()
 {
   //std::string res = plain_wallet::init("195.201.107.230", "33340", "C:\\Users\\roky\\home\\", 0);
   //std::string res = plain_wallet::init("", "", "C:\\Users\\roky\\home\\", 0);
-  std::string res = plain_wallet::init("http://zano.api.puffin.systems", "80", "C:\\Users\\roky\\home\\", 0);
+  std::string res = plain_wallet::init("https://node.zano.org", "443", "C:\\Users\\roky\\home\\", LOG_LEVEL_2);
   //std::string res = plain_wallet::init("127.0.0.1", "12111", "C:\\Users\\roky\\home22\\", 0);
   
   plain_wallet::configure_object conf = AUTO_VAL_INIT(conf);
   //plain_wallet::configure_response conf_resp = AUTO_VAL_INIT(conf_resp);
   conf.postponed_run_wallet = true;
   std::string r = plain_wallet::sync_call("configure", 0, epee::serialization::store_t_to_json(conf));
-
+  
+  std::string seed;
+  if (!epee::file_io_utils::load_file_to_string("C:\\Users\\roky\\home\\temp\\wallets\\seed.txt", seed))
+    return;
 
   std::string res___ = plain_wallet::get_wallet_files();
 
 
   uint64_t instance_id = 0;
-  res = plain_wallet::open("test_restored_2.zan", "111");
-  //res = plain_wallet::restore("",
-  //  "test_restored_2.zan", "111", "");
+  res = plain_wallet::open("test_restored_3.zan", "111");
+  //res = plain_wallet::restore(seed,
+  //  "test_restored_3.zan", "111", "test");
 
   epee::misc_utils::sleep_no_w(2000);
 
@@ -67,7 +71,7 @@ void test_plain_wallet()
     res = plain_wallet::sync_call("get_wallet_status", instance_id, "");
     view::wallet_sync_status_info wsi = AUTO_VAL_INIT(wsi);
     epee::serialization::load_t_from_json(wsi, res);
-    LOG_PRINT_L0("Progress: " << wsi.progress);
+    LOG_PRINT_L0("Progress: " << wsi.progress << " state: " << wsi.wallet_state << ", height: " << wsi.current_wallet_height << " of " << wsi.current_daemon_height);
     if (wsi.wallet_state == 2)
       break;
   }
@@ -75,6 +79,8 @@ void test_plain_wallet()
   std::string invoke_body = "{\"method\":\"store\",\"params\":{}}";
   std::string res1 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
+  LOG_PRINT_L0("Store: " << res1);
+  return;
   {
     invoke_body = "{\"method\":\"getbalance\",\"params\":{}}";
     std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
