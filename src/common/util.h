@@ -46,6 +46,7 @@ namespace tools
   std::error_code replace_file(const std::string& replacement_name, const std::string& replaced_name);
   uint64_t get_total_system_memory();
   std::string pretty_print_big_nums(std::uint64_t num);
+  bool sanitize_utf8(std::string& input);
   std::pair<std::string, std::string> pretty_print_big_nums_to_pair(std::uint64_t num);
 
   inline crypto::hash get_proof_of_trust_hash(const nodetool::proof_of_trust& pot)

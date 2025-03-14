@@ -15,6 +15,11 @@ namespace tools
     core_fast_rpc_proxy(currency::core_rpc_server& rpc_srv) :m_rpc(rpc_srv)
     {}
     //------------------------------------------------------------------------------------------------------------------------------
+    virtual bool is_daemon_inbox() 
+    {
+      return true; 
+    }
+    //------------------------------------------------------------------------------------------------------------------------------
     virtual bool set_connection_addr(const std::string& url) override
     {
       return true;

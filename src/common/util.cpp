@@ -840,5 +840,113 @@ std::string get_nix_version_display_string()
     return pr.first + " " + pr.second;
   }
 
+  // Replaces invalid UTF-8 sequences with the UTF-8 replacement character (U+FFFD).
+// If the original string is already valid UTF-8, it remains untouched.
+// Returns true if the function modified the string, false otherwise.
+  bool sanitize_utf8(std::string& str_to_sanitize) {
+    const unsigned char* data = reinterpret_cast<const unsigned char*>(str_to_sanitize.data());
+    const unsigned char* end = data + str_to_sanitize.size();
+
+    std::string output;      // remains empty unless invalid data is found
+    bool foundInvalid = false;
+
+    // We'll track where the last "valid segment" started.
+    const unsigned char* segmentStart = data;
+
+    // Helper lambda to append the replacement character U+FFFD (0xEF 0xBF 0xBD).
+    auto appendReplacementChar = [&](const unsigned char* pos) {
+      // If this is our first detected invalid sequence, start building 'output'.
+      //  - Copy everything from segmentStart to 'pos' (not inclusive).
+      if (!foundInvalid) {
+        foundInvalid = true;
+        // Reserve approximate space to avoid repeated allocations
+        output.reserve(str_to_sanitize.size());
+        output.append(reinterpret_cast<const char*>(segmentStart),
+          reinterpret_cast<const char*>(pos));
+      }
+      // Append the UTF-8 replacement character
+      output.append("\xEF\xBF\xBD");
+      };
+
+    while (data < end) {
+      unsigned char c = *data;
+      int extraBytes = 0;
+
+      // 1) Determine how many bytes the current sequence should have,
+      //    based on the leading byte.
+      if ((c & 0x80) == 0) {
+        // 1-byte sequence (ASCII)
+        extraBytes = 0;
+      }
+      else if ((c & 0xE0) == 0xC0) {
+        // 2-byte sequence
+        extraBytes = 1;
+      }
+      else if ((c & 0xF0) == 0xE0) {
+        // 3-byte sequence
+        extraBytes = 2;
+      }
+      else if ((c & 0xF8) == 0xF0) {
+        // 4-byte sequence
+        extraBytes = 3;
+      }
+      else {
+        // Invalid leading byte
+        appendReplacementChar(data);
+        data++;
+        // Next segment of "known good" data starts after this invalid byte
+        segmentStart = data;
+        continue;
+      }
+
+      // 2) Check that we have enough bytes left in the string
+      if (data + extraBytes >= end) {
+        // We don't have enough continuation bytes for a complete sequence
+        appendReplacementChar(data);
+        // Nothing more we can parse, so we're done
+        data = end;
+        break;
+      }
+
+      // 3) Validate the continuation bytes, which must match 10xxxxxx
+      bool invalidContinuation = false;
+      for (int i = 1; i <= extraBytes; ++i) {
+        if ((data[i] & 0xC0) != 0x80) {
+          invalidContinuation = true;
+          break;
+        }
+      }
+
+      if (invalidContinuation) {
+        // One or more continuation bytes are invalid
+        appendReplacementChar(data);
+        data++;
+        segmentStart = data;
+        continue;
+      }
+
+      // If we reach here, (c + continuation) forms a valid UTF-8 sequence
+      data += (extraBytes + 1);
+    }
+
+    // If we never encountered invalid data, 'foundInvalid' is false.
+    // In that case, we do nothing and simply return false.
+    if (!foundInvalid) {
+      return false; // No change was made
+    }
+
+    // Otherwise, we need to copy the last valid segment (if any) into 'output'.
+    // This covers the data from 'segmentStart' to the end.
+    if (segmentStart < end) {
+      output.append(reinterpret_cast<const char*>(segmentStart),
+        reinterpret_cast<const char*>(end));
+    }
+
+    // Now replace the original string with our sanitized version
+    str_to_sanitize.swap(output);
+
+    // Indicate we performed a modification
+    return true;
+  }
 
 } // namespace tools

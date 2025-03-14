@@ -4588,7 +4588,11 @@ void wallet2::get_recent_transfers_history(std::vector<wallet_public::wallet_tra
 
     if (wti.remote_addresses.size() == 1)
     {
-      wti.remote_aliases = get_aliases_for_address(wti.remote_addresses[0]);
+      //this code is significantly slowing down when daemon are not "in-the-same-box"
+      if (m_core_proxy->is_daemon_inbox())
+      {
+        wti.remote_aliases = get_aliases_for_address(wti.remote_addresses[0]);
+      }
     }
 
     if (trs.size() >= count)

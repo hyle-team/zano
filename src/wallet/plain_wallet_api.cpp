@@ -42,7 +42,7 @@
     LOG_ERROR("Core already deinitialised or not initialized yet."); \
     epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response); \
     ok_response.result.return_code = API_RETURN_CODE_UNINITIALIZED; \
-    return epee::serialization::store_t_to_json(ok_response); \
+    return sanitized_store_to_json(ok_response); \
   }
 namespace plain_wallet
 {
@@ -80,6 +80,13 @@ namespace plain_wallet
 
   typedef epee::json_rpc::response<epee::json_rpc::dummy_result, error> error_response;
 
+  template<class t_struct>
+  std::string sanitized_store_to_json(const t_struct& t_obj)
+  {
+    std::string r = epee::serialization::store_t_to_json(t_obj);
+    tools::sanitize_utf8(r);
+    return r;
+  }
 
   std::string get_set_working_dir(bool need_to_set = false, const std::string val = "")
   {
@@ -182,7 +189,7 @@ namespace plain_wallet
     inst_ptr->gwm.quick_clear_wallets_no_save();
     epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
     ok_response.result.return_code = API_RETURN_CODE_OK;
-    return epee::serialization::store_t_to_json(ok_response);
+    return sanitized_store_to_json(ok_response);
   }
 
 
@@ -197,7 +204,7 @@ namespace plain_wallet
       LOG_ERROR("Double-initialization in plain_wallet detected.");
       epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
       ok_response.result.return_code = API_RETURN_CODE_ALREADY_EXISTS;
-      return epee::serialization::store_t_to_json(ok_response);
+      return sanitized_store_to_json(ok_response);
     }
 
     epee::static_helpers::set_or_call_on_destruct(true, static_destroy_handler);
@@ -254,7 +261,7 @@ namespace plain_wallet
       error_response err_result = AUTO_VAL_INIT(err_result);
       err_result.error.code = API_RETURN_CODE_INTERNAL_ERROR;
       err_result.error.message = LOCATION_STR + " \nmessage:" + ec.message();
-      return epee::serialization::store_t_to_json(err_result);
+      return sanitized_store_to_json(err_result);
     }
 
     std::string app_config_folder = get_app_config_folder();
@@ -264,14 +271,14 @@ namespace plain_wallet
       error_response err_result = AUTO_VAL_INIT(err_result);
       err_result.error.code = API_RETURN_CODE_INTERNAL_ERROR;
       err_result.error.message = LOCATION_STR + " \nmessage:" + ec.message();
-      return epee::serialization::store_t_to_json(err_result);
+      return sanitized_store_to_json(err_result);
     }
 #endif
     std::atomic_store(&ginstance_ptr, ptr);
 #ifndef CAKEWALLET
     epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
     ok_response.result.return_code = API_RETURN_CODE_OK;
-    return epee::serialization::store_t_to_json(ok_response);
+    return sanitized_store_to_json(ok_response);
 #else
     return API_RETURN_CODE_OK;
 #endif
@@ -299,7 +306,7 @@ namespace plain_wallet
     {
       error_response err_result = AUTO_VAL_INIT(err_result);
       err_result.error.code = ret_code;
-      return epee::serialization::store_t_to_json(err_result);
+      return sanitized_store_to_json(err_result);
     }
     return res_str;
   }
@@ -311,13 +318,13 @@ namespace plain_wallet
     {
       error_response err_result = AUTO_VAL_INIT(err_result);
       err_result.error.code = ret_code;
-      return epee::serialization::store_t_to_json(err_result);
+      return sanitized_store_to_json(err_result);
     }
     else
     {
       epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
       ok_response.result.return_code = API_RETURN_CODE_OK;
-      return epee::serialization::store_t_to_json(ok_response);
+      return sanitized_store_to_json(ok_response);
     }
   }
   bool is_wallet_exist(const std::string& path)
@@ -344,7 +351,7 @@ namespace plain_wallet
     epee::log_space::log_singletone::truncate_log_files();
     epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
     ok_response.result.return_code = API_RETURN_CODE_OK;
-    return epee::serialization::store_t_to_json(ok_response);
+    return sanitized_store_to_json(ok_response);
   }
 
   std::string get_connectivity_status()
@@ -374,7 +381,7 @@ namespace plain_wallet
     std::string wallet_files_path = get_wallets_folder();
     strings_list sl = AUTO_VAL_INIT(sl);
     epee::file_io_utils::get_folder_content(wallet_files_path, sl.items, true);
-    return epee::serialization::store_t_to_json(sl);
+    return sanitized_store_to_json(sl);
   }
 
   std::string get_export_private_info(const std::string& target_dir)
@@ -388,18 +395,18 @@ namespace plain_wallet
       LOG_ERROR("Failed to create target directory(" << full_target_path << "):" << ec.message());
       epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
       ok_response.result.return_code = API_RETURN_CODE_FAIL;
-      return epee::serialization::store_t_to_json(ok_response);
+      return sanitized_store_to_json(ok_response);
     }
     if(!tools::copy_dir(src_folder_path, full_target_path))
     {
       LOG_ERROR("Failed to copy target directory");
       epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
       ok_response.result.return_code = API_RETURN_CODE_FAIL;
-      return epee::serialization::store_t_to_json(ok_response);
+      return sanitized_store_to_json(ok_response);
     }
     epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
     ok_response.result.return_code = API_RETURN_CODE_OK;
-    return epee::serialization::store_t_to_json(ok_response);
+    return sanitized_store_to_json(ok_response);
   }
 
   std::string delete_wallet(const std::string& file_name)
@@ -410,7 +417,7 @@ namespace plain_wallet
     boost::filesystem::remove(wallet_files_path + file_name, er);
     epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
     ok_response.result.return_code = API_RETURN_CODE_OK;
-    return epee::serialization::store_t_to_json(ok_response);
+    return sanitized_store_to_json(ok_response);
   }
 
   std::string get_address_info(const std::string& addr)
@@ -463,11 +470,11 @@ namespace plain_wallet
         inst_ptr->gwm.run_wallet(ok_response.result.wallet_id);
       }      
 
-      return epee::serialization::store_t_to_json(ok_response);
+      return sanitized_store_to_json(ok_response);
     }
     error_response err_result = AUTO_VAL_INIT(err_result);
     err_result.error.code = rsp;
-    return epee::serialization::store_t_to_json(err_result);
+    return sanitized_store_to_json(err_result);
   }
 
   std::string restore(const std::string& seed, const std::string& path, const std::string& password, const std::string& seed_password)
@@ -487,11 +494,11 @@ namespace plain_wallet
       {
         inst_ptr->gwm.run_wallet(ok_response.result.wallet_id);
       }
-      return epee::serialization::store_t_to_json(ok_response);
+      return sanitized_store_to_json(ok_response);
     }
     error_response err_result = AUTO_VAL_INIT(err_result);
     err_result.error.code = rsp;
-    return epee::serialization::store_t_to_json(err_result);
+    return sanitized_store_to_json(err_result);
   }
 
   std::string generate(const std::string& path, const std::string& password)
@@ -511,11 +518,11 @@ namespace plain_wallet
       {
         inst_ptr->gwm.run_wallet(ok_response.result.wallet_id);
       }
-      return epee::serialization::store_t_to_json(ok_response);
+      return sanitized_store_to_json(ok_response);
     }
     error_response err_result = AUTO_VAL_INIT(err_result);
     err_result.error.code = rsp;
-    return epee::serialization::store_t_to_json(err_result);
+    return sanitized_store_to_json(err_result);
   }
 
   std::string get_opened_wallets()
@@ -523,7 +530,7 @@ namespace plain_wallet
     GET_INSTANCE_PTR(inst_ptr);
     epee::json_rpc::response<std::list<view::open_wallet_response>, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
     inst_ptr->gwm.get_opened_wallets(ok_response.result);
-    return epee::serialization::store_t_to_json(ok_response);
+    return sanitized_store_to_json(ok_response);
   }
 
   std::string close_wallet(hwallet h)
@@ -588,7 +595,7 @@ namespace plain_wallet
 
     view::api_response ar = AUTO_VAL_INIT(ar);
     ar.error_code = API_RETURN_CODE_OK;
-    return epee::serialization::store_t_to_json(ar);
+    return sanitized_store_to_json(ar);
   }
 
   std::string handle_run_wallet(uint64_t instance_id)
@@ -609,7 +616,7 @@ namespace plain_wallet
 
     view::api_response ar = AUTO_VAL_INIT(ar);
     ar.error_code = inst_ptr->gwm.run_wallet(instance_id);
-    return epee::serialization::store_t_to_json(ar);
+    return sanitized_store_to_json(ar);
   }
 
   std::string handle_configure(const std::string& settings_json)
@@ -621,11 +628,11 @@ namespace plain_wallet
     if (!res)
     {
       conf_resp.status = API_RETURN_CODE_BAD_ARG;
-      return epee::serialization::store_t_to_json(conf_resp);
+      return sanitized_store_to_json(conf_resp);
     }
     inst_ptr->postponed_run_wallet = conf.postponed_run_wallet;
     conf_resp.status = API_RETURN_CODE_OK;
-    return epee::serialization::store_t_to_json(conf_resp);
+    return sanitized_store_to_json(conf_resp);
   }
 
   std::string sync_call(const std::string& method_name, uint64_t instance_id, const std::string& params)
@@ -636,7 +643,7 @@ namespace plain_wallet
         close_wallet(instance_id);
         view::api_responce_return_code rc = AUTO_VAL_INIT(rc);
         rc.return_code = API_RETURN_CODE_OK;
-        res = epee::serialization::store_t_to_json(rc);
+        res = sanitized_store_to_json(rc);
     }
     else if (method_name == "open")
     {
@@ -645,7 +652,7 @@ namespace plain_wallet
       {
         view::api_response ar = AUTO_VAL_INIT(ar);
         ar.error_code = "Wrong parameter";
-        res = epee::serialization::store_t_to_json(ar);
+        res = sanitized_store_to_json(ar);
       }else
       {
         res = open(owr.path, owr.pass);
@@ -658,7 +665,7 @@ namespace plain_wallet
       {
         view::api_response ar = AUTO_VAL_INIT(ar);
         ar.error_code = "Wrong parameter";
-        res = epee::serialization::store_t_to_json(ar);
+        res = sanitized_store_to_json(ar);
       }
       else
       {
@@ -672,13 +679,13 @@ namespace plain_wallet
       {
         view::api_response ar = AUTO_VAL_INIT(ar);
         ar.error_code = "Wrong parameter";
-        res = epee::serialization::store_t_to_json(ar);
+        res = sanitized_store_to_json(ar);
       }
       else
       {
         view::api_response_t<view::seed_phrase_info> rsp = AUTO_VAL_INIT(rsp);
         rsp.error_code = tools::get_seed_phrase_info(sip.seed_phrase, sip.seed_password, rsp.response_data);
-        res = epee::serialization::store_t_to_json(rsp);
+        res = sanitized_store_to_json(rsp);
       }
     }    
     else if (method_name == "invoke")
@@ -705,7 +712,7 @@ namespace plain_wallet
     {
       view::api_response ar = AUTO_VAL_INIT(ar);
       ar.error_code = "UNKNOWN METHOD";
-      res = epee::serialization::store_t_to_json(ar);
+      res = sanitized_store_to_json(ar);
     }
     return res;
   }
@@ -748,7 +755,7 @@ namespace plain_wallet
     wallet_extended_info wei = AUTO_VAL_INIT(wei);
     inst_ptr->gwm.get_wallet_info(h, wei.wi);
     inst_ptr->gwm.get_wallet_info_extra(h, wei.wi_extended);
-    return epee::serialization::store_t_to_json(wei);
+    return sanitized_store_to_json(wei);
   }
   std::string reset_wallet_password(hwallet h, const std::string& password)
   {
