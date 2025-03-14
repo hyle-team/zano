@@ -11,7 +11,8 @@ using namespace epee;
 #include "util.h"
 #include "currency_core/currency_config.h"
 #include "version.h"
-
+#define UTF_CPP_CPLUSPLUS 201703L
+#include "utf8.h"
 #ifdef WIN32
 #include <windows.h>
 #include <shlobj.h>
@@ -840,113 +841,198 @@ std::string get_nix_version_display_string()
     return pr.first + " " + pr.second;
   }
 
-  // Replaces invalid UTF-8 sequences with the UTF-8 replacement character (U+FFFD).
-// If the original string is already valid UTF-8, it remains untouched.
-// Returns true if the function modified the string, false otherwise.
-  bool sanitize_utf8(std::string& str_to_sanitize) {
-    const unsigned char* data = reinterpret_cast<const unsigned char*>(str_to_sanitize.data());
-    const unsigned char* end = data + str_to_sanitize.size();
 
-    std::string output;      // remains empty unless invalid data is found
-    bool foundInvalid = false;
-
-    // We'll track where the last "valid segment" started.
-    const unsigned char* segmentStart = data;
-
-    // Helper lambda to append the replacement character U+FFFD (0xEF 0xBF 0xBD).
-    auto appendReplacementChar = [&](const unsigned char* pos) {
-      // If this is our first detected invalid sequence, start building 'output'.
-      //  - Copy everything from segmentStart to 'pos' (not inclusive).
-      if (!foundInvalid) {
-        foundInvalid = true;
-        // Reserve approximate space to avoid repeated allocations
-        output.reserve(str_to_sanitize.size());
-        output.append(reinterpret_cast<const char*>(segmentStart),
-          reinterpret_cast<const char*>(pos));
-      }
-      // Append the UTF-8 replacement character
-      output.append("\xEF\xBF\xBD");
-      };
-
-    while (data < end) {
-      unsigned char c = *data;
-      int extraBytes = 0;
-
-      // 1) Determine how many bytes the current sequence should have,
-      //    based on the leading byte.
-      if ((c & 0x80) == 0) {
-        // 1-byte sequence (ASCII)
-        extraBytes = 0;
-      }
-      else if ((c & 0xE0) == 0xC0) {
-        // 2-byte sequence
-        extraBytes = 1;
-      }
-      else if ((c & 0xF0) == 0xE0) {
-        // 3-byte sequence
-        extraBytes = 2;
-      }
-      else if ((c & 0xF8) == 0xF0) {
-        // 4-byte sequence
-        extraBytes = 3;
-      }
-      else {
-        // Invalid leading byte
-        appendReplacementChar(data);
-        data++;
-        // Next segment of "known good" data starts after this invalid byte
-        segmentStart = data;
-        continue;
-      }
-
-      // 2) Check that we have enough bytes left in the string
-      if (data + extraBytes >= end) {
-        // We don't have enough continuation bytes for a complete sequence
-        appendReplacementChar(data);
-        // Nothing more we can parse, so we're done
-        data = end;
-        break;
-      }
-
-      // 3) Validate the continuation bytes, which must match 10xxxxxx
-      bool invalidContinuation = false;
-      for (int i = 1; i <= extraBytes; ++i) {
-        if ((data[i] & 0xC0) != 0x80) {
-          invalidContinuation = true;
-          break;
-        }
-      }
-
-      if (invalidContinuation) {
-        // One or more continuation bytes are invalid
-        appendReplacementChar(data);
-        data++;
-        segmentStart = data;
-        continue;
-      }
-
-      // If we reach here, (c + continuation) forms a valid UTF-8 sequence
-      data += (extraBytes + 1);
-    }
-
-    // If we never encountered invalid data, 'foundInvalid' is false.
-    // In that case, we do nothing and simply return false.
-    if (!foundInvalid) {
-      return false; // No change was made
-    }
-
-    // Otherwise, we need to copy the last valid segment (if any) into 'output'.
-    // This covers the data from 'segmentStart' to the end.
-    if (segmentStart < end) {
-      output.append(reinterpret_cast<const char*>(segmentStart),
-        reinterpret_cast<const char*>(end));
-    }
-
-    // Now replace the original string with our sanitized version
-    str_to_sanitize.swap(output);
-
-    // Indicate we performed a modification
-    return true;
+  bool isUtf8(std::string_view text, size_t* p_invalid_offset) 
+  {
+    size_t local_invalid = 0;
+    size_t& invalid = p_invalid_offset ? *p_invalid_offset : local_invalid;
+    invalid = ::utf8::find_invalid(text);
+    return invalid == std::string_view::npos;
   }
+
+  bool sanitize_utf8(std::string& str_to_sanitize)
+  {
+    size_t invalid = 0;
+    if (!isUtf8(str_to_sanitize, &invalid)) 
+    {
+      std::string temp;
+      utf8::replace_invalid(str_to_sanitize.begin(), str_to_sanitize.end(), back_inserter(temp));
+      str_to_sanitize.swap(temp);
+      return true;
+    }
+    return false;
+  }
+
+//   // UTF-8 encoding of the Unicode replacement character U+FFFD.
+//   static const char REPLACEMENT_CHAR_UTF8[] = "\xEF\xBF\xBD";
+// 
+//   bool sanitize_utf8(std::string& str_to_sanitize)
+//   {
+//     const unsigned char* data = reinterpret_cast<const unsigned char*>(str_to_sanitize.data());
+//     std::size_t length = str_to_sanitize.size();
+//     std::size_t i = 0;
+// 
+//     std::string sanitized;
+//     sanitized.reserve(length); // Reserve to avoid repeated allocations
+// 
+//     bool changed = false;
+// 
+//     while (i < length)
+//     {
+//       unsigned char c = data[i];
+// 
+//       // 1) ASCII fast path: 0xxxxxxx
+//       if (c < 0x80)
+//       {
+//         sanitized.push_back(static_cast<char>(c));
+//         i++;
+//       }
+//       // 2) 2-byte sequence: 110xxxxx 10xxxxxx
+//       else if ((c & 0xE0) == 0xC0)
+//       {
+//         // Need at least 2 bytes total
+//         if (i + 1 < length)
+//         {
+//           unsigned char c2 = data[i + 1];
+//           // Valid second byte: 10xxxxxx
+//           // Also ensure it’s not an overlong encoding (0xC0, 0xC1 are invalid starts)
+//           if ((c2 & 0xC0) == 0x80 && (c & 0xFE) != 0xC0)
+//           {
+//             sanitized.push_back(static_cast<char>(c));
+//             sanitized.push_back(static_cast<char>(c2));
+//             i += 2;
+//           }
+//           else
+//           {
+//             sanitized.append(REPLACEMENT_CHAR_UTF8);
+//             changed = true;
+//             // Advance by one or two bytes if second byte was somewhat valid
+//             i += 1 + ((c2 & 0xC0) == 0x80);
+//           }
+//         }
+//         else
+//         {
+//           // Truncated 2-byte sequence at the end
+//           sanitized.append(REPLACEMENT_CHAR_UTF8);
+//           changed = true;
+//           i++;
+//         }
+//       }
+//       // 3) 3-byte sequence: 1110xxxx 10xxxxxx 10xxxxxx
+//       else if ((c & 0xF0) == 0xE0)
+//       {
+//         // Need at least 3 bytes total
+//         if (i + 2 < length)
+//         {
+//           unsigned char c2 = data[i + 1];
+//           unsigned char c3 = data[i + 2];
+//           if (((c2 & 0xC0) == 0x80) &&
+//             ((c3 & 0xC0) == 0x80))
+//           {
+//             // Combine to form a code point:
+//             //  1110xxxx 10xxxxxx 10xxxxxx
+//             // Check for UTF-16 surrogates (invalid in UTF-8)
+//             unsigned int codepoint = ((c & 0x0F) << 12)
+//               | ((c2 & 0x3F) << 6)
+//               | (c3 & 0x3F);
+//             if (codepoint >= 0xD800 && codepoint <= 0xDFFF)
+//             {
+//               // Surrogate half, invalid in UTF-8
+//               sanitized.append(REPLACEMENT_CHAR_UTF8);
+//               changed = true;
+//             }
+//             else
+//             {
+//               // Valid 3-byte sequence
+//               sanitized.push_back(static_cast<char>(c));
+//               sanitized.push_back(static_cast<char>(c2));
+//               sanitized.push_back(static_cast<char>(c3));
+//             }
+//             i += 3;
+//           }
+//           else
+//           {
+//             sanitized.append(REPLACEMENT_CHAR_UTF8);
+//             changed = true;
+//             // Advance by how many bytes look valid
+//             i += 1 + ((c2 & 0xC0) == 0x80) + ((c3 & 0xC0) == 0x80);
+//           }
+//         }
+//         else
+//         {
+//           // Truncated 3-byte sequence
+//           sanitized.append(REPLACEMENT_CHAR_UTF8);
+//           changed = true;
+//           i = length; // jump out
+//         }
+//       }
+//       // 4) 4-byte sequence: 11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+//       else if ((c & 0xF8) == 0xF0)
+//       {
+//         // Need at least 4 bytes total
+//         if (i + 3 < length)
+//         {
+//           unsigned char c2 = data[i + 1];
+//           unsigned char c3 = data[i + 2];
+//           unsigned char c4 = data[i + 3];
+//           if (((c2 & 0xC0) == 0x80) &&
+//             ((c3 & 0xC0) == 0x80) &&
+//             ((c4 & 0xC0) == 0x80))
+//           {
+//             // Combine to form a code point:
+//             //  11110xxx 10xxxxxx 10xxxxxx 10xxxxxx
+//             unsigned int codepoint = ((c & 0x07) << 18)
+//               | ((c2 & 0x3F) << 12)
+//               | ((c3 & 0x3F) << 6)
+//               | (c4 & 0x3F);
+//             // Max valid code point is 0x10FFFF
+//             if (codepoint <= 0x10FFFF)
+//             {
+//               sanitized.push_back(static_cast<char>(c));
+//               sanitized.push_back(static_cast<char>(c2));
+//               sanitized.push_back(static_cast<char>(c3));
+//               sanitized.push_back(static_cast<char>(c4));
+//             }
+//             else
+//             {
+//               sanitized.append(REPLACEMENT_CHAR_UTF8);
+//               changed = true;
+//             }
+//             i += 4;
+//           }
+//           else
+//           {
+//             sanitized.append(REPLACEMENT_CHAR_UTF8);
+//             changed = true;
+//             i += 1 + ((c2 & 0xC0) == 0x80) +
+//               ((c3 & 0xC0) == 0x80) +
+//               ((c4 & 0xC0) == 0x80);
+//           }
+//         }
+//         else
+//         {
+//           // Truncated 4-byte sequence
+//           sanitized.append(REPLACEMENT_CHAR_UTF8);
+//           changed = true;
+//           i = length; // jump out
+//         }
+//       }
+//       else
+//       {
+//         // Invalid leading byte (> 0xF4 or some unexpected pattern)
+//         sanitized.append(REPLACEMENT_CHAR_UTF8);
+//         changed = true;
+//         i++;
+//       }
+//     }
+// 
+//     // Update original string only if changes were made
+//     if (changed)
+//     {
+//       str_to_sanitize = std::move(sanitized);
+//       return true;
+//     }
+//     return false;
+//   }
 
 } // namespace tools
