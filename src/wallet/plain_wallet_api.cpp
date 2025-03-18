@@ -73,6 +73,7 @@ namespace plain_wallet
     std::atomic<uint64_t> gjobs_counter;
     std::map<uint64_t, std::string> gjobs;
     epee::critical_section gjobs_lock;
+    tools::default_http_core_proxy m_common_daemon_proxy;
   };
 
   std::shared_ptr<plain_wallet::plain_wallet_instance> ginstance_ptr;
@@ -248,6 +249,8 @@ namespace plain_wallet
       }
       ptr->postponed_main_worked_started = true;
     }
+
+    ptr->m_common_daemon_proxy.set_connection_addr(ip + ":" + port);
 
     LOG_PRINT_L0("[INIT PLAIN_WALLET_INSTANCE] Ver:" << PROJECT_VERSION_LONG << "(" << BUILD_TYPE << ")" << ENDL << "Working dir: " << working_dir << ENDL << "URL: " << ip << ",  port: " << port);
 
@@ -598,6 +601,35 @@ namespace plain_wallet
     return sanitized_store_to_json(ar);
   }
 
+  std::string handle_proxy_to_daemon(const std::string& data)
+  {
+    GET_INSTANCE_PTR(inst_ptr);
+    tools::wallet_public::COMMAND_PROXY_TO_DAEMON::request req;
+    tools::wallet_public::COMMAND_PROXY_TO_DAEMON::response res;
+
+    if (!epee::serialization::load_t_from_json(req, data))
+    {
+      view::api_response ar = AUTO_VAL_INIT(ar);
+      ar.error_code = API_RETURN_CODE_BAD_ARG_INVALID_JSON;
+      return sanitized_store_to_json(ar);
+    }
+
+    std::string buff = epee::string_encoding::base64_decode(req.base64_body);
+    int response_code = 0;
+    std::string response_body;
+    if (!inst_ptr->m_common_daemon_proxy.call_COMMAND_RPC_INVOKE(req.uri, buff, response_code, response_body))
+    {
+      view::api_response ar = AUTO_VAL_INIT(ar);
+      ar.error_code = API_RETURN_CODE_FAIL;
+      return sanitized_store_to_json(ar);
+    }
+    res.base64_body = epee::string_encoding::base64_encode(response_body);
+    res.response_code = response_code;
+    return sanitized_store_to_json(res);
+  }
+
+  
+
   std::string handle_run_wallet(uint64_t instance_id)
   {
     GET_INSTANCE_PTR(inst_ptr);
@@ -707,6 +739,10 @@ namespace plain_wallet
     else if (method_name == "run_wallet")
     {
       res = handle_run_wallet(instance_id);
+    }
+    else if (method_name == "proxy_to_daemon")
+    {
+      res = handle_proxy_to_daemon(params);
     }
     else
     {

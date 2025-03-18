@@ -46,6 +46,21 @@ void test_plain_wallet()
   conf.postponed_run_wallet = true;
   std::string r = plain_wallet::sync_call("configure", 0, epee::serialization::store_t_to_json(conf));
   
+
+
+  //-------------------------------------------------------------------
+//test proxy_to_wallet
+  std::string daemon_body = "{\"method\":\"getinfo\",\"params\":{}}";
+  std::string daemon_body_base64 = epee::string_encoding::base64_encode(daemon_body);
+  tools::wallet_public::COMMAND_PROXY_TO_DAEMON::request req_to_daemon;
+  req_to_daemon.uri = "/json_rpc";
+  req_to_daemon.base64_body = daemon_body_base64;
+  std::string rsp_ = plain_wallet::sync_call("proxy_to_daemon", 0, epee::serialization::store_t_to_json(req_to_daemon));
+  //-------------------------------------------------------------------
+
+
+
+
   std::string seed;
   if (!epee::file_io_utils::load_file_to_string("C:\\Users\\roky\\home\\temp\\wallets\\seed.txt", seed))
     return;
@@ -65,6 +80,11 @@ void test_plain_wallet()
   
   r = plain_wallet::sync_call("run_wallet", instance_id, "");
 
+
+
+
+
+
   while(true)
   {
     epee::misc_utils::sleep_no_w(2000);
@@ -75,6 +95,8 @@ void test_plain_wallet()
     if (wsi.wallet_state == 2)
       break;
   }
+  
+
 
   std::string invoke_body = "{\"method\":\"store\",\"params\":{}}";
   std::string res1 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
