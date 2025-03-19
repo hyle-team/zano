@@ -417,7 +417,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
 {
   handle_command_line(vm);
 
-  if (command_line::has_arg(arg_daemon_address) && (command_line::has_arg(arg_daemon_host) || command_line::has_arg(arg_daemon_port)))
+  if (command_line::has_arg(vm, arg_daemon_address) && (command_line::has_arg(vm, arg_daemon_host) || command_line::has_arg(vm, arg_daemon_port)))
   {
     fail_msg_writer() << "Please use either --daemon-address=\"host:port\" or specify both --daemon-host=\"host\" and --daemon-port=\"port\".";
     return false;
