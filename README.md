@@ -42,14 +42,19 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
 
        sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev libssl-dev bzip2 mesa-common-dev libglu1-mesa-dev
 
-2. Clone Zano into a local folder\
+   Make sure you have correct versions installed (see 'Dependencies' section above):
+
+       cmake --version && gcc --version
+   
+
+3. Clone Zano into a local folder\
    (If for some reason you need to use alternative Zano branch, change 'master' to the required branch name.)
    
        git clone --recursive https://github.com/hyle-team/zano.git -b master
 
    In the following steps we assume that you cloned Zano into '~/zano' folder in your home directory. 
 
-3. Download and build Boost\
+4. Download and build Boost\
     (Assuming you have cloned Zano into the 'zano' folder. If you used a different location for Zano, **edit line 4** accordingly.)
 
        curl -OL https://archives.boost.io/release/1.84.0/source/boost_1_84_0.tar.bz2
@@ -59,7 +64,7 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
        ./b2 && cd ..
     Make sure that you see "The Boost C++ Libraries were successfully built!" message at the end.
 
-4. Install Qt\
+5. Install Qt\
 (*GUI version only, skip this step if you're building server version*)
 
     [*GUI version*]
@@ -70,7 +75,7 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
     Then follow the instructions in Wizard. Don't forget to tick the WebEngine module checkbox!
 
 
-5. Install OpenSSL
+6. Install OpenSSL
 
    We recommend installing OpenSSL v1.1.1w locally unless you would like to use the same version system-wide.\
    (Assuming that `$HOME` environment variable is set to your home directory. Otherwise, edit line 4 accordingly.)
@@ -82,7 +87,7 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
        make && make test && make install && cd ..
 
 
-6. [*OPTIONAL*] Set global environment variables for convenient use\
+7. [*OPTIONAL*] Set global environment variables for convenient use\
 For instance, by adding the following lines to `~/.bashrc`
 
     [*server version*]
