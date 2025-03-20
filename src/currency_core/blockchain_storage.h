@@ -215,7 +215,7 @@ namespace currency
     bool clear();
     bool reset_and_set_genesis_block(const block& b);
     //debug function
-    bool truncate_blockchain(uint64_t to_height);
+    bool truncate_blockchain(uint64_t to_blockchain_size);
     //------------- readers members -----------------
     bool pre_validate_relayed_block(block& b, block_verification_context& bvc, const crypto::hash& id)const ;
     //bool push_new_block();

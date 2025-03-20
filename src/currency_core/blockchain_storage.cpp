@@ -7508,11 +7508,11 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
   }
 }
 //------------------------------------------------------------------
-bool blockchain_storage::truncate_blockchain(uint64_t to_height)
+bool blockchain_storage::truncate_blockchain(uint64_t to_blockchain_size)
 {
   m_db.begin_transaction();
-  uint64_t inital_height = get_current_blockchain_size();
-  while (get_current_blockchain_size() > to_height)
+  uint64_t inital_blockchain_size = get_current_blockchain_size();
+  while (get_current_blockchain_size() > to_blockchain_size)
   {
     transactions_map ot;
     pop_block_from_blockchain(ot);
@@ -7521,7 +7521,7 @@ bool blockchain_storage::truncate_blockchain(uint64_t to_height)
   m_alternative_chains.clear();
   m_altblocks_keyimages.clear();
   m_alternative_chains_txs.clear();
-  LOG_PRINT_MAGENTA("Blockchain truncated from " << inital_height << " to " << get_current_blockchain_size(), LOG_LEVEL_0);
+  LOG_PRINT_MAGENTA("Blockchain truncated from size " << inital_blockchain_size << " to size " << get_current_blockchain_size() << ". Alt blocks cleared.", LOG_LEVEL_0);
   m_db.commit_transaction();
   return true;
 }

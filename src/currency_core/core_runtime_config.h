@@ -55,6 +55,12 @@ namespace currency
       return epee::string_tools::num_to_string_fast(m_height_the_hardfork_n_active_after[hardfork_id]);
     }
 
+    uint64_t get_height_the_hardfork_active_after(size_t hardfork_id) const
+    {
+      CHECK_AND_ASSERT_THROW_MES(hardfork_id < m_total_count, "invalid hardfork id: " << hardfork_id);
+      return m_height_the_hardfork_n_active_after[hardfork_id];
+    }
+
     size_t get_the_most_recent_hardfork_id_for_height(uint64_t height) const
     {
       for(size_t hid = m_total_count - 1; hid != 0; --hid) // 0 is not including
