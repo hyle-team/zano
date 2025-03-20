@@ -2206,7 +2206,7 @@ void wallets_manager::wallet_vs_options::worker_func()
     stop_for_refresh = false;
     try
     {
-      wsi.wallet_state = view::wallet_status_info::wallet_state_ready;
+      wsi.wallet_state = view::wallet_status_info::wallet_state_synchronizing;
       if (m_pproxy_diagnostig_info->last_daemon_is_disconnected.load())
       {
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
