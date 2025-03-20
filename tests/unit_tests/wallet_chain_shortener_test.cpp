@@ -4,12 +4,12 @@
 #include <algorithm>
 
 #include "gtest/gtest.h"
-#include "wallet/wallet_chain_shortener.h"
+#include "currency_core/block_chain_shortener.h"
 
-TEST(wallet_chain_shortener, wallet_chain_shortener)
+TEST(block_chain_shortener, block_chain_shortener)
 {
   uint64_t counter = 0;
-  wallet_chain_shortener ws;
+  block_chain_shortener ws;
 
   for (counter = 1; counter != 1000000; counter++)
   {

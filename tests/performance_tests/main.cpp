@@ -43,7 +43,7 @@ void test_plain_wallet()
   
   plain_wallet::configure_object conf = AUTO_VAL_INIT(conf);
   //plain_wallet::configure_response conf_resp = AUTO_VAL_INIT(conf_resp);
-  conf.postponed_run_wallet = true;
+  //conf.postponed_run_wallet = true;
   std::string r = plain_wallet::sync_call("configure", 0, epee::serialization::store_t_to_json(conf));
   
 
@@ -77,6 +77,10 @@ void test_plain_wallet()
 
   //res = plain_wallet::sync_call("reset_connection_url", 0, "195.201.107.230:33336");
   //res = plain_wallet::sync_call("reset_connection_url", 0, "https://node.zano.org:443");
+  //res = plain_wallet::sync_call("reset_connection_url", 0, "https://zano.cakewallet.com");
+  //res = plain_wallet::sync_call("reset_connection_url", 0, "https://zano.api.wombat.systems:443");
+  //res = plain_wallet::sync_call("reset_connection_url", 0, "http://127.0.0.1:11211");
+
   
   r = plain_wallet::sync_call("run_wallet", instance_id, "");
 

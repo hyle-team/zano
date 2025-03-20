@@ -283,6 +283,8 @@ namespace currency
     bool create_block_template(const create_block_template_params& params, create_block_template_response& resp) const;
 
     bool have_block(const crypto::hash& id) const;
+    bool have_block_main(const crypto::hash& id) const;
+    bool have_block_alt(const crypto::hash& id) const;
     size_t get_total_transactions()const;
     bool get_outs(uint64_t amount, std::list<crypto::public_key>& pkeys)const;
     bool get_short_chain_history(std::list<crypto::hash>& ids)const;

@@ -69,6 +69,7 @@ namespace plain_wallet
     std::atomic<bool> initialized = false;
     std::atomic<bool> postponed_run_wallet = false;
     std::atomic<bool> postponed_main_worked_started = false;
+    callback_type m_callback = nullptr;
 
     std::atomic<uint64_t> gjobs_counter;
     std::map<uint64_t, std::string> gjobs;
@@ -565,11 +566,28 @@ namespace plain_wallet
     {
       return;
     }
-    CRITICAL_REGION_LOCAL(inst_ptr->gjobs_lock);
-    inst_ptr->gjobs[job_id] = res;
-    LOG_PRINT_L2("[ASYNC_CALL]: Finished(result put), job id: " << job_id);
+    if (inst_ptr->m_callback)
+    {
+      inst_ptr->m_callback(job_id, res);
+      LOG_PRINT_L2("[ASYNC_CALL]: Finished(result caalback), job id: " << job_id);
+    }
+    else
+    {
+      CRITICAL_REGION_LOCAL(inst_ptr->gjobs_lock);
+      inst_ptr->gjobs[job_id] = res;
+      LOG_PRINT_L2("[ASYNC_CALL]: Finished(result put), job id: " << job_id);
+    }
   }
 
+  void set_callback(callback_type callback)
+  {
+    auto inst_ptr = std::atomic_load(&ginstance_ptr);
+    if (!inst_ptr)
+    {
+      return;
+    }
+    inst_ptr->m_callback = callback;
+  }
 
   std::string async_call(const std::string& method_name, uint64_t instance_id, const std::string& params)
   {

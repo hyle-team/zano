@@ -3762,6 +3762,22 @@ bool blockchain_storage::have_block(const crypto::hash& id)const
   return false;
 }
 //------------------------------------------------------------------
+bool blockchain_storage::have_block_main(const crypto::hash& id) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  if (m_db_blocks_index.find(id))
+    return true;
+  return false;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::have_block_alt(const crypto::hash& id) const
+{
+  CRITICAL_REGION_LOCAL1(m_alternative_chains_lock);
+  if (m_alternative_chains.count(id))
+    return true;
+  return false;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::handle_block_to_main_chain(const block& bl, block_verification_context& bvc)
 {
   crypto::hash id = get_block_hash(bl);
