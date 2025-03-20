@@ -5,6 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "block_chain_shortener.h"
+#include "common/crypto_stream_operators.h"
 //#include "wallet_errors.h"
 
 #define SHORTENER_EVERYBLOCK_SIZE                                        20
