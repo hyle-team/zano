@@ -460,7 +460,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
       if (m_db_most_recent_hardfork_id == 0)
       {
         // HF5 and the first time use: we need to check
-        // to handle this case we manually check hash for the block, right after HF5 activation, and if it doesn't match -- truncate the blockchain
+        // to handle this case we manually check hash for the block right after HF5 activation, and if it doesn't match -- truncate the blockchain
         block blk{};
         if (get_block_by_height(ZANO_HARDFORK_05_AFTER_HEIGHT + 1, blk))
         {
@@ -475,16 +475,16 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         }
         else
         {
-          need_reinit = true;
-          LOG_ERROR("get_block_by_height(" << ZANO_HARDFORK_05_AFTER_HEIGHT + 1 << ") returned false, which is unexpected. Reinit the blockchain.");
+          // do nothing if there's no such block (yet)
         }
       }
       else
       {
-        size_t current_hardfork_id = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(get_top_block_height());
+        uint64_t next_block_height = get_top_block_height() + 1;
+        size_t current_hardfork_id = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(next_block_height); // note: current rules are effective for top_block_height+1
         if (m_db_most_recent_hardfork_id < current_hardfork_id)
         {
-          // most likely we have blocks that don't meet new hardfork criteria, so we need to remove last N blocks till the hardfork and try to resync them again
+          // most likely we have blocks that don't meet new hardfork criteria, so we need to remove last N blocks till the hardfork height and try to resync them again
           uint64_t height_right_before_hardfork_activation = m_core_runtime_config.hard_forks.get_height_the_hardfork_active_after(current_hardfork_id);
           LOG_PRINT_L0("The most recent hardfork id in the DB is " << m_db_most_recent_hardfork_id << " while according to the code, the top block must belong to the hardfork " <<
             current_hardfork_id << ". Most likely recent blocks are alternative and invalid for the current hardfork, thus we truncate the blockchain, so that block " <<
@@ -623,7 +623,7 @@ void blockchain_storage::store_db_solo_options_values()
   m_db_storage_major_compatibility_version = BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION;
   m_db_storage_minor_compatibility_version = BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION;
   m_db_last_worked_version = std::string(PROJECT_VERSION_LONG);
-  m_db_most_recent_hardfork_id = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(get_top_block_height());
+  m_db_most_recent_hardfork_id = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(get_top_block_height() + 1 /* <-- next block height */);
   m_db.commit_transaction();
 }
 //------------------------------------------------------------------
