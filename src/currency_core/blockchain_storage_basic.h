@@ -75,7 +75,7 @@ namespace currency
     END_SERIALIZE()
 
     // This is an optional data fields, It is not included in serialization and therefore is never stored in the database.
-    // It might be calculated “on the fly” to speed up access operations.
+    // It might be calculated "on the fly" to speed up access operations.
     mutable std::shared_ptr<crypto::hash> m_cache_coinbase_id;
   };
 
