@@ -513,6 +513,7 @@ namespace currency
     void set_db_l2_cache_size(uint64_t ceched_elements) const;
     //experimental
     void do_full_db_warm_up() const;
+    void on_hardfork_activated(size_t hardfork_id);
 
   private:
 
@@ -566,6 +567,7 @@ namespace currency
     tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container> m_db_storage_major_compatibility_version;
     tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container> m_db_storage_minor_compatibility_version;
     tools::db::solo_db_value<uint64_t, bool, solo_options_container> m_db_major_failure; //safety fuse
+    tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container> m_db_most_recent_hardfork_id;
 
     outputs_container m_db_outputs;
     multisig_outs_container m_db_multisig_outs;
