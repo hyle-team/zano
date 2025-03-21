@@ -4435,6 +4435,45 @@ void wallet2::submit_externally_signed_asset_tx(const finalized_tx& ft, const cr
   print_tx_sent_message(tx, "from submit_externally_signed_asset_tx", true, get_tx_fee(tx));
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::attach_asset_descriptor(const wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::request& req, wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::response& resp)
+{
+  if (!req.do_attach)
+  {
+    //detaching
+    auto it = m_own_asset_descriptors.find(req.asset_id);
+    if (it == m_own_asset_descriptors.end())
+    {
+      resp.status = API_RETURN_CODE_NOT_FOUND;
+      return false;
+    }
+    if (!it->second.thirdparty_custody)
+    {
+      LOG_ERROR("Detachig assets that are not 'thirdparty_custody' are not allowed");
+      resp.status = API_RETURN_CODE_ACCESS_DENIED;
+      return false;
+    }
+    m_own_asset_descriptors.erase(it);
+    resp.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  else
+  {
+    currency::COMMAND_RPC_GET_ASSET_INFO::request req_asset_info = AUTO_VAL_INIT(req_asset_info);
+    currency::COMMAND_RPC_GET_ASSET_INFO::response resp_asset_info = AUTO_VAL_INIT(resp_asset_info);
+    req_asset_info.asset_id = req.asset_id;
+
+    bool r = m_core_proxy->call_COMMAND_RPC_GET_ASSET_INFO(req_asset_info, resp_asset_info);
+    if (r && resp_asset_info.status == API_RETURN_CODE_OK)
+    {
+      static_cast<currency::asset_descriptor_base&>(m_own_asset_descriptors[req.asset_id]) = resp_asset_info.asset_descriptor;
+      m_own_asset_descriptors[req.asset_id].thirdparty_custody = true;
+      resp.status = API_RETURN_CODE_OK;
+      return true;
+    }
+    resp.status = API_RETURN_CODE_NOT_FOUND;
+    return false;
+  }
+}
 void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx)
 {
   // decrypt sources

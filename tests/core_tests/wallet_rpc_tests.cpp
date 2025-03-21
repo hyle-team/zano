@@ -808,7 +808,7 @@ wallet_true_rpc_pos_mining::wallet_true_rpc_pos_mining()
 {
   REGISTER_CALLBACK_METHOD(wallet_true_rpc_pos_mining, c1);
 }
-
+//------------------------------------------------------------------------------
 bool wallet_true_rpc_pos_mining::generate(std::vector<test_event_entry>& events) const
 {
   uint64_t ts = test_core_time::get_time();
@@ -921,6 +921,307 @@ bool wallet_true_rpc_pos_mining::c1(currency::core& c, size_t ev_index, const st
   //CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
 
   //CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", amount_to_alice + CURRENCY_BLOCK_REWARD, 0, 0, 0, 0), false, "");
+
+  return true;
+}
+
+
+
+wallet_rpc_thirdparty_custody::wallet_rpc_thirdparty_custody()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_thirdparty_custody, c1);
+}
+//------------------------------------------------------------------------------
+bool wallet_rpc_thirdparty_custody::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+//------------------------------------------------------------------------------
+
+#define TEST_TOKEN_NAME  "TEST TOKEN"
+
+bool wallet_rpc_thirdparty_custody::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+
+  bool r = false;
+  account_base alice_acc, bob_acc, carol_acc, custody_acc;
+  alice_acc.generate();
+  bob_acc.generate();
+  carol_acc.generate();
+  custody_acc.generate();
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, alice_acc);
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, bob_acc);
+  std::shared_ptr<tools::wallet2> carol_wlt = init_playtime_test_wallet(events, c, carol_acc);
+  std::shared_ptr<tools::wallet2> custody_wlt = init_playtime_test_wallet(events, c, custody_acc);
+
+  r = mine_next_pow_blocks_in_playtime(alice_wlt->get_account().get_public_address(), c, 3);
+  r = mine_next_pow_blocks_in_playtime(bob_wlt->get_account().get_public_address(), c, 3);
+  r = mine_next_pow_blocks_in_playtime(carol_wlt->get_account().get_public_address(), c, 3);
+  //r = mine_next_pow_blocks_in_playtime(custody_wlt->get_account().get_public_address(), c, 3);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+
+  // wallet RPC server
+  tools::wallet_rpc_server custody_wlt_rpc(custody_wlt);
+
+  struct tools::wallet_public::COMMAND_ASSETS_DEPLOY::request req = AUTO_VAL_INIT(resp);
+  struct tools::wallet_public::COMMAND_ASSETS_DEPLOY::response resp = AUTO_VAL_INIT(resp);
+  
+  req.asset_descriptor.current_supply = 1000;
+  req.asset_descriptor.decimal_point = 1;
+  req.asset_descriptor.full_name = TEST_TOKEN_NAME;
+  req.asset_descriptor.hidden_supply = false;
+
+
+  r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_recent_txs_and_info", req, resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+
+
+
+
+
+
+
+
+
+  r = test_payment_ids_generation(custody_wlt_rpc);
+  CHECK_AND_ASSERT_MES(r, false, "test_payment_ids_generation() failed ");
+  //======================================================================
+  std::string alice_payment_id = gen_payment_id(custody_wlt_rpc);
+  std::string bob_payment_id = gen_payment_id(custody_wlt_rpc);
+  std::string carol_payment_id = gen_payment_id(custody_wlt_rpc);
+
+  // generate payment id's for each wallet and deposit
+  custody_wlt->refresh();
+  alice_wlt->refresh();
+  bob_wlt->refresh();
+  carol_wlt->refresh();
+
+#define TRANSFER_AMOUNT   COIN / 10
+
+  std::string alice_tx1 = transfer_(alice_wlt, get_integr_addr(custody_wlt_rpc, alice_payment_id), TRANSFER_AMOUNT);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
+
+  std::string bob_tx1 = transfer_(bob_wlt, get_integr_addr(custody_wlt_rpc, bob_payment_id), TRANSFER_AMOUNT);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
+
+  std::string bob_tx2 = transfer_(bob_wlt, get_integr_addr(custody_wlt_rpc, bob_payment_id), TRANSFER_AMOUNT);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
+
+  std::string carol_tx1 = transfer_(carol_wlt, get_integr_addr(custody_wlt_rpc, carol_payment_id), TRANSFER_AMOUNT);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
+
+  std::string carol_tx2 = transfer_(carol_wlt, get_integr_addr(custody_wlt_rpc, carol_payment_id), TRANSFER_AMOUNT);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
+
+  std::string carol_tx3 = transfer_(carol_wlt, get_integr_addr(custody_wlt_rpc, carol_payment_id), TRANSFER_AMOUNT);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
+
+  CHECK_AND_ASSERT_MES(alice_tx1.size()
+    && bob_tx1.size()
+    && bob_tx2.size()
+    && carol_tx1.size()
+    && carol_tx2.size()
+    && carol_tx3.size(),
+    false, "One of deposit transactions wan't created"
+  );
+
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  custody_wlt->refresh();
+  pre_hf4_api::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::request req = AUTO_VAL_INIT(req);
+  req.update_provision_info = true;
+  req.count = 10;
+
+  pre_hf4_api::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::response resp = AUTO_VAL_INIT(resp);
+  r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_recent_txs_and_info", req, resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+
+#define CHECK_RESPONSE_EQUAL(condition) CHECK_AND_ASSERT_MES((condition), false, "Failed check");
+
+  CHECK_RESPONSE_EQUAL(resp.pi.balance == 600000000000);
+  CHECK_RESPONSE_EQUAL(resp.pi.unlocked_balance == 600000000000);
+  CHECK_RESPONSE_EQUAL(resp.pi.transfers_count == 6);
+  CHECK_RESPONSE_EQUAL(resp.total_transfers == 6);
+  CHECK_RESPONSE_EQUAL(resp.transfers.size() == 6);
+  CHECK_RESPONSE_EQUAL(resp.transfers[0].comment == TRANSFER_COMMENT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[0].amount == TRANSFER_AMOUNT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[0].is_income == true);
+  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[0].payment_id) == carol_payment_id);
+  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[0].tx_hash) == carol_tx3);
+
+  CHECK_RESPONSE_EQUAL(resp.transfers[1].comment == TRANSFER_COMMENT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[1].amount == TRANSFER_AMOUNT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[1].is_income == true);
+  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[1].payment_id) == carol_payment_id);
+  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[1].tx_hash) == carol_tx2);
+
+  CHECK_RESPONSE_EQUAL(resp.transfers[2].comment == TRANSFER_COMMENT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[2].amount == TRANSFER_AMOUNT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[2].is_income == true);
+  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[2].payment_id) == carol_payment_id);
+  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[2].tx_hash) == carol_tx1);
+
+  CHECK_RESPONSE_EQUAL(resp.transfers[3].comment == TRANSFER_COMMENT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[3].amount == TRANSFER_AMOUNT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[3].is_income == true);
+  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[3].payment_id) == bob_payment_id);
+  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[3].tx_hash) == bob_tx2);
+
+  CHECK_RESPONSE_EQUAL(resp.transfers[4].comment == TRANSFER_COMMENT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[4].amount == TRANSFER_AMOUNT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[4].is_income == true);
+  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[4].payment_id) == bob_payment_id);
+  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[4].tx_hash) == bob_tx1);
+
+  CHECK_RESPONSE_EQUAL(resp.transfers[5].comment == TRANSFER_COMMENT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[5].amount == TRANSFER_AMOUNT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[5].is_income == true);
+  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[5].payment_id) == alice_payment_id);
+  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[5].tx_hash) == alice_tx1);
+
+
+  req.count = 10;
+  req.offset = 2;
+  r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_recent_txs_and_info", req, resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+
+  CHECK_RESPONSE_EQUAL(resp.pi.balance == 600000000000);
+  CHECK_RESPONSE_EQUAL(resp.pi.unlocked_balance == 600000000000);
+  CHECK_RESPONSE_EQUAL(resp.pi.transfers_count == 6);
+  CHECK_RESPONSE_EQUAL(resp.total_transfers == 6);
+  CHECK_RESPONSE_EQUAL(resp.transfers.size() == 4);
+  CHECK_RESPONSE_EQUAL(resp.transfers[0].comment == TRANSFER_COMMENT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[0].amount == TRANSFER_AMOUNT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[0].is_income == true);
+  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[0].payment_id) == carol_payment_id);
+  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[0].tx_hash) == carol_tx1);
+
+  CHECK_RESPONSE_EQUAL(resp.transfers[1].comment == TRANSFER_COMMENT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[1].amount == TRANSFER_AMOUNT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[1].is_income == true);
+  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[1].payment_id) == bob_payment_id);
+  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[1].tx_hash) == bob_tx2);
+
+  CHECK_RESPONSE_EQUAL(resp.transfers[2].comment == TRANSFER_COMMENT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[2].amount == TRANSFER_AMOUNT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[2].is_income == true);
+  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[2].payment_id) == bob_payment_id);
+  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[2].tx_hash) == bob_tx1);
+
+  CHECK_RESPONSE_EQUAL(resp.transfers[3].comment == TRANSFER_COMMENT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[3].amount == TRANSFER_AMOUNT);
+  CHECK_RESPONSE_EQUAL(resp.transfers[3].is_income == true);
+  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[3].payment_id) == alice_payment_id);
+  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[3].tx_hash) == alice_tx1);
+
+  //getbalance
+  pre_hf4_api::COMMAND_RPC_GET_BALANCE::request gb_req = AUTO_VAL_INIT(gb_req);
+  pre_hf4_api::COMMAND_RPC_GET_BALANCE::response gb_resp = AUTO_VAL_INIT(gb_resp);
+  r = invoke_text_json_for_rpc(custody_wlt_rpc, "getbalance", gb_req, gb_resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+  CHECK_RESPONSE_EQUAL(gb_resp.balance == 600000000000);
+  CHECK_RESPONSE_EQUAL(gb_resp.unlocked_balance == 600000000000);
+
+  //get_wallet_info
+  pre_hf4_api::COMMAND_RPC_GET_WALLET_INFO::request gwi_req = AUTO_VAL_INIT(gwi_req);
+  pre_hf4_api::COMMAND_RPC_GET_WALLET_INFO::response gwi_resp = AUTO_VAL_INIT(gwi_resp);
+  r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_wallet_info", gwi_req, gwi_resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+  CHECK_RESPONSE_EQUAL(gwi_resp.current_height == 35);
+  CHECK_RESPONSE_EQUAL(gwi_resp.transfer_entries_count == 6);
+  CHECK_RESPONSE_EQUAL(gwi_resp.transfers_count == 6);
+  CHECK_RESPONSE_EQUAL(gwi_resp.address == custody_wlt->get_account().get_public_address_str());
+
+
+  //search_for_transactions
+  pre_hf4_api::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::request st_req = AUTO_VAL_INIT(st_req);
+  st_req.filter_by_height = false;
+  st_req.in = true;
+  st_req.out = true;
+  st_req.pool = true;
+  st_req.tx_id = resp.transfers[1].tx_hash; //bob_tx2
+  pre_hf4_api::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::response st_resp = AUTO_VAL_INIT(st_resp);
+  r = invoke_text_json_for_rpc(custody_wlt_rpc, "search_for_transactions", st_req, st_resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+  //TODO: add more cases for search transaction in pool, in and out
+
+
+  CHECK_RESPONSE_EQUAL(st_resp.in.size() == 1);
+  CHECK_RESPONSE_EQUAL(st_resp.in.begin()->comment == TRANSFER_COMMENT);
+  CHECK_RESPONSE_EQUAL(st_resp.in.begin()->amount == TRANSFER_AMOUNT);
+  CHECK_RESPONSE_EQUAL(st_resp.in.begin()->is_income == true);
+  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(st_resp.in.begin()->payment_id) == bob_payment_id);
+  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(st_resp.in.begin()->tx_hash) == bob_tx2);
+
+
+  //get_payments
+  pre_hf4_api::COMMAND_RPC_GET_PAYMENTS::request gps_req = AUTO_VAL_INIT(gps_req);
+  gps_req.payment_id = carol_payment_id;
+  pre_hf4_api::COMMAND_RPC_GET_PAYMENTS::response gps_resp = AUTO_VAL_INIT(gps_resp);
+  r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_payments", gps_req, gps_resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+
+  {
+    //sort by block_height to have deterministic order
+    gps_resp.payments.sort([&](const pre_hf4_api::payment_details& a, const pre_hf4_api::payment_details& b) {return a.block_height < b.block_height; });
+
+    CHECK_RESPONSE_EQUAL(gps_resp.payments.size() == 3);
+    auto  it = gps_resp.payments.begin();
+    CHECK_RESPONSE_EQUAL(it->amount == 100000000000);
+    CHECK_RESPONSE_EQUAL(it->payment_id == carol_payment_id);
+    CHECK_RESPONSE_EQUAL(it->block_height == 23);
+    it++;
+    CHECK_RESPONSE_EQUAL(it->amount == 100000000000);
+    CHECK_RESPONSE_EQUAL(it->payment_id == carol_payment_id);
+    CHECK_RESPONSE_EQUAL(it->block_height == 24);
+    it++;
+    CHECK_RESPONSE_EQUAL(it->amount == 100000000000);
+    CHECK_RESPONSE_EQUAL(it->payment_id == carol_payment_id);
+    CHECK_RESPONSE_EQUAL(it->block_height == 25);
+  }
+
+
+
+  //get_bulk_payments
+  pre_hf4_api::COMMAND_RPC_GET_BULK_PAYMENTS::request gbps_req = AUTO_VAL_INIT(gbps_req);
+  gbps_req.payment_ids.push_back(bob_payment_id);
+  gbps_req.payment_ids.push_back(alice_payment_id);
+  pre_hf4_api::COMMAND_RPC_GET_BULK_PAYMENTS::response gbps_resp = AUTO_VAL_INIT(gbps_resp);
+  r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_bulk_payments", gbps_req, gbps_resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+
+  {
+    //sort by block_height to have deterministic order
+    gbps_resp.payments.sort([&](const pre_hf4_api::payment_details& a, const pre_hf4_api::payment_details& b) {return a.block_height < b.block_height; });
+
+    CHECK_RESPONSE_EQUAL(gbps_resp.payments.size() == 3);
+    auto  it = gbps_resp.payments.begin();
+    CHECK_RESPONSE_EQUAL(it->amount == 100000000000);
+    CHECK_RESPONSE_EQUAL(it->payment_id == alice_payment_id);
+    CHECK_RESPONSE_EQUAL(it->block_height == 20);
+    it++;
+    CHECK_RESPONSE_EQUAL(it->amount == 100000000000);
+    CHECK_RESPONSE_EQUAL(it->payment_id == bob_payment_id);
+    CHECK_RESPONSE_EQUAL(it->block_height == 21);
+    it++;
+    CHECK_RESPONSE_EQUAL(it->amount == 100000000000);
+    CHECK_RESPONSE_EQUAL(it->payment_id == bob_payment_id);
+    CHECK_RESPONSE_EQUAL(it->block_height == 22);
+  }
 
   return true;
 }

@@ -2079,5 +2079,61 @@ namespace wallet_public
   };
 
 
+  struct COMMAND_ATTACH_ASSET_DESCRIPTOR
+  {
+    DOC_COMMAND("Attach asset descripto to this wallet instance, if asset descripto attached then ADO operations to this asset can be performed using API of this wallet.");
+
+    struct request
+    {
+      crypto::public_key asset_id;
+      bool do_attach = true;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Asset id of the ADO that need to be attached to this wallet") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
+        KV_SERIALIZE(do_attach)  DOC_DSCR("If true - asset descriptor attached to wallet, if false - asset detached") DOC_EXMP(true) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string           status;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)                     DOC_DSCR("Status of the call") DOC_EXMP("OK") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_TRANSFER_ASSET_OWNERSHIP
+  {
+    DOC_COMMAND("Transfer asset ownership to new public key.");
+
+    struct request
+    {
+      crypto::public_key asset_id;
+      crypto::eth_public_key owner_eth_pub_key = currency::null_eth_public_key; // note: the size is 33 bytes (if present) 
+      crypto::public_key  owner = currency::null_pkey; // regular Zano Ed25519 public key
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)            DOC_DSCR("Own asset id, that would be transfered to someone else") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(owner)               DOC_DSCR("Public key of the new owner(default Ed25519 public key, 32 bytes)") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(owner_eth_pub_key)   DOC_DSCR("Public key of the new owner(ECDSA public key, 33 bytes) Used only if 'owner' field is empty") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a84d") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string           status;
+      crypto::hash          tx_id = currency::null_hash;
+      std::optional<data_for_external_asset_signing_tx> data_for_external_signing;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)                     DOC_DSCR("Status of the call") DOC_EXMP("OK") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Id of transaction that carries asset transfer ownership operation") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE(data_for_external_signing)  DOC_DSCR("[optional] Additional data for external ownership transfer tx signing(if asset is ownership is belong to third party).") DOC_EXMP_AGGR() DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
 } // namespace wallet_rpc
 } // namespace tools
