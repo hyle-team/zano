@@ -471,6 +471,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
             LOG_PRINT_L0("In the blockchain hash for the block 3076401 is " << h << " while it is expected to be " << b3076401_id <<
               ". Most likely recent blocks are alternative and invalid for the current hardfork, thus we truncate the blockchain, so that block 3076400 becomes new top block...");
             truncate_blockchain(ZANO_HARDFORK_05_AFTER_HEIGHT + 1);
+            m_tx_pool.clear();
           }
         }
         else
