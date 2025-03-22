@@ -1313,8 +1313,7 @@ int main(int argc, char* argv[])
 
     GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
     GENERATE_AND_PLAY_HF(wallet_reorganize_and_trim_test, "4-*");
-    
-
+    GENERATE_AND_PLAY_HF(wallet_rpc_thirdparty_custody, "5-*");    
 
     GENERATE_AND_PLAY_HF(attachment_isolation_test, "4-*");
 

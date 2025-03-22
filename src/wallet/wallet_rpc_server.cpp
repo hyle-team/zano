@@ -1312,15 +1312,22 @@ namespace tools
     }
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_asset_deploy(const wallet_public::COMMAND_ASSETS_DEPLOY::request& req, wallet_public::COMMAND_ASSETS_DEPLOY::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_asset_deploy(const wallet_public::COMMAND_ASSETS_DEPLOY::request& req_, wallet_public::COMMAND_ASSETS_DEPLOY::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
+    //make local req so we can modify it (if needed)
+    wallet_public::COMMAND_ASSETS_DEPLOY::request req = req_;
 
     if (!currency::validate_asset_ticker_and_full_name(req.asset_descriptor))
     {
       er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
       er.message = "asset ticker or full_name is invalid";
       return false;
+    }
+
+    if (req.destinations.empty() && req.asset_descriptor.current_supply != 0)
+    {
+      req.destinations.push_back(tools::wallet_public::transfer_destination{ req.asset_descriptor.current_supply , w.get_wallet()->get_account().get_public_address_str(), currency::null_pkey });
     }
 
     std::vector<currency::tx_destination_entry> currency_destinations;

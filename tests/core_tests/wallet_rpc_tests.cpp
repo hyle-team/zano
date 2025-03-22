@@ -950,6 +950,10 @@ bool wallet_rpc_thirdparty_custody::generate(std::vector<test_event_entry>& even
 //------------------------------------------------------------------------------
 
 #define TEST_TOKEN_NAME  "TEST TOKEN"
+#define TEST_TOKEN_METAINFO  "Metainfo"
+#define TEST_TOKEN_TICKER  "TT"
+#define TEST_TOKEN_MAX_SUPPLY      2000
+#define TEST_TOKEN_CURRENT_SUPPLY  1000
 
 bool wallet_rpc_thirdparty_custody::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
@@ -975,253 +979,118 @@ bool wallet_rpc_thirdparty_custody::c1(currency::core& c, size_t ev_index, const
 
 
   // wallet RPC server
-  tools::wallet_rpc_server custody_wlt_rpc(custody_wlt);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
 
-  struct tools::wallet_public::COMMAND_ASSETS_DEPLOY::request req = AUTO_VAL_INIT(resp);
+  miner_wlt->refresh();
+  struct tools::wallet_public::COMMAND_ASSETS_DEPLOY::request req = AUTO_VAL_INIT(req);
   struct tools::wallet_public::COMMAND_ASSETS_DEPLOY::response resp = AUTO_VAL_INIT(resp);
   
-  req.asset_descriptor.current_supply = 1000;
   req.asset_descriptor.decimal_point = 1;
   req.asset_descriptor.full_name = TEST_TOKEN_NAME;
   req.asset_descriptor.hidden_supply = false;
+  req.asset_descriptor.meta_info = TEST_TOKEN_METAINFO;
+  req.asset_descriptor.ticker = TEST_TOKEN_TICKER;
+  req.asset_descriptor.total_max_supply = TEST_TOKEN_MAX_SUPPLY;
+  req.asset_descriptor.current_supply = TEST_TOKEN_CURRENT_SUPPLY;
 
-
-  r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_recent_txs_and_info", req, resp);
+  r = invoke_text_json_for_rpc(miner_wlt_rpc, "deploy_asset", req, resp);
   CHECK_AND_ASSERT_MES(r, false, "failed to call");
 
+  if (resp.new_asset_id == currency::null_pkey)
+  {
+    LOG_ERROR("Failed to deploy asset");
+    return false;
+  }
 
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 3);
+   
+  // core RPC server
+  currency::t_currency_protocol_handler<currency::core> cprotocol(c, NULL);
+  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > dummy_p2p(cprotocol);
+  bc_services::bc_offers_service dummy_bc(nullptr);
+  currency::core_rpc_server core_rpc(c, dummy_p2p, dummy_bc);
+  currency::COMMAND_RPC_GET_ASSET_INFO::request gai_req = AUTO_VAL_INIT(gai_req);
+  currency::COMMAND_RPC_GET_ASSET_INFO::response gai_resp = AUTO_VAL_INIT(gai_resp);
+  gai_req.asset_id = resp.new_asset_id;
+  r = invoke_text_json_for_rpc(core_rpc, "get_asset_info", gai_req, gai_resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+  CHECK_AND_ASSERT_MES(gai_resp.status == API_RETURN_CODE_OK, false, "failed to call");
 
+  CHECK_AND_ASSERT_MES(gai_resp.asset_descriptor.decimal_point == 1, false, "Wrong asset descriptor");
+  CHECK_AND_ASSERT_MES(gai_resp.asset_descriptor.full_name == TEST_TOKEN_NAME, false, "Wrong asset descriptor");
+  CHECK_AND_ASSERT_MES(gai_resp.asset_descriptor.hidden_supply == false, false, "Wrong asset descriptor");
+  CHECK_AND_ASSERT_MES(gai_resp.asset_descriptor.meta_info == TEST_TOKEN_METAINFO, false, "Wrong asset descriptor");
+  CHECK_AND_ASSERT_MES(gai_resp.asset_descriptor.ticker == TEST_TOKEN_TICKER, false, "Wrong asset descriptor");
+  CHECK_AND_ASSERT_MES(gai_resp.asset_descriptor.total_max_supply == TEST_TOKEN_MAX_SUPPLY, false, "Wrong asset descriptor");
+  CHECK_AND_ASSERT_MES(gai_resp.asset_descriptor.current_supply == TEST_TOKEN_CURRENT_SUPPLY, false, "Wrong asset descriptor");
 
-
-
-
-
-
-  r = test_payment_ids_generation(custody_wlt_rpc);
-  CHECK_AND_ASSERT_MES(r, false, "test_payment_ids_generation() failed ");
-  //======================================================================
-  std::string alice_payment_id = gen_payment_id(custody_wlt_rpc);
-  std::string bob_payment_id = gen_payment_id(custody_wlt_rpc);
-  std::string carol_payment_id = gen_payment_id(custody_wlt_rpc);
-
-  // generate payment id's for each wallet and deposit
-  custody_wlt->refresh();
   alice_wlt->refresh();
+  // wallet RPC server
+  tools::wallet_rpc_server alice_wlt_rpc(alice_wlt);
+
+  tools::wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::request att_req = AUTO_VAL_INIT(att_req);
+  tools::wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::response att_resp = AUTO_VAL_INIT(att_resp);
+  att_req.asset_id = resp.new_asset_id;
+  att_req.do_attach = true;
+  r = invoke_text_json_for_rpc(alice_wlt_rpc, "get_asset_info", gai_req, gai_resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+  CHECK_AND_ASSERT_MES(att_resp.status == API_RETURN_CODE_OK, false, "failed to call");
+
+
+  //let's emit it, but transfer actually to Bob, by using Alice wallet as attache
+  tools::wallet_public::COMMAND_ASSETS_EMIT::request emm_req = AUTO_VAL_INIT(emm_req);
+  tools::wallet_public::COMMAND_ASSETS_EMIT::response emm_resp = AUTO_VAL_INIT(emm_resp);
+
+  emm_req.asset_id = resp.new_asset_id;
+  emm_req.destinations.push_back(tools::wallet_public::transfer_destination{10, bob_wlt->get_account().get_public_address_str(), emm_req.asset_id });
+  r = invoke_text_json_for_rpc(alice_wlt_rpc, "emit_asset", emm_req, emm_resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+  if (!emm_resp.data_for_external_signing)
+  {
+    LOG_ERROR("Missing data_for_external_signing");
+    return false;
+  }
+
+  crypto::signature sig = AUTO_VAL_INIT(sig);
+  crypto::generate_signature(emm_resp.tx_id, miner_wlt->get_account().get_keys().spend_secret_key, sig);
+  // instant verification, just in case
+  r = crypto::check_signature(emm_resp.tx_id, miner_wlt->get_account().get_keys().account_address.spend_public_key, sig);
+  CHECK_AND_ASSERT_MES(r, false, "verify_eth_signature failed");
+
+  //
+  // send ETH signature alogn with all previous data to a wallet RPC call for final tx assembling and broadcasting
+  //
+  tools::wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::request send_signed_req{};
+  send_signed_req.unsigned_tx = emm_resp.data_for_external_signing->unsigned_tx;
+  send_signed_req.eth_sig = eth_sig;
+  send_signed_req.expected_tx_id = emm_resp.tx_id;
+  send_signed_req.finalized_tx = emm_resp.data_for_external_signing->finalized_tx;
+  send_signed_req.unlock_transfers_on_fail = true;
+  tools::wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::response send_signed_resp{};
+
+  r = invoke_text_json_for_rpc(alice_wlt_rpc, "send_ext_signed_asset_tx", send_signed_req, send_signed_resp);
+  CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: ");
+  CHECK_AND_ASSERT_MES(send_signed_resp.status == API_RETURN_CODE_OK, false, "RPC send_ext_signed_asset_tx failed: ");
+  
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 3);
+
+
+  //check bob wallet
+  wallet_public::COMMAND_ASSETS_WHITELIST_ADD::request wtl_req = AUTO_VAL_INIT(wtl_req);
+  wallet_public::COMMAND_ASSETS_WHITELIST_ADD::request wtl_resp = AUTO_VAL_INIT(wtl_resp);
+  wtl_req.asset_id = resp.new_asset_id;
+  tools::wallet_rpc_server bob_wlt_rpc(bob_wlt);
+  r = invoke_text_json_for_rpc(bob_wlt_rpc, "assets_whitelist_add", send_signed_req, send_signed_resp);
+  CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: ");
+  CHECK_AND_ASSERT_MES(wtl_resp.status == API_RETURN_CODE_OK, false, "RPC status failed");
   bob_wlt->refresh();
-  carol_wlt->refresh();
 
-#define TRANSFER_AMOUNT   COIN / 10
+  wallet_public::COMMAND_RPC_GET_BALANCE::request balance_req = AUTO_VAL_INIT(balance_req);
+  wallet_public::COMMAND_RPC_GET_BALANCE::request balance_resp = AUTO_VAL_INIT(balance_resp);
+  r = invoke_text_json_for_rpc(bob_wlt_rpc, "getbalance", send_signed_req, send_signed_resp);
+  CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: ");
+  
 
-  std::string alice_tx1 = transfer_(alice_wlt, get_integr_addr(custody_wlt_rpc, alice_payment_id), TRANSFER_AMOUNT);
-  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
-
-  std::string bob_tx1 = transfer_(bob_wlt, get_integr_addr(custody_wlt_rpc, bob_payment_id), TRANSFER_AMOUNT);
-  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
-
-  std::string bob_tx2 = transfer_(bob_wlt, get_integr_addr(custody_wlt_rpc, bob_payment_id), TRANSFER_AMOUNT);
-  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
-
-  std::string carol_tx1 = transfer_(carol_wlt, get_integr_addr(custody_wlt_rpc, carol_payment_id), TRANSFER_AMOUNT);
-  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
-
-  std::string carol_tx2 = transfer_(carol_wlt, get_integr_addr(custody_wlt_rpc, carol_payment_id), TRANSFER_AMOUNT);
-  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
-
-  std::string carol_tx3 = transfer_(carol_wlt, get_integr_addr(custody_wlt_rpc, carol_payment_id), TRANSFER_AMOUNT);
-  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
-
-  CHECK_AND_ASSERT_MES(alice_tx1.size()
-    && bob_tx1.size()
-    && bob_tx2.size()
-    && carol_tx1.size()
-    && carol_tx2.size()
-    && carol_tx3.size(),
-    false, "One of deposit transactions wan't created"
-  );
-
-  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
-
-  custody_wlt->refresh();
-  pre_hf4_api::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::request req = AUTO_VAL_INIT(req);
-  req.update_provision_info = true;
-  req.count = 10;
-
-  pre_hf4_api::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::response resp = AUTO_VAL_INIT(resp);
-  r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_recent_txs_and_info", req, resp);
-  CHECK_AND_ASSERT_MES(r, false, "failed to call");
-
-#define CHECK_RESPONSE_EQUAL(condition) CHECK_AND_ASSERT_MES((condition), false, "Failed check");
-
-  CHECK_RESPONSE_EQUAL(resp.pi.balance == 600000000000);
-  CHECK_RESPONSE_EQUAL(resp.pi.unlocked_balance == 600000000000);
-  CHECK_RESPONSE_EQUAL(resp.pi.transfers_count == 6);
-  CHECK_RESPONSE_EQUAL(resp.total_transfers == 6);
-  CHECK_RESPONSE_EQUAL(resp.transfers.size() == 6);
-  CHECK_RESPONSE_EQUAL(resp.transfers[0].comment == TRANSFER_COMMENT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[0].amount == TRANSFER_AMOUNT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[0].is_income == true);
-  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[0].payment_id) == carol_payment_id);
-  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[0].tx_hash) == carol_tx3);
-
-  CHECK_RESPONSE_EQUAL(resp.transfers[1].comment == TRANSFER_COMMENT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[1].amount == TRANSFER_AMOUNT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[1].is_income == true);
-  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[1].payment_id) == carol_payment_id);
-  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[1].tx_hash) == carol_tx2);
-
-  CHECK_RESPONSE_EQUAL(resp.transfers[2].comment == TRANSFER_COMMENT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[2].amount == TRANSFER_AMOUNT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[2].is_income == true);
-  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[2].payment_id) == carol_payment_id);
-  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[2].tx_hash) == carol_tx1);
-
-  CHECK_RESPONSE_EQUAL(resp.transfers[3].comment == TRANSFER_COMMENT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[3].amount == TRANSFER_AMOUNT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[3].is_income == true);
-  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[3].payment_id) == bob_payment_id);
-  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[3].tx_hash) == bob_tx2);
-
-  CHECK_RESPONSE_EQUAL(resp.transfers[4].comment == TRANSFER_COMMENT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[4].amount == TRANSFER_AMOUNT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[4].is_income == true);
-  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[4].payment_id) == bob_payment_id);
-  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[4].tx_hash) == bob_tx1);
-
-  CHECK_RESPONSE_EQUAL(resp.transfers[5].comment == TRANSFER_COMMENT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[5].amount == TRANSFER_AMOUNT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[5].is_income == true);
-  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[5].payment_id) == alice_payment_id);
-  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[5].tx_hash) == alice_tx1);
-
-
-  req.count = 10;
-  req.offset = 2;
-  r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_recent_txs_and_info", req, resp);
-  CHECK_AND_ASSERT_MES(r, false, "failed to call");
-
-  CHECK_RESPONSE_EQUAL(resp.pi.balance == 600000000000);
-  CHECK_RESPONSE_EQUAL(resp.pi.unlocked_balance == 600000000000);
-  CHECK_RESPONSE_EQUAL(resp.pi.transfers_count == 6);
-  CHECK_RESPONSE_EQUAL(resp.total_transfers == 6);
-  CHECK_RESPONSE_EQUAL(resp.transfers.size() == 4);
-  CHECK_RESPONSE_EQUAL(resp.transfers[0].comment == TRANSFER_COMMENT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[0].amount == TRANSFER_AMOUNT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[0].is_income == true);
-  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[0].payment_id) == carol_payment_id);
-  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[0].tx_hash) == carol_tx1);
-
-  CHECK_RESPONSE_EQUAL(resp.transfers[1].comment == TRANSFER_COMMENT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[1].amount == TRANSFER_AMOUNT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[1].is_income == true);
-  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[1].payment_id) == bob_payment_id);
-  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[1].tx_hash) == bob_tx2);
-
-  CHECK_RESPONSE_EQUAL(resp.transfers[2].comment == TRANSFER_COMMENT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[2].amount == TRANSFER_AMOUNT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[2].is_income == true);
-  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[2].payment_id) == bob_payment_id);
-  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[2].tx_hash) == bob_tx1);
-
-  CHECK_RESPONSE_EQUAL(resp.transfers[3].comment == TRANSFER_COMMENT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[3].amount == TRANSFER_AMOUNT);
-  CHECK_RESPONSE_EQUAL(resp.transfers[3].is_income == true);
-  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[3].payment_id) == alice_payment_id);
-  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[3].tx_hash) == alice_tx1);
-
-  //getbalance
-  pre_hf4_api::COMMAND_RPC_GET_BALANCE::request gb_req = AUTO_VAL_INIT(gb_req);
-  pre_hf4_api::COMMAND_RPC_GET_BALANCE::response gb_resp = AUTO_VAL_INIT(gb_resp);
-  r = invoke_text_json_for_rpc(custody_wlt_rpc, "getbalance", gb_req, gb_resp);
-  CHECK_AND_ASSERT_MES(r, false, "failed to call");
-  CHECK_RESPONSE_EQUAL(gb_resp.balance == 600000000000);
-  CHECK_RESPONSE_EQUAL(gb_resp.unlocked_balance == 600000000000);
-
-  //get_wallet_info
-  pre_hf4_api::COMMAND_RPC_GET_WALLET_INFO::request gwi_req = AUTO_VAL_INIT(gwi_req);
-  pre_hf4_api::COMMAND_RPC_GET_WALLET_INFO::response gwi_resp = AUTO_VAL_INIT(gwi_resp);
-  r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_wallet_info", gwi_req, gwi_resp);
-  CHECK_AND_ASSERT_MES(r, false, "failed to call");
-  CHECK_RESPONSE_EQUAL(gwi_resp.current_height == 35);
-  CHECK_RESPONSE_EQUAL(gwi_resp.transfer_entries_count == 6);
-  CHECK_RESPONSE_EQUAL(gwi_resp.transfers_count == 6);
-  CHECK_RESPONSE_EQUAL(gwi_resp.address == custody_wlt->get_account().get_public_address_str());
-
-
-  //search_for_transactions
-  pre_hf4_api::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::request st_req = AUTO_VAL_INIT(st_req);
-  st_req.filter_by_height = false;
-  st_req.in = true;
-  st_req.out = true;
-  st_req.pool = true;
-  st_req.tx_id = resp.transfers[1].tx_hash; //bob_tx2
-  pre_hf4_api::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::response st_resp = AUTO_VAL_INIT(st_resp);
-  r = invoke_text_json_for_rpc(custody_wlt_rpc, "search_for_transactions", st_req, st_resp);
-  CHECK_AND_ASSERT_MES(r, false, "failed to call");
-  //TODO: add more cases for search transaction in pool, in and out
-
-
-  CHECK_RESPONSE_EQUAL(st_resp.in.size() == 1);
-  CHECK_RESPONSE_EQUAL(st_resp.in.begin()->comment == TRANSFER_COMMENT);
-  CHECK_RESPONSE_EQUAL(st_resp.in.begin()->amount == TRANSFER_AMOUNT);
-  CHECK_RESPONSE_EQUAL(st_resp.in.begin()->is_income == true);
-  CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(st_resp.in.begin()->payment_id) == bob_payment_id);
-  CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(st_resp.in.begin()->tx_hash) == bob_tx2);
-
-
-  //get_payments
-  pre_hf4_api::COMMAND_RPC_GET_PAYMENTS::request gps_req = AUTO_VAL_INIT(gps_req);
-  gps_req.payment_id = carol_payment_id;
-  pre_hf4_api::COMMAND_RPC_GET_PAYMENTS::response gps_resp = AUTO_VAL_INIT(gps_resp);
-  r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_payments", gps_req, gps_resp);
-  CHECK_AND_ASSERT_MES(r, false, "failed to call");
-
-  {
-    //sort by block_height to have deterministic order
-    gps_resp.payments.sort([&](const pre_hf4_api::payment_details& a, const pre_hf4_api::payment_details& b) {return a.block_height < b.block_height; });
-
-    CHECK_RESPONSE_EQUAL(gps_resp.payments.size() == 3);
-    auto  it = gps_resp.payments.begin();
-    CHECK_RESPONSE_EQUAL(it->amount == 100000000000);
-    CHECK_RESPONSE_EQUAL(it->payment_id == carol_payment_id);
-    CHECK_RESPONSE_EQUAL(it->block_height == 23);
-    it++;
-    CHECK_RESPONSE_EQUAL(it->amount == 100000000000);
-    CHECK_RESPONSE_EQUAL(it->payment_id == carol_payment_id);
-    CHECK_RESPONSE_EQUAL(it->block_height == 24);
-    it++;
-    CHECK_RESPONSE_EQUAL(it->amount == 100000000000);
-    CHECK_RESPONSE_EQUAL(it->payment_id == carol_payment_id);
-    CHECK_RESPONSE_EQUAL(it->block_height == 25);
-  }
-
-
-
-  //get_bulk_payments
-  pre_hf4_api::COMMAND_RPC_GET_BULK_PAYMENTS::request gbps_req = AUTO_VAL_INIT(gbps_req);
-  gbps_req.payment_ids.push_back(bob_payment_id);
-  gbps_req.payment_ids.push_back(alice_payment_id);
-  pre_hf4_api::COMMAND_RPC_GET_BULK_PAYMENTS::response gbps_resp = AUTO_VAL_INIT(gbps_resp);
-  r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_bulk_payments", gbps_req, gbps_resp);
-  CHECK_AND_ASSERT_MES(r, false, "failed to call");
-
-  {
-    //sort by block_height to have deterministic order
-    gbps_resp.payments.sort([&](const pre_hf4_api::payment_details& a, const pre_hf4_api::payment_details& b) {return a.block_height < b.block_height; });
-
-    CHECK_RESPONSE_EQUAL(gbps_resp.payments.size() == 3);
-    auto  it = gbps_resp.payments.begin();
-    CHECK_RESPONSE_EQUAL(it->amount == 100000000000);
-    CHECK_RESPONSE_EQUAL(it->payment_id == alice_payment_id);
-    CHECK_RESPONSE_EQUAL(it->block_height == 20);
-    it++;
-    CHECK_RESPONSE_EQUAL(it->amount == 100000000000);
-    CHECK_RESPONSE_EQUAL(it->payment_id == bob_payment_id);
-    CHECK_RESPONSE_EQUAL(it->block_height == 21);
-    it++;
-    CHECK_RESPONSE_EQUAL(it->amount == 100000000000);
-    CHECK_RESPONSE_EQUAL(it->payment_id == bob_payment_id);
-    CHECK_RESPONSE_EQUAL(it->block_height == 22);
-  }
 
   return true;
 }

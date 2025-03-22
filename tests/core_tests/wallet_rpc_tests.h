@@ -59,7 +59,7 @@ struct wallet_true_rpc_pos_mining : public wallet_test
 
 struct wallet_rpc_thirdparty_custody : public wallet_test
 {
-  wallet_rpc_exchange_suite();
+  wallet_rpc_thirdparty_custody();
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
