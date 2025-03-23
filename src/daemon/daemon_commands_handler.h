@@ -83,6 +83,111 @@ public:
 #ifdef _DEBUG
     m_cmd_binder.set_handler("debug_set_time_adj", boost::bind(&daemon_commands_handler::debug_set_time_adj, this, ph::_1), "DEBUG: set core time adjustment");
 #endif
+    m_cmd_binder.set_handler("decoys_data", boost::bind<bool>([this](const std::vector<std::string>& args) -> bool
+    {
+      if (args.empty())
+      {
+        return false;
+      }
+
+      try
+      {
+        const uint64_t height_begin{std::stoull(args.front())};
+        auto& storage{m_srv.get_payload_object().get_core().get_blockchain_storage()};
+        const auto height_top{storage.get_top_block_height()};
+
+        for (auto height{height_begin}; height < height_top; ++height)
+        {
+          const auto id_block{storage.get_block_id_by_height(height)};
+          currency::block block{};
+
+          assert(true == storage.get_block_by_hash(id_block, block));
+
+          std::cerr << "Height: " << height << '\n';
+
+          const auto& ids_txs{block.tx_hashes};
+
+          if (ids_txs.empty())
+          {
+            std::cerr << '\t' << "No transactions" << '\n';
+          }
+
+          else
+          {
+            std::cerr << "\tTransactions: " << ids_txs.size() << '\n';
+
+            std::vector<currency::transaction> txs{};
+
+            {
+              std::vector<crypto::hash> txs_missed{};
+
+              assert(true == storage.get_transactions(ids_txs, txs, txs_missed));
+            }
+
+            for (const auto& tx : txs)
+            {
+              if (tx.vin.empty())
+              {
+                std::cerr << "\t\t" << "No inputs." << '\n';
+              }
+
+              else
+              {
+                std::cerr << "\t\tInputs: " << tx.vin.size() << '\n';
+
+                for (const auto& input : tx.vin)
+                {
+                  if (const auto& id_type{input.type()}; id_type == typeid(currency::txin_zc_input))
+                  {
+                    const auto& zc_input{boost::get<currency::txin_zc_input>(input)};
+                    const auto& offsets{zc_input.key_offsets};
+
+                    std::cerr << "\t\t\tKey offsets: " << offsets.size() << '\n';
+
+                    for (const auto& offset : offsets)
+                    {
+                      if (const auto& id_type{offset.type()}; id_type == typeid(currency::ref_by_id))
+                      {
+                        const auto& ref{boost::get<currency::ref_by_id>(offset)};
+                        std::vector<uint64_t> global_indexes{};
+
+                        // std::cerr << "\t\t\t\t" << ref.tx_id << ' ' << ref.n << '\n';
+
+                        assert(true == storage.get_tx_outputs_gindexs(ref.tx_id, global_indexes));
+
+                        for (const auto index : global_indexes)
+                        {
+                          std::cerr << "\t\t\t\t" << index << '\n';
+                        }
+                      }
+
+                      else
+                      {
+                        const auto& ref{boost::get<uint64_t>(offset)};
+
+                        std::cerr << "\t\t\t\t" << ref << '\n';
+                      }
+                    }
+                  }
+
+                  else
+                  {
+                    std::cerr << "\t\t\t" << "not zc input" << '\n';
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      catch (...)
+      {
+        return false;
+      }
+
+      return true;
+    }, ph::_1));
   }
 
   bool start_handling()
