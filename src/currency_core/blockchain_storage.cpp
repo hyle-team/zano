@@ -4232,7 +4232,6 @@ bool blockchain_storage::pop_asset_info(const asset_descriptor_operation& ado, c
   if (is_hardfork_active_for_height(ZANO_HARDFORK_05, height))
   {
     // NEW HF5 handling
-    assets_container::t_value_type local_asset_hist = *asset_history_ptr;
     asset_descriptor_operation& last_ado = local_asset_hist.back(); // above we made sure that the history isn't empty
     CHECK_AND_ASSERT_MES(last_ado.opt_descriptor.has_value(), false, "opt_descriptor is missing during asset pop, op: " << (int)ado.operation_type);
     asset_descriptor_base& last_adb = last_ado.opt_descriptor.get();
