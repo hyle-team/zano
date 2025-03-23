@@ -1438,7 +1438,14 @@ namespace tools
     try
     {
       currency::transaction result_tx{};
-      w.get_wallet()->submit_externally_signed_asset_tx(ft, req.eth_sig, req.unlock_transfers_on_fail, result_tx, res.transfers_were_unlocked);
+      if (req.regular_sig != currency::null_sig)
+      {
+        w.get_wallet()->submit_externally_signed_asset_tx(ft, req.regular_sig, req.unlock_transfers_on_fail, result_tx, res.transfers_were_unlocked);
+      }
+      else
+      {
+        w.get_wallet()->submit_externally_signed_asset_tx(ft, req.eth_sig, req.unlock_transfers_on_fail, result_tx, res.transfers_were_unlocked);
+      }
     }
     catch(std::exception& e)
     {

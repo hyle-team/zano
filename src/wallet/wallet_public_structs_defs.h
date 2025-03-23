@@ -2053,14 +2053,16 @@ namespace wallet_public
     {
       currency::blobdata    finalized_tx;
       currency::blobdata    unsigned_tx;
-      crypto::eth_signature eth_sig; //TODO: add value initialization here 
+      crypto::eth_signature eth_sig =  currency::null_eth_signature;
+      crypto::signature     regular_sig = currency::null_sig;
       crypto::hash          expected_tx_id = currency::null_hash;
       bool                  unlock_transfers_on_fail = false;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_BLOB_AS_BASE64_STRING(finalized_tx)DOC_DSCR("Base64-encoded finalized_tx data structure, which was received from emit_asset call.") DOC_EXMP("ewogICJ2ZXJzaW9uIjogMSwgC....iAgInZpbiI6IFsgewogICAgIC") DOC_END
         KV_SERIALIZE_BLOB_AS_BASE64_STRING(unsigned_tx) DOC_DSCR("Base64-encoded unsigned transaction blob, which was received from emit_asset call.") DOC_EXMP("083737bcfd826a973f74bb56a52b4fa562e6579ccaadd2697463498a66de4f1760b2cd40f11c3a00a7a80000") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(eth_sig)         DOC_DSCR("HEX-encoded ETH signature (64 bytes)") DOC_EXMP("674bb56a5b4fa562e679ccacc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6add697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(eth_sig)         DOC_DSCR("HEX-encoded ETH signature (64 bytes), used only if regular_sig is empty") DOC_EXMP("674bb56a5b4fa562e679ccacc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6add697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(regular_sig)     DOC_DSCR("HEX-encoded regular signature (64 bytes)") DOC_EXMP("674bb56a5b4fa562e679ccacc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6add697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(expected_tx_id)  DOC_DSCR("The expected transaction id. Tx won't be sent if the calculated one doesn't match this one. Consider using 'verified_tx_id' returned by 'decrypt_tx_details' call.") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
         KV_SERIALIZE(unlock_transfers_on_fail)          DOC_DSCR("If true, all locked wallet transfers, corresponding to the transaction, will be unlocked on sending failure. False by default.") DOC_EXMP(false) DOC_END
       END_KV_SERIALIZE_MAP()

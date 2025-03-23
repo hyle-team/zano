@@ -1032,7 +1032,7 @@ bool wallet_rpc_thirdparty_custody::c1(currency::core& c, size_t ev_index, const
   tools::wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::response att_resp = AUTO_VAL_INIT(att_resp);
   att_req.asset_id = resp.new_asset_id;
   att_req.do_attach = true;
-  r = invoke_text_json_for_rpc(alice_wlt_rpc, "get_asset_info", gai_req, gai_resp);
+  r = invoke_text_json_for_rpc(alice_wlt_rpc, "attach_asset_descriptor", att_req, att_resp);
   CHECK_AND_ASSERT_MES(r, false, "failed to call");
   CHECK_AND_ASSERT_MES(att_resp.status == API_RETURN_CODE_OK, false, "failed to call");
 
@@ -1052,17 +1052,23 @@ bool wallet_rpc_thirdparty_custody::c1(currency::core& c, size_t ev_index, const
   }
 
   crypto::signature sig = AUTO_VAL_INIT(sig);
-  crypto::generate_signature(emm_resp.tx_id, miner_wlt->get_account().get_keys().spend_secret_key, sig);
+  crypto::generic_schnorr_sig sig_sch = AUTO_VAL_INIT(sig_sch);
+  r = crypto::generate_schnorr_sig(emm_resp.tx_id, miner_wlt->get_account().get_keys().spend_secret_key, sig_sch);
+  CHECK_AND_ASSERT_MES(r, false, "gailed to generate schnorr signature");
+
+  //crypto::generate_signature(emm_resp.tx_id, miner_wlt->get_account().get_keys().account_address.spend_public_key, miner_wlt->get_account().get_keys().spend_secret_key, sig);
   // instant verification, just in case
-  r = crypto::check_signature(emm_resp.tx_id, miner_wlt->get_account().get_keys().account_address.spend_public_key, sig);
-  CHECK_AND_ASSERT_MES(r, false, "verify_eth_signature failed");
+  r = crypto::verify_schnorr_sig(emm_resp.tx_id, miner_wlt->get_account().get_keys().account_address.spend_public_key, sig_sch);
+  CHECK_AND_ASSERT_MES(r, false, "verify_schnorr_sig failed");
+  currency::schnor_new_to_schnor_old(sig_sch, sig);
+
 
   //
   // send ETH signature alogn with all previous data to a wallet RPC call for final tx assembling and broadcasting
   //
-  tools::wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::request send_signed_req{};
+  tools::wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::request send_signed_req = AUTO_VAL_INIT(send_signed_req);
   send_signed_req.unsigned_tx = emm_resp.data_for_external_signing->unsigned_tx;
-  send_signed_req.eth_sig = eth_sig;
+  send_signed_req.regular_sig = sig;
   send_signed_req.expected_tx_id = emm_resp.tx_id;
   send_signed_req.finalized_tx = emm_resp.data_for_external_signing->finalized_tx;
   send_signed_req.unlock_transfers_on_fail = true;
@@ -1076,18 +1082,18 @@ bool wallet_rpc_thirdparty_custody::c1(currency::core& c, size_t ev_index, const
 
 
   //check bob wallet
-  wallet_public::COMMAND_ASSETS_WHITELIST_ADD::request wtl_req = AUTO_VAL_INIT(wtl_req);
-  wallet_public::COMMAND_ASSETS_WHITELIST_ADD::request wtl_resp = AUTO_VAL_INIT(wtl_resp);
+  tools::wallet_public::COMMAND_ASSETS_WHITELIST_ADD::request wtl_req = AUTO_VAL_INIT(wtl_req);
+  tools::wallet_public::COMMAND_ASSETS_WHITELIST_ADD::response wtl_resp = AUTO_VAL_INIT(wtl_resp);
   wtl_req.asset_id = resp.new_asset_id;
   tools::wallet_rpc_server bob_wlt_rpc(bob_wlt);
-  r = invoke_text_json_for_rpc(bob_wlt_rpc, "assets_whitelist_add", send_signed_req, send_signed_resp);
+  r = invoke_text_json_for_rpc(bob_wlt_rpc, "assets_whitelist_add", wtl_req, wtl_resp);
   CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: ");
   CHECK_AND_ASSERT_MES(wtl_resp.status == API_RETURN_CODE_OK, false, "RPC status failed");
   bob_wlt->refresh();
 
-  wallet_public::COMMAND_RPC_GET_BALANCE::request balance_req = AUTO_VAL_INIT(balance_req);
-  wallet_public::COMMAND_RPC_GET_BALANCE::request balance_resp = AUTO_VAL_INIT(balance_resp);
-  r = invoke_text_json_for_rpc(bob_wlt_rpc, "getbalance", send_signed_req, send_signed_resp);
+  tools::wallet_public::COMMAND_RPC_GET_BALANCE::request balance_req = AUTO_VAL_INIT(balance_req);
+  tools::wallet_public::COMMAND_RPC_GET_BALANCE::response balance_resp = AUTO_VAL_INIT(balance_resp);
+  r = invoke_text_json_for_rpc(bob_wlt_rpc, "getbalance", balance_req, balance_resp);
   CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: ");
   
 
