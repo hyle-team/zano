@@ -722,7 +722,7 @@ namespace currency
     bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v) const;
     bool is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height) const;
     bool is_output_allowed_for_input(const tx_out_zarcanum& out, const txin_v& in_v) const;
-
+    void remove_old_dbs();
 
 
     //POS

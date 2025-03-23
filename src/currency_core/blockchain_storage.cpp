@@ -220,6 +220,23 @@ void blockchain_storage::set_db_l2_cache_size(uint64_t ceched_elements) const
   m_db_assets.set_cache_size(ceched_elements);
   m_db_addr_to_alias.set_cache_size(ceched_elements);
 }
+
+void remove_old_db(const std::string old_db_folder_path)
+{
+  try {
+    if (boost::filesystem::exists(epee::string_encoding::utf8_to_wstring(old_db_folder_path)))
+    {
+      LOG_PRINT_YELLOW("Removing old DB in " << old_db_folder_path << "...", LOG_LEVEL_0);
+      boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(old_db_folder_path));
+    }
+  }
+  catch (...)
+  {
+
+  }
+}
+
+
 bool blockchain_storage::init(const std::string& config_folder, const boost::program_options::variables_map& vm)
 {
 //  CRITICAL_REGION_LOCAL(m_read_lock);
@@ -251,12 +268,10 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
   m_config_folder = config_folder;
 
   // remove old incompatible DB
-  const std::string old_db_folder_path = m_config_folder + "/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD;
-  if (boost::filesystem::exists(epee::string_encoding::utf8_to_wstring(old_db_folder_path)))
-  {
-    LOG_PRINT_YELLOW("Removing old DB in " << old_db_folder_path << "...", LOG_LEVEL_0);
-    boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(old_db_folder_path));
-  }
+  std::string old_db_folder_path = m_config_folder + "/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD;
+  remove_old_db(old_db_folder_path);
+  remove_old_db(dbbs.get_db_folder_path_old_1());
+  remove_old_db(dbbs.get_db_folder_path_old_2());
 
   const std::string db_folder_path = dbbs.get_db_folder_path();
   LOG_PRINT_L0("Loading blockchain from " << db_folder_path);
