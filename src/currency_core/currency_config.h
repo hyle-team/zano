@@ -232,7 +232,11 @@
 #define CURRENCY_POOLDATA_FOLDERNAME_PREFIX             "poolstate_"
 #define CURRENCY_POOLDATA_FOLDERNAME_SUFFIX             "_v1"
 #define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_PREFIX       "blockchain_" 
-#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX       "_v2"
+#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX       "_v3"
+
+#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX_OLD_1       "_v1"
+#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX_OLD_2       "_v2"
+
 
 #define P2P_NET_DATA_FILENAME                           "p2pstate.bin"
 #define MINER_CONFIG_FILENAME                           "miner_conf.json"
