@@ -95,6 +95,26 @@ public:
         const uint64_t height_begin{std::stoull(args.front())};
         auto& storage{m_srv.get_payload_object().get_core().get_blockchain_storage()};
         const auto height_top{storage.get_top_block_height()};
+        std::unordered_map<crypto::hash, uint64_t> tx_block{};
+
+        std::cerr << "Begin define map. " << height_begin << ", " << height_top << '\n';
+
+        for (auto height{height_begin}; height < height_top; ++height)
+        {
+          // std::cerr << height << '\n';
+
+          const auto id_block{storage.get_block_id_by_height(height)};
+          currency::block block{};
+
+          assert(true == storage.get_block_by_hash(id_block, block));
+
+          for (const auto& id : block.tx_hashes)
+          {
+            tx_block[id] = height;
+          }
+        }
+
+        std::cerr << "End define map\n";
 
         for (auto height{height_begin}; height < height_top; ++height)
         {
@@ -149,23 +169,33 @@ public:
                       if (const auto& id_type{offset.type()}; id_type == typeid(currency::ref_by_id))
                       {
                         const auto& ref{boost::get<currency::ref_by_id>(offset)};
-                        std::vector<uint64_t> global_indexes{};
+                        const auto output_height{tx_block.at(ref.tx_id)};
 
-                        // std::cerr << "\t\t\t\t" << ref.tx_id << ' ' << ref.n << '\n';
-
-                        assert(true == storage.get_tx_outputs_gindexs(ref.tx_id, global_indexes));
-
-                        for (const auto index : global_indexes)
-                        {
-                          std::cerr << "\t\t\t\t" << index << '\n';
-                        }
+                        std::cerr << "\t\t\t\tHeight: " << output_height << ", difference: " << (height - output_height) << '\n';
                       }
 
                       else
                       {
-                        const auto& ref{boost::get<uint64_t>(offset)};
+                        const auto& global_index{boost::get<uint64_t>(offset)};
+                        
+                        // std::cerr << "\t\t\t\t" << ref << '\n';
+                        
+                        const auto item{storage.get_outputs_container().get_subitem(0, global_index)};
 
-                        std::cerr << "\t\t\t\t" << ref << '\n';
+                        if (item == nullptr)
+                        {
+                          // ...
+                        }
+
+                        else
+                        {
+                          // std::cerr << "\t\t\t\t" << item->tx_id << '\n';
+                          // item->out_no;
+
+                          const auto output_height{tx_block.at(item->tx_id)};
+
+                          std::cerr << "\t\t\t\tHeight: " << output_height << ", difference: " << (height - output_height) << '\n';
+                        }
                       }
                     }
                   }
@@ -181,8 +211,9 @@ public:
         }
       }
 
-      catch (...)
+      catch (const std::exception& exception)
       {
+        std::cerr << exception.what() << '\n';
         return false;
       }
 

@@ -7271,6 +7271,25 @@ void blockchain_storage::on_block_added(const block_extended_info& bei, const cr
   rise_core_event(CORE_EVENT_BLOCK_ADDED, void_struct());
   TIME_MEASURE_FINISH_PD(raise_block_core_event);
 
+  std::ofstream out{"output.text", std::ios_base::app};
+
+  //---
+  // out << bei.height << '\n';
+
+  // for (int i{}; i < bei.bl.tx_hashes.size(); ++i)
+  // {
+  //   transaction tx{};
+  //   auto pointer{m_db_transactions.find(bei.bl.tx_hashes.at(i))};
+
+  //   if (pointer == nullptr)
+  //   {
+  //     out << "NULL\n";
+  //     break;
+  //   }
+
+  //   tx = pointer->tx;
+  //   out << '\t' << tx.signatures.size() << '\n';
+  // }
 }
 //------------------------------------------------------------------
 void blockchain_storage::on_block_removed(const block_extended_info& bei)
