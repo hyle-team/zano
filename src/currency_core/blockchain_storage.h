@@ -215,7 +215,7 @@ namespace currency
     bool clear();
     bool reset_and_set_genesis_block(const block& b);
     //debug function
-    bool truncate_blockchain(uint64_t to_height);
+    bool truncate_blockchain(uint64_t to_blockchain_size);
     //------------- readers members -----------------
     bool pre_validate_relayed_block(block& b, block_verification_context& bvc, const crypto::hash& id)const ;
     //bool push_new_block();
@@ -283,6 +283,8 @@ namespace currency
     bool create_block_template(const create_block_template_params& params, create_block_template_response& resp) const;
 
     bool have_block(const crypto::hash& id) const;
+    bool have_block_main(const crypto::hash& id) const;
+    bool have_block_alt(const crypto::hash& id) const;
     size_t get_total_transactions()const;
     bool get_outs(uint64_t amount, std::list<crypto::public_key>& pkeys)const;
     bool get_short_chain_history(std::list<crypto::hash>& ids)const;
@@ -513,6 +515,7 @@ namespace currency
     void set_db_l2_cache_size(uint64_t ceched_elements) const;
     //experimental
     void do_full_db_warm_up() const;
+    void on_hardfork_activated(size_t hardfork_id);
 
   private:
 
@@ -566,6 +569,7 @@ namespace currency
     tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container> m_db_storage_major_compatibility_version;
     tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container> m_db_storage_minor_compatibility_version;
     tools::db::solo_db_value<uint64_t, bool, solo_options_container> m_db_major_failure; //safety fuse
+    tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container> m_db_most_recent_hardfork_id;
 
     outputs_container m_db_outputs;
     multisig_outs_container m_db_multisig_outs;
@@ -720,7 +724,7 @@ namespace currency
     bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v) const;
     bool is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height) const;
     bool is_output_allowed_for_input(const tx_out_zarcanum& out, const txin_v& in_v) const;
-
+    void remove_old_dbs();
 
 
     //POS

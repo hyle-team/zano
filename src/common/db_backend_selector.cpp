@@ -67,6 +67,19 @@ namespace db
     return m_config_folder + ("/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_PREFIX) + get_engine_name() + CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX;
   }
 
+  std::string db_backend_selector::get_db_folder_path_old_1() const
+  {
+    //CHECK_AND_ASSERT_THROW_MES(m_engine_type != db_none, "db_backend_selector was no inited");
+    return m_config_folder + ("/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_PREFIX) + get_engine_name() + CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX_OLD_1;
+  }
+
+  std::string db_backend_selector::get_db_folder_path_old_2() const
+  {
+    //CHECK_AND_ASSERT_THROW_MES(m_engine_type != db_none, "db_backend_selector was no inited");
+    return m_config_folder + ("/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_PREFIX) + get_engine_name() + CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX_OLD_2;
+  }
+
+
   std::string db_backend_selector::get_temp_db_folder_path() const
   {
     //CHECK_AND_ASSERT_THROW_MES(m_engine_type != db_none, "db_backend_selector was no inited");

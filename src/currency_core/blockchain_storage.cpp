@@ -67,6 +67,7 @@ using namespace currency;
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_STORAGE_MAJOR_COMPATIBILITY_VERSION   3 //DON'T CHANGE THIS, if you need to resync db change BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_STORAGE_MINOR_COMPATIBILITY_VERSION   4 //mismatch here means some reinitializations
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_MAJOR_FAILURE                         5 //if not blocks should ever be added with this condition
+#define BLOCKCHAIN_STORAGE_OPTIONS_ID_MOST_RECENT_HARDFORK_ID               6
 
 
 #define TARGETDATA_CACHE_SIZE                          DIFFICULTY_WINDOW + 10
@@ -95,6 +96,7 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
                                                                  m_db_storage_major_compatibility_version(BLOCKCHAIN_STORAGE_OPTIONS_ID_STORAGE_MAJOR_COMPATIBILITY_VERSION, m_db_solo_options),
                                                                  m_db_storage_minor_compatibility_version(BLOCKCHAIN_STORAGE_OPTIONS_ID_STORAGE_MINOR_COMPATIBILITY_VERSION, m_db_solo_options),
                                                                  m_db_major_failure(BLOCKCHAIN_STORAGE_OPTIONS_ID_MAJOR_FAILURE, m_db_solo_options),
+                                                                 m_db_most_recent_hardfork_id(BLOCKCHAIN_STORAGE_OPTIONS_ID_MOST_RECENT_HARDFORK_ID, m_db_solo_options),
                                                                  m_db_per_block_gindex_incs(m_db),
                                                                  m_tx_pool(tx_pool), 
                                                                  m_is_in_checkpoint_zone(false), 
@@ -116,6 +118,7 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
   m_services_mgr.set_core_runtime_config(m_core_runtime_config);
   m_performance_data.epic_failure_happend = false;
 }
+
 blockchain_storage::~blockchain_storage()
 {
   if (!m_deinit_is_done)
@@ -217,6 +220,23 @@ void blockchain_storage::set_db_l2_cache_size(uint64_t ceched_elements) const
   m_db_assets.set_cache_size(ceched_elements);
   m_db_addr_to_alias.set_cache_size(ceched_elements);
 }
+
+void remove_old_db(const std::string old_db_folder_path)
+{
+  try {
+    if (boost::filesystem::exists(epee::string_encoding::utf8_to_wstring(old_db_folder_path)))
+    {
+      LOG_PRINT_YELLOW("Removing old DB in " << old_db_folder_path << "...", LOG_LEVEL_0);
+      boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(old_db_folder_path));
+    }
+  }
+  catch (...)
+  {
+
+  }
+}
+
+
 bool blockchain_storage::init(const std::string& config_folder, const boost::program_options::variables_map& vm)
 {
 //  CRITICAL_REGION_LOCAL(m_read_lock);
@@ -248,12 +268,10 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
   m_config_folder = config_folder;
 
   // remove old incompatible DB
-  const std::string old_db_folder_path = m_config_folder + "/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD;
-  if (boost::filesystem::exists(epee::string_encoding::utf8_to_wstring(old_db_folder_path)))
-  {
-    LOG_PRINT_YELLOW("Removing old DB in " << old_db_folder_path << "...", LOG_LEVEL_0);
-    boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(old_db_folder_path));
-  }
+  std::string old_db_folder_path = m_config_folder + "/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD;
+  remove_old_db(old_db_folder_path);
+  remove_old_db(dbbs.get_db_folder_path_old_1());
+  remove_old_db(dbbs.get_db_folder_path_old_2());
 
   const std::string db_folder_path = dbbs.get_db_folder_path();
   LOG_PRINT_L0("Loading blockchain from " << db_folder_path);
@@ -451,7 +469,48 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         m_db.commit_transaction();
         LOG_PRINT_MAGENTA("migration of m_db_per_block_gindex_incs completed successfully", LOG_LEVEL_0);
       }
-    }
+
+#ifndef TESTNET
+      // MAINNET ONLY
+      if (m_db_most_recent_hardfork_id == 0)
+      {
+        // HF5 and the first time use: we need to check
+        // to handle this case we manually check hash for the block right after HF5 activation, and if it doesn't match -- truncate the blockchain
+        block blk{};
+        if (get_block_by_height(ZANO_HARDFORK_05_AFTER_HEIGHT + 1, blk))
+        {
+          crypto::hash b3076401_id = epee::string_tools::hex_to_pod<crypto::hash>("8d93e0a7ab93b367dea44862f27ee9ca044649db84a9f44bf095d2eebc133b2d");
+          crypto::hash h = get_block_hash(blk);
+          if (h != b3076401_id)
+          {
+            LOG_PRINT_L0("In the blockchain hash for the block 3076401 is " << h << " while it is expected to be " << b3076401_id <<
+              ". Most likely recent blocks are alternative and invalid for the current hardfork, thus we truncate the blockchain, so that block 3076400 becomes new top block...");
+            truncate_blockchain(ZANO_HARDFORK_05_AFTER_HEIGHT + 1);
+            m_tx_pool.clear();
+          }
+        }
+        else
+        {
+          // do nothing if there's no such block (yet)
+        }
+      }
+      else
+      {
+        uint64_t next_block_height = get_top_block_height() + 1;
+        size_t current_hardfork_id = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(next_block_height); // note: current rules are effective for top_block_height+1
+        if (m_db_most_recent_hardfork_id < current_hardfork_id)
+        {
+          // most likely we have blocks that don't meet new hardfork criteria, so we need to remove last N blocks till the hardfork height and try to resync them again
+          uint64_t height_right_before_hardfork_activation = m_core_runtime_config.hard_forks.get_height_the_hardfork_active_after(current_hardfork_id);
+          LOG_PRINT_L0("The most recent hardfork id in the DB is " << m_db_most_recent_hardfork_id << " while according to the code, the top block must belong to the hardfork " <<
+            current_hardfork_id << ". Most likely recent blocks are alternative and invalid for the current hardfork, thus we truncate the blockchain, so that block " <<
+            height_right_before_hardfork_activation << " becomes new top block...");
+          truncate_blockchain(height_right_before_hardfork_activation + 1);
+        }
+      }
+#endif
+
+    } // if (m_db_blocks.size() != 0)
 
     if (need_reinit)
     {
@@ -505,9 +564,10 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
   set_lost_tx_unmixable();
   m_db.commit_transaction();
 
-  LOG_PRINT_GREEN("Blockchain initialized, ver: " << m_db_storage_major_compatibility_version << "." << m_db_storage_minor_compatibility_version << ", last block: " << m_db_blocks.size() - 1 << ENDL 
+  LOG_PRINT_GREEN("Blockchain initialized, ver: " << m_db_storage_major_compatibility_version << "." << m_db_storage_minor_compatibility_version << ENDL 
     << "  genesis:                " << get_block_hash(m_db_blocks[0]->bl) << ENDL
     << "  last block:             " << m_db_blocks.size() - 1 << ", " << misc_utils::get_time_interval_string(timestamp_diff) << " ago" << ENDL
+    << "  last hardfork id:       " << m_db_most_recent_hardfork_id << ENDL
     << "  current pos difficulty: " << get_next_diff_conditional(true) << ENDL
     << "  current pow difficulty: " << get_next_diff_conditional(false) << ENDL
     << "  total transactions:     " << m_db_transactions.size() << ENDL
@@ -579,6 +639,7 @@ void blockchain_storage::store_db_solo_options_values()
   m_db_storage_major_compatibility_version = BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION;
   m_db_storage_minor_compatibility_version = BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION;
   m_db_last_worked_version = std::string(PROJECT_VERSION_LONG);
+  m_db_most_recent_hardfork_id = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(get_top_block_height() + 1 /* <-- next block height */);
   m_db.commit_transaction();
 }
 //------------------------------------------------------------------
@@ -3762,6 +3823,22 @@ bool blockchain_storage::have_block(const crypto::hash& id)const
   return false;
 }
 //------------------------------------------------------------------
+bool blockchain_storage::have_block_main(const crypto::hash& id) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  if (m_db_blocks_index.find(id))
+    return true;
+  return false;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::have_block_alt(const crypto::hash& id) const
+{
+  CRITICAL_REGION_LOCAL1(m_alternative_chains_lock);
+  if (m_alternative_chains.count(id))
+    return true;
+  return false;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::handle_block_to_main_chain(const block& bl, block_verification_context& bvc)
 {
   crypto::hash id = get_block_hash(bl);
@@ -4186,7 +4263,6 @@ bool blockchain_storage::pop_asset_info(const asset_descriptor_operation& ado, c
   if (is_hardfork_active_for_height(ZANO_HARDFORK_05, height))
   {
     // NEW HF5 handling
-    assets_container::t_value_type local_asset_hist = *asset_history_ptr;
     asset_descriptor_operation& last_ado = local_asset_hist.back(); // above we made sure that the history isn't empty
     CHECK_AND_ASSERT_MES(last_ado.opt_descriptor.has_value(), false, "opt_descriptor is missing during asset pop, op: " << (int)ado.operation_type);
     asset_descriptor_base& last_adb = last_ado.opt_descriptor.get();
@@ -5378,6 +5454,13 @@ void blockchain_storage::do_full_db_warm_up() const
       LOG_PRINT_CYAN("CACHE STATE: " << ENDL << strm.str(), LOG_LEVEL_2);
     }
   }
+}
+//------------------------------------------------------------------
+void blockchain_storage::on_hardfork_activated(size_t hardfork_id)
+{
+  m_db.begin_transaction();
+  m_db_most_recent_hardfork_id = hardfork_id;
+  m_db.commit_transaction();
 }
 //------------------------------------------------------------------
 bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const
@@ -7527,11 +7610,11 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
   }
 }
 //------------------------------------------------------------------
-bool blockchain_storage::truncate_blockchain(uint64_t to_height)
+bool blockchain_storage::truncate_blockchain(uint64_t to_blockchain_size)
 {
   m_db.begin_transaction();
-  uint64_t inital_height = get_current_blockchain_size();
-  while (get_current_blockchain_size() > to_height)
+  uint64_t inital_blockchain_size = get_current_blockchain_size();
+  while (get_current_blockchain_size() > to_blockchain_size)
   {
     transactions_map ot;
     pop_block_from_blockchain(ot);
@@ -7540,7 +7623,7 @@ bool blockchain_storage::truncate_blockchain(uint64_t to_height)
   m_alternative_chains.clear();
   m_altblocks_keyimages.clear();
   m_alternative_chains_txs.clear();
-  LOG_PRINT_MAGENTA("Blockchain truncated from " << inital_height << " to " << get_current_blockchain_size(), LOG_LEVEL_0);
+  LOG_PRINT_MAGENTA("Blockchain truncated from size " << inital_blockchain_size << " to size " << get_current_blockchain_size() << ". Alt blocks cleared.", LOG_LEVEL_0);
   m_db.commit_transaction();
   return true;
 }

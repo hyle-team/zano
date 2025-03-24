@@ -44,6 +44,18 @@ namespace net_utils {
 /************************************************************************/
 DISABLE_VS_WARNINGS(4355)
 
+
+
+template <typename, typename = std::void_t<>>
+struct has_pre_destructor_handler : std::false_type {};
+
+// This specialization is selected if T has a valid 'b()' that can be called
+template <typename T>
+struct has_pre_destructor_handler<T, std::void_t<decltype(std::declval<T&>().on_pre_destroy())>>
+  : std::true_type {};
+
+
+
 template<class t_protocol_handler>
 connection<t_protocol_handler>::connection(boost::asio::io_service& io_service,
                                            typename t_protocol_handler::config_type& config, volatile uint32_t& sock_count, i_connection_filter*& pfilter)
@@ -65,6 +77,12 @@ template<class t_protocol_handler>
 connection<t_protocol_handler>::~connection()
 {
   NESTED_TRY_ENTRY();
+
+  if constexpr (has_pre_destructor_handler<t_protocol_handler>::value)
+  {
+    m_protocol_handler.on_pre_destroy();
+  }
+
 
   if(!m_was_shutdown) {
     LOG_PRINT_L3("[sock " << socket_.native_handle() << "] Socket destroyed without shutdown.");
