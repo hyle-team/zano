@@ -97,16 +97,24 @@ public:
         const auto height_top{storage.get_top_block_height()};
         std::unordered_map<crypto::hash, uint64_t> tx_block{};
 
+        const auto get_block{[&storage](uint64_t height) -> currency::block
+          {
+            const auto id{storage.get_block_id_by_height(height)};
+            currency::block block{};
+
+            assert(true == storage.get_block_by_hash(id, block));
+
+            return block;
+          }
+        };
+
         std::cerr << "Begin define map. " << height_begin << ", " << height_top << '\n';
 
-        for (auto height{height_begin}; height < height_top; ++height)
+        for (uint64_t height{}; height < height_top; ++height)
         {
-          // std::cerr << height << '\n';
+          std::cerr << height << '\n';
 
-          const auto id_block{storage.get_block_id_by_height(height)};
-          currency::block block{};
-
-          assert(true == storage.get_block_by_hash(id_block, block));
+          const currency::block block{get_block(height)};
 
           for (const auto& id : block.tx_hashes)
           {
@@ -118,10 +126,7 @@ public:
 
         for (auto height{height_begin}; height < height_top; ++height)
         {
-          const auto id_block{storage.get_block_id_by_height(height)};
-          currency::block block{};
-
-          assert(true == storage.get_block_by_hash(id_block, block));
+          const currency::block block{get_block(height)};
 
           std::cerr << "Height: " << height << '\n';
 
@@ -134,7 +139,7 @@ public:
 
           else
           {
-            std::cerr << "\tTransactions: " << ids_txs.size() << '\n';
+            std::cerr << '\t' << "Transactions: " << ids_txs.size() << '\n';
 
             std::vector<currency::transaction> txs{};
 
@@ -177,24 +182,25 @@ public:
                       else
                       {
                         const auto& global_index{boost::get<uint64_t>(offset)};
-                        
-                        // std::cerr << "\t\t\t\t" << ref << '\n';
-                        
-                        const auto item{storage.get_outputs_container().get_subitem(0, global_index)};
 
-                        if (item == nullptr)
+                        if (const auto pointer{storage.get_outputs_container().get_subitem(0, global_index)}; pointer != nullptr)
                         {
-                          // ...
+                          try
+                          {
+                            const uint64_t output_height{tx_block.at(pointer->tx_id)};
+
+                            std::cerr << "\t\t\t\t" << "Height: " << output_height << ", difference: " << (height - output_height) << '\n';
+                          }
+
+                          catch (const std::out_of_range& exception)
+                          {
+                            std::cerr << "\t\t\t\t" << "tx_block.at(pointer->tx_id)" << '\n';
+                          }
                         }
 
                         else
                         {
-                          // std::cerr << "\t\t\t\t" << item->tx_id << '\n';
-                          // item->out_no;
-
-                          const auto output_height{tx_block.at(item->tx_id)};
-
-                          std::cerr << "\t\t\t\tHeight: " << output_height << ", difference: " << (height - output_height) << '\n';
+                          std::cerr << "\t\t\t\t" << "Uknown global index." << '\n';
                         }
                       }
                     }
