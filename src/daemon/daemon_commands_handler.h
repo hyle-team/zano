@@ -92,11 +92,25 @@ public:
 
       try
       {
+
+        std::map<uint64_t, uint64_t> hit_counts;
+
         const uint64_t height_begin{std::stoull(args.front())};
         auto& storage{m_srv.get_payload_object().get_core().get_blockchain_storage()};
         const auto height_top{storage.get_top_block_height()};
-        std::unordered_map<crypto::hash, uint64_t> tx_block{};
+        //std::unordered_map<crypto::hash, uint64_t> tx_block{};
         std::ofstream output{"output.text", std::ios::ate};
+
+        const auto get_tx_height_by_tx_id {[&storage](const crypto::hash& tx_id) -> uint64_t
+          {
+            auto tx_entry_ptr = storage.get_tx_chain_entry(tx_id);
+            if (!tx_entry_ptr)
+              CHECK_AND_ASSERT_THROW_MES(false, "unable to find tx");
+
+            return tx_entry_ptr->m_keeper_block_height;
+          }
+        };
+
 
         if (!output.is_open())
         {
@@ -116,7 +130,7 @@ public:
 
         // std::cerr << "Begin define map. " << height_begin << ", " << height_top << '\n';
 
-        for (uint64_t height{}; height < height_top; ++height)
+        /*for (uint64_t height{}; height < height_top; ++height)
         {
           std::cerr << height << '\n';
 
@@ -126,7 +140,7 @@ public:
           {
             tx_block[id] = height;
           }
-        }
+        }*/
 
         // std::cerr << "End define map\n";
 
@@ -171,7 +185,8 @@ public:
                   if (const auto& id_type{input.type()}; id_type == typeid(currency::txin_zc_input))
                   {
                     const auto& zc_input{boost::get<currency::txin_zc_input>(input)};
-                    const auto& offsets{zc_input.key_offsets};
+                    const auto& offsets{ relative_output_offsets_to_absolute(zc_input.key_offsets) };
+                    //const auto& offsets{zc_input.key_offsets};
 
                     // std::cerr << "\t\t\tKey offsets: " << offsets.size() << '\n';
 
@@ -180,9 +195,10 @@ public:
                       if (const auto& id_type{offset.type()}; id_type == typeid(currency::ref_by_id))
                       {
                         const auto& ref{boost::get<currency::ref_by_id>(offset)};
-                        const auto output_height{tx_block.at(ref.tx_id)};
+                        const auto output_height{get_tx_height_by_tx_id(ref.tx_id)};
 
-                        std::cerr << /*"\t\t\t\t" <<*/ "height = " << height << ", output_height = " << output_height << ", difference = " << (height - output_height) << '\n';
+                        //std::cerr << /*"\t\t\t\t" <<*/ "height = " << height << ", output_height = " << output_height << ", difference = " << (height - output_height) << '\n';
+                        hit_counts[height - output_height]++;
                         output << (height - output_height) << '\n';
                       }
 
@@ -194,13 +210,14 @@ public:
                         {
                           try
                           {
-                            const uint64_t output_height{tx_block.at(pointer->tx_id)};
+                            const uint64_t output_height{ get_tx_height_by_tx_id(pointer->tx_id)};
 
-                            std::cerr << /*"\t\t\t\t" <<*/ "height = " << height << ", output_height = " << output_height << ", difference = " << (height - output_height) << '\n';
+                            //std::cerr << /*"\t\t\t\t" <<*/ "height = " << height << ", output_height = " << output_height << ", difference = " << (height - output_height) << '\n';
                             output << (height - output_height) << '\n';
+                            hit_counts[height - output_height]++;
                           }
 
-                          catch (const std::out_of_range& exception)
+                          catch (const std::out_of_range& /*exception*/)
                           {
                             // std::cerr << "\t\t\t\t" << "tx_block.at(pointer->tx_id)" << '\n';
                           }
@@ -223,6 +240,7 @@ public:
             }
           }
         }
+        LOG_PRINT_L0("Finished");
       }
 
       catch (const std::exception& exception)
