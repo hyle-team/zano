@@ -96,6 +96,12 @@ public:
         auto& storage{m_srv.get_payload_object().get_core().get_blockchain_storage()};
         const auto height_top{storage.get_top_block_height()};
         std::unordered_map<crypto::hash, uint64_t> tx_block{};
+        std::ofstream output{"output.text", std::ios::ate};
+
+        if (!output.is_open())
+        {
+          return false;
+        }
 
         const auto get_block{[&storage](uint64_t height) -> currency::block
           {
@@ -108,7 +114,7 @@ public:
           }
         };
 
-        std::cerr << "Begin define map. " << height_begin << ", " << height_top << '\n';
+        // std::cerr << "Begin define map. " << height_begin << ", " << height_top << '\n';
 
         for (uint64_t height{}; height < height_top; ++height)
         {
@@ -122,24 +128,24 @@ public:
           }
         }
 
-        std::cerr << "End define map\n";
+        // std::cerr << "End define map\n";
 
         for (auto height{height_begin}; height < height_top; ++height)
         {
           const currency::block block{get_block(height)};
 
-          std::cerr << "Height: " << height << '\n';
+          // std::cerr << "Height: " << height << '\n';
 
           const auto& ids_txs{block.tx_hashes};
 
           if (ids_txs.empty())
           {
-            std::cerr << '\t' << "No transactions" << '\n';
+            // std::cerr << '\t' << "No transactions" << '\n';
           }
 
           else
           {
-            std::cerr << '\t' << "Transactions: " << ids_txs.size() << '\n';
+            // std::cerr << '\t' << "Transactions: " << ids_txs.size() << '\n';
 
             std::vector<currency::transaction> txs{};
 
@@ -153,12 +159,12 @@ public:
             {
               if (tx.vin.empty())
               {
-                std::cerr << "\t\t" << "No inputs." << '\n';
+                // std::cerr << "\t\t" << "No inputs." << '\n';
               }
 
               else
               {
-                std::cerr << "\t\tInputs: " << tx.vin.size() << '\n';
+                // std::cerr << "\t\tInputs: " << tx.vin.size() << '\n';
 
                 for (const auto& input : tx.vin)
                 {
@@ -167,7 +173,7 @@ public:
                     const auto& zc_input{boost::get<currency::txin_zc_input>(input)};
                     const auto& offsets{zc_input.key_offsets};
 
-                    std::cerr << "\t\t\tKey offsets: " << offsets.size() << '\n';
+                    // std::cerr << "\t\t\tKey offsets: " << offsets.size() << '\n';
 
                     for (const auto& offset : offsets)
                     {
@@ -176,7 +182,8 @@ public:
                         const auto& ref{boost::get<currency::ref_by_id>(offset)};
                         const auto output_height{tx_block.at(ref.tx_id)};
 
-                        std::cerr << "\t\t\t\tHeight: " << output_height << ", difference: " << (height - output_height) << '\n';
+                        std::cerr << /*"\t\t\t\t" <<*/ "height = " << height << ", output_height = " << output_height << ", difference = " << (height - output_height) << '\n';
+                        output << (height - output_height) << '\n';
                       }
 
                       else
@@ -189,18 +196,19 @@ public:
                           {
                             const uint64_t output_height{tx_block.at(pointer->tx_id)};
 
-                            std::cerr << "\t\t\t\t" << "Height: " << output_height << ", difference: " << (height - output_height) << '\n';
+                            std::cerr << /*"\t\t\t\t" <<*/ "height = " << height << ", output_height = " << output_height << ", difference = " << (height - output_height) << '\n';
+                            output << (height - output_height) << '\n';
                           }
 
                           catch (const std::out_of_range& exception)
                           {
-                            std::cerr << "\t\t\t\t" << "tx_block.at(pointer->tx_id)" << '\n';
+                            // std::cerr << "\t\t\t\t" << "tx_block.at(pointer->tx_id)" << '\n';
                           }
                         }
 
                         else
                         {
-                          std::cerr << "\t\t\t\t" << "Uknown global index." << '\n';
+                          // std::cerr << "\t\t\t\t" << "Uknown global index." << '\n';
                         }
                       }
                     }
@@ -208,7 +216,7 @@ public:
 
                   else
                   {
-                    std::cerr << "\t\t\t" << "not zc input" << '\n';
+                    // std::cerr << "\t\t\t" << "not zc input" << '\n';
                   }
                 }
               }
