@@ -83,6 +83,156 @@ public:
 #ifdef _DEBUG
     m_cmd_binder.set_handler("debug_set_time_adj", boost::bind(&daemon_commands_handler::debug_set_time_adj, this, ph::_1), "DEBUG: set core time adjustment");
 #endif
+    m_cmd_binder.set_handler("decoys_data", boost::bind<bool>([this](const std::vector<std::string>& args) -> bool
+    {
+      if (args.empty())
+      {
+        return false;
+      }
+
+      try
+      {
+        const uint64_t height_begin{std::stoull(args.front())};
+        auto& storage{m_srv.get_payload_object().get_core().get_blockchain_storage()};
+        const auto height_top{storage.get_top_block_height()};
+        std::unordered_map<crypto::hash, uint64_t> tx_block{};
+        std::ofstream output{"output.text", std::ios::ate};
+
+        if (!output.is_open())
+        {
+          return false;
+        }
+
+        const auto get_block{[&storage](uint64_t height) -> currency::block
+          {
+            const auto id{storage.get_block_id_by_height(height)};
+            currency::block block{};
+
+            assert(true == storage.get_block_by_hash(id, block));
+
+            return block;
+          }
+        };
+
+        // std::cerr << "Begin define map. " << height_begin << ", " << height_top << '\n';
+
+        for (uint64_t height{}; height < height_top; ++height)
+        {
+          std::cerr << height << '\n';
+
+          const currency::block block{get_block(height)};
+
+          for (const auto& id : block.tx_hashes)
+          {
+            tx_block[id] = height;
+          }
+        }
+
+        // std::cerr << "End define map\n";
+
+        for (auto height{height_begin}; height < height_top; ++height)
+        {
+          const currency::block block{get_block(height)};
+
+          // std::cerr << "Height: " << height << '\n';
+
+          const auto& ids_txs{block.tx_hashes};
+
+          if (ids_txs.empty())
+          {
+            // std::cerr << '\t' << "No transactions" << '\n';
+          }
+
+          else
+          {
+            // std::cerr << '\t' << "Transactions: " << ids_txs.size() << '\n';
+
+            std::vector<currency::transaction> txs{};
+
+            {
+              std::vector<crypto::hash> txs_missed{};
+
+              assert(true == storage.get_transactions(ids_txs, txs, txs_missed));
+            }
+
+            for (const auto& tx : txs)
+            {
+              if (tx.vin.empty())
+              {
+                // std::cerr << "\t\t" << "No inputs." << '\n';
+              }
+
+              else
+              {
+                // std::cerr << "\t\tInputs: " << tx.vin.size() << '\n';
+
+                for (const auto& input : tx.vin)
+                {
+                  if (const auto& id_type{input.type()}; id_type == typeid(currency::txin_zc_input))
+                  {
+                    const auto& zc_input{boost::get<currency::txin_zc_input>(input)};
+                    const auto& offsets{zc_input.key_offsets};
+
+                    // std::cerr << "\t\t\tKey offsets: " << offsets.size() << '\n';
+
+                    for (const auto& offset : offsets)
+                    {
+                      if (const auto& id_type{offset.type()}; id_type == typeid(currency::ref_by_id))
+                      {
+                        const auto& ref{boost::get<currency::ref_by_id>(offset)};
+                        const auto output_height{tx_block.at(ref.tx_id)};
+
+                        std::cerr << /*"\t\t\t\t" <<*/ "height = " << height << ", output_height = " << output_height << ", difference = " << (height - output_height) << '\n';
+                        output << (height - output_height) << '\n';
+                      }
+
+                      else
+                      {
+                        const auto& global_index{boost::get<uint64_t>(offset)};
+
+                        if (const auto pointer{storage.get_outputs_container().get_subitem(0, global_index)}; pointer != nullptr)
+                        {
+                          try
+                          {
+                            const uint64_t output_height{tx_block.at(pointer->tx_id)};
+
+                            std::cerr << /*"\t\t\t\t" <<*/ "height = " << height << ", output_height = " << output_height << ", difference = " << (height - output_height) << '\n';
+                            output << (height - output_height) << '\n';
+                          }
+
+                          catch (const std::out_of_range& exception)
+                          {
+                            // std::cerr << "\t\t\t\t" << "tx_block.at(pointer->tx_id)" << '\n';
+                          }
+                        }
+
+                        else
+                        {
+                          // std::cerr << "\t\t\t\t" << "Uknown global index." << '\n';
+                        }
+                      }
+                    }
+                  }
+
+                  else
+                  {
+                    // std::cerr << "\t\t\t" << "not zc input" << '\n';
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      catch (const std::exception& exception)
+      {
+        std::cerr << exception.what() << '\n';
+        return false;
+      }
+
+      return true;
+    }, ph::_1));
   }
 
   bool start_handling()
