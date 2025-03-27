@@ -695,12 +695,14 @@ namespace currency
     struct request
     {
       std::string tx_as_hex;
+      std::string tx_as_base64;
 
       request() {}
       explicit request(const transaction &);
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(tx_as_hex)                  DOC_DSCR("The transaction data as a hexadecimal string, ready for network broadcast.") DOC_EXMP("00018ed1535b8b4862e.....368cdc5a86") DOC_END
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(tx_as_base64)     DOC_DSCR("The transaction data as a base64 string, ready for network broadcast. Used only if tx_as_hex is empty") DOC_EXMP("AwElEBr7PxIAAAAAABr......cQAAAAAAABqBJAAAAAAAABo6BQ") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 

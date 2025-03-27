@@ -863,11 +863,24 @@ namespace currency
     CHECK_CORE_READY();
 
     std::string tx_blob;
-    if(!string_tools::parse_hexstr_to_binbuff(req.tx_as_hex, tx_blob))
+    if (req.tx_as_hex.size())
     {
-      LOG_PRINT_L0("[on_send_raw_tx]: Failed to parse tx from hexbuff: " << req.tx_as_hex);
-      res.status = "Failed";
-      return true;
+      if (!string_tools::parse_hexstr_to_binbuff(req.tx_as_hex, tx_blob))
+      {
+        LOG_PRINT_L0("[on_send_raw_tx]: Failed to parse tx from hexbuff: " << req.tx_as_hex);
+        res.status = "Failed";
+        return true;
+      }
+    }
+    else
+    {
+      if (!req.tx_as_base64.size())
+      {
+        LOG_PRINT_L0("[on_send_raw_tx]: Failed to parse tx from hexbuff: " << req.tx_as_hex);
+        res.status = API_RETURN_CODE_BAD_ARG;
+        return true;
+      }
+      tx_blob = req.tx_as_base64;
     }
 
     if (!m_ignore_offline_status && !m_p2p.get_payload_object().get_synchronized_connections_count())

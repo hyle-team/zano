@@ -129,6 +129,7 @@ namespace currency
       BEGIN_JSON_RPC_MAP("/json_rpc")
         MAP_JON_RPC   ("getblockcount",               on_getblockcount,               COMMAND_RPC_GETBLOCKCOUNT)
         MAP_JON_RPC_WE("on_getblockhash",             on_getblockhash,                COMMAND_RPC_GETBLOCKHASH)
+        MAP_JON_RPC   ("sendrawtransaction",          on_send_raw_tx,                 COMMAND_RPC_SEND_RAW_TX)
         MAP_JON_RPC_WE("getblocktemplate",            on_getblocktemplate,            COMMAND_RPC_GETBLOCKTEMPLATE)
         MAP_JON_RPC_WE("submitblock",                 on_submitblock,                 COMMAND_RPC_SUBMITBLOCK)
         MAP_JON_RPC_WE("submitblock2",                on_submitblock2,                COMMAND_RPC_SUBMITBLOCK2)
