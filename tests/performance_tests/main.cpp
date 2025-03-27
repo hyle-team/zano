@@ -34,6 +34,26 @@ DISABLE_VS_WARNINGS(4244)
 POP_VS_WARNINGS
 
 
+
+void test_base64_serialization()
+{
+  currency::COMMAND_RPC_GET_POOL_TXS_DETAILS::response rsp;
+  rsp.txs.resize(1);
+  rsp.txs.back().blob.resize(4000);
+  crypto::generate_random_bytes(rsp.txs.back().blob.size(), (void*)rsp.txs.back().blob.data());
+
+  std::string str_json;
+  epee::serialization::store_t_to_json(rsp, str_json);
+
+  currency::COMMAND_RPC_GET_POOL_TXS_DETAILS::response rsp2;
+  bool res = epee::serialization::load_t_from_json(rsp2, str_json);
+  if (rsp.txs.back().blob != rsp2.txs.back().blob)
+  {
+    LOG_PRINT_L0("Troubles");
+  }
+    
+}
+
 void test_plain_wallet()
 {
   //std::string res = plain_wallet::init("195.201.107.230", "33340", "C:\\Users\\roky\\home\\", 0);
@@ -158,8 +178,8 @@ int main(int argc, char** argv)
   //epee::log_space::log_singletone::add_logger(LOGGER_FILE,
   //  epee::log_space::log_singletone::get_default_log_file().c_str(),
   //  epee::log_space::log_singletone::get_default_log_folder().c_str());
-
-  test_plain_wallet();
+  test_base64_serialization();
+  //test_plain_wallet();
   //parse_weird_tx();
   //thread_pool_tests();
 
