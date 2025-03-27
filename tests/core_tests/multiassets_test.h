@@ -126,3 +126,14 @@ struct assets_transfer_with_smallest_amount : public wallet_test
 
   mutable uint64_t m_alice_initial_balance = 0;
 };
+
+
+struct asset_operations_and_chain_switching : public wallet_test
+{
+  asset_operations_and_chain_switching();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  mutable crypto::public_key m_asset_ids[4];
+};
