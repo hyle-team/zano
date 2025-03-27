@@ -45,3 +45,4 @@
 #define API_RETURN_CODE_HTLC_ORIGIN_HASH_MISSMATCHED            "HTLC_ORIGIN_HASH_MISSMATCHED"
 #define API_RETURN_CODE_WRAP                                    "WRAP"
 #define API_RETURN_CODE_MISSING_ZC_INPUTS                       "MISSING_ZC_INPUTS"
+#define API_RETURN_CODE_BAD_JSON                                "BAD_JSON"
