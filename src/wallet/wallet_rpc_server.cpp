@@ -1066,7 +1066,15 @@ namespace tools
   bool wallet_rpc_server::on_marketplace_push_offer(const wallet_public::COMMAND_MARKETPLACE_PUSH_OFFER::request& req, wallet_public::COMMAND_MARKETPLACE_PUSH_OFFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
-    currency::transaction res_tx = AUTO_VAL_INIT(res_tx);
+    
+    if (req.od.fee < w.get_wallet()->get_current_minimum_network_fee())
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "fee is too low";
+      return false;
+    }
+
+    currency::transaction res_tx{};
     w.get_wallet()->push_offer(req.od, res_tx);
 
     res.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
@@ -1077,9 +1085,15 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_marketplace_push_update_offer(const wallet_public::COMMAND_MARKETPLACE_PUSH_UPDATE_OFFER::request& req, wallet_public::COMMAND_MARKETPLACE_PUSH_UPDATE_OFFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
-
     WALLET_RPC_BEGIN_TRY_ENTRY();
-    currency::transaction res_tx = AUTO_VAL_INIT(res_tx);
+    if (req.od.fee < w.get_wallet()->get_current_minimum_network_fee())
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "fee is too low";
+      return false;
+    }
+
+    currency::transaction res_tx{};
     w.get_wallet()->update_offer_by_id(req.tx_id, req.no, req.od, res_tx);
 
     res.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
@@ -1091,7 +1105,15 @@ namespace tools
   bool wallet_rpc_server::on_marketplace_cancel_offer(const wallet_public::COMMAND_MARKETPLACE_CANCEL_OFFER::request& req, wallet_public::COMMAND_MARKETPLACE_CANCEL_OFFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
-    currency::transaction res_tx = AUTO_VAL_INIT(res_tx);
+
+    if (req.fee < w.get_wallet()->get_current_minimum_network_fee())
+    {
+      er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
+      er.message = "fee is too low";
+      return false;
+    }
+
+    currency::transaction res_tx{};
     w.get_wallet()->cancel_offer_by_id(req.tx_id, req.no, req.fee, res_tx);
 
     res.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
