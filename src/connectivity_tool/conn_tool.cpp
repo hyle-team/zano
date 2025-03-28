@@ -1246,7 +1246,7 @@ bool handle_pack_file(po::variables_map& vm)
 
   if (do_pack)
   {
-    epee::net_utils::gzip_encoder_lyambda gzip_encoder(Z_BEST_COMPRESSION);
+    epee::net_utils::gzip_encoder_lyambda gzip_encoder(Z_BEST_SPEED);
     return process_archive(gzip_encoder, true, source, target);
   }
   else

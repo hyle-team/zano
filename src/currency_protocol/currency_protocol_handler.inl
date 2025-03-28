@@ -561,6 +561,7 @@ namespace currency
         LOG_ERROR_CCONTEXT("sent wrong NOTIFY_RESPONSE_GET_OBJECTS: block with id=" << epst::pod_to_hex(get_blob_hash(block_entry.block)) 
           << " wasn't requested, block_blob: " << epst::buff_to_hex_nodelimer(block_entry.block) << " dropping connection");
         m_p2p->drop_connection(context);
+        m_p2p->add_ip_fail(context.m_remote_ip);
         return 1;
       }
       if(b.tx_hashes.size() != block_entry.txs.size()) 

@@ -25,6 +25,7 @@
 
 #include "include_base_utils.h"
 
+#include "common/boost_version_check.h"
 #include "serialization/binary_archive.h"
 #include "common/crypto_serialization.h"
 #include "serialization/stl_containers.h"

@@ -21,8 +21,8 @@ namespace tools
   };
 
 #ifndef TESTNET
-  static constexpr pre_download_entry c_pre_download_mdbx = { "https://f005.backblazeb2.com/file/zano-predownload/zano_mdbx_95_3030303.pak", "937c80a2a212e70f0b5c9001159f983db72dd0cf7a6d55d72bcd9d6998874ffb", 7809031729, 12347842560 };
-  static constexpr pre_download_entry c_pre_download_lmdb = { "https://f005.backblazeb2.com/file/zano-predownload/zano_lmdb_95_3030303.pak", "227f20b3998a8622363ebd4b7189e73caac21cfc17fa8544a3fa9d593e41709d", 9450752666, 12102598656 };
+  static constexpr pre_download_entry c_pre_download_mdbx = { "https://f005.backblazeb2.com/file/zano-predownload/zano_mdbx_95_3083770.pak", "e7cb7b5e1560c3a7615604880feda9df37636be83264a5afff01f44b5f824cc8", 8357805798, 12884705280 };
+  static constexpr pre_download_entry c_pre_download_lmdb = { "https://f005.backblazeb2.com/file/zano-predownload/zano_lmdb_95_3083770.pak", "685db01e1a4c827d20e777563009f771be593fe80cc32b8a4dfe2711e6a2b2f8", 10070627937, 12842385408 };
 #else
   static constexpr pre_download_entry c_pre_download_mdbx = { "", "", 0, 0 };
   static constexpr pre_download_entry c_pre_download_lmdb = { "", "", 0, 0 };
