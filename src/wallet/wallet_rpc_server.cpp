@@ -1470,13 +1470,13 @@ namespace tools
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
     currency::asset_owner_pub_key_v new_owner_v;
-    if (req.owner != currency::null_pkey)
+    if (req.new_owner!= currency::null_pkey)
     {
-      new_owner_v = req.owner;
+      new_owner_v = req.new_owner;
     }
-    else if(req.owner_eth_pub_key != currency::null_eth_public_key)
+    else if(req.new_owner_eth_pub_key != currency::null_eth_public_key)
     {
-      new_owner_v = req.owner_eth_pub_key;
+      new_owner_v = req.new_owner_eth_pub_key;
     }else
     {
       res.status = API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS;

@@ -2113,13 +2113,13 @@ namespace wallet_public
     struct request
     {
       crypto::public_key asset_id;
-      crypto::eth_public_key owner_eth_pub_key = currency::null_eth_public_key; // note: the size is 33 bytes (if present) 
-      crypto::public_key  owner = currency::null_pkey; // regular Zano Ed25519 public key
+      crypto::eth_public_key new_owner_eth_pub_key = currency::null_eth_public_key; // note: the size is 33 bytes (if present) 
+      crypto::public_key  new_owner = currency::null_pkey; // regular Zano Ed25519 public key
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)            DOC_DSCR("Own asset id, that would be transfered to someone else") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(owner)               DOC_DSCR("Public key of the new owner(default Ed25519 public key, 32 bytes)") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(owner_eth_pub_key)   DOC_DSCR("Public key of the new owner(ECDSA public key, 33 bytes) Used only if 'owner' field is empty") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a84d") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(new_owner)               DOC_DSCR("Public key of the new owner(default Ed25519 public key, 32 bytes)") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(new_owner_eth_pub_key)   DOC_DSCR("Public key of the new owner(ECDSA public key, 33 bytes) Used only if 'owner' field is empty") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a84d") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 

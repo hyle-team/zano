@@ -955,6 +955,64 @@ bool wallet_rpc_thirdparty_custody::generate(std::vector<test_event_entry>& even
 #define TEST_TOKEN_MAX_SUPPLY      2000
 #define TEST_TOKEN_CURRENT_SUPPLY  1000
 
+
+
+typedef boost::variant<crypto::secret_key, crypto::eth_secret_key> secret_key_v;
+typedef boost::variant<crypto::public_key, crypto::eth_public_key> public_key_v;
+
+
+template<typename t_response>
+bool sign_signature_with_keys(const t_response& rsp_with_data, tools::wallet_rpc_server& attached_wallet_rpc, const secret_key_v& signer_v, const public_key_v& verifier)
+{
+  bool r = false;
+  tools::wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::request send_signed_req = AUTO_VAL_INIT(send_signed_req);
+  if (signer_v.type() == typeid(crypto::secret_key))
+  {
+    //schnor sig
+    const crypto::secret_key& signer = boost::get<crypto::secret_key>(signer_v);
+    crypto::signature sig = AUTO_VAL_INIT(sig);
+    crypto::generic_schnorr_sig sig_sch = AUTO_VAL_INIT(sig_sch);
+    r = crypto::generate_schnorr_sig(rsp_with_data.tx_id, signer, sig_sch);
+    CHECK_AND_ASSERT_MES(r, false, "gailed to generate schnorr signature");
+
+    //crypto::generate_signature(emm_resp.tx_id, miner_wlt->get_account().get_keys().account_address.spend_public_key, miner_wlt->get_account().get_keys().spend_secret_key, sig);
+    // instant verification, just in case
+    r = crypto::verify_schnorr_sig(rsp_with_data.tx_id, boost::get<crypto::public_key>(verifier), sig_sch);
+    CHECK_AND_ASSERT_MES(r, false, "verify_schnorr_sig failed");
+    currency::schnor_new_to_schnor_old(sig_sch, sig);
+
+    send_signed_req.regular_sig = sig;
+  }
+  else if (signer_v.type() == typeid(crypto::eth_secret_key))
+  {
+    ////ecdsa sig
+    const crypto::eth_secret_key& signer = boost::get<crypto::eth_secret_key>(signer_v);
+    r = crypto::generate_eth_signature(rsp_with_data.tx_id, signer, send_signed_req.eth_sig);
+    CHECK_AND_ASSERT_MES(r, false, "gailed to generate schnorr signature");
+
+    r = crypto::verify_eth_signature(rsp_with_data.tx_id, boost::get<crypto::eth_public_key>(verifier), send_signed_req.eth_sig);
+    CHECK_AND_ASSERT_MES(r, false, "verify_eth_signature failed");
+
+  }
+  else
+  {
+    return false;
+  }
+
+  send_signed_req.unsigned_tx = rsp_with_data.data_for_external_signing->unsigned_tx;
+  send_signed_req.expected_tx_id = rsp_with_data.tx_id;
+  send_signed_req.finalized_tx = rsp_with_data.data_for_external_signing->finalized_tx;
+  send_signed_req.unlock_transfers_on_fail = true;
+  tools::wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::response send_signed_resp{};
+
+  r = invoke_text_json_for_rpc(attached_wallet_rpc, "send_ext_signed_asset_tx", send_signed_req, send_signed_resp);
+  CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: ");
+  CHECK_AND_ASSERT_MES(send_signed_resp.status == API_RETURN_CODE_OK, false, "RPC send_ext_signed_asset_tx failed: ");
+  return true;
+}
+
+
+
 bool wallet_rpc_thirdparty_custody::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
 
@@ -1040,9 +1098,10 @@ bool wallet_rpc_thirdparty_custody::c1(currency::core& c, size_t ev_index, const
   //let's emit it, but transfer actually to Bob, by using Alice wallet as attache
   tools::wallet_public::COMMAND_ASSETS_EMIT::request emm_req = AUTO_VAL_INIT(emm_req);
   tools::wallet_public::COMMAND_ASSETS_EMIT::response emm_resp = AUTO_VAL_INIT(emm_resp);
+#define COINS_TO_TRANSFER 10
 
   emm_req.asset_id = resp.new_asset_id;
-  emm_req.destinations.push_back(tools::wallet_public::transfer_destination{10, bob_wlt->get_account().get_public_address_str(), emm_req.asset_id });
+  emm_req.destinations.push_back(tools::wallet_public::transfer_destination{ COINS_TO_TRANSFER, bob_wlt->get_account().get_public_address_str(), emm_req.asset_id });
   r = invoke_text_json_for_rpc(alice_wlt_rpc, "emit_asset", emm_req, emm_resp);
   CHECK_AND_ASSERT_MES(r, false, "failed to call");
   if (!emm_resp.data_for_external_signing)
@@ -1051,33 +1110,9 @@ bool wallet_rpc_thirdparty_custody::c1(currency::core& c, size_t ev_index, const
     return false;
   }
 
-  crypto::signature sig = AUTO_VAL_INIT(sig);
-  crypto::generic_schnorr_sig sig_sch = AUTO_VAL_INIT(sig_sch);
-  r = crypto::generate_schnorr_sig(emm_resp.tx_id, miner_wlt->get_account().get_keys().spend_secret_key, sig_sch);
-  CHECK_AND_ASSERT_MES(r, false, "gailed to generate schnorr signature");
+  r = sign_signature_with_keys(emm_resp, alice_wlt_rpc, miner_wlt->get_account().get_keys().spend_secret_key, miner_wlt->get_account().get_keys().account_address.spend_public_key);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call sign_signature_with_keys");
 
-  //crypto::generate_signature(emm_resp.tx_id, miner_wlt->get_account().get_keys().account_address.spend_public_key, miner_wlt->get_account().get_keys().spend_secret_key, sig);
-  // instant verification, just in case
-  r = crypto::verify_schnorr_sig(emm_resp.tx_id, miner_wlt->get_account().get_keys().account_address.spend_public_key, sig_sch);
-  CHECK_AND_ASSERT_MES(r, false, "verify_schnorr_sig failed");
-  currency::schnor_new_to_schnor_old(sig_sch, sig);
-
-
-  //
-  // send ETH signature alogn with all previous data to a wallet RPC call for final tx assembling and broadcasting
-  //
-  tools::wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::request send_signed_req = AUTO_VAL_INIT(send_signed_req);
-  send_signed_req.unsigned_tx = emm_resp.data_for_external_signing->unsigned_tx;
-  send_signed_req.regular_sig = sig;
-  send_signed_req.expected_tx_id = emm_resp.tx_id;
-  send_signed_req.finalized_tx = emm_resp.data_for_external_signing->finalized_tx;
-  send_signed_req.unlock_transfers_on_fail = true;
-  tools::wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::response send_signed_resp{};
-
-  r = invoke_text_json_for_rpc(alice_wlt_rpc, "send_ext_signed_asset_tx", send_signed_req, send_signed_resp);
-  CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: ");
-  CHECK_AND_ASSERT_MES(send_signed_resp.status == API_RETURN_CODE_OK, false, "RPC send_ext_signed_asset_tx failed: ");
-  
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 3);
 
 
@@ -1096,6 +1131,75 @@ bool wallet_rpc_thirdparty_custody::c1(currency::core& c, size_t ev_index, const
   r = invoke_text_json_for_rpc(bob_wlt_rpc, "getbalance", balance_req, balance_resp);
   CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: ");
   
+
+  bool found_asset = false;
+  for (auto& bal : balance_resp.balances)
+  {
+    if (bal.asset_info.asset_id == resp.new_asset_id)
+    {
+      found_asset = true;
+      CHECK_AND_ASSERT_MES(bal.total == COINS_TO_TRANSFER, false, "Amount is unexpected");
+    }
+  }
+  CHECK_AND_ASSERT_MES(found_asset, false, "Asset not found ");
+
+
+
+  //transfer ownership of the asset to new address
+  //let's change the owner to ecdsa
+  crypto::eth_secret_key eth_sk_2{};
+  crypto::eth_public_key eth_pk_2{};
+  r = crypto::generate_eth_key_pair(eth_sk_2, eth_pk_2);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_key_pair failed");
+
+  tools::wallet_public::COMMAND_TRANSFER_ASSET_OWNERSHIP::request req_own = AUTO_VAL_INIT(req_own);
+  tools::wallet_public::COMMAND_TRANSFER_ASSET_OWNERSHIP::response res_own = AUTO_VAL_INIT(res_own);
+  req_own.asset_id = resp.new_asset_id;
+  req_own.new_owner_eth_pub_key = eth_pk_2;
+
+
+  r = invoke_text_json_for_rpc(alice_wlt_rpc, "transfer_asset_ownership", req_own, res_own);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+  if (!res_own.data_for_external_signing)
+  {
+    LOG_ERROR("Missing data_for_external_signing");
+    return false;
+  }
+
+  r = sign_signature_with_keys(res_own, alice_wlt_rpc, miner_wlt->get_account().get_keys().spend_secret_key, miner_wlt->get_account().get_keys().account_address.spend_public_key);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call sign_signature_with_keys");
+
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 3);
+
+
+  //now make another tx and see of ownership got changed
+  emm_resp = AUTO_VAL_INIT(emm_resp);
+  r = invoke_text_json_for_rpc(alice_wlt_rpc, "emit_asset", emm_req, emm_resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+  if (!emm_resp.data_for_external_signing)
+  {
+    LOG_ERROR("Missing data_for_external_signing");
+    return false;
+  }
+
+  r = sign_signature_with_keys(emm_resp, alice_wlt_rpc, eth_sk_2, eth_pk_2);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call sign_signature_with_keys");
+
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 3);
+
+  r = invoke_text_json_for_rpc(bob_wlt_rpc, "getbalance", balance_req, balance_resp);
+  CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: ");
+
+  found_asset = false;
+  for (auto& bal : balance_resp.balances)
+  {
+    if (bal.asset_info.asset_id == resp.new_asset_id)
+    {
+      found_asset = true;
+      CHECK_AND_ASSERT_MES(bal.total == COINS_TO_TRANSFER, false, "Amount is unexpected");
+    }
+  }
+  CHECK_AND_ASSERT_MES(found_asset, false, "Asset not found ");
 
 
   return true;

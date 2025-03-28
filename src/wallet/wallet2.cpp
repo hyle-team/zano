@@ -5682,11 +5682,12 @@ void wallet2::update_asset(const crypto::public_key& asset_id, const currency::a
   ctp.tx_meaning_for_logs = "asset update";
 
   bool send_to_network = true;
-  if (last_adb.owner_eth_pub_key.has_value())
+  if (own_asset_entry_it->second.thirdparty_custody || last_adb.owner_eth_pub_key.has_value())
   {
     send_to_network = false;
     ctp.additional_transfer_flags_to_mark = WALLET_TRANSFER_DETAIL_FLAG_ASSET_OP_RESERVATION;
     ctp.tx_meaning_for_logs = "asset eth update";
+    ctp.ado_sign_thirdparty = true;
   }
 
   this->transfer(ctp, ft, send_to_network, nullptr);
@@ -5724,11 +5725,12 @@ void wallet2::transfer_asset_ownership(const crypto::public_key& asset_id, const
   ctp.tx_meaning_for_logs = "transfer asset ownership";
 
   bool send_to_network = true;
-  if (last_adb.owner_eth_pub_key.has_value())
+  if (own_asset_entry_it->second.thirdparty_custody || last_adb.owner_eth_pub_key.has_value())
   {
     send_to_network = false;
     ctp.additional_transfer_flags_to_mark = WALLET_TRANSFER_DETAIL_FLAG_ASSET_OP_RESERVATION;
     ctp.tx_meaning_for_logs = "transfer asset eth ownership";
+    ctp.ado_sign_thirdparty = true;
   }
 
   this->transfer(ctp, ft, send_to_network, nullptr);
