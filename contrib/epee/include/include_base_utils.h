@@ -29,6 +29,11 @@
 #define BOOST_FILESYSTEM_VERSION 3
 #define ENABLE_RELEASE_LOGGING
 
+#if BOOST_VERSION < 107500
+  #error "Boost version 1.75.0 or newer is required for zano-node-util."
+#endif
+
 #include "misc_log_ex.h"
+
 
 
