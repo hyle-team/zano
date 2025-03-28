@@ -30,6 +30,7 @@
 #define ENABLE_RELEASE_LOGGING
 
 #if BOOST_VERSION < 107500
+  #pragma message("Detected Boost version: " BOOST_LIB_VERSION)
   #error "Boost version 1.75.0 or newer is required for zano-node-util."
 #endif
 
