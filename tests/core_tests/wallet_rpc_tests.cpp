@@ -1186,7 +1186,8 @@ bool wallet_rpc_thirdparty_custody::c1(currency::core& c, size_t ev_index, const
   CHECK_AND_ASSERT_MES(r, false, "failed to call sign_signature_with_keys");
 
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 3);
-
+  
+  bob_wlt->refresh();
   r = invoke_text_json_for_rpc(bob_wlt_rpc, "getbalance", balance_req, balance_resp);
   CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: ");
 
@@ -1196,7 +1197,7 @@ bool wallet_rpc_thirdparty_custody::c1(currency::core& c, size_t ev_index, const
     if (bal.asset_info.asset_id == resp.new_asset_id)
     {
       found_asset = true;
-      CHECK_AND_ASSERT_MES(bal.total == COINS_TO_TRANSFER, false, "Amount is unexpected");
+      CHECK_AND_ASSERT_MES(bal.total == 2 * COINS_TO_TRANSFER, false, "Amount is unexpected");
     }
   }
   CHECK_AND_ASSERT_MES(found_asset, false, "Asset not found ");
