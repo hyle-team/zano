@@ -4402,14 +4402,8 @@ bool wallet2::get_utxo_distribution(std::map<uint64_t, uint64_t>& distribution)
   return false;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::submit_externally_signed_asset_tx(const finalized_tx& ft, const crypto::eth_signature& eth_sig, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked)
+void wallet2::submit_externally_signed_asset_tx(const currency::finalized_tx& ft, const currency::transaction& tx, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked)
 {
-  transaction tx = ft.tx;
-  
-  currency::asset_operation_ownership_proof_eth aoop_eth{};
-  aoop_eth.eth_sig = eth_sig;
-  tx.proofs.push_back(std::move(aoop_eth));
-  
   // foolproof
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(ft.ftp.spend_pub_key == m_account.get_keys().account_address.spend_public_key, "The given tx was created in a different wallet, keys missmatch, tx hash: " << ft.tx_id);
 
@@ -4433,8 +4427,70 @@ void wallet2::submit_externally_signed_asset_tx(const finalized_tx& ft, const cr
   add_sent_tx_detailed_info(tx, ft.ftp.attachments, ft.ftp.prepared_destinations, ft.ftp.selected_transfers);
 
   print_tx_sent_message(tx, "from submit_externally_signed_asset_tx", true, get_tx_fee(tx));
+  result_tx = tx;
+}
+
+//----------------------------------------------------------------------------------------------------
+void wallet2::submit_externally_signed_asset_tx(const currency::finalized_tx& ft, const crypto::signature& sig, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked)
+{
+  currency::transaction tx = ft.tx;
+
+  currency::asset_operation_ownership_proof aoop_eth{};
+  currency::schnor_old_to_schnor_new(sig, aoop_eth.gss);
+  //aoop_eth.gss = sig;
+  tx.proofs.push_back(std::move(aoop_eth));
+  submit_externally_signed_asset_tx(ft, tx, unlock_transfers_on_fail, result_tx, transfers_unlocked);
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::submit_externally_signed_asset_tx(const currency::finalized_tx& ft, const crypto::eth_signature& eth_sig, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked)
+{
+  transaction tx = ft.tx;
+  
+  currency::asset_operation_ownership_proof_eth aoop_eth{};
+  aoop_eth.eth_sig = eth_sig;
+  tx.proofs.push_back(std::move(aoop_eth));
+  submit_externally_signed_asset_tx(ft, tx, unlock_transfers_on_fail, result_tx, transfers_unlocked);
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::attach_asset_descriptor(const wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::request& req, wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::response& resp)
+{
+  if (!req.do_attach)
+  {
+    //detaching
+    auto it = m_own_asset_descriptors.find(req.asset_id);
+    if (it == m_own_asset_descriptors.end())
+    {
+      resp.status = API_RETURN_CODE_NOT_FOUND;
+      return false;
+    }
+    if (!it->second.thirdparty_custody)
+    {
+      LOG_ERROR("Detachig assets that are not 'thirdparty_custody' are not allowed");
+      resp.status = API_RETURN_CODE_ACCESS_DENIED;
+      return false;
+    }
+    m_own_asset_descriptors.erase(it);
+    resp.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  else
+  {
+    currency::COMMAND_RPC_GET_ASSET_INFO::request req_asset_info = AUTO_VAL_INIT(req_asset_info);
+    currency::COMMAND_RPC_GET_ASSET_INFO::response resp_asset_info = AUTO_VAL_INIT(resp_asset_info);
+    req_asset_info.asset_id = req.asset_id;
+
+    bool r = m_core_proxy->call_COMMAND_RPC_GET_ASSET_INFO(req_asset_info, resp_asset_info);
+    if (r && resp_asset_info.status == API_RETURN_CODE_OK)
+    {
+      static_cast<currency::asset_descriptor_base&>(m_own_asset_descriptors[req.asset_id]) = resp_asset_info.asset_descriptor;
+      m_own_asset_descriptors[req.asset_id].thirdparty_custody = true;
+      resp.status = API_RETURN_CODE_OK;
+      return true;
+    }
+    resp.status = API_RETURN_CODE_NOT_FOUND;
+    return false;
+  }
+}
 void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx)
 {
   // decrypt sources
@@ -5626,11 +5682,12 @@ void wallet2::update_asset(const crypto::public_key& asset_id, const currency::a
   ctp.tx_meaning_for_logs = "asset update";
 
   bool send_to_network = true;
-  if (last_adb.owner_eth_pub_key.has_value())
+  if (own_asset_entry_it->second.thirdparty_custody || last_adb.owner_eth_pub_key.has_value())
   {
     send_to_network = false;
     ctp.additional_transfer_flags_to_mark = WALLET_TRANSFER_DETAIL_FLAG_ASSET_OP_RESERVATION;
     ctp.tx_meaning_for_logs = "asset eth update";
+    ctp.ado_sign_thirdparty = true;
   }
 
   this->transfer(ctp, ft, send_to_network, nullptr);
@@ -5646,7 +5703,7 @@ void wallet2::update_asset(const crypto::public_key& asset_id, const currency::a
 void wallet2::transfer_asset_ownership(const crypto::public_key& asset_id, const currency::asset_owner_pub_key_v& new_owner_v, currency::finalized_tx& ft)
 {
   auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
-  CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
+  CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Couldn't find asset_id " << asset_id << " in own assets list");
   currency::asset_descriptor_base last_adb{};
   bool r = this->daemon_get_asset_info(asset_id, last_adb);
   CHECK_AND_ASSERT_THROW_MES(r, "Failed to get asset info from daemon");
@@ -5659,20 +5716,29 @@ void wallet2::transfer_asset_ownership(const crypto::public_key& asset_id, const
   asset_update_info.opt_asset_id = asset_id;
 
   if (new_owner_v.type() == typeid(crypto::public_key))
-    asset_update_info.opt_descriptor->owner = boost::get<crypto::public_key>(new_owner_v);
+  {
+    const crypto::public_key new_owner_pk = boost::get<crypto::public_key>(new_owner_v);
+    asset_update_info.opt_descriptor->owner = new_owner_pk;
+    asset_update_info.opt_descriptor->owner_eth_pub_key = boost::none;
+  }
   else
-    asset_update_info.opt_descriptor->owner_eth_pub_key = boost::get<crypto::eth_public_key>(new_owner_v);
+  {
+    const crypto::eth_public_key new_owner_eth_pk = boost::get<crypto::eth_public_key>(new_owner_v);
+    asset_update_info.opt_descriptor->owner = currency::null_pkey;
+    asset_update_info.opt_descriptor->owner_eth_pub_key = new_owner_eth_pk;
+  }
 
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.extra.push_back(asset_update_info);
   ctp.tx_meaning_for_logs = "transfer asset ownership";
 
   bool send_to_network = true;
-  if (last_adb.owner_eth_pub_key.has_value())
+  if (own_asset_entry_it->second.thirdparty_custody || last_adb.owner_eth_pub_key.has_value())
   {
     send_to_network = false;
     ctp.additional_transfer_flags_to_mark = WALLET_TRANSFER_DETAIL_FLAG_ASSET_OP_RESERVATION;
     ctp.tx_meaning_for_logs = "transfer asset eth ownership";
+    ctp.ado_sign_thirdparty = true;
   }
 
   this->transfer(ctp, ft, send_to_network, nullptr);

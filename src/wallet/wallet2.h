@@ -616,6 +616,8 @@ namespace tools
     void submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx);
     void submit_transfer_files(const std::string& signed_tx_file, currency::transaction& tx);
     void submit_externally_signed_asset_tx(const currency::finalized_tx& ft, const crypto::eth_signature& eth_sig, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked);
+    void submit_externally_signed_asset_tx(const currency::finalized_tx& ft, const crypto::signature& sig, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked);
+    void submit_externally_signed_asset_tx(const currency::finalized_tx& ft, const currency::transaction& tx, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked);
 
     void sweep_below(size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
       uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
@@ -694,6 +696,7 @@ namespace tools
     size_t scan_for_collisions(std::unordered_map<crypto::key_image, std::list<size_t> >& key_images);
     size_t fix_collisions();
     size_t scan_for_transaction_entries(const crypto::hash& tx_id, const crypto::key_image& ki, std::list<transfer_details>& details);
+    bool attach_asset_descriptor(const wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::request& req, wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::response& resp);
 
     bool get_contracts(escrow_contracts_container& contracts);
     const std::list<expiration_entry_info>& get_expiration_entries() const { return m_money_expirations; };
@@ -767,6 +770,7 @@ namespace tools
     void set_concise_mode(bool enabled) { m_concise_mode = enabled; }
     void set_concise_mode_reorg_max_reorg_blocks(uint64_t max_blocks) { m_wallet_concise_mode_max_reorg_blocks = max_blocks; }
     void set_concise_mode_truncate_history(uint64_t max_entries) { m_truncate_history_max_entries = max_entries; }
+
 
     construct_tx_param get_default_construct_tx_param();
 

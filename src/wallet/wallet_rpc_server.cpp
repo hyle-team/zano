@@ -1334,15 +1334,22 @@ namespace tools
     }
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_asset_deploy(const wallet_public::COMMAND_ASSETS_DEPLOY::request& req, wallet_public::COMMAND_ASSETS_DEPLOY::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  bool wallet_rpc_server::on_asset_deploy(const wallet_public::COMMAND_ASSETS_DEPLOY::request& req_, wallet_public::COMMAND_ASSETS_DEPLOY::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
+    //make local req so we can modify it (if needed)
+    wallet_public::COMMAND_ASSETS_DEPLOY::request req = req_;
 
     if (!currency::validate_asset_ticker_and_full_name(req.asset_descriptor))
     {
       er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
       er.message = "asset ticker or full_name is invalid";
       return false;
+    }
+
+    if (req.destinations.empty() && req.asset_descriptor.current_supply != 0)
+    {
+      req.destinations.push_back(tools::wallet_public::transfer_destination{ req.asset_descriptor.current_supply , w.get_wallet()->get_account().get_public_address_str(), currency::null_pkey });
     }
 
     std::vector<currency::tx_destination_entry> currency_destinations;
@@ -1354,6 +1361,17 @@ namespace tools
 
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  void finalized_tx_to_external_signing_data(const currency::finalized_tx& ft, wallet_public::data_for_external_asset_signing_tx& data)
+  {
+    // include additonal info into response, if it's an external signing asset operation
+    data.unsigned_tx = t_serializable_object_to_blob(ft.tx);
+    data.tx_secret_key = ft.one_time_key;
+    std::vector<std::string>& outs_addr = data.outputs_addresses;
+    for (auto d : ft.ftp.prepared_destinations)
+      outs_addr.push_back(currency::get_account_address_as_str(d.addr.back()));
+    data.finalized_tx = t_serializable_object_to_blob(ft);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_asset_emit(const wallet_public::COMMAND_ASSETS_EMIT::request& req, wallet_public::COMMAND_ASSETS_EMIT::response& res, epee::json_rpc::error& er, connection_context& cntx)
@@ -1369,17 +1387,11 @@ namespace tools
     w.get_wallet()->emit_asset(req.asset_id, currency_destinations, ft);
     res.tx_id = ft.tx_id;
 
-    if (last_adb.owner_eth_pub_key.has_value())
+    if (ft.ftp.ado_sign_thirdparty)
     {
-      // include additonal info into response, if it's an external signing asset operation
+      // include additional info into response, if it's an external signing asset operation
       wallet_public::data_for_external_asset_signing_tx data{};
-      data.unsigned_tx = t_serializable_object_to_blob(ft.tx);
-      data.tx_secret_key = ft.one_time_key;
-      std::vector<std::string>& outs_addr = data.outputs_addresses;
-      for(auto d : ft.ftp.prepared_destinations)
-        outs_addr.push_back(currency::get_account_address_as_str(d.addr.back()));
-      data.finalized_tx = t_serializable_object_to_blob(ft);
-
+      finalized_tx_to_external_signing_data(ft, data);
       res.data_for_external_signing = data;
     }
 
@@ -1394,17 +1406,11 @@ namespace tools
     w.get_wallet()->update_asset(req.asset_id, req.asset_descriptor, ft);
     res.tx_id = ft.tx_id;
 
-    if (req.asset_descriptor.owner_eth_pub_key.has_value())
+    if (ft.ftp.ado_sign_thirdparty)
     {
-      // include additonal info into response, if it's an external signing asset operation
+      // include additional info into response, if it's an external signing asset operation
       wallet_public::data_for_external_asset_signing_tx data{};
-      data.unsigned_tx = t_serializable_object_to_blob(ft.tx);
-      data.tx_secret_key = ft.one_time_key;
-      std::vector<std::string>& outs_addr = data.outputs_addresses;
-      for(auto d : ft.ftp.prepared_destinations)
-        outs_addr.push_back(currency::get_account_address_as_str(d.addr.back()));
-      data.finalized_tx = t_serializable_object_to_blob(ft);
-
+      finalized_tx_to_external_signing_data(ft, data);
       res.data_for_external_signing = data;
     }
 
@@ -1454,7 +1460,14 @@ namespace tools
     try
     {
       currency::transaction result_tx{};
-      w.get_wallet()->submit_externally_signed_asset_tx(ft, req.eth_sig, req.unlock_transfers_on_fail, result_tx, res.transfers_were_unlocked);
+      if (req.regular_sig != currency::null_sig)
+      {
+        w.get_wallet()->submit_externally_signed_asset_tx(ft, req.regular_sig, req.unlock_transfers_on_fail, result_tx, res.transfers_were_unlocked);
+      }
+      else
+      {
+        w.get_wallet()->submit_externally_signed_asset_tx(ft, req.eth_sig, req.unlock_transfers_on_fail, result_tx, res.transfers_were_unlocked);
+      }
     }
     catch(std::exception& e)
     {
@@ -1463,6 +1476,57 @@ namespace tools
       return true;
     }
     res.status = API_RETURN_CODE_OK;  
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_attach_asset_descriptor(const wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::request& req, wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    w.get_wallet()->attach_asset_descriptor(req, res);
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_transfer_asset_ownership(const wallet_public::COMMAND_TRANSFER_ASSET_OWNERSHIP::request& req, wallet_public::COMMAND_TRANSFER_ASSET_OWNERSHIP::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    currency::asset_owner_pub_key_v new_owner_v;
+    if (req.new_owner!= currency::null_pkey)
+    {
+      new_owner_v = req.new_owner;
+    }
+    else if(req.new_owner_eth_pub_key != currency::null_eth_public_key)
+    {
+      new_owner_v = req.new_owner_eth_pub_key;
+    }else
+    {
+      res.status = API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS;
+      return true;
+    }
+
+    try
+    {
+      currency::finalized_tx ft;
+      w.get_wallet()->transfer_asset_ownership(req.asset_id, new_owner_v, ft);
+      if (ft.ftp.ado_sign_thirdparty)
+      {
+        // include additional info into response, if it's an external signing asset operation
+        wallet_public::data_for_external_asset_signing_tx data{};
+        finalized_tx_to_external_signing_data(ft, data);
+        res.data_for_external_signing = data;
+      }
+      res.tx_id = ft.tx_id;
+      res.status = API_RETURN_CODE_OK;
+      return true;
+    }
+    catch (std::exception& e)
+    {
+      // doing this to be able to return 'transfers_were_unlocked' to the caller even in the case of exception
+      res.status = e.what();
+      return true;
+    }
+
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }

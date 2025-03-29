@@ -56,6 +56,9 @@ namespace currency
   const static crypto::secret_key null_skey = AUTO_VAL_INIT(null_skey);
   const static crypto::signature null_sig = AUTO_VAL_INIT(null_sig);
   const static crypto::key_derivation null_derivation = AUTO_VAL_INIT(null_derivation);
+  const static crypto::eth_public_key null_eth_public_key = AUTO_VAL_INIT(null_eth_public_key);
+  const static crypto::eth_signature null_eth_signature = AUTO_VAL_INIT(null_eth_signature);
+  
 
   const static crypto::hash gdefault_genesis = epee::string_tools::hex_to_pod<crypto::hash>("CC608F59F8080E2FBFE3C8C80EB6E6A953D47CF2D6AEBD345BADA3A1CAB99852");
 

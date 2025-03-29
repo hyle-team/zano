@@ -808,7 +808,7 @@ wallet_true_rpc_pos_mining::wallet_true_rpc_pos_mining()
 {
   REGISTER_CALLBACK_METHOD(wallet_true_rpc_pos_mining, c1);
 }
-
+//------------------------------------------------------------------------------
 bool wallet_true_rpc_pos_mining::generate(std::vector<test_event_entry>& events) const
 {
   uint64_t ts = test_core_time::get_time();
@@ -921,6 +921,287 @@ bool wallet_true_rpc_pos_mining::c1(currency::core& c, size_t ev_index, const st
   //CHECK_AND_ASSERT_EQ(blocks_fetched, 1);
 
   //CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", amount_to_alice + CURRENCY_BLOCK_REWARD, 0, 0, 0, 0), false, "");
+
+  return true;
+}
+
+
+
+wallet_rpc_thirdparty_custody::wallet_rpc_thirdparty_custody()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_thirdparty_custody, c1);
+}
+//------------------------------------------------------------------------------
+bool wallet_rpc_thirdparty_custody::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+//------------------------------------------------------------------------------
+
+#define TEST_TOKEN_NAME  "TEST TOKEN"
+#define TEST_TOKEN_METAINFO  "Metainfo"
+#define TEST_TOKEN_TICKER  "TT"
+#define TEST_TOKEN_MAX_SUPPLY      2000
+#define TEST_TOKEN_CURRENT_SUPPLY  1000
+
+
+
+typedef boost::variant<crypto::secret_key, crypto::eth_secret_key> secret_key_v;
+typedef boost::variant<crypto::public_key, crypto::eth_public_key> public_key_v;
+
+
+template<typename t_response>
+bool sign_signature_with_keys(const t_response& rsp_with_data, tools::wallet_rpc_server& attached_wallet_rpc, const secret_key_v& signer_v, const public_key_v& verifier)
+{
+  bool r = false;
+  tools::wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::request send_signed_req = AUTO_VAL_INIT(send_signed_req);
+  if (signer_v.type() == typeid(crypto::secret_key))
+  {
+    //schnor sig
+    const crypto::secret_key& signer = boost::get<crypto::secret_key>(signer_v);
+    crypto::signature sig = AUTO_VAL_INIT(sig);
+    crypto::generic_schnorr_sig sig_sch = AUTO_VAL_INIT(sig_sch);
+    r = crypto::generate_schnorr_sig(rsp_with_data.tx_id, signer, sig_sch);
+    CHECK_AND_ASSERT_MES(r, false, "gailed to generate schnorr signature");
+
+    //crypto::generate_signature(emm_resp.tx_id, miner_wlt->get_account().get_keys().account_address.spend_public_key, miner_wlt->get_account().get_keys().spend_secret_key, sig);
+    // instant verification, just in case
+    r = crypto::verify_schnorr_sig(rsp_with_data.tx_id, boost::get<crypto::public_key>(verifier), sig_sch);
+    CHECK_AND_ASSERT_MES(r, false, "verify_schnorr_sig failed");
+    currency::schnor_new_to_schnor_old(sig_sch, sig);
+
+    send_signed_req.regular_sig = sig;
+  }
+  else if (signer_v.type() == typeid(crypto::eth_secret_key))
+  {
+    ////ecdsa sig
+    const crypto::eth_secret_key& signer = boost::get<crypto::eth_secret_key>(signer_v);
+    r = crypto::generate_eth_signature(rsp_with_data.tx_id, signer, send_signed_req.eth_sig);
+    CHECK_AND_ASSERT_MES(r, false, "gailed to generate schnorr signature");
+
+    r = crypto::verify_eth_signature(rsp_with_data.tx_id, boost::get<crypto::eth_public_key>(verifier), send_signed_req.eth_sig);
+    CHECK_AND_ASSERT_MES(r, false, "verify_eth_signature failed");
+
+  }
+  else
+  {
+    return false;
+  }
+
+  send_signed_req.unsigned_tx = rsp_with_data.data_for_external_signing->unsigned_tx;
+  send_signed_req.expected_tx_id = rsp_with_data.tx_id;
+  send_signed_req.finalized_tx = rsp_with_data.data_for_external_signing->finalized_tx;
+  send_signed_req.unlock_transfers_on_fail = true;
+  tools::wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::response send_signed_resp{};
+
+  r = invoke_text_json_for_rpc(attached_wallet_rpc, "send_ext_signed_asset_tx", send_signed_req, send_signed_resp);
+  CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: ");
+  CHECK_AND_ASSERT_MES(send_signed_resp.status == API_RETURN_CODE_OK, false, "RPC send_ext_signed_asset_tx failed: ");
+  return true;
+}
+
+
+
+bool wallet_rpc_thirdparty_custody::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+
+  bool r = false;
+  account_base alice_acc, bob_acc, carol_acc, custody_acc;
+  alice_acc.generate();
+  bob_acc.generate();
+  carol_acc.generate();
+  custody_acc.generate();
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, alice_acc);
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, bob_acc);
+  std::shared_ptr<tools::wallet2> carol_wlt = init_playtime_test_wallet(events, c, carol_acc);
+  std::shared_ptr<tools::wallet2> custody_wlt = init_playtime_test_wallet(events, c, custody_acc);
+
+  r = mine_next_pow_blocks_in_playtime(alice_wlt->get_account().get_public_address(), c, 3);
+  r = mine_next_pow_blocks_in_playtime(bob_wlt->get_account().get_public_address(), c, 3);
+  r = mine_next_pow_blocks_in_playtime(carol_wlt->get_account().get_public_address(), c, 3);
+  //r = mine_next_pow_blocks_in_playtime(custody_wlt->get_account().get_public_address(), c, 3);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+
+  // wallet RPC server
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
+
+  miner_wlt->refresh();
+  struct tools::wallet_public::COMMAND_ASSETS_DEPLOY::request req = AUTO_VAL_INIT(req);
+  struct tools::wallet_public::COMMAND_ASSETS_DEPLOY::response resp = AUTO_VAL_INIT(resp);
+  
+  req.asset_descriptor.decimal_point = 1;
+  req.asset_descriptor.full_name = TEST_TOKEN_NAME;
+  req.asset_descriptor.hidden_supply = false;
+  req.asset_descriptor.meta_info = TEST_TOKEN_METAINFO;
+  req.asset_descriptor.ticker = TEST_TOKEN_TICKER;
+  req.asset_descriptor.total_max_supply = TEST_TOKEN_MAX_SUPPLY;
+  req.asset_descriptor.current_supply = TEST_TOKEN_CURRENT_SUPPLY;
+
+  r = invoke_text_json_for_rpc(miner_wlt_rpc, "deploy_asset", req, resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+
+  if (resp.new_asset_id == currency::null_pkey)
+  {
+    LOG_ERROR("Failed to deploy asset");
+    return false;
+  }
+
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 3);
+   
+  // core RPC server
+  currency::t_currency_protocol_handler<currency::core> cprotocol(c, NULL);
+  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > dummy_p2p(cprotocol);
+  bc_services::bc_offers_service dummy_bc(nullptr);
+  currency::core_rpc_server core_rpc(c, dummy_p2p, dummy_bc);
+  currency::COMMAND_RPC_GET_ASSET_INFO::request gai_req = AUTO_VAL_INIT(gai_req);
+  currency::COMMAND_RPC_GET_ASSET_INFO::response gai_resp = AUTO_VAL_INIT(gai_resp);
+  gai_req.asset_id = resp.new_asset_id;
+  r = invoke_text_json_for_rpc(core_rpc, "get_asset_info", gai_req, gai_resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+  CHECK_AND_ASSERT_MES(gai_resp.status == API_RETURN_CODE_OK, false, "failed to call");
+
+  CHECK_AND_ASSERT_MES(gai_resp.asset_descriptor.decimal_point == 1, false, "Wrong asset descriptor");
+  CHECK_AND_ASSERT_MES(gai_resp.asset_descriptor.full_name == TEST_TOKEN_NAME, false, "Wrong asset descriptor");
+  CHECK_AND_ASSERT_MES(gai_resp.asset_descriptor.hidden_supply == false, false, "Wrong asset descriptor");
+  CHECK_AND_ASSERT_MES(gai_resp.asset_descriptor.meta_info == TEST_TOKEN_METAINFO, false, "Wrong asset descriptor");
+  CHECK_AND_ASSERT_MES(gai_resp.asset_descriptor.ticker == TEST_TOKEN_TICKER, false, "Wrong asset descriptor");
+  CHECK_AND_ASSERT_MES(gai_resp.asset_descriptor.total_max_supply == TEST_TOKEN_MAX_SUPPLY, false, "Wrong asset descriptor");
+  CHECK_AND_ASSERT_MES(gai_resp.asset_descriptor.current_supply == TEST_TOKEN_CURRENT_SUPPLY, false, "Wrong asset descriptor");
+
+  alice_wlt->refresh();
+  // wallet RPC server
+  tools::wallet_rpc_server alice_wlt_rpc(alice_wlt);
+
+  tools::wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::request att_req = AUTO_VAL_INIT(att_req);
+  tools::wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::response att_resp = AUTO_VAL_INIT(att_resp);
+  att_req.asset_id = resp.new_asset_id;
+  att_req.do_attach = true;
+  r = invoke_text_json_for_rpc(alice_wlt_rpc, "attach_asset_descriptor", att_req, att_resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+  CHECK_AND_ASSERT_MES(att_resp.status == API_RETURN_CODE_OK, false, "failed to call");
+
+
+  //let's emit it, but transfer actually to Bob, by using Alice wallet as attache
+  tools::wallet_public::COMMAND_ASSETS_EMIT::request emm_req = AUTO_VAL_INIT(emm_req);
+  tools::wallet_public::COMMAND_ASSETS_EMIT::response emm_resp = AUTO_VAL_INIT(emm_resp);
+#define COINS_TO_TRANSFER 10
+
+  emm_req.asset_id = resp.new_asset_id;
+  emm_req.destinations.push_back(tools::wallet_public::transfer_destination{ COINS_TO_TRANSFER, bob_wlt->get_account().get_public_address_str(), emm_req.asset_id });
+  r = invoke_text_json_for_rpc(alice_wlt_rpc, "emit_asset", emm_req, emm_resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+  if (!emm_resp.data_for_external_signing)
+  {
+    LOG_ERROR("Missing data_for_external_signing");
+    return false;
+  }
+
+  r = sign_signature_with_keys(emm_resp, alice_wlt_rpc, miner_wlt->get_account().get_keys().spend_secret_key, miner_wlt->get_account().get_keys().account_address.spend_public_key);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call sign_signature_with_keys");
+
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 3);
+
+
+  //check bob wallet
+  tools::wallet_public::COMMAND_ASSETS_WHITELIST_ADD::request wtl_req = AUTO_VAL_INIT(wtl_req);
+  tools::wallet_public::COMMAND_ASSETS_WHITELIST_ADD::response wtl_resp = AUTO_VAL_INIT(wtl_resp);
+  wtl_req.asset_id = resp.new_asset_id;
+  tools::wallet_rpc_server bob_wlt_rpc(bob_wlt);
+  r = invoke_text_json_for_rpc(bob_wlt_rpc, "assets_whitelist_add", wtl_req, wtl_resp);
+  CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: ");
+  CHECK_AND_ASSERT_MES(wtl_resp.status == API_RETURN_CODE_OK, false, "RPC status failed");
+  bob_wlt->refresh();
+
+  tools::wallet_public::COMMAND_RPC_GET_BALANCE::request balance_req = AUTO_VAL_INIT(balance_req);
+  tools::wallet_public::COMMAND_RPC_GET_BALANCE::response balance_resp = AUTO_VAL_INIT(balance_resp);
+  r = invoke_text_json_for_rpc(bob_wlt_rpc, "getbalance", balance_req, balance_resp);
+  CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: ");
+  
+
+  bool found_asset = false;
+  for (auto& bal : balance_resp.balances)
+  {
+    if (bal.asset_info.asset_id == resp.new_asset_id)
+    {
+      found_asset = true;
+      CHECK_AND_ASSERT_MES(bal.total == COINS_TO_TRANSFER, false, "Amount is unexpected");
+    }
+  }
+  CHECK_AND_ASSERT_MES(found_asset, false, "Asset not found ");
+
+
+
+  //transfer ownership of the asset to new address
+  //let's change the owner to ecdsa
+  crypto::eth_secret_key eth_sk_2{};
+  crypto::eth_public_key eth_pk_2{};
+  r = crypto::generate_eth_key_pair(eth_sk_2, eth_pk_2);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_key_pair failed");
+
+  tools::wallet_public::COMMAND_TRANSFER_ASSET_OWNERSHIP::request req_own = AUTO_VAL_INIT(req_own);
+  tools::wallet_public::COMMAND_TRANSFER_ASSET_OWNERSHIP::response res_own = AUTO_VAL_INIT(res_own);
+  req_own.asset_id = resp.new_asset_id;
+  req_own.new_owner_eth_pub_key = eth_pk_2;
+
+
+  r = invoke_text_json_for_rpc(alice_wlt_rpc, "transfer_asset_ownership", req_own, res_own);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+  if (!res_own.data_for_external_signing)
+  {
+    LOG_ERROR("Missing data_for_external_signing");
+    return false;
+  }
+
+  r = sign_signature_with_keys(res_own, alice_wlt_rpc, miner_wlt->get_account().get_keys().spend_secret_key, miner_wlt->get_account().get_keys().account_address.spend_public_key);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call sign_signature_with_keys");
+
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 3);
+
+
+  //now make another tx and see of ownership got changed
+  emm_resp = AUTO_VAL_INIT(emm_resp);
+  r = invoke_text_json_for_rpc(alice_wlt_rpc, "emit_asset", emm_req, emm_resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+  if (!emm_resp.data_for_external_signing)
+  {
+    LOG_ERROR("Missing data_for_external_signing");
+    return false;
+  }
+
+  r = sign_signature_with_keys(emm_resp, alice_wlt_rpc, eth_sk_2, eth_pk_2);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call sign_signature_with_keys");
+
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 3);
+  
+  bob_wlt->refresh();
+  r = invoke_text_json_for_rpc(bob_wlt_rpc, "getbalance", balance_req, balance_resp);
+  CHECK_AND_ASSERT_MES(r, false, "RPC send_ext_signed_asset_tx failed: ");
+
+  found_asset = false;
+  for (auto& bal : balance_resp.balances)
+  {
+    if (bal.asset_info.asset_id == resp.new_asset_id)
+    {
+      found_asset = true;
+      CHECK_AND_ASSERT_MES(bal.total == 2 * COINS_TO_TRANSFER, false, "Amount is unexpected");
+    }
+  }
+  CHECK_AND_ASSERT_MES(found_asset, false, "Asset not found ");
+
 
   return true;
 }
