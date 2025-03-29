@@ -5703,7 +5703,7 @@ void wallet2::update_asset(const crypto::public_key& asset_id, const currency::a
 void wallet2::transfer_asset_ownership(const crypto::public_key& asset_id, const currency::asset_owner_pub_key_v& new_owner_v, currency::finalized_tx& ft)
 {
   auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
-  CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
+  CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Couldn't find asset_id " << asset_id << " in own assets list");
   currency::asset_descriptor_base last_adb{};
   bool r = this->daemon_get_asset_info(asset_id, last_adb);
   CHECK_AND_ASSERT_THROW_MES(r, "Failed to get asset info from daemon");
@@ -5716,9 +5716,17 @@ void wallet2::transfer_asset_ownership(const crypto::public_key& asset_id, const
   asset_update_info.opt_asset_id = asset_id;
 
   if (new_owner_v.type() == typeid(crypto::public_key))
-    asset_update_info.opt_descriptor->owner = boost::get<crypto::public_key>(new_owner_v);
+  {
+    const crypto::public_key new_owner_pk = boost::get<crypto::public_key>(new_owner_v);
+    asset_update_info.opt_descriptor->owner = new_owner_pk;
+    asset_update_info.opt_descriptor->owner_eth_pub_key = boost::none;
+  }
   else
-    asset_update_info.opt_descriptor->owner_eth_pub_key = boost::get<crypto::eth_public_key>(new_owner_v);
+  {
+    const crypto::eth_public_key new_owner_eth_pk = boost::get<crypto::eth_public_key>(new_owner_v);
+    asset_update_info.opt_descriptor->owner = currency::null_pkey;
+    asset_update_info.opt_descriptor->owner_eth_pub_key = new_owner_eth_pk;
+  }
 
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.extra.push_back(asset_update_info);
