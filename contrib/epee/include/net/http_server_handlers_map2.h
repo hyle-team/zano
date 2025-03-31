@@ -551,6 +551,8 @@ namespace epee
        ss << "### Response: " << ENDL << "```json" << ENDL << de.response_json_example << ENDL << "```" << ENDL;
        ss << "### Response description: " << ENDL << "```" << ENDL << de.response_json_descriptions << ENDL << "```" << ENDL;
 
+       ss << "<sub>Auto-doc built with: " << PROJECT_VERSION_LONG  << "</sub>" << ENDL;
+
        std::string filename = de.json_method_name;
        if (!filename.size())
        {
