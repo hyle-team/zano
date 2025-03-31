@@ -300,7 +300,7 @@ int main(int argc, char* argv[])
   if (command_line::has_arg(vm, command_line::arg_generate_rpc_autodoc))
   {
     std::string path_to_generate = command_line::get_arg(vm, command_line::arg_generate_rpc_autodoc);
-    std::string auto_doc_sufix = "<sub>Auto-doc built with: " PROJECT_VERSION_LONG "</sub";
+    std::string auto_doc_sufix = "<sub>Auto-doc built with: " PROJECT_VERSION_LONG "</sub>";
     if (!generate_doc_as_md_files(path_to_generate, rpc_server, auto_doc_sufix))
       return 1;
     return 0;
