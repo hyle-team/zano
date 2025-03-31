@@ -3293,8 +3293,10 @@ int main(int argc, char* argv[])
   {
     tools::wallet_rpc_server wallet_rpc_server(std::shared_ptr<tools::wallet2>(new tools::wallet2()));
     std::string path_to_generate = command_line::get_arg(vm, command_line::arg_generate_rpc_autodoc);
+    
+    std::string auto_doc_sufix = "<sub>Auto-doc built with: " PROJECT_VERSION_LONG "</sub";
 
-    if (!generate_doc_as_md_files(path_to_generate, wallet_rpc_server))
+    if (!generate_doc_as_md_files(path_to_generate, wallet_rpc_server, auto_doc_sufix))
       return 1;
     return 0;
   }
