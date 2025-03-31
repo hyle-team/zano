@@ -2369,7 +2369,7 @@ void wallet_lock_time_watching_policy::watch_lock_time(uint64_t lock_time)
 {
   if (lock_time > 500)
   {
-    LOG_PRINT_RED_L0("[wallet_lock_time_watching_policy::watch_lock_time] LOCK_TIME: " << lock_time);
+    LOG_PRINT_RED_L0("[wallet_lock_time_watching_policy::watch_lock_time] LOCK_TIME: " << lock_time) << "ms";
   }
 }
 
