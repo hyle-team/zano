@@ -56,7 +56,7 @@ POP_VS_WARNINGS
         catch (const std::exception& e) \
         { \
           er.code = WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR; \
-          er.message = std::string("WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR") + e.what(); \
+          er.message = std::string("WALLET_RPC_ERROR_CODE_GENERIC_TRANSFER_ERROR: ") + e.what(); \
           return false; \
         } \
         catch (...) \

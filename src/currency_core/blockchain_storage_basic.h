@@ -195,14 +195,13 @@ namespace currency
 
   inline crypto::hash get_coinbase_hash_cached(const block_extended_info& bei)
   {    
-    if (bei.m_cache_coinbase_id)
-    {
-      return *bei.m_cache_coinbase_id;
-    }
-    else
+    std::shared_ptr<crypto::hash> local_coinbase_id = bei.m_cache_coinbase_id;
+    if (!local_coinbase_id)
     {
       bei.m_cache_coinbase_id = std::make_shared<crypto::hash>(get_transaction_hash(bei.bl.miner_tx));
-      return *bei.m_cache_coinbase_id;
+      local_coinbase_id = bei.m_cache_coinbase_id;
     }
+    return *local_coinbase_id;
+
   }
 } // namespace currency
