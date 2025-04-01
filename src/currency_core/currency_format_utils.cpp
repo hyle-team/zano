@@ -2320,7 +2320,9 @@ namespace currency
       }
       else
       {
-        CHECK_AND_ASSERT_THROW_MES(!ado.opt_descriptor.has_value(), "Internal error: opt_descriptor unset during ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN for version less then 2");
+        if (ado.opt_descriptor.has_value())
+          LOG_PRINT_YELLOW("\nWARNING: opt_descriptor is set for ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN when ado.version is >= 2\n", LOG_LEVEL_0);
+
         ado.opt_amount = amount_of_burned_assets;       // TODO: support hidden supply -- sowle
       }
       
@@ -2356,7 +2358,9 @@ namespace currency
         }
         else
         {
-          CHECK_AND_ASSERT_THROW_MES(!ado.opt_descriptor.has_value(), "Internal error: opt_descriptor unset during ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN for version less then 2");
+          if (ado.opt_descriptor.has_value())
+            LOG_PRINT_YELLOW("\nWARNING: opt_descriptor is set for ASSET_DESCRIPTOR_OPERATION_EMIT when ado.version is >= 2\n", LOG_LEVEL_0);
+
           ado.opt_amount = amount_of_emitted_asset;       // TODO: support hidden supply -- sowle
         }
 
