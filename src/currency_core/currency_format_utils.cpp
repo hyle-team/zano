@@ -1233,6 +1233,7 @@ namespace currency
     if (tx.version > TRANSACTION_VERSION_PRE_HF4)
     {
       // create tx_out_zarcanum
+      CHECK_AND_ASSERT_MES(de.addr.size() != 0, false, "cannot construct tx output: empty addr vector was given");
       CHECK_AND_ASSERT_MES(de.addr.size() == 1, false, "zarcanum multisig not implemented for tx_out_zarcanum yet");
       // TODO @#@# implement multisig support
 
@@ -2407,6 +2408,7 @@ namespace currency
       tx.vout.clear();
       tx.extra = extra;
       tx.signatures.clear();
+      tx.proofs.clear();
 
       tx.version = ftp.tx_version;
       if (tx.version >= TRANSACTION_VERSION_POST_HF5)
@@ -2417,7 +2419,7 @@ namespace currency
 
       if (flags != 0)
         set_tx_flags(tx, flags);
-      //generate key pair  
+
       if (expiration_time != 0)
         set_tx_expiration_time(tx, expiration_time);
     }
