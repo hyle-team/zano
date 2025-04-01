@@ -374,6 +374,7 @@ namespace currency
       {
         found_unlock_time = true;
         unlock_time2.unlock_time_array[i] = destinations[i].unlock_time;
+        LOG_PRINT_L0("%#%#%# apply_unlock_time(): tx " << get_transaction_hash(tx) << ", destination: " << i << ", unlock time: " << destinations[i].unlock_time);
       }
     }
     if (found_unlock_time)

@@ -181,6 +181,9 @@ namespace currency
     e.v = v;
     update_or_add_field_to_extra(tx.extra, e);
   }
+
+  crypto::hash get_transaction_prefix_hash(const transaction_prefix& tx);
+
   //---------------------------------------------------------------
   uint64_t get_tx_unlock_time(const transaction& tx, uint64_t o_i);
   uint64_t get_tx_max_unlock_time(const transaction& tx);
@@ -188,7 +191,7 @@ namespace currency
   inline bool should_unlock_value_be_treated_as_block_height(uint64_t v) { return v < CURRENCY_MAX_BLOCK_NUMBER; }
   inline uint64_t get_tx_flags(const transaction& tx) { return get_tx_x_detail<etc_tx_details_flags>(tx); }
   inline uint64_t get_tx_expiration_time(const transaction& tx) {return get_tx_x_detail<etc_tx_details_expiration_time>(tx); }
-  inline void set_tx_unlock_time(transaction& tx, uint64_t v) { set_tx_x_detail<etc_tx_details_unlock_time>(tx, v); }
+  inline void set_tx_unlock_time(transaction& tx, uint64_t v) { set_tx_x_detail<etc_tx_details_unlock_time>(tx, v); LOG_PRINT_L0("#%#%#% set_tx_unlock_time(): transaction " << get_transaction_prefix_hash(tx) << ", unlock time: " << v); }
   inline void set_tx_flags(transaction& tx, uint64_t v) { set_tx_x_detail<etc_tx_details_flags>(tx, v); }
   inline void set_tx_expiration_time(transaction& tx, uint64_t v) { set_tx_x_detail<etc_tx_details_expiration_time>(tx, v); }
   account_public_address get_crypt_address_from_destinations(const account_keys& sender_account_keys, const std::vector<tx_destination_entry>& destinations);
@@ -197,7 +200,6 @@ namespace currency
   bool is_tx_expired(const transaction& tx, uint64_t expiration_ts_median);
   uint64_t get_burned_amount(const transaction& tx);
   void get_transaction_prefix_hash(const transaction_prefix& tx, crypto::hash& h);
-  crypto::hash get_transaction_prefix_hash(const transaction_prefix& tx);
   bool parse_and_validate_tx_from_blob(const blobdata& tx_blob, transaction& tx, crypto::hash& tx_hash);
   bool parse_and_validate_tx_from_blob(const blobdata& tx_blob, transaction& tx);
   crypto::hash get_transaction_hash(const transaction& t);
