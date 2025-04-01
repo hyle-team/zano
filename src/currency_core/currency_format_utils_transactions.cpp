@@ -137,6 +137,11 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
+  void set_tx_unlock_time(transaction& tx, uint64_t v)
+  {
+    set_tx_x_detail<etc_tx_details_unlock_time>(tx, v); LOG_PRINT_L0("#%#%#% set_tx_unlock_time(): transaction " << get_transaction_hash(tx) << ", unlock time: " << v);
+  }
+  //---------------------------------------------------------------
   void get_transaction_prefix_hash(const transaction_prefix& tx, crypto::hash& h)
   {
     std::ostringstream s;
