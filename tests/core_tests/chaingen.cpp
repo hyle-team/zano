@@ -531,6 +531,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
     wallets.back().wallet->set_core_proxy(tmp_proxy);
     wallets.back().wallet->set_minimum_height(0);
     wallets.back().wallet->set_pos_required_decoys_count(0);
+    wallets.back().wallet->set_use_assets_whitelisting(false);
 
     currency::core_runtime_config pc = cc;
     pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
@@ -1004,6 +1005,7 @@ bool test_generator::init_test_wallet(const currency::account_base& account, con
   w->set_disable_tor_relay(true);
   w->set_concise_mode(true);
   w->set_concise_mode_reorg_max_reorg_blocks(TESTS_CONCISE_MODE_REORG_MAX_REORG_BLOCK);
+  w->set_use_assets_whitelisting(false);
 
   result = w;
   return true;
