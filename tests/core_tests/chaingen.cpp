@@ -1704,6 +1704,7 @@ bool construct_miner_tx_manually(size_t height, uint64_t already_generated_coins
                                  const account_public_address& miner_address, transaction& tx, uint64_t fee,
                                  keypair* p_txkey/* = 0*/)
 {
+  LOG_PRINT_L0("construct_miner_tx_manually(height=" << height << ")");
   keypair txkey;
   txkey = keypair::generate();
   add_tx_pub_key_to_extra(tx, txkey.pub);

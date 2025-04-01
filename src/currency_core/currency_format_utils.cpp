@@ -404,6 +404,7 @@ namespace currency
     const std::vector<tx_destination_entry>& destinations_ /* = std::vector<tx_destination_entry>() */
   )
   {
+    LOG_PRINT_L0("construct_miner_tx(height=" << height << ")");
     std::vector<tx_destination_entry> destinations = destinations_;
 
     bool r = false;
@@ -545,7 +546,8 @@ namespace currency
 
     if (!have_type_in_variant_container<etc_tx_details_unlock_time2>(tx.extra))
     {
-      //if stake unlock time was not set, then we can use simple "whole transaction" lock scheme 
+      //if stake unlock time was not set, then we can use simple "whole transaction" lock scheme
+      LOG_PRINT_L0("construct_miner_tx: setting unlock time to " << height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW << ", height is " << height);
       set_tx_unlock_time(tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
     }
 

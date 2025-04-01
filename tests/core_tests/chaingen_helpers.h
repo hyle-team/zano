@@ -113,6 +113,7 @@ inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::accou
     CHECKED_GET_SPECIFIC_VARIANT(b.miner_tx.vin[0], currency::txin_gen, in, false);
     in.height = height;
     set_tx_unlock_time(b.miner_tx, cbtr.height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+    LOG_PRINT_L0("mine_next_pow_block_in_playtime_with_given_txs(): prev_id != null, height: " << height << ", cbtr.height: " << cbtr.height);
   }
   else
   {
