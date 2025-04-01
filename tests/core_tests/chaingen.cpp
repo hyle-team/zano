@@ -1433,8 +1433,22 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
 }
 
 bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
-                     const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix, const std::vector<currency::tx_source_entry>& sources_to_avoid,
-                     uint64_t fts_flags, uint64_t* p_sources_amount_found /* = nullptr */)
+                     const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix,
+                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, uint64_t* p_sources_amount_found /* = nullptr */)
+{
+  std::unordered_map<crypto::public_key, uint64_t> amounts;
+  amounts[native_coin_asset_id] = amount;
+  std::unordered_map<crypto::public_key, uint64_t> sources_amounts;
+  if (!fill_tx_sources(sources, events, blk_head, from, amounts, nmix, sources_to_avoid, fts_flags, &sources_amounts))
+    return false;
+  if (p_sources_amount_found)
+    *p_sources_amount_found = sources_amounts[native_coin_asset_id];
+  return true;
+}
+
+bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
+                     const currency::block& blk_head, const currency::account_keys& from, const std::unordered_map<crypto::public_key, uint64_t>& amounts, size_t nmix,
+                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, std::unordered_map<crypto::public_key, uint64_t>* p_sources_amounts /* = nullptr */)
 {
   map_output_idx_t outs;
   map_output_t outs_mine;
@@ -1497,7 +1511,9 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
   uint64_t next_block_height = blockchain.size();
 
   // Iterate in reverse is more efficiency
-  uint64_t sources_amount = 0;
+  std::unordered_map<crypto::public_key, uint64_t> sources_amounts_local;
+  if (p_sources_amounts == nullptr)
+    p_sources_amounts = &sources_amounts_local;
   bool sources_found = false;
   BOOST_REVERSE_FOREACH(const map_output_t::value_type o, outs_mine)
   {
@@ -1507,6 +1523,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
       const output_index& oi = outs[o.first][sender_out];
       if (oi.spent)
           continue;
+
       if (fts_flags & fts_check_for_unlocktime)
       {
         uint64_t unlock_time = currency::get_tx_max_unlock_time(*oi.p_tx);
@@ -1531,8 +1548,10 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
         continue;
       }
 
+      if (amounts.count(oi.asset_id) == 0)
+        continue; // skip assets that are not required
 
-      currency::tx_source_entry ts = AUTO_VAL_INIT(ts);
+      currency::tx_source_entry ts{};
       ts.asset_id = oi.asset_id;
       ts.amount = oi.amount;
       ts.real_out_asset_id_blinding_mask = oi.asset_id_blinding_mask;
@@ -1547,16 +1566,21 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
 
       sources.push_back(ts);
 
-      sources_amount += ts.amount;
-      sources_found = amount <= sources_amount;
+      (*p_sources_amounts)[ts.asset_id] += ts.amount;
+      sources_found = true;
+      for (const auto& aid : amounts)
+      {
+        if ((*p_sources_amounts)[aid.first] < aid.second)
+        {
+          sources_found = false;
+          break;
+        }
+      }
     }
 
     if (sources_found)
       break;
   }
-
-  if (p_sources_amount_found != nullptr)
-    *p_sources_amount_found = sources_amount;
 
   return sources_found;
 }
