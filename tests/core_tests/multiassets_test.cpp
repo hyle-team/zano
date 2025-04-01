@@ -452,6 +452,7 @@ void fill_adb_version_based_onhardfork(currency::asset_descriptor_base& asset_ba
 
 //----------------------------------------------------------------------------------------------------
 
+
 assets_and_explicit_native_coins_in_outs::assets_and_explicit_native_coins_in_outs()
 {
   REGISTER_CALLBACK_METHOD(assets_and_explicit_native_coins_in_outs, c1_alice_cannot_deploy_asset);
@@ -498,7 +499,8 @@ bool assets_and_explicit_native_coins_in_outs::generate(std::vector<test_event_e
   r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc, alice_acc, m_alice_initial_balance, TESTS_DEFAULT_FEE, 0, sources, destinations, true /* spends */, false /* unlock time */);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   size_t tx_hardfork_id{};
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id), tx_hardfork_id, 0);
+  uint64_t tx_version = get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, tx_version, tx_hardfork_id, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   
   ADD_CUSTOM_EVENT(events, tx_0);
@@ -705,7 +707,8 @@ bool asset_depoyment_and_few_zc_utxos::generate(std::vector<test_event_entry>& e
   r = fill_tx_sources(sources, events, blk_0r, miner_acc.get_keys(), m_alice_initial_balance + TESTS_DEFAULT_FEE, 0);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
   size_t tx_hardfork_id{};
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id), tx_hardfork_id, 0);
+  uint64_t tx_version = get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, tx_version, tx_hardfork_id, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   ADD_CUSTOM_EVENT(events, tx_0);
@@ -2714,10 +2717,12 @@ bool assets_transfer_with_smallest_amount::c1(currency::core& c, size_t ev_index
 }
 
 //------------------------------------------------------------------------------
+
 asset_operations_and_chain_switching::asset_operations_and_chain_switching()
 {
   REGISTER_CALLBACK_METHOD(asset_operations_and_chain_switching, c1);
   REGISTER_CALLBACK_METHOD(asset_operations_and_chain_switching, c2);
+  REGISTER_CALLBACK_METHOD(asset_operations_and_chain_switching, c3);
 }
 
 bool asset_operations_and_chain_switching::generate(std::vector<test_event_entry>& events) const
@@ -2763,7 +2768,7 @@ bool asset_operations_and_chain_switching::generate(std::vector<test_event_entry
   REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   // register two assets
-  transaction tx_0{};  
+  transaction tx_0{};
   asset_descriptor_base adb_0{};
   {
     adb_0.total_max_supply = 911;
@@ -2790,7 +2795,7 @@ bool asset_operations_and_chain_switching::generate(std::vector<test_event_entry
   }
   ADD_CUSTOM_EVENT(events, tx_0);
 
-  transaction tx_1{};  
+  transaction tx_1{};
   asset_descriptor_base adb_1{};
   {
     adb_1.total_max_supply = 2;
@@ -2837,48 +2842,109 @@ bool asset_operations_and_chain_switching::generate(std::vector<test_event_entry
   // check balances
   DO_CALLBACK(events, "c1");
 
-  // now update one asset
+  // emit asset 0
   transaction tx_2{};
   {
     asset_descriptor_operation ado{};
     fill_ado_version_based_onhardfork(ado, current_hardfork_id);
-    ado.opt_descriptor = adb_1;
-    ado.opt_descriptor->meta_info = "where is they?";
+    ado.opt_descriptor = adb_0;  // required only for HF4 (since HF5 descriptor is not required, but it sill can be provided)
     ado.opt_descriptor->current_supply = 2;
-    ado.operation_type = ASSET_DESCRIPTOR_OPERATION_UPDATE;
-    ado.opt_asset_id = m_asset_ids[1];
+    ado.operation_type = ASSET_DESCRIPTOR_OPERATION_EMIT;
+    ado.opt_asset_id = m_asset_ids[0];
     std::vector<tx_destination_entry> destinations;
-    destinations.emplace_back(TESTS_DEFAULT_FEE, m_accounts[BOB_ACC_IDX].get_public_address());
-    r = construct_tx_to_key(m_hardforks, events, tx_2, blk_3, bob_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, std::vector<attachment_v>({ado}));
+    destinations.emplace_back(900, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey);
+    r = construct_tx_to_key(m_hardforks, events, tx_2, blk_3, alice_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, std::vector<attachment_v>({ado}));
     CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
   }
   ADD_CUSTOM_EVENT(events, tx_2);
 
-  // tx_3: transfer 1 WEEWOO from Alice to Bob
-  //transaction tx_3{};
-  //std::vector<tx_destination_entry> destinations;
-  //destinations.emplace_back(1, m_accounts[BOB_ACC_IDX].get_public_address(), m_asset_ids[0]);
-  //r = construct_tx_to_key(m_hardforks, events, tx_3, blk_2r, alice_acc, destinations);
-  //CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
-  //ADD_CUSTOM_EVENT(events, tx_2);
+  // update asset 1
+  transaction tx_3{};
+  {
+    asset_descriptor_operation ado{};
+    fill_ado_version_based_onhardfork(ado, current_hardfork_id);
+    adb_1.meta_info = "where is they?";
+    adb_1.current_supply = 2;
+    ado.opt_descriptor = adb_1;
+    ado.operation_type = ASSET_DESCRIPTOR_OPERATION_UPDATE;
+    ado.opt_asset_id = m_asset_ids[1];
+    std::vector<tx_destination_entry> destinations;
+    destinations.emplace_back(TESTS_DEFAULT_FEE, m_accounts[BOB_ACC_IDX].get_public_address());
+    r = construct_tx_to_key(m_hardforks, events, tx_3, blk_3, bob_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, std::vector<attachment_v>({ado}));
+    CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  }
+  ADD_CUSTOM_EVENT(events, tx_3);
 
-  MAKE_NEXT_BLOCK_TX_LIST(events, blk_4, blk_3, miner_acc, std::list<transaction>({tx_2}));
+  // this time we put tx_2 and tx_3 into an alt block first
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_4a, blk_3, miner_acc, std::list<transaction>({tx_2, tx_3}));
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_4a));
 
-  // now make an alternative chain from blk_3 and switch to it -- tx_2 should be moved to the pool and update operation should be undone
-  MAKE_NEXT_BLOCK(events, blk_4a, blk_3, miner_acc);
-  MAKE_NEXT_BLOCK(events, blk_5a, blk_4a, miner_acc);
+  // now make a main chain from blk_3 and switch to it -- tx_2, tx_3 should be moved to the pool and update/emit operations should be undone
+  MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_acc);
 
   // make sure chain switching occured
-  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_5a));
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_5));
 
-  // switch again (rewind blocks from blk_4)
-  REWIND_BLOCKS_N_WITH_TIME(events, blk_4r, blk_4, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
-
-  // make sure we've succeeded
-  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_4r));
+  // continue the chain, add a main chain block with tx_2 and tx_3
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_6, blk_5, miner_acc, std::list<transaction>({tx_2, tx_3}));
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_6r, blk_6, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   // check balances
   DO_CALLBACK(events, "c2");
+
+  // burn asset 1
+  transaction tx_4{};
+  {
+    asset_descriptor_operation ado{};
+    fill_ado_version_based_onhardfork(ado, current_hardfork_id);
+    ado.opt_descriptor = adb_1; // only for HF4
+    ado.operation_type = ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN;
+    ado.opt_asset_id = m_asset_ids[1];
+
+    // to construct tx for burn operation we need to provide more asset outputs in sources, than in destinations 
+    uint64_t asset_burn_amount = 2;
+    std::vector<tx_source_entry> sources;
+    std::unordered_map<crypto::public_key, uint64_t> amounts;
+    amounts[native_coin_asset_id] = TESTS_DEFAULT_FEE;
+    amounts[m_asset_ids[1]] = asset_burn_amount;
+    r = fill_tx_sources(sources, events, blk_6r, bob_acc.get_keys(), amounts, 0, std::vector<tx_source_entry>(), fts_default, nullptr);
+    CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
+
+    // fill destinations
+    std::unordered_map<crypto::public_key, uint64_t> sources_total_amounts;
+    get_sources_total_amount(sources, sources_total_amounts);
+    std::vector<tx_destination_entry> destinations;
+    // add change if necessary
+    for(const auto& el : sources_total_amounts)
+      if (el.second > amounts[el.first])
+        destinations.emplace_back(el.second - amounts[el.first], bob_acc.get_public_address(), el.first);
+    // handle minimum outputs limit
+    if (destinations.size() < CURRENCY_TX_MIN_ALLOWED_OUTS)
+      for(size_t i = 0; i < CURRENCY_TX_MIN_ALLOWED_OUTS - destinations.size(); ++i)
+        destinations.emplace_back(0, bob_acc.get_public_address());
+
+    crypto::secret_key sk{};
+    size_t tx_hardfork_id{};
+    uint64_t tx_version = get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id);
+    r = construct_tx(bob_acc.get_keys(), sources, destinations, std::vector<attachment_v>({ado}), empty_attachment, tx_4, tx_version, tx_hardfork_id, sk, 0);
+    CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  }
+  ADD_CUSTOM_EVENT(events, tx_4);
+
+  // tx_4 appears in altchain first
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_7a, blk_6r, miner_acc, std::list<transaction>({tx_4}));
+  DO_CALLBACK(events, "check_tx_pool_empty");
+
+  // switch to main chain
+  MAKE_NEXT_BLOCK(events, blk_7, blk_6r, miner_acc);
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_8, blk_7, miner_acc, std::list<transaction>({tx_4}));
+
+  // make sure chain switching occured
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_8));
+
+  // check final balances
+  DO_CALLBACK(events, "c3");
 
   return true;
 }
@@ -2906,9 +2972,31 @@ bool asset_operations_and_chain_switching::c2(currency::core& c, size_t ev_index
   std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, m_accounts[BOB_ACC_IDX]);
   bob_wlt->refresh();
 
-  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", 2, 0, 2, 0, 0, m_asset_ids[0], 0), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", 902, 0, 902, 0, 0, m_asset_ids[0], 0), false, "");
 
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt, "Bob", 2, 0, 2, 0, 0, m_asset_ids[1], 0), false, "");
+
+  asset_descriptor_base adb{};
+  r = c.get_blockchain_storage().get_asset_info(m_asset_ids[1], adb);
+  CHECK_AND_ASSERT_MES(r, false, "get_asset_info failed for id " << m_asset_ids[1]);
+
+  // make sure the update operation was successfull
+  CHECK_AND_ASSERT_EQ(adb.meta_info, std::string("where is they?"));
+
+  return true;
+}
+
+bool asset_operations_and_chain_switching::c3(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false, stub = false;;
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
+  alice_wlt->refresh();
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, m_accounts[BOB_ACC_IDX]);
+  bob_wlt->refresh();
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", 902, 0, 902, 0, 0, m_asset_ids[0], 0), false, "");
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt, "Bob", 0, 0, 0, 0, 0, m_asset_ids[1], 0), false, "");
 
   asset_descriptor_base adb{};
   r = c.get_blockchain_storage().get_asset_info(m_asset_ids[1], adb);

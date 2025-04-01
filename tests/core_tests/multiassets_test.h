@@ -134,6 +134,7 @@ struct asset_operations_and_chain_switching : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool c3(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
   mutable crypto::public_key m_asset_ids[4];
 };
