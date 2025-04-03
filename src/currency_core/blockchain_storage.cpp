@@ -658,7 +658,7 @@ bool blockchain_storage::pop_block_from_blockchain(transactions_map& onboard_tra
   CHECK_AND_ASSERT_MES(m_db_blocks.size() > 1, false, "pop_block_from_blockchain: can't pop from blockchain with size = " << m_db_blocks.size());
   size_t h = m_db_blocks.size()-1;
   auto bei_ptr = m_db_blocks[h];
-  CHECK_AND_ASSERT_MES(bei_ptr.get(), false, "pop_block_from_blockchain: can't pop from blockchain");
+  CHECK_AND_ASSERT_MES(bei_ptr.get(), false, "pop_block_from_blockchain: can't pop from blockchain, height = " << h);
 
   uint64_t fee_total = 0;
   bool r = purge_block_data_from_blockchain(bei_ptr->bl, bei_ptr->bl.tx_hashes.size(), fee_total, onboard_transactions);
@@ -1186,7 +1186,7 @@ bool blockchain_storage::rollback_blockchain_switching(std::list<block_ws_txs>& 
     CHECK_AND_ASSERT_MES(r && bvc.m_added_to_main_chain, false, "PANIC!!! failed to add (again) block while chain switching during the rollback!");
   }
 
-  LOG_PRINT_L0("Rollback succeeded.");
+  LOG_PRINT_YELLOW("Rollback succeeded.", LOG_LEVEL_0);
   return true;
 }
 //------------------------------------------------------------------
@@ -1268,7 +1268,7 @@ bool blockchain_storage::switch_to_alternative_blockchain(alt_chain_type& alt_ch
     bool r = handle_block_to_main_chain(ch_ent->second.bl, bvc);
     if(!r || !bvc.m_added_to_main_chain)
     {
-      LOG_PRINT_L0("Failed to switch to alternative blockchain");
+      LOG_PRINT_RED("Failed to switch to alternative blockchain", LOG_LEVEL_0);
       rollback_blockchain_switching(disconnected_chain, split_height);
       LOG_PRINT_L0("The block was inserted as invalid while connecting new alternative chain,  block_id: " << get_block_hash(ch_ent->second.bl));
 
