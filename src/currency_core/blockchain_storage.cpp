@@ -908,7 +908,9 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
   bool res_erase = m_db_transactions.erase_validate(tx_id);
   CHECK_AND_ASSERT_MES_NO_RET(res_erase, "serious internal error: m_transactions.erase_validate() failed for tx " << tx_id);
 
-  LOG_PRINT_L1("transaction " << tx_id << " from block @ " << tx_res_ptr->m_keeper_block_height << (added_to_the_pool ? " was removed from blockchain history -> to the pool" : " was removed from blockchain history"));
+  LOG_PRINT_L1("transaction " << tx_id << " from block @ " << tx_res_ptr->m_keeper_block_height <<
+    (added_to_the_pool ? " was removed from blockchain history -> to the pool" : " was removed from blockchain history") <<
+    ((res_pop_gi && res_erase) ? "" : " WITH ERRORS (see above)"));
   return res_pop_gi && res_erase;
 }
 
