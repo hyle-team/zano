@@ -901,16 +901,17 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
   {
     currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
     added_to_the_pool = m_tx_pool.add_tx(tx, tvc, true, true);
-    CHECK_AND_ASSERT_MES(added_to_the_pool, false, "failed to add transaction " << tx_id << " to transaction pool");
   }
 
-  bool res = pop_transaction_from_global_index(tx, tx_id);
-  CHECK_AND_ASSERT_MES_NO_RET(res, "pop_transaction_from_global_index failed for tx " << tx_id);
+  bool res_pop_gi = pop_transaction_from_global_index(tx, tx_id);
+  CHECK_AND_ASSERT_MES_NO_RET(res_pop_gi, "serious internal error: pop_transaction_from_global_index() failed for tx " << tx_id);
   bool res_erase = m_db_transactions.erase_validate(tx_id);
-  CHECK_AND_ASSERT_MES_NO_RET(res_erase, "Failed to m_transactions.erase with id = " << tx_id);
+  CHECK_AND_ASSERT_MES_NO_RET(res_erase, "serious internal error: m_transactions.erase_validate() failed for tx " << tx_id);
 
-  LOG_PRINT_L1("transaction " << tx_id << " from block @ " << tx_res_ptr->m_keeper_block_height << (added_to_the_pool ? " was removed from blockchain history -> to the pool" : " was removed from blockchain history"));
-  return res;
+  LOG_PRINT_L1("transaction " << tx_id << " from block @ " << tx_res_ptr->m_keeper_block_height <<
+    (added_to_the_pool ? " was removed from blockchain history -> to the pool" : " was removed from blockchain history") <<
+    ((res_pop_gi && res_erase) ? "" : " WITH ERRORS (see above)"));
+  return res_pop_gi && res_erase;
 }
 
 //------------------------------------------------------------------
