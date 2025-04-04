@@ -371,7 +371,7 @@ namespace misc_utils
   }
 
 
-#define ON_EXIT misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler
+#define ON_FUNC_EXIT misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler
 
 
     template< typename t_contaner, typename t_redicate>

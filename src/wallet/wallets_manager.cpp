@@ -1375,6 +1375,10 @@ std::string wallets_manager::close_wallet(size_t wallet_id)
   {
     return std::string(API_RETURN_CODE_FAIL) + ":" + e.what();
   }
+  catch (...)
+  {
+    return API_RETURN_CODE_INTERNAL_ERROR;
+  }
   //m_pview->hide_wallet();
   return API_RETURN_CODE_OK;
 }

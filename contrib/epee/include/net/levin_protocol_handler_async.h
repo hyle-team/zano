@@ -356,7 +356,7 @@ public:
     //update threads name to see connection context where errors came from
     std::string original_prefix = epee::log_space::log_singletone::get_thread_log_prefix();
     epee::log_space::log_singletone::set_thread_log_prefix(original_prefix + "[" + epee::net_utils::print_connection_context_short(m_connection_context) + "]");
-    ON_EXIT([&](){epee::log_space::log_singletone::set_thread_log_prefix(original_prefix); });
+    ON_FUNC_EXIT([&](){epee::log_space::log_singletone::set_thread_log_prefix(original_prefix); });
 
     //create_scope_leave_handler()
 
