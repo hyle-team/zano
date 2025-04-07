@@ -727,6 +727,14 @@ bool construct_tx(const currency::account_keys& sender_account_keys,
                   currency::transaction& tx,
                   uint64_t tx_version);
 
+bool construct_tx(const currency::account_keys& sender_account_keys, 
+                  const std::vector<currency::tx_source_entry>& sources,
+                  const std::vector<currency::tx_destination_entry>& destinations,
+                  const std::vector<test_event_entry> &events_to_get_hardfork_and_version,
+                  const test_chain_unit_base* p_test_instance,
+                  currency::transaction& result_tx);
+
+
 void get_confirmed_txs(const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, map_hash2tx_t& confirmed_txs);
 bool find_block_chain(const std::vector<test_event_entry>& events, std::vector<currency::block>& blockchain, map_hash2tx_t& mtx, const crypto::hash& head);
 

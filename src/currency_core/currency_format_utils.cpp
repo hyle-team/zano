@@ -1445,8 +1445,8 @@ namespace currency
     uint64_t tx_version,
     size_t tx_hardfork_id,
     uint64_t unlock_time,
-    uint8_t tx_outs_attr, 
-    bool shuffle)
+    uint8_t tx_outs_attr /* = CURRENCY_TO_KEY_OUT_RELAXED */, 
+    bool shuffle /* = true */)
   {
     crypto::secret_key one_time_secret_key{};
     return construct_tx(sender_account_keys, sources, destinations, std::vector<extra_v>(), attachments, tx, tx_version, tx_hardfork_id, one_time_secret_key, unlock_time, tx_outs_attr, shuffle);

@@ -2013,6 +2013,19 @@ bool construct_tx(const currency::account_keys& sender_account_keys,
   );
 }
 
+bool construct_tx(const currency::account_keys& sender_account_keys, 
+                  const std::vector<currency::tx_source_entry>& sources,
+                  const std::vector<currency::tx_destination_entry>& destinations,
+                  const std::vector<test_event_entry> &events_to_get_hardfork_and_version,
+                  const test_chain_unit_base* p_test_instance,
+                  currency::transaction& result_tx)
+{
+  size_t tx_hardfork_id{};
+  uint64_t tx_version = p_test_instance->get_tx_version_and_harfork_id_from_events(events_to_get_hardfork_and_version, tx_hardfork_id);
+  return construct_tx(sender_account_keys, sources, destinations, empty_attachment, result_tx, tx_version, tx_hardfork_id, 0);
+}
+
+
 uint64_t get_balance(const currency::account_keys& addr, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, bool dbg_log)
 {
   uint64_t res = 0;
