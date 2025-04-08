@@ -498,9 +498,7 @@ bool assets_and_explicit_native_coins_in_outs::generate(std::vector<test_event_e
   std::vector<tx_destination_entry> destinations;
   r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc, alice_acc, m_alice_initial_balance, TESTS_DEFAULT_FEE, 0, sources, destinations, true /* spends */, false /* unlock time */);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
-  size_t tx_hardfork_id{};
-  uint64_t tx_version = get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, tx_version, tx_hardfork_id, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, events, this, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   
   ADD_CUSTOM_EVENT(events, tx_0);
@@ -706,9 +704,7 @@ bool asset_depoyment_and_few_zc_utxos::generate(std::vector<test_event_entry>& e
   m_alice_initial_balance = TESTS_DEFAULT_FEE * 100;
   r = fill_tx_sources(sources, events, blk_0r, miner_acc.get_keys(), m_alice_initial_balance + TESTS_DEFAULT_FEE, 0);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
-  size_t tx_hardfork_id{};
-  uint64_t tx_version = get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, tx_version, tx_hardfork_id, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, events, this, tx_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   ADD_CUSTOM_EVENT(events, tx_0);

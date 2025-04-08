@@ -158,9 +158,7 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
   destinations.push_back(tx_destination_entry(sources.front().amount - TX_MAX_TRANSFER_AMOUNT - TX_MAX_TRANSFER_AMOUNT + 1 - TESTS_DEFAULT_FEE, bob_addr));
 
   currency::transaction tx_1{};
-  std::vector<currency::attachment_v> attachments;
-  size_t tx_hardfork_id{};
-  if (!construct_tx(miner_account.get_keys(), sources, destinations, attachments, tx_1, get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id), tx_hardfork_id, 0))
+  if (!construct_tx(miner_account.get_keys(), sources, destinations, events, this, tx_1))
     return false;
   events.push_back(tx_1);
 
@@ -185,9 +183,8 @@ bool gen_uint_overflow_2::generate(std::vector<test_event_entry>& events) const
   destinations.push_back(de);
   destinations.push_back(de);
 
-  currency::transaction tx_2;
-  std::vector<currency::attachment_v> attachments2;
-  if (!construct_tx(bob_account.get_keys(), sources, destinations, attachments2, tx_2, get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id), tx_hardfork_id, 0))
+  currency::transaction tx_2{};
+  if (!construct_tx(bob_account.get_keys(), sources, destinations, events, this, tx_2))
     return false;
   events.push_back(tx_2);
 
