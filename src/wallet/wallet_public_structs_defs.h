@@ -1935,7 +1935,7 @@ namespace wallet_public
       crypto::public_key new_asset_id;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Id of transaction that carries asset registration command, asset would be registered as soon as transaction got confirmed") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)         DOC_DSCR("Id of transaction that carries asset registration command, asset would be registered as soon as transaction got confirmed") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(new_asset_id)  DOC_DSCR("Issued asset id") DOC_EXMP("40fa6db923728b38962718c61b4dc3af1acaa1967479c73703e260dc3609c58d") DOC_END
       END_KV_SERIALIZE_MAP()
     };

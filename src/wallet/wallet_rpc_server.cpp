@@ -268,6 +268,8 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response, epee::net_utils::connection_context_base& conn_context, bool& call_found, documentation& docs)
   {
+    
+    //#ifndef _DEBUG
     if (m_jwt_secret.size() && conn_context.m_connection_id != RPC_INTERNAL_UI_CONTEXT)
     {
       if (!auth_http_request(query_info, response, conn_context))
@@ -278,6 +280,7 @@ namespace tools
         return true;
       }
     }
+    #endif
 
     response.m_response_code = 200;
     response.m_response_comment = "Ok";
