@@ -207,6 +207,7 @@ namespace currency
 
     context.m_state = currency_connection_context::state_synchronizing;
     context.m_remote_blockchain_height = hshd.current_height;
+    context.m_priv.m_last_fetched_block_ids.clear();
     //let the socket to send response to handshake, but request callback, to let send request data after response
     LOG_PRINT_L3("requesting callback");
     ++context.m_priv.m_callback_request_count;
@@ -368,6 +369,7 @@ namespace currency
     }else if(bvc.m_marked_as_orphaned)
     {
       context.m_state = currency_connection_context::state_synchronizing;
+      context.m_priv.m_last_fetched_block_ids.clear();
       NOTIFY_REQUEST_CHAIN::request r = boost::value_initialized<NOTIFY_REQUEST_CHAIN::request>();
       m_core.get_short_chain_history(r.block_ids);
       LOG_PRINT_MAGENTA("State changed to state_synchronizing.", LOG_LEVEL_2);
