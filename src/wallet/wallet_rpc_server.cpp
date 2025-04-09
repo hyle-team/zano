@@ -280,7 +280,7 @@ namespace tools
         return true;
       }
     }
-    #endif
+    //#endif
 
     response.m_response_code = 200;
     response.m_response_comment = "Ok";
