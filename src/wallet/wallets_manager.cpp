@@ -2205,13 +2205,15 @@ void wallets_manager::wallet_vs_options::worker_func()
   epee::math_helper::once_a_time_seconds<TX_POOL_SCAN_INTERVAL> scan_pool_interval;
   epee::math_helper::once_a_time_seconds<2> pos_minin_interval;
   view::wallet_status_info wsi = AUTO_VAL_INIT(wsi);
+  
+  wsi.wallet_state = view::wallet_status_info::wallet_state_synchronizing;
+  long_refresh_in_progress = true;
+
   while (!major_stop)
   {
     stop_for_refresh = false;
     try
     {
-      wsi.wallet_state = view::wallet_status_info::wallet_state_synchronizing;
-      long_refresh_in_progress = true;
       if (m_pproxy_diagnostig_info->last_daemon_is_disconnected.load())
       {
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));

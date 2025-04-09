@@ -81,11 +81,11 @@ void test_plain_wallet()
 
 
 
-  std::string seed;
-  if (!epee::file_io_utils::load_file_to_string("C:\\Users\\roky\\home\\temp\\wallets\\seed.txt", seed))
-    return;
+  //std::string seed;
+  //if (!epee::file_io_utils::load_file_to_string("C:\\Users\\roky\\home\\temp\\wallets\\seed.txt", seed))
+  //  return;
 
-  std::string res___ = plain_wallet::get_wallet_files();
+  //std::string res___ = plain_wallet::get_wallet_files();
 
 
   uint64_t instance_id = 0;
@@ -102,7 +102,7 @@ void test_plain_wallet()
   //res = plain_wallet::sync_call("reset_connection_url", 0, "http://127.0.0.1:11211");
 
   
-  r = plain_wallet::sync_call("run_wallet", instance_id, "");
+  //r = plain_wallet::sync_call("run_wallet", instance_id, "");
 
 
 
@@ -115,7 +115,7 @@ void test_plain_wallet()
     res = plain_wallet::sync_call("get_wallet_status", instance_id, "");
     view::wallet_sync_status_info wsi = AUTO_VAL_INIT(wsi);
     epee::serialization::load_t_from_json(wsi, res);
-    LOG_PRINT_L0("Progress: " << wsi.progress << " state: " << wsi.wallet_state << ", height: " << wsi.current_wallet_height << " of " << wsi.current_daemon_height);
+    LOG_PRINT_L0("Progress: "  << wsi.progress << " state: " << wsi.wallet_state << "is_in_long_refresh: " << wsi.is_in_long_refresh << ", height: " << wsi.current_wallet_height << " of " << wsi.current_daemon_height);
     if (wsi.wallet_state == 2)
       break;
   }
@@ -178,8 +178,8 @@ int main(int argc, char** argv)
   //epee::log_space::log_singletone::add_logger(LOGGER_FILE,
   //  epee::log_space::log_singletone::get_default_log_file().c_str(),
   //  epee::log_space::log_singletone::get_default_log_folder().c_str());
-  test_base64_serialization();
-  //test_plain_wallet();
+  //test_base64_serialization();
+  test_plain_wallet();
   //parse_weird_tx();
   //thread_pool_tests();
 
