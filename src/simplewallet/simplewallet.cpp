@@ -417,22 +417,15 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
 {
   handle_command_line(vm);
 
-  if (command_line::has_arg(vm, arg_daemon_address) && (command_line::has_arg(vm, arg_daemon_host) || command_line::has_arg(vm, arg_daemon_port)))
+  if (!m_daemon_address.empty() && (!m_daemon_host.empty() || 0 != m_daemon_port))
   {
-    fail_msg_writer() << "Please use either --daemon-address=\"host:port\" or specify both --daemon-host=\"host\" and --daemon-port=\"port\".";
-    return false;
-  }
-
-
-  if (!m_daemon_address.empty() && !m_daemon_host.empty() && 0 != m_daemon_port)
-  {
-    fail_msg_writer() << "you can't specify daemon host or port several times";
+    fail_msg_writer() << "please use either --daemon-address=\"host:port\" or specify both --daemon-host=\"host\" and --daemon-port=\"port\".";
     return false;
   }
 
   if (m_wallet_file.empty() && m_generate_new.empty() && m_restore_wallet.empty() && m_generate_new_aw.empty())
   {
-    fail_msg_writer() << "you must specify --wallet-file, --generate-new-wallet, --generate-new-auditable-wallet, --restore-wallet";
+    fail_msg_writer() << "you must specify --wallet-file, --generate-new-wallet, --generate-new-auditable-wallet, or --restore-wallet";
     return false;
   }
 
