@@ -237,7 +237,7 @@ private:
   std::mutex m_stop_singal_sent_mutex;
   std::condition_variable m_stop_singal_sent_mutex_cv;
 
-  std::mutex m_select_wallet_rpc_lock;
+  std::recursive_mutex m_select_wallet_rpc_lock{};
 
   view::i_view m_view_stub;
   view::i_view* m_pview;
