@@ -4402,7 +4402,7 @@ bool wallet2::get_utxo_distribution(std::map<uint64_t, uint64_t>& distribution)
   return false;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::submit_externally_signed_asset_tx(const currency::finalized_tx& ft, const currency::transaction& tx, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked)
+void wallet2::submit_externally_signed_asset_tx_impl(const finalized_tx& ft, const transaction& tx, bool unlock_transfers_on_fail, transaction& result_tx, bool& transfers_unlocked)
 {
   // foolproof
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(ft.ftp.spend_pub_key == m_account.get_keys().account_address.spend_public_key, "The given tx was created in a different wallet, keys missmatch, tx hash: " << ft.tx_id);
@@ -4426,30 +4426,29 @@ void wallet2::submit_externally_signed_asset_tx(const currency::finalized_tx& ft
   m_tx_keys.insert(std::make_pair(ft.tx_id, ft.one_time_key));
   add_sent_tx_detailed_info(tx, ft.ftp.attachments, ft.ftp.prepared_destinations, ft.ftp.selected_transfers);
 
-  print_tx_sent_message(tx, "from submit_externally_signed_asset_tx", true, get_tx_fee(tx));
+  print_tx_sent_message(tx, "from submit_externally_signed_asset_tx_impl", true, get_tx_fee(tx));
   result_tx = tx;
 }
 
 //----------------------------------------------------------------------------------------------------
-void wallet2::submit_externally_signed_asset_tx(const currency::finalized_tx& ft, const crypto::signature& sig, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked)
+void wallet2::submit_externally_signed_asset_tx(const finalized_tx& ft, const crypto::generic_schnorr_sig_s& gss_sig, bool unlock_transfers_on_fail, transaction& result_tx, bool& transfers_unlocked)
 {
-  currency::transaction tx = ft.tx;
+  transaction tx = ft.tx;
 
-  currency::asset_operation_ownership_proof aoop_eth{};
-  currency::schnor_old_to_schnor_new(sig, aoop_eth.gss);
-  //aoop_eth.gss = sig;
+  asset_operation_ownership_proof aoop_eth{};
+  aoop_eth.gss = gss_sig;
   tx.proofs.push_back(std::move(aoop_eth));
-  submit_externally_signed_asset_tx(ft, tx, unlock_transfers_on_fail, result_tx, transfers_unlocked);
+  submit_externally_signed_asset_tx_impl(ft, tx, unlock_transfers_on_fail, result_tx, transfers_unlocked);
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::submit_externally_signed_asset_tx(const currency::finalized_tx& ft, const crypto::eth_signature& eth_sig, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked)
+void wallet2::submit_externally_signed_asset_tx(const finalized_tx& ft, const crypto::eth_signature& eth_sig, bool unlock_transfers_on_fail, transaction& result_tx, bool& transfers_unlocked)
 {
   transaction tx = ft.tx;
   
-  currency::asset_operation_ownership_proof_eth aoop_eth{};
+  asset_operation_ownership_proof_eth aoop_eth{};
   aoop_eth.eth_sig = eth_sig;
   tx.proofs.push_back(std::move(aoop_eth));
-  submit_externally_signed_asset_tx(ft, tx, unlock_transfers_on_fail, result_tx, transfers_unlocked);
+  submit_externally_signed_asset_tx_impl(ft, tx, unlock_transfers_on_fail, result_tx, transfers_unlocked);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::attach_asset_descriptor(const wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::request& req, wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::response& resp)
@@ -4491,6 +4490,7 @@ bool wallet2::attach_asset_descriptor(const wallet_public::COMMAND_ATTACH_ASSET_
     return false;
   }
 }
+//----------------------------------------------------------------------------------------------------
 void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx)
 {
   // decrypt sources
