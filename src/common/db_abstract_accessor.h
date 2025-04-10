@@ -761,6 +761,11 @@ namespace tools
         NESTED_CATCH_ENTRY(__func__);
       }
 
+      const cache_container_type& get_cache_obj() const
+      {
+        return m_cache;
+      }
+
       void clear_cache() const 
       {
         m_cache.clear();

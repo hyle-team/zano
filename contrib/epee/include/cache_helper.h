@@ -60,14 +60,14 @@ namespace epee
     template<bool is_ordered_container, typename t_key, typename t_value, uint64_t max_elements>
     class cache_base
     {
-      uint64_t mac_allowed_elements;
+      uint64_t max_allowed_elements;
       std::list<t_key> most_recet_acessed;
       typename container_selector<is_ordered_container, t_key, std::pair<t_value, typename std::list<t_key>::iterator> >::container data;
     protected:
       critical_section m_lock;
     public:
 
-      cache_base() : mac_allowed_elements(max_elements)
+      cache_base() : max_allowed_elements(max_elements)
       {}
 
       size_t size() const
@@ -76,14 +76,19 @@ namespace epee
         return data.size();
       }
 
+      size_t most_recent_accessed_container_size() const
+      {
+        return most_recet_acessed.size();
+      }
+
       uint64_t get_max_elements() const
       {
-        return mac_allowed_elements;
+        return max_allowed_elements;
       }
 
       void set_max_elements(uint64_t e)
       {
-        mac_allowed_elements = e;
+        max_allowed_elements = e;
       }
 
       bool get(const t_key& k, t_value& v)
@@ -130,7 +135,7 @@ namespace epee
       void trim()
       {
         CRITICAL_REGION_LOCAL(m_lock);
-        while (most_recet_acessed.size() > mac_allowed_elements)
+        while (most_recet_acessed.size() > max_allowed_elements)
         {
           auto data_it = data.find(most_recet_acessed.back());
           if (data_it != data.end())

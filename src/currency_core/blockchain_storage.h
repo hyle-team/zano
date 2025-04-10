@@ -516,6 +516,8 @@ namespace currency
     //experimental
     void do_full_db_warm_up() const;
     void on_hardfork_activated(size_t hardfork_id);
+    void print_db_l2_cache_state() const;
+    std::string get_db_l2_cache_state_str() const;
 
   private:
 

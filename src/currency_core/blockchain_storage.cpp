@@ -220,7 +220,30 @@ void blockchain_storage::set_db_l2_cache_size(uint64_t ceched_elements) const
   m_db_assets.set_cache_size(ceched_elements);
   m_db_addr_to_alias.set_cache_size(ceched_elements);
 }
+//------------------------------------------------------------------
+std::string blockchain_storage::get_db_l2_cache_state_str() const
+{
+  std::stringstream ss;
+#define PRINT_CACHE_STATE(db_name)   ss << #db_name ":[" <<  tools::pretty_print_big_nums(db_name.get_cache_obj().size()) << "/" << tools::pretty_print_big_nums(db_name.get_cache_obj().most_recent_accessed_container_size()) << "] " << (db_name.get_cache_obj().size() * 100) / db_name.get_cache_size() << "%" << ENDL; 
 
+  PRINT_CACHE_STATE(m_db_blocks_index);
+  PRINT_CACHE_STATE(m_db_blocks);
+  PRINT_CACHE_STATE(m_db_blocks_index);
+  PRINT_CACHE_STATE(m_db_transactions);
+  PRINT_CACHE_STATE(m_db_spent_keys);
+  PRINT_CACHE_STATE(m_db_multisig_outs);
+  PRINT_CACHE_STATE(m_db_solo_options);
+  PRINT_CACHE_STATE(m_db_aliases);
+  PRINT_CACHE_STATE(m_db_assets);
+  PRINT_CACHE_STATE(m_db_addr_to_alias);
+  return ss.str();
+}
+//------------------------------------------------------------------
+void blockchain_storage::print_db_l2_cache_state() const
+{
+  LOG_PRINT_MAGENTA("CACHE STATE (L2):" << ENDL << get_db_l2_cache_state_str(), LOG_LEVEL_0);
+}
+//------------------------------------------------------------------
 void remove_old_db(const std::string old_db_folder_path)
 {
   try {
@@ -235,8 +258,7 @@ void remove_old_db(const std::string old_db_folder_path)
 
   }
 }
-
-
+//------------------------------------------------------------------
 bool blockchain_storage::init(const std::string& config_folder, const boost::program_options::variables_map& vm)
 {
 //  CRITICAL_REGION_LOCAL(m_read_lock);
@@ -5438,23 +5460,11 @@ void blockchain_storage::do_full_db_warm_up() const
     {
       ticks_last_print = epee::misc_utils::get_tick_count();
       LOG_PRINT_CYAN("Warming up: " <<  ( ( (i) * 100)/ current_sz) << "%, " << (i) << " of " << current_sz, LOG_LEVEL_0);
-
-#define PRINT_CONTAINER(cont_name)  strm << #cont_name"[" << cont_name.get_cache_size() << "]:" << (cont_name.get_cacheed_items_count() * 100) / cont_name.get_cache_size() << " %, items: " << cont_name.get_cacheed_items_count() << ENDL
-
-      std::stringstream strm;
-      PRINT_CONTAINER(m_db_blocks_index);
-      PRINT_CONTAINER(m_db_blocks);
-      PRINT_CONTAINER(m_db_blocks_index);
-      PRINT_CONTAINER(m_db_transactions);
-      PRINT_CONTAINER(m_db_spent_keys);
-      PRINT_CONTAINER(m_db_multisig_outs);
-      PRINT_CONTAINER(m_db_solo_options);
-      PRINT_CONTAINER(m_db_aliases);
-      PRINT_CONTAINER(m_db_assets);
-      PRINT_CONTAINER(m_db_addr_to_alias);
-      LOG_PRINT_CYAN("CACHE STATE: " << ENDL << strm.str(), LOG_LEVEL_2);
+      
+      LOG_PRINT_CYAN("CACHE STATE: " << ENDL << get_db_l2_cache_state_str(), LOG_LEVEL_2);
     }
   }
+  LOG_PRINT_CYAN("CACHE STATE: " << ENDL << get_db_l2_cache_state_str(), LOG_LEVEL_0);
 }
 //------------------------------------------------------------------
 void blockchain_storage::on_hardfork_activated(size_t hardfork_id)
