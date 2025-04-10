@@ -389,16 +389,16 @@ namespace currency
         return false; // stop handling
       }
 
-      std::string prev_alias = m_blockchain.get_alias_by_address(eai.m_address);
-      if (!is_in_block && !eai.m_sign.size() &&
-        prev_alias.size())
-      {
-        LOG_PRINT_L0("Address \"" << get_account_address_as_str(eai.m_address)  
-          << "\" already registered with \""<< prev_alias 
-          << "\" alias in blockchain (new alias: \"" << eai.m_alias  << "\"), transaction rejected");
-        r = false;
-        return false; // stop handling
-      }
+      //std::string prev_alias = m_blockchain.get_alias_by_address(eai.m_address);
+      //if (!is_in_block && !eai.m_sign.size() &&
+      //  prev_alias.size())
+      //{
+      //  LOG_PRINT_L0("Address \"" << get_account_address_as_str(eai.m_address)  
+      //    << "\" already registered with \""<< prev_alias 
+      //    << "\" alias in blockchain (new alias: \"" << eai.m_alias  << "\"), transaction rejected");
+      //  r = false;
+      //  return false; // stop handling
+      //}
 
       if (!is_in_block)
       {
