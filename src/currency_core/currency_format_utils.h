@@ -1262,28 +1262,4 @@ namespace currency
     return true;
   }
 
-
-
-  //@#@
-  //TEMPORARY CODE, TODO: talk to @val and re-do it 
-  //----------------------------------------------------------------------------------------------------
-  inline void schnor_old_to_schnor_new(const crypto::signature& sig, crypto::generic_schnorr_sig& sig_new)
-  {
-    static_assert(sizeof(sig.c) == sizeof(sig_new.c));
-    static_assert(sizeof(sig.r) == sizeof(sig_new.y));
-    std::memcpy(&sig_new.c, &sig.c, sizeof(sig_new.c));
-    std::memcpy(&sig_new.y, &sig.r, sizeof(sig_new.y));
-
-  }
-  //----------------------------------------------------------------------------------------------------
-  inline void schnor_new_to_schnor_old(const crypto::generic_schnorr_sig& sig_new, crypto::signature& sig)
-  {
-    static_assert(sizeof(sig.c) == sizeof(sig_new.c));
-    static_assert(sizeof(sig.r) == sizeof(sig_new.y));
-    std::memcpy(&sig.c, &sig_new.c, sizeof(sig_new.c));
-    std::memcpy(&sig.r, &sig_new.y, sizeof(sig_new.y));
-
-  }
-
-
 } // namespace currency

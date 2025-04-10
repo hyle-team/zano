@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -182,6 +182,8 @@ namespace crypto
       BOOST_SERIALIZE(c)
       BOOST_SERIALIZE(y)
     END_BOOST_SERIALIZATION()
+
+    bool is_zero() const { return c.is_zero() && y.is_zero(); }
   };
 
   struct generic_double_schnorr_sig_s : public generic_double_schnorr_sig
@@ -219,6 +221,25 @@ namespace crypto
       BOOST_SERIALIZE(z)
     END_BOOST_SERIALIZATION()
   };
+
+  // helper functions
+
+  // plain serialization for generic_schnorr_sig_s as hex-encoded 64-bytes string, consisting of two 32-bytes integers (c, y)
+  inline std::string generic_schnorr_sig_s_to_hex_string(const generic_schnorr_sig_s& s) 
+  {
+    return crypto::pod_to_hex(s.c) + crypto::pod_to_hex(s.y);
+  }
+
+  inline generic_schnorr_sig_s generic_schnorr_sig_s_from_hex_string(const std::string& hex_str)
+  {
+    generic_schnorr_sig_s result{};
+    if (hex_str.size() != 2 * (sizeof(result.c) + sizeof(result.y)))
+      return result;
+    crypto::parse_tpod_from_hex_string(hex_str.substr(0, 2 * sizeof(result.c)), result.c);
+    crypto::parse_tpod_from_hex_string(hex_str.substr(2 * sizeof(result.c)), result.y);
+    return result;
+  }
+
 
 } // namespace crypto
 

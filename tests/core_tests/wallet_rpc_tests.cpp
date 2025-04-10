@@ -970,25 +970,19 @@ bool sign_signature_with_keys(const t_response& rsp_with_data, tools::wallet_rpc
   {
     //schnor sig
     const crypto::secret_key& signer = boost::get<crypto::secret_key>(signer_v);
-    crypto::signature sig = AUTO_VAL_INIT(sig);
-    crypto::generic_schnorr_sig sig_sch = AUTO_VAL_INIT(sig_sch);
-    r = crypto::generate_schnorr_sig(rsp_with_data.tx_id, signer, sig_sch);
-    CHECK_AND_ASSERT_MES(r, false, "gailed to generate schnorr signature");
+    r = crypto::generate_schnorr_sig(rsp_with_data.tx_id, signer, send_signed_req.regular_sig);
+    CHECK_AND_ASSERT_MES(r, false, "generate_schnorr_sig failed");
 
-    //crypto::generate_signature(emm_resp.tx_id, miner_wlt->get_account().get_keys().account_address.spend_public_key, miner_wlt->get_account().get_keys().spend_secret_key, sig);
     // instant verification, just in case
-    r = crypto::verify_schnorr_sig(rsp_with_data.tx_id, boost::get<crypto::public_key>(verifier), sig_sch);
+    r = crypto::verify_schnorr_sig(rsp_with_data.tx_id, boost::get<crypto::public_key>(verifier), send_signed_req.regular_sig);
     CHECK_AND_ASSERT_MES(r, false, "verify_schnorr_sig failed");
-    currency::schnor_new_to_schnor_old(sig_sch, sig);
-
-    send_signed_req.regular_sig = sig;
   }
   else if (signer_v.type() == typeid(crypto::eth_secret_key))
   {
     ////ecdsa sig
     const crypto::eth_secret_key& signer = boost::get<crypto::eth_secret_key>(signer_v);
     r = crypto::generate_eth_signature(rsp_with_data.tx_id, signer, send_signed_req.eth_sig);
-    CHECK_AND_ASSERT_MES(r, false, "gailed to generate schnorr signature");
+    CHECK_AND_ASSERT_MES(r, false, "generate_eth_signature failed");
 
     r = crypto::verify_eth_signature(rsp_with_data.tx_id, boost::get<crypto::eth_public_key>(verifier), send_signed_req.eth_sig);
     CHECK_AND_ASSERT_MES(r, false, "verify_eth_signature failed");

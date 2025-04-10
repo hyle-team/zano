@@ -1463,7 +1463,7 @@ namespace tools
     try
     {
       currency::transaction result_tx{};
-      if (req.regular_sig != currency::null_sig)
+      if (!req.regular_sig.is_zero())
       {
         w.get_wallet()->submit_externally_signed_asset_tx(ft, req.regular_sig, req.unlock_transfers_on_fail, result_tx, res.transfers_were_unlocked);
       }
@@ -1495,14 +1495,15 @@ namespace tools
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
     currency::asset_owner_pub_key_v new_owner_v;
-    if (req.new_owner!= currency::null_pkey)
+    if (req.new_owner != currency::null_pkey && req.new_owner_eth_pub_key == currency::null_eth_public_key)
     {
       new_owner_v = req.new_owner;
     }
-    else if(req.new_owner_eth_pub_key != currency::null_eth_public_key)
+    else if(req.new_owner_eth_pub_key != currency::null_eth_public_key && req.new_owner == currency::null_pkey)
     {
       new_owner_v = req.new_owner_eth_pub_key;
-    }else
+    }
+    else
     {
       res.status = API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS;
       return true;
@@ -1510,7 +1511,7 @@ namespace tools
 
     try
     {
-      currency::finalized_tx ft;
+      currency::finalized_tx ft{};
       w.get_wallet()->transfer_asset_ownership(req.asset_id, new_owner_v, ft);
       if (ft.ftp.ado_sign_thirdparty)
       {
