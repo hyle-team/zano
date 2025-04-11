@@ -4205,12 +4205,12 @@ bool blockchain_storage::put_alias_info(const transaction & tx, extra_alias_entr
     std::string old_address = currency::get_account_address_as_str(local_alias_history.back().m_address);
     bool r = crypto::check_signature(get_sign_buff_hash_for_alias_update(ai), local_alias_history.back().m_address.spend_public_key, ai.m_sign.back());
     CHECK_AND_ASSERT_MES(r, false, "Failed to check signature, alias update failed." << ENDL 
-      << "alias: " << ai.m_alias << ENDL
-      << "signed_buff_hash: " << get_sign_buff_hash_for_alias_update(ai) << ENDL
-      << "public key: " << local_alias_history.back().m_address.spend_public_key << ENDL
-      << "new_address: " << get_account_address_as_str(ai.m_address) << ENDL
-      << "signature: " << epee::string_tools::pod_to_hex(ai.m_sign) << ENDL 
-      << "alias_history.size() = " << local_alias_history.size());
+      << "alias:                      " << ai.m_alias << ENDL
+      << "sign buff hash:             " << get_sign_buff_hash_for_alias_update(ai) << ENDL
+      << "spend public key:           " << local_alias_history.back().m_address.spend_public_key << ENDL
+      << "new address:                " << get_account_address_as_str(ai.m_address) << ENDL
+      << "signature:                  " << epee::string_tools::pod_to_hex(ai.m_sign) << ENDL 
+      << "local_alias_history.size(): " << local_alias_history.size());
 
     //update adr-to-alias db
     auto addr_to_alias_ptr_ = m_db_addr_to_alias.find(local_alias_history.back().m_address);
@@ -4220,7 +4220,7 @@ bool blockchain_storage::put_alias_info(const transaction & tx, extra_alias_entr
       auto it_in_set = addr_to_alias_local.find(ai.m_alias);
       if (it_in_set == addr_to_alias_local.end())
       {
-        LOG_ERROR("it_in_set == it->second.end()");
+        LOG_ERROR("it_in_set == addr_to_alias_local.end()");
       }
       else
       {
