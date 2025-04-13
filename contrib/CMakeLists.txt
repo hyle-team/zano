@@ -1,7 +1,10 @@
 set(UPNPC_BUILD_STATIC ON CACHE BOOL "Build static library")
 set(UPNPC_BUILD_SHARED OFF CACHE BOOL "Build shared library")
 set(UPNPC_BUILD_TESTS OFF CACHE BOOL "Build test executables")
+
+set(ZLIB_BUILD_EXAMPLES OFF CACHE INTERNAL "" FORCE)
 add_subdirectory(zlib)
+
 add_subdirectory(db)
 add_subdirectory(ethereum)
 
@@ -37,6 +40,7 @@ add_subdirectory(miniupnp/miniupnpc)
 
 
 set_property(TARGET libminiupnpc-static PROPERTY FOLDER "contrib")
+set_property(TARGET zlib PROPERTY FOLDER "contrib")
 set_property(TARGET zlibstatic PROPERTY FOLDER "contrib")
 set_property(TARGET mdbx PROPERTY FOLDER "contrib")
 set_property(TARGET lmdb PROPERTY FOLDER "contrib")
