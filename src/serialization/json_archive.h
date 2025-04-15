@@ -152,3 +152,22 @@ struct json_archive<true> : public json_archive_base<std::ostream, true>
 private:
   size_t inner_array_size_;
 };
+
+inline
+bool do_serialize(json_archive<true>& ar, std::string& v)
+{
+    ar.begin_string();
+    ar.stream() << v;
+    ar.end_string();
+    return true;
+}
+
+inline
+bool do_serialize(json_archive<true>& ar, bool& v)
+{
+  if(v)
+    ar.stream() << "true";
+  else
+    ar.stream() << "false";
+  return true;
+}

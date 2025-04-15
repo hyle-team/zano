@@ -54,6 +54,21 @@ void test_base64_serialization()
     
 }
 
+
+void test_tx_json_serialization()
+{
+  currency::transaction tx{};
+
+  tx.version = CURRENT_TRANSACTION_VERSION;
+  currency::asset_descriptor_operation ado{};
+  ado.version = ASSET_DESCRIPTOR_OPERATION_LAST_VER;
+  ado.opt_asset_id = currency::null_pkey;
+  currency::asset_descriptor_base adb{};
+  ado.opt_descriptor = adb;
+  tx.extra.push_back(ado);
+  std::string json_tx = currency::obj_to_json_str(tx);
+}
+
 void test_plain_wallet()
 {
   //std::string res = plain_wallet::init("195.201.107.230", "33340", "C:\\Users\\roky\\home\\", 0);
@@ -178,8 +193,10 @@ int main(int argc, char** argv)
   //epee::log_space::log_singletone::add_logger(LOGGER_FILE,
   //  epee::log_space::log_singletone::get_default_log_file().c_str(),
   //  epee::log_space::log_singletone::get_default_log_folder().c_str());
+  
+  test_tx_json_serialization();
   //test_base64_serialization();
-  test_plain_wallet();
+  //test_plain_wallet();
   //parse_weird_tx();
   //thread_pool_tests();
 

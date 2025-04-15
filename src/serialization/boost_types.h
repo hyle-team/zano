@@ -5,7 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once
-
+#include <type_traits> 
 #include <boost/serialization/optional.hpp>
 
 // boost::optional
@@ -41,11 +41,26 @@ bool do_serialize(Archive<true> &ar, boost::optional<T> &v)
 {
   //writing flag
   bool is_none = !v.has_value();
-  if (!::do_serialize(ar, is_none))
-  {
-    ar.stream().setstate(std::ios::failbit);
-    return false;
+  
+  //make sure we don't put bool into json-like archives
+  if constexpr (std::is_same_v<typename Archive<true>::variant_tag_type, const char*>) {
+    if (is_none)
+    {
+      ar.begin_string();
+      ar.end_string();
+      return true;
+    }
   }
+  else {
+    
+    if (!::do_serialize(ar, is_none))
+    {
+      ar.stream().setstate(std::ios::failbit);
+      return false;
+    }
+  }
+
+  
   if (is_none)
   {
     return true;
@@ -93,11 +108,25 @@ bool do_serialize(Archive<true> &ar, std::optional<T> &v)
 {
   //writing flag
   bool is_none = !v.has_value();
-  if (!::do_serialize(ar, is_none))
-  {
-    ar.stream().setstate(std::ios::failbit);
-    return false;
+
+  //make sure we don't put bool into json-like archives
+  if constexpr (std::is_same_v<typename Archive<true>::variant_tag_type, const char*>) {
+    if (is_none)
+    {
+      ar.begin_string();
+      ar.end_string();
+      return true;
+    }
   }
+  else {
+
+    if (!::do_serialize(ar, is_none))
+    {
+      ar.stream().setstate(std::ios::failbit);
+      return false;
+    }
+  }
+
   if (is_none)
   {
     return true;
