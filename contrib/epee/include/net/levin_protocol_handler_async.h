@@ -817,7 +817,9 @@ template<class t_connection_context> template<class callback_t>
 bool async_protocol_handler_config<t_connection_context>::foreach_connection(callback_t cb)
 {
   CRITICAL_REGION_LOCAL(m_connects_lock);
-  for(auto& c: m_connects)
+  //in case any of the cb() leads to erasing items from m_connects, let's go over local copy of it
+  auto connects_local = m_connects;
+  for(auto& c: connects_local)
   {
     async_protocol_handler<t_connection_context>* aph = c.second;
     if(!cb(aph->get_context_ref()))
