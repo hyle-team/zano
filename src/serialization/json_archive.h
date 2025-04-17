@@ -157,7 +157,7 @@ inline
 bool do_serialize(json_archive<true>& ar, std::string& v)
 {
     ar.begin_string();
-    ar.stream() << v;
+    ar.stream() << epee::string_tools::buff_to_hex_nodelimer(v);
     ar.end_string();
     return true;
 }
@@ -171,3 +171,4 @@ bool do_serialize(json_archive<true>& ar, bool& v)
     ar.stream() << "false";
   return true;
 }
+
