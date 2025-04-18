@@ -57,6 +57,7 @@ namespace
   const command_line::arg_descriptor<std::string> arg_generate_genesis    ("generate-genesis", "Generate genesis coinbase based on config file");
   const command_line::arg_descriptor<uint64_t>    arg_genesis_split_amount  ( "genesis-split-amount", "Set split amount for generating genesis block");
   const command_line::arg_descriptor<std::string> arg_get_info_flags      ( "getinfo-flags-hex", "Set of bits for rpc-get-daemon-info", "");
+  const command_line::arg_descriptor<bool>        arg_get_anonymized_peers( "get-anonymized-peers", "Retrieves anonymized peers connected to the specified peer.");
   const command_line::arg_descriptor<bool>        arg_do_consloe_log     ( "do-console-log", "Tool generates debug console output(debug purposes)");
   const command_line::arg_descriptor<std::string> arg_generate_integrated_address  ( "generate-integrated-address", "Tool create integrated address from simple address and payment_id");
   const command_line::arg_descriptor<std::string> arg_pack_file           ("pack-file", "perform gzip-packing and calculate hash for a given file");
@@ -744,23 +745,23 @@ bool get_private_key(crypto::secret_key& pk, po::variables_map& vm)
   }
   else
   {
-    key_str = get_password("Enter maintain private key:");
+    key_str = get_password("Enter maintenance private key:");
   }
   
   if(!string_tools::hex_to_pod(key_str, pk))
   {
-    std::cout << "ERROR: wrong secret key set" << ENDL;
+    std::cout << "ERROR: incorrect private key entered" << ENDL;
     return false;
   }
   crypto::public_key pubkey = AUTO_VAL_INIT(pubkey);
   if(!crypto::secret_key_to_public_key(pk, pubkey))
   {
-    std::cout << "ERROR: wrong secret key set(secret_key_to_public_key failed)" << ENDL;
+    std::cout << "ERROR: wrong private key (secret_key_to_public_key failed)" << ENDL;
     return false;
   }
   if( pubkey != tools::get_public_key_from_string(P2P_MAINTAINERS_PUB_KEY))
   {
-    std::cout << "ERROR: wrong secret key set(public keys not match)" << ENDL;
+    std::cout << "ERROR: wrong pritvate key (public key missmatch)" << ENDL;
     return false;
   }
   return true;
@@ -921,8 +922,34 @@ bool invoke_debug_command(po::variables_map& vm, const crypto::secret_key& sk, n
   return net_utils::invoke_remote_command2(command_t::ID, req, rsp, transport);
 }
 //---------------------------------------------------------------------------------------------------------------
+bool handle_get_anonymized_peers(po::variables_map& vm)
+{
+  crypto::secret_key sk{};
+  if (!get_private_key(sk, vm))
+  {
+    std::cout << "ERROR: secret key error" << ENDL;
+    return false;
+  }
 
+  net_utils::levin_client2 transport;
+  peerid_type peer_id = 0;
 
+  COMMAND_REQUEST_ANONYMIZED_PEERS::request req{};
+  
+  COMMAND_REQUEST_ANONYMIZED_PEERS::response rsp{};
+  if (!invoke_debug_command<COMMAND_REQUEST_ANONYMIZED_PEERS>(vm, sk, transport, peer_id, req, rsp))
+  {
+    std::cout << "ERROR: invoking COMMAND_REQUEST_ANONYMIZED_PEERS failed" << ENDL;
+    return false;
+  }
+
+  std::cout << "Success." << ENDL << ENDL;
+
+  std::cout << epee::serialization::store_t_to_json(rsp);
+
+  return true;
+}
+//---------------------------------------------------------------------------------------------------------------
 bool handle_generate_integrated_address(po::variables_map& vm)
 {
   std::string add_and_payment_id = command_line::get_arg(vm, arg_generate_integrated_address);
@@ -1175,8 +1202,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_genesis_split_amount);
   command_line::add_arg(desc_params, arg_get_info_flags);
   command_line::add_arg(desc_params, arg_log_journal_len);
-  command_line::add_arg(desc_params, arg_set_peer_log_level);
-  command_line::add_arg(desc_params, arg_download_peer_log);
+  command_line::add_arg(desc_params, arg_get_anonymized_peers);
   command_line::add_arg(desc_params, arg_do_consloe_log);
   command_line::add_arg(desc_params, arg_generate_integrated_address);
   command_line::add_arg(desc_params, arg_pack_file);
@@ -1244,13 +1270,9 @@ int main(int argc, char* argv[])
   {
     return generate_genesis(command_line::get_arg(vm, arg_generate_genesis), 10000000000000000) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
-  else if (command_line::has_arg(vm, arg_set_peer_log_level))
+  else if (command_line::has_arg(vm, arg_get_anonymized_peers) && command_line::get_arg(vm, arg_get_anonymized_peers))
   {
-    return handle_set_peer_log_level(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
-  }
-  else if (command_line::has_arg(vm, arg_download_peer_log))
-  {
-    return handle_download_peer_log(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
+    return handle_get_anonymized_peers(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else if (command_line::has_arg(vm, arg_generate_integrated_address))
   {
