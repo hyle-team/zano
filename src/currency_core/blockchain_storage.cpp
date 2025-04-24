@@ -208,9 +208,8 @@ bool blockchain_storage::validate_instance(const std::string& path)
 void blockchain_storage::set_db_l2_cache_size(uint64_t ceched_elements) const
 {
   LOG_PRINT_GREEN("Using db items cache size(L2): " << tools::pretty_print_big_nums(ceched_elements) << " items", LOG_LEVEL_0);
-  m_db_blocks_index.set_cache_size(ceched_elements);
+  //m_db_blocks_index.set_cache_size(ceched_elements);
   m_db_blocks.set_cache_size(ceched_elements);
-  m_db_blocks_index.set_cache_size(ceched_elements);
   m_db_transactions.set_cache_size(ceched_elements);
   m_db_spent_keys.set_cache_size(ceched_elements);
   //m_db_outputs.set_cache_size(ceched_elements);
@@ -228,7 +227,6 @@ std::string blockchain_storage::get_db_l2_cache_state_str() const
 
   PRINT_CACHE_STATE(m_db_blocks_index);
   PRINT_CACHE_STATE(m_db_blocks);
-  PRINT_CACHE_STATE(m_db_blocks_index);
   PRINT_CACHE_STATE(m_db_transactions);
   PRINT_CACHE_STATE(m_db_spent_keys);
   PRINT_CACHE_STATE(m_db_multisig_outs);
