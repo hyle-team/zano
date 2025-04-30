@@ -12,6 +12,7 @@
 #include <mutex>
 #include <system_error>
 #include <boost/filesystem.hpp>
+#include <boost/program_options/variables_map.hpp>
 
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
