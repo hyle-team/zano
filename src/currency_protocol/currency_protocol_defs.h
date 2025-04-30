@@ -122,7 +122,7 @@ namespace currency
       std::list<blobdata>              txs;
       std::list<block_complete_entry>  blocks;
       std::list<crypto::hash>          missed_ids;
-      uint64_t                         current_blockchain_height;
+      uint64_t                         current_blockchain_height; // height of the top block + 1
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(txs)
@@ -140,6 +140,7 @@ namespace currency
     uint64_t last_checkpoint_height;
     uint64_t core_time;
     std::string client_version;
+    bool non_pruning_mode_enabled;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(current_height)
@@ -147,6 +148,7 @@ namespace currency
       KV_SERIALIZE(last_checkpoint_height)
       KV_SERIALIZE(core_time)
       KV_SERIALIZE(client_version)
+      KV_SERIALIZE(non_pruning_mode_enabled)
     END_KV_SERIALIZE_MAP()
   };
 

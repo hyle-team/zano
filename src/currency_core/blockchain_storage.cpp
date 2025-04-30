@@ -754,15 +754,12 @@ bool blockchain_storage::pop_block_from_blockchain(transactions_map& onboard_tra
 //------------------------------------------------------------------
 bool blockchain_storage::set_checkpoints(checkpoints&& chk_pts) 
 {
-  if (m_non_pruning_mode_enabled)
-    return true;
-
   m_checkpoints = chk_pts;
   try
   {
     m_db.begin_transaction();
     if (m_db_blocks.size() < m_checkpoints.get_top_checkpoint_height())
-      m_is_in_checkpoint_zone = true;
+      m_is_in_checkpoint_zone = !m_non_pruning_mode_enabled; // set to true unless non-pruning mode is on
     prune_ring_signatures_and_attachments_if_need();
     m_db.commit_transaction();
     return true;
@@ -785,6 +782,7 @@ bool blockchain_storage::set_checkpoints(checkpoints&& chk_pts)
 bool blockchain_storage::prune_ring_signatures_and_attachments(uint64_t height, uint64_t& transactions_pruned, uint64_t& signatures_pruned, uint64_t& attachments_pruned)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
+  CHECK_AND_ASSERT_MES(!m_non_pruning_mode_enabled, false, "cannot prune while non-pruning mode is enabled");
 
   CHECK_AND_ASSERT_MES(height < m_db_blocks.size(), false, "prune_ring_signatures called with wrong parameter: " << height << ", m_blocks.size() = " << m_db_blocks.size());
   auto vptr = m_db_blocks[height];
@@ -818,7 +816,9 @@ bool blockchain_storage::prune_ring_signatures_and_attachments(uint64_t height, 
 bool blockchain_storage::prune_ring_signatures_and_attachments_if_need()
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  CHECK_AND_ASSERT_MES(!m_non_pruning_mode_enabled, false, "cannot prune while non-pruning mode is enabled");
+
+  if (m_non_pruning_mode_enabled)
+    return true;
 
   uint64_t top_block_height = get_top_block_height();
   uint64_t pruning_end_height = m_checkpoints.get_checkpoint_before_height(top_block_height);
@@ -2091,7 +2091,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     }
     else
     {
-      m_is_in_checkpoint_zone = true;
+      m_is_in_checkpoint_zone = !m_non_pruning_mode_enabled; // set to true unless non-pruning mode is on
       if (!m_checkpoints.check_block(abei.height, id))
       {
         LOG_ERROR("CHECKPOINT VALIDATION FAILED");
@@ -6947,7 +6947,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
 
   if (m_checkpoints.is_in_checkpoint_zone(get_current_blockchain_size()))
   {
-    m_is_in_checkpoint_zone = true;
+    m_is_in_checkpoint_zone = !m_non_pruning_mode_enabled; // set to true unless non-pruning mode is on
     if (!m_checkpoints.check_block(get_current_blockchain_size(), id))
     {
       LOG_ERROR("CHECKPOINT VALIDATION FAILED @ " << height);
