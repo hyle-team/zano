@@ -194,11 +194,12 @@ namespace currency
     {
       LOG_PRINT_RED("Remote node has longer checkpoints zone (" << hshd.last_checkpoint_height <<  ") " << 
         "than local (" << m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height() << "). " <<
-        "It means that current software is outdated, please updated it! " << 
+        (m_core.get_blockchain_storage().is_non_pruning_mode_enabled() ? "It is expected since this node is in non-pruning mode. " : "It means that current software is outdated, please updated it! ") << 
         "Current height lays under checkpoints zone on remote host, so it's impossible to validate remote transactions locally, disconnecting.", LOG_LEVEL_0);
       return false;
     }
-    else if (m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height() < hshd.last_checkpoint_height)
+    
+    if (!m_core.get_blockchain_storage().is_non_pruning_mode_enabled() && m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height() < hshd.last_checkpoint_height)
     {
       LOG_PRINT_MAGENTA("Remote node has longer checkpoints zone (" << hshd.last_checkpoint_height <<  ") " <<
         "than local (" << m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height() << "). " << 

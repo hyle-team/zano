@@ -41,6 +41,7 @@ namespace tools
   bool parse_client_version(const std::string& str, int& major, int& minor, int& revision, int& build_number, std::string& commit_id, bool& dirty);
   bool parse_client_version_build_number(const std::string& str, int& build_number);
   bool check_remote_client_version(const std::string& client_ver);
+  bool is_non_pruning_mode_enabled(const boost::program_options::variables_map& vm, bool *p_enabled_via_env = nullptr);
 
   bool create_directories_if_necessary(const std::string& path);
   std::error_code replace_file(const std::string& replacement_name, const std::string& replaced_name);
@@ -57,6 +58,7 @@ namespace tools
     return crypto::cn_fast_hash(s.data(), s.size());
   }
 
+  // the following is unsafe, consider removing -- sowle
   inline 
   crypto::public_key get_public_key_from_string(const std::string& str_key)
   {

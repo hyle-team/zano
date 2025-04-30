@@ -232,6 +232,7 @@ namespace command_line
   extern const arg_descriptor<std::string> arg_process_predownload_from_path;
   extern const arg_descriptor<bool>        arg_validate_predownload;
   extern const arg_descriptor<std::string> arg_predownload_link;
+  extern const arg_descriptor<bool>        arg_non_pruning_mode;
   extern const arg_descriptor<std::string> arg_deeplink;
   extern const arg_descriptor<std::string> arg_generate_rpc_autodoc;
   

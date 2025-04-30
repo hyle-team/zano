@@ -570,14 +570,14 @@ namespace nodetool
       {
         if(!m_payload_handler.process_payload_sync_data(rsp.payload_data, context, true))
         {
-          LOG_ERROR_CCONTEXT("COMMAND_HANDSHAKE invoked, but process_payload_sync_data returned false, dropping connection.");
+          LOG_PRINT_L1("COMMAND_HANDSHAKE invoked, but process_payload_sync_data returned false, dropping connection.");
           hsh_result = false;
           return;
         }
 
         if (is_peer_id_used(rsp.node_data.peer_id))
         {
-          LOG_PRINT_L0("It seems that peer " << std::hex << rsp.node_data.peer_id << " has already been connected, dropping connection");
+          LOG_PRINT_L1("It seems that peer " << std::hex << rsp.node_data.peer_id << " has already been connected, dropping connection");
           hsh_result = false;
           return;
         }
@@ -587,7 +587,7 @@ namespace nodetool
 
         if(rsp.node_data.peer_id == m_config.m_peer_id)
         {
-          LOG_PRINT_L0("Connection to self detected, dropping connection");
+          LOG_PRINT_L1("Connection to self detected, dropping connection");
           hsh_result = false;
           return;
         }
@@ -606,7 +606,7 @@ namespace nodetool
 
     if(!hsh_result)
     {
-      LOG_PRINT_CC_L0(context_, "COMMAND_HANDSHAKE Failed, closing connection");
+      LOG_PRINT_CC_L1(context_, "COMMAND_HANDSHAKE Failed, closing connection");
       m_net_server.get_config_object().close(context_.m_connection_id);
     }
 
