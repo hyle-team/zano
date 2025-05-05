@@ -57,6 +57,7 @@ public:
 #endif
     m_cmd_binder.set_handler("print_pool", boost::bind(&daemon_commands_handler::print_pool, this, ph::_1), "Print transaction pool (long format)");
     m_cmd_binder.set_handler("print_pool_sh", boost::bind(&daemon_commands_handler::print_pool_sh, this, ph::_1), "Print transaction pool (short format)");
+    m_cmd_binder.set_handler("print_biggest_blocks", boost::bind(&daemon_commands_handler::print_biggest_blocks, this, ph::_1), "Print the biggest blocks within the given timeframe");
     m_cmd_binder.set_handler("save", boost::bind(&daemon_commands_handler::save, this, ph::_1), "Save blockchain");
     m_cmd_binder.set_handler("print_daemon_stat", boost::bind(&daemon_commands_handler::print_daemon_stat, this, ph::_1), "Print daemon stat");
     m_cmd_binder.set_handler("print_debug_stat", boost::bind(&daemon_commands_handler::print_debug_stat, this, ph::_1), "Print debug stat info");
@@ -910,6 +911,74 @@ private:
   bool print_pool_sh(const std::vector<std::string>& args)
   {
     LOG_PRINT_L0("Pool state: " << ENDL << m_srv.get_payload_object().get_core().print_pool(true));
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool print_biggest_blocks(const std::vector<std::string>& args)
+  {
+    bool r = false;
+    const currency::blockchain_storage& bcs = m_srv.get_payload_object().get_core().get_blockchain_storage();
+    uint64_t top_block_height = bcs.get_top_block_height();
+
+    uint64_t from_height = 0, to_height = top_block_height;
+    if (args.size() == 1)
+    {
+      int64_t v = -1;
+      r = epee::string_tools::string_to_num_fast(args.front(), v);
+      if (!r || v < 0 || v > static_cast<int64_t>(top_block_height) + 1)
+      {
+        std::cout << "invalid argument: " << args.front() << ENDL;
+        return true;
+      }
+      from_height = top_block_height + 1 - v;
+    }
+    else if (args.size() == 2)
+    {
+      int64_t v1 = -1, v2 = -1;
+      r = epee::string_tools::string_to_num_fast(args.front(), v1) && epee::string_tools::string_to_num_fast(args.back(), v2);
+      if (!r || v1 < 0 || v2 < 0 || v2 < v1 || v2 > static_cast<int64_t>(top_block_height))
+      {
+        std::cout << "invalid arguments: " << args.front() << ", " << args.back() << ENDL;
+        return true;
+      }
+      from_height = v1;
+      to_height = v2;
+    }
+    else
+    {
+      std::cout << "expected: print_biggest_blocks [N_blocks_backward] | [from_height, to_height] (Specify either a number of recent blocks or a block height range.)" << ENDL;
+      return true;
+    }
+
+    std::multimap<uint64_t, uint64_t> cum_size_to_height;
+    for(uint64_t h = from_height; h <= to_height; ++h)
+    {
+      currency::block_extended_info bei{};
+      r = bcs.get_block_extended_info_by_height(h, bei);
+      CHECK_AND_ASSERT_MES(r, true, "get_block_extended_info_by_height failed for height " << h);
+      cum_size_to_height.insert(std::make_pair(bei.block_cumulative_size, h));
+    }
+
+    size_t blocks_to_print = cum_size_to_height.size() / 10;
+    if (blocks_to_print < 10)
+      blocks_to_print = 10;
+    if (blocks_to_print > 100)
+      blocks_to_print = 100;
+    size_t n = 0;
+    std::stringstream ss;
+    ss << " h  cum. size  blobsize  id  txs" << ENDL;
+    for(auto it = cum_size_to_height.rbegin(); n < blocks_to_print && it != cum_size_to_height.rend(); ++it, ++n)
+    {
+      uint64_t h = it->second;
+      currency::block b{};
+      r = bcs.get_block_by_height(h, b);
+      CHECK_AND_ASSERT_MES(r, true, "get_block_by_height failed for height " << h);
+      size_t blobsize = currency::get_object_blobsize(b);
+      ss << h << "  " << it->first << "  " << blobsize << "  " << currency::get_block_hash(b) << "  " << b.tx_hashes.size() << ENDL;
+    }
+
+    LOG_PRINT_L0(ENDL << ss.str());
+    
     return true;
   }
   //--------------------------------------------------------------------------------
