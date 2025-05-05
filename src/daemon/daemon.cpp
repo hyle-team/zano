@@ -69,7 +69,7 @@ struct core_critical_error_handler_t : public currency::i_critical_error_handler
     LOG_ERROR(ENDL << ENDL << "Serious TIME sync problem detected, daemon will stop immediately" << ENDL << ENDL);
 
     // stop handling
-    dch.stop_handling();
+    p2psrv.send_stop_signal();
     return true; // the caller must stop processing
   }
 

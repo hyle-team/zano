@@ -751,6 +751,26 @@ namespace wallet_public
     };
   };
 
+  struct COMMAND_RPC_FORCE_RESCAN_TX_POOL
+  {
+    DOC_COMMAND("Force wallet to fetch tx pool from daemon and go through it's transactions");
+
+    struct request
+    {
+      BEGIN_KV_SERIALIZE_MAP()
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status) DOC_DSCR("Operation status") DOC_EXMP(API_RETURN_CODE_OK)     DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
   struct payment_details
   {
     std::string payment_id;
