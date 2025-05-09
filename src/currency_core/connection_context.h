@@ -49,7 +49,7 @@ namespace currency
     };
 
     state m_state;
-    uint64_t m_remote_blockchain_height;
+    uint64_t m_remote_blockchain_size; // height of the top block + 1
     uint64_t m_last_response_height;
     int64_t m_time_delta;
     std::string m_remote_version;

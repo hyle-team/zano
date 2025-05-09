@@ -74,8 +74,8 @@ using namespace currency;
 
 DISABLE_VS_WARNINGS(4267)
 
-const command_line::arg_descriptor<uint32_t>      arg_db_cache_l1  ( "db-cache-l1", "Specify size of memory mapped db cache file");
-const command_line::arg_descriptor<uint32_t>      arg_db_cache_l2  ( "db-cache-l2", "Specify cached elements in db helpers");
+const command_line::arg_descriptor<uint32_t>  arg_db_cache_l1       ( "db-cache-l1", "Specify size of memory mapped db cache file");
+const command_line::arg_descriptor<uint32_t>  arg_db_cache_l2       ( "db-cache-l2", "Specify cached elements in db helpers");
 
 //------------------------------------------------------------------
 blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m_rw_lock),
@@ -111,7 +111,8 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
                                                                  m_deinit_is_done(false), 
                                                                  m_cached_next_pow_difficulty(0), 
                                                                  m_cached_next_pos_difficulty(0), 
-                                                                 m_blockchain_launch_timestamp(0)
+                                                                 m_blockchain_launch_timestamp(0),
+                                                                 m_non_pruning_mode_enabled(false)
 
 
 {
@@ -155,6 +156,7 @@ void blockchain_storage::init_options(boost::program_options::options_descriptio
 {
   command_line::add_arg(desc, arg_db_cache_l1);
   command_line::add_arg(desc, arg_db_cache_l2);
+  command_line::add_arg(desc, command_line::arg_non_pruning_mode);
 }
 //------------------------------------------------------------------
 uint64_t blockchain_storage::get_block_h_older_then(uint64_t timestamp) const 
@@ -276,6 +278,13 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
   {
     LOG_ERROR("Failed to initialize instance");
     return false;
+  }
+
+  bool npm_env_enabled = false;
+  m_non_pruning_mode_enabled = tools::is_non_pruning_mode_enabled(vm, &npm_env_enabled);
+  if (m_non_pruning_mode_enabled)
+  {
+    LOG_PRINT_CYAN("*** Non-pruning mode ENABLED" << (npm_env_enabled ? " (via an environment variable)" : "") << ". This build will allways retain all transaction data regardless of checkpoints. The DB is expected to have all data and will be verified soon.", LOG_LEVEL_0);
   }
 
   uint64_t cache_size_l1 = CACHE_SIZE;
@@ -594,6 +603,52 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     << "  major failure:          " << (m_db_major_failure ? "true" : "false"),
     LOG_LEVEL_0);
 
+
+  if (m_non_pruning_mode_enabled)
+  {
+    size_t txs = 0;
+    size_t pruned_txs = 0;
+    size_t signatures = 0;
+    size_t attachments = 0;
+
+    uint64_t last_block_height = m_db_blocks.size() > 0 ? m_db_blocks.size() - 1 : 0;
+
+    LOG_PRINT_CYAN("The blockchain will be scanned now; it takes a while, please wait...", LOG_LEVEL_0);
+
+    for (uint64_t height = 0; height <= last_block_height; height++)
+    {
+      auto vptr = m_db_blocks[height];
+      CHECK_AND_ASSERT_MES(vptr.get(), false, "Failed to get block on height");
+
+      for (const auto& h : vptr->bl.tx_hashes)
+      {
+        auto it = m_db_transactions.find(h);
+        CHECK_AND_ASSERT_MES(it != m_db_transactions.end(), false, "failed to find transaction " << h << " in blockchain index, in block on height = " << height);
+        CHECK_AND_ASSERT_MES(it->m_keeper_block_height == height, false,
+          "failed to validate extra check, it->second.m_keeper_block_height = " << it->m_keeper_block_height <<
+          "is mot equal to height = " << height << " in blockchain index, for block on height = " << height);
+
+        if (it->tx.signatures.size() == 0)
+        {
+          pruned_txs += 1;
+          CHECK_AND_ASSERT_THROW_MES(false, "found pruned tx " << h << ", non pruning mode couldn't be activated on pruned DB, terminating...");
+        }
+
+        txs += 1;
+        signatures += it->tx.signatures.size();
+        attachments += it->tx.attachment.size();
+      }
+    }
+
+    LOG_PRINT_CYAN(ENDL << "blockchain (non)pruning status:" << ENDL <<
+      "  last block height: " << last_block_height << ENDL <<
+      "  total txs:         " << txs << ENDL <<
+      "  pruned txs:        " << pruned_txs << ENDL <<
+      "  total signatures:  " << signatures << ENDL <<
+      "  total attachments: " << attachments << ENDL <<
+      ENDL << "Blockchain DB was successfully scanned for pruned txs.", LOG_LEVEL_0);
+  }
+
   return true;
 }
 
@@ -704,7 +759,7 @@ bool blockchain_storage::set_checkpoints(checkpoints&& chk_pts)
   {
     m_db.begin_transaction();
     if (m_db_blocks.size() < m_checkpoints.get_top_checkpoint_height())
-      m_is_in_checkpoint_zone = true;
+      m_is_in_checkpoint_zone = !m_non_pruning_mode_enabled; // set to true unless non-pruning mode is on
     prune_ring_signatures_and_attachments_if_need();
     m_db.commit_transaction();
     return true;
@@ -727,6 +782,7 @@ bool blockchain_storage::set_checkpoints(checkpoints&& chk_pts)
 bool blockchain_storage::prune_ring_signatures_and_attachments(uint64_t height, uint64_t& transactions_pruned, uint64_t& signatures_pruned, uint64_t& attachments_pruned)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
+  CHECK_AND_ASSERT_MES(!m_non_pruning_mode_enabled, false, "cannot prune while non-pruning mode is enabled");
 
   CHECK_AND_ASSERT_MES(height < m_db_blocks.size(), false, "prune_ring_signatures called with wrong parameter: " << height << ", m_blocks.size() = " << m_db_blocks.size());
   auto vptr = m_db_blocks[height];
@@ -760,6 +816,9 @@ bool blockchain_storage::prune_ring_signatures_and_attachments(uint64_t height, 
 bool blockchain_storage::prune_ring_signatures_and_attachments_if_need()
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
+
+  if (m_non_pruning_mode_enabled)
+    return true;
 
   uint64_t top_block_height = get_top_block_height();
   uint64_t pruning_end_height = m_checkpoints.get_checkpoint_before_height(top_block_height);
@@ -2032,7 +2091,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     }
     else
     {
-      m_is_in_checkpoint_zone = true;
+      m_is_in_checkpoint_zone = !m_non_pruning_mode_enabled; // set to true unless non-pruning mode is on
       if (!m_checkpoints.check_block(abei.height, id))
       {
         LOG_ERROR("CHECKPOINT VALIDATION FAILED");
@@ -6888,7 +6947,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
 
   if (m_checkpoints.is_in_checkpoint_zone(get_current_blockchain_size()))
   {
-    m_is_in_checkpoint_zone = true;
+    m_is_in_checkpoint_zone = !m_non_pruning_mode_enabled; // set to true unless non-pruning mode is on
     if (!m_checkpoints.check_block(get_current_blockchain_size(), id))
     {
       LOG_ERROR("CHECKPOINT VALIDATION FAILED @ " << height);

@@ -193,6 +193,7 @@ int main(int argc, char* argv[])
 
   
 
+  std::string data_dir;
   po::variables_map vm;
   bool exit_requested = false;
   bool r = command_line::handle_error_helper(desc_options, [&]()
@@ -213,7 +214,7 @@ int main(int argc, char* argv[])
       return true;
     }
 
-    std::string data_dir = command_line::get_arg(vm, command_line::arg_data_dir);
+    data_dir = command_line::get_arg(vm, command_line::arg_data_dir);
     std::string config = command_line::get_arg(vm, command_line::arg_config_file);
 
     boost::filesystem::path data_dir_path(epee::string_encoding::utf8_to_wstring(data_dir));
@@ -240,17 +241,11 @@ int main(int argc, char* argv[])
     return EXIT_SUCCESS;
 
   //set up logging options
-  std::string log_dir;
+  std::string log_dir = data_dir;
   std::string log_file_name = log_space::log_singletone::get_default_log_file();
   //check if there was specific option
   if (command_line::has_arg(vm, command_line::arg_log_dir))
-  {
     log_dir = command_line::get_arg(vm, command_line::arg_log_dir);
-  }
-  else
-  {
-    log_dir = command_line::get_arg(vm, command_line::arg_data_dir);
-  }
 
   log_space::log_singletone::add_logger(LOGGER_FILE, log_file_name.c_str(), log_dir.c_str());
   LOG_PRINT_L0(CURRENCY_NAME << " v" << PROJECT_VERSION_LONG);
@@ -264,7 +259,7 @@ int main(int argc, char* argv[])
 
   // stratum server is enabled if any of its options present
   bool stratum_enabled = currency::stratum_server::should_start(vm);
-  LOG_PRINT("Module folder: " << argv[0], LOG_LEVEL_0);
+  LOG_PRINT("Module folder: " << argv[0] << ", data folder: " << data_dir, LOG_LEVEL_0);
 
   //create objects and link them
   bc_services::bc_offers_service offers_service(nullptr);

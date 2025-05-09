@@ -341,6 +341,7 @@ namespace currency
     bool is_multisig_output_spent(const crypto::hash& multisig_id) const;
     boost::multiprecision::uint128_t total_coins()const;
     bool is_pos_allowed()const;
+    bool is_non_pruning_mode_enabled() const { return m_non_pruning_mode_enabled; }
     uint64_t get_tx_fee_median()const;
     uint64_t get_tx_fee_window_value_median() const;
     uint64_t get_tx_expiration_median() const;
@@ -593,6 +594,7 @@ namespace currency
 
     std::atomic<bool> m_is_in_checkpoint_zone;
     std::atomic<bool> m_is_blockchain_storing;
+    bool m_non_pruning_mode_enabled;
 
     std::string m_config_folder;
     //events

@@ -26,6 +26,7 @@ using namespace epee;
 #include <boost/asio.hpp>
 
 #include "string_coding.h"
+#include "command_line.h"
 
 namespace tools
 {
@@ -727,6 +728,17 @@ std::string get_nix_version_display_string()
       return false;
 
     return true;
+  }
+
+  bool is_non_pruning_mode_enabled(const boost::program_options::variables_map& vm, bool *p_enabled_via_env /* = nullptr */)
+  {
+    const char* npm_env = std::getenv("ZANO_NON_PRUNING_MODE");
+    std::string npm_env_str = boost::algorithm::to_lower_copy(std::string(npm_env ? npm_env : ""));
+    bool npm_env_enabled = (npm_env_str == "1" || npm_env_str == "on" || npm_env_str == "true");
+    bool result = (command_line::has_arg(vm, command_line::arg_non_pruning_mode) && command_line::get_arg(vm, command_line::arg_non_pruning_mode)) || npm_env_enabled;
+    if (result && p_enabled_via_env != nullptr)
+      *p_enabled_via_env = npm_env_enabled;
+    return result;
   }
 
   //this code was taken from https://stackoverflow.com/a/8594696/5566653 
