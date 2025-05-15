@@ -4338,34 +4338,26 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
 
   for (size_t i = 0; i < ft.tx.vout.size(); ++i)
   {
-    VARIANT_SWITCH_BEGIN(ft.tx.vout[i]);
-    VARIANT_CASE_CONST(tx_out_bare, out)
+    std::list<htlc_info> stub;
+    const crypto::public_key& out_pk = out_get_pub_key(ft.tx.vout[i], stub);
+    
+    crypto::public_key ephemeral_pub{};
+    if (!crypto::derive_public_key(derivation, i, m_account.get_keys().account_address.spend_public_key, ephemeral_pub))
     {
-      if (out.target.type() != typeid(txout_to_key))
-        continue;
-      const txout_to_key& otk = boost::get<txout_to_key>(out.target);
-
-      crypto::public_key ephemeral_pub = AUTO_VAL_INIT(ephemeral_pub);
-      if (!crypto::derive_public_key(derivation, i, m_account.get_keys().account_address.spend_public_key, ephemeral_pub))
-      {
-        WLT_LOG_ERROR("derive_public_key failed for tx " << get_transaction_hash(ft.tx) << ", out # " << i);
-      }
-
-      if (otk.key == ephemeral_pub)
-      {
-        // this is the output to the given keys
-        // derive secret key and calculate key image
-        crypto::secret_key ephemeral_sec = AUTO_VAL_INIT(ephemeral_sec);
-        crypto::derive_secret_key(derivation, i, m_account.get_keys().spend_secret_key, ephemeral_sec);
-        crypto::key_image ki = AUTO_VAL_INIT(ki);
-        crypto::generate_key_image(ephemeral_pub, ephemeral_sec, ki);
-
-        ft.outs_key_images.push_back(make_serializable_pair(static_cast<uint64_t>(i), ki));
-      }
+      WLT_LOG_ERROR("derive_public_key failed for tx " << get_transaction_hash(ft.tx) << ", out # " << i);
     }
-    VARIANT_CASE_CONST(tx_out_zarcanum, o);
-    //@#@      
-    VARIANT_SWITCH_END();
+
+    if (out_pk == ephemeral_pub)
+    {
+      // this is the output to the given keys
+      // derive secret key and calculate key image
+      crypto::secret_key ephemeral_sec{};
+      crypto::derive_secret_key(derivation, i, m_account.get_keys().spend_secret_key, ephemeral_sec);
+      crypto::key_image ki{};
+      crypto::generate_key_image(ephemeral_pub, ephemeral_sec, ki);
+
+      ft.outs_key_images.push_back(make_serializable_pair(static_cast<uint64_t>(i), ki));
+    }
   }
 
   // serialize and encrypt the result
@@ -4529,19 +4521,15 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
     for (auto& p : ft.outs_key_images)
     {
       THROW_IF_FALSE_WALLET_INT_ERR_EX(p.first < tx.vout.size(), "outs_key_images has invalid out index: " << p.first << ", tx.vout.size() = " << tx.vout.size());
-      THROW_IF_FALSE_WALLET_INT_ERR_EX(tx.vout[p.first].type() == typeid(tx_out_bare), "Unexpected type in submit_transfer: " << tx.vout[p.first].type().name());
-      auto& out = boost::get<tx_out_bare>(tx.vout[p.first]);
-      THROW_IF_FALSE_WALLET_INT_ERR_EX(out.target.type() == typeid(txout_to_key), "outs_key_images has invalid out type, index: " << p.first);
-      const txout_to_key& otk = boost::get<txout_to_key>(out.target);
-      pk_ki_to_be_added.push_back(std::make_pair(otk.key, p.second));
+      std::list<htlc_info> stub{};
+      const crypto::public_key& pk = out_get_pub_key(tx.vout[p.first], stub);
+      pk_ki_to_be_added.push_back(std::make_pair(pk, p.second));
     }
 
     THROW_IF_FALSE_WALLET_INT_ERR_EX(tx.vin.size() == ft.ftp.sources.size(), "tx.vin and ft.ftp.sources sizes missmatch");
     for (size_t i = 0; i < tx.vin.size(); ++i)
     {
-      const txin_v& in = tx.vin[i];
-      THROW_IF_FALSE_WALLET_CMN_ERR_EX(in.type() == typeid(txin_to_key), "tx " << tx_hash << " has a non txin_to_key input");
-      const crypto::key_image& ki = boost::get<txin_to_key>(in).k_image;
+      const crypto::key_image& ki = get_key_image_from_txin_v(tx.vin[i]);
 
       const auto& src = ft.ftp.sources[i];
       THROW_IF_FALSE_WALLET_INT_ERR_EX(src.real_output < src.outputs.size(), "src.real_output is out of bounds: " << src.real_output);
