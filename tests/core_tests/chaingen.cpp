@@ -21,6 +21,7 @@
 #include "currency_core/bc_offers_service.h"
 #include "wallet/wallet2.h"
 #include "wallet_test_core_proxy.h"
+#include "wallet_tests_basic.h"
 #include "pos_block_builder.h"
  
 using namespace epee;
@@ -1002,10 +1003,7 @@ bool test_generator::init_test_wallet(const currency::account_base& account, con
   w->assign_account(account);
   w->set_genesis(genesis_hash);
   w->set_core_proxy(m_wallet_test_core_proxy);
-  w->set_disable_tor_relay(true);
-  w->set_concise_mode(true);
-  w->set_concise_mode_reorg_max_reorg_blocks(TESTS_CONCISE_MODE_REORG_MAX_REORG_BLOCK);
-  w->set_use_assets_whitelisting(false);
+  set_playtime_test_wallet_options(w);
 
   result = w;
   return true;
