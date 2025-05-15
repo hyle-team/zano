@@ -63,3 +63,14 @@ struct wallet_rpc_thirdparty_custody : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct wallet_rpc_cold_signing : public wallet_test
+{
+  wallet_rpc_cold_signing();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  void set_wallet_options(std::shared_ptr<tools::wallet2> w);
+
+  mutable std::wstring m_wallet_filename = L"~coretests.wallet_rpc_cold_signing.file.tmp";
+  mutable std::string m_wallet_password = "ballerinacappuccina";
+};
