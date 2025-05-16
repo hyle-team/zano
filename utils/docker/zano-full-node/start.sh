@@ -1,0 +1,1 @@
+zanod --disable-upnp --rpc-bind-ip=0.0.0.0 --log-level=0 --no-console --data-dir=/home/zano/.Zano --no-predownload

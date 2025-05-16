@@ -1,0 +1,43 @@
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: 5m
+      max-file: "2"
+
+volumes:
+  zano_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: /var/zano_data
+      o: bind
+
+
+services:
+  zanod:
+    init: true
+    image: zano
+    restart: on-failure
+    stop_grace_period: 1m
+    build:
+      context: .
+      dockerfile: Dockerfile
+    deploy:
+      resources:
+        limits:
+          memory: 24G # could be tuned
+          cpus: "10"
+    <<: *logging
+    ports:
+      - 11121:11121 # p2p
+      - 127.0.0.1:11211:11211 
+    networks:
+      - zano-net
+    volumes:
+      - zano_data:/home/zano/.Zano
+      - ./start.sh:/home/zano/start.sh
+    command: ["./start.sh"]
+
+networks:
+  zano-net: {}

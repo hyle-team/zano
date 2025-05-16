@@ -29,34 +29,39 @@
 # Build Zano
 #
 
-FROM ubuntu:18.04 as build-prep
+FROM ubuntu:22.04 as build-prep
 
 ENV DEBIAN_FRONTEND noninteractive
 
 RUN apt update && \
     apt install -y build-essential \
-    libicu-dev \
-    libz-dev \
+    g++ \
     curl \
-    gcc-8 \
-    g++-8 \
-    git
-
-RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 700 --slave /usr/bin/g++ g++ /usr/bin/g++-7 && \
-    update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-8 800 --slave /usr/bin/g++ g++ /usr/bin/g++-8
+    autotools-dev \
+    libicu-dev \
+    libbz2-dev \
+    cmake \
+    git \
+    screen \
+    checkinstall \
+    zlib1g-dev \
+    libssl-dev \
+    bzip2
 
 WORKDIR /root
 
 # Lib Settings
-ARG CMAKE_VERSION_DOT=3.16.9
-ARG CMAKE_HASH=d71eda07d6ecf3964de65a0e36d0b171565e1aced56ba9f53ca3783406b5cacf
+# ARG CMAKE_VERSION_DOT=3.16.9
+# ARG CMAKE_HASH=d71eda07d6ecf3964de65a0e36d0b171565e1aced56ba9f53ca3783406b5cacf
 
-ARG BOOST_VERSION=1_70_0
-ARG BOOST_VERSION_DOT=1.70.0
-ARG BOOST_HASH=430ae8354789de4fd19ee52f3b1f739e1fba576f0aded0897c3c2bc00fb38778
+ARG BOOST_VERSION=1_84_0
+ARG BOOST_VERSION_DOT=1.84.0
+ARG BOOST_HASH=cc4b893acf645c9d4b698e9a0f08ca8846aa5d6c68275c14c3e7949c24109454
 
 ARG OPENSSL_VERSION_DOT=1.1.1w
 ARG OPENSSL_HASH=cf3098950cb4d853ad95c0841f1f9c6d3dc102dccfcacd521d93925208b76ac8
+
+ARG ZANO_RELEASE_VERSION=2.1.5.397
 
 # Environment Variables
 ENV BOOST_ROOT /root/boost_${BOOST_VERSION}
@@ -67,9 +72,9 @@ ENV OPENSSL_ROOT_DIR=/root/openssl
 ##########################################################
 
 # Download CMake
-RUN set -ex \
-    && curl https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION_DOT}/cmake-${CMAKE_VERSION_DOT}-Linux-x86_64.sh -OL\
-    && echo "${CMAKE_HASH}  cmake-${CMAKE_VERSION_DOT}-Linux-x86_64.sh" | sha256sum -c
+# RUN set -ex \
+#     && curl https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION_DOT}/cmake-${CMAKE_VERSION_DOT}-Linux-x86_64.sh -OL\
+#     && echo "${CMAKE_HASH}  cmake-${CMAKE_VERSION_DOT}-Linux-x86_64.sh" | sha256sum -c
 
 # Download Boost
 RUN set -ex \
@@ -86,12 +91,12 @@ RUN curl https://www.openssl.org/source/openssl-${OPENSSL_VERSION_DOT}.tar.gz -O
 
 
 # Compile CMake
-RUN set -ex \
-    && mkdir /opt/cmake \
-    && sh cmake-3.16.9-Linux-x86_64.sh --prefix=/opt/cmake --skip-license\
-    && ln -s /opt/cmake/bin/cmake /usr/local/bin/cmake\
-    && cmake --version\
-    && rm cmake-3.16.9-Linux-x86_64.sh
+# RUN set -ex \
+#     && mkdir /opt/cmake \
+#     && sh cmake-3.16.9-Linux-x86_64.sh --prefix=/opt/cmake --skip-license\
+#     && ln -s /opt/cmake/bin/cmake /usr/local/bin/cmake\
+#     && cmake --version\
+#     && rm cmake-3.16.9-Linux-x86_64.sh
 
 # Compile Boost
 RUN set -ex \
@@ -121,6 +126,7 @@ RUN pwd && mem_avail_gb=$(( $(getconf _AVPHYS_PAGES) * $(getconf PAGE_SIZE) / (1
     set -x &&\
     git clone --single-branch --recursive https://github.com/hyle-team/zano.git &&\
     cd zano &&\
+    git checkout ${ZANO_RELEASE_VERSION} && \
     mkdir build && cd build &&\
     cmake -D STATIC=TRUE .. &&\
     make -j $make_job_slots daemon simplewallet
@@ -130,22 +136,15 @@ RUN pwd && mem_avail_gb=$(( $(getconf _AVPHYS_PAGES) * $(getconf PAGE_SIZE) / (1
 # Run Zano
 #
 
-FROM ubuntu:18.04
+FROM ubuntu:22.04
 
-RUN useradd -ms /bin/bash zano &&\
-    mkdir -p /home/zano/.Zano &&\
-    chown -R zano:zano /home/zano/.Zano
-
-USER zano:zano
+RUN mkdir -p /home/zano/.Zano
 
 WORKDIR /home/zano
-COPY --chown=zano:zano --from=build /root/zano/build/src/zanod .
-COPY --chown=zano:zano --from=build /root/zano/build/src/simplewallet .
+COPY --from=build /root/zano/build/src/zanod /usr/local/bin
+COPY --from=build /root/zano/build/src/simplewallet /usr/local/bin
 
 # blockchain loaction
-VOLUME /home/zano/.Zano
+#VOLUME /home/zano/.Zano
 
 EXPOSE 11121 11211
-
-ENTRYPOINT ["./zanod"]
-CMD ["--disable-upnp", "--rpc-bind-ip=0.0.0.0", "--log-level=0"]
