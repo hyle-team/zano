@@ -77,6 +77,28 @@ namespace currency
     // This is an optional data fields, It is not included in serialization and therefore is never stored in the database.
     // It might be calculated "on the fly" to speed up access operations.
     mutable std::shared_ptr<crypto::hash> m_cache_coinbase_id;
+    mutable std::atomic<uint8_t> m_cache_coinbase_state{0};
+
+    block_extended_info& operator=(const block_extended_info& rhs)
+    {
+      this->bl = rhs.bl;
+      this->height = rhs.height;
+      this->block_cumulative_size = rhs.block_cumulative_size;
+      this->cumulative_diff_adjusted = rhs.cumulative_diff_adjusted;
+      this->cumulative_diff_precise = rhs.cumulative_diff_precise;
+      this->cumulative_diff_precise_adjusted = rhs.cumulative_diff_precise_adjusted;
+      this->difficulty = rhs.difficulty;
+      this->already_generated_coins = rhs.already_generated_coins;
+      this->stake_hash = rhs.stake_hash;
+      this->version = rhs.version;
+      this->this_block_tx_fee_median = rhs.this_block_tx_fee_median;
+      this->effective_tx_fee_median = rhs.effective_tx_fee_median;
+      this->m_cache_coinbase_id.reset();
+      this->m_cache_coinbase_state = 0;
+      return *this;
+    }
+    block_extended_info(const block_extended_info& rhs) { *this = rhs; }
+    block_extended_info() = default;
   };
 
   struct gindex_increment
@@ -194,14 +216,31 @@ namespace currency
 
 
   inline crypto::hash get_coinbase_hash_cached(const block_extended_info& bei)
-  {    
-    std::shared_ptr<crypto::hash> local_coinbase_id = bei.m_cache_coinbase_id;
-    if (!local_coinbase_id)
-    {
-      bei.m_cache_coinbase_id = std::make_shared<crypto::hash>(get_transaction_hash(bei.bl.miner_tx));
-      local_coinbase_id = bei.m_cache_coinbase_id;
-    }
-    return *local_coinbase_id;
+  {
+    // bei.m_cache_coinbase_state : 0 -- m_cache_coinbase_id is empty
+    //                              1 -- m_cache_coinbase_id is calculating and writing
+    //                              2 -- m_cache_coinbase_id is ready to read
 
+    if (bei.m_cache_coinbase_state == 2)
+    {
+      // state is 2, cache must be ready, access the cache
+      std::shared_ptr<crypto::hash> local_coinbase_id = bei.m_cache_coinbase_id;
+      CHECK_AND_ASSERT_THROW_MES(local_coinbase_id, "internal error: m_cache_coinbase_id is empty");
+      return *local_coinbase_id;
+    }
+
+    uint8_t state = 0;
+    if (bei.m_cache_coinbase_state.compare_exchange_strong(state, 1))
+    {
+      // state has just been 0, now 1, we're calculating
+      std::shared_ptr<crypto::hash> ptr_h = std::make_shared<crypto::hash>(get_transaction_hash(bei.bl.miner_tx));
+      bei.m_cache_coinbase_id = ptr_h;
+      bei.m_cache_coinbase_state = 2;
+      return *ptr_h;
+    }
+
+    // state is 1, another thread is calculating, so we calculate locally and don't touch the cache
+    crypto::hash h = get_transaction_hash(bei.bl.miner_tx);
+    return h;
   }
 } // namespace currency
