@@ -442,6 +442,33 @@ namespace currency
     };
   };
   //-----------------------------------------------
+  struct COMMAND_RPC_GET_INTEGRATED_ADDRESS
+  {
+    DOC_COMMAND("Make integrated address from regular address");
+
+    struct request
+    {
+      std::string payment_id; // hex-encoded
+      std::string regular_address; // hex-encoded
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(payment_id) DOC_DSCR("Hex-encoded Payment ID to be associated with the this address. If empty then wallet would generate new payment id using system random library") DOC_EXMP("1dfe5a88ff9effb3")  DOC_END
+        KV_SERIALIZE(regular_address) DOC_DSCR("Zano wallet address to be used as a base for integrated address") DOC_EXMP("ZxCSpsGGeJsS8fwvQ4HktDU3qBeauoJTR6j73jAWWZxFXdF7XTbGm4YfS2kXJmAP4Rf5BVsSQ9iZ45XANXEYsrLN2L2W77dH7")  DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string integrated_address;
+      std::string payment_id; // hex-encoded
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(integrated_address) DOC_DSCR("Integrated address combining a standard address and payment ID, if applicable.")  DOC_EXMP("iZ2EMyPD7g28hgBfboZeCENaYrHBYZ1bLFi5cgWvn4WJLaxfgs4kqG6cJi9ai2zrXWSCpsvRXit14gKjeijx6YPCLJEv6Fx4rVm1hdAGQFis") DOC_END
+        KV_SERIALIZE(payment_id)         DOC_DSCR("Payment ID associated with the this address.") DOC_EXMP("1dfe5a88ff9effb3")  DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+  //-----------------------------------------------
   struct COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES
   {
     DOC_COMMAND("Obtain global outputs' indexes for the given txs.")

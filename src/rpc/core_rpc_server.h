@@ -98,6 +98,7 @@ namespace currency
     bool on_get_alt_blocks_details(const COMMAND_RPC_GET_ALT_BLOCKS_DETAILS::request& req, COMMAND_RPC_GET_ALT_BLOCKS_DETAILS::response& res, connection_context& cntx);
     bool on_get_est_height_from_date(const COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::request& req, COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::response& res, connection_context& cntx);
     bool on_find_outs_in_recent_blocks(const COMMAND_RPC_FIND_OUTS_IN_RECENT_BLOCKS::request& req, COMMAND_RPC_FIND_OUTS_IN_RECENT_BLOCKS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
+    bool on_get_integrated_address(const COMMAND_RPC_GET_INTEGRATED_ADDRESS::request& req, COMMAND_RPC_GET_INTEGRATED_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);    
     bool on_validate_signature(const COMMAND_VALIDATE_SIGNATURE::request& req, COMMAND_VALIDATE_SIGNATURE::response& res, epee::json_rpc::error& er, connection_context& cntx);
     
     
@@ -141,6 +142,7 @@ namespace currency
         MAP_JON_RPC_WE("get_alias_reward",            on_get_alias_reward,            COMMAND_RPC_GET_ALIAS_REWARD)
         MAP_JON_RPC   ("get_est_height_from_date",    on_get_est_height_from_date,    COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE)
         MAP_JON_RPC_WE("find_outs_in_recent_blocks",  on_find_outs_in_recent_blocks,  COMMAND_RPC_FIND_OUTS_IN_RECENT_BLOCKS)
+        MAP_JON_RPC_WE("get_integrated_address",      on_get_integrated_address,      COMMAND_RPC_GET_INTEGRATED_ADDRESS)
 
         //block explorer api
         MAP_JON_RPC   ("get_blocks_details",          on_rpc_get_blocks_details,      COMMAND_RPC_GET_BLOCKS_DETAILS)

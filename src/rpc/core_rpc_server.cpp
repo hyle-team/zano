@@ -1510,6 +1510,50 @@ namespace currency
 #undef LOCAL_CHECK
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_get_integrated_address(const COMMAND_RPC_GET_INTEGRATED_ADDRESS::request& req, COMMAND_RPC_GET_INTEGRATED_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
+  {
+    std::string payment_id;
+    if (!epee::string_tools::parse_hexstr_to_binbuff(req.payment_id, payment_id))
+    {
+      error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
+      error_resp.message = std::string("invalid payment id given: \'") + req.payment_id + "\', hex-encoded string was expected";
+      return false;
+    }
+
+    if (!currency::is_payment_id_size_ok(payment_id))
+    {
+      error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
+      error_resp.message = std::string("given payment id is too long: \'") + req.payment_id + "\'";
+      return false;
+    }
+
+    if (payment_id.empty())
+    {
+      payment_id = std::string(8, ' ');
+      crypto::generate_random_bytes(payment_id.size(), &payment_id.front());
+    }
+
+
+    std::string payment_id_from_provided_addr; // won't be used
+    account_public_address addr = AUTO_VAL_INIT(addr);
+    if (!get_account_address_and_payment_id_from_str(addr, payment_id_from_provided_addr, req.regular_address))
+    {
+      error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
+      error_resp.message = std::string("invalid address provided: \'") + req.regular_address + "\', Zano address expected";
+      return false;
+    }
+    if (payment_id_from_provided_addr.size())
+    {
+      error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
+      error_resp.message = std::string("invalid address provided: \'") + req.regular_address + "\', Zano address expected be regular and NOT integrated address";
+      return false;
+    }
+
+    res.integrated_address = currency::get_account_address_and_payment_id_as_str(addr, payment_id);
+    res.payment_id = epee::string_tools::buff_to_hex_nodelimer(payment_id);
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_aliases_by_address(const COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& req, COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
     account_public_address addr = AUTO_VAL_INIT(addr);
