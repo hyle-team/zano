@@ -3838,7 +3838,14 @@ bool blockchain_storage::find_blockchain_supplement(const std::list<crypto::hash
     std::list<crypto::hash> mis;
     get_transactions_direct(m_db_blocks[i]->bl.tx_hashes, blocks.back().second, mis);
     CHECK_AND_ASSERT_MES(!mis.size(), false, "internal error, block " << get_block_hash(m_db_blocks[i]->bl) << " [" << i << "] contains missing transactions: " << mis);
-    blocks.back().third = m_db_transactions.find(get_coinbase_hash_cached(*m_db_blocks[i]));
+    //blocks.back().third = m_db_transactions.find(get_coinbase_hash_cached(*m_db_blocks[i]));
+
+    crypto::hash coinbase_hash = get_coinbase_hash_cached(*m_db_blocks[i]);
+    blocks.back().third = m_db_transactions.find(coinbase_hash);
+    if (!blocks.back().third)
+    {
+      LOG_PRINT_YELLOW("m_db_transactions.find failed for coinbase hash: " << coinbase_hash << ", height: " << i, LOG_LEVEL_0);
+    }
   }
   return true;
 }
