@@ -77,28 +77,7 @@ namespace currency
     // This is an optional data fields, It is not included in serialization and therefore is never stored in the database.
     // It might be calculated "on the fly" to speed up access operations.
     mutable std::shared_ptr<crypto::hash> m_cache_coinbase_id;
-    mutable std::atomic<uint8_t> m_cache_coinbase_state{0};
-
-    block_extended_info& operator=(const block_extended_info& rhs)
-    {
-      this->bl = rhs.bl;
-      this->height = rhs.height;
-      this->block_cumulative_size = rhs.block_cumulative_size;
-      this->cumulative_diff_adjusted = rhs.cumulative_diff_adjusted;
-      this->cumulative_diff_precise = rhs.cumulative_diff_precise;
-      this->cumulative_diff_precise_adjusted = rhs.cumulative_diff_precise_adjusted;
-      this->difficulty = rhs.difficulty;
-      this->already_generated_coins = rhs.already_generated_coins;
-      this->stake_hash = rhs.stake_hash;
-      this->version = rhs.version;
-      this->this_block_tx_fee_median = rhs.this_block_tx_fee_median;
-      this->effective_tx_fee_median = rhs.effective_tx_fee_median;
-      this->m_cache_coinbase_id.reset();
-      this->m_cache_coinbase_state = 0;
-      return *this;
-    }
-    block_extended_info(const block_extended_info& rhs) { *this = rhs; }
-    block_extended_info() = default;
+    mutable epee::misc_utils::void_copy<std::atomic<uint8_t>> m_cache_coinbase_state;
   };
 
   struct gindex_increment
@@ -235,7 +214,7 @@ namespace currency
       // state has just been 0, now 1, we're calculating
       std::shared_ptr<crypto::hash> ptr_h = std::make_shared<crypto::hash>(get_transaction_hash(bei.bl.miner_tx));
       bei.m_cache_coinbase_id = ptr_h;
-      bei.m_cache_coinbase_state = 2;
+      bei.m_cache_coinbase_state.store(2);
       return *ptr_h;
     }
 

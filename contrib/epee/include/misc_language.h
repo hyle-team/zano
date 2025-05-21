@@ -627,6 +627,18 @@ namespace misc_utils
   };
 
 
+  // helper class mainly intended for using with std::atomic to repair copy-construction in classes where std::atomic is aggregated
+  template<typename parent_t>
+  struct void_copy : public parent_t
+  {
+    void_copy()                                 = default;
+    void_copy(void_copy&&) noexcept             = default;
+    void_copy& operator=(void_copy&&) noexcept  = default;
+
+    void_copy(const void_copy&) : parent_t{}    {}
+    void_copy& operator=(const void_copy&)      { return *this; }
+  };
+
 } // namespace misc_utils
 } // namespace epee
 
