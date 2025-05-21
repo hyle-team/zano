@@ -120,6 +120,7 @@ namespace epee
         {
           most_recent_accessed.erase(it->second.second);
           most_recent_accessed.push_front(k);
+          it->second.first = v;
           it->second.second = most_recent_accessed.begin();
         }
 
