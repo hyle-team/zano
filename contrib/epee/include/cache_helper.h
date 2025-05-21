@@ -98,7 +98,11 @@ namespace epee
         if (it == data.end())
           return false;
 
-        most_recet_acessed.splice(most_recet_acessed.begin(), most_recet_acessed, it->second.second);
+        //most_recet_acessed.splice(most_recet_acessed.begin(), most_recet_acessed, it->second.second);
+        most_recet_acessed.erase(it->second.second);
+        most_recet_acessed.push_front(k);
+        it->second.second = most_recet_acessed.begin();
+
         v = it->second.first;
         return true;
       }
@@ -106,8 +110,18 @@ namespace epee
       bool set(const t_key& k, const t_value& v)
       {
         CRITICAL_REGION_LOCAL(m_lock);
-        most_recet_acessed.push_front(k);
-        data[k] = std::pair<t_value, typename std::list<t_key>::iterator>(v, most_recet_acessed.begin());
+        auto it = data.find(k);
+        if (it == data.end())
+        {
+          most_recet_acessed.push_front(k);
+          data.insert(std::make_pair(k, std::make_pair(v, most_recet_acessed.begin())));
+        }
+        else
+        {
+          most_recet_acessed.erase(it->second.second);
+          most_recet_acessed.push_front(k);
+          it->second.second = most_recet_acessed.begin();
+        }
 
         trim();
         return true;
@@ -248,7 +262,10 @@ namespace epee
 
       bool erase(const t_key& k)
       {
-        return m_isolation.isolated_write_access<bool>([&](){return base_class::erase(k); });
+        return m_isolation.isolated_write_access<bool>([&]()
+        {
+          return base_class::erase(k);
+        });
       }
     };
 
