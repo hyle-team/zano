@@ -2934,6 +2934,11 @@ int custom_seed_builder()
   acc.generate();
   std::string pass_protected_or_not = "";
   std::vector<unsigned char> binary_from_seed = tools::mnemonic_encoding::text2binary(seed_24);
+  if (!binary_from_seed.size())
+  {
+    success_msg_writer() << "The seed phrase you have provided is not correct. (Please keep in mind that seed words is not compatible with bip39 dictionary)";
+    return EXIT_FAILURE;
+  }
   std::vector<unsigned char> processed_binary_from_seed = binary_from_seed;
   if (!passphrase.empty())
   {
