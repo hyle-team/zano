@@ -61,7 +61,7 @@ namespace epee
     class cache_base
     {
       uint64_t max_allowed_elements;
-      std::list<t_key> most_recet_acessed;
+      std::list<t_key> most_recent_accessed;
       typename container_selector<is_ordered_container, t_key, std::pair<t_value, typename std::list<t_key>::iterator> >::container data;
     protected:
       critical_section m_lock;
@@ -78,7 +78,7 @@ namespace epee
 
       size_t most_recent_accessed_container_size() const
       {
-        return most_recet_acessed.size();
+        return most_recent_accessed.size();
       }
 
       uint64_t get_max_elements() const
@@ -98,10 +98,10 @@ namespace epee
         if (it == data.end())
           return false;
 
-        //most_recet_acessed.splice(most_recet_acessed.begin(), most_recet_acessed, it->second.second);
-        most_recet_acessed.erase(it->second.second);
-        most_recet_acessed.push_front(k);
-        it->second.second = most_recet_acessed.begin();
+        //most_recent_accessed.splice(most_recent_accessed.begin(), most_recent_accessed, it->second.second);
+        most_recent_accessed.erase(it->second.second);
+        most_recent_accessed.push_front(k);
+        it->second.second = most_recent_accessed.begin();
 
         v = it->second.first;
         return true;
@@ -113,14 +113,14 @@ namespace epee
         auto it = data.find(k);
         if (it == data.end())
         {
-          most_recet_acessed.push_front(k);
-          data.insert(std::make_pair(k, std::make_pair(v, most_recet_acessed.begin())));
+          most_recent_accessed.push_front(k);
+          data.insert(std::make_pair(k, std::make_pair(v, most_recent_accessed.begin())));
         }
         else
         {
-          most_recet_acessed.erase(it->second.second);
-          most_recet_acessed.push_front(k);
-          it->second.second = most_recet_acessed.begin();
+          most_recent_accessed.erase(it->second.second);
+          most_recent_accessed.push_front(k);
+          it->second.second = most_recent_accessed.begin();
         }
 
         trim();
@@ -131,7 +131,7 @@ namespace epee
       {
         CRITICAL_REGION_LOCAL(m_lock);
         data.clear();
-        most_recet_acessed.clear();
+        most_recent_accessed.clear();
       }
 
       bool erase(const t_key& k)
@@ -141,20 +141,21 @@ namespace epee
         if (data_it == data.end())
           return false;
 
-        most_recet_acessed.erase(data_it->second.second);
+        most_recent_accessed.erase(data_it->second.second);
         data.erase(data_it);
         return true;
       }
+
     protected:
       void trim()
       {
         CRITICAL_REGION_LOCAL(m_lock);
-        while (most_recet_acessed.size() > max_allowed_elements)
+        while (most_recent_accessed.size() > max_allowed_elements)
         {
-          auto data_it = data.find(most_recet_acessed.back());
+          auto data_it = data.find(most_recent_accessed.back());
           if (data_it != data.end())
             data.erase(data_it);
-          most_recet_acessed.erase(--most_recet_acessed.end());  
+          most_recent_accessed.erase(--most_recent_accessed.end());  
         }
       }
     };
