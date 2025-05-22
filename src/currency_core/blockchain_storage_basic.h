@@ -204,8 +204,13 @@ namespace currency
     {
       // state is 2, cache must be ready, access the cache
       std::shared_ptr<crypto::hash> local_coinbase_id = std::atomic_load(&bei.m_cache_coinbase_id);
-      CHECK_AND_ASSERT_THROW_MES(local_coinbase_id, "internal error: m_cache_coinbase_id is empty");
-      return *local_coinbase_id;
+      if (local_coinbase_id)
+        return *local_coinbase_id;
+
+      // this branch is considered to be a rare case with possible race condition during state 1, reset state to 0
+      bei.m_cache_coinbase_state.store(0);
+      crypto::hash h = get_transaction_hash(bei.bl.miner_tx);
+      return h;
     }
 
     uint8_t state = 0;
