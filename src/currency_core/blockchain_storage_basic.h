@@ -203,7 +203,7 @@ namespace currency
     if (bei.m_cache_coinbase_state == 2)
     {
       // state is 2, cache must be ready, access the cache
-      std::shared_ptr<crypto::hash> local_coinbase_id = bei.m_cache_coinbase_id;
+      std::shared_ptr<crypto::hash> local_coinbase_id = std::atomic_load(&bei.m_cache_coinbase_id);
       CHECK_AND_ASSERT_THROW_MES(local_coinbase_id, "internal error: m_cache_coinbase_id is empty");
       return *local_coinbase_id;
     }
@@ -213,7 +213,7 @@ namespace currency
     {
       // state has just been 0, now 1, we're calculating
       std::shared_ptr<crypto::hash> ptr_h = std::make_shared<crypto::hash>(get_transaction_hash(bei.bl.miner_tx));
-      std::atomic_store(&bei.m_cache_coinbase_id, ptr_h);
+      std::atomic_store(&bei.m_cache_coinbase_id, ptr_h); // when moving to C++20 consider to change this to atomic shared ptr -- sowle
       bei.m_cache_coinbase_state.store(2);
       return *ptr_h;
     }
