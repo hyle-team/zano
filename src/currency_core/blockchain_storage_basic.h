@@ -213,7 +213,7 @@ namespace currency
     {
       // state has just been 0, now 1, we're calculating
       std::shared_ptr<crypto::hash> ptr_h = std::make_shared<crypto::hash>(get_transaction_hash(bei.bl.miner_tx));
-      bei.m_cache_coinbase_id = ptr_h;
+      std::atomic_store(&bei.m_cache_coinbase_id, ptr_h);
       bei.m_cache_coinbase_state.store(2);
       return *ptr_h;
     }
