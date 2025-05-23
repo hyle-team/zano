@@ -5214,7 +5214,9 @@ bool wallet2::reset_history()
   std::string pass = m_password;
   std::wstring file_path = m_wallet_file;
   account_base acc_tmp = m_account;
+  auto tx_keys = m_tx_keys;
   clear();
+  m_tx_keys = tx_keys;
   m_account = acc_tmp;
   m_password = pass;
   prepare_file_names(file_path);
