@@ -285,6 +285,35 @@ namespace currency
     return false;
   }
   //---------------------------------------------------------------
+  inline
+  bool get_out_pub_key_from_tx_out_v(const tx_out_v& out_v, crypto::public_key& result) noexcept
+  {
+    try
+    {
+      if (out_v.type() == typeid(tx_out_bare))
+      {
+        const txout_target_v& target_v = boost::get<tx_out_bare>(out_v).target;
+        if (target_v.type() == typeid(txout_to_key))
+        {
+          result = boost::get<txout_to_key>(target_v).key;
+          return true;
+        }
+      }
+      
+      if (out_v.type() == typeid(tx_out_zarcanum))
+      {
+        result = boost::get<tx_out_zarcanum>(out_v).stealth_address;
+        return true;
+      }
+    }
+    catch(...)
+    {
+      // should never go here, just precaution
+    }
+
+    return false;
+  }
+  //---------------------------------------------------------------
   //, txin_htlc, txin_zc_input
   inline bool compare_variant_by_types(const txin_multisig& left, const txin_multisig& right)
   {
