@@ -3657,19 +3657,18 @@ void wallet2::store_watch_only(const std::wstring& path_to_save, const std::stri
   // populate pending key images for spent outputs (this will help to resync watch-only wallet)
   for (const auto& tr : m_transfers)
   {
-
     const auto& td = tr.second;
     if (!td.is_spent())
       continue; // only spent transfers really need to be stored, because watch-only wallet will not be able to figure out they were spent otherwise
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.m_internal_output_index < td.m_ptx_wallet_info->m_tx.vout.size(), "invalid transfer #" << tr.first);
-    if (td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].type() != typeid(tx_out_bare))
+    const tx_out_v& out_v = td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index];
+    crypto::public_key out_key{};
+    if (!get_out_pub_key_from_tx_out_v(out_v, out_key))
       continue;
-    const currency::txout_target_v& out_t = boost::get<tx_out_bare>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]).target;
-    if (out_t.type() != typeid(currency::txout_to_key))
-      continue;
-    const crypto::public_key& out_key = boost::get<txout_to_key>(out_t).key;
-    wo.m_pending_key_images.insert(std::make_pair(out_key, td.m_key_image));
-    wo.m_pending_key_images_file_container.push_back(tools::out_key_to_ki{ out_key, td.m_key_image });
+    if (wo.m_pending_key_images.insert(std::make_pair(out_key, td.m_key_image)).second)
+      wo.m_pending_key_images_file_container.push_back(tools::out_key_to_ki{ out_key, td.m_key_image });
+    else
+      WLT_LOG_YELLOW("WARNING: m_pending_key_images.insert failed for pair (" << out_key << ", " << td.m_key_image << "), pair skipped", LOG_LEVEL_0);
     WLT_LOG_L1("preparing watch-only wallet: added pending ki (" << out_key << ", " << td.m_key_image << ")");
   }
 
