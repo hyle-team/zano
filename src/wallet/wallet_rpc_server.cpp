@@ -554,8 +554,15 @@ namespace tools
     }
     else
     {
-      res.tx_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(result.tx));
+      crypto::hash tx_id = currency::get_transaction_hash(result.tx);
+      res.tx_hash = epee::string_tools::pod_to_hex(tx_id);
       res.tx_size = get_object_blobsize(result.tx);
+      //try to get wallet_transfer_info
+      wallet_public::wallet_transfer_info wti = AUTO_VAL_INIT(wti);
+      if (w.get_wallet()->find_unconfirmed_tx(tx_id, wti))
+      {
+        res.tx_details = wti;
+      }
     }
     return true;
 

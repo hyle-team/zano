@@ -5341,6 +5341,15 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   return true;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::find_unconfirmed_tx(const crypto::hash& tx_id, wallet_public::wallet_transfer_info& res) const
+{
+  auto it = m_unconfirmed_txs.find(tx_id);
+  if (it == m_unconfirmed_txs.end())
+    return false;
+  res = it->second;
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::get_unconfirmed_transfers(std::vector<wallet_public::wallet_transfer_info>& trs, bool exclude_mining_txs)
 {
   for (auto& u : m_unconfirmed_txs)

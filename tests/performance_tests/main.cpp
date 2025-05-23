@@ -27,6 +27,7 @@
 #include "wallet/plain_wallet_api.h"  
 #include "wallet/view_iface.h"
 #include "wallet/plain_wallet_api_defs.h"
+#include "math_helper.h"
   
 PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4244)
@@ -184,17 +185,57 @@ void test_plain_wallet()
 
 }
 
+void multithread_test_of_get_coinbase_hash_cached()
+{
+  epee::math_helper::once_a_time_seconds<1> print_interwal;
+
+  try
+  {
+    crypto::hash h = currency::null_hash;
+    utils::threads_pool pool;
+    pool.init();
+    for (uint64_t j = 0; j != 100000000; j++)
+    {
+
+      print_interwal.do_call([&]() { LOG_PRINT_L0("Job " << j << " started, h=" << h); return true; });
+      currency::block_extended_info bei = AUTO_VAL_INIT(bei);
+      utils::threads_pool::jobs_container jobs;
+      size_t i = 0;
+
+      for (; i != 10; i++)
+      {
+        utils::threads_pool::add_job_to_container(jobs, [&, i]() {
+          h = get_coinbase_hash_cached(bei);
+          //LOG_PRINT_L0("Job " << i << " started"); 
+          //epee::misc_utils::sleep_no_w(10000); 
+          // ++count_jobs_finished; LOG_PRINT_L0("Job " << i << " finished"); 
+          });
+      }
+
+      pool.add_batch_and_wait(jobs);
+    }
+  }
+  catch (...)
+  {
+    LOG_ERROR("Exception happened");
+  }
+
+
+}
+
+
 
 int main(int argc, char** argv)
 {
   epee::string_tools::set_module_name_and_folder(argv[0]);
   epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
-  //epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
+  epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
   //epee::log_space::log_singletone::add_logger(LOGGER_FILE,
   //  epee::log_space::log_singletone::get_default_log_file().c_str(),
   //  epee::log_space::log_singletone::get_default_log_folder().c_str());
   
-  test_tx_json_serialization();
+  multithread_test_of_get_coinbase_hash_cached();
+  //test_tx_json_serialization();
   //test_base64_serialization();
   //test_plain_wallet();
   //parse_weird_tx();

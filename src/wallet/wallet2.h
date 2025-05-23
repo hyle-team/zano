@@ -769,7 +769,7 @@ namespace tools
     void set_concise_mode(bool enabled) { m_concise_mode = enabled; }
     void set_concise_mode_reorg_max_reorg_blocks(uint64_t max_blocks) { m_wallet_concise_mode_max_reorg_blocks = max_blocks; }
     void set_concise_mode_truncate_history(uint64_t max_entries) { m_truncate_history_max_entries = max_entries; }
-
+    bool find_unconfirmed_tx(const crypto::hash& tx_id, wallet_public::wallet_transfer_info& res) const;
 
     construct_tx_param get_default_construct_tx_param();
 
