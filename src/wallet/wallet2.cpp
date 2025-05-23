@@ -3289,7 +3289,7 @@ void wallet2::load_keys2ki(bool create_if_not_exist, bool& need_to_resync)
       ok = m_pending_key_images_file_container.get_item(i, item);
       WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(ok, "m_pending_key_images_file_container.get_item() failed for index " << i << ", size: " << m_pending_key_images_file_container.size());
       ok = m_pending_key_images.insert(std::make_pair(item.out_key, item.key_image)).second;
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(ok, "m_pending_key_images.insert failed for index " << i << ", size: " << m_pending_key_images_file_container.size());
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(ok, "m_pending_key_images.insert failed for index " << i << ", pair (" << item.out_key << ", " << item.key_image << "), size: " << m_pending_key_images_file_container.size());
       WLT_LOG_L2("pending key image restored: (" << item.out_key << ", " << item.key_image << ")");
     }
     WLT_LOG_L0(m_pending_key_images.size() << " elements restored, requesting full wallet resync");
@@ -6964,18 +6964,18 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys
       }
       VARIANT_SWITCH_END();
     }
-    VARIANT_CASE_CONST(tx_out_zarcanum, o);
-    real_oe.amount_commitment = o.amount_commitment; // TODO @#@# consider using shorter code like in sweep_below() (or better reuse it)
-    real_oe.concealing_point = o.concealing_point;
-    real_oe.stealth_address = o.stealth_address;
-    real_oe.blinded_asset_id = o.blinded_asset_id;
-    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.is_zc(), "transfer #" << J << ", amount: " << print_money_brief(td.amount()) << " is not a ZC");
-    src.real_out_amount_blinding_mask = td.m_zc_info_ptr->amount_blinding_mask;
-    src.real_out_asset_id_blinding_mask = td.m_zc_info_ptr->asset_id_blinding_mask;
-    src.asset_id = td.m_zc_info_ptr->asset_id;
+    VARIANT_CASE_CONST(tx_out_zarcanum, o)
+      real_oe.amount_commitment           = o.amount_commitment; // TODO @#@# consider using shorter code like in sweep_below() (or better reuse it)
+      real_oe.concealing_point            = o.concealing_point;
+      real_oe.stealth_address             = o.stealth_address;
+      real_oe.blinded_asset_id            = o.blinded_asset_id;
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.is_zc(), "transfer #" << J << ", amount: " << print_money_brief(td.amount()) << " is not a ZC");
+      src.real_out_amount_blinding_mask   = td.m_zc_info_ptr->amount_blinding_mask;
+      src.real_out_asset_id_blinding_mask = td.m_zc_info_ptr->asset_id_blinding_mask;
+      src.asset_id                        = td.m_zc_info_ptr->asset_id;
 #ifndef NDEBUG
-    WLT_CHECK_AND_ASSERT_MES(crypto::point_t(src.asset_id) + src.real_out_asset_id_blinding_mask * crypto::c_point_X == crypto::point_t(real_oe.blinded_asset_id).modify_mul8(), false, "real_out_asset_id_blinding_mask doesn't match real_oe.blinded_asset_id");
-    WLT_CHECK_AND_ASSERT_MES(td.m_amount * crypto::point_t(real_oe.blinded_asset_id).modify_mul8() + src.real_out_amount_blinding_mask * crypto::c_point_G == crypto::point_t(real_oe.amount_commitment).modify_mul8(), false, "real_out_amount_blinding_mask doesn't match real_oe.amount_commitment");
+      WLT_CHECK_AND_ASSERT_MES(crypto::point_t(src.asset_id) + src.real_out_asset_id_blinding_mask * crypto::c_point_X == crypto::point_t(real_oe.blinded_asset_id).modify_mul8(), false, "real_out_asset_id_blinding_mask doesn't match real_oe.blinded_asset_id");
+      WLT_CHECK_AND_ASSERT_MES(td.m_amount * crypto::point_t(real_oe.blinded_asset_id).modify_mul8() + src.real_out_amount_blinding_mask * crypto::c_point_G == crypto::point_t(real_oe.amount_commitment).modify_mul8(), false, "real_out_amount_blinding_mask doesn't match real_oe.amount_commitment");
 #endif
     VARIANT_SWITCH_END();
 
@@ -8455,12 +8455,12 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
           }
           VARIANT_SWITCH_END();
         }
-        VARIANT_CASE_CONST(tx_out_zarcanum, o);
-        interted_it = src.outputs.emplace(it_to_insert, out_reference, o.stealth_address, o.concealing_point, o.amount_commitment, o.blinded_asset_id);
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.is_zc(), "transfer #" << tr_index << ", amount: " << print_money_brief(td.amount()) << " is not a ZC");
-        src.real_out_amount_blinding_mask = td.m_zc_info_ptr->amount_blinding_mask;
-        src.real_out_asset_id_blinding_mask = td.m_zc_info_ptr->asset_id_blinding_mask;
-        src.asset_id = td.m_zc_info_ptr->asset_id;
+        VARIANT_CASE_CONST(tx_out_zarcanum, o)
+          interted_it = src.outputs.emplace(it_to_insert, out_reference, o.stealth_address, o.concealing_point, o.amount_commitment, o.blinded_asset_id);
+          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.is_zc(), "transfer #" << tr_index << ", amount: " << print_money_brief(td.amount()) << " is not a ZC");
+          src.real_out_amount_blinding_mask   = td.m_zc_info_ptr->amount_blinding_mask;
+          src.real_out_asset_id_blinding_mask = td.m_zc_info_ptr->asset_id_blinding_mask;
+          src.asset_id                        = td.m_zc_info_ptr->asset_id;
         VARIANT_SWITCH_END();
         src.real_out_tx_key = get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
         src.real_output = interted_it - src.outputs.begin();
