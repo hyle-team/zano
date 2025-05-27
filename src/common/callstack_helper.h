@@ -1,4 +1,4 @@
-// Copyright (c) 2019 Zano Project
+// Copyright (c) 2019-2025 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #pragma once
@@ -7,10 +7,10 @@
 namespace tools
 {
 #if defined(WIN32)
-  extern std::string get_callstack_win_x64();
+  extern std::string get_callstack_win_x64() noexcept;
 #endif
 
-  inline std::string get_callstack()
+  inline std::string get_callstack() noexcept
   {
 #if defined(__GNUC__)
     return epee::misc_utils::print_trace_default();
