@@ -153,6 +153,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
   install(TARGETS wallet currency_core crypto common zlibstatic DESTINATION "${CMAKE_ANDROID_ARCH_ABI}/lib")
   message("Generating install for Android")
+
+  file(GLOB WALLET_INCLUDES wallet/*.h)
+  install(FILES ${WALLET_INCLUDES} DESTINATION "${CMAKE_INSTALL_PREFIX}/include")
   return()
 endif()
 
