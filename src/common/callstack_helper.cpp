@@ -43,20 +43,19 @@ namespace
       module_data ret{};
       try
       {
-        char temp[buffer_length];
-        MODULEINFO mi;
+        char temp[buffer_length] = {0};
+        MODULEINFO mi{};
 
         GetModuleInformation(process, module, &mi, sizeof(mi));
         ret.base_address = mi.lpBaseOfDll;
         ret.load_size = mi.SizeOfImage;
 
-        GetModuleFileNameEx(process, module, temp, sizeof(temp));
-        ret.image_name = temp;
-        GetModuleBaseName(process, module, temp, sizeof(temp));
-        ret.module_name = temp;
-        std::vector<char> img(ret.image_name.begin(), ret.image_name.end());
-        std::vector<char> mod(ret.module_name.begin(), ret.module_name.end());
-        SymLoadModule64(process, 0, &img[0], &mod[0], (DWORD64)ret.base_address, ret.load_size);
+        if (GetModuleFileNameEx(process, module, temp, sizeof(temp)))
+          ret.image_name = temp;
+        if (GetModuleBaseName(process, module, temp, sizeof(temp)))
+          ret.module_name = temp;
+
+        SymLoadModule64(process, 0, ret.image_name.c_str(), ret.module_name.c_str(), (DWORD64)ret.base_address, ret.load_size);
       }
       catch(std::exception& e)
       {
