@@ -939,9 +939,10 @@ namespace currency
         txd.last_failed_id = m_blockchain.get_block_id_by_height(txd.last_failed_height);
         return false;
       }
-    }else
+    }
+    else
     {
-      if(txd.max_used_block_height >= m_blockchain.get_current_blockchain_size())
+      if (m_blockchain.get_current_blockchain_size() < txd.max_used_block_height + CURRENCY_HF4_MANDATORY_MIN_COINAGE) // coinage rule since HF4, s.a. scan_outputkeys_for_indexes()
         return false;
       if(m_blockchain.get_block_id_by_height(txd.max_used_block_height) != txd.max_used_block_id)
       {

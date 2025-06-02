@@ -6,6 +6,7 @@
 
 #pragma once 
 #include "chaingen.h"
+#include "wallet_tests_basic.h"
 
 struct gen_tx_big_version : public test_chain_unit_enchanced
 {
@@ -174,4 +175,11 @@ struct input_refers_to_incompatible_by_type_output : public test_chain_unit_ench
   bool assert_to_key_input_refers_zarcanum_output_is_wrong(const currency::core& c, const size_t ev_index, const std::vector<test_event_entry>& events) const;
   bool assert_zc_input_refers_bare_output_is_wrong(const currency::core& c, const size_t ev_index, const std::vector<test_event_entry>& events) const;
   bool assert_htlc_input_refers_zarcanum_output_is_wrong(const currency::core& c, const size_t ev_index, const std::vector<test_event_entry>& events) const;
+};
+
+struct tx_pool_validation_and_chain_switch : public wallet_test
+{
+  tx_pool_validation_and_chain_switch();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
