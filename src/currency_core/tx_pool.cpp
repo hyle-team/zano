@@ -942,7 +942,7 @@ namespace currency
     }
     else
     {
-      if (m_blockchain.get_current_blockchain_size() < txd.max_used_block_height + CURRENCY_HF4_MANDATORY_MIN_COINAGE) // coinage rule since HF4, s.a. scan_outputkeys_for_indexes()
+      if(txd.max_used_block_height >= m_blockchain.get_current_blockchain_size())
         return false;
       if(m_blockchain.get_block_id_by_height(txd.max_used_block_height) != txd.max_used_block_id)
       {
@@ -958,6 +958,10 @@ namespace currency
         }
       }
     }
+
+    if (m_blockchain.get_current_blockchain_size() < txd.max_used_block_height + CURRENCY_HF4_MANDATORY_MIN_COINAGE) // coinage rule since HF4, s.a. scan_outputkeys_for_indexes()
+      return false;
+
     //if we here, transaction seems valid, but, anyway, check for key_images collisions with blockchain, just to be sure
     if (m_blockchain.have_tx_keyimges_as_spent(txd.tx))
     {
