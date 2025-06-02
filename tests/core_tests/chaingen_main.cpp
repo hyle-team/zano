@@ -1227,6 +1227,7 @@ int main(int argc, char* argv[])
     the heights >= 10. */
     GENERATE_AND_PLAY_HF(tx_pool_semantic_validation, "3");
     GENERATE_AND_PLAY(input_refers_to_incompatible_by_type_output);
+    GENERATE_AND_PLAY_HF(tx_pool_validation_and_chain_switch, "3-*");
 
     // Double spend
     GENERATE_AND_PLAY(gen_double_spend_in_tx<false>);
