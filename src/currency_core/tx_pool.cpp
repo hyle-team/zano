@@ -959,7 +959,7 @@ namespace currency
       }
     }
 
-    if (m_blockchain.get_current_blockchain_size() < txd.max_used_block_height + CURRENCY_HF4_MANDATORY_MIN_COINAGE) // coinage rule since HF4, s.a. scan_outputkeys_for_indexes()
+    if (txd.tx.version > TRANSACTION_VERSION_PRE_HF4 && m_blockchain.get_current_blockchain_size() < txd.max_used_block_height + CURRENCY_HF4_MANDATORY_MIN_COINAGE) // coinage rule since HF4, s.a. scan_outputkeys_for_indexes()
       return false;
 
     //if we here, transaction seems valid, but, anyway, check for key_images collisions with blockchain, just to be sure
