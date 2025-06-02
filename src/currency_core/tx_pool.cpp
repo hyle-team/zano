@@ -723,15 +723,26 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------------------------
+  std::string tx_memory_pool::get_blacklisted_txs_string() const
+  {
+    std::stringstream ss;
+    m_db_black_tx_list.enumerate_items([&](uint64_t i, const crypto::hash& td_id, const bool& /*dummy */ )
+      {
+        ss << td_id << ENDL;
+        return true;
+      });
+    return ss.str();
+  }
+  //---------------------------------------------------------------------------------
   bool tx_memory_pool::add_transaction_to_black_list(const transaction& tx)
   {
     // atm:
     // 1) the only side effect of a tx being blacklisted is the one is just ignored by fill_block_template(), but it still can be added to blockchain/pool
     // 2) it's permanent
-    LOG_PRINT_YELLOW("TX ADDED TO POOL'S BLACKLIST: " << get_transaction_hash(tx), LOG_LEVEL_0);
     m_db.begin_transaction();
     m_db_black_tx_list.set(get_transaction_hash(tx), true);
     m_db.commit_transaction();
+    LOG_PRINT_YELLOW("TX ADDED TO POOL'S BLACKLIST: " << get_transaction_hash(tx) << ", full black list: " << ENDL << get_blacklisted_txs_string(), LOG_LEVEL_0);
     return true;
   }
   //---------------------------------------------------------------------------------
@@ -908,8 +919,12 @@ namespace currency
   {
     //not the best implementation at this time, sorry :(
 
-    if (is_tx_blacklisted(get_transaction_hash(txd.tx)))
+    if (is_tx_blacklisted(id))
+    {
+      LOG_PRINT_L2("[is_transaction_ready_to_go]Tx " << id << " skipped as it blacklisted");
       return false;
+    }
+      
 
     //check is ring_signature already checked ?
     if(txd.max_used_block_id == null_hash)
@@ -924,7 +939,8 @@ namespace currency
         txd.last_failed_id = m_blockchain.get_block_id_by_height(txd.last_failed_height);
         return false;
       }
-    }else
+    }
+    else
     {
       if(txd.max_used_block_height >= m_blockchain.get_current_blockchain_size())
         return false;
@@ -942,6 +958,10 @@ namespace currency
         }
       }
     }
+
+    if (txd.tx.version > TRANSACTION_VERSION_PRE_HF4 && m_blockchain.get_current_blockchain_size() < txd.max_used_block_height + CURRENCY_HF4_MANDATORY_MIN_COINAGE) // coinage rule since HF4, s.a. scan_outputkeys_for_indexes()
+      return false;
+
     //if we here, transaction seems valid, but, anyway, check for key_images collisions with blockchain, just to be sure
     if (m_blockchain.have_tx_keyimges_as_spent(txd.tx))
     {
@@ -1193,13 +1213,14 @@ namespace currency
         if (i < best_position)
         {
           bl.tx_hashes.push_back(tx.first);
+          LOG_PRINT_L2("[fill_block_template]: Added tx to block: " << tx.first);
         }
-        else if (have_attachment_service_in_container(tx.second->tx.attachment, BC_OFFERS_SERVICE_ID, BC_OFFERS_SERVICE_INSTRUCTION_DEL))
+        /*else if (have_attachment_service_in_container(tx.second->tx.attachment, BC_OFFERS_SERVICE_ID, BC_OFFERS_SERVICE_INSTRUCTION_DEL))
         {
           // BC_OFFERS_SERVICE_INSTRUCTION_DEL transactions has zero fee, so include them here regardless of reward effectiveness
           bl.tx_hashes.push_back(tx.first);
           total_size += tx.second->blob_size;
-        }
+        }*/
       }
     }
     // add explicit transactions 

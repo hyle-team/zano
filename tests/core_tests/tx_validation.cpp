@@ -2606,3 +2606,121 @@ bool input_refers_to_incompatible_by_type_output::assert_htlc_input_refers_zarca
 
   return true;
 }
+
+//------------------------------------------------------------------
+
+tx_pool_validation_and_chain_switch::tx_pool_validation_and_chain_switch()
+{
+  REGISTER_CALLBACK_METHOD(tx_pool_validation_and_chain_switch, c1);
+}
+
+bool tx_pool_validation_and_chain_switch::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: 
+
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+
+  std::list<currency::account_base> miner_stake_sources( {miner_acc} );
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2);
+  MAKE_TX(events, tx_0, miner_acc, alice_acc, MK_TEST_COINS(100), blk_0r);
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+
+  //  0 ... 10    21    22    23    24    25    26    27    28    29    30    31          <- height
+  // (0 )- (0r)- (1 )-                                                                    <- chain A
+  //       tx_0                           
+
+  MAKE_NEXT_POS_BLOCK(events, blk_2, blk_1, miner_acc, miner_stake_sources);
+  MAKE_NEXT_POS_BLOCK(events, blk_3, blk_2, miner_acc, miner_stake_sources);
+  MAKE_NEXT_POS_BLOCK(events, blk_4, blk_3, miner_acc, miner_stake_sources);
+  MAKE_NEXT_POS_BLOCK(events, blk_5, blk_4, miner_acc, miner_stake_sources);
+  MAKE_NEXT_POS_BLOCK(events, blk_6, blk_5, miner_acc, miner_stake_sources);
+  MAKE_NEXT_POS_BLOCK(events, blk_7, blk_6, miner_acc, miner_stake_sources);
+  MAKE_NEXT_POS_BLOCK(events, blk_8, blk_7, miner_acc, miner_stake_sources);
+  MAKE_NEXT_POS_BLOCK(events, blk_9, blk_8, miner_acc, miner_stake_sources);
+  MAKE_NEXT_POS_BLOCK(events, blk_10, blk_9, miner_acc, miner_stake_sources);
+
+  // now Alice should be able to spend her coins
+  MAKE_TX(events, tx_a, alice_acc, miner_acc, MK_TEST_COINS(100) - TESTS_DEFAULT_FEE, blk_10);
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+
+  MAKE_NEXT_POS_BLOCK_TX1(events, blk_11, blk_10, miner_acc, miner_stake_sources, tx_a);
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+
+  // construct chain B as PoW-PoS-PoW-PoS, it should win
+  MAKE_NEXT_BLOCK(events, blk_3a, blk_3, miner_acc);
+  MAKE_NEXT_POS_BLOCK(events, blk_4a, blk_3a, miner_acc, miner_stake_sources);
+  MAKE_NEXT_BLOCK(events, blk_5a, blk_4a, miner_acc);
+  MAKE_NEXT_POS_BLOCK(events, blk_6a, blk_5a, miner_acc, miner_stake_sources);
+
+  // make sure it won
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_6a));
+
+  // now tx_a should have been put back to the tx pool
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+
+  // the next block should be rejected, because of max_related_block_height=21 and the current height is 28
+  //DO_CALLBACK(events, "mark_invalid_block");
+  //MAKE_NEXT_BLOCK_TX1(events, blk_7a, blk_6a, miner_acc, tx_a);
+
+  // and if we clear tx pool ...
+  //DO_CALLBACK(events, "clear_tx_pool");
+  //DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+  // and re-add the transaction on this height, it sould be added
+  //ADD_CUSTOM_EVENT(events, tx_a);
+
+  // however, we need to make sure that tx pool won't be use tx_a in a block template until the height is good enough
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool tx_pool_validation_and_chain_switch::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+
+  bool r = false;
+  alice_wlt->refresh();
+
+  // make sure tx_a is still in the pool
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  // and Alice's unconfirmed balance is nonzero
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", MK_TEST_COINS(100)), false, "");
+
+  // mine a block, make sure it is possible and the tx is still in the pool afterwards
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_blocks_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+
+  // make sure tx_a is still in the pool
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  // and Alice's unconfirmed balance is nonzero
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", MK_TEST_COINS(100)), false, "");
+
+  // mine more
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 2);
+
+  // make sure tx_a is still in the pool
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  // and Alice's unconfirmed balance is nonzero
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", MK_TEST_COINS(100)), false, "");
+
+  // the next blocktemplate should include it
+  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
+  // make sure it did
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  // and Alice's unconfirmed balance is zero
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", MK_TEST_COINS(0)), false, "");
+
+  return true;
+}
+
