@@ -3154,8 +3154,7 @@ void wallet2::detach_blockchain(uint64_t including_height)
   //asset descriptors
   handle_rollback_events(including_height);
 
-  WLT_LOG_L0("Detached blockchain on height " << including_height << ", transfers detached " << transfers_detached << ", blocks detached " << blocks_detached
-    << ", new top: " << print16(m_chain.get_top_block_id()) << " @ " << m_chain.get_top_block_height());
+  WLT_LOG_L0("Detached blockchain on height " << including_height << ", transfers detached " << transfers_detached << ", blocks detached " << blocks_detached);
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::operator()(const asset_register_event& e)
