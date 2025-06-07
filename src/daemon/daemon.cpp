@@ -409,10 +409,14 @@ int main(int argc, char* argv[])
     LOG_PRINT_MAGENTA("[Warp]: Warm up finished!", LOG_LEVEL_0);
   }
 
-  // start components
-  if (!command_line::has_arg(vm, command_line::arg_console))
+  //detect if console is available
+  if (isatty(fileno(stdin)))
   {
-    dch.start_handling();
+    // start components
+    if (!command_line::has_arg(vm, command_line::arg_console))
+    {
+      dch.start_handling();
+    }
   }
 
   uint32_t rpc_threads_count = RPC_SERVER_DEFAULT_THREADS_NUM;
