@@ -302,6 +302,7 @@ namespace currency
       res.status = API_RETURN_CODE_FAIL;
       return false;
     }
+    res.current_hardfork = m_core.get_blockchain_storage().get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height);
 
     for(auto& b: bs)
     {
@@ -339,6 +340,7 @@ namespace currency
       res.status = API_RETURN_CODE_FAIL;
       return false;
     }
+    res.current_hardfork = m_core.get_blockchain_storage().get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height);
 
     LOG_PRINT_L2("[on_get_blocks]: Enumerating over blocks ....");
     for (auto& b : bs)
@@ -357,6 +359,8 @@ namespace currency
         i++;
       }
     }
+
+
     LOG_PRINT_L2("[on_get_blocks]: Finished");
     res.status = API_RETURN_CODE_OK;
     return true;

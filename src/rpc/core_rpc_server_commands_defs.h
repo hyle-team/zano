@@ -274,12 +274,14 @@ namespace currency
       std::list<t_block_complete_entry> blocks;
       uint64_t    start_height;
       uint64_t    current_height;
+      uint64_t    current_hardfork;
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(blocks)                     DOC_DSCR("Bunch of blocks") DOC_EXMP_AUTO(1) DOC_END
         KV_SERIALIZE(start_height)               DOC_DSCR("Starting height of the resulting bunch of blocks.") DOC_EXMP(2000000) DOC_END
         KV_SERIALIZE(current_height)             DOC_DSCR("Current height of the blockchain.") DOC_EXMP(2555000) DOC_END
+        KV_SERIALIZE(current_hardfork)           DOC_DSCR("Current hardfork, used for wallet <-> version verification") DOC_EXMP(4) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
