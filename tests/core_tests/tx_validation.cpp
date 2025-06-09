@@ -2568,10 +2568,9 @@ bool input_refers_to_incompatible_by_type_output::assert_zc_input_refers_bare_ou
 
   {
     bool all_inputs_have_explicit_native_asset_id{};
-    uint64_t max_related_block_height{};
+    blockchain_storage::check_tx_inputs_context ctic{};
 
-    CHECK_AND_ASSERT_EQ(c.get_blockchain_storage().check_tx_input(tx, 0, boost::get<const txin_zc_input>(tx.vin.front()), get_transaction_hash(tx), max_related_block_height,
-      all_inputs_have_explicit_native_asset_id), false);
+    CHECK_AND_ASSERT_EQ(c.get_blockchain_storage().check_tx_input(tx, 0, boost::get<const txin_zc_input>(tx.vin.front()), get_transaction_hash(tx), ctic), false);
   }
 
   return true;

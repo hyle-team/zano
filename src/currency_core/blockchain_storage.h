@@ -150,9 +150,19 @@ namespace currency
 
     struct scan_for_keys_context
     {
-      bool htlc_is_expired;
-      std::list<txout_htlc> htlc_outs;
-      std::list<tx_out_zarcanum> zc_outs;
+      bool check_hf4_coinage_rule = true;                      // input
+      bool htlc_is_expired;                                    // output
+      std::list<txout_htlc> htlc_outs;                         // output, legacy
+      std::list<tx_out_zarcanum> zc_outs;                      // output
+    };
+
+    struct check_tx_inputs_context
+    {
+      bool check_hf4_coinage_rule = true;                      // input
+      bool calculate_max_used_block_id = false;                // input
+      crypto::hash max_used_block_id{};                        // output
+      uint64_t max_used_block_height = 0;                      // output
+      bool all_tx_ins_have_explicit_native_asset_ids = true;   // output
     };
 
     // == Output indexes local lookup table conception ==
@@ -316,8 +326,8 @@ namespace currency
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_htlc& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
-    bool check_tx_input(const transaction& tx, size_t in_index, const txin_zc_input& zc_in, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, bool& all_tx_ins_have_explicit_native_asset_ids) const;
-    bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height)const;
+    bool check_tx_input(const transaction& tx, size_t in_index, const txin_zc_input& zc_in, const crypto::hash& tx_prefix_hash, check_tx_inputs_context& ctic) const;
+    bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, check_tx_inputs_context& ctic)const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash) const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height, crypto::hash& max_used_block_id)const;
     bool check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const transaction& source_tx, size_t out_n) const;
@@ -927,7 +937,7 @@ namespace currency
       ++output_index;
     }
 
-    if (m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, this->get_current_blockchain_size()))
+    if (scan_context.check_hf4_coinage_rule && m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, this->get_current_blockchain_size()))
     { 
       //with hard fork 4 make it network rule to have at least 10 confirmations
       

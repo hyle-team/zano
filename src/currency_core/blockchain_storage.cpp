@@ -5118,10 +5118,13 @@ bool blockchain_storage::get_tx_outputs_gindexs(const crypto::hash& tx_id, std::
 bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height, crypto::hash& max_used_block_id) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  bool res = check_tx_inputs(tx, tx_prefix_hash, max_used_block_height);
-  if(!res) return false;
-  CHECK_AND_ASSERT_MES(max_used_block_height < m_db_blocks.size(), false,  "internal error: max used block index=" << max_used_block_height << " is not less than blockchain size = " << m_db_blocks.size());
-  get_block_hash(m_db_blocks[max_used_block_height]->bl, max_used_block_id);
+  check_tx_inputs_context ctic{};
+  ctic.calculate_max_used_block_id = true;
+  bool res = check_tx_inputs(tx, tx_prefix_hash, ctic);
+  if (!res)
+    return false;
+  max_used_block_height = ctic.max_used_block_height;
+  max_used_block_id = ctic.max_used_block_id;
   return true;
 }
 //------------------------------------------------------------------
@@ -5397,15 +5400,16 @@ bool blockchain_storage::have_tx_keyimges_as_spent(const transaction &tx) const
 //------------------------------------------------------------------
 bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash) const
 {
-  uint64_t stub = 0;
-  return check_tx_inputs(tx, tx_prefix_hash, stub);
+  check_tx_inputs_context ctic{};
+  return check_tx_inputs(tx, tx_prefix_hash, ctic);
 }
 //------------------------------------------------------------------
-bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height) const
+bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, check_tx_inputs_context& ctic) const
 {
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
   size_t sig_index = 0;
-  max_used_block_height = 0;
-  bool all_tx_ins_have_explicit_native_asset_ids = true;
+  ctic.max_used_block_height = 0;
 
   auto local_check_key_image = [&](const crypto::key_image& ki) -> bool
   {
@@ -5430,7 +5434,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
         return false;
 
       uint64_t max_unlock_time = 0;
-      if (!check_tx_input(tx, sig_index, in_to_key, tx_prefix_hash, max_used_block_height, max_unlock_time))
+      if (!check_tx_input(tx, sig_index, in_to_key, tx_prefix_hash, ctic.max_used_block_height, max_unlock_time))
       {
         LOG_ERROR("Failed to validate input #" << sig_index << " tx: " << tx_prefix_hash);
         return false;
@@ -5438,7 +5442,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
     }
     VARIANT_CASE_CONST(txin_multisig, in_ms)
     {
-      if (!check_tx_input(tx, sig_index, in_ms, tx_prefix_hash, max_used_block_height))
+      if (!check_tx_input(tx, sig_index, in_ms, tx_prefix_hash, ctic.max_used_block_height))
       {
         LOG_ERROR("Failed to validate multisig input #" << sig_index << " (ms out id: " << in_ms.multisig_out_id << ") in tx: " << tx_prefix_hash);
         return false;
@@ -5450,7 +5454,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
       if (!local_check_key_image(in_htlc.k_image))
         return false;
 
-      if (!check_tx_input(tx, sig_index, in_htlc, tx_prefix_hash, max_used_block_height))
+      if (!check_tx_input(tx, sig_index, in_htlc, tx_prefix_hash, ctic.max_used_block_height))
       {
         LOG_ERROR("Failed to validate htlc input #" << sig_index << " in tx: " << tx_prefix_hash << ", htlc json: " << ENDL << obj_to_json_str(in_htlc));
         return false;
@@ -5461,7 +5465,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
       if (!local_check_key_image(in_zc.k_image))
         return false;
 
-      if (!check_tx_input(tx, sig_index, in_zc, tx_prefix_hash, max_used_block_height, all_tx_ins_have_explicit_native_asset_ids))
+      if (!check_tx_input(tx, sig_index, in_zc, tx_prefix_hash, ctic))
       {
         LOG_ERROR("Failed to validate zc input #" << sig_index << " in tx: " << tx_prefix_hash);
         return false;
@@ -5484,9 +5488,16 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
       CHECK_AND_ASSERT_MES(r, false, "Failed to validate attachments in tx " << tx_prefix_hash << ": incorrect extra_attachment_info in tx.extra");
     }
 
-    CHECK_AND_ASSERT_MES(check_tx_explicit_asset_id_rules(tx, all_tx_ins_have_explicit_native_asset_ids), false, "tx does not comply with explicit asset id rules");
+    CHECK_AND_ASSERT_MES(check_tx_explicit_asset_id_rules(tx, ctic.all_tx_ins_have_explicit_native_asset_ids), false, "tx does not comply with explicit asset id rules");
   }
   TIME_MEASURE_FINISH_PD(tx_check_inputs_attachment_check);
+
+  if (ctic.calculate_max_used_block_id)
+  {
+    CHECK_AND_ASSERT_MES(ctic.max_used_block_height < m_db_blocks.size(), false,  "internal error: max used block index=" << ctic.max_used_block_height << " is not less than blockchain size = " << m_db_blocks.size());
+    get_block_hash(m_db_blocks[ctic.max_used_block_height]->bl, ctic.max_used_block_id);
+  }
+
   return true;
 }
 //------------------------------------------------------------------
@@ -5620,7 +5631,7 @@ struct outputs_visitor
 };
 
 //------------------------------------------------------------------
-// Checks each referenced output for:
+// Checks each referenced output against the current blockchain state for:
 // 1) source tx unlock time validity
 // 2) mixin restrictions
 // 3) general gindex/ref_by_id corectness
@@ -5908,8 +5919,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   return check_input_signature(tx, in_index, txin.amount, txin.k_image, txin.etc_details, tx_prefix_hash, output_keys_ptrs);
 }
 //------------------------------------------------------------------
-bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_zc_input& zc_in, const crypto::hash& tx_prefix_hash,
-  uint64_t& max_related_block_height, bool& all_tx_ins_have_explicit_native_asset_ids) const
+bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_zc_input& zc_in, const crypto::hash& tx_prefix_hash, check_tx_inputs_context& ctic) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
@@ -5919,9 +5929,10 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   //
   std::vector<crypto::public_key> dummy_output_keys; // won't be used
   uint64_t dummy_source_max_unlock_time_for_pos_coinbase_dummy = 0; // won't be used
-  scan_for_keys_context scan_contex = AUTO_VAL_INIT(scan_contex);
+  scan_for_keys_context scan_contex{};
+  scan_contex.check_hf4_coinage_rule = ctic.check_hf4_coinage_rule;
 
-  if (!get_output_keys_for_input_with_checks(tx, zc_in, dummy_output_keys, max_related_block_height, dummy_source_max_unlock_time_for_pos_coinbase_dummy, scan_contex))
+  if (!get_output_keys_for_input_with_checks(tx, zc_in, dummy_output_keys, ctic.max_used_block_height, dummy_source_max_unlock_time_for_pos_coinbase_dummy, scan_contex))
   {
     LOG_PRINT_L0("get_output_keys_for_input_with_checks failed for input #" << in_index << ", key_offset.size = " << zc_in.key_offsets.size() << ")");
     return false;
@@ -5942,8 +5953,8 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   for(auto& zc_out : scan_contex.zc_outs)
   {
     ring.emplace_back(zc_out.stealth_address, zc_out.amount_commitment, zc_out.blinded_asset_id);
-    if (all_tx_ins_have_explicit_native_asset_ids && crypto::point_t(zc_out.blinded_asset_id).modify_mul8().to_public_key() != native_coin_asset_id)
-      all_tx_ins_have_explicit_native_asset_ids = false;
+    if (ctic.all_tx_ins_have_explicit_native_asset_ids && crypto::point_t(zc_out.blinded_asset_id).modify_mul8().to_public_key() != native_coin_asset_id)
+      ctic.all_tx_ins_have_explicit_native_asset_ids = false;
   }
 
   // calculate corresponding tx prefix hash
