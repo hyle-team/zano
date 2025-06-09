@@ -2612,7 +2612,8 @@ tx_pool_validation_and_chain_switch::tx_pool_validation_and_chain_switch()
 
 bool tx_pool_validation_and_chain_switch::generate(std::vector<test_event_entry>& events) const
 {
-  // Test idea: 
+  // Test idea: make shure that if a tx in the tx pool doesn't satisfy HF4 coinage rule, it won't be added to the block template
+  // UNTIL the current height is enough so the rule is obeyed.
 
   uint64_t ts = test_core_time::get_time();
   m_accounts.resize(TOTAL_ACCS_COUNT);
@@ -2627,9 +2628,10 @@ bool tx_pool_validation_and_chain_switch::generate(std::vector<test_event_entry>
   MAKE_TX(events, tx_0, miner_acc, alice_acc, MK_TEST_COINS(100), blk_0r);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
 
-  //  0 ... 10    21    22    23    24    25    26    27    28    29    30    31          <- height
-  // (0 )- (0r)- (1 )-                                                                    <- chain A
-  //       tx_0                           
+  //  0 ... 20    21    22    23    24    25    26    27    28    29    30    31          <- height
+  // (0 )- (0r)- {1 }- {2 }- {3 }- {4 }- {5 }- {6 }- {7 }- {8 }- {9 }- {10}- {11}-        <- chain M
+  //             tx_0           \                                            tx_a 
+  //                             - (4a)- {5a}- (6a)- {7a}-                                <- chain A
 
   MAKE_NEXT_POS_BLOCK(events, blk_2, blk_1, miner_acc, miner_stake_sources);
   MAKE_NEXT_POS_BLOCK(events, blk_3, blk_2, miner_acc, miner_stake_sources);
@@ -2648,27 +2650,27 @@ bool tx_pool_validation_and_chain_switch::generate(std::vector<test_event_entry>
   MAKE_NEXT_POS_BLOCK_TX1(events, blk_11, blk_10, miner_acc, miner_stake_sources, tx_a);
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
 
-  // construct chain B as PoW-PoS-PoW-PoS, it should win
-  MAKE_NEXT_BLOCK(events, blk_3a, blk_3, miner_acc);
-  MAKE_NEXT_POS_BLOCK(events, blk_4a, blk_3a, miner_acc, miner_stake_sources);
-  MAKE_NEXT_BLOCK(events, blk_5a, blk_4a, miner_acc);
-  MAKE_NEXT_POS_BLOCK(events, blk_6a, blk_5a, miner_acc, miner_stake_sources);
+  // construct chain A as PoW-PoS-PoW-PoS, it should win
+  MAKE_NEXT_BLOCK(events, blk_4a, blk_3, miner_acc);
+  MAKE_NEXT_POS_BLOCK(events, blk_5a, blk_4a, miner_acc, miner_stake_sources);
+  MAKE_NEXT_BLOCK(events, blk_6a, blk_5a, miner_acc);
+  MAKE_NEXT_POS_BLOCK(events, blk_7a, blk_6a, miner_acc, miner_stake_sources);
 
   // make sure it won
-  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_6a));
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_7a));
 
   // now tx_a should have been put back to the tx pool
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
 
   // the next block should be rejected, because of max_related_block_height=21 and the current height is 28
-  //DO_CALLBACK(events, "mark_invalid_block");
-  //MAKE_NEXT_BLOCK_TX1(events, blk_7a, blk_6a, miner_acc, tx_a);
+  DO_CALLBACK(events, "mark_invalid_block");
+  MAKE_NEXT_BLOCK_TX1(events, blk_8a, blk_7a, miner_acc, tx_a);
 
   // and if we clear tx pool ...
-  //DO_CALLBACK(events, "clear_tx_pool");
-  //DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
-  // and re-add the transaction on this height, it sould be added
-  //ADD_CUSTOM_EVENT(events, tx_a);
+  DO_CALLBACK(events, "clear_tx_pool");
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+  // and re-add the transaction on this height, it should be added
+  ADD_CUSTOM_EVENT(events, tx_a);
 
   // however, we need to make sure that tx pool won't be use tx_a in a block template until the height is good enough
   DO_CALLBACK(events, "c1");
@@ -2678,6 +2680,13 @@ bool tx_pool_validation_and_chain_switch::generate(std::vector<test_event_entry>
 
 bool tx_pool_validation_and_chain_switch::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
+  //  0 ... 20    21    22    23    24    25    26    27    28    29    30    31          <- height
+  // (0 )- (0r)- {1 }- {2 }- {3 }- {4 }- {5 }- {6 }- {7 }- {8 }- {9 }- {10}- {11}-        <- chain M
+  //             tx_0           \                                            tx_a 
+  //                             - (4a)- {5a}- (6a)- {7a}- (  )- (  )- (  )- (  )-        <- chain A
+  //                                                     |                   tx_a         tx_a re-added in A chain (in mine_next_pow_block_in_playtime() call)
+  //                                                     c1                               <- callback called
+
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
 
