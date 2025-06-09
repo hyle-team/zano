@@ -2835,7 +2835,7 @@ bool test_chain_unit_enchanced::check_top_block(currency::core& c, size_t ev_ind
 
 bool test_chain_unit_enchanced::clear_tx_pool(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  c.get_tx_pool().purge_transactions();
+  c.get_tx_pool().clear();
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool after purge_transactions(): " << c.get_pool_transactions_count());
   return true;
 }
