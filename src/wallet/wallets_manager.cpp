@@ -1375,6 +1375,10 @@ std::string wallets_manager::close_wallet(size_t wallet_id)
   {
     return std::string(API_RETURN_CODE_FAIL) + ":" + e.what();
   }
+  catch (...)
+  {
+    return API_RETURN_CODE_INTERNAL_ERROR;
+  }
   //m_pview->hide_wallet();
   return API_RETURN_CODE_OK;
 }
@@ -2201,12 +2205,15 @@ void wallets_manager::wallet_vs_options::worker_func()
   epee::math_helper::once_a_time_seconds<TX_POOL_SCAN_INTERVAL> scan_pool_interval;
   epee::math_helper::once_a_time_seconds<2> pos_minin_interval;
   view::wallet_status_info wsi = AUTO_VAL_INIT(wsi);
+  
+  wsi.wallet_state = view::wallet_status_info::wallet_state_synchronizing;
+  long_refresh_in_progress = true;
+
   while (!major_stop)
   {
     stop_for_refresh = false;
     try
     {
-      wsi.wallet_state = view::wallet_status_info::wallet_state_ready;
       if (m_pproxy_diagnostig_info->last_daemon_is_disconnected.load())
       {
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -2368,7 +2375,7 @@ void wallet_lock_time_watching_policy::watch_lock_time(uint64_t lock_time)
 {
   if (lock_time > 500)
   {
-    LOG_PRINT_RED_L0("[wallet_lock_time_watching_policy::watch_lock_time] LOCK_TIME: " << lock_time);
+    LOG_PRINT_RED_L0("[wallet_lock_time_watching_policy::watch_lock_time] LOCK_TIME: " << lock_time << "ms");
   }
 }
 

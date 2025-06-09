@@ -69,7 +69,7 @@ struct core_critical_error_handler_t : public currency::i_critical_error_handler
     LOG_ERROR(ENDL << ENDL << "Serious TIME sync problem detected, daemon will stop immediately" << ENDL << ENDL);
 
     // stop handling
-    dch.stop_handling();
+    p2psrv.send_stop_signal();
     return true; // the caller must stop processing
   }
 
@@ -193,6 +193,7 @@ int main(int argc, char* argv[])
 
   
 
+  std::string data_dir;
   po::variables_map vm;
   bool exit_requested = false;
   bool r = command_line::handle_error_helper(desc_options, [&]()
@@ -213,7 +214,7 @@ int main(int argc, char* argv[])
       return true;
     }
 
-    std::string data_dir = command_line::get_arg(vm, command_line::arg_data_dir);
+    data_dir = command_line::get_arg(vm, command_line::arg_data_dir);
     std::string config = command_line::get_arg(vm, command_line::arg_config_file);
 
     boost::filesystem::path data_dir_path(epee::string_encoding::utf8_to_wstring(data_dir));
@@ -240,17 +241,11 @@ int main(int argc, char* argv[])
     return EXIT_SUCCESS;
 
   //set up logging options
-  std::string log_dir;
+  std::string log_dir = data_dir;
   std::string log_file_name = log_space::log_singletone::get_default_log_file();
   //check if there was specific option
   if (command_line::has_arg(vm, command_line::arg_log_dir))
-  {
     log_dir = command_line::get_arg(vm, command_line::arg_log_dir);
-  }
-  else
-  {
-    log_dir = command_line::get_arg(vm, command_line::arg_data_dir);
-  }
 
   log_space::log_singletone::add_logger(LOGGER_FILE, log_file_name.c_str(), log_dir.c_str());
   LOG_PRINT_L0(CURRENCY_NAME << " v" << PROJECT_VERSION_LONG);
@@ -264,7 +259,7 @@ int main(int argc, char* argv[])
 
   // stratum server is enabled if any of its options present
   bool stratum_enabled = currency::stratum_server::should_start(vm);
-  LOG_PRINT("Module folder: " << argv[0], LOG_LEVEL_0);
+  LOG_PRINT("Module folder: " << argv[0] << ", data folder: " << data_dir, LOG_LEVEL_0);
 
   //create objects and link them
   bc_services::bc_offers_service offers_service(nullptr);
@@ -300,8 +295,8 @@ int main(int argc, char* argv[])
   if (command_line::has_arg(vm, command_line::arg_generate_rpc_autodoc))
   {
     std::string path_to_generate = command_line::get_arg(vm, command_line::arg_generate_rpc_autodoc);
-
-    if (!generate_doc_as_md_files(path_to_generate, rpc_server))
+    std::string auto_doc_sufix = "<sub>Auto-doc built with: " PROJECT_VERSION_LONG "</sub>";
+    if (!generate_doc_as_md_files(path_to_generate, rpc_server, auto_doc_sufix))
       return 1;
     return 0;
   }
@@ -414,10 +409,14 @@ int main(int argc, char* argv[])
     LOG_PRINT_MAGENTA("[Warp]: Warm up finished!", LOG_LEVEL_0);
   }
 
-  // start components
-  if (!command_line::has_arg(vm, command_line::arg_console))
+  //detect if console is available
+  if (isatty(fileno(stdin)))
   {
-    dch.start_handling();
+    // start components
+    if (!command_line::has_arg(vm, command_line::arg_console))
+    {
+      dch.start_handling();
+    }
   }
 
   uint32_t rpc_threads_count = RPC_SERVER_DEFAULT_THREADS_NUM;

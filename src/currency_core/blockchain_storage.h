@@ -150,9 +150,19 @@ namespace currency
 
     struct scan_for_keys_context
     {
-      bool htlc_is_expired;
-      std::list<txout_htlc> htlc_outs;
-      std::list<tx_out_zarcanum> zc_outs;
+      bool check_hf4_coinage_rule = true;                      // input
+      bool htlc_is_expired;                                    // output
+      std::list<txout_htlc> htlc_outs;                         // output, legacy
+      std::list<tx_out_zarcanum> zc_outs;                      // output
+    };
+
+    struct check_tx_inputs_context
+    {
+      bool check_hf4_coinage_rule = true;                      // input
+      bool calculate_max_used_block_id = false;                // input
+      crypto::hash max_used_block_id{};                        // output
+      uint64_t max_used_block_height = 0;                      // output
+      bool all_tx_ins_have_explicit_native_asset_ids = true;   // output
     };
 
     // == Output indexes local lookup table conception ==
@@ -283,6 +293,8 @@ namespace currency
     bool create_block_template(const create_block_template_params& params, create_block_template_response& resp) const;
 
     bool have_block(const crypto::hash& id) const;
+    bool have_block_main(const crypto::hash& id) const;
+    bool have_block_alt(const crypto::hash& id) const;
     size_t get_total_transactions()const;
     bool get_outs(uint64_t amount, std::list<crypto::public_key>& pkeys)const;
     bool get_short_chain_history(std::list<crypto::hash>& ids)const;
@@ -314,8 +326,8 @@ namespace currency
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_htlc& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
-    bool check_tx_input(const transaction& tx, size_t in_index, const txin_zc_input& zc_in, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, bool& all_tx_ins_have_explicit_native_asset_ids) const;
-    bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height)const;
+    bool check_tx_input(const transaction& tx, size_t in_index, const txin_zc_input& zc_in, const crypto::hash& tx_prefix_hash, check_tx_inputs_context& ctic) const;
+    bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, check_tx_inputs_context& ctic)const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash) const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height, crypto::hash& max_used_block_id)const;
     bool check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const transaction& source_tx, size_t out_n) const;
@@ -339,6 +351,7 @@ namespace currency
     bool is_multisig_output_spent(const crypto::hash& multisig_id) const;
     boost::multiprecision::uint128_t total_coins()const;
     bool is_pos_allowed()const;
+    bool is_non_pruning_mode_enabled() const { return m_non_pruning_mode_enabled; }
     uint64_t get_tx_fee_median()const;
     uint64_t get_tx_fee_window_value_median() const;
     uint64_t get_tx_expiration_median() const;
@@ -514,6 +527,8 @@ namespace currency
     //experimental
     void do_full_db_warm_up() const;
     void on_hardfork_activated(size_t hardfork_id);
+    void print_db_l2_cache_state() const;
+    std::string get_db_l2_cache_state_str() const;
 
   private:
 
@@ -589,6 +604,7 @@ namespace currency
 
     std::atomic<bool> m_is_in_checkpoint_zone;
     std::atomic<bool> m_is_blockchain_storing;
+    bool m_non_pruning_mode_enabled;
 
     std::string m_config_folder;
     //events
@@ -921,13 +937,13 @@ namespace currency
       ++output_index;
     }
 
-    if (m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, this->get_current_blockchain_size()))
+    if (scan_context.check_hf4_coinage_rule && m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, this->get_current_blockchain_size()))
     { 
       //with hard fork 4 make it network rule to have at least 10 confirmations
       
       if (this->get_current_blockchain_size() - max_related_block_height < CURRENCY_HF4_MANDATORY_MIN_COINAGE)
       {
-        LOG_ERROR("Coinage rule broken(mainblock): h = " << this->get_current_blockchain_size() << ", max_related_block_height=" << max_related_block_height << ", tx: " << get_transaction_hash(validated_tx));
+        LOG_ERROR("Coinage rule is broken (mainblock): current blockchain size = " << this->get_current_blockchain_size() << ", max_related_block_height = " << max_related_block_height << ", tx: " << get_transaction_hash(validated_tx));
         return false;
       }
     }

@@ -93,7 +93,7 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::check_tx_fee(const transaction &tx, uint64_t amount_fee)
+  bool tx_memory_pool::check_tx_fee(const transaction &tx, uint64_t amount_fee) const
   {
     if (amount_fee < m_blockchain.get_core_runtime_config().tx_pool_min_fee)
       return false;
@@ -227,9 +227,10 @@ namespace currency
     TIME_MEASURE_FINISH_PD(check_keyimages_ws_ms_time);
 
     TIME_MEASURE_START_PD(check_inputs_time);
-    crypto::hash max_used_block_id = null_hash;
-    uint64_t max_used_block_height = 0;
-    bool ch_inp_res = m_blockchain.check_tx_inputs(tx, id, max_used_block_height, max_used_block_id);
+    blockchain_storage::check_tx_inputs_context ctic{};
+    ctic.calculate_max_used_block_id = true;
+    ctic.check_hf4_coinage_rule = false;
+    bool ch_inp_res = m_blockchain.check_tx_inputs(tx, id, ctic);
     if (!ch_inp_res && !kept_by_block && !from_core)
     {
       LOG_PRINT_L0("check_tx_inputs failed, tx rejected");
@@ -255,7 +256,7 @@ namespace currency
       }
     }
 
-    do_insert_transaction(tx, id, blob_size, kept_by_block, tx_fee, ch_inp_res ? max_used_block_id : null_hash, ch_inp_res ? max_used_block_height : 0);
+    do_insert_transaction(tx, id, blob_size, kept_by_block, tx_fee, ch_inp_res ? ctic.max_used_block_id : null_hash, ch_inp_res ? ctic.max_used_block_height : 0);
     
     TIME_MEASURE_FINISH_PD(tx_processing_time);
     tvc.m_added_to_pool = true;
@@ -389,6 +390,7 @@ namespace currency
         return false; // stop handling
       }
 
+#ifndef TESTNET
       std::string prev_alias = m_blockchain.get_alias_by_address(eai.m_address);
       if (!is_in_block && !eai.m_sign.size() &&
         prev_alias.size())
@@ -399,6 +401,7 @@ namespace currency
         r = false;
         return false; // stop handling
       }
+#endif
 
       if (!is_in_block)
       {
@@ -723,15 +726,26 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------------------------
+  std::string tx_memory_pool::get_blacklisted_txs_string() const
+  {
+    std::stringstream ss;
+    m_db_black_tx_list.enumerate_items([&](uint64_t i, const crypto::hash& td_id, const bool& /*dummy */ )
+      {
+        ss << td_id << ENDL;
+        return true;
+      });
+    return ss.str();
+  }
+  //---------------------------------------------------------------------------------
   bool tx_memory_pool::add_transaction_to_black_list(const transaction& tx)
   {
     // atm:
     // 1) the only side effect of a tx being blacklisted is the one is just ignored by fill_block_template(), but it still can be added to blockchain/pool
     // 2) it's permanent
-    LOG_PRINT_YELLOW("TX ADDED TO POOL'S BLACKLIST: " << get_transaction_hash(tx), LOG_LEVEL_0);
     m_db.begin_transaction();
     m_db_black_tx_list.set(get_transaction_hash(tx), true);
     m_db.commit_transaction();
+    LOG_PRINT_YELLOW("TX ADDED TO POOL'S BLACKLIST: " << get_transaction_hash(tx) << ", full black list: " << ENDL << get_blacklisted_txs_string(), LOG_LEVEL_0);
     return true;
   }
   //---------------------------------------------------------------------------------
@@ -908,8 +922,12 @@ namespace currency
   {
     //not the best implementation at this time, sorry :(
 
-    if (is_tx_blacklisted(get_transaction_hash(txd.tx)))
+    if (is_tx_blacklisted(id))
+    {
+      LOG_PRINT_L2("[is_transaction_ready_to_go]Tx " << id << " skipped as it blacklisted");
       return false;
+    }
+      
 
     //check is ring_signature already checked ?
     if(txd.max_used_block_id == null_hash)
@@ -918,13 +936,18 @@ namespace currency
       if(txd.last_failed_id != null_hash && m_blockchain.get_current_blockchain_size() > txd.last_failed_height && txd.last_failed_id == m_blockchain.get_block_id_by_height(txd.last_failed_height))
         return false;//we already sure that this tx is broken for this height
 
-      if(!m_blockchain.check_tx_inputs(txd.tx, id, txd.max_used_block_height, txd.max_used_block_id))
+      blockchain_storage::check_tx_inputs_context ctic{};
+      ctic.check_hf4_coinage_rule = false;
+      if(!m_blockchain.check_tx_inputs(txd.tx, id, ctic))
       {
         txd.last_failed_height = m_blockchain.get_top_block_height();
         txd.last_failed_id = m_blockchain.get_block_id_by_height(txd.last_failed_height);
         return false;
       }
-    }else
+      txd.max_used_block_height = ctic.max_used_block_height;
+      txd.max_used_block_id = ctic.max_used_block_id;
+    }
+    else
     {
       if(txd.max_used_block_height >= m_blockchain.get_current_blockchain_size())
         return false;
@@ -934,14 +957,22 @@ namespace currency
         if(txd.last_failed_id == m_blockchain.get_block_id_by_height(txd.last_failed_height))
           return false;
         //check ring signature again, it is possible (with very small chance) that this transaction become again valid
-        if(!m_blockchain.check_tx_inputs(txd.tx, id, txd.max_used_block_height, txd.max_used_block_id))
+        blockchain_storage::check_tx_inputs_context ctic{};
+        ctic.check_hf4_coinage_rule = false;
+        if(!m_blockchain.check_tx_inputs(txd.tx, id, ctic))
         {
           txd.last_failed_height = m_blockchain.get_top_block_height();
           txd.last_failed_id = m_blockchain.get_block_id_by_height(txd.last_failed_height);
           return false;
         }
+        txd.max_used_block_height = ctic.max_used_block_height;
+        txd.max_used_block_id = ctic.max_used_block_id;
       }
     }
+
+    if (txd.tx.version > TRANSACTION_VERSION_PRE_HF4 && m_blockchain.get_current_blockchain_size() < txd.max_used_block_height + CURRENCY_HF4_MANDATORY_MIN_COINAGE) // coinage rule since HF4, s.a. scan_outputkeys_for_indexes()
+      return false;
+
     //if we here, transaction seems valid, but, anyway, check for key_images collisions with blockchain, just to be sure
     if (m_blockchain.have_tx_keyimges_as_spent(txd.tx))
     {
@@ -1193,13 +1224,14 @@ namespace currency
         if (i < best_position)
         {
           bl.tx_hashes.push_back(tx.first);
+          LOG_PRINT_L2("[fill_block_template]: Added tx to block: " << tx.first);
         }
-        else if (have_attachment_service_in_container(tx.second->tx.attachment, BC_OFFERS_SERVICE_ID, BC_OFFERS_SERVICE_INSTRUCTION_DEL))
+        /*else if (have_attachment_service_in_container(tx.second->tx.attachment, BC_OFFERS_SERVICE_ID, BC_OFFERS_SERVICE_INSTRUCTION_DEL))
         {
           // BC_OFFERS_SERVICE_INSTRUCTION_DEL transactions has zero fee, so include them here regardless of reward effectiveness
           bl.tx_hashes.push_back(tx.first);
           total_size += tx.second->blob_size;
-        }
+        }*/
       }
     }
     // add explicit transactions 

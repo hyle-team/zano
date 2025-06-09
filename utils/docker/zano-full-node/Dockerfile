@@ -48,11 +48,11 @@ RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 700 --slave /u
 WORKDIR /root
 
 # Lib Settings
-ARG CMAKE_VERSION_DOT=3.16.9
+ARG CMAKE_VERSION_DOT=3.26.3
 ARG CMAKE_HASH=d71eda07d6ecf3964de65a0e36d0b171565e1aced56ba9f53ca3783406b5cacf
 
-ARG BOOST_VERSION=1_70_0
-ARG BOOST_VERSION_DOT=1.70.0
+ARG BOOST_VERSION=1_84_0
+ARG BOOST_VERSION_DOT=1.84.0
 ARG BOOST_HASH=430ae8354789de4fd19ee52f3b1f739e1fba576f0aded0897c3c2bc00fb38778
 
 ARG OPENSSL_VERSION_DOT=1.1.1w
@@ -88,10 +88,10 @@ RUN curl https://www.openssl.org/source/openssl-${OPENSSL_VERSION_DOT}.tar.gz -O
 # Compile CMake
 RUN set -ex \
     && mkdir /opt/cmake \
-    && sh cmake-3.16.9-Linux-x86_64.sh --prefix=/opt/cmake --skip-license\
+    && sh cmake-${CMAKE_VERSION_DOT}-Linux-x86_64.sh --prefix=/opt/cmake --skip-license\
     && ln -s /opt/cmake/bin/cmake /usr/local/bin/cmake\
     && cmake --version\
-    && rm cmake-3.16.9-Linux-x86_64.sh
+    && rm cmake-${CMAKE_VERSION_DOT}-Linux-x86_64.sh
 
 # Compile Boost
 RUN set -ex \

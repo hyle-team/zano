@@ -44,6 +44,37 @@
     ok_response.result.return_code = API_RETURN_CODE_UNINITIALIZED; \
     return sanitized_store_to_json(ok_response); \
   }
+
+#define PLAIN_WALLET_BEGIN_TRY_ENTRY()     try {
+#define PLAIN_WALLET_CATCH()     } \
+        catch (const std::exception& e) \
+        { \
+          LOG_ERROR("Exception during plain wallet call [" << __func__ << "]: " << e.what()); \
+          epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response); \
+          ok_response.result.return_code = std::string(API_RETURN_CODE_INTERNAL_ERROR) + " " + e.what(); \
+          return sanitized_store_to_json(ok_response); \
+        } \
+        catch (...) \
+        { \
+          LOG_ERROR("Unknown exception during plain wallet call [" << __func__ << "]"); \
+          epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response); \
+          ok_response.result.return_code = API_RETURN_CODE_INTERNAL_ERROR; \
+          return sanitized_store_to_json(ok_response); \
+        } 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 namespace plain_wallet
 {
   void deinit();
@@ -69,10 +100,12 @@ namespace plain_wallet
     std::atomic<bool> initialized = false;
     std::atomic<bool> postponed_run_wallet = false;
     std::atomic<bool> postponed_main_worked_started = false;
+    callback_type m_callback = nullptr;
 
     std::atomic<uint64_t> gjobs_counter;
     std::map<uint64_t, std::string> gjobs;
     epee::critical_section gjobs_lock;
+    tools::default_http_core_proxy m_common_daemon_proxy;
   };
 
   std::shared_ptr<plain_wallet::plain_wallet_instance> ginstance_ptr;
@@ -185,11 +218,13 @@ namespace plain_wallet
 
   std::string reset()
   {
+    PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
     inst_ptr->gwm.quick_clear_wallets_no_save();
     epee::json_rpc::response<view::api_responce_return_code, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
     ok_response.result.return_code = API_RETURN_CODE_OK;
     return sanitized_store_to_json(ok_response);
+    PLAIN_WALLET_CATCH();
   }
 
 
@@ -248,6 +283,8 @@ namespace plain_wallet
       }
       ptr->postponed_main_worked_started = true;
     }
+
+    ptr->m_common_daemon_proxy.set_connection_addr(ip + ":" + port);
 
     LOG_PRINT_L0("[INIT PLAIN_WALLET_INSTANCE] Ver:" << PROJECT_VERSION_LONG << "(" << BUILD_TYPE << ")" << ENDL << "Working dir: " << working_dir << ENDL << "URL: " << ip << ",  port: " << port);
 
@@ -356,9 +393,11 @@ namespace plain_wallet
 
   std::string get_connectivity_status()
   {
+    PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
 
     return inst_ptr->gwm.get_connectivity_status();
+    PLAIN_WALLET_CATCH();
   }
 
   std::string get_version()
@@ -454,6 +493,7 @@ namespace plain_wallet
 
   std::string open(const std::string& path, const std::string& password)
   {
+    PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
 
     std::string full_path = get_wallets_folder() + path;
@@ -474,11 +514,13 @@ namespace plain_wallet
     }
     error_response err_result = AUTO_VAL_INIT(err_result);
     err_result.error.code = rsp;
-    return sanitized_store_to_json(err_result);
+    return sanitized_store_to_json(err_result); 
+    PLAIN_WALLET_CATCH();
   }
 
   std::string restore(const std::string& seed, const std::string& path, const std::string& password, const std::string& seed_password)
   {
+    PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
 
     std::string full_path = get_wallets_folder() + path;
@@ -499,10 +541,12 @@ namespace plain_wallet
     error_response err_result = AUTO_VAL_INIT(err_result);
     err_result.error.code = rsp;
     return sanitized_store_to_json(err_result);
+    PLAIN_WALLET_CATCH();
   }
 
   std::string generate(const std::string& path, const std::string& password)
   {
+    PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
 
     std::string full_path = get_wallets_folder() + path;
@@ -523,36 +567,45 @@ namespace plain_wallet
     error_response err_result = AUTO_VAL_INIT(err_result);
     err_result.error.code = rsp;
     return sanitized_store_to_json(err_result);
+    PLAIN_WALLET_CATCH();
   }
 
   std::string get_opened_wallets()
   {
+    PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
     epee::json_rpc::response<std::list<view::open_wallet_response>, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
     inst_ptr->gwm.get_opened_wallets(ok_response.result);
     return sanitized_store_to_json(ok_response);
+    PLAIN_WALLET_CATCH();
   }
 
   std::string close_wallet(hwallet h)
   {
+    PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
 
     std::string r = "{\"response\": \"";
     r += inst_ptr->gwm.close_wallet(h);
     r += "\"}";
     return r;
+    PLAIN_WALLET_CATCH();
   }
 
   std::string get_wallet_status(hwallet h)
   {
+    PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
     return inst_ptr->gwm.get_wallet_status(h);
+    PLAIN_WALLET_CATCH();
   }
 
   std::string invoke(hwallet h, const std::string& params)
   {
+    PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
     return inst_ptr->gwm.invoke(h, params);
+    PLAIN_WALLET_CATCH();
   }
 
   void put_result(uint64_t job_id, const std::string& res)
@@ -562,20 +615,40 @@ namespace plain_wallet
     {
       return;
     }
-    CRITICAL_REGION_LOCAL(inst_ptr->gjobs_lock);
-    inst_ptr->gjobs[job_id] = res;
-    LOG_PRINT_L2("[ASYNC_CALL]: Finished(result put), job id: " << job_id);
+    if (inst_ptr->m_callback)
+    {
+      inst_ptr->m_callback(job_id, res);
+      LOG_PRINT_L2("[ASYNC_CALL]: Finished(result caalback), job id: " << job_id);
+    }
+    else
+    {
+      CRITICAL_REGION_LOCAL(inst_ptr->gjobs_lock);
+      inst_ptr->gjobs[job_id] = res;
+      LOG_PRINT_L2("[ASYNC_CALL]: Finished(result put), job id: " << job_id);
+    }
   }
 
+  void set_callback(callback_type callback)
+  {
+    auto inst_ptr = std::atomic_load(&ginstance_ptr);
+    if (!inst_ptr)
+    {
+      return;
+    }
+    inst_ptr->m_callback = callback;
+  }
 
   std::string async_call(const std::string& method_name, uint64_t instance_id, const std::string& params)
   {
+    PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
     std::function<void()> async_callback;
 
     uint64_t job_id = inst_ptr->gjobs_counter++;
     async_callback = [job_id, instance_id, method_name, params]()
     {
+      ON_FUNC_EXIT([&]() {LOG_PRINT_L2("Worker for job " << job_id << " finished"); });
+      
       std::string res_str = sync_call(method_name,  instance_id, params);
       put_result(job_id, res_str);
     };
@@ -584,10 +657,12 @@ namespace plain_wallet
     t.detach();
     LOG_PRINT_L2("[ASYNC_CALL]: started " << method_name << ", job id: " << job_id);
     return std::string("{ \"job_id\": ") + std::to_string(job_id) + "}";
+    PLAIN_WALLET_CATCH();
   }
 
   std::string handle_reset_connection_url(const std::string& url)
   {
+    PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
     inst_ptr->gwm.set_remote_node_url(url);
 
@@ -596,10 +671,43 @@ namespace plain_wallet
     view::api_response ar = AUTO_VAL_INIT(ar);
     ar.error_code = API_RETURN_CODE_OK;
     return sanitized_store_to_json(ar);
+    PLAIN_WALLET_CATCH();
   }
+
+  std::string handle_proxy_to_daemon(const std::string& data)
+  {
+    PLAIN_WALLET_BEGIN_TRY_ENTRY();
+    GET_INSTANCE_PTR(inst_ptr);
+    tools::wallet_public::COMMAND_PROXY_TO_DAEMON::request req;
+    tools::wallet_public::COMMAND_PROXY_TO_DAEMON::response res;
+
+    if (!epee::serialization::load_t_from_json(req, data))
+    {
+      view::api_response ar = AUTO_VAL_INIT(ar);
+      ar.error_code = API_RETURN_CODE_BAD_ARG_INVALID_JSON;
+      return sanitized_store_to_json(ar);
+    }
+
+    std::string buff = epee::string_encoding::base64_decode(req.base64_body);
+    int response_code = 0;
+    std::string response_body;
+    if (!inst_ptr->m_common_daemon_proxy.call_COMMAND_RPC_INVOKE(req.uri, buff, response_code, response_body))
+    {
+      view::api_response ar = AUTO_VAL_INIT(ar);
+      ar.error_code = API_RETURN_CODE_FAIL;
+      return sanitized_store_to_json(ar);
+    }
+    res.base64_body = epee::string_encoding::base64_encode(response_body);
+    res.response_code = response_code;
+    return sanitized_store_to_json(res);
+    PLAIN_WALLET_CATCH();
+  }
+
+  
 
   std::string handle_run_wallet(uint64_t instance_id)
   {
+    PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
 
 
@@ -617,10 +725,12 @@ namespace plain_wallet
     view::api_response ar = AUTO_VAL_INIT(ar);
     ar.error_code = inst_ptr->gwm.run_wallet(instance_id);
     return sanitized_store_to_json(ar);
+    PLAIN_WALLET_CATCH();
   }
 
   std::string handle_configure(const std::string& settings_json)
   {
+    PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
     configure_object conf = AUTO_VAL_INIT(conf);
     configure_response conf_resp = AUTO_VAL_INIT(conf_resp);
@@ -633,88 +743,113 @@ namespace plain_wallet
     inst_ptr->postponed_run_wallet = conf.postponed_run_wallet;
     conf_resp.status = API_RETURN_CODE_OK;
     return sanitized_store_to_json(conf_resp);
+    PLAIN_WALLET_CATCH();
   }
 
   std::string sync_call(const std::string& method_name, uint64_t instance_id, const std::string& params)
   {
     std::string res;
-    if (method_name == "close")
-    {
+    try {
+
+      if (method_name == "close")
+      {
         close_wallet(instance_id);
         view::api_responce_return_code rc = AUTO_VAL_INIT(rc);
         rc.return_code = API_RETURN_CODE_OK;
         res = sanitized_store_to_json(rc);
-    }
-    else if (method_name == "open")
-    {
-      view::open_wallet_request owr = AUTO_VAL_INIT(owr);
-      if (!epee::serialization::load_t_from_json(owr, params))
-      {
-        view::api_response ar = AUTO_VAL_INIT(ar);
-        ar.error_code = "Wrong parameter";
-        res = sanitized_store_to_json(ar);
-      }else
-      {
-        res = open(owr.path, owr.pass);
       }
-    }
-    else if (method_name == "restore")
-    {
-      view::restore_wallet_request rwr = AUTO_VAL_INIT(rwr);
-      if (!epee::serialization::load_t_from_json(rwr, params))
+      else if (method_name == "open")
       {
-        view::api_response ar = AUTO_VAL_INIT(ar);
-        ar.error_code = "Wrong parameter";
-        res = sanitized_store_to_json(ar);
+        view::open_wallet_request owr = AUTO_VAL_INIT(owr);
+        if (!epee::serialization::load_t_from_json(owr, params))
+        {
+          view::api_response ar = AUTO_VAL_INIT(ar);
+          ar.error_code = "Wrong parameter";
+          res = sanitized_store_to_json(ar);
+        }
+        else
+        {
+          res = open(owr.path, owr.pass);
+        }
+      }
+      else if (method_name == "restore")
+      {
+        view::restore_wallet_request rwr = AUTO_VAL_INIT(rwr);
+        if (!epee::serialization::load_t_from_json(rwr, params))
+        {
+          view::api_response ar = AUTO_VAL_INIT(ar);
+          ar.error_code = "Wrong parameter";
+          res = sanitized_store_to_json(ar);
+        }
+        else
+        {
+          res = restore(rwr.seed_phrase, rwr.path, rwr.pass, rwr.seed_pass);
+        }
+      }
+      else if (method_name == "get_seed_phrase_info")
+      {
+        view::seed_info_param sip = AUTO_VAL_INIT(sip);
+        if (!epee::serialization::load_t_from_json(sip, params))
+        {
+          view::api_response ar = AUTO_VAL_INIT(ar);
+          ar.error_code = "Wrong parameter";
+          res = sanitized_store_to_json(ar);
+        }
+        else
+        {
+          view::api_response_t<view::seed_phrase_info> rsp = AUTO_VAL_INIT(rsp);
+          rsp.error_code = tools::get_seed_phrase_info(sip.seed_phrase, sip.seed_password, rsp.response_data);
+          res = sanitized_store_to_json(rsp);
+        }
+      }
+      else if (method_name == "invoke")
+      {
+        res = invoke(instance_id, params);
+      }
+      else if (method_name == "get_wallet_status")
+      {
+        res = get_wallet_status(instance_id);
+      }
+      else if (method_name == "configure")
+      {
+        res = handle_configure(params);
+      }
+      else if (method_name == "reset_connection_url")
+      {
+        res = handle_reset_connection_url(params);
+      }
+      else if (method_name == "run_wallet")
+      {
+        res = handle_run_wallet(instance_id);
+      }
+      else if (method_name == "proxy_to_daemon")
+      {
+        res = handle_proxy_to_daemon(params);
       }
       else
       {
-        res = restore(rwr.seed_phrase, rwr.path, rwr.pass, rwr.seed_pass);
-      }
-    }
-    else if (method_name == "get_seed_phrase_info")
-    {
-      view::seed_info_param sip = AUTO_VAL_INIT(sip);
-      if (!epee::serialization::load_t_from_json(sip, params))
-      {
         view::api_response ar = AUTO_VAL_INIT(ar);
-        ar.error_code = "Wrong parameter";
+        ar.error_code = "UNKNOWN METHOD";
         res = sanitized_store_to_json(ar);
       }
-      else
-      {
-        view::api_response_t<view::seed_phrase_info> rsp = AUTO_VAL_INIT(rsp);
-        rsp.error_code = tools::get_seed_phrase_info(sip.seed_phrase, sip.seed_password, rsp.response_data);
-        res = sanitized_store_to_json(rsp);
-      }
-    }    
-    else if (method_name == "invoke")
-    {
-      res = invoke(instance_id, params);
+      return res;
     }
-    else if (method_name == "get_wallet_status")
+    catch (const std::exception& ex)
     {
-      res = get_wallet_status(instance_id);
-    }
-    else if (method_name == "configure")
-    {
-      res = handle_configure(params);
-    }
-    else if (method_name == "reset_connection_url")
-    {
-      res = handle_reset_connection_url(params);
-    }
-    else if (method_name == "run_wallet")
-    {
-      res = handle_run_wallet(instance_id);
-    }
-    else
-    {
+      LOG_ERROR("Exception during method call: " << method_name << ", instance id:" << instance_id << ", params: " << ENDL << params << ENDL << "exception text: " << ex.what());
       view::api_response ar = AUTO_VAL_INIT(ar);
-      ar.error_code = "UNKNOWN METHOD";
+      ar.error_code = std::string("EXCEPTION: ") + ex.what();
       res = sanitized_store_to_json(ar);
+      return res;
     }
-    return res;
+    catch (...)
+    {
+      LOG_ERROR("Unknown exception during method call: " << method_name << ", instance id:" << instance_id << ", params: " << ENDL << params);
+      view::api_response ar = AUTO_VAL_INIT(ar);
+      ar.error_code = "UNKONW_EXCEPTION";
+      res = sanitized_store_to_json(ar);
+      return res;
+    }
   }
 
   std::string try_pull_result(uint64_t job_id)
@@ -751,16 +886,20 @@ namespace plain_wallet
 
   std::string get_wallet_info(hwallet h)
   {
+    PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
     wallet_extended_info wei = AUTO_VAL_INIT(wei);
     inst_ptr->gwm.get_wallet_info(h, wei.wi);
     inst_ptr->gwm.get_wallet_info_extra(h, wei.wi_extended);
     return sanitized_store_to_json(wei);
+    PLAIN_WALLET_CATCH();
   }
   std::string reset_wallet_password(hwallet h, const std::string& password)
   {
+    PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
     return inst_ptr->gwm.reset_wallet_password(h, password);
+    PLAIN_WALLET_CATCH();
   }
 
 

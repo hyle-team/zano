@@ -1233,6 +1233,7 @@ namespace currency
     if (tx.version > TRANSACTION_VERSION_PRE_HF4)
     {
       // create tx_out_zarcanum
+      CHECK_AND_ASSERT_MES(de.addr.size() != 0, false, "cannot construct tx output: empty addr vector was given");
       CHECK_AND_ASSERT_MES(de.addr.size() == 1, false, "zarcanum multisig not implemented for tx_out_zarcanum yet");
       // TODO @#@# implement multisig support
 
@@ -1444,8 +1445,8 @@ namespace currency
     uint64_t tx_version,
     size_t tx_hardfork_id,
     uint64_t unlock_time,
-    uint8_t tx_outs_attr, 
-    bool shuffle)
+    uint8_t tx_outs_attr /* = CURRENCY_TO_KEY_OUT_RELAXED */, 
+    bool shuffle /* = true */)
   {
     crypto::secret_key one_time_secret_key{};
     return construct_tx(sender_account_keys, sources, destinations, std::vector<extra_v>(), attachments, tx, tx_version, tx_hardfork_id, one_time_secret_key, unlock_time, tx_outs_attr, shuffle);
@@ -2319,7 +2320,9 @@ namespace currency
       }
       else
       {
-        CHECK_AND_ASSERT_THROW_MES(!ado.opt_descriptor.has_value(), "Internal error: opt_descriptor unset during ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN for version less then 2");
+        if (ado.opt_descriptor.has_value())
+          LOG_PRINT_YELLOW("\nWARNING: opt_descriptor is set for ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN when ado.version is >= 2\n", LOG_LEVEL_0);
+
         ado.opt_amount = amount_of_burned_assets;       // TODO: support hidden supply -- sowle
       }
       
@@ -2355,7 +2358,9 @@ namespace currency
         }
         else
         {
-          CHECK_AND_ASSERT_THROW_MES(!ado.opt_descriptor.has_value(), "Internal error: opt_descriptor unset during ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN for version less then 2");
+          if (ado.opt_descriptor.has_value())
+            LOG_PRINT_YELLOW("\nWARNING: opt_descriptor is set for ASSET_DESCRIPTOR_OPERATION_EMIT when ado.version is >= 2\n", LOG_LEVEL_0);
+
           ado.opt_amount = amount_of_emitted_asset;       // TODO: support hidden supply -- sowle
         }
 
@@ -2407,6 +2412,7 @@ namespace currency
       tx.vout.clear();
       tx.extra = extra;
       tx.signatures.clear();
+      tx.proofs.clear();
 
       tx.version = ftp.tx_version;
       if (tx.version >= TRANSACTION_VERSION_POST_HF5)
@@ -2417,7 +2423,7 @@ namespace currency
 
       if (flags != 0)
         set_tx_flags(tx, flags);
-      //generate key pair  
+
       if (expiration_time != 0)
         set_tx_expiration_time(tx, expiration_time);
     }

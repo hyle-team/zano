@@ -27,12 +27,48 @@
 #include "wallet/plain_wallet_api.h"  
 #include "wallet/view_iface.h"
 #include "wallet/plain_wallet_api_defs.h"
+#include "math_helper.h"
   
 PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4244)
 #include "jwt-cpp/jwt.h"
 POP_VS_WARNINGS
 
+
+
+void test_base64_serialization()
+{
+  currency::COMMAND_RPC_GET_POOL_TXS_DETAILS::response rsp;
+  rsp.txs.resize(1);
+  rsp.txs.back().blob.resize(4000);
+  crypto::generate_random_bytes(rsp.txs.back().blob.size(), (void*)rsp.txs.back().blob.data());
+
+  std::string str_json;
+  epee::serialization::store_t_to_json(rsp, str_json);
+
+  currency::COMMAND_RPC_GET_POOL_TXS_DETAILS::response rsp2;
+  bool res = epee::serialization::load_t_from_json(rsp2, str_json);
+  if (rsp.txs.back().blob != rsp2.txs.back().blob)
+  {
+    LOG_PRINT_L0("Troubles");
+  }
+    
+}
+
+
+void test_tx_json_serialization()
+{
+  currency::transaction tx{};
+
+  tx.version = CURRENT_TRANSACTION_VERSION;
+  currency::asset_descriptor_operation ado{};
+  ado.version = ASSET_DESCRIPTOR_OPERATION_LAST_VER;
+  ado.opt_asset_id = currency::null_pkey;
+  currency::asset_descriptor_base adb{};
+  ado.opt_descriptor = adb;
+  tx.extra.push_back(ado);
+  std::string json_tx = currency::obj_to_json_str(tx);
+}
 
 void test_plain_wallet()
 {
@@ -43,14 +79,29 @@ void test_plain_wallet()
   
   plain_wallet::configure_object conf = AUTO_VAL_INIT(conf);
   //plain_wallet::configure_response conf_resp = AUTO_VAL_INIT(conf_resp);
-  conf.postponed_run_wallet = true;
+  //conf.postponed_run_wallet = true;
   std::string r = plain_wallet::sync_call("configure", 0, epee::serialization::store_t_to_json(conf));
   
-  std::string seed;
-  if (!epee::file_io_utils::load_file_to_string("C:\\Users\\roky\\home\\temp\\wallets\\seed.txt", seed))
-    return;
 
-  std::string res___ = plain_wallet::get_wallet_files();
+
+  //-------------------------------------------------------------------
+//test proxy_to_wallet
+  std::string daemon_body = "{\"method\":\"getinfo\",\"params\":{}}";
+  std::string daemon_body_base64 = epee::string_encoding::base64_encode(daemon_body);
+  tools::wallet_public::COMMAND_PROXY_TO_DAEMON::request req_to_daemon;
+  req_to_daemon.uri = "/json_rpc";
+  req_to_daemon.base64_body = daemon_body_base64;
+  std::string rsp_ = plain_wallet::sync_call("proxy_to_daemon", 0, epee::serialization::store_t_to_json(req_to_daemon));
+  //-------------------------------------------------------------------
+
+
+
+
+  //std::string seed;
+  //if (!epee::file_io_utils::load_file_to_string("C:\\Users\\roky\\home\\temp\\wallets\\seed.txt", seed))
+  //  return;
+
+  //std::string res___ = plain_wallet::get_wallet_files();
 
 
   uint64_t instance_id = 0;
@@ -62,8 +113,17 @@ void test_plain_wallet()
 
   //res = plain_wallet::sync_call("reset_connection_url", 0, "195.201.107.230:33336");
   //res = plain_wallet::sync_call("reset_connection_url", 0, "https://node.zano.org:443");
+  //res = plain_wallet::sync_call("reset_connection_url", 0, "https://zano.cakewallet.com");
+  //res = plain_wallet::sync_call("reset_connection_url", 0, "https://zano.api.wombat.systems:443");
+  //res = plain_wallet::sync_call("reset_connection_url", 0, "http://127.0.0.1:11211");
+
   
-  r = plain_wallet::sync_call("run_wallet", instance_id, "");
+  //r = plain_wallet::sync_call("run_wallet", instance_id, "");
+
+
+
+
+
 
   while(true)
   {
@@ -71,10 +131,12 @@ void test_plain_wallet()
     res = plain_wallet::sync_call("get_wallet_status", instance_id, "");
     view::wallet_sync_status_info wsi = AUTO_VAL_INIT(wsi);
     epee::serialization::load_t_from_json(wsi, res);
-    LOG_PRINT_L0("Progress: " << wsi.progress << " state: " << wsi.wallet_state << ", height: " << wsi.current_wallet_height << " of " << wsi.current_daemon_height);
+    LOG_PRINT_L0("Progress: "  << wsi.progress << " state: " << wsi.wallet_state << "is_in_long_refresh: " << wsi.is_in_long_refresh << ", height: " << wsi.current_wallet_height << " of " << wsi.current_daemon_height);
     if (wsi.wallet_state == 2)
       break;
   }
+  
+
 
   std::string invoke_body = "{\"method\":\"store\",\"params\":{}}";
   std::string res1 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
@@ -123,17 +185,59 @@ void test_plain_wallet()
 
 }
 
+void multithread_test_of_get_coinbase_hash_cached()
+{
+  epee::math_helper::once_a_time_seconds<1> print_interwal;
+
+  try
+  {
+    crypto::hash h = currency::null_hash;
+    utils::threads_pool pool;
+    pool.init();
+    for (uint64_t j = 0; j != 100000000; j++)
+    {
+
+      print_interwal.do_call([&]() { LOG_PRINT_L0("Job " << j << " started, h=" << h); return true; });
+      currency::block_extended_info bei = AUTO_VAL_INIT(bei);
+      utils::threads_pool::jobs_container jobs;
+      size_t i = 0;
+
+      for (; i != 10; i++)
+      {
+        utils::threads_pool::add_job_to_container(jobs, [&, i]() {
+          h = get_coinbase_hash_cached(bei);
+          //LOG_PRINT_L0("Job " << i << " started"); 
+          //epee::misc_utils::sleep_no_w(10000); 
+          // ++count_jobs_finished; LOG_PRINT_L0("Job " << i << " finished"); 
+          });
+      }
+
+      pool.add_batch_and_wait(jobs);
+    }
+  }
+  catch (...)
+  {
+    LOG_ERROR("Exception happened");
+  }
+
+
+}
+
+
 
 int main(int argc, char** argv)
 {
   epee::string_tools::set_module_name_and_folder(argv[0]);
   epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
-  //epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
+  epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
   //epee::log_space::log_singletone::add_logger(LOGGER_FILE,
   //  epee::log_space::log_singletone::get_default_log_file().c_str(),
   //  epee::log_space::log_singletone::get_default_log_folder().c_str());
-
-  test_plain_wallet();
+  
+  multithread_test_of_get_coinbase_hash_cached();
+  //test_tx_json_serialization();
+  //test_base64_serialization();
+  //test_plain_wallet();
   //parse_weird_tx();
   //thread_pool_tests();
 

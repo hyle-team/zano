@@ -63,7 +63,8 @@ namespace tools
 #endif
 
       const epee::net_utils::http::http_response_info* response = nullptr;
-      bool res = m_http_client.invoke(uri, "POST", body, &response);
+      bool res = epee::net_utils::http::invoke_request(m_daemon_address + uri, m_http_client, m_connection_timeout, &response, "POST", body);
+      //bool res = m_http_client.invoke(uri, "POST", body, &response);
       if (response)
       {
         response_body = response->m_body;

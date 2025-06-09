@@ -146,11 +146,11 @@ Recommended OS version: Windows 7 x64, Windows 11 x64.
 
 In order to correctly deploy Qt GUI application, you also need to do the following:
 
-6. Copy Zano.exe to a folder (e.g. `depoy`). 
-7. Run  `PATH_TO_QT\bin\windeployqt.exe deploy\Zano.exe`.
-8. Copy folder `\src\gui\qt-daemon\html` to `deploy\html`.
-9. Now you can run `Zano.exe`
-
+6. Run `PATH_TO_QT\bin\windeployqt.exe PATH_TO_PROJECT_ROOT\build\src\Debug\Zano.exe` (choose the Debug or Release folder depending on the configuration you built).
+7. You can now run the application using one of the following options:
+   *  Start the program from Visual Studio
+   *  Run `Zano.exe --html-path=PATH_TO_HTML`, where PATH_TO_HTML is by default located at PATH_TO_PROJECT_ROOT\src\gui\qt-daemon\layout\html
+   *  Copy the contents of PATH_TO_PROJECT_ROOT\src\gui\qt-daemon\layout\html to a folder named "html" located in the same directory as the Zano.exe binary.
 <br />
 
 ### macOS

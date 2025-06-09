@@ -727,6 +727,14 @@ bool construct_tx(const currency::account_keys& sender_account_keys,
                   currency::transaction& tx,
                   uint64_t tx_version);
 
+bool construct_tx(const currency::account_keys& sender_account_keys, 
+                  const std::vector<currency::tx_source_entry>& sources,
+                  const std::vector<currency::tx_destination_entry>& destinations,
+                  const std::vector<test_event_entry> &events_to_get_hardfork_and_version,
+                  const test_chain_unit_base* p_test_instance,
+                  currency::transaction& result_tx);
+
+
 void get_confirmed_txs(const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, map_hash2tx_t& confirmed_txs);
 bool find_block_chain(const std::vector<test_event_entry>& events, std::vector<currency::block>& blockchain, map_hash2tx_t& mtx, const crypto::hash& head);
 
@@ -748,8 +756,11 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
                      const std::vector<currency::tx_source_entry>& sources_to_avoid, bool check_for_spends = true, bool check_for_unlocktime = true,
                      bool use_ref_by_id = false, uint64_t* p_sources_amount_found = nullptr);
 bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
-                     const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix, const std::vector<currency::tx_source_entry>& sources_to_avoid,
-                     uint64_t fts_flags, uint64_t* p_sources_amount_found = nullptr);
+                     const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix,
+                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, uint64_t* p_sources_amount_found = nullptr);
+bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
+                     const currency::block& blk_head, const currency::account_keys& from, const std::unordered_map<crypto::public_key, uint64_t>& amounts, size_t nmix,
+                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, std::unordered_map<crypto::public_key, uint64_t>* p_sources_amounts = nullptr);
 
 bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& events, const currency::block& blk_head,
                                       const currency::account_keys& from, const std::list<currency::account_public_address>& to,
@@ -1091,6 +1102,13 @@ inline uint64_t get_sources_total_amount(const std::vector<currency::tx_source_e
   for (auto& e : s)
     result += e.amount;
   return result;
+}
+
+inline void get_sources_total_amount(const std::vector<currency::tx_source_entry>& s, std::unordered_map<crypto::public_key, uint64_t>& amounts)
+{
+  amounts.clear();
+  for (auto& e : s)
+    amounts[e.asset_id] += e.amount;
 }
 
 inline void count_ref_by_id_and_gindex_refs_for_tx_inputs(const currency::transaction& tx, size_t& refs_by_id, size_t& refs_by_gindex)

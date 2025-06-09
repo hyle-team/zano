@@ -1103,6 +1103,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(wallet_rpc_alias_tests);
     GENERATE_AND_PLAY_HF(wallet_rpc_exchange_suite, "3,4");
     GENERATE_AND_PLAY_HF(wallet_true_rpc_pos_mining, "4-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_cold_signing, "3,5-*");
     GENERATE_AND_PLAY(wallet_chain_switch_with_spending_the_same_ki);
     GENERATE_AND_PLAY(wallet_sending_to_integrated_address);
     GENERATE_AND_PLAY_HF(block_template_blacklist_test, "4-*");
@@ -1226,6 +1227,7 @@ int main(int argc, char* argv[])
     the heights >= 10. */
     GENERATE_AND_PLAY_HF(tx_pool_semantic_validation, "3");
     GENERATE_AND_PLAY(input_refers_to_incompatible_by_type_output);
+    GENERATE_AND_PLAY_HF(tx_pool_validation_and_chain_switch, "4-*");
 
     // Double spend
     GENERATE_AND_PLAY(gen_double_spend_in_tx<false>);
@@ -1310,11 +1312,11 @@ int main(int argc, char* argv[])
     //GENERATE_AND_PLAY_HF(asset_current_and_total_supplies_comparative_constraints, "4-*"); <-- temporary disabled, waiting for Stepan's fix -- sowle
     GENERATE_AND_PLAY_HF(several_asset_emit_burn_txs_in_pool, "5-*");
     GENERATE_AND_PLAY_HF(assets_transfer_with_smallest_amount, "4-*");
+    GENERATE_AND_PLAY_HF(asset_operations_and_chain_switching, "4-*");
 
     GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
     GENERATE_AND_PLAY_HF(wallet_reorganize_and_trim_test, "4-*");
-    
-
+    GENERATE_AND_PLAY_HF(wallet_rpc_thirdparty_custody, "5-*");    
 
     GENERATE_AND_PLAY_HF(attachment_isolation_test, "4-*");
 

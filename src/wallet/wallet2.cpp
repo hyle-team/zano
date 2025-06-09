@@ -2019,6 +2019,16 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& f
     "wrong daemon response: m_start_height=" + std::to_string(res.start_height) +
     " not less than local blockchain size=" + std::to_string(get_blockchain_current_size()));
 
+  //check if wallet are "on the same hardfork" with daemon with latest height of daemon
+  if (res.current_hardfork != 0 && res.current_hardfork != get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height))
+  {    
+    LOG_ERROR("Daemon currently on the hardfork (" << res.current_hardfork 
+      << ") at heigh (" << res.current_height << "), while wallet think it's hardfork (" << get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height)  << ") at a given height");
+    THROW_IF_TRUE_WALLET_EX(true, error::wallet_internal_error, "Daemon and wallet ver validation failed, hardforks missmatch");
+  }
+  
+
+
   try
   {
     handle_pulled_blocks(blocks_added, stop, res, full_reset_needed);
@@ -3154,7 +3164,8 @@ void wallet2::detach_blockchain(uint64_t including_height)
   //asset descriptors
   handle_rollback_events(including_height);
 
-  WLT_LOG_L0("Detached blockchain on height " << including_height << ", transfers detached " << transfers_detached << ", blocks detached " << blocks_detached);
+  WLT_LOG_L0("Detached blockchain on height " << including_height << ", transfers detached " << transfers_detached << ", blocks detached " << blocks_detached
+    << ", new top: " << print16(m_chain.get_top_block_id()) << " @ " << m_chain.get_top_block_height());
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::operator()(const asset_register_event& e)
@@ -3289,7 +3300,7 @@ void wallet2::load_keys2ki(bool create_if_not_exist, bool& need_to_resync)
       ok = m_pending_key_images_file_container.get_item(i, item);
       WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(ok, "m_pending_key_images_file_container.get_item() failed for index " << i << ", size: " << m_pending_key_images_file_container.size());
       ok = m_pending_key_images.insert(std::make_pair(item.out_key, item.key_image)).second;
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(ok, "m_pending_key_images.insert failed for index " << i << ", size: " << m_pending_key_images_file_container.size());
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(ok, "m_pending_key_images.insert failed for index " << i << ", pair (" << item.out_key << ", " << item.key_image << "), size: " << m_pending_key_images_file_container.size());
       WLT_LOG_L2("pending key image restored: (" << item.out_key << ", " << item.key_image << ")");
     }
     WLT_LOG_L0(m_pending_key_images.size() << " elements restored, requesting full wallet resync");
@@ -3657,19 +3668,18 @@ void wallet2::store_watch_only(const std::wstring& path_to_save, const std::stri
   // populate pending key images for spent outputs (this will help to resync watch-only wallet)
   for (const auto& tr : m_transfers)
   {
-
     const auto& td = tr.second;
     if (!td.is_spent())
       continue; // only spent transfers really need to be stored, because watch-only wallet will not be able to figure out they were spent otherwise
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.m_internal_output_index < td.m_ptx_wallet_info->m_tx.vout.size(), "invalid transfer #" << tr.first);
-    if (td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index].type() != typeid(tx_out_bare))
+    const tx_out_v& out_v = td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index];
+    crypto::public_key out_key{};
+    if (!get_out_pub_key_from_tx_out_v(out_v, out_key))
       continue;
-    const currency::txout_target_v& out_t = boost::get<tx_out_bare>(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]).target;
-    if (out_t.type() != typeid(currency::txout_to_key))
-      continue;
-    const crypto::public_key& out_key = boost::get<txout_to_key>(out_t).key;
-    wo.m_pending_key_images.insert(std::make_pair(out_key, td.m_key_image));
-    wo.m_pending_key_images_file_container.push_back(tools::out_key_to_ki{ out_key, td.m_key_image });
+    if (wo.m_pending_key_images.insert(std::make_pair(out_key, td.m_key_image)).second)
+      wo.m_pending_key_images_file_container.push_back(tools::out_key_to_ki{ out_key, td.m_key_image });
+    else
+      WLT_LOG_YELLOW("WARNING: m_pending_key_images.insert failed for pair (" << out_key << ", " << td.m_key_image << "), pair skipped", LOG_LEVEL_0);
     WLT_LOG_L1("preparing watch-only wallet: added pending ki (" << out_key << ", " << td.m_key_image << ")");
   }
 
@@ -4338,34 +4348,26 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
 
   for (size_t i = 0; i < ft.tx.vout.size(); ++i)
   {
-    VARIANT_SWITCH_BEGIN(ft.tx.vout[i]);
-    VARIANT_CASE_CONST(tx_out_bare, out)
+    std::list<htlc_info> stub;
+    const crypto::public_key& out_pk = out_get_pub_key(ft.tx.vout[i], stub);
+    
+    crypto::public_key ephemeral_pub{};
+    if (!crypto::derive_public_key(derivation, i, m_account.get_keys().account_address.spend_public_key, ephemeral_pub))
     {
-      if (out.target.type() != typeid(txout_to_key))
-        continue;
-      const txout_to_key& otk = boost::get<txout_to_key>(out.target);
-
-      crypto::public_key ephemeral_pub = AUTO_VAL_INIT(ephemeral_pub);
-      if (!crypto::derive_public_key(derivation, i, m_account.get_keys().account_address.spend_public_key, ephemeral_pub))
-      {
-        WLT_LOG_ERROR("derive_public_key failed for tx " << get_transaction_hash(ft.tx) << ", out # " << i);
-      }
-
-      if (otk.key == ephemeral_pub)
-      {
-        // this is the output to the given keys
-        // derive secret key and calculate key image
-        crypto::secret_key ephemeral_sec = AUTO_VAL_INIT(ephemeral_sec);
-        crypto::derive_secret_key(derivation, i, m_account.get_keys().spend_secret_key, ephemeral_sec);
-        crypto::key_image ki = AUTO_VAL_INIT(ki);
-        crypto::generate_key_image(ephemeral_pub, ephemeral_sec, ki);
-
-        ft.outs_key_images.push_back(make_serializable_pair(static_cast<uint64_t>(i), ki));
-      }
+      WLT_LOG_ERROR("derive_public_key failed for tx " << get_transaction_hash(ft.tx) << ", out # " << i);
     }
-    VARIANT_CASE_CONST(tx_out_zarcanum, o);
-    //@#@      
-    VARIANT_SWITCH_END();
+
+    if (out_pk == ephemeral_pub)
+    {
+      // this is the output to the given keys
+      // derive secret key and calculate key image
+      crypto::secret_key ephemeral_sec{};
+      crypto::derive_secret_key(derivation, i, m_account.get_keys().spend_secret_key, ephemeral_sec);
+      crypto::key_image ki{};
+      crypto::generate_key_image(ephemeral_pub, ephemeral_sec, ki);
+
+      ft.outs_key_images.push_back(make_serializable_pair(static_cast<uint64_t>(i), ki));
+    }
   }
 
   // serialize and encrypt the result
@@ -4402,14 +4404,8 @@ bool wallet2::get_utxo_distribution(std::map<uint64_t, uint64_t>& distribution)
   return false;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::submit_externally_signed_asset_tx(const finalized_tx& ft, const crypto::eth_signature& eth_sig, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked)
+void wallet2::submit_externally_signed_asset_tx_impl(const finalized_tx& ft, const transaction& tx, bool unlock_transfers_on_fail, transaction& result_tx, bool& transfers_unlocked)
 {
-  transaction tx = ft.tx;
-  
-  currency::asset_operation_ownership_proof_eth aoop_eth{};
-  aoop_eth.eth_sig = eth_sig;
-  tx.proofs.push_back(std::move(aoop_eth));
-  
   // foolproof
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(ft.ftp.spend_pub_key == m_account.get_keys().account_address.spend_public_key, "The given tx was created in a different wallet, keys missmatch, tx hash: " << ft.tx_id);
 
@@ -4432,7 +4428,69 @@ void wallet2::submit_externally_signed_asset_tx(const finalized_tx& ft, const cr
   m_tx_keys.insert(std::make_pair(ft.tx_id, ft.one_time_key));
   add_sent_tx_detailed_info(tx, ft.ftp.attachments, ft.ftp.prepared_destinations, ft.ftp.selected_transfers);
 
-  print_tx_sent_message(tx, "from submit_externally_signed_asset_tx", true, get_tx_fee(tx));
+  print_tx_sent_message(tx, "from submit_externally_signed_asset_tx_impl", true, get_tx_fee(tx));
+  result_tx = tx;
+}
+
+//----------------------------------------------------------------------------------------------------
+void wallet2::submit_externally_signed_asset_tx(const finalized_tx& ft, const crypto::generic_schnorr_sig_s& gss_sig, bool unlock_transfers_on_fail, transaction& result_tx, bool& transfers_unlocked)
+{
+  transaction tx = ft.tx;
+
+  asset_operation_ownership_proof aoop_eth{};
+  aoop_eth.gss = gss_sig;
+  tx.proofs.push_back(std::move(aoop_eth));
+  submit_externally_signed_asset_tx_impl(ft, tx, unlock_transfers_on_fail, result_tx, transfers_unlocked);
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::submit_externally_signed_asset_tx(const finalized_tx& ft, const crypto::eth_signature& eth_sig, bool unlock_transfers_on_fail, transaction& result_tx, bool& transfers_unlocked)
+{
+  transaction tx = ft.tx;
+  
+  asset_operation_ownership_proof_eth aoop_eth{};
+  aoop_eth.eth_sig = eth_sig;
+  tx.proofs.push_back(std::move(aoop_eth));
+  submit_externally_signed_asset_tx_impl(ft, tx, unlock_transfers_on_fail, result_tx, transfers_unlocked);
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::attach_asset_descriptor(const wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::request& req, wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::response& resp)
+{
+  if (!req.do_attach)
+  {
+    //detaching
+    auto it = m_own_asset_descriptors.find(req.asset_id);
+    if (it == m_own_asset_descriptors.end())
+    {
+      resp.status = API_RETURN_CODE_NOT_FOUND;
+      return false;
+    }
+    if (!it->second.thirdparty_custody)
+    {
+      LOG_ERROR("Detachig assets that are not 'thirdparty_custody' are not allowed");
+      resp.status = API_RETURN_CODE_ACCESS_DENIED;
+      return false;
+    }
+    m_own_asset_descriptors.erase(it);
+    resp.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  else
+  {
+    currency::COMMAND_RPC_GET_ASSET_INFO::request req_asset_info = AUTO_VAL_INIT(req_asset_info);
+    currency::COMMAND_RPC_GET_ASSET_INFO::response resp_asset_info = AUTO_VAL_INIT(resp_asset_info);
+    req_asset_info.asset_id = req.asset_id;
+
+    bool r = m_core_proxy->call_COMMAND_RPC_GET_ASSET_INFO(req_asset_info, resp_asset_info);
+    if (r && resp_asset_info.status == API_RETURN_CODE_OK)
+    {
+      static_cast<currency::asset_descriptor_base&>(m_own_asset_descriptors[req.asset_id]) = resp_asset_info.asset_descriptor;
+      m_own_asset_descriptors[req.asset_id].thirdparty_custody = true;
+      resp.status = API_RETURN_CODE_OK;
+      return true;
+    }
+    resp.status = API_RETURN_CODE_NOT_FOUND;
+    return false;
+  }
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx)
@@ -4473,19 +4531,15 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
     for (auto& p : ft.outs_key_images)
     {
       THROW_IF_FALSE_WALLET_INT_ERR_EX(p.first < tx.vout.size(), "outs_key_images has invalid out index: " << p.first << ", tx.vout.size() = " << tx.vout.size());
-      THROW_IF_FALSE_WALLET_INT_ERR_EX(tx.vout[p.first].type() == typeid(tx_out_bare), "Unexpected type in submit_transfer: " << tx.vout[p.first].type().name());
-      auto& out = boost::get<tx_out_bare>(tx.vout[p.first]);
-      THROW_IF_FALSE_WALLET_INT_ERR_EX(out.target.type() == typeid(txout_to_key), "outs_key_images has invalid out type, index: " << p.first);
-      const txout_to_key& otk = boost::get<txout_to_key>(out.target);
-      pk_ki_to_be_added.push_back(std::make_pair(otk.key, p.second));
+      std::list<htlc_info> stub{};
+      const crypto::public_key& pk = out_get_pub_key(tx.vout[p.first], stub);
+      pk_ki_to_be_added.push_back(std::make_pair(pk, p.second));
     }
 
     THROW_IF_FALSE_WALLET_INT_ERR_EX(tx.vin.size() == ft.ftp.sources.size(), "tx.vin and ft.ftp.sources sizes missmatch");
     for (size_t i = 0; i < tx.vin.size(); ++i)
     {
-      const txin_v& in = tx.vin[i];
-      THROW_IF_FALSE_WALLET_CMN_ERR_EX(in.type() == typeid(txin_to_key), "tx " << tx_hash << " has a non txin_to_key input");
-      const crypto::key_image& ki = boost::get<txin_to_key>(in).k_image;
+      const crypto::key_image& ki = get_key_image_from_txin_v(tx.vin[i]);
 
       const auto& src = ft.ftp.sources[i];
       THROW_IF_FALSE_WALLET_INT_ERR_EX(src.real_output < src.outputs.size(), "src.real_output is out of bounds: " << src.real_output);
@@ -5171,7 +5225,9 @@ bool wallet2::reset_history()
   std::string pass = m_password;
   std::wstring file_path = m_wallet_file;
   account_base acc_tmp = m_account;
+  auto tx_keys = m_tx_keys;
   clear();
+  m_tx_keys = tx_keys;
   m_account = acc_tmp;
   m_password = pass;
   prepare_file_names(file_path);
@@ -5293,6 +5349,15 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
     wcb->on_pos_block_found(b);
 
   gracefull_leaving = true; // to prevent source transfer flags be cleared in scope leave handler
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::find_unconfirmed_tx(const crypto::hash& tx_id, wallet_public::wallet_transfer_info& res) const
+{
+  auto it = m_unconfirmed_txs.find(tx_id);
+  if (it == m_unconfirmed_txs.end())
+    return false;
+  res = it->second;
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -5626,11 +5691,12 @@ void wallet2::update_asset(const crypto::public_key& asset_id, const currency::a
   ctp.tx_meaning_for_logs = "asset update";
 
   bool send_to_network = true;
-  if (last_adb.owner_eth_pub_key.has_value())
+  if (own_asset_entry_it->second.thirdparty_custody || last_adb.owner_eth_pub_key.has_value())
   {
     send_to_network = false;
     ctp.additional_transfer_flags_to_mark = WALLET_TRANSFER_DETAIL_FLAG_ASSET_OP_RESERVATION;
     ctp.tx_meaning_for_logs = "asset eth update";
+    ctp.ado_sign_thirdparty = true;
   }
 
   this->transfer(ctp, ft, send_to_network, nullptr);
@@ -5646,7 +5712,7 @@ void wallet2::update_asset(const crypto::public_key& asset_id, const currency::a
 void wallet2::transfer_asset_ownership(const crypto::public_key& asset_id, const currency::asset_owner_pub_key_v& new_owner_v, currency::finalized_tx& ft)
 {
   auto own_asset_entry_it = m_own_asset_descriptors.find(asset_id);
-  CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Failed find asset_id " << asset_id << " in own assets list");
+  CHECK_AND_ASSERT_THROW_MES(own_asset_entry_it != m_own_asset_descriptors.end(), "Couldn't find asset_id " << asset_id << " in own assets list");
   currency::asset_descriptor_base last_adb{};
   bool r = this->daemon_get_asset_info(asset_id, last_adb);
   CHECK_AND_ASSERT_THROW_MES(r, "Failed to get asset info from daemon");
@@ -5659,20 +5725,29 @@ void wallet2::transfer_asset_ownership(const crypto::public_key& asset_id, const
   asset_update_info.opt_asset_id = asset_id;
 
   if (new_owner_v.type() == typeid(crypto::public_key))
-    asset_update_info.opt_descriptor->owner = boost::get<crypto::public_key>(new_owner_v);
+  {
+    const crypto::public_key new_owner_pk = boost::get<crypto::public_key>(new_owner_v);
+    asset_update_info.opt_descriptor->owner = new_owner_pk;
+    asset_update_info.opt_descriptor->owner_eth_pub_key = boost::none;
+  }
   else
-    asset_update_info.opt_descriptor->owner_eth_pub_key = boost::get<crypto::eth_public_key>(new_owner_v);
+  {
+    const crypto::eth_public_key new_owner_eth_pk = boost::get<crypto::eth_public_key>(new_owner_v);
+    asset_update_info.opt_descriptor->owner = currency::null_pkey;
+    asset_update_info.opt_descriptor->owner_eth_pub_key = new_owner_eth_pk;
+  }
 
   construct_tx_param ctp = get_default_construct_tx_param();
   ctp.extra.push_back(asset_update_info);
   ctp.tx_meaning_for_logs = "transfer asset ownership";
 
   bool send_to_network = true;
-  if (last_adb.owner_eth_pub_key.has_value())
+  if (own_asset_entry_it->second.thirdparty_custody || last_adb.owner_eth_pub_key.has_value())
   {
     send_to_network = false;
     ctp.additional_transfer_flags_to_mark = WALLET_TRANSFER_DETAIL_FLAG_ASSET_OP_RESERVATION;
     ctp.tx_meaning_for_logs = "transfer asset eth ownership";
+    ctp.ado_sign_thirdparty = true;
   }
 
   this->transfer(ctp, ft, send_to_network, nullptr);
@@ -6910,18 +6985,18 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys
       }
       VARIANT_SWITCH_END();
     }
-    VARIANT_CASE_CONST(tx_out_zarcanum, o);
-    real_oe.amount_commitment = o.amount_commitment; // TODO @#@# consider using shorter code like in sweep_below() (or better reuse it)
-    real_oe.concealing_point = o.concealing_point;
-    real_oe.stealth_address = o.stealth_address;
-    real_oe.blinded_asset_id = o.blinded_asset_id;
-    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.is_zc(), "transfer #" << J << ", amount: " << print_money_brief(td.amount()) << " is not a ZC");
-    src.real_out_amount_blinding_mask = td.m_zc_info_ptr->amount_blinding_mask;
-    src.real_out_asset_id_blinding_mask = td.m_zc_info_ptr->asset_id_blinding_mask;
-    src.asset_id = td.m_zc_info_ptr->asset_id;
+    VARIANT_CASE_CONST(tx_out_zarcanum, o)
+      real_oe.amount_commitment           = o.amount_commitment; // TODO @#@# consider using shorter code like in sweep_below() (or better reuse it)
+      real_oe.concealing_point            = o.concealing_point;
+      real_oe.stealth_address             = o.stealth_address;
+      real_oe.blinded_asset_id            = o.blinded_asset_id;
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.is_zc(), "transfer #" << J << ", amount: " << print_money_brief(td.amount()) << " is not a ZC");
+      src.real_out_amount_blinding_mask   = td.m_zc_info_ptr->amount_blinding_mask;
+      src.real_out_asset_id_blinding_mask = td.m_zc_info_ptr->asset_id_blinding_mask;
+      src.asset_id                        = td.m_zc_info_ptr->asset_id;
 #ifndef NDEBUG
-    WLT_CHECK_AND_ASSERT_MES(crypto::point_t(src.asset_id) + src.real_out_asset_id_blinding_mask * crypto::c_point_X == crypto::point_t(real_oe.blinded_asset_id).modify_mul8(), false, "real_out_asset_id_blinding_mask doesn't match real_oe.blinded_asset_id");
-    WLT_CHECK_AND_ASSERT_MES(td.m_amount * crypto::point_t(real_oe.blinded_asset_id).modify_mul8() + src.real_out_amount_blinding_mask * crypto::c_point_G == crypto::point_t(real_oe.amount_commitment).modify_mul8(), false, "real_out_amount_blinding_mask doesn't match real_oe.amount_commitment");
+      WLT_CHECK_AND_ASSERT_MES(crypto::point_t(src.asset_id) + src.real_out_asset_id_blinding_mask * crypto::c_point_X == crypto::point_t(real_oe.blinded_asset_id).modify_mul8(), false, "real_out_asset_id_blinding_mask doesn't match real_oe.blinded_asset_id");
+      WLT_CHECK_AND_ASSERT_MES(td.m_amount * crypto::point_t(real_oe.blinded_asset_id).modify_mul8() + src.real_out_amount_blinding_mask * crypto::c_point_G == crypto::point_t(real_oe.amount_commitment).modify_mul8(), false, "real_out_amount_blinding_mask doesn't match real_oe.amount_commitment");
 #endif
     VARIANT_SWITCH_END();
 
@@ -8401,12 +8476,12 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
           }
           VARIANT_SWITCH_END();
         }
-        VARIANT_CASE_CONST(tx_out_zarcanum, o);
-        interted_it = src.outputs.emplace(it_to_insert, out_reference, o.stealth_address, o.concealing_point, o.amount_commitment, o.blinded_asset_id);
-        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.is_zc(), "transfer #" << tr_index << ", amount: " << print_money_brief(td.amount()) << " is not a ZC");
-        src.real_out_amount_blinding_mask = td.m_zc_info_ptr->amount_blinding_mask;
-        src.real_out_asset_id_blinding_mask = td.m_zc_info_ptr->asset_id_blinding_mask;
-        src.asset_id = td.m_zc_info_ptr->asset_id;
+        VARIANT_CASE_CONST(tx_out_zarcanum, o)
+          interted_it = src.outputs.emplace(it_to_insert, out_reference, o.stealth_address, o.concealing_point, o.amount_commitment, o.blinded_asset_id);
+          WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.is_zc(), "transfer #" << tr_index << ", amount: " << print_money_brief(td.amount()) << " is not a ZC");
+          src.real_out_amount_blinding_mask   = td.m_zc_info_ptr->amount_blinding_mask;
+          src.real_out_asset_id_blinding_mask = td.m_zc_info_ptr->asset_id_blinding_mask;
+          src.asset_id                        = td.m_zc_info_ptr->asset_id;
         VARIANT_SWITCH_END();
         src.real_out_tx_key = get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
         src.real_output = interted_it - src.outputs.begin();

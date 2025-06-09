@@ -1113,7 +1113,7 @@ bool handle_generate_integrated_address(po::variables_map& vm)
 }
 //---------------------------------------------------------------------------------------------------------------
 template<class archive_processor_t>
-bool process_archive(archive_processor_t& arch_processor, bool is_packing, std::ifstream& source, std::ofstream& target)
+bool process_archive(archive_processor_t& arch_processor, bool is_packing, const std::string& path_target, std::ifstream& source, std::ofstream& target)
 {
   source.seekg(0, std::ios::end);
   uint64_t sz = source.tellg();
@@ -1167,8 +1167,11 @@ bool process_archive(archive_processor_t& arch_processor, bool is_packing, std::
 
   crypto::hash data_hash = hash_stream.calculate_hash();
 
-  std::cout << "\r\nFile " << (is_packing ? "packed" : "unpacked") << " from size " << sz << " to " << written_bytes <<
-                "\r\nhash of the data is " << epee::string_tools::pod_to_hex(data_hash) << "\r\n";
+  std::cout << ENDL
+    << "File " << (is_packing ? "packed" : "unpacked") << " from size " << sz << " to " << written_bytes << ENDL
+    << "hash of the data is " << epee::string_tools::pod_to_hex(data_hash) << ENDL
+    << ENDL
+    << " = { \"" << boost::filesystem::basename(path_target) << "\", \"" << epee::string_tools::pod_to_hex(data_hash) << "\", " << written_bytes << ", " << sz << " }" << ENDL;
 
   return true;
 }
@@ -1247,12 +1250,12 @@ bool handle_pack_file(po::variables_map& vm)
   if (do_pack)
   {
     epee::net_utils::gzip_encoder_lyambda gzip_encoder(Z_BEST_SPEED);
-    return process_archive(gzip_encoder, true, source, target);
+    return process_archive(gzip_encoder, true, path_target, source, target);
   }
   else
   {
     epee::net_utils::gzip_decoder_lambda gzip_decoder;
-    return process_archive(gzip_decoder, false, source, target);
+    return process_archive(gzip_decoder, false, path_target, source, target);
   }
 }
 

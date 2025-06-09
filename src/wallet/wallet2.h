@@ -41,7 +41,7 @@
 #include "currency_core/bc_offers_serialization.h"
 #include "currency_core/bc_escrow_service.h"
 #include "common/pod_array_file_container.h"
-#include "wallet_chain_shortener.h"
+#include "currency_core/block_chain_shortener.h"
 #include "tor-connect/torlib/tor_lib_iface.h"
 #include "currency_core/pos_mining.h"
 #include "view_iface.h"
@@ -127,7 +127,7 @@ namespace tools
   */
   struct wallet2_base_state
   {
-    wallet_chain_shortener m_chain;
+    block_chain_shortener m_chain;
     uint64_t m_minimum_height = WALLET_MINIMUM_HEIGHT_UNSET_CONST;
     amount_gindex_to_transfer_id_container m_amount_gindex_to_transfer_id;
     transfer_container m_transfers;
@@ -615,6 +615,7 @@ namespace tools
     void sign_transfer_files(const std::string& tx_sources_file, const std::string& signed_tx_file, currency::transaction& tx);
     void submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx);
     void submit_transfer_files(const std::string& signed_tx_file, currency::transaction& tx);
+    void submit_externally_signed_asset_tx(const currency::finalized_tx& ft, const crypto::generic_schnorr_sig_s& gss_sig, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked);
     void submit_externally_signed_asset_tx(const currency::finalized_tx& ft, const crypto::eth_signature& eth_sig, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked);
 
     void sweep_below(size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
@@ -694,6 +695,7 @@ namespace tools
     size_t scan_for_collisions(std::unordered_map<crypto::key_image, std::list<size_t> >& key_images);
     size_t fix_collisions();
     size_t scan_for_transaction_entries(const crypto::hash& tx_id, const crypto::key_image& ki, std::list<transfer_details>& details);
+    bool attach_asset_descriptor(const wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::request& req, wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::response& resp);
 
     bool get_contracts(escrow_contracts_container& contracts);
     const std::list<expiration_entry_info>& get_expiration_entries() const { return m_money_expirations; };
@@ -767,6 +769,7 @@ namespace tools
     void set_concise_mode(bool enabled) { m_concise_mode = enabled; }
     void set_concise_mode_reorg_max_reorg_blocks(uint64_t max_blocks) { m_wallet_concise_mode_max_reorg_blocks = max_blocks; }
     void set_concise_mode_truncate_history(uint64_t max_entries) { m_truncate_history_max_entries = max_entries; }
+    bool find_unconfirmed_tx(const crypto::hash& tx_id, wallet_public::wallet_transfer_info& res) const;
 
     construct_tx_param get_default_construct_tx_param();
 
@@ -929,6 +932,8 @@ private:
     detail::split_strategy_id_t get_current_split_strategy();
     void build_distribution_for_input(std::vector<uint64_t>& offsets, uint64_t own_index);
     void select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount & amount_entry, uint64_t own_g_index);
+
+    void submit_externally_signed_asset_tx_impl(const currency::finalized_tx& ft, const currency::transaction& tx, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked);
 
     static void wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index);
     static void wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index);
