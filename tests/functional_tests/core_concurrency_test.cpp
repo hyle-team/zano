@@ -134,9 +134,9 @@ bool generate_events(currency::core& c, cct_events_t& events, const cct_wallets_
         if (it->type() == typeid(currency::transaction))
         {
           const transaction& tx = boost::get<const currency::transaction>(*it);
-          uint64_t max_used_block_height = 0;
-          r = bcs.check_tx_inputs(tx, get_transaction_hash(tx), max_used_block_height);
-          if (r && max_used_block_height <= prev_block.height)
+          blockchain_storage::check_tx_inputs_context ctic{};
+          r = bcs.check_tx_inputs(tx, get_transaction_hash(tx), ctic);
+          if (r && ctic.max_used_block_height <= prev_block.height)
             txs.push_back(&tx); // filter out tx that are using too recent outputs -- yep, some txs will be dropped forever
         }
         else if (it->type() == typeid(currency::block))

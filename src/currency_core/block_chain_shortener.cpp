@@ -4,19 +4,20 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "wallet_chain_shortener.h"
-#include "wallet_errors.h"
+#include "block_chain_shortener.h"
+#include "common/crypto_stream_operators.h"
+//#include "wallet_errors.h"
 
-#define WALLET_EVERYBLOCK_SIZE                                        20
-#define WALLET_EVERY_10_BLOCKS_SIZE                                   144
-#define WALLET_EVERY_100_BLOCKS_SIZE                                  144
-#define WALLET_EVERY_1000_BLOCKS_SIZE                                 144
+#define SHORTENER_EVERYBLOCK_SIZE                                        20
+#define SHORTENER_EVERY_10_BLOCKS_SIZE                                   144
+#define SHORTENER_EVERY_100_BLOCKS_SIZE                                  144
+#define SHORTENER_EVERY_1000_BLOCKS_SIZE                                 144
 
 static void exception_handler(){}
 
 
 
-void wallet_chain_shortener::clear()
+void block_chain_shortener::clear()
 {
   m_local_bc_size = 1;
   m_last_20_blocks.clear();
@@ -26,29 +27,42 @@ void wallet_chain_shortener::clear()
 
 }
 //----------------------------------------------------------------------------------------------------
-uint64_t wallet_chain_shortener::get_blockchain_current_size() const 
+uint64_t block_chain_shortener::get_blockchain_current_size() const 
 {
   return m_local_bc_size;
 }
 //----------------------------------------------------------------------------------------------------
-uint64_t wallet_chain_shortener::get_top_block_height() const
+uint64_t block_chain_shortener::get_top_block_height() const
 {
   return m_local_bc_size - 1; 
 }
 //----------------------------------------------------------------------------------------------------
-void wallet_chain_shortener::set_genesis(const crypto::hash& id)
+crypto::hash block_chain_shortener::get_top_block_id() const
+{
+  if (m_last_20_blocks.size())
+    return (--m_last_20_blocks.end())->second;
+  
+  else return currency::null_hash;
+}
+//----------------------------------------------------------------------------------------------------
+void block_chain_shortener::set_genesis(const crypto::hash& id)
 {
   m_genesis = id;
   m_local_bc_size = 1;
 }
 //----------------------------------------------------------------------------------------------------
-const crypto::hash& wallet_chain_shortener::get_genesis()
+const crypto::hash& block_chain_shortener::get_genesis()
 {
   return m_genesis;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet_chain_shortener::push_new_block_id(const crypto::hash& id, uint64_t height)
+void block_chain_shortener::push_new_block_id(const crypto::hash& id, uint64_t height)
 {
+  if (height < m_local_bc_size)
+  {
+    detach(height);
+  }
+
   if (height == 0)
   {
     m_genesis = id;
@@ -60,12 +74,13 @@ void wallet_chain_shortener::push_new_block_id(const crypto::hash& id, uint64_t 
   //self check
   if (m_local_bc_size != 1)
   {
-    THROW_IF_FALSE_WALLET_INT_ERR_EX(get_blockchain_current_size() == height, "Inernal error: get_blockchain_current_height(){" << get_blockchain_current_size() << "} == height{" << height << "} is not equal");
+    CHECK_AND_ASSERT_THROW_MES(get_blockchain_current_size() == height, "Inernal error: get_blockchain_current_height(){" << get_blockchain_current_size() << "} == height{" << height << "} is not equal")
+    //THROW_IF_FALSE_INT_ERR_EX();
   }
 
   m_local_bc_size = height+1;
   m_last_20_blocks[height] = id;
-  if (m_last_20_blocks.size() > WALLET_EVERYBLOCK_SIZE)
+  if (m_last_20_blocks.size() > SHORTENER_EVERYBLOCK_SIZE)
   {
     m_last_20_blocks.erase(m_last_20_blocks.begin());
   }
@@ -76,10 +91,10 @@ void wallet_chain_shortener::push_new_block_id(const crypto::hash& id, uint64_t 
     //self check
     if (!m_last_144_blocks_every_10.empty())
     {
-      THROW_IF_FALSE_WALLET_INT_ERR_EX((--m_last_144_blocks_every_10.end())->first + 10 == height, "Inernal error: (--m_last_144_blocks_every_10.end())->first + 10{" << (--m_last_144_blocks_every_10.end())->first + 10 << "} == height{" << height << "} is not equal");
+      CHECK_AND_ASSERT_THROW_MES((--m_last_144_blocks_every_10.end())->first + 10 == height, "Inernal error: (--m_last_144_blocks_every_10.end())->first + 10{" << (--m_last_144_blocks_every_10.end())->first + 10 << "} == height{" << height << "} is not equal");
     }
     m_last_144_blocks_every_10[height] = id;
-    if (m_last_144_blocks_every_10.size() > WALLET_EVERY_10_BLOCKS_SIZE)
+    if (m_last_144_blocks_every_10.size() > SHORTENER_EVERY_10_BLOCKS_SIZE)
     {
       m_last_144_blocks_every_10.erase(m_last_144_blocks_every_10.begin());
     }
@@ -90,10 +105,10 @@ void wallet_chain_shortener::push_new_block_id(const crypto::hash& id, uint64_t 
     //self check
     if (!m_last_144_blocks_every_100.empty())
     {
-      THROW_IF_FALSE_WALLET_INT_ERR_EX((--m_last_144_blocks_every_100.end())->first + 100 == height, "Inernal error: (--m_last_144_blocks_every_100.end())->first + 100{" << (--m_last_144_blocks_every_100.end())->first + 100 << "} == height{" << height << "} is not equal");
+      CHECK_AND_ASSERT_THROW_MES((--m_last_144_blocks_every_100.end())->first + 100 == height, "Inernal error: (--m_last_144_blocks_every_100.end())->first + 100{" << (--m_last_144_blocks_every_100.end())->first + 100 << "} == height{" << height << "} is not equal");
     }
     m_last_144_blocks_every_100[height] = id;
-    if (m_last_144_blocks_every_100.size() > WALLET_EVERY_100_BLOCKS_SIZE)
+    if (m_last_144_blocks_every_100.size() > SHORTENER_EVERY_100_BLOCKS_SIZE)
     {
       m_last_144_blocks_every_100.erase(m_last_144_blocks_every_100.begin());
     }
@@ -105,10 +120,10 @@ void wallet_chain_shortener::push_new_block_id(const crypto::hash& id, uint64_t 
     //self check
     if (!m_last_144_blocks_every_1000.empty())
     {
-      THROW_IF_FALSE_WALLET_INT_ERR_EX((--m_last_144_blocks_every_1000.end())->first + 1000 == height, "Inernal error: (--m_last_144_blocks_every_1000.end())->first + 1000{" << (--m_last_144_blocks_every_1000.end())->first + 1000 << "} == height{" << height << "} is not equal");
+      CHECK_AND_ASSERT_THROW_MES((--m_last_144_blocks_every_1000.end())->first + 1000 == height, "Inernal error: (--m_last_144_blocks_every_1000.end())->first + 1000{" << (--m_last_144_blocks_every_1000.end())->first + 1000 << "} == height{" << height << "} is not equal");
     }
     m_last_144_blocks_every_1000[height] = id;
-    if (m_last_144_blocks_every_1000.size() > WALLET_EVERY_1000_BLOCKS_SIZE)
+    if (m_last_144_blocks_every_1000.size() > SHORTENER_EVERY_1000_BLOCKS_SIZE)
     {
       m_last_144_blocks_every_1000.erase(m_last_144_blocks_every_1000.begin());
     }
@@ -118,7 +133,7 @@ void wallet_chain_shortener::push_new_block_id(const crypto::hash& id, uint64_t 
 
 }
 //----------------------------------------------------------------------------------------------------
-void wallet_chain_shortener::get_short_chain_history(std::list<crypto::hash>& ids)const 
+void block_chain_shortener::get_short_chain_history(std::list<crypto::hash>& ids)const 
 {
   ids.clear();
   uint64_t i = 0;
@@ -137,7 +152,7 @@ void wallet_chain_shortener::get_short_chain_history(std::list<crypto::hash>& id
 
   uint64_t current_back_offset = ids.size()+1;
   //self check
-  THROW_IF_FALSE_WALLET_INT_ERR_EX(current_back_offset == sz - i + 1 || !count, "Inernal error: current_back_offset{" << current_back_offset << "} == sz-i{" << sz << " - " << i << "} is not equal");
+  CHECK_AND_ASSERT_THROW_MES(current_back_offset == sz - i + 1 || !count, "Inernal error: current_back_offset{" << current_back_offset << "} == sz-i{" << sz << " - " << i << "} is not equal");
 
   uint64_t current_offset_distance = 1;
   while (current_back_offset < sz)
@@ -157,7 +172,7 @@ void wallet_chain_shortener::get_short_chain_history(std::list<crypto::hash>& id
   ids.push_back(m_genesis);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet_chain_shortener::lookup_item_around(uint64_t i, std::pair<uint64_t, crypto::hash>& result)const 
+bool block_chain_shortener::lookup_item_around(uint64_t i, std::pair<uint64_t, crypto::hash>& result)const 
 {
   //in which container we are looking for?
   uint64_t devider = 0;
@@ -189,14 +204,14 @@ bool wallet_chain_shortener::lookup_item_around(uint64_t i, std::pair<uint64_t, 
   i = i - i % devider;
   auto it = pcontainer->find(i);
   //self check
-  THROW_IF_FALSE_WALLET_INT_ERR_EX(it != pcontainer->end(),
+  CHECK_AND_ASSERT_THROW_MES(it != pcontainer->end(),
     "Inernal error: index " << i << " not found for devider " << devider
     << " pcontainer={" << pcontainer->begin()->first << ":" << (--pcontainer->end())->first << "}");
   result = *it;
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet_chain_shortener::check_if_block_matched(uint64_t i, const crypto::hash& id, bool& block_found, bool& block_matched, bool& full_reset_needed)const
+void block_chain_shortener::check_if_block_matched(uint64_t i, const crypto::hash& id, bool& block_found, bool& block_matched, bool& full_reset_needed)const
 {
   if (i == 0)
   {
@@ -221,12 +236,12 @@ void wallet_chain_shortener::check_if_block_matched(uint64_t i, const crypto::ha
   {
     //must be in short sequence (m_last_20_blocks)
     //self check
-    THROW_IF_FALSE_WALLET_INT_ERR_EX((--m_last_20_blocks.end())->first >= i,
+    CHECK_AND_ASSERT_THROW_MES((--m_last_20_blocks.end())->first >= i,
       "Inernal error: index " << i << " is not located in expected range of m_last_20_blocks={"
       << m_last_20_blocks.begin()->first << ":" << (--m_last_20_blocks.end())->first << "}");
 
     auto it = m_last_20_blocks.find(i);
-    THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_last_20_blocks.end(),
+    CHECK_AND_ASSERT_THROW_MES(it != m_last_20_blocks.end(),
       "Inernal error: filde to find index " << i << " in m_last_20_blocks={"
       << m_last_20_blocks.begin()->first << ":" << (--m_last_20_blocks.end())->first << "}");
 
@@ -271,7 +286,7 @@ void wallet_chain_shortener::check_if_block_matched(uint64_t i, const crypto::ha
   }
 }
 //----------------------------------------------------------------------------------------------------
-std::string wallet_chain_shortener::get_internal_state_text() const
+std::string block_chain_shortener::get_internal_state_text() const
 {
   std::stringstream ss;
 #define PRINT_CHAIN_SHORTENER_STATE_INFO(cont_name) \
@@ -296,7 +311,7 @@ void clean_map_from_items_above(std::map<uint64_t, crypto::hash>& container, uin
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet_chain_shortener::detach(uint64_t including_height)
+void block_chain_shortener::detach(uint64_t including_height)
 {
   clean_map_from_items_above(m_last_20_blocks, including_height);
   clean_map_from_items_above(m_last_144_blocks_every_10, including_height);

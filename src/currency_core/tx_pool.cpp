@@ -93,7 +93,7 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::check_tx_fee(const transaction &tx, uint64_t amount_fee)
+  bool tx_memory_pool::check_tx_fee(const transaction &tx, uint64_t amount_fee) const
   {
     if (amount_fee < m_blockchain.get_core_runtime_config().tx_pool_min_fee)
       return false;
@@ -227,9 +227,10 @@ namespace currency
     TIME_MEASURE_FINISH_PD(check_keyimages_ws_ms_time);
 
     TIME_MEASURE_START_PD(check_inputs_time);
-    crypto::hash max_used_block_id = null_hash;
-    uint64_t max_used_block_height = 0;
-    bool ch_inp_res = m_blockchain.check_tx_inputs(tx, id, max_used_block_height, max_used_block_id);
+    blockchain_storage::check_tx_inputs_context ctic{};
+    ctic.calculate_max_used_block_id = true;
+    ctic.check_hf4_coinage_rule = false;
+    bool ch_inp_res = m_blockchain.check_tx_inputs(tx, id, ctic);
     if (!ch_inp_res && !kept_by_block && !from_core)
     {
       LOG_PRINT_L0("check_tx_inputs failed, tx rejected");
@@ -255,7 +256,7 @@ namespace currency
       }
     }
 
-    do_insert_transaction(tx, id, blob_size, kept_by_block, tx_fee, ch_inp_res ? max_used_block_id : null_hash, ch_inp_res ? max_used_block_height : 0);
+    do_insert_transaction(tx, id, blob_size, kept_by_block, tx_fee, ch_inp_res ? ctic.max_used_block_id : null_hash, ch_inp_res ? ctic.max_used_block_height : 0);
     
     TIME_MEASURE_FINISH_PD(tx_processing_time);
     tvc.m_added_to_pool = true;
@@ -389,6 +390,7 @@ namespace currency
         return false; // stop handling
       }
 
+#ifndef TESTNET
       std::string prev_alias = m_blockchain.get_alias_by_address(eai.m_address);
       if (!is_in_block && !eai.m_sign.size() &&
         prev_alias.size())
@@ -399,6 +401,7 @@ namespace currency
         r = false;
         return false; // stop handling
       }
+#endif
 
       if (!is_in_block)
       {
@@ -933,12 +936,16 @@ namespace currency
       if(txd.last_failed_id != null_hash && m_blockchain.get_current_blockchain_size() > txd.last_failed_height && txd.last_failed_id == m_blockchain.get_block_id_by_height(txd.last_failed_height))
         return false;//we already sure that this tx is broken for this height
 
-      if(!m_blockchain.check_tx_inputs(txd.tx, id, txd.max_used_block_height, txd.max_used_block_id))
+      blockchain_storage::check_tx_inputs_context ctic{};
+      ctic.check_hf4_coinage_rule = false;
+      if(!m_blockchain.check_tx_inputs(txd.tx, id, ctic))
       {
         txd.last_failed_height = m_blockchain.get_top_block_height();
         txd.last_failed_id = m_blockchain.get_block_id_by_height(txd.last_failed_height);
         return false;
       }
+      txd.max_used_block_height = ctic.max_used_block_height;
+      txd.max_used_block_id = ctic.max_used_block_id;
     }
     else
     {
@@ -950,12 +957,16 @@ namespace currency
         if(txd.last_failed_id == m_blockchain.get_block_id_by_height(txd.last_failed_height))
           return false;
         //check ring signature again, it is possible (with very small chance) that this transaction become again valid
-        if(!m_blockchain.check_tx_inputs(txd.tx, id, txd.max_used_block_height, txd.max_used_block_id))
+        blockchain_storage::check_tx_inputs_context ctic{};
+        ctic.check_hf4_coinage_rule = false;
+        if(!m_blockchain.check_tx_inputs(txd.tx, id, ctic))
         {
           txd.last_failed_height = m_blockchain.get_top_block_height();
           txd.last_failed_id = m_blockchain.get_block_id_by_height(txd.last_failed_height);
           return false;
         }
+        txd.max_used_block_height = ctic.max_used_block_height;
+        txd.max_used_block_id = ctic.max_used_block_id;
       }
     }
 

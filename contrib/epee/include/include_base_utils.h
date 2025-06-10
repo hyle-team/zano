@@ -30,5 +30,3 @@
 #define ENABLE_RELEASE_LOGGING
 
 #include "misc_log_ex.h"
-
-

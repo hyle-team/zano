@@ -11,6 +11,15 @@
 #include "currency_core/bc_offers_service.h"
 #include "rpc/core_rpc_server.h"
 
+template<typename wallet_t>
+void set_playtime_test_wallet_options(std::shared_ptr<wallet_t> w)
+{
+  w->set_disable_tor_relay(true);
+  w->set_concise_mode(true);
+  w->set_concise_mode_reorg_max_reorg_blocks(TESTS_CONCISE_MODE_REORG_MAX_REORG_BLOCK);
+  w->set_use_assets_whitelisting(false);
+}
+
 struct wallet_test : virtual public test_chain_unit_enchanced
 {
   enum { MINER_ACC_IDX = 0, ALICE_ACC_IDX = 1, BOB_ACC_IDX = 2, CAROL_ACC_IDX = 3, DAN_ACC_IDX = 4, TOTAL_ACCS_COUNT = 5 }; // to be used as index for m_accounts
@@ -59,9 +68,7 @@ struct wallet_test : virtual public test_chain_unit_enchanced
     w->assign_account(acc);
     w->set_genesis(genesis_hash);
     w->set_core_proxy(m_core_proxy);
-    w->set_disable_tor_relay(true);
-    w->set_concise_mode(true);
-    w->set_concise_mode_reorg_max_reorg_blocks(TESTS_CONCISE_MODE_REORG_MAX_REORG_BLOCK);
+    set_playtime_test_wallet_options(w);
     return w;
 
 #undef LOCAL_HOST_CSTR

@@ -176,9 +176,9 @@ namespace nodetool
   inline void peerlist_manager::trim_white_peerlist()
   {
     CRITICAL_REGION_LOCAL(m_peerlist_lock);
-    while(m_peers_gray.size() > P2P_LOCAL_GRAY_PEERLIST_LIMIT)
+    while(m_peers_white.size() > P2P_LOCAL_GRAY_PEERLIST_LIMIT)
     {
-      peers_indexed::index<by_time>::type& sorted_index=m_peers_gray.get<by_time>();
+      peers_indexed::index<by_time>::type& sorted_index= m_peers_white.get<by_time>();
       sorted_index.erase(sorted_index.begin());
     }
   }
@@ -186,9 +186,9 @@ namespace nodetool
   inline void peerlist_manager::trim_gray_peerlist()
   {
     CRITICAL_REGION_LOCAL(m_peerlist_lock);
-    while(m_peers_white.size() > P2P_LOCAL_WHITE_PEERLIST_LIMIT)
+    while(m_peers_gray.size() > P2P_LOCAL_WHITE_PEERLIST_LIMIT)
     {
-      peers_indexed::index<by_time>::type& sorted_index=m_peers_white.get<by_time>();
+      peers_indexed::index<by_time>::type& sorted_index=m_peers_gray.get<by_time>();
       sorted_index.erase(sorted_index.begin());
     }
   }

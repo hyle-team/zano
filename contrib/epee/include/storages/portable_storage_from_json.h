@@ -34,7 +34,20 @@ namespace epee
   {
     namespace json
     {
-#define CHECK_ISSPACE()  if(!isspace(*it)){ ASSERT_MES_AND_THROW("Wrong JSON character at: " << std::string(it, buf_end));}
+
+      namespace details
+      {
+        inline bool report_wrong_char_with_context(const std::string::const_iterator begin, const std::string::const_iterator it, const std::string::const_iterator end)
+        {
+          auto before_it = it - std::min(it - begin, static_cast<ptrdiff_t>(8));
+          auto after_it  = it + std::min(end - it, static_cast<ptrdiff_t>(8));
+          std::string escaped_str(before_it, after_it);
+          std::replace_if(escaped_str.begin(), escaped_str.end(), [](int c){ return std::isprint(c); }, '?');
+          ASSERT_MES_AND_THROW("Wrong JSON character 0x" << std::hex << (int)*it << ", context: " << escaped_str);
+        }
+      }
+
+#define CHECK_ISSPACE()  if (!isspace(*it)) details::report_wrong_char_with_context(sec_buf_begin, it, buf_end)
 
       /*inline void parse_error()
       {

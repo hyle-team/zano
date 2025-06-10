@@ -21,6 +21,7 @@
 #include "currency_core/bc_offers_service.h"
 #include "wallet/wallet2.h"
 #include "wallet_test_core_proxy.h"
+#include "wallet_tests_basic.h"
 #include "pos_block_builder.h"
  
 using namespace epee;
@@ -531,6 +532,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
     wallets.back().wallet->set_core_proxy(tmp_proxy);
     wallets.back().wallet->set_minimum_height(0);
     wallets.back().wallet->set_pos_required_decoys_count(0);
+    wallets.back().wallet->set_use_assets_whitelisting(false);
 
     currency::core_runtime_config pc = cc;
     pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
@@ -1001,9 +1003,7 @@ bool test_generator::init_test_wallet(const currency::account_base& account, con
   w->assign_account(account);
   w->set_genesis(genesis_hash);
   w->set_core_proxy(m_wallet_test_core_proxy);
-  w->set_disable_tor_relay(true);
-  w->set_concise_mode(true);
-  w->set_concise_mode_reorg_max_reorg_blocks(TESTS_CONCISE_MODE_REORG_MAX_REORG_BLOCK);
+  set_playtime_test_wallet_options(w);
 
   result = w;
   return true;
@@ -1433,8 +1433,22 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
 }
 
 bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
-                     const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix, const std::vector<currency::tx_source_entry>& sources_to_avoid,
-                     uint64_t fts_flags, uint64_t* p_sources_amount_found /* = nullptr */)
+                     const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix,
+                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, uint64_t* p_sources_amount_found /* = nullptr */)
+{
+  std::unordered_map<crypto::public_key, uint64_t> amounts;
+  amounts[native_coin_asset_id] = amount;
+  std::unordered_map<crypto::public_key, uint64_t> sources_amounts;
+  if (!fill_tx_sources(sources, events, blk_head, from, amounts, nmix, sources_to_avoid, fts_flags, &sources_amounts))
+    return false;
+  if (p_sources_amount_found)
+    *p_sources_amount_found = sources_amounts[native_coin_asset_id];
+  return true;
+}
+
+bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
+                     const currency::block& blk_head, const currency::account_keys& from, const std::unordered_map<crypto::public_key, uint64_t>& amounts, size_t nmix,
+                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, std::unordered_map<crypto::public_key, uint64_t>* p_sources_amounts /* = nullptr */)
 {
   map_output_idx_t outs;
   map_output_t outs_mine;
@@ -1497,7 +1511,9 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
   uint64_t next_block_height = blockchain.size();
 
   // Iterate in reverse is more efficiency
-  uint64_t sources_amount = 0;
+  std::unordered_map<crypto::public_key, uint64_t> sources_amounts_local;
+  if (p_sources_amounts == nullptr)
+    p_sources_amounts = &sources_amounts_local;
   bool sources_found = false;
   BOOST_REVERSE_FOREACH(const map_output_t::value_type o, outs_mine)
   {
@@ -1507,6 +1523,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
       const output_index& oi = outs[o.first][sender_out];
       if (oi.spent)
           continue;
+
       if (fts_flags & fts_check_for_unlocktime)
       {
         uint64_t unlock_time = currency::get_tx_max_unlock_time(*oi.p_tx);
@@ -1531,8 +1548,10 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
         continue;
       }
 
+      if (amounts.count(oi.asset_id) == 0)
+        continue; // skip assets that are not required
 
-      currency::tx_source_entry ts = AUTO_VAL_INIT(ts);
+      currency::tx_source_entry ts{};
       ts.asset_id = oi.asset_id;
       ts.amount = oi.amount;
       ts.real_out_asset_id_blinding_mask = oi.asset_id_blinding_mask;
@@ -1547,16 +1566,21 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
 
       sources.push_back(ts);
 
-      sources_amount += ts.amount;
-      sources_found = amount <= sources_amount;
+      (*p_sources_amounts)[ts.asset_id] += ts.amount;
+      sources_found = true;
+      for (const auto& aid : amounts)
+      {
+        if ((*p_sources_amounts)[aid.first] < aid.second)
+        {
+          sources_found = false;
+          break;
+        }
+      }
     }
 
     if (sources_found)
       break;
   }
-
-  if (p_sources_amount_found != nullptr)
-    *p_sources_amount_found = sources_amount;
 
   return sources_found;
 }
@@ -1986,6 +2010,19 @@ bool construct_tx(const currency::account_keys& sender_account_keys,
                       gen_context                   /* tx_generation_context */
   );
 }
+
+bool construct_tx(const currency::account_keys& sender_account_keys, 
+                  const std::vector<currency::tx_source_entry>& sources,
+                  const std::vector<currency::tx_destination_entry>& destinations,
+                  const std::vector<test_event_entry> &events_to_get_hardfork_and_version,
+                  const test_chain_unit_base* p_test_instance,
+                  currency::transaction& result_tx)
+{
+  size_t tx_hardfork_id{};
+  uint64_t tx_version = p_test_instance->get_tx_version_and_harfork_id_from_events(events_to_get_hardfork_and_version, tx_hardfork_id);
+  return construct_tx(sender_account_keys, sources, destinations, empty_attachment, result_tx, tx_version, tx_hardfork_id, 0);
+}
+
 
 uint64_t get_balance(const currency::account_keys& addr, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, bool dbg_log)
 {
@@ -2798,7 +2835,7 @@ bool test_chain_unit_enchanced::check_top_block(currency::core& c, size_t ev_ind
 
 bool test_chain_unit_enchanced::clear_tx_pool(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  c.get_tx_pool().purge_transactions();
+  c.get_tx_pool().clear();
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool after purge_transactions(): " << c.get_pool_transactions_count());
   return true;
 }

@@ -277,7 +277,7 @@ namespace epee
 
 #define POTENTIAL_HANG_PREVENT_LIMIT 1000
 
-
+#define DEADLOCK_GUARD_JOURNAL_LIMIT 1000
 
   /************************************************************************/
   /*                                                                      */
@@ -290,11 +290,11 @@ namespace epee
     struct thread_info
     {
       std::map<lock_reference_type, size_t> m_owned_objects;
-      bool is_blocked;
-      lock_reference_type blocker_lock;
-      const char* block_location;
-      const char* func_name;
-      const char* lock_name;
+      bool is_blocked = false;
+      lock_reference_type blocker_lock = nullptr;
+      const char* block_location = "unknown";
+      const char* func_name = "unknown";
+      const char* lock_name = "unknown";
       std::string thread_name;
     };
 
@@ -307,6 +307,18 @@ namespace epee
     std::map<lock_reference_type, thread_id_to_info_map::iterator> m_owned_locks_to_thread;
     // deadlock journal
     std::list<std::string> m_deadlock_journal;
+    //lock/unlock journal
+    struct journal_entry
+    {
+      std::thread::id tid;
+      lock_reference_type lock = nullptr;
+      bool is_lock_event = false;
+      const char* func_name = "unkonwn";
+      const char* lock_name = "unkonwn";
+      std::string thread_name;
+    };
+
+    std::list<journal_entry> m_journal;
 
   public:
     void on_before_lock(lock_reference_type lock, const char* func_name, const char* loction, const char* lock_name, const std::string& thread_name)
@@ -363,6 +375,10 @@ namespace epee
         }
         else
         {
+          m_journal.push_front(journal_entry{ this_id, lock, false, "", "", ""});
+          if (m_journal.size() > DEADLOCK_GUARD_JOURNAL_LIMIT)
+            m_journal.pop_back();
+
           m_owned_locks_to_thread.erase(lock_to_thread_it);
         }
         it->second.m_owned_objects.erase(ownership_it);
@@ -400,6 +416,15 @@ namespace epee
         ss << "-----------------------------------------------------------------------" << std::endl << err << std::endl;
       }
 
+      ss << "Ownership history history:" << std::endl;
+      size_t count = 0;
+      for (auto entry : m_journal)
+      {
+        ss  << "tid(" << entry.thread_name << "): " << entry.tid << ", lock_addr: " << entry.lock << (entry.is_lock_event ? "-->":"<--") << ", func: " << (entry.func_name ? entry.func_name:"") << ", lock_name: " << (entry.lock_name ? entry.lock_name : "") << std::endl;
+        if (++count > 100)
+          break;
+      }
+
       return ss.str();
     }
 
@@ -429,6 +454,10 @@ namespace epee
         //need to add lock-to-thread reccord 
         m_owned_locks_to_thread[lock] = it;
         DO_DEBUG_COUT("[" << std::this_thread::get_id() << "][ADDED_OWNERSHIP]: " << lock << std::endl);
+        m_journal.push_front(journal_entry{ this_id, lock, true, it->second.func_name, it->second.lock_name, it->second.thread_name });
+        if (m_journal.size() > DEADLOCK_GUARD_JOURNAL_LIMIT)
+          m_journal.pop_back();
+
       }
       else
       {

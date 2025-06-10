@@ -274,12 +274,14 @@ namespace currency
       std::list<t_block_complete_entry> blocks;
       uint64_t    start_height;
       uint64_t    current_height;
+      uint64_t    current_hardfork;
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(blocks)                     DOC_DSCR("Bunch of blocks") DOC_EXMP_AUTO(1) DOC_END
         KV_SERIALIZE(start_height)               DOC_DSCR("Starting height of the resulting bunch of blocks.") DOC_EXMP(2000000) DOC_END
         KV_SERIALIZE(current_height)             DOC_DSCR("Current height of the blockchain.") DOC_EXMP(2555000) DOC_END
+        KV_SERIALIZE(current_hardfork)           DOC_DSCR("Current hardfork, used for wallet <-> version verification") DOC_EXMP(4) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -438,6 +440,33 @@ namespace currency
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(images_stat)                DOC_DSCR("List of spent states, where 1 means unspent and 0 means spent.") DOC_EXMP_AUTO(1, 0) DOC_END
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+  //-----------------------------------------------
+  struct COMMAND_RPC_GET_INTEGRATED_ADDRESS
+  {
+    DOC_COMMAND("Make integrated address from regular address");
+
+    struct request
+    {
+      std::string payment_id; // hex-encoded
+      std::string regular_address; // hex-encoded
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(payment_id) DOC_DSCR("Hex-encoded Payment ID to be associated with the this address. If empty then wallet would generate new payment id using system random library") DOC_EXMP("1dfe5a88ff9effb3")  DOC_END
+        KV_SERIALIZE(regular_address) DOC_DSCR("Zano wallet address to be used as a base for integrated address") DOC_EXMP("ZxCSpsGGeJsS8fwvQ4HktDU3qBeauoJTR6j73jAWWZxFXdF7XTbGm4YfS2kXJmAP4Rf5BVsSQ9iZ45XANXEYsrLN2L2W77dH7")  DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string integrated_address;
+      std::string payment_id; // hex-encoded
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(integrated_address) DOC_DSCR("Integrated address combining a standard address and payment ID, if applicable.")  DOC_EXMP("iZ2EMyPD7g28hgBfboZeCENaYrHBYZ1bLFi5cgWvn4WJLaxfgs4kqG6cJi9ai2zrXWSCpsvRXit14gKjeijx6YPCLJEv6Fx4rVm1hdAGQFis") DOC_END
+        KV_SERIALIZE(payment_id)         DOC_DSCR("Payment ID associated with the this address.") DOC_EXMP("1dfe5a88ff9effb3")  DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -695,12 +724,14 @@ namespace currency
     struct request
     {
       std::string tx_as_hex;
+      std::string tx_as_base64;
 
       request() {}
       explicit request(const transaction &);
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(tx_as_hex)                  DOC_DSCR("The transaction data as a hexadecimal string, ready for network broadcast.") DOC_EXMP("00018ed1535b8b4862e.....368cdc5a86") DOC_END
+        KV_SERIALIZE_BLOB_AS_BASE64_STRING(tx_as_base64)     DOC_DSCR("The transaction data as a base64 string, ready for network broadcast. Used only if tx_as_hex is empty") DOC_EXMP("AwElEBr7PxIAAAAAABr......cQAAAAAAABqBJAAAAAAAABo6BQ") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 

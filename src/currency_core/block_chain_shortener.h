@@ -19,11 +19,12 @@
 #include "crypto/crypto.h"
 #include "currency_core/currency_basic.h"
 
-class wallet_chain_shortener
+class block_chain_shortener
 {
 public:
   void push_new_block_id(const crypto::hash& id, uint64_t height);
   uint64_t get_top_block_height() const;
+  crypto::hash get_top_block_id() const;
   uint64_t get_blockchain_current_size() const;
   void get_short_chain_history(std::list<crypto::hash>& ids)const;
   bool lookup_item_around(uint64_t i, std::pair<uint64_t, crypto::hash>& result)const;

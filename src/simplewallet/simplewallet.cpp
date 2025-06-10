@@ -417,15 +417,15 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
 {
   handle_command_line(vm);
 
-  if (!m_daemon_address.empty() && !m_daemon_host.empty() && 0 != m_daemon_port)
+  if (!m_daemon_address.empty() && (!m_daemon_host.empty() || 0 != m_daemon_port))
   {
-    fail_msg_writer() << "you can't specify daemon host or port several times";
+    fail_msg_writer() << "please use either --daemon-address=\"host:port\" or specify both --daemon-host=\"host\" and --daemon-port=\"port\".";
     return false;
   }
 
   if (m_wallet_file.empty() && m_generate_new.empty() && m_restore_wallet.empty() && m_generate_new_aw.empty())
   {
-    fail_msg_writer() << "you must specify --wallet-file, --generate-new-wallet, --generate-new-auditable-wallet, --restore-wallet";
+    fail_msg_writer() << "you must specify --wallet-file, --generate-new-wallet, --generate-new-auditable-wallet, or --restore-wallet";
     return false;
   }
 
@@ -2934,6 +2934,11 @@ int custom_seed_builder()
   acc.generate();
   std::string pass_protected_or_not = "";
   std::vector<unsigned char> binary_from_seed = tools::mnemonic_encoding::text2binary(seed_24);
+  if (!binary_from_seed.size())
+  {
+    success_msg_writer() << "The seed phrase you have provided is not correct. (Please keep in mind that seed words is not compatible with bip39 dictionary)";
+    return EXIT_FAILURE;
+  }
   std::vector<unsigned char> processed_binary_from_seed = binary_from_seed;
   if (!passphrase.empty())
   {
@@ -3286,8 +3291,9 @@ int main(int argc, char* argv[])
   {
     tools::wallet_rpc_server wallet_rpc_server(std::shared_ptr<tools::wallet2>(new tools::wallet2()));
     std::string path_to_generate = command_line::get_arg(vm, command_line::arg_generate_rpc_autodoc);
-
-    if (!generate_doc_as_md_files(path_to_generate, wallet_rpc_server))
+    
+    std::string auto_doc_sufix = "<sub>Auto-doc built with: " PROJECT_VERSION_LONG "</sub>";
+    if (!generate_doc_as_md_files(path_to_generate, wallet_rpc_server, auto_doc_sufix))
       return 1;
     return 0;
   }

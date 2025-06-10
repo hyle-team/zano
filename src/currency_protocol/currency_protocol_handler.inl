@@ -181,24 +181,38 @@ namespace currency
       LOG_PRINT_L0("wtf");
     }
 
+    if (m_core.get_blockchain_storage().is_non_pruning_mode_enabled())
+    {
+      // if non-pruning mode is enabled, allow syncronization iff the remote is also in non-pruning mode,
+      // or if this node top height above the last checkpoint height of the remote
+      if (!hshd.non_pruning_mode_enabled && m_core.get_top_block_height() < hshd.last_checkpoint_height)
+      {
+        LOG_PRINT_YELLOW("Non-pruning mode: current top block height (" << m_core.get_top_block_height() << ") is less than the remote's most recent checkpoint height (" << hshd.last_checkpoint_height <<
+          ") and the remove isn't in non-pruning mode, disconnecting.", LOG_LEVEL_0);
+        return false;
+      }
+    }
+
     int64_t diff = static_cast<int64_t>(hshd.current_height) - static_cast<int64_t>(m_core.get_current_blockchain_size());
     LOG_PRINT_COLOR2(LOG_DEFAULT_TARGET, (is_inital ? "Inital ":"Idle ") << "sync data returned unknown top block (" << hshd.top_id << "): " << m_core.get_top_block_height() << " -> " << hshd.current_height - 1
       << " [" << std::abs(diff) << " blocks (" << diff / (24 * 60 * 60 / DIFFICULTY_TOTAL_TARGET ) << " days) "
       << (0 <= diff ? std::string("behind") : std::string("ahead"))
       << "] " << ENDL << "SYNCHRONIZATION started", (is_inital ? LOG_LEVEL_0 : LOG_LEVEL_1), (is_inital ? epee::log_space::console_color_yellow : epee::log_space::console_color_magenta));
-    LOG_PRINT_L1("Remote top block height: " << hshd.current_height << ", id: " << hshd.top_id);
+    LOG_PRINT_L1("Remote top block height: " << hshd.current_height - 1 << ", id: " << hshd.top_id);
+
     /*check if current height is in remote's checkpoints zone*/
     if(hshd.last_checkpoint_height 
       && m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height() < hshd.last_checkpoint_height 
-      && m_core.get_current_blockchain_size() < hshd.last_checkpoint_height )
+      && m_core.get_top_block_height() < hshd.last_checkpoint_height )
     {
       LOG_PRINT_RED("Remote node has longer checkpoints zone (" << hshd.last_checkpoint_height <<  ") " << 
         "than local (" << m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height() << "). " <<
-        "It means that current software is outdated, please updated it! " << 
+        (m_core.get_blockchain_storage().is_non_pruning_mode_enabled() ? "It is expected since this node is in non-pruning mode. " : "It means that current software is outdated, please updated it! ") << 
         "Current height lays under checkpoints zone on remote host, so it's impossible to validate remote transactions locally, disconnecting.", LOG_LEVEL_0);
       return false;
     }
-    else if (m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height() < hshd.last_checkpoint_height)
+    
+    if (m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height() < hshd.last_checkpoint_height)
     {
       LOG_PRINT_MAGENTA("Remote node has longer checkpoints zone (" << hshd.last_checkpoint_height <<  ") " <<
         "than local (" << m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height() << "). " << 
@@ -206,7 +220,8 @@ namespace currency
     }
 
     context.m_state = currency_connection_context::state_synchronizing;
-    context.m_remote_blockchain_height = hshd.current_height;
+    context.m_remote_blockchain_size = hshd.current_height;
+    context.m_priv.m_last_fetched_block_ids.clear();
     //let the socket to send response to handshake, but request callback, to let send request data after response
     LOG_PRINT_L3("requesting callback");
     ++context.m_priv.m_callback_request_count;
@@ -241,6 +256,7 @@ namespace currency
     hshd.last_checkpoint_height = m_core.get_blockchain_storage().get_checkpoints().get_top_checkpoint_height();
     hshd.core_time = m_core.get_blockchain_storage().get_core_runtime_config().get_core_time();
     hshd.client_version = PROJECT_VERSION_LONG;
+    hshd.non_pruning_mode_enabled = m_core.get_blockchain_storage().is_non_pruning_mode_enabled();
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------  
@@ -368,6 +384,7 @@ namespace currency
     }else if(bvc.m_marked_as_orphaned)
     {
       context.m_state = currency_connection_context::state_synchronizing;
+      context.m_priv.m_last_fetched_block_ids.clear();
       NOTIFY_REQUEST_CHAIN::request r = boost::value_initialized<NOTIFY_REQUEST_CHAIN::request>();
       m_core.get_short_chain_history(r.block_ids);
       LOG_PRINT_MAGENTA("State changed to state_synchronizing.", LOG_LEVEL_2);
@@ -520,7 +537,7 @@ namespace currency
       return 1;
     }
 
-    context.m_remote_blockchain_height = arg.current_blockchain_height;
+    context.m_remote_blockchain_size = arg.current_blockchain_height;
 
     uint64_t total_blocks_parsing_time = 0;
     size_t count = 0;
@@ -559,7 +576,7 @@ namespace currency
       if(req_it == context.m_priv.m_requested_objects.end())
       {
         LOG_ERROR_CCONTEXT("sent wrong NOTIFY_RESPONSE_GET_OBJECTS: block with id=" << epst::pod_to_hex(get_blob_hash(block_entry.block)) 
-          << " wasn't requested, dropping connection");
+          << " wasn't requested, block_blob: " << epst::buff_to_hex_nodelimer(block_entry.block) << " dropping connection");
         m_p2p->drop_connection(context);
         m_p2p->add_ip_fail(context.m_remote_ip);
         return 1;
@@ -662,9 +679,9 @@ namespace currency
     }
     uint64_t current_size = m_core.get_blockchain_storage().get_current_blockchain_size();
     LOG_PRINT_YELLOW(">>>>>>>>> sync progress: " << arg.blocks.size() << " blocks added, now have "
-      << current_size << " of " << context.m_remote_blockchain_height
-      << " ( " << std::fixed << std::setprecision(2) << current_size * 100.0 / context.m_remote_blockchain_height << "% ) and "
-      << context.m_remote_blockchain_height - current_size << " blocks left"
+      << current_size << " of " << context.m_remote_blockchain_size
+      << " ( " << std::fixed << std::setprecision(2) << current_size * 100.0 / context.m_remote_blockchain_size << "% ) and "
+      << context.m_remote_blockchain_size - current_size << " blocks left"
       , LOG_LEVEL_0);
 
     request_missing_objects(context, true);
@@ -741,21 +758,51 @@ namespace currency
       LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_GET_OBJECTS(req_missing): requested_cumulative_size=" << requested_cumulative_size << ", blocks.size()=" << req.blocks.size() << ", txs.size()=" << req.txs.size());
       LOG_PRINT_L3("[NOTIFY]NOTIFY_REQUEST_GET_OBJECTS(req_missing): " << ENDL << currency::print_kv_structure(req));
       post_notify<NOTIFY_REQUEST_GET_OBJECTS>(req, context);    
-    }else if(context.m_last_response_height < context.m_remote_blockchain_height-1)
+    }else if(context.m_last_response_height < context.m_remote_blockchain_size-1)
     {//we have to fetch more objects ids, request blockchain entry
      
       NOTIFY_REQUEST_CHAIN::request r = boost::value_initialized<NOTIFY_REQUEST_CHAIN::request>();
-      m_core.get_short_chain_history(r.block_ids);
-      LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_CHAIN: m_block_ids.size()=" << r.block_ids.size() );
-      LOG_PRINT_L3("[NOTIFY]NOTIFY_REQUEST_CHAIN: " << ENDL << print_kv_structure(r) );
+      if (context.m_priv.m_last_fetched_block_ids.get_top_block_height() > 0)
+      {
+        bool last_received_block_is_in_mainchain = m_core.get_blockchain_storage().have_block_main(context.m_priv.m_last_fetched_block_ids.get_top_block_id());
+        bool far_from_top = context.m_priv.m_last_fetched_block_ids.get_top_block_height() + BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT < m_core.get_blockchain_storage().get_current_blockchain_size();
+        if (!last_received_block_is_in_mainchain || (last_received_block_is_in_mainchain && far_from_top))
+        {          
+          block_extended_info blk = AUTO_VAL_INIT(blk);
+          // In this scenario, it's likely the remote daemon is on an alternate chain 
+          // where the network split goes deeper than 2000 blocks. The NOTIFY_REQUEST_GET_OBJECTS 
+          // call returns a batch of BLOCKS_IDS_SYNCHRONIZING_DEFAULT_COUNT IDs, which may 
+          // start well beyond the original split point.
+          //
+          // If we repeatedly call NOTIFY_REQUEST_GET_OBJECTS with the IDs obtained from 
+          // get_short_chain_history, it would create an endless loop. However, we still need 
+          // to retrieve the full alternate chain from the remote daemon because it could 
+          // potentially be “heavier” (in terms of consensus).
+          //
+          // Therefore, we provide only the last ten blocks returned by the remote daemon 
+          // in the NOTIFY_REQUEST_CHAIN request, expecting to receive the subsequent batch 
+          // of alternate blocks next.
+          context.m_priv.m_last_fetched_block_ids.get_short_chain_history(r.block_ids);
+          //add genesis to the latest
+          LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_CHAIN: requesting alt version starting from " << r.block_ids.front());
+        }
+      }
+
+      if (!r.block_ids.size())
+      {
+        m_core.get_short_chain_history(r.block_ids);
+      }
+      LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_CHAIN: m_block_ids.size()=" << r.block_ids.size());
+      LOG_PRINT_L3("[NOTIFY]NOTIFY_REQUEST_CHAIN: " << ENDL << print_kv_structure(r));
       post_notify<NOTIFY_REQUEST_CHAIN>(r, context);
+
     }else
     { 
-      CHECK_AND_ASSERT_MES(context.m_last_response_height == context.m_remote_blockchain_height-1 
+      CHECK_AND_ASSERT_MES(context.m_last_response_height == context.m_remote_blockchain_size-1 
                            && !context.m_priv.m_needed_objects.size() 
                            && !context.m_priv.m_requested_objects.size(), false, "request_missing_blocks final condition failed!" 
                            << "\r\nm_last_response_height=" << context.m_last_response_height
-                           << "\r\nm_remote_blockchain_height=" << context.m_remote_blockchain_height
+                           << "\r\nm_remote_blockchain_size=" << context.m_remote_blockchain_size
                            << "\r\nm_needed_objects.size()=" << context.m_priv.m_needed_objects.size()
                            << "\r\nm_requested_objects.size()=" << context.m_priv.m_requested_objects.size()
                            << "\r\non connection [" << epee::net_utils::print_connection_context_short(context)<< "]");
@@ -966,9 +1013,9 @@ namespace currency
       return 1;
     }
     
-    context.m_remote_blockchain_height = arg.total_height;
+    context.m_remote_blockchain_size = arg.total_height;
     context.m_last_response_height = arg.start_height + arg.m_block_ids.size()-1;
-    if(context.m_last_response_height > context.m_remote_blockchain_height)
+    if(context.m_last_response_height > context.m_remote_blockchain_size)
     {
       LOG_ERROR_CCONTEXT("sent wrong NOTIFY_RESPONSE_CHAIN_ENTRY, with \r\nm_total_height=" << arg.total_height
                                                                          << "\r\nm_start_height=" << arg.start_height
@@ -977,10 +1024,16 @@ namespace currency
       m_p2p->add_ip_fail(context.m_remote_ip);
     }
 
+    uint64_t height = arg.start_height;
     BOOST_FOREACH(auto& bl_details, arg.m_block_ids)
     {
       if (!m_core.have_block(bl_details.h))
+      {
         context.m_priv.m_needed_objects.push_back(bl_details);
+      }
+
+      context.m_priv.m_last_fetched_block_ids.push_new_block_id(bl_details.h, height);
+      height++;
     }
 
     request_missing_objects(context, false);

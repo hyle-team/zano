@@ -371,7 +371,7 @@ namespace misc_utils
   }
 
 
-#define ON_EXIT misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler
+#define ON_FUNC_EXIT misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler
 
 
     template< typename t_contaner, typename t_redicate>
@@ -626,6 +626,18 @@ namespace misc_utils
 
   };
 
+
+  // helper class mainly intended for using with std::atomic to repair copy-construction in classes where std::atomic is aggregated
+  template<typename parent_t>
+  struct void_copy : public parent_t
+  {
+    void_copy()                                 = default;
+    void_copy(void_copy&&) noexcept             = default;
+    void_copy& operator=(void_copy&&) noexcept  = default;
+
+    void_copy(const void_copy&) : parent_t{}    {}
+    void_copy& operator=(const void_copy&)      { return *this; }
+  };
 
 } // namespace misc_utils
 } // namespace epee

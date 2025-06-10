@@ -524,7 +524,7 @@ namespace epee {
 namespace epee
 {
    template<typename t_rpc_server>
-   bool generate_doc_as_md_files(const std::string& folder, t_rpc_server& server)
+   bool generate_doc_as_md_files(const std::string& folder, t_rpc_server& server, const std::string& sufix = std::string())
    {
      LOG_PRINT_L0("Dumping RPC auto-generated documents!");
      epee::net_utils::http::http_request_info query_info;
@@ -550,6 +550,8 @@ namespace epee
        ss << "### Request description: " << ENDL << "```" << ENDL << de.request_json_descriptions << ENDL << "```" << ENDL;
        ss << "### Response: " << ENDL << "```json" << ENDL << de.response_json_example << ENDL << "```" << ENDL;
        ss << "### Response description: " << ENDL << "```" << ENDL << de.response_json_descriptions << ENDL << "```" << ENDL;
+
+       ss << sufix;
 
        std::string filename = de.json_method_name;
        if (!filename.size())
