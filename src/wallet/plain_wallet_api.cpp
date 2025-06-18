@@ -605,6 +605,7 @@ namespace plain_wallet
     PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
     return inst_ptr->gwm.invoke(h, params);
+    tools::sanitize_utf8(params);
     PLAIN_WALLET_CATCH();
   }
 
