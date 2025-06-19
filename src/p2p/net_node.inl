@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2019 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -1196,7 +1196,7 @@ namespace nodetool
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
-  int node_server<t_payload_net_handler>::handle_request_log(int command, COMMAND_REQUEST_LOG::request& req, COMMAND_REQUEST_LOG::response& rsp, p2p_connection_context& context)
+  int node_server<t_payload_net_handler>::handle_request_anonymized_peers(int command, COMMAND_REQUEST_ANONYMIZED_PEERS::request& req, COMMAND_REQUEST_ANONYMIZED_PEERS::response& rsp, p2p_connection_context& context)
   {
     if (!check_trust(req.tr))
     {
@@ -1204,30 +1204,15 @@ namespace nodetool
       return 1;
     }
 
-    rsp.current_log_level = static_cast<int64_t>(log_space::get_set_log_detalisation_level());
-    tools::get_log_chunk_gzipped(req.log_chunk_offset, req.log_chunk_size, rsp.log_chunk, rsp.error);
-    rsp.current_log_size = tools::get_log_file_size();
+    m_net_server.get_config_object().foreach_connection([&](const p2p_connection_context& cn_context)
+      {
+        auto& el = rsp.peers.emplace_back();
+        el.inbound = cn_context.m_is_income;
+        el.time_started = cn_context.m_started;
+        return true;
+      });
 
-    return 1;
-  }
-  //-----------------------------------------------------------------------------------
-  template<class t_payload_net_handler>
-  int node_server<t_payload_net_handler>::handle_set_log_level(int command, COMMAND_SET_LOG_LEVEL::request& req, COMMAND_SET_LOG_LEVEL::response& rsp, p2p_connection_context& context)
-  {
-    if (!check_trust(req.tr))
-    {
-      drop_connection(context);
-      return 1;
-    }
-
-    rsp.old_log_level = static_cast<int64_t>(log_space::get_set_log_detalisation_level());
-    log_space::get_set_log_detalisation_level(true, static_cast<int>(req.new_log_level));
-    rsp.current_log_level = static_cast<int64_t>(log_space::get_set_log_detalisation_level());
-
-    if (rsp.old_log_level != rsp.current_log_level)
-    {
-      LOG_PRINT_CC(context, "log level changed by debug command: " << rsp.old_log_level << " -> " << rsp.current_log_level, LOG_LEVEL_0);
-    }
+    std::shuffle(rsp.peers.begin(), rsp.peers.end(), crypto::uniform_random_bit_generator());
 
     return 1;
   }
