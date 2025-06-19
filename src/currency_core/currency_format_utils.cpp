@@ -1784,7 +1784,7 @@ namespace currency
   }
 
   //---------------------------------------------------------------
-  void encrypt_attachments(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key, crypto::key_derivation& derivation)
+  void encrypt_payload_items(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key, crypto::key_derivation& derivation)
   {
     bool r = crypto::generate_key_derivation(destination_addr.view_public_key, tx_random_key.sec, derivation);
     CHECK_AND_ASSERT_MES(r, void(), "failed to generate_key_derivation");
@@ -1816,10 +1816,10 @@ namespace currency
     }
   }
   //---------------------------------------------------------------
-  void encrypt_attachments(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key)
+  void encrypt_payload_items(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key)
   {
     crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-    return encrypt_attachments(tx, sender_keys, destination_addr, tx_random_key, derivation);
+    return encrypt_payload_items(tx, sender_keys, destination_addr, tx_random_key, derivation);
   }
   //---------------------------------------------------------------
   void load_wallet_transfer_info_flags(tools::wallet_public::wallet_transfer_info& x)
@@ -2582,7 +2582,7 @@ namespace currency
 
       //include offers if need
       tx.attachment = attachments;
-      encrypt_attachments(tx, sender_account_keys, crypt_destination_addr, gen_context.tx_key, result.derivation);
+      encrypt_payload_items(tx, sender_account_keys, crypt_destination_addr, gen_context.tx_key, result.derivation);
     }
     else
     {

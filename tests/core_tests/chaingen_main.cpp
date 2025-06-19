@@ -1077,7 +1077,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_wallet_oversized_payment_id);
     GENERATE_AND_PLAY(gen_wallet_transfers_and_outdated_unconfirmed_txs);
     GENERATE_AND_PLAY(gen_wallet_transfers_and_chain_switch);
-    GENERATE_AND_PLAY(gen_wallet_decrypted_attachments);
+    GENERATE_AND_PLAY(gen_wallet_decrypted_payload_items);
     GENERATE_AND_PLAY_HF(gen_wallet_alias_and_unconfirmed_txs, "3-*");
     GENERATE_AND_PLAY_HF(gen_wallet_alias_via_special_wallet_funcs, "3-*");
     GENERATE_AND_PLAY(gen_wallet_fake_outputs_randomness);

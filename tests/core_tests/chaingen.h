@@ -1356,11 +1356,13 @@ void append_vector_by_another_vector(U& dst, const V& src)
 
 #define MAKE_TX_LIST_START_WITH_ATTACHS(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, HEAD, ATTACHS) MAKE_TX_LIST_START_MIX_ATTR(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, HEAD, CURRENCY_TO_KEY_OUT_RELAXED, ATTACHS)
 
-#define MAKE_TX_ATTACH_FEE(EVENTS, TX_VAR, FROM, TO, AMOUNT, FEE, HEAD, ATTACH)        \
-  PRINT_EVENT_N(EVENTS);                                                               \
-  currency::transaction TX_VAR = AUTO_VAL_INIT(TX_VAR);                                \
-  CHECK_AND_ASSERT_MES(construct_tx_to_key(generator.get_hardforks(), EVENTS, TX_VAR, HEAD, FROM, TO, AMOUNT, FEE, 0, generator.last_tx_generated_secret_key, CURRENCY_TO_KEY_OUT_RELAXED, empty_extra, ATTACH), false, "construct_tx_to_key failed"); \
+#define MAKE_TX_EXTRA_ATTACH_FEE(EVENTS, TX_VAR, FROM, TO, AMOUNT, FEE, HEAD, EXTRA, ATTACH)  \
+  PRINT_EVENT_N(EVENTS);                                                                      \
+  currency::transaction TX_VAR{};                                                             \
+  CHECK_AND_ASSERT_MES(construct_tx_to_key(generator.get_hardforks(), EVENTS, TX_VAR, HEAD, FROM, TO, AMOUNT, FEE, 0, generator.last_tx_generated_secret_key, CURRENCY_TO_KEY_OUT_RELAXED, EXTRA, ATTACH), false, "construct_tx_to_key failed"); \
   EVENTS.push_back(TX_VAR)
+
+#define MAKE_TX_ATTACH_FEE(EVENTS, TX_VAR, FROM, TO, AMOUNT, FEE, HEAD, ATTACH) MAKE_TX_EXTRA_ATTACH_FEE(EVENTS, TX_VAR, FROM, TO, AMOUNT, FEE, HEAD, empty_extra, ATTACH) 
 
 #define MAKE_TX_ATTACH(EVENTS, TX_VAR, FROM, TO, AMOUNT, HEAD, ATTACH) MAKE_TX_ATTACH_FEE(EVENTS, TX_VAR, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, HEAD, ATTACH)
 
@@ -1417,30 +1419,25 @@ void append_vector_by_another_vector(U& dst, const V& src)
 
 #define MAKE_TEST_WALLET_TX(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC)              \
   PRINT_EVENT_N(EVENTS_VEC);                                                           \
-  transaction TX_VAR = AUTO_VAL_INIT(TX_VAR);                                          \
+  transaction TX_VAR{};                                                                \
   {                                                                                    \
     std::vector<tx_destination_entry> destinations(1, tx_destination_entry(MONEY, DEST_ACC.get_public_address())); \
     WLT_WAR->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, std::vector<extra_v>(), std::vector<attachment_v>(), TX_VAR); \
   }                                                                                    \
   EVENTS_VEC.push_back(TX_VAR)
 
-#define MAKE_TEST_WALLET_TX_ATTACH(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC, ATTACH) \
+#define MAKE_TEST_WALLET_TX_EXTRA_ATTACH(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC, EXTRA, ATTACH) \
   PRINT_EVENT_N(EVENTS_VEC);                                                           \
-  transaction TX_VAR = AUTO_VAL_INIT(TX_VAR);                                          \
+  transaction TX_VAR{};                                                                \
   {                                                                                    \
     std::vector<tx_destination_entry> destinations(1, tx_destination_entry(MONEY, DEST_ACC.get_public_address())); \
-    WLT_WAR->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, std::vector<extra_v>(), ATTACH, TX_VAR); \
+    WLT_WAR->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, EXTRA, ATTACH, TX_VAR);   \
   }                                                                                    \
   EVENTS_VEC.push_back(TX_VAR)
 
-#define MAKE_TEST_WALLET_TX_EXTRA(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC, EXTRA) \
-  PRINT_EVENT_N(EVENTS_VEC);                                                           \
-  transaction TX_VAR = AUTO_VAL_INIT(TX_VAR);                                          \
-  {                                                                                    \
-    std::vector<tx_destination_entry> destinations(1, tx_destination_entry(MONEY, DEST_ACC.get_public_address())); \
-    WLT_WAR->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, EXTRA, std::vector<attachment_v>(), TX_VAR); \
-  }                                                                                    \
-  EVENTS_VEC.push_back(TX_VAR)
+#define MAKE_TEST_WALLET_TX_ATTACH(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC, ATTACH) MAKE_TEST_WALLET_TX_EXTRA_ATTACH(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC, empty_extra, ATTACH)
+
+#define MAKE_TEST_WALLET_TX_EXTRA(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC, EXTRA) MAKE_TEST_WALLET_TX_EXTRA_ATTACH(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC, EXTRA, empty_attachment)
 
 #define CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(WLT_WAR, TOTAL_BALANCE) \
   if (!check_balance_via_wallet(*WLT_WAR.get(), #WLT_WAR, TOTAL_BALANCE)) \
