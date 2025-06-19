@@ -505,6 +505,12 @@ namespace tools
           er.message = std::string("embedded payment id: ") + embedded_payment_id + " conflicts with previously set payment id: " + payment_id;
           return false;
         }
+        if (it != req.destinations.begin())
+        {
+          er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
+          er.message = std::string("payment id: ") + embedded_payment_id + " currently can only be set for the first destination (an so you can use integrated address only for the fist destination)";
+          return false;
+        }
         payment_id = embedded_payment_id;
       }
       de.amount = it->amount;
