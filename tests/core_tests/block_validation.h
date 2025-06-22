@@ -220,9 +220,5 @@ private:
 
 struct block_choice_rule_bigger_fee : public gen_block_verification_base<2>
 {
-  block_choice_rule_bigger_fee();
   bool generate(std::vector<test_event_entry>& events) const;
-  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
-private:
-  mutable currency::block blk_;
 };

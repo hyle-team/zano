@@ -1202,20 +1202,6 @@ bool block_reward_in_alt_chain_basic::assert_reward(currency::core& core, size_t
 
   return true;
 }
-block_choice_rule_bigger_fee::block_choice_rule_bigger_fee()
-{
-  REGISTER_CALLBACK("c1", block_choice_rule_bigger_fee::c1);
-}
-
-// bool blockchain_storage::is_reorganize_required(const block_extended_info& main_chain_bei, const alt_chain_type& alt_chain, const crypto::hash& proof_alt)
-bool block_choice_rule_bigger_fee::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
-  currency::block_verification_context context_blk{};
-  bool verification_result = c.get_blockchain_storage().add_new_block(blk_, context_blk);
-  CHECK_AND_ASSERT_MES(verification_result, true, "Block blk_1a failed to be added");
-
-  return true;
-}
 
 bool block_choice_rule_bigger_fee::generate(std::vector<test_event_entry>& events) const
 {
@@ -1226,33 +1212,33 @@ bool block_choice_rule_bigger_fee::generate(std::vector<test_event_entry>& event
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   // Main chain
-  MAKE_TX_FEE(events, tx_1, miner, miner, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, blk_0r);
-  MAKE_TX_FEE(events, tx_2, miner, miner, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, blk_0r);
-  MAKE_TX_FEE(events, tx_3, miner, miner, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, blk_0r);
-  MAKE_TX_FEE(events, tx_4, miner, miner, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, blk_0r);
+  MAKE_TX_FEE(events, tx_1, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
+  MAKE_TX_FEE(events, tx_2, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
+  MAKE_TX_FEE(events, tx_3, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
+  MAKE_TX_FEE(events, tx_4, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
 
   std::list<transaction> txs_main{tx_1, tx_2, tx_3, tx_4};
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner, txs_main);
 
   // Alt chain
-  MAKE_TX_FEE(events, tx_5, miner, miner, MK_TEST_COINS(1), 33 * TESTS_DEFAULT_FEE, blk_0r);
-  MAKE_TX_FEE(events, tx_6, miner, miner, MK_TEST_COINS(1), 33 * TESTS_DEFAULT_FEE, blk_0r);
-  MAKE_TX_FEE(events, tx_7, miner, miner, MK_TEST_COINS(1), 33 * TESTS_DEFAULT_FEE, blk_0r);
-  MAKE_TX_FEE(events, tx_8, miner, miner, MK_TEST_COINS(1), 33 * TESTS_DEFAULT_FEE, blk_0r);
+  MAKE_TX_FEE(events, tx_5, miner, miner, MK_TEST_COINS(8), TESTS_DEFAULT_FEE * 33, blk_0r);
+  MAKE_TX_FEE(events, tx_6, miner, miner, MK_TEST_COINS(8), TESTS_DEFAULT_FEE * 33, blk_0r);
+  MAKE_TX_FEE(events, tx_7, miner, miner, MK_TEST_COINS(8), TESTS_DEFAULT_FEE * 33, blk_0r);
+  MAKE_TX_FEE(events, tx_8, miner, miner, MK_TEST_COINS(8), TESTS_DEFAULT_FEE * 33, blk_0r);
 
   std::list<transaction> txs_alt{tx_5, tx_6, tx_7, tx_8};
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1a, blk_0r, miner, txs_alt);
-  blk_ = blk_1a;
+
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_1a));
 
   /* 0                 10               11
-    (blk_0) - ... - (blk_0r) -        (blk_1)
+      (blk_0) - ... - (blk_0r) -        (blk_1)
                       {tx0}     {tx1, tx2, tx3, tx4}
-                          |
-                          |            11
+                            |
+                            |          11
                             \       (blk_1a)
                               {tx5, tx6, tx7, tx8}
     */
 
-  DO_CALLBACK(events, "c1");
   return true;
 }
