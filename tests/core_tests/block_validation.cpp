@@ -1214,6 +1214,7 @@ struct block_choice_rule_bigger_fee::argument_assert
   uint64_t block_height{};
   uint64_t checked_height{};
   crypto::hash blk_id{};
+  std::list<crypto::hash> transactions{};
 
   argument_assert() = default;
 
@@ -1226,10 +1227,18 @@ struct block_choice_rule_bigger_fee::argument_assert
     CHECK_AND_ASSERT_THROW(instance, std::runtime_error{"Test instance is nullptr"});
   }
 
+  template<typename test>
+  argument_assert(const test* instance, const std::list<crypto::hash>& txs)
+    : transactions(txs)
+  {
+    CHECK_AND_ASSERT_THROW(instance, std::runtime_error{"Test instance is nullptr"});
+  }
+
   BEGIN_SERIALIZE()
     FIELD(block_height)
     FIELD(checked_height)
     FIELD(blk_id)
+    FIELD(transactions)
   END_SERIALIZE()
 };
 
@@ -1253,18 +1262,12 @@ bool block_choice_rule_bigger_fee::generate(std::vector<test_event_entry>& event
 
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
-  /*    0                10
-      (blk_0) - ... - (blk_0r)
-  */
-
   // Main chain
-  MAKE_TX_FEE(events, tx_1, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
-  MAKE_TX_FEE(events, tx_2, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
-  MAKE_TX_FEE(events, tx_3, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
-  MAKE_TX_FEE(events, tx_4, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
+  MAKE_TX_FEE(events, tx_1, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE * 10, blk_0r);
+  MAKE_TX_FEE(events, tx_2, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE * 10, blk_0r);
 
-  std::list<transaction> txs_main{tx_1, tx_2, tx_3, tx_4};
-  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner, txs_main);
+  std::list<transaction> txs_1{tx_1, tx_2};
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner, txs_1);
 
   DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_1));
   DO_CALLBACK(events, "check_tx_pool_empty");
@@ -1272,36 +1275,43 @@ bool block_choice_rule_bigger_fee::generate(std::vector<test_event_entry>& event
   argument_assert argument1{this, blk_1, 11};
   DO_CALLBACK_PARAMS_STR(events, "check_block_height", t_serializable_object_to_blob(argument1));
 
-  /*   0                 10               11
-     (blk_0) - ... - (blk_0r) -        (blk_1)
-                      {tx0}     {tx1, tx2, tx3, tx4}
+  /*   0                 10         11
+     (blk_0) - ... - (blk_0r) -   (blk_1)
+                      {tx0}     {tx1, tx2}
   */
 
   // Alt chain
-  MAKE_TX_FEE(events, tx_5, miner, miner, MK_TEST_COINS(8), TESTS_DEFAULT_FEE * 33, blk_0r);
-  MAKE_TX_FEE(events, tx_6, miner, miner, MK_TEST_COINS(8), TESTS_DEFAULT_FEE * 33, blk_0r);
-  MAKE_TX_FEE(events, tx_7, miner, miner, MK_TEST_COINS(8), TESTS_DEFAULT_FEE * 33, blk_0r);
-  MAKE_TX_FEE(events, tx_8, miner, miner, MK_TEST_COINS(8), TESTS_DEFAULT_FEE * 33, blk_0r);
+  MAKE_TX_FEE(events, tx_3, miner, miner, MK_TEST_COINS(8), TESTS_DEFAULT_FEE * 6, blk_0r);
+  MAKE_TX_FEE(events, tx_4, miner, miner, MK_TEST_COINS(8), TESTS_DEFAULT_FEE * 6, blk_0r);
+  MAKE_TX_FEE(events, tx_5, miner, miner, MK_TEST_COINS(8), TESTS_DEFAULT_FEE * 6, blk_0r);
+  MAKE_TX_FEE(events, tx_6, miner, miner, MK_TEST_COINS(8), TESTS_DEFAULT_FEE * 6, blk_0r);
 
-  std::list<transaction> txs_alt{tx_5, tx_6, tx_7, tx_8};
-  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1a, blk_0r, miner, txs_alt);
+  std::list<transaction> txs_1a{tx_3, tx_4, tx_5, tx_6};
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1a, blk_0r, miner, txs_1a);
 
   // tx_1,tx_2, tx_3, tx_4 should be in pool
   DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_1a));
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(4));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
 
   argument_assert argument1a{this, blk_1a, 11};
   DO_CALLBACK_PARAMS_STR(events, "check_block_height", t_serializable_object_to_blob(argument1));
 
   /*   0               10               11
-    (blk_0) - ... - (blk_0r)    -    (blk_1a)        - main chain with new block
-                      {tx0}     {tx5, tx6, tx7, tx8}
+    (blk_0) - ... - (blk_0r)    -     (blk_1a)        - main chain with new block
+                      {tx0}     {tx_3, tx_4, tx_5, tx_6}
                         |
                         |              11
                         |       -    (blk_1)         - alt chain with old block
   */
 
-  DO_CALLBACK(events, "c1");
+  std::list<crypto::hash> transactions;
+  for (const auto& tx : txs_1)
+  {
+    transactions.push_back(get_transaction_hash(tx));
+  }
+  argument_assert argument_c1{this, transactions};
+
+  DO_CALLBACK_PARAMS_STR(events, "c1", t_serializable_object_to_blob(argument_c1));
 
   return true;
 }
@@ -1314,8 +1324,26 @@ bool block_choice_rule_bigger_fee::c1(currency::core& c, size_t ev_index, const 
   c.get_blockchain_storage().get_alternative_blocks(blocks);
   CHECK_AND_ASSERT_EQ(blocks.size(), expected_alt_blocks_count);
 
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 4, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
 
+  argument_assert argument{};
+  {
+    const auto serialized_argument{boost::get<callback_entry>(events.at(ev_index)).callback_params};
+
+    CHECK_AND_ASSERT_EQ(t_unserializable_object_from_blob(argument, serialized_argument), true);
+  }
+
+  std::list<currency::transaction> txs;
+  c.get_pool_transactions(txs);
+  std::list<crypto::hash> hash_txs;
+  for (const auto& tx : txs)
+  {
+    hash_txs.push_back(get_transaction_hash(tx));
+  }
+
+  hash_txs.sort();
+  argument.transactions.sort();
+  CHECK_AND_ASSERT_MES(hash_txs == argument.transactions, false, "Unexpected transactions in the mempool");
 
   return true;
 }
