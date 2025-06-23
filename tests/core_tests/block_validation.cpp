@@ -1202,3 +1202,151 @@ bool block_reward_in_alt_chain_basic::assert_reward(currency::core& core, size_t
 
   return true;
 }
+
+//-----------------------------------------------------------------------------------------------------
+block_choice_rule_bigger_fee::block_choice_rule_bigger_fee()
+{
+  REGISTER_CALLBACK("c1", block_choice_rule_bigger_fee::c1);
+}
+
+struct block_choice_rule_bigger_fee::argument_assert
+{
+  std::list<crypto::hash> transactions{};
+
+  argument_assert() = default;
+
+  argument_assert(const std::list<crypto::hash>& txs)
+    : transactions(txs)
+  {}
+
+  BEGIN_SERIALIZE()
+    FIELD(transactions)
+  END_SERIALIZE()
+};
+
+// Test idea: fork-choice rule based on transactions’ median fees
+/* Sets up three competing chains:
+ * - Main(blk_1a): 4 transactions with fee 6  (fees = [6, 6, 6, 6], median = (6 + 6)   / 2 = 6,  score = 6  * 4 = 24)
+ * - Alt1(blk_1b): 2 transactions with fee 11 (fees = [11, 11],     median = (11 + 11) / 2 = 11, score = 11 * 2 = 22)
+ * - Alt2(blk_1): 2 transactions with fee 10 (fees = [10, 10],   median = (10 + 10) / 2 = 10, score = 10 * 2 = 20)
+ *
+ * Fork-choice rule:
+ * - Even count: median = average of the two middle fees, then multiply by the number of transactions.
+ * - Odd count:  median = fee of the central transaction, then multiply by the number of transactions.
+ *
+ * The chain with the highest resulting value wins. In this test, Main(blk_1a) wins (24 > 22 and 24 > 20)
+ * and remains the preferred chain even after Alt2Alt2(blk_1) appears.
+ */
+bool block_choice_rule_bigger_fee::generate(std::vector<test_event_entry>& events) const
+{
+  GENERATE_ACCOUNT(miner);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // Main chain
+  MAKE_TX_FEE(events, tx_1, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE * 10, blk_0r);
+  MAKE_TX_FEE(events, tx_2, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE * 10, blk_0r);
+
+  std::list<transaction> txs_1{tx_1, tx_2};
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner, txs_1);
+
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_1));
+  DO_CALLBACK(events, "check_tx_pool_empty");
+
+  /*   0                 10         11
+     (blk_0) - ... - (blk_0r) -   (blk_1)
+                      {tx0}     {tx1, tx2}
+  */
+
+  // Alt chain
+  MAKE_TX_FEE(events, tx_3, miner, miner, MK_TEST_COINS(8), TESTS_DEFAULT_FEE * 6, blk_0r);
+  MAKE_TX_FEE(events, tx_4, miner, miner, MK_TEST_COINS(8), TESTS_DEFAULT_FEE * 6, blk_0r);
+  MAKE_TX_FEE(events, tx_5, miner, miner, MK_TEST_COINS(8), TESTS_DEFAULT_FEE * 6, blk_0r);
+  MAKE_TX_FEE(events, tx_6, miner, miner, MK_TEST_COINS(8), TESTS_DEFAULT_FEE * 6, blk_0r);
+
+  std::list<transaction> txs_1a{tx_3, tx_4, tx_5, tx_6};
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1a, blk_0r, miner, txs_1a);
+
+  // tx_1,tx_2 should be in pool
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_1a));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
+
+  // Fees are pre-sorted:
+  // - If count is even: sum the two middle fees -> e.g., 6 + 6 / 2 * 4 = 24 (blk_1a)
+  // - If the number is odd: take the central transaction, for example tx1 tx2 tx3 - the fee of tx2 will be median
+  /*   0               10               11
+    (blk_0) - ... - (blk_0r)    -     (blk_1a) - win because 1
+                      {tx0}     {tx_3, tx_4, tx_5, tx_6}
+                        |
+                        |              11
+                        \       -    (blk_1)
+  */
+
+  std::list<crypto::hash> transactions;
+  for (const auto& tx : txs_1)
+  {
+    transactions.push_back(get_transaction_hash(tx));
+  }
+  argument_assert argument_1a{transactions};
+
+  DO_CALLBACK_PARAMS_STR(events, "c1", t_serializable_object_to_blob(argument_1a));
+
+  MAKE_TX_FEE(events, tx_7, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE * 11, blk_0r);
+  MAKE_TX_FEE(events, tx_8, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE * 11, blk_0r);
+
+  std::list<transaction> txs_1b{tx_7, tx_8};
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1b, blk_0r, miner, txs_1b);
+
+  /*   0               10               11
+    (blk_0) - ... - (blk_0r)    -     (blk_1a) - won because (6 + 6) / 2 * 4 = 24 > 22(blk_1b)
+                      {tx0}     {tx_3, tx_4, tx_5, tx_6}
+                        |
+                        |               11
+                        \      -      (blk_1b) - lost because after sorting the central element has the value (11 + 11) / 2 * 2 = 22 < 24
+                        |
+                        |              11
+                        \       -    (blk_1) - lost (10 + 10) / 2 * 2 = 20 < 24
+  */
+  
+  // tx_1, tx_2, tx_7, tx_8 should be in pool
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_1a));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(4));
+
+  for (const auto& tx : txs_1b)
+  {
+    transactions.push_back(get_transaction_hash(tx));
+  }
+  argument_assert argument_1b{transactions};
+  DO_CALLBACK_PARAMS_STR(events, "c1", t_serializable_object_to_blob(argument_1b));
+
+  return true;
+}
+
+bool block_choice_rule_bigger_fee::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  argument_assert argument{};
+  {
+    const auto serialized_argument{boost::get<callback_entry>(events.at(ev_index)).callback_params};
+
+    CHECK_AND_ASSERT_EQ(t_unserializable_object_from_blob(argument, serialized_argument), true);
+  }
+
+  std::list<currency::transaction> txs;
+  c.get_pool_transactions(txs);
+
+  CHECK_AND_ASSERT_MES(txs.size() == argument.transactions.size(), false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());  
+  
+  std::list<crypto::hash> hash_txs;
+  for (const auto& tx : txs)
+  {
+    hash_txs.push_back(get_transaction_hash(tx));
+  }
+
+  hash_txs.sort();
+  argument.transactions.sort();
+  CHECK_AND_ASSERT_MES(hash_txs == argument.transactions, false, "Unexpected transactions in the mempool");
+
+  return true;
+}

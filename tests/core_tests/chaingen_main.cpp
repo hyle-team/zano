@@ -1191,7 +1191,8 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_out_to_initiator, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_has_invalid_tx, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_is_too_big, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_wrong_version_agains_hardfork, "0,3");  
+    GENERATE_AND_PLAY_HF(gen_block_wrong_version_agains_hardfork, "0,3");
+    GENERATE_AND_PLAY_HF(block_choice_rule_bigger_fee, "4-*"); 
     //GENERATE_AND_PLAY(gen_block_invalid_binary_format); // Takes up to 3 hours, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 500, up to 30 minutes, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10
 
 
