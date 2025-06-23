@@ -1209,7 +1209,6 @@ block_choice_rule_bigger_fee::block_choice_rule_bigger_fee()
   REGISTER_CALLBACK("c1", block_choice_rule_bigger_fee::c1);
 }
 
-
 struct block_choice_rule_bigger_fee::argument_assert
 {
   std::list<crypto::hash> transactions{};
@@ -1225,7 +1224,12 @@ struct block_choice_rule_bigger_fee::argument_assert
   END_SERIALIZE()
 };
 
-// the test checks that the median transaction will be taken into account when selecting a block
+// The test idea: the fork-choice rule based on transactions’ median fees
+/* Sets up two competing chains:
+ * - Main: odd count of high-fee txs (median = middle fee).
+ * - Alt: even count of lower-fee txs (median = sum of two middle fees).
+ * Verifies the chain with the higher median fee wins, even after adding new higher-fee txs.
+ */
 bool block_choice_rule_bigger_fee::generate(std::vector<test_event_entry>& events) const
 {
   GENERATE_ACCOUNT(miner);
@@ -1263,10 +1267,10 @@ bool block_choice_rule_bigger_fee::generate(std::vector<test_event_entry>& event
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
 
   // Fees are pre-sorted:
-  // - If count is even: sum the two middle fees → e.g., 6 + 6 = 12 (blk_1a)
-  // - If count is odd: take the middle fee → e.g., 11 (blk_1)
+  // - If count is even: sum the two middle fees -> e.g., 6 + 6 / 2 * 4 = 24 (blk_1a)
+  // - If count is odd: take the middle fee -> e.g., 11 (blk_1)
   /*   0               10               11
-    (blk_0) - ... - (blk_0r)    -     (blk_1a) - win couse 1
+    (blk_0) - ... - (blk_0r)    -     (blk_1a) - win because 1
                       {tx0}     {tx_3, tx_4, tx_5, tx_6}
                         |
                         |              11
@@ -1289,17 +1293,17 @@ bool block_choice_rule_bigger_fee::generate(std::vector<test_event_entry>& event
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1b, blk_0r, miner, txs_1b);
 
   /*   0               10               11
-    (blk_0) - ... - (blk_0r)    -     (blk_1a)
+    (blk_0) - ... - (blk_0r)    -     (blk_1a) - won because (6 + 6) / 2 * 4 = 24 > 22(blk_1b)
                       {tx0}     {tx_3, tx_4, tx_5, tx_6}
                         |
                         |               11
-                        \     -       (blk_1b) - lost because after sorting the central element has the value 11
+                        \      -      (blk_1b) - lost because after sorting the central element has the value (11 + 11) / 2 * 2 = 22 < 24
                         |
                         |              11
-                        \       -    (blk_1)
+                        \       -    (blk_1) - lost (10 + 10) / 2 * 2 = 20 < 24
   */
   
-  // tx_1,tx_2, tx_7, tx_8 should be in pool
+  // tx_1, tx_2, tx_7, tx_8 should be in pool
   DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_1a));
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(4));
 
