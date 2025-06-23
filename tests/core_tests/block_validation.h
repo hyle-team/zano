@@ -225,6 +225,5 @@ struct block_choice_rule_bigger_fee : public wallet_test
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
 private:
-  bool check_block_height(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   struct argument_assert;
 };
