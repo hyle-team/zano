@@ -1206,54 +1206,26 @@ bool block_reward_in_alt_chain_basic::assert_reward(currency::core& core, size_t
 //-----------------------------------------------------------------------------------------------------
 block_choice_rule_bigger_fee::block_choice_rule_bigger_fee()
 {
-  REGISTER_CALLBACK_METHOD(block_choice_rule_bigger_fee, check_block_height);
   REGISTER_CALLBACK("c1", block_choice_rule_bigger_fee::c1);
 }
 
+
 struct block_choice_rule_bigger_fee::argument_assert
 {
-  uint64_t block_height{};
-  uint64_t checked_height{};
-  crypto::hash blk_id{};
   std::list<crypto::hash> transactions{};
 
   argument_assert() = default;
 
-  template<typename test>
-  argument_assert(const test* instance, const block& block, uint64_t expected_height)
-    : block_height(get_block_height(block)),
-      checked_height(expected_height),
-      blk_id(get_block_hash(block))
-  {
-    CHECK_AND_ASSERT_THROW(instance, std::runtime_error{"Test instance is nullptr"});
-  }
-
-  template<typename test>
-  argument_assert(const test* instance, const std::list<crypto::hash>& txs)
+  argument_assert(const std::list<crypto::hash>& txs)
     : transactions(txs)
-  {
-    CHECK_AND_ASSERT_THROW(instance, std::runtime_error{"Test instance is nullptr"});
-  }
+  {}
 
   BEGIN_SERIALIZE()
-    FIELD(block_height)
-    FIELD(checked_height)
-    FIELD(blk_id)
     FIELD(transactions)
   END_SERIALIZE()
 };
-bool block_choice_rule_bigger_fee::check_block_height(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
-{
-  argument_assert argument{};
-  {
-    const auto serialized_argument{boost::get<callback_entry>(events.at(ev_index)).callback_params};
 
-    CHECK_AND_ASSERT_EQ(t_unserializable_object_from_blob(argument, serialized_argument), true);
-  }
-  CHECK_AND_ASSERT_EQ(argument.block_height, argument.checked_height);
-  return true; 
-}
-
+// the test checks that the median transaction will be taken into account when selecting a block
 bool block_choice_rule_bigger_fee::generate(std::vector<test_event_entry>& events) const
 {
   GENERATE_ACCOUNT(miner);
@@ -1272,9 +1244,6 @@ bool block_choice_rule_bigger_fee::generate(std::vector<test_event_entry>& event
   DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_1));
   DO_CALLBACK(events, "check_tx_pool_empty");
 
-  argument_assert argument1{this, blk_1, 11};
-  DO_CALLBACK_PARAMS_STR(events, "check_block_height", t_serializable_object_to_blob(argument1));
-
   /*   0                 10         11
      (blk_0) - ... - (blk_0r) -   (blk_1)
                       {tx0}     {tx1, tx2}
@@ -1289,22 +1258,63 @@ bool block_choice_rule_bigger_fee::generate(std::vector<test_event_entry>& event
   std::list<transaction> txs_1a{tx_3, tx_4, tx_5, tx_6};
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1a, blk_0r, miner, txs_1a);
 
-  /* 0                 10               11
-    (blk_0) - ... - (blk_0r) -        (blk_1)
-                      {tx0}     {tx1, tx2, tx3, tx4}
-                            |
-                            |          11
-                            \       (blk_1a)
-                              {tx5, tx6, tx7, tx8}
-    */
+  // tx_1,tx_2 should be in pool
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_1a));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
+
+  // Fees are pre-sorted:
+  // - If count is even: sum the two middle fees → e.g., 6 + 6 = 12 (blk_1a)
+  // - If count is odd: take the middle fee → e.g., 11 (blk_1)
+  /*   0               10               11
+    (blk_0) - ... - (blk_0r)    -     (blk_1a) - win couse 1
+                      {tx0}     {tx_3, tx_4, tx_5, tx_6}
+                        |
+                        |              11
+                        \       -    (blk_1)
+  */
+
+  std::list<crypto::hash> transactions;
+  for (const auto& tx : txs_1)
+  {
+    transactions.push_back(get_transaction_hash(tx));
+  }
+  argument_assert argument_1a{transactions};
+
+  DO_CALLBACK_PARAMS_STR(events, "c1", t_serializable_object_to_blob(argument_1a));
+
+  MAKE_TX_FEE(events, tx_7, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE * 11, blk_0r);
+  MAKE_TX_FEE(events, tx_8, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE * 11, blk_0r);
+
+  std::list<transaction> txs_1b{tx_7, tx_8};
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1b, blk_0r, miner, txs_1b);
+
+  /*   0               10               11
+    (blk_0) - ... - (blk_0r)    -     (blk_1a)
+                      {tx0}     {tx_3, tx_4, tx_5, tx_6}
+                        |
+                        |               11
+                        \     -       (blk_1b) - lost because after sorting the central element has the value 11
+                        |
+                        |              11
+                        \       -    (blk_1)
+  */
+  
+  // tx_1,tx_2, tx_7, tx_8 should be in pool
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_1a));
+  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(4));
+
+  for (const auto& tx : txs_1b)
+  {
+    transactions.push_back(get_transaction_hash(tx));
+  }
+  argument_assert argument_1b{transactions};
+  DO_CALLBACK_PARAMS_STR(events, "c1", t_serializable_object_to_blob(argument_1b));
 
   return true;
 }
 
 bool block_choice_rule_bigger_fee::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
-
   argument_assert argument{};
   {
     const auto serialized_argument{boost::get<callback_entry>(events.at(ev_index)).callback_params};
@@ -1314,6 +1324,9 @@ bool block_choice_rule_bigger_fee::c1(currency::core& c, size_t ev_index, const 
 
   std::list<currency::transaction> txs;
   c.get_pool_transactions(txs);
+
+  CHECK_AND_ASSERT_MES(txs.size() == argument.transactions.size(), false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());  
+  
   std::list<crypto::hash> hash_txs;
   for (const auto& tx : txs)
   {
