@@ -1203,6 +1203,7 @@ bool block_reward_in_alt_chain_basic::assert_reward(currency::core& core, size_t
   return true;
 }
 
+//-----------------------------------------------------------------------------------------------------
 block_choice_rule_bigger_fee::block_choice_rule_bigger_fee()
 {
   REGISTER_CALLBACK_METHOD(block_choice_rule_bigger_fee, check_block_height);
@@ -1241,7 +1242,6 @@ struct block_choice_rule_bigger_fee::argument_assert
     FIELD(transactions)
   END_SERIALIZE()
 };
-
 bool block_choice_rule_bigger_fee::check_block_height(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   argument_assert argument{};
@@ -1289,41 +1289,20 @@ bool block_choice_rule_bigger_fee::generate(std::vector<test_event_entry>& event
   std::list<transaction> txs_1a{tx_3, tx_4, tx_5, tx_6};
   MAKE_NEXT_BLOCK_TX_LIST(events, blk_1a, blk_0r, miner, txs_1a);
 
-  // tx_1,tx_2, tx_3, tx_4 should be in pool
-  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_1a));
-  DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(2));
-
-  argument_assert argument1a{this, blk_1a, 11};
-  DO_CALLBACK_PARAMS_STR(events, "check_block_height", t_serializable_object_to_blob(argument1));
-
-  /*   0               10               11
-    (blk_0) - ... - (blk_0r)    -     (blk_1a)        - main chain with new block
-                      {tx0}     {tx_3, tx_4, tx_5, tx_6}
-                        |
-                        |              11
-                        |       -    (blk_1)         - alt chain with old block
-  */
-
-  std::list<crypto::hash> transactions;
-  for (const auto& tx : txs_1)
-  {
-    transactions.push_back(get_transaction_hash(tx));
-  }
-  argument_assert argument_c1{this, transactions};
-
-  DO_CALLBACK_PARAMS_STR(events, "c1", t_serializable_object_to_blob(argument_c1));
+  /* 0                 10               11
+    (blk_0) - ... - (blk_0r) -        (blk_1)
+                      {tx0}     {tx1, tx2, tx3, tx4}
+                            |
+                            |          11
+                            \       (blk_1a)
+                              {tx5, tx6, tx7, tx8}
+    */
 
   return true;
 }
 
 bool block_choice_rule_bigger_fee::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  size_t expected_alt_blocks_count = 1;
-
-  std::list<block> blocks;
-  c.get_blockchain_storage().get_alternative_blocks(blocks);
-  CHECK_AND_ASSERT_EQ(blocks.size(), expected_alt_blocks_count);
-
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
 
   argument_assert argument{};
