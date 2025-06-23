@@ -1268,7 +1268,7 @@ bool block_choice_rule_bigger_fee::generate(std::vector<test_event_entry>& event
 
   // Fees are pre-sorted:
   // - If count is even: sum the two middle fees -> e.g., 6 + 6 / 2 * 4 = 24 (blk_1a)
-  // - If count is odd: take the middle fee -> e.g., 11 (blk_1)
+  // - If the number is odd: take the central transaction, for example tx1 tx2 tx3 - the fee of tx2 will be median
   /*   0               10               11
     (blk_0) - ... - (blk_0r)    -     (blk_1a) - win because 1
                       {tx0}     {tx_3, tx_4, tx_5, tx_6}
