@@ -1224,11 +1224,18 @@ struct block_choice_rule_bigger_fee::argument_assert
   END_SERIALIZE()
 };
 
-// The test idea: the fork-choice rule based on transactions’ median fees
-/* Sets up two competing chains:
- * - Main: odd count of high-fee txs (median = middle fee).
- * - Alt: even count of lower-fee txs (median = sum of two middle fees).
- * Verifies the chain with the higher median fee wins, even after adding new higher-fee txs.
+// Test idea: fork-choice rule based on transactions’ median fees
+/* Sets up three competing chains:
+ * - Main(blk_1a): 4 transactions with fee 6  (fees = [6, 6, 6, 6], median = (6 + 6)   / 2 = 6,  score = 6  * 4 = 24)
+ * - Alt1(blk_1b): 2 transactions with fee 11 (fees = [11, 11],     median = (11 + 11) / 2 = 11, score = 11 * 2 = 22)
+ * - Alt2(blk_1): 2 transactions with fee 10 (fees = [10, 10],   median = (10 + 10) / 2 = 10, score = 10 * 2 = 20)
+ *
+ * Fork-choice rule:
+ * - Even count: median = average of the two middle fees, then multiply by the number of transactions.
+ * - Odd count:  median = fee of the central transaction, then multiply by the number of transactions.
+ *
+ * The chain with the highest resulting value wins. In this test, Main(blk_1a) wins (24 > 22 and 24 > 20)
+ * and remains the preferred chain even after Alt2Alt2(blk_1) appears.
  */
 bool block_choice_rule_bigger_fee::generate(std::vector<test_event_entry>& events) const
 {
