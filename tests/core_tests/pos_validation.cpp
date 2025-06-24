@@ -267,6 +267,81 @@ bool gen_pos_extra_nonce::generate(std::vector<test_event_entry>& events) const
   return true;
 }
 
+gen_pos_extra_nonce_hf4::gen_pos_extra_nonce_hf4()
+{
+  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf4, c1);
+}
+
+bool gen_pos_extra_nonce_hf4::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = time(NULL);
+
+  GENERATE_ACCOUNT(miner);
+  GENERATE_ACCOUNT(alice);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner, ts);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS(events, blk_0r, blk_0, miner);
+
+  crypto::hash prev_id = get_block_hash(blk_0r);
+  size_t height = CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1;
+  currency::wide_difficulty_type diff = generator.get_difficulty_for_next_block(prev_id, false);
+
+  const transaction& stake = blk_0.miner_tx;
+  crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
+  size_t stake_output_idx = 0;
+  size_t stake_output_gidx = 0;
+  uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
+  crypto::key_image stake_output_key_image;
+  keypair kp;
+  generate_key_image_helper(miner.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
+  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
+
+  pos_block_builder pb;
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
+  pb.step2_set_txs(std::vector<transaction>());
+  pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, blk_0r.timestamp);
+
+  // use biggest possible extra nonce (255 bytes) + largest alias
+  currency::blobdata extra_nonce(255, 'x');
+  pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(blk_0r), alice.get_public_address(), extra_nonce, CURRENCY_MINER_TX_MAX_OUTS);
+  pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, miner);
+  block blk_1 = pb.m_block;
+
+  // EXPECTED: blk_1 is accepted
+  events.push_back(blk_1);
+  blk_hash_ = get_block_hash(blk_1);
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool gen_pos_extra_nonce_hf4::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  currency::block blk;
+  c.get_blockchain_storage().get_top_block(blk);
+
+  CHECK_AND_ASSERT_MES(get_block_hash(blk) == blk_hash_, false, "Is not top block");
+  CHECK_AND_ASSERT_MES(blk.miner_tx.extra.size() == 2, false, blk.miner_tx.extra.size() << " != 2");
+
+  currency::blobdata result;
+  bool r;
+  for (const auto& item : blk.miner_tx.extra)
+  {
+    if (typeid(item) == typeid(currency::extra_user_data))
+    {
+      result = boost::get<currency::extra_user_data>(item).buff;
+      r = true;
+      break;
+    }
+  }
+  CHECK_AND_ASSERT_MES(r, false, "blk.miner_tx.extra is not extra_user_data");
+
+  currency::blobdata expected(255, 'x');
+  CHECK_AND_ASSERT_MES(result == expected, false, "Failed compare: " << result << "!=" << expected);
+
+  return true;
+}
+
 gen_pos_min_allowed_height::gen_pos_min_allowed_height()
 {
   REGISTER_CALLBACK_METHOD(gen_pos_min_allowed_height, configure_core);
