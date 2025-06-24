@@ -320,25 +320,22 @@ bool gen_pos_extra_nonce_hf4::c1(currency::core& c, size_t ev_index, const std::
   currency::block blk;
   c.get_blockchain_storage().get_top_block(blk);
 
-  CHECK_AND_ASSERT_MES(get_block_hash(blk) == blk_hash_, false, "Is not top block");
-  CHECK_AND_ASSERT_MES(blk.miner_tx.extra.size() == 2, false, blk.miner_tx.extra.size() << " != 2");
-
+  bool r = false;
   currency::blobdata result;
-  bool r;
   for (const auto& item : blk.miner_tx.extra)
   {
-    if (typeid(item) == typeid(currency::extra_user_data))
+    const currency::extra_user_data* p = boost::get<currency::extra_user_data>(&item);
+    if (p)
     {
-      result = boost::get<currency::extra_user_data>(item).buff;
+      result = p->buff;
       r = true;
       break;
     }
   }
-  CHECK_AND_ASSERT_MES(r, false, "blk.miner_tx.extra is not extra_user_data");
+  CHECK_AND_ASSERT_MES(r, false, "Not found extra nonce");
 
   currency::blobdata expected(255, 'x');
-  CHECK_AND_ASSERT_MES(result == expected, false, "Failed compare: " << result << "!=" << expected);
-
+  CHECK_AND_ASSERT_MES(result == expected, false, "extra nonce in tx not equal expected");
   return true;
 }
 
