@@ -74,13 +74,18 @@ struct gen_pos_extra_nonce : public pos_validation
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_pos_extra_nonce_hf4 : public pos_validation
+struct gen_pos_extra_nonce_hf3 : public pos_validation
 {
-  gen_pos_extra_nonce_hf4();
+  gen_pos_extra_nonce_hf3();
+  bool configure_core(currency::core& c, size_t, const std::vector<test_event_entry>&);
+  bool request_pow(currency::core& c, size_t, const std::vector<test_event_entry>&);
+  bool check_pos_nonce(currency::core& c, size_t, const std::vector<test_event_entry>&);
   bool generate(std::vector<test_event_entry>& events) const;
-  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 private:
-  mutable crypto::hash blk_hash_;
+  mutable currency::blobdata pow_nonce_;
+  mutable currency::blobdata pos_nonce_;
+  mutable std::vector<currency::account_base> m_accounts;
+  mutable currency::block blk_0, blk_0r;
 };
 
 struct gen_pos_min_allowed_height : public pos_validation
