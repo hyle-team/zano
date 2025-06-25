@@ -919,7 +919,7 @@ namespace currency
 
     if(!tvc.m_should_be_relayed)
     {
-      LOG_PRINT_L0("[on_send_raw_tx]: tx accepted, but not relayed");
+      LOG_PRINT_L0("[on_send_raw_tx]: tx accepted, but not relayed, tx blob: " << << req.tx_as_hex);
       res.status = "Not relayed";
       return true;
     }
