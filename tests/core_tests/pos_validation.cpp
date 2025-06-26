@@ -281,7 +281,7 @@ bool gen_pos_extra_nonce_hf3::configure_core(currency::core& c, size_t, const st
 gen_pos_extra_nonce_hf3::gen_pos_extra_nonce_hf3()
 {
   REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf3, configure_core);
-  // REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf3, request_pow);
+  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf3, request_pow);
   REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf3, check_pos_nonce);
 }
 
@@ -291,138 +291,28 @@ bool gen_pos_extra_nonce_hf3::generate(std::vector<test_event_entry>& events) co
   GENERATE_ACCOUNT(alice);
   m_accounts.push_back(miner);
   m_accounts.push_back(alice);
-  
+  pow_nonce_ = "POW123";
+  pos_nonce_ = "POS123";
+
   uint64_t ts = test_core_time::get_time();
   MAKE_GENESIS_BLOCK(events, blk_0, miner, ts);
   DO_CALLBACK(events, "configure_core");
   MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner);
   MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner);
-  // HF-setup
 
-  // check PoW
-  pow_nonce_ = "POW123";
-  // DO_CALLBACK(events, "request_pow");
-
-  // check PoS
   REWIND_BLOCKS(events, blk_0r, blk_2, miner);
-  crypto::hash prev_id = get_block_hash(blk_0r);
-  size_t height = CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3;
 
-  wide_difficulty_type pos_diff{};
-  crypto::hash last_pow_block_hash{}, last_pos_block_kernel_hash{};
-  bool r = generator.get_params_for_next_pos_block(
-    prev_id, pos_diff, last_pow_block_hash, last_pos_block_kernel_hash
-  );
-  CHECK_AND_ASSERT_MES(r, false, "get_params_for_next_pos_block failed");
-
-  // data from genesis stake
-  const transaction& stake = blk_2.miner_tx;
-  crypto::public_key stake_pk = get_tx_pub_key_from_extra(stake);
+  // setup params for PoS
+  const currency::transaction& stake = blk_2.miner_tx;
   size_t idx = 0;
-  
-  keypair kp; crypto::key_image ki;
-  generate_key_image_helper(miner.get_keys(), stake_pk, idx, kp, ki);
+  uint64_t height = CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3;
+  crypto::hash prev_hash = get_block_hash(blk_0r);
+  LOG_PRINT_L0("[generate] Generating PoS block at height=" << height << ", prev_hash=" << prev_hash<< ", pos_nonce='" << pos_nonce_ << "'");
+  currency::block new_pos_block;
+  bool ok = generate_pos_block_with_extra_nonce(generator, events, miner, alice, blk_0r, height, stake, idx, pos_nonce_, new_pos_block);
+  CHECK_AND_ASSERT_MES(ok, false, "generate_pos_block_with_extra_nonce failed");
 
-  // try to find global index
-  uint64_t stake_output_gidx = UINT64_MAX;
-  r = find_global_index_for_output(events, prev_id, stake, idx, stake_output_gidx);
-  CHECK_AND_ASSERT_MES(r, false, "find_global_index_for_output failed");
-
-  // do PoS blk
-  pos_block_builder pb;
-  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
-  pb.step2_set_txs({});
-
-  if (generator.get_hardforks().is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, height))
-  {
-    if (!generator.get_hardforks().is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, 2))
-      LOG_PRINT_L0("FIRST BLCOK WITHOUT ZARCANUM");
-
-    // get all source entries (unblinded!)
-    std::vector<tx_source_entry> sources;
-    bool ok = fill_tx_sources(
-      sources,
-      events,
-      blk_0r,
-      miner.get_keys(),
-      /*max_global_index*/ UINT64_MAX,
-      /*nmix*/ 2,
-      /*check_for_spends*/ false,
-      /*check_for_unlocktime*/ false,
-      /*check_unblinded*/ true
-    );
-    // CHECK_AND_ASSERT_MES(ok && !sources.empty(), false, "fill_tx_sources failed");
-
-    // try to find our se
-    auto it = std::find_if(sources.begin(), sources.end(),
-      [&](const tx_source_entry &e){
-        return e.real_out_tx_key == stake_pk
-            && e.real_output_in_tx_index == idx;
-      });
-    CHECK_AND_ASSERT_MES(it != sources.end(), false, "source entry not found");
-    const tx_source_entry& se = *it;
-
-    // step3a + step3b gidx
-    pb.step3a(pos_diff, last_pow_block_hash, last_pos_block_kernel_hash);
-    pb.step3b(
-      se.amount,
-      ki,
-      se.real_out_tx_key,
-      se.real_output_in_tx_index,
-      se.real_out_amount_blinding_mask,
-      miner.get_keys().view_secret_key,
-      stake_output_gidx,
-      blk_0r.timestamp,
-      POS_SCAN_WINDOW,
-      POS_SCAN_STEP
-    );
-
-    // insert in coinbase nonce
-    pos_nonce_ = currency::blobdata(64, 'P');
-    pb.step4_generate_coinbase_tx(
-      generator.get_timestamps_median(prev_id),
-      generator.get_already_generated_coins(blk_0r),
-      alice.get_public_address(),
-      pos_nonce_,
-      CURRENCY_MINER_TX_MAX_OUTS
-    );
-
-    pb.step5_sign(se, miner.get_keys());
-  }
-  else
-  {
-    // HF3 NLSAG
-    uint64_t amount = boost::get<tx_out_bare>(stake.vout[idx]).amount;
-    // build stake kernel
-    pb.step3_build_stake_kernel(
-      amount,
-      stake_output_gidx,
-      ki,
-      pos_diff,
-      last_pow_block_hash,
-      last_pos_block_kernel_hash,
-      blk_0r.timestamp
-    );
-
-    // insert extra_nonce in coinbase
-    pos_nonce_ = currency::blobdata(64, 'P');
-    pb.step4_generate_coinbase_tx(
-      generator.get_timestamps_median(prev_id),
-      generator.get_already_generated_coins(blk_0r),
-      alice.get_public_address(),
-      pos_nonce_,
-      CURRENCY_MINER_TX_MAX_OUTS
-    );
-
-    // sign by old overload
-    crypto::public_key out_pk =
-      boost::get<txout_to_key>(
-        boost::get<tx_out_bare>(stake.vout[idx]).target
-      ).key;
-    pb.step5_sign(stake_pk, idx, out_pk, miner);
-  }
-
-  events.push_back(pb.m_block);
+  events.push_back(new_pos_block);
   DO_CALLBACK(events, "check_pos_nonce");
   return true;
 }
@@ -432,22 +322,20 @@ bool gen_pos_extra_nonce_hf3::request_pow(currency::core& c, size_t, const std::
   // call RPC‐method get_block_template
   block bl; wide_difficulty_type diff; 
   uint64_t height;
-  bool ok = c.get_block_template(
-    bl,
-    m_accounts[0].get_public_address(),  // miner
-    m_accounts[0].get_public_address(),
-    diff, height,
-    pow_nonce_
-  );
+  bool ok = c.get_block_template(bl, m_accounts[0].get_public_address(), m_accounts[0].get_public_address(), diff, height, pow_nonce_);
   CHECK_AND_ASSERT_MES(ok, false, "get_block_template failed");
 
+  crypto::hash bl_hash = get_block_hash(bl);
+  LOG_PRINT_L0("[request_pow] checking PoW template — height=" << height << ", hash=" << bl_hash << ", expected nonce='" << pow_nonce_ << "'");
   // try to find in coinbase-tx extra_user_data == pow_nonce_
   const transaction& cb = bl.miner_tx;
   bool found = false;
   for (auto& e : cb.extra)
-    if (auto ud = boost::get<extra_user_data>(&e))
+    if (auto ud = boost::get<extra_user_data>(&e)) {
+      LOG_PRINT_L0("[request_pow] ud->buff: '" << ud->buff << "' pow_nonce_: '" << pow_nonce_ << "'");
       if (ud->buff == pow_nonce_)
         { found = true; break; }
+    }
   CHECK_AND_ASSERT_MES(found, false, "PoW extra_nonce not found");
   return true;
 }
@@ -457,13 +345,17 @@ bool gen_pos_extra_nonce_hf3::check_pos_nonce(currency::core& c, size_t, const s
   block top;
   bool ok = c.get_blockchain_storage().get_top_block(top);
   CHECK_AND_ASSERT_MES(ok, false, "get_top_block failed");
-
+  uint64_t height = get_block_height(top);
+  crypto::hash top_hash = get_block_hash(top);
+  LOG_PRINT_L0("-------> [check_pos_nonce] checking PoS block — height=" << height << ", hash=" << top_hash << ", expected nonce='" << pos_nonce_ << "'");
   const transaction& cb = top.miner_tx;
   bool found = false;
   for (auto& e : cb.extra)
-    if (auto ud = boost::get<extra_user_data>(&e))
+    if (auto ud = boost::get<extra_user_data>(&e)) {
+      LOG_PRINT_L0("[check_pos_nonce] ud->buff: '" << ud->buff << "' pos_nonce_: '" << pos_nonce_ << "'");
       if (ud->buff == pos_nonce_)
         { found = true; break; }
+    }
   CHECK_AND_ASSERT_MES(found, false, "PoS extra_nonce not found");
   return true;
 }
