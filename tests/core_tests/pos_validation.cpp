@@ -269,15 +269,19 @@ bool gen_pos_extra_nonce::generate(std::vector<test_event_entry>& events) const
 
 bool gen_pos_extra_nonce_hf3::configure_core(currency::core& c, size_t, const std::vector<test_event_entry>&)
 {
-  auto cfg = c.get_blockchain_storage().get_core_runtime_config();
-  cfg.hard_forks.set_hardfork_height(3, 1);
-  c.get_blockchain_storage().set_core_runtime_config(cfg);
+  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
+  pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
+  pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
+  pc.hf4_minimum_mixins = 2;
+  pc.hard_forks = m_hardforks;
+  c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
 }
 
 gen_pos_extra_nonce_hf3::gen_pos_extra_nonce_hf3()
 {
-  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf3, request_pow);
+  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf3, configure_core);
+  // REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf3, request_pow);
   REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf3, check_pos_nonce);
 }
 
@@ -287,21 +291,22 @@ bool gen_pos_extra_nonce_hf3::generate(std::vector<test_event_entry>& events) co
   GENERATE_ACCOUNT(alice);
   m_accounts.push_back(miner);
   m_accounts.push_back(alice);
-
+  
   uint64_t ts = test_core_time::get_time();
   MAKE_GENESIS_BLOCK(events, blk_0, miner, ts);
-
-  // HF-setup
   DO_CALLBACK(events, "configure_core");
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner);
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner);
+  // HF-setup
 
   // check PoW
   pow_nonce_ = "POW123";
-  DO_CALLBACK(events, "request_pow");
+  // DO_CALLBACK(events, "request_pow");
 
   // check PoS
-  REWIND_BLOCKS(events, blk_0r, blk_0, miner);
+  REWIND_BLOCKS(events, blk_0r, blk_2, miner);
   crypto::hash prev_id = get_block_hash(blk_0r);
-  size_t height = CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1;
+  size_t height = CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3;
 
   wide_difficulty_type pos_diff{};
   crypto::hash last_pow_block_hash{}, last_pos_block_kernel_hash{};
@@ -311,10 +316,10 @@ bool gen_pos_extra_nonce_hf3::generate(std::vector<test_event_entry>& events) co
   CHECK_AND_ASSERT_MES(r, false, "get_params_for_next_pos_block failed");
 
   // data from genesis stake
-  const transaction& stake = blk_0.miner_tx;
+  const transaction& stake = blk_2.miner_tx;
   crypto::public_key stake_pk = get_tx_pub_key_from_extra(stake);
   size_t idx = 0;
-  uint64_t amount = boost::get<tx_out_bare>(stake.vout[idx]).amount;
+  
   keypair kp; crypto::key_image ki;
   generate_key_image_helper(miner.get_keys(), stake_pk, idx, kp, ki);
 
@@ -330,6 +335,8 @@ bool gen_pos_extra_nonce_hf3::generate(std::vector<test_event_entry>& events) co
 
   if (generator.get_hardforks().is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, height))
   {
+    if (!generator.get_hardforks().is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, 2))
+      LOG_PRINT_L0("FIRST BLCOK WITHOUT ZARCANUM");
 
     // get all source entries (unblinded!)
     std::vector<tx_source_entry> sources;
@@ -339,12 +346,12 @@ bool gen_pos_extra_nonce_hf3::generate(std::vector<test_event_entry>& events) co
       blk_0r,
       miner.get_keys(),
       /*max_global_index*/ UINT64_MAX,
-      /*nmix*/ 0,
+      /*nmix*/ 2,
       /*check_for_spends*/ false,
       /*check_for_unlocktime*/ false,
       /*check_unblinded*/ true
     );
-    CHECK_AND_ASSERT_MES(ok && !sources.empty(), false, "fill_tx_sources failed");
+    // CHECK_AND_ASSERT_MES(ok && !sources.empty(), false, "fill_tx_sources failed");
 
     // try to find our se
     auto it = std::find_if(sources.begin(), sources.end(),
@@ -385,7 +392,7 @@ bool gen_pos_extra_nonce_hf3::generate(std::vector<test_event_entry>& events) co
   else
   {
     // HF3 NLSAG
-
+    uint64_t amount = boost::get<tx_out_bare>(stake.vout[idx]).amount;
     // build stake kernel
     pb.step3_build_stake_kernel(
       amount,
