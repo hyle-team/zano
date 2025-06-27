@@ -274,7 +274,6 @@ bool gen_pos_extra_nonce_hf3::generate(std::vector<test_event_entry>& events) co
   size_t idx = 0;
   uint64_t height = CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 3;
   crypto::hash prev_hash = get_block_hash(blk_0r);
-  LOG_PRINT_L0("[generate] Generating PoS block at height=" << height << ", prev_hash=" << prev_hash<< ", pos_nonce='" << pos_nonce_ << "'");
   currency::block new_pos_block;
   bool ok = generate_pos_block_with_extra_nonce(generator, events, miner, alice, blk_0r, height, stake, idx, pos_nonce_, new_pos_block);
   CHECK_AND_ASSERT_MES(ok, false, "generate_pos_block_with_extra_nonce failed");
@@ -318,13 +317,14 @@ bool gen_pos_extra_nonce_hf3::has_extra_nonce(const currency::block& blk, const 
 {
   for (const auto& e : blk.miner_tx.extra) {
     if (const auto* ud = boost::get<extra_user_data>(&e)) {
-      LOG_PRINT_L0("Found extra nonce ud->buff='" << ud->buff << "'");
       if (ud->buff == expected_nonce)
         return true;
     }
   }
   return false;
 }
+
+//------------------------------------------------------------------
 
 gen_pos_min_allowed_height::gen_pos_min_allowed_height()
 {
