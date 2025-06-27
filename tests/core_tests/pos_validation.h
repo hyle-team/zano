@@ -69,9 +69,9 @@ struct gen_pos_too_early_pos_block : public pos_validation
   size_t m_pos_min_height;
 };
 
-struct gen_pos_extra_nonce_hf3 : public pos_validation
+struct gen_pos_extra_nonce : public pos_validation
 {
-  gen_pos_extra_nonce_hf3();
+  gen_pos_extra_nonce();
   bool configure_core(currency::core& c, size_t, const std::vector<test_event_entry>& events);
   bool request_pow_template_with_nonce(currency::core& c, size_t, const std::vector<test_event_entry>& events);
   bool check_pos_nonce(currency::core& c, size_t, const std::vector<test_event_entry>& events);

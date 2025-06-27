@@ -217,7 +217,7 @@ bool gen_pos_too_early_pos_block::configure_core(currency::core& c, size_t ev_in
 
 //------------------------------------------------------------------
 
-bool gen_pos_extra_nonce_hf3::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>&)
+bool gen_pos_extra_nonce::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>&)
 {
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
@@ -228,12 +228,12 @@ bool gen_pos_extra_nonce_hf3::configure_core(currency::core& c, size_t ev_index,
   return true;
 }
 
-gen_pos_extra_nonce_hf3::gen_pos_extra_nonce_hf3()
+gen_pos_extra_nonce::gen_pos_extra_nonce()
 {
-  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf3, configure_core);
-  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf3, request_pow_template_with_nonce);
-  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf3, check_pow_nonce);
-  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf3, check_pos_nonce);
+  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce, configure_core);
+  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce, request_pow_template_with_nonce);
+  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce, check_pow_nonce);
+  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce, check_pos_nonce);
 }
 
 // Test: verify custom extra_nonce in blocks and templates
@@ -243,7 +243,7 @@ gen_pos_extra_nonce_hf3::gen_pos_extra_nonce_hf3()
  * 2. PoS block contains pos_nonce_
  * 3. PoW mining template contains pow_template_nonce_
  */
-bool gen_pos_extra_nonce_hf3::generate(std::vector<test_event_entry>& events) const
+bool gen_pos_extra_nonce::generate(std::vector<test_event_entry>& events) const
 {
   GENERATE_ACCOUNT(miner);
   GENERATE_ACCOUNT(alice);
@@ -284,7 +284,7 @@ bool gen_pos_extra_nonce_hf3::generate(std::vector<test_event_entry>& events) co
   return true;
 }
 
-bool gen_pos_extra_nonce_hf3::request_pow_template_with_nonce(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+bool gen_pos_extra_nonce::request_pow_template_with_nonce(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   block bl;
   wide_difficulty_type diff;
@@ -295,7 +295,7 @@ bool gen_pos_extra_nonce_hf3::request_pow_template_with_nonce(currency::core& c,
   return true;
 }
 
-bool gen_pos_extra_nonce_hf3::check_pow_nonce(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+bool gen_pos_extra_nonce::check_pow_nonce(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   block top;
   bool ok = c.get_blockchain_storage().get_top_block(top);
@@ -304,7 +304,7 @@ bool gen_pos_extra_nonce_hf3::check_pow_nonce(currency::core& c, size_t ev_index
   return true;
 }
 
-bool gen_pos_extra_nonce_hf3::check_pos_nonce(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+bool gen_pos_extra_nonce::check_pos_nonce(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   block top;
   bool ok = c.get_blockchain_storage().get_top_block(top);
@@ -313,7 +313,7 @@ bool gen_pos_extra_nonce_hf3::check_pos_nonce(currency::core& c, size_t ev_index
   return true;
 }
 
-bool gen_pos_extra_nonce_hf3::has_extra_nonce(const currency::block& blk, const std::string& expected_nonce) const
+bool gen_pos_extra_nonce::has_extra_nonce(const currency::block& blk, const std::string& expected_nonce) const
 {
   for (const auto& e : blk.miner_tx.extra) {
     if (const auto* ud = boost::get<extra_user_data>(&e)) {
