@@ -1118,7 +1118,6 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_pos_coinstake_already_spent);
     GENERATE_AND_PLAY(gen_pos_incorrect_timestamp);
     GENERATE_AND_PLAY(gen_pos_too_early_pos_block);
-    GENERATE_AND_PLAY(gen_pos_extra_nonce);
     GENERATE_AND_PLAY_HF(gen_pos_extra_nonce_hf3, "3-*");
     GENERATE_AND_PLAY(gen_pos_min_allowed_height);
     GENERATE_AND_PLAY(gen_pos_invalid_coinbase);

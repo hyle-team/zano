@@ -69,21 +69,21 @@ struct gen_pos_too_early_pos_block : public pos_validation
   size_t m_pos_min_height;
 };
 
-struct gen_pos_extra_nonce : public pos_validation
-{
-  bool generate(std::vector<test_event_entry>& events) const;
-};
-
 struct gen_pos_extra_nonce_hf3 : public pos_validation
 {
   gen_pos_extra_nonce_hf3();
-  bool configure_core(currency::core& c, size_t, const std::vector<test_event_entry>&);
-  bool request_pow(currency::core& c, size_t, const std::vector<test_event_entry>&);
-  bool check_pos_nonce(currency::core& c, size_t, const std::vector<test_event_entry>&);
+  bool configure_core(currency::core& c, size_t, const std::vector<test_event_entry>& events);
+  bool request_pow_template_with_nonce(currency::core& c, size_t, const std::vector<test_event_entry>& events);
+  bool check_pos_nonce(currency::core& c, size_t, const std::vector<test_event_entry>& events);
+  bool check_pow_nonce(currency::core& c, size_t, const std::vector<test_event_entry>& events);
   bool generate(std::vector<test_event_entry>& events) const;
+
+private:
+  bool has_extra_nonce(const currency::block& blk, const std::string& expected_nonce) const;
 private:
   mutable currency::blobdata pow_nonce_;
   mutable currency::blobdata pos_nonce_;
+  mutable currency::blobdata pow_template_nonce_;
   mutable std::vector<currency::account_base> m_accounts;
   mutable currency::block blk_0, blk_0r;
 };

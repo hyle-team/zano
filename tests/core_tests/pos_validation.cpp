@@ -217,57 +217,7 @@ bool gen_pos_too_early_pos_block::configure_core(currency::core& c, size_t ev_in
 
 //------------------------------------------------------------------
 
-bool gen_pos_extra_nonce::generate(std::vector<test_event_entry>& events) const
-{
-  uint64_t ts = time(NULL);
-
-  GENERATE_ACCOUNT(miner);
-  GENERATE_ACCOUNT(alice);
-  MAKE_GENESIS_BLOCK(events, blk_0, miner, ts);
-  DO_CALLBACK(events, "configure_core");
-  REWIND_BLOCKS(events, blk_0r, blk_0, miner);
-
-  // Legend: (n) - PoW block, [m] - PoS block
-  //  0     10    11                 <-- blockchain height  (assuming CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10)
-  // (0 )--(0r)--[1 ]                main chain
-
-  // make a PoS block manually with incorrect timestamp
-  crypto::hash prev_id = get_block_hash(blk_0r);
-  size_t height = CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1;
-  currency::wide_difficulty_type diff = generator.get_difficulty_for_next_block(prev_id, false);
-
-  const transaction& stake = blk_0.miner_tx;
-  crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
-  size_t stake_output_idx = 0;
-  size_t stake_output_gidx = 0;
-  uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
-  crypto::key_image stake_output_key_image;
-  keypair kp;
-  generate_key_image_helper(miner.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
-
-  pos_block_builder pb;
-  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
-  pb.step2_set_txs(std::vector<transaction>());
-  pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, blk_0r.timestamp);
-
-  // use biggest possible extra nonce (255 bytes) + largest alias
-  currency::blobdata extra_nonce(255, 'x');
-  //currency::extra_alias_entry alias = AUTO_VAL_INIT(alias); // TODO: this alias entry was ignored for a long time, now I commented it out, make sure it's okay -- sowle 
-  //alias.m_alias = std::string(255, 'a');
-  //alias.m_address = miner.get_keys().account_address;
-  //alias.m_text_comment = std::string(255, 'y');
-  pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(blk_0r), alice.get_public_address(), extra_nonce, CURRENCY_MINER_TX_MAX_OUTS);
-  pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, miner);
-  block blk_1 = pb.m_block;
-
-  // EXPECTED: blk_1 is accepted
-  events.push_back(blk_1);
-
-  return true;
-}
-
-bool gen_pos_extra_nonce_hf3::configure_core(currency::core& c, size_t, const std::vector<test_event_entry>&)
+bool gen_pos_extra_nonce_hf3::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>&)
 {
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
@@ -281,10 +231,18 @@ bool gen_pos_extra_nonce_hf3::configure_core(currency::core& c, size_t, const st
 gen_pos_extra_nonce_hf3::gen_pos_extra_nonce_hf3()
 {
   REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf3, configure_core);
-  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf3, request_pow);
+  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf3, request_pow_template_with_nonce);
+  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf3, check_pow_nonce);
   REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce_hf3, check_pos_nonce);
 }
 
+// Test: verify custom extra_nonce in blocks and templates
+/*
+ * Scenarios:
+ * 1. PoW block contains pow_nonce_
+ * 2. PoS block contains pos_nonce_
+ * 3. PoW mining template contains pow_template_nonce_
+ */
 bool gen_pos_extra_nonce_hf3::generate(std::vector<test_event_entry>& events) const
 {
   GENERATE_ACCOUNT(miner);
@@ -293,13 +251,22 @@ bool gen_pos_extra_nonce_hf3::generate(std::vector<test_event_entry>& events) co
   m_accounts.push_back(alice);
   pow_nonce_ = "POW123";
   pos_nonce_ = "POS123";
+  pow_template_nonce_ = "POW_TEMPLATE123";
 
   uint64_t ts = test_core_time::get_time();
   MAKE_GENESIS_BLOCK(events, blk_0, miner, ts);
   DO_CALLBACK(events, "configure_core");
   MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner);
-  MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner);
 
+  block blk_2 = AUTO_VAL_INIT(blk_2);
+  ts = blk_2.timestamp + DIFFICULTY_BLOCKS_ESTIMATE_TIMESPAN / 2; // to increase main chain difficulty
+  bool r = generator.construct_block_manually(blk_2, blk_1, miner, test_generator::bf_timestamp, 0, 0, 
+    ts, crypto::hash(), 1, transaction(), std::vector<crypto::hash>(), 0, pow_nonce_);
+  CHECK_AND_ASSERT_MES(r, false, "construct_block_manually failed");
+  events.push_back(blk_2);
+  blk_0r = blk_2;
+
+  DO_CALLBACK(events, "check_pow_nonce");
   REWIND_BLOCKS(events, blk_0r, blk_2, miner);
 
   // setup params for PoS
@@ -314,50 +281,49 @@ bool gen_pos_extra_nonce_hf3::generate(std::vector<test_event_entry>& events) co
 
   events.push_back(new_pos_block);
   DO_CALLBACK(events, "check_pos_nonce");
+  DO_CALLBACK(events, "request_pow_template_with_nonce");
   return true;
 }
 
-bool gen_pos_extra_nonce_hf3::request_pow(currency::core& c, size_t, const std::vector<test_event_entry>&)
+bool gen_pos_extra_nonce_hf3::request_pow_template_with_nonce(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  // call RPC‐method get_block_template
-  block bl; wide_difficulty_type diff; 
+  block bl;
+  wide_difficulty_type diff;
   uint64_t height;
-  bool ok = c.get_block_template(bl, m_accounts[0].get_public_address(), m_accounts[0].get_public_address(), diff, height, pow_nonce_);
+  bool ok = c.get_block_template(bl, m_accounts[0].get_public_address(), m_accounts[0].get_public_address(), diff, height, pow_template_nonce_);
   CHECK_AND_ASSERT_MES(ok, false, "get_block_template failed");
-
-  crypto::hash bl_hash = get_block_hash(bl);
-  LOG_PRINT_L0("[request_pow] checking PoW template — height=" << height << ", hash=" << bl_hash << ", expected nonce='" << pow_nonce_ << "'");
-  // try to find in coinbase-tx extra_user_data == pow_nonce_
-  const transaction& cb = bl.miner_tx;
-  bool found = false;
-  for (auto& e : cb.extra)
-    if (auto ud = boost::get<extra_user_data>(&e)) {
-      LOG_PRINT_L0("[request_pow] ud->buff: '" << ud->buff << "' pow_nonce_: '" << pow_nonce_ << "'");
-      if (ud->buff == pow_nonce_)
-        { found = true; break; }
-    }
-  CHECK_AND_ASSERT_MES(found, false, "PoW extra_nonce not found");
+  CHECK_AND_ASSERT_MES(has_extra_nonce(bl, pow_template_nonce_), false, "PoW extra_nonce not found");
   return true;
 }
 
-bool gen_pos_extra_nonce_hf3::check_pos_nonce(currency::core& c, size_t, const std::vector<test_event_entry>&)
+bool gen_pos_extra_nonce_hf3::check_pow_nonce(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   block top;
   bool ok = c.get_blockchain_storage().get_top_block(top);
   CHECK_AND_ASSERT_MES(ok, false, "get_top_block failed");
-  uint64_t height = get_block_height(top);
-  crypto::hash top_hash = get_block_hash(top);
-  LOG_PRINT_L0("-------> [check_pos_nonce] checking PoS block — height=" << height << ", hash=" << top_hash << ", expected nonce='" << pos_nonce_ << "'");
-  const transaction& cb = top.miner_tx;
-  bool found = false;
-  for (auto& e : cb.extra)
-    if (auto ud = boost::get<extra_user_data>(&e)) {
-      LOG_PRINT_L0("[check_pos_nonce] ud->buff: '" << ud->buff << "' pos_nonce_: '" << pos_nonce_ << "'");
-      if (ud->buff == pos_nonce_)
-        { found = true; break; }
-    }
-  CHECK_AND_ASSERT_MES(found, false, "PoS extra_nonce not found");
+  CHECK_AND_ASSERT_MES(has_extra_nonce(top, pow_nonce_), false, "PoW extra_nonce not found");
   return true;
+}
+
+bool gen_pos_extra_nonce_hf3::check_pos_nonce(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  block top;
+  bool ok = c.get_blockchain_storage().get_top_block(top);
+  CHECK_AND_ASSERT_MES(ok, false, "get_top_block failed");
+  CHECK_AND_ASSERT_MES(has_extra_nonce(top, pos_nonce_), false, "PoS extra_nonce not found");
+  return true;
+}
+
+bool gen_pos_extra_nonce_hf3::has_extra_nonce(const currency::block& blk, const std::string& expected_nonce) const
+{
+  for (const auto& e : blk.miner_tx.extra) {
+    if (const auto* ud = boost::get<extra_user_data>(&e)) {
+      LOG_PRINT_L0("Found extra nonce ud->buff='" << ud->buff << "'");
+      if (ud->buff == expected_nonce)
+        return true;
+    }
+  }
+  return false;
 }
 
 gen_pos_min_allowed_height::gen_pos_min_allowed_height()

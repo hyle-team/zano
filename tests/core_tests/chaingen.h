@@ -570,7 +570,8 @@ public:
     const currency::account_base& miner_acc, int actual_params = bf_none, uint8_t major_ver = 0,
     uint8_t minor_ver = 0, uint64_t timestamp = 0, const crypto::hash& prev_id = crypto::hash(),
     const currency::wide_difficulty_type& diffic = 1, const currency::transaction& miner_tx = currency::transaction(),
-    const std::vector<crypto::hash>& tx_hashes = std::vector<crypto::hash>(), size_t txs_sizes = 0);
+    const std::vector<crypto::hash>& tx_hashes = std::vector<crypto::hash>(), size_t txs_sizes = 0, 
+    currency::blobdata extra_nonce = currency::blobdata());
   bool construct_block_manually_tx(currency::block& blk, const currency::block& prev_block,
     const currency::account_base& miner_acc, const std::vector<crypto::hash>& tx_hashes, size_t txs_size);
   bool find_nounce(currency::block& blk, std::vector<const block_info*>& blocks, currency::wide_difficulty_type dif, uint64_t height) const;

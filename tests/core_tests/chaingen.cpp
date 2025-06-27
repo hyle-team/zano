@@ -940,7 +940,7 @@ bool test_generator::construct_block(int64_t manual_timestamp_adjustment,
                                               const crypto::hash& prev_id/* = crypto::hash()*/, const wide_difficulty_type& diffic/* = 1*/,
                                               const transaction& miner_tx/* = transaction()*/,
                                               const std::vector<crypto::hash>& tx_hashes/* = std::vector<crypto::hash>()*/,
-                                              size_t txs_sizes/* = 0*/)
+                                              size_t txs_sizes/* = 0*/, currency::blobdata extra_nonce/* = blobdata()*/)
 {
   size_t height = get_block_height(prev_block) + 1;
   blk.major_version = actual_params & bf_major_ver ? major_ver : m_hardforks.get_block_major_version_by_height(height);
@@ -966,7 +966,7 @@ bool test_generator::construct_block(int64_t manual_timestamp_adjustment,
     size_t current_block_size = txs_sizes + get_object_blobsize(blk.miner_tx);
     // TODO: This will work, until size of constructed block is less then CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE
     if (!construct_miner_tx(height, misc_utils::median(block_sizes), already_generated_coins, current_block_size, 0,
-      miner_acc.get_public_address(), miner_acc.get_public_address(), blk.miner_tx, base_block_reward, block_reward, tx_version, tx_hardfork_id, blobdata(), 1))
+      miner_acc.get_public_address(), miner_acc.get_public_address(), blk.miner_tx, base_block_reward, block_reward, tx_version, tx_hardfork_id, extra_nonce, 1))
       return false;
   }
 
