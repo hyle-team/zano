@@ -2498,7 +2498,7 @@ uint64_t decode_native_output_amount_or_throw(const account_base& acc, const tra
   return amount;
 }
 
-bool generate_pos_block_with_extra_nonce(test_generator& generator, const std::vector<test_event_entry>& events, const currency::account_base& miner, const currency::account_base& recipient, const currency::block& prev_block, uint64_t height, const currency::transaction& stake_tx, size_t stake_output_idx, const currency::blobdata& pos_nonce, currency::block& result)
+bool generate_pos_block_with_extra_nonce(test_generator& generator, const std::vector<test_event_entry>& events, const currency::account_base& miner, const currency::account_base& recipient, const currency::block& prev_block, const currency::transaction& stake_tx, const currency::blobdata& pos_nonce, currency::block& result)
 {
   // get params for PoS
   crypto::hash prev_id = get_block_hash(prev_block);
@@ -2513,6 +2513,7 @@ bool generate_pos_block_with_extra_nonce(test_generator& generator, const std::v
   crypto::public_key stake_pk = get_tx_pub_key_from_extra(stake_tx);
   keypair kp;
   crypto::key_image ki;
+  size_t stake_output_idx = 0;
   generate_key_image_helper(miner.get_keys(), stake_pk, stake_output_idx, kp, ki);
 
   // glob index for stake out
@@ -2521,6 +2522,7 @@ bool generate_pos_block_with_extra_nonce(test_generator& generator, const std::v
   CHECK_AND_ASSERT_MES(r, false, "find_global_index_for_output failed");
 
   pos_block_builder pb;
+  uint64_t height = get_block_height(prev_block) + 1;
   pb.step1_init_header(generator.get_hardforks(), height, prev_id);
   pb.step2_set_txs({});
 
@@ -2529,8 +2531,9 @@ bool generate_pos_block_with_extra_nonce(test_generator& generator, const std::v
     std::vector<tx_source_entry> sources;
     bool ok = fill_tx_sources(
       sources, events, prev_block, miner.get_keys(),
-      UINT64_MAX, 2, false, false, true
+      UINT64_MAX, 0, false, false, true
     );
+
     auto it = std::find_if(sources.begin(), sources.end(),
       [&](const tx_source_entry &e){
         return e.real_out_tx_key == stake_pk
@@ -2561,7 +2564,7 @@ bool generate_pos_block_with_extra_nonce(test_generator& generator, const std::v
 
     pb.step5_sign(se, miner.get_keys());
   }
-  else // HF3: NLSAG
+  else // HF3: SLSAG
   {
     uint64_t amount = boost::get<tx_out_bare>(stake_tx.vout[stake_output_idx]).amount;
     pb.step3_build_stake_kernel(

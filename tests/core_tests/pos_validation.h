@@ -79,13 +79,13 @@ struct gen_pos_extra_nonce : public pos_validation
   bool generate(std::vector<test_event_entry>& events) const;
 
 private:
-  bool has_extra_nonce(const currency::block& blk, const std::string& expected_nonce) const;
+  bool has_extra_nonce(currency::block& blk, const std::string& expected_nonce);
+  
 private:
-  mutable currency::blobdata pow_nonce_;
-  mutable currency::blobdata pos_nonce_;
-  mutable currency::blobdata pow_template_nonce_;
+  mutable currency::blobdata m_pow_nonce;
+  mutable currency::blobdata m_pos_nonce;
+  mutable currency::blobdata m_pow_template_nonce;
   mutable std::vector<currency::account_base> m_accounts;
-  mutable currency::block blk_0, blk_0r;
 };
 
 struct gen_pos_min_allowed_height : public pos_validation
