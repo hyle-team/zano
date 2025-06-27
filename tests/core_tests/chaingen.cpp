@@ -940,7 +940,7 @@ bool test_generator::construct_block(int64_t manual_timestamp_adjustment,
                                               const crypto::hash& prev_id/* = crypto::hash()*/, const wide_difficulty_type& diffic/* = 1*/,
                                               const transaction& miner_tx/* = transaction()*/,
                                               const std::vector<crypto::hash>& tx_hashes/* = std::vector<crypto::hash>()*/,
-                                              size_t txs_sizes/* = 0*/)
+                                              size_t txs_sizes/* = 0*/, currency::blobdata extra_nonce/* = blobdata()*/)
 {
   size_t height = get_block_height(prev_block) + 1;
   blk.major_version = actual_params & bf_major_ver ? major_ver : m_hardforks.get_block_major_version_by_height(height);
@@ -966,7 +966,7 @@ bool test_generator::construct_block(int64_t manual_timestamp_adjustment,
     size_t current_block_size = txs_sizes + get_object_blobsize(blk.miner_tx);
     // TODO: This will work, until size of constructed block is less then CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE
     if (!construct_miner_tx(height, misc_utils::median(block_sizes), already_generated_coins, current_block_size, 0,
-      miner_acc.get_public_address(), miner_acc.get_public_address(), blk.miner_tx, base_block_reward, block_reward, tx_version, tx_hardfork_id, blobdata(), 1))
+      miner_acc.get_public_address(), miner_acc.get_public_address(), blk.miner_tx, base_block_reward, block_reward, tx_version, tx_hardfork_id, extra_nonce, 1))
       return false;
   }
 
@@ -2496,6 +2496,102 @@ uint64_t decode_native_output_amount_or_throw(const account_base& acc, const tra
   r = (asset_id == native_coin_asset_id);
   CHECK_AND_ASSERT_THROW_MES(r, "wrong asset_id: not native coin");
   return amount;
+}
+
+bool generate_pos_block_with_extra_nonce(test_generator& generator, const std::vector<test_event_entry>& events, const currency::account_base& miner, const currency::account_base& recipient, const currency::block& prev_block, const currency::transaction& stake_tx, const currency::blobdata& pos_nonce, currency::block& result)
+{
+  // get params for PoS
+  crypto::hash prev_id = get_block_hash(prev_block);
+  wide_difficulty_type pos_diff{};
+  crypto::hash last_pow_block_hash{}, last_pos_block_kernel_hash{};
+  bool r = generator.get_params_for_next_pos_block(
+    prev_id, pos_diff, last_pow_block_hash, last_pos_block_kernel_hash
+  );
+  CHECK_AND_ASSERT_MES(r, false, "get_params_for_next_pos_block failed");
+
+  // tx key and key image for stake out
+  crypto::public_key stake_pk = get_tx_pub_key_from_extra(stake_tx);
+  keypair kp;
+  crypto::key_image ki;
+  size_t stake_output_idx = 0;
+  generate_key_image_helper(miner.get_keys(), stake_pk, stake_output_idx, kp, ki);
+
+  // glob index for stake out
+  uint64_t stake_output_gidx = UINT64_MAX;
+  r = find_global_index_for_output(events, prev_id, stake_tx, stake_output_idx, stake_output_gidx);
+  CHECK_AND_ASSERT_MES(r, false, "find_global_index_for_output failed");
+
+  pos_block_builder pb;
+  uint64_t height = get_block_height(prev_block) + 1;
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
+  pb.step2_set_txs({});
+
+  if (generator.get_hardforks().is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, height))
+  {
+    std::vector<tx_source_entry> sources;
+    bool ok = fill_tx_sources(
+      sources, events, prev_block, miner.get_keys(),
+      UINT64_MAX, 0, false, false, true
+    );
+
+    auto it = std::find_if(sources.begin(), sources.end(),
+      [&](const tx_source_entry &e){
+        return e.real_out_tx_key == stake_pk
+            && e.real_output_in_tx_index == stake_output_idx;
+      });
+    CHECK_AND_ASSERT_MES(it != sources.end(), false, "source entry not found");
+    const tx_source_entry& se = *it;
+
+    pb.step3a(pos_diff, last_pow_block_hash, last_pos_block_kernel_hash);
+    pb.step3b(
+      se.amount, ki,
+      se.real_out_tx_key, se.real_output_in_tx_index,
+      se.real_out_amount_blinding_mask,
+      miner.get_keys().view_secret_key,
+      stake_output_gidx,
+      prev_block.timestamp,
+      POS_SCAN_WINDOW, POS_SCAN_STEP
+    );
+
+    // insert extra_nonce
+    pb.step4_generate_coinbase_tx(
+      generator.get_timestamps_median(prev_id),
+      generator.get_already_generated_coins(prev_block),
+      recipient.get_public_address(),
+      pos_nonce,
+      CURRENCY_MINER_TX_MAX_OUTS
+    );
+
+    pb.step5_sign(se, miner.get_keys());
+  }
+  else // HF3: SLSAG
+  {
+    uint64_t amount = boost::get<tx_out_bare>(stake_tx.vout[stake_output_idx]).amount;
+    pb.step3_build_stake_kernel(
+      amount,
+      stake_output_gidx,
+      ki,
+      pos_diff,
+      last_pow_block_hash,
+      last_pos_block_kernel_hash,
+      prev_block.timestamp
+    );
+
+    // insert extra_nonce
+    pb.step4_generate_coinbase_tx(
+      generator.get_timestamps_median(prev_id),
+      generator.get_already_generated_coins(prev_block),
+      recipient.get_public_address(),
+      pos_nonce,
+      CURRENCY_MINER_TX_MAX_OUTS
+    );
+
+    crypto::public_key out_pk = boost::get<txout_to_key>(boost::get<tx_out_bare>(stake_tx.vout[stake_output_idx]).target).key;
+    pb.step5_sign(stake_pk, stake_output_idx, out_pk, miner);
+  }
+
+  result = pb.m_block;
+  return true;
 }
 
 bool generate_pos_block_with_given_coinstake(test_generator& generator, const std::vector<test_event_entry> &events, const currency::account_base& miner, const currency::block& prev_block,
