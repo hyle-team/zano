@@ -50,7 +50,7 @@ MARK_AS_POD_C11(macro_alias_1);
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "core"
 
-extern const command_line::arg_descriptor<uint32_t>      arg_db_cache_l2;
+extern const command_line::arg_descriptor<uint64_t>      arg_db_cache_l2;
 
 namespace currency
 {

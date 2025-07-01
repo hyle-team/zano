@@ -74,8 +74,8 @@ using namespace currency;
 
 DISABLE_VS_WARNINGS(4267)
 
-const command_line::arg_descriptor<uint32_t>  arg_db_cache_l1       ( "db-cache-l1", "Specify size of memory mapped db cache file");
-const command_line::arg_descriptor<uint32_t>  arg_db_cache_l2       ( "db-cache-l2", "Specify cached elements in db helpers");
+const command_line::arg_descriptor<uint64_t>  arg_db_cache_l1       ( "db-cache-l1", "Specify size of memory mapped db cache file");
+const command_line::arg_descriptor<uint64_t>  arg_db_cache_l2       ( "db-cache-l2", "Specify cached elements in db helpers");
 
 //------------------------------------------------------------------
 blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m_rw_lock),
