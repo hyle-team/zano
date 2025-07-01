@@ -145,6 +145,7 @@ namespace
   const command_line::arg_descriptor<std::string>   arg_voting_config_file("voting-config-file", "Set voting config instead of getting if from daemon", "");
   const command_line::arg_descriptor<bool>          arg_no_password_confirmations("no-password-confirmation", "Enable/Disable password confirmation for transactions", false);
   const command_line::arg_descriptor<bool>          arg_seed_doctor("seed-doctor", "Experimental: if your seed is not working for recovery this is likely because you've made a mistake whene you were doing back up(typo, wrong words order, missing word). This experimental code will attempt to recover seed phrase from with few approaches.");
+  const command_line::arg_descriptor<bool>          arg_no_whitelist("no-white-list", "Do not load white list from interned.");
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command  ("command", "");
 
@@ -405,6 +406,16 @@ void process_wallet_command_line_params(const po::variables_map& vm, tools::wall
       wal.set_disable_tor_relay(true);
     }
   }
+  
+  if (command_line::has_arg(vm, arg_no_whitelist))
+  {
+    wal.set_use_assets_whitelisting(!command_line::get_arg(vm, arg_no_whitelist));
+  }
+  else
+  {
+    wal.set_use_assets_whitelisting(true);
+  }
+  
 
   if (command_line::has_arg(vm, arg_set_timeout))
   {
@@ -551,6 +562,7 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_disable_tor     = command_line::get_arg(vm, arg_disable_tor_relay);
   m_voting_config_file = command_line::get_arg(vm, arg_voting_config_file);
   m_no_password_confirmations = command_line::get_arg(vm, arg_no_password_confirmations);  
+  m_no_whitelist = command_line::get_arg(vm, arg_no_whitelist);
 } 
 //----------------------------------------------------------------------------------------------------
 
@@ -612,6 +624,7 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
     m_wallet->generate(epee::string_encoding::utf8_to_wstring(m_wallet_file), password, create_auditable_wallet);
     message_writer(epee::log_space::console_color_white, true) << "Generated new " << (create_auditable_wallet ? "AUDITABLE" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
     display_vote_info(*m_wallet);
+    preconfig_wallet_obj();
     std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().view_secret_key) << std::endl << std::flush;
     if (m_wallet->is_auditable())
       std::cout << "tracking seed: " << std::endl << m_wallet->get_account().get_tracking_seed() << std::endl << std::flush;
@@ -660,6 +673,7 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
         std::cout << "tracking seed: " << std::endl << m_wallet->get_account().get_tracking_seed() << std::endl << std::flush;
     }
     display_vote_info(*m_wallet);
+    preconfig_wallet_obj();
     if (m_do_not_set_date)
       m_wallet->reset_creation_time(0);
   }
@@ -686,7 +700,12 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-
+void simple_wallet::preconfig_wallet_obj()
+{
+  if (m_no_whitelist)
+    m_wallet->set_use_assets_whitelisting(false);
+}
+//
 bool simple_wallet::open_wallet(const string &wallet_file, const std::string& password)
 {
   m_wallet_file = wallet_file;
@@ -702,8 +721,9 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
     {
       m_wallet->load(epee::string_encoding::utf8_to_wstring(m_wallet_file), password);
       message_writer(epee::log_space::console_color_white, true) << "Opened" << (m_wallet->is_auditable() ? " auditable" : "") << (m_wallet->is_watch_only() ? " watch-only" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
+      preconfig_wallet_obj();
       display_vote_info(*m_wallet);
-
+      
       break;
     }
     catch (const tools::error::wallet_load_notice_wallet_restored& /*e*/)
@@ -3224,7 +3244,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, command_line::arg_generate_rpc_autodoc); 
   command_line::add_arg(desc_params, arg_seed_doctor);
   command_line::add_arg(desc_params, arg_derive_custom_seed);
-
+  command_line::add_arg(desc_params, arg_no_whitelist);
 
   tools::wallet_rpc_server::init_options(desc_params);
 
@@ -3415,7 +3435,7 @@ int main(int argc, char* argv[])
         if (command_line::get_arg(vm, arg_generate_new_wallet).size() || command_line::get_arg(vm, arg_generate_new_auditable_wallet).size())
           return EXIT_FAILURE;
 
-        wal.set_use_assets_whitelisting(true);
+        
         wal.callback(callback);
 
         if (!offline_mode)
