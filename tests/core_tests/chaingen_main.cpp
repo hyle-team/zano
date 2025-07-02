@@ -1278,6 +1278,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(hardfork_4_wallet_transfer_with_mandatory_mixins, "3-*");
     GENERATE_AND_PLAY(hardfork_4_wallet_sweep_bare_outs);
     GENERATE_AND_PLAY_HF(hardfork_4_pop_tx_from_global_index, "4-*");
+    GENERATE_AND_PLAY_HF(hard_fork_4_coinbase_separate_sig_flag, "4-*");
 
     // HF5
     GENERATE_AND_PLAY_HF(hard_fork_5_tx_version, "5-*");
