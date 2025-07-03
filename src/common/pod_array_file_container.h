@@ -137,12 +137,9 @@ namespace tools
 
       // close and re-open stream with trunc bit
       m_stream.close();
-      m_stream.open(m_filename, std::ios::binary | std::ios::trunc | std::ios::in);
+      m_stream.open(m_filename, std::ios::binary | std::ios::trunc | std::ios::in | std::ios::out);
 
-      if (m_stream.rdstate() != std::ios::eofbit)
-        return false;
-      
-      return true;
+      return is_opened_and_in_good_state();
     }
 
   private:
