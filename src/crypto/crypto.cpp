@@ -294,6 +294,7 @@ namespace crypto {
   }
 
   void crypto_ops::generate_key_image(const public_key &pub, const secret_key &sec, key_image &image) {
+    // image = sec * 8 * ge_fromfe_frombytes_vartime(cn_fast_hash(pub)) = sec * Hp( pub )
     ge_p3 point;
     ge_p2 point2;
     crypto_assert(sc_check(&sec) == 0);

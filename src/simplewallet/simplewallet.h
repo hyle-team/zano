@@ -180,6 +180,8 @@ namespace currency
     };
 
   private:
+    void preconfig_wallet_obj();
+
     std::string m_wallet_file;
     std::string m_generate_new;
     std::string m_generate_new_aw;
@@ -196,6 +198,7 @@ namespace currency
     std::string m_restore_wallet;
     std::string m_voting_config_file;
     bool m_no_password_confirmations = false;
+    bool m_no_whitelist = false;
     
     crypto::hash m_password_hash;
     uint64_t m_password_salt;
