@@ -1,4 +1,4 @@
-// Copyright (c) 2025
+// Copyright (c) 2025 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -201,8 +201,12 @@ TEST(pod_array_file_container_struct, corrupted_file_truncation_struct)
 
   test_struct got;
   ASSERT_TRUE(c.get_item(0, got));
-  EXPECT_EQ(0, memcmp(&got.pubkey.data, std::vector<char>(sizeof(got.pubkey.data), 'X').data(), sizeof(got.pubkey.data)));
-  EXPECT_EQ(0, memcmp(&got.key.data, std::vector<char>(sizeof(got.key.data), 'Y').data(), sizeof(got.key.data)));
+
+  for (size_t i = 0; i < sizeof(got.pubkey.data); ++i)
+    EXPECT_EQ(got.pubkey.data[i], 'X');
+  for (size_t i = 0; i < sizeof(got.key.data); ++i)
+    EXPECT_EQ(got.key.data[i], 'Y');
+
   EXPECT_TRUE(reason.find("truncated") != std::string::npos);
 }
 
