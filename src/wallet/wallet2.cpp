@@ -757,7 +757,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           {
             // normal wallet, calculate and store key images for own outs
             currency::keypair in_ephemeral = AUTO_VAL_INIT(in_ephemeral);
-            currency::generate_key_image_helper(m_account.get_keys(), ptc.tx_pub_key, o, in_ephemeral, ki);
+            currency::generate_key_image_helper(m_account.get_keys(), ptc.tx_pub_key, /* output index */ o, in_ephemeral, ki);
             WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(in_ephemeral.pub == out_key, "key_image generated ephemeral public key that does not match with output_key");
           }
 
@@ -4322,29 +4322,25 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
   // assumed to be called from normal, non-watch-only wallet
   THROW_IF_FALSE_WALLET_EX(!m_watch_only, error::wallet_common_error, "watch-only wallet is unable to sign transfers, you need to use normal wallet for that");
 
-    // decrypt the blob
-    std::string decrypted_src_blob = crypto::chacha_crypt(tx_sources_blob, m_account.get_keys().view_secret_key);
+  // decrypt the blob
+  std::string decrypted_src_blob = crypto::chacha_crypt(tx_sources_blob, m_account.get_keys().view_secret_key);
 
   // deserialize args
-  currency::finalized_tx ft = AUTO_VAL_INIT(ft);
+  currency::finalized_tx ft{};
   bool r = t_unserializable_object_from_blob(ft.ftp, decrypted_src_blob);
   THROW_IF_FALSE_WALLET_EX(r, error::wallet_common_error, "Failed to decrypt tx sources blob");
 
   // make sure unsigned tx was created with the same keys
   THROW_IF_FALSE_WALLET_EX(ft.ftp.spend_pub_key == m_account.get_keys().account_address.spend_public_key, error::wallet_common_error, "The was created in a different wallet, keys missmatch");
 
-  finalize_transaction(ft.ftp, ft.tx, ft.one_time_key, false);
+  finalize_transaction(ft.ftp, ft, false, true);
+
+  WLT_LOG_L0("sign_transfer: tx " << ft.tx_id << " has been successfully signed");
 
   // calculate key images for each change output
-  crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(
-    crypto::generate_key_derivation(
-      m_account.get_keys().account_address.view_public_key,
-      ft.one_time_key,
-      derivation),
-    "internal error: sign_transfer: failed to generate key derivation("
-    << m_account.get_keys().account_address.view_public_key
-    << ", view secret key: " << ft.one_time_key << ")");
+  crypto::key_derivation derivation{};
+  r = crypto::generate_key_derivation(m_account.get_keys().account_address.view_public_key, ft.one_time_key, derivation);
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "sign_transfer: generate_key_derivation failed, tx: " << ft.tx_id);
 
   for (size_t i = 0; i < ft.tx.vout.size(); ++i)
   {
@@ -4354,7 +4350,7 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
     crypto::public_key ephemeral_pub{};
     if (!crypto::derive_public_key(derivation, i, m_account.get_keys().account_address.spend_public_key, ephemeral_pub))
     {
-      WLT_LOG_ERROR("derive_public_key failed for tx " << get_transaction_hash(ft.tx) << ", out # " << i);
+      WLT_LOG_ERROR("derive_public_key failed for tx " << ft.tx_id << ", out # " << i);
     }
 
     if (out_pk == ephemeral_pub)
@@ -4367,6 +4363,7 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
       crypto::generate_key_image(ephemeral_pub, ephemeral_sec, ki);
 
       ft.outs_key_images.push_back(make_serializable_pair(static_cast<uint64_t>(i), ki));
+      WLT_LOG_L1("sign_transfer: tx " << ft.tx_id << ", out index: " << i << ", ki: " << ki);
     }
   }
 
@@ -4495,6 +4492,9 @@ bool wallet2::attach_asset_descriptor(const wallet_public::COMMAND_ATTACH_ASSET_
 //----------------------------------------------------------------------------------------------------
 void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx)
 {
+  // assumed to be called from watch-only wallet
+  THROW_IF_FALSE_WALLET_EX(m_watch_only, error::wallet_common_error, "submit_transfer should be called in watch-only wallet only");
+
   // decrypt sources
   std::string decrypted_src_blob = crypto::chacha_crypt(signed_tx_blob, m_account.get_keys().view_secret_key);
 
@@ -4505,8 +4505,35 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
   tx = ft.tx;
   crypto::hash tx_hash = get_transaction_hash(tx);
 
-  // foolproof
+  // foolproof check
   THROW_IF_FALSE_WALLET_CMN_ERR_EX(ft.ftp.spend_pub_key == m_account.get_keys().account_address.spend_public_key, "The given tx was created in a different wallet, keys missmatch, tx hash: " << tx_hash);
+
+  // prepare and check data for watch-only outkey2ki before sending the tx
+  std::vector<std::pair<crypto::public_key, crypto::key_image>> pk_ki_to_be_added;
+  std::vector<std::pair<uint64_t, crypto::key_image>> tri_ki_to_be_added;
+  if (m_watch_only)
+  {
+    for (auto& p : ft.outs_key_images)
+    {
+      THROW_IF_FALSE_WALLET_INT_ERR_EX(p.first < tx.vout.size(), "outs_key_images has invalid out index: " << p.first << ", tx.vout.size() = " << tx.vout.size());
+      std::list<htlc_info> stub{};
+      const crypto::public_key& pk = out_get_pub_key(tx.vout[p.first], stub);
+      pk_ki_to_be_added.push_back(std::make_pair(pk, p.second));
+    }
+
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(tx.vin.size() == ft.ftp.sources.size(), "tx.vin and ft.ftp.sources sizes missmatch");
+    for (size_t i = 0; i < tx.vin.size(); ++i)
+    {
+      const crypto::key_image& ki = get_key_image_from_txin_v(tx.vin[i]);
+      const auto& src = ft.ftp.sources[i];
+      THROW_IF_FALSE_WALLET_INT_ERR_EX(src.real_output < src.outputs.size(), "src.real_output is out of bounds: " << src.real_output);
+      const crypto::public_key& out_key = src.outputs[src.real_output].stealth_address;
+      tri_ki_to_be_added.push_back(std::make_pair(src.transfer_index, ki));
+      pk_ki_to_be_added.push_back(std::make_pair(out_key, ki));
+    }
+  }
+
+  // SEND the transaction
 
   try
   {
@@ -4523,38 +4550,16 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
   add_sent_tx_detailed_info(tx, ft.ftp.attachments, ft.ftp.prepared_destinations, ft.ftp.selected_transfers);
   m_tx_keys.insert(std::make_pair(tx_hash, ft.one_time_key));
 
+  // populate and store key images from own outputs, because otherwise a watch-only wallet cannot calculate it
   if (m_watch_only)
   {
-    std::vector<std::pair<crypto::public_key, crypto::key_image>> pk_ki_to_be_added;
-    std::vector<std::pair<uint64_t, crypto::key_image>> tri_ki_to_be_added;
-
-    for (auto& p : ft.outs_key_images)
-    {
-      THROW_IF_FALSE_WALLET_INT_ERR_EX(p.first < tx.vout.size(), "outs_key_images has invalid out index: " << p.first << ", tx.vout.size() = " << tx.vout.size());
-      std::list<htlc_info> stub{};
-      const crypto::public_key& pk = out_get_pub_key(tx.vout[p.first], stub);
-      pk_ki_to_be_added.push_back(std::make_pair(pk, p.second));
-    }
-
-    THROW_IF_FALSE_WALLET_INT_ERR_EX(tx.vin.size() == ft.ftp.sources.size(), "tx.vin and ft.ftp.sources sizes missmatch");
-    for (size_t i = 0; i < tx.vin.size(); ++i)
-    {
-      const crypto::key_image& ki = get_key_image_from_txin_v(tx.vin[i]);
-
-      const auto& src = ft.ftp.sources[i];
-      THROW_IF_FALSE_WALLET_INT_ERR_EX(src.real_output < src.outputs.size(), "src.real_output is out of bounds: " << src.real_output);
-      const crypto::public_key& out_key = src.outputs[src.real_output].stealth_address;
-
-      tri_ki_to_be_added.push_back(std::make_pair(src.transfer_index, ki));
-      pk_ki_to_be_added.push_back(std::make_pair(out_key, ki));
-    }
-
     for (auto& p : pk_ki_to_be_added)
     {
       auto it = m_pending_key_images.find(p.first);
       if (it != m_pending_key_images.end())
       {
-        LOG_PRINT_YELLOW("warning: for tx " << tx_hash << " out pub key " << p.first << " already exist in m_pending_key_images, ki: " << it->second << ", proposed new ki: " << p.second, LOG_LEVEL_0);
+        if (it->second != p.second)
+          LOG_PRINT_YELLOW("warning: for tx " << tx_hash << " out pub key " << p.first << " already exist in m_pending_key_images, ki: " << it->second << ", proposed new ki: " << p.second, LOG_LEVEL_0);
       }
       else
       {

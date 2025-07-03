@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -96,22 +96,18 @@ namespace ph = boost::placeholders;
           } \
           catch (const tools::error::transfer_error& e) \
           { \
-            LOG_ERROR("unknown transfer error: " << e.to_string()); \
-            fail_msg_writer() << "unknown transfer error: " << e.what(); \
+            fail_msg_writer() << "(transfer) " << e.what(); \
           } \
           catch (const tools::error::wallet_internal_error& e) \
           { \
-            LOG_ERROR("internal error: " << e.to_string()); \
-            fail_msg_writer() << "internal error: " << e.what(); \
+            fail_msg_writer() << "(internal) " << e.what(); \
           } \
           catch (const std::exception& e) \
           { \
-            LOG_ERROR("unexpected error: " << e.what()); \
-            fail_msg_writer() << "unexpected error: " << e.what(); \
+            fail_msg_writer() << "(unexpected) " << e.what(); \
           } \
           catch (...) \
           { \
-            LOG_ERROR("Unknown error"); \
             fail_msg_writer() << "unknown error"; \
           } \
 
@@ -521,7 +517,7 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
   else
   {
     bool r = open_wallet(m_wallet_file, pwd_container.password());
-    CHECK_AND_ASSERT_MES(r, false, "could not open account");
+    CHECK_AND_ASSERT_MES(r, false, "wallet could not be opened");
     was_open = true;
   }
   process_wallet_command_line_params(vm, *m_wallet, false);
@@ -714,6 +710,10 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
   if (!m_voting_config_file.empty())
     m_wallet->set_votes_config_path(m_voting_config_file);
 
+  auto print_wallet_opened_msg = [&](){
+    message_writer(epee::log_space::console_color_white, true) << "Opened" << (m_wallet->is_auditable() ? " auditable" : "") << (m_wallet->is_watch_only() ? " watch-only" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
+  };
+
 
   while (true)
   {
@@ -728,7 +728,7 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
     }
     catch (const tools::error::wallet_load_notice_wallet_restored& /*e*/)
     {
-      message_writer(epee::log_space::console_color_white, true) << "Opened wallet: " << m_wallet->get_account().get_public_address_str();
+      print_wallet_opened_msg();
       message_writer(epee::log_space::console_color_red, true) << "NOTICE: Wallet file was damaged and restored.";
       break;
     }
@@ -1797,6 +1797,12 @@ bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::show_seed(const std::vector<std::string> &args)
 {
+  if (m_wallet->is_watch_only())
+  {
+    fail_msg_writer() << "watch-only wallet doesn't have the full set of keys, hence no seed phrase can be generated";
+    return false;
+  }
+
   CONFIRM_WITH_PASSWORD();
   success_msg_writer() << "Please enter a password to secure this seed. Securing your seed is HIGHLY recommended. Leave password blank to stay unsecured.";
   success_msg_writer(true) << "Remember, restoring a wallet from Secured Seed can only be done if you know its password.";
@@ -1984,12 +1990,10 @@ bool simple_wallet::save_watch_only(const std::vector<std::string> &args)
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR("unexpected error: " << e.what());
-    fail_msg_writer() << "unexpected error: " << e.what();
+    fail_msg_writer() << e.what();
   }
   catch (...)
   {
-    LOG_ERROR("Unknown error");
     fail_msg_writer() << "unknown error";
   }
   return true;
@@ -2053,12 +2057,10 @@ bool simple_wallet::sign_transfer(const std::vector<std::string> &args)
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR("unexpected error: " << e.what());
-    fail_msg_writer() << "unexpected error: " << e.what();
+    fail_msg_writer() << e.what();
   }
   catch (...)
   {
-    LOG_ERROR("Unknown error");
     fail_msg_writer() << "unknown error";
   }
   return true;
@@ -2079,12 +2081,10 @@ bool simple_wallet::submit_transfer(const std::vector<std::string> &args)
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR("unexpected error: " << e.what());
-    fail_msg_writer() << "unexpected error: " << e.what();
+    fail_msg_writer() << e.what();
   }
   catch (...)
   {
-    LOG_ERROR("Unknown error");
     fail_msg_writer() << "unknown error";
   }
   return true;
@@ -3270,7 +3270,7 @@ int main(int argc, char* argv[])
     }
     else if (command_line::get_arg(vm, command_line::arg_version))
     {
-      success_msg_writer() << CURRENCY_NAME << " wallet v" << PROJECT_VERSION_LONG;
+      success_msg_writer() << CURRENCY_NAME << " simplewallet v" << PROJECT_VERSION_LONG;
       exit_requested = true;
       return true;
     }
@@ -3296,6 +3296,7 @@ int main(int argc, char* argv[])
   std::string log_dir;
   log_dir = log_file_path.has_parent_path() ? log_file_path.parent_path().string() : log_space::log_singletone::get_default_log_folder();
   log_space::log_singletone::add_logger(LOGGER_FILE, log_file_path.filename().string().c_str(), log_dir.c_str(), LOG_LEVEL_4);
+  LOG_PRINT_L0(ENDL << ENDL);
   message_writer(epee::log_space::console_color_white, true, std::string(), LOG_LEVEL_0) << CURRENCY_NAME << " simplewallet v" << PROJECT_VERSION_LONG;
 
   if (command_line::has_arg(vm, command_line::arg_log_level))

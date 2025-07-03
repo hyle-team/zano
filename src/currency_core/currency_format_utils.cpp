@@ -736,14 +736,15 @@ namespace currency
   //------------------------------------------------------------------
   bool derive_ephemeral_key_helper(const account_keys& ack, const crypto::public_key& tx_public_key, size_t real_output_index, keypair& in_ephemeral)
   {
+    // TODO: re-implement this to avoid double Hs calculation -- sowle
     crypto::key_derivation recv_derivation = AUTO_VAL_INIT(recv_derivation);
-    bool r = crypto::generate_key_derivation(tx_public_key, ack.view_secret_key, recv_derivation);
+    bool r = crypto::generate_key_derivation(tx_public_key, ack.view_secret_key, recv_derivation);  // recv_derivation = 8 * ack.view_secret_key * tx_public_key
     CHECK_AND_ASSERT_MES(r, false, "key image helper: failed to generate_key_derivation(" << tx_public_key << ", " << ack.view_secret_key << ")");
 
-    r = crypto::derive_public_key(recv_derivation, real_output_index, ack.account_address.spend_public_key, in_ephemeral.pub);
+    r = crypto::derive_public_key(recv_derivation, real_output_index, ack.account_address.spend_public_key, in_ephemeral.pub); // = Hs(recv_derivation, real_output_index) * G + spend_public_key
     CHECK_AND_ASSERT_MES(r, false, "key image helper: failed to derive_public_key(" << recv_derivation << ", " << real_output_index << ", " << ack.account_address.spend_public_key << ")");
 
-    crypto::derive_secret_key(recv_derivation, real_output_index, ack.spend_secret_key, in_ephemeral.sec);
+    crypto::derive_secret_key(recv_derivation, real_output_index, ack.spend_secret_key, in_ephemeral.sec); // = Hs(recv_derivation, real_output_index) + spend_secret_key
     return true;
   }
   //---------------------------------------------------------------
@@ -764,6 +765,8 @@ namespace currency
   //---------------------------------------------------------------
   bool generate_key_image_helper(const account_keys& ack, const crypto::public_key& tx_public_key, size_t real_output_index, keypair& in_ephemeral, crypto::key_image& ki)
   {
+    // h = Hs(8 * ack.view_secret_key * tx_public_key, real_output_index)
+    // ki = sec * Hp( pub ) = (h + spend_secret_key) * Hp( h * G + spend_public_key )
     bool r = derive_ephemeral_key_helper(ack, tx_public_key, real_output_index, in_ephemeral);
     CHECK_AND_ASSERT_MES(r, false, "Failed to call derive_ephemeral_key_helper(...)");
 
