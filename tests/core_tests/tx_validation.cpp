@@ -2728,3 +2728,39 @@ bool tx_pool_validation_and_chain_switch::c1(currency::core& c, size_t ev_index,
   return true;
 }
 
+// Сoinbase transactions must NOT allow the TX_FLAG_SIGNATURE_MODE_SEPARATE flag.
+// Сhecks that setting this flag for coinbase fails, while a default coinbase (without the flag) succeeds.
+bool tx_coinbase_separate_sig_flag::generate(std::vector<test_event_entry>& events) const
+{
+  GENERATE_ACCOUNT(miner);
+  
+  uint64_t ts = test_core_time::get_time();
+  MAKE_GENESIS_BLOCK(events, blk_0, miner, ts);
+  DO_CALLBACK(events, "configure_core");
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner);
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  block blk_2;
+  auto coinbase_default_cb = [](transaction& miner_tx, const keypair&) -> bool { return true; };
+  auto coinbase_separate_cb = [](transaction& miner_tx, const keypair&) -> bool
+  {
+    set_tx_flags(miner_tx, get_tx_flags(miner_tx) | TX_FLAG_SIGNATURE_MODE_SEPARATE);
+    return true;
+  };
+
+  // сonstruct a block with the forbidden flag, should fail after hf4
+  bool with_separate_flag = generator.construct_block_gentime_with_coinbase_cb(blk_1r, miner, coinbase_separate_cb, blk_2);
+  CHECK_AND_ASSERT_MES(with_separate_flag, false, "expected failure because TX_FLAG_SIGNATURE_MODE_SEPARATE is forbidden for coinbase after HF4");
+
+  DO_CALLBACK(events, "mark_invalid_block"); 
+  events.push_back(blk_2);
+
+  // construct a default coinbase block, should succeed
+  bool default_tx = generator.construct_block_gentime_with_coinbase_cb(blk_1r, miner, coinbase_default_cb, blk_2);
+  CHECK_AND_ASSERT_MES(default_tx, true, "default coinbase must succeed");
+
+  events.push_back(blk_2);
+
+  return true;
+}
+

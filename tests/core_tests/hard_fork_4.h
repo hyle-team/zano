@@ -49,10 +49,3 @@ struct hardfork_4_pop_tx_from_global_index : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
-
-struct hard_fork_4_coinbase_separate_sig_flag : public wallet_test
-{
-  hard_fork_4_coinbase_separate_sig_flag();
-  bool generate(std::vector<test_event_entry>& events) const;
-  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
-};

@@ -183,3 +183,8 @@ struct tx_pool_validation_and_chain_switch : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct tx_coinbase_separate_sig_flag : public test_chain_unit_enchanced
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};

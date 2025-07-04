@@ -1229,6 +1229,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(tx_pool_semantic_validation, "3");
     GENERATE_AND_PLAY(input_refers_to_incompatible_by_type_output);
     GENERATE_AND_PLAY_HF(tx_pool_validation_and_chain_switch, "4-*");
+    GENERATE_AND_PLAY_HF(tx_coinbase_separate_sig_flag, "4-*");
 
     // Double spend
     GENERATE_AND_PLAY(gen_double_spend_in_tx<false>);
@@ -1278,7 +1279,6 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(hardfork_4_wallet_transfer_with_mandatory_mixins, "3-*");
     GENERATE_AND_PLAY(hardfork_4_wallet_sweep_bare_outs);
     GENERATE_AND_PLAY_HF(hardfork_4_pop_tx_from_global_index, "4-*");
-    GENERATE_AND_PLAY_HF(hard_fork_4_coinbase_separate_sig_flag, "4-*");
 
     // HF5
     GENERATE_AND_PLAY_HF(hard_fork_5_tx_version, "5-*");
