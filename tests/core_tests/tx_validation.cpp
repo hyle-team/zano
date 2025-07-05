@@ -2728,3 +2728,62 @@ bool tx_pool_validation_and_chain_switch::c1(currency::core& c, size_t ev_index,
   return true;
 }
 
+bool gen_tx_to_key_and_zc_mixin::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts_start = test_core_time::get_time();
+
+  GENERATE_ACCOUNT(miner);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner, ts_start);
+  REWIND_BLOCKS_N(events, blk_1, blk_0, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  REWIND_BLOCKS(events, blk_1r, blk_1, miner);
+
+  std::vector<tx_source_entry> src_to_key, src_zc;
+  std::vector<tx_destination_entry> destinations;
+  bool r = fill_tx_sources_and_destinations(
+    events, blk_1r, miner, miner,
+    MK_TEST_COINS(2), TESTS_DEFAULT_FEE,
+    3, // mixin для to_key
+    src_to_key, destinations
+  );
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed for to_key");
+
+  r = fill_tx_sources_and_destinations(
+    events, blk_1r, miner, miner,
+    MK_TEST_COINS(1), TESTS_DEFAULT_FEE,
+    15, // mixin для ZC
+    src_zc, destinations
+  );
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed for zc");
+
+  {
+    tx_builder builder;
+    builder.step1_init(CURRENT_TRANSACTION_VERSION, 0);
+    builder.step2_fill_inputs(miner.get_keys(), src_to_key);
+
+    auto small_zc = src_zc;
+    small_zc[0].outputs.resize(5);
+    builder.step2_fill_inputs(miner.get_keys(), small_zc);
+
+    builder.step3_fill_outputs(destinations);
+    builder.step4_calc_hash();
+    builder.step5_sign(src_to_key);
+
+    DO_CALLBACK(events, "mark_invalid_tx");
+    events.push_back(builder.m_tx);
+  }
+
+  {
+    tx_builder builder;
+    builder.step1_init(CURRENT_TRANSACTION_VERSION, 0);
+    builder.step2_fill_inputs(miner.get_keys(), src_to_key);
+    builder.step2_fill_inputs(miner.get_keys(), src_zc);
+    builder.step3_fill_outputs(destinations);
+    builder.step4_calc_hash();
+    builder.step5_sign(src_to_key);
+
+    events.push_back(builder.m_tx);
+    MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner, builder.m_tx);
+  }
+
+  return true;
+}

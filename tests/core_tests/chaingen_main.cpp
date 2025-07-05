@@ -1219,6 +1219,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_tx_signatures_are_invalid);
     GENERATE_AND_PLAY(gen_tx_extra_double_entry);
     GENERATE_AND_PLAY(gen_tx_double_key_image);
+    GENERATE_AND_PLAY(gen_tx_to_key_and_zc_mixin);
     GENERATE_AND_PLAY(tx_expiration_time);
     GENERATE_AND_PLAY(tx_expiration_time_and_block_template);
     GENERATE_AND_PLAY(tx_expiration_time_and_chain_switching);
