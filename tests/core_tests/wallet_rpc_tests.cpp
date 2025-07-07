@@ -1217,12 +1217,7 @@ bool wallet_rpc_cold_signing::generate(std::vector<test_event_entry>& events) co
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   DO_CALLBACK(events, "configure_core");
 
-  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
-
-  MAKE_TX(events, tx_0, miner_acc, alice_acc, MK_TEST_COINS(100), blk_0r);
-  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
-
-  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
 
   DO_CALLBACK(events, "c1");
 
@@ -1277,6 +1272,39 @@ bool wallet_rpc_cold_signing::c1(currency::core& c, size_t ev_index, const std::
   bob_wlt->refresh();
   check_balance_via_wallet(*bob_wlt, "Bob", 0, 0, 0, 0, 0);
 
+  // for post HF4 cases transfer some assets along with native coins
+  crypto::public_key deployed_asset_id{};
+  size_t deployed_asset_decimal_point = 0;
+  const bool use_assets = c.get_blockchain_storage().is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM);
+  if (use_assets)
+  {
+    // miner deploys new asset and sends 50 coins of it to Alice
+    tools::wallet_rpc_server miner_rpc(miner_wlt);
+    tools::wallet_public::COMMAND_ASSETS_DEPLOY::request req_deploy{};
+    req_deploy.asset_descriptor.current_supply = 50;
+    req_deploy.asset_descriptor.decimal_point = deployed_asset_decimal_point;
+    req_deploy.asset_descriptor.full_name = "50 pounds per person";
+    req_deploy.asset_descriptor.ticker = "50PPP";
+    req_deploy.asset_descriptor.total_max_supply = 200; // for a family of four
+    req_deploy.destinations.emplace_back(tools::wallet_public::transfer_destination{50, m_accounts[ALICE_ACC_IDX].get_public_address_str(), null_pkey});
+    req_deploy.do_not_split_destinations = true;
+    tools::wallet_public::COMMAND_ASSETS_DEPLOY::response res_deploy{};
+    r = invoke_text_json_for_rpc(miner_rpc, "deploy_asset", req_deploy, res_deploy);
+    CHECK_AND_ASSERT_MES(r, false, "RPC 'deploy_asset' failed");
+    deployed_asset_id = res_deploy.new_asset_id;
+  }
+
+  // also, send some native coins
+  miner_wlt->transfer(MK_TEST_COINS(100), m_accounts[ALICE_ACC_IDX].get_public_address(), native_coin_asset_id);
+
+  // confirm this tx and mine 10 block to unlock the coins
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == (use_assets ? 2 : 1), false, "enexpected pool txs count: " << c.get_pool_transactions_count());
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool is not empty: " << c.get_pool_transactions_count());
+
+  // Alice: prepare watch-only wallet
+
   account_base alice_acc_wo = m_accounts[ALICE_ACC_IDX];
   alice_acc_wo.make_account_watch_only();
   std::shared_ptr<tools::wallet2> alice_wlt_wo = init_playtime_test_wallet(events, c, alice_acc_wo);
@@ -1297,17 +1325,17 @@ bool wallet_rpc_cold_signing::c1(currency::core& c, size_t ev_index, const std::
   tools::wallet_rpc_server alice_rpc(alice_wlt);
   std::shared_ptr<tools::wallet_rpc_server> alice_rpc_wo_ptr{ new tools::wallet_rpc_server(alice_wlt_wo) };
 
-  // send a cold-signed transaction
+  // send a cold-signed transaction: Alice -> Bob; 50 test coins + 50 of the asset
   tools::wallet_public::COMMAND_RPC_TRANSFER::request req{};
-  req.destinations.emplace_back();
-  req.destinations.back().amount = MK_TEST_COINS(50);
-  req.destinations.back().address = m_accounts[BOB_ACC_IDX].get_public_address_str();
+  req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(50), m_accounts[BOB_ACC_IDX].get_public_address_str(), native_coin_asset_id});
+  if (use_assets)
+    req.destinations.emplace_back(tools::wallet_public::transfer_destination{50, m_accounts[BOB_ACC_IDX].get_public_address_str(), deployed_asset_id});
   req.fee = TESTS_DEFAULT_FEE;
   req.mixin = 10;
   r = make_cold_signing_transaction(*alice_rpc_wo_ptr, alice_rpc, req);
   CHECK_AND_ASSERT_MES(r, false, "make_cold_signing_transaction failed");
 
-  uint64_t bob_expected_balance = req.destinations.back().amount;
+  uint64_t bob_expected_balance = req.destinations.front().amount;
 
   // mine few blocks to unlock Alice's coins
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "unexpected pool txs count: " << c.get_pool_transactions_count());
@@ -1340,7 +1368,7 @@ bool wallet_rpc_cold_signing::c1(currency::core& c, size_t ev_index, const std::
   CHECK_AND_ASSERT_EQ(blocks_fetched, 0);
 
 
-  // send a cold-signed transaction
+  // send a cold-signed transaction: Alice -> Bob; all rest test coins (should be 50 - 1 = 49)
   req = tools::wallet_public::COMMAND_RPC_TRANSFER::request{};
   req.destinations.emplace_back();
   req.destinations.back().amount = alice_expected_balance - TESTS_DEFAULT_FEE;
@@ -1370,7 +1398,7 @@ bool wallet_rpc_cold_signing::c1(currency::core& c, size_t ev_index, const std::
     CURRENCY_MINED_MONEY_UNLOCK_WINDOW, alice_expected_balance, 0, 0, 0), false, "");
 
 
-  // send a cold-signed transaction
+  // send a cold-signed transaction: Alice -> Bob; all rest test coins (should be 7 - 1 = 6)
   req = tools::wallet_public::COMMAND_RPC_TRANSFER::request{};
   req.destinations.emplace_back();
   req.destinations.back().amount = alice_expected_balance - TESTS_DEFAULT_FEE;
@@ -1398,7 +1426,11 @@ bool wallet_rpc_cold_signing::c1(currency::core& c, size_t ev_index, const std::
 
 
   // finally, check Bob's balance
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, bob_expected_balance, true, 3 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW, bob_expected_balance, 0, 0, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, bob_expected_balance, true, 4 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW, bob_expected_balance, 0, 0, 0), false, "");
+  if (use_assets)
+  {
+    CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", 50, 0, 50, 0, 0, deployed_asset_id, deployed_asset_decimal_point), false, "");
+  }
 
   return true;
 }
