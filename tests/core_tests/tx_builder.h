@@ -151,6 +151,11 @@ struct tx_builder
     return crypto::public_key();
   }
 
+  void print_tx()
+  {
+    LOG_PRINT_GREEN("---------> builder TX: " << currency::obj_to_json_str(m_tx), LOG_LEVEL_0);
+  }
+
   currency::transaction m_tx;
   currency::keypair m_tx_key;
   std::vector<currency::keypair> m_in_contexts;

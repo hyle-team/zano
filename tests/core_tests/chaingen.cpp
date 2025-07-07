@@ -261,6 +261,8 @@ bool test_generator::construct_block(currency::block& blk,
   {
     uint64_t fee = 0;
     bool r = get_tx_fee(tx, fee);
+    
+    LOG_PRINT_GREEN("---------> TX: " << obj_to_json_str(tx), LOG_LEVEL_0);
     CHECK_AND_ASSERT_MES(r, false, "wrong transaction passed to construct_block");
     total_fee += fee;
     txs_size += get_object_blobsize(tx);
