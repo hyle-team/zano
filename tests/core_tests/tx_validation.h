@@ -183,3 +183,14 @@ struct tx_pool_validation_and_chain_switch : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct tx_input_mixins: public wallet_test
+{
+  tx_input_mixins();
+  bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+  mutable currency::transaction tx1;
+  mutable currency::transaction tx2;
+};

@@ -2728,3 +2728,91 @@ bool tx_pool_validation_and_chain_switch::c1(currency::core& c, size_t ev_index,
   return true;
 }
 
+tx_input_mixins::tx_input_mixins()
+{
+  REGISTER_CALLBACK_METHOD(tx_input_mixins, configure_core);
+  REGISTER_CALLBACK_METHOD(tx_input_mixins, c1);
+}
+
+bool tx_input_mixins::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
+  pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
+  pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
+  pc.hf4_minimum_mixins = 0;
+  pc.hard_forks.set_hardfork_height(1, 1);
+  pc.hard_forks.set_hardfork_height(2, 1);
+  pc.hard_forks.set_hardfork_height(3, 1);
+  c.get_blockchain_storage().set_core_runtime_config(pc);
+  return true;
+}
+
+bool tx_input_mixins::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc =   m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+  //account_base& carol_acc = m_accounts[CAROL_ACC_IDX]; carol_acc.generate(); carol_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, alice_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  transaction pre_zc_tx{};
+  std::vector<tx_source_entry> sources;
+  std::vector<tx_destination_entry> destinations{};
+  uint64_t alice_bob_amount = TESTS_DEFAULT_FEE * 5;
+
+  // Make tx with txin_to_key input
+  // Spend money before include zarcanum rules
+
+  // destination is bob
+  destinations.emplace_back(/* amount = */ alice_bob_amount,
+                            /* to = */ bob_acc.get_public_address(),
+                            /* asset_id = */ currency::native_coin_asset_id);
+
+  bool r = fill_tx_sources(sources, events, blk_0r, alice_acc.get_keys(), alice_bob_amount, 0);
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, events, this, pre_zc_tx);
+  tx1 = pre_zc_tx;
+
+  // let's go to zarcanum
+  uint64_t alice_miner_amount = TESTS_DEFAULT_FEE * 5;
+  transaction post_zc_tx{};
+
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0r, alice_acc);
+  destinations.clear();
+  sources.clear();
+
+  // Make tx with tx_zc_input
+
+  // destination is miner
+  destinations.emplace_back(/* amount = */ alice_miner_amount,
+                            /* to = */ miner_acc.get_public_address(),
+                            /* asset_id = */ currency::native_coin_asset_id);
+
+  r = fill_tx_sources(sources, events, blk_1, alice_acc.get_keys(), alice_miner_amount, 15);
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, events, this, post_zc_tx);
+  tx2 = post_zc_tx;
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool tx_input_mixins::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  CHECK_AND_ASSERT_MES(tx1.hardfork_id < 4, false, "tx1 is not pre zarcanum tx");
+  CHECK_AND_ASSERT_MES(tx2.hardfork_id > 3, false, "tx2 is not zarcanum tx. tx2.hardfork_id == " << tx2.hardfork_id);
+
+  CHECK_AND_ASSERT_MES(tx1.vin.size() > 0, false, "tx1.vin.size() == 0");
+  auto pre_zc_vin = boost::get<txin_to_key>(tx1.vin[0]);
+  // CHECK_AND_ASSERT_MES(pre_zc_vin.key_offsets.size() > 0, false, "tx1.vin[0] has 0 decoy-outs");
+  
+  CHECK_AND_ASSERT_MES(tx2.vin.size() > 0, false, "tx2.vin.size() == 0");
+  auto post_zc_vin = boost::get<txin_zc_input>(tx2.vin[0]);
+  CHECK_AND_ASSERT_MES(post_zc_vin.key_offsets.size() >= 15, false, "tx2.vin[0] has < 15 decoy-outs: post_zc_vin.key_offsets.size() == " << post_zc_vin.key_offsets.size());
+
+  return true;
+}
