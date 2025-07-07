@@ -5921,9 +5921,9 @@ struct local_transfers_struct
   END_KV_SERIALIZE_MAP()
 };
 
-void wallet2::dump_trunsfers(std::stringstream& ss, bool verbose, const crypto::public_key& asset_id) const
+void wallet2::dump_transfers(std::stringstream& ss, bool verbose, const crypto::public_key& asset_id_to_filter) const
 {
-  bool filter_by_asset_id = asset_id != currency::null_pkey;
+  bool filter_by_asset_id = asset_id_to_filter != currency::null_pkey;
 
   if (verbose)
   {
@@ -5933,7 +5933,7 @@ void wallet2::dump_trunsfers(std::stringstream& ss, bool verbose, const crypto::
     {
       uint64_t i = tr.first;
       const transfer_details& td = tr.second;
-      if (filter_by_asset_id && td.get_asset_id() != asset_id)
+      if (filter_by_asset_id && td.get_asset_id() != asset_id_to_filter)
         continue;
       ss << "{ \"i\": " << i << "," << ENDL;
       ss << "\"entry\": " << epee::serialization::store_t_to_json(td) << "}," << ENDL;
@@ -5942,16 +5942,22 @@ void wallet2::dump_trunsfers(std::stringstream& ss, bool verbose, const crypto::
   else
   {
     boost::io::ios_flags_saver ifs(ss);
-    ss << "index                 amount  spent_h  g_index   block  block_ts     flg  tx                                                                out#  key image" << ENDL;
+    ss << "index                 amount  spent_h  g_index   block  block_ts     flg  tx                                                                out#  asset id" << ENDL;
     for (const auto& tr : m_transfers)
     {
       uint64_t i = tr.first;
       const transfer_details& td = tr.second;
-      if (filter_by_asset_id && td.get_asset_id() != asset_id)
+      const crypto::public_key asset_id = td.get_asset_id();
+      if (filter_by_asset_id && asset_id != asset_id_to_filter)
         continue;
+
+      uint32_t asset_flags = 0;
+      currency::asset_descriptor_base asset_info{};
+      get_asset_info(asset_id, asset_info, asset_flags);
+
       ss << std::right <<
         std::setw(5) << i << "  " <<
-        std::setw(21) << print_money(td.amount()) << "  " <<
+        std::setw(21) << print_money(td.amount(), asset_info.decimal_point) << "  " <<
         std::setw(7) << td.m_spent_height << "  " <<
         std::setw(7) << td.m_global_output_index << "  " <<
         std::setw(6) << td.m_ptx_wallet_info->m_block_height << "  " <<
@@ -5959,15 +5965,15 @@ void wallet2::dump_trunsfers(std::stringstream& ss, bool verbose, const crypto::
         std::setw(4) << td.m_flags << "  " <<
         get_transaction_hash(td.m_ptx_wallet_info->m_tx) << "  " <<
         std::setw(4) << td.m_internal_output_index << "  " <<
-        td.m_key_image << ENDL;
+        (asset_id == native_coin_asset_id ? std::string() : crypto::pod_to_hex(asset_id)) << ENDL;
     }
   }
 }
 //----------------------------------------------------------------------------------------------------
-std::string wallet2::dump_trunsfers(bool verbose, const crypto::public_key& asset_id) const
+std::string wallet2::dump_transfers(bool verbose, const crypto::public_key& asset_id) const
 {
   std::stringstream ss;
-  dump_trunsfers(ss, verbose, asset_id);
+  dump_transfers(ss, verbose, asset_id);
   return ss.str();
 }
 //----------------------------------------------------------------------------------------------------

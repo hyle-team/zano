@@ -2988,7 +2988,7 @@ bool mined_balance_wallet_test::c1(currency::core& c, size_t ev_index, const std
   miner_wlt->refresh();
 
   std::stringstream ss;
-  miner_wlt->dump_trunsfers(ss, false);
+  miner_wlt->dump_transfers(ss, false);
   LOG_PRINT_CYAN("miner transfers: " << ENDL << ss.str(), LOG_LEVEL_0);
 
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*miner_wlt.get(), "miner", miner_mined_money, miner_mined_money), false, "wrong balance");

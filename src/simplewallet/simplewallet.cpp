@@ -298,7 +298,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("export_recent_transfers", boost::bind(&simple_wallet::export_recent_transfers, this, ph::_1), "list_recent_transfers_tx - Write recent transfer in json to wallet_recent_transfers.txt");
   m_cmd_binder.set_handler("list_outputs", boost::bind(&simple_wallet::list_outputs, this, ph::_1), "list_outputs [spent|unspent] [ticker=ZANO] [unknown] - Lists all the outputs. The result may be filtered by spent status, asset ticker or unknown asset ids.");
   m_cmd_binder.set_handler("lo", boost::bind(&simple_wallet::list_outputs, this, ph::_1), "alias for list_outputs");
-  m_cmd_binder.set_handler("dump_transfers", boost::bind(&simple_wallet::dump_trunsfers, this, ph::_1), "dump_transfers - Write  transfers in json to dump_transfers.txt");
+  m_cmd_binder.set_handler("dump_transfers", boost::bind(&simple_wallet::dump_transfers, this, ph::_1), "dump_transfers - Write  transfers in json to dump_transfers.txt");
   m_cmd_binder.set_handler("dump_keyimages", boost::bind(&simple_wallet::dump_key_images, this, ph::_1), "dump_keyimages - Write  key_images in json to dump_key_images.txt");
   m_cmd_binder.set_handler("payments", boost::bind(&simple_wallet::show_payments, this, ph::_1), "payments <payment_id_1> [<payment_id_2> ... <payment_id_N>] - Show payments <payment_id_1>, ... <payment_id_N>");
   m_cmd_binder.set_handler("bc_height", boost::bind(&simple_wallet::show_blockchain_height, this,ph::_1), "Show blockchain height");
@@ -1184,12 +1184,12 @@ bool simple_wallet::export_recent_transfers(const std::vector<std::string>& args
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::dump_trunsfers(const std::vector<std::string>& args)
+bool simple_wallet::dump_transfers(const std::vector<std::string>& args)
 {
 
   stringstream ss;
   success_msg_writer() << "Generating text....";
-  m_wallet->dump_trunsfers(ss);
+  m_wallet->dump_transfers(ss);
   success_msg_writer() << "Storing text to dump_transfers.txt....";
   file_io_utils::save_string_to_file(log_space::log_singletone::get_default_log_folder() + "/dump_transfers.txt", ss.str());
   success_msg_writer() << "Done....";

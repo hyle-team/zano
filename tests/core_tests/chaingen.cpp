@@ -684,7 +684,7 @@ bool test_generator::find_kernel(const std::list<currency::account_base>& accs,
   for (size_t wallet_index = 0, size = wallets.size(); wallet_index < size; ++wallet_index)
   {
     std::shared_ptr<tools::wallet2> w = wallets[wallet_index].wallet;
-    LOG_PRINT_L0("wallet #" << wallet_index << " @ block " << w->get_top_block_height() << ENDL << wallets[wallet_index].wallet->dump_trunsfers());
+    LOG_PRINT_L0("wallet #" << wallet_index << " @ block " << w->get_top_block_height() << ENDL << wallets[wallet_index].wallet->dump_transfers());
   }
 
   return false;
@@ -2190,7 +2190,7 @@ bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name,
 
   if (!r)
   {
-    LOG_PRINT(account_name << "'s transfers for asset_id " << asset_id << ": " << ENDL << w.dump_trunsfers(false, asset_id), LOG_LEVEL_0);
+    LOG_PRINT(account_name << "'s transfers for asset_id " << asset_id << ": " << ENDL << w.dump_transfers(false, asset_id), LOG_LEVEL_0);
   }
 
   return r;
@@ -2451,7 +2451,7 @@ bool refresh_wallet_and_check_balance(const char* intro_log_message, const char*
 
   if (print_transfers)
   {
-    LOG_PRINT_CYAN(wallet_name << "'s transfers: " << ENDL << wallet->dump_trunsfers(), LOG_LEVEL_0);
+    LOG_PRINT_CYAN(wallet_name << "'s transfers: " << ENDL << wallet->dump_transfers(), LOG_LEVEL_0);
   }
 
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*wallet.get(), wallet_name, expected_total, expected_mined, expected_unlocked, expected_awaiting_in, expected_awaiting_out), false, "");
