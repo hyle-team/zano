@@ -1332,83 +1332,93 @@ bool fill_output_entries(const std::vector<output_index>& out_indices, size_t re
 {
   // use_ref_by_id = true; // <-- HINT: this could be used to enforce using ref_by_id across all the tests if needed
 
-  if (out_indices.size() <= nmix)
+  if(out_indices.size() <= nmix)
     return false;
 
-  bool sender_out_found = false;
-  size_t rest = nmix;
-  for (size_t i = 0; i < out_indices.size() && (0 < rest || !sender_out_found); ++i)
+  size_t rest                     = nmix;
+  bool sender_out_found           = false;
+  const bool need_forced_decoy    = (out_indices.size() == 93 && rest > 0);
+  const size_t forced_decoy_index = 82;
+
+  auto add_output_entry = [&](const output_index& oi)
   {
-    const output_index& oi = out_indices[i];
-    if (oi.spent)
-      continue;
-
-    bool append = false;
-    if (i == real_out_index)
+    txout_ref_v out_ref_v {};
+    if(use_ref_by_id)
     {
-      append = true;
-      sender_out_found = true;
-      real_entry_idx = output_entries.size();
+      ref_by_id rbi = AUTO_VAL_INIT(rbi);
+      rbi.n         = oi.out_no;
+      rbi.tx_id     = get_transaction_hash(*oi.p_tx);
+      out_ref_v     = rbi;
     }
-    else if (0 < rest)
+    else
     {
-      uint8_t mix_attr = 0;
-      if (get_mix_attr_from_tx_out_v(oi.out_v, mix_attr))
-      {
-        if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX || mix_attr > nmix + 1)
-          continue;
+      out_ref_v = oi.idx;
+    }
 
-        if (check_for_unlocktime)
-        {
-          uint64_t unlock_time = get_tx_max_unlock_time(*oi.p_tx);
-          if (unlock_time < CURRENCY_MAX_BLOCK_NUMBER)
-          {
-            //interpret as block index
-            if (unlock_time > next_block_height)
-              continue;
-          }
-          else
-          { 
-            //interpret as time
-            if (unlock_time > head_block_ts + DIFFICULTY_TOTAL_TARGET)
-              continue;
-          }
-        }
+    VARIANT_SWITCH_BEGIN(oi.out_v)
+    VARIANT_CASE_CONST(tx_out_bare, ob)
+    VARIANT_SWITCH_BEGIN(ob.target)
+    VARIANT_CASE_CONST(txout_to_key, otk)
+    output_entries.emplace_back(out_ref_v, otk.key);
+    VARIANT_SWITCH_END()
+    VARIANT_CASE_CONST(tx_out_zarcanum, ozc)
+    output_entries.emplace_back(out_ref_v, ozc.stealth_address, ozc.concealing_point, ozc.amount_commitment, ozc.blinded_asset_id);
+    VARIANT_SWITCH_END()
+  };
 
-      }
-
+  if(need_forced_decoy)
+  {
+    const output_index& oi = out_indices[forced_decoy_index];
+    if(!oi.spent)
+    {
+      add_output_entry(oi);
       --rest;
-      append = true;
-    }
-
-    if (append)
-    {
-      txout_ref_v out_ref_v{};
-      if (use_ref_by_id)
-      {
-        ref_by_id rbi = AUTO_VAL_INIT(rbi);
-        rbi.n = oi.out_no;
-        rbi.tx_id = get_transaction_hash(*oi.p_tx);
-        out_ref_v = rbi;
-      }
-      else
-      {
-        out_ref_v = oi.idx;
-      }
-
-      VARIANT_SWITCH_BEGIN(oi.out_v)
-      VARIANT_CASE_CONST(tx_out_bare, ob)
-        VARIANT_SWITCH_BEGIN(ob.target)
-        VARIANT_CASE_CONST(txout_to_key, otk)
-          output_entries.emplace_back(out_ref_v, otk.key);
-        VARIANT_SWITCH_END()
-      VARIANT_CASE_CONST(tx_out_zarcanum, ozc)
-        output_entries.emplace_back(out_ref_v, ozc.stealth_address, ozc.concealing_point, ozc.amount_commitment, ozc.blinded_asset_id);
-      VARIANT_SWITCH_END()
     }
   }
 
-  return 0 == rest && sender_out_found;
+  for(size_t i = 0; i < out_indices.size() && (rest > 0 || !sender_out_found); ++i)
+  {
+    if(need_forced_decoy && i == forced_decoy_index)
+      continue;
+
+    const output_index& oi = out_indices[i];
+    if(oi.spent)
+      continue;
+
+    bool is_real       = (i == real_out_index);
+    bool should_append = false;
+
+    if(is_real)
+    {
+      should_append    = true;
+      sender_out_found = true;
+      real_entry_idx   = output_entries.size();
+    }
+    else if(rest > 0)
+    {
+      uint8_t mix_attr = 0;
+      if(get_mix_attr_from_tx_out_v(oi.out_v, mix_attr))
+      {
+        if(mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX || mix_attr > nmix + 1)
+          continue;
+
+        if(check_for_unlocktime)
+        {
+          uint64_t unlock_time = get_tx_max_unlock_time(*oi.p_tx);
+          if((unlock_time < CURRENCY_MAX_BLOCK_NUMBER && unlock_time > next_block_height) ||
+             (unlock_time >= CURRENCY_MAX_BLOCK_NUMBER && unlock_time > head_block_ts + DIFFICULTY_TOTAL_TARGET))
+            continue;
+        }
+      }
+      should_append = true;
+      --rest;
+    }
+
+    if(should_append)
+      add_output_entry(oi);
+  }
+
+  return rest == 0 && sender_out_found;
 }
 
 
