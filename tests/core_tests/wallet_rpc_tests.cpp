@@ -1304,7 +1304,6 @@ bool wallet_rpc_cold_signing::c1(currency::core& c, size_t ev_index, const std::
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool is not empty: " << c.get_pool_transactions_count());
 
   // Alice: prepare watch-only wallet
-
   account_base alice_acc_wo = m_accounts[ALICE_ACC_IDX];
   alice_acc_wo.make_account_watch_only();
   std::shared_ptr<tools::wallet2> alice_wlt_wo = init_playtime_test_wallet(events, c, alice_acc_wo);
@@ -1422,15 +1421,73 @@ bool wallet_rpc_cold_signing::c1(currency::core& c, size_t ev_index, const std::
   // check Alice's balance
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("after sending the second cold-signed tx:", "Alice", alice_wlt_wo, alice_expected_balance, true,
     CURRENCY_MINED_MONEY_UNLOCK_WINDOW, alice_expected_balance, 0, 0, 0), false, "");
+  if (use_assets)
+    CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt_wo.get(), "Alice", 0, 0, 0, 0, 0, deployed_asset_id, deployed_asset_decimal_point), false, "");
 
 
 
   // finally, check Bob's balance
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, bob_expected_balance, true, 4 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW, bob_expected_balance, 0, 0, 0), false, "");
   if (use_assets)
-  {
     CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", 50, 0, 50, 0, 0, deployed_asset_id, deployed_asset_decimal_point), false, "");
-  }
+
+  
+  // Alice watch-only: reload the wallet, make sure the balance is still okay (zero)
+  alice_rpc_wo_ptr.reset();
+  alice_wlt_wo->reset_password(m_wallet_password);
+  alice_wlt_wo->store(m_wallet_filename);
+  CHECK_AND_ASSERT_EQ(alice_wlt_wo.unique(), true);
+  alice_wlt_wo.reset(new tools::wallet2);
+  alice_wlt_wo->load(m_wallet_filename, m_wallet_password);
+  alice_wlt_wo->set_core_proxy(m_core_proxy);
+  alice_wlt_wo->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
+  set_wallet_options(alice_wlt_wo);
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("after re-loading with zero balance:", "Alice", alice_wlt_wo, 0, true, 0, 0, 0, 0, 0), false, "");
+  if (use_assets)
+    CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt_wo.get(), "Alice", 0, 0, 0, 0, 0, deployed_asset_id, deployed_asset_decimal_point), false, "");
+
+
+  // Alice: remove outkey2ki file with key images copies and restore the wallet from watch-only account
+  std::string alice_seed_phrase = m_accounts[ALICE_ACC_IDX].get_seed_phrase("");
+  CHECK_AND_ASSERT_EQ(alice_wlt_wo.unique(), true);
+  alice_wlt_wo.reset();
+  CHECK_AND_ASSERT_MES(boost::filesystem::remove(epee::string_tools::cut_off_extension(m_wallet_filename) + L".outkey2ki"), false, "boost::filesystem::remove failed");
+  CHECK_AND_ASSERT_MES(boost::filesystem::remove(m_wallet_filename), false, "boost::filesystem::remove failed");
+
+  alice_wlt_wo = init_playtime_test_wallet(events, c, alice_acc_wo);
+  alice_wlt_wo->set_core_proxy(m_core_proxy);
+  alice_wlt_wo->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
+  set_wallet_options(alice_wlt_wo);
+
+  // without key images Alice watch-only wallet is only able to detect incoming transfers and thus calculate incorrect balance
+  alice_expected_balance = MK_TEST_COINS(100 + 49 + 7);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("after sending the second cold-signed tx:", "Alice", alice_wlt_wo, alice_expected_balance, true,
+    5 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1, alice_expected_balance, 0, 0, 0), false, "");
+  if (use_assets)
+    CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt_wo.get(), "Alice", 50, 0, 50, 0, 0, deployed_asset_id, deployed_asset_decimal_point), false, "");
+
+  // store this broken watch-only wallet into a file ...
+  alice_wlt_wo->reset_password(m_wallet_password);
+  alice_wlt_wo->store(m_wallet_filename);
+  CHECK_AND_ASSERT_EQ(alice_wlt_wo.unique(), true);
+  alice_wlt_wo.reset();
+
+  // ... and repair it using full key wallet
+  alice_wlt->restore_key_images_in_wo_wallet(m_wallet_filename, m_wallet_password);
+
+  alice_wlt_wo.reset(new tools::wallet2);
+  alice_wlt_wo->load(m_wallet_filename, m_wallet_password);
+  alice_wlt_wo->set_core_proxy(m_core_proxy);
+  alice_wlt_wo->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
+  set_wallet_options(alice_wlt_wo);
+
+  // re-check the balance, it should be zero now
+  alice_expected_balance = 0;
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("after sending the second cold-signed tx:", "Alice", alice_wlt_wo, alice_expected_balance, true,
+    5 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1, alice_expected_balance, 0, 0, 0), false, "");
+  if (use_assets)
+    CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt_wo.get(), "Alice", 0, 0, 0, 0, 0, deployed_asset_id, deployed_asset_decimal_point), false, "");
 
   return true;
 }
