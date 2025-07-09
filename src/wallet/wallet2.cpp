@@ -92,6 +92,11 @@ namespace tools
     m_core_runtime_config = currency::get_default_core_runtime_config();
   }
   //---------------------------------------------------------------
+  wallet2::~wallet2()
+  {
+    // do nothing
+  }
+  //---------------------------------------------------------------
   uint64_t wallet2::get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const wallet_public::employed_tx_entries& td)
   {
     uint64_t max_unlock_time = 0;
@@ -5231,7 +5236,11 @@ bool wallet2::reset_history()
   std::wstring file_path = m_wallet_file;
   account_base acc_tmp = m_account;
   auto tx_keys = m_tx_keys;
+  auto pending_key_images = m_pending_key_images;
+  crypto::hash genesis_id = m_chain.get_genesis();
   clear();
+  m_chain.set_genesis(genesis_id);
+  m_pending_key_images = pending_key_images;
   m_tx_keys = tx_keys;
   m_account = acc_tmp;
   m_password = pass;
@@ -7856,6 +7865,100 @@ bool wallet2::get_tx_key(const crypto::hash& txid, crypto::secret_key& tx_key) c
 bool wallet2::is_need_to_split_outputs()
 {
   return !is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM);
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::restore_key_images_in_wo_wallet(const std::wstring& filename, const std::string& password) const
+{
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!m_watch_only, "restore_key_images_in_wo_wallet can only be used in non watch-only wallet");
+  bool r = false;
+
+  // load the given watch-only wallet
+  wallet2 wo;
+  wo.load(filename, password);
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(wo.is_watch_only(), epee::string_encoding::wstring_to_utf8(filename) << " is not a watch-only wallet");
+  if (m_account.get_keys().view_secret_key != wo.get_account().get_keys().view_secret_key ||
+    m_account.get_public_address() != wo.get_account().get_public_address())
+  {
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, epee::string_encoding::wstring_to_utf8(filename) << " has keys that differ from this wallet's keys; wrong wallet?");
+  }
+
+  //
+  // 1. Find missing key images and calculate them using secret spend key. Populate missing_ki_items container.
+  //
+  struct missing_ki_item
+  {
+    crypto::public_key  tx_pub_key;
+    crypto::public_key  out_pub_key;
+    uint64_t            output_index;
+    uint64_t            transfer_index;
+    crypto::key_image   ki;
+  };
+
+  std::set<size_t> transfer_indices_to_include;
+  for(auto el : wo.m_pending_key_images)
+  {
+    const crypto::key_image& ki = el.second;
+    auto it = wo.m_key_images.find(ki);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != wo.m_key_images.end(), "restore_key_images_in_wo_wallet: m_key_images inconsistency, ki: " << ki);
+    size_t transfer_index = it->second;
+    transfer_indices_to_include.insert(transfer_index);
+    WLT_LOG_L1("restore_key_images_in_wo_wallet: transfer " << transfer_index << " is in m_pending_key_images, included");
+  }
+
+  for(auto el : wo.m_transfers)
+  {
+    size_t transfer_index = el.first;
+    if (el.second.m_key_image == null_ki)
+    {
+      transfer_indices_to_include.insert(transfer_index);
+      WLT_LOG_L1("restore_key_images_in_wo_wallet: ki is null for ti " << transfer_index << ", included");
+    }
+  }
+
+  // now in transfer_indices_to_include we have ordered and unique list of transfer indices
+  std::vector<missing_ki_item> missing_ki_items;
+  std::set<crypto::public_key> pk_uniqueness_set;
+  for(size_t transfer_index : transfer_indices_to_include)
+  {
+    const auto& td = wo.m_transfers.at(transfer_index);
+    auto& item = missing_ki_items.emplace_back();
+    item.output_index = td.m_internal_output_index;
+    crypto::public_key out_pub_key{};
+    r = get_out_pub_key_from_tx_out_v(td.output(), out_pub_key);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "restore_key_images_in_wo_wallet failed for ti: " << transfer_index);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(pk_uniqueness_set.insert(out_pub_key).second, "restore_key_images_in_wo_wallet: out pub key in not unique: " << out_pub_key << ", ti: " << transfer_index);
+    item.out_pub_key = out_pub_key;
+    item.transfer_index = transfer_index;
+    item.tx_pub_key = get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
+    WLT_LOG_L0("restore_key_images_in_wo_wallet: including: " << item.out_pub_key << ", " << transfer_index);
+
+    // calculate key image
+    keypair ephemeral{};
+    generate_key_image_helper(m_account.get_keys(), item.tx_pub_key, item.output_index, ephemeral, item.ki);
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(ephemeral.pub == item.out_pub_key, "restore_key_images_in_wo_wallet: out pub key missmatch, ti: " << transfer_index);
+  };
+
+  //
+  // 2. Actually restore key images in the 'wo' object.
+  //
+  r = wo.m_pending_key_images_file_container.clear();
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "restore_key_images_in_wo_wallet: pending ki container clearing failed");
+  wo.m_pending_key_images.clear();
+
+  for(size_t i = 0; i < missing_ki_items.size(); ++i)
+  {
+    const auto& item = missing_ki_items[i];
+    auto& td = wo.m_transfers[item.transfer_index]; // item.transfer_index validity was checked above
+
+    td.m_key_image = item.ki; // TODO: it's unclear whether we need to update m_transfers[].m_key_image since later I decided to clear history to trigger resync later. Probably, no. -- sowle
+    r = wo.m_pending_key_images.insert(std::make_pair(item.out_pub_key, item.ki)).second;
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "restore_key_images_in_wo_wallet: insert failed, out_pub_key: " << item.out_pub_key << ", i: " << i);
+    wo.m_pending_key_images_file_container.push_back(out_key_to_ki{item.out_pub_key, item.ki});
+    LOG_PRINT_L0("restore_key_images_in_wo_wallet: added #" << i << " ti: " << item.transfer_index << ", pk: " << item.out_pub_key << ", ki: " << item.ki);
+  }
+
+  wo.reset_history();
+  wo.store();
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::prepare_tx_destinations(const assets_selection_context& needed_money_map,
