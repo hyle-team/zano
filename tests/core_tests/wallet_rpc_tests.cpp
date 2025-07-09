@@ -1234,6 +1234,16 @@ bool make_cold_signing_transaction(tools::wallet_rpc_server& rpc_wo, tools::wall
   r = invoke_text_json_for_rpc(rpc_wo, "transfer", req_transfer, res_transfer);
   CHECK_AND_ASSERT_MES(r, false, "RPC 'transfer' failed");
 
+  // skip this reservation just for fun
+  tools::wallet_public::COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION::request req_clear_csr{};
+  tools::wallet_public::COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION::response res_clear_csr{};
+  invoke_text_json_for_rpc(rpc_wo, "clear_utxo_cold_sig_reservation", req_clear_csr, res_clear_csr);
+  CHECK_AND_ASSERT_MES(res_clear_csr.affected_outputs.size() > 0, false, "no outputs were affected after clear_utxo_cold_sig_reservation");
+
+  // watch only creates a transaction once again
+  res_transfer = tools::wallet_public::COMMAND_RPC_TRANSFER::response{};
+  r = invoke_text_json_for_rpc(rpc_wo, "transfer", req_transfer, res_transfer);
+  CHECK_AND_ASSERT_MES(r, false, "RPC 'transfer' failed");
     
   // secure wallet with full keys set signs the transaction
   tools::wallet_public::COMMAND_SIGN_TRANSFER::request req_sign{};

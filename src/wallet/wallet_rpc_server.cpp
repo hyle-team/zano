@@ -1620,6 +1620,31 @@ namespace tools
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_clear_utxo_cold_sig_reservation(const wallet_public::COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION::request& req, wallet_public::COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+
+    std::vector<uint64_t> affected_transfer_ids;
+    w.get_wallet()->clear_utxo_cold_sig_reservation(affected_transfer_ids);
+
+    for (auto tid : affected_transfer_ids)
+    {
+      transfer_details td{};
+      if (!w.get_wallet()->get_transfer_info_by_index(tid, td))
+      {
+        er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+        er.message = "internal error: get_transfer_info_by_index failed for tid " + epee::string_tools::num_to_string_fast(tid);
+        return false;
+      }
+
+      res.affected_outputs.emplace_back();
+      currency::get_out_pub_key_from_tx_out_v(td.output(), res.affected_outputs.back().pk);
+    }
+
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_decrypt_data(const wallet_public::COMMAND_DECRYPT_DATA::request& req, wallet_public::COMMAND_DECRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();

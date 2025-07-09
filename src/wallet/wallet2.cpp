@@ -7961,6 +7961,27 @@ void wallet2::restore_key_images_in_wo_wallet(const std::wstring& filename, cons
   wo.store();
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::clear_utxo_cold_sig_reservation(std::vector<uint64_t>& affected_transfer_ids)
+{
+  affected_transfer_ids.clear();
+
+  for(auto& [tid, td] : m_transfers)
+  {
+    if (!td.is_spent() && (td.m_flags & WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION) != 0)
+    {
+      affected_transfer_ids.push_back(tid);
+      crypto::public_key pk{};
+      get_out_pub_key_from_tx_out_v(td.output(), pk);
+      WLT_LOG_L0("clear_utxo_cold_sig_reservation: tid: " << tid << ", pk: " << pk << ", amount: " << td.amount() <<
+        (!td.is_native_coin() ? std::string(", aid: ") + crypto::pod_to_hex(td.get_asset_id()) : std::string()) <<
+        (td.m_key_image != null_ki ? std::string(", ki: ") + crypto::pod_to_hex(td.m_key_image) : std::string()));
+    }
+  }
+
+  clear_transfers_from_flag(affected_transfer_ids, WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION, "clear_utxo_cold_sig_reservation");
+  m_found_free_amounts.clear();
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::prepare_tx_destinations(const assets_selection_context& needed_money_map,
   detail::split_strategy_id_t destination_split_strategy_id,
   const tx_dust_policy& dust_policy,
