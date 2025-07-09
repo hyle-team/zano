@@ -142,6 +142,7 @@ namespace
   const command_line::arg_descriptor<bool>          arg_no_password_confirmations("no-password-confirmation", "Enable/Disable password confirmation for transactions", false);
   const command_line::arg_descriptor<bool>          arg_seed_doctor("seed-doctor", "Experimental: if your seed is not working for recovery this is likely because you've made a mistake whene you were doing back up(typo, wrong words order, missing word). This experimental code will attempt to recover seed phrase from with few approaches.");
   const command_line::arg_descriptor<bool>          arg_no_whitelist("no-white-list", "Do not load white list from interned.");
+  const command_line::arg_descriptor<std::string>   arg_restore_ki_in_wo_wallet("restore-ki-in-wo-wallet", "Watch-only missing key images restoration. Please, DON'T use it unless you 100% sure of what are you doing.", "");
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command  ("command", "");
 
@@ -519,6 +520,8 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
     bool r = open_wallet(m_wallet_file, pwd_container.password());
     CHECK_AND_ASSERT_MES(r, false, "wallet could not be opened");
     was_open = true;
+    if (!process_ki_restoration())
+      return false;
   }
   process_wallet_command_line_params(vm, *m_wallet, false);
 
@@ -559,6 +562,7 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_voting_config_file = command_line::get_arg(vm, arg_voting_config_file);
   m_no_password_confirmations = command_line::get_arg(vm, arg_no_password_confirmations);  
   m_no_whitelist = command_line::get_arg(vm, arg_no_whitelist);
+  m_restore_ki_in_wo_wallet = command_line::get_arg(vm, arg_restore_ki_in_wo_wallet);
 } 
 //----------------------------------------------------------------------------------------------------
 
@@ -720,7 +724,7 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
     try
     {
       m_wallet->load(epee::string_encoding::utf8_to_wstring(m_wallet_file), password);
-      message_writer(epee::log_space::console_color_white, true) << "Opened" << (m_wallet->is_auditable() ? " auditable" : "") << (m_wallet->is_watch_only() ? " watch-only" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
+      print_wallet_opened_msg();
       preconfig_wallet_obj();
       display_vote_info(*m_wallet);
       
@@ -781,6 +785,28 @@ bool simple_wallet::save(const std::vector<std::string> &args)
   }
 
   return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::process_ki_restoration()
+{
+  bool r = false;
+  if (!m_restore_ki_in_wo_wallet.empty())
+  {
+    std::wstring wo_filename = epee::string_encoding::utf8_to_wstring(m_restore_ki_in_wo_wallet);
+    CHECK_AND_ASSERT_THROW_MES(std::filesystem::exists(wo_filename), "cannot open " << m_restore_ki_in_wo_wallet);
+
+    tools::password_container wo_password;
+    if (!wo_password.read_password("Enter password for wallet " + m_restore_ki_in_wo_wallet + " :"))
+      return false;
+
+    m_wallet->restore_key_images_in_wo_wallet(wo_filename, wo_password.password());
+
+    success_msg_writer() << "Missing key images have been successfully repared in " << m_restore_ki_in_wo_wallet << ENDL;
+    
+    return false; // means the wallet processing should stop now
+  }
+
+  return true; // means the wallet can load and work further normally
 }
 //----------------------------------------------------------------------------------------------------
 #ifdef CPU_MINING_ENABLED
@@ -3245,6 +3271,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_seed_doctor);
   command_line::add_arg(desc_params, arg_derive_custom_seed);
   command_line::add_arg(desc_params, arg_no_whitelist);
+  command_line::add_arg(desc_params, arg_restore_ki_in_wo_wallet);
+
 
   tools::wallet_rpc_server::init_options(desc_params);
 
