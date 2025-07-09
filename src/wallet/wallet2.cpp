@@ -7963,6 +7963,7 @@ void wallet2::restore_key_images_in_wo_wallet(const std::wstring& filename, cons
 //----------------------------------------------------------------------------------------------------
 void wallet2::clear_utxo_cold_sig_reservation(std::vector<uint64_t>& affected_transfer_ids)
 {
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(m_watch_only, "clear_utxo_cold_sig_reservation can only be used in watch-only wallet");
   affected_transfer_ids.clear();
 
   for(auto& [tid, td] : m_transfers)

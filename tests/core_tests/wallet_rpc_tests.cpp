@@ -1234,13 +1234,11 @@ bool make_cold_signing_transaction(tools::wallet_rpc_server& rpc_wo, tools::wall
   r = invoke_text_json_for_rpc(rpc_wo, "transfer", req_transfer, res_transfer);
   CHECK_AND_ASSERT_MES(r, false, "RPC 'transfer' failed");
 
-  // skip this reservation just for fun
+  // (optional step) skip this reservation just for fun and then create a transaction once again
   tools::wallet_public::COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION::request req_clear_csr{};
   tools::wallet_public::COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION::response res_clear_csr{};
   invoke_text_json_for_rpc(rpc_wo, "clear_utxo_cold_sig_reservation", req_clear_csr, res_clear_csr);
   CHECK_AND_ASSERT_MES(res_clear_csr.affected_outputs.size() > 0, false, "no outputs were affected after clear_utxo_cold_sig_reservation");
-
-  // watch only creates a transaction once again
   res_transfer = tools::wallet_public::COMMAND_RPC_TRANSFER::response{};
   r = invoke_text_json_for_rpc(rpc_wo, "transfer", req_transfer, res_transfer);
   CHECK_AND_ASSERT_MES(r, false, "RPC 'transfer' failed");
@@ -1252,8 +1250,11 @@ bool make_cold_signing_transaction(tools::wallet_rpc_server& rpc_wo, tools::wall
   r = invoke_text_json_for_rpc(rpc, "sign_transfer", req_sign, res_sign);
   CHECK_AND_ASSERT_MES(r, false, "RPC 'sign_transfer' failed");
 
+  // (optional step) make sure clear_utxo_cold_sig_reservation cannot be called in a full keys wallet
+  r = !invoke_text_json_for_rpc(rpc, "clear_utxo_cold_sig_reservation", req_clear_csr, res_clear_csr);
+  CHECK_AND_ASSERT_MES(r, false, "clear_utxo_cold_sig_reservation called in full key wallet");
     
-  // watch only wallet submits it
+  // watch only wallet submits signed transaction
   tools::wallet_public::COMMAND_SUBMIT_TRANSFER::request req_submit{};
   req_submit.tx_signed_hex = res_sign.tx_signed_hex;
   tools::wallet_public::COMMAND_SUBMIT_TRANSFER::response res_submit{};
