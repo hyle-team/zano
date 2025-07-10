@@ -2732,6 +2732,15 @@ bool tx_pool_validation_and_chain_switch::c1(currency::core& c, size_t ev_index,
 tx_input_mixins::tx_input_mixins()
 {
   REGISTER_CALLBACK_METHOD(tx_input_mixins, configure_core);
+  REGISTER_CALLBACK_METHOD(tx_input_mixins, check_block_reward);
+}
+
+bool tx_input_mixins::check_block_reward(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  currency::block last_block{};
+  uint64_t reward{};
+  c.get_blockchain_storage().get_top_block(last_block);
+  c.get_blockchain_storage().get_block_reward_by_hash(last_block.prev_id, reward);
 }
 
 bool tx_input_mixins::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
@@ -2742,7 +2751,7 @@ bool tx_input_mixins::configure_core(currency::core& c, size_t ev_index, const s
   pc.hard_forks.set_hardfork_height(1, 0);
   pc.hard_forks.set_hardfork_height(2, 1);
   pc.hard_forks.set_hardfork_height(3, 1);
-  pc.hard_forks.set_hardfork_height(4, 25);
+  pc.hard_forks.set_hardfork_height(4, 31);
   c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
 }
@@ -2758,7 +2767,7 @@ bool tx_input_mixins::generate(std::vector<test_event_entry>& events) const
   m_hardforks.set_hardfork_height(1, 0);
   m_hardforks.set_hardfork_height(2, 1);
   m_hardforks.set_hardfork_height(3, 1);
-  m_hardforks.set_hardfork_height(4, 25);
+  m_hardforks.set_hardfork_height(4, 31);
   MAKE_GENESIS_BLOCK(events, blk_0, alice_acc, ts);
   DO_CALLBACK(events, "configure_core");
   bool is_hf4_active = m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, get_block_height(blk_0));
@@ -2766,48 +2775,61 @@ bool tx_input_mixins::generate(std::vector<test_event_entry>& events) const
   uint64_t amount = TESTS_DEFAULT_FEE * 7;
 
   LOG_PRINT_L0("1----------> is_hf4_active = " << is_hf4_active);
-  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW*2);
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW*2);
 
-  // prepare needed outputs
-  MAKE_TX(events, tx_a, miner_acc, alice_acc, amount, blk_0r);
-  LOG_PRINT_GREEN("---------> tx_a miner -> alice: " << obj_to_json_str(tx_a), LOG_LEVEL_0);
-  MAKE_NEXT_BLOCK_TX1(events, blk_1r_a, blk_0r, miner_acc, tx_a);
+  // send batch of 10 x 5 test coins to Alice for easier tx_a construction (and to generate free decoys)
+  transaction tx_a;
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_1r, miner_acc.get_keys(), alice_acc.get_public_address(), amount, 2, TESTS_DEFAULT_FEE, tx_a);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
+  LOG_PRINT_GREEN("---------> tx_a miner -> miner_acc: alice_acc " << amount << "\n" << obj_to_json_str(tx_a), LOG_LEVEL_0);
+  events.push_back(tx_a);
 
-  REWIND_BLOCKS_N(events, blk_2r, blk_1r_a, alice_acc, 4);
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1r, miner_acc);
+  REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, 4);
+  MAKE_NEXT_BLOCK(events, blk_3, blk_2r, miner_acc);
+
+  LOG_PRINT_GREEN("---------> push block blk_4 with tx 0 ", LOG_LEVEL_0);
+  MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_a);
+  REWIND_BLOCKS_N(events, blk_4r, blk_4, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   std::vector<currency::tx_source_entry> sources_b;
   std::vector<currency::tx_destination_entry> destinations_b;
-  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_0r, miner_acc, alice_acc, amount, TESTS_DEFAULT_FEE, 15, sources_b, destinations_b), false, "fill_tx_sources_and_destinations failed");
+  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_4r, miner_acc, alice_acc, amount, TESTS_DEFAULT_FEE, 2, sources_b, destinations_b), false, "fill_tx_sources_and_destinations failed");
   currency::transaction tx_b{};
-  bool r = construct_tx(miner_acc.get_keys(), sources_b, destinations_b, events, this, tx_b);
+  r = construct_tx(miner_acc.get_keys(), sources_b, destinations_b, events, this, tx_b);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_b);
 
-  LOG_PRINT_GREEN("---------> tx_b miner -> alice: " << obj_to_json_str(tx_b), LOG_LEVEL_0);
-  MAKE_NEXT_BLOCK_TX1(events, blk_1r_b, blk_2r, miner_acc, tx_b);
+  LOG_PRINT_GREEN("---------> tx_b miner_acc -> alice_acc:  amount " << amount << "\n"  << obj_to_json_str(tx_b), LOG_LEVEL_0);
+  MAKE_NEXT_BLOCK_TX1(events, blk_5, blk_4r, miner_acc, tx_b);
+  REWIND_BLOCKS_N(events, blk_5r, blk_5, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
-  is_hf4_active = m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, get_block_height(blk_1r_b));
+
+
+  std::shared_ptr<tools::wallet2> alice_wlt;
+  generator.init_test_wallet(alice_acc, get_block_hash(blk_0), alice_wlt);
+  generator.refresh_test_wallet(events, alice_wlt.get(), get_block_hash(blk_5r), /*expected_blocks_to_fetch*/ 10);
+
+  tools::transfer_container transfers;
+  alice_wlt->get_transfers(transfers);
+  size_t outputs_count = transfers.size();
+  LOG_PRINT_L0("!!!!!!!!!!!!!!!!!!!!!!!!!! Alice outputs count: " << outputs_count);
+
+  std::vector<currency::tx_source_entry> sources_c;
+  std::vector<currency::tx_destination_entry> destinations_c;
+  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_5r, alice_acc, bob_acc, amount*2, TESTS_DEFAULT_FEE, 2, sources_c, destinations_c), false, "fill_tx_sources_and_destinations failed");
+  currency::transaction tx_c{};
+  r = construct_tx(miner_acc.get_keys(), sources_c, destinations_c, events, this, tx_c);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  events.push_back(tx_c);
+  LOG_PRINT_GREEN("---------> tx_c alice -> bob:  amount " << amount*2 << "\n"  << obj_to_json_str(tx_c), LOG_LEVEL_0);
+
+  is_hf4_active = m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, get_block_height(blk_4));
   LOG_PRINT_L0("2----------> is_hf4_active = " << is_hf4_active);
 
 
   DO_CALLBACK_PARAMS(events, "check_hardfork_active", size_t{ZANO_HARDFORK_04_ZARCANUM});
-
-  std::vector<tx_source_entry> sources{};
-  std::vector<tx_destination_entry> destinations{};
-  uint64_t total_amount = amount + amount;
-
-  destinations.emplace_back(total_amount - TESTS_DEFAULT_FEE, bob_acc.get_public_address(), currency::native_coin_asset_id);
-
-  r = fill_tx_sources(sources, events, blk_1r_b, alice_acc.get_keys(), total_amount, 1);
-  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
-
-  currency::transaction tx{};
-  r = construct_tx(alice_acc.get_keys(), sources, destinations, events, this, tx);
-  LOG_PRINT_GREEN("---------> TX: " << obj_to_json_str(tx), LOG_LEVEL_0);
-
-
-  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
-  DO_CALLBACK(events, "c1");
 
   return true;
 }

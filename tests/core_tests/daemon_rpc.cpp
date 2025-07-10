@@ -98,7 +98,8 @@ bool fill_tx_rpc_inputs::generate(std::vector<test_event_entry>& events) const
     }
 
     tx.vin.push_back(std::move(currency::txin_multisig{}));
-
+    
+  LOG_PRINT_GREEN("---------> tx_0 miner -> alice: " << obj_to_json_str(tx), LOG_LEVEL_0);
     DO_CALLBACK_PARAMS_STR(events, "c5", t_serializable_object_to_blob(tx));
   }
 
