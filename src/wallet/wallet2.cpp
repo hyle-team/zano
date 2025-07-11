@@ -3940,13 +3940,13 @@ bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, u
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_info, uint32_t& asset_flags) const
+bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_info, uint32_t& asset_flags, bool ask_daemon_for_unknown /* = false */) const
 {
   asset_flags = aif_none;
   if (asset_id == currency::native_coin_asset_id)
   {
     asset_info = currency::get_native_coin_asset_descriptor();
-    asset_flags |= aif_whitelisted;
+    asset_flags |= (aif_native_coin | aif_whitelisted);
     return true;
   }
 
@@ -3973,7 +3973,17 @@ bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset
   if (it_cust != m_custom_assets.end())
   {
     asset_info = it_cust->second;
+    asset_flags |= aif_custom;
     return true;
+  }
+
+  if (ask_daemon_for_unknown)
+  {
+    if (daemon_get_asset_info(asset_id, asset_info))
+    {
+      asset_flags |= aif_unknown;
+      return true;
+    }
   }
 
   return false;
@@ -4132,7 +4142,8 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
     bool native_coin = td.is_native_coin();
     asset_descriptor_base adb{};
     uint32_t asset_info_flags{};
-    if (get_asset_info(td.get_asset_id(), adb, asset_info_flags) == show_only_unknown)
+    bool unknown_asset = !get_asset_info(td.get_asset_id(), adb, asset_info_flags, show_only_unknown) || (asset_info_flags & aif_unknown);
+    if (unknown_asset != show_only_unknown)
     {
       if (!show_only_unknown)
         ++unknown_assets_outs_count;
@@ -4172,11 +4183,11 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::get_balance_str() const
 {
-  // balance unlocked     / [balance total]       ticker   asset id
-  // 0.21                 / 98.51                 DP2      a6974d5874e97e5f4ed5ad0a62f0975edbccb1bb55502fc75c7fe808f12f44d3
-  // 190.123456789012     / 199.123456789012      ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
-  // 98.0                                         BGTVUW   af2b12f3033337f9aea1845a6bc3fc966ed4d13227a3ace7706fca7dbcdaa7e2
-  // 1000.034                                     DP3      d4aba1020f26927571771e04b585b4ffb211f52708d5e4c465bbdfa4a12e6271
+  // balance unlocked      / [balance total]        ticker   asset id
+  // 0.21                  / 98.51                  DP2      a6974d5874e97e5f4ed5ad0a62f0975edbccb1bb55502fc75c7fe808f12f44d3
+  // 190.123456789012      / 199.123456789012       ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a  NATIVE
+  // 98.0                                           BGTVUW   af2b12f3033337f9aea1845a6bc3fc966ed4d13227a3ace7706fca7dbcdaa7e2
+  // 1000.034                                       DP3      d4aba1020f26927571771e04b585b4ffb211f52708d5e4c465bbdfa4a12e6271
 
   static const char* header = " balance unlocked      / [balance total]        ticker    asset id";
   std::stringstream ss;
@@ -4211,13 +4222,12 @@ std::string wallet2::get_balance_str() const
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::get_balance_str_raw() const
 {
-  // balance unlocked     / [balance total]     DP   asset id
-  // 0.21                 / 98.51                2   a6974d5874e97e5f4ed5ad0a62f0975edbccb1bb55502fc75c7fe808f12f44d3
-  // 190.123456789012     / 199.123456789012    12   d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
-  // 98.0                                       12   af2b12f3033337f9aea1845a6bc3fc966ed4d13227a3ace7706fca7dbcdaa7e2
-  // 1000.034                                    3   d4aba1020f26927571771e04b585b4ffb211f52708d5e4c465bbdfa4a12e6271
+  // balance unlocked      / [balance total]        ticker    asset id                                                          DP  flags
+  // 0.21                  / 98.51                  ZANO      d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a  12  NATIVE
+  // 2.0                                            MYFB      13615ffdfbdc09275a1dfc0fbdaf6a9b07849b835ffdfed0b9e1478ea8924774   1  custom
+  // 1000.0                                         BurnCT    14608811180d4bbad96a6b91405e329e4f2a10519e6dcea644f83b9f8ccb5863  12  unknown asset
   //WHITELIST:
-  // 7d3f348fbebfffc4e61a3686189cf870ea393e1c88b8f636acbfdacf9e4b2db2    CT
+  // a7e8e5b31c24f2d6a07e141701237b136d704c9a89f9a5d1ca4a8290df0b9edc    WETH
   // ...
 
   static const char* header = " balance unlocked      / [balance total]        ticker    asset id                                                          DP  flags";
@@ -4234,7 +4244,7 @@ std::string wallet2::get_balance_str_raw() const
     {
       uint32_t asset_flags = 0;
       asset_descriptor_base asset_info{};
-      bool has_info = get_asset_info(entry.first, asset_info, asset_flags);
+      bool has_info = get_asset_info(entry.first, asset_info, asset_flags, true);
       ss << " " << std::left << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(entry.second.unlocked, asset_info.decimal_point);
       if (entry.second.total == entry.second.unlocked)
         ss << std::string(21 + 3, ' ');
@@ -4251,7 +4261,7 @@ std::string wallet2::get_balance_str_raw() const
 
       ss << "  ";
 
-      if (entry.first == native_coin_asset_id)
+      if (asset_flags & aif_native_coin)
       {
         ss << "NATIVE";
       }
@@ -4261,6 +4271,10 @@ std::string wallet2::get_balance_str_raw() const
           ss << "own,";
         if (asset_flags & aif_whitelisted)
           ss << "whitelisted,";
+        if (asset_flags & aif_custom)
+          ss << "custom,";
+        if (asset_flags & aif_unknown)
+          ss << "unknown asset,";
         ss.seekp(-1, ss.cur); // trim comma
       }
       ss << ENDL;
@@ -5813,7 +5827,7 @@ void wallet2::burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_
   result_tx = ft.tx;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb)
+bool wallet2::daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb) const
 {
   COMMAND_RPC_GET_ASSET_INFO::request req;
   req.asset_id = asset_id;

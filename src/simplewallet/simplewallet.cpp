@@ -293,7 +293,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("stop_mining", boost::bind(&simple_wallet::stop_mining, this, ph::_1), "Stop mining in daemon");
 #endif // #ifdef CPU_MINING_ENABLED
   m_cmd_binder.set_handler("refresh", boost::bind(&simple_wallet::refresh, this, ph::_1), "Resynchronize transactions and balance");
-  m_cmd_binder.set_handler("balance", boost::bind(&simple_wallet::show_balance, this, ph::_1), "[raw] Show current wallet balance, with 'raw' param it displays all assets without filtering against whitelists"); 
+  m_cmd_binder.set_handler("balance", boost::bind(&simple_wallet::show_balance, this, ph::_1), "[r,raw] Show current wallet balance, with 'raw' param it displays all assets without filtering against whitelists"); 
   m_cmd_binder.set_handler("show_staking_history", boost::bind(&simple_wallet::show_staking_history, this, ph::_1), "show_staking_history [2] - Show staking transfers, if option provided - number of days for history to display");
   m_cmd_binder.set_handler("incoming_transfers", boost::bind(&simple_wallet::show_incoming_transfers, this, ph::_1), "incoming_transfers [available|unavailable] - Show incoming transfers - all of them or filter them by availability");
   m_cmd_binder.set_handler("incoming_counts", boost::bind(&simple_wallet::show_incoming_transfers_counts, this, ph::_1), "incoming_transfers counts");
@@ -886,7 +886,7 @@ void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_inf
     message_writer(color, false) <<
       "height " << wti.height <<
       ", tx " << wti.tx_hash <<
-      " " << std::right << std::setw(18) << print_money_trailing_zeros_replaced_with_spaces(wti.subtransfers[0].amount, decimal_points) << (wti.subtransfers[0].is_income ? " received," : " spent") << " " << token_info;
+      " " << std::right << std::setw(18) << print_money_trailing_zeros_replaced_with_spaces(wti.subtransfers[0].amount, decimal_points) << (wti.subtransfers[0].is_income ? " received" : "    spent") << " " << token_info;
   }
   else
   {
@@ -900,7 +900,7 @@ void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_inf
       std::string token_info = get_token_info_string(st.asset_id, decimal_points);
 
       message_writer(epee::log_space::console_color_cyan, false) << "    " 
-        << std::right << std::setw(24) << print_money_trailing_zeros_replaced_with_spaces(st.amount, decimal_points) << std::left << (st.is_income ? " received," : " spent") << " " << token_info;
+        << std::right << std::setw(24) << print_money_trailing_zeros_replaced_with_spaces(st.amount, decimal_points) << std::left << (st.is_income ? " received" : "    spent") << " " << token_info;
     }
   }
 
@@ -1025,7 +1025,7 @@ bool simple_wallet::refresh(const std::vector<std::string>& args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::show_balance(const std::vector<std::string>& args /* = std::vector<std::string>()*/)
 {
-  if (args.size() == 1 && args[0] == "raw")
+  if (args.size() == 1 && (args[0] == "raw" || args[0] == "r"))
   {
     success_msg_writer() << m_wallet->get_balance_str_raw();
   }
