@@ -1127,6 +1127,7 @@ int main(int argc, char* argv[])
     //GENERATE_AND_PLAY(block_template_against_txs_size); // Long test! by demand only
     GENERATE_AND_PLAY_HF(pos_altblocks_validation, "3-*");
     GENERATE_AND_PLAY_HF(pos_mining_with_decoys, "3");
+    GENERATE_AND_PLAY_HF(pos_and_no_pow_blocks_between_output_and_stake, "4-*");
 
     // alternative blocks and generic chain-switching tests
     GENERATE_AND_PLAY(gen_chain_switch_pow_pos);

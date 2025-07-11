@@ -1239,6 +1239,18 @@ void append_vector_by_another_vector(U& dst, const V& src)
   }                                                                                                         \
   VEC_EVENTS.push_back(BLK_NAME)
 
+#define REWIND_POS_BLOCKS_N_WITH_TIME(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, MINERS_ACC_LIST, COUNT)                                               \
+  currency::block BLK_NAME = PREV_BLOCK;                                                                                                                 \
+  for(size_t i = 0; i < COUNT; ++i)                                                                                                                      \
+  {                                                                                                                                                      \
+    PRINT_EVENT_N_TEXT(VEC_EVENTS, "REWIND_POS_BLOCKS_N_WITH_TIME(" << #BLK_NAME << ", " << #PREV_BLOCK << ", " << #MINER_ACC << ", " << #COUNT << ")"); \
+    currency::block next_block = AUTO_VAL_INIT(next_block);                                                                                              \
+    generator.construct_block(VEC_EVENTS, next_block, BLK_NAME, MINER_ACC, std::list<currency::transaction>(), MINERS_ACC_LIST);                         \
+    VEC_EVENTS.push_back(event_core_time(next_block.timestamp - 10));                                                                                    \
+    VEC_EVENTS.push_back(next_block);                                                                                                                    \
+    BLK_NAME = next_block;                                                                                                                               \
+  }
+
 #define MAKE_NEXT_BLOCK_NO_ADD(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC)           \
   PRINT_EVENT_N_TEXT(VEC_EVENTS, "MAKE_NEXT_BLOCK_NO_ADD(" << #BLK_NAME << ")");      \
   currency::block BLK_NAME = AUTO_VAL_INIT(BLK_NAME);                                 \
