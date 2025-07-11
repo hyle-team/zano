@@ -1329,7 +1329,7 @@ bool init_spent_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, 
 
 bool fill_output_entries(const std::vector<output_index>& out_indices, size_t real_out_index, size_t nmix, bool check_for_unlocktime, bool use_ref_by_id,
                          uint64_t next_block_height, uint64_t head_block_ts, uint64_t& real_entry_idx, std::vector<tx_source_entry::output_entry>& output_entries,
-                         const std::vector<std::pair<size_t, size_t>>* source_nmix_map = nullptr)
+                         const std::vector<std::pair<size_t, size_t>>* source_nmix_map = nullptr, size_t i_input_index = 0)
 
 {
   // use_ref_by_id = true; // <-- HINT: this could be used to enforce using ref_by_id across all the tests if needed
@@ -1338,7 +1338,7 @@ bool fill_output_entries(const std::vector<output_index>& out_indices, size_t re
   {
     for (const auto& p : *source_nmix_map)
     {
-      if (p.first == real_out_index)
+      if (p.first == i_input_index)
       {
         local_nmix = p.second;
         break;
@@ -1576,7 +1576,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
       ts.real_output_in_tx_index = oi.out_no;
       ts.real_out_tx_key = get_tx_pub_key_from_extra(*oi.p_tx); // source tx public key
       if (!fill_output_entries(outs[o.first], sender_out, nmix, fts_flags & fts_check_for_unlocktime, fts_flags & fts_use_ref_by_id,
-        next_block_height, head_block_ts, ts.real_output, ts.outputs, source_nmix_map))
+        next_block_height, head_block_ts, ts.real_output, ts.outputs, source_nmix_map, i))
       {
         continue;
       }
