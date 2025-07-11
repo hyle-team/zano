@@ -769,7 +769,8 @@ bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& event
                                       bool check_for_spends = true,
                                       bool check_for_unlocktime = true,
                                       size_t minimum_sigs = SIZE_MAX,
-                                      bool use_ref_by_id = false);
+                                      bool use_ref_by_id = false,
+                                      const std::vector<std::pair<size_t, size_t>>* source_nmix_map = nullptr);
 bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& events, const currency::block& blk_head,
                                       const currency::account_keys& from, const currency::account_public_address& to,
                                       uint64_t amount, uint64_t fee, size_t nmix,
@@ -777,7 +778,8 @@ bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& event
                                       std::vector<currency::tx_destination_entry>& destinations, 
                                       bool check_for_spends = true, 
                                       bool check_for_unlocktime = true,
-                                      bool use_ref_by_id = false);
+                                      bool use_ref_by_id = false,
+                                      const std::vector<std::pair<size_t, size_t>>* source_nmix_map = nullptr);
 bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& events, const currency::block& blk_head,
                                       const currency::account_base& from, const currency::account_base& to,
                                       uint64_t amount, uint64_t fee, size_t nmix,
@@ -785,7 +787,8 @@ bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& event
                                       std::vector<currency::tx_destination_entry>& destinations, 
                                       bool check_for_spends = true, 
                                       bool check_for_unlocktime = true,
-                                      bool use_ref_by_id = false);
+                                      bool use_ref_by_id = false,
+                                      const std::vector<std::pair<size_t, size_t>>* source_nmix_map = nullptr);
 uint64_t get_balance(const currency::account_keys& addr, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, bool dbg_log = false);
 uint64_t get_balance(const currency::account_base& addr, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, bool dbg_log = false);
 void balance_via_wallet(const tools::wallet2& w, const crypto::public_key& asset_id, uint64_t* p_total, uint64_t* p_unlocked = 0, uint64_t* p_awaiting_in = 0, uint64_t* p_awaiting_out = 0, uint64_t* p_mined = 0);
