@@ -754,13 +754,16 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
 bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
                      const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix,
                      const std::vector<currency::tx_source_entry>& sources_to_avoid, bool check_for_spends = true, bool check_for_unlocktime = true,
-                     bool use_ref_by_id = false, uint64_t* p_sources_amount_found = nullptr);
+                     bool use_ref_by_id = false, uint64_t* p_sources_amount_found = nullptr,
+                     const std::vector<std::pair<size_t, size_t>>* source_nmix_map = nullptr);
 bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
                      const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix,
-                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, uint64_t* p_sources_amount_found = nullptr);
+                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, uint64_t* p_sources_amount_found = nullptr,
+                     const std::vector<std::pair<size_t, size_t>>* source_nmix_map = nullptr);
 bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
                      const currency::block& blk_head, const currency::account_keys& from, const std::unordered_map<crypto::public_key, uint64_t>& amounts, size_t nmix,
-                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, std::unordered_map<crypto::public_key, uint64_t>* p_sources_amounts = nullptr);
+                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, std::unordered_map<crypto::public_key, uint64_t>* p_sources_amounts = nullptr,
+                     const std::vector<std::pair<size_t, size_t>>* source_nmix_map = nullptr);
 
 bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& events, const currency::block& blk_head,
                                       const currency::account_keys& from, const std::list<currency::account_public_address>& to,

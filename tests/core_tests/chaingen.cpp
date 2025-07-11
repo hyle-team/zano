@@ -1338,7 +1338,7 @@ bool fill_output_entries(const std::vector<output_index>& out_indices, size_t re
   {
     for (const auto& p : *source_nmix_map)
     {
-      if (p.first == source_index)
+      if (p.first == real_out_index)
       {
         local_nmix = p.second;
         break;
@@ -1436,7 +1436,7 @@ bool fill_tx_sources(std::vector<tx_source_entry>& sources, const std::vector<te
 
 bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
   const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix, const std::vector<currency::tx_source_entry>& sources_to_avoid,
-  bool check_for_spends, bool check_for_unlocktime, bool use_ref_by_id, uint64_t* p_sources_amount_found /* = nullptr */)
+  bool check_for_spends, bool check_for_unlocktime, bool use_ref_by_id, uint64_t* p_sources_amount_found /* = nullptr */, const std::vector<std::pair<size_t, size_t>>* source_nmix_map /* = nullptr */)
 {
   uint64_t fts_flags =
     (check_for_spends     ? fts_check_for_spends      : fts_none) |
@@ -1444,17 +1444,18 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
     (use_ref_by_id        ? fts_use_ref_by_id         : fts_none) |
     fts_check_for_hf4_min_coinage;
 
-  return fill_tx_sources(sources, events, blk_head, from, amount, nmix, sources_to_avoid, fts_flags, p_sources_amount_found);
+  return fill_tx_sources(sources, events, blk_head, from, amount, nmix, sources_to_avoid, fts_flags, p_sources_amount_found, source_nmix_map);
 }
 
 bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
                      const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix,
-                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, uint64_t* p_sources_amount_found /* = nullptr */)
+                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, uint64_t* p_sources_amount_found /* = nullptr */,
+                     const std::vector<std::pair<size_t, size_t>>* source_nmix_map /* = nullptr */)
 {
   std::unordered_map<crypto::public_key, uint64_t> amounts;
   amounts[native_coin_asset_id] = amount;
   std::unordered_map<crypto::public_key, uint64_t> sources_amounts;
-  if (!fill_tx_sources(sources, events, blk_head, from, amounts, nmix, sources_to_avoid, fts_flags, &sources_amounts))
+  if (!fill_tx_sources(sources, events, blk_head, from, amounts, nmix, sources_to_avoid, fts_flags, &sources_amounts, source_nmix_map))
     return false;
   if (p_sources_amount_found)
     *p_sources_amount_found = sources_amounts[native_coin_asset_id];

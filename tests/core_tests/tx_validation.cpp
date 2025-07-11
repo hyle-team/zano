@@ -2813,10 +2813,11 @@ bool tx_input_mixins::generate(std::vector<test_event_entry>& events) const
   std::vector<currency::tx_destination_entry> destinations_c;
 
   // const std::vector<std::pair<size_t, size_t>>* source_nmix_map = nullptr
-  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_5r, alice_acc, bob_acc, MK_TEST_COINS(29), TESTS_DEFAULT_FEE, 5, sources_c, destinations_c, true, true, false), false, "fill_tx_sources_and_destinations failed");
+  std::vector<std::pair<size_t, size_t>> nmix_map = { {0, 2}, {1, 16} };
+  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_5r, alice_acc, bob_acc, MK_TEST_COINS(29), TESTS_DEFAULT_FEE, 5, sources_c, destinations_c, true, true, false, &nmix_map), false, "fill_tx_sources_and_destinations failed");
   currency::transaction tx_c{};
   r = construct_tx(alice_acc.get_keys(), sources_c, destinations_c, events, this, tx_c);
-  LOG_PRINT_GREEN("---------> tx_c alice -> bob:  amount " << amount*2 << "\n"  << obj_to_json_str(tx_c), LOG_LEVEL_0);
+  LOG_PRINT_GREEN("---------> tx_c alice -> bob:  amount " << MK_TEST_COINS(29) << "\n"  << obj_to_json_str(tx_c), LOG_LEVEL_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
 
