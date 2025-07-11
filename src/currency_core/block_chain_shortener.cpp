@@ -13,7 +13,7 @@
 #define SHORTENER_EVERY_100_BLOCKS_SIZE                                  144
 #define SHORTENER_EVERY_1000_BLOCKS_SIZE                                 144
 
-static void exception_handler(){}
+//static void exception_handler(){}
 
 
 
