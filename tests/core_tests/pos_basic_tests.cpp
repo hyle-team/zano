@@ -507,7 +507,7 @@ bool pos_and_no_pow_blocks_between_output_and_stake::generate(std::vector<test_e
   REWIND_POS_BLOCKS_N_WITH_TIME(events, blk_3ra, blk_1a, miner, { miner }, CURRENCY_MINED_MONEY_UNLOCK_WINDOW - 1);
 
   // case 3: Provide valid tx output
-  // Expected error: stake input refs' max related block height is 20 while last PoW block height is 21
+  // Expected valid: stake input refs' max related block height is 20 while last PoW block height is 21
   {
     const currency::block& prev_block = blk_3ra;
     const transaction& stake          = tx_to_alice;
