@@ -188,10 +188,6 @@ struct tx_input_mixins: public test_chain_unit_enchanced
 {
   tx_input_mixins();
 
-  bool check_block_reward(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool generate(std::vector<test_event_entry>& events) const;
-
-  mutable currency::transaction tx1;
-  mutable currency::transaction tx2;
 };
