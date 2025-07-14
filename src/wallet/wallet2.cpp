@@ -5252,9 +5252,7 @@ bool wallet2::reset_history()
   auto tx_keys = m_tx_keys;
   auto pending_key_images = m_pending_key_images;
   crypto::hash genesis_id = m_chain.get_genesis();
-  auto custom_assets = m_custom_assets;
   clear();
-  m_custom_assets = custom_assets;
   m_chain.set_genesis(genesis_id);
   m_pending_key_images = pending_key_images;
   m_tx_keys = tx_keys;
