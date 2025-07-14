@@ -1837,7 +1837,6 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
 
     CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
 
-    LOG_PRINT_GREEN("TX: " << currency::obj_to_json_str(tx), LOG_LEVEL_0);
   }
 
   // Two entries of the same type in extra.
@@ -2728,64 +2727,6 @@ bool tx_pool_validation_and_chain_switch::c1(currency::core& c, size_t ev_index,
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", MK_TEST_COINS(0)), false, "");
 
   return true;
-}
-
-gen_tx_to_key_and_zc_mixin::gen_tx_to_key_and_zc_mixin()
-{
-  // 1) включаем HF4 сразу в generator
-  m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 1);
-  // 2) регистрируем callback для configure_core
-  REGISTER_CALLBACK_METHOD(gen_tx_to_key_and_zc_mixin, configure_core);
-}
-
-bool gen_tx_to_key_and_zc_mixin::configure_core(
-    currency::core& c, 
-    size_t ev_index, 
-    const std::vector<test_event_entry>& /*events*/
-)
-{
-  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
-  pc.hard_forks = m_hardforks;
-  c.get_blockchain_storage().set_core_runtime_config(pc);
-  return true;
-}
-
-bool gen_tx_to_key_and_zc_mixin::generate(std::vector<test_event_entry>& events) const
-{
-  uint64_t ts = test_core_time::get_time();
-  GENERATE_ACCOUNT(miner_account);
-  MAKE_GENESIS_BLOCK(events, blk_0, miner_account, ts);
-  DO_CALLBACK(events, "configure_core");
-
-  // Unlock coinbase outputs
-  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_account, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
-
-  // Construct a shielded transaction spending miner_account back to itself
-  currency::transaction tx;
-
-  // Use helper to build valid tx_in_zc_input + tx_out_zarcanum with proofs and fee
-  construct_tx_to_key(m_hardforks,
-                      events,
-                      tx,
-                      blk_0r,
-                      miner_account,
-                      miner_account,
-                      MK_TEST_COINS(1),          // amount
-                      TESTS_DEFAULT_FEE,         // fee
-                      0,                         // unlock_time
-                      CURRENCY_TO_KEY_OUT_RELAXED,
-                      std::vector<currency::extra_v>(),            // extra data
-                      std::vector<currency::attachment_v>());
-
-  // Log entire tx
-  LOG_PRINT_GREEN("TX: " << currency::obj_to_json_str(tx), LOG_LEVEL_0);
-
-  // Mine tx in new block
-  events.push_back(tx);
-  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_account, tx);
-
-  return true;
-
 }
 
 tx_input_mixins::tx_input_mixins()

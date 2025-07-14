@@ -1329,7 +1329,6 @@ bool init_spent_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, 
 
 bool fill_output_entries(const std::vector<output_index>& out_indices, size_t real_out_index, size_t nmix, bool check_for_unlocktime, bool use_ref_by_id,
                          uint64_t next_block_height, uint64_t head_block_ts, uint64_t& real_entry_idx, std::vector<tx_source_entry::output_entry>& output_entries)
-
 {
   // use_ref_by_id = true; // <-- HINT: this could be used to enforce using ref_by_id across all the tests if needed
 
@@ -1341,7 +1340,6 @@ bool fill_output_entries(const std::vector<output_index>& out_indices, size_t re
   for (size_t i = 0; i < out_indices.size() && (0 < rest || !sender_out_found); ++i)
   {
     const output_index& oi = out_indices[i];
-    // skip if 
     if (oi.spent)
       continue;
 
