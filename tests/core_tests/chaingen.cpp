@@ -1567,14 +1567,13 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
       size_t local_nmix = nmix;
       if (nmix_map)
       {
-        for (const auto& p : *nmix_map)
+        // Try to find an override for this input index 'i'
+        auto it = nmix_map->find(i);
+        if (it != nmix_map->end())
         {
-          if (p.first == i)
-          {
-            local_nmix = p.second;
-            break;
-          }
+          local_nmix = it->second;
         }
+        // leave local_nmix at its default
       }
 
       if (!fill_output_entries(outs[o.first], sender_out, local_nmix, fts_flags & fts_check_for_unlocktime, fts_flags & fts_use_ref_by_id,
