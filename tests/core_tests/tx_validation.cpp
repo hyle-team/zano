@@ -2807,6 +2807,8 @@ bool tx_input_mixins::configure_core(currency::core& c, size_t ev_index, const s
   return true;
 }
 
+// Tests that post-HF4, legacy txin_to_key inputs accept any mixin count, while new txin_zc inputs enforce a >= 15 mixin minimum
+// are in the same vin and work together
 bool tx_input_mixins::generate(std::vector<test_event_entry>& events) const
 {
   uint64_t ts = test_core_time::get_time();
@@ -2821,53 +2823,64 @@ bool tx_input_mixins::generate(std::vector<test_event_entry>& events) const
   m_hardforks.set_hardfork_height(4, 31);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
   DO_CALLBACK(events, "configure_core");
-  bool is_hf4_active = m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, get_block_height(blk_0));
 
-
+  // mine one block, then rewind enough to unlock initial coinbase funds
   MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
   REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW*2);
 
-  transaction tx_a;
-  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_1r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(15), 1, TESTS_DEFAULT_FEE, tx_a);
+  // build tx_a_1: single txin_to_key output of 15 coins to Alice
+  transaction tx_a_1;
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_1r, miner_acc.get_keys(), 
+    alice_acc.get_public_address(), MK_TEST_COINS(15), 1, TESTS_DEFAULT_FEE, tx_a_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs 1 failed");
-  events.push_back(tx_a);
+  events.push_back(tx_a_1);
 
+  // build tx_a_2: 16 outputs of 15 coins each to Bob for mixins
   transaction tx_a_2;
-  r = construct_tx_with_many_outputs(m_hardforks, events, blk_1r, miner_acc.get_keys(), bob_acc.get_public_address(), MK_TEST_COINS(15*16), 16, TESTS_DEFAULT_FEE, tx_a_2);
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_1r, miner_acc.get_keys(), 
+    bob_acc.get_public_address(), MK_TEST_COINS(15*16), 16, TESTS_DEFAULT_FEE, tx_a_2);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs 2 failed");
   events.push_back(tx_a_2);
 
-  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1r_1, blk_1r, miner_acc, std::list<transaction>({ tx_a, tx_a_2 }));
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1r_1, blk_1r, miner_acc, std::list<transaction>({ tx_a_1, tx_a_2 }));
 
+  // mine a couple more blocks and rewind to generate new spendable outputs
   MAKE_NEXT_BLOCK(events, blk_2, blk_1r_1, miner_acc);
   REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, 4);
   MAKE_NEXT_BLOCK(events, blk_3, blk_2r, miner_acc);
   REWIND_BLOCKS_N(events, blk_4r, blk_3, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", size_t{ZANO_HARDFORK_04_ZARCANUM});
 
+  // build tx_b with zc hf4 input, send 15 coins from miner -> Alice
   std::vector<currency::tx_source_entry> sources_b;
   std::vector<currency::tx_destination_entry> destinations_b;
-  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_4r, miner_acc, alice_acc, MK_TEST_COINS(15), TESTS_DEFAULT_FEE, 2, sources_b, destinations_b), false, "fill_tx_sources_and_destinations failed");
+  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(
+    events, blk_4r, miner_acc, alice_acc, MK_TEST_COINS(15), TESTS_DEFAULT_FEE, 2, sources_b, destinations_b), 
+    false, "fill_tx_sources_and_destinations failed");
   currency::transaction tx_b{};
   r = construct_tx(miner_acc.get_keys(), sources_b, destinations_b, events, this, tx_b);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_b);
 
+  // mine tx_b and rewind to unlock its outputs
   MAKE_NEXT_BLOCK_TX1(events, blk_5, blk_4r, miner_acc, tx_b);
   REWIND_BLOCKS_N(events, blk_5r, blk_5, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   std::vector<currency::tx_source_entry> sources_c;
   std::vector<currency::tx_destination_entry> destinations_c;
-
+  // For input #0 use 5 mixins (old-style ring-CT allows any mixins)
+  // For input #1 use 16 mixins (new-style txin_zc enforces >=15 once HF4 is live)
   mixins_per_input nmix_map = { {0, 5}, {1, 16} };
-  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(events, blk_5r, alice_acc, bob_acc, MK_TEST_COINS(29), TESTS_DEFAULT_FEE, 5, sources_c, destinations_c, true, true, false, &nmix_map), false, "fill_tx_sources_and_destinations failed");
+  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(
+    events, blk_5r, alice_acc, bob_acc, MK_TEST_COINS(29), TESTS_DEFAULT_FEE, 5, sources_c, destinations_c, 
+    true, true, false, &nmix_map), false, "fill_tx_sources_and_destinations failed");
   currency::transaction tx_c{};
   r = construct_tx(alice_acc.get_keys(), sources_c, destinations_c, events, this, tx_c);
-  LOG_PRINT_GREEN("---------> tx_c alice -> bob \n" << obj_to_json_str(tx_c), LOG_LEVEL_0);
-
+  LOG_PRINT_GREEN("tx_c alice -> bob \n" << obj_to_json_str(tx_c), LOG_LEVEL_0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_c);
+
   MAKE_NEXT_BLOCK_TX1(events, blk_6, blk_5r, miner_acc, tx_c);
-  DO_CALLBACK_PARAMS(events, "check_hardfork_active", size_t{ZANO_HARDFORK_04_ZARCANUM});
 
   return true;
 }

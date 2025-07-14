@@ -1328,29 +1328,16 @@ bool init_spent_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, 
 }
 
 bool fill_output_entries(const std::vector<output_index>& out_indices, size_t real_out_index, size_t nmix, bool check_for_unlocktime, bool use_ref_by_id,
-                         uint64_t next_block_height, uint64_t head_block_ts, uint64_t& real_entry_idx, std::vector<tx_source_entry::output_entry>& output_entries,
-                         const mixins_per_input* nmix_map = nullptr, size_t i_input_index = 0)
+                         uint64_t next_block_height, uint64_t head_block_ts, uint64_t& real_entry_idx, std::vector<tx_source_entry::output_entry>& output_entries)
 
 {
   // use_ref_by_id = true; // <-- HINT: this could be used to enforce using ref_by_id across all the tests if needed
-  size_t local_nmix = nmix;
-  if (nmix_map)
-  {
-    for (const auto& p : *nmix_map)
-    {
-      if (p.first == i_input_index)
-      {
-        local_nmix = p.second;
-        break;
-      }
-    }
-  }
 
-  if (out_indices.size() <= local_nmix)
+  if (out_indices.size() <= nmix)
     return false;
 
   bool sender_out_found = false;
-  size_t rest = local_nmix;
+  size_t rest = nmix;
   for (size_t i = 0; i < out_indices.size() && (0 < rest || !sender_out_found); ++i)
   {
     const output_index& oi = out_indices[i];
@@ -1370,7 +1357,7 @@ bool fill_output_entries(const std::vector<output_index>& out_indices, size_t re
       uint8_t mix_attr = 0;
       if (get_mix_attr_from_tx_out_v(oi.out_v, mix_attr))
       {
-        if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX || mix_attr > local_nmix + 1)
+        if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX || mix_attr > nmix + 1)
           continue;
 
         if (check_for_unlocktime)
@@ -1575,8 +1562,25 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
       ts.real_out_amount_blinding_mask = oi.amount_blinding_mask;
       ts.real_output_in_tx_index = oi.out_no;
       ts.real_out_tx_key = get_tx_pub_key_from_extra(*oi.p_tx); // source tx public key
-      if (!fill_output_entries(outs[o.first], sender_out, nmix, fts_flags & fts_check_for_unlocktime, fts_flags & fts_use_ref_by_id,
-        next_block_height, head_block_ts, ts.real_output, ts.outputs, nmix_map, i))
+
+      // If we use nmix_map, we should use local_nmix instead of nmix
+      // to allow different nmix for different inputs in the same transaction.
+      // If nmix_map is not provided, we use nmix as local_nmix.
+      size_t local_nmix = nmix;
+      if (nmix_map)
+      {
+        for (const auto& p : *nmix_map)
+        {
+          if (p.first == i)
+          {
+            local_nmix = p.second;
+            break;
+          }
+        }
+      }
+
+      if (!fill_output_entries(outs[o.first], sender_out, local_nmix, fts_flags & fts_check_for_unlocktime, fts_flags & fts_use_ref_by_id,
+        next_block_height, head_block_ts, ts.real_output, ts.outputs))
       {
         continue;
       }
