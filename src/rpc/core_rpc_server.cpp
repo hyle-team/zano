@@ -62,6 +62,13 @@ namespace currency
   bool core_rpc_server::handle_command_line(const boost::program_options::variables_map& vm)
   {
     m_bind_ip = command_line::get_arg(vm, arg_rpc_bind_ip);
+    if (m_bind_ip == "0.0.0.0")
+    {
+      LOG_PRINT_COLOR("!!!!!!IMPORTANT!!!!!!: We strongly advise against binding the server to 0.0.0.0 and exposing it directly" << ENDL
+                << "to the public internet. The server is meant solely for internal functionality and lacks the security features" << ENDL
+                << "required for publicly facing services. If you need to offer a public API, always place it behind secure" << ENDL
+                << "proxies that are properly configured with security measures—such as rate - limiting—to protect the service.", LOG_LEVEL_0, LOG_COLOR_RED);
+    }
     m_port = command_line::get_arg(vm, arg_rpc_bind_port);
     if (command_line::has_arg(vm, arg_rpc_ignore_offline_status))
     {
