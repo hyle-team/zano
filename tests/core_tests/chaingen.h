@@ -227,7 +227,7 @@ VARIANT_TAG(binary_archive, core_hardforks_config, 0xd2);
 
 typedef boost::variant<currency::block, currency::transaction, currency::account_base, callback_entry, serialized_block, serialized_transaction, event_visitor_settings, event_special_block, event_core_time, core_hardforks_config> test_event_entry;
 typedef std::unordered_map<crypto::hash, const currency::transaction*> map_hash2tx_t;
-using mixins_per_input = std::unordered_map<std::size_t, std::size_t>;
+typedef std::unordered_map<std::size_t, std::size_t> mixins_per_input;
 
 enum test_tx_split_strategy { tests_default_split_strategy /*height-based, TODO*/, tests_void_split_strategy, tests_null_split_strategy, tests_digits_split_strategy, tests_random_split_strategy };
 struct test_gentime_settings
