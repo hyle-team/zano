@@ -6490,6 +6490,8 @@ bool wallet2::build_ionic_swap_template(const wallet_public::ionic_swap_proposal
   for (uint64_t i : selected_transfers)
     m_transfers.at(i).m_flags &= ~WALLET_TRANSFER_DETAIL_FLAG_BLOCKED;
 
+  m_found_free_amounts.clear();
+
   //add_transfers_to_expiration_list(selected_transfers, for_expiration_list, this->get_core_runtime_config().get_core_time() + proposal_detais.expiration_time, currency::null_hash);
 
   //wrap it all 

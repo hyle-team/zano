@@ -74,7 +74,7 @@ void test_plain_wallet()
 {
   //std::string res = plain_wallet::init("195.201.107.230", "33340", "C:\\Users\\roky\\home\\", 0);
   //std::string res = plain_wallet::init("", "", "C:\\Users\\roky\\home\\", 0);
-  std::string res = plain_wallet::init("https://node.zano.org", "443", "C:\\Users\\roky\\home\\", LOG_LEVEL_2);
+  std::string res = plain_wallet::init("https://node.zano.org", "443", "C:\\Users\\roky\\home\\", LOG_LEVEL_0);
   //std::string res = plain_wallet::init("127.0.0.1", "12111", "C:\\Users\\roky\\home22\\", 0);
   
   plain_wallet::configure_object conf = AUTO_VAL_INIT(conf);
@@ -105,7 +105,7 @@ void test_plain_wallet()
 
 
   uint64_t instance_id = 0;
-  res = plain_wallet::open("test_restored_3.zan", "111");
+  res = plain_wallet::open("restored_33333.zan", "111");
   //res = plain_wallet::restore(seed,
   //  "test_restored_3.zan", "111", "test");
 
@@ -142,7 +142,7 @@ void test_plain_wallet()
   std::string res1 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
   LOG_PRINT_L0("Store: " << res1);
-  return;
+  //return;
   {
     invoke_body = "{\"method\":\"getbalance\",\"params\":{}}";
     std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
@@ -160,9 +160,16 @@ void test_plain_wallet()
   {
     //invoke_body = "{\"method\":\"assets_whitelist_get\",\"params\":{}}";
     //std::string json_request;
-    bool r = epee::file_io_utils::load_file_to_string("C:\\Users\\roky\\home\\wallets\\deploy_asset_request.json", invoke_body);
+    bool r = epee::file_io_utils::load_file_to_string("C:\\Users\\roky\\home\\wallets\\proposal.json", invoke_body);
     CHECK_AND_ASSERT_MES(r, void(), "wrong bla bla bla");
     std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+    std::string res44 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
+    std::string res444 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
+    std::string res34444 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+    std::string res344444 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
     invoke_body = "";
   }
 
@@ -234,10 +241,10 @@ int main(int argc, char** argv)
   //  epee::log_space::log_singletone::get_default_log_file().c_str(),
   //  epee::log_space::log_singletone::get_default_log_folder().c_str());
   
-  multithread_test_of_get_coinbase_hash_cached();
+  //multithread_test_of_get_coinbase_hash_cached();
   //test_tx_json_serialization();
   //test_base64_serialization();
-  //test_plain_wallet();
+  test_plain_wallet();
   //parse_weird_tx();
   //thread_pool_tests();
 
