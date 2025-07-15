@@ -16,6 +16,23 @@ using namespace epee;
 #include "crypto/hash.h"
 #include "core_rpc_server_error_codes.h"
 
+#define CHECK_RPC_LIMITS(var, limit)    if(var > limit)  {res.status = API_RETURN_CODE_ARG_OUT_OF_LIMITS; return true;}
+
+
+#define RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS                                       4000
+#define RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY_AMOUNTS                     500
+#define RPC_LIMIT_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES_TXIDS                               100
+#define RPC_LIMIT_COMMAND_RPC_CHECK_KEYIMAGES_IMAGES                                            1000
+#define RPC_LIMIT_COMMAND_RPC_GET_TRANSACTIONS_TXS_HASHES                                       5000
+#define RPC_LIMIT_COMMAND_RPC_GET_OFFERS_EX_LIMIT                                               1000
+#define RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DETAILS_COUNT                                          4000
+#define RPC_LIMIT_COMMAND_RPC_GET_POOL_TXS_DETAILS_IDS                                          4000
+#define RPC_LIMIT_COMMAND_RPC_GET_VOTES                                                         4000
+#define RPC_LIMIT_COMMAND_RPC_GET_ASSETS_LIST                                                   1000
+#define RPC_LIMIT_COMMAND_RPC_GET_ALT_BLOCKS_DETAILS_COUNT                                      100
+#define RPC_LIMIT_COMMAND_RPC_FORCE_RELAY_RAW_TXS                                               100
+#define RPC_LIMIT_COMMAND_RPC_GET_ALIASES_COUNT                                                 200
+
 
 
 namespace currency
@@ -281,6 +298,7 @@ namespace currency
   bool core_rpc_server::on_get_blocks_direct(const COMMAND_RPC_GET_BLOCKS_DIRECT::request& req, COMMAND_RPC_GET_BLOCKS_DIRECT::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.block_ids.size(), RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS);
 
     if (req.block_ids.back() != m_core.get_blockchain_storage().get_block_id_by_height(0))
     {
@@ -319,6 +337,7 @@ namespace currency
   bool core_rpc_server::on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.block_ids.size(), RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS);
     LOG_PRINT_L2("[on_get_blocks]: Prevalidating....");
     if (req.block_ids.back() != m_core.get_blockchain_storage().get_block_id_by_height(0))
     {
@@ -369,6 +388,8 @@ namespace currency
   bool core_rpc_server::on_get_random_outs(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.amounts.size(), RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY_AMOUNTS);
+    
     res.status = API_RETURN_CODE_FAIL;
 
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request req_native = AUTO_VAL_INIT(req_native);
@@ -420,6 +441,7 @@ namespace currency
   bool core_rpc_server::on_get_random_outs1(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.amounts.size(), RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY_AMOUNTS);
     res.status = API_RETURN_CODE_FAIL;
 
     if(!m_core.get_random_outs_for_amounts(req, res))
@@ -434,6 +456,12 @@ namespace currency
   bool core_rpc_server::on_get_random_outs3(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.amounts.size(), RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY_AMOUNTS);
+    for (const auto& item : req.amounts)
+    {
+      CHECK_RPC_LIMITS(item.global_offsets.size(), RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY_AMOUNTS);      
+    }
+
     res.status = API_RETURN_CODE_FAIL;
     if (!m_core.get_blockchain_storage().get_random_outs_for_amounts3(req, res))
     {
@@ -447,6 +475,8 @@ namespace currency
   bool core_rpc_server::on_get_indexes(const COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request& req, COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.txids.size(), RPC_LIMIT_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES_TXIDS);
+    
     res.tx_global_outs.resize(req.txids.size());
     size_t i = 0;
     for (auto& txid : req.txids)
@@ -498,6 +528,8 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_check_keyimages(const COMMAND_RPC_CHECK_KEYIMAGES::request& req, COMMAND_RPC_CHECK_KEYIMAGES::response& res, connection_context& cntx)
   {
+    CHECK_RPC_LIMITS(req.images.size(), RPC_LIMIT_COMMAND_RPC_CHECK_KEYIMAGES_IMAGES);
+    
     m_core.get_blockchain_storage().check_keyimages(req.images, res.images_stat);
     res.status = API_RETURN_CODE_OK;
     return true;
@@ -506,6 +538,8 @@ namespace currency
   bool core_rpc_server::on_get_transactions(const COMMAND_RPC_GET_TRANSACTIONS::request& req, COMMAND_RPC_GET_TRANSACTIONS::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.txs_hashes.size(), RPC_LIMIT_COMMAND_RPC_GET_TRANSACTIONS_TXS_HASHES);
+
     std::vector<crypto::hash> vh;
     for(const auto& tx_hex_str : req.txs_hashes)
     {
@@ -548,6 +582,9 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_offers_ex(const COMMAND_RPC_GET_OFFERS_EX::request& req, COMMAND_RPC_GET_OFFERS_EX::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
+    CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.filter.limit, RPC_LIMIT_COMMAND_RPC_GET_OFFERS_EX_LIMIT);
+    
     m_of.get_offers_ex(req.filter, res.offers, res.total_offers, m_core.get_blockchain_storage().get_core_runtime_config().get_core_time());
     res.status = API_RETURN_CODE_OK;
     return true;
@@ -624,6 +661,8 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_rpc_get_blocks_details(const COMMAND_RPC_GET_BLOCKS_DETAILS::request& req, COMMAND_RPC_GET_BLOCKS_DETAILS::response& res, connection_context& cntx)
   {
+    CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DETAILS_COUNT);
+    
     m_core.get_blockchain_storage().get_main_blocks_rpc_details(req.height_start, req.count, req.ignore_transactions, res.blocks);
     res.status = API_RETURN_CODE_OK;
     return true;
@@ -683,6 +722,9 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_pool_txs_details(const COMMAND_RPC_GET_POOL_TXS_DETAILS::request& req, COMMAND_RPC_GET_POOL_TXS_DETAILS::response& res, connection_context& cntx)
   {
+    CHECK_RPC_LIMITS(req.ids.size(), RPC_LIMIT_COMMAND_RPC_GET_POOL_TXS_DETAILS_IDS);
+    
+    
     if (!req.ids.size())
     {
       m_core.get_tx_pool().get_all_transactions_details(res.txs);
@@ -697,6 +739,7 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_pool_txs_brief_details(const COMMAND_RPC_GET_POOL_TXS_BRIEF_DETAILS::request& req, COMMAND_RPC_GET_POOL_TXS_BRIEF_DETAILS::response& res, connection_context& cntx)
   {
+    CHECK_RPC_LIMITS(req.ids.size(), RPC_LIMIT_COMMAND_RPC_GET_POOL_TXS_DETAILS_IDS);
     if (!req.ids.size())
     {
       m_core.get_tx_pool().get_all_transactions_brief_details(res.txs);
@@ -730,6 +773,8 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_votes(const COMMAND_RPC_GET_VOTES::request& req, COMMAND_RPC_GET_VOTES::response& res, connection_context& cntx)
   {
+    CHECK_RPC_LIMITS(req.h_end - req.h_start, RPC_LIMIT_COMMAND_RPC_GET_VOTES);
+
     if (!m_core.get_blockchain_storage().get_pos_votes(req.h_start, req.h_end, res.votes))
     {
       res.status = API_RETURN_CODE_INTERNAL_ERROR;
@@ -754,6 +799,8 @@ namespace currency
   bool core_rpc_server::on_get_assets_list(const COMMAND_RPC_GET_ASSETS_LIST::request& req, COMMAND_RPC_GET_ASSETS_LIST::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GET_ASSETS_LIST);
+
     if (!m_core.get_blockchain_storage().get_assets(req.offset, req.count, res.assets))
     {
       res.status = API_RETURN_CODE_NOT_FOUND;
@@ -857,6 +904,8 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_alt_blocks_details(const COMMAND_RPC_GET_ALT_BLOCKS_DETAILS::request& req, COMMAND_RPC_GET_ALT_BLOCKS_DETAILS::response& res, connection_context& cntx)
   {
+    CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GET_ALT_BLOCKS_DETAILS_COUNT);
+       
     m_core.get_blockchain_storage().get_alt_blocks_rpc_details(req.offset, req.count, res.blocks);
     res.status = API_RETURN_CODE_OK;
     return true;
@@ -934,7 +983,8 @@ namespace currency
   }
 	//------------------------------------------------------------------------------------------------------------------------------
 	bool core_rpc_server::on_force_relaey_raw_txs(const COMMAND_RPC_FORCE_RELAY_RAW_TXS::request& req, COMMAND_RPC_FORCE_RELAY_RAW_TXS::response& res, connection_context& cntx)
-	{
+  {
+    CHECK_RPC_LIMITS(req.txs_as_hex.size(), RPC_LIMIT_COMMAND_RPC_FORCE_RELAY_RAW_TXS);
 		CHECK_CORE_READY();
 		NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request r = AUTO_VAL_INIT(r);
 
@@ -1371,10 +1421,11 @@ namespace currency
     res.status = API_RETURN_CODE_OK;
     return true;
   }
-
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_aliases(const COMMAND_RPC_GET_ALIASES::request& req, COMMAND_RPC_GET_ALIASES::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
+    CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GET_ALIASES_COUNT);
+    
     if(!check_core_ready())
     {
       error_resp.code = CORE_RPC_ERROR_CODE_CORE_BUSY;
