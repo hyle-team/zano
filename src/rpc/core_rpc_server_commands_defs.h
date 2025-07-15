@@ -1494,7 +1494,7 @@ namespace currency
 
   struct COMMAND_RPC_RESET_TX_POOL
   {
-    DOC_COMMAND("Clears transaction pool.");
+    DOC_COMMAND("Clears transaction pool. (Admin API, requires CLI option, disabled by default)");
 
     struct request
     {
@@ -1516,7 +1516,7 @@ namespace currency
 
   struct COMMAND_RPC_REMOVE_TX_FROM_POOL
   {
-    DOC_COMMAND("Removes specified transactions from the transaction pool, typically to clear out transactions that are no longer valid or needed.");
+    DOC_COMMAND("Removes specified transactions from the transaction pool, typically to clear out transactions that are no longer valid or needed. (Admin API, requires CLI option, disabled by default)");
 
     struct request
     {

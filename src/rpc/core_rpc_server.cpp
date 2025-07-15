@@ -42,7 +42,7 @@ namespace currency
     const command_line::arg_descriptor<std::string> arg_rpc_bind_ip         ("rpc-bind-ip",         "", "127.0.0.1");
     const command_line::arg_descriptor<std::string> arg_rpc_bind_port       ("rpc-bind-port",       "", std::to_string(RPC_DEFAULT_PORT));
     const command_line::arg_descriptor<bool> arg_rpc_ignore_offline_status  ("rpc-ignore-offline",  "Let rpc calls despite online/offline status");
-    const command_line::arg_descriptor<bool> arg_rpc_enable_rpc_api         ("rpc-enable-admin-api", "Enable API commands that can alter state of pool or daemon(reset pool, remove txs etc)");
+    const command_line::arg_descriptor<bool> arg_rpc_enable_admin_api       ("rpc-enable-admin-api", "Enable API commands that can alter pool or daemon state (reset pool, remove txs, etc.)");
   }
   //-----------------------------------------------------------------------------------
   void core_rpc_server::init_options(boost::program_options::options_description& desc)
@@ -50,7 +50,7 @@ namespace currency
     command_line::add_arg(desc, arg_rpc_bind_ip);
     command_line::add_arg(desc, arg_rpc_bind_port);
     command_line::add_arg(desc, arg_rpc_ignore_offline_status);
-    command_line::add_arg(desc, arg_rpc_enable_rpc_api);
+    command_line::add_arg(desc, arg_rpc_enable_admin_api);
     
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -70,16 +70,16 @@ namespace currency
       LOG_PRINT_COLOR("!!!!!!IMPORTANT!!!!!!: We strongly advise against binding the server to 0.0.0.0 and exposing it directly" << ENDL
                 << "to the public internet. The server is meant solely for internal functionality and lacks the security features" << ENDL
                 << "required for publicly facing services. If you need to offer a public API, always place it behind secure" << ENDL
-                << "proxies that are properly configured with security measures—such as rate - limiting—to protect the service.", LOG_LEVEL_0, LOG_COLOR_RED);
+                << "proxies that are properly configured with security measures--such as rate limiting--to protect the service.", LOG_LEVEL_0, LOG_COLOR_RED);
     }
     m_port = command_line::get_arg(vm, arg_rpc_bind_port);
     if (command_line::has_arg(vm, arg_rpc_ignore_offline_status))
     {
       m_ignore_offline_status = command_line::get_arg(vm, arg_rpc_ignore_offline_status);
     }
-    if (command_line::has_arg(vm, arg_rpc_enable_rpc_api))
+    if (command_line::has_arg(vm, arg_rpc_enable_admin_api))
     {
-      m_enabled_admin_api = command_line::get_arg(vm, arg_rpc_enable_rpc_api);
+      m_enabled_admin_api = command_line::get_arg(vm, arg_rpc_enable_admin_api);
     }
     
     return true;
