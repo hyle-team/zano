@@ -2790,6 +2790,8 @@ bool tx_input_mixins::generate(std::vector<test_event_entry>& events) const
   REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, 4);
   MAKE_NEXT_BLOCK(events, blk_3, blk_2r, miner_acc);
   REWIND_BLOCKS_N(events, blk_4r, blk_3, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // make sure HF4 is active at 31 height
   DO_CALLBACK_PARAMS(events, "check_hardfork_active", size_t{ZANO_HARDFORK_04_ZARCANUM});
 
   // build tx_b with zc hf4 input, send 15 coins from miner -> Alice
