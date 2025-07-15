@@ -42,6 +42,7 @@ namespace currency
     const command_line::arg_descriptor<std::string> arg_rpc_bind_ip         ("rpc-bind-ip",         "", "127.0.0.1");
     const command_line::arg_descriptor<std::string> arg_rpc_bind_port       ("rpc-bind-port",       "", std::to_string(RPC_DEFAULT_PORT));
     const command_line::arg_descriptor<bool> arg_rpc_ignore_offline_status  ("rpc-ignore-offline",  "Let rpc calls despite online/offline status");
+    const command_line::arg_descriptor<bool> arg_rpc_enable_rpc_api         ("rpc-enable-admin-api", "Enable API commands that can alter state of pool or daemon(reset pool, remove txs etc)");
   }
   //-----------------------------------------------------------------------------------
   void core_rpc_server::init_options(boost::program_options::options_description& desc)
@@ -49,6 +50,8 @@ namespace currency
     command_line::add_arg(desc, arg_rpc_bind_ip);
     command_line::add_arg(desc, arg_rpc_bind_port);
     command_line::add_arg(desc, arg_rpc_ignore_offline_status);
+    command_line::add_arg(desc, arg_rpc_enable_rpc_api);
+    
   }
   //------------------------------------------------------------------------------------------------------------------------------
   core_rpc_server::core_rpc_server(core& cr, nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >& p2p,
@@ -74,6 +77,11 @@ namespace currency
     {
       m_ignore_offline_status = command_line::get_arg(vm, arg_rpc_ignore_offline_status);
     }
+    if (command_line::has_arg(vm, arg_rpc_enable_rpc_api))
+    {
+      m_enabled_admin_api = command_line::get_arg(vm, arg_rpc_enable_rpc_api);
+    }
+    
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------

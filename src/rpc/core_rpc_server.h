@@ -171,9 +171,10 @@ namespace currency
         MAP_JON_RPC_WE("get_alt_block_details",       on_get_alt_block_details,       COMMAND_RPC_GET_BLOCK_DETAILS)
         MAP_JON_RPC   ("get_alt_blocks_details",      on_get_alt_blocks_details,      COMMAND_RPC_GET_ALT_BLOCKS_DETAILS)
         //
-        MAP_JON_RPC   ("reset_transaction_pool",      on_reset_transaction_pool,      COMMAND_RPC_RESET_TX_POOL)
-        MAP_JON_RPC   ("remove_tx_from_pool",         on_remove_tx_from_pool,         COMMAND_RPC_REMOVE_TX_FROM_POOL)
-        MAP_JON_RPC   ("get_current_core_tx_expiration_median", on_get_current_core_tx_expiration_median, COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN)
+        MAP_JON_RPC_CONDITIONAL("reset_transaction_pool", on_reset_transaction_pool, COMMAND_RPC_RESET_TX_POOL, m_enabled_admin_api)
+        MAP_JON_RPC_CONDITIONAL("remove_tx_from_pool", on_remove_tx_from_pool,       COMMAND_RPC_REMOVE_TX_FROM_POOL, m_enabled_admin_api)
+
+        MAP_JON_RPC("get_current_core_tx_expiration_median", on_get_current_core_tx_expiration_median, COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN)
         //
         MAP_JON_RPC_WE("marketplace_global_get_offers_ex", on_get_offers_ex,          COMMAND_RPC_GET_OFFERS_EX)        
         MAP_JON_RPC_WE("validate_signature",          on_validate_signature,          COMMAND_VALIDATE_SIGNATURE)
@@ -200,6 +201,7 @@ namespace currency
     std::string m_port;
     std::string m_bind_ip;
     bool m_ignore_offline_status;
+    bool m_enabled_admin_api = false;
     epee::net_utils::http::i_chain_handler* m_prpc_chain_handler = nullptr;
   };
 }
