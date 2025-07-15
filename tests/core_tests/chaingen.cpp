@@ -1450,7 +1450,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
 bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
                      const currency::block& blk_head, const currency::account_keys& from, const std::unordered_map<crypto::public_key, uint64_t>& amounts, size_t nmix,
                      const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, std::unordered_map<crypto::public_key, uint64_t>* p_sources_amounts /* = nullptr */,
-                     const mixins_per_input* nmix_map = nullptr)
+                     const mixins_per_input* nmix_map /* = nullptr */)
 {
   map_output_idx_t outs;
   map_output_t outs_mine;
