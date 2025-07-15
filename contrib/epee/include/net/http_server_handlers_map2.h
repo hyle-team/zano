@@ -507,6 +507,26 @@ namespace epee {
   return true;\
 }
 
+#define MAP_JON_RPC_CONDITIONAL(method_name, callback_f, command_type, predicate) \
+    else if(predicate && auto_doc<command_type, true>(current_zone_json_uri, method_name, true, docs) && callback_name == method_name) \
+{ \
+  call_found = true; \
+  PREPARE_OBJECTS_FROM_JSON(command_type) \
+  if(!callback_f(req.params, resp.result, m_conn_context)) \
+  { \
+    epee::json_rpc::error_response fail_resp = AUTO_VAL_INIT(fail_resp); \
+    fail_resp.jsonrpc = "2.0"; \
+    fail_resp.method = req.method; \
+    fail_resp.id = req.id; \
+    fail_resp.error.code = -32603; \
+    fail_resp.error.message = "Internal error"; \
+    epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(fail_resp), response_info.m_body); \
+    return true; \
+  } \
+  FINALIZE_OBJECTS_TO_JSON(method_name) \
+  return true;\
+}
+
 #define MAP_JON_RPC_N(callback_f, command_type) MAP_JON_RPC(command_type::methodname(), callback_f, command_type)
 
 #define END_JSON_RPC_MAP() \
