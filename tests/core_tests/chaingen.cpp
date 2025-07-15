@@ -1421,7 +1421,7 @@ bool fill_tx_sources(std::vector<tx_source_entry>& sources, const std::vector<te
 
 bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
   const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix, const std::vector<currency::tx_source_entry>& sources_to_avoid,
-  bool check_for_spends, bool check_for_unlocktime, bool use_ref_by_id, uint64_t* p_sources_amount_found /* = nullptr */)
+  bool check_for_spends, bool check_for_unlocktime, bool use_ref_by_id, uint64_t* p_sources_amount_found /* = nullptr */, const mixins_per_input* nmix_map /* = nullptr */)
 {
   uint64_t fts_flags =
     (check_for_spends     ? fts_check_for_spends      : fts_none) |
@@ -1429,17 +1429,18 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
     (use_ref_by_id        ? fts_use_ref_by_id         : fts_none) |
     fts_check_for_hf4_min_coinage;
 
-  return fill_tx_sources(sources, events, blk_head, from, amount, nmix, sources_to_avoid, fts_flags, p_sources_amount_found);
+  return fill_tx_sources(sources, events, blk_head, from, amount, nmix, sources_to_avoid, fts_flags, p_sources_amount_found, nmix_map);
 }
 
 bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
                      const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix,
-                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, uint64_t* p_sources_amount_found /* = nullptr */)
+                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, uint64_t* p_sources_amount_found /* = nullptr */,
+                     const mixins_per_input* nmix_map /* = nullptr */)
 {
   std::unordered_map<crypto::public_key, uint64_t> amounts;
   amounts[native_coin_asset_id] = amount;
   std::unordered_map<crypto::public_key, uint64_t> sources_amounts;
-  if (!fill_tx_sources(sources, events, blk_head, from, amounts, nmix, sources_to_avoid, fts_flags, &sources_amounts))
+  if (!fill_tx_sources(sources, events, blk_head, from, amounts, nmix, sources_to_avoid, fts_flags, &sources_amounts, nmix_map))
     return false;
   if (p_sources_amount_found)
     *p_sources_amount_found = sources_amounts[native_coin_asset_id];
@@ -1448,7 +1449,8 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
 
 bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
                      const currency::block& blk_head, const currency::account_keys& from, const std::unordered_map<crypto::public_key, uint64_t>& amounts, size_t nmix,
-                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, std::unordered_map<crypto::public_key, uint64_t>* p_sources_amounts /* = nullptr */)
+                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, std::unordered_map<crypto::public_key, uint64_t>* p_sources_amounts /* = nullptr */,
+                     const mixins_per_input* nmix_map = nullptr)
 {
   map_output_idx_t outs;
   map_output_t outs_mine;
@@ -1558,7 +1560,23 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
       ts.real_out_amount_blinding_mask = oi.amount_blinding_mask;
       ts.real_output_in_tx_index = oi.out_no;
       ts.real_out_tx_key = get_tx_pub_key_from_extra(*oi.p_tx); // source tx public key
-      if (!fill_output_entries(outs[o.first], sender_out, nmix, fts_flags & fts_check_for_unlocktime, fts_flags & fts_use_ref_by_id,
+
+      // If we use nmix_map, we should use local_nmix instead of nmix
+      // to allow different nmix for different inputs in the same transaction.
+      // If nmix_map is not provided, we use nmix as local_nmix.
+      size_t local_nmix = nmix;
+      if (nmix_map)
+      {
+        // Try to find an override for this input index 'i'
+        auto it = nmix_map->find(i);
+        if (it != nmix_map->end())
+        {
+          local_nmix = it->second;
+        }
+        // leave local_nmix at its default
+      }
+
+      if (!fill_output_entries(outs[o.first], sender_out, local_nmix, fts_flags & fts_check_for_unlocktime, fts_flags & fts_use_ref_by_id,
         next_block_height, head_block_ts, ts.real_output, ts.outputs))
       {
         continue;
@@ -1592,7 +1610,9 @@ bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& event
   bool check_for_spends,
   bool check_for_unlocktime,
   size_t minimum_sigs,
-  bool use_ref_by_id)
+  bool use_ref_by_id,
+  const mixins_per_input* nmix_map
+)
 {
   CHECK_AND_ASSERT_MES(!to.empty(), false, "destination addresses vector is empty");
   CHECK_AND_ASSERT_MES(amount + fee > amount, false, "amount + fee overflow!");
@@ -1601,7 +1621,7 @@ bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& event
   bool b_multisig = to.size() > 1;
 
   uint64_t source_amount_found = 0;
-  bool r = fill_tx_sources(sources, events, blk_head, from, amount + fee, nmix, std::vector<currency::tx_source_entry>(), check_for_spends, check_for_unlocktime, use_ref_by_id, &source_amount_found);
+  bool r = fill_tx_sources(sources, events, blk_head, from, amount + fee, nmix, std::vector<currency::tx_source_entry>(), check_for_spends, check_for_unlocktime, use_ref_by_id, &source_amount_found, nmix_map);
   CHECK_AND_ASSERT_MES(r, false, "couldn't fill transaction sources (nmix = " << nmix << "): " << ENDL <<
     "  required:      " << print_money(amount + fee) << " = " << std::fixed << std::setprecision(1) << ceil(1.0 * (amount + fee) / TESTS_DEFAULT_FEE) << " x TESTS_DEFAULT_FEE" << ENDL <<
     "  found coins:   " << print_money(source_amount_found) << " = " << std::fixed << std::setprecision(1) << ceil(1.0 * source_amount_found / TESTS_DEFAULT_FEE) << " x TESTS_DEFAULT_FEE" << ENDL <<
@@ -1673,9 +1693,10 @@ bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& event
                                       std::vector<tx_destination_entry>& destinations,
                                       bool check_for_spends,
                                       bool check_for_unlocktime,
-                                      bool use_ref_by_id)
+                                      bool use_ref_by_id,
+                                      const mixins_per_input* nmix_map)
 {
-  return fill_tx_sources_and_destinations(events, blk_head, from, std::list<account_public_address>({ to }), amount, fee, nmix, sources, destinations, check_for_spends, check_for_unlocktime, 0, use_ref_by_id);
+  return fill_tx_sources_and_destinations(events, blk_head, from, std::list<account_public_address>({ to }), amount, fee, nmix, sources, destinations, check_for_spends, check_for_unlocktime, 0, use_ref_by_id, nmix_map);
 }
 
 bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& events, const currency::block& blk_head,
@@ -1685,9 +1706,10 @@ bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& event
                                       std::vector<currency::tx_destination_entry>& destinations,
                                       bool check_for_spends,
                                       bool check_for_unlocktime,
-                                      bool use_ref_by_id)
+                                      bool use_ref_by_id,
+                                      const mixins_per_input* nmix_map)
 {
-  return fill_tx_sources_and_destinations(events, blk_head, from.get_keys(), to.get_public_address(), amount, fee, nmix, sources, destinations, check_for_spends, check_for_unlocktime, use_ref_by_id);
+  return fill_tx_sources_and_destinations(events, blk_head, from.get_keys(), to.get_public_address(), amount, fee, nmix, sources, destinations, check_for_spends, check_for_unlocktime, use_ref_by_id, nmix_map);
 }
 
 /*
