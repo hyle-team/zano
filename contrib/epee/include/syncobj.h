@@ -38,7 +38,7 @@
 #include "static_helpers.h"
 #include "misc_helpers.h"
 
-//#define DISABLE_DEADLOCK_GUARD
+#define DISABLE_DEADLOCK_GUARD
 
 
 namespace epee
