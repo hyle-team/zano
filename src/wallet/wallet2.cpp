@@ -3827,6 +3827,9 @@ bool wallet2::balance(std::unordered_map<crypto::public_key, wallet_public::asse
 
   }
 
+  if (balances.empty())
+    balances[currency::native_coin_asset_id] = wallet_public::asset_balance_entry_base{};
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -3877,62 +3880,32 @@ bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, u
   balances.clear();
   std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base> balances_map;
   this->balance(balances_map, mined);
-  std::unordered_map<crypto::public_key, currency::asset_descriptor_base> custom_assets_local = m_custom_assets;
 
-  for (auto& own_asset : m_own_asset_descriptors)
+  for (const auto& [asset_id, balance_entry] : balances_map)
   {
-    if (m_whitelisted_assets.find(own_asset.first) == m_whitelisted_assets.end())
+    asset_descriptor_base asset_info{};
+    uint32_t asset_flags = 0;
+    if (!get_asset_info(asset_id, asset_info, asset_flags))
+      continue;
+
+    if (!m_use_assets_whitelisting)
+      asset_flags &= ~aif_whitelisted;
+
+    if ((asset_flags & (aif_native_coin | aif_custom | aif_whitelisted)) == 0)
     {
-      custom_assets_local[own_asset.first] = own_asset.second;
-    }
-  }
-
-  asset_descriptor_base native_asset_info = AUTO_VAL_INIT(native_asset_info);
-  native_asset_info.full_name = CURRENCY_NAME_SHORT_BASE;
-  native_asset_info.ticker = CURRENCY_NAME_ABR;
-  native_asset_info.decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT;
-  custom_assets_local[currency::native_coin_asset_id] = native_asset_info;
-
-  for (const auto& item : balances_map)
-  {
-    asset_descriptor_base asset_info = AUTO_VAL_INIT(asset_info);
-    //check if asset is whitelisted or customly added
-
-    //check if it custom asset
-    auto it_cust = custom_assets_local.find(item.first);
-    if (it_cust == custom_assets_local.end())
-    {
-      if (!m_use_assets_whitelisting)
-        continue;
-
-      auto it_local = m_whitelisted_assets.find(item.first);
-      if (it_local == m_whitelisted_assets.end())
-      {
-        WLT_LOG_YELLOW("WARNING: unknown asset " << item.first << " found and skipped; it's NOT included in balance", LOG_LEVEL_1);
-        continue;
-      }
-      else
-      {
-        asset_info = it_local->second;
-      }
-    }
-    else
-    {
-      asset_info = it_cust->second;
-      custom_assets_local.erase(it_cust);
+      WLT_LOG_YELLOW("WARNING: unknown asset " << asset_id << " with total balance of " << balance_entry.total << " found and skipped; it's NOT included in the resulted balance", LOG_LEVEL_1);
+      continue;
     }
 
-    balances.push_back(wallet_public::asset_balance_entry());
-    wallet_public::asset_balance_entry& new_item = balances.back();
-    static_cast<wallet_public::asset_balance_entry_base&>(new_item) = item.second;
-    new_item.asset_info.asset_id = item.first;
+    wallet_public::asset_balance_entry& new_item = balances.emplace_back();
+    static_cast<wallet_public::asset_balance_entry_base&>(new_item) = balance_entry;
+    new_item.asset_info.asset_id = asset_id;
     static_cast<currency::asset_descriptor_base&>(new_item.asset_info) = asset_info;
   }
   //manually added assets should be always present, at least as zero balanced items
-  for (auto& asset : custom_assets_local)
+  for (auto& asset : m_custom_assets)
   {
-    balances.push_back(wallet_public::asset_balance_entry());
-    wallet_public::asset_balance_entry& new_item = balances.back();
+    wallet_public::asset_balance_entry& new_item = balances.emplace_back();
     new_item.asset_info.asset_id = asset.first;
     static_cast<currency::asset_descriptor_base&>(new_item.asset_info) = asset.second;
   }
@@ -3956,7 +3929,6 @@ bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset
   {
     asset_info = it_own->second;
     asset_flags |= aif_own;
-    return true;
   }
 
   // whitelisted?
@@ -3965,7 +3937,6 @@ bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset
   {
     asset_info = it_white->second;
     asset_flags |= aif_whitelisted;
-    return true;
   }
 
   // custom asset?
@@ -3974,7 +3945,6 @@ bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset
   {
     asset_info = it_cust->second;
     asset_flags |= aif_custom;
-    return true;
   }
 
   if (ask_daemon_for_unknown)
@@ -3982,11 +3952,10 @@ bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset
     if (daemon_get_asset_info(asset_id, asset_info))
     {
       asset_flags |= aif_unknown;
-      return true;
     }
   }
 
-  return false;
+  return asset_flags != aif_none;
 }
 //----------------------------------------------------------------------------------------------------
 size_t wallet2::get_asset_decimal_point(const crypto::public_key& asset_id, size_t result_if_not_found /* = 0 */) const
