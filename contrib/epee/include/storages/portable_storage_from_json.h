@@ -28,6 +28,8 @@
 #include "parserse_base_utils.h"
 #include "file_io_utils.h"
 
+#define EPEE_JSON_RECURSION_LIMIT_INTERNAL 100
+
 namespace epee
 {
   namespace serialization
@@ -54,9 +56,10 @@ namespace epee
         ASSERT_MES_AND_THROW("json parse error");
       }*/
       template<class t_storage>
-      inline void run_handler(typename t_storage::hsection current_section, std::string::const_iterator& sec_buf_begin, std::string::const_iterator buf_end, t_storage& stg)
+      inline void run_handler(typename t_storage::hsection current_section, std::string::const_iterator& sec_buf_begin, std::string::const_iterator buf_end, t_storage& stg, unsigned int recursion)
       {
-
+        CHECK_AND_ASSERT_THROW_MES(recursion < EPEE_JSON_RECURSION_LIMIT_INTERNAL, 
+          "Wrong JSON data: recursion limitation (" << EPEE_JSON_RECURSION_LIMIT_INTERNAL << ") exceeded");
         std::string::const_iterator sub_element_start;
         std::string name;        
         typename t_storage::harray h_array = nullptr;
@@ -167,7 +170,7 @@ namespace epee
               //sub section here
               typename t_storage::hsection new_sec = stg.open_section(name, current_section, true);
               CHECK_AND_ASSERT_THROW_MES(new_sec, "Failed to insert new section in json: " << std::string(it, buf_end));
-              run_handler(new_sec, it, buf_end, stg);
+              run_handler(new_sec, it, buf_end, stg, recursion + 1);
               state = match_state_wonder_after_value;
             }else if(*it == '[')
             {//array of something
@@ -196,7 +199,7 @@ namespace epee
               typename t_storage::hsection new_sec = nullptr;
               h_array = stg.insert_first_section(name, new_sec, current_section);
               CHECK_AND_ASSERT_THROW_MES(h_array&&new_sec, "failed to create new section");
-              run_handler(new_sec, it, buf_end, stg);
+              run_handler(new_sec, it, buf_end, stg, recursion + 1);
               state = match_state_array_after_value;
               array_md = array_mode_sections;
             }else if(*it == '"')
@@ -270,7 +273,7 @@ namespace epee
                 typename t_storage::hsection new_sec = NULL;
                 bool res = stg.insert_next_section(h_array, new_sec);
                 CHECK_AND_ASSERT_THROW_MES(res&&new_sec, "failed to insert next section");
-                run_handler(new_sec, it, buf_end, stg);
+                run_handler(new_sec, it, buf_end, stg, recursion + 1);
                 state = match_state_array_after_value;
               }else CHECK_ISSPACE();
               break;
@@ -372,7 +375,7 @@ namespace epee
         std::string::const_iterator sec_buf_begin  = buff_json.begin();
         try
         {
-          run_handler(nullptr, sec_buf_begin, buff_json.end(), stg);
+          run_handler(nullptr, sec_buf_begin, buff_json.end(), stg, 0);
           return true;
         }
         catch(const std::exception& ex)
