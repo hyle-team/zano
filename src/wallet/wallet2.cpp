@@ -3892,10 +3892,7 @@ bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, u
       asset_flags &= ~aif_whitelisted;
 
     if ((asset_flags & (aif_native_coin | aif_custom | aif_whitelisted)) == 0)
-    {
-      WLT_LOG_YELLOW("WARNING: unknown asset " << asset_id << " with total balance of " << balance_entry.total << " found and skipped; it's NOT included in the resulted balance", LOG_LEVEL_1);
       continue;
-    }
 
     wallet_public::asset_balance_entry& new_item = balances.emplace_back();
     static_cast<wallet_public::asset_balance_entry_base&>(new_item) = balance_entry;
