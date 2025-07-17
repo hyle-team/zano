@@ -290,7 +290,7 @@ namespace currency
     }
 
     crypto::hash block_id = get_block_hash(b);
-    LOG_PRINT_GREEN("[HANDLE]NOTIFY_NEW_BLOCK " << block_id << " HEIGHT " << get_block_height(b) << " (hop " << arg.hop << ")", LOG_LEVEL_2);
+    LOG_PRINT_GREEN("[HANDLE]NOTIFY_NEW_BLOCK " << block_id << " HEIGHT " << get_block_height(b), LOG_LEVEL_2);
 
     CRITICAL_REGION_BEGIN(m_blocks_id_que_lock);
     auto it = m_blocks_id_que.find(block_id);
@@ -329,7 +329,6 @@ namespace currency
     if (m_core.pre_validate_block(b, bvc, block_id) && bvc.m_added_to_main_chain)
     {
       //not alternative block, relay it
-      ++arg.hop;
       relay_block(arg, context);
       prevalidate_relayed = true;
     }
@@ -377,7 +376,6 @@ namespace currency
       if (true/*!prevalidate_relayed*/)
       {
         // pre-validation failed prevoiusly, but complete check was success, not an alternative block
-        ++arg.hop;
         //TODO: Add here announce protocol usage
         relay_block(arg, context);
       }
