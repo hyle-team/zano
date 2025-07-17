@@ -3903,11 +3903,13 @@ bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, u
     static_cast<currency::asset_descriptor_base&>(new_item.asset_info) = asset_info;
   }
   //manually added assets should be always present, at least as zero balanced items
-  for (auto& asset : m_custom_assets)
+  for (const auto& [asset_id, custom_asset_entry] : m_custom_assets)
   {
+    if (std::find_if(balances.begin(), balances.end(), [&](wallet_public::asset_balance_entry& e){ return e.asset_info.asset_id == asset_id; }) != balances.end())
+      continue;
     wallet_public::asset_balance_entry& new_item = balances.emplace_back();
-    new_item.asset_info.asset_id = asset.first;
-    static_cast<currency::asset_descriptor_base&>(new_item.asset_info) = asset.second;
+    new_item.asset_info.asset_id = asset_id;
+    static_cast<currency::asset_descriptor_base&>(new_item.asset_info) = custom_asset_entry;
   }
 
   return true;
