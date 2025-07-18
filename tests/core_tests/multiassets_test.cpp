@@ -1469,8 +1469,6 @@ bool eth_signed_asset_basics::c1(currency::core& c, size_t ev_index, const std::
   crypto::public_key asset_id = currency::null_pkey;
   miner_wlt->deploy_new_asset(adb, destinations, ft, asset_id);
 
-  const transaction& tx = ft.tx;
-
   LOG_PRINT_L0("Deployed new asset: " << asset_id << ", tx_id: " << ft.tx_id);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Unexpected number of txs in the pool: " << c.get_pool_transactions_count());
@@ -2122,7 +2120,7 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     std::vector<tx_destination_entry> destinations{};
     const auto& ado{m_ados_register.at(asset_position::gamma)};
     crypto::secret_key one_time{};
-    size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_1r));
+    //size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_1r));
     //fill_ado_version_based_onhardfork(ado, hf_n);
     //fill_adb_version_based_onhardfork(*ado.opt_descriptor, hf_n);
 
@@ -2148,7 +2146,7 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     std::vector<tx_destination_entry> destinations{};
     crypto::secret_key one_time{};
     const auto& ado{m_ados_register.at(asset_position::alpha)};
-    size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
+    //size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
     //fill_ado_version_based_onhardfork(ado, hf_n);
     //fill_adb_version_based_onhardfork(*ado.opt_descriptor, hf_n);
 
@@ -2173,7 +2171,7 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     std::vector<tx_destination_entry> destinations{};
     crypto::secret_key one_time{};
     const auto& ado{m_ados_register.at(asset_position::beta)};
-    size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
+    //size_t hf_n = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_2r));
     //fill_ado_version_based_onhardfork(ado, hf_n);
     //fill_adb_version_based_onhardfork(*ado.opt_descriptor, hf_n);
 
@@ -2210,7 +2208,6 @@ bool asset_current_and_total_supplies_comparative_constraints::generate(std::vec
     const auto& ado_register{m_ados_register.at(asset_position::beta)};
     std::vector<tx_source_entry> sources{};
     std::vector<tx_destination_entry> destinations{};
-    crypto::secret_key one_time{};
     tx_source_entry source{};
     finalize_tx_param ftp{};
     finalized_tx ftx{};
@@ -2452,8 +2449,6 @@ bool several_asset_emit_burn_txs_in_pool::generate(std::vector<test_event_entry>
 
 bool several_asset_emit_burn_txs_in_pool::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false;
-
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
   miner_wlt->refresh();
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
@@ -2614,7 +2609,6 @@ bool assets_transfer_with_smallest_amount::generate(std::vector<test_event_entry
   // Only for HF >= 4
   //
 
-  bool r = false;
   uint64_t ts = test_core_time::get_time();
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
@@ -2947,7 +2941,6 @@ bool asset_operations_and_chain_switching::generate(std::vector<test_event_entry
 
 bool asset_operations_and_chain_switching::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false, stub = false;;
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
   alice_wlt->refresh();
   std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, m_accounts[BOB_ACC_IDX]);
@@ -2962,7 +2955,7 @@ bool asset_operations_and_chain_switching::c1(currency::core& c, size_t ev_index
 
 bool asset_operations_and_chain_switching::c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false, stub = false;;
+  bool r = false;
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
   alice_wlt->refresh();
   std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, m_accounts[BOB_ACC_IDX]);
@@ -2984,7 +2977,7 @@ bool asset_operations_and_chain_switching::c2(currency::core& c, size_t ev_index
 
 bool asset_operations_and_chain_switching::c3(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false, stub = false;;
+  bool r = false;
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
   alice_wlt->refresh();
   std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, m_accounts[BOB_ACC_IDX]);

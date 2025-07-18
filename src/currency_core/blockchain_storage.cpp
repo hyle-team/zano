@@ -7101,7 +7101,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     if (!m_is_in_checkpoint_zone)
     {
       auto cleanup = [&](){ 
-        bool add_res = m_tx_pool.add_tx(tx, tvc, true, true);
+        m_tx_pool.add_tx(tx, tvc, true, true);
         m_tx_pool.add_transaction_to_black_list(tx);
         purge_block_data_from_blockchain(bl, tx_processed_count); 
         bvc.m_verification_failed = true; 
@@ -8102,7 +8102,6 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
 
   for (size_t pk_n = 0; pk_n < pub_keys.size(); ++pk_n)
   {
-    crypto::public_key& pk = pub_keys[pk_n];
     crypto::hash tx_id = null_hash;
     uint64_t out_n = UINT64_MAX;
     auto &off = abs_key_offsets[pk_n];

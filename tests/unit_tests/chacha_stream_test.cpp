@@ -38,7 +38,7 @@ TEST(chacha_stream_test, basic_test_with_serialization_on_top)
 
 
   //out << buff;
-  bool res = tools::portble_serialize_obj_to_stream(test_list, out);
+  tools::portble_serialize_obj_to_stream(test_list, out);
   
   out.flush();
   store_data_file.close();
