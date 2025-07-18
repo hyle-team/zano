@@ -464,8 +464,7 @@ namespace currency
       {
         time_pack_txs_ms = epee::misc_utils::get_tick_count();
         currency_connection_context exclude_context = boost::value_initialized<currency_connection_context>();
-        NOTIFY_NEW_BLOCK::request arg = AUTO_VAL_INIT(arg);
-        arg.hop = 0;
+        NOTIFY_NEW_BLOCK::request arg{};
         arg.current_blockchain_height = m_blockchain_storage.get_current_blockchain_size();
         std::list<crypto::hash> missed_txs;
         std::list<transaction> txs;

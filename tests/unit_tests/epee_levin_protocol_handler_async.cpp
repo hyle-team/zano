@@ -12,7 +12,9 @@
 #include "net/levin_protocol_handler_async.h"
 #include "net/net_utils_base.h"
 #include "unit_tests_utils.h"
-
+#include "storages/parserse_base_utils.h"
+#include "storages/portable_storage_base.h"
+#include "storages/portable_storage.h"
 namespace
 {
   struct test_levin_connection_context : public epee::net_utils::connection_context_base
@@ -503,4 +505,62 @@ TEST_F(test_levin_protocol_handler__hanle_recv_with_invalid_data, handles_unexpe
   prepare_buf();
 
   ASSERT_FALSE(m_conn->m_protocol_handler.handle_recv(m_buf.data(), m_buf.size()));
+}
+
+using epee::serialization::portable_storage;
+using epee::serialization::array_entry;
+using epee::serialization::section;
+using epee::serialization::throwable_buffer_reader;
+
+/**
+ * Purpose:
+ *   Verify what the deserialization of array_entry no longer uses memcpy to 
+ *   overwrite the boost::variant memory directly. Instead, an unsupported-array-entry 
+ *   path should throw an exception indicating array_entry deserialization isn't supported.
+ */
+TEST(levin_protocol_variant_memcpy, memcpy_variant_verify)
+{
+  std::string buf; // raw buffer simulating an array_entry section
+
+  buf.push_back(static_cast<char>(SERIALIZE_FLAG_ARRAY | SERIALIZE_TYPE_ARRAY));
+  buf.push_back(static_cast<char>(1 << 2));
+  buf.append(sizeof(array_entry), char(0x41));
+
+  throwable_buffer_reader reader(reinterpret_cast<const uint8_t*>(buf.data()), buf.size());
+
+  EXPECT_THROW(
+    reader.load_storage_array_entry(SERIALIZE_TYPE_ARRAY),
+    std::runtime_error
+  ) << "Expected load_storage_array_entry to throw due to array_entry";
+}
+
+/**
+ * Purpose:
+ *   Construct a JSON string nested deeper than the built-in recursion limit (100 levels).
+ */
+TEST(json_parse_deep, parser_deep)
+{
+  const int depth = 200;
+  std::string json;
+  json.reserve(depth * 10);
+
+  // Build a deeply nested JSON
+  // {"level": {"level": { ... {"level":1} ... }}}
+  for (int i = 0; i < depth; ++i)
+  {
+    json += '{';
+    json += "\"level\":";
+  }
+  json += '1';
+
+  for (int i = 0; i < depth; ++i)
+  {
+    json += '}';
+  }
+
+  portable_storage storage;
+  bool ok = epee::serialization::json::load_from_json(json, storage);
+
+  EXPECT_FALSE(ok) << "Expected load_from_json to fail when depth " << depth
+                   << " exceeds the 100-level recursion limit.";
 }
