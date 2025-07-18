@@ -8102,6 +8102,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
 
   for (size_t pk_n = 0; pk_n < pub_keys.size(); ++pk_n)
   {
+    [[maybe_unused]] crypto::public_key& pk = pub_keys[pk_n];
     crypto::hash tx_id = null_hash;
     uint64_t out_n = UINT64_MAX;
     auto &off = abs_key_offsets[pk_n];

@@ -940,6 +940,7 @@ void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_inf
       ", tx " << wti.tx_hash;
     for (const auto& st : wti.subtransfers)
     {
+      [[maybe_unused]] epee::log_space::console_colors color = st.is_income ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
       uint64_t decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
       std::string token_info = get_token_info_string(st.asset_id, decimal_points);
 
@@ -1172,6 +1173,7 @@ std::string wti_to_text_line(const tools::wallet_public::wallet_transfer_info& w
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::export_recent_transfers(const std::vector<std::string>& args)
 {
+  [[maybe_unused]] bool export_to_json = true;
   bool ignore_pos = false;
   if (args.size() > 1)
   {

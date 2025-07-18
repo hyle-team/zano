@@ -6825,6 +6825,8 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys
   if (true)
   {
     size_t fake_outputs_count = fake_outputs_count_;
+    [[maybe_unused]] uint64_t zarcanum_start_from = m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_HARDFORK_04_ZARCANUM];
+    [[maybe_unused]] uint64_t current_size = m_chain.get_blockchain_current_size();
 
     bool need_to_request = fake_outputs_count != 0;
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request req = AUTO_VAL_INIT(req);

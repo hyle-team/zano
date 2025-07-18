@@ -690,57 +690,57 @@ size_t find_pos_hash(const boost::multiprecision::uint256_t& L_div_D, const curr
 TEST(crypto, pos)
 {
   //scalar_t D = 10000000000000001u;
-  //scalar_t D = 13042196742415129u; // prime number
-  //currency::wide_difficulty_type D_w = D.as_boost_mp_type<boost::multiprecision::uint256_t>().convert_to<currency::wide_difficulty_type>();
-  // uint64_t amount = 1000000000000;
-  // size_t count_old = 0;
-  // size_t count_new = 0;
-  // size_t count_3 = 0;
+  [[maybe_unused]] scalar_t D = 13042196742415129u; // prime number
+  [[maybe_unused]] currency::wide_difficulty_type D_w = D.as_boost_mp_type<boost::multiprecision::uint256_t>().convert_to<currency::wide_difficulty_type>();
+  [[maybe_unused]] uint64_t amount = 1000000000000;
+  [[maybe_unused]] size_t count_old = 0;
+  [[maybe_unused]] size_t count_new = 0;
+  [[maybe_unused]] size_t count_3 = 0;
   scalar_t x;
   x.make_random();
 
   const boost::multiprecision::uint512_t c_2_pow_256_m1(std::numeric_limits<boost::multiprecision::uint256_t>::max());
 
 
-  // const boost::multiprecision::uint256_t c_L_w = c_scalar_L.as_boost_mp_type<boost::multiprecision::uint256_t>();
-  // const boost::multiprecision::uint256_t c_L_div_D_w = c_L_w / D_w;
-  //boost::multiprecision::uint512_t h_tres = c_L_div_D_w * amount;
+  const boost::multiprecision::uint256_t c_L_w = c_scalar_L.as_boost_mp_type<boost::multiprecision::uint256_t>();
+  const boost::multiprecision::uint256_t c_L_div_D_w = c_L_w / D_w;
+  [[maybe_unused]] boost::multiprecision::uint512_t h_tres = c_L_div_D_w * amount;
 
-  //currency::wide_difficulty_type final_diff = D_w / amount;
+  [[maybe_unused]] currency::wide_difficulty_type final_diff = D_w / amount;
 
-  //boost::multiprecision::uint512_t Lv = boost::multiprecision::uint512_t(c_L_w) * amount;
+  [[maybe_unused]] boost::multiprecision::uint512_t Lv = boost::multiprecision::uint512_t(c_L_w) * amount;
 
-  //constexpr uint64_t c_coin = 1000000000000;
-  // const uint64_t amounts[] = {
-  //   c_coin / 100,
-  //   c_coin / 50,
-  //   c_coin / 20,
-  //   c_coin / 10,
-  //   c_coin / 5,
-  //   c_coin / 2,
-  //   c_coin * 1,
-  //   c_coin * 2,
-  //   c_coin * 5,
-  //   c_coin * 10,
-  //   c_coin * 20,
-  //   c_coin * 50,
-  //   c_coin * 100,
-  //   c_coin * 200,
-  //   c_coin * 500,
-  //   c_coin * 1000,
-  //   c_coin * 2000,
-  //   c_coin * 5000,
-  //   c_coin * 10000,
-  //   c_coin * 20000,
-  //   c_coin * 50000,
-  //   c_coin * 100000,
-  //   c_coin * 200000,
-  //   c_coin * 500000
-  // };
+  constexpr uint64_t c_coin = 1000000000000;
+  [[maybe_unused]] const uint64_t amounts[] = {
+    c_coin / 100,
+    c_coin / 50,
+    c_coin / 20,
+    c_coin / 10,
+    c_coin / 5,
+    c_coin / 2,
+    c_coin * 1,
+    c_coin * 2,
+    c_coin * 5,
+    c_coin * 10,
+    c_coin * 20,
+    c_coin * 50,
+    c_coin * 100,
+    c_coin * 200,
+    c_coin * 500,
+    c_coin * 1000,
+    c_coin * 2000,
+    c_coin * 5000,
+    c_coin * 10000,
+    c_coin * 20000,
+    c_coin * 50000,
+    c_coin * 100000,
+    c_coin * 200000,
+    c_coin * 500000
+  };
 
-  //uint64_t kernel = 0;
-  //scalar_t d0 = 0;
-  //uint64_t d1 = 0;
+  [[maybe_unused]] uint64_t kernel = 0;
+  [[maybe_unused]] scalar_t d0 = 0;
+  [[maybe_unused]] uint64_t d1 = 0;
 
 
   /*
