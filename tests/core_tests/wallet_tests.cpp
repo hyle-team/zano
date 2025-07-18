@@ -3799,7 +3799,6 @@ bool wallet_and_sweep_below::generate(std::vector<test_event_entry>& events) con
 
 bool wallet_and_sweep_below::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false;
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
 
   uint64_t miner_balance = (3 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW - 1) * COIN;
@@ -3960,14 +3959,12 @@ bool wallet_reorganize_and_trim_test::c1(currency::core& c, size_t ev_index, con
   mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 2);
 
   mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, WALLET_REORGANIZE_AND_TRIM_TEST_REORG_SIZE);
-  uint64_t h1 = c.get_blockchain_storage().get_top_block_height();
   miner_wlt->refresh();
   uint64_t unlocked = 0;
   uint64_t total = miner_wlt->balance(unlocked);
 
   c.get_blockchain_storage().truncate_blockchain(c.get_blockchain_storage().get_top_block_height() - (WALLET_REORGANIZE_AND_TRIM_TEST_REORG_SIZE-1));
   mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 10);
-  uint64_t h2 = c.get_blockchain_storage().get_top_block_height();
   miner_wlt->refresh();
   uint64_t unlocked2 = 0;
   uint64_t total2 = miner_wlt->balance(unlocked2);

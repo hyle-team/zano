@@ -2551,7 +2551,7 @@ bool generate_pos_block_with_extra_nonce(test_generator& generator, const std::v
   if (generator.get_hardforks().is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, height))
   {
     std::vector<tx_source_entry> sources;
-    bool ok = fill_tx_sources(
+    fill_tx_sources(
       sources, events, prev_block, miner.get_keys(),
       UINT64_MAX, 0, false, false, true
     );

@@ -789,7 +789,6 @@ bool simple_wallet::save(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::process_ki_restoration()
 {
-  bool r = false;
   if (!m_restore_ki_in_wo_wallet.empty())
   {
     std::wstring wo_filename = epee::string_encoding::utf8_to_wstring(m_restore_ki_in_wo_wallet);
@@ -941,7 +940,7 @@ void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_inf
       ", tx " << wti.tx_hash;
     for (const auto& st : wti.subtransfers)
     {
-      epee::log_space::console_colors color = st.is_income ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
+      [[maybe_unused]] epee::log_space::console_colors color = st.is_income ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
       uint64_t decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
       std::string token_info = get_token_info_string(st.asset_id, decimal_points);
 
@@ -1174,7 +1173,7 @@ std::string wti_to_text_line(const tools::wallet_public::wallet_transfer_info& w
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::export_recent_transfers(const std::vector<std::string>& args)
 {
-  bool export_to_json = true;
+  [[maybe_unused]] bool export_to_json = true;
   bool ignore_pos = false;
   if (args.size() > 1)
   {
@@ -2718,7 +2717,6 @@ bool simple_wallet::sweep_bare_outs(const std::vector<std::string> &args)
 {
   CONFIRM_WITH_PASSWORD();
   SIMPLE_WALLET_BEGIN_TRY_ENTRY();
-  bool r = false;
 
   if (args.size() > 1)
   {
@@ -3070,7 +3068,7 @@ int seed_doctor()
   }
 
   bool pass_protected = false;
-  bool success = account_base::is_seed_password_protected(seed, pass_protected);
+  account_base::is_seed_password_protected(seed, pass_protected);
   success_msg_writer() << "SECURED_SEED: " << (pass_protected ? "true" : "false");
 
   if (pass_protected)
@@ -3176,7 +3174,7 @@ int seed_doctor()
       success_msg_writer() << "No address and no checksum, recovery is limited only to date reset";
       std::string result = boost::algorithm::join(words, " ");
       account_base acc;
-      bool r = acc.restore_from_seed_phrase(result, passphrase);
+      acc.restore_from_seed_phrase(result, passphrase);
       success_msg_writer() << "Potential seed candidate:\n" << result << "\nAddress: " << acc.get_public_address_str();
       return EXIT_FAILURE;
     }
