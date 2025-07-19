@@ -44,7 +44,7 @@ bool do_serialize(Archive<false> &ar, std::vector<T> &v)
   v.clear();
 
   // very basic sanity check
-  if (ar.remaining_bytes() < (cnt * sizeof(T)) ) {
+  if (ar.remaining_bytes() < cnt) {
     ar.stream().setstate(std::ios::failbit);
     return false;
   }
