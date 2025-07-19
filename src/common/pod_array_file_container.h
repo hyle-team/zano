@@ -67,6 +67,7 @@ namespace tools
           *p_reason = std::string("file was corrupted, truncated: ") + epee::string_tools::num_to_string_fast(file_size) + " -> " + epee::string_tools::num_to_string_fast(corrected_size);
       }
 
+      m_filename = filename;
       return true;
     }
 
@@ -77,7 +78,7 @@ namespace tools
 
     bool push_back(const pod_t& item)
     {
-      if (!m_stream.is_open() || (m_stream.rdstate() != std::ios::goodbit && m_stream.rdstate() != std::ios::eofbit))
+      if (!is_opened_and_in_good_state())
         return false;
 
       m_stream.seekp(0, std::ios_base::end);
@@ -93,7 +94,7 @@ namespace tools
 
     bool get_item(size_t index, pod_t& result) const
     {
-      if (!m_stream.is_open() || (m_stream.rdstate() != std::ios::goodbit && m_stream.rdstate() != std::ios::eofbit))
+      if (!is_opened_and_in_good_state())
         return false;
 
       size_t offset = index * sizeof result;
@@ -108,11 +109,20 @@ namespace tools
 
     size_t size_bytes() const
     {
-      if (!m_stream.is_open() || (m_stream.rdstate() != std::ios::goodbit && m_stream.rdstate() != std::ios::eofbit))
+      if (!is_opened_and_in_good_state())
         return 0;
 
       m_stream.seekg(0, std::ios_base::end);
       return m_stream.tellg();
+    }
+
+    bool is_opened_and_in_good_state() const
+    {
+      if (!m_stream.is_open())
+        return false;
+      if (m_stream.rdstate() != std::ios::goodbit && m_stream.rdstate() != std::ios::eofbit)
+        return false;
+      return true;
     }
 
     size_t size() const
@@ -120,8 +130,21 @@ namespace tools
       return size_bytes() / sizeof(pod_t);
     }
 
+    bool clear()
+    {
+      if (!is_opened_and_in_good_state())
+        return false;
+
+      // close and re-open stream with trunc bit
+      m_stream.close();
+      m_stream.open(m_filename, std::ios::binary | std::ios::trunc | std::ios::in | std::ios::out);
+
+      return is_opened_and_in_good_state();
+    }
+
   private:
     mutable boost::filesystem::fstream m_stream;
+    std::wstring m_filename;
   };
 
 } // namespace tools

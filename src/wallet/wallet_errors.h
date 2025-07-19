@@ -71,10 +71,10 @@ namespace tools
       std::string to_string() const
       {
         std::ostringstream ss;
-        ss << m_loc << '[' << boost::replace_all_copy(std::string(typeid(*this).name()), "struct ", "");
+        ss << '[' << boost::replace_all_copy(std::string(typeid(*this).name()), "struct ", "");
         if (!m_error_code.empty())
           ss << "[" << m_error_code << "]";
-        ss << "] " << Base::what();
+        ss << "] " << m_loc << ENDL << "  " << Base::what();
         return ss.str();
       }
 

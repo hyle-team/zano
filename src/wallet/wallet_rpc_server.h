@@ -179,6 +179,7 @@ namespace tools
 
         //utility call
         MAP_JON_RPC_WE("proxy_to_daemon",                     on_proxy_to_daemon,               wallet_public::COMMAND_PROXY_TO_DAEMON)
+        MAP_JON_RPC_WE("clear_utxo_cold_sig_reservation",     on_clear_utxo_cold_sig_reservation, wallet_public::COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION)
       END_JSON_RPC_MAP()
     END_URI_MAP2()
 
@@ -252,6 +253,7 @@ namespace tools
     bool on_decrypt_data(const wallet_public::COMMAND_DECRYPT_DATA::request& req, wallet_public::COMMAND_DECRYPT_DATA::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
     bool on_proxy_to_daemon(const wallet_public::COMMAND_PROXY_TO_DAEMON::request& req, wallet_public::COMMAND_PROXY_TO_DAEMON::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_clear_utxo_cold_sig_reservation(const wallet_public::COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION::request& req, wallet_public::COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
 
     //std::shared_ptr<wallet2> get_wallet();

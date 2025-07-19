@@ -47,7 +47,7 @@ void test_base64_serialization()
   epee::serialization::store_t_to_json(rsp, str_json);
 
   currency::COMMAND_RPC_GET_POOL_TXS_DETAILS::response rsp2;
-  bool res = epee::serialization::load_t_from_json(rsp2, str_json);
+  epee::serialization::load_t_from_json(rsp2, str_json);
   if (rsp.txs.back().blob != rsp2.txs.back().blob)
   {
     LOG_PRINT_L0("Troubles");

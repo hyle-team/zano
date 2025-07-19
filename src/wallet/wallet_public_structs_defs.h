@@ -2159,5 +2159,35 @@ namespace wallet_public
     };
   };
 
+  struct COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION
+  {
+    DOC_COMMAND("Clears cold sig reservation flag for all unspent transaction outputs, that have one. Please, use with CAUTION!");
+
+    struct request
+    {
+      BEGIN_KV_SERIALIZE_MAP()
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response_item
+    {
+      crypto::public_key pk;
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(pk)       DOC_DSCR("Output's one-time public key") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string                     status;
+      std::vector<response_item>      affected_outputs;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)                     DOC_DSCR("Status of the call") DOC_EXMP("OK") DOC_END
+        KV_SERIALIZE(affected_outputs)           DOC_DSCR("List of affected outputs (for reference).") DOC_EXMP_AUTO(1) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
 } // namespace wallet_rpc
 } // namespace tools

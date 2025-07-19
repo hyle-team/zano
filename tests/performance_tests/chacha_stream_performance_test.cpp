@@ -41,9 +41,8 @@ bool perform_crypt_stream_iteration(const std::list<currency::block_extended_inf
   in.push(data_file);
   try {
 
-    bool res2 = tools::portable_unserialize_obj_from_stream(verification_list, in);
+    tools::portable_unserialize_obj_from_stream(verification_list, in);
     CHECK_AND_ASSERT_MES(res, false, "Failed to unserialize wallet");
-    size_t i = 0;
     CHECK_AND_ASSERT_MES(test_list.size() == verification_list.size(), false, "restored list is wrong size");
     return true;
   }
@@ -81,9 +80,8 @@ bool perform_just_substream_stream_iteration(const std::list<currency::block_ext
   in.push(data_file);
   try {
 
-    bool res2 = tools::portable_unserialize_obj_from_stream(verification_list, in);
+    tools::portable_unserialize_obj_from_stream(verification_list, in);
     CHECK_AND_ASSERT_MES(res, false, "Failed to unserialize wallet");
-    size_t i = 0;
     CHECK_AND_ASSERT_MES(test_list.size() == verification_list.size(), false, "restored list is wrong size");
     return true;
   }
@@ -122,9 +120,8 @@ bool perform_no_crypt_stream_iteration(const std::list<currency::block_extended_
 //  in.push(data_file);
   try {
 
-    bool res2 = tools::portable_unserialize_obj_from_stream(verification_list, data_file);
+    tools::portable_unserialize_obj_from_stream(verification_list, data_file);
     CHECK_AND_ASSERT_MES(res, false, "Failed to unserialize wallet");
-    size_t i = 0;
     CHECK_AND_ASSERT_MES(test_list.size() == verification_list.size(), false, "restored list is wrong size");
     return true;
   }

@@ -78,6 +78,7 @@ namespace currency
       FIELD(ms_keys_count)
       FIELD(separately_signed_tx_complete)
       FIELD(htlc_origin)
+      FIELD(asset_id)
     END_SERIALIZE()
   };
 

@@ -92,6 +92,11 @@ namespace tools
     m_core_runtime_config = currency::get_default_core_runtime_config();
   }
   //---------------------------------------------------------------
+  wallet2::~wallet2()
+  {
+    // do nothing
+  }
+  //---------------------------------------------------------------
   uint64_t wallet2::get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const wallet_public::employed_tx_entries& td)
   {
     uint64_t max_unlock_time = 0;
@@ -757,7 +762,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
           {
             // normal wallet, calculate and store key images for own outs
             currency::keypair in_ephemeral = AUTO_VAL_INIT(in_ephemeral);
-            currency::generate_key_image_helper(m_account.get_keys(), ptc.tx_pub_key, o, in_ephemeral, ki);
+            currency::generate_key_image_helper(m_account.get_keys(), ptc.tx_pub_key, /* output index */ o, in_ephemeral, ki);
             WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(in_ephemeral.pub == out_key, "key_image generated ephemeral public key that does not match with output_key");
           }
 
@@ -3827,6 +3832,9 @@ bool wallet2::balance(std::unordered_map<crypto::public_key, wallet_public::asse
 
   }
 
+  if (balances.empty())
+    balances[currency::native_coin_asset_id] = wallet_public::asset_balance_entry_base{};
+
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -3877,76 +3885,45 @@ bool wallet2::balance(std::list<wallet_public::asset_balance_entry>& balances, u
   balances.clear();
   std::unordered_map<crypto::public_key, wallet_public::asset_balance_entry_base> balances_map;
   this->balance(balances_map, mined);
-  std::unordered_map<crypto::public_key, currency::asset_descriptor_base> custom_assets_local = m_custom_assets;
 
-  for (auto& own_asset : m_own_asset_descriptors)
+  for (const auto& [asset_id, balance_entry] : balances_map)
   {
-    if (m_whitelisted_assets.find(own_asset.first) == m_whitelisted_assets.end())
-    {
-      custom_assets_local[own_asset.first] = own_asset.second;
-    }
-  }
+    asset_descriptor_base asset_info{};
+    uint32_t asset_flags = 0;
+    if (!get_asset_info(asset_id, asset_info, asset_flags))
+      continue;
 
-  asset_descriptor_base native_asset_info = AUTO_VAL_INIT(native_asset_info);
-  native_asset_info.full_name = CURRENCY_NAME_SHORT_BASE;
-  native_asset_info.ticker = CURRENCY_NAME_ABR;
-  native_asset_info.decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT;
-  custom_assets_local[currency::native_coin_asset_id] = native_asset_info;
+    if (!m_use_assets_whitelisting)
+      asset_flags &= ~aif_whitelisted;
 
-  for (const auto& item : balances_map)
-  {
-    asset_descriptor_base asset_info = AUTO_VAL_INIT(asset_info);
-    //check if asset is whitelisted or customly added
+    if ((asset_flags & (aif_native_coin | aif_custom | aif_whitelisted)) == 0)
+      continue;
 
-    //check if it custom asset
-    auto it_cust = custom_assets_local.find(item.first);
-    if (it_cust == custom_assets_local.end())
-    {
-      if (!m_use_assets_whitelisting)
-        continue;
-
-      auto it_local = m_whitelisted_assets.find(item.first);
-      if (it_local == m_whitelisted_assets.end())
-      {
-        WLT_LOG_YELLOW("WARNING: unknown asset " << item.first << " found and skipped; it's NOT included in balance", LOG_LEVEL_1);
-        continue;
-      }
-      else
-      {
-        asset_info = it_local->second;
-      }
-    }
-    else
-    {
-      asset_info = it_cust->second;
-      custom_assets_local.erase(it_cust);
-    }
-
-    balances.push_back(wallet_public::asset_balance_entry());
-    wallet_public::asset_balance_entry& new_item = balances.back();
-    static_cast<wallet_public::asset_balance_entry_base&>(new_item) = item.second;
-    new_item.asset_info.asset_id = item.first;
+    wallet_public::asset_balance_entry& new_item = balances.emplace_back();
+    static_cast<wallet_public::asset_balance_entry_base&>(new_item) = balance_entry;
+    new_item.asset_info.asset_id = asset_id;
     static_cast<currency::asset_descriptor_base&>(new_item.asset_info) = asset_info;
   }
   //manually added assets should be always present, at least as zero balanced items
-  for (auto& asset : custom_assets_local)
+  for (const auto& [asset_id, custom_asset_entry] : m_custom_assets)
   {
-    balances.push_back(wallet_public::asset_balance_entry());
-    wallet_public::asset_balance_entry& new_item = balances.back();
-    new_item.asset_info.asset_id = asset.first;
-    static_cast<currency::asset_descriptor_base&>(new_item.asset_info) = asset.second;
+    if (std::find_if(balances.begin(), balances.end(), [asset_id = asset_id](wallet_public::asset_balance_entry& e){ return e.asset_info.asset_id == asset_id; }) != balances.end())
+      continue;
+    wallet_public::asset_balance_entry& new_item = balances.emplace_back();
+    new_item.asset_info.asset_id = asset_id;
+    static_cast<currency::asset_descriptor_base&>(new_item.asset_info) = custom_asset_entry;
   }
 
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_info, uint32_t& asset_flags) const
+bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_info, uint32_t& asset_flags, bool ask_daemon_for_unknown /* = false */) const
 {
   asset_flags = aif_none;
   if (asset_id == currency::native_coin_asset_id)
   {
     asset_info = currency::get_native_coin_asset_descriptor();
-    asset_flags |= aif_whitelisted;
+    asset_flags |= (aif_native_coin | aif_whitelisted);
     return true;
   }
 
@@ -3956,7 +3933,6 @@ bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset
   {
     asset_info = it_own->second;
     asset_flags |= aif_own;
-    return true;
   }
 
   // whitelisted?
@@ -3965,7 +3941,6 @@ bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset
   {
     asset_info = it_white->second;
     asset_flags |= aif_whitelisted;
-    return true;
   }
 
   // custom asset?
@@ -3973,10 +3948,18 @@ bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset
   if (it_cust != m_custom_assets.end())
   {
     asset_info = it_cust->second;
-    return true;
+    asset_flags |= aif_custom;
   }
 
-  return false;
+  if (ask_daemon_for_unknown)
+  {
+    if (daemon_get_asset_info(asset_id, asset_info))
+    {
+      asset_flags |= aif_unknown;
+    }
+  }
+
+  return asset_flags != aif_none;
 }
 //----------------------------------------------------------------------------------------------------
 size_t wallet2::get_asset_decimal_point(const crypto::public_key& asset_id, size_t result_if_not_found /* = 0 */) const
@@ -4132,7 +4115,8 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
     bool native_coin = td.is_native_coin();
     asset_descriptor_base adb{};
     uint32_t asset_info_flags{};
-    if (get_asset_info(td.get_asset_id(), adb, asset_info_flags) == show_only_unknown)
+    bool unknown_asset = !get_asset_info(td.get_asset_id(), adb, asset_info_flags, show_only_unknown) || (asset_info_flags & aif_unknown);
+    if (unknown_asset != show_only_unknown)
     {
       if (!show_only_unknown)
         ++unknown_assets_outs_count;
@@ -4172,11 +4156,11 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::get_balance_str() const
 {
-  // balance unlocked     / [balance total]       ticker   asset id
-  // 0.21                 / 98.51                 DP2      a6974d5874e97e5f4ed5ad0a62f0975edbccb1bb55502fc75c7fe808f12f44d3
-  // 190.123456789012     / 199.123456789012      ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
-  // 98.0                                         BGTVUW   af2b12f3033337f9aea1845a6bc3fc966ed4d13227a3ace7706fca7dbcdaa7e2
-  // 1000.034                                     DP3      d4aba1020f26927571771e04b585b4ffb211f52708d5e4c465bbdfa4a12e6271
+  // balance unlocked      / [balance total]        ticker   asset id
+  // 0.21                  / 98.51                  DP2      a6974d5874e97e5f4ed5ad0a62f0975edbccb1bb55502fc75c7fe808f12f44d3
+  // 190.123456789012      / 199.123456789012       ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a  NATIVE
+  // 98.0                                           BGTVUW   af2b12f3033337f9aea1845a6bc3fc966ed4d13227a3ace7706fca7dbcdaa7e2
+  // 1000.034                                       DP3      d4aba1020f26927571771e04b585b4ffb211f52708d5e4c465bbdfa4a12e6271
 
   static const char* header = " balance unlocked      / [balance total]        ticker    asset id";
   std::stringstream ss;
@@ -4211,13 +4195,12 @@ std::string wallet2::get_balance_str() const
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::get_balance_str_raw() const
 {
-  // balance unlocked     / [balance total]     DP   asset id
-  // 0.21                 / 98.51                2   a6974d5874e97e5f4ed5ad0a62f0975edbccb1bb55502fc75c7fe808f12f44d3
-  // 190.123456789012     / 199.123456789012    12   d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a
-  // 98.0                                       12   af2b12f3033337f9aea1845a6bc3fc966ed4d13227a3ace7706fca7dbcdaa7e2
-  // 1000.034                                    3   d4aba1020f26927571771e04b585b4ffb211f52708d5e4c465bbdfa4a12e6271
+  // balance unlocked      / [balance total]        ticker    asset id                                                          DP  flags
+  // 0.21                  / 98.51                  ZANO      d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a  12  NATIVE
+  // 2.0                                            MYFB      13615ffdfbdc09275a1dfc0fbdaf6a9b07849b835ffdfed0b9e1478ea8924774   1  custom
+  // 1000.0                                         BurnCT    14608811180d4bbad96a6b91405e329e4f2a10519e6dcea644f83b9f8ccb5863  12  unknown asset
   //WHITELIST:
-  // 7d3f348fbebfffc4e61a3686189cf870ea393e1c88b8f636acbfdacf9e4b2db2    CT
+  // a7e8e5b31c24f2d6a07e141701237b136d704c9a89f9a5d1ca4a8290df0b9edc    WETH
   // ...
 
   static const char* header = " balance unlocked      / [balance total]        ticker    asset id                                                          DP  flags";
@@ -4234,7 +4217,7 @@ std::string wallet2::get_balance_str_raw() const
     {
       uint32_t asset_flags = 0;
       asset_descriptor_base asset_info{};
-      bool has_info = get_asset_info(entry.first, asset_info, asset_flags);
+      bool has_info = get_asset_info(entry.first, asset_info, asset_flags, true);
       ss << " " << std::left << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(entry.second.unlocked, asset_info.decimal_point);
       if (entry.second.total == entry.second.unlocked)
         ss << std::string(21 + 3, ' ');
@@ -4251,7 +4234,7 @@ std::string wallet2::get_balance_str_raw() const
 
       ss << "  ";
 
-      if (entry.first == native_coin_asset_id)
+      if (asset_flags & aif_native_coin)
       {
         ss << "NATIVE";
       }
@@ -4261,6 +4244,10 @@ std::string wallet2::get_balance_str_raw() const
           ss << "own,";
         if (asset_flags & aif_whitelisted)
           ss << "whitelisted,";
+        if (asset_flags & aif_custom)
+          ss << "custom,";
+        if (asset_flags & aif_unknown)
+          ss << "unknown asset,";
         ss.seekp(-1, ss.cur); // trim comma
       }
       ss << ENDL;
@@ -4322,29 +4309,25 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
   // assumed to be called from normal, non-watch-only wallet
   THROW_IF_FALSE_WALLET_EX(!m_watch_only, error::wallet_common_error, "watch-only wallet is unable to sign transfers, you need to use normal wallet for that");
 
-    // decrypt the blob
-    std::string decrypted_src_blob = crypto::chacha_crypt(tx_sources_blob, m_account.get_keys().view_secret_key);
+  // decrypt the blob
+  std::string decrypted_src_blob = crypto::chacha_crypt(tx_sources_blob, m_account.get_keys().view_secret_key);
 
   // deserialize args
-  currency::finalized_tx ft = AUTO_VAL_INIT(ft);
+  currency::finalized_tx ft{};
   bool r = t_unserializable_object_from_blob(ft.ftp, decrypted_src_blob);
   THROW_IF_FALSE_WALLET_EX(r, error::wallet_common_error, "Failed to decrypt tx sources blob");
 
   // make sure unsigned tx was created with the same keys
   THROW_IF_FALSE_WALLET_EX(ft.ftp.spend_pub_key == m_account.get_keys().account_address.spend_public_key, error::wallet_common_error, "The was created in a different wallet, keys missmatch");
 
-  finalize_transaction(ft.ftp, ft.tx, ft.one_time_key, false);
+  finalize_transaction(ft.ftp, ft, false, true);
+
+  WLT_LOG_L0("sign_transfer: tx " << ft.tx_id << " has been successfully signed");
 
   // calculate key images for each change output
-  crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(
-    crypto::generate_key_derivation(
-      m_account.get_keys().account_address.view_public_key,
-      ft.one_time_key,
-      derivation),
-    "internal error: sign_transfer: failed to generate key derivation("
-    << m_account.get_keys().account_address.view_public_key
-    << ", view secret key: " << ft.one_time_key << ")");
+  crypto::key_derivation derivation{};
+  r = crypto::generate_key_derivation(m_account.get_keys().account_address.view_public_key, ft.one_time_key, derivation);
+  WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "sign_transfer: generate_key_derivation failed, tx: " << ft.tx_id);
 
   for (size_t i = 0; i < ft.tx.vout.size(); ++i)
   {
@@ -4354,7 +4337,7 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
     crypto::public_key ephemeral_pub{};
     if (!crypto::derive_public_key(derivation, i, m_account.get_keys().account_address.spend_public_key, ephemeral_pub))
     {
-      WLT_LOG_ERROR("derive_public_key failed for tx " << get_transaction_hash(ft.tx) << ", out # " << i);
+      WLT_LOG_ERROR("derive_public_key failed for tx " << ft.tx_id << ", out # " << i);
     }
 
     if (out_pk == ephemeral_pub)
@@ -4367,6 +4350,7 @@ void wallet2::sign_transfer(const std::string& tx_sources_blob, std::string& sig
       crypto::generate_key_image(ephemeral_pub, ephemeral_sec, ki);
 
       ft.outs_key_images.push_back(make_serializable_pair(static_cast<uint64_t>(i), ki));
+      WLT_LOG_L1("sign_transfer: tx " << ft.tx_id << ", out index: " << i << ", ki: " << ki);
     }
   }
 
@@ -4495,6 +4479,9 @@ bool wallet2::attach_asset_descriptor(const wallet_public::COMMAND_ATTACH_ASSET_
 //----------------------------------------------------------------------------------------------------
 void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::transaction& tx)
 {
+  // assumed to be called from watch-only wallet
+  THROW_IF_FALSE_WALLET_EX(m_watch_only, error::wallet_common_error, "submit_transfer should be called in watch-only wallet only");
+
   // decrypt sources
   std::string decrypted_src_blob = crypto::chacha_crypt(signed_tx_blob, m_account.get_keys().view_secret_key);
 
@@ -4505,8 +4492,35 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
   tx = ft.tx;
   crypto::hash tx_hash = get_transaction_hash(tx);
 
-  // foolproof
+  // foolproof check
   THROW_IF_FALSE_WALLET_CMN_ERR_EX(ft.ftp.spend_pub_key == m_account.get_keys().account_address.spend_public_key, "The given tx was created in a different wallet, keys missmatch, tx hash: " << tx_hash);
+
+  // prepare and check data for watch-only outkey2ki before sending the tx
+  std::vector<std::pair<crypto::public_key, crypto::key_image>> pk_ki_to_be_added;
+  std::vector<std::pair<uint64_t, crypto::key_image>> tri_ki_to_be_added;
+  if (m_watch_only)
+  {
+    for (auto& p : ft.outs_key_images)
+    {
+      THROW_IF_FALSE_WALLET_INT_ERR_EX(p.first < tx.vout.size(), "outs_key_images has invalid out index: " << p.first << ", tx.vout.size() = " << tx.vout.size());
+      std::list<htlc_info> stub{};
+      const crypto::public_key& pk = out_get_pub_key(tx.vout[p.first], stub);
+      pk_ki_to_be_added.push_back(std::make_pair(pk, p.second));
+    }
+
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(tx.vin.size() == ft.ftp.sources.size(), "tx.vin and ft.ftp.sources sizes missmatch");
+    for (size_t i = 0; i < tx.vin.size(); ++i)
+    {
+      const crypto::key_image& ki = get_key_image_from_txin_v(tx.vin[i]);
+      const auto& src = ft.ftp.sources[i];
+      THROW_IF_FALSE_WALLET_INT_ERR_EX(src.real_output < src.outputs.size(), "src.real_output is out of bounds: " << src.real_output);
+      const crypto::public_key& out_key = src.outputs[src.real_output].stealth_address;
+      tri_ki_to_be_added.push_back(std::make_pair(src.transfer_index, ki));
+      pk_ki_to_be_added.push_back(std::make_pair(out_key, ki));
+    }
+  }
+
+  // SEND the transaction
 
   try
   {
@@ -4523,38 +4537,16 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
   add_sent_tx_detailed_info(tx, ft.ftp.attachments, ft.ftp.prepared_destinations, ft.ftp.selected_transfers);
   m_tx_keys.insert(std::make_pair(tx_hash, ft.one_time_key));
 
+  // populate and store key images from own outputs, because otherwise a watch-only wallet cannot calculate it
   if (m_watch_only)
   {
-    std::vector<std::pair<crypto::public_key, crypto::key_image>> pk_ki_to_be_added;
-    std::vector<std::pair<uint64_t, crypto::key_image>> tri_ki_to_be_added;
-
-    for (auto& p : ft.outs_key_images)
-    {
-      THROW_IF_FALSE_WALLET_INT_ERR_EX(p.first < tx.vout.size(), "outs_key_images has invalid out index: " << p.first << ", tx.vout.size() = " << tx.vout.size());
-      std::list<htlc_info> stub{};
-      const crypto::public_key& pk = out_get_pub_key(tx.vout[p.first], stub);
-      pk_ki_to_be_added.push_back(std::make_pair(pk, p.second));
-    }
-
-    THROW_IF_FALSE_WALLET_INT_ERR_EX(tx.vin.size() == ft.ftp.sources.size(), "tx.vin and ft.ftp.sources sizes missmatch");
-    for (size_t i = 0; i < tx.vin.size(); ++i)
-    {
-      const crypto::key_image& ki = get_key_image_from_txin_v(tx.vin[i]);
-
-      const auto& src = ft.ftp.sources[i];
-      THROW_IF_FALSE_WALLET_INT_ERR_EX(src.real_output < src.outputs.size(), "src.real_output is out of bounds: " << src.real_output);
-      const crypto::public_key& out_key = src.outputs[src.real_output].stealth_address;
-
-      tri_ki_to_be_added.push_back(std::make_pair(src.transfer_index, ki));
-      pk_ki_to_be_added.push_back(std::make_pair(out_key, ki));
-    }
-
     for (auto& p : pk_ki_to_be_added)
     {
       auto it = m_pending_key_images.find(p.first);
       if (it != m_pending_key_images.end())
       {
-        LOG_PRINT_YELLOW("warning: for tx " << tx_hash << " out pub key " << p.first << " already exist in m_pending_key_images, ki: " << it->second << ", proposed new ki: " << p.second, LOG_LEVEL_0);
+        if (it->second != p.second)
+          LOG_PRINT_YELLOW("warning: for tx " << tx_hash << " out pub key " << p.first << " already exist in m_pending_key_images, ki: " << it->second << ", proposed new ki: " << p.second, LOG_LEVEL_0);
       }
       else
       {
@@ -5226,7 +5218,11 @@ bool wallet2::reset_history()
   std::wstring file_path = m_wallet_file;
   account_base acc_tmp = m_account;
   auto tx_keys = m_tx_keys;
+  auto pending_key_images = m_pending_key_images;
+  crypto::hash genesis_id = m_chain.get_genesis();
   clear();
+  m_chain.set_genesis(genesis_id);
+  m_pending_key_images = pending_key_images;
   m_tx_keys = tx_keys;
   m_account = acc_tmp;
   m_password = pass;
@@ -5813,7 +5809,7 @@ void wallet2::burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_
   result_tx = ft.tx;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb)
+bool wallet2::daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb) const
 {
   COMMAND_RPC_GET_ASSET_INFO::request req;
   req.asset_id = asset_id;
@@ -5916,9 +5912,9 @@ struct local_transfers_struct
   END_KV_SERIALIZE_MAP()
 };
 
-void wallet2::dump_trunsfers(std::stringstream& ss, bool verbose, const crypto::public_key& asset_id) const
+void wallet2::dump_transfers(std::stringstream& ss, bool verbose, const crypto::public_key& asset_id_to_filter) const
 {
-  bool filter_by_asset_id = asset_id != currency::null_pkey;
+  bool filter_by_asset_id = asset_id_to_filter != currency::null_pkey;
 
   if (verbose)
   {
@@ -5928,7 +5924,7 @@ void wallet2::dump_trunsfers(std::stringstream& ss, bool verbose, const crypto::
     {
       uint64_t i = tr.first;
       const transfer_details& td = tr.second;
-      if (filter_by_asset_id && td.get_asset_id() != asset_id)
+      if (filter_by_asset_id && td.get_asset_id() != asset_id_to_filter)
         continue;
       ss << "{ \"i\": " << i << "," << ENDL;
       ss << "\"entry\": " << epee::serialization::store_t_to_json(td) << "}," << ENDL;
@@ -5937,16 +5933,22 @@ void wallet2::dump_trunsfers(std::stringstream& ss, bool verbose, const crypto::
   else
   {
     boost::io::ios_flags_saver ifs(ss);
-    ss << "index                 amount  spent_h  g_index   block  block_ts     flg  tx                                                                out#  key image" << ENDL;
+    ss << "index                 amount  spent_h  g_index   block  block_ts     flg  tx                                                                out#  asset id" << ENDL;
     for (const auto& tr : m_transfers)
     {
       uint64_t i = tr.first;
       const transfer_details& td = tr.second;
-      if (filter_by_asset_id && td.get_asset_id() != asset_id)
+      const crypto::public_key asset_id = td.get_asset_id();
+      if (filter_by_asset_id && asset_id != asset_id_to_filter)
         continue;
+
+      uint32_t asset_flags = 0;
+      currency::asset_descriptor_base asset_info{};
+      get_asset_info(asset_id, asset_info, asset_flags);
+
       ss << std::right <<
         std::setw(5) << i << "  " <<
-        std::setw(21) << print_money(td.amount()) << "  " <<
+        std::setw(21) << print_money(td.amount(), asset_info.decimal_point) << "  " <<
         std::setw(7) << td.m_spent_height << "  " <<
         std::setw(7) << td.m_global_output_index << "  " <<
         std::setw(6) << td.m_ptx_wallet_info->m_block_height << "  " <<
@@ -5954,15 +5956,15 @@ void wallet2::dump_trunsfers(std::stringstream& ss, bool verbose, const crypto::
         std::setw(4) << td.m_flags << "  " <<
         get_transaction_hash(td.m_ptx_wallet_info->m_tx) << "  " <<
         std::setw(4) << td.m_internal_output_index << "  " <<
-        td.m_key_image << ENDL;
+        (asset_id == native_coin_asset_id ? std::string() : crypto::pod_to_hex(asset_id)) << ENDL;
     }
   }
 }
 //----------------------------------------------------------------------------------------------------
-std::string wallet2::dump_trunsfers(bool verbose, const crypto::public_key& asset_id) const
+std::string wallet2::dump_transfers(bool verbose, const crypto::public_key& asset_id) const
 {
   std::stringstream ss;
-  dump_trunsfers(ss, verbose, asset_id);
+  dump_transfers(ss, verbose, asset_id);
   return ss.str();
 }
 //----------------------------------------------------------------------------------------------------
@@ -6823,8 +6825,8 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys
   if (true)
   {
     size_t fake_outputs_count = fake_outputs_count_;
-    uint64_t zarcanum_start_from = m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_HARDFORK_04_ZARCANUM];
-    uint64_t current_size = m_chain.get_blockchain_current_size();
+    [[maybe_unused]] uint64_t zarcanum_start_from = m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[ZANO_HARDFORK_04_ZARCANUM];
+    [[maybe_unused]] uint64_t current_size = m_chain.get_blockchain_current_size();
 
     bool need_to_request = fake_outputs_count != 0;
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request req = AUTO_VAL_INIT(req);
@@ -7845,6 +7847,122 @@ bool wallet2::get_tx_key(const crypto::hash& txid, crypto::secret_key& tx_key) c
 bool wallet2::is_need_to_split_outputs()
 {
   return !is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM);
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::restore_key_images_in_wo_wallet(const std::wstring& filename, const std::string& password) const
+{
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!m_watch_only, "restore_key_images_in_wo_wallet can only be used in non watch-only wallet");
+  bool r = false;
+
+  // load the given watch-only wallet
+  wallet2 wo;
+  wo.load(filename, password);
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(wo.is_watch_only(), epee::string_encoding::wstring_to_utf8(filename) << " is not a watch-only wallet");
+  if (m_account.get_keys().view_secret_key != wo.get_account().get_keys().view_secret_key ||
+    m_account.get_public_address() != wo.get_account().get_public_address())
+  {
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(false, epee::string_encoding::wstring_to_utf8(filename) << " has keys that differ from this wallet's keys; wrong wallet?");
+  }
+
+  //
+  // 1. Find missing key images and calculate them using secret spend key. Populate missing_ki_items container.
+  //
+  struct missing_ki_item
+  {
+    crypto::public_key  tx_pub_key;
+    crypto::public_key  out_pub_key;
+    uint64_t            output_index;
+    uint64_t            transfer_index;
+    crypto::key_image   ki;
+  };
+
+  std::set<size_t> transfer_indices_to_include;
+  for(auto el : wo.m_pending_key_images)
+  {
+    const crypto::key_image& ki = el.second;
+    auto it = wo.m_key_images.find(ki);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != wo.m_key_images.end(), "restore_key_images_in_wo_wallet: m_key_images inconsistency, ki: " << ki);
+    size_t transfer_index = it->second;
+    transfer_indices_to_include.insert(transfer_index);
+    WLT_LOG_L1("restore_key_images_in_wo_wallet: transfer " << transfer_index << " is in m_pending_key_images, included");
+  }
+
+  for(auto el : wo.m_transfers)
+  {
+    size_t transfer_index = el.first;
+    if (el.second.m_key_image == null_ki)
+    {
+      transfer_indices_to_include.insert(transfer_index);
+      WLT_LOG_L1("restore_key_images_in_wo_wallet: ki is null for ti " << transfer_index << ", included");
+    }
+  }
+
+  // now in transfer_indices_to_include we have ordered and unique list of transfer indices
+  std::vector<missing_ki_item> missing_ki_items;
+  std::set<crypto::public_key> pk_uniqueness_set;
+  for(size_t transfer_index : transfer_indices_to_include)
+  {
+    const auto& td = wo.m_transfers.at(transfer_index);
+    auto& item = missing_ki_items.emplace_back();
+    item.output_index = td.m_internal_output_index;
+    crypto::public_key out_pub_key{};
+    r = get_out_pub_key_from_tx_out_v(td.output(), out_pub_key);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "restore_key_images_in_wo_wallet failed for ti: " << transfer_index);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(pk_uniqueness_set.insert(out_pub_key).second, "restore_key_images_in_wo_wallet: out pub key in not unique: " << out_pub_key << ", ti: " << transfer_index);
+    item.out_pub_key = out_pub_key;
+    item.transfer_index = transfer_index;
+    item.tx_pub_key = get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
+    WLT_LOG_L0("restore_key_images_in_wo_wallet: including: " << item.out_pub_key << ", " << transfer_index);
+
+    // calculate key image
+    keypair ephemeral{};
+    generate_key_image_helper(m_account.get_keys(), item.tx_pub_key, item.output_index, ephemeral, item.ki);
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(ephemeral.pub == item.out_pub_key, "restore_key_images_in_wo_wallet: out pub key missmatch, ti: " << transfer_index);
+  };
+
+  //
+  // 2. Actually restore key images in the 'wo' object.
+  //
+  r = wo.m_pending_key_images_file_container.clear();
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "restore_key_images_in_wo_wallet: pending ki container clearing failed");
+  wo.m_pending_key_images.clear();
+
+  for(size_t i = 0; i < missing_ki_items.size(); ++i)
+  {
+    const auto& item = missing_ki_items[i];
+    auto& td = wo.m_transfers[item.transfer_index]; // item.transfer_index validity was checked above
+
+    td.m_key_image = item.ki; // TODO: it's unclear whether we need to update m_transfers[].m_key_image since later I decided to clear history to trigger resync later. Probably, no. -- sowle
+    r = wo.m_pending_key_images.insert(std::make_pair(item.out_pub_key, item.ki)).second;
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(r, "restore_key_images_in_wo_wallet: insert failed, out_pub_key: " << item.out_pub_key << ", i: " << i);
+    wo.m_pending_key_images_file_container.push_back(out_key_to_ki{item.out_pub_key, item.ki});
+    LOG_PRINT_L0("restore_key_images_in_wo_wallet: added #" << i << " ti: " << item.transfer_index << ", pk: " << item.out_pub_key << ", ki: " << item.ki);
+  }
+
+  wo.reset_history();
+  wo.store();
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::clear_utxo_cold_sig_reservation(std::vector<uint64_t>& affected_transfer_ids)
+{
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(m_watch_only, "clear_utxo_cold_sig_reservation can only be used in watch-only wallet");
+  affected_transfer_ids.clear();
+
+  for(auto& [tid, td] : m_transfers)
+  {
+    if (!td.is_spent() && (td.m_flags & WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION) != 0)
+    {
+      affected_transfer_ids.push_back(tid);
+      crypto::public_key pk{};
+      get_out_pub_key_from_tx_out_v(td.output(), pk);
+      WLT_LOG_L0("clear_utxo_cold_sig_reservation: tid: " << tid << ", pk: " << pk << ", amount: " << td.amount() <<
+        (!td.is_native_coin() ? std::string(", aid: ") + crypto::pod_to_hex(td.get_asset_id()) : std::string()) <<
+        (td.m_key_image != null_ki ? std::string(", ki: ") + crypto::pod_to_hex(td.m_key_image) : std::string()));
+    }
+  }
+
+  clear_transfers_from_flag(affected_transfer_ids, WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION, "clear_utxo_cold_sig_reservation");
+  m_found_free_amounts.clear();
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::prepare_tx_destinations(const assets_selection_context& needed_money_map,

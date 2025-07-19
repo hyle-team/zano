@@ -1230,6 +1230,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(input_refers_to_incompatible_by_type_output);
     GENERATE_AND_PLAY_HF(tx_pool_validation_and_chain_switch, "4-*");
     GENERATE_AND_PLAY_HF(tx_coinbase_separate_sig_flag, "4-*");
+    GENERATE_AND_PLAY(tx_input_mixins);
 
     // Double spend
     GENERATE_AND_PLAY(gen_double_spend_in_tx<false>);

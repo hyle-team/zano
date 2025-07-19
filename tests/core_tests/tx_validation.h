@@ -188,3 +188,11 @@ struct tx_coinbase_separate_sig_flag : public test_chain_unit_enchanced
 {
   bool generate(std::vector<test_event_entry>& events) const;
 };
+
+struct tx_input_mixins: public test_chain_unit_enchanced
+{
+  tx_input_mixins();
+
+  bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool generate(std::vector<test_event_entry>& events) const;
+};

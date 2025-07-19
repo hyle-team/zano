@@ -96,7 +96,7 @@ bool gen_double_spend_in_tx<txs_kept_by_block>::generate(std::vector<test_event_
   currency::transaction tx_1 = AUTO_VAL_INIT(tx_1);
   std::vector<currency::attachment_v> attachments;
   size_t tx_hardfork_id{};
-  uint64_t tx_version = get_tx_version_from_events(events);
+  uint64_t tx_version = this->get_tx_version_from_events(events);
   if (!construct_tx(bob_account.get_keys(), sources, destinations, attachments, tx_1, tx_version, tx_hardfork_id, uint64_t(0)))
     return false;
 

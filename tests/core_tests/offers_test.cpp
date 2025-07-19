@@ -658,7 +658,7 @@ bool offer_removing_and_selected_output::check_offers(currency::core& c, size_t 
 
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
   alice_wlt->refresh();
-  LOG_PRINT_CYAN("Alice's transfers:" << ENDL << alice_wlt->dump_trunsfers(), LOG_LEVEL_0);
+  LOG_PRINT_CYAN("Alice's transfers:" << ENDL << alice_wlt->dump_transfers(), LOG_LEVEL_0);
   uint64_t alice_start_balance = alice_wlt->balance();
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
@@ -1354,7 +1354,7 @@ bool offer_cancellation_with_zero_fee::c1(currency::core& c, size_t ev_index, co
   bool r = false;
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
   miner_wlt->refresh();
-  LOG_PRINT_CYAN("Miners's transfers:" << ENDL << miner_wlt->dump_trunsfers(), LOG_LEVEL_0);
+  LOG_PRINT_CYAN("Miners's transfers:" << ENDL << miner_wlt->dump_transfers(), LOG_LEVEL_0);
   uint64_t miner_start_balance = miner_wlt->balance();
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());

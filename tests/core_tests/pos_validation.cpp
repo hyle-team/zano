@@ -53,7 +53,7 @@ bool gen_pos_coinstake_already_spent::generate(std::vector<test_event_entry>& ev
 
   CREATE_TEST_WALLET(miner_wlt, miner, blk_0);
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, miner_wlt, blk_2, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
-  LOG_PRINT_L0("miner's transfers:" << ENDL << miner_wlt->dump_trunsfers(false));
+  LOG_PRINT_L0("miner's transfers:" << ENDL << miner_wlt->dump_transfers(false));
 
   // Legend: (n) - PoW block, [m] - PoS block
   //  0     1     11    12    13       <-- blockchain height  (assuming CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10)
@@ -782,7 +782,7 @@ void pos_wallet_minting_same_amount_diff_outs::dump_wallets_entries(const std::v
   LOG_PRINT2(LOG2_FILENAME, ENDL << ENDL << ENDL << ENDL << ENDL << ENDL, LOG_LEVEL_0);
   for (size_t i = 0; i < minting_wallets.size(); ++i)
   {
-    LOG_PRINT2(LOG2_FILENAME, "wallet #" << i << ":" << ENDL << minting_wallets[i].w->dump_trunsfers() << ENDL, LOG_LEVEL_0);
+    LOG_PRINT2(LOG2_FILENAME, "wallet #" << i << ":" << ENDL << minting_wallets[i].w->dump_transfers() << ENDL, LOG_LEVEL_0);
   }
 #undef LOG2_FILENAME
 }
@@ -860,7 +860,7 @@ bool pos_wallet_big_block_test::c1(currency::core& c, size_t ev_index, const std
   miner_wlt->refresh();
   miner_wlt->scan_tx_pool(stub_bool);
 
-  LOG_PRINT_L0("miner transfers:" << ENDL << miner_wlt->dump_trunsfers(false));
+  LOG_PRINT_L0("miner transfers:" << ENDL << miner_wlt->dump_transfers(false));
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Incorrect number of txs in the pool: " << c.get_pool_transactions_count());
 

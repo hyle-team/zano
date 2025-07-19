@@ -443,8 +443,6 @@ TEST(multiassets, native_serialization_get_or_calculate_asset_id_undefined)
     '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x00', '\x97', '\x9e', '\xb7', '\x06', '\xac', '\xe2', '\xeb', '\x83', '\xf9', '\x12', 'V', 'X', '\xb2', '?', '\xb3', 'R', ' ',
     '\x84', '\x80', '\xcb', ';', '\x90', '\xc4', '>', '-', '\xf0', '\xd2', '\x98', '\xf9', 'u', 'N', '\xbc'};
 
-  crypto::point_t expected_point_asset_id{};
-  crypto::public_key expected_asset_id{};
   crypto::point_t calculated_point_asset_id{};
   crypto::public_key calculated_asset_id{};
   const std::optional ado{deserialize<currency::asset_descriptor_operation>(serialization_method::native, serialized_ado)};
