@@ -224,7 +224,7 @@ namespace nodetool
     bool critical_alert_worker();
     bool remove_dead_connections();
     bool is_ip_good_for_adding_to_peerlist(uint32_t adress);
-    bool is_ip_in_blacklist(uint32_t adress);
+    bool is_ip_in_blacklist(uint32_t adress, bool ignore_auto_blocked_list = false);
 
 
     //debug functions

@@ -81,7 +81,7 @@ public:
     m_cmd_binder.set_handler("debug_remote_node_mode", boost::bind(&daemon_commands_handler::debug_remote_node_mode, this, ph::_1), "<ip-address> - If node got connected put node into 'debug mode' i.e. no sync process of other communication except ping responses, maintenance secrete key will be requested"); 
     m_cmd_binder.set_handler("full_db_cache_warmup", boost::bind(&daemon_commands_handler::full_db_cache_warmup, this, ph::_1), "(Experimental) Perform full DB loading to RAM cache(make sense only with big numbers passed to --db-cache-l2 option)");
     m_cmd_binder.set_handler("print_cache_state", boost::bind(&daemon_commands_handler::print_cache_state, this, ph::_1), "Print db l2 cache state");
-    m_cmd_binder.set_handler("reload_p2p_manual_config", boost::bind(&daemon_commands_handler::reload_p2p_manual_config, this, ph::_1), "Reload manual p2p config from 'p2p_manual_config.json'");
+    m_cmd_binder.set_handler("reload_p2p_manual_config", boost::bind(&daemon_commands_handler::reload_p2p_manual_config, this, ph::_1), "Reload manual p2p config from '" P2P_MANUAL_CONFIG_FILENAME "'");
 #ifdef _DEBUG
     m_cmd_binder.set_handler("debug_set_time_adj", boost::bind(&daemon_commands_handler::debug_set_time_adj, this, ph::_1), "DEBUG: set core time adjustment");
 #endif
@@ -227,10 +227,10 @@ private:
     std::map<uint32_t, time_t> blocklist;
     m_srv.get_ip_block_list(blocklist);
     std::stringstream ss;
-    ss << "BLOCKED IPS:" << ENDL;
+    ss << "AUTO BLOCKED IPs:" << ENDL << "ip               block time" << ENDL;
     for (const auto& e : blocklist)
     {
-      ss << string_tools::get_ip_string_from_int32(e.first) << ", time: " << std::put_time(std::localtime(&e.second), "%Y-%m-%d %H:%M:%S") << ENDL;
+      ss << std::left << std::setw(15) << string_tools::get_ip_string_from_int32(e.first) << "  " << std::put_time(std::localtime(&e.second), "%Y-%m-%d %H:%M:%S") << ENDL;
     }
     LOG_PRINT_L0(ss.str());
     return true;

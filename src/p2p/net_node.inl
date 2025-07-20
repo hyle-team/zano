@@ -37,7 +37,7 @@ namespace nodetool
     const command_line::arg_descriptor<bool>                      arg_p2p_hide_my_port               ("hide-my-port", "Do not announce yourself as peerlist candidate"); 
     const command_line::arg_descriptor<bool>                      arg_p2p_offline_mode               ( "offline-mode", "Don't connect to any node and reject any connections");
     const command_line::arg_descriptor<bool>                      arg_p2p_disable_debug_reqs         ( "disable-debug-p2p-requests", "Disable p2p debug requests");
-    const command_line::arg_descriptor<uint32_t>                  arg_p2p_ip_auto_blocking           ( "p2p-ip-auto-blocking", "Enable (1) or disable (0) peers auto-blocking by IP <0|1>. Default: 0", 1);
+    const command_line::arg_descriptor<uint32_t>                  arg_p2p_ip_auto_blocking           ( "p2p-ip-auto-blocking", "Enable (1) or disable (0) peers auto-blocking by IP <0|1>. Default: 1", 1);
     const command_line::arg_descriptor<uint32_t>                  arg_p2p_server_threads             ( "p2p-server-threads", "Specify number of p2p server threads. Default: 10", P2P_SERVER_DEFAULT_THREADS_NUM);
   }
 
@@ -108,16 +108,20 @@ namespace nodetool
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::is_remote_ip_allowed(uint32_t addr, bool is_incoming)
   {
-    if (is_incoming && m_p2p_manual_config.incoming_connections_limit && *m_p2p_manual_config.incoming_connections_limit >= get_incoming_connections_count())
-      return false;
-
     if (m_offline_mode)
       return false;
 
-    if (!m_ip_auto_blocking_enabled)
-      return true;
-    
-    return !is_ip_in_blacklist(addr);
+    if (is_incoming)
+    {
+      if (m_p2p_manual_config.incoming_connections_limit && *m_p2p_manual_config.incoming_connections_limit >= get_incoming_connections_count())
+        return false;
+
+      if (m_use_only_priority_peers)
+        return false;
+    }
+
+    bool ignore_auto_blocked_list = !m_ip_auto_blocking_enabled;
+    return !is_ip_in_blacklist(addr, ignore_auto_blocked_list);
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
@@ -132,7 +136,7 @@ namespace nodetool
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
-  bool node_server<t_payload_net_handler>::is_ip_in_blacklist(uint32_t addr)
+  bool node_server<t_payload_net_handler>::is_ip_in_blacklist(uint32_t addr, bool ignore_auto_blocked_list /* = false */)
   {
     CRITICAL_REGION_LOCAL(m_blocked_ips_lock);
     
@@ -140,6 +144,8 @@ namespace nodetool
     if (m_permanently_blocked_ips.find(addr) != m_permanently_blocked_ips.end())
       return true;
 
+    if (ignore_auto_blocked_list)
+      return false;
 
     //check temporary blocked 
     auto it = m_blocked_ips.find(addr);
@@ -1005,22 +1011,22 @@ namespace nodetool
 
     size_t expected_white_connections = (m_config.m_net_config.connections_count*P2P_DEFAULT_WHITELIST_CONNECTIONS_PERCENT)/100;
 
-    size_t conn_count = get_outgoing_connections_count();
+    size_t out_conn_count = get_outgoing_connections_count();
     bool need_more_connections = false;
     if (m_p2p_manual_config.outgoing_connections_limit)
     {
       // m_p2p_manual_config always override default settings from m_config.m_net_config
-      need_more_connections = conn_count < *m_p2p_manual_config.outgoing_connections_limit;
+      need_more_connections = out_conn_count < *m_p2p_manual_config.outgoing_connections_limit;
     }
     else
     {
       // use default policy
-      need_more_connections = conn_count < m_config.m_net_config.connections_count;
+      need_more_connections = out_conn_count < m_config.m_net_config.connections_count;
     }
 
     if(need_more_connections)
     {
-      if(conn_count < expected_white_connections)
+      if(out_conn_count < expected_white_connections)
       {
         //start from white list
         if(!make_expected_connections_count(true, expected_white_connections))
