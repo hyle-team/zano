@@ -81,6 +81,7 @@ public:
     m_cmd_binder.set_handler("debug_remote_node_mode", boost::bind(&daemon_commands_handler::debug_remote_node_mode, this, ph::_1), "<ip-address> - If node got connected put node into 'debug mode' i.e. no sync process of other communication except ping responses, maintenance secrete key will be requested"); 
     m_cmd_binder.set_handler("full_db_cache_warmup", boost::bind(&daemon_commands_handler::full_db_cache_warmup, this, ph::_1), "(Experimental) Perform full DB loading to RAM cache(make sense only with big numbers passed to --db-cache-l2 option)");
     m_cmd_binder.set_handler("print_cache_state", boost::bind(&daemon_commands_handler::print_cache_state, this, ph::_1), "Print db l2 cache state");
+    m_cmd_binder.set_handler("reload_p2p_manual_config", boost::bind(&daemon_commands_handler::reload_p2p_manual_config, this, ph::_1), "Reload manual p2p config from 'p2p_manual_config.json'");
 #ifdef _DEBUG
     m_cmd_binder.set_handler("debug_set_time_adj", boost::bind(&daemon_commands_handler::debug_set_time_adj, this, ph::_1), "DEBUG: set core time adjustment");
 #endif
@@ -897,6 +898,13 @@ private:
   {
 
     m_srv.get_payload_object().get_core().get_blockchain_storage().print_db_l2_cache_state();
+
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool reload_p2p_manual_config(const std::vector<std::string>& args)
+  {
+    m_srv.reload_p2p_manual_config(false);
 
     return true;
   }

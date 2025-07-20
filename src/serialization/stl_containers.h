@@ -9,6 +9,10 @@
 #include <vector>
 #include <list>
 
+
+#define SANITY_CHECK_MAX_RESERVATION_RAM                    10000000 
+
+
 //#include "serialization.h"
 template <template <bool> class Archive, class T>
 bool do_serialize(Archive<false> &ar, std::vector<T> &v);
@@ -44,12 +48,18 @@ bool do_serialize(Archive<false> &ar, std::vector<T> &v)
   v.clear();
 
   // very basic sanity check
-  if (ar.remaining_bytes() < (cnt * sizeof(T)) ) {
+  if (ar.remaining_bytes() < cnt) {
     ar.stream().setstate(std::ios::failbit);
     return false;
   }
 
-  v.reserve(cnt);
+  if (sizeof(T) * cnt < SANITY_CHECK_MAX_RESERVATION_RAM)
+  {
+    v.reserve(cnt);
+  }
+
+
+
   for (size_t i = 0; i < cnt; i++) {
     if (i > 0)
       ar.delimit_array();

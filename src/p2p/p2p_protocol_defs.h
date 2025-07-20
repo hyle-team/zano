@@ -289,6 +289,29 @@ namespace nodetool
     };
   };
 
+
+
+  struct p2p_config_data
+  {
+    std::optional<uint64_t> incoming_connections_limit;
+    std::optional<uint64_t> outgoing_connections_limit;
+    std::vector<std::string> ip_black_list;
+    std::optional<bool> use_only_priority_peers = false;             //allow to make outgoing connections only to the peers listed in ip_priority_list
+    std::vector<std::string> ip_priority_list; 
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(incoming_connections_limit)
+      KV_SERIALIZE(outgoing_connections_limit)
+      KV_SERIALIZE(ip_black_list)
+      KV_SERIALIZE(use_only_priority_peers)
+      KV_SERIALIZE(ip_priority_list)
+    END_KV_SERIALIZE_MAP()
+  };
+
+
+
+
+
   
 #ifdef ALLOW_DEBUG_COMMANDS
   //These commands are considered as insecure, and made in debug purposes for a limited lifetime. 

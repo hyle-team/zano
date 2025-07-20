@@ -121,10 +121,12 @@ namespace nodetool
     bool log_connections();
     virtual uint64_t get_connections_count();
     size_t get_outgoing_connections_count();
+    size_t get_incoming_connections_count();
     peerlist_manager& get_peerlist_manager(){return m_peerlist;}
     bool handle_maintainers_entry(const maintainers_entry& me);
     bool get_maintainers_info(maintainers_info_external& me);
     void get_ip_block_list(std::map<uint32_t, time_t>& blocklist);
+    bool reload_p2p_manual_config(bool silent = true);
     typedef COMMAND_REQUEST_STAT_INFO_T<typename t_payload_net_handler::stat_info> COMMAND_REQUEST_STAT_INFO;
   private:
 
@@ -184,9 +186,10 @@ namespace nodetool
     virtual bool add_ip_fail(uint32_t address);
     virtual bool is_stop_signal_sent();
     //----------------- i_connection_filter  --------------------------------------------------------
-    virtual bool is_remote_ip_allowed(uint32_t adress);
+    virtual bool is_remote_ip_allowed(uint32_t adress, bool is_incoming);
     //-----------------------------------------------------------------------------------------------
     bool parse_peer_from_string(nodetool::net_address& pe, const std::string& node_addr);
+    bool parse_peerlist(const std::vector<std::string>& perrs_str, std::list<nodetool::net_address>& peers);
     bool handle_command_line(const boost::program_options::variables_map& vm);
     bool idle_worker();
     bool handle_remote_peerlist(const std::list<peerlist_entry>& peerlist, time_t local_time, const net_utils::connection_context_base& context);
@@ -298,8 +301,15 @@ namespace nodetool
     critical_section m_blocked_ips_lock;
     std::map<uint32_t, time_t> m_blocked_ips;
 
+    //critical_section m_permanently_blocked_ips_lock;
+    std::set<uint32_t> m_permanently_blocked_ips;
+
+
     critical_section m_ip_fails_score_lock;
     std::map<uint32_t, uint64_t> m_ip_fails_score;
+
+    critical_section m_p2p_manual_config_lock;
+    p2p_config_data m_p2p_manual_config;
 
   };
 }

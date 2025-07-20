@@ -239,6 +239,7 @@
 
 
 #define P2P_NET_DATA_FILENAME                           "p2pstate.bin"
+#define P2P_MANUAL_CONFIG_FILENAME                      "p2p_manual_config.json"
 #define MINER_CONFIG_FILENAME                           "miner_conf.json"
 #define GUI_SECURE_CONFIG_FILENAME                      "gui_secure_conf.bin"
 #define GUI_CONFIG_FILENAME                             "gui_settings.json"
