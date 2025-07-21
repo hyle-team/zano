@@ -192,9 +192,9 @@ namespace nodetool
         new_block_list.insert(ip);
       }  
 
-      if (config.ip_priority_list.size())
+      if (config.priority_peers_list.size())
       {
-        bool r = parse_peerlist(config.ip_priority_list, new_priority_peers);
+        bool r = parse_peerlist(config.priority_peers_list, new_priority_peers);
         CHECK_AND_ASSERT_MES(r, false, "Failed to parse priority peers");
       }
 
