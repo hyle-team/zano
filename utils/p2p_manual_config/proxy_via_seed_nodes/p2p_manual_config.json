@@ -27,7 +27,7 @@
     "93.127.160.63"
   ],
   "use_only_priority_peers": true,
-  "ip_priority_list": [
+  "priority_peers_list": [
     "95.217.43.225:11121",
     "95.217.42.247:11121",
     "94.130.160.115:11121",
