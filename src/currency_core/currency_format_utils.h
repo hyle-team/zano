@@ -925,9 +925,9 @@ namespace currency
     if (crc.is_hardfork_active_for_height(2, top_block_height))
     {
       // after hardfork 2
-      tx_payer result = AUTO_VAL_INIT(result);
-      result.acc_addr = addr;
-      container.push_back(result);
+      //tx_payer result = AUTO_VAL_INIT(result);
+      //result.acc_addr = addr;
+      //container.push_back(result);
     }
     else
     {
@@ -947,9 +947,9 @@ namespace currency
     if (crc.is_hardfork_active_for_height(2, top_block_height))
     {
       // after hardfork 2
-      tx_receiver result = AUTO_VAL_INIT(result);
-      result.acc_addr = addr;
-      container.push_back(result);
+      //tx_receiver result = AUTO_VAL_INIT(result);
+      //result.acc_addr = addr;
+      //container.push_back(result);
     }
     else
     {
