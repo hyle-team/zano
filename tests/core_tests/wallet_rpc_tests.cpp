@@ -633,37 +633,38 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
   CHECK_RESPONSE_EQUAL(resp.pi.transfers_count == 6);
   CHECK_RESPONSE_EQUAL(resp.total_transfers == 6);
   CHECK_RESPONSE_EQUAL(resp.transfers.size() == 6);
-  CHECK_RESPONSE_EQUAL(resp.transfers[0].comment == TRANSFER_COMMENT);
+  // below: tx_comment is temporary disabled, @#@#TODO -- sowle
+  //CHECK_RESPONSE_EQUAL(resp.transfers[0].comment == TRANSFER_COMMENT);
   CHECK_RESPONSE_EQUAL(resp.transfers[0].amount == TRANSFER_AMOUNT);
   CHECK_RESPONSE_EQUAL(resp.transfers[0].is_income == true);
   CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[0].payment_id) == carol_payment_id);
   CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[0].tx_hash) == carol_tx3);
 
-  CHECK_RESPONSE_EQUAL(resp.transfers[1].comment == TRANSFER_COMMENT);
+  //CHECK_RESPONSE_EQUAL(resp.transfers[1].comment == TRANSFER_COMMENT);
   CHECK_RESPONSE_EQUAL(resp.transfers[1].amount == TRANSFER_AMOUNT);
   CHECK_RESPONSE_EQUAL(resp.transfers[1].is_income == true);
   CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[1].payment_id) == carol_payment_id);
   CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[1].tx_hash) == carol_tx2);
 
-  CHECK_RESPONSE_EQUAL(resp.transfers[2].comment == TRANSFER_COMMENT);
+  //CHECK_RESPONSE_EQUAL(resp.transfers[2].comment == TRANSFER_COMMENT);
   CHECK_RESPONSE_EQUAL(resp.transfers[2].amount == TRANSFER_AMOUNT);
   CHECK_RESPONSE_EQUAL(resp.transfers[2].is_income == true);
   CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[2].payment_id) == carol_payment_id);
   CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[2].tx_hash) == carol_tx1);
 
-  CHECK_RESPONSE_EQUAL(resp.transfers[3].comment == TRANSFER_COMMENT);
+  //CHECK_RESPONSE_EQUAL(resp.transfers[3].comment == TRANSFER_COMMENT);
   CHECK_RESPONSE_EQUAL(resp.transfers[3].amount == TRANSFER_AMOUNT);
   CHECK_RESPONSE_EQUAL(resp.transfers[3].is_income == true);
   CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[3].payment_id) == bob_payment_id);
   CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[3].tx_hash) == bob_tx2);
 
-  CHECK_RESPONSE_EQUAL(resp.transfers[4].comment == TRANSFER_COMMENT);
+  //CHECK_RESPONSE_EQUAL(resp.transfers[4].comment == TRANSFER_COMMENT);
   CHECK_RESPONSE_EQUAL(resp.transfers[4].amount == TRANSFER_AMOUNT);
   CHECK_RESPONSE_EQUAL(resp.transfers[4].is_income == true);
   CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[4].payment_id) == bob_payment_id);
   CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[4].tx_hash) == bob_tx1);
 
-  CHECK_RESPONSE_EQUAL(resp.transfers[5].comment == TRANSFER_COMMENT);
+  //CHECK_RESPONSE_EQUAL(resp.transfers[5].comment == TRANSFER_COMMENT);
   CHECK_RESPONSE_EQUAL(resp.transfers[5].amount == TRANSFER_AMOUNT);
   CHECK_RESPONSE_EQUAL(resp.transfers[5].is_income == true);
   CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[5].payment_id) == alice_payment_id);
@@ -680,25 +681,25 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
   CHECK_RESPONSE_EQUAL(resp.pi.transfers_count == 6);
   CHECK_RESPONSE_EQUAL(resp.total_transfers == 6);
   CHECK_RESPONSE_EQUAL(resp.transfers.size() == 4);
-  CHECK_RESPONSE_EQUAL(resp.transfers[0].comment == TRANSFER_COMMENT);
+  //CHECK_RESPONSE_EQUAL(resp.transfers[0].comment == TRANSFER_COMMENT);
   CHECK_RESPONSE_EQUAL(resp.transfers[0].amount == TRANSFER_AMOUNT);
   CHECK_RESPONSE_EQUAL(resp.transfers[0].is_income == true);
   CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[0].payment_id) == carol_payment_id);
   CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[0].tx_hash) == carol_tx1);
 
-  CHECK_RESPONSE_EQUAL(resp.transfers[1].comment == TRANSFER_COMMENT);
+  //CHECK_RESPONSE_EQUAL(resp.transfers[1].comment == TRANSFER_COMMENT);
   CHECK_RESPONSE_EQUAL(resp.transfers[1].amount == TRANSFER_AMOUNT);
   CHECK_RESPONSE_EQUAL(resp.transfers[1].is_income == true);
   CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[1].payment_id) == bob_payment_id);
   CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[1].tx_hash) == bob_tx2);
 
-  CHECK_RESPONSE_EQUAL(resp.transfers[2].comment == TRANSFER_COMMENT);
+  //CHECK_RESPONSE_EQUAL(resp.transfers[2].comment == TRANSFER_COMMENT);
   CHECK_RESPONSE_EQUAL(resp.transfers[2].amount == TRANSFER_AMOUNT);
   CHECK_RESPONSE_EQUAL(resp.transfers[2].is_income == true);
   CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[2].payment_id) == bob_payment_id);
   CHECK_RESPONSE_EQUAL(boost::lexical_cast<std::string>(resp.transfers[2].tx_hash) == bob_tx1);
 
-  CHECK_RESPONSE_EQUAL(resp.transfers[3].comment == TRANSFER_COMMENT);
+  //CHECK_RESPONSE_EQUAL(resp.transfers[3].comment == TRANSFER_COMMENT);
   CHECK_RESPONSE_EQUAL(resp.transfers[3].amount == TRANSFER_AMOUNT);
   CHECK_RESPONSE_EQUAL(resp.transfers[3].is_income == true);
   CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[3].payment_id) == alice_payment_id);
@@ -737,7 +738,7 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
 
 
   CHECK_RESPONSE_EQUAL(st_resp.in.size() == 1);
-  CHECK_RESPONSE_EQUAL(st_resp.in.begin()->comment == TRANSFER_COMMENT);
+  //CHECK_RESPONSE_EQUAL(st_resp.in.begin()->comment == TRANSFER_COMMENT);
   CHECK_RESPONSE_EQUAL(st_resp.in.begin()->amount == TRANSFER_AMOUNT);
   CHECK_RESPONSE_EQUAL(st_resp.in.begin()->is_income == true);
   CHECK_RESPONSE_EQUAL(epee::string_tools::buff_to_hex_nodelimer(st_resp.in.begin()->payment_id) == bob_payment_id);
