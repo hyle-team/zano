@@ -1615,9 +1615,10 @@ std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_p
   //process attachments
   if (tp.comment.size())
   {
-    currency::tx_comment tc = AUTO_VAL_INIT(tc);
-    tc.comment = tp.comment;
-    extra.push_back(tc);
+    // tx_comment is temporary disabled -- sowle
+    //currency::tx_comment tc = AUTO_VAL_INIT(tc);
+    //tc.comment = tp.comment;
+    //extra.push_back(tc);
   }
   if (tp.push_payer && !wrap)
   {

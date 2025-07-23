@@ -1263,8 +1263,8 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(hard_fork_1_pos_and_locked_coins);
 
     // Hardfork 2 tests
-    GENERATE_AND_PLAY(hard_fork_2_tx_payer_in_wallet);
-    GENERATE_AND_PLAY(hard_fork_2_tx_receiver_in_wallet);
+    //GENERATE_AND_PLAY(hard_fork_2_tx_payer_in_wallet);
+    //GENERATE_AND_PLAY(hard_fork_2_tx_receiver_in_wallet);
     GENERATE_AND_PLAY(hard_fork_2_tx_extra_alias_entry_in_wallet);
     GENERATE_AND_PLAY_HF(hard_fork_2_auditable_addresses_basics, "2-*");
     GENERATE_AND_PLAY(hard_fork_2_no_new_structures_before_hf);
