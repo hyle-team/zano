@@ -124,7 +124,7 @@ namespace currency
     for(auto it = conn_map.rbegin(); it != conn_map.rend(); ++it)
       ss << it->second;
 
-    LOG_PRINT_L0("Connections (" << incoming_count << " in, " << outgoing_count << " out, " << incoming_count + outgoing_count << " total):" << ENDL << ss.str());
+    LOG_PRINT_L0("Connections:" << ENDL << ss.str() << ENDL << "(" << incoming_count << " in, " << outgoing_count << " out, " << incoming_count + outgoing_count << " total)");
   }
   //------------------------------------------------------------------------------------------------------------------------
   template<class t_core> 

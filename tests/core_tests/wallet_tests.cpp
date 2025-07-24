@@ -3545,8 +3545,9 @@ bool wallet_sending_to_integrated_address::c1(currency::core& c, size_t ev_index
     if (wti.payment_id.empty())
       return true; // skip another outputs
     CHECK_AND_ASSERT_MES(wti.payment_id == payment_id, false, "incorrect payment id");
-    CHECK_AND_ASSERT_MES(wti.remote_addresses.size() == 1, false, "remote_addressed.size() = " << wti.remote_addresses.size());
-    CHECK_AND_ASSERT_MES(wti.remote_addresses[0] == alice_integrated_address, false, "incorrect remote address");
+    // below: tx_payer and tx_receiver are temporary disabled, @#@#TODO -- sowle
+    //CHECK_AND_ASSERT_MES(wti.remote_addresses.size() == 1, false, "remote_addressed.size() = " << wti.remote_addresses.size());
+    //CHECK_AND_ASSERT_MES(wti.remote_addresses[0] == alice_integrated_address, false, "incorrect remote address");
     callback_succeded = true;
     return true;
   }

@@ -37,7 +37,7 @@ namespace nodetool
     const command_line::arg_descriptor<bool>                      arg_p2p_hide_my_port               ("hide-my-port", "Do not announce yourself as peerlist candidate"); 
     const command_line::arg_descriptor<bool>                      arg_p2p_offline_mode               ( "offline-mode", "Don't connect to any node and reject any connections");
     const command_line::arg_descriptor<bool>                      arg_p2p_disable_debug_reqs         ( "disable-debug-p2p-requests", "Disable p2p debug requests");
-    const command_line::arg_descriptor<uint32_t>                  arg_p2p_ip_auto_blocking           ( "p2p-ip-auto-blocking", "Enable (1) or disable (0) peers auto-blocking by IP <0|1>. Default: 0", 1);
+    const command_line::arg_descriptor<uint32_t>                  arg_p2p_ip_auto_blocking           ( "p2p-ip-auto-blocking", "Enable (1) or disable (0) peers auto-blocking by IP <0|1>. Default: 1", 1);
     const command_line::arg_descriptor<uint32_t>                  arg_p2p_server_threads             ( "p2p-server-threads", "Specify number of p2p server threads. Default: 10", P2P_SERVER_DEFAULT_THREADS_NUM);
   }
 
@@ -106,15 +106,22 @@ namespace nodetool
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
-  bool node_server<t_payload_net_handler>::is_remote_ip_allowed(uint32_t addr)
+  bool node_server<t_payload_net_handler>::is_remote_ip_allowed(uint32_t addr, bool is_incoming)
   {
     if (m_offline_mode)
       return false;
 
-    if (!m_ip_auto_blocking_enabled)
-      return true;
-    
-    return !is_ip_in_blacklist(addr);
+    if (is_incoming)
+    {
+      if (m_p2p_manual_config.incoming_connections_limit && *m_p2p_manual_config.incoming_connections_limit >= get_incoming_connections_count())
+        return false;
+
+      if (m_use_only_priority_peers)
+        return false;
+    }
+
+    bool ignore_auto_blocked_list = !m_ip_auto_blocking_enabled;
+    return !is_ip_in_blacklist(addr, ignore_auto_blocked_list);
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
@@ -129,9 +136,18 @@ namespace nodetool
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
-  bool node_server<t_payload_net_handler>::is_ip_in_blacklist(uint32_t addr)
+  bool node_server<t_payload_net_handler>::is_ip_in_blacklist(uint32_t addr, bool ignore_auto_blocked_list /* = false */)
   {
     CRITICAL_REGION_LOCAL(m_blocked_ips_lock);
+    
+    //first check permanently blocked ip
+    if (m_permanently_blocked_ips.find(addr) != m_permanently_blocked_ips.end())
+      return true;
+
+    if (ignore_auto_blocked_list)
+      return false;
+
+    //check temporary blocked 
     auto it = m_blocked_ips.find(addr);
     if (it == m_blocked_ips.end())
       return false;
@@ -143,6 +159,77 @@ namespace nodetool
       return false;
     }
 
+    return true;
+  }
+  //-----------------------------------------------------------------------------------
+  template<class t_payload_net_handler>
+  bool node_server<t_payload_net_handler>::reload_p2p_manual_config(bool silent)
+  {
+    std::set<uint32_t> new_block_list;
+    std::list<net_address> new_priority_peers;
+    {
+      CRITICAL_REGION_LOCAL(m_p2p_manual_config_lock);
+      p2p_config_data config = AUTO_VAL_INIT(config);
+      std::string p2p_config_file_path = m_config_folder + "/" + P2P_MANUAL_CONFIG_FILENAME;
+      bool r = epee::serialization::load_t_from_json_file(config, p2p_config_file_path);
+      if (!r)
+      {
+        if (!silent)
+        {
+          LOG_PRINT_L0("P2P network config file is missing or not loaded");
+        }
+        return true;
+      }
+      //loaded json, let's try to load blacklist
+      for (const std::string& ip_str_entry : config.ip_black_list)
+      {
+        uint32_t ip = 0;
+        if (!string_tools::get_ip_int32_from_string(ip, ip_str_entry))
+        {
+          LOG_ERROR("P2P network config file loading error: failed to convert '" << ip_str_entry << "' to ip address");
+          return false;
+        }
+        new_block_list.insert(ip);
+      }  
+
+      if (config.priority_peers_list.size())
+      {
+        bool r = parse_peerlist(config.priority_peers_list, new_priority_peers);
+        CHECK_AND_ASSERT_MES(r, false, "Failed to parse priority peers");
+      }
+
+      m_p2p_manual_config = config;
+
+
+      //override some of the settings 
+      if (m_p2p_manual_config.use_only_priority_peers)
+      {
+        m_use_only_priority_peers = *m_p2p_manual_config.use_only_priority_peers;
+      }
+
+      m_priority_peers = new_priority_peers;
+
+
+      if (m_p2p_manual_config.incoming_connections_limit && *m_p2p_manual_config.incoming_connections_limit == 0)
+      {
+        m_hide_my_port = true;
+      }
+
+      if (m_p2p_manual_config.outgoing_connections_limit && *m_p2p_manual_config.outgoing_connections_limit == 0)
+      {
+        //TODO: consider if need to do this
+        //m_offline_mode = true; 
+      }
+
+    }
+
+
+    //TODO: this command when passed to running daemon via command line option might be multi-thread-unsafe, subject for refactoring
+    //CRITICAL_REGION_LOCAL(m_permanently_blocked_ips_lock);
+    m_permanently_blocked_ips.clear();
+    m_permanently_blocked_ips = new_block_list;
+
+    LOG_PRINT_L0("P2P network manual config file loaded(some of the p2p cpommand line options might be overridden by '" << P2P_MANUAL_CONFIG_FILENAME << "').");
     return true;
   }
   //-----------------------------------------------------------------------------------
@@ -185,6 +272,19 @@ namespace nodetool
   bool node_server<t_payload_net_handler>::parse_peer_from_string(nodetool::net_address& pe, const std::string& node_addr)
   {
     return string_tools::parse_peer_from_string(pe.ip, pe.port, node_addr);
+  }
+  //-----------------------------------------------------------------------------------
+  template<class t_payload_net_handler>
+  bool node_server<t_payload_net_handler>::parse_peerlist(const std::vector<std::string>& perrs_str, std::list<net_address>& peers)
+  {
+    for (const std::string& pr_str : perrs_str)
+    {
+      nodetool::net_address na = AUTO_VAL_INIT(na);
+      bool r = parse_peer_from_string(na, pr_str);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to parse address from string: " << pr_str);
+      peers.push_back(na);
+    }
+    return true;
   }
   //-----------------------------------------------------------------------------------
   template<class t_payload_net_handler>
@@ -236,13 +336,8 @@ namespace nodetool
     if (command_line::has_arg(vm, arg_p2p_add_priority_node))
     {       
       std::vector<std::string> perrs = command_line::get_arg(vm, arg_p2p_add_priority_node);
-      for(const std::string& pr_str: perrs)
-      {
-        nodetool::net_address na = AUTO_VAL_INIT(na);
-        bool r = parse_peer_from_string(na, pr_str);
-        CHECK_AND_ASSERT_MES(r, false, "Failed to parse address from string: " << pr_str);
-        m_priority_peers.push_back(na);
-      }
+      bool r = parse_peerlist(perrs, m_priority_peers);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to parse priority peers");
     }
     if(command_line::has_arg(vm, arg_p2p_use_only_priority_nodes))
       m_use_only_priority_peers = true;
@@ -383,6 +478,10 @@ namespace nodetool
     LOG_PRINT_GREEN("Net service binded on " << m_bind_ip << ":" << m_listenning_port, LOG_LEVEL_0);
     if(m_external_port)
       LOG_PRINT_L0("External port defined as " << m_external_port);
+
+
+    reload_p2p_manual_config(true);
+
     return res;
   }
   //-----------------------------------------------------------------------------------
@@ -842,7 +941,7 @@ namespace nodetool
         continue;
       }
 
-      if (!is_remote_ip_allowed(pe.adr.ip))
+      if (!is_remote_ip_allowed(pe.adr.ip, false))
       {
         ++peer_index;
         continue;
@@ -912,10 +1011,22 @@ namespace nodetool
 
     size_t expected_white_connections = (m_config.m_net_config.connections_count*P2P_DEFAULT_WHITELIST_CONNECTIONS_PERCENT)/100;
 
-    size_t conn_count = get_outgoing_connections_count();
-    if(conn_count < m_config.m_net_config.connections_count)
+    size_t out_conn_count = get_outgoing_connections_count();
+    bool need_more_connections = false;
+    if (m_p2p_manual_config.outgoing_connections_limit)
     {
-      if(conn_count < expected_white_connections)
+      // m_p2p_manual_config always override default settings from m_config.m_net_config
+      need_more_connections = out_conn_count < *m_p2p_manual_config.outgoing_connections_limit;
+    }
+    else
+    {
+      // use default policy
+      need_more_connections = out_conn_count < m_config.m_net_config.connections_count;
+    }
+
+    if(need_more_connections)
+    {
+      if(out_conn_count < expected_white_connections)
       {
         //start from white list
         if(!make_expected_connections_count(true, expected_white_connections))
@@ -965,6 +1076,20 @@ namespace nodetool
         ++count;
       return true;
     });
+
+    return count;
+  }
+  //-----------------------------------------------------------------------------------
+  template<class t_payload_net_handler>
+  size_t node_server<t_payload_net_handler>::get_incoming_connections_count()
+  {
+    size_t count = 0;
+    m_net_server.get_config_object().foreach_connection([&](const p2p_connection_context& cntxt)
+      {
+        if (cntxt.m_is_income)
+          ++count;
+        return true;
+      });
 
     return count;
   }

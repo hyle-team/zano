@@ -146,7 +146,7 @@ bool connection<t_protocol_handler>::start(bool is_income, bool is_multithreaded
 
   LOG_PRINT_L3("[sock " << socket_.native_handle() << "] new connection, remote end_point: " << print_connection_context_short(context) << " local end_point: " << local_ep.address().to_string() << ':' << local_ep.port() << ", total sockets objects " << m_ref_sockets_count);
 
-  if(is_income && m_pfilter && !m_pfilter->is_remote_ip_allowed(context.m_remote_ip)) {
+  if(is_income && m_pfilter && !m_pfilter->is_remote_ip_allowed(context.m_remote_ip, is_income)) {
     LOG_PRINT_L0("[sock " << socket_.native_handle() << "] ip denied " << string_tools::get_ip_string_from_int32(context.m_remote_ip) << ", shutdowning connection");
     close();
     return false;

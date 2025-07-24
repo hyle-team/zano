@@ -1613,7 +1613,7 @@ std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_p
       
     
   //process attachments
-  if (tp.comment.size())
+  if (tp.comment.size() && payment_id.empty())
   {
     currency::tx_comment tc = AUTO_VAL_INIT(tc);
     tc.comment = tp.comment;
