@@ -1771,7 +1771,7 @@ bool simple_wallet::transfer_so(const std::vector<std::string> &args)
     return true;
   }
 
-  std::vector<size_t> outs_idxs;
+  std::vector<uint64_t> outs_idxs;
   std::string outs_str = args[0];
   while (!outs_str.empty())
   {
@@ -1818,7 +1818,7 @@ bool simple_wallet::transfer_so(const std::vector<std::string> &args)
 
   m_wallet->set_tids_to_be_only_used_in_the_next_transfer(outs_idxs);
   auto slh = epee::misc_utils::create_scope_leave_handler([&](){
-      m_wallet->set_tids_to_be_only_used_in_the_next_transfer(std::vector<size_t>()); // reset    
+      m_wallet->set_tids_to_be_only_used_in_the_next_transfer(std::vector<uint64_t>()); // reset    
     });
   transfer_impl(args_copy, fee);
 
