@@ -527,7 +527,7 @@ namespace tools
       return false;
     }
 
-    if (!req.comment.empty())
+    if (!req.comment.empty() && payment_id.empty())
     {
       // tx_comment is temporary disabled -- sowle
       //currency::tx_comment comment = AUTO_VAL_INIT(comment);
@@ -1147,44 +1147,6 @@ namespace tools
     res.tx_blob_size = currency::get_object_blobsize(res_tx);
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_create_htlc_proposal(const wallet_public::COMMAND_CREATE_HTLC_PROPOSAL::request& req, wallet_public::COMMAND_CREATE_HTLC_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx)
-  {
-    WALLET_RPC_BEGIN_TRY_ENTRY();
-    currency::transaction tx = AUTO_VAL_INIT(tx);
-    w.get_wallet()->create_htlc_proposal(req.amount, req.counterparty_address, req.lock_blocks_count, tx, req.htlc_hash, res.derived_origin_secret);
-    res.result_tx_blob = currency::tx_to_blob(tx);
-    res.result_tx_id = get_transaction_hash(tx);
-    WALLET_RPC_CATCH_TRY_ENTRY();
-    return true;
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_get_list_of_active_htlc(const wallet_public::COMMAND_GET_LIST_OF_ACTIVE_HTLC::request& req, wallet_public::COMMAND_GET_LIST_OF_ACTIVE_HTLC::response& res, epee::json_rpc::error& er, connection_context& cntx)
-  {
-    WALLET_RPC_BEGIN_TRY_ENTRY();
-    w.get_wallet()->get_list_of_active_htlc(res.htlcs, req.income_redeem_only);
-    WALLET_RPC_CATCH_TRY_ENTRY();
-    return true;
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_redeem_htlc(const wallet_public::COMMAND_REDEEM_HTLC::request& req, wallet_public::COMMAND_REDEEM_HTLC::response& res, epee::json_rpc::error& er, connection_context& cntx)
-  {
-    WALLET_RPC_BEGIN_TRY_ENTRY();
-    currency::transaction tx = AUTO_VAL_INIT(tx);
-    w.get_wallet()->redeem_htlc(req.tx_id, req.origin_secret, tx);
-    res.result_tx_blob = currency::tx_to_blob(tx);
-    res.result_tx_id = get_transaction_hash(tx);
-    WALLET_RPC_CATCH_TRY_ENTRY();
-    return true;
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
-  bool wallet_rpc_server::on_check_htlc_redeemed(const wallet_public::COMMAND_CHECK_HTLC_REDEEMED::request& req, wallet_public::COMMAND_CHECK_HTLC_REDEEMED::response& res, epee::json_rpc::error& er, connection_context& cntx)
-  {
-    WALLET_RPC_BEGIN_TRY_ENTRY();
-    w.get_wallet()->check_htlc_redeemed(req.htlc_tx_id, res.origin_secrete, res.redeem_tx_id);
-    WALLET_RPC_CATCH_TRY_ENTRY();
-    return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_ionic_swap_generate_proposal(const wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL::request& req, wallet_public::COMMAND_IONIC_SWAP_GENERATE_PROPOSAL::response& res, epee::json_rpc::error& er, connection_context& cntx)

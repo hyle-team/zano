@@ -1,8 +1,11 @@
 // Copyright (c) 2014-2021 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 #include "chaingen.h"
+
+// htlc clean up, WIP -- sowle
+#if 0
+
 #include "escrow_wallet_tests.h"
 #include "random_helper.h"
 #include "chaingen_helpers.h"
@@ -671,3 +674,5 @@ bool atomic_test_check_hardfork_rules::c1(currency::core& c, size_t ev_index, co
 
   return true;
 }
+
+#endif

@@ -73,7 +73,9 @@ namespace currency
     bool print_utxo_distribution(const std::vector<std::string> &args);    
     bool show_blockchain_height(const std::vector<std::string> &args);
     bool show_wallet_bcheight(const std::vector<std::string> &args);    
+    bool transfer_impl(const std::vector<std::string> &args, uint64_t fee);
     bool transfer(const std::vector<std::string> &args);
+    bool transfer_so(const std::vector<std::string> &args);
     bool resync_wallet(const std::vector<std::string> &args);    
     bool print_address(const std::vector<std::string> &args = std::vector<std::string>());
     bool show_seed(const std::vector<std::string> &args);

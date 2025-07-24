@@ -586,6 +586,13 @@ namespace tools
     bool truncate_transfers_and_history(const std::list<size_t>& items_to_remove);
     bool truncate_wallet();
 
+    void set_tids_to_be_only_used_in_the_next_transfer(const std::vector<uint64_t>& tids)
+    {
+      WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(std::all_of(tids.cbegin(), tids.cend(), [&](size_t i){ return i < m_transfers.size(); }), "some transfers IDs are out of range");
+      m_found_free_amounts.clear();
+      add_transfers_to_transfers_cache(tids);
+    }
+
     // PoS mining
     void do_pos_mining_prepare_entry(mining_context& cxt, const transfer_details& td);
     bool do_pos_mining_iteration(mining_context& cxt, uint64_t ts);
@@ -733,17 +740,6 @@ namespace tools
 
     void set_connectivity_options(unsigned int timeout);
     
-    /*
-    create_htlc_proposal: if htlc_hash == null_hash, then this wallet is originator of the atomic process, and 
-    we use deterministic origin, if given some particular htlc_hash, then we use this hash, and this means that 
-    opener-hash will be given by other side
-    */
-    void create_htlc_proposal(uint64_t amount, const currency::account_public_address& addr, uint64_t lock_blocks_count, currency::transaction &tx, const crypto::hash& htlc_hash, std::string &origin);
-    void get_list_of_active_htlc(std::list<wallet_public::htlc_entry_info>& htlcs, bool only_redeem_txs);
-    void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin, currency::transaction& result_tx);
-    void redeem_htlc(const crypto::hash& htlc_tx_id, const std::string& origin);
-    bool check_htlc_redeemed(const crypto::hash& htlc_tx_id, std::string& origin, crypto::hash& redeem_tx_id);
-
     void set_votes_config_path(const std::string& path_to_config_file);
     const tools::wallet_public::wallet_vote_config& get_current_votes() { return m_votes_config; }
 
