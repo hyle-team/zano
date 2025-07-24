@@ -1347,7 +1347,7 @@ bool wallet_rpc_cold_signing::c1(currency::core& c, size_t ev_index, const std::
 
   miner_wlt->refresh();
   bob_wlt->refresh();
-  check_balance_via_wallet(*bob_wlt, "Bob", 0, 0, 0, 0, 0);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt, "Bob", 0, 0, 0, 0, 0), false, "");
 
   // for post HF4 cases transfer some assets along with native coins
   crypto::public_key deployed_asset_id{};
@@ -1386,7 +1386,7 @@ bool wallet_rpc_cold_signing::c1(currency::core& c, size_t ev_index, const std::
   std::shared_ptr<tools::wallet2> alice_wlt_wo = init_playtime_test_wallet(events, c, alice_acc_wo);
 
   alice_wlt_wo->refresh();
-  check_balance_via_wallet(*alice_wlt_wo, "Alice (WO)", MK_TEST_COINS(100), 0, MK_TEST_COINS(100), 0, 0);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt_wo, "Alice (WO)", MK_TEST_COINS(100), 0, MK_TEST_COINS(100), 0, 0), false, "");
 
   // Alice: perform initial save-load to properly initialize internal wallet2 structures
   boost::filesystem::remove(epee::string_tools::cut_off_extension(m_wallet_filename) + L".outkey2ki");
