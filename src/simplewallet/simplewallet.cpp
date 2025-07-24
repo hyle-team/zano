@@ -306,7 +306,10 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("payments", boost::bind(&simple_wallet::show_payments, this, ph::_1), "payments <payment_id_1> [<payment_id_2> ... <payment_id_N>] - Show payments <payment_id_1>, ... <payment_id_N>");
   m_cmd_binder.set_handler("bc_height", boost::bind(&simple_wallet::show_blockchain_height, this,ph::_1), "Show blockchain height");
   m_cmd_binder.set_handler("wallet_bc_height", boost::bind(&simple_wallet::show_wallet_bcheight, this,ph::_1), "Show blockchain height");
+
   m_cmd_binder.set_handler("transfer", boost::bind(&simple_wallet::transfer, this,ph::_1), "transfer <mixin_count> [asset_id_1:]<addr_1> <amount_1> [ [asset_id_2:]<addr_2> <amount_2> ... [asset_id_N:]<addr_N> <amount_N>] [payment_id] - Transfer <amount_1>,... <amount_N> to <address_1>,... <address_N>, respectively. <mixin_count> is the number of transactions yours is indistinguishable from (from 0 to maximum available), <payment_id> is an optional HEX-encoded string");
+  m_cmd_binder.set_handler("transfer_so", boost::bind(&simple_wallet::transfer_so, this, ph::_1), "transfer_so <out_idx,out_idx,...> <fee> <mixin_count> [asset_id_1:]<addr_1> <amount_1> [ [asset_id_2:]<addr_2> <amount_2> ... [asset_id_N:]<addr_N> <amount_N>] [payment_id] - Transfer funds spending only specified outputs (use list_outputs command to get outputs' indecies)");
+
   m_cmd_binder.set_handler("set_log", boost::bind(&simple_wallet::set_log, this,ph::_1), "set_log <level> - Change current log detalisation level, <level> is a number 0-4");
   m_cmd_binder.set_handler("enable_console_logger", boost::bind(&simple_wallet::enable_console_logger, this,ph::_1), "Enables console logging");
   m_cmd_binder.set_handler("resync", boost::bind(&simple_wallet::resync_wallet, this,ph::_1), "Causes wallet to reset all transfers and re-synchronize wallet");
@@ -1602,7 +1605,7 @@ bool preprocess_asset_id(std::string& address_arg, crypto::public_key& asset_id)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::transfer(const std::vector<std::string> &args_)
+bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_t fee)
 {
   CONFIRM_WITH_PASSWORD();
   SIMPLE_WALLET_BEGIN_TRY_ENTRY();
@@ -1734,7 +1737,7 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
   }
 
   currency::transaction tx;
-  m_wallet->transfer(dsts, fake_outs_count, 0, m_wallet->get_core_runtime_config().tx_default_fee, extra, attachments, tx);
+  m_wallet->transfer(dsts, fake_outs_count, 0, fee, extra, attachments, tx);
 
   if (!m_wallet->is_watch_only())
   {
@@ -1748,6 +1751,76 @@ bool simple_wallet::transfer(const std::vector<std::string> &args_)
     success_msg_writer(true) << "Transaction prepared for signing and saved into \"zano_tx_unsigned\" file, use full wallet to sign transfer and then use \"submit_transfer\" on this wallet to broadcast the transaction to the network";
   }  
   SIMPLE_WALLET_CATCH_TRY_ENTRY()
+
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::transfer(const std::vector<std::string> &args)
+{
+  return transfer_impl(args, m_wallet->get_core_runtime_config().tx_default_fee);
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::transfer_so(const std::vector<std::string> &args)
+{
+  bool r = false;
+
+  // 1st arg: outs
+  if (args.size() <= 0)
+  {
+    fail_msg_writer() << "invalid agruments, can't parse outputs index array, 'out_idx,out_idx,...' format is expected";
+    return true;
+  }
+
+  std::vector<size_t> outs_idxs;
+  std::string outs_str = args[0];
+  while (!outs_str.empty())
+  {
+    size_t comma_pos = outs_str.find(',');
+    if (comma_pos != 0)
+    {
+      std::string out_idx_str = outs_str.substr(0, comma_pos);
+      int64_t out_idx = -1;
+      r = epee::string_tools::string_to_num_fast(out_idx_str, out_idx);
+      if (!r || out_idx < 0)
+      {
+        fail_msg_writer() << "invalid output index given: " << out_idx_str;
+        return true;
+      }
+      outs_idxs.push_back(out_idx);
+      if (comma_pos == std::string::npos)
+        break;
+    }
+    outs_str.erase(0, comma_pos + 1);
+  }
+
+  std::stringstream ss;
+  for (auto i : outs_idxs)
+    ss << i << " ";
+  success_msg_writer() << "outputs' indicies allowed to spent: " << (outs_idxs.empty() ? std::string("all") : ss.str());
+
+  // 2nd arg: fee
+  if (args.size() <= 1)
+  {
+    fail_msg_writer() << "invalid agruments: can't parse fee";
+    return true;
+  }
+
+  uint64_t fee = 0;
+  r = currency::parse_amount(args[1], fee);
+  if (!r || fee < TX_MINIMUM_FEE)
+  {
+    fail_msg_writer() << "invalid agruments: given fee is invalid or too small: " << args[1] << ", minimum fee: " << print_money_brief(TX_MINIMUM_FEE);
+    return true;
+  }
+
+  std::vector<std::string> args_copy = args;
+  args_copy.erase(args_copy.begin(), args_copy.begin() + 2); // remove first two args
+
+  m_wallet->set_tids_to_be_only_used_in_the_next_transfer(outs_idxs);
+  auto slh = epee::misc_utils::create_scope_leave_handler([&](){
+      m_wallet->set_tids_to_be_only_used_in_the_next_transfer(std::vector<size_t>()); // reset    
+    });
+  transfer_impl(args_copy, fee);
 
   return true;
 }
