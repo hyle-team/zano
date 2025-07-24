@@ -98,6 +98,7 @@ namespace zlib_helper
 			if (ret != Z_OK)
 			{
 				LOCAL_ASSERT(0);
+				inflateEnd(&zstream);
 				return false;
 			}
 			
@@ -108,6 +109,7 @@ namespace zlib_helper
 			if (ret != Z_OK && ret != Z_STREAM_END)
 			{
 				LOCAL_ASSERT(0);
+				inflateEnd(&zstream);
 				return false;
 			}
 
@@ -118,6 +120,7 @@ namespace zlib_helper
 			if(ungzip_buff_size == zstream.avail_out)
 			{
 				LOG_ERROR("Can't unpack buffer");
+				inflateEnd(&zstream);
 				return false;
 			}
 
