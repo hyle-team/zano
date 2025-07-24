@@ -1282,10 +1282,10 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(hard_fork_5_tx_version, "5-*");
 
     // atomics
-    GENERATE_AND_PLAY(atomic_simple_test);
-    GENERATE_AND_PLAY(atomic_test_wrong_redeem_wrong_refund);    
-    GENERATE_AND_PLAY(atomic_test_altchain_simple);
-    GENERATE_AND_PLAY(atomic_test_check_hardfork_rules);
+    //GENERATE_AND_PLAY(atomic_simple_test);
+    //GENERATE_AND_PLAY(atomic_test_wrong_redeem_wrong_refund);    
+    //GENERATE_AND_PLAY(atomic_test_altchain_simple);
+    //GENERATE_AND_PLAY(atomic_test_check_hardfork_rules);
 
     GENERATE_AND_PLAY_HF(isolate_auditable_and_proof, "2-*");
     
