@@ -256,7 +256,7 @@ namespace tools
       LOG_PRINT_L4("[DB] Transaction committed");
       return true;
     }
-    // filepath: /home/dmatsiukhov/git_repos/zano/src/common/db_backend_lmdb.cpp
+
     void lmdb_db_backend::abort_transaction()
     {
       {
