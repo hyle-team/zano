@@ -21,7 +21,7 @@
 // 'lmdb' channel is disabled by default
 static void print_stacktrace()
 {
-  std::cout << "Stacktrace:\n" << boost::stacktrace::stacktrace() << std::endl;
+  LOG_PRINT_L1("Stacktrace \n" << boost::stacktrace::stacktrace());
 }
 
 namespace tools
@@ -113,11 +113,8 @@ namespace tools
 
     bool lmdb_db_backend::begin_transaction(bool read_only)
     {
-      LOG_PRINT_L1("[---DB---] 1begin_transaction(" << (read_only ? "RO" : "RW") << ") by thread " << std::this_thread::get_id());
       if (!read_only)
       {
-        LOG_PRINT_L1("[---DB---] 2WRITE LOCKED");
-        LOG_PRINT_CYAN("[DB " << m_path << "] WRITE LOCKED", LOG_LEVEL_3);
         CRITICAL_SECTION_LOCK(m_write_exclusive_lock);
       }
       PROFILE_FUNC("lmdb_db_backend::begin_transaction");
@@ -127,7 +124,6 @@ namespace tools
           for (auto &pr : m_txs) total_entries += pr.second.size();
           LOG_PRINT_L1("[---DB---] 3begin_transaction(" << (read_only ? "RO" : "RW") << ") by thread " << std::this_thread::get_id() << 
             ", threads with tx size: " << m_txs.size() << ", total open entries: " << total_entries);
-        if(!read_only)
 
         CHECK_AND_ASSERT_THROW_MES(m_penv, "m_penv==null, db closed");
         transactions_list& rtxlist = m_txs[std::this_thread::get_id()];
@@ -159,16 +155,28 @@ namespace tools
             pparent_tx = nullptr;
 
           CHECK_AND_ASSERT_THROW_MES(m_penv, "m_penv==null, db closed");
+          // --- DEBUG INFO ---
+          LOG_PRINT_L1("[---DB---][DEBUG] Current thread tx list size: " << rtxlist.size());
+          LOG_PRINT_L1("[---DB---][DEBUG] All threads:");
+          for (const auto& pr : m_txs) {
+            LOG_PRINT_L1("  Thread " << pr.first << " txs: " << pr.second.size());
+            size_t idx = 0;
+            for (const auto& txe : pr.second) {
+              LOG_PRINT_L1("    [" << idx << "] read_only=" << txe.read_only << ", count=" << txe.count << ", ptx=" << txe.ptx);
+              ++idx;
+            }
+          }
+          // --- END DEBUG INFO ---
           res = mdb_txn_begin(m_penv, pparent_tx, flags, &p_new_tx);
           if(res != MDB_SUCCESS)
           {
             LOG_PRINT_L1("[---DB---] 5mdb_txn_begin failed " << res << " (" << mdb_strerror(res) << "), RO=" 
               << (read_only?"true":"false")
               << ", threads with tx size: " << m_txs.size());
+            print_stacktrace();
             //Important: if mdb_txn_begin is failed need to unlock previously locked mutex
             CRITICAL_SECTION_UNLOCK(m_write_exclusive_lock);
             //throw exception to avoid regular code execution 
-            print_stacktrace();
             ASSERT_MES_AND_THROW_LMDB(res, "Unable to mdb_txn_begin");
           }
 
@@ -231,11 +239,6 @@ namespace tools
 
         tx_entry txe = AUTO_VAL_INIT(txe);
         bool r = pop_tx_entry(txe);
-        LOG_PRINT_L1("[---DB---] 6commit_transaction by thread " << std::this_thread::get_id() 
-          << ", read_only=" << (txe.read_only ? "true":"false")
-          << ", count(before)=" << count_before
-          << ", txe.count=" << txe.count
-          << ", remaining threads with tx size=" << m_txs.size());
         CHECK_AND_ASSERT_MES(r, false, "Unable to pop_tx_entry");
           
         if (txe.count == 0 || (txe.read_only && txe.count == 1))
@@ -265,11 +268,6 @@ namespace tools
 
         tx_entry txe = AUTO_VAL_INIT(txe);
         bool r = pop_tx_entry(txe);
-        LOG_PRINT_L1("[---DB---] 7abort_transaction by thread " << std::this_thread::get_id() 
-          << ", read_only=" << (txe.read_only ? "true":"false")
-          << ", count(before)=" << count_before
-          << ", txe.count=" << txe.count
-          << ", remaining threads with tx size =" << m_txs.size());
         CHECK_AND_ASSERT_MES(r, void(), "Unable to pop_tx_entry");
         if (txe.count == 0 || (txe.read_only && txe.count == 1))
         {
