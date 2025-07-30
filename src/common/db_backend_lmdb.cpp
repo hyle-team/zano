@@ -113,6 +113,7 @@ namespace tools
 
     bool lmdb_db_backend::begin_transaction(bool read_only)
     {
+      LOG_PRINT_L1("[---DB---] 1begin_transaction(" << (read_only ? "RO" : "RW") << ") by thread " << std::this_thread::get_id());
       if (!read_only)
       {
         CRITICAL_SECTION_LOCK(m_write_exclusive_lock);
@@ -177,6 +178,7 @@ namespace tools
             //Important: if mdb_txn_begin is failed need to unlock previously locked mutex
             CRITICAL_SECTION_UNLOCK(m_write_exclusive_lock);
             //throw exception to avoid regular code execution 
+            print_stacktrace();
             ASSERT_MES_AND_THROW_LMDB(res, "Unable to mdb_txn_begin");
           }
 
@@ -239,6 +241,11 @@ namespace tools
 
         tx_entry txe = AUTO_VAL_INIT(txe);
         bool r = pop_tx_entry(txe);
+        LOG_PRINT_L1("[---DB---] 6commit_transaction by thread " << std::this_thread::get_id() 
+          << ", read_only=" << (txe.read_only ? "true":"false")
+          << ", count(before)=" << count_before
+          << ", txe.count=" << txe.count
+          << ", remaining threads with tx size=" << m_txs.size());
         CHECK_AND_ASSERT_MES(r, false, "Unable to pop_tx_entry");
           
         if (txe.count == 0 || (txe.read_only && txe.count == 1))
@@ -256,7 +263,6 @@ namespace tools
       LOG_PRINT_L4("[DB] Transaction committed");
       return true;
     }
-
     void lmdb_db_backend::abort_transaction()
     {
       {
@@ -268,6 +274,11 @@ namespace tools
 
         tx_entry txe = AUTO_VAL_INIT(txe);
         bool r = pop_tx_entry(txe);
+        LOG_PRINT_L1("[---DB---] 7abort_transaction by thread " << std::this_thread::get_id() 
+          << ", read_only=" << (txe.read_only ? "true":"false")
+          << ", count(before)=" << count_before
+          << ", txe.count=" << txe.count
+          << ", remaining threads with tx size =" << m_txs.size());
         CHECK_AND_ASSERT_MES(r, void(), "Unable to pop_tx_entry");
         if (txe.count == 0 || (txe.read_only && txe.count == 1))
         {
