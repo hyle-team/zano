@@ -292,6 +292,7 @@ namespace currency
   bool tx_memory_pool::do_insert_transaction(const transaction &tx, const crypto::hash &id, uint64_t blob_size, bool kept_by_block, uint64_t fee, const crypto::hash& max_used_block_id, uint64_t max_used_block_height)
   {
     TIME_MEASURE_START_PD(begin_tx_time);
+    LOG_PRINT_L1("beginn_transaction 19()");
     m_db.begin_transaction();
     TIME_MEASURE_FINISH_PD(begin_tx_time);
 
@@ -445,6 +446,7 @@ namespace currency
   bool tx_memory_pool::take_tx(const crypto::hash &id, transaction &tx, size_t& blob_size, uint64_t& fee)
   {
     
+    LOG_PRINT_L1("beginn_transaction 20()");
     m_db_transactions.begin_transaction();
     misc_utils::auto_scope_leave_caller seh = misc_utils::create_scope_leave_handler([&](){m_db_transactions.commit_transaction();});
     
@@ -474,6 +476,7 @@ namespace currency
     CRITICAL_REGION_LOCAL(m_remove_stuck_txs_lock);
     CRITICAL_SECTION_UNLOCK(m_remove_stuck_txs_lock);// release try_lock iteration
     
+    LOG_PRINT_L1("beginn_transaction 21()");
     m_db_transactions.begin_transaction();
     misc_utils::auto_scope_leave_caller seh = misc_utils::create_scope_leave_handler([&](){m_db_transactions.commit_transaction(); });
 
@@ -742,6 +745,7 @@ namespace currency
     // atm:
     // 1) the only side effect of a tx being blacklisted is the one is just ignored by fill_block_template(), but it still can be added to blockchain/pool
     // 2) it's permanent
+    LOG_PRINT_L1("beginn_transaction 22()");
     m_db.begin_transaction();
     m_db_black_tx_list.set(get_transaction_hash(tx), true);
     m_db.commit_transaction();
@@ -902,6 +906,7 @@ namespace currency
   void tx_memory_pool::purge_transactions()
   {
     
+    LOG_PRINT_L1("beginn_transaction 23()");
     m_db.begin_transaction();
     m_db_transactions.clear();
     m_db.commit_transaction();
@@ -911,6 +916,7 @@ namespace currency
   //---------------------------------------------------------------------------------
   void tx_memory_pool::clear()
   {
+    LOG_PRINT_L1("beginn_transaction 24()");
     m_db.begin_transaction();
     m_db_transactions.clear();
     m_db_black_tx_list.clear();
@@ -1086,6 +1092,7 @@ namespace currency
     const std::list<transaction>& explicit_txs
   )
   {
+    std::cout << "FILL BLOCK TEMPLATE" << std::endl;
     LOCAL_READONLY_TRANSACTION();
     //typedef transactions_container::value_type txv;
     typedef std::pair<crypto::hash, std::shared_ptr<const tx_details> > txv;
@@ -1120,7 +1127,6 @@ namespace currency
       b_ = boost::multiprecision::uint128_t(txs_v[b].second->fee) * txs_v[a].second->blob_size;
       return a_ > b_;
     });
-
 
     size_t explicit_total_size = get_objects_blobsize(explicit_txs);
     size_t current_size = explicit_total_size;
@@ -1185,6 +1191,8 @@ namespace currency
       if (!is_tx_ready_to_go_result && 
         (local_copy_txd.last_failed_height != tx.second->last_failed_height || local_copy_txd.last_failed_id != tx.second->last_failed_id))
       {
+        std::cout << "---> FILL BLOCK TEMPLATE logic" << std::endl;
+        LOG_PRINT_L1("beginn_transaction 25()");
         m_db_transactions.begin_transaction();
         m_db_transactions.set(get_transaction_hash(local_copy_txd.tx), local_copy_txd);
         m_db_transactions.commit_transaction();
@@ -1245,6 +1253,7 @@ namespace currency
   //---------------------------------------------------------------------------------
   void tx_memory_pool::store_db_solo_options_values()
   {
+    LOG_PRINT_L1("beginn_transaction 26()");
     m_db.begin_transaction();
     m_db_storage_major_compatibility_version = TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION;
     m_db.commit_transaction();

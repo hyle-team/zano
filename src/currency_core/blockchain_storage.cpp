@@ -375,6 +375,8 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         CHECK_AND_ASSERT_MES(res, false, "Unable to init db_addr_to_alias_old");
 
         // temporary set db compatibility version to zero during migration in order to trigger db reinit on the next lanunch in case the process stops in the middle
+
+        LOG_PRINT_L1("beginn_transaction 4()");
         m_db.begin_transaction();
         uint64_t tmp_db_maj_version = m_db_storage_major_compatibility_version;
         m_db_storage_major_compatibility_version = 0;
@@ -399,6 +401,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         });
 
         // clear and close old format container
+        LOG_PRINT_L1("beginn_transaction 5()");
         m_db.begin_transaction();
         db_aliases_old.clear();
         db_addr_to_alias_old.clear();
@@ -412,6 +415,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         CHECK_AND_ASSERT_MES(res, false, "Unable to init m_db_addr_to_alias");
 
         // re-populate all alias entries back
+        LOG_PRINT_L1("beginn_transaction 6()");
         m_db.begin_transaction();
         for(auto& el : temp_container)
           m_db_aliases.set(el.first, el.second);
@@ -421,6 +425,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         m_db.commit_transaction();
 
         // restore db maj compartibility
+        LOG_PRINT_L1("beginn_transaction 7()");
         m_db.begin_transaction();
         m_db_storage_major_compatibility_version = tmp_db_maj_version;
         m_db.commit_transaction();
@@ -465,11 +470,13 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         LOG_PRINT_MAGENTA("DB version is " << DB_MAJ_VERSION_FOR_PER_BLOCK_GINDEX_FIX << ".1, migrating m_db_per_block_gindex_incs to ver. " << DB_MAJ_VERSION_FOR_PER_BLOCK_GINDEX_FIX << ".2...", LOG_LEVEL_0);
 
         // temporary set db compatibility version to zero during migration in order to trigger db reinit on the next lanunch in case the process stops in the middle
+        LOG_PRINT_L1("beginn_transaction 8()");
         m_db.begin_transaction();
         uint64_t tmp_db_maj_version = m_db_storage_major_compatibility_version;
         m_db_storage_major_compatibility_version = 0;
         m_db.commit_transaction();
 
+        LOG_PRINT_L1("beginn_transaction 9()");
         m_db.begin_transaction();
         std::unordered_map<uint64_t, uint32_t> gindices;
         for(size_t height = ZANO_HARDFORK_04_AFTER_HEIGHT + 1, size = m_db_blocks.size(); height < size; ++height)
@@ -493,6 +500,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         m_db.commit_transaction();
 
         // restore db maj compatibility
+        LOG_PRINT_L1("beginn_transaction 10()");
         m_db.begin_transaction();
         m_db_storage_major_compatibility_version = tmp_db_maj_version;
         m_db.commit_transaction();
@@ -589,6 +597,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
   if(!m_db_blocks.back()->bl.timestamp)
     timestamp_diff = m_core_runtime_config.get_core_time() - 1341378000;
 
+  LOG_PRINT_L1("beginn_transaction 11()");
   m_db.begin_transaction();
   set_lost_tx_unmixable();
   m_db.commit_transaction();
@@ -710,6 +719,7 @@ void  blockchain_storage::patch_out_if_needed(txout_to_key& out, const crypto::h
 //------------------------------------------------------------------
 void blockchain_storage::store_db_solo_options_values()
 {
+  LOG_PRINT_L1("beginn_transaction 12()");
   m_db.begin_transaction();
   m_db_storage_major_compatibility_version = BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION;
   m_db_storage_minor_compatibility_version = BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION;
@@ -757,6 +767,7 @@ bool blockchain_storage::set_checkpoints(checkpoints&& chk_pts)
   m_checkpoints = chk_pts;
   try
   {
+    LOG_PRINT_L1("beginn_transaction 13()");
     m_db.begin_transaction();
     if (m_db_blocks.size() < m_checkpoints.get_top_checkpoint_height())
       m_is_in_checkpoint_zone = !m_non_pruning_mode_enabled; // set to true unless non-pruning mode is on
@@ -841,6 +852,7 @@ bool blockchain_storage::prune_ring_signatures_and_attachments_if_need()
 bool blockchain_storage::clear()
 {
   //CRITICAL_REGION_LOCAL(m_read_lock);
+  LOG_PRINT_L1("beginn_transaction 14()");
   m_db.begin_transaction();
 
   m_db_blocks.clear();
@@ -5133,6 +5145,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
 bool blockchain_storage::rebuild_tx_fee_medians()
 {
   uint64_t sz = m_db_blocks.size();
+  LOG_PRINT_L1("beginn_transaction 15()");
   m_db.begin_transaction(); 
   LOG_PRINT_L0("Started reinitialization of median fee...");
   math_helper::once_a_time_seconds<10> log_idle;
@@ -5544,6 +5557,7 @@ void blockchain_storage::do_full_db_warm_up() const
 //------------------------------------------------------------------
 void blockchain_storage::on_hardfork_activated(size_t hardfork_id)
 {
+    LOG_PRINT_L1("beginn_transaction 16()");
   m_db.begin_transaction();
   m_db_most_recent_hardfork_id = hardfork_id;
   m_db.commit_transaction();
@@ -7589,6 +7603,7 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
       return false;
     }
 
+    LOG_PRINT_L1("beginn_transaction 17()");
     m_db.begin_transaction();
 
     //block bl = bl_;
@@ -7679,6 +7694,7 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
 //------------------------------------------------------------------
 bool blockchain_storage::truncate_blockchain(uint64_t to_blockchain_size)
 {
+  LOG_PRINT_L1("beginn_transaction 18()");
   m_db.begin_transaction();
   uint64_t inital_blockchain_size = get_current_blockchain_size();
   while (get_current_blockchain_size() > to_blockchain_size)
