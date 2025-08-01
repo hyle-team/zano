@@ -11,7 +11,7 @@ bool check_scalar(const crypto::ec_scalar &scalar) {
 }
 
 void random_scalar(crypto::ec_scalar &res) {
-  crypto::random_scalar(res);
+  crypto::random_scalar_no_lock(res);
 }
 
 void hash_to_scalar(const void *data, std::size_t length, crypto::ec_scalar &res) {
