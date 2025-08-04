@@ -8,7 +8,7 @@
 
 TEST(decoy_selection_test, decoy_selection_test)
 {
-  const uint64_t test_scale_size = 20000;
+  [[maybe_unused]] const uint64_t test_scale_size = 20000;
   decoy_selection_generator dsg;
   dsg.init(100);
   std::map<uint64_t, uint64_t> hits;
