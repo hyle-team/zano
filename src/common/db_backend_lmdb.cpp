@@ -330,6 +330,7 @@ namespace tools
       if (!have_tx())
       {
         need_to_commit = true;
+        LOG_PRINT_L1("beginn_transaction 333()");
         begin_transaction(true);
       }
 
@@ -365,6 +366,7 @@ namespace tools
       if (!have_tx())
       {
         need_to_commit = true;
+        LOG_PRINT_L1("beginn_transaction 332()");
         begin_transaction(true);
       }
       int res = mdb_stat(get_current_tx(), static_cast<MDB_dbi>(h), &container_stat);
@@ -399,6 +401,7 @@ namespace tools
       if (!have_tx())
       {
         need_to_commit = true;
+        LOG_PRINT_L1("beginn_transaction 331()");
         begin_transaction(true);
       }
       MDB_cursor* cursor_ptr = nullptr;

@@ -45,6 +45,7 @@ endif()
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
+set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "Build type" FORCE)
 # build types
 if (UNIX AND NOT APPLE)
   # single configurations, defaults to Release

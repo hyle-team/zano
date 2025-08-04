@@ -357,7 +357,7 @@ void hash_rate_analysis(const std::string& path)
   uint64_t curren_hashrate = 0;
   uint64_t step = 10;
   uint64_t hash_rate_range = 10;
-  uint64_t second_windowf_or_hashrate = 20*60;
+  [[maybe_unused]] uint64_t second_windowf_or_hashrate = 20*60;
   
   for (size_t i = hash_rate_range; i != blocks.size(); i++)
   {

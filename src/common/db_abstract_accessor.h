@@ -129,6 +129,7 @@ namespace tools
       }
       bool begin_transaction(bool readonly = false)
       {
+        LOG_PRINT_L1("beginn_transaction 337()");
         bool r = m_backend->begin_transaction(readonly);
         CRITICAL_REGION_LOCAL(m_transactions_stack_lock);
         std::vector<bool>& this_thread_tx_stack = m_transactions_stack[std::this_thread::get_id()];
@@ -151,6 +152,7 @@ namespace tools
 
       bool begin_readonly_transaction()const
       {
+        LOG_PRINT_L1("beginn_transaction 338()");
         return const_cast<basic_db_accessor&>(*this).begin_transaction(true);
       }
 
@@ -544,6 +546,7 @@ namespace tools
 
       bool begin_transaction(bool read_only = false)
       {
+        LOG_PRINT_L1("beginn_transaction 336()");
         return bdb.begin_transaction(read_only);
       }
       void commit_transaction()
@@ -1104,6 +1107,7 @@ namespace tools
         //start read only transaction
         if (m_db.is_open())
         {
+          LOG_PRINT_L1("beginn_transaction 335()");
           m_db.begin_transaction(true);
           got_transaction = true;
         }
