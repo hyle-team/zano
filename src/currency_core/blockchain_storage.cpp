@@ -1515,6 +1515,84 @@ std::shared_ptr<block_extended_info> blockchain_storage::get_last_block_of_type(
   return pbei;
 }
 //------------------------------------------------------------------
+void blockchain_storage::scan_pos_coin_age_distribution(std::map<uint64_t, uint64_t>& confirmations_distribution)
+{
+  constexpr uint64_t zarcanum_epoch_start = 2555000;
+  constexpr uint64_t amount               = 0;
+  constexpr uint64_t scan_depth           = 200000;
+
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  const uint64_t top_height = m_db_blocks.size() > 0 ? m_db_blocks.size() - 1 : 0;
+
+  CHECK_AND_ASSERT_MES(top_height >= zarcanum_epoch_start, void(),
+                       "Blockchain height (" << top_height << ") is less than zarcanum epoch start ("
+                                             << zarcanum_epoch_start << "). Cannot scan POS coin age.");
+
+  const uint64_t start_height = std::max(zarcanum_epoch_start, top_height > scan_depth ? (top_height - scan_depth) : 0);
+  const uint64_t total_blocks = top_height - start_height + 1;
+
+  uint64_t processed_blocks  = 0;
+  uint64_t processed_outputs = 0;
+
+  LOG_PRINT_L0("Scanning POS coin age from block height " << start_height << " to " << top_height
+                                                          << " (" << total_blocks << " blocks total)");
+  LOG_PRINT_L0("Blockchain top height: " << top_height);
+   std::cout << "Blockchain top height: " << top_height << "\n";
+
+  for (uint64_t height = start_height; height <= top_height; ++height)
+  {
+    const std::shared_ptr<const currency::block_extended_info>& block_entry_ptr = m_db_blocks[height];
+    CHECK_AND_ASSERT_MES(block_entry_ptr, void(), "No block entry found at height: " << height);
+
+    const currency::block& blk = block_entry_ptr->bl;
+
+    if (!is_pos_block(blk))
+      continue;
+
+    const currency::txin_zc_input& stake_input               = boost::get<currency::txin_zc_input>(blk.miner_tx.vin[1]);
+    CHECK_AND_ASSERT_MES(blk.miner_tx.vin.size() > 1, void(), "Expected at least 2 inputs in miner_tx at height " << height);
+
+    const std::vector<currency::txout_ref_v> abs_key_offsets = relative_output_offsets_to_absolute(stake_input.key_offsets);
+
+    for (const currency::txout_ref_v& abs_offset : abs_key_offsets)
+    {
+      CHECK_AND_ASSERT_MES(abs_offset.type() == typeid(uint64_t), void(),
+                           "Unexpected txout_ref_v type, expected uint64_t at height " << height);
+
+      const uint64_t global_index = boost::get<uint64_t>(abs_offset);
+
+      const std::shared_ptr<const currency::global_output_entry> out_ptr = m_db_outputs.get_subitem(amount, global_index);
+      CHECK_AND_ASSERT_MES(out_ptr, void(),
+                           "Output not found for global index " << global_index << " at height " << height);
+
+      const std::shared_ptr<const currency::transaction_chain_entry> tx_ptr = m_db_transactions.find(out_ptr->tx_id);
+      CHECK_AND_ASSERT_MES(tx_ptr, void(),
+                           "Transaction not found for output tx_id " << out_ptr->tx_id << " at height " << height);
+
+      const uint64_t mint_block_height = tx_ptr->m_keeper_block_height;
+      CHECK_AND_ASSERT_MES(mint_block_height <= height, void(),
+                           "Mint block height " << mint_block_height << " is greater than current block height " << height);
+
+      const uint64_t confirmations = height - mint_block_height + 1;
+      ++confirmations_distribution[confirmations];
+      ++processed_outputs;
+    }
+
+    ++processed_blocks;
+    if (processed_blocks % 1000 == 0)
+    {
+      double progress = (static_cast<double>(processed_blocks) / total_blocks) * 100;
+      LOG_PRINT_L0("Scanned " << processed_blocks << " / " << total_blocks
+                              << " blocks (" << std::fixed << std::setprecision(2) << progress
+                              << "% done), outputs counted: " << processed_outputs);
+    }
+  }
+
+  LOG_PRINT_L0("Finished scanning POS coin age: total blocks processed: "
+               << processed_blocks << ", outputs counted: " << processed_outputs);
+}
+//------------------------------------------------------------------
 wide_difficulty_type blockchain_storage::get_next_difficulty_for_alternative_chain(const alt_chain_type& alt_chain, block_extended_info& bei, bool pos) const
 {
   std::vector<uint64_t> timestamps;
