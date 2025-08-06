@@ -136,7 +136,7 @@ namespace tools
           //don't use parent tx in write transactions if parent tx was read-only (restriction in lmdb) 
           //see "Nested transactions: Max 1 child, write txns only, no writemap"
           if (pparent_tx && parent_read_only)
-                pparent_tx = nullptr;
+            pparent_tx = nullptr;
           CHECK_AND_ASSERT_THROW_MES(m_penv, "m_penv==null, db closed");
           lmdb_txn txn(*this, read_only, pparent_tx);
           txn.commit();
@@ -451,9 +451,11 @@ namespace tools
       int res = mdb_txn_begin(m_db.m_penv, parent_tx, flags, &new_tx);
       if (res != MDB_SUCCESS)
       {
-        //Important: if mdb_txn_begin is failed need to unlock previously locked mutex
-        if (!read_only) 
+        if (!read_only)
+        {
+          //Important: if mdb_txn_begin is failed need to unlock previously locked mutex
           CRITICAL_SECTION_UNLOCK(m_db.m_write_exclusive_lock);
+        }
         //throw exception to avoid regular code execution 
         ASSERT_MES_AND_THROW_LMDB(res, "Unable to mdb_txn_begin");
       }
@@ -475,12 +477,15 @@ namespace tools
 
     lmdb_db_backend::lmdb_txn::~lmdb_txn()
     {
-      if (!m_committed) {
+      if (!m_committed)
+      {
         tx_entry entry = *it;
         m_db.m_txs[std::this_thread::get_id()].erase(it);
         mdb_txn_abort(entry.ptx);
         if (!entry.read_only)
+        {
           CRITICAL_SECTION_UNLOCK(m_db.m_write_exclusive_lock);
+        }
       }
     }
   }
