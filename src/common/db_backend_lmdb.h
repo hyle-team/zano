@@ -37,6 +37,21 @@ namespace tools
       std::map<std::thread::id, transactions_list> m_txs; // size_t -> count of nested read_only transactions
       bool pop_tx_entry(tx_entry& txe);
 
+      friend class lmdb_txn;
+      class lmdb_txn 
+      {
+      public:
+        lmdb_txn(lmdb_db_backend& db, bool read_only, MDB_txn* parent_tx);
+        ~lmdb_txn();
+
+        void commit();
+
+      private:
+        lmdb_db_backend& m_db;
+        bool m_committed;
+        std::list<tx_entry>::iterator it;
+      };
+
     public:
       lmdb_db_backend();
       ~lmdb_db_backend();

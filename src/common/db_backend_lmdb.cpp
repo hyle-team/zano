@@ -119,14 +119,12 @@ namespace tools
         CHECK_AND_ASSERT_THROW_MES(m_penv, "m_penv==null, db closed");
         transactions_list& rtxlist = m_txs[std::this_thread::get_id()];
         MDB_txn* pparent_tx = nullptr;
-        MDB_txn* p_new_tx = nullptr;
         bool parent_read_only = false;
-        if (rtxlist.size())
+        if (!rtxlist.empty())
         {
           pparent_tx = rtxlist.back().ptx;
           parent_read_only = rtxlist.back().read_only;
         }
-
 
         if (pparent_tx && read_only)
         {
@@ -134,33 +132,16 @@ namespace tools
         }
         else
         {
-          int res = 0;
-          unsigned int flags = 0;
-          if (read_only)
-            flags += MDB_RDONLY;
 
           //don't use parent tx in write transactions if parent tx was read-only (restriction in lmdb) 
           //see "Nested transactions: Max 1 child, write txns only, no writemap"
           if (pparent_tx && parent_read_only)
-            pparent_tx = nullptr;
-
+                pparent_tx = nullptr;
           CHECK_AND_ASSERT_THROW_MES(m_penv, "m_penv==null, db closed");
-          res = mdb_txn_begin(m_penv, pparent_tx, flags, &p_new_tx);
-          if(res != MDB_SUCCESS)
-          {
-            //Important: if mdb_txn_begin is failed need to unlock previously locked mutex
-            CRITICAL_SECTION_UNLOCK(m_write_exclusive_lock);
-            //throw exception to avoid regular code execution 
-            ASSERT_MES_AND_THROW_LMDB(res, "Unable to mdb_txn_begin");
-          }
-
-          rtxlist.push_back(tx_entry());
-          rtxlist.back().count = read_only ? 1 : 0;
-          rtxlist.back().ptx = p_new_tx;
-          rtxlist.back().read_only = read_only;
+          lmdb_txn txn(*this, read_only, pparent_tx);
+          txn.commit();
         }
       }
-
 
       LOG_PRINT_L4("[DB] Transaction started");
       return true;
@@ -212,12 +193,19 @@ namespace tools
         if (txe.count == 0 || (txe.read_only && txe.count == 1))
         {
           int res = 0;
-          res = mdb_txn_commit(txe.ptx);
-          CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_txn_commit (error " << res << ")");
-          if (!txe.read_only && !txe.count)
+          if(txe.read_only)
           {
-            CRITICAL_SECTION_UNLOCK(m_write_exclusive_lock);
-            LOG_PRINT_CYAN("[DB " << m_path << "] WRITE UNLOCKED", LOG_LEVEL_3);
+            mdb_txn_abort(txe.ptx);
+          }
+          else
+          {
+            res = mdb_txn_commit(txe.ptx);
+            CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_txn_commit (error " << res << ")");
+            if (!txe.read_only && !txe.count)
+            {
+              CRITICAL_SECTION_UNLOCK(m_write_exclusive_lock);
+              LOG_PRINT_CYAN("[DB " << m_path << "] WRITE UNLOCKED", LOG_LEVEL_3);
+            }
           }
         } 
       }
@@ -455,6 +443,46 @@ namespace tools
       #undef MDB_CHECK
     }
 
+    lmdb_db_backend::lmdb_txn::lmdb_txn(lmdb_db_backend& db, bool read_only, MDB_txn* parent_tx)
+      : m_db(db), m_committed(false)
+    {
+      unsigned int flags = read_only ? MDB_RDONLY : 0;
+      MDB_txn* new_tx = nullptr;
+      int res = mdb_txn_begin(m_db.m_penv, parent_tx, flags, &new_tx);
+      if (res != MDB_SUCCESS)
+      {
+        //Important: if mdb_txn_begin is failed need to unlock previously locked mutex
+        if (!read_only) 
+          CRITICAL_SECTION_UNLOCK(m_db.m_write_exclusive_lock);
+        //throw exception to avoid regular code execution 
+        ASSERT_MES_AND_THROW_LMDB(res, "Unable to mdb_txn_begin");
+      }
+      tx_entry e
+      { 
+        new_tx, 
+        read_only, 
+        read_only ? 1 : 0 
+      };
+      auto& slot = m_db.m_txs[std::this_thread::get_id()];
+      slot.push_back(e);
+      it = --slot.end();
+    }
+
+    void lmdb_db_backend::lmdb_txn::commit()
+    {
+      m_committed = true;
+    }
+
+    lmdb_db_backend::lmdb_txn::~lmdb_txn()
+    {
+      if (!m_committed) {
+        tx_entry entry = *it;
+        m_db.m_txs[std::this_thread::get_id()].erase(it);
+        mdb_txn_abort(entry.ptx);
+        if (!entry.read_only)
+          CRITICAL_SECTION_UNLOCK(m_db.m_write_exclusive_lock);
+      }
+    }
   }
 }
 
