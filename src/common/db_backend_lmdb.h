@@ -44,12 +44,12 @@ namespace tools
         lmdb_txn(lmdb_db_backend& db, bool read_only, MDB_txn* parent_tx);
         ~lmdb_txn();
 
-        void commit();
+        void mark_committed();
 
       private:
         lmdb_db_backend& m_db;
-        bool m_committed;
-        std::list<tx_entry>::iterator it;
+        bool m_marked_committed;
+        std::list<tx_entry>::iterator m_slot_iterator;
       };
 
     public:

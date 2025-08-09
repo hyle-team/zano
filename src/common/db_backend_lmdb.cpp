@@ -444,7 +444,7 @@ namespace tools
     }
 
     lmdb_db_backend::lmdb_txn::lmdb_txn(lmdb_db_backend& db, bool read_only, MDB_txn* parent_tx)
-      : m_db(db), m_committed(false)
+      : m_db(db), m_marked_committed(false)
     {
       unsigned int flags = read_only ? MDB_RDONLY : 0;
       MDB_txn* new_tx = nullptr;
@@ -467,20 +467,20 @@ namespace tools
       };
       auto& slot = m_db.m_txs[std::this_thread::get_id()];
       slot.push_back(e);
-      it = --slot.end();
+      m_slot_iterator = --slot.end();
     }
 
-    void lmdb_db_backend::lmdb_txn::commit()
+    void lmdb_db_backend::lmdb_txn::mark_committed()
     {
-      m_committed = true;
+      m_marked_committed = true;
     }
 
     lmdb_db_backend::lmdb_txn::~lmdb_txn()
     {
-      if (!m_committed)
+      if (!m_marked_committed)
       {
-        tx_entry entry = *it;
-        m_db.m_txs[std::this_thread::get_id()].erase(it);
+        tx_entry entry = *m_slot_iterator;
+        m_db.m_txs[std::this_thread::get_id()].erase(m_slot_iterator);
         mdb_txn_abort(entry.ptx);
         if (!entry.read_only)
         {
