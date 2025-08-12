@@ -133,7 +133,7 @@ namespace tools
 
         if (pparent_tx && read_only)
         {
-          ++rtxlist.back().count;
+          ++rtxlist.back().nested_count;
         }
         else
         {
@@ -181,7 +181,7 @@ namespace tools
       CHECK_AND_ASSERT_MES(!txs.empty(), false, "[DB] No active tx for current thread");
 
       lmdb_txn& top = txs.back();
-      const bool finalize = (top.read_only ? (top.count < 2) : (top.count < 1));
+      const bool finalize = (top.read_only ? (top.nested_count < 2) : (top.nested_count < 1));
 
       if (finalize)
       {
@@ -192,10 +192,10 @@ namespace tools
       }
       else
       {
-        --top.count;
+        --top.nested_count;
         txe.ptx = nullptr;
         txe.read_only = top.read_only;
-        txe.count = top.count;
+        txe.nested_count = top.nested_count;
       }
       return true;
     }
@@ -208,7 +208,7 @@ namespace tools
         bool r = pop_lmdb_txn(txe);
         CHECK_AND_ASSERT_MES(r, false, "Unable to pop_lmdb_txn");
           
-        if (txe.count == 0 || (txe.read_only && txe.count == 1))
+        if (txe.nested_count == 0 || (txe.read_only && txe.nested_count == 1))
         {
           if(txe.read_only)
           {
@@ -218,7 +218,7 @@ namespace tools
           {
             int res = txe.commit();
             CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to commit transaction(error " << res << ")");
-            if (!txe.read_only && !txe.count)
+            if (!txe.read_only && !txe.nested_count)
             {
               CRITICAL_SECTION_UNLOCK(m_write_exclusive_lock);
               LOG_PRINT_CYAN("[DB " << m_path << "] WRITE UNLOCKED", LOG_LEVEL_3);
@@ -236,10 +236,10 @@ namespace tools
         lmdb_txn txe(*this);
         bool r = pop_lmdb_txn(txe);
         CHECK_AND_ASSERT_MES(r, void(), "Unable to pop_lmdb_txn");
-        if (txe.count == 0 || (txe.read_only && txe.count == 1))
+        if (txe.nested_count == 0 || (txe.read_only && txe.nested_count == 1))
         {
           txe.abort();
-          if (!txe.read_only && !txe.count)
+          if (!txe.read_only && !txe.nested_count)
           {
             CRITICAL_SECTION_UNLOCK(m_write_exclusive_lock);
             LOG_PRINT_CYAN("[DB " << m_path << "] WRITE UNLOCKED(ABORTED)", LOG_LEVEL_3);
@@ -468,12 +468,12 @@ namespace tools
       : m_db(db)
     {
       read_only = is_read_only;
-      count = is_read_only ? 1 : 0;
+      nested_count = is_read_only ? 1 : 0;
     }
 
     lmdb_db_backend::lmdb_txn::lmdb_txn(lmdb_db_backend::lmdb_txn&& other) noexcept
       : m_db(other.m_db), ptx(other.ptx), read_only(other.read_only),
-        count(other.count), m_marked_finished(other.m_marked_finished)
+        nested_count(other.nested_count), m_marked_finished(other.m_marked_finished)
     {
       other.ptx = nullptr;
       other.m_marked_finished = true;
@@ -486,7 +486,7 @@ namespace tools
         ptx = other.ptx;
         other.ptx = nullptr;
         read_only = other.read_only;
-        count = other.count;
+        nested_count = other.nested_count;
         m_marked_finished = other.m_marked_finished;
         other.m_marked_finished = true;
       }

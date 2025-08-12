@@ -35,11 +35,11 @@ namespace tools
         int begin(MDB_txn* parent_tx);
         int commit();
         void abort();
-        void mark_finished();
+        void mark_finished(); // mark when commit or abort is called, to avoid double commit/abort and correct delete in destructor
 
         MDB_txn* ptx{nullptr};
         bool read_only{false}; // needed for thread-top transaction, for figure out if we need to unlock exclusive access
-        size_t count{0};   //count of read-only nested emulated transactions
+        size_t nested_count{0};   //count of read-only nested emulated transactions
 
       private:
         std::reference_wrapper<lmdb_db_backend> m_db;
@@ -55,7 +55,6 @@ namespace tools
       boost::recursive_mutex m_write_exclusive_lock;
       std::map<std::thread::id, transactions_list> m_txs; // thread_id -> count of nested read_only transactions
       bool pop_lmdb_txn(lmdb_txn& txe);
-
 
     public:
       lmdb_db_backend();
