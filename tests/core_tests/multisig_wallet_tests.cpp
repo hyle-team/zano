@@ -2576,7 +2576,7 @@ bool multisig_unconfirmed_transfer_and_multiple_scan_pool_calls::c1(currency::co
 
   alice_wlt->scan_tx_pool(stub);
   alice_wlt->get_transfers(transfers);
-  CHECK_AND_ASSERT_MES(transfers.size() == 0, false, "incorrect transfers size for Alice: " << transfers.size() << "\n" << alice_wlt->dump_trunsfers());
+  CHECK_AND_ASSERT_MES(transfers.size() == 0, false, "incorrect transfers size for Alice: " << transfers.size() << "\n" << alice_wlt->dump_transfers());
   alice_wlt->get_unconfirmed_transfers(unconfirmed_transfers);
   CHECK_AND_ASSERT_MES(unconfirmed_transfers.size() == 1, false, "incorrect unconfirmed transfers size for Alice: " << unconfirmed_transfers.size());
   CHECK_AND_ASSERT_MES(alice_wlt->get_multisig_transfers().size() == 1, false, "incorrect multisig transfers size for Alice: " << alice_wlt->get_multisig_transfers().size());
@@ -2590,7 +2590,7 @@ bool multisig_unconfirmed_transfer_and_multiple_scan_pool_calls::c1(currency::co
   transfers.clear();
   unconfirmed_transfers.clear();
   alice_wlt->get_transfers(transfers);
-  CHECK_AND_ASSERT_MES(transfers.size() == 0, false, "incorrect transfers size for Alice: " << transfers.size() << "\n" << alice_wlt->dump_trunsfers());
+  CHECK_AND_ASSERT_MES(transfers.size() == 0, false, "incorrect transfers size for Alice: " << transfers.size() << "\n" << alice_wlt->dump_transfers());
   alice_wlt->get_unconfirmed_transfers(unconfirmed_transfers);
   CHECK_AND_ASSERT_MES(unconfirmed_transfers.size() == 1, false, "incorrect unconfirmed transfers size for Alice: " << unconfirmed_transfers.size());
   CHECK_AND_ASSERT_MES(alice_wlt->get_multisig_transfers().size() == 1, false, "incorrect multisig transfers size for Alice: " << alice_wlt->get_multisig_transfers().size());

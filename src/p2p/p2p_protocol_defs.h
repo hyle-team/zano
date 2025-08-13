@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -425,65 +425,36 @@ namespace nodetool
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
-  struct COMMAND_REQUEST_LOG
+  struct COMMAND_REQUEST_ANONYMIZED_PEERS
   {
-    const static int ID = P2P_COMMANDS_POOL_BASE + 7;
+    const static int ID = P2P_COMMANDS_POOL_BASE + 100;
 
     struct request
     {
       proof_of_trust  tr;
-      uint64_t        log_chunk_offset;
-      uint64_t        log_chunk_size;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(tr)
-        KV_SERIALIZE(log_chunk_offset)
-        KV_SERIALIZE(log_chunk_size)
       END_KV_SERIALIZE_MAP()
     };
 
+    struct anonymized_peer_info
+    {
+      uint64_t  time_started;
+      bool      inbound;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(time_started)
+        KV_SERIALIZE(inbound)
+      END_KV_SERIALIZE_MAP()
+    };
+    
     struct response
     {
-      int64_t     current_log_level;
-      uint64_t    current_log_size;
-      std::string error;
-      std::string log_chunk;
+      std::vector<anonymized_peer_info> peers;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(current_log_level)
-        KV_SERIALIZE(current_log_size)
-        KV_SERIALIZE(error)
-        KV_SERIALIZE(log_chunk)
-      END_KV_SERIALIZE_MAP()
-    };
-  };
-
-  /************************************************************************/
-  /*                                                                      */
-  /************************************************************************/
-  struct COMMAND_SET_LOG_LEVEL
-  {
-    const static int ID = P2P_COMMANDS_POOL_BASE + 8;
-
-    struct request
-    {
-      proof_of_trust  tr;
-      int64_t         new_log_level;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(tr)
-        KV_SERIALIZE(new_log_level)
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response
-    {
-      int64_t     old_log_level;
-      int64_t     current_log_level;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(old_log_level)
-        KV_SERIALIZE(current_log_level)
+        KV_SERIALIZE(peers)
       END_KV_SERIALIZE_MAP()
     };
   };

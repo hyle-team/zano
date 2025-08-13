@@ -344,7 +344,8 @@ TEST(perf, primitives)
       p = p + p;
     }
     ge_p3 Q;
-    ge_scalarmult_base(&Q, &scalar_t::random().m_s[0]);
+    scalar_t s_rnd = scalar_t::random();
+    ge_scalarmult_base(&Q, &s_rnd.m_s[0]);
     std::vector<ge_p1p1> results(rnd_indecies.size());
 
     t.start();
@@ -1109,8 +1110,6 @@ struct pme_runner_t : public pme_runner_i
 
 TEST(perf, msm)
 {
-  bool r = false;
-
   std::deque<std::unique_ptr<pme_runner_i>> runners;
   //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v1> >("Zarcanum, BPPE, 128", 1));
   //runners.emplace_front(std::make_unique< pme_runner_t<128, bpp_crypto_trait_Zarcanum,  mes_msm_and_check_zero_pippenger_v1> >("Zarcanum, BPPE, 128", 2));

@@ -1091,7 +1091,7 @@ namespace currency
       BOOST_SERIALIZE(attachment)
       BOOST_END_VERSION_UNDER(1)
       BOOST_SERIALIZE(proofs)
-      END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION()
   };
 
   

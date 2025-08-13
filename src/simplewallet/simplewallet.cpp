@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -96,22 +96,18 @@ namespace ph = boost::placeholders;
           } \
           catch (const tools::error::transfer_error& e) \
           { \
-            LOG_ERROR("unknown transfer error: " << e.to_string()); \
-            fail_msg_writer() << "unknown transfer error: " << e.what(); \
+            fail_msg_writer() << "(transfer) " << e.what(); \
           } \
           catch (const tools::error::wallet_internal_error& e) \
           { \
-            LOG_ERROR("internal error: " << e.to_string()); \
-            fail_msg_writer() << "internal error: " << e.what(); \
+            fail_msg_writer() << "(internal) " << e.what(); \
           } \
           catch (const std::exception& e) \
           { \
-            LOG_ERROR("unexpected error: " << e.what()); \
-            fail_msg_writer() << "unexpected error: " << e.what(); \
+            fail_msg_writer() << "(unexpected) " << e.what(); \
           } \
           catch (...) \
           { \
-            LOG_ERROR("Unknown error"); \
             fail_msg_writer() << "unknown error"; \
           } \
 
@@ -145,6 +141,8 @@ namespace
   const command_line::arg_descriptor<std::string>   arg_voting_config_file("voting-config-file", "Set voting config instead of getting if from daemon", "");
   const command_line::arg_descriptor<bool>          arg_no_password_confirmations("no-password-confirmation", "Enable/Disable password confirmation for transactions", false);
   const command_line::arg_descriptor<bool>          arg_seed_doctor("seed-doctor", "Experimental: if your seed is not working for recovery this is likely because you've made a mistake whene you were doing back up(typo, wrong words order, missing word). This experimental code will attempt to recover seed phrase from with few approaches.");
+  const command_line::arg_descriptor<bool>          arg_no_whitelist("no-white-list", "Do not load white list from interned.");
+  const command_line::arg_descriptor<std::string>   arg_restore_ki_in_wo_wallet("restore-ki-in-wo-wallet", "Watch-only missing key images restoration. Please, DON'T use it unless you 100% sure of what are you doing.", "");
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command  ("command", "");
 
@@ -301,7 +299,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("export_recent_transfers", boost::bind(&simple_wallet::export_recent_transfers, this, ph::_1), "list_recent_transfers_tx - Write recent transfer in json to wallet_recent_transfers.txt");
   m_cmd_binder.set_handler("list_outputs", boost::bind(&simple_wallet::list_outputs, this, ph::_1), "list_outputs [spent|unspent] [ticker=ZANO] [unknown] - Lists all the outputs. The result may be filtered by spent status, asset ticker or unknown asset ids.");
   m_cmd_binder.set_handler("lo", boost::bind(&simple_wallet::list_outputs, this, ph::_1), "alias for list_outputs");
-  m_cmd_binder.set_handler("dump_transfers", boost::bind(&simple_wallet::dump_trunsfers, this, ph::_1), "dump_transfers - Write  transfers in json to dump_transfers.txt");
+  m_cmd_binder.set_handler("dump_transfers", boost::bind(&simple_wallet::dump_transfers, this, ph::_1), "dump_transfers - Write  transfers in json to dump_transfers.txt");
   m_cmd_binder.set_handler("dump_keyimages", boost::bind(&simple_wallet::dump_key_images, this, ph::_1), "dump_keyimages - Write  key_images in json to dump_key_images.txt");
   m_cmd_binder.set_handler("payments", boost::bind(&simple_wallet::show_payments, this, ph::_1), "payments <payment_id_1> [<payment_id_2> ... <payment_id_N>] - Show payments <payment_id_1>, ... <payment_id_N>");
   m_cmd_binder.set_handler("bc_height", boost::bind(&simple_wallet::show_blockchain_height, this,ph::_1), "Show blockchain height");
@@ -408,6 +406,16 @@ void process_wallet_command_line_params(const po::variables_map& vm, tools::wall
       wal.set_disable_tor_relay(true);
     }
   }
+  
+  if (command_line::has_arg(vm, arg_no_whitelist))
+  {
+    wal.set_use_assets_whitelisting(!command_line::get_arg(vm, arg_no_whitelist));
+  }
+  else
+  {
+    wal.set_use_assets_whitelisting(true);
+  }
+  
 
   if (command_line::has_arg(vm, arg_set_timeout))
   {
@@ -513,8 +521,10 @@ bool simple_wallet::init(const boost::program_options::variables_map& vm)
   else
   {
     bool r = open_wallet(m_wallet_file, pwd_container.password());
-    CHECK_AND_ASSERT_MES(r, false, "could not open account");
+    CHECK_AND_ASSERT_MES(r, false, "wallet could not be opened");
     was_open = true;
+    if (!process_ki_restoration())
+      return false;
   }
   process_wallet_command_line_params(vm, *m_wallet, false);
 
@@ -554,6 +564,8 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_disable_tor     = command_line::get_arg(vm, arg_disable_tor_relay);
   m_voting_config_file = command_line::get_arg(vm, arg_voting_config_file);
   m_no_password_confirmations = command_line::get_arg(vm, arg_no_password_confirmations);  
+  m_no_whitelist = command_line::get_arg(vm, arg_no_whitelist);
+  m_restore_ki_in_wo_wallet = command_line::get_arg(vm, arg_restore_ki_in_wo_wallet);
 } 
 //----------------------------------------------------------------------------------------------------
 
@@ -615,6 +627,7 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
     m_wallet->generate(epee::string_encoding::utf8_to_wstring(m_wallet_file), password, create_auditable_wallet);
     message_writer(epee::log_space::console_color_white, true) << "Generated new " << (create_auditable_wallet ? "AUDITABLE" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
     display_vote_info(*m_wallet);
+    preconfig_wallet_obj();
     std::cout << "view key: " << string_tools::pod_to_hex(m_wallet->get_account().get_keys().view_secret_key) << std::endl << std::flush;
     if (m_wallet->is_auditable())
       std::cout << "tracking seed: " << std::endl << m_wallet->get_account().get_tracking_seed() << std::endl << std::flush;
@@ -663,6 +676,7 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
         std::cout << "tracking seed: " << std::endl << m_wallet->get_account().get_tracking_seed() << std::endl << std::flush;
     }
     display_vote_info(*m_wallet);
+    preconfig_wallet_obj();
     if (m_do_not_set_date)
       m_wallet->reset_creation_time(0);
   }
@@ -689,7 +703,12 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-
+void simple_wallet::preconfig_wallet_obj()
+{
+  if (m_no_whitelist)
+    m_wallet->set_use_assets_whitelisting(false);
+}
+//
 bool simple_wallet::open_wallet(const string &wallet_file, const std::string& password)
 {
   m_wallet_file = wallet_file;
@@ -698,20 +717,25 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
   if (!m_voting_config_file.empty())
     m_wallet->set_votes_config_path(m_voting_config_file);
 
+  auto print_wallet_opened_msg = [&](){
+    message_writer(epee::log_space::console_color_white, true) << "Opened" << (m_wallet->is_auditable() ? " auditable" : "") << (m_wallet->is_watch_only() ? " watch-only" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
+  };
+
 
   while (true)
   {
     try
     {
       m_wallet->load(epee::string_encoding::utf8_to_wstring(m_wallet_file), password);
-      message_writer(epee::log_space::console_color_white, true) << "Opened" << (m_wallet->is_auditable() ? " auditable" : "") << (m_wallet->is_watch_only() ? " watch-only" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
+      print_wallet_opened_msg();
+      preconfig_wallet_obj();
       display_vote_info(*m_wallet);
-
+      
       break;
     }
     catch (const tools::error::wallet_load_notice_wallet_restored& /*e*/)
     {
-      message_writer(epee::log_space::console_color_white, true) << "Opened wallet: " << m_wallet->get_account().get_public_address_str();
+      print_wallet_opened_msg();
       message_writer(epee::log_space::console_color_red, true) << "NOTICE: Wallet file was damaged and restored.";
       break;
     }
@@ -764,6 +788,27 @@ bool simple_wallet::save(const std::vector<std::string> &args)
   }
 
   return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::process_ki_restoration()
+{
+  if (!m_restore_ki_in_wo_wallet.empty())
+  {
+    std::wstring wo_filename = epee::string_encoding::utf8_to_wstring(m_restore_ki_in_wo_wallet);
+    CHECK_AND_ASSERT_THROW_MES(std::filesystem::exists(wo_filename), "cannot open " << m_restore_ki_in_wo_wallet);
+
+    tools::password_container wo_password;
+    if (!wo_password.read_password("Enter password for wallet " + m_restore_ki_in_wo_wallet + " :"))
+      return false;
+
+    m_wallet->restore_key_images_in_wo_wallet(wo_filename, wo_password.password());
+
+    success_msg_writer() << "Missing key images have been successfully repared in " << m_restore_ki_in_wo_wallet << ENDL;
+    
+    return false; // means the wallet processing should stop now
+  }
+
+  return true; // means the wallet can load and work further normally
 }
 //----------------------------------------------------------------------------------------------------
 #ifdef CPU_MINING_ENABLED
@@ -898,7 +943,7 @@ void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_inf
       ", tx " << wti.tx_hash;
     for (const auto& st : wti.subtransfers)
     {
-      epee::log_space::console_colors color = st.is_income ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
+      [[maybe_unused]] epee::log_space::console_colors color = st.is_income ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
       uint64_t decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
       std::string token_info = get_token_info_string(st.asset_id, decimal_points);
 
@@ -1131,7 +1176,7 @@ std::string wti_to_text_line(const tools::wallet_public::wallet_transfer_info& w
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::export_recent_transfers(const std::vector<std::string>& args)
 {
-  bool export_to_json = true;
+  [[maybe_unused]] bool export_to_json = true;
   bool ignore_pos = false;
   if (args.size() > 1)
   {
@@ -1167,12 +1212,12 @@ bool simple_wallet::export_recent_transfers(const std::vector<std::string>& args
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::dump_trunsfers(const std::vector<std::string>& args)
+bool simple_wallet::dump_transfers(const std::vector<std::string>& args)
 {
 
   stringstream ss;
   success_msg_writer() << "Generating text....";
-  m_wallet->dump_trunsfers(ss);
+  m_wallet->dump_transfers(ss);
   success_msg_writer() << "Storing text to dump_transfers.txt....";
   file_io_utils::save_string_to_file(log_space::log_singletone::get_default_log_folder() + "/dump_transfers.txt", ss.str());
   success_msg_writer() << "Done....";
@@ -1850,6 +1895,12 @@ bool simple_wallet::print_address(const std::vector<std::string> &args/* = std::
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::show_seed(const std::vector<std::string> &args)
 {
+  if (m_wallet->is_watch_only())
+  {
+    fail_msg_writer() << "watch-only wallet doesn't have the full set of keys, hence no seed phrase can be generated";
+    return false;
+  }
+
   CONFIRM_WITH_PASSWORD();
   success_msg_writer() << "Please enter a password to secure this seed. Securing your seed is HIGHLY recommended. Leave password blank to stay unsecured.";
   success_msg_writer(true) << "Remember, restoring a wallet from Secured Seed can only be done if you know its password.";
@@ -2037,12 +2088,10 @@ bool simple_wallet::save_watch_only(const std::vector<std::string> &args)
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR("unexpected error: " << e.what());
-    fail_msg_writer() << "unexpected error: " << e.what();
+    fail_msg_writer() << e.what();
   }
   catch (...)
   {
-    LOG_ERROR("Unknown error");
     fail_msg_writer() << "unknown error";
   }
   return true;
@@ -2106,12 +2155,10 @@ bool simple_wallet::sign_transfer(const std::vector<std::string> &args)
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR("unexpected error: " << e.what());
-    fail_msg_writer() << "unexpected error: " << e.what();
+    fail_msg_writer() << e.what();
   }
   catch (...)
   {
-    LOG_ERROR("Unknown error");
     fail_msg_writer() << "unknown error";
   }
   return true;
@@ -2132,12 +2179,10 @@ bool simple_wallet::submit_transfer(const std::vector<std::string> &args)
   }
   catch (const std::exception& e)
   {
-    LOG_ERROR("unexpected error: " << e.what());
-    fail_msg_writer() << "unexpected error: " << e.what();
+    fail_msg_writer() << e.what();
   }
   catch (...)
   {
-    LOG_ERROR("Unknown error");
     fail_msg_writer() << "unknown error";
   }
   return true;
@@ -2745,7 +2790,6 @@ bool simple_wallet::sweep_bare_outs(const std::vector<std::string> &args)
 {
   CONFIRM_WITH_PASSWORD();
   SIMPLE_WALLET_BEGIN_TRY_ENTRY();
-  bool r = false;
 
   if (args.size() > 1)
   {
@@ -3097,7 +3141,7 @@ int seed_doctor()
   }
 
   bool pass_protected = false;
-  bool success = account_base::is_seed_password_protected(seed, pass_protected);
+  account_base::is_seed_password_protected(seed, pass_protected);
   success_msg_writer() << "SECURED_SEED: " << (pass_protected ? "true" : "false");
 
   if (pass_protected)
@@ -3203,7 +3247,7 @@ int seed_doctor()
       success_msg_writer() << "No address and no checksum, recovery is limited only to date reset";
       std::string result = boost::algorithm::join(words, " ");
       account_base acc;
-      bool r = acc.restore_from_seed_phrase(result, passphrase);
+      acc.restore_from_seed_phrase(result, passphrase);
       success_msg_writer() << "Potential seed candidate:\n" << result << "\nAddress: " << acc.get_public_address_str();
       return EXIT_FAILURE;
     }
@@ -3297,6 +3341,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, command_line::arg_generate_rpc_autodoc); 
   command_line::add_arg(desc_params, arg_seed_doctor);
   command_line::add_arg(desc_params, arg_derive_custom_seed);
+  command_line::add_arg(desc_params, arg_no_whitelist);
+  command_line::add_arg(desc_params, arg_restore_ki_in_wo_wallet);
 
 
   tools::wallet_rpc_server::init_options(desc_params);
@@ -3323,7 +3369,7 @@ int main(int argc, char* argv[])
     }
     else if (command_line::get_arg(vm, command_line::arg_version))
     {
-      success_msg_writer() << CURRENCY_NAME << " wallet v" << PROJECT_VERSION_LONG;
+      success_msg_writer() << CURRENCY_NAME << " simplewallet v" << PROJECT_VERSION_LONG;
       exit_requested = true;
       return true;
     }
@@ -3349,6 +3395,7 @@ int main(int argc, char* argv[])
   std::string log_dir;
   log_dir = log_file_path.has_parent_path() ? log_file_path.parent_path().string() : log_space::log_singletone::get_default_log_folder();
   log_space::log_singletone::add_logger(LOGGER_FILE, log_file_path.filename().string().c_str(), log_dir.c_str(), LOG_LEVEL_4);
+  LOG_PRINT_L0(ENDL << ENDL);
   message_writer(epee::log_space::console_color_white, true, std::string(), LOG_LEVEL_0) << CURRENCY_NAME << " simplewallet v" << PROJECT_VERSION_LONG;
 
   if (command_line::has_arg(vm, command_line::arg_log_level))
@@ -3488,7 +3535,7 @@ int main(int argc, char* argv[])
         if (command_line::get_arg(vm, arg_generate_new_wallet).size() || command_line::get_arg(vm, arg_generate_new_auditable_wallet).size())
           return EXIT_FAILURE;
 
-        wal.set_use_assets_whitelisting(true);
+        
         wal.callback(callback);
 
         if (!offline_mode)

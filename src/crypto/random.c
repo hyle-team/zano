@@ -1,3 +1,4 @@
+// Copyright (c) 2018-2025 Zano Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -5,9 +6,10 @@
 #include <assert.h>
 #include <stddef.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "hash-ops.h"
-//#include "initializer.h"
 #include "random.h"
 
 static_assert(RANDOM_STATE_SIZE >= HASH_DATA_AREA, "Invalid RANDOM_STATE_SIZE");
@@ -15,19 +17,29 @@ static_assert(RANDOM_STATE_SIZE >= HASH_DATA_AREA, "Invalid RANDOM_STATE_SIZE");
 #if defined(_WIN32)
 
 #include <windows.h>
-#include <wincrypt.h>
+#include <bcrypt.h>
 
-void generate_system_random_bytes(size_t n, void *result) {
-  HCRYPTPROV prov;
-#define must_succeed(x) do if (!(x)) assert(0); while (0)
-  if(!CryptAcquireContext(&prov, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT))
+// thread-safe version
+bool generate_system_random_bytes(size_t n, void *result)
+{
+  if (n == 0)
+    return true;
+
+  if (result == NULL)
+    return false;
+    
+  NTSTATUS status = BCryptGenRandom(NULL, (PUCHAR)result, (ULONG)n, BCRYPT_USE_SYSTEM_PREFERRED_RNG);
+  return BCRYPT_SUCCESS(status);
+}
+
+void generate_system_random_bytes_or_die(size_t n, void *result)
+{
+  if (!generate_system_random_bytes(n, result))
   {
-    int err = GetLastError();
-    assert(0);
+    fprintf(stderr, "Error: generate_system_random_bytes failed and this is fatal\n\n");
+    fflush(stderr);
+    _exit(EXIT_FAILURE);
   }
-  must_succeed(CryptGenRandom(prov, (DWORD)n, result));
-  must_succeed(CryptReleaseContext(prov, 0));
-#undef must_succeed
 }
 
 #else
@@ -40,28 +52,49 @@ void generate_system_random_bytes(size_t n, void *result) {
 #include <sys/types.h>
 #include <unistd.h>
 
-void generate_system_random_bytes(size_t n, void *result) {
+bool generate_system_random_bytes(size_t n, void *result)
+{
   int fd;
-  if ((fd = open("/dev/urandom", O_RDONLY | O_NOCTTY | O_CLOEXEC)) < 0) {
-    exit(EXIT_FAILURE);
-  }
-  for (;;) {
-    ssize_t res = read(fd, result, n);
-    if ((size_t) res == n) {
-      break;
-    }
-    if (res < 0) {
-      if (errno != EINTR) {
-        exit(EXIT_FAILURE);
+    
+  fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
+  if (fd < 0)
+    return false;
+
+  size_t bytes_read = 0;
+  while (bytes_read < n)
+  {
+    ssize_t res = read(fd, (char*)result + bytes_read, n - bytes_read);
+    if (res < 0)
+    {
+      if (errno != EINTR)
+      {
+        close(fd);
+        return false;
       }
-    } else if (res == 0) {
-      exit(EXIT_FAILURE);
-    } else {
-      result = padd(result, (size_t) res);
-      n -= (size_t) res;
+      // EINTR - interrupted by signal, continue reading
+    }
+    else if (res == 0)
+    {
+      // EOF - should not happen with /dev/urandom
+      close(fd);
+      return false;
+    }
+    else
+    {
+      bytes_read += res;
     }
   }
-  if (close(fd) < 0) {
+    
+  close(fd); // don't check, 'cuz failing to close /dev/urandom is not truly fatal, the OS will clean up
+  return true;
+}
+
+void generate_system_random_bytes_or_die(size_t n, void *result)
+{
+  if (!generate_system_random_bytes(n, result))
+  {
+    fprintf(stderr, "FATAL: Failed to generate %zu random bytes: %s\n\n", n, strerror(errno));
+    fflush(stderr);
     exit(EXIT_FAILURE);
   }
 }
@@ -69,6 +102,8 @@ void generate_system_random_bytes(size_t n, void *result) {
 #endif
 
 static union hash_state state;
+
+static_assert(sizeof(union hash_state) == RANDOM_STATE_SIZE, "RANDOM_STATE_SIZE and hash_state size missmatch");
 
 #if !defined(NDEBUG)
 static volatile int curstate; /* To catch thread safety problems. */
@@ -83,11 +118,10 @@ FINALIZER(deinit_random) {
 }
 */
 
-//INITIALIZER(init_random) {
 void init_random(void)
 {
-  generate_system_random_bytes(32, &state);
-  //REGISTER_FINA\LIZER(deinit_random);
+  generate_system_random_bytes_or_die(HASH_DATA_AREA, &state);
+
 #if !defined(NDEBUG)
   assert(curstate == 0);
   curstate = 1;
@@ -95,7 +129,7 @@ void init_random(void)
 }
 
 
-void grant_random_initialize(void)
+void grant_random_initialize_no_lock(void)
 {
   static bool initalized = false;
   if(!initalized)
@@ -105,9 +139,9 @@ void grant_random_initialize(void)
   }
 }
 
-void random_prng_initialize_with_seed(uint64_t seed)
+void random_prng_initialize_with_seed_no_lock(uint64_t seed)
 {
-  grant_random_initialize();
+  grant_random_initialize_no_lock();
 #if !defined(NDEBUG)
   assert(curstate == 1);
   curstate = 3;
@@ -122,9 +156,9 @@ void random_prng_initialize_with_seed(uint64_t seed)
 #endif
 }
 
-void random_prng_get_state(void *state_buffer, const size_t buffer_size)
+void random_prng_get_state_no_lock(void *state_buffer, const size_t buffer_size)
 {
-  grant_random_initialize();
+  grant_random_initialize_no_lock();
 #if !defined(NDEBUG)
   assert(curstate == 1);
   curstate = 4;
@@ -139,9 +173,9 @@ void random_prng_get_state(void *state_buffer, const size_t buffer_size)
 #endif
 }
 
-void random_prng_set_state(const void *state_buffer, const size_t buffer_size)
+void random_prng_set_state_no_lock(const void *state_buffer, const size_t buffer_size)
 {
-  grant_random_initialize();
+  grant_random_initialize_no_lock();
 #if !defined(NDEBUG)
   assert(curstate == 1);
   curstate = 5;
@@ -156,8 +190,9 @@ void random_prng_set_state(const void *state_buffer, const size_t buffer_size)
 #endif
 }
 
-void generate_random_bytes(size_t n, void *result) {
-  grant_random_initialize();
+void generate_random_bytes_no_lock(size_t n, void *result)
+{
+  grant_random_initialize_no_lock();
 #if !defined(NDEBUG)
   assert(curstate == 1);
   curstate = 2;

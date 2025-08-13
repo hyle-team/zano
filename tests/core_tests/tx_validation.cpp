@@ -1651,6 +1651,7 @@ bool tx_version_against_hardfork::generate(std::vector<test_event_entry>& events
   {
   case ZANO_HARDFORK_04_ZARCANUM:
     tx_hardfork_id = 0;
+    [[fallthrough]];
   case ZANO_HARDFORK_05:
     tx_version_good = TRANSACTION_VERSION_POST_HF4;
     tx_version_bad = TRANSACTION_VERSION_PRE_HF4;
@@ -1836,6 +1837,7 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
     }
 
     CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+
   }
 
   // Two entries of the same type in extra.
@@ -2567,7 +2569,6 @@ bool input_refers_to_incompatible_by_type_output::assert_zc_input_refers_bare_ou
   }
 
   {
-    bool all_inputs_have_explicit_native_asset_id{};
     blockchain_storage::check_tx_inputs_context ctic{};
 
     CHECK_AND_ASSERT_EQ(c.get_blockchain_storage().check_tx_input(tx, 0, boost::get<const txin_zc_input>(tx.vin.front()), get_transaction_hash(tx), ctic), false);
@@ -2728,3 +2729,137 @@ bool tx_pool_validation_and_chain_switch::c1(currency::core& c, size_t ev_index,
   return true;
 }
 
+// Сoinbase transactions must NOT allow the TX_FLAG_SIGNATURE_MODE_SEPARATE flag.
+// Сhecks that setting this flag for coinbase fails, while a default coinbase (without the flag) succeeds.
+bool tx_coinbase_separate_sig_flag::generate(std::vector<test_event_entry>& events) const
+{
+  GENERATE_ACCOUNT(miner);
+  
+  uint64_t ts = test_core_time::get_time();
+  MAKE_GENESIS_BLOCK(events, blk_0, miner, ts);
+  DO_CALLBACK(events, "configure_core");
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner);
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  block blk_2;
+  auto coinbase_default_cb = [](transaction& miner_tx, const keypair&) -> bool { return true; };
+  auto coinbase_separate_cb = [](transaction& miner_tx, const keypair&) -> bool
+  {
+    set_tx_flags(miner_tx, get_tx_flags(miner_tx) | TX_FLAG_SIGNATURE_MODE_SEPARATE);
+    return true;
+  };
+
+  // сonstruct a block with the forbidden flag, should fail after hf4
+  bool with_separate_flag = generator.construct_block_gentime_with_coinbase_cb(blk_1r, miner, coinbase_separate_cb, blk_2);
+  CHECK_AND_ASSERT_MES(with_separate_flag, false, "expected failure because TX_FLAG_SIGNATURE_MODE_SEPARATE is forbidden for coinbase after HF4");
+
+  DO_CALLBACK(events, "mark_invalid_block"); 
+  events.push_back(blk_2);
+
+  // construct a default coinbase block, should succeed
+  bool default_tx = generator.construct_block_gentime_with_coinbase_cb(blk_1r, miner, coinbase_default_cb, blk_2);
+  CHECK_AND_ASSERT_MES(default_tx, true, "default coinbase must succeed");
+
+  events.push_back(blk_2);
+
+  return true;
+}
+
+tx_input_mixins::tx_input_mixins()
+{
+  REGISTER_CALLBACK_METHOD(tx_input_mixins, configure_core);
+}
+
+bool tx_input_mixins::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
+  pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
+  pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
+  pc.hf4_minimum_mixins = 5;
+  pc.hard_forks.set_hardfork_height(1, 0);
+  pc.hard_forks.set_hardfork_height(2, 1);
+  pc.hard_forks.set_hardfork_height(3, 1);
+  pc.hard_forks.set_hardfork_height(4, 31);
+  c.get_blockchain_storage().set_core_runtime_config(pc);
+  return true;
+}
+
+// Tests that post-HF4, legacy txin_to_key inputs accept any mixin count, while new txin_zc inputs enforce a >= 15 mixin minimum
+// are in the same vin and work together
+bool tx_input_mixins::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+
+  GENERATE_ACCOUNT(miner_acc);
+  GENERATE_ACCOUNT(alice_acc);
+  GENERATE_ACCOUNT(bob_acc);
+
+  m_hardforks.set_hardfork_height(1, 0);
+  m_hardforks.set_hardfork_height(2, 1);
+  m_hardforks.set_hardfork_height(3, 1);
+  m_hardforks.set_hardfork_height(4, 31);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+
+  // mine one block, then rewind enough to unlock initial coinbase funds
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner_acc);
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW*2);
+
+  // build tx_a_1: single txin_to_key output of 15 coins to Alice
+  transaction tx_a_1;
+  bool r = construct_tx_with_many_outputs(m_hardforks, events, blk_1r, miner_acc.get_keys(), 
+    alice_acc.get_public_address(), MK_TEST_COINS(15), 1, TESTS_DEFAULT_FEE, tx_a_1);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs 1 failed");
+  events.push_back(tx_a_1);
+
+  // build tx_a_2: 16 outputs of 15 coins each to Bob for mixins
+  transaction tx_a_2;
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_1r, miner_acc.get_keys(), 
+    bob_acc.get_public_address(), MK_TEST_COINS(15*16), 16, TESTS_DEFAULT_FEE, tx_a_2);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs 2 failed");
+  events.push_back(tx_a_2);
+
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1r_1, blk_1r, miner_acc, std::list<transaction>({ tx_a_1, tx_a_2 }));
+
+  // mine a couple more blocks and rewind to generate new spendable outputs
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1r_1, miner_acc);
+  REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, 4);
+  MAKE_NEXT_BLOCK(events, blk_3, blk_2r, miner_acc);
+  REWIND_BLOCKS_N(events, blk_4r, blk_3, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // make sure HF4 is active at 31 height
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", size_t{ZANO_HARDFORK_04_ZARCANUM});
+
+  // build tx_b with zc hf4 input, send 15 coins from miner -> Alice
+  std::vector<currency::tx_source_entry> sources_b;
+  std::vector<currency::tx_destination_entry> destinations_b;
+  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(
+    events, blk_4r, miner_acc, alice_acc, MK_TEST_COINS(15), TESTS_DEFAULT_FEE, 2, sources_b, destinations_b), 
+    false, "fill_tx_sources_and_destinations failed");
+  currency::transaction tx_b{};
+  r = construct_tx(miner_acc.get_keys(), sources_b, destinations_b, events, this, tx_b);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  events.push_back(tx_b);
+
+  // mine tx_b and rewind to unlock its outputs
+  MAKE_NEXT_BLOCK_TX1(events, blk_5, blk_4r, miner_acc, tx_b);
+  REWIND_BLOCKS_N(events, blk_5r, blk_5, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  std::vector<currency::tx_source_entry> sources_c;
+  std::vector<currency::tx_destination_entry> destinations_c;
+  // For input #0 use 5 mixins (old-style ring-CT allows any mixins)
+  // For input #1 use 16 mixins (new-style txin_zc enforces >=15 once HF4 is live)
+  mixins_per_input nmix_map = { {0, 5}, {1, 16} };
+  CHECK_AND_ASSERT_MES(fill_tx_sources_and_destinations(
+    events, blk_5r, alice_acc, bob_acc, MK_TEST_COINS(29), TESTS_DEFAULT_FEE, 5, sources_c, destinations_c, 
+    true, true, false, &nmix_map), false, "fill_tx_sources_and_destinations failed");
+  currency::transaction tx_c{};
+  r = construct_tx(alice_acc.get_keys(), sources_c, destinations_c, events, this, tx_c);
+  LOG_PRINT_GREEN("tx_c alice -> bob \n" << obj_to_json_str(tx_c), LOG_LEVEL_0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  events.push_back(tx_c);
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_6, blk_5r, miner_acc, tx_c);
+
+  return true;
+}

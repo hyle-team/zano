@@ -1922,10 +1922,11 @@ std::string wallets_manager::get_wallet_restore_info(uint64_t wallet_id, std::st
 {
   GET_WALLET_OPT_BY_ID(wallet_id, wo);
 
-  if (wo.wallet_state != view::wallet_status_info::wallet_state_ready || wo.long_refresh_in_progress)
-    return API_RETURN_CODE_CORE_BUSY;
+  seed_phrase = wo.w.unlocked_get()->get_account().get_seed_phrase(seed_password);
 
-  seed_phrase = wo.w->get()->get_account().get_seed_phrase(seed_password);
+  //if (wo.wallet_state != view::wallet_status_info::wallet_state_ready || wo.long_refresh_in_progress)
+  //  return API_RETURN_CODE_CORE_BUSY;
+  //seed_phrase = wo.w->get()->get_account().get_seed_phrase(seed_password);
 
   return API_RETURN_CODE_OK;
 }

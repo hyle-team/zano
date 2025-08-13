@@ -58,7 +58,7 @@ namespace currency
     bool show_balance(const std::vector<std::string> &args = std::vector<std::string>());
     bool list_recent_transfers(const std::vector<std::string>& args);
     bool export_recent_transfers(const std::vector<std::string>& args);
-    bool dump_trunsfers(const std::vector<std::string>& args);
+    bool dump_transfers(const std::vector<std::string>& args);
     bool dump_key_images(const std::vector<std::string>& args);
     bool show_incoming_transfers(const std::vector<std::string> &args);
     bool show_staking_history(const std::vector<std::string>& args);
@@ -182,6 +182,9 @@ namespace currency
     };
 
   private:
+    void preconfig_wallet_obj();
+    bool process_ki_restoration();
+
     std::string m_wallet_file;
     std::string m_generate_new;
     std::string m_generate_new_aw;
@@ -198,6 +201,8 @@ namespace currency
     std::string m_restore_wallet;
     std::string m_voting_config_file;
     bool m_no_password_confirmations = false;
+    bool m_no_whitelist = false;
+    std::string m_restore_ki_in_wo_wallet;
     
     crypto::hash m_password_hash;
     uint64_t m_password_salt;

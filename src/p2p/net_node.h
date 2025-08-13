@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2019 Zano Project
+﻿// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -144,8 +144,7 @@ namespace nodetool
         HANDLE_INVOKE_T2(COMMAND_REQUEST_STAT_INFO, &node_server::handle_get_stat_info)
         HANDLE_INVOKE_T2(COMMAND_REQUEST_NETWORK_STATE, &node_server::handle_get_network_state)
         HANDLE_INVOKE_T2(COMMAND_REQUEST_PEER_ID, &node_server::handle_get_peer_id)
-        HANDLE_INVOKE_T2(COMMAND_REQUEST_LOG, &node_server::handle_request_log)
-        HANDLE_INVOKE_T2(COMMAND_SET_LOG_LEVEL, &node_server::handle_set_log_level)
+        HANDLE_INVOKE_T2(COMMAND_REQUEST_ANONYMIZED_PEERS, &node_server::handle_request_anonymized_peers)
       }
 #endif
       CHAIN_INVOKE_MAP_TO_OBJ_FORCE_CONTEXT(m_payload_handler, typename t_payload_net_handler::connection_context&)
@@ -160,8 +159,7 @@ namespace nodetool
     int handle_get_stat_info(int command, typename COMMAND_REQUEST_STAT_INFO::request& arg, typename COMMAND_REQUEST_STAT_INFO::response& rsp, p2p_connection_context& context);
     int handle_get_network_state(int command, COMMAND_REQUEST_NETWORK_STATE::request& arg, COMMAND_REQUEST_NETWORK_STATE::response& rsp, p2p_connection_context& context);
     int handle_get_peer_id(int command, COMMAND_REQUEST_PEER_ID::request& arg, COMMAND_REQUEST_PEER_ID::response& rsp, p2p_connection_context& context);
-    int handle_request_log(int command, COMMAND_REQUEST_LOG::request& arg, COMMAND_REQUEST_LOG::response& rsp, p2p_connection_context& context);
-    int handle_set_log_level(int command, COMMAND_SET_LOG_LEVEL::request& arg, COMMAND_SET_LOG_LEVEL::response& rsp, p2p_connection_context& context);
+    int handle_request_anonymized_peers(int command, COMMAND_REQUEST_ANONYMIZED_PEERS::request& req, COMMAND_REQUEST_ANONYMIZED_PEERS::response& rsp, p2p_connection_context& context);
   private:
 #endif
     bool init_config();
