@@ -401,6 +401,339 @@ bool solo_container_save_load_test()
   return true;
 }
 
+struct lmdb_txn_basic_write_test
+{
+  typedef tools::db::cached_key_value_accessor<uint64_t, std::string, true, true> accessor_type;
+  static bool run_test(accessor_type& acc)
+  {
+    acc.begin_transaction();
+
+    uint64_t key = 12345;
+    std::string data = "test_data";
+
+    acc.set(key, data);
+
+    auto ptr = acc.get(key);
+    CHECK_AND_ASSERT_MES(ptr.get() && *ptr == data, false, "Data mismatch after set in transaction");
+
+    acc.commit_transaction();
+
+    acc.begin_transaction(true);
+    ptr = acc.get(key);
+    CHECK_AND_ASSERT_MES(ptr.get() && *ptr == data, false, "Data not persisted after commit");
+    acc.commit_transaction();
+
+    LOG_PRINT_GREEN("Test successful", LOG_LEVEL_0);
+    return true;
+  }
+};
+
+struct lmdb_txn_basic_read_only_test
+{
+  typedef tools::db::cached_key_value_accessor<uint64_t, std::string, true, true> accessor_type;
+  static bool run_test(accessor_type& acc)
+  {
+    acc.begin_transaction(false);
+    uint64_t key = 67890;
+    std::string data = "read_only_data";
+    acc.set(key, data);
+    acc.commit_transaction();
+
+    acc.begin_transaction(true);
+    auto ptr = acc.get(key);
+    CHECK_AND_ASSERT_MES(ptr.get() && *ptr == data, false, "Data not readable in read-only transaction");
+
+    try
+    {
+      acc.set(key, "modified");
+      CHECK_AND_ASSERT_MES(false, false, "Write allowed in read-only transaction");
+    }
+    catch (...) {}
+
+    acc.commit_transaction();
+
+    acc.begin_transaction(true);
+    ptr = acc.get(key);
+    CHECK_AND_ASSERT_MES(ptr.get() && *ptr == data, false, "Data modified unexpectedly in read-only");
+    acc.commit_transaction();
+
+    LOG_PRINT_GREEN("lmdb_txn_basic_read_only_test successful", LOG_LEVEL_0);
+    return true;
+  }
+};
+
+struct lmdb_txn_nested_read_only_test
+{
+  typedef tools::db::cached_key_value_accessor<uint64_t, std::string, true, true> accessor_type;
+  static bool run_test(accessor_type& acc)
+  {
+    // Insert initial data
+    acc.begin_transaction(false);
+    uint64_t key = 11111;
+    std::string data = "nested_read_data";
+    acc.set(key, data);
+    acc.commit_transaction();
+
+    // Start outer read-only
+    acc.begin_transaction(true);
+
+    // Nested read-only
+    acc.begin_transaction(true);
+    auto ptr = acc.get(key);
+    CHECK_AND_ASSERT_MES(ptr.get() && *ptr == data, false, "Data not readable in nested read-only");
+
+    // Another nested
+    acc.begin_transaction(true);
+    ptr = acc.get(key);
+    CHECK_AND_ASSERT_MES(ptr.get() && *ptr == data, false, "Data not readable in double nested read-only");
+    acc.commit_transaction(); // Commit inner
+
+    acc.commit_transaction(); // Commit middle
+
+    acc.commit_transaction(); // Commit outer
+
+    LOG_PRINT_GREEN("lmdb_txn_nested_read_only_test successful", LOG_LEVEL_0);
+    return true;
+  }
+};
+
+struct lmdb_txn_abort_test
+{
+  typedef tools::db::cached_key_value_accessor<uint64_t, std::string, true, true> accessor_type;
+  static bool run_test(accessor_type& acc)
+  {
+    uint64_t key = 22222;
+    std::string data = "abort_data";
+
+    acc.begin_transaction(false);
+    acc.set(key, data);
+    acc.abort_transaction();
+
+    // Verify data not persisted
+    acc.begin_transaction(true);
+    auto ptr = acc.get(key);
+    CHECK_AND_ASSERT_MES(!ptr.get(), false, "Data persisted after abort");
+    acc.commit_transaction();
+
+    LOG_PRINT_GREEN("lmdb_txn_abort_test successful", LOG_LEVEL_0);
+    return true;
+  }
+};
+
+struct lmdb_txn_destructor_abort_test
+{
+  typedef tools::db::cached_key_value_accessor<uint64_t, std::string, true, true> accessor_type;
+
+  static bool run_test(accessor_type& /*acc*/)
+  {
+    const std::string base = epee::string_tools::get_current_module_folder() + std::string("/") + DB_TEST_SUB_DIR + "/lmdb_txn_dtor";
+    boost::system::error_code ec;
+    boost::filesystem::remove_all(base, ec);
+    CHECK_AND_ASSERT_MES(!ec, false, "Failed to empty db subdir: " << ec.message());
+    CHECK_AND_ASSERT_MES(tools::create_directories_if_necessary(base), false, "mkdir failed");
+
+    epee::shared_recursive_mutex rwlock;
+    auto backend_sp = std::make_shared<tools::db::lmdb_db_backend>();
+    tools::db::lmdb_db_backend* backend = backend_sp.get();
+    tools::db::basic_db_accessor bdb(backend_sp, rwlock);
+
+    CHECK_AND_ASSERT_MES(bdb.open(base), false, "backend open failed");
+
+    tools::db::container_handle h = 0;
+    CHECK_AND_ASSERT_MES(bdb.get_backend()->open_container("txn", h), false, "open_container failed");
+    MDB_dbi dbi = static_cast<MDB_dbi>(h);
+
+    const std::string key = "dtor_key";
+    const std::string val = "dtor_val";
+
+    {
+      tools::db::lmdb_db_backend::lmdb_txn txn(*backend, false);
+      int rc = txn.begin(nullptr);
+      CHECK_AND_ASSERT_MES(rc == MDB_SUCCESS, false, "txn.begin failed");
+
+      MDB_val k = AUTO_VAL_INIT(k);
+      MDB_val v = AUTO_VAL_INIT(v);
+      k.mv_data = (void*)key.data(); k.mv_size = key.size();
+      v.mv_data = (void*)val.data(); v.mv_size = val.size();
+
+      rc = mdb_put(txn.ptx, dbi, &k, &v, 0);
+      CHECK_AND_ASSERT_MES(rc == MDB_SUCCESS, false, "mdb_put failed");
+    }
+
+    CHECK_AND_ASSERT_MES(bdb.begin_transaction(true), false, "ro begin failed");
+    std::string out;
+    bool found = backend->get(h, key.data(), key.size(), out);
+    bdb.commit_transaction();
+    CHECK_AND_ASSERT_MES(!found, false, "Data persisted after lmdb_txn destructor — expected abort");
+
+    bdb.close();
+    LOG_PRINT_GREEN("Test successful", LOG_LEVEL_0);
+    return true;
+  }
+};
+
+struct lmdb_txn_thread_specific_test
+{
+  typedef tools::db::cached_key_value_accessor<uint64_t, std::string, true, true> accessor_type;
+  static bool run_test(accessor_type& acc)
+  {
+    acc.begin_transaction(false);
+    uint64_t key = 44444;
+    std::string data_main = "main_thread_data";
+    acc.set(key, data_main);
+    acc.commit_transaction();
+
+    // Read in separate thread, but without macros assert inside
+    std::atomic<bool> thread_ok{true};
+    std::atomic<bool> saw_expected{false};
+
+    std::thread th([&](){
+      try
+      {
+        acc.begin_transaction(true);
+        auto ptr = acc.get(key);
+        if (ptr.get() && *ptr == data_main)
+          saw_expected.store(true, std::memory_order_relaxed);
+        acc.commit_transaction();
+      }
+      catch (...)
+      {
+        thread_ok.store(false, std::memory_order_relaxed);
+      }
+    });
+
+    th.join();
+    CHECK_AND_ASSERT_MES(thread_ok.load(), false, "reader thread threw an exception");
+    CHECK_AND_ASSERT_MES(saw_expected.load(), false, "Data not visible in thread read-only txn");
+
+    std::thread th_write([&](){
+    try
+    {
+      acc.begin_transaction(false);
+      uint64_t key_thread = 55555;
+      std::string data_thread = "thread_data";
+      acc.set(key_thread, data_thread);
+      acc.commit_transaction();
+    }
+    catch (...)
+    {
+      thread_ok.store(false, std::memory_order_relaxed);
+    }
+    });
+
+    th_write.join();
+    CHECK_AND_ASSERT_MES(thread_ok.load(), false, "writer thread threw an exception");
+
+    acc.begin_transaction(true);
+    auto ptr = acc.get(55555);
+    CHECK_AND_ASSERT_MES(ptr.get() && *ptr == "thread_data", false, "Thread write not persisted");
+    acc.commit_transaction();
+
+    LOG_PRINT_GREEN("lmdb_txn_thread_specific_test successful", LOG_LEVEL_0);
+    return true;
+  }
+};
+
+struct lmdb_txn_stress_multithread_test
+{
+  typedef tools::db::cached_key_value_accessor<uint64_t, std::string, true, true> accessor_type;
+  // Two threads read with 10 nested ROs, the third writes, in parallel; check isolation and locks.
+  static bool run_test(accessor_type& acc)
+  {
+    const uint64_t key = 77777;
+    acc.begin_transaction(false);
+    acc.set(key, std::string("v0"));
+    acc.commit_transaction();
+    acc.clear_cache();
+
+    std::atomic<bool> stop_readers{false};
+    std::atomic<uint64_t> read_loops{0}, read_failures{0};
+    std::atomic<uint64_t> write_loops{0}, write_failures{0};
+
+    auto reader = [&]()
+    {
+      auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+      const int depth = 10;
+      while (std::chrono::steady_clock::now() < deadline && !stop_readers.load(std::memory_order_relaxed))
+      {
+        int opened = 0;
+        try
+        {
+          // open depth nested read-only transactions
+          for (int i = 0; i < depth; ++i) { acc.begin_transaction(true); ++opened; }
+
+          //just read the value — it should exist
+          auto p = acc.get(key);
+          if (!p.get())
+            ++read_failures;
+          // close all levels (for read-only commit == correct finish)
+          for (int i = 0; i < depth; ++i) acc.commit_transaction();
+
+          ++read_loops;
+        }
+        catch (...)
+        {
+          ++read_failures;
+          // try to correctly close already opened levels (commit for read-only)
+          for (int i = 0; i < opened; ++i)
+          {
+            try { acc.commit_transaction(); } catch (...) {}
+          }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
+    };
+
+    auto writer = [&]()
+    {
+      auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+      uint64_t n = 1;
+      while (std::chrono::steady_clock::now() < deadline)
+      {
+        bool opened = false;
+        try
+        {
+          acc.begin_transaction(false);
+          opened = true;
+          acc.set(key, std::string("v") + std::to_string(n++));
+          acc.commit_transaction();
+          opened = false;
+          ++write_loops;
+        }
+        catch (...)
+        {
+          ++write_failures;
+          if (opened)
+          {
+            try { acc.abort_transaction(); } catch (...) {}
+          }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
+    };
+
+    std::thread r1(reader), r2(reader);
+    std::thread w(writer);
+
+    r1.join();
+    r2.join();
+    w.join();
+    stop_readers.store(true, std::memory_order_relaxed);
+
+    CHECK_AND_ASSERT_MES(read_loops.load() > 0, false, "read loops == 0");
+    CHECK_AND_ASSERT_MES(write_loops.load() > 0, false, "write loops == 0");
+    CHECK_AND_ASSERT_MES(read_failures.load() == 0, false, "read failures: " << read_failures.load());
+    CHECK_AND_ASSERT_MES(write_failures.load() == 0, false, "write failures: " << write_failures.load());
+
+    acc.begin_transaction(true);
+    auto final_ptr = acc.get(key);
+    CHECK_AND_ASSERT_MES(final_ptr.get(), false, "final value missing after stress");
+    acc.commit_transaction();
+
+    LOG_PRINT_GREEN("[stress] OK, reads=" << read_loops.load() << " writes=" << write_loops.load(), LOG_LEVEL_0);
+    return true;
+  }
+};
 
 int main(int argc, char* argv[])
 {
@@ -408,6 +741,24 @@ int main(int argc, char* argv[])
   epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
   epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
 
+
+  if (!prepare_db_and_run_test<lmdb_txn_basic_write_test>())
+  return 0;
+
+  // if (!prepare_db_and_run_test<lmdb_txn_basic_read_only_test>())
+  //   return 0;
+
+  if (!prepare_db_and_run_test<lmdb_txn_nested_read_only_test>())
+    return 0;
+
+  if (!prepare_db_and_run_test<lmdb_txn_abort_test>())
+    return 0;
+
+  if (!prepare_db_and_run_test<lmdb_txn_destructor_abort_test>())
+    return 0;
+
+  if (!prepare_db_and_run_test<lmdb_txn_thread_specific_test>())
+    return 0;
 
   if (!prepare_db_and_run_test<check_boost_multiprecision_container>())
     return 0;
@@ -428,6 +779,9 @@ int main(int argc, char* argv[])
     return 0;
 
   if (!solo_container_save_load_test())
+    return 0;
+
+  if (!prepare_db_and_run_test<lmdb_txn_stress_multithread_test>())
     return 0;
 
   return 1;

@@ -12,14 +12,17 @@
 #include "db_backend_base.h"
 #include "db/liblmdb/lmdb.h"
 
+struct lmdb_txn_destructor_abort_test;
 
 namespace tools
 {
   namespace db
   {
+    struct lmdb_txn_destructor_abort_test;
     class lmdb_db_backend : public i_db_backend
     {
       friend class lmdb_txn;
+      friend struct ::lmdb_txn_destructor_abort_test;
       class lmdb_txn 
       {
       public:
