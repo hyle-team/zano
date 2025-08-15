@@ -759,7 +759,7 @@ bool escrow_proposal_expiration::c1(currency::core& c, size_t ev_index, const st
   bob_wlt->refresh();
 
   uint64_t alice_start_balance = alice_wlt->balance();
-  LOG_PRINT_CYAN("Alice's wallet transfers: " << ENDL << alice_wlt->dump_trunsfers(), LOG_LEVEL_0);
+  LOG_PRINT_CYAN("Alice's wallet transfers: " << ENDL << alice_wlt->dump_transfers(), LOG_LEVEL_0);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool");
 
@@ -777,7 +777,7 @@ bool escrow_proposal_expiration::c1(currency::core& c, size_t ev_index, const st
   transaction proposal_tx = AUTO_VAL_INIT(proposal_tx);
   transaction escrow_template_tx = AUTO_VAL_INIT(escrow_template_tx);
   alice_wlt->send_escrow_proposal(cpd, 0, 0, expiration_period, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, "", proposal_tx, escrow_template_tx);
-  LOG_PRINT_CYAN("alice transfers: " << ENDL << alice_wlt->dump_trunsfers(), LOG_LEVEL_0);
+  LOG_PRINT_CYAN("alice transfers: " << ENDL << alice_wlt->dump_transfers(), LOG_LEVEL_0);
   uint64_t alice_post_proposal_balance = alice_wlt->balance();
   uint64_t alice_post_proposal_balance_expected = alice_start_balance - TESTS_DEFAULT_FEE;
   CHECK_AND_ASSERT_MES(alice_post_proposal_balance == alice_post_proposal_balance_expected, false, "Incorrect alice_post_proposal_balance: " << print_money(alice_post_proposal_balance) << ", expected: " << print_money(alice_post_proposal_balance_expected));
@@ -840,9 +840,9 @@ bool escrow_proposal_expiration::c2(currency::core& c, size_t ev_index, const st
   bob_wlt->refresh();
 
   uint64_t alice_start_balance = alice_wlt->balance();
-  LOG_PRINT_CYAN("Alice's wallet transfers: " << ENDL << alice_wlt->dump_trunsfers(), LOG_LEVEL_0);
+  LOG_PRINT_CYAN("Alice's wallet transfers: " << ENDL << alice_wlt->dump_transfers(), LOG_LEVEL_0);
   uint64_t bob_start_balance = bob_wlt->balance();
-  LOG_PRINT_CYAN("Bob's wallet transfers: " << ENDL << bob_wlt->dump_trunsfers(), LOG_LEVEL_0);
+  LOG_PRINT_CYAN("Bob's wallet transfers: " << ENDL << bob_wlt->dump_transfers(), LOG_LEVEL_0);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
@@ -860,7 +860,7 @@ bool escrow_proposal_expiration::c2(currency::core& c, size_t ev_index, const st
   transaction proposal_tx = AUTO_VAL_INIT(proposal_tx);
   transaction escrow_template_tx = AUTO_VAL_INIT(escrow_template_tx);
   alice_wlt->send_escrow_proposal(cpd, 0, 0, expiration_period, TESTS_DEFAULT_FEE, TESTS_DEFAULT_FEE, "", proposal_tx, escrow_template_tx);
-  LOG_PRINT_CYAN("%%%%% Escrow proposal sent, Alice's transfers: " << ENDL << alice_wlt->dump_trunsfers(), LOG_LEVEL_0);
+  LOG_PRINT_CYAN("%%%%% Escrow proposal sent, Alice's transfers: " << ENDL << alice_wlt->dump_transfers(), LOG_LEVEL_0);
   CHECK_AND_ASSERT_MES(check_wallet_balance_blocked_for_escrow(*alice_wlt.get(), "Alice", cpd.amount_a_pledge + cpd.amount_to_pay), false, "");
   crypto::hash ms_id = get_multisig_out_id(escrow_template_tx, get_multisig_out_index(escrow_template_tx.vout));
   CHECK_AND_ASSERT_MES(ms_id != null_hash, false, "Can't obtain multisig id from escrow template tx");
@@ -996,7 +996,7 @@ bool escrow_proposal_and_accept_expiration::c1(currency::core& c, size_t ev_inde
   transaction proposal_tx = AUTO_VAL_INIT(proposal_tx);
   transaction escrow_template_tx = AUTO_VAL_INIT(escrow_template_tx);
   alice_wlt->send_escrow_proposal(cpd, 0, 0, expiration_period, TESTS_DEFAULT_FEE, b_release_fee, "", proposal_tx, escrow_template_tx);
-  LOG_PRINT_CYAN("%%%%% Escrow proposal sent, Alice's transfers: " << ENDL << alice_wlt->dump_trunsfers(), LOG_LEVEL_0);
+  LOG_PRINT_CYAN("%%%%% Escrow proposal sent, Alice's transfers: " << ENDL << alice_wlt->dump_transfers(), LOG_LEVEL_0);
   CHECK_AND_ASSERT_MES(check_wallet_balance_blocked_for_escrow(*alice_wlt.get(), "Alice", cpd.amount_a_pledge + cpd.amount_to_pay), false, "");
 
   crypto::hash ms_id = get_multisig_out_id(escrow_template_tx, get_multisig_out_index(escrow_template_tx.vout));
@@ -1021,8 +1021,8 @@ bool escrow_proposal_and_accept_expiration::c1(currency::core& c, size_t ev_inde
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, ms_id, 0), false, "");
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, ms_id, 0), false, "");
 
-  LOG_PRINT_CYAN("%%%%% Escrow proposal accepted (unconfirmed), Alice's transfers: " << ENDL << alice_wlt->dump_trunsfers(), LOG_LEVEL_0);
-  LOG_PRINT_CYAN("%%%%% Escrow proposal accepted (unconfirmed), Bob's transfers: " << ENDL << bob_wlt->dump_trunsfers(), LOG_LEVEL_0);
+  LOG_PRINT_CYAN("%%%%% Escrow proposal accepted (unconfirmed), Alice's transfers: " << ENDL << alice_wlt->dump_transfers(), LOG_LEVEL_0);
+  LOG_PRINT_CYAN("%%%%% Escrow proposal accepted (unconfirmed), Bob's transfers: " << ENDL << bob_wlt->dump_transfers(), LOG_LEVEL_0);
 
 
   // mine a few blocks with no txs
@@ -1047,8 +1047,8 @@ bool escrow_proposal_and_accept_expiration::c1(currency::core& c, size_t ev_inde
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, ms_id, TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW + 1), false, "");
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_contract_state("Bob", bob_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, ms_id, TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW + 1), false, "");
 
-  LOG_PRINT_CYAN("%%%%% Escrow acceptance tx expired and removed from tx pool, Alice's transfers: " << ENDL << alice_wlt->dump_trunsfers(), LOG_LEVEL_0);
-  LOG_PRINT_CYAN("%%%%% Escrow acceptance tx expired and removed from tx pool, Bob's transfers: " << ENDL << bob_wlt->dump_trunsfers(), LOG_LEVEL_0);
+  LOG_PRINT_CYAN("%%%%% Escrow acceptance tx expired and removed from tx pool, Alice's transfers: " << ENDL << alice_wlt->dump_transfers(), LOG_LEVEL_0);
+  LOG_PRINT_CYAN("%%%%% Escrow acceptance tx expired and removed from tx pool, Bob's transfers: " << ENDL << bob_wlt->dump_transfers(), LOG_LEVEL_0);
 
   // try to accept expired proposal once again -- an exception should be thrown
   r = false;
@@ -1318,7 +1318,7 @@ bool escrow_incorrect_proposal_acceptance::check_normal_acceptance(currency::cor
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
   alice_wlt->refresh();
   std::stringstream ss;
-  alice_wlt->dump_trunsfers(ss, false);
+  alice_wlt->dump_transfers(ss, false);
   LOG_PRINT_L0("check_normal_acceptance(" << release_instruction << "):" << ENDL << "Alice transfers: " << ENDL << ss.str());
   uint64_t alice_balance = alice_wlt->balance();
   uint64_t alice_balance_expected = m_alice_bob_start_amount - m_cpd.amount_a_pledge - m_cpd.amount_to_pay - TESTS_DEFAULT_FEE;
@@ -1392,7 +1392,7 @@ bool escrow_incorrect_proposal_acceptance::check_incorrect_acceptance(currency::
   alice_wlt->refresh();
   uint64_t alice_balance = alice_wlt->balance();
   std::stringstream ss;
-  alice_wlt->dump_trunsfers(ss, false);
+  alice_wlt->dump_transfers(ss, false);
   LOG_PRINT_L0("check_incorrect_acceptance(" << param << "):" << ENDL << "Alice balance: " << print_money(alice_balance) << ", transfers: " << ENDL << ss.str());
 
   tools::escrow_contracts_container contracts;
@@ -2110,7 +2110,7 @@ bool escrow_incorrect_cancel_proposal::check_normal_cancel_proposal(currency::co
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
   alice_wlt->refresh();
   std::stringstream ss;
-  alice_wlt->dump_trunsfers(ss, false);
+  alice_wlt->dump_transfers(ss, false);
   LOG_PRINT_L0("check_normal_cancel_proposal:" << ENDL << "Alice transfers: " << ENDL << ss.str());
   uint64_t alice_balance = alice_wlt->balance();
   uint64_t alice_balance_expected = m_alice_bob_start_amount - m_cpd.amount_a_pledge - m_cpd.amount_to_pay - TESTS_DEFAULT_FEE - TESTS_DEFAULT_FEE; // one fee for escrow request, second - for cancel request
@@ -2198,7 +2198,7 @@ bool escrow_incorrect_cancel_proposal::check_incorrect_cancel_proposal_internal(
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
   alice_wlt->refresh();
   std::stringstream ss;
-  alice_wlt->dump_trunsfers(ss, false);
+  alice_wlt->dump_transfers(ss, false);
   LOG_PRINT_L0("Alice transfers: " << ENDL << ss.str());
   uint64_t alice_balance = alice_wlt->balance();
   uint64_t alice_balance_expected = m_alice_bob_start_amount - m_cpd.amount_a_pledge - m_cpd.amount_to_pay - TESTS_DEFAULT_FEE - TESTS_DEFAULT_FEE; // one fee for escrow request, second - for cancel request

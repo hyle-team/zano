@@ -396,8 +396,8 @@ namespace currency
   bool is_tx_spendtime_unlocked(uint64_t unlock_time, uint64_t current_blockchain_size, uint64_t current_time);
   crypto::key_derivation get_encryption_key_derivation(bool is_income, const transaction& tx, const account_keys& acc_keys);
   bool decrypt_payload_items(bool is_income, const transaction& tx, const account_keys& acc_keys, std::vector<payload_items_v>& decrypted_items);
-  void encrypt_attachments(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key, crypto::key_derivation& derivation);
-  void encrypt_attachments(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key);
+  void encrypt_payload_items(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key, crypto::key_derivation& derivation);
+  void encrypt_payload_items(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key);
   bool is_derivation_used_to_encrypt(const transaction& tx, const crypto::key_derivation& derivation);
   bool is_address_like_wrapped(const std::string& addr);
   void load_wallet_transfer_info_flags(tools::wallet_public::wallet_transfer_info& x);

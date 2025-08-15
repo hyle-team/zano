@@ -262,7 +262,7 @@ namespace tools
     wallet2(const wallet2&) = delete;
   public:
     wallet2();
-    virtual ~wallet2() {}
+    virtual ~wallet2();
 
     static std::string transfer_flags_to_str(uint32_t flags);
 
@@ -624,6 +624,9 @@ namespace tools
     void submit_transfer_files(const std::string& signed_tx_file, currency::transaction& tx);
     void submit_externally_signed_asset_tx(const currency::finalized_tx& ft, const crypto::generic_schnorr_sig_s& gss_sig, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked);
     void submit_externally_signed_asset_tx(const currency::finalized_tx& ft, const crypto::eth_signature& eth_sig, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked);
+    
+    void restore_key_images_in_wo_wallet(const std::wstring& filename, const std::string& password) const;
+    void clear_utxo_cold_sig_reservation(std::vector<uint64_t>& affected_transfer_ids);
 
     void sweep_below(size_t fake_outs_count, const currency::account_public_address& destination_addr, uint64_t threshold_amount, const currency::payment_id_t& payment_id,
       uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
@@ -690,8 +693,8 @@ namespace tools
 
     void scan_tx_to_key_inputs(std::vector<uint64_t>& found_transfers, const currency::transaction& tx);
     // asset_id = null_pkey means no filtering by asset id
-    void dump_trunsfers(std::stringstream& ss, bool verbose = true, const crypto::public_key& asset_id = currency::null_pkey) const;
-    std::string dump_trunsfers(bool verbose = false, const crypto::public_key& asset_id = currency::null_pkey) const;
+    void dump_transfers(std::stringstream& ss, bool verbose = true, const crypto::public_key& asset_id = currency::null_pkey) const;
+    std::string dump_transfers(bool verbose = false, const crypto::public_key& asset_id = currency::null_pkey) const;
     void dump_key_images(std::stringstream& ss);
     void get_multisig_transfers(multisig_transfer_container& ms_transfers);
     const multisig_transfer_container& get_multisig_transfers() const { return m_multisig_transfers; }
@@ -909,6 +912,7 @@ private:
     bool generate_utxo_defragmentation_transaction_if_needed(currency::transaction& tx);
     bool store_unsigned_tx_to_file_and_reserve_transfers(const currency::finalize_tx_param& ftp, const std::string& filename, std::string* p_unsigned_tx_blob_str = nullptr);
     void check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp);
+    void check_and_throw_if_smth_not_good_with_comment_or_payment_id(const construct_tx_param& ctp);
     void push_new_block_id(const crypto::hash& id, uint64_t height);
     bool lookup_item_around(uint64_t i, std::pair<uint64_t, crypto::hash>& result);
     //void get_short_chain_history(std::list<crypto::hash>& ids);

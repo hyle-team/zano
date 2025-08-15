@@ -830,7 +830,6 @@ bool wallet_true_rpc_pos_mining::generate(std::vector<test_event_entry>& events)
 
 bool wallet_true_rpc_pos_mining::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false;
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet_with_true_http_rpc(events, c, MINER_ACC_IDX);
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet_with_true_http_rpc(events, c, ALICE_ACC_IDX);
 
@@ -1284,12 +1283,7 @@ bool wallet_rpc_cold_signing::generate(std::vector<test_event_entry>& events) co
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   DO_CALLBACK(events, "configure_core");
 
-  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
-
-  MAKE_TX(events, tx_0, miner_acc, alice_acc, MK_TEST_COINS(100), blk_0r);
-  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
-
-  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
 
   DO_CALLBACK(events, "c1");
 
@@ -1306,6 +1300,14 @@ bool make_cold_signing_transaction(tools::wallet_rpc_server& rpc_wo, tools::wall
   r = invoke_text_json_for_rpc(rpc_wo, "transfer", req_transfer, res_transfer);
   CHECK_AND_ASSERT_MES(r, false, "RPC 'transfer' failed");
 
+  // (optional step) skip this reservation just for fun and then create a transaction once again
+  tools::wallet_public::COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION::request req_clear_csr{};
+  tools::wallet_public::COMMAND_CLEAR_UTXO_COLD_SIG_RESERVATION::response res_clear_csr{};
+  invoke_text_json_for_rpc(rpc_wo, "clear_utxo_cold_sig_reservation", req_clear_csr, res_clear_csr);
+  CHECK_AND_ASSERT_MES(res_clear_csr.affected_outputs.size() > 0, false, "no outputs were affected after clear_utxo_cold_sig_reservation");
+  res_transfer = tools::wallet_public::COMMAND_RPC_TRANSFER::response{};
+  r = invoke_text_json_for_rpc(rpc_wo, "transfer", req_transfer, res_transfer);
+  CHECK_AND_ASSERT_MES(r, false, "RPC 'transfer' failed");
     
   // secure wallet with full keys set signs the transaction
   tools::wallet_public::COMMAND_SIGN_TRANSFER::request req_sign{};
@@ -1314,8 +1316,11 @@ bool make_cold_signing_transaction(tools::wallet_rpc_server& rpc_wo, tools::wall
   r = invoke_text_json_for_rpc(rpc, "sign_transfer", req_sign, res_sign);
   CHECK_AND_ASSERT_MES(r, false, "RPC 'sign_transfer' failed");
 
+  // (optional step) make sure clear_utxo_cold_sig_reservation cannot be called in a full keys wallet
+  r = !invoke_text_json_for_rpc(rpc, "clear_utxo_cold_sig_reservation", req_clear_csr, res_clear_csr);
+  CHECK_AND_ASSERT_MES(r, false, "clear_utxo_cold_sig_reservation called in full key wallet");
     
-  // watch only wallet submits it
+  // watch only wallet submits signed transaction
   tools::wallet_public::COMMAND_SUBMIT_TRANSFER::request req_submit{};
   req_submit.tx_signed_hex = res_sign.tx_signed_hex;
   tools::wallet_public::COMMAND_SUBMIT_TRANSFER::response res_submit{};
@@ -1342,14 +1347,46 @@ bool wallet_rpc_cold_signing::c1(currency::core& c, size_t ev_index, const std::
 
   miner_wlt->refresh();
   bob_wlt->refresh();
-  check_balance_via_wallet(*bob_wlt, "Bob", 0, 0, 0, 0, 0);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt, "Bob", 0, 0, 0, 0, 0), false, "");
 
+  // for post HF4 cases transfer some assets along with native coins
+  crypto::public_key deployed_asset_id{};
+  size_t deployed_asset_decimal_point = 0;
+  const bool use_assets = c.get_blockchain_storage().is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM);
+  if (use_assets)
+  {
+    // miner deploys new asset and sends 50 coins of it to Alice
+    tools::wallet_rpc_server miner_rpc(miner_wlt);
+    tools::wallet_public::COMMAND_ASSETS_DEPLOY::request req_deploy{};
+    req_deploy.asset_descriptor.current_supply = 50;
+    req_deploy.asset_descriptor.decimal_point = deployed_asset_decimal_point;
+    req_deploy.asset_descriptor.full_name = "50 pounds per person";
+    req_deploy.asset_descriptor.ticker = "50PPP";
+    req_deploy.asset_descriptor.total_max_supply = 200; // for a family of four
+    req_deploy.destinations.emplace_back(tools::wallet_public::transfer_destination{50, m_accounts[ALICE_ACC_IDX].get_public_address_str(), null_pkey});
+    req_deploy.do_not_split_destinations = true;
+    tools::wallet_public::COMMAND_ASSETS_DEPLOY::response res_deploy{};
+    r = invoke_text_json_for_rpc(miner_rpc, "deploy_asset", req_deploy, res_deploy);
+    CHECK_AND_ASSERT_MES(r, false, "RPC 'deploy_asset' failed");
+    deployed_asset_id = res_deploy.new_asset_id;
+  }
+
+  // also, send some native coins
+  miner_wlt->transfer(MK_TEST_COINS(100), m_accounts[ALICE_ACC_IDX].get_public_address(), native_coin_asset_id);
+
+  // confirm this tx and mine 10 block to unlock the coins
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == (use_assets ? 2 : 1), false, "enexpected pool txs count: " << c.get_pool_transactions_count());
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool is not empty: " << c.get_pool_transactions_count());
+
+  // Alice: prepare watch-only wallet
   account_base alice_acc_wo = m_accounts[ALICE_ACC_IDX];
   alice_acc_wo.make_account_watch_only();
   std::shared_ptr<tools::wallet2> alice_wlt_wo = init_playtime_test_wallet(events, c, alice_acc_wo);
 
   alice_wlt_wo->refresh();
-  check_balance_via_wallet(*alice_wlt_wo, "Alice (WO)", MK_TEST_COINS(100), 0, MK_TEST_COINS(100), 0, 0);
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt_wo, "Alice (WO)", MK_TEST_COINS(100), 0, MK_TEST_COINS(100), 0, 0), false, "");
 
   // Alice: perform initial save-load to properly initialize internal wallet2 structures
   boost::filesystem::remove(epee::string_tools::cut_off_extension(m_wallet_filename) + L".outkey2ki");
@@ -1364,17 +1401,17 @@ bool wallet_rpc_cold_signing::c1(currency::core& c, size_t ev_index, const std::
   tools::wallet_rpc_server alice_rpc(alice_wlt);
   std::shared_ptr<tools::wallet_rpc_server> alice_rpc_wo_ptr{ new tools::wallet_rpc_server(alice_wlt_wo) };
 
-  // send a cold-signed transaction
+  // send a cold-signed transaction: Alice -> Bob; 50 test coins + 50 of the asset
   tools::wallet_public::COMMAND_RPC_TRANSFER::request req{};
-  req.destinations.emplace_back();
-  req.destinations.back().amount = MK_TEST_COINS(50);
-  req.destinations.back().address = m_accounts[BOB_ACC_IDX].get_public_address_str();
+  req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(50), m_accounts[BOB_ACC_IDX].get_public_address_str(), native_coin_asset_id});
+  if (use_assets)
+    req.destinations.emplace_back(tools::wallet_public::transfer_destination{50, m_accounts[BOB_ACC_IDX].get_public_address_str(), deployed_asset_id});
   req.fee = TESTS_DEFAULT_FEE;
   req.mixin = 10;
   r = make_cold_signing_transaction(*alice_rpc_wo_ptr, alice_rpc, req);
   CHECK_AND_ASSERT_MES(r, false, "make_cold_signing_transaction failed");
 
-  uint64_t bob_expected_balance = req.destinations.back().amount;
+  uint64_t bob_expected_balance = req.destinations.front().amount;
 
   // mine few blocks to unlock Alice's coins
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "unexpected pool txs count: " << c.get_pool_transactions_count());
@@ -1407,7 +1444,7 @@ bool wallet_rpc_cold_signing::c1(currency::core& c, size_t ev_index, const std::
   CHECK_AND_ASSERT_EQ(blocks_fetched, 0);
 
 
-  // send a cold-signed transaction
+  // send a cold-signed transaction: Alice -> Bob; all rest test coins (should be 50 - 1 = 49)
   req = tools::wallet_public::COMMAND_RPC_TRANSFER::request{};
   req.destinations.emplace_back();
   req.destinations.back().amount = alice_expected_balance - TESTS_DEFAULT_FEE;
@@ -1437,7 +1474,7 @@ bool wallet_rpc_cold_signing::c1(currency::core& c, size_t ev_index, const std::
     CURRENCY_MINED_MONEY_UNLOCK_WINDOW, alice_expected_balance, 0, 0, 0), false, "");
 
 
-  // send a cold-signed transaction
+  // send a cold-signed transaction: Alice -> Bob; all rest test coins (should be 7 - 1 = 6)
   req = tools::wallet_public::COMMAND_RPC_TRANSFER::request{};
   req.destinations.emplace_back();
   req.destinations.back().amount = alice_expected_balance - TESTS_DEFAULT_FEE;
@@ -1461,11 +1498,167 @@ bool wallet_rpc_cold_signing::c1(currency::core& c, size_t ev_index, const std::
   // check Alice's balance
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("after sending the second cold-signed tx:", "Alice", alice_wlt_wo, alice_expected_balance, true,
     CURRENCY_MINED_MONEY_UNLOCK_WINDOW, alice_expected_balance, 0, 0, 0), false, "");
+  if (use_assets)
+    CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt_wo.get(), "Alice", 0, 0, 0, 0, 0, deployed_asset_id, deployed_asset_decimal_point), false, "");
 
 
 
   // finally, check Bob's balance
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, bob_expected_balance, true, 3 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW, bob_expected_balance, 0, 0, 0), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Bob", bob_wlt, bob_expected_balance, true, 4 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW, bob_expected_balance, 0, 0, 0), false, "");
+  if (use_assets)
+    CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", 50, 0, 50, 0, 0, deployed_asset_id, deployed_asset_decimal_point), false, "");
+
+  
+  // Alice watch-only: reload the wallet, make sure the balance is still okay (zero)
+  alice_rpc_wo_ptr.reset();
+  alice_wlt_wo->reset_password(m_wallet_password);
+  alice_wlt_wo->store(m_wallet_filename);
+  CHECK_AND_ASSERT_EQ(alice_wlt_wo.unique(), true);
+  alice_wlt_wo.reset(new tools::wallet2);
+  alice_wlt_wo->load(m_wallet_filename, m_wallet_password);
+  alice_wlt_wo->set_core_proxy(m_core_proxy);
+  alice_wlt_wo->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
+  set_wallet_options(alice_wlt_wo);
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("after re-loading with zero balance:", "Alice", alice_wlt_wo, 0, true, 0, 0, 0, 0, 0), false, "");
+  if (use_assets)
+    CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt_wo.get(), "Alice", 0, 0, 0, 0, 0, deployed_asset_id, deployed_asset_decimal_point), false, "");
+
+
+  // Alice: remove outkey2ki file with key images copies and restore the wallet from watch-only account
+  std::string alice_seed_phrase = m_accounts[ALICE_ACC_IDX].get_seed_phrase("");
+  CHECK_AND_ASSERT_EQ(alice_wlt_wo.unique(), true);
+  alice_wlt_wo.reset();
+  CHECK_AND_ASSERT_MES(boost::filesystem::remove(epee::string_tools::cut_off_extension(m_wallet_filename) + L".outkey2ki"), false, "boost::filesystem::remove failed");
+  CHECK_AND_ASSERT_MES(boost::filesystem::remove(m_wallet_filename), false, "boost::filesystem::remove failed");
+
+  alice_wlt_wo = init_playtime_test_wallet(events, c, alice_acc_wo);
+  alice_wlt_wo->set_core_proxy(m_core_proxy);
+  alice_wlt_wo->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
+  set_wallet_options(alice_wlt_wo);
+
+  // without key images Alice watch-only wallet is only able to detect incoming transfers and thus calculate incorrect balance
+  alice_expected_balance = MK_TEST_COINS(100 + 49 + 7);
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("after sending the second cold-signed tx:", "Alice", alice_wlt_wo, alice_expected_balance, true,
+    5 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1, alice_expected_balance, 0, 0, 0), false, "");
+  if (use_assets)
+    CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt_wo.get(), "Alice", 50, 0, 50, 0, 0, deployed_asset_id, deployed_asset_decimal_point), false, "");
+
+  // store this broken watch-only wallet into a file ...
+  alice_wlt_wo->reset_password(m_wallet_password);
+  alice_wlt_wo->store(m_wallet_filename);
+  CHECK_AND_ASSERT_EQ(alice_wlt_wo.unique(), true);
+  alice_wlt_wo.reset();
+
+  // ... and repair it using full key wallet
+  alice_wlt->restore_key_images_in_wo_wallet(m_wallet_filename, m_wallet_password);
+
+  alice_wlt_wo.reset(new tools::wallet2);
+  alice_wlt_wo->load(m_wallet_filename, m_wallet_password);
+  alice_wlt_wo->set_core_proxy(m_core_proxy);
+  alice_wlt_wo->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
+  set_wallet_options(alice_wlt_wo);
+
+  // re-check the balance, it should be zero now
+  alice_expected_balance = 0;
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("after sending the second cold-signed tx:", "Alice", alice_wlt_wo, alice_expected_balance, true,
+    5 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1, alice_expected_balance, 0, 0, 0), false, "");
+  if (use_assets)
+    CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt_wo.get(), "Alice", 0, 0, 0, 0, 0, deployed_asset_id, deployed_asset_decimal_point), false, "");
 
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+// TODO: work in progress -- sowle
+wallet_rpc_multiple_receivers::wallet_rpc_multiple_receivers()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_multiple_receivers, c1);
+}
+
+void wallet_rpc_multiple_receivers::set_wallet_options(std::shared_ptr<tools::wallet2> w)
+{
+  set_playtime_test_wallet_options(w);
+  w->set_concise_mode(false);
+}
+
+bool wallet_rpc_multiple_receivers::generate(std::vector<test_event_entry>& events) const
+{
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool wallet_rpc_multiple_receivers::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+
+  tools::wallet_rpc_server miner_rpc(miner_wlt);
+  tools::wallet_rpc_server alice_rpc(alice_wlt);
+
+  miner_wlt->refresh();
+  //bob_wlt->refresh();
+  //check_balance_via_wallet(*bob_wlt, "Bob", 0, 0, 0, 0, 0);
+
+  // for post HF4 cases transfer some assets along with native coins
+  crypto::public_key deployed_asset_id{};
+  size_t deployed_asset_decimal_point = 0;
+
+  // miner deploys new asset and sends 50 coins of it to Alice
+  tools::wallet_public::COMMAND_ASSETS_DEPLOY::request req_deploy{};
+  req_deploy.asset_descriptor.current_supply = 50;
+  req_deploy.asset_descriptor.decimal_point = deployed_asset_decimal_point;
+  req_deploy.asset_descriptor.full_name = "50 pounds per person";
+  req_deploy.asset_descriptor.ticker = "50PPP";
+  req_deploy.asset_descriptor.total_max_supply = 200; // for a family of four
+  req_deploy.destinations.emplace_back(tools::wallet_public::transfer_destination{50, m_accounts[ALICE_ACC_IDX].get_public_address_str(), null_pkey});
+  req_deploy.do_not_split_destinations = true;
+  tools::wallet_public::COMMAND_ASSETS_DEPLOY::response res_deploy{};
+  r = invoke_text_json_for_rpc(miner_rpc, "deploy_asset", req_deploy, res_deploy);
+  CHECK_AND_ASSERT_MES(r, false, "RPC 'deploy_asset' failed");
+  deployed_asset_id = res_deploy.new_asset_id;
+
+
+  // 
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request tr_req{};
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_res{};
+  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(80), m_accounts[ALICE_ACC_IDX].get_public_address_str()});
+  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(90), m_accounts[BOB_ACC_IDX].get_public_address_str()});
+  tr_req.fee = TESTS_DEFAULT_FEE;
+  tr_req.mixin = 0;
+  tr_req.hide_receiver = false;
+  tr_req.push_payer = true;
+  r = invoke_text_json_for_rpc(miner_rpc, "transfer", tr_req, tr_res);
+  CHECK_AND_ASSERT_MES(r, false, "RPC failed");
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "enexpected pool txs count: " << c.get_pool_transactions_count());
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool is not empty: " << c.get_pool_transactions_count());
+
+
+  // Alice: prepare watch-only wallet
+  alice_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", MK_TEST_COINS(80), 0, MK_TEST_COINS(80), 0, 0), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt, "Alice", req_deploy.asset_descriptor.current_supply, 0, req_deploy.asset_descriptor.current_supply, 0, 0, deployed_asset_id, deployed_asset_decimal_point), false, "");
+
+  bob_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt, "Bob", MK_TEST_COINS(90), 0, MK_TEST_COINS(90), 0, 0), false, "");
+
+  return true;
+}
+

@@ -1443,14 +1443,14 @@ bool gen_wallet_transfers_and_chain_switch::generate(std::vector<test_event_entr
 
 //------------------------------------------------------------------------------
 
-gen_wallet_decrypted_attachments::gen_wallet_decrypted_attachments()
+gen_wallet_decrypted_payload_items::gen_wallet_decrypted_payload_items()
   : m_on_transfer2_called(false)
 {
     m_hardforks.set_hardfork_height(1, 0);
     m_hardforks.set_hardfork_height(2, 0); // tx_payer requires HF2
 }
 
-bool gen_wallet_decrypted_attachments::generate(std::vector<test_event_entry>& events) const
+bool gen_wallet_decrypted_payload_items::generate(std::vector<test_event_entry>& events) const
 {
   // Test outline
   // NOTE: All transactions are sending with same attachments: tx_payer, tx_comment and tx_message
@@ -1508,16 +1508,18 @@ bool gen_wallet_decrypted_attachments::generate(std::vector<test_event_entry>& e
     // that feeling when you are a bit paranoid
     std::vector<currency::payload_items_v> decrypted_attachments;
     currency::keypair k = currency::keypair::generate();
-    transaction t = AUTO_VAL_INIT(t);
-    t.attachment = std::vector<currency::attachment_v>({ a_tx_payer, a_tx_comment, a_tx_message });
+    transaction t{};
+    t.attachment.push_back(a_tx_payer);
+    t.attachment.push_back(a_tx_message);
+    t.extra.push_back(a_tx_comment);
     add_tx_pub_key_to_extra(t, k.pub);
     add_attachments_info_to_extra(t.extra, t.attachment);
-    currency::encrypt_attachments(t, miner_acc.get_keys(), alice_acc.get_public_address(), k);
+    currency::encrypt_payload_items(t, miner_acc.get_keys(), alice_acc.get_public_address(), k);
     bool r = currency::decrypt_payload_items(true, t, alice_acc.get_keys(), decrypted_attachments);
-    CHECK_AND_ASSERT_MES(r, false, "encrypt_attachments + decrypt_attachments failed to work together");
+    CHECK_AND_ASSERT_MES(r, false, "encrypt_payload_items + decrypt_attachments failed to work together");
   }
 
-  MAKE_TX_ATTACH(events, tx_0, miner_acc, alice_acc, MK_TEST_COINS(10000), blk_0r, std::vector<currency::attachment_v>({ a_tx_payer, a_tx_comment, a_tx_message }));
+  MAKE_TX_EXTRA_ATTACH_FEE(events, tx_0, miner_acc, alice_acc, MK_TEST_COINS(10000), TESTS_DEFAULT_FEE, blk_0r, std::vector<currency::payload_items_v>({ a_tx_comment }), std::vector<currency::payload_items_v>({ a_tx_payer, a_tx_message }));
   MAKE_NEXT_BLOCK(events, blk_1, blk_0r, miner_acc); // don't put tx_0 into this block, the block is only necessary to trigger tx_pool scan on in wallet2::refresh()
 
   // wallet callback must be passed as shared_ptr, so to avoid deleting "this" construct shared_ptr with custom null-deleter
@@ -1540,7 +1542,7 @@ bool gen_wallet_decrypted_attachments::generate(std::vector<test_event_entry>& e
   // Do the same in opposite direction: alice -> miner. Unlock money, received by Alice first.
   REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
 
-  MAKE_TX_ATTACH(events, tx_1, alice_acc, miner_acc, MK_TEST_COINS(100), blk_2r, std::vector<currency::attachment_v>({ a_tx_payer, a_tx_comment, a_tx_message }));
+  MAKE_TX_EXTRA_ATTACH_FEE(events, tx_1, alice_acc, miner_acc, MK_TEST_COINS(100), TESTS_DEFAULT_FEE, blk_2r, std::vector<currency::payload_items_v>({ a_tx_comment }), std::vector<currency::payload_items_v>({ a_tx_payer, a_tx_message }));
   MAKE_NEXT_BLOCK(events, blk_3, blk_2r, miner_acc); // don't put tx_1 into this block, the block is only necessary to trigger tx_pool scan on in wallet2::refresh()
 
   // Spend tx was not sent via Alice wallet instance, so wallet can't obtain destination address and pass it to callback (although, it decrypts attachments & extra)
@@ -1573,7 +1575,7 @@ bool gen_wallet_decrypted_attachments::generate(std::vector<test_event_entry>& e
   m_comment_to_be_checked = a_tx_comment.comment;
   m_address_to_be_checked = get_account_address_as_str(bob_acc.get_public_address()); // note, that a_tx_payer is NOT refering to Bob's account, but in the callback we should get correct sender addr
   m_on_transfer2_called = false;
-  MAKE_TEST_WALLET_TX_ATTACH(events, tx_2, alice_wlt, MK_TEST_COINS(2000), bob_acc, std::vector<currency::attachment_v>({ a_tx_payer, a_tx_comment, a_tx_message }));
+  MAKE_TEST_WALLET_TX_EXTRA_ATTACH(events, tx_2, alice_wlt, MK_TEST_COINS(2000), bob_acc, std::vector<currency::extra_v>({ a_tx_comment }), std::vector<currency::attachment_v>({ a_tx_payer, a_tx_message }));
   CHECK_AND_ASSERT_MES(m_on_transfer2_called, false, "on_transfer2() was not called (5)");
 
   MAKE_NEXT_BLOCK(events, blk_5, blk_4r, miner_acc); // don't put tx_2 into this block, the block is only necessary to trigger tx_pool scan on in wallet2::refresh()
@@ -1595,7 +1597,7 @@ bool gen_wallet_decrypted_attachments::generate(std::vector<test_event_entry>& e
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, bob_wlt, blk_6r, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2 + WALLET_DEFAULT_TX_SPENDABLE_AGE + 2 + WALLET_DEFAULT_TX_SPENDABLE_AGE + 2 + WALLET_DEFAULT_TX_SPENDABLE_AGE);
 
   a_tx_payer.acc_addr = bob_acc.get_public_address(); // here we specify correct payer address, as it will not be masked by wallet
-  MAKE_TEST_WALLET_TX_ATTACH(events, tx_3, bob_wlt, MK_TEST_COINS(200), alice_acc, std::vector<currency::attachment_v>({ a_tx_payer, a_tx_comment, a_tx_message }));
+  MAKE_TEST_WALLET_TX_EXTRA_ATTACH(events, tx_3, bob_wlt, MK_TEST_COINS(200), alice_acc, std::vector<currency::extra_v>({ a_tx_comment }), std::vector<currency::attachment_v>({ a_tx_payer, a_tx_message }));
 
   MAKE_NEXT_BLOCK(events, blk_7, blk_6r, miner_acc); // don't put tx_3 into this block, the block is only necessary to trigger tx_pool scan on in wallet2::refresh()
 
@@ -1612,7 +1614,7 @@ bool gen_wallet_decrypted_attachments::generate(std::vector<test_event_entry>& e
   return true;
 }
 
-void gen_wallet_decrypted_attachments::on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
+void gen_wallet_decrypted_payload_items::on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
 {
   m_on_transfer2_called = true;
   //try {
@@ -2986,7 +2988,7 @@ bool mined_balance_wallet_test::c1(currency::core& c, size_t ev_index, const std
   miner_wlt->refresh();
 
   std::stringstream ss;
-  miner_wlt->dump_trunsfers(ss, false);
+  miner_wlt->dump_transfers(ss, false);
   LOG_PRINT_CYAN("miner transfers: " << ENDL << ss.str(), LOG_LEVEL_0);
 
   CHECK_AND_ASSERT_MES(check_balance_via_wallet(*miner_wlt.get(), "miner", miner_mined_money, miner_mined_money), false, "wrong balance");
@@ -3798,7 +3800,6 @@ bool wallet_and_sweep_below::generate(std::vector<test_event_entry>& events) con
 
 bool wallet_and_sweep_below::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-  bool r = false;
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
 
   uint64_t miner_balance = (3 * CURRENCY_MINED_MONEY_UNLOCK_WINDOW - 1) * COIN;
@@ -3959,14 +3960,12 @@ bool wallet_reorganize_and_trim_test::c1(currency::core& c, size_t ev_index, con
   mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 2);
 
   mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, WALLET_REORGANIZE_AND_TRIM_TEST_REORG_SIZE);
-  uint64_t h1 = c.get_blockchain_storage().get_top_block_height();
   miner_wlt->refresh();
   uint64_t unlocked = 0;
   uint64_t total = miner_wlt->balance(unlocked);
 
   c.get_blockchain_storage().truncate_blockchain(c.get_blockchain_storage().get_top_block_height() - (WALLET_REORGANIZE_AND_TRIM_TEST_REORG_SIZE-1));
   mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 10);
-  uint64_t h2 = c.get_blockchain_storage().get_top_block_height();
   miner_wlt->refresh();
   uint64_t unlocked2 = 0;
   uint64_t total2 = miner_wlt->balance(unlocked2);

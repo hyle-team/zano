@@ -217,3 +217,13 @@ private:
   bool assert_reward(currency::core& core, size_t event_index, const std::vector<test_event_entry>& events) const;
   struct argument_assert;
 };
+
+struct block_choice_rule_bigger_fee : public wallet_test
+{
+  block_choice_rule_bigger_fee();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+
+private:
+  struct argument_assert;
+};

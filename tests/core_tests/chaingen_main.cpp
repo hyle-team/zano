@@ -1077,7 +1077,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_wallet_oversized_payment_id);
     GENERATE_AND_PLAY(gen_wallet_transfers_and_outdated_unconfirmed_txs);
     GENERATE_AND_PLAY(gen_wallet_transfers_and_chain_switch);
-    GENERATE_AND_PLAY(gen_wallet_decrypted_attachments);
+    GENERATE_AND_PLAY(gen_wallet_decrypted_payload_items);
     GENERATE_AND_PLAY_HF(gen_wallet_alias_and_unconfirmed_txs, "3-*");
     GENERATE_AND_PLAY_HF(gen_wallet_alias_via_special_wallet_funcs, "3-*");
     GENERATE_AND_PLAY(gen_wallet_fake_outputs_randomness);
@@ -1104,6 +1104,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(wallet_rpc_exchange_suite, "3,4");
     GENERATE_AND_PLAY_HF(wallet_true_rpc_pos_mining, "4-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_cold_signing, "3,5-*");
+    // GENERATE_AND_PLAY_HF(wallet_rpc_multiple_receivers, "5-*"); work in progress -- sowle
     GENERATE_AND_PLAY(wallet_chain_switch_with_spending_the_same_ki);
     GENERATE_AND_PLAY(wallet_sending_to_integrated_address);
     GENERATE_AND_PLAY_HF(block_template_blacklist_test, "4-*");
@@ -1118,7 +1119,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_pos_coinstake_already_spent);
     GENERATE_AND_PLAY(gen_pos_incorrect_timestamp);
     GENERATE_AND_PLAY(gen_pos_too_early_pos_block);
-    GENERATE_AND_PLAY(gen_pos_extra_nonce);
+    GENERATE_AND_PLAY_HF(gen_pos_extra_nonce, "3-*");
     GENERATE_AND_PLAY(gen_pos_min_allowed_height);
     GENERATE_AND_PLAY(gen_pos_invalid_coinbase);
     // GENERATE_AND_PLAY(pos_wallet_minting_same_amount_diff_outs); // Long test! Takes ~10 hours to simulate 6000 blocks on 2015 middle-end computer
@@ -1191,7 +1192,8 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_out_to_initiator, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_has_invalid_tx, "0,3");
     GENERATE_AND_PLAY_HF(gen_block_is_too_big, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_wrong_version_agains_hardfork, "0,3");  
+    GENERATE_AND_PLAY_HF(gen_block_wrong_version_agains_hardfork, "0,3");
+    GENERATE_AND_PLAY_HF(block_choice_rule_bigger_fee, "4-*"); 
     //GENERATE_AND_PLAY(gen_block_invalid_binary_format); // Takes up to 3 hours, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 500, up to 30 minutes, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10
 
 
@@ -1228,6 +1230,8 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(tx_pool_semantic_validation, "3");
     GENERATE_AND_PLAY(input_refers_to_incompatible_by_type_output);
     GENERATE_AND_PLAY_HF(tx_pool_validation_and_chain_switch, "4-*");
+    GENERATE_AND_PLAY_HF(tx_coinbase_separate_sig_flag, "4-*");
+    GENERATE_AND_PLAY(tx_input_mixins);
 
     // Double spend
     GENERATE_AND_PLAY(gen_double_spend_in_tx<false>);

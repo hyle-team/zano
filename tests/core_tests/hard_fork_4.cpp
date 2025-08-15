@@ -227,8 +227,6 @@ bool hardfork_4_wallet_transfer_with_mandatory_mixins::generate(std::vector<test
   * (It should also work prior to HF4.)
   */
 
-  bool r = false;
-
   uint64_t ts = test_core_time::get_time();
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
@@ -441,7 +439,6 @@ bool hardfork_4_pop_tx_from_global_index::generate(std::vector<test_event_entry>
 bool hardfork_4_pop_tx_from_global_index::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
   auto& bcs = c.get_blockchain_storage();
-  bool r = false;
 
   //currency::outs_index_stat outs_stat{};
   //bcs.get_outs_index_stat(outs_stat); // 24 - bad, 22 - good
