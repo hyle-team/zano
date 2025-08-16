@@ -588,7 +588,6 @@ namespace tools
 
     void set_tids_to_be_only_used_in_the_next_transfer(const std::vector<uint64_t>& tids)
     {
-      WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(std::all_of(tids.cbegin(), tids.cend(), [&](size_t i){ return i < m_transfers.size(); }), "some transfers IDs are out of range");
       m_found_free_amounts.clear();
       add_transfers_to_transfers_cache(tids);
     }

@@ -223,8 +223,10 @@ bool wallet2::get_transfer_info_by_key_image(const crypto::key_image& ki, transf
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_transfer_info_by_index(size_t i, transfer_details& td)
 {
-  //WLT_CHECK_AND_ASSERT_MES(i < m_transfers.size(), false, "wrong out in transaction: internal index, m_transfers.size()=" << m_transfers.size());
-  td = m_transfers.at(i);
+  auto it = m_transfers.find(i);
+  if (it == m_transfers.end())
+    return false;
+  td = it->second;
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -3865,7 +3867,7 @@ bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset
     asset_flags |= aif_custom;
   }
 
-  if (ask_daemon_for_unknown)
+  if (asset_flags == aif_none && ask_daemon_for_unknown)
   {
     if (daemon_get_asset_info(asset_id, asset_info))
     {
