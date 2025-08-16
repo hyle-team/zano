@@ -1840,7 +1840,14 @@ bool simple_wallet::transfer_so(const std::vector<std::string> &args)
 
   std::stringstream ss;
   for (auto i : outs_idxs)
+  {
     ss << i << " ";
+    tools::transfer_details td{};
+    if (!m_wallet->get_transfer_info_by_index(i, td) || !td.is_spendable())
+    {
+      fail_msg_writer() << "output #" << i << ": wrong index or not spendable";
+    }
+  }
   success_msg_writer() << "outputs' indicies allowed to spent: " << (outs_idxs.empty() ? std::string("all") : ss.str());
 
   // 2nd arg: fee
