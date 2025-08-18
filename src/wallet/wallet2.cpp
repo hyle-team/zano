@@ -223,8 +223,10 @@ bool wallet2::get_transfer_info_by_key_image(const crypto::key_image& ki, transf
 //----------------------------------------------------------------------------------------------------
 bool wallet2::get_transfer_info_by_index(size_t i, transfer_details& td)
 {
-  //WLT_CHECK_AND_ASSERT_MES(i < m_transfers.size(), false, "wrong out in transaction: internal index, m_transfers.size()=" << m_transfers.size());
-  td = m_transfers.at(i);
+  auto it = m_transfers.find(i);
+  if (it == m_transfers.end())
+    return false;
+  td = it->second;
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -3865,7 +3867,7 @@ bool wallet2::get_asset_info(const crypto::public_key& asset_id, currency::asset
     asset_flags |= aif_custom;
   }
 
-  if (ask_daemon_for_unknown)
+  if (asset_flags == aif_none && ask_daemon_for_unknown)
   {
     if (daemon_get_asset_info(asset_id, asset_info))
     {
@@ -4012,7 +4014,7 @@ bool wallet2::generate_utxo_defragmentation_transaction_if_needed(currency::tran
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool include_unspent /*= true*/, bool show_only_unknown /*= false*/, const std::string& filter_asset_ticker /*= std::string{}*/) const
 {
-  static const char* header = " index                 amount  ticker  g_index  flags          block  tx                                                                out#  asset id";
+  static const char* header = " index                 amount  ticker          g_index  flags          block  tx                                                                out#  asset id";
   std::stringstream ss;
   ss << header << ENDL;
   size_t count = 0;
@@ -4043,7 +4045,7 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
     ss << std::right << (is_locked ? "*" : " ") <<
       std::setw(5) << i << "  " <<
       std::setw(21) << print_asset_money(td.m_amount, adb.decimal_point) << "  " <<
-      std::setw(6) << std::left << (native_coin ? std::string("      ") : adb.ticker) << "  " << std::right <<
+      std::setw(14) << std::left << (native_coin ? std::string("              ") : adb.ticker) << "  " << std::right <<
       std::setw(7) << td.m_global_output_index << "  " <<
       std::setw(2) << std::setfill('0') << td.m_flags << std::setfill(' ') << ":" <<
       std::setw(8) << transfer_flags_to_str(td.m_flags) << "  " <<
@@ -4062,21 +4064,21 @@ std::string wallet2::get_transfers_str(bool include_spent /*= true*/, bool inclu
 
   ss << "printed " << count << " outputs of " << m_transfers.size() << " total" << ENDL;
   if (unknown_assets_outs_count == 1)
-    ss << "(" << unknown_assets_outs_count << " output with unrecognized asset id is not shown, use 'list_outputs unknown' to see it)" << ENDL;
+    ss << "(" << unknown_assets_outs_count << " output with unrecognized asset id is not shown, use 'list_outputs unknown' or 'lo unk' to see it)" << ENDL;
   else if (unknown_assets_outs_count > 1)
-    ss << "(" << unknown_assets_outs_count << " outputs with unrecognized asset ids are not shown, use 'list_outputs unknown' to see them)" << ENDL;
+    ss << "(" << unknown_assets_outs_count << " outputs with unrecognized asset ids are not shown, use 'list_outputs unknown' or 'lo unk' to see them)" << ENDL;
   return ss.str();
 }
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::get_balance_str() const
 {
-  // balance unlocked      / [balance total]        ticker   asset id
-  // 0.21                  / 98.51                  DP2      a6974d5874e97e5f4ed5ad0a62f0975edbccb1bb55502fc75c7fe808f12f44d3
-  // 190.123456789012      / 199.123456789012       ZANO     d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a  NATIVE
-  // 98.0                                           BGTVUW   af2b12f3033337f9aea1845a6bc3fc966ed4d13227a3ace7706fca7dbcdaa7e2
-  // 1000.034                                       DP3      d4aba1020f26927571771e04b585b4ffb211f52708d5e4c465bbdfa4a12e6271
+  // balance unlocked      / [balance total]        ticker          asset id
+  // 0.21                  / 98.51                  DP2             a6974d5874e97e5f4ed5ad0a62f0975edbccb1bb55502fc75c7fe808f12f44d3
+  // 190.123456789012      / 199.123456789012       ZANO            d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a  NATIVE
+  // 98.0                                           BGTVUW          af2b12f3033337f9aea1845a6bc3fc966ed4d13227a3ace7706fca7dbcdaa7e2
+  // 1000.034                                       DP3             d4aba1020f26927571771e04b585b4ffb211f52708d5e4c465bbdfa4a12e6271
 
-  static const char* header = " balance unlocked      / [balance total]        ticker    asset id";
+  static const char* header = " balance unlocked      / [balance total]        ticker          asset id";
   std::stringstream ss;
   ss << header << ENDL;
 
@@ -4098,7 +4100,7 @@ std::string wallet2::get_balance_str() const
       ss << std::string(21 + 3, ' ');
     else
       ss << " / " << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(b.total, b.asset_info.decimal_point);
-    ss << "  " << std::setw(8) << std::left << b.asset_info.ticker << "  " << b.asset_info.asset_id;
+    ss << "  " << std::setw(14) << std::left << b.asset_info.ticker << "  " << b.asset_info.asset_id;
     if (b.asset_info.asset_id == native_coin_asset_id)
       ss << "  NATIVE";
     ss << ENDL;
@@ -4109,15 +4111,15 @@ std::string wallet2::get_balance_str() const
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::get_balance_str_raw() const
 {
-  // balance unlocked      / [balance total]        ticker    asset id                                                          DP  flags
-  // 0.21                  / 98.51                  ZANO      d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a  12  NATIVE
-  // 2.0                                            MYFB      13615ffdfbdc09275a1dfc0fbdaf6a9b07849b835ffdfed0b9e1478ea8924774   1  custom
-  // 1000.0                                         BurnCT    14608811180d4bbad96a6b91405e329e4f2a10519e6dcea644f83b9f8ccb5863  12  unknown asset
+  // balance unlocked      / [balance total]        ticker          asset id                                                          DP  flags
+  // 0.21                  / 98.51                  ZANO            d6329b5b1f7c0805b5c345f4957554002a2f557845f64d7645dae0e051a6498a  12  NATIVE
+  // 2.0                                            MYFB            13615ffdfbdc09275a1dfc0fbdaf6a9b07849b835ffdfed0b9e1478ea8924774   1  custom
+  // 1000.0                                         BurnCT          14608811180d4bbad96a6b91405e329e4f2a10519e6dcea644f83b9f8ccb5863  12  unknown asset
   //WHITELIST:
   // a7e8e5b31c24f2d6a07e141701237b136d704c9a89f9a5d1ca4a8290df0b9edc    WETH
   // ...
 
-  static const char* header = " balance unlocked      / [balance total]        ticker    asset id                                                          DP  flags";
+  static const char* header = " balance unlocked      / [balance total]        ticker          asset id                                                          DP  flags";
   std::stringstream ss;
   ss << header << ENDL;
 
@@ -4138,7 +4140,7 @@ std::string wallet2::get_balance_str_raw() const
       else
         ss << " / " << std::setw(21) << print_fixed_decimal_point_with_trailing_spaces(entry.second.total, asset_info.decimal_point);
 
-      ss << "  " << std::setw(8) << std::left << asset_info.ticker;
+      ss << "  " << std::setw(14) << std::left << asset_info.ticker;
       ss << "  " << entry.first << "  ";
 
       if (has_info)

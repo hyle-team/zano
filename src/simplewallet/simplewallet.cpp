@@ -1840,7 +1840,14 @@ bool simple_wallet::transfer_so(const std::vector<std::string> &args)
 
   std::stringstream ss;
   for (auto i : outs_idxs)
+  {
     ss << i << " ";
+    tools::transfer_details td{};
+    if (!m_wallet->get_transfer_info_by_index(i, td) || !td.is_spendable())
+    {
+      fail_msg_writer() << "output #" << i << ": wrong index or not spendable";
+    }
+  }
   success_msg_writer() << "outputs' indicies allowed to spent: " << (outs_idxs.empty() ? std::string("all") : ss.str());
 
   // 2nd arg: fee
@@ -2109,7 +2116,7 @@ bool simple_wallet::list_outputs(const std::vector<std::string> &args)
       arg_spent_flags = true, include_spent = false;
     else if (!arg_spent_flags && (arg == "s" || arg == "spent" || arg == "unavailable"))
       arg_spent_flags = true, include_unspent = false;
-    else if (!arg_unknown_assets && (arg == "unknown"))
+    else if (!arg_unknown_assets && (arg == "unknown" || arg == "unk"))
       arg_unknown_assets = true, show_only_unknown = true;
     else if (!arg_ticker_filer && (arg.find("ticker=") == 0 || arg.find("t=") == 0))
       arg_ticker_filer = true, filter_asset_ticker = boost::erase_all_copy(boost::erase_all_copy(arg, "ticker="), "t=");
