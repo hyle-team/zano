@@ -4720,7 +4720,7 @@ namespace currency
 
   const boost::multiprecision::uint1024_t adjusting_multiplier = get_adjuster_for_fork_choice_rule_hf4();
 
-  boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty_hf4(const wide_difficulty_type& difficulty_pos_at_split_point,
+  boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty_hf6(const wide_difficulty_type& difficulty_pos_at_split_point,
     const wide_difficulty_type& difficulty_pow_at_split_point,
     const difficulties& a_diff,
     const difficulties& b_diff)

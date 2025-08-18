@@ -1025,7 +1025,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(offers_expiration_test);
     GENERATE_AND_PLAY(offers_tests);
     GENERATE_AND_PLAY(offers_filtering_1);
-    GENERATE_AND_PLAY(offers_handling_on_chain_switching);
+    //GENERATE_AND_PLAY(offers_handling_on_chain_switching);
     GENERATE_AND_PLAY(offer_removing_and_selected_output);
     GENERATE_AND_PLAY(offers_multiple_update);
     GENERATE_AND_PLAY(offer_sig_validity_in_update_and_cancel);

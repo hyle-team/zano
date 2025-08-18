@@ -2316,6 +2316,21 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
   }
   else if (m_core_runtime_config.is_hardfork_active_for_height(1, alt_chain_bei.height))
   {
+    if (m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_06, alt_chain_bei.height))
+    {
+      uint64_t split_length = alt_chain_bei.height > m_db_blocks.back()->height ? m_db_blocks.back()->height - connection_point.height: alt_chain_bei.height - connection_point.height;
+      if (split_length < 100)
+      {
+        wide_difficulty_type dummy;
+        //performance effective quick check
+        wide_difficulty_type alt_chain_pos_diff_precise = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain, alt_chain_bei.height, true, dummy);
+        wide_difficulty_type main_chain_pos_diff_precise = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain_type(), m_db_blocks.size() - 1, true, dummy);
+        if (main_chain_pos_diff_precise > alt_chain_pos_diff_precise)
+          return false;
+      }
+    }
+
+
     //new rules, applied after HARD_FORK_1
     //to learn this algo please read https://github.com/hyle-team/docs/blob/master/zano/PoS_Analysis_and_improvements_proposal.pdf
 
@@ -2344,15 +2359,16 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
 
     boost::multiprecision::uint1024_t alt = 0;
     boost::multiprecision::uint1024_t main = 0;
-    if (m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, alt_chain_bei.height))
+    if (m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, alt_chain_bei.height) && 
+        !m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_06, alt_chain_bei.height))
     {
       alt = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
       main = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
     }
-    else
+    else if(m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_06, alt_chain_bei.height))
     {
-      alt = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
-      main = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
+      alt = get_a_to_b_relative_cumulative_difficulty_hf6(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
+      main = get_a_to_b_relative_cumulative_difficulty_hf6(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
     }
     LOG_PRINT_L1("[FORK_CHOICE]: " << ENDL 
       << "difficulty_pow_at_split_point:" << difficulty_pow_at_split_point << ENDL
