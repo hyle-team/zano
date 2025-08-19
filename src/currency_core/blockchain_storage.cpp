@@ -1613,6 +1613,10 @@ void blockchain_storage::scan_outputs_distribution() {
 
   uint64_t pool_cb = 0;
   uint64_t pool_reg = 0;
+  uint64_t pool_no_mixins = 0;
+  //
+  uint64_t added_count = 0;
+  uint64_t total = 0;
 
   LOG_PRINT_L0("Scanning pool composition from g_index 0 to " << (up_index_limit - 1)
                                                               << " (amount=" << amount << ")");
@@ -1628,36 +1632,84 @@ void blockchain_storage::scan_outputs_distribution() {
     const std::shared_ptr<const currency::transaction_chain_entry> tx_ptr = 
         m_db_transactions.find(out_ptr->tx_id);
     if (!tx_ptr) {
+      LOG_ERROR("can't be");
       continue;
     }
 
     const uint64_t mint_block_height = tx_ptr->m_keeper_block_height;
 
     if (mint_block_height < zarcanum_epoch_start) {
+      LOG_ERROR("can't be");
       continue;
     }
 
-    if (is_pos_miner_tx(tx_ptr->tx)) {
-      ++pool_cb;
-    } else {
-      ++pool_reg;
+    bool added = false;
+    bool auditble_output = false;
+    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    {    
+      const tx_out_v& out_v = tx_ptr->tx.vout[out_ptr->out_no];
+
+      // do not use burned coins
+      if (is_out_burned(out_v))
+        continue;
+
+      // check mix_attr
+      uint8_t mix_attr = CURRENCY_TO_KEY_OUT_RELAXED;
+      if (!get_mix_attr_from_tx_out_v(out_v, mix_attr))
+      {
+        LOG_ERROR("why no mixins?");
+        continue;
+      }
+
+      if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+        auditble_output = true;
+    }
+    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    {
+      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount result_outs = AUTO_VAL_INIT(result_outs);
+      result_outs.amount = 0;
+      added = add_out_to_get_random_outs(result_outs, 0, g_idx, 16, false, top_height - 10);
+    }
+    if (added)
+      ++added_count;
+      
+
+
+
+
+    if (auditble_output)
+    {
+      ++pool_no_mixins;
+    }
+    else
+    {
+      if (is_pos_miner_tx(tx_ptr->tx)) {
+        ++pool_cb;
+      }
+      else {
+        ++pool_reg;
+      }
     }
 
     if (g_idx > 0 && g_idx % 10000 == 0) {
       LOG_PRINT_L0("Scanned " << g_idx << " / " << up_index_limit << " outputs...");
+      total = pool_cb + pool_reg + pool_no_mixins;
+      LOG_PRINT_L0("Pool composition (outputs created from Zarcanum epoch):" << ENDL <<
+      "   Coinbase outputs: " << pool_cb << " (" << (pool_cb * 100.0 / total) << "%)" << ENDL <<
+      "   Regular outputs:  " << pool_reg << " (" << (pool_reg * 100.0 / total) << "%)" << ENDL <<
+      "   Auditble outputs:  " << pool_no_mixins << " (" << (pool_no_mixins * 100.0 / total) << "%)" << ENDL <<
+      "   Added percent:  " << added_count << " (" << (added_count * 100.0 / total) << "%)" << ENDL <<
+      "   Total outputs:    " << total);
     }
   }
 
-  uint64_t total = pool_cb + pool_reg;
+  LOG_PRINT_L0("Done");
+
   if (total == 0) {
     LOG_PRINT_L0("No outputs found created from Zarcanum epoch");
     return;
   }
 
-  LOG_PRINT_L0("Pool composition (outputs created from Zarcanum epoch):");
-  LOG_PRINT_L0("   Coinbase outputs: " << pool_cb << " (" << (pool_cb * 100.0 / total) << "%)");
-  LOG_PRINT_L0("   Regular outputs:  " << pool_reg << " (" << (pool_reg * 100.0 / total) << "%)");
-  LOG_PRINT_L0("   Total outputs:    " << total);
 }
 //------------------------------------------------------------------
 void blockchain_storage::scan_pos_ring_unique_composition() {
@@ -1713,7 +1765,11 @@ void blockchain_storage::scan_pos_ring_unique_composition() {
         if (!tx_ptr) continue;
 
         const uint64_t mint_height = tx_ptr->m_keeper_block_height;
-        if (mint_height < zarcanum_epoch_start) continue;
+        if (mint_height < zarcanum_epoch_start)
+        {
+          LOG_ERROR("can't be");
+          continue;
+        }
 
         if (is_pos_miner_tx(tx_ptr->tx)) {
           ++unique_from_coinbase;
@@ -1765,7 +1821,7 @@ void blockchain_storage::scan_pos_ring_unique_composition() {
   }
 }
 //------------------------------------------------------------------
-void blockchain_storage::scan_pos_ring_composition() {
+void blockchain_storage::scan_pos_ring_composition(uint64_t start, uint64_t stop) {
   constexpr uint64_t zarcanum_epoch_start = 2555000;
   constexpr uint64_t amount = 0;
 
@@ -1781,17 +1837,18 @@ void blockchain_storage::scan_pos_ring_composition() {
   uint64_t inputs_from_regular_tx   = 0;
   uint64_t total_inputs = 0;
 
-  const uint64_t start_height = zarcanum_epoch_start;
-  const uint64_t total_blocks = top_height - start_height + 1;
+  const uint64_t start_height = start == 0 ? 3000000: start;
+  const uint64_t stop_height = stop == 0 ? top_height: stop;
+  const uint64_t total_blocks = stop_height - start_height + 1;
   uint64_t processed_blocks = 0;
 
-  LOG_PRINT_L0("Scanning POS ring input origin from height " << start_height << " to " << top_height);
+  LOG_PRINT_L0("Scanning POS ring input origin from height " << start_height << " to " << stop_height);
   LOG_PRINT_L0("Total blocks to scan: " << total_blocks);
 
-  for (uint64_t height = start_height; height <= top_height; ++height) {
+  for (uint64_t height = start_height; height <= stop_height; ++height) {
     const auto& block_entry_ptr = m_db_blocks[height];
     if (!block_entry_ptr) {
-      LOG_PRINT_L1("Missing block entry at height " << height);
+      LOG_PRINT_L0("Missing block entry at height " << height);
       continue;
     }
 
@@ -1800,13 +1857,13 @@ void blockchain_storage::scan_pos_ring_composition() {
       continue;
 
     if (blk.miner_tx.vin.size() < 2) {
-      LOG_PRINT_L1("Miner tx at height " << height << " has less than 2 inputs");
+      LOG_PRINT_L0("Miner tx at height " << height << " has less than 2 inputs");
       continue;
     }
 
     const auto& second_input = blk.miner_tx.vin[1];
     if (second_input.type() != typeid(currency::txin_zc_input)) {
-      LOG_PRINT_L1("Second input is not txin_zc_input at height " << height);
+      LOG_PRINT_L0("Second input is not txin_zc_input at height " << height);
       continue;
     }
 
@@ -1815,7 +1872,7 @@ void blockchain_storage::scan_pos_ring_composition() {
 
     for (const auto& abs_offset : abs_offsets) {
       if (abs_offset.type() != typeid(uint64_t)) {
-        LOG_PRINT_L1("Invalid offset type at height " << height);
+        LOG_PRINT_L0("Invalid offset type at height " << height);
         continue;
       }
 
@@ -1823,18 +1880,19 @@ void blockchain_storage::scan_pos_ring_composition() {
 
       const auto out_ptr = m_db_outputs.get_subitem(amount, global_index);
       if (!out_ptr) {
-        LOG_PRINT_L1("Output not found for global_index=" << global_index << " at height " << height);
+        LOG_PRINT_L0("Output not found for global_index=" << global_index << " at height " << height);
         continue;
       }
 
       const auto tx_entry_ptr = m_db_transactions.find(out_ptr->tx_id);
       if (!tx_entry_ptr) {
-        LOG_PRINT_L1("Transaction not found for tx_id=" << out_ptr->tx_id << " at height " << height);
+        LOG_PRINT_L0("Transaction not found for tx_id=" << out_ptr->tx_id << " at height " << height);
         continue;
       }
 
       const uint64_t mint_height = tx_entry_ptr->m_keeper_block_height;
       if (mint_height < zarcanum_epoch_start) {
+        LOG_ERROR("Can't be");
         continue;
       }
 
@@ -1849,10 +1907,17 @@ void blockchain_storage::scan_pos_ring_composition() {
 
     ++processed_blocks;
     if (processed_blocks % 1000 == 0) {
-      double progress = (double)processed_blocks / total_blocks * 100.0;
-       LOG_PRINT_L0("Scanned " << processed_blocks << "/" << total_blocks
+      double cb_percent = static_cast<double>(inputs_from_pos_coinbase) * 100.0 / total_inputs;
+      double reg_percent = static_cast<double>(inputs_from_regular_tx) * 100.0 / total_inputs;
+
+      double progress = (double)(height - start_height) / total_blocks * 100.0;
+      LOG_PRINT_L0("Scanned " << processed_blocks << " blocks, from " << start_height << " to " << height
                               << " blocks (" << std::fixed << std::setprecision(2) << progress
-                              << "%), inputs processed: " << total_inputs);
+                              << "%), inputs processed: " << total_inputs << ", height = " << height << ", top stop_height=" << stop_height << ENDL
+                              << "Inputs referencing PoS-coinbase UTXOs: " << inputs_from_pos_coinbase
+                              << " (" << std::fixed << std::setprecision(2) << cb_percent << "%)" << ENDL 
+                              << "Inputs referencing regular UTXOs:     " << inputs_from_regular_tx
+                              << " (" << std::setprecision(2) << reg_percent << "%)" );
     }
   }
 

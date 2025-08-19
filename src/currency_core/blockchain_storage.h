@@ -532,7 +532,7 @@ namespace currency
     void scan_pos_coin_age_distribution(std::map<uint64_t, uint64_t>& confirmations_distribution);
     void scan_outputs_distribution();
     void scan_pos_ring_unique_composition();
-    void scan_pos_ring_composition();
+    void scan_pos_ring_composition(uint64_t start, uint64_t stop);
 
   private:
 

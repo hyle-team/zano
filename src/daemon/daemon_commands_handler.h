@@ -970,7 +970,27 @@ private:
   //--------------------------------------------------------------------------------
   bool scan_pos_ring_composition(const std::vector<std::string>& args)
   {
-    m_srv.get_payload_object().get_core().get_blockchain_storage().scan_pos_ring_composition();
+    uint64_t start = 0;
+    uint64_t stop = 0;
+    if (args.size() > 0)
+    {
+      if (!epee::string_tools::get_xtype_from_string(start, args[0]))
+      {
+        std::cout << "unable to convert to number '" << args[0] << "'" << std::endl;
+        return true;
+      }
+
+      if (args.size() > 1)
+      {
+        if (!epee::string_tools::get_xtype_from_string(stop, args[1]))
+        {
+          std::cout << "unable to convert to number '" << args[1] << "'" << std::endl;
+          return true;
+        }
+      }
+    }
+
+    m_srv.get_payload_object().get_core().get_blockchain_storage().scan_pos_ring_composition(start, stop);
     return true;
   }
   //--------------------------------------------------------------------------------
