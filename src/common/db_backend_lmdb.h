@@ -13,6 +13,8 @@
 #include "db/liblmdb/lmdb.h"
 
 struct lmdb_txn_destructor_abort_test;
+struct lmdb_ro_double_begin_bad_rslot_test;
+struct lmdb_ro_cross_thread_finish_test;
 
 namespace tools
 {
@@ -23,6 +25,8 @@ namespace tools
     {
       friend class lmdb_txn;
       friend struct ::lmdb_txn_destructor_abort_test;
+      friend struct ::lmdb_ro_double_begin_bad_rslot_test;
+      friend struct ::lmdb_ro_cross_thread_finish_test;
       class lmdb_txn 
       {
       public:
@@ -44,9 +48,12 @@ namespace tools
         bool read_only{false}; // needed for thread-top transaction, for figure out if we need to unlock exclusive access
         size_t nested_count{0};   //count of read-only nested emulated transactions
 
+        uint64_t dbg_id{0};        // human readable transaction id
+        uint32_t stack_level{0};   // depth of the stack at the moment of opening (number of elements before push)
       private:
         std::reference_wrapper<lmdb_db_backend> m_db;
         bool m_marked_finished{false};
+        std::thread::id owner{};
       };
 
       typedef std::list<lmdb_txn> transactions_list;
@@ -62,7 +69,8 @@ namespace tools
     public:
       lmdb_db_backend();
       ~lmdb_db_backend();
-
+      void dump();
+      void dump_tx_stacks();
       //----------------- i_db_backend -----------------------------------------------------
       bool close() override;
       bool begin_transaction(bool read_only = false) override;

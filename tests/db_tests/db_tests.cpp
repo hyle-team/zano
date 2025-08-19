@@ -628,7 +628,10 @@ struct lmdb_txn_thread_specific_test
     auto ptr = acc.get(55555);
     CHECK_AND_ASSERT_MES(ptr.get() && *ptr == "thread_data", false, "Thread write not persisted");
     acc.commit_transaction();
-
+    auto backend_sp = acc.get_db_accessor().get_backend();
+    auto* backend = dynamic_cast<tools::db::lmdb_db_backend*>(backend_sp.get());
+    if (backend)
+      backend->dump();
     LOG_PRINT_GREEN("lmdb_txn_thread_specific_test successful", LOG_LEVEL_0);
     return true;
   }
@@ -729,8 +732,102 @@ struct lmdb_txn_stress_multithread_test
     auto final_ptr = acc.get(key);
     CHECK_AND_ASSERT_MES(final_ptr.get(), false, "final value missing after stress");
     acc.commit_transaction();
-
+    
     LOG_PRINT_GREEN("[stress] OK, reads=" << read_loops.load() << " writes=" << write_loops.load(), LOG_LEVEL_0);
+    return true;
+  }
+};
+
+struct lmdb_ro_double_begin_bad_rslot_test
+{
+  typedef tools::db::cached_key_value_accessor<uint64_t, std::string, true, true> accessor_type;
+
+  static bool run_test(accessor_type& /*acc*/)
+  {
+    const std::string base =
+      epee::string_tools::get_current_module_folder() + std::string("/") + DB_TEST_SUB_DIR + "/ro_double_begin";
+
+    boost::system::error_code ec;
+    boost::filesystem::remove_all(base, ec);
+    CHECK_AND_ASSERT_MES(!ec, false, "Failed to empty db subdir: " << ec.message());
+    CHECK_AND_ASSERT_MES(tools::create_directories_if_necessary(base), false, "mkdir failed");
+
+    epee::shared_recursive_mutex rwlock;
+    auto backend_sp = std::make_shared<tools::db::lmdb_db_backend>();
+    tools::db::lmdb_db_backend* backend = backend_sp.get();
+    tools::db::basic_db_accessor bdb(backend_sp, rwlock);
+
+    CHECK_AND_ASSERT_MES(bdb.open(base), false, "backend open failed");
+
+    tools::db::container_handle h = 0;
+    CHECK_AND_ASSERT_MES(bdb.get_backend()->open_container("c", h), false, "open_container failed");
+
+    tools::db::lmdb_db_backend::lmdb_txn t1(*backend, /*is_read_only=*/true);
+    int rc1 = t1.begin(nullptr);
+    CHECK_AND_ASSERT_MES(rc1 == MDB_SUCCESS, false, "first ro begin failed: " << mdb_strerror(rc1));
+
+    tools::db::lmdb_db_backend::lmdb_txn t2(*backend, /*is_read_only=*/true);
+    int rc2 = t2.begin(nullptr);
+
+    LOG_PRINT_MAGENTA("second ro begin rc=" << rc2 << " (" << mdb_strerror(rc2) << ")", LOG_LEVEL_0);
+
+    const int MDB_BAD_RSLOT_LOCAL = -30783;
+    CHECK_AND_ASSERT_MES(rc2 == MDB_BAD_RSLOT_LOCAL, false, "Expected MDB_BAD_RSLOT on second ro begin in same thread");
+
+    t1.abort();
+    backend_sp->dump();
+    bdb.close();
+
+    LOG_PRINT_GREEN("lmdb_ro_double_begin_bad_rslot_test reproduced BAD_RSLOT", LOG_LEVEL_0);
+    return true;
+  }
+};
+
+struct lmdb_ro_cross_thread_finish_test
+{
+  typedef tools::db::cached_key_value_accessor<uint64_t, std::string, true, true> accessor_type;
+
+  static bool run_test(accessor_type& /*acc*/)
+  {
+    const std::string base =
+      epee::string_tools::get_current_module_folder() + std::string("/") + DB_TEST_SUB_DIR + "/ro_cross_thread";
+
+    boost::system::error_code ec;
+    boost::filesystem::remove_all(base, ec);
+    CHECK_AND_ASSERT_MES(!ec, false, "Failed to empty db subdir: " << ec.message());
+    CHECK_AND_ASSERT_MES(tools::create_directories_if_necessary(base), false, "mkdir failed");
+
+    epee::shared_recursive_mutex rwlock;
+    auto backend_sp = std::make_shared<tools::db::lmdb_db_backend>();
+    tools::db::lmdb_db_backend* backend = backend_sp.get();
+    tools::db::basic_db_accessor bdb(backend_sp, rwlock);
+    CHECK_AND_ASSERT_MES(bdb.open(base), false, "backend open failed");
+
+    tools::db::container_handle h = 0;
+    CHECK_AND_ASSERT_MES(bdb.get_backend()->open_container("c", h), false, "open_container failed");
+
+    tools::db::lmdb_db_backend::lmdb_txn t(*backend, /*is_read_only=*/true);
+    int rc = t.begin(nullptr);
+    CHECK_AND_ASSERT_MES(rc == MDB_SUCCESS, false, "ro begin failed: " << mdb_strerror(rc));
+
+    std::atomic<bool> threw{false};
+
+    std::thread th([&]()
+    {
+      try {
+        t.commit();
+      } catch (...) {
+        threw.store(true, std::memory_order_relaxed);
+      }
+    });
+    th.join();
+    CHECK_AND_ASSERT_MES(threw.load(), false, "owner guard didn't fire for cross-thread commit");
+
+    t.abort();
+
+    backend_sp->dump();
+    bdb.close();
+    LOG_PRINT_GREEN("lmdb_ro_cross_thread_finish_test reproduced cross-thread misuse error", LOG_LEVEL_0);
     return true;
   }
 };
@@ -741,6 +838,11 @@ int main(int argc, char* argv[])
   epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
   epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
 
+  if (!prepare_db_and_run_test<lmdb_ro_double_begin_bad_rslot_test>())
+    return 0;
+
+  if (!prepare_db_and_run_test<lmdb_ro_cross_thread_finish_test>())
+    return 0;
 
   if (!prepare_db_and_run_test<lmdb_txn_basic_write_test>())
   return 0;

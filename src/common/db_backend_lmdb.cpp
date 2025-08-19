@@ -8,6 +8,7 @@
 #include "string_coding.h"
 #include "profile_tools.h"
 #include "util.h"
+#include <boost/stacktrace.hpp>
 
 #define BUF_SIZE 1024
 
@@ -15,14 +16,58 @@
 #define CHECK_AND_ASSERT_THROW_MESS_LMDB_DB(rc, mess) CHECK_AND_ASSERT_THROW_MES(rc == MDB_SUCCESS, "[DB ERROR]:(" << rc << ")" << mdb_strerror(rc) << ", [message]: " << mess);
 #define ASSERT_MES_AND_THROW_LMDB(rc, mess) ASSERT_MES_AND_THROW("[DB ERROR]:(" << rc << ")" << mdb_strerror(rc) << ", [message]: " << mess);
 
-#undef LOG_DEFAULT_CHANNEL 
-#define LOG_DEFAULT_CHANNEL "lmdb"
+// #undef LOG_DEFAULT_CHANNEL 
+// #define LOG_DEFAULT_CHANNEL "lmdb"
 // 'lmdb' channel is disabled by default
+static void print_stacktrace()
+{
+  LOG_PRINT_L0("Stacktrace \n" << boost::stacktrace::stacktrace());
+}
 
 namespace tools
 {
   namespace db
   {
+    static inline std::string tid_str()
+    {
+      std::ostringstream os; os << std::this_thread::get_id(); return os.str();
+    }
+
+    static std::atomic<uint64_t> g_tx_dbg_counter{0};
+
+    static int print_reader(const char* s, void*) 
+    { 
+      LOG_PRINT_L0(std::string(s));
+      return 0;
+    }
+
+    void dump_readers(MDB_env* env)
+    {
+      int dead = 0;
+      mdb_reader_check(env, &dead);
+      LOG_PRINT_L0("purged dead readers: " << dead);
+      mdb_reader_list(env, print_reader, nullptr);
+    }
+
+    void lmdb_db_backend::dump_tx_stacks()
+    {
+      std::lock_guard<boost::recursive_mutex> lock(m_cs);
+      LOG_PRINT_L0("== TX STACKS ==");
+      for (const auto& kv : m_txs) {
+        std::ostringstream tid; tid << kv.first;
+        const auto& lst = kv.second; // transactions_list = std::list<lmdb_txn>
+        LOG_PRINT_L0("  tid=" << tid.str() << " depth=" << lst.size());
+        size_t i = 0;
+        for (const auto& t : lst) {
+          LOG_PRINT_L0("[" << i++ << "] id=" << t.dbg_id
+            << " ro=" << (t.read_only ? 1 : 0)
+            << " lvl=" << t.stack_level
+            << " nested=" << t.nested_count
+            << " ptx=" << (void*)t.ptx);
+        }
+      }
+    }
+
     lmdb_db_backend::lmdb_db_backend() : m_penv(AUTO_VAL_INIT(m_penv))  
     {
 
@@ -80,6 +125,12 @@ namespace tools
       return true;
     }
 
+    void lmdb_db_backend::dump()
+    {
+      std::lock_guard<boost::recursive_mutex> lock(m_cs);
+      dump_readers(m_penv);
+    }
+
     bool lmdb_db_backend::close()
     {
       {
@@ -123,6 +174,7 @@ namespace tools
         std::lock_guard<boost::recursive_mutex> lock(m_cs);
         CHECK_AND_ASSERT_THROW_MES(m_penv, "m_penv==null, db closed");
         transactions_list& rtxlist = m_txs[std::this_thread::get_id()];
+        const size_t stack_before = rtxlist.size();
         MDB_txn* pparent_tx = nullptr;
         bool parent_read_only = false;
         if (!rtxlist.empty())
@@ -145,6 +197,9 @@ namespace tools
           CHECK_AND_ASSERT_THROW_MES(m_penv, "m_penv==null, db closed");
           rtxlist.emplace_back(*this, read_only);
           lmdb_txn& txn = rtxlist.back();
+
+          txn.stack_level = static_cast<uint32_t>(stack_before);
+
           int res = txn.begin(pparent_tx);
           if(res != MDB_SUCCESS)
           {
@@ -155,6 +210,16 @@ namespace tools
             }
             rtxlist.pop_back();
             //throw exception to avoid regular code execution 
+            LOG_PRINT_L0(
+              "[TX] OPEN FAIL tid=" << tid_str()
+              << " id=" << txn.dbg_id
+              << " ro=" << (txn.read_only ? 1 : 0)
+              << " lvl=" << txn.stack_level
+              << " stack_after=" << rtxlist.size()
+              << " nested=" << txn.nested_count);
+            dump();
+            dump_tx_stacks();
+            print_stacktrace();
             ASSERT_MES_AND_THROW_LMDB(res, "Unable to mdb_txn_begin");
           }
         }
@@ -207,7 +272,13 @@ namespace tools
         lmdb_txn txe(*this);
         bool r = pop_lmdb_txn(txe);
         CHECK_AND_ASSERT_MES(r, false, "Unable to pop_lmdb_txn");
-          
+        
+        if (!txe.ptx)
+        {
+          LOG_PRINT_L4("[DB] Nested transaction scope closed");
+          return true;
+        }
+
         if (txe.nested_count == 0 || (txe.read_only && txe.nested_count == 1))
         {
           if(txe.read_only)
@@ -224,7 +295,7 @@ namespace tools
               LOG_PRINT_CYAN("[DB " << m_path << "] WRITE UNLOCKED", LOG_LEVEL_3);
             }
           }
-        } 
+        }
       }
       LOG_PRINT_L4("[DB] Transaction committed");
       return true;
@@ -473,34 +544,53 @@ namespace tools
 
     lmdb_db_backend::lmdb_txn::lmdb_txn(lmdb_db_backend::lmdb_txn&& other) noexcept
       : m_db(other.m_db), ptx(other.ptx), read_only(other.read_only),
-        nested_count(other.nested_count), m_marked_finished(other.m_marked_finished)
+        nested_count(other.nested_count), m_marked_finished(other.m_marked_finished), 
+        owner(other.owner),
+        dbg_id(other.dbg_id),
+        stack_level(other.stack_level)
     {
       other.ptx = nullptr;
       other.m_marked_finished = true;
+      other.owner = std::thread::id{};
+      other.dbg_id = 0;
+      other.stack_level = 0;
     }
 
     lmdb_db_backend::lmdb_txn& lmdb_db_backend::lmdb_txn::operator=(lmdb_db_backend::lmdb_txn&& other) noexcept
     {
       if (this != &other)
       {
+        owner = other.owner;
         ptx = other.ptx;
         other.ptx = nullptr;
         read_only = other.read_only;
         nested_count = other.nested_count;
         m_marked_finished = other.m_marked_finished;
         other.m_marked_finished = true;
+        dbg_id = other.dbg_id; other.dbg_id = 0;
+        stack_level = other.stack_level; other.stack_level = 0;
       }
       return *this;
     }
 
     int lmdb_db_backend::lmdb_txn::begin(MDB_txn* parent_tx)
     {
+      owner = std::this_thread::get_id();
       unsigned int flags = read_only ? MDB_RDONLY : 0;
+      if (!parent_tx || !read_only)
+      {
+        dbg_id = ++g_tx_dbg_counter;
+      }
       return mdb_txn_begin(m_db.get().m_penv, parent_tx, flags, &ptx);
     }
 
     int lmdb_db_backend::lmdb_txn::commit()
     {
+      if (owner != std::this_thread::get_id())
+      {
+        dump_tx_stacks();
+        print_stacktrace();
+      }
       int res = mdb_txn_commit(ptx);
       if (res != MDB_SUCCESS)
       {
@@ -513,7 +603,13 @@ namespace tools
 
     void lmdb_db_backend::lmdb_txn::abort()
     {
-      mdb_txn_abort(ptx);
+      if (owner != std::this_thread::get_id())
+      {
+        dump_tx_stacks();
+        print_stacktrace();
+      }
+      if (ptx)
+        mdb_txn_abort(ptx);
       ptx = nullptr; // reset pointer to avoid double abort
       mark_finished();
     }
