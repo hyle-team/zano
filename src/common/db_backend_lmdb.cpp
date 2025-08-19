@@ -588,7 +588,7 @@ namespace tools
     {
       if (owner != std::this_thread::get_id())
       {
-        dump_tx_stacks();
+        m_db.get().dump_tx_stacks();
         print_stacktrace();
       }
       int res = mdb_txn_commit(ptx);
@@ -605,7 +605,7 @@ namespace tools
     {
       if (owner != std::this_thread::get_id())
       {
-        dump_tx_stacks();
+        m_db.get().dump_tx_stacks();
         print_stacktrace();
       }
       if (ptx)
