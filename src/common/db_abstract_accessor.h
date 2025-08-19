@@ -565,6 +565,9 @@ namespace tools
         bdb.abort_transaction();
       }
 
+      basic_db_accessor& get_db_accessor() { return bdb; }
+      const basic_db_accessor& get_db_accessor() const { return bdb; }
+
       bool init(const std::string& container_name)
       {
 #ifdef ENABLE_PROFILING
