@@ -1619,7 +1619,7 @@ void blockchain_storage::scan_outputs_distribution() {
   uint64_t total = 0;
 
   LOG_PRINT_L0("Scanning pool composition from g_index 0 to " << (up_index_limit - 1)
-                                                             << " (amount=" << amount << ")");
+                                                              << " (amount=" << amount << ")");
   LOG_PRINT_L0("Zarcanum epoch start: " << zarcanum_epoch_start);
 
   for (size_t g_idx = 0; g_idx < up_index_limit; ++g_idx) {
