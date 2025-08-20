@@ -1594,121 +1594,145 @@ void blockchain_storage::scan_pos_coin_age_distribution(std::map<uint64_t, uint6
 }
 //------------------------------------------------------------------
 void blockchain_storage::scan_outputs_distribution() {
-  constexpr uint64_t zarcanum_epoch_start = 2555000;
-  constexpr uint64_t amount = 0;
+ constexpr uint64_t zarcanum_epoch_start = 2555000;
+ constexpr uint64_t amount = 0;
 
-  CRITICAL_REGION_LOCAL(m_read_lock);
+ CRITICAL_REGION_LOCAL(m_read_lock);
 
-  const uint64_t top_height = m_db_blocks.size() > 0 ? m_db_blocks.size() - 1 : 0;
-  if (top_height < zarcanum_epoch_start) {
-    LOG_PRINT_L0("Blockchain height " << top_height << " < " << zarcanum_epoch_start << ", nothing to scan");
-    return;
-  }
+ const uint64_t top_height = m_db_blocks.size() > 0 ? m_db_blocks.size() - 1 : 0;
+ if (top_height < zarcanum_epoch_start) {
+   LOG_PRINT_L0("Blockchain height " << top_height << " < " << zarcanum_epoch_start << ", nothing to scan");
+   return;
+ }
 
-  const uint64_t up_index_limit = find_end_of_allowed_index(amount);
-  if (up_index_limit == 0) {
-    LOG_PRINT_L0("No allowed outputs found");
-    return;
-  }
+ const uint64_t up_index_limit = find_end_of_allowed_index(amount);
+ if (up_index_limit == 0) {
+   LOG_PRINT_L0("No allowed outputs found");
+   return;
+ }
 
-  uint64_t pool_cb = 0;
-  uint64_t pool_reg = 0;
-  uint64_t pool_no_mixins = 0;
-  //
-  uint64_t added_count = 0;
-  uint64_t total = 0;
+ uint64_t pool_cb = 0;
+ uint64_t pool_reg = 0;
+ uint64_t pool_no_mixins = 0;
+ //
+ uint64_t added_count = 0;
+ uint64_t total = 0;
 
-  LOG_PRINT_L0("Scanning pool composition from g_index 0 to " << (up_index_limit - 1)
-                                                              << " (amount=" << amount << ")");
-  LOG_PRINT_L0("Zarcanum epoch start: " << zarcanum_epoch_start);
+ LOG_PRINT_L0("Scanning pool composition from g_index 0 to " << (up_index_limit - 1)
+                                                             << " (amount=" << amount << ")");
+ LOG_PRINT_L0("Zarcanum epoch start: " << zarcanum_epoch_start);
 
-  for (size_t g_idx = 0; g_idx < up_index_limit; ++g_idx) {
-    const std::shared_ptr<const currency::global_output_entry> out_ptr = 
-        m_db_outputs.get_subitem(amount, g_idx);
-    if (!out_ptr) {
-      continue;
-    }
+ for (size_t g_idx = 0; g_idx < up_index_limit; ++g_idx) {
+   const std::shared_ptr<const currency::global_output_entry> out_ptr = 
+       m_db_outputs.get_subitem(amount, g_idx);
+   if (!out_ptr) {
+     continue;
+   }
 
-    const std::shared_ptr<const currency::transaction_chain_entry> tx_ptr = 
-        m_db_transactions.find(out_ptr->tx_id);
-    if (!tx_ptr) {
-      LOG_ERROR("can't be");
-      continue;
-    }
+   const std::shared_ptr<const currency::transaction_chain_entry> tx_ptr = 
+       m_db_transactions.find(out_ptr->tx_id);
+   if (!tx_ptr) {
+     LOG_ERROR("can't be");
+     continue;
+   }
 
-    const uint64_t mint_block_height = tx_ptr->m_keeper_block_height;
+   const uint64_t mint_block_height = tx_ptr->m_keeper_block_height;
 
-    if (mint_block_height < zarcanum_epoch_start) {
-      LOG_ERROR("can't be");
-      continue;
-    }
+   if (mint_block_height < zarcanum_epoch_start) {
+     LOG_ERROR("can't be");
+     continue;
+   }
 
-    bool added = false;
-    bool auditble_output = false;
-    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    {    
-      const tx_out_v& out_v = tx_ptr->tx.vout[out_ptr->out_no];
+   bool added = false;
+   bool auditble_output = false;
+   //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   {
+     const tx_out_v& out_v = tx_ptr->tx.vout[out_ptr->out_no];
 
-      // do not use burned coins
-      if (is_out_burned(out_v))
-        continue;
+     // do not use burned coins
+     if (is_out_burned(out_v))
+       continue;
 
-      // check mix_attr
-      uint8_t mix_attr = CURRENCY_TO_KEY_OUT_RELAXED;
-      if (!get_mix_attr_from_tx_out_v(out_v, mix_attr))
-      {
-        LOG_ERROR("why no mixins?");
-        continue;
-      }
+     // check mix_attr
+     uint8_t mix_attr = CURRENCY_TO_KEY_OUT_RELAXED;
+     if (!get_mix_attr_from_tx_out_v(out_v, mix_attr))
+     {
+       LOG_ERROR("why no mixins?");
+       continue;
+     }
 
-      if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
-        auditble_output = true;
-    }
-    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    {
-      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount result_outs = AUTO_VAL_INIT(result_outs);
-      result_outs.amount = 0;
-      added = add_out_to_get_random_outs(result_outs, 0, g_idx, 16, false, top_height - 10);
-    }
-    if (added)
-      ++added_count;
-      
-
+     if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+       auditble_output = true;
+   }
+   //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   {
+     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount result_outs = AUTO_VAL_INIT(result_outs);
+     result_outs.amount = 0;
+     added = add_out_to_get_random_outs(result_outs, 0, g_idx, 16, false, top_height - 10);
+   }
+   if (added)
+     ++added_count;
 
 
 
-    if (auditble_output)
-    {
-      ++pool_no_mixins;
-    }
-    else
-    {
-      if (is_pos_miner_tx(tx_ptr->tx)) {
-        ++pool_cb;
-      }
-      else {
-        ++pool_reg;
-      }
-    }
 
-    if (g_idx > 0 && g_idx % 10000 == 0) {
-      LOG_PRINT_L0("Scanned " << g_idx << " / " << up_index_limit << " outputs...");
-      total = pool_cb + pool_reg + pool_no_mixins;
-      LOG_PRINT_L0("Pool composition (outputs created from Zarcanum epoch):" << ENDL <<
-      "   Coinbase outputs: " << pool_cb << " (" << (pool_cb * 100.0 / total) << "%)" << ENDL <<
-      "   Regular outputs:  " << pool_reg << " (" << (pool_reg * 100.0 / total) << "%)" << ENDL <<
-      "   Auditble outputs:  " << pool_no_mixins << " (" << (pool_no_mixins * 100.0 / total) << "%)" << ENDL <<
-      "   Added percent:  " << added_count << " (" << (added_count * 100.0 / total) << "%)" << ENDL <<
-      "   Total outputs:    " << total);
-    }
-  }
 
-  LOG_PRINT_L0("Done");
+   if (auditble_output)
+   {
+     ++pool_no_mixins;
+   }
+   else
+   {
+     if (is_pos_miner_tx(tx_ptr->tx)) {
+       ++pool_cb;
+     }
+     else {
+       ++pool_reg;
+     }
+   }
 
-  if (total == 0) {
-    LOG_PRINT_L0("No outputs found created from Zarcanum epoch");
-    return;
-  }
+   if (g_idx > 0 && g_idx % 10000 == 0) {
+     total = pool_cb + pool_reg + pool_no_mixins;
+     if (total == 0) {
+       LOG_PRINT_L0("Scanned " << g_idx << " / " << up_index_limit << " outputs... (no valid outputs yet)");
+       continue;
+     }
+
+     uint64_t mixable_total = pool_cb + pool_reg;
+     double cb_pct_all = static_cast<double>(pool_cb) * 100.0 / total;
+     double reg_pct_all = static_cast<double>(pool_reg) * 100.0 / total;
+     double audit_pct_all = static_cast<double>(pool_no_mixins) * 100.0 / total;
+     double added_pct_all = static_cast<double>(added_count) * 100.0 / total;
+
+     std::string mixable_str = "Mixable outputs (excl. auditble): N/A";
+     if (mixable_total > 0) {
+       double cb_ratio_nonaudit = static_cast<double>(pool_cb) * 100.0 / mixable_total;
+       double reg_ratio_nonaudit = static_cast<double>(pool_reg) * 100.0 / mixable_total;
+       std::ostringstream oss;
+       oss << std::fixed << std::setprecision(2);
+       oss << " Mixable outputs (excl. auditble): " << mixable_total << ENDL
+           << "      -> Coinbase: " << pool_cb << " (" << cb_ratio_nonaudit << "%)" << ENDL
+           << "      -> Regular:  " << pool_reg << " (" << reg_ratio_nonaudit << "%)";
+       mixable_str = oss.str();
+     }
+
+     LOG_PRINT_L0("Scanned " << g_idx << " / " << up_index_limit << " outputs..." << ENDL
+                             << "Pool composition (outputs created from Zarcanum epoch):" << ENDL
+                             << "Total outputs:        " << total << ENDL
+                             << "Coinbase outputs:     " << pool_cb << " (" << cb_pct_all << "%)" << ENDL
+                             << "Regular outputs:      " << pool_reg << " (" << reg_pct_all << "%)" << ENDL
+                             << "Auditble outputs:     " << pool_no_mixins << " (" << audit_pct_all << "%)" << ENDL
+                             << "Added to pool:        " << added_count << " (" << added_pct_all << "%)" << ENDL
+                             << mixable_str);
+   }
+ }
+
+ LOG_PRINT_L0("Done");
+
+ if (total == 0) {
+   LOG_PRINT_L0("No outputs found created from Zarcanum epoch");
+   return;
+ }
 
 }
 //------------------------------------------------------------------
