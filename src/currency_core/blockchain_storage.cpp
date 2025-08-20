@@ -1646,7 +1646,7 @@ void blockchain_storage::scan_outputs_distribution() {
     bool added = false;
     bool auditble_output = false;
     //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    {    
+    {
       const tx_out_v& out_v = tx_ptr->tx.vout[out_ptr->out_no];
 
       // do not use burned coins
@@ -1672,7 +1672,7 @@ void blockchain_storage::scan_outputs_distribution() {
     }
     if (added)
       ++added_count;
-      
+
 
 
 
@@ -1692,14 +1692,38 @@ void blockchain_storage::scan_outputs_distribution() {
     }
 
     if (g_idx > 0 && g_idx % 10000 == 0) {
-      LOG_PRINT_L0("Scanned " << g_idx << " / " << up_index_limit << " outputs...");
       total = pool_cb + pool_reg + pool_no_mixins;
-      LOG_PRINT_L0("Pool composition (outputs created from Zarcanum epoch):" << ENDL <<
-      "   Coinbase outputs: " << pool_cb << " (" << (pool_cb * 100.0 / total) << "%)" << ENDL <<
-      "   Regular outputs:  " << pool_reg << " (" << (pool_reg * 100.0 / total) << "%)" << ENDL <<
-      "   Auditble outputs:  " << pool_no_mixins << " (" << (pool_no_mixins * 100.0 / total) << "%)" << ENDL <<
-      "   Added percent:  " << added_count << " (" << (added_count * 100.0 / total) << "%)" << ENDL <<
-      "   Total outputs:    " << total);
+      if (total == 0) {
+        LOG_PRINT_L0("Scanned " << g_idx << " / " << up_index_limit << " outputs... (no valid outputs yet)");
+        continue;
+      }
+
+      uint64_t mixable_total = pool_cb + pool_reg;
+      double cb_pct_all = static_cast<double>(pool_cb) * 100.0 / total;
+      double reg_pct_all = static_cast<double>(pool_reg) * 100.0 / total;
+      double audit_pct_all = static_cast<double>(pool_no_mixins) * 100.0 / total;
+      double added_pct_all = static_cast<double>(added_count) * 100.0 / total;
+
+      std::string mixable_str = "Mixable outputs (excl. auditble): N/A";
+      if (mixable_total > 0) {
+        double cb_ratio_nonaudit = static_cast<double>(pool_cb) * 100.0 / mixable_total;
+        double reg_ratio_nonaudit = static_cast<double>(pool_reg) * 100.0 / mixable_total;
+        std::ostringstream oss;
+        oss << std::fixed << std::setprecision(2);
+        oss << " Mixable outputs (excl. auditble): " << mixable_total << ENDL
+            << "      -> Coinbase: " << pool_cb << " (" << cb_ratio_nonaudit << "%)" << ENDL
+            << "      -> Regular:  " << pool_reg << " (" << reg_ratio_nonaudit << "%)";
+        mixable_str = oss.str();
+      }
+
+      LOG_PRINT_L0("Scanned " << g_idx << " / " << up_index_limit << " outputs..." << ENDL
+                              << "Pool composition (outputs created from Zarcanum epoch):" << ENDL
+                              << "Total outputs:        " << total << ENDL
+                              << "Coinbase outputs:     " << pool_cb << " (" << cb_pct_all << "%)" << ENDL
+                              << "Regular outputs:      " << pool_reg << " (" << reg_pct_all << "%)" << ENDL
+                              << "Auditble outputs:     " << pool_no_mixins << " (" << audit_pct_all << "%)" << ENDL
+                              << "Added to pool:        " << added_count << " (" << added_pct_all << "%)" << ENDL
+                              << mixable_str);
     }
   }
 
