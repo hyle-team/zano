@@ -125,7 +125,7 @@ public:
     uint64_t next_report   = step_bytes;
     uint64_t chunks_done   = 0;
     uint64_t counter       = 0;
-    uint64_t array_key     = _entries; // для array: следующий индекс
+    uint64_t array_key     = _entries;
 
     const auto all_start   = clock::now();
     auto       chunk_start = all_start;
