@@ -24,9 +24,8 @@ struct first_item_cb : public i_db_callback
 {
   std::string k, v;
   bool got = false;
-  bool on_enum_item(uint64_t /*i*/,
-                    const void* pkey, uint64_t ks,
-                    const void* pval, uint64_t vs) override {
+  bool on_enum_item(uint64_t /*i*/, const void* pkey, uint64_t ks, const void* pval, uint64_t vs) override
+  {
     k.assign(static_cast<const char*>(pkey), static_cast<size_t>(ks));
     v.assign(static_cast<const char*>(pval), static_cast<size_t>(vs));
     got = true;
@@ -37,7 +36,8 @@ struct first_item_cb : public i_db_callback
 static void gen_key_bytes(std::mt19937_64& gen, uint64_t counter, std::string& out, size_t size)
 {
   out.resize(size);
-  for (size_t i = 0; i < size; i += 8) {
+  for (size_t i = 0; i < size; i += 8)
+  {
     uint64_t r = gen() ^ (0x9E3779B97F4A7C15ull * (counter + i));
     std::memcpy(&out[i], &r, std::min<size_t>(8, size - i));
   }
