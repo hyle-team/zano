@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+﻿// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -1734,6 +1734,272 @@ void blockchain_storage::scan_outputs_distribution() {
     return;
   }
 
+}
+//------------------------------------------------------------------
+void blockchain_storage::analyze_pos_ring_spending_behavior()
+{
+  constexpr uint64_t zarcanum_epoch_start = 2555000;
+  constexpr uint64_t amount = 0;
+
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  const uint64_t top_height = m_db_blocks.size() > 0 ? m_db_blocks.size() - 1 : 0;
+  if (top_height < zarcanum_epoch_start) {
+    LOG_PRINT_L0("Blockchain height " << top_height << " < " << zarcanum_epoch_start << ", nothing to scan");
+    return;
+  }
+
+  const uint64_t start_height = zarcanum_epoch_start;
+  const uint64_t stop_height = top_height;
+
+  LOG_PRINT_L0("Analyzing PoS ring spending behavior from height " << start_height
+                                                                    << " to " << stop_height);
+  // storage struct
+  struct output_record
+  {
+    uint64_t mint_height;
+    uint64_t g_idx;
+    uint8_t type;
+  };
+
+  std::vector<output_record> sorted_outputs;
+
+  // storages
+  std::unordered_map<uint64_t, std::pair<uint8_t, uint64_t>> created_outputs;
+  std::unordered_map<uint64_t, std::pair<uint64_t, uint64_t>> pool_cache;
+
+  const uint64_t up_index_limit = find_end_of_allowed_index(amount);
+  if (up_index_limit == 0) {
+    LOG_PRINT_L0("No allowed outputs found");
+    return;
+  }
+
+  LOG_PRINT_L0("Pre-scanning all outputs (amount=" << amount << ") from g_index 0 to " << (up_index_limit - 1) << "...");
+
+  for (size_t g_idx = 0; g_idx < up_index_limit; ++g_idx) {
+    const auto out_ptr = m_db_outputs.get_subitem(amount, g_idx);
+    if (!out_ptr) continue;
+
+    const auto tx_ptr = m_db_transactions.find(out_ptr->tx_id);
+    if (!tx_ptr) continue;
+
+    const uint64_t mint_height = tx_ptr->m_keeper_block_height;
+    if (mint_height > stop_height) continue;
+
+    const tx_out_v& out_v = tx_ptr->tx.vout[out_ptr->out_no];
+    if (is_out_burned(out_v)) continue;
+
+    uint8_t mix_attr = CURRENCY_TO_KEY_OUT_RELAXED;
+    if (!get_mix_attr_from_tx_out_v(out_v, mix_attr)) continue;
+
+    uint8_t type;
+    if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX) {
+      type = 2; // audit
+    } else if (is_pos_miner_tx(tx_ptr->tx)) {
+      type = 0; // pos-coinbase
+    } else {
+      type = 1; // regular
+    }
+
+    created_outputs[g_idx] = std::make_pair(type, mint_height);
+    sorted_outputs.push_back({mint_height, g_idx, type});
+  }
+
+  std::sort(sorted_outputs.begin(), sorted_outputs.end(),
+    [](const output_record& a, const output_record& b) {
+      return a.mint_height < b.mint_height;
+    });
+
+  LOG_PRINT_L0("Pre-scanned " << created_outputs.size() << " outputs.");
+
+  // --- csv ---
+  FILE* csv = fopen("rings_analysis.csv", "w");
+  if (!csv) {
+    LOG_PRINT_L0("Failed to open rings_analysis.csv for writing");
+    return;
+  }
+  fprintf(csv, "height,ring_size,pool_cb_count,pool_reg_count,pool_cb_ratio,ring_cb_count,ring_cb_ratio,x_i\n");
+
+  // counters
+  uint64_t audit_inputs_skipped = 0;
+  uint64_t audit_inputs_were_coinbase = 0;
+  size_t total_rings_analyzed = 0;
+
+  double total_x = 0.0;
+  double sum_K = 0.0;
+  double sum_K_squared = 0.0;
+  double sum_expected_var = 0.0;
+  double sum_P_cb_pool = 0.0;
+
+  // progress
+  const uint64_t total_blocks = (stop_height >= start_height) ? (stop_height - start_height + 1) : 0;
+  if (total_blocks == 0) {
+    LOG_PRINT_L0("No blocks to scan.");
+    fclose(csv);
+    return;
+  }
+
+  uint64_t last_logged_percent = 0;
+
+    // main
+  for (uint64_t height = start_height; height <= stop_height; ++height) {
+    // progress
+    uint64_t current_block = height - start_height + 1;
+    uint64_t progress_percent = (current_block * 100) / total_blocks;
+
+    if (progress_percent != last_logged_percent && (progress_percent % 1 == 0)) {
+      LOG_PRINT_L0("Progress: " << std::fixed << std::setprecision(1) << static_cast<double>(progress_percent)
+                                << "% | Height: " << height);
+      last_logged_percent = progress_percent;
+    }
+
+    // block analys
+    const auto& block_entry_ptr = m_db_blocks[height];
+    if (!block_entry_ptr) continue;
+
+    const currency::block& blk = block_entry_ptr->bl;
+    if (!is_pos_block(blk)) continue;
+
+    if (blk.miner_tx.vin.size() < 2) continue;
+
+    const auto& second_input = blk.miner_tx.vin[1];
+    if (second_input.type() != typeid(currency::txin_zc_input)) continue;
+
+    const currency::txin_zc_input& stake_input = boost::get<currency::txin_zc_input>(second_input);
+    const std::vector<currency::txout_ref_v> abs_offsets = relative_output_offsets_to_absolute(stake_input.key_offsets);
+
+    // --- Audit inputs (ring size <= 1) ---
+    if (abs_offsets.size() == 1) {
+      ++audit_inputs_skipped;
+      if (!abs_offsets.empty() && abs_offsets[0].type() == typeid(uint64_t)) {
+        const uint64_t global_index = boost::get<uint64_t>(abs_offsets[0]);
+        auto it = created_outputs.find(global_index);
+        if (it != created_outputs.end() && it->second.first == 0) {
+          ++audit_inputs_were_coinbase;
+        }
+      }
+      continue;
+    }
+
+    // --- pool state (height - 10) ---
+    const uint64_t pool_height = (height > 10) ? height - 10 : 0;
+
+    auto cache_it = pool_cache.find(pool_height);
+    uint64_t pool_cb = 0, pool_reg = 0;
+    if (cache_it != pool_cache.end()) {
+      pool_cb = cache_it->second.first;
+      pool_reg = cache_it->second.second;
+    } 
+    else 
+    {
+      auto it_end = std::upper_bound(
+      sorted_outputs.begin(),
+      sorted_outputs.end(),
+      output_record{pool_height + 1, 0, 0},
+       [](const output_record& a, const output_record& b) {
+         return a.mint_height < b.mint_height;
+       }
+      );
+
+      for (auto it = sorted_outputs.begin(); it != it_end; ++it) {
+        if (it->type == 0) ++pool_cb;
+        else if (it->type == 1) ++pool_reg;
+      }
+
+      pool_cache[pool_height] = {pool_cb, pool_reg};
+    }
+
+    uint64_t total_mixable = pool_cb + pool_reg;
+    double P_cb_pool = (total_mixable > 0) ? static_cast<double>(pool_cb) / total_mixable : 0.0;
+
+    // --- PoS coinbase ring count ---
+    uint64_t ring_cb_count = 0;
+    size_t ring_size = 0;
+    for (const auto& abs_offset : abs_offsets) {
+      if (abs_offset.type() != typeid(uint64_t)) continue;
+      const uint64_t global_index = boost::get<uint64_t>(abs_offset);
+      auto it = created_outputs.find(global_index);
+      if (it != created_outputs.end() && it->second.first == 0) {
+        ++ring_cb_count;
+      }
+      ++ring_size;
+    }
+
+    if (ring_size == 0) continue;
+
+    double P_cb = static_cast<double>(ring_cb_count) / ring_size;
+    double x_i = 16.0 * P_cb - 15.0 * P_cb_pool;
+
+    total_x += x_i;
+    ++total_rings_analyzed;
+    sum_K += ring_cb_count;
+    sum_K_squared += ring_cb_count * ring_cb_count;
+    sum_expected_var += 15.0 * P_cb_pool * (1.0 - P_cb_pool);
+    sum_P_cb_pool += P_cb_pool;
+
+    // --- write to CSV ---
+    fprintf(csv, "%llu,%zu,%llu,%llu,%.6f,%llu,%.6f,%.6f\n",
+           (unsigned long long)height,
+           ring_size,
+           (unsigned long long)pool_cb,
+           (unsigned long long)pool_reg,
+           P_cb_pool,
+           (unsigned long long)ring_cb_count,
+           P_cb,
+           x_i);
+  }
+
+  fclose(csv);
+  LOG_PRINT_L0("Ring data saved to rings_analysis.csv");
+
+  // --- Final Statistics ---
+  LOG_PRINT_L0("=== Final Statistics ===");
+
+  if (total_rings_analyzed == 0) {
+    LOG_PRINT_L0("No rings with ring size > 1 found.");
+    return;
+  }
+
+  double avg_x = total_x / total_rings_analyzed;
+  double spends_probability = std::clamp(avg_x, 0.0, 1.0);
+
+  double mean_K = sum_K / total_rings_analyzed;
+  double var_K = (sum_K_squared / total_rings_analyzed) - (mean_K * mean_K);
+  double std_K = std::sqrt(var_K);
+
+  double avg_P_cb_pool = sum_P_cb_pool / total_rings_analyzed;
+  double mean_expected_var = sum_expected_var / total_rings_analyzed;
+  double std_expected = std::sqrt(mean_expected_var);
+
+  LOG_PRINT_L0("Total rings analyzed (ring size > 1): " << total_rings_analyzed);
+  LOG_PRINT_L0("Average x = 16*P_cb - 15*P_pool:      " 
+                 << std::fixed << std::setprecision(6) << avg_x);
+  LOG_PRINT_L0("Estimated probability user spends PoS-coinbase: "
+                 << std::setprecision(3) << (spends_probability * 100.0) << "%");
+
+  LOG_PRINT_L0("=== Dispersion Analysis ===");
+  LOG_PRINT_L0("Observed:   mean K = " << std::fixed << std::setprecision(3) << mean_K
+                    << ", std K = " << std::setprecision(3) << std_K);
+  LOG_PRINT_L0("Expected: mean K ≈ " << std::setprecision(3) << (15.0 * avg_P_cb_pool)
+                    << ", std K = " << std::setprecision(3) << std_expected);
+
+  double dispersion_ratio = (std_expected > 1e-6) ? (std_K / std_expected) : 0.0;
+  if (dispersion_ratio > 1.5) {
+    LOG_PRINT_L0("-> WARNING: Observed variance is " << std::setprecision(2) << dispersion_ratio
+                    << "x higher than expected. Mixin selection may be biased.");
+  } else {
+    LOG_PRINT_L0("-> Mixin selection appears statistically consistent.");
+  }
+
+  LOG_PRINT_L0("=== Audit Inputs (ring size <= 1) ===");
+  LOG_PRINT_L0("Audit inputs skipped:                  " << audit_inputs_skipped);
+  if (audit_inputs_skipped > 0) {
+    double audit_cb_share = static_cast<double>(audit_inputs_were_coinbase) * 100.0 / audit_inputs_skipped;
+    LOG_PRINT_L0("Of which were PoS-coinbase:              " << audit_inputs_were_coinbase
+                     << " (" << std::fixed << std::setprecision(2) << audit_cb_share << "%)");
+  }
+
+  LOG_PRINT_L0("Analysis complete.");
 }
 //------------------------------------------------------------------
 void blockchain_storage::scan_pos_ring_unique_composition() {
