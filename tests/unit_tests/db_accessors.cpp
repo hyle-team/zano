@@ -328,7 +328,7 @@ TEST(db_accessor_tests, median_db_cache_test)
   uint64_t cache_size = CACHE_SIZE;
   ASSERT_TRUE(m_db.open(folder_name, cache_size));
   ASSERT_TRUE(m_tx_fee_median.init("median_fee"));
-  m_db.begin_transaction();
+  auto db_tx_ptr = m_db.begin_transaction_obj();
 
   naive_median<uint64_t, uint64_t> m_naive_median;
 
@@ -361,9 +361,9 @@ TEST(db_accessor_tests, median_db_cache_test)
 
   //epee::misc_utils::auto_scope_leave_caller scope_exit_handler = epee::misc_utils::create_scope_leave_handler([&] { m_db.commit_transaction(); bcs_stub.save_to_file(naive_median_serialization_filename); });
 
-  m_db.commit_transaction();
+  db_tx_ptr->commit_transaction();
   bcs_stub.save_to_file(naive_median_serialization_filename);
-  m_db.begin_transaction();
+  auto db_tx_ptr = m_db.begin_transaction_obj();
   
   size_t forward_steps_max_random_boundary = 20, rewind_steps_max_random_boundary = 7;
   size_t steps = 1000;
@@ -425,7 +425,7 @@ TEST(db_accessor_tests, median_db_cache_test)
 
   }
 
-  m_db.commit_transaction(); // save initial data for tx fee median cache to db
+  db_tx_ptr->commit_transaction(); // save initial data for tx fee median cache to db
   bcs_stub.save_to_file(naive_median_serialization_filename);
 
   m_naive_median.print_to_file(folder_name + "/naive_median_2.txt");

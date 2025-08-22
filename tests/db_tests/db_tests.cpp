@@ -367,9 +367,9 @@ bool solo_container_save_load_test_iteration(bool clear_data, uint64_t& read_val
   CHECK_AND_ASSERT_MES(r, false, "Unable to init db container");
 
   read_value = m_db_storage_major_compability_version;
-  m_db.begin_transaction();
+  auto db_tx_ptr = m_db.begin_transaction_obj();
   m_db_storage_major_compability_version = value_to_set;
-  m_db.commit_transaction();
+  db_tx_ptr->commit_transaction();
 
   m_db.close();
   return true;

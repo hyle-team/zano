@@ -50,10 +50,11 @@ namespace tools
 
         uint64_t dbg_id{0};        // human readable transaction id
         uint32_t stack_level{0};   // depth of the stack at the moment of opening (number of elements before push)
+        std::thread::id owner{};
       private:
         std::reference_wrapper<lmdb_db_backend> m_db;
         bool m_marked_finished{false};
-        std::thread::id owner{};
+
       };
 
       typedef std::list<lmdb_txn> transactions_list;

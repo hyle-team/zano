@@ -16,6 +16,11 @@
 #define CHECK_AND_ASSERT_THROW_MESS_LMDB_DB(rc, mess) CHECK_AND_ASSERT_THROW_MES(rc == MDB_SUCCESS, "[DB ERROR]:(" << rc << ")" << mdb_strerror(rc) << ", [message]: " << mess);
 #define ASSERT_MES_AND_THROW_LMDB(rc, mess) ASSERT_MES_AND_THROW("[DB ERROR]:(" << rc << ")" << mdb_strerror(rc) << ", [message]: " << mess);
 
+#define BEGIN_TX_LOCAL(is_read_only)   db_transaction_wrapper<lmdb_db_backend> local_tx(*this);  local_tx.begin_transaction(is_read_only);
+#define COMMIT_TX_LOCAL()   local_tx.commit_transaction();
+
+
+
 // #undef LOG_DEFAULT_CHANNEL 
 // #define LOG_DEFAULT_CHANNEL "lmdb"
 // 'lmdb' channel is disabled by default
@@ -23,6 +28,37 @@ static void print_stacktrace()
 {
   LOG_PRINT_L0("Stacktrace \n" << boost::stacktrace::stacktrace());
 }
+
+
+#define LMDB_JOURNAL_LIMIT 10000
+std::list<std::string> lmdb_journal;
+epee::critical_section lmdb_cs;
+
+extern "C" void print_log_to_file(const char* message)
+{
+  CRITICAL_REGION_LOCAL(lmdb_cs);
+  lmdb_journal.push_back( epee::log_space::get_prefix_entry() + std::string(message));
+  if (lmdb_journal.size() > LMDB_JOURNAL_LIMIT)
+    lmdb_journal.pop_front();
+  //LOG_PRINT_L0("[LMDB] " << message);
+}
+
+void print_journal(size_t limit)
+{
+  CRITICAL_REGION_LOCAL(lmdb_cs);
+  std::stringstream ss;
+  size_t count = 0;
+  for (auto it = lmdb_journal.rbegin(); it != lmdb_journal.rend(); it++)
+  {
+    ss << *it << ENDL;
+    ++count;
+    if (count > limit)
+      break;
+  }
+  LOG_PRINT_L0("JOUNRAL: " << ENDL << ss.str());
+
+}
+
 
 namespace tools
 {
@@ -105,10 +141,10 @@ namespace tools
     bool lmdb_db_backend::open_container(const std::string& name, container_handle& h)
     {
       MDB_dbi dbi = AUTO_VAL_INIT(dbi);
-      begin_transaction();
+      BEGIN_TX_LOCAL(false);
       int res = mdb_dbi_open(get_current_tx(), name.c_str(), MDB_CREATE, &dbi);
       CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_dbi_open with container name: " << name);
-      commit_transaction();
+      COMMIT_TX_LOCAL();
       h = static_cast<container_handle>(dbi);
       return true;
     }
@@ -118,9 +154,9 @@ namespace tools
       static const container_handle null_handle = AUTO_VAL_INIT(null_handle);
       CHECK_AND_ASSERT_MES(h != null_handle, false, "close_container is called for null container handle");
       MDB_dbi dbi = static_cast<MDB_dbi>(h);
-      begin_transaction();
+      BEGIN_TX_LOCAL(false);
       mdb_dbi_close(m_penv, dbi);
-      commit_transaction();
+      COMMIT_TX_LOCAL();
       h = null_handle;
       return true;
     }
@@ -220,6 +256,7 @@ namespace tools
             dump();
             dump_tx_stacks();
             print_stacktrace();
+            print_journal(1000);
             ASSERT_MES_AND_THROW_LMDB(res, "Unable to mdb_txn_begin");
           }
         }
@@ -261,6 +298,7 @@ namespace tools
         txe.ptx = nullptr;
         txe.read_only = top.read_only;
         txe.nested_count = top.nested_count;
+        txe.owner = top.owner;
       }
       return true;
     }
@@ -353,17 +391,19 @@ namespace tools
       MDB_val data = AUTO_VAL_INIT(data);
       key.mv_data = (void*)k;
       key.mv_size = ks;
-      bool need_to_commit = false;
-      if (!have_tx())
-      {
-        need_to_commit = true;
-        begin_transaction(true);
-      }
+      BEGIN_TX_LOCAL(true);
+//      bool need_to_commit = false;
+//       if (!have_tx())
+//       {
+//         need_to_commit = true;
+//         begin_transaction(true);
+//       }
 
       res = mdb_get(get_current_tx(), static_cast<MDB_dbi>(h), &key, &data);
 
-      if (need_to_commit)
-        commit_transaction();
+//      if (need_to_commit)
+//        commit_transaction();
+      COMMIT_TX_LOCAL();
 
       if (res == MDB_NOTFOUND)
         return false;
@@ -388,15 +428,18 @@ namespace tools
     {
       PROFILE_FUNC("lmdb_db_backend::size");
       MDB_stat container_stat = AUTO_VAL_INIT(container_stat);
-      bool need_to_commit = false;
-      if (!have_tx())
-      {
-        need_to_commit = true;
-        begin_transaction(true);
-      }
+      BEGIN_TX_LOCAL(true);
+//      bool need_to_commit = false;
+//      if (!have_tx())
+//      {
+//        need_to_commit = true;
+//        begin_transaction(true);
+//      }
       int res = mdb_stat(get_current_tx(), static_cast<MDB_dbi>(h), &container_stat);
-      if (need_to_commit)
-        commit_transaction();
+
+//      if (need_to_commit)
+//        commit_transaction();
+      COMMIT_TX_LOCAL();
       CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_stat");
       return container_stat.ms_entries;
     }
@@ -422,12 +465,13 @@ namespace tools
       MDB_val key = AUTO_VAL_INIT(key);
       MDB_val data = AUTO_VAL_INIT(data);
 
-      bool need_to_commit = false;
-      if (!have_tx())
-      {
-        need_to_commit = true;
-        begin_transaction(true);
-      }
+      BEGIN_TX_LOCAL(true);
+//      bool need_to_commit = false;
+//      if (!have_tx())
+//      {
+//        need_to_commit = true;
+//        begin_transaction(true);
+//      }
       MDB_cursor* cursor_ptr = nullptr;
       int res = mdb_cursor_open(get_current_tx(), static_cast<MDB_dbi>(h), &cursor_ptr);
       CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_cursor_open");
@@ -445,8 +489,9 @@ namespace tools
       } while (cursor_ptr);
 
       mdb_cursor_close(cursor_ptr);
-      if (need_to_commit)
-        commit_transaction();
+//      if (need_to_commit)
+//        commit_transaction();
+      COMMIT_TX_LOCAL();
       return true;
     }
 

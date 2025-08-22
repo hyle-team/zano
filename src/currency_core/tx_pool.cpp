@@ -281,25 +281,26 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------------------------
-#define LOCAL_READONLY_TRANSACTION() \
-  m_db.begin_readonly_transaction(); \
-  misc_utils::auto_scope_leave_caller db_tx_closer = misc_utils::create_scope_leave_handler([&]() \
-  { \
-    m_db.commit_transaction(); \
-  });
+#define LOCAL_READONLY_TRANSACTION()  auto local_db_tx_ptr = m_db.begin_readonly_transaction_obj(); 
+
+  //\
+//  misc_utils::auto_scope_leave_caller db_tx_closer = misc_utils::create_scope_leave_handler([&]() \
+//  { \
+//    m_db.commit_transaction(); \
+//  });
 
 
   bool tx_memory_pool::do_insert_transaction(const transaction &tx, const crypto::hash &id, uint64_t blob_size, bool kept_by_block, uint64_t fee, const crypto::hash& max_used_block_id, uint64_t max_used_block_height)
   {
     TIME_MEASURE_START_PD(begin_tx_time);
-    m_db.begin_transaction();
+    auto db_tx_ptr = m_db.begin_transaction_obj();
     TIME_MEASURE_FINISH_PD(begin_tx_time);
 
     TIME_MEASURE_START_PD(update_db_time);
     misc_utils::auto_scope_leave_caller seh = misc_utils::create_scope_leave_handler([&]()
     {
       TIME_MEASURE_START_PD(db_commit_time);
-      m_db.commit_transaction();
+      db_tx_ptr->commit_transaction();
       TIME_MEASURE_FINISH_PD(db_commit_time);
 
     });
@@ -742,9 +743,9 @@ namespace currency
     // atm:
     // 1) the only side effect of a tx being blacklisted is the one is just ignored by fill_block_template(), but it still can be added to blockchain/pool
     // 2) it's permanent
-    m_db.begin_transaction();
+    auto db_tx_ptr = m_db.begin_transaction_obj();
     m_db_black_tx_list.set(get_transaction_hash(tx), true);
-    m_db.commit_transaction();
+    db_tx_ptr->commit_transaction();
     LOG_PRINT_YELLOW("TX ADDED TO POOL'S BLACKLIST: " << get_transaction_hash(tx) << ", full black list: " << ENDL << get_blacklisted_txs_string(), LOG_LEVEL_0);
     return true;
   }
@@ -902,19 +903,19 @@ namespace currency
   void tx_memory_pool::purge_transactions()
   {
     
-    m_db.begin_transaction();
+    auto db_tx_ptr = m_db.begin_transaction_obj();
     m_db_transactions.clear();
-    m_db.commit_transaction();
+    db_tx_ptr->commit_transaction();
     // should m_db_black_tx_list be cleared here?
     CIRITCAL_OPERATION(m_key_images,clear());
   }
   //---------------------------------------------------------------------------------
   void tx_memory_pool::clear()
   {
-    m_db.begin_transaction();
+    auto db_tx_ptr = m_db.begin_transaction_obj();
     m_db_transactions.clear();
     m_db_black_tx_list.clear();
-    m_db.commit_transaction();
+    db_tx_ptr->commit_transaction();
     CIRITCAL_OPERATION(m_key_images,clear());
   }
   //---------------------------------------------------------------------------------
@@ -1245,9 +1246,9 @@ namespace currency
   //---------------------------------------------------------------------------------
   void tx_memory_pool::store_db_solo_options_values()
   {
-    m_db.begin_transaction();
+    auto db_tx_ptr = m_db.begin_transaction_obj();
     m_db_storage_major_compatibility_version = TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION;
-    m_db.commit_transaction();
+    db_tx_ptr->commit_transaction();
   }
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::init(const std::string& config_folder, const boost::program_options::variables_map& vm)

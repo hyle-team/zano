@@ -48,6 +48,9 @@ typedef _Return_type_success_(return >= 0) LONG NTSTATUS;
 typedef NTSTATUS *PNTSTATUS;
 #endif
 
+
+void print_log_to_file(const char* message);
+
 /** Visual studio big files support
 */
 
@@ -2880,7 +2883,22 @@ mdb_txn_renew0(MDB_txn *txn)
 				pthread_getspecific(env->me_txkey);
 			if (r) {
 				if (r->mr_pid != env->me_pid || r->mr_txnid != (txnid_t)-1)
+				{
+					if (r->mr_txnid != (txnid_t)-1)
+					{
+						char buff[1000] = {0};
+						sprintf(buff, "MDB_reader %p, mr_txnid is not -1, %"PRIx64, (void*)r, r->mr_txnid );
+						print_log_to_file(buff);
+					}
+					else
+					{
+            char buff[1000] = { 0 };
+            sprintf(buff, "MDB_reader %p, r->mr_pid(%ld) != env->me_pid(%ld)", (void*)r, (long)r->mr_pid, (long)env->me_pid);
+            print_log_to_file(buff);
+					}
 					return MDB_BAD_RSLOT;
+				}
+					
 			} else {
 				MDB_PID_T pid = env->me_pid;
 				MDB_THR_T tid = pthread_self();
@@ -2912,6 +2930,11 @@ mdb_txn_renew0(MDB_txn *txn)
 				 */
 				r->mr_pid = 0;
 				r->mr_txnid = (txnid_t)-1;
+				{
+          char buff[1000] = { 0 };
+          sprintf(buff, "MDB_reader %p, mr_txnid assigned -1", (void*)r);
+          print_log_to_file(buff);
+				}
 				r->mr_tid = tid;
 				if (i == nr)
 					ti->mti_numreaders = ++nr;
@@ -2926,7 +2949,14 @@ mdb_txn_renew0(MDB_txn *txn)
 				}
 			}
 			do /* LY: Retry on a race, ITS#7970. */
+			{
 				r->mr_txnid = ti->mti_txnid;
+        {
+          char buff[1000] = { 0 };
+          sprintf(buff, "MDB_reader %p, mr_txnid assigned %"PRIx64, (void*)r, r->mr_txnid );
+          print_log_to_file(buff);
+        }
+			}
 			while(r->mr_txnid != ti->mti_txnid);
 			txn->mt_txnid = r->mr_txnid;
 			txn->mt_u.reader = r;
@@ -3197,7 +3227,15 @@ mdb_txn_end(MDB_txn *txn, unsigned mode)
 
 	if (F_ISSET(txn->mt_flags, MDB_TXN_RDONLY)) {
 		if (txn->mt_u.reader) {
+			
 			txn->mt_u.reader->mr_txnid = (txnid_t)-1;
+      {
+        char buff[1000] = { 0 };
+				sprintf(buff, "MDB_reader %p, mr_txnid assigned -1", (void*)txn->mt_u.reader);
+        print_log_to_file(buff);
+      }
+
+
 			if (!(env->me_flags & MDB_NOTLS)) {
 				txn->mt_u.reader = NULL; /* txn does not own reader */
 			} else if (mode & MDB_END_SLOT) {
