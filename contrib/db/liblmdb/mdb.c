@@ -49,7 +49,8 @@ typedef NTSTATUS *PNTSTATUS;
 #endif
 
 
-void print_log_to_file(const char* message);
+void print_log_to_journal(const char* message);
+
 
 /** Visual studio big files support
 */
@@ -2888,13 +2889,13 @@ mdb_txn_renew0(MDB_txn *txn)
 					{
 						char buff[1000] = {0};
 						sprintf(buff, "MDB_reader %p, mr_txnid is not -1, %"PRIx64, (void*)r, r->mr_txnid );
-						print_log_to_file(buff);
+						print_log_to_journal(buff);
 					}
 					else
 					{
             char buff[1000] = { 0 };
             sprintf(buff, "MDB_reader %p, r->mr_pid(%ld) != env->me_pid(%ld)", (void*)r, (long)r->mr_pid, (long)env->me_pid);
-            print_log_to_file(buff);
+            print_log_to_journal(buff);
 					}
 					return MDB_BAD_RSLOT;
 				}
@@ -2933,7 +2934,7 @@ mdb_txn_renew0(MDB_txn *txn)
 				{
           char buff[1000] = { 0 };
           sprintf(buff, "MDB_reader %p, mr_txnid assigned -1", (void*)r);
-          print_log_to_file(buff);
+          print_log_to_journal(buff);
 				}
 				r->mr_tid = tid;
 				if (i == nr)
@@ -2954,7 +2955,7 @@ mdb_txn_renew0(MDB_txn *txn)
         {
           char buff[1000] = { 0 };
           sprintf(buff, "MDB_reader %p, mr_txnid assigned %"PRIx64, (void*)r, r->mr_txnid );
-          print_log_to_file(buff);
+          print_log_to_journal(buff);
         }
 			}
 			while(r->mr_txnid != ti->mti_txnid);
@@ -3232,7 +3233,7 @@ mdb_txn_end(MDB_txn *txn, unsigned mode)
       {
         char buff[1000] = { 0 };
 				sprintf(buff, "MDB_reader %p, mr_txnid assigned -1", (void*)txn->mt_u.reader);
-        print_log_to_file(buff);
+        print_log_to_journal(buff);
       }
 
 

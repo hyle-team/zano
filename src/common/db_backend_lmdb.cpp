@@ -34,7 +34,7 @@ static void print_stacktrace()
 std::list<std::string> lmdb_journal;
 epee::critical_section lmdb_cs;
 
-extern "C" void print_log_to_file(const char* message)
+extern "C" void print_log_to_journal(const char* message)
 {
   CRITICAL_REGION_LOCAL(lmdb_cs);
   lmdb_journal.push_back( epee::log_space::get_prefix_entry() + std::string(message));
@@ -200,6 +200,12 @@ namespace tools
 
     bool lmdb_db_backend::begin_transaction(bool read_only)
     {
+      std::string messg = "[BACK] begin_transaction(";
+      if (read_only) messg += "ro";
+      messg += ")";
+      print_log_to_journal(messg.c_str());
+
+
       if (!read_only)
       {
         LOG_PRINT_CYAN("[DB " << m_path << "] WRITE LOCKED", LOG_LEVEL_3);
@@ -305,6 +311,7 @@ namespace tools
 
     bool lmdb_db_backend::commit_transaction()
     {
+      print_log_to_journal("[BACK] commit_transaction()");
       PROFILE_FUNC("lmdb_db_backend::commit_transaction");
       {
         lmdb_txn txe(*this);
@@ -341,6 +348,7 @@ namespace tools
     
     void lmdb_db_backend::abort_transaction()
     {
+      print_log_to_journal("[BACK] abort_transaction()");
       {
         lmdb_txn txe(*this);
         bool r = pop_lmdb_txn(txe);
