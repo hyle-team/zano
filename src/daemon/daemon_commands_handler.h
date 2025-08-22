@@ -86,6 +86,7 @@ public:
     m_cmd_binder.set_handler("scan_outputs_distribution",  boost::bind(&daemon_commands_handler::scan_outputs_distribution, this, ph::_1));
     m_cmd_binder.set_handler("scan_pos_ring_unique_composition",  boost::bind(&daemon_commands_handler::scan_pos_ring_unique_composition, this, ph::_1));
     m_cmd_binder.set_handler("scan_pos_ring_composition",  boost::bind(&daemon_commands_handler::scan_pos_ring_composition, this, ph::_1));
+    m_cmd_binder.set_handler("analyze_pos_ring_spending_behavior",  boost::bind(&daemon_commands_handler::analyze_pos_ring_spending_behavior, this, ph::_1));
 #ifdef _DEBUG
     m_cmd_binder.set_handler("debug_set_time_adj", boost::bind(&daemon_commands_handler::debug_set_time_adj, this, ph::_1), "DEBUG: set core time adjustment");
 #endif
@@ -991,6 +992,12 @@ private:
     }
 
     m_srv.get_payload_object().get_core().get_blockchain_storage().scan_pos_ring_composition(start, stop);
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool analyze_pos_ring_spending_behavior(const std::vector<std::string>& args)
+  {
+    m_srv.get_payload_object().get_core().get_blockchain_storage().analyze_pos_ring_spending_behavior();
     return true;
   }
   //--------------------------------------------------------------------------------

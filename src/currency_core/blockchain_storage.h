@@ -533,6 +533,7 @@ namespace currency
     void scan_outputs_distribution();
     void scan_pos_ring_unique_composition();
     void scan_pos_ring_composition(uint64_t start, uint64_t stop);
+    void analyze_pos_ring_spending_behavior();
 
   private:
 
