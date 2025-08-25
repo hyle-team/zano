@@ -30,6 +30,7 @@ using namespace epee;
 #include "common/pre_download.h"
 
 #include <cstdlib>
+#include <limits>
 
 #if defined(WIN32)
 #include <crtdbg.h>
@@ -380,8 +381,27 @@ int main(int argc, char* argv[])
     //let's check if cache size were specifically set 
     if (!command_line::has_arg(vm, arg_db_cache_l2))
     {
-      //overriding caching settings
-      uint64_t cache_size = ccore.get_blockchain_storage().get_total_transactions() * 10;
+      // Safely compute cache size from total transactions to avoid integer overflow
+      uint64_t total_txs = ccore.get_blockchain_storage().get_total_transactions();
+      uint64_t cache_size = 0;
+
+      // Prevent multiplication overflow: check if total_txs * 10 would overflow
+      if (total_txs > (std::numeric_limits<uint64_t>::max() / 10ULL))
+      {
+        LOG_PRINT_RED_L0("[Warp]: Transactions count too large (" << total_txs << "), clamping cache size to safe maximum");
+        cache_size = (1ULL << 30); // conservative default: 1B items
+      }
+      else
+      {
+        cache_size = total_txs * 10ULL;
+        const uint64_t MAX_SAFE_CACHE_ITEMS = (1ULL << 30); // tuneable upper bound
+        if (cache_size > MAX_SAFE_CACHE_ITEMS)
+        {
+          LOG_PRINT_RED_L0("[Warp]: Computed cache_size too large (" << tools::pretty_print_big_nums(cache_size) << "), clamping to " << tools::pretty_print_big_nums(MAX_SAFE_CACHE_ITEMS));
+          cache_size = MAX_SAFE_CACHE_ITEMS;
+        }
+      }
+
       ccore.get_blockchain_storage().set_db_l2_cache_size(cache_size);
       
       LOG_PRINT_MAGENTA("[Warp]: Setting up db cache to " << tools::pretty_print_big_nums(cache_size) << " items.....", LOG_LEVEL_0);
