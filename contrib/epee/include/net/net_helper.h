@@ -48,7 +48,9 @@
 #include "misc_helpers.h"
 //#include "profile_tools.h"
 #include "../string_tools.h"
-
+#ifdef _WIN32
+  #include <wincrypt.h>
+#endif
 #ifndef MAKE_IP
 #define MAKE_IP( a1, a2, a3, a4 )	(a1|(a2<<8)|(a3<<16)|(a4<<24))
 #endif
@@ -58,6 +60,37 @@ namespace epee
 {
   namespace net_utils
   {
+    
+#ifdef _WIN32
+  // https://stackoverflow.com/questions/40307541
+  #include <wincrypt.h>
+  static void add_windows_root_certs(boost::asio::ssl::context& ctx) noexcept
+  {
+      HCERTSTORE hStore = CertOpenSystemStore(0, "ROOT");
+      if (hStore == NULL) {
+          return;
+      }
+
+      X509_STORE *store = X509_STORE_new();
+      PCCERT_CONTEXT pContext = NULL;
+      while ((pContext = CertEnumCertificatesInStore(hStore, pContext)) != NULL) {
+          // convert from DER to internal format
+          X509 *x509 = d2i_X509(NULL,
+                                (const unsigned char **)&pContext->pbCertEncoded,
+                                pContext->cbCertEncoded);
+          if(x509 != NULL) {
+              X509_STORE_add_cert(store, x509);
+              X509_free(x509);
+          }
+      }
+
+      CertFreeCertificateContext(pContext);
+      CertCloseStore(hStore, 0);
+
+      // attach X509_STORE to boost ssl context
+      SSL_CTX_set_cert_store(ctx.native_handle(), store);
+  }
+#endif
 
     template<bool is_ssl>
     struct socket_backend;
@@ -70,44 +103,12 @@ namespace epee
       {
         // Create a context that uses the default paths for
         // finding CA certificates.
-        m_ssl_context.set_default_verify_paths();
-        m_ssl_context.set_verify_mode(boost::asio::ssl::verify_peer);
-
 #ifdef _WIN32
-        bool loaded_from_env = false;
-        const char* cafile = std::getenv("SSL_CERT_FILE");
-        const char* cadir  = std::getenv("SSL_CERT_DIR");
-
-        if (cafile && cafile[0])
-        {
-          if (SSL_CTX_load_verify_locations(m_ssl_context.native_handle(), cafile, nullptr) == 1)
-          {
-            LOG_PRINT_L1(std::string("TLS: using CA file from SSL_CERT_FILE=") + cafile);
-            loaded_from_env = true;
-          }
-          else
-          {
-            LOG_ERROR(std::string("TLS: failed to load CA file from SSL_CERT_FILE=") + cafile);
-          }
-        }
-        if (cadir && cadir[0])
-        {
-          if (SSL_CTX_load_verify_locations(m_ssl_context.native_handle(), nullptr, cadir) == 1)
-          {
-            LOG_PRINT_L1(std::string("TLS: using CA dir from SSL_CERT_DIR=") + cadir);
-            loaded_from_env = true;
-          }
-          else
-          {
-            LOG_ERROR(std::string("TLS: failed to load CA dir from SSL_CERT_DIR=") + cadir);
-          }
-        }
-
-        if ((!cafile || !cafile[0]) && (!cadir || !cadir[0]))
-        {
-          LOG_PRINT_L1("TLS(WIN): SSL_CERT_FILE/SSL_CERT_DIR are not set.");
-        }
+        add_windows_root_certs(m_ssl_context);
+#else
+        m_ssl_context.set_default_verify_paths();
 #endif
+        m_ssl_context.set_verify_mode(boost::asio::ssl::verify_peer);
       }
 
       /*
