@@ -74,6 +74,7 @@ void test_plain_wallet()
 {
   //std::string res = plain_wallet::init("195.201.107.230", "33340", "C:\\Users\\roky\\home\\", 0);
   //std::string res = plain_wallet::init("", "", "C:\\Users\\roky\\home\\", 0);
+  // std::string res = plain_wallet::init("https://195.201.107.230", "443", "C:\\git_repos\\zano\\build_msvc2022_64\\src\\Debug\\", LOG_LEVEL_2);
   std::string res = plain_wallet::init("https://node.zano.org", "443", "C:\\git_repos\\zano\\build_msvc2022_64\\src\\Debug\\", LOG_LEVEL_2);
   //std::string res = plain_wallet::init("127.0.0.1", "12111", "C:\\Users\\roky\\home22\\", 0);
   

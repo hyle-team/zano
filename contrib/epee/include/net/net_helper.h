@@ -105,6 +105,7 @@ namespace epee
 #else
         m_ssl_context.set_default_verify_paths();
 #endif
+        m_ssl_context.set_verify_mode(boost::asio::ssl::verify_peer);
       }
 
       /*
@@ -131,13 +132,20 @@ namespace epee
 
       void set_domain(const std::string& domain_name)
       {
-        SSL_set_tlsext_host_name(m_socket.native_handle(), domain_name.c_str());
-        X509_VERIFY_PARAM* param = SSL_CTX_get0_param(m_ssl_context.native_handle());
-        // do not allow partial substitutions like "foo.bar" against "*.bar"
+        SSL* ssl = m_socket.native_handle();
+
+        SSL_set_tlsext_host_name(ssl, domain_name.c_str());
+#if BOOST_VERSION >= 107300
+        m_socket.set_verify_callback(boost::asio::ssl::host_name_verification(domain_name));
+#else
+        m_socket.set_verify_callback(boost::asio::ssl::rfc2818_verification(domain_name));
+#endif
+
+        X509_VERIFY_PARAM* param = SSL_get0_param(ssl);
         X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
         if (X509_VERIFY_PARAM_set1_host(param, domain_name.c_str(), 0) != 1)
         {
-          LOG_ERROR("Failed to set hostname for TLS verification");
+          LOG_PRINT_L0("Failed to set expected hostname: " << domain_name);
         }
       }
 
@@ -151,12 +159,27 @@ namespace epee
         return m_socket;
       }
 
-      void on_after_connect()
+      bool on_after_connect()
       {
         LOG_PRINT_L2("SSL Handshake....");
         m_socket.set_verify_mode(boost::asio::ssl::verify_peer);
-        m_socket.handshake(boost::asio::ssl::stream_base::client);
+
+        boost::system::error_code ec;
+        m_socket.handshake(boost::asio::ssl::stream_base::client, ec);
+
+        if (ec)
+        {
+          long vr = SSL_get_verify_result(m_socket.native_handle());
+          LOG_PRINT_L0("TLS Handshake failed: " << ec.message() << " (verify: " << X509_verify_cert_error_string(vr) << ")");
+          ERR_clear_error();
+          boost::system::error_code ignored;
+          m_socket.lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored);
+          m_socket.lowest_layer().close(ignored);
+          return false;
+        }
+
         LOG_PRINT_L2("SSL Handshake OK");
+        return true;
       }
 
     private: 
@@ -185,9 +208,9 @@ namespace epee
         return m_socket;
       }
 
-      void on_after_connect()
+      bool on_after_connect()
       {
-
+        return true;
       }
 
       void reset()
@@ -220,7 +243,7 @@ namespace epee
         return m_pbackend->get_stream();
       }
 
-      void on_after_connect()
+      bool on_after_connect()
       {
         return m_pbackend->on_after_connect();
       }
@@ -359,13 +382,16 @@ namespace epee
           {
             m_io_service.run_one();
           }
-
           if (!ec && m_sct_back.get_socket().is_open())
           {
-            m_sct_back.on_after_connect();
-            m_connected = true;       
+            if (!m_sct_back.on_after_connect())
+            {
+              return false;
+            }
+
+            m_connected = true;
             m_deadline.expires_at(boost::posix_time::pos_infin);
-            LOG_PRINT_L1("Connected OK: " << addr << ":" << port);
+            LOG_PRINT_L1("TLS connected OK: " << addr << ":" << port);
             return true;
           }
           else
