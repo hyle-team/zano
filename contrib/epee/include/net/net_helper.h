@@ -71,10 +71,43 @@ namespace epee
         // Create a context that uses the default paths for
         // finding CA certificates.
         m_ssl_context.set_default_verify_paths();
-        /*m_socket.set_verify_mode(boost::asio::ssl::verify_peer);
-        m_socket.set_verify_callback(
-          boost::bind(&socket_backend::verify_certificate, this, _1, _2));*/
+        m_ssl_context.set_verify_mode(boost::asio::ssl::verify_peer);
 
+#ifdef _WIN32
+        bool loaded_from_env = false;
+        const char* cafile = std::getenv("SSL_CERT_FILE");
+        const char* cadir  = std::getenv("SSL_CERT_DIR");
+
+        if (cafile && cafile[0])
+        {
+          if (SSL_CTX_load_verify_locations(m_ssl_context.native_handle(), cafile, nullptr) == 1)
+          {
+            LOG_PRINT_L1(std::string("TLS: using CA file from SSL_CERT_FILE=") + cafile);
+            loaded_from_env = true;
+          }
+          else
+          {
+            LOG_ERROR(std::string("TLS: failed to load CA file from SSL_CERT_FILE=") + cafile);
+          }
+        }
+        if (cadir && cadir[0])
+        {
+          if (SSL_CTX_load_verify_locations(m_ssl_context.native_handle(), nullptr, cadir) == 1)
+          {
+            LOG_PRINT_L1(std::string("TLS: using CA dir from SSL_CERT_DIR=") + cadir);
+            loaded_from_env = true;
+          }
+          else
+          {
+            LOG_ERROR(std::string("TLS: failed to load CA dir from SSL_CERT_DIR=") + cadir);
+          }
+        }
+
+        if ((!cafile || !cafile[0]) && (!cadir || !cadir[0]))
+        {
+          LOG_PRINT_L1("TLS(WIN): SSL_CERT_FILE/SSL_CERT_DIR are not set.");
+        }
+#endif
       }
 
       /*
@@ -102,6 +135,14 @@ namespace epee
       void set_domain(const std::string& domain_name)
       {
         SSL_set_tlsext_host_name(m_socket.native_handle(), domain_name.c_str());
+        // hostname verification link to host
+        X509_VERIFY_PARAM* param = SSL_CTX_get0_param(m_ssl_context.native_handle());
+        // do not allow partial substitutions like "foo.bar" against "*.bar"
+        X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+        if (X509_VERIFY_PARAM_set1_host(param, domain_name.c_str(), 0) != 1)
+        {
+          LOG_ERROR("Failed to set hostname for TLS verification");
+        }
       }
 
       boost::asio::ip::tcp::socket& get_socket()
@@ -117,6 +158,7 @@ namespace epee
       void on_after_connect()
       {
         LOG_PRINT_L2("SSL Handshake....");
+        m_socket.set_verify_mode(boost::asio::ssl::verify_peer);
         m_socket.handshake(boost::asio::ssl::stream_base::client);
         LOG_PRINT_L2("SSL Handshake OK");
       }
