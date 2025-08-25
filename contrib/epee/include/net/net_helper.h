@@ -48,9 +48,6 @@
 #include "misc_helpers.h"
 //#include "profile_tools.h"
 #include "../string_tools.h"
-#ifdef _WIN32
-  #include <wincrypt.h>
-#endif
 #ifndef MAKE_IP
 #define MAKE_IP( a1, a2, a3, a4 )	(a1|(a2<<8)|(a3<<16)|(a4<<24))
 #endif
@@ -108,7 +105,6 @@ namespace epee
 #else
         m_ssl_context.set_default_verify_paths();
 #endif
-        m_ssl_context.set_verify_mode(boost::asio::ssl::verify_peer);
       }
 
       /*
@@ -136,7 +132,6 @@ namespace epee
       void set_domain(const std::string& domain_name)
       {
         SSL_set_tlsext_host_name(m_socket.native_handle(), domain_name.c_str());
-        // hostname verification link to host
         X509_VERIFY_PARAM* param = SSL_CTX_get0_param(m_ssl_context.native_handle());
         // do not allow partial substitutions like "foo.bar" against "*.bar"
         X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
