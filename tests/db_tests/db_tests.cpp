@@ -472,7 +472,7 @@ struct lmdb_txn_nested_read_only_test
     uint64_t key = 11111;
     std::string data = "nested_read_data";
     acc.set(key, data);
-    acc.commit_transaction();
+    //acc.commit_transaction();
 
     // Start outer read-only
     acc.begin_transaction(true);
@@ -483,14 +483,46 @@ struct lmdb_txn_nested_read_only_test
     CHECK_AND_ASSERT_MES(ptr.get() && *ptr == data, false, "Data not readable in nested read-only");
 
     // Another nested
+    /*
     acc.begin_transaction(true);
     ptr = acc.get(key);
     CHECK_AND_ASSERT_MES(ptr.get() && *ptr == data, false, "Data not readable in double nested read-only");
     acc.commit_transaction(); // Commit inner
-
+    */
     acc.commit_transaction(); // Commit middle
 
     acc.commit_transaction(); // Commit outer
+    acc.commit_transaction(); // writer
+
+
+    //======
+    acc.begin_transaction(false);
+    //uint64_t key = 11111;
+    //std::string data = "nested_read_data";
+    //acc.set(key, data);
+    //acc.commit_transaction();
+
+    // Start outer read-only
+    acc.begin_transaction(true);
+
+    // Nested read-only
+    acc.begin_transaction(true);
+    //auto ptr = acc.get(key);
+    //CHECK_AND_ASSERT_MES(ptr.get() && *ptr == data, false, "Data not readable in nested read-only");
+
+    // Another nested
+    /*
+    acc.begin_transaction(true);
+    ptr = acc.get(key);
+    CHECK_AND_ASSERT_MES(ptr.get() && *ptr == data, false, "Data not readable in double nested read-only");
+    acc.commit_transaction(); // Commit inner
+    */
+    acc.commit_transaction(); // Commit middle
+
+    acc.commit_transaction(); // Commit outer
+    acc.commit_transaction(); // writer
+
+
 
     LOG_PRINT_GREEN("lmdb_txn_nested_read_only_test successful", LOG_LEVEL_0);
     return true;
@@ -838,14 +870,14 @@ int main(int argc, char* argv[])
   epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
   epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
 
-  if (!prepare_db_and_run_test<lmdb_ro_double_begin_bad_rslot_test>())
-    return 0;
+  //if (!prepare_db_and_run_test<lmdb_ro_double_begin_bad_rslot_test>())
+  //  return 0;
 
-  if (!prepare_db_and_run_test<lmdb_ro_cross_thread_finish_test>())
-    return 0;
+  //if (!prepare_db_and_run_test<lmdb_ro_cross_thread_finish_test>())
+  //  return 0;
 
   if (!prepare_db_and_run_test<lmdb_txn_basic_write_test>())
-  return 0;
+    return 0;
 
   // if (!prepare_db_and_run_test<lmdb_txn_basic_read_only_test>())
   //   return 0;

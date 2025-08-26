@@ -262,7 +262,7 @@ namespace tools
             dump();
             dump_tx_stacks();
             print_stacktrace();
-            print_journal(1000);
+            //print_journal(1000);
             ASSERT_MES_AND_THROW_LMDB(res, "Unable to mdb_txn_begin");
           }
         }
