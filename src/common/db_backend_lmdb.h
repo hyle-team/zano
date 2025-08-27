@@ -16,6 +16,8 @@ struct lmdb_txn_destructor_abort_test;
 struct lmdb_ro_double_begin_bad_rslot_test;
 struct lmdb_ro_cross_thread_finish_test;
 
+
+
 namespace tools
 {
   namespace db
@@ -27,13 +29,15 @@ namespace tools
       friend struct ::lmdb_txn_destructor_abort_test;
       friend struct ::lmdb_ro_double_begin_bad_rslot_test;
       friend struct ::lmdb_ro_cross_thread_finish_test;
+      
+      
       class lmdb_txn 
       {
       public:
         lmdb_txn(lmdb_db_backend& db);
         lmdb_txn(lmdb_db_backend& db, bool is_read_only);
-        lmdb_txn(lmdb_txn&&) noexcept;
-        lmdb_txn& operator=(lmdb_txn&&) noexcept;
+        //lmdb_txn(lmdb_txn&&) noexcept;
+        //lmdb_txn& operator=(lmdb_txn&&) noexcept;
         lmdb_txn(const lmdb_txn&) = delete;
         lmdb_txn& operator=(const lmdb_txn&) = delete;
 
@@ -42,22 +46,65 @@ namespace tools
         int begin(MDB_txn* parent_tx);
         int commit();
         void abort();
-        void mark_finished(); // mark when commit or abort is called, to avoid double commit/abort and correct delete in destructor
+        bool is_empty();
 
-        MDB_txn* ptx{nullptr};
-        bool read_only{false}; // needed for thread-top transaction, for figure out if we need to unlock exclusive access
-        size_t nested_count{0};   //count of read-only nested emulated transactions
 
-        uint64_t dbg_id{0};        // human readable transaction id
-        uint32_t stack_level{0};   // depth of the stack at the moment of opening (number of elements before push)
-        std::thread::id owner{};
+        //void mark_finished(); // mark when commit or abort is called, to avoid double commit/abort and correct delete in destructor
+
+        MDB_txn* m_ptx{nullptr};
+        bool m_read_only{false};
+        uint64_t m_ref_count{ 0 };
+        // needed for thread-top transaction, for figure out if we need to unlock exclusive access
+        //size_t m_nested_count{0};   //count of read-only nested emulated transactions
+
+        //uint64_t m_dbg_id{0};        // human readable transaction id
+        //uint32_t m_stack_level{0};   // depth of the stack at the moment of opening (number of elements before push)
+        std::thread::id m_owner{};
       private:
+        bool validate_empty();
+        void check_thread_id();
+
         std::reference_wrapper<lmdb_db_backend> m_db;
-        bool m_marked_finished{false};
+        //bool m_marked_finished{true};
 
       };
 
-      typedef std::list<lmdb_txn> transactions_list;
+
+
+      /*
+      It could be only 1 RO transaction in the list, and it might be only at the beginning of the list
+      [0]w-transaction
+      or
+      [0]ro-transaction
+      [1]w-transaction
+      or
+      [0]ro-transaction
+      [1]w-transaction
+      [2]w-transaction
+      etc
+
+      if begin(ro) call happens at any level where last tx is W-transaction in the list, then it's ref-counter just increases, while m_calls 
+      items is always added and linked to item that were before incremented or created. 
+      At the commit/abort link to lmdb_txn is validated as it should be the latest object on the m_txs stack
+
+      */
+      
+      struct begin_call_handler
+      {
+        begin_call_handler(std::shared_ptr<lmdb_txn> related_tx_object, bool is_read_obly):m_related_tx_object(related_tx_object), m_read_only(is_read_obly)
+        {}
+        std::shared_ptr<lmdb_txn> m_related_tx_object;
+        bool m_read_only = false;
+      }
+
+      struct thread_transactions
+      {
+        st::list<std::shared_ptr<begin_call_handler> > m_calls;
+        std::list<std::shared_ptr<lmdb_txn>> m_txs;
+      };
+
+
+      typedef std::list<std::shared_ptr<lmdb_txn>> transactions_list;
 
       std::string m_path;
       MDB_env *m_penv;
@@ -66,6 +113,7 @@ namespace tools
       boost::recursive_mutex m_write_exclusive_lock;
       std::map<std::thread::id, transactions_list> m_txs; // thread_id -> count of nested read_only transactions
       bool pop_lmdb_txn(lmdb_txn& txe);
+      bool m_journal_printed = false;
 
     public:
       lmdb_db_backend();

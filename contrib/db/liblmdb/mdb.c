@@ -2888,13 +2888,13 @@ mdb_txn_renew0(MDB_txn *txn)
 					if (r->mr_txnid != (txnid_t)-1)
 					{
 						char buff[1000] = {0};
-						sprintf(buff, "MDB_reader %p, mr_txnid is not -1, %"PRIx64, (void*)r, r->mr_txnid );
+						sprintf(buff, "[LMDB]MDB_reader %p, mr_txnid is not -1, %"PRIx64, (void*)r, r->mr_txnid );
 						print_log_to_journal(buff);
 					}
 					else
 					{
             char buff[1000] = { 0 };
-            sprintf(buff, "MDB_reader %p, r->mr_pid(%ld) != env->me_pid(%ld)", (void*)r, (long)r->mr_pid, (long)env->me_pid);
+            sprintf(buff, "[LMDB]MDB_reader %p, r->mr_pid(%ld) != env->me_pid(%ld)", (void*)r, (long)r->mr_pid, (long)env->me_pid);
             print_log_to_journal(buff);
 					}
 					return MDB_BAD_RSLOT;
@@ -2933,7 +2933,7 @@ mdb_txn_renew0(MDB_txn *txn)
 				r->mr_txnid = (txnid_t)-1;
 				{
           char buff[1000] = { 0 };
-          sprintf(buff, "MDB_reader %p, mr_txnid assigned -1", (void*)r);
+          sprintf(buff, "[LMDB]MDB_reader %p, mr_txnid assigned -1", (void*)r);
           print_log_to_journal(buff);
 				}
 				r->mr_tid = tid;
@@ -2954,7 +2954,7 @@ mdb_txn_renew0(MDB_txn *txn)
 				r->mr_txnid = ti->mti_txnid;
         {
           char buff[1000] = { 0 };
-          sprintf(buff, "MDB_reader %p, mr_txnid assigned %"PRIx64, (void*)r, r->mr_txnid );
+          sprintf(buff, "[LMDB]MDB_reader %p, mr_txnid assigned %"PRIx64, (void*)r, r->mr_txnid );
           print_log_to_journal(buff);
         }
 			}
@@ -3046,6 +3046,7 @@ mdb_txn_renew(MDB_txn *txn)
 int
 mdb_txn_begin(MDB_env *env, MDB_txn *parent, unsigned int flags, MDB_txn **ret)
 {
+	print_log_to_journal("[LMDB] BEGIN");
 	MDB_txn *txn;
 	MDB_ntxn *ntxn;
 	int rc, size, tsize;
@@ -3232,7 +3233,7 @@ mdb_txn_end(MDB_txn *txn, unsigned mode)
 			txn->mt_u.reader->mr_txnid = (txnid_t)-1;
       {
         char buff[1000] = { 0 };
-				sprintf(buff, "MDB_reader %p, mr_txnid assigned -1", (void*)txn->mt_u.reader);
+				sprintf(buff, "[LMDB]MDB_reader %p, mr_txnid assigned -1", (void*)txn->mt_u.reader);
         print_log_to_journal(buff);
       }
 
@@ -3315,6 +3316,8 @@ mdb_txn_end(MDB_txn *txn, unsigned mode)
 void
 mdb_txn_reset(MDB_txn *txn)
 {
+	print_log_to_journal("[LMDB] ABORT");
+
 	if (txn == NULL)
 		return;
 
@@ -3694,6 +3697,7 @@ static int ESECT mdb_env_share_locks(MDB_env *env, int *excl);
 int
 mdb_txn_commit(MDB_txn *txn)
 {
+	print_log_to_journal("[LMDB] COMMIT");
 	int		rc;
 	unsigned int i, end_mode;
 	MDB_env	*env;
