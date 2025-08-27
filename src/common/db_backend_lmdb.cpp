@@ -86,7 +86,7 @@ namespace tools
       mdb_reader_list(env, print_reader, nullptr);
     }
 
-    std::string lmdb_db_backend::dump_tx_stacks()
+    void lmdb_db_backend::dump_tx_stacks()
     {
       std::lock_guard<boost::recursive_mutex> lock(m_cs);
       
@@ -96,17 +96,33 @@ namespace tools
       for (const auto& kv : m_txs) 
       {
         const auto& thr_txs = kv.second; // transactions_list = std::list<lmdb_txn>
-        ss << "  tid=" << kv.first << " depth=" << thr_txs.size() <<ENDL;
+        ss << "  tid=" << kv.first << " m_calls.depth=" << thr_txs.m_calls.size() << " m_txs.depth=" << thr_txs.m_txs.size() <<ENDL;
+        
+        {
+          ss << "CALLS:" << ENDL;
+          size_t i = 0;
+          for (const auto& c : thr_txs.m_calls)
+          {
+            ss << std::string(i, ' ') << "call(";
+            if (c->m_read_only)
+              ss << "ro";
+            ss << ")" << ENDL;
+          }
+        }
 
-        size_t i = 0;
-        for (const auto& t : lst) {
-          LOG_PRINT_L0("[" << i++ << "] id=" << t.dbg_id
-            << " ro=" << (t.read_only ? 1 : 0)
-//            << " lvl=" << t.stack_level
-//            << " nested=" << t.nested_count
-            << " ptx=" << (void*)t.ptx);
+        {
+          ss << "TXS:" << ENDL;
+          size_t i = 0;
+          for (const auto& t : thr_txs.m_txs)
+          {
+            ss << std::string(i, ' ') << "tx(";
+            if (t->m_read_only)
+              ss << "ro";
+            ss << "), ref_count:" << t->m_ref_count << ", owner_thr:" << t->m_owner << ", tx_ptr" << t->m_ptx << ENDL;
+          }
         }
       }
+      LOG_PRINT_L0(ss.str());
     }
 
     lmdb_db_backend::lmdb_db_backend() : m_penv(AUTO_VAL_INIT(m_penv))  
@@ -181,7 +197,7 @@ namespace tools
         {          
           for (auto& txe : tx_thread.second.m_txs)
           {
-            if (!txe.m_read_only)
+            if (!txe->m_read_only)
             {
               LOG_ERROR("not cleared W-transactions on db close");
             }
@@ -232,9 +248,9 @@ namespace tools
         std::lock_guard<boost::recursive_mutex> lock(m_cs);
         CHECK_AND_ASSERT_THROW_MES(m_penv, "m_penv==null, db closed");
         thread_transactions& thread_txs = m_txs[std::this_thread::get_id()];
-        
+
         MDB_txn* pparent_tx = nullptr;
-        
+
         //do we have to create new lmdb_txn object(and actually call for lmdb api)?         
         if (!read_only || !thread_txs.m_txs.size())
         {
@@ -250,10 +266,10 @@ namespace tools
           }
 
           //either RO-transaction with no prev transactions or W-transaction, create new lmdb_txn object for m_txs
-          thread_txs.m_txs.push_back(std::shared_ptr<lmdb_txn>( new lmdb_txn(*this, read_only)));
+          thread_txs.m_txs.push_back(std::shared_ptr<lmdb_txn>(new lmdb_txn(*this, read_only)));
         }
 
-        std::shared_ptr<lmdb_txn> current_tx_pointer = current_tx_pointer = thread_txs.m_txs.back();
+        std::shared_ptr<lmdb_txn> current_tx_pointer = thread_txs.m_txs.back();
 
 
         int res = current_tx_pointer->begin(pparent_tx);
@@ -264,7 +280,7 @@ namespace tools
             //Important: if mdb_txn_begin is failed need to unlock previously locked mutex
             CRITICAL_SECTION_UNLOCK(m_write_exclusive_lock);
           }
-                    
+
           if (current_tx_pointer->is_empty())
           {
             thread_txs.m_txs.pop_back();
@@ -289,9 +305,62 @@ namespace tools
 
           ASSERT_MES_AND_THROW_LMDB(res, "Unable to mdb_txn_begin");
         }
+
+        //debug and self-validation purposes only
+        push_the_call(current_tx_pointer, read_only, thread_txs);
+        
+      }
       LOG_PRINT_L4("[DB] Transaction started");
       return true;
     }
+
+    void lmdb_db_backend::push_the_call(std::shared_ptr<lmdb_txn> current_tx_pointer, bool is_read_only, thread_transactions& thread_txs)
+    {
+      thread_txs.m_calls.push_back(std::shared_ptr<each_call_handler>(new each_call_handler(current_tx_pointer, is_read_only)));
+    }
+
+    bool lmdb_db_backend::pop_the_call(bool is_commit)
+    {
+      auto& thrd_txs = m_txs[std::this_thread::get_id()];
+      CHECK_AND_ASSERT_THROW_MES(thrd_txs.m_txs.size(), " On commit/abort unable to find active tx for thread " << std::this_thread::get_id());
+      CHECK_AND_ASSERT_THROW_MES(thrd_txs.m_calls.size(), " On commit/abort unable to find active m_calls for thread " << std::this_thread::get_id());
+      std::shared_ptr<each_call_handler> call_ptr = thrd_txs.m_calls.back();
+      std::shared_ptr<lmdb_txn> tx_ptr = thrd_txs.m_txs.back();
+
+      //check that lmdb_txn and each_call_handler link are correct, this guarantees that call sequence didn't break
+      CHECK_AND_ASSERT_THROW_MES(call_ptr->m_related_tx_object == tx_ptr, "The objects in m_related_tx_object and lmdb_txn didn't much");
+      //one extra check to see if this is end this tx, is_read_only should much
+      
+      if (tx_ptr->m_ref_count == 1)
+      {
+        CHECK_AND_ASSERT_THROW_MES(call_ptr->m_read_only == tx_ptr->m_read_only, "call_ptr->m_read_only == tx_ptr->m_read_only didn't much");
+      }
+
+      int res = MDB_SUCCESS;
+      if (is_commit)
+        res = tx_ptr->commit();
+      else
+      {
+        tx_ptr->abort();
+      }
+
+      if (!call_ptr->m_read_only)
+      {
+        LOG_PRINT_CYAN("[DB " << m_path << "] WRITE EXCLUSIVE UNLOCKED", LOG_LEVEL_3);
+        CRITICAL_SECTION_UNLOCK(m_write_exclusive_lock);
+      }
+
+      //clear the objects
+      thrd_txs.m_calls.pop_back();
+      if (tx_ptr->is_empty())
+        thrd_txs.m_txs.pop_back();
+      //check if it's empty
+
+      CHECK_AND_ASSERT_THROW_MES(res == MDB_SUCCESS, "Failed to commit lmdb tx");
+
+      return true;
+    }
+
 
     MDB_txn* lmdb_db_backend::get_current_tx()
     {
@@ -302,61 +371,26 @@ namespace tools
     }
 
 
+
     bool lmdb_db_backend::commit_transaction()
     {
+      bool ret = false;
       print_log_to_journal("[BACK] commit_transaction()");
       PROFILE_FUNC("lmdb_db_backend::commit_transaction");
-      {
-        lmdb_txn txe(*this);
-        bool r = pop_lmdb_txn(txe);
-        CHECK_AND_ASSERT_MES(r, false, "Unable to pop_lmdb_txn");
-        
-        if (!txe.ptx)
-        {
-          LOG_PRINT_L4("[DB] Nested transaction scope closed");
-          return true;
-        }
-
-        if (txe.nested_count == 0 || (txe.read_only && txe.nested_count == 1))
-        {
-          if(txe.read_only)
-          {
-            txe.abort();
-          }
-          else
-          {
-            int res = txe.commit();
-            CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to commit transaction(error " << res << ")");
-            if (!txe.read_only && !txe.nested_count)
-            {
-              CRITICAL_SECTION_UNLOCK(m_write_exclusive_lock);
-              LOG_PRINT_CYAN("[DB " << m_path << "] WRITE UNLOCKED", LOG_LEVEL_3);
-            }
-          }
-        }
+      {        
+        std::lock_guard<boost::recursive_mutex> lock(m_cs);
+        ret = pop_the_call(true);
       }
       LOG_PRINT_L4("[DB] Transaction committed");
-      return true;
+      return ret;
     }
     
     void lmdb_db_backend::abort_transaction()
     {
       print_log_to_journal("[BACK] abort_transaction()");
       {
-        lmdb_txn txe(*this);
-        bool r = pop_lmdb_txn(txe);
-        CHECK_AND_ASSERT_MES(r, void(), "Unable to pop_lmdb_txn");
-        if (txe.nested_count == 0 || (txe.read_only && txe.nested_count == 1))
-        {
-          txe.abort();
-          if (!txe.read_only && !txe.nested_count)
-          {
-            CRITICAL_SECTION_UNLOCK(m_write_exclusive_lock);
-            LOG_PRINT_CYAN("[DB " << m_path << "] WRITE UNLOCKED(ABORTED)", LOG_LEVEL_3);
-          }
-        }
-          
-
+        std::lock_guard<boost::recursive_mutex> lock(m_cs);
+        pop_the_call(false);
       }
       LOG_PRINT_L4("[DB] Transaction aborted");
     }
@@ -381,7 +415,7 @@ namespace tools
       auto it = m_txs.find(std::this_thread::get_id());
       if (it == m_txs.end())
         return false;
-      return it->second.size() ? true : false;
+      return it->second.m_txs.size() ? true : false;
     }
 
     bool lmdb_db_backend::get(container_handle h, const char* k, size_t ks, std::string& res_buff)
@@ -507,10 +541,10 @@ namespace tools
       std::lock_guard<boost::recursive_mutex> lock(m_cs);
       for (auto& e : m_txs)
       {
-        for (auto& pr : e.second)
+        for (auto& pr : e.second.m_calls)
         {
           ++si.tx_count;
-          if(!pr.read_only)
+          if(!pr->m_read_only)
             ++si.write_tx_count;
         }
       }
@@ -582,9 +616,8 @@ namespace tools
     {}
 
     lmdb_db_backend::lmdb_txn::lmdb_txn(lmdb_db_backend& db, bool is_read_only)
-      : m_db(db)
+      : m_db(db), m_read_only(is_read_only)
     {
-      m_read_only = is_read_only;
     }
 
 
@@ -617,9 +650,10 @@ namespace tools
       {
         m_ref_count = 1;
       }
+      return response;
     }
     
-    bool is_empty()
+    bool lmdb_db_backend::lmdb_txn::is_empty()
     {
       return m_ref_count == 0;
     }
@@ -644,7 +678,7 @@ namespace tools
       int res = MDB_SUCCESS;
       if (m_read_only)
       {
-        res = mdb_txn_abort(m_ptx);
+        mdb_txn_abort(m_ptx);
       }
       else
       {

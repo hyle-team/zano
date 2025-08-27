@@ -89,30 +89,32 @@ namespace tools
 
       */
       
-      struct begin_call_handler
+      struct each_call_handler
       {
-        begin_call_handler(std::shared_ptr<lmdb_txn> related_tx_object, bool is_read_obly):m_related_tx_object(related_tx_object), m_read_only(is_read_obly)
-        {}
+        each_call_handler(std::shared_ptr<lmdb_txn> related_tx_object, bool is_read_only) :m_related_tx_object(related_tx_object), m_read_only(is_read_only)
+        {
+        }
         std::shared_ptr<lmdb_txn> m_related_tx_object;
         bool m_read_only = false;
-      }
+      };
 
       struct thread_transactions
       {
-        st::list<std::shared_ptr<begin_call_handler> > m_calls;
+        std::list<std::shared_ptr<each_call_handler> > m_calls; //this one is purely for extra validation and debug purposes 
         std::list<std::shared_ptr<lmdb_txn>> m_txs;
       };
 
 
-      typedef std::list<std::shared_ptr<lmdb_txn>> transactions_list;
+      //typedef std::list<std::shared_ptr<lmdb_txn>> transactions_list;
 
       std::string m_path;
       MDB_env *m_penv;
 
       boost::recursive_mutex m_cs;
       boost::recursive_mutex m_write_exclusive_lock;
-      std::map<std::thread::id, transactions_list> m_txs; // thread_id -> count of nested read_only transactions
-      bool pop_lmdb_txn(lmdb_txn& txe);
+      std::map<std::thread::id, thread_transactions> m_txs; // thread_id -> thread_transactions
+      void push_the_call(std::shared_ptr<lmdb_txn> related_tx_object, bool is_read_only, thread_transactions& thread_txs);
+      bool pop_the_call(bool is_commit);
       bool m_journal_printed = false;
 
     public:

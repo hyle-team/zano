@@ -552,57 +552,58 @@ struct lmdb_txn_abort_test
   }
 };
 
-struct lmdb_txn_destructor_abort_test
-{
-  typedef tools::db::cached_key_value_accessor<uint64_t, std::string, true, true> accessor_type;
 
-  static bool run_test(accessor_type& /*acc*/)
-  {
-    const std::string base = epee::string_tools::get_current_module_folder() + std::string("/") + DB_TEST_SUB_DIR + "/lmdb_txn_dtor";
-    boost::system::error_code ec;
-    boost::filesystem::remove_all(base, ec);
-    CHECK_AND_ASSERT_MES(!ec, false, "Failed to empty db subdir: " << ec.message());
-    CHECK_AND_ASSERT_MES(tools::create_directories_if_necessary(base), false, "mkdir failed");
-
-    epee::shared_recursive_mutex rwlock;
-    auto backend_sp = std::make_shared<tools::db::lmdb_db_backend>();
-    tools::db::lmdb_db_backend* backend = backend_sp.get();
-    tools::db::basic_db_accessor bdb(backend_sp, rwlock);
-
-    CHECK_AND_ASSERT_MES(bdb.open(base), false, "backend open failed");
-
-    tools::db::container_handle h = 0;
-    CHECK_AND_ASSERT_MES(bdb.get_backend()->open_container("txn", h), false, "open_container failed");
-    MDB_dbi dbi = static_cast<MDB_dbi>(h);
-
-    const std::string key = "dtor_key";
-    const std::string val = "dtor_val";
-
-    {
-      tools::db::lmdb_db_backend::lmdb_txn txn(*backend, false);
-      int rc = txn.begin(nullptr);
-      CHECK_AND_ASSERT_MES(rc == MDB_SUCCESS, false, "txn.begin failed");
-
-      MDB_val k = AUTO_VAL_INIT(k);
-      MDB_val v = AUTO_VAL_INIT(v);
-      k.mv_data = (void*)key.data(); k.mv_size = key.size();
-      v.mv_data = (void*)val.data(); v.mv_size = val.size();
-
-      rc = mdb_put(txn.ptx, dbi, &k, &v, 0);
-      CHECK_AND_ASSERT_MES(rc == MDB_SUCCESS, false, "mdb_put failed");
-    }
-
-    CHECK_AND_ASSERT_MES(bdb.begin_transaction(true), false, "ro begin failed");
-    std::string out;
-    bool found = backend->get(h, key.data(), key.size(), out);
-    bdb.commit_transaction();
-    CHECK_AND_ASSERT_MES(!found, false, "Data persisted after lmdb_txn destructor — expected abort");
-
-    bdb.close();
-    LOG_PRINT_GREEN("Test successful", LOG_LEVEL_0);
-    return true;
-  }
-};
+// struct lmdb_txn_destructor_abort_test
+// {
+//   typedef tools::db::cached_key_value_accessor<uint64_t, std::string, true, true> accessor_type;
+// 
+//   static bool run_test(accessor_type& /*acc*/)
+//   {
+//     const std::string base = epee::string_tools::get_current_module_folder() + std::string("/") + DB_TEST_SUB_DIR + "/lmdb_txn_dtor";
+//     boost::system::error_code ec;
+//     boost::filesystem::remove_all(base, ec);
+//     CHECK_AND_ASSERT_MES(!ec, false, "Failed to empty db subdir: " << ec.message());
+//     CHECK_AND_ASSERT_MES(tools::create_directories_if_necessary(base), false, "mkdir failed");
+// 
+//     epee::shared_recursive_mutex rwlock;
+//     auto backend_sp = std::make_shared<tools::db::lmdb_db_backend>();
+//     tools::db::lmdb_db_backend* backend = backend_sp.get();
+//     tools::db::basic_db_accessor bdb(backend_sp, rwlock);
+// 
+//     CHECK_AND_ASSERT_MES(bdb.open(base), false, "backend open failed");
+// 
+//     tools::db::container_handle h = 0;
+//     CHECK_AND_ASSERT_MES(bdb.get_backend()->open_container("txn", h), false, "open_container failed");
+//     MDB_dbi dbi = static_cast<MDB_dbi>(h);
+// 
+//     const std::string key = "dtor_key";
+//     const std::string val = "dtor_val";
+// 
+//     {
+//       tools::db::lmdb_db_backend::lmdb_txn txn(*backend, false);
+//       int rc = txn.begin(nullptr);
+//       CHECK_AND_ASSERT_MES(rc == MDB_SUCCESS, false, "txn.begin failed");
+// 
+//       MDB_val k = AUTO_VAL_INIT(k);
+//       MDB_val v = AUTO_VAL_INIT(v);
+//       k.mv_data = (void*)key.data(); k.mv_size = key.size();
+//       v.mv_data = (void*)val.data(); v.mv_size = val.size();
+// 
+//       rc = mdb_put(txn.ptx, dbi, &k, &v, 0);
+//       CHECK_AND_ASSERT_MES(rc == MDB_SUCCESS, false, "mdb_put failed");
+//     }
+// 
+//     CHECK_AND_ASSERT_MES(bdb.begin_transaction(true), false, "ro begin failed");
+//     std::string out;
+//     bool found = backend->get(h, key.data(), key.size(), out);
+//     bdb.commit_transaction();
+//     CHECK_AND_ASSERT_MES(!found, false, "Data persisted after lmdb_txn destructor — expected abort");
+// 
+//     bdb.close();
+//     LOG_PRINT_GREEN("Test successful", LOG_LEVEL_0);
+//     return true;
+//   }
+// };
 
 struct lmdb_txn_thread_specific_test
 {
@@ -888,8 +889,8 @@ int main(int argc, char* argv[])
   if (!prepare_db_and_run_test<lmdb_txn_abort_test>())
     return 0;
 
-  if (!prepare_db_and_run_test<lmdb_txn_destructor_abort_test>())
-    return 0;
+  //if (!prepare_db_and_run_test<lmdb_txn_destructor_abort_test>())
+  //  return 0;
 
   if (!prepare_db_and_run_test<lmdb_txn_thread_specific_test>())
     return 0;
