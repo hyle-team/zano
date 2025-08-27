@@ -529,7 +529,7 @@ namespace tools
 
     if (!req.comment.empty() && payment_id.empty())
     {
-      currency::tx_comment{};
+      currency::tx_comment comment{};
       comment.comment = req.comment;
       extra.push_back(comment);
     }
