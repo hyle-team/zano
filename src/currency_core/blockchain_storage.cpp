@@ -6852,9 +6852,8 @@ wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise
   return res;
 }
 //------------------------------------------------------------------
-wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise_difficulty(const alt_chain_type& alt_chain, uint64_t block_height, bool pos, wide_difficulty_type& cumulative_diff_precise_adj) const
+wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise_difficulty(const alt_chain_type& alt_chain, uint64_t main_chain_start_block_height, bool pos, wide_difficulty_type& cumulative_diff_precise_adj) const
 {
-  uint64_t main_chain_first_block = block_height;
   for (auto it = alt_chain.rbegin(); it != alt_chain.rend(); it++)
   {
     if (is_pos_block((*it)->second.bl) == pos)
@@ -6862,14 +6861,14 @@ wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise
       cumulative_diff_precise_adj = (*it)->second.cumulative_diff_precise_adjusted;
       return (*it)->second.cumulative_diff_precise;
     }
-    main_chain_first_block = (*it)->second.height - 1;
+    main_chain_start_block_height = (*it)->second.height - 1;
   }
 
 
   CRITICAL_REGION_LOCAL(m_read_lock);
-  CHECK_AND_ASSERT_MES(main_chain_first_block < m_db_blocks.size(), false, "Intrnal error: main_chain_first_block(" << main_chain_first_block << ") < m_blocks.size() (" << m_db_blocks.size() << ")");
+  CHECK_AND_ASSERT_MES(main_chain_start_block_height < m_db_blocks.size(), false, "Internal error: main_chain_start_block_height (" << main_chain_start_block_height << ") < m_blocks.size() (" << m_db_blocks.size() << ")");
 
-  for (uint64_t i = main_chain_first_block; i != 0; i--)
+  for (uint64_t i = main_chain_start_block_height; i != 0; i--)
   {
     if (is_pos_block(m_db_blocks[i]->bl) == pos)
     {
