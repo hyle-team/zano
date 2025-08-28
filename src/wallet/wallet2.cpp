@@ -3901,7 +3901,7 @@ size_t wallet2::get_asset_decimal_point(const crypto::public_key& asset_id, size
   return result_if_not_found; // if not overriden, use the 0 decimal point (raw numbers) as the default
 }
 
-std::unordered_map<crypto::public_key, size_t> wallet2::get_asset_decimal_point() const
+std::unordered_map<crypto::public_key, size_t> wallet2::get_assets_decimal_points_map() const
 {
   std::unordered_map<crypto::public_key, size_t> res;
   res.reserve(m_whitelisted_assets.size() + m_custom_assets.size() + m_own_asset_descriptors.size() + 1);
@@ -7028,7 +7028,7 @@ assets_selection_context wallet2::get_needed_money(uint64_t fee, const std::vect
     auto& amount_item = amounts_map[dt.asset_id];
 
     amount_item.needed_amount += money_to_add;
-    THROW_IF_TRUE_WALLET_EX(amount_item.needed_amount < money_to_add, error::tx_sum_overflow, dsts, fee, get_asset_decimal_point());
+    THROW_IF_TRUE_WALLET_EX(amount_item.needed_amount < money_to_add, error::tx_sum_overflow, dsts, fee, get_assets_decimal_points_map());
     if (amount_item.needed_amount == 0)
     {
       amounts_map.erase(amounts_map.find(dt.asset_id)); // clean up empty entries
@@ -8011,7 +8011,7 @@ void wallet2::finalize_transaction(currency::finalize_tx_param& ftp, currency::f
   bool r = currency::construct_tx(m_account.get_keys(),
     ftp, result);
   //TIME_MEASURE_FINISH_MS(construct_tx_time);
-  THROW_IF_FALSE_WALLET_EX(r, error::tx_not_constructed, ftp.sources, ftp.prepared_destinations, ftp.unlock_time, get_asset_decimal_point());
+  THROW_IF_FALSE_WALLET_EX(r, error::tx_not_constructed, ftp.sources, ftp.prepared_destinations, ftp.unlock_time, get_assets_decimal_points_map());
   uint64_t effective_fee = 0;
   THROW_IF_FALSE_WALLET_CMN_ERR_EX(!get_tx_fee(result.tx, effective_fee) || effective_fee <= WALLET_TX_MAX_ALLOWED_FEE, "tx fee is WAY too big: " << print_money_brief(effective_fee) << ", maximum allowed is " << print_money_brief(WALLET_TX_MAX_ALLOWED_FEE) << ".");
 
