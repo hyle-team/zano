@@ -1515,6 +1515,364 @@ std::shared_ptr<block_extended_info> blockchain_storage::get_last_block_of_type(
   return pbei;
 }
 //------------------------------------------------------------------
+void blockchain_storage::scan_pos_coin_age_distribution(std::map<uint64_t, uint64_t>& confirmations_distribution)
+{
+  constexpr uint64_t zarcanum_epoch_start = 2555000;
+  constexpr uint64_t amount               = 0;
+  constexpr uint64_t scan_depth           = 200000;
+
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  const uint64_t top_height = m_db_blocks.size() > 0 ? m_db_blocks.size() - 1 : 0;
+
+  CHECK_AND_ASSERT_MES(top_height >= zarcanum_epoch_start, void(),
+                       "Blockchain height (" << top_height << ") is less than zarcanum epoch start ("
+                                             << zarcanum_epoch_start << "). Cannot scan POS coin age.");
+
+  const uint64_t start_height = std::max(zarcanum_epoch_start, top_height > scan_depth ? (top_height - scan_depth) : 0);
+  const uint64_t total_blocks = top_height - start_height + 1;
+
+  uint64_t processed_blocks  = 0;
+  uint64_t processed_outputs = 0;
+
+  LOG_PRINT_L0("Scanning POS coin age from block height " << start_height << " to " << top_height
+                                                          << " (" << total_blocks << " blocks total)");
+  LOG_PRINT_L0("Blockchain top height: " << top_height);
+   std::cout << "Blockchain top height: " << top_height << "\n";
+
+  for (uint64_t height = start_height; height <= top_height; ++height)
+  {
+    const std::shared_ptr<const currency::block_extended_info>& block_entry_ptr = m_db_blocks[height];
+    CHECK_AND_ASSERT_MES(block_entry_ptr, void(), "No block entry found at height: " << height);
+
+    const currency::block& blk = block_entry_ptr->bl;
+
+    if (!is_pos_block(blk))
+      continue;
+
+    const currency::txin_zc_input& stake_input               = boost::get<currency::txin_zc_input>(blk.miner_tx.vin[1]);
+    CHECK_AND_ASSERT_MES(blk.miner_tx.vin.size() > 1, void(), "Expected at least 2 inputs in miner_tx at height " << height);
+
+    const std::vector<currency::txout_ref_v> abs_key_offsets = relative_output_offsets_to_absolute(stake_input.key_offsets);
+
+    for (const currency::txout_ref_v& abs_offset : abs_key_offsets)
+    {
+      CHECK_AND_ASSERT_MES(abs_offset.type() == typeid(uint64_t), void(),
+                           "Unexpected txout_ref_v type, expected uint64_t at height " << height);
+
+      const uint64_t global_index = boost::get<uint64_t>(abs_offset);
+
+      const std::shared_ptr<const currency::global_output_entry> out_ptr = m_db_outputs.get_subitem(amount, global_index);
+      CHECK_AND_ASSERT_MES(out_ptr, void(),
+                           "Output not found for global index " << global_index << " at height " << height);
+
+      const std::shared_ptr<const currency::transaction_chain_entry> tx_ptr = m_db_transactions.find(out_ptr->tx_id);
+      CHECK_AND_ASSERT_MES(tx_ptr, void(),
+                           "Transaction not found for output tx_id " << out_ptr->tx_id << " at height " << height);
+
+      const uint64_t mint_block_height = tx_ptr->m_keeper_block_height;
+      CHECK_AND_ASSERT_MES(mint_block_height <= height, void(),
+                           "Mint block height " << mint_block_height << " is greater than current block height " << height);
+
+      const uint64_t confirmations = height - mint_block_height + 1;
+      ++confirmations_distribution[confirmations];
+      ++processed_outputs;
+    }
+
+    ++processed_blocks;
+    if (processed_blocks % 1000 == 0)
+    {
+      double progress = (static_cast<double>(processed_blocks) / total_blocks) * 100;
+      LOG_PRINT_L0("Scanned " << processed_blocks << " / " << total_blocks
+                              << " blocks (" << std::fixed << std::setprecision(2) << progress
+                              << "% done), outputs counted: " << processed_outputs);
+    }
+  }
+
+  LOG_PRINT_L0("Finished scanning POS coin age: total blocks processed: "
+               << processed_blocks << ", outputs counted: " << processed_outputs);
+}
+//------------------------------------------------------------------
+void blockchain_storage::scan_outputs_distribution() {
+  constexpr uint64_t zarcanum_epoch_start = 2555000;
+  constexpr uint64_t amount = 0;
+
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  const uint64_t top_height = m_db_blocks.size() > 0 ? m_db_blocks.size() - 1 : 0;
+  if (top_height < zarcanum_epoch_start) {
+    LOG_PRINT_L0("Blockchain height " << top_height << " < " << zarcanum_epoch_start << ", nothing to scan");
+    return;
+  }
+
+  const uint64_t up_index_limit = find_end_of_allowed_index(amount);
+  if (up_index_limit == 0) {
+    LOG_PRINT_L0("No allowed outputs found");
+    return;
+  }
+
+  uint64_t pool_cb = 0;
+  uint64_t pool_reg = 0;
+
+  LOG_PRINT_L0("Scanning pool composition from g_index 0 to " << (up_index_limit - 1)
+                                                              << " (amount=" << amount << ")");
+  LOG_PRINT_L0("Zarcanum epoch start: " << zarcanum_epoch_start);
+
+  for (size_t g_idx = 0; g_idx < up_index_limit; ++g_idx) {
+    const std::shared_ptr<const currency::global_output_entry> out_ptr = 
+        m_db_outputs.get_subitem(amount, g_idx);
+    if (!out_ptr) {
+      continue;
+    }
+
+    const std::shared_ptr<const currency::transaction_chain_entry> tx_ptr = 
+        m_db_transactions.find(out_ptr->tx_id);
+    if (!tx_ptr) {
+      continue;
+    }
+
+    const uint64_t mint_block_height = tx_ptr->m_keeper_block_height;
+
+    if (mint_block_height < zarcanum_epoch_start) {
+      continue;
+    }
+
+    if (is_pos_miner_tx(tx_ptr->tx)) {
+      ++pool_cb;
+    } else {
+      ++pool_reg;
+    }
+
+    if (g_idx > 0 && g_idx % 10000 == 0) {
+      LOG_PRINT_L0("Scanned " << g_idx << " / " << up_index_limit << " outputs...");
+    }
+  }
+
+  uint64_t total = pool_cb + pool_reg;
+  if (total == 0) {
+    LOG_PRINT_L0("No outputs found created from Zarcanum epoch");
+    return;
+  }
+
+  LOG_PRINT_L0("Pool composition (outputs created from Zarcanum epoch):");
+  LOG_PRINT_L0("   Coinbase outputs: " << pool_cb << " (" << (pool_cb * 100.0 / total) << "%)");
+  LOG_PRINT_L0("   Regular outputs:  " << pool_reg << " (" << (pool_reg * 100.0 / total) << "%)");
+  LOG_PRINT_L0("   Total outputs:    " << total);
+}
+//------------------------------------------------------------------
+void blockchain_storage::scan_pos_ring_unique_composition() {
+  constexpr uint64_t zarcanum_epoch_start = 2555000;
+
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  const uint64_t top_height = m_db_blocks.size() > 0 ? m_db_blocks.size() - 1 : 0;
+   if (top_height < zarcanum_epoch_start) {
+     LOG_PRINT_L0("Blockchain height " << top_height << " < " << zarcanum_epoch_start);
+     return;
+   }
+
+  uint64_t unique_from_coinbase = 0;
+  uint64_t unique_from_regular  = 0;
+
+  std::set<uint64_t> processed_global_indices;
+
+  const uint64_t start_height  = zarcanum_epoch_start;
+  uint64_t processed_blocks    = 0;
+  uint64_t processed_pos_blocks = 0;
+  const uint64_t total_blocks  = top_height - start_height + 1;
+
+  LOG_PRINT_L0("Scanning unique POS ring inputs from height " << start_height << " to " << top_height);
+
+  for (uint64_t height = start_height; height <= top_height; ++height) {
+    ++processed_blocks;
+    const std::shared_ptr<const currency::block_extended_info>& block_entry_ptr = m_db_blocks[height];
+    if (!block_entry_ptr) continue;
+
+      const currency::block& blk = block_entry_ptr->bl;
+      if (!is_pos_block(blk)) continue;
+
+      ++processed_pos_blocks;
+
+      if (blk.miner_tx.vin.size() < 2) continue;
+      const currency::txin_v& second_input = blk.miner_tx.vin[1];
+      if (second_input.type() != typeid(currency::txin_zc_input)) continue;
+
+      const currency::txin_zc_input& stake_input = boost::get<currency::txin_zc_input>(second_input);
+      const std::vector<currency::txout_ref_v> abs_offsets = relative_output_offsets_to_absolute(stake_input.key_offsets);
+
+      for (const currency::txout_ref_v& abs_offset : abs_offsets) {
+        if (abs_offset.type() != typeid(uint64_t)) continue;
+        const uint64_t global_index = boost::get<uint64_t>(abs_offset);
+
+        if (!processed_global_indices.insert(global_index).second) continue;
+
+        const std::shared_ptr<const currency::global_output_entry> out_ptr = m_db_outputs.get_subitem(0, global_index);
+        if (!out_ptr) continue;
+
+        const std::shared_ptr<const currency::transaction_chain_entry> tx_ptr = m_db_transactions.find(out_ptr->tx_id);
+        if (!tx_ptr) continue;
+
+        const uint64_t mint_height = tx_ptr->m_keeper_block_height;
+        if (mint_height < zarcanum_epoch_start) continue;
+
+        if (is_pos_miner_tx(tx_ptr->tx)) {
+          ++unique_from_coinbase;
+        } else {
+          ++unique_from_regular;
+        }
+      }
+
+    if (processed_blocks % 1000 == 0) {
+      double progress_all = (double)processed_blocks / total_blocks * 100.0;
+      double progress_pos = processed_pos_blocks > 0 ? (double)processed_pos_blocks / processed_blocks * 100.0 : 0.0;
+
+      LOG_PRINT_L0("Scanned " << processed_blocks << "/" << total_blocks
+                              << " blocks (" << std::fixed << std::setprecision(2) << progress_all << "%), "
+                              << "PoS share: " << processed_pos_blocks << " blocks ("
+                              << std::setprecision(2) << progress_pos << "% of scanned), "
+                              << "unique outputs so far: " << processed_global_indices.size());
+    }
+  }
+
+  uint64_t total_unique = unique_from_coinbase + unique_from_regular;
+
+  LOG_PRINT_L0("=== Unique Inputs ===");
+
+  if (total_unique > 0) {
+    double cb_percent  = static_cast<double>(unique_from_coinbase) * 100.0 / static_cast<double>(total_unique);
+    double reg_percent = static_cast<double>(unique_from_regular) * 100.0 / static_cast<double>(total_unique);
+
+    std::ostringstream ss;
+    ss << std::fixed << std::setprecision(6);
+
+    ss.str(""); ss.clear();
+    ss << "From PoS coinbase outputs: " << unique_from_coinbase << " (" << cb_percent << "%)";
+    LOG_PRINT_L0(ss.str());
+
+    ss.str(""); ss.clear();
+    ss << "From regular outputs:      " << unique_from_regular << " (" << reg_percent << "%)";
+    LOG_PRINT_L0(ss.str());
+  } else {
+    LOG_PRINT_L0("No unique outputs found");
+  }
+
+  LOG_PRINT_L0("Total unique outputs:      " << total_unique);
+
+  if (total_unique != processed_global_indices.size()) {
+    LOG_PRINT_RED_L0("WARNING: total_unique (" << total_unique
+                         << ") != processed_global_indices.size() ("
+                         << processed_global_indices.size() << ")");
+  }
+}
+//------------------------------------------------------------------
+void blockchain_storage::scan_pos_ring_composition() {
+  constexpr uint64_t zarcanum_epoch_start = 2555000;
+  constexpr uint64_t amount = 0;
+
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+ const uint64_t top_height = m_db_blocks.size() > 0 ? m_db_blocks.size() - 1 : 0;
+  if (top_height < zarcanum_epoch_start) {
+    LOG_PRINT_L0("Blockchain height " << top_height << " < " << zarcanum_epoch_start << ", nothing to scan");
+    return;
+  }
+
+  uint64_t inputs_from_pos_coinbase = 0;
+  uint64_t inputs_from_regular_tx   = 0;
+  uint64_t total_inputs = 0;
+
+  const uint64_t start_height = zarcanum_epoch_start;
+  const uint64_t total_blocks = top_height - start_height + 1;
+  uint64_t processed_blocks = 0;
+
+  LOG_PRINT_L0("Scanning POS ring input origin from height " << start_height << " to " << top_height);
+  LOG_PRINT_L0("Total blocks to scan: " << total_blocks);
+
+  for (uint64_t height = start_height; height <= top_height; ++height) {
+    const auto& block_entry_ptr = m_db_blocks[height];
+    if (!block_entry_ptr) {
+      LOG_PRINT_L1("Missing block entry at height " << height);
+      continue;
+    }
+
+    const currency::block& blk = block_entry_ptr->bl;
+    if(!is_pos_block(blk))
+      continue;
+
+    if (blk.miner_tx.vin.size() < 2) {
+      LOG_PRINT_L1("Miner tx at height " << height << " has less than 2 inputs");
+      continue;
+    }
+
+    const auto& second_input = blk.miner_tx.vin[1];
+    if (second_input.type() != typeid(currency::txin_zc_input)) {
+      LOG_PRINT_L1("Second input is not txin_zc_input at height " << height);
+      continue;
+    }
+
+    const currency::txin_zc_input& stake_input = boost::get<currency::txin_zc_input>(second_input);
+    const std::vector<currency::txout_ref_v> abs_offsets = relative_output_offsets_to_absolute(stake_input.key_offsets);
+
+    for (const auto& abs_offset : abs_offsets) {
+      if (abs_offset.type() != typeid(uint64_t)) {
+        LOG_PRINT_L1("Invalid offset type at height " << height);
+        continue;
+      }
+
+      const uint64_t global_index = boost::get<uint64_t>(abs_offset);
+
+      const auto out_ptr = m_db_outputs.get_subitem(amount, global_index);
+      if (!out_ptr) {
+        LOG_PRINT_L1("Output not found for global_index=" << global_index << " at height " << height);
+        continue;
+      }
+
+      const auto tx_entry_ptr = m_db_transactions.find(out_ptr->tx_id);
+      if (!tx_entry_ptr) {
+        LOG_PRINT_L1("Transaction not found for tx_id=" << out_ptr->tx_id << " at height " << height);
+        continue;
+      }
+
+      const uint64_t mint_height = tx_entry_ptr->m_keeper_block_height;
+      if (mint_height < zarcanum_epoch_start) {
+        continue;
+      }
+
+      if (is_pos_miner_tx(tx_entry_ptr->tx)) {
+        ++inputs_from_pos_coinbase;
+      } else {
+        ++inputs_from_regular_tx;
+      }
+
+      ++total_inputs;
+    }
+
+    ++processed_blocks;
+    if (processed_blocks % 1000 == 0) {
+      double progress = (double)processed_blocks / total_blocks * 100.0;
+       LOG_PRINT_L0("Scanned " << processed_blocks << "/" << total_blocks
+                              << " blocks (" << std::fixed << std::setprecision(2) << progress
+                              << "%), inputs processed: " << total_inputs);
+    }
+  }
+
+  const uint64_t total = inputs_from_pos_coinbase + inputs_from_regular_tx;
+  LOG_PRINT_L0("=== POS Ring Input Origin Summary ===");
+
+  if (total > 0) {
+    double cb_percent = static_cast<double>(inputs_from_pos_coinbase) * 100.0 / total;
+    double reg_percent = static_cast<double>(inputs_from_regular_tx) * 100.0 / total;
+
+    LOG_PRINT_L0("Inputs referencing PoS-coinbase UTXOs: " << inputs_from_pos_coinbase
+                      << " (" << std::fixed << std::setprecision(2) << cb_percent << "%)");
+    LOG_PRINT_L0("Inputs referencing regular UTXOs:     " << inputs_from_regular_tx
+                      << " (" << std::setprecision(2) << reg_percent << "%)");
+    LOG_PRINT_L0("Total POS ring inputs scanned:        " << total);
+  } else {
+    LOG_PRINT_L0("No POS ring inputs found from Zarcanum epoch");
+  }
+}
+//------------------------------------------------------------------
 wide_difficulty_type blockchain_storage::get_next_difficulty_for_alternative_chain(const alt_chain_type& alt_chain, block_extended_info& bei, bool pos) const
 {
   std::vector<uint64_t> timestamps;
