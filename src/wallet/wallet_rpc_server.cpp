@@ -529,10 +529,9 @@ namespace tools
 
     if (!req.comment.empty() && payment_id.empty())
     {
-      // tx_comment is temporary disabled -- sowle
-      //currency::tx_comment comment = AUTO_VAL_INIT(comment);
-      //comment.comment = req.comment;
-      //extra.push_back(comment);
+      currency::tx_comment comment{};
+      comment.comment = req.comment;
+      extra.push_back(comment);
     }
 
     if (req.push_payer && !wrap)
