@@ -94,38 +94,8 @@ struct cb_capture_errors : public tools::i_wallet2_callback
 {
   std::vector<std::string> msgs;
 
-  void on_message(message_severity /*sev*/, const std::string& m) override
-  {
-    msgs.push_back(m);
-  }
-
-  void clear()
-  {
-    msgs.clear();
-  }
-
-  bool has_pull_err() const
-  {
-    for (const auto& s : msgs)
-    {
-      if (s.find("error on pulling blocks:") != std::string::npos)
-      {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  bool has_hf_mismatch() const
-  {
-    for (const auto& s : msgs)
-    {
-      if (s.find("validation failed") != std::string::npos &&
-         (s.find("hardforks missmatch") != std::string::npos))
-      {
-        return true;
-      }
-    }
-    return false;
-  }
+  void on_message(message_severity /*sev*/, const std::string& m) override;
+  void clear();
+  bool has_pull_err() const;
+  bool has_hf_mismatch() const;
 };

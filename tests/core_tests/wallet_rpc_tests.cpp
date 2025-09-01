@@ -1745,3 +1745,38 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
 
   return true;
 }
+
+void cb_capture_errors::on_message(message_severity /*sev*/, const std::string& m)
+{
+  msgs.push_back(m);
+}
+
+void cb_capture_errors::clear()
+{
+  msgs.clear();
+}
+
+bool cb_capture_errors::has_pull_err() const
+{
+  for (const auto& s : msgs)
+  {
+    if (s.find("error on pulling blocks:") != std::string::npos)
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool cb_capture_errors::has_hf_mismatch() const
+{
+  for (const auto& s : msgs)
+  {
+    if (s.find("validation failed") != std::string::npos &&
+        (s.find("hardforks missmatch") != std::string::npos))
+    {
+      return true;
+    }
+  }
+  return false;
+}
