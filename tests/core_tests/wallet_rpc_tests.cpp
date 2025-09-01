@@ -1662,3 +1662,86 @@ bool wallet_rpc_multiple_receivers::c1(currency::core& c, size_t ev_index, const
   return true;
 }
 
+wallet_rpc_hardfork_verification::wallet_rpc_hardfork_verification()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_hardfork_verification, configure_core);
+  REGISTER_CALLBACK_METHOD(wallet_rpc_hardfork_verification, c1);
+}
+
+bool wallet_rpc_hardfork_verification::generate(std::vector<test_event_entry>& events) const
+{
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; 
+  miner_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  set_hard_fork_heights_to_generator(generator);
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 2);
+
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::vector<test_event_entry>& events)
+{
+  // The test idea: verify that wallet and core hardfork versions must match, 
+  // if wallet is on a different hardfork than the daemon, refresh should fail. 
+  // when both sides switch to the same hardfork again, refresh must succeed.
+
+  auto miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+
+  size_t blocks_added = 0;
+  bool received_money = false;
+  std::atomic<bool> stop{false};
+
+  auto cb = std::make_shared<cb_capture_errors>();
+  miner_wlt->callback(cb);
+  miner_wlt->refresh(blocks_added, received_money, stop);
+
+  // 1) wallet->HF6, core->HF5 => error
+  {
+    cb->clear();
+
+    auto cfg = c.get_blockchain_storage().get_core_runtime_config();
+    cfg.hard_forks.set_hardfork_height(6, 1);
+    miner_wlt->set_core_runtime_config(cfg);
+
+    miner_wlt->refresh(blocks_added, received_money, stop);
+
+    CHECK_AND_ASSERT_MES(cb->has_pull_err() && cb->has_hf_mismatch(), false,
+      "wallet->hf6 vs core->hf5 must fail");
+  }
+
+  // wallet->HF5 and core->HF6 -> error
+  {
+    cb->clear();
+
+    miner_wlt->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
+    auto cfg = c.get_blockchain_storage().get_core_runtime_config();
+    cfg.hard_forks.set_hardfork_height(6, 1);
+    c.get_blockchain_storage().set_core_runtime_config(cfg);
+
+    miner_wlt->refresh(blocks_added, received_money, stop);
+
+    CHECK_AND_ASSERT_MES(cb->has_pull_err() && cb->has_hf_mismatch(), false, "wallet->hf5 vs core->hf6 must fail");
+  }
+
+  // both HF6 -> success
+  {
+    cb->clear();
+
+    auto cfg = c.get_blockchain_storage().get_core_runtime_config();
+    cfg.hard_forks.set_hardfork_height(6, 1);
+    miner_wlt->set_core_runtime_config(cfg);
+    c.get_blockchain_storage().set_core_runtime_config(cfg);
+
+    miner_wlt->refresh(blocks_added, received_money, stop);
+
+    CHECK_AND_ASSERT_MES(!cb->has_pull_err(), false, "refresh must succeed when both on the same HF");
+  }
+
+  miner_wlt->callback(std::make_shared<tools::i_wallet2_callback>());
+
+  return true;
+}
