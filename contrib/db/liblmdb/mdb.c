@@ -1635,6 +1635,21 @@ mdb_strerror(int err)
 #endif
 }
 
+static void mdb_dump_readers(MDB_env* env, const char* tag)
+{
+  MDB_txninfo* ti = env->me_txns;
+  if (!ti) return;
+  unsigned rdrs = ti->mti_numreaders;
+  for (unsigned i = 0; i < rdrs; i++) {
+    MDB_reader* r = &ti->mti_readers[i];
+    if (!r->mr_pid) continue;
+    char buff[256];
+    sprintf(buff, "[LMDB][READERS][%s] idx=%u pid=%ld tid=%" PRIu64 " txnid=%" PRIx64,
+      tag, i, (long)r->mr_pid, (uint64_t)r->mr_tid, (uint64_t)r->mr_txnid);
+    print_log_to_journal(buff);
+  }
+}
+
 /** assert(3) variant in cursor context */
 #define mdb_cassert(mc, expr)	mdb_assert0((mc)->mc_txn->mt_env, expr, #expr)
 /** assert(3) variant in transaction context */
@@ -2887,9 +2902,24 @@ mdb_txn_renew0(MDB_txn *txn)
 				{
 					if (r->mr_txnid != (txnid_t)-1)
 					{
+						//====================
 						char buff[1000] = {0};
-						sprintf(buff, "[LMDB]MDB_reader %p, mr_txnid is not -1, %"PRIx64, (void*)r, r->mr_txnid );
+						sprintf(buff, "[LMDB]MDB_reader %p, mr_txnid is not -1, it's %"PRIx64, (void*)r, r->mr_txnid );
 						print_log_to_journal(buff);
+						//===================
+						{
+							MDB_txninfo* ti = env->me_txns;
+							intptr_t idx = ti ? (r - ti->mti_readers) : -1;
+							char buff[1024];
+							sprintf(buff, "[LMDB][BAD_RSLOT] r=%p idx=%ld mr_pid=%ld me_pid=%ld mr_tid=%" PRIu64
+								" mr_txnid=%" PRIx64 " expected=-1 ti=%p mti_txnid(now)=%" PRIx64
+								" flags=0x%x NOTLS=%d",
+								(void*)r, (long)idx, (long)r->mr_pid, (long)env->me_pid,
+								(uint64_t)r->mr_tid, (uint64_t)r->mr_txnid,
+								(void*)ti, ti ? (uint64_t)ti->mti_txnid : (uint64_t)0,
+								txn->mt_flags, !!(env->me_flags & MDB_NOTLS));
+							print_log_to_journal(buff);
+						}
 					}
 					else
 					{
@@ -2897,6 +2927,7 @@ mdb_txn_renew0(MDB_txn *txn)
             sprintf(buff, "[LMDB]MDB_reader %p, r->mr_pid(%ld) != env->me_pid(%ld)", (void*)r, (long)r->mr_pid, (long)env->me_pid);
             print_log_to_journal(buff);
 					}
+					mdb_dump_readers(env, "BAD_RSLOT");
 					return MDB_BAD_RSLOT;
 				}
 					
@@ -2929,6 +2960,14 @@ mdb_txn_renew0(MDB_txn *txn)
 				 * that, it is safe for mdb_env_close() to touch it.
 				 * When it will be closed, we can finally claim it.
 				 */
+        {
+          char buff[1024];
+          sprintf(buff, "[LMDB][CLAIM] choose idx=%u prev{pid=%ld txnid=%" PRIx64 " tid=%" PRIu64 "}",
+            i, (long)r->mr_pid, (uint64_t)r->mr_txnid, (uint64_t)r->mr_tid);
+          print_log_to_journal(buff);
+        }
+
+
 				r->mr_pid = 0;
 				r->mr_txnid = (txnid_t)-1;
 				{
@@ -2937,6 +2976,14 @@ mdb_txn_renew0(MDB_txn *txn)
           print_log_to_journal(buff);
 				}
 				r->mr_tid = tid;
+        {
+          char buff[1024];
+          sprintf(buff, "[LMDB][CLAIM] publish idx=%u now{pid=%ld txnid=%" PRIx64 " tid=%" PRIu64 "} "
+            "mti_numreaders=%u",
+            i, (long)r->mr_pid, (uint64_t)r->mr_txnid, (uint64_t)r->mr_tid, ti->mti_numreaders);
+          print_log_to_journal(buff);
+        }
+
 				if (i == nr)
 					ti->mti_numreaders = ++nr;
 				env->me_close_readers = nr;
@@ -2949,16 +2996,20 @@ mdb_txn_renew0(MDB_txn *txn)
 					return rc;
 				}
 			}
+			int spins = 0;
 			do /* LY: Retry on a race, ITS#7970. */
 			{
-				r->mr_txnid = ti->mti_txnid;
-        {
-          char buff[1000] = { 0 };
-          sprintf(buff, "[LMDB]MDB_reader %p, mr_txnid assigned %"PRIx64, (void*)r, r->mr_txnid );
-          print_log_to_journal(buff);
-        }
+				r->mr_txnid = ti->mti_txnid;					
+				spins++;
 			}
-			while(r->mr_txnid != ti->mti_txnid);
+			while (r->mr_txnid != ti->mti_txnid);
+      {
+        char buff[256];
+        sprintf(buff, "[LMDB][BEGIN-RO] idx=%ld set mr_txnid=%" PRIx64 " after %d spins",
+          (long)(r - ti->mti_readers), (uint64_t)r->mr_txnid, spins);
+        print_log_to_journal(buff);
+      }
+
 			txn->mt_txnid = r->mr_txnid;
 			txn->mt_u.reader = r;
 			meta = env->me_metas[txn->mt_txnid & 1];
@@ -3236,6 +3287,20 @@ mdb_txn_end(MDB_txn *txn, unsigned mode)
 				sprintf(buff, "[LMDB]MDB_reader %p, mr_txnid assigned -1", (void*)txn->mt_u.reader);
         print_log_to_journal(buff);
       }
+			{
+				MDB_reader* r = txn->mt_u.reader;
+				MDB_txninfo* ti = env->me_txns;
+				intptr_t idx = ti ? (r - ti->mti_readers) : -1;
+				char buff[256];
+				sprintf(buff, "[LMDB][END-RO] idx=%ld set mr_txnid=-1 mode=0x%x NOTLS=%d",
+					(long)idx, mode, !!(env->me_flags & MDB_NOTLS));
+				print_log_to_journal(buff);
+
+				if ((env->me_flags & MDB_NOTLS) && (mode & MDB_END_SLOT)) {
+					sprintf(buff, "[LMDB][END-RO] idx=%ld releasing slot pid->0", (long)idx);
+					print_log_to_journal(buff);
+				}
+			}
 
 
 			if (!(env->me_flags & MDB_NOTLS)) {
@@ -4611,7 +4676,13 @@ static void
 mdb_env_reader_dest(void *ptr)
 {
 	MDB_reader *reader = ptr;
-
+	{
+    char buff[256];
+    sprintf(buff, "[LMDB][TLS-DEST] r=%p pid=%ld txnid=%" PRIx64 " tid=%" PRIu64,
+      (void*)reader, (long)reader->mr_pid,
+      (uint64_t)reader->mr_txnid, (uint64_t)reader->mr_tid);
+    print_log_to_journal(buff);
+	}
 	reader->mr_pid = 0;
 }
 
@@ -5110,6 +5181,14 @@ mdb_env_setup_locks(MDB_env *env, char *lpath, int mode, int *excl)
 #endif
 #endif
 
+  {
+    MDB_txninfo* ti = env->me_txns;
+    char buff[256];
+    sprintf(buff, "[LMDB][LOCKS] me_pid=%ld me_txns=%p readers=%u rmutex=%p",
+      (long)env->me_pid, (void*)ti, ti ? ti->mti_numreaders : 0U,
+      (void*)env->me_rmutex);
+    print_log_to_journal(buff);
+  }
 	return MDB_SUCCESS;
 
 fail_errno:
@@ -5218,6 +5297,8 @@ mdb_env_open(MDB_env *env, const char *path, unsigned int flags, mdb_mode_t mode
 		rc = mdb_env_setup_locks(env, lpath, mode, &excl);
 		if (rc)
 			goto leave;
+
+		mdb_dump_readers(env, "STARTUP");
 	}
 
 #ifdef _WIN32
@@ -5252,6 +5333,9 @@ mdb_env_open(MDB_env *env, const char *path, unsigned int flags, mdb_mode_t mode
 		rc = mdb_env_setup_locks(env, lpath, mode, &excl);
 		if (rc)
 			goto leave;
+
+		mdb_dump_readers(env, "STARTUP");
+
 		if ((flags & MDB_PREVSNAPSHOT) && !excl) {
 			rc = EAGAIN;
 			goto leave;
@@ -5332,6 +5416,11 @@ leave:
 static void ESECT
 mdb_env_close0(MDB_env *env, int excl)
 {
+  {
+		char buff[256];
+    sprintf(buff, "[LMDB][LOCKS] mdb_env_close0!!!!!");
+    print_log_to_journal(buff);
+  }
 	int i;
 
 	if (!(env->me_flags & MDB_ENV_ACTIVE))
@@ -10874,7 +10963,11 @@ mdb_reader_check0(MDB_env *env, int rlocked, int *dead)
 	rdrs = env->me_txns->mti_numreaders;
 	pids = malloc((rdrs+1) * sizeof(MDB_PID_T));
 	if (!pids)
+	{
+		mdb_dump_readers(env, "REAPER");
 		return ENOMEM;
+	}
+		
 	pids[0] = 0;
 	mr = env->me_txns->mti_readers;
 	for (i=0; i<rdrs; i++) {
@@ -10900,6 +10993,13 @@ mdb_reader_check0(MDB_env *env, int rlocked, int *dead)
 								DPRINTF(("clear stale reader pid %u txn %"Y"d",
 									(unsigned) pid, mr[j].mr_txnid));
 								mr[j].mr_pid = 0;
+                {
+                  char buff[256];
+                  sprintf(buff, "[LMDB][READER-CHECK] clear stale idx=%u pid=%u old_txn=%" PRIx64,
+                    j, (unsigned)pid, (uint64_t)mr[j].mr_txnid);
+                  print_log_to_journal(buff);
+                }
+
 								count++;
 							}
 					if (rmutex)
@@ -10911,6 +11011,8 @@ mdb_reader_check0(MDB_env *env, int rlocked, int *dead)
 	free(pids);
 	if (dead)
 		*dead = count;
+
+	mdb_dump_readers(env, "REAPER");
 	return rc;
 }
 
