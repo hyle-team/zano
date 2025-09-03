@@ -35,7 +35,7 @@ struct wde_construct_tx_after_asset_ownership_eth_proof_generated
   currency::asset_operation_ownership_proof_eth* pownership_proof_eth;
 };
 
-struct wde_wallet_message
+enum wde_error_type
 {
-  std::string message;
+  wde_pulling_hardforks_missmatch, 
 };

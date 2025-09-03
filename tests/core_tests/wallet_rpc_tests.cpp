@@ -1696,17 +1696,12 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
   bool received_money = false;
   std::atomic<bool> stop{false};
 
-  bool pull_err = false;
   bool hf_mismatch_err = false;
 
   miner_wlt->get_debug_events_dispatcher()
-    .SUBSCIRBE_DEBUG_EVENT<wde_wallet_message>([&](const wde_wallet_message& e)
+    .SUBSCIRBE_DEBUG_EVENT<wde_error_type>([&](const wde_error_type& e)
     {
-      if (e.message.find("error on pulling blocks:") != std::string::npos)
-        pull_err = true;
-
-      if (e.message.find("validation failed") != std::string::npos &&
-          e.message.find("hardforks missmatch") != std::string::npos)
+      if (e == wde_pulling_hardforks_missmatch)
         hf_mismatch_err = true;
     });
 
@@ -1718,13 +1713,13 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
     cfg.hard_forks.set_hardfork_height(6, 1);
     miner_wlt->set_core_runtime_config(cfg);
 
-    pull_err = hf_mismatch_err = false;
-    blocks_added = 0; received_money = false;
+    hf_mismatch_err = false;
+    blocks_added = 0;
+    received_money = false;
 
     miner_wlt->refresh(blocks_added, received_money, stop);
 
-    CHECK_AND_ASSERT_MES(pull_err, false,
-      "wallet->hf6 vs core->hf5 must fail");
+    CHECK_AND_ASSERT_MES(hf_mismatch_err, false, "wallet->hf6 vs core->hf5 must fail");
   }
 
   // wallet->HF5 and core->HF6 -> error
@@ -1734,12 +1729,13 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
     cfg.hard_forks.set_hardfork_height(6, 1);
     c.get_blockchain_storage().set_core_runtime_config(cfg);
 
-    pull_err = hf_mismatch_err = false;
-    blocks_added = 0; received_money = false;
+    hf_mismatch_err = false;
+    blocks_added = 0;
+    received_money = false;
 
     miner_wlt->refresh(blocks_added, received_money, stop);
 
-    CHECK_AND_ASSERT_MES(pull_err && hf_mismatch_err, false, "wallet->hf5 vs core->hf6 must fail");
+    CHECK_AND_ASSERT_MES(hf_mismatch_err, false, "wallet->hf5 vs core->hf6 must fail");
   }
 
   // both HF6 -> success
@@ -1749,12 +1745,13 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
     miner_wlt->set_core_runtime_config(cfg);
     c.get_blockchain_storage().set_core_runtime_config(cfg);
 
-    pull_err = hf_mismatch_err = false;
-    blocks_added = 0; received_money = false;
+    hf_mismatch_err = false;
+    blocks_added = 0;
+    received_money = false;
 
     miner_wlt->refresh(blocks_added, received_money, stop);
 
-    CHECK_AND_ASSERT_MES(!pull_err, false, "refresh must succeed when both on the same HF");
+    CHECK_AND_ASSERT_MES(!hf_mismatch_err, false, "refresh must succeed when both on the same HF");
   }
 
   miner_wlt->callback(std::make_shared<tools::i_wallet2_callback>());
