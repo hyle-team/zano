@@ -3532,8 +3532,13 @@ int main(int argc, char* argv[])
         wallets.back().wallet_id = 0;
         tools::get_wallet_info(*m_wlt_ptr, wallets.back().wi);
       }
-
     };
+
+    if (command_line::has_arg(vm, arg_no_idle_unlock_spent))
+    {
+      wal.set_do_not_unlock_reserved_on_idle(command_line::get_arg(vm, arg_no_idle_unlock_spent));
+    }
+
 
     std::shared_ptr<tools::i_wallet2_callback> callback(new wallet_rpc_local_callback(wallet_ptr));
 
@@ -3576,9 +3581,7 @@ int main(int argc, char* argv[])
         LOG_PRINT_YELLOW("PoS reward will be sent to another address: " << arg_pos_mining_reward_address_str, LOG_LEVEL_0);
       }
     }
-
-    wal.set_do_not_unlock_reserved_on_idle(m_do_not_unlock_reserved_on_idle);
-
+    
     if (command_line::has_arg(vm, arg_pos_mining_defrag))
     {
       std::string arg_pos_mining_defrag_str = command_line::get_arg(vm, arg_pos_mining_defrag);
