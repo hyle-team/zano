@@ -2781,21 +2781,23 @@ bool wallet2::scan_not_compliant_unconfirmed_txs()
     }
   }
 
-
-  for (auto& tr : m_transfers)
+  if (!m_do_not_unlock_reserved_on_idle)
   {
-    uint64_t i = tr.first;
-    auto& t = tr.second;
-
-    if (t.m_flags & WALLET_TRANSFER_DETAIL_FLAG_SPENT && !t.m_spent_height && !static_cast<bool>(t.m_flags & WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION)
-      && !t.is_htlc())
+    for (auto& tr : m_transfers)
     {
-      //check if there is unconfirmed for this transfer is no longer exist?
-      if (!ki_in_unconfirmed.count((t.m_key_image)))
+      uint64_t i = tr.first;
+      auto& t = tr.second;
+
+      if (t.m_flags & WALLET_TRANSFER_DETAIL_FLAG_SPENT && !t.m_spent_height && !static_cast<bool>(t.m_flags & WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION)
+        && !t.is_htlc())
       {
-        uint32_t flags_before = t.m_flags;
-        t.m_flags &= ~(WALLET_TRANSFER_DETAIL_FLAG_SPENT);
-        WLT_LOG_BLUE("Transfer [" << i << "] marked as unspent, flags: " << flags_before << " -> " << t.m_flags << ", reason: there is no unconfirmed tx relataed to this key image", LOG_LEVEL_0);
+        //check if there is unconfirmed for this transfer is no longer exist?
+        if (!ki_in_unconfirmed.count((t.m_key_image)))
+        {
+          uint32_t flags_before = t.m_flags;
+          t.m_flags &= ~(WALLET_TRANSFER_DETAIL_FLAG_SPENT);
+          WLT_LOG_BLUE("Transfer [" << i << "] marked as unspent, flags: " << flags_before << " -> " << t.m_flags << ", reason: there is no unconfirmed tx relataed to this key image", LOG_LEVEL_0);
+        }
       }
     }
   }
@@ -7119,7 +7121,7 @@ void wallet2::send_transaction_to_network(const transaction& tx)
     THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_DISCONNECTED, error::no_connection_to_daemon, "Transfer attempt while daemon offline");
     THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status != API_RETURN_CODE_OK, error::tx_rejected, tx, daemon_send_resp.status);
 
-    WLT_LOG_L2("transaction " << get_transaction_hash(tx) << " generated ok and sent to daemon:" << ENDL << currency::obj_to_json_str(tx));
+    WLT_LOG_L0("transaction " << get_transaction_hash(tx) << " sent to daemon:" << ENDL << currency::obj_to_json_str(tx));
   }
 
 }
@@ -7184,7 +7186,7 @@ void wallet2::clear_transfers_from_flag(const std::vector<uint64_t>& selected_tr
     auto& tr_entry = m_transfers.at(i);
     uint32_t flags_before = tr_entry.m_flags;
     tr_entry.m_flags &= ~flag;
-    WLT_LOG_L1("clearing transfer #" << std::setfill('0') << std::right << std::setw(3) << i << " from flag " << flag << " : " << flags_before << " -> " << tr_entry.m_flags <<
+    WLT_LOG_L0("clearing transfer #" << std::setfill('0') << std::right << std::setw(3) << i << " from flag " << flag << " : " << flags_before << " -> " << tr_entry.m_flags <<
       (reason.empty() ? "" : ", reason: ") << reason);
   }
   CATCH_ENTRY_NO_RETURN();

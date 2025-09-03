@@ -722,6 +722,7 @@ namespace tools
     uint64_t get_sync_progress();
     uint64_t get_wallet_file_size()const;
     void set_use_deffered_global_outputs(bool use);
+    void set_do_not_unlock_reserved_on_idle(bool val) {m_do_not_unlock_reserved_on_idle = val;}
     void set_use_assets_whitelisting(bool use);
     construct_tx_param get_default_construct_tx_param_inital();
     void set_disable_tor_relay(bool disable);
@@ -961,6 +962,7 @@ private:
    
 
     bool m_do_rise_transfer;
+    bool m_do_not_unlock_reserved_on_idle = false;
     
     bool m_defragmentation_tx_enabled;
     uint64_t m_max_allowed_output_amount_for_defragmentation_tx;
