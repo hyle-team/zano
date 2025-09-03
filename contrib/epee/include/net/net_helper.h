@@ -96,7 +96,8 @@ namespace epee
     template<>
     struct socket_backend<true>
     {
-      socket_backend(boost::asio::io_service& _io_service): m_ssl_context(boost::asio::ssl::context::sslv23), m_socket(_io_service, m_ssl_context)
+      socket_backend(boost::asio::io_service& _io_service, const std::string& ssl_path = std::string())
+      : m_ssl_context(boost::asio::ssl::context::sslv23), m_socket(_io_service, m_ssl_context)
       {
         // Create a context that uses the default paths for
         // finding CA certificates.
@@ -106,6 +107,12 @@ namespace epee
         m_ssl_context.set_default_verify_paths();
 #endif
         m_ssl_context.set_verify_mode(boost::asio::ssl::verify_peer);
+        if(!ssl_path.empty())
+        {
+          const boost::system::error_code err = load_ca_file(ssl_path);
+          if (err)
+            LOG_ERROR("Failed to load user CA file at " << ssl_path << ": " << err.message());
+        }
       }
 
       /*
@@ -182,6 +189,22 @@ namespace epee
         return true;
       }
 
+    private:
+      boost::system::error_code load_ca_file(const std::string& path)
+      {
+        SSL_CTX* const ssl_ctx = m_ssl_context.native_handle();
+        if (ssl_ctx == nullptr)
+        {
+          return {boost::asio::error::invalid_argument};
+        }
+
+        if (!SSL_CTX_load_verify_locations(ssl_ctx, path.c_str(), nullptr))
+        {
+          return boost::system::error_code {int(::ERR_get_error()), boost::asio::error::get_ssl_category()};
+        }
+        return boost::system::error_code{};
+      }
+
     private: 
       boost::asio::ssl::context m_ssl_context;
       boost::asio::ssl::stream<boost::asio::ip::tcp::socket> m_socket;
@@ -190,7 +213,8 @@ namespace epee
     template<>
     struct socket_backend<false>
     {
-      socket_backend(boost::asio::io_service& _io_service): m_socket(_io_service)
+      socket_backend(boost::asio::io_service& _io_service, const std::string& ssl_path = std::string())
+      : m_socket(_io_service)
       {}
 
       boost::asio::ip::tcp::socket& get_socket()
@@ -225,7 +249,10 @@ namespace epee
     template<bool is_ssl>
     struct socket_backend_resetable
     {
-      socket_backend_resetable(boost::asio::io_service& _io_service) : mr_io_service(_io_service), m_pbackend(std::make_shared<socket_backend<is_ssl>>(_io_service))
+      socket_backend_resetable(boost::asio::io_service& _io_service, const std::string& ssl_path = std::string()) 
+      : mr_io_service(_io_service)
+      , m_ssl_path(ssl_path)
+      , m_pbackend(std::make_shared<socket_backend<is_ssl>>(_io_service, ssl_path))
       {}
 
       boost::asio::ip::tcp::socket& get_socket()
@@ -250,11 +277,12 @@ namespace epee
 
       void reset()
       {
-        m_pbackend = std::make_shared<socket_backend<is_ssl>>(mr_io_service);
+        m_pbackend = std::make_shared<socket_backend<is_ssl>>(mr_io_service, m_ssl_path);
       }
 
     private: 
       boost::asio::io_service& mr_io_service;
+      std::string m_ssl_path;
       std::shared_ptr<socket_backend<is_ssl>> m_pbackend;
     };
 
@@ -284,7 +312,7 @@ namespace epee
 
     public:
       inline
-        blocked_mode_client_t() :m_sct_back(m_io_service),
+        blocked_mode_client_t(const std::string& ssl_path = std::string()) :m_sct_back(m_io_service, ssl_path),
         m_initialized(false),
         m_connected(false),
         m_deadline(m_io_service),

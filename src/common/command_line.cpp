@@ -41,6 +41,7 @@ namespace command_line
   const arg_descriptor<bool>        arg_validate_predownload  ( "validate-predownload", "Paranoid mode, re-validate each block from pre-downloaded database and rebuild own database");
   const arg_descriptor<std::string> arg_predownload_link      ( "predownload-link", "Override url for blockchain database pre-downloading");
   const arg_descriptor<bool>        arg_non_pruning_mode      ( "non-pruning-mode", "Enables a special operational mode with full retention of all tx signatures. Will terminate if the DB was previously in (normal) pruning mode. Use only if you know what you do.");
+  const arg_descriptor<std::string> arg_verify_ssl_path      ( "verify-ssl-path", "Path to SSL certificate for verifying connections");
 
   const arg_descriptor<std::string> arg_deeplink  ( "deeplink-params", "Deeplink parameter, in that case app just forward params to running app");
 
