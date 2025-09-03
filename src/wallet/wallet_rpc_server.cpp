@@ -352,10 +352,36 @@ namespace tools
     res.path = epee::string_encoding::convert_to_ansii(w.get_wallet()->get_wallet_path());
     res.transfers_count = w.get_wallet()->get_recent_transfers_total_count();
     res.transfer_entries_count = w.get_wallet()->get_transfer_entries_count();
-    std::map<uint64_t, uint64_t> distribution;
-    w.get_wallet()->get_utxo_distribution(distribution);
-    for (const auto& ent : distribution)
-      res.utxo_distribution.push_back(currency::print_money_brief(ent.first) + ":" + std::to_string(ent.second));
+    if(req.collect_utxo_data)
+    {
+      std::unordered_map<crypto::public_key, std::map<uint64_t, uint64_t>> distribution;
+      w.get_wallet()->get_utxo_distribution(distribution);
+
+      res.utxo_distribution.resize(distribution.size());
+      size_t i = 0;
+      for (const auto& asset_entry : distribution)
+      {
+        size_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT;
+        uint32_t flags = 0;
+        currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
+        if (w.get_wallet()->get_asset_info(asset_entry.first, adb, flags, false))
+        {
+          decimal_point = adb.decimal_point;
+        }
+
+        res.utxo_distribution[i].first = epee::string_tools::pod_to_hex(asset_entry.first);
+        res.utxo_distribution[i].second.resize(asset_entry.second.size());
+        size_t j = 0;
+        for(auto amount_item: asset_entry.second)
+        {
+          res.utxo_distribution[i].second[j] = currency::print_money_brief(amount_item.first, decimal_point) + ":" + std::to_string(amount_item.second);
+
+          j++;
+        }
+
+        i++;
+      }
+    }
 
     res.current_height = w.get_wallet()->get_top_block_height();
     res.has_bare_unspent_outputs = w.get_wallet()->has_bare_unspent_outputs();

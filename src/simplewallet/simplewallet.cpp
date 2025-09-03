@@ -1467,11 +1467,22 @@ bool simple_wallet::scan_transfers_for_ki(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::print_utxo_distribution(const std::vector<std::string> &args)
 {
-  std::map<uint64_t, uint64_t> distribution;
+  std::unordered_map<crypto::public_key, std::map<uint64_t, uint64_t>> distribution;
   m_wallet->get_utxo_distribution(distribution);
-  for (auto& e : distribution)
-  {    
-    message_writer() << std::left << setw(25) << print_money(e.first) << "|" << e.second;
+  for (auto& asset_entry : distribution)
+  { 
+    size_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT;
+    uint32_t flags = 0;
+    currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
+    if (m_wallet->get_asset_info(asset_entry.first, adb, flags, false))
+    {
+      decimal_point = adb.decimal_point;
+    }
+    message_writer() << "asset_id: " << asset_entry.first;
+    for (auto& amount : asset_entry.second)
+    {
+      message_writer()  << std::left << setw(25) << print_money(amount.first, decimal_point) << "|" << amount.second;
+    }    
   }
   return true;
 }

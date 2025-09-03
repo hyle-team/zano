@@ -4307,17 +4307,18 @@ void wallet2::sign_transfer_files(const std::string& tx_sources_file, const std:
   THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "failed to store signed tx to file " << signed_tx_file);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::get_utxo_distribution(std::map<uint64_t, uint64_t>& distribution)
+bool wallet2::get_utxo_distribution(std::unordered_map<crypto::public_key, std::map<uint64_t, uint64_t>>& distribution)
 {
-  //TODO@#@
-  /*
-  prepare_free_transfers_cache(0);
-  for (auto ent : m_found_free_amounts)
+  
+  prepare_free_transfers_cache(CURRENCY_DEFAULT_DECOY_SET_SIZE);
+  for (auto asset_entry : m_found_free_amounts)
   {
-    distribution[ent.first] = ent.second.size();
+    for (auto amout_entry : asset_entry.second)
+    {
+      ++distribution[asset_entry.first][amout_entry.first];
+    }    
   }
-  */
-
+  
   return false;
 }
 //----------------------------------------------------------------------------------------------------

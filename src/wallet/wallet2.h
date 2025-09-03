@@ -718,7 +718,7 @@ namespace tools
 
     std::string get_log_prefix() const { return m_log_prefix; }
     static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const wallet_public::employed_tx_entries& td);
-    bool get_utxo_distribution(std::map<uint64_t, uint64_t>& distribution);
+    bool get_utxo_distribution(std::unordered_map<crypto::public_key, std::map<uint64_t, uint64_t>>& distribution);
     uint64_t get_sync_progress();
     uint64_t get_wallet_file_size()const;
     void set_use_deffered_global_outputs(bool use);
