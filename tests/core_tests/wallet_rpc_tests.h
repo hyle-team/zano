@@ -89,13 +89,3 @@ struct wallet_rpc_hardfork_verification : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
-
-struct cb_capture_errors : public tools::i_wallet2_callback
-{
-  std::vector<std::string> msgs;
-
-  void on_message(message_severity /*sev*/, const std::string& m) override;
-  void clear();
-  bool has_pull_err() const;
-  bool has_hf_mismatch() const;
-};

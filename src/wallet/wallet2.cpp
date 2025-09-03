@@ -2828,13 +2828,14 @@ void wallet2::refresh(size_t& blocks_fetched, bool& received_money, std::atomic<
           WLT_LOG_L0("Intenral error: reset_count infinit loop catch");
           if (auto wcb = m_wcallback.lock())
             wcb->on_message(tools::i_wallet2_callback::ms_red, "Internal error: reset_count infinite loop catch");
+          m_debug_events_dispatcher.RAISE_DEBUG_EVENT(wde_wallet_message{"Internal error: reset_count infinite loop catch"});
           return;
         }
         reset_count++;
         m_height_of_start_sync = 0;
         had_full_reset = true;
         continue;
-      } 
+      }
       blocks_fetched += added_blocks;
       if (!added_blocks)
         break;
@@ -2847,14 +2848,17 @@ void wallet2::refresh(size_t& blocks_fetched, bool& received_money, std::atomic<
       WLT_LOG_L2("no connection to the daemon, wait and try pull_blocks again (try_count: " << try_count << ", blocks_fetched: " << blocks_fetched << ")");
       if (auto wcb = m_wcallback.lock())
         wcb->on_message(tools::i_wallet2_callback::ms_red, "no connection to daemon");
+      m_debug_events_dispatcher.RAISE_DEBUG_EVENT(wde_wallet_message{"no connection to daemon"});
       std::this_thread::sleep_for(std::chrono::seconds(3));
     }
     catch (const std::exception& e)
     {
       blocks_fetched += added_blocks;
       WLT_LOG_ERROR("refresh->pull_blocks failed, try_count: " << try_count << ", blocks_fetched: " << blocks_fetched << ", exception: " << e.what());
+      const std::string msg = std::string("error on pulling blocks: ") + e.what();
       if (auto wcb = m_wcallback.lock())
-        wcb->on_message(tools::i_wallet2_callback::ms_red, std::string("error on pulling blocks: ") + e.what());
+        wcb->on_message(tools::i_wallet2_callback::ms_red, msg);
+      m_debug_events_dispatcher.RAISE_DEBUG_EVENT(wde_wallet_message{ msg });
       return;
     }
   }

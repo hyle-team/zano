@@ -10,7 +10,8 @@
 #include "currency_core/bc_offers_service.h"
 #include "rpc/core_rpc_server.h"
 #include "currency_protocol/currency_protocol_handler.h"
-
+#include "wallet/wallet2.h"
+#include "wallet/wallet_debug_events_definitions.h"
 
 #include "../../src/wallet/wallet_rpc_server.h"
 #include "offers_helper.h"
@@ -1689,94 +1690,74 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
   // if wallet is on a different hardfork than the daemon, refresh should fail. 
   // when both sides switch to the same hardfork again, refresh must succeed.
 
-  auto miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<debug_wallet2> miner_wlt = init_playtime_test_wallet_t<debug_wallet2>(events, c, MINER_ACC_IDX);
 
   size_t blocks_added = 0;
   bool received_money = false;
   std::atomic<bool> stop{false};
 
-  auto cb = std::make_shared<cb_capture_errors>();
-  miner_wlt->callback(cb);
+  bool pull_err = false;
+  bool hf_mismatch_err = false;
+
+  miner_wlt->get_debug_events_dispatcher()
+    .SUBSCIRBE_DEBUG_EVENT<wde_wallet_message>([&](const wde_wallet_message& e)
+    {
+      if (e.message.find("error on pulling blocks:") != std::string::npos)
+        pull_err = true;
+
+      if (e.message.find("validation failed") != std::string::npos &&
+          e.message.find("hardforks missmatch") != std::string::npos)
+        hf_mismatch_err = true;
+    });
+
   miner_wlt->refresh(blocks_added, received_money, stop);
 
   // 1) wallet->HF6, core->HF5 => error
   {
-    cb->clear();
-
     auto cfg = c.get_blockchain_storage().get_core_runtime_config();
     cfg.hard_forks.set_hardfork_height(6, 1);
     miner_wlt->set_core_runtime_config(cfg);
 
+    pull_err = hf_mismatch_err = false;
+    blocks_added = 0; received_money = false;
+
     miner_wlt->refresh(blocks_added, received_money, stop);
 
-    CHECK_AND_ASSERT_MES(cb->has_pull_err() && cb->has_hf_mismatch(), false,
+    CHECK_AND_ASSERT_MES(pull_err, false,
       "wallet->hf6 vs core->hf5 must fail");
   }
 
   // wallet->HF5 and core->HF6 -> error
   {
-    cb->clear();
-
     miner_wlt->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
     auto cfg = c.get_blockchain_storage().get_core_runtime_config();
     cfg.hard_forks.set_hardfork_height(6, 1);
     c.get_blockchain_storage().set_core_runtime_config(cfg);
 
+    pull_err = hf_mismatch_err = false;
+    blocks_added = 0; received_money = false;
+
     miner_wlt->refresh(blocks_added, received_money, stop);
 
-    CHECK_AND_ASSERT_MES(cb->has_pull_err() && cb->has_hf_mismatch(), false, "wallet->hf5 vs core->hf6 must fail");
+    CHECK_AND_ASSERT_MES(pull_err && hf_mismatch_err, false, "wallet->hf5 vs core->hf6 must fail");
   }
 
   // both HF6 -> success
   {
-    cb->clear();
-
     auto cfg = c.get_blockchain_storage().get_core_runtime_config();
     cfg.hard_forks.set_hardfork_height(6, 1);
     miner_wlt->set_core_runtime_config(cfg);
     c.get_blockchain_storage().set_core_runtime_config(cfg);
 
+    pull_err = hf_mismatch_err = false;
+    blocks_added = 0; received_money = false;
+
     miner_wlt->refresh(blocks_added, received_money, stop);
 
-    CHECK_AND_ASSERT_MES(!cb->has_pull_err(), false, "refresh must succeed when both on the same HF");
+    CHECK_AND_ASSERT_MES(!pull_err, false, "refresh must succeed when both on the same HF");
   }
 
   miner_wlt->callback(std::make_shared<tools::i_wallet2_callback>());
 
   return true;
-}
-
-void cb_capture_errors::on_message(message_severity /*sev*/, const std::string& m)
-{
-  msgs.push_back(m);
-}
-
-void cb_capture_errors::clear()
-{
-  msgs.clear();
-}
-
-bool cb_capture_errors::has_pull_err() const
-{
-  for (const auto& s : msgs)
-  {
-    if (s.find("error on pulling blocks:") != std::string::npos)
-    {
-      return true;
-    }
-  }
-  return false;
-}
-
-bool cb_capture_errors::has_hf_mismatch() const
-{
-  for (const auto& s : msgs)
-  {
-    if (s.find("validation failed") != std::string::npos &&
-        (s.find("hardforks missmatch") != std::string::npos))
-    {
-      return true;
-    }
-  }
-  return false;
 }
