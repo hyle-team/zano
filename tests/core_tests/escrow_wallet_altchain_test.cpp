@@ -64,32 +64,32 @@ bool escrow_altchain_meta_impl::configure_core(currency::core& c, size_t ev_inde
 bool escrow_altchain_meta_impl::generate(std::vector<test_event_entry>& events) const
 {
   bool r = false;
-  
+
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base &miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
   account_base &alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
   account_base &bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
-  
+
   m_etd.cpd.a_addr = alice_acc.get_public_address();
   m_etd.cpd.b_addr = bob_acc.get_public_address();
-  
+
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
-  
+
   // give Alice and Bob 'm_etd.alice_bob_start_amoun' coins for pocket money
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
   r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), m_etd.alice_bob_start_amount, m_etd.start_amount_outs_count, TESTS_DEFAULT_FEE, tx_1);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_1);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1);
-  
+
   transaction tx_2 = AUTO_VAL_INIT(tx_2);
   r = construct_tx_with_many_outputs(m_hardforks, events, blk_1, miner_acc.get_keys(), bob_acc.get_public_address(), m_etd.alice_bob_start_amount, m_etd.start_amount_outs_count, TESTS_DEFAULT_FEE, tx_2);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
   events.push_back(tx_2);
   MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1, miner_acc, tx_2);
-  
+
   REWIND_BLOCKS_N_WITH_TIME(events, blk_2r, blk_2, miner_acc, 7 + WALLET_DEFAULT_TX_SPENDABLE_AGE);
 
   DO_CALLBACK(events, "c1");
