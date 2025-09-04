@@ -37,6 +37,7 @@
 #include <istream>
 #include <ostream>
 #include <string>
+#include <boost/filesystem.hpp>
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/preprocessor/selection/min.hpp>
@@ -96,9 +97,10 @@ namespace epee
     template<>
     struct socket_backend<true>
     {
-      socket_backend(boost::asio::io_service& _io_service, const std::string& ssl_path = std::string())
+      socket_backend(boost::asio::io_service& _io_service, const std::vector<std::string>& ssl_paths = {})
       : m_ssl_context(boost::asio::ssl::context::sslv23), m_socket(_io_service, m_ssl_context)
       {
+        namespace fs = std::filesystem;
         // Create a context that uses the default paths for
         // finding CA certificates.
 #ifdef _WIN32
@@ -107,11 +109,23 @@ namespace epee
         m_ssl_context.set_default_verify_paths();
 #endif
         m_ssl_context.set_verify_mode(boost::asio::ssl::verify_peer);
-        if(!ssl_path.empty())
+        std::size_t loaded = 0;
+        for (const auto& path : ssl_paths)
         {
-          const boost::system::error_code err = load_ca_file(ssl_path);
-          if (err)
-            LOG_ERROR("Failed to load user CA file at " << ssl_path << ": " << err.message());
+          if (path.empty()) continue;
+          const auto ec = load_ca_file(path);
+          if (!ec)
+          {
+            ++loaded;
+            LOG_PRINT_L0("Loaded CA file '" << path << "'");
+          }
+        }
+        if(!loaded)
+          LOG_ERROR("Cant load ssl certificate ");
+
+        if (!loaded && !ssl_paths.empty())
+        {
+          LOG_PRINT_L0("No user CA files were loaded; using only system defaults");
         }
       }
 
@@ -193,16 +207,26 @@ namespace epee
       boost::system::error_code load_ca_file(const std::string& path)
       {
         SSL_CTX* const ssl_ctx = m_ssl_context.native_handle();
-        if (ssl_ctx == nullptr)
+        if (!ssl_ctx)
+          return { boost::asio::error::invalid_argument };
+
+        ERR_clear_error();
+
+        namespace bfs = boost::filesystem;
+        boost::system::error_code ec;
+        bfs::path p(path);
+
+        if (!bfs::exists(p, ec) || !bfs::is_regular_file(p, ec))
         {
-          return {boost::asio::error::invalid_argument};
+          return make_error_code(boost::system::errc::no_such_file_or_directory);
         }
 
         if (!SSL_CTX_load_verify_locations(ssl_ctx, path.c_str(), nullptr))
         {
-          return boost::system::error_code {int(::ERR_get_error()), boost::asio::error::get_ssl_category()};
+          return { static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category() };
         }
-        return boost::system::error_code{};
+
+        return {};
       }
 
     private: 
@@ -213,7 +237,7 @@ namespace epee
     template<>
     struct socket_backend<false>
     {
-      socket_backend(boost::asio::io_service& _io_service, const std::string& ssl_path = std::string())
+      socket_backend(boost::asio::io_service& _io_service, const std::vector<std::string>& ssl_paths = {})
       : m_socket(_io_service)
       {}
 
@@ -249,10 +273,10 @@ namespace epee
     template<bool is_ssl>
     struct socket_backend_resetable
     {
-      socket_backend_resetable(boost::asio::io_service& _io_service, const std::string& ssl_path = std::string()) 
+      socket_backend_resetable(boost::asio::io_service& _io_service, const std::vector<std::string>& ssl_paths = {}) 
       : mr_io_service(_io_service)
-      , m_ssl_path(ssl_path)
-      , m_pbackend(std::make_shared<socket_backend<is_ssl>>(_io_service, ssl_path))
+      , m_ssl_paths(ssl_paths)
+      , m_pbackend(std::make_shared<socket_backend<is_ssl>>(_io_service, ssl_paths))
       {}
 
       boost::asio::ip::tcp::socket& get_socket()
@@ -277,12 +301,12 @@ namespace epee
 
       void reset()
       {
-        m_pbackend = std::make_shared<socket_backend<is_ssl>>(mr_io_service, m_ssl_path);
+        m_pbackend = std::make_shared<socket_backend<is_ssl>>(mr_io_service, m_ssl_paths);
       }
 
     private: 
       boost::asio::io_service& mr_io_service;
-      std::string m_ssl_path;
+      std::vector<std::string> m_ssl_paths;
       std::shared_ptr<socket_backend<is_ssl>> m_pbackend;
     };
 
@@ -312,7 +336,7 @@ namespace epee
 
     public:
       inline
-        blocked_mode_client_t(const std::string& ssl_path = std::string()) :m_sct_back(m_io_service, ssl_path),
+        blocked_mode_client_t(const std::vector<std::string>& ssl_paths = {}) :m_sct_back(m_io_service, ssl_paths),
         m_initialized(false),
         m_connected(false),
         m_deadline(m_io_service),

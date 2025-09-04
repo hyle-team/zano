@@ -41,7 +41,29 @@ namespace command_line
   const arg_descriptor<bool>        arg_validate_predownload  ( "validate-predownload", "Paranoid mode, re-validate each block from pre-downloaded database and rebuild own database");
   const arg_descriptor<std::string> arg_predownload_link      ( "predownload-link", "Override url for blockchain database pre-downloading");
   const arg_descriptor<bool>        arg_non_pruning_mode      ( "non-pruning-mode", "Enables a special operational mode with full retention of all tx signatures. Will terminate if the DB was previously in (normal) pruning mode. Use only if you know what you do.");
-  const arg_descriptor<std::string> arg_verify_ssl_path      ( "verify-ssl-path", "Path to SSL certificate for verifying connections");
+  const arg_descriptor<std::vector<std::string>> arg_verify_ssl_path      ( "verify-ssl-path", "Path to SSL certificate for verifying connections", 
+    std::vector<std::string> {
+#if defined(__linux__)
+      "/etc/ssl/certs/ca-certificates.crt",
+      "/etc/pki/tls/certs/ca-bundle.crt",
+      "/etc/ssl/ca-bundle.pem",
+      "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+      "/etc/ssl/cert.pem"
+#elif defined(__APPLE__)
+      "/opt/homebrew/etc/openssl@3/cert.pem",
+      "/usr/local/etc/openssl@3/cert.pem",
+      "/opt/homebrew/etc/openssl@1.1/cert.pem",
+      "/usr/local/etc/openssl@1.1/cert.pem",
+      "/opt/local/etc/openssl/cert.pem",
+      "/etc/ssl/cert.pem"
+#elif defined(_WIN32)
+      "C:\\Windows\\System32\\curl-ca-bundle.crt",
+      "C:\\Program Files\\Git\\mingw64\\ssl\\certs\\ca-bundle.crt",
+      "C:\\Program Files\\Git\\usr\\ssl\\certs\\ca-bundle.crt",
+      "C:\\msys64\\usr\\ssl\\certs\\ca-bundle.crt",
+      "C:\\OpenSSL-Win64\\certs\\cacert.pem"
+#endif
+    });
 
   const arg_descriptor<std::string> arg_deeplink  ( "deeplink-params", "Deeplink parameter, in that case app just forward params to running app");
 

@@ -53,15 +53,18 @@ namespace command_line
   template<typename T>
   struct arg_descriptor<std::vector<T>, false>
   {
-    arg_descriptor(const char* _name, const char* _description) :
-      name(_name),
-      description(_description)
-    {}
+    using value_type = std::vector<T>;
 
-    typedef std::vector<T> value_type;
+    arg_descriptor(const char* _name, const char* _description)
+      : name(_name), description(_description), use_default(false), default_value{} {}
+
+    arg_descriptor(const char* _name, const char* _description, const std::vector<T>& def)
+      : name(_name), description(_description), use_default(true), default_value(def) {}
 
     const char* name;
     const char* description;
+    bool use_default;
+    std::vector<T> default_value;
   };
 
   template<typename T>
@@ -100,10 +103,13 @@ namespace command_line
   }
 
   template<typename T>
-  boost::program_options::typed_value<std::vector<T>, char>* make_semantic(const arg_descriptor<std::vector<T>, false>& /*arg*/)
+  boost::program_options::typed_value<std::vector<T>, char>* make_semantic(const arg_descriptor<std::vector<T>, false>& arg)
   {
-    auto semantic = boost::program_options::value< std::vector<T> >();
-    semantic->default_value(std::vector<T>(), "");
+    auto semantic = boost::program_options::value<std::vector<T>>()->composing()->multitoken();
+    if (arg.use_default)
+      semantic->default_value(arg.default_value, "");
+    else
+      semantic->default_value(std::vector<T>{}, "");
     return semantic;
   }
 
@@ -230,7 +236,7 @@ namespace command_line
   extern const arg_descriptor<bool>        arg_no_predownload;
   extern const arg_descriptor<bool>        arg_force_predownload;
   extern const arg_descriptor<std::string> arg_process_predownload_from_path;
-  extern const arg_descriptor<std::string> arg_verify_ssl_path;
+  extern const arg_descriptor<std::vector<std::string>> arg_verify_ssl_path;
   extern const arg_descriptor<bool>        arg_validate_predownload;
   extern const arg_descriptor<std::string> arg_predownload_link;
   extern const arg_descriptor<bool>        arg_non_pruning_mode;
