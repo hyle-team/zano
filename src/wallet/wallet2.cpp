@@ -1946,6 +1946,7 @@ void wallet2::pull_blocks(size_t& blocks_added, std::atomic<bool>& stop, bool& f
   {    
     LOG_ERROR("Daemon currently on the hardfork (" << res.current_hardfork 
       << ") at heigh (" << res.current_height << "), while wallet think it's hardfork (" << get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height)  << ") at a given height");
+    m_debug_events_dispatcher.RAISE_DEBUG_EVENT(wde_pulling_hardforks_missmatch);
     THROW_IF_TRUE_WALLET_EX(true, error::wallet_internal_error, "Daemon and wallet ver validation failed, hardforks missmatch");
   }
   
@@ -2837,7 +2838,7 @@ void wallet2::refresh(size_t& blocks_fetched, bool& received_money, std::atomic<
         m_height_of_start_sync = 0;
         had_full_reset = true;
         continue;
-      } 
+      }
       blocks_fetched += added_blocks;
       if (!added_blocks)
         break;
