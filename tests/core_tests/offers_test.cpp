@@ -528,7 +528,7 @@ bool offers_handling_on_chain_switching::generate(std::vector<test_event_entry>&
 
   MAKE_TX(events, tx_0, miner_acc, alice_acc, TESTS_DEFAULT_FEE * 70, blk_0r);                                          // 2N+1
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);                                                            // 2N+2
-
+  
   REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);                        // 4N+2
 
   bc_services::offer_details od = AUTO_VAL_INIT(od);
@@ -539,7 +539,7 @@ bool offers_handling_on_chain_switching::generate(std::vector<test_event_entry>&
 
   MAKE_NEXT_BLOCK(events, blk_2, blk_1r, miner_acc);                                                                      // 4N+4
   //MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_1);                                                            // 4N+4
-
+  DO_CALLBACK(events, "configure_core");
   DO_CALLBACK(events, "c1");                                                                                              // 4N+5
 
   return true;
