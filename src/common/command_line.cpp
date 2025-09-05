@@ -64,7 +64,7 @@ namespace command_line
       "C:\\OpenSSL-Win64\\certs\\cacert.pem"
 #endif
     });
-  const arg_descriptor<bool> arg_ssl_disable("ssl-disable", "Disable TLS certificate and hostname verification (INSECURE)");
+  const arg_descriptor<bool> arg_ssl_disable("ssl-disable-domain-validation", "Disable TLS certificate and hostname verification (INSECURE)");
   const arg_descriptor<std::string> arg_deeplink  ( "deeplink-params", "Deeplink parameter, in that case app just forward params to running app");
 
 }
