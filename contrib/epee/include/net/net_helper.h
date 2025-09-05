@@ -97,8 +97,10 @@ namespace epee
     template<>
     struct socket_backend<true>
     {
-      socket_backend(boost::asio::io_service& _io_service, const std::vector<std::string>& ssl_paths = {})
-      : m_ssl_context(boost::asio::ssl::context::sslv23), m_socket(_io_service, m_ssl_context)
+      socket_backend(boost::asio::io_service& _io_service, const std::vector<std::string>& ssl_paths = {}, bool disable_verify = false)
+      : m_ssl_context(boost::asio::ssl::context::sslv23)
+      , m_socket(_io_service, m_ssl_context)
+      , m_disable_verify(disable_verify)
       {
         namespace fs = std::filesystem;
         // Create a context that uses the default paths for
@@ -108,23 +110,30 @@ namespace epee
 #else
         m_ssl_context.set_default_verify_paths();
 #endif
-        m_ssl_context.set_verify_mode(boost::asio::ssl::verify_peer);
-        std::size_t loaded = 0;
-        for (const auto& path : ssl_paths)
+        m_ssl_context.set_verify_mode(m_disable_verify ? boost::asio::ssl::verify_none : boost::asio::ssl::verify_peer);
+        if (!m_disable_verify)
         {
-          if (path.empty()) 
-            continue;
-          const auto ec = load_ca_file(path);
-          if (!ec)
+          std::size_t loaded = 0;
+          for (const auto& path : ssl_paths)
           {
-            ++loaded;
-            LOG_PRINT_L1("Loaded CA file '" << path << "'");
+            if (path.empty()) 
+              continue;
+            const auto ec = load_ca_file(path);
+            if (!ec)
+            {
+              ++loaded;
+              LOG_PRINT_L0("Loaded CA file '" << path << "'");
+            }
+          }
+
+          if (!loaded && !ssl_paths.empty())
+          {
+            LOG_PRINT_L0("No user CA files were loaded, using only system defaults");
           }
         }
-
-        if (!loaded && !ssl_paths.empty())
+        else
         {
-          LOG_PRINT_L1("No user CA files were loaded, using only system defaults");
+          LOG_PRINT_L0("Certificate verification disabled");
         }
       }
 
@@ -182,7 +191,7 @@ namespace epee
       bool on_after_connect()
       {
         LOG_PRINT_L2("SSL Handshake....");
-        m_socket.set_verify_mode(boost::asio::ssl::verify_peer);
+        m_socket.set_verify_mode(m_disable_verify ? boost::asio::ssl::verify_none : boost::asio::ssl::verify_peer);
 
         boost::system::error_code ec;
         m_socket.handshake(boost::asio::ssl::stream_base::client, ec);
@@ -229,6 +238,7 @@ namespace epee
       }
 
     private: 
+      bool m_disable_verify{false};
       boost::asio::ssl::context m_ssl_context;
       boost::asio::ssl::stream<boost::asio::ip::tcp::socket> m_socket;
     };
@@ -236,7 +246,7 @@ namespace epee
     template<>
     struct socket_backend<false>
     {
-      socket_backend(boost::asio::io_service& _io_service, const std::vector<std::string>& ssl_paths = {})
+      socket_backend(boost::asio::io_service& _io_service, const std::vector<std::string>& ssl_paths = {}, bool disable_verify = false)
       : m_socket(_io_service)
       {}
 
@@ -272,10 +282,10 @@ namespace epee
     template<bool is_ssl>
     struct socket_backend_resetable
     {
-      socket_backend_resetable(boost::asio::io_service& _io_service, const std::vector<std::string>& ssl_paths = {}) 
+      socket_backend_resetable(boost::asio::io_service& _io_service, const std::vector<std::string>& ssl_paths = {}, bool disable_verify = false) 
       : mr_io_service(_io_service)
       , m_ssl_paths(ssl_paths)
-      , m_pbackend(std::make_shared<socket_backend<is_ssl>>(_io_service, ssl_paths))
+      , m_pbackend(std::make_shared<socket_backend<is_ssl>>(_io_service, ssl_paths, disable_verify))
       {}
 
       boost::asio::ip::tcp::socket& get_socket()
@@ -335,7 +345,7 @@ namespace epee
 
     public:
       inline
-        blocked_mode_client_t(const std::vector<std::string>& ssl_paths = {}) :m_sct_back(m_io_service, ssl_paths),
+        blocked_mode_client_t(const std::vector<std::string>& ssl_paths = {}, bool disable_verify = false) :m_sct_back(m_io_service, ssl_paths, disable_verify),
         m_initialized(false),
         m_connected(false),
         m_deadline(m_io_service),

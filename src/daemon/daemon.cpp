@@ -167,7 +167,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_sett, command_line::arg_no_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_force_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_process_predownload_from_path);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_verify_ssl_path);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_ssl_cert_path);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_ssl_disable);
   command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_ntp);
