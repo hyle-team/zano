@@ -102,7 +102,6 @@ namespace epee
       , m_socket(_io_service, m_ssl_context)
       , m_disable_verify(disable_verify)
       {
-        namespace fs = std::filesystem;
         // Create a context that uses the default paths for
         // finding CA certificates.
 #ifdef _WIN32
