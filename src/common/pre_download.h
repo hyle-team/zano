@@ -99,7 +99,7 @@ namespace tools
       tools::create_directories_if_necessary(working_folder);
       std::vector<std::string> ssl_paths;
 
-      const bool disable_ssl_verify = command_line::has_arg(vm, command_line::arg_ssl_disable) && command_line::get_arg(vm, command_line::arg_ssl_disable);
+      const bool disable_ssl_verify = command_line::has_arg(vm, command_line::arg_ssl_disable_domain_validation) && command_line::get_arg(vm, command_line::arg_ssl_disable_domain_validation);
       if(command_line::has_arg(vm, command_line::arg_ssl_cert_path) && !disable_ssl_verify)
       {
         ssl_paths = command_line::get_arg(vm, command_line::arg_ssl_cert_path);
