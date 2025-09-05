@@ -49,5 +49,40 @@ namespace tools
       virtual const char* name()=0;
       virtual ~i_db_backend(){};
     };
+
+
+    template<typename t_backend>
+    struct db_transaction_wrapper
+    {
+    private:
+      t_backend& m_backend;
+      bool m_finalized = true;
+
+    public: 
+      db_transaction_wrapper(t_backend& rbackend): m_backend(rbackend) {}
+      db_transaction_wrapper(t_backend& rbackend, bool finalized) : m_backend(rbackend), m_finalized(finalized){}
+      ~db_transaction_wrapper()
+      {
+        if (!m_finalized)
+          m_backend.abort_transaction();
+      }
+      bool begin_transaction(bool read_only = false)
+      {
+        bool r = m_backend.begin_transaction(read_only);
+        if(r)
+          m_finalized = false;
+        return r;
+      }
+      void commit_transaction()
+      {
+        m_backend.commit_transaction();
+        m_finalized = true;
+      }
+      void abort_transaction()
+      {
+        m_backend.abort_transaction();
+        m_finalized = true;
+      }
+    };
   }
 }
