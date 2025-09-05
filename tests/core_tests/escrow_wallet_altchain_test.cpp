@@ -47,6 +47,20 @@ escrow_altchain_meta_impl::escrow_altchain_meta_impl(const eam_test_data_t &etd)
 {
 }
 
+bool escrow_altchain_meta_impl::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
+  pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
+  pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
+  pc.hf4_minimum_mixins = 0;
+  pc.hard_forks.m_height_the_hardfork_n_active_after[1] = 5;
+  pc.hard_forks.m_height_the_hardfork_n_active_after[2] = 5;
+  pc.hard_forks.m_height_the_hardfork_n_active_after[3] = 5;
+  pc.hard_forks.m_height_the_hardfork_n_active_after[4] = 999999999999999999;
+  c.get_blockchain_storage().set_core_runtime_config(pc);
+  return true;
+}
+
 bool escrow_altchain_meta_impl::generate(std::vector<test_event_entry>& events) const
 {
   bool r = false;
@@ -60,6 +74,7 @@ bool escrow_altchain_meta_impl::generate(std::vector<test_event_entry>& events) 
   m_etd.cpd.b_addr = bob_acc.get_public_address();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   // give Alice and Bob 'm_etd.alice_bob_start_amoun' coins for pocket money

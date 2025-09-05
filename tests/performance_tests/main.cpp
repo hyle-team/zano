@@ -74,8 +74,7 @@ void test_plain_wallet()
 {
   //std::string res = plain_wallet::init("195.201.107.230", "33340", "C:\\Users\\roky\\home\\", 0);
   //std::string res = plain_wallet::init("", "", "C:\\Users\\roky\\home\\", 0);
-  // std::string res = plain_wallet::init("https://195.201.107.230", "443", "C:\\git_repos\\zano\\build_msvc2022_64\\src\\Debug\\", LOG_LEVEL_2);
-  std::string res = plain_wallet::init("https://node.zano.org", "443", "C:\\git_repos\\zano\\build_msvc2022_64\\src\\Debug\\", LOG_LEVEL_2);
+  std::string res = plain_wallet::init("https://node.zano.org", "443", "C:\\Users\\roky\\home\\", LOG_LEVEL_2);
   //std::string res = plain_wallet::init("127.0.0.1", "12111", "C:\\Users\\roky\\home22\\", 0);
   
   plain_wallet::configure_object conf = AUTO_VAL_INIT(conf);
@@ -229,16 +228,16 @@ void multithread_test_of_get_coinbase_hash_cached()
 int main(int argc, char** argv)
 {
   epee::string_tools::set_module_name_and_folder(argv[0]);
-  epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_3);
-  epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_3);
+  epee::log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
+  epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_2);
   //epee::log_space::log_singletone::add_logger(LOGGER_FILE,
   //  epee::log_space::log_singletone::get_default_log_file().c_str(),
   //  epee::log_space::log_singletone::get_default_log_folder().c_str());
   
-  //multithread_test_of_get_coinbase_hash_cached();
+  multithread_test_of_get_coinbase_hash_cached();
   //test_tx_json_serialization();
   //test_base64_serialization();
-  test_plain_wallet();
+  //test_plain_wallet();
   //parse_weird_tx();
   //thread_pool_tests();
 

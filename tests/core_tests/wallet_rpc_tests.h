@@ -82,3 +82,10 @@ struct wallet_rpc_multiple_receivers : public wallet_test
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   void set_wallet_options(std::shared_ptr<tools::wallet2> w);
 };
+
+struct wallet_rpc_hardfork_verification : public wallet_test
+{
+  wallet_rpc_hardfork_verification();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};

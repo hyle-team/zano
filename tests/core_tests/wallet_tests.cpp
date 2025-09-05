@@ -3235,7 +3235,7 @@ bool wallet_chain_switch_with_spending_the_same_ki::generate(std::vector<test_ev
 
   // rewind blocks to allow wallet be able to spend the coins
   REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
-
+  DO_CALLBACK(events, "configure_core");
   DO_CALLBACK(events, "c1");
 
   return true;
@@ -3631,7 +3631,7 @@ bool wallet_watch_only_and_chain_switch::generate(std::vector<test_event_entry>&
 
   m_split_point_block_id = get_block_hash(blk_1);
   m_split_point_block_height = get_block_height(blk_1);
-
+  DO_CALLBACK(events, "configure_core");
   DO_CALLBACK(events, "c1");
 
   return true;

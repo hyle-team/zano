@@ -1094,7 +1094,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(wallet_unconfirmed_tx_expiration);
     GENERATE_AND_PLAY(wallet_unconfimed_tx_balance);
     GENERATE_AND_PLAY_HF(packing_outputs_on_pos_minting_wallet, "3");
-    GENERATE_AND_PLAY(wallet_watch_only_and_chain_switch);
+    GENERATE_AND_PLAY_HF(wallet_watch_only_and_chain_switch, "3");
     GENERATE_AND_PLAY_HF(wallet_and_sweep_below, "3-*");
 
     GENERATE_AND_PLAY(wallet_rpc_integrated_address);
@@ -1105,9 +1105,10 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(wallet_true_rpc_pos_mining, "4-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_cold_signing, "3,5-*");
     // GENERATE_AND_PLAY_HF(wallet_rpc_multiple_receivers, "5-*"); work in progress -- sowle
-    GENERATE_AND_PLAY(wallet_chain_switch_with_spending_the_same_ki);
+    GENERATE_AND_PLAY_HF(wallet_chain_switch_with_spending_the_same_ki, "3");
     GENERATE_AND_PLAY(wallet_sending_to_integrated_address);
     GENERATE_AND_PLAY_HF(block_template_blacklist_test, "4-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_hardfork_verification, "5");
     
 
     // GENERATE_AND_PLAY(emission_test); // simulate 1 year of blockchain, too long run (1 y ~= 1 hr), by demand only
