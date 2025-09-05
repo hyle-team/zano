@@ -112,20 +112,19 @@ namespace epee
         std::size_t loaded = 0;
         for (const auto& path : ssl_paths)
         {
-          if (path.empty()) continue;
+          if (path.empty()) 
+            continue;
           const auto ec = load_ca_file(path);
           if (!ec)
           {
             ++loaded;
-            LOG_PRINT_L0("Loaded CA file '" << path << "'");
+            LOG_PRINT_L1("Loaded CA file '" << path << "'");
           }
         }
-        if(!loaded)
-          LOG_ERROR("Cant load ssl certificate ");
 
         if (!loaded && !ssl_paths.empty())
         {
-          LOG_PRINT_L0("No user CA files were loaded; using only system defaults");
+          LOG_PRINT_L1("No user CA files were loaded, using only system defaults");
         }
       }
 

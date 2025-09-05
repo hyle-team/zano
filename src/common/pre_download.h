@@ -103,7 +103,7 @@ namespace tools
         ssl_paths = command_line::get_arg(vm, command_line::arg_verify_ssl_path);
         for(const auto& it : ssl_paths)
         {
-          LOG_PRINT_L0("Add custom CA path: " << it);
+          LOG_PRINT_L1("Add custom CA path: " << it);
         }
       }
       r = cl.download_and_unzip(cb, downloading_file_path, url, 5000 /* timout */, "GET", std::string(), 30 /* fails count */, ssl_paths);
