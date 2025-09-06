@@ -538,9 +538,9 @@ bool offers_handling_on_chain_switching::generate(std::vector<test_event_entry>&
   MAKE_TX_ATTACH(events, tx_1, alice_acc, alice_acc, TESTS_DEFAULT_FEE, blk_1r, attachment);                            // 4N+3
 
   MAKE_NEXT_BLOCK(events, blk_2, blk_1r, miner_acc);                                                                      // 4N+4
-  //MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_1);                                                            // 4N+4
-  DO_CALLBACK(events, "configure_core");
-  DO_CALLBACK(events, "c1");                                                                                              // 4N+5
+
+  DO_CALLBACK(events, "configure_core");                                                                                  // 4N+5
+  DO_CALLBACK(events, "c1");                                                                                              // 4N+6
 
   return true;
 }
