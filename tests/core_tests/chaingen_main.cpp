@@ -1108,6 +1108,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(wallet_chain_switch_with_spending_the_same_ki, "3");
     GENERATE_AND_PLAY(wallet_sending_to_integrated_address);
     GENERATE_AND_PLAY_HF(block_template_blacklist_test, "4-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_hardfork_verification, "5");
     
 
     // GENERATE_AND_PLAY(emission_test); // simulate 1 year of blockchain, too long run (1 y ~= 1 hr), by demand only
@@ -1128,6 +1129,7 @@ int main(int argc, char* argv[])
     //GENERATE_AND_PLAY(block_template_against_txs_size); // Long test! by demand only
     GENERATE_AND_PLAY_HF(pos_altblocks_validation, "3-*");
     GENERATE_AND_PLAY_HF(pos_mining_with_decoys, "3");
+    GENERATE_AND_PLAY_HF(pos_and_no_pow_blocks_between_output_and_stake, "4-*");
 
     // alternative blocks and generic chain-switching tests
     GENERATE_AND_PLAY(gen_chain_switch_pow_pos);

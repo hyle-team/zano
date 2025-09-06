@@ -74,6 +74,7 @@ bool escrow_altchain_meta_impl::generate(std::vector<test_event_entry>& events) 
   m_etd.cpd.b_addr = bob_acc.get_public_address();
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   
   // give Alice and Bob 'm_etd.alice_bob_start_amoun' coins for pocket money
