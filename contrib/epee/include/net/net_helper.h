@@ -37,6 +37,7 @@
 #include <istream>
 #include <ostream>
 #include <string>
+#include <boost/filesystem.hpp>
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/preprocessor/selection/min.hpp>
@@ -48,7 +49,6 @@
 #include "misc_helpers.h"
 //#include "profile_tools.h"
 #include "../string_tools.h"
-
 #ifndef MAKE_IP
 #define MAKE_IP( a1, a2, a3, a4 )	(a1|(a2<<8)|(a3<<16)|(a4<<24))
 #endif
@@ -58,6 +58,37 @@ namespace epee
 {
   namespace net_utils
   {
+    
+#ifdef _WIN32
+  // https://stackoverflow.com/questions/40307541
+  #include <wincrypt.h>
+  static void add_windows_root_certs(boost::asio::ssl::context& ctx) noexcept
+  {
+      HCERTSTORE hStore = CertOpenSystemStore(0, "ROOT");
+      if (hStore == NULL) {
+          return;
+      }
+
+      X509_STORE *store = X509_STORE_new();
+      PCCERT_CONTEXT pContext = NULL;
+      while ((pContext = CertEnumCertificatesInStore(hStore, pContext)) != NULL) {
+          // convert from DER to internal format
+          X509 *x509 = d2i_X509(NULL,
+                                (const unsigned char **)&pContext->pbCertEncoded,
+                                pContext->cbCertEncoded);
+          if(x509 != NULL) {
+              X509_STORE_add_cert(store, x509);
+              X509_free(x509);
+          }
+      }
+
+      CertFreeCertificateContext(pContext);
+      CertCloseStore(hStore, 0);
+
+      // attach X509_STORE to boost ssl context
+      SSL_CTX_set_cert_store(ctx.native_handle(), store);
+  }
+#endif
 
     template<bool is_ssl>
     struct socket_backend;
@@ -66,15 +97,43 @@ namespace epee
     template<>
     struct socket_backend<true>
     {
-      socket_backend(boost::asio::io_service& _io_service): m_ssl_context(boost::asio::ssl::context::sslv23), m_socket(_io_service, m_ssl_context)
+      socket_backend(boost::asio::io_service& _io_service, const std::vector<std::string>& ssl_paths = {}, bool disable_verify = false)
+      : m_ssl_context(boost::asio::ssl::context::sslv23)
+      , m_socket(_io_service, m_ssl_context)
+      , m_disable_verify(disable_verify)
       {
         // Create a context that uses the default paths for
         // finding CA certificates.
+#ifdef _WIN32
+        add_windows_root_certs(m_ssl_context);
+#else
         m_ssl_context.set_default_verify_paths();
-        /*m_socket.set_verify_mode(boost::asio::ssl::verify_peer);
-        m_socket.set_verify_callback(
-          boost::bind(&socket_backend::verify_certificate, this, _1, _2));*/
+#endif
+        m_ssl_context.set_verify_mode(m_disable_verify ? boost::asio::ssl::verify_none : boost::asio::ssl::verify_peer);
+        if (!m_disable_verify)
+        {
+          std::size_t loaded = 0;
+          for (const auto& path : ssl_paths)
+          {
+            if (path.empty()) 
+              continue;
+            const auto ec = load_ca_file(path);
+            if (!ec)
+            {
+              ++loaded;
+              LOG_PRINT_L0("Loaded CA file '" << path << "'");
+            }
+          }
 
+          if (!loaded && !ssl_paths.empty())
+          {
+            LOG_PRINT_L0("No user CA files were loaded, using only system defaults");
+          }
+        }
+        else
+        {
+          LOG_PRINT_L0("Certificate verification disabled");
+        }
       }
 
       /*
@@ -101,7 +160,21 @@ namespace epee
 
       void set_domain(const std::string& domain_name)
       {
-        SSL_set_tlsext_host_name(m_socket.native_handle(), domain_name.c_str());
+        SSL* ssl = m_socket.native_handle();
+
+        SSL_set_tlsext_host_name(ssl, domain_name.c_str());
+#if BOOST_VERSION >= 107300
+        m_socket.set_verify_callback(boost::asio::ssl::host_name_verification(domain_name));
+#else
+        m_socket.set_verify_callback(boost::asio::ssl::rfc2818_verification(domain_name));
+#endif
+
+        X509_VERIFY_PARAM* param = SSL_get0_param(ssl);
+        X509_VERIFY_PARAM_set_hostflags(param, X509_CHECK_FLAG_NO_PARTIAL_WILDCARDS);
+        if (X509_VERIFY_PARAM_set1_host(param, domain_name.c_str(), 0) != 1)
+        {
+          LOG_PRINT_L0("Failed to set expected hostname: " << domain_name);
+        }
       }
 
       boost::asio::ip::tcp::socket& get_socket()
@@ -114,14 +187,57 @@ namespace epee
         return m_socket;
       }
 
-      void on_after_connect()
+      bool on_after_connect()
       {
         LOG_PRINT_L2("SSL Handshake....");
-        m_socket.handshake(boost::asio::ssl::stream_base::client);
+        m_socket.set_verify_mode(m_disable_verify ? boost::asio::ssl::verify_none : boost::asio::ssl::verify_peer);
+
+        boost::system::error_code ec;
+        m_socket.handshake(boost::asio::ssl::stream_base::client, ec);
+
+        if (ec)
+        {
+          long vr = SSL_get_verify_result(m_socket.native_handle());
+          LOG_PRINT_L0("TLS Handshake failed: " << ec.message() << " (verify: " << X509_verify_cert_error_string(vr) << ")");
+          ERR_clear_error();
+          boost::system::error_code ignored;
+          m_socket.lowest_layer().shutdown(boost::asio::ip::tcp::socket::shutdown_both, ignored);
+          m_socket.lowest_layer().close(ignored);
+          return false;
+        }
+
         LOG_PRINT_L2("SSL Handshake OK");
+        return true;
+      }
+
+    private:
+      boost::system::error_code load_ca_file(const std::string& path)
+      {
+        SSL_CTX* const ssl_ctx = m_ssl_context.native_handle();
+        if (!ssl_ctx)
+          return { boost::asio::error::invalid_argument };
+
+        ERR_clear_error();
+
+        namespace bfs = boost::filesystem;
+        boost::system::error_code ec;
+        bfs::path p(path);
+
+        if (!bfs::exists(p, ec) || !bfs::is_regular_file(p, ec))
+        {
+          return make_error_code(boost::system::errc::no_such_file_or_directory);
+        }
+
+        if (!SSL_CTX_load_verify_locations(ssl_ctx, path.c_str(), nullptr))
+        {
+          return { static_cast<int>(::ERR_get_error()), boost::asio::error::get_ssl_category() };
+        }
+
+        return {};
       }
 
     private: 
+      bool m_disable_verify{false};
       boost::asio::ssl::context m_ssl_context;
       boost::asio::ssl::stream<boost::asio::ip::tcp::socket> m_socket;
     };
@@ -129,7 +245,8 @@ namespace epee
     template<>
     struct socket_backend<false>
     {
-      socket_backend(boost::asio::io_service& _io_service): m_socket(_io_service)
+      socket_backend(boost::asio::io_service& _io_service, const std::vector<std::string>& ssl_paths = {}, bool disable_verify = false)
+      : m_socket(_io_service)
       {}
 
       boost::asio::ip::tcp::socket& get_socket()
@@ -147,9 +264,9 @@ namespace epee
         return m_socket;
       }
 
-      void on_after_connect()
+      bool on_after_connect()
       {
-
+        return true;
       }
 
       void reset()
@@ -164,7 +281,10 @@ namespace epee
     template<bool is_ssl>
     struct socket_backend_resetable
     {
-      socket_backend_resetable(boost::asio::io_service& _io_service) : mr_io_service(_io_service), m_pbackend(std::make_shared<socket_backend<is_ssl>>(_io_service))
+      socket_backend_resetable(boost::asio::io_service& _io_service, const std::vector<std::string>& ssl_paths = {}, bool disable_verify = false) 
+      : mr_io_service(_io_service)
+      , m_ssl_paths(ssl_paths)
+      , m_pbackend(std::make_shared<socket_backend<is_ssl>>(_io_service, ssl_paths, disable_verify))
       {}
 
       boost::asio::ip::tcp::socket& get_socket()
@@ -182,18 +302,19 @@ namespace epee
         return m_pbackend->get_stream();
       }
 
-      void on_after_connect()
+      bool on_after_connect()
       {
         return m_pbackend->on_after_connect();
       }
 
       void reset()
       {
-        m_pbackend = std::make_shared<socket_backend<is_ssl>>(mr_io_service);
+        m_pbackend = std::make_shared<socket_backend<is_ssl>>(mr_io_service, m_ssl_paths);
       }
 
     private: 
       boost::asio::io_service& mr_io_service;
+      std::vector<std::string> m_ssl_paths;
       std::shared_ptr<socket_backend<is_ssl>> m_pbackend;
     };
 
@@ -223,7 +344,7 @@ namespace epee
 
     public:
       inline
-        blocked_mode_client_t() :m_sct_back(m_io_service),
+        blocked_mode_client_t(const std::vector<std::string>& ssl_paths = {}, bool disable_verify = false) :m_sct_back(m_io_service, ssl_paths, disable_verify),
         m_initialized(false),
         m_connected(false),
         m_deadline(m_io_service),
@@ -321,13 +442,16 @@ namespace epee
           {
             m_io_service.run_one();
           }
-
           if (!ec && m_sct_back.get_socket().is_open())
           {
-            m_sct_back.on_after_connect();
-            m_connected = true;       
+            if (!m_sct_back.on_after_connect())
+            {
+              return false;
+            }
+
+            m_connected = true;
             m_deadline.expires_at(boost::posix_time::pos_infin);
-            LOG_PRINT_L1("Connected OK: " << addr << ":" << port);
+            LOG_PRINT_L1("TLS connected OK: " << addr << ":" << port);
             return true;
           }
           else

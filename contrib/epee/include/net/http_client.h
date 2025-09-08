@@ -222,6 +222,8 @@ namespace epee
                                    public i_http_client
       {
       public:
+        explicit http_simple_client_t(const std::vector<std::string>& ssl_paths = {}, bool disable_verify = false)
+        : m_net_client(ssl_paths, disable_verify) {}
 
 
       private:
@@ -1024,8 +1026,10 @@ namespace epee
       class http_https_simple_client_wrapper : virtual public http_simple_client, virtual public https_simple_client
       {
       public:
-        http_https_simple_client_wrapper(bool is_ssl, std::shared_ptr<idle_handler_base> ihb_cb)
-          : m_ssl(is_ssl)
+        http_https_simple_client_wrapper(bool is_ssl, std::shared_ptr<idle_handler_base> ihb_cb, const std::vector<std::string>& ssl_paths = {}, bool disable_verify = false)
+          : http_simple_client()
+          , https_simple_client(ssl_paths, disable_verify)
+          , m_ssl(is_ssl)
           , m_ihb_cb(ihb_cb)
         {}
 
@@ -1062,7 +1066,7 @@ namespace epee
         bool m_permanent_error = false;
       public:
         template<typename callback_t>
-        bool invoke_cb(callback_t cb, const std::string& url, uint64_t timeout, const std::string& method = "GET", const std::string& body = std::string(), const fields_list& additional_params = fields_list())
+        bool invoke_cb(callback_t cb, const std::string& url, uint64_t timeout, const std::string& method = "GET", const std::string& body = std::string(), const fields_list& additional_params = fields_list(), const std::vector<std::string>& ssl_paths = {}, bool disable_verify = false)
         {
           http::url_content uc{};
           if (!parse_url(url, uc))
@@ -1073,7 +1077,7 @@ namespace epee
           }
           bool is_ssl = uc.schema == "https";
 
-          http_https_simple_client_wrapper wrapper(is_ssl, std::make_shared<idle_handler<callback_t>>(cb));
+          http_https_simple_client_wrapper wrapper(is_ssl, std::make_shared<idle_handler<callback_t>>(cb), ssl_paths, disable_verify);
 
           const http_response_info* p_hri = nullptr;
           bool r = wrapper.invoke_request(uc, timeout, &p_hri, method, body, additional_params);
@@ -1109,13 +1113,13 @@ namespace epee
 
         //
         template<typename callback_t>
-        bool download_and_unzip(callback_t cb, const std::string& path_for_file, const std::string& url, uint64_t timeout, const std::string& method = "GET", const std::string& body = std::string(), uint64_t fails_count = 1000, const fields_list& additional_params = fields_list())
+        bool download_and_unzip(callback_t cb, const std::string& path_for_file, const std::string& url, uint64_t timeout, const std::string& method = "GET", const std::string& body = std::string(), uint64_t fails_count = 1000, const std::vector<std::string>& ssl_paths = {}, bool disable_ssl_verify = false, const fields_list& additional_params = fields_list())
         {
           std::ofstream fs;
           fs.open(path_for_file, std::ios::binary | std::ios::out | std::ios::trunc);
           if (!fs.is_open())
           {
-            LOG_ERROR("Fsiled to open " << path_for_file);
+            LOG_ERROR("Failed to open " << path_for_file);
             return false;
           }
           std::string buff;
@@ -1147,7 +1151,7 @@ namespace epee
             LOG_PRINT_L0("Attempt " << current_err_count + 1 << "/" << fails_count << " to get " << url << " (offset:" << state_received_bytes_base << ")");
             fields_list additional_params_local = additional_params;
             additional_params_local.push_back(std::make_pair<std::string, std::string>("Range", std::string("bytes=") + std::to_string(state_received_bytes_base) + "-"));
-            r = this->invoke_cb(local_cb, url, timeout, method, body, additional_params_local);
+            r = this->invoke_cb(local_cb, url, timeout, method, body, additional_params_local, ssl_paths, disable_ssl_verify);
             if (!r)
             {
               if (stopped || m_permanent_error)

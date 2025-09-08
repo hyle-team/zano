@@ -167,6 +167,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_sett, command_line::arg_no_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_force_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_process_predownload_from_path);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_ssl_cert_path);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_ssl_disable_domain_validation);
   command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
   command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_ntp);
@@ -284,9 +286,7 @@ int main(int argc, char* argv[])
     ccore.get_blockchain_storage().get_attachment_services_manager().add_service(&offers_service);
   }
 
-  
-  
-  std::shared_ptr<currency::stratum_server> stratum_server_ptr; 
+  std::shared_ptr<currency::stratum_server> stratum_server_ptr;
   if (stratum_enabled)
     stratum_server_ptr = std::make_shared<currency::stratum_server>(&ccore);
 
