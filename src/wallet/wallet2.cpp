@@ -4431,27 +4431,56 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
   THROW_IF_FALSE_WALLET_CMN_ERR_EX(ft.ftp.spend_pub_key == m_account.get_keys().account_address.spend_public_key, "The given tx was created in a different wallet, keys missmatch, tx hash: " << tx_hash);
 
   // prepare and check data for watch-only outkey2ki before sending the tx
+  std::list<crypto::key_image> key_images_for_spend_check;
   std::vector<std::pair<crypto::public_key, crypto::key_image>> pk_ki_to_be_added;
   std::vector<std::pair<uint64_t, crypto::key_image>> tri_ki_to_be_added;
-  if (m_watch_only)
+  for (auto& p : ft.outs_key_images)
   {
-    for (auto& p : ft.outs_key_images)
-    {
-      THROW_IF_FALSE_WALLET_INT_ERR_EX(p.first < tx.vout.size(), "outs_key_images has invalid out index: " << p.first << ", tx.vout.size() = " << tx.vout.size());
-      std::list<htlc_info> stub{};
-      const crypto::public_key& pk = out_get_pub_key(tx.vout[p.first], stub);
-      pk_ki_to_be_added.push_back(std::make_pair(pk, p.second));
-    }
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(p.first < tx.vout.size(), "outs_key_images has invalid out index: " << p.first << ", tx.vout.size() = " << tx.vout.size());
+    std::list<htlc_info> stub{};
+    const crypto::public_key& pk = out_get_pub_key(tx.vout[p.first], stub);
+    crypto::key_image& out_ki = p.second;
+    pk_ki_to_be_added.push_back(std::make_pair(pk, out_ki));
+    key_images_for_spend_check.push_back(out_ki);
+  }
 
-    THROW_IF_FALSE_WALLET_INT_ERR_EX(tx.vin.size() == ft.ftp.sources.size(), "tx.vin and ft.ftp.sources sizes missmatch");
-    for (size_t i = 0; i < tx.vin.size(); ++i)
+  THROW_IF_FALSE_WALLET_INT_ERR_EX(tx.vin.size() == ft.ftp.sources.size(), "tx.vin and ft.ftp.sources sizes missmatch");
+  for (size_t i = 0; i < tx.vin.size(); ++i)
+  {
+    const crypto::key_image& in_ki = get_key_image_from_txin_v(tx.vin[i]);
+    const auto& src = ft.ftp.sources[i];
+    THROW_IF_FALSE_WALLET_INT_ERR_EX(src.real_output < src.outputs.size(), "src.real_output is out of bounds: " << src.real_output);
+    const crypto::public_key& out_key = src.outputs[src.real_output].stealth_address;
+    tri_ki_to_be_added.push_back(std::make_pair(src.transfer_index, in_ki));
+    pk_ki_to_be_added.push_back(std::make_pair(out_key, in_ki));
+    key_images_for_spend_check.push_back(in_ki);
+  }
+
+  // request spent status for each of key images to make sure no abuse is about to happen
+  currency::COMMAND_RPC_CHECK_KEYIMAGES::request rpc_check_ki_req{};
+  rpc_check_ki_req.images.swap(key_images_for_spend_check);
+  currency::COMMAND_RPC_CHECK_KEYIMAGES::response rpc_check_ki_res{};
+  r = m_core_proxy->call_COMMAND_RPC_COMMAND_RPC_CHECK_KEYIMAGES(rpc_check_ki_req, rpc_check_ki_res);
+  if (rpc_check_ki_res.status == API_RETURN_CODE_BUSY)
+    throw error::daemon_busy(LOCATION_STR, "call_COMMAND_RPC_COMMAND_RPC_CHECK_KEYIMAGES");
+  if (!r)
+    throw error::no_connection_to_daemon(LOCATION_STR, "call_COMMAND_RPC_COMMAND_RPC_CHECK_KEYIMAGES");
+  THROW_IF_FALSE_WALLET_CMN_ERR_EX(rpc_check_ki_res.status == API_RETURN_CODE_OK, "call_COMMAND_RPC_COMMAND_RPC_CHECK_KEYIMAGES failed: " << rpc_check_ki_res.status);
+  THROW_IF_FALSE_WALLET_CMN_ERR_EX(rpc_check_ki_res.images_stat.size() == rpc_check_ki_req.images.size(), "rpc: images_stats size does not match with images size");
+  {
+    auto it = rpc_check_ki_req.images.begin();
+    size_t i = 0;
+    for(auto status_flag : rpc_check_ki_res.images_stat)
     {
-      const crypto::key_image& ki = get_key_image_from_txin_v(tx.vin[i]);
-      const auto& src = ft.ftp.sources[i];
-      THROW_IF_FALSE_WALLET_INT_ERR_EX(src.real_output < src.outputs.size(), "src.real_output is out of bounds: " << src.real_output);
-      const crypto::public_key& out_key = src.outputs[src.real_output].stealth_address;
-      tri_ki_to_be_added.push_back(std::make_pair(src.transfer_index, ki));
-      pk_ki_to_be_added.push_back(std::make_pair(out_key, ki));
+      if (status_flag != 0)
+      {
+        std::stringstream ss;
+        ss <<"submit_transfer seems to be abused: " << (i < ft.outs_key_images.size() ? "output key image " : "input key image ") << *it << " of tx " << tx_hash << " is already spent, according to daemon";
+        WLT_LOG_RED(ss.str(), LOG_LEVEL_0);
+        throw error::wallet_error_with_rpc_code(LOCATION_STR, WALLET_RPC_ERROR_CODE_KEY_IMAGE_ALREADY_SPENT, ss.str());
+      }
+      ++it;
+      ++i;
     }
   }
 
@@ -4473,36 +4502,33 @@ void wallet2::submit_transfer(const std::string& signed_tx_blob, currency::trans
   m_tx_keys.insert(std::make_pair(tx_hash, ft.one_time_key));
 
   // populate and store key images from own outputs, because otherwise a watch-only wallet cannot calculate it
-  if (m_watch_only)
+  for (auto& p : pk_ki_to_be_added)
   {
-    for (auto& p : pk_ki_to_be_added)
+    auto it = m_pending_key_images.find(p.first);
+    if (it != m_pending_key_images.end())
     {
-      auto it = m_pending_key_images.find(p.first);
-      if (it != m_pending_key_images.end())
-      {
-        if (it->second != p.second)
-          LOG_PRINT_YELLOW("warning: for tx " << tx_hash << " out pub key " << p.first << " already exist in m_pending_key_images, ki: " << it->second << ", proposed new ki: " << p.second, LOG_LEVEL_0);
-      }
-      else
-      {
-        m_pending_key_images[p.first] = p.second;
-        m_pending_key_images_file_container.push_back(tools::out_key_to_ki{ p.first, p.second });
-        LOG_PRINT_L2("for tx " << tx_hash << " pending key image added (" << p.first << ", " << p.second << ")");
-      }
+      if (it->second != p.second)
+        LOG_PRINT_YELLOW("warning: for tx " << tx_hash << " out pub key " << p.first << " already exist in m_pending_key_images, ki: " << it->second << ", proposed new ki: " << p.second, LOG_LEVEL_0);
     }
+    else
+    {
+      m_pending_key_images[p.first] = p.second;
+      m_pending_key_images_file_container.push_back(tools::out_key_to_ki{ p.first, p.second });
+      LOG_PRINT_L2("for tx " << tx_hash << " pending key image added (" << p.first << ", " << p.second << ")");
+    }
+  }
 
-    for (auto& p : tri_ki_to_be_added)
+  for (auto& p : tri_ki_to_be_added)
+  {
+    //THROW_IF_FALSE_WALLET_INT_ERR_EX(p.first < m_transfers.size(), "incorrect transfer index: " << p.first);
+    auto& tr = m_transfers.at(p.first);
+    if (tr.m_key_image != currency::null_ki && tr.m_key_image != p.second)
     {
-      //THROW_IF_FALSE_WALLET_INT_ERR_EX(p.first < m_transfers.size(), "incorrect transfer index: " << p.first);
-      auto& tr = m_transfers.at(p.first);
-      if (tr.m_key_image != currency::null_ki && tr.m_key_image != p.second)
-      {
-        LOG_PRINT_YELLOW("transfer #" << p.first << " already has not null key image " << tr.m_key_image << " and it will be replaced with ki " << p.second, LOG_LEVEL_0);
-      }
-      tr.m_key_image = p.second;
-      m_key_images[p.second] = p.first;
-      LOG_PRINT_L2("for tx " << tx_hash << " key image " << p.second << " was associated with transfer # " << p.first);
+      LOG_PRINT_YELLOW("transfer #" << p.first << " already has not null key image " << tr.m_key_image << " and it will be replaced with ki " << p.second, LOG_LEVEL_0);
     }
+    tr.m_key_image = p.second;
+    m_key_images[p.second] = p.first;
+    LOG_PRINT_L2("for tx " << tx_hash << " key image " << p.second << " was associated with transfer # " << p.first);
   }
 
   // TODO: print inputs' key images
