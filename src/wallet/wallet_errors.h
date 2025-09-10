@@ -684,6 +684,38 @@ namespace tools
       std::string m_wallet_file;
     };
     //----------------------------------------------------------------------------------------------------
+    struct wallet_error_with_rpc_code : public wallet_logic_error
+    {
+      const std::string& rpc_error_message() const { return m_rpc_error_message; }
+      int64_t rpc_error_code() const { return m_rpc_error_code; }
+
+      std::string to_string() const
+      {
+        std::ostringstream ss;
+        ss << wallet_logic_error::to_string() << ", code = " << m_rpc_error_code << ", message = " << m_rpc_error_message;
+        return ss.str();
+      }
+
+      wallet_error_with_rpc_code(std::string&& loc, int64_t rpc_error_code, const std::string& rpc_error_message)
+        : wallet_logic_error(std::move(loc), rpc_error_message)
+        , m_rpc_error_code(rpc_error_code)
+        , m_rpc_error_message(rpc_error_message)
+      {
+      }
+
+      wallet_error_with_rpc_code(std::string&& loc, int64_t rpc_error_code, const std::string& rpc_error_message, const std::string& message)
+        : wallet_logic_error(std::move(loc), message)
+        , m_rpc_error_code(rpc_error_code)
+        , m_rpc_error_message(rpc_error_message)
+      {
+      }
+
+    private:
+      int64_t m_rpc_error_code;
+      std::string m_rpc_error_message;
+    };
+    //----------------------------------------------------------------------------------------------------
+
 
     template<typename TException, typename... TArgs>
     void throw_wallet_ex(std::string&& loc, const TArgs&... args)

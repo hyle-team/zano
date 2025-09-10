@@ -434,7 +434,7 @@ namespace currency
 
     struct response
     {
-      std::list<uint64_t> images_stat;  //true - unspent, false - spent
+      std::list<uint64_t> images_stat;  //1 - unspent, 0 - spent
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
