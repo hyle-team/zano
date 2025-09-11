@@ -8,7 +8,6 @@
 #include "string_coding.h"
 #include "profile_tools.h"
 #include "util.h"
-#include <boost/stacktrace.hpp>
 
 #define BUF_SIZE 1024
 
@@ -24,11 +23,6 @@
 // #undef LOG_DEFAULT_CHANNEL 
 // #define LOG_DEFAULT_CHANNEL "lmdb"
 // 'lmdb' channel is disabled by default
-static void print_stacktrace()
-{
-  LOG_PRINT_L0("Stacktrace \n" << boost::stacktrace::stacktrace());
-}
-
 
 //@#@
 #define LMDB_JOURNAL_LIMIT 10000
@@ -296,7 +290,6 @@ namespace tools
             << " thread_txs.m_txs=" << thread_txs.m_txs.size());
           dump();
           dump_tx_stacks();
-          print_stacktrace();
           if (!m_journal_printed)
           {
             print_journal(10000);
@@ -628,7 +621,6 @@ namespace tools
       {
         LOG_ERROR("[lmdb] thread_id thread(" << std::this_thread::get_id() << ") different from owner thread(" << m_owner << ")");
 //        m_db.get().dump_tx_stacks();
-//        print_stacktrace();
         CHECK_AND_ASSERT_THROW_MES(false, "[lmdb] cross-thread commit");
       }
     }
