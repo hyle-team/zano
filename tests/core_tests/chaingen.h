@@ -1158,8 +1158,12 @@ void append_vector_by_another_vector(U& dst, const V& src)
 //--------------------------------------------------------------------------
 
 
-#define PRINT_EVENT_N(VEC_EVENTS)            std::cout << concolor::yellow << ">EVENT # " << VEC_EVENTS.size() << ", line " << STR(__LINE__) << concolor::normal << std::endl
-#define PRINT_EVENT_N_TEXT(VEC_EVENTS, text) std::cout << concolor::yellow << ">EVENT # " << VEC_EVENTS.size() << ", line " << STR(__LINE__) << "  " << text << concolor::normal << std::endl
+//#define PRINT_EVENT_N(VEC_EVENTS)            std::cout << concolor::yellow << ">EVENT # " << VEC_EVENTS.size() << ", line " << STR(__LINE__) << concolor::normal << std::endl
+//#define PRINT_EVENT_N_TEXT(VEC_EVENTS, text) std::cout << concolor::yellow << ">EVENT # " << VEC_EVENTS.size() << ", line " << STR(__LINE__) << "  " << text << concolor::normal << std::endl
+
+#define PRINT_EVENT_N(VEC_EVENTS)            LOG_PRINT_COLOR_NO_PREFIX(">EVENT # " << VEC_EVENTS.size() << ", line " << STR(__LINE__), LOG_LEVEL_0, LOG_COLOR_YELLOW)
+#define PRINT_EVENT_N_TEXT(VEC_EVENTS, text) LOG_PRINT_COLOR_NO_PREFIX(">EVENT # " << VEC_EVENTS.size() << ", line " << STR(__LINE__) << "  " << text, LOG_LEVEL_0, LOG_COLOR_YELLOW)
+
 
 
 #define GENERATE_ACCOUNT(account)                                                     \

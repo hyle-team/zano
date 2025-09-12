@@ -2319,7 +2319,7 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
     if (m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_06, alt_chain_bei.height))
     {
       uint64_t split_length = alt_chain_bei.height > m_db_blocks.back()->height ? m_db_blocks.back()->height - connection_point.height: alt_chain_bei.height - connection_point.height;
-      if (split_length < 100)
+      if (split_length < 30)
       {
         wide_difficulty_type dummy;
         //performance effective quick check
@@ -2327,6 +2327,8 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
         wide_difficulty_type main_chain_pos_diff_precise = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain_type(), m_db_blocks.size() - 1, true, dummy);
         if (main_chain_pos_diff_precise > alt_chain_pos_diff_precise)
           return false;
+        else if (main_chain_pos_diff_precise < alt_chain_pos_diff_precise)
+          return true;
       }
     }
 

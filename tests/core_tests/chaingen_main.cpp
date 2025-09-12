@@ -698,7 +698,7 @@ public:
 private:
   void log_event(const std::string& event_type) const
   {
-    std::cout << concolor::yellow << "=== EVENT # " << m_ev_index << ": " << event_type << concolor::normal << std::endl;
+    LOG_PRINT_COLOR_NO_PREFIX("=== EVENT # " << m_ev_index << ": " << event_type, LOG_LEVEL_0, LOG_COLOR_YELLOW);
   }
 };
 //--------------------------------------------------------------------------
