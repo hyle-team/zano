@@ -69,6 +69,7 @@ using namespace currency;
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_MAJOR_FAILURE                         5 //if not blocks should ever be added with this condition
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_MOST_RECENT_HARDFORK_ID               6
 
+#define POS_COINBASE_DECOYS_PERCENTAGE                                      95
 
 #define TARGETDATA_CACHE_SIZE                          DIFFICULTY_WINDOW + 10
 
@@ -3409,7 +3410,7 @@ bool blockchain_storage::get_random_outs_for_amounts(const COMMAND_RPC_GET_RANDO
     {
       up_index_limit = it_limit->second;
     }
-    
+
     CHECK_AND_ASSERT_MES(up_index_limit <= outs_container_size, false, "internal error: find_end_of_allowed_index returned wrong index=" << up_index_limit << ", with amount_outs.size = " << outs_container_size);
     if (up_index_limit >= req.decoys_count)
     {
@@ -3516,17 +3517,141 @@ bool blockchain_storage::get_target_outs_for_amount_prezarcanum(const COMMAND_RP
 //------------------------------------------------------------------
 bool blockchain_storage::get_target_outs_for_postzarcanum(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution& details, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, std::map<uint64_t, uint64_t>& amounts_to_up_index_limit_cache) const 
 {
+  CHECK_AND_ASSERT_MES(details.amount == 0, false, "get_target_outs_for_postzarcanum called for non-zero amount");
+  result_outs.amount = 0;
+
+  // --- PoS mode: demon does 95% coinbase / 5% regular selection itself ---
+  if (req.is_decoy_selection_for_pos)
+  {
+    const size_t K = details.global_offsets.size(); // requested decoys count (wallet passes K == mixins+1)
+    if (K == 0)
+      return true;
+
+    const uint64_t amount = 0;
+    const uint64_t total = m_db_outputs.get_item_size(amount);
+    if (!total)
+      return true;
+
+    // limit by "not too fresh" rule
+    size_t up_index_limit = 0;
+    if (auto it = amounts_to_up_index_limit_cache.find(amount); it == amounts_to_up_index_limit_cache.end())
+    {
+      up_index_limit = find_end_of_allowed_index(amount);
+      amounts_to_up_index_limit_cache[amount] = up_index_limit;
+    }
+    else
+    {
+      up_index_limit = it->second;
+    }
+    CHECK_AND_ASSERT_MES(up_index_limit <= total, false, "upper limit OOB");
+    if (up_index_limit == 0)
+      return true;
+
+    // 1) Build candidate pools with all standard filters applied
+    std::vector<size_t> pool_cb;
+    pool_cb.reserve(up_index_limit);
+    std::vector<size_t> pool_reg;
+    pool_reg.reserve(up_index_limit);
+
+    // Reuse existing checks and flags through a probe container
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount probe{};
+    probe.amount = amount;
+
+    for (size_t gi = 0; gi < up_index_limit; ++gi)
+    {
+      const size_t before = probe.outs.size();
+      if (add_out_to_get_random_outs(probe, amount, gi, /*mix_count*/ K, req.use_forced_mix_outs, req.height_upper_limit))
+      {
+        const uint64_t flags = probe.outs.back().flags;
+        if (flags & RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_COINBASE)
+          pool_cb.push_back(gi);
+        else
+          pool_reg.push_back(gi);
+        probe.outs.pop_back();
+      }
+    }
+
+    if (pool_cb.empty() && pool_reg.empty())
+      return true;
+
+    // 2) Target counts per basket: 95%/5% (or request override)
+    unsigned pct = 95;
+    if (req.coinbase_percents <= 100)
+      pct = static_cast<unsigned>(req.coinbase_percents);
+    size_t target_cb  = (K * pct + 50) / 100; if (target_cb > K) target_cb = K;
+    size_t target_reg = K - target_cb;
+
+    // Cap by availability, borrow from the other pool when needed
+    target_cb  = std::min(target_cb,  pool_cb.size());
+    target_reg = std::min(target_reg, pool_reg.size());
+    {
+      size_t deficit = K - (target_cb + target_reg);
+      if (deficit)
+      {
+        const size_t add_cb = std::min(deficit, pool_cb.size() - target_cb);
+        target_cb += add_cb; deficit -= add_cb;
+        const size_t add_reg = std::min(deficit, pool_reg.size() - target_reg);
+        target_reg += add_reg; deficit -= add_reg;
+        // if still deficit > 0 – total eligible < K, we'll return fewer
+      }
+    }
+
+    // 3) Random sampling without repeats inside each pool
+    auto pick_and_pop = [](std::vector<size_t>& v)
+    {
+      size_t i = crypto::rand<size_t>() % v.size();
+      size_t x = v[i];
+      v[i] = v.back();
+      v.pop_back();
+      return x;
+    };
+
+    size_t added = 0;
+    while (target_reg && !pool_reg.empty() && added < K)
+    {
+      const size_t gi = pick_and_pop(pool_reg);
+      if (add_out_to_get_random_outs(result_outs, amount, gi, K, req.use_forced_mix_outs, req.height_upper_limit))
+      {
+        ++added;
+        --target_reg;
+      }
+    }
+    while (target_cb && !pool_cb.empty() && added < K)
+    {
+      const size_t gi = pick_and_pop(pool_cb);
+      if (add_out_to_get_random_outs(result_outs, amount, gi, K, req.use_forced_mix_outs, req.height_upper_limit))
+      {
+        ++added;
+        --target_cb;
+      }
+    }
+
+    // 4) If still short of K, pull randoms from leftovers irrespective of basket
+    while (added < K && (!pool_cb.empty() || !pool_reg.empty()))
+    {
+      std::vector<size_t>* src = pool_cb.empty() ? &pool_reg
+        : pool_reg.empty() ? &pool_cb
+        : (pool_cb.size() >= pool_reg.size() ? &pool_cb : &pool_reg);
+      const size_t gi = pick_and_pop(*src);
+      if (add_out_to_get_random_outs(result_outs, amount, gi, K, req.use_forced_mix_outs, req.height_upper_limit))
+        ++added;
+    }
+
+    return true;
+  }
+
+  // --- Regular AMOUNTS3 behavior (non-PoS): materialize wallet-supplied offsets ---
   for (auto global_index : details.global_offsets)
   {
-    //pick up a random output from selected_global_indes
-    bool res = add_out_to_get_random_outs(result_outs, details.amount, global_index, this->get_core_runtime_config().hf4_minimum_mixins, false);
-    if (!res)
+    const bool r = add_out_to_get_random_outs(result_outs, details.amount, global_index, this->get_core_runtime_config().hf4_minimum_mixins,
+      /*use_only_forced_to_mix*/false,req.height_upper_limit);
+    if (!r)
     {
-      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen = *result_outs.outs.insert(result_outs.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry{});
-      oen.flags = RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_NOT_ALLOWED;
+      auto& out_entry = *result_outs.outs.insert(result_outs.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry{});
+      out_entry.flags = RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_NOT_ALLOWED;
     }
   }
-  CHECK_AND_ASSERT_THROW_MES(details.global_offsets.size() == result_outs.outs.size(), "details.global_offsets.size() == result_outs.outs.size() check failed");  
+  CHECK_AND_ASSERT_THROW_MES(details.global_offsets.size() == result_outs.outs.size(), "details.global_offsets.size() == result_outs.outs.size() check failed");
   return true;
 }
 //------------------------------------------------------------------
