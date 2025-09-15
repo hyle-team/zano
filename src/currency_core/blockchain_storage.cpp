@@ -3516,18 +3516,132 @@ bool blockchain_storage::get_target_outs_for_amount_prezarcanum(const COMMAND_RP
 //------------------------------------------------------------------
 bool blockchain_storage::get_target_outs_for_postzarcanum(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution& details, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, std::map<uint64_t, uint64_t>& amounts_to_up_index_limit_cache) const 
 {
-  for (auto global_index : details.global_offsets)
+  const bool pos_mode = req.is_decoy_selection_for_pos;
+  result_outs.amount = details.amount;
+  const size_t n = details.global_offsets.size();
+  // TODO: exist method for rand?
+  size_t non_cb_slot = std::numeric_limits<size_t>::max();
+  if (pos_mode && n)
   {
-    //pick up a random output from selected_global_indes
-    bool res = add_out_to_get_random_outs(result_outs, details.amount, global_index, this->get_core_runtime_config().hf4_minimum_mixins, false);
-    if (!res)
+    uint64_t r = 0;
+    crypto::generate_random_bytes(sizeof(r), &r);
+    if ((r % 100) < 5) // TODO: do constant for 5%? and where?
+      non_cb_slot = static_cast<size_t>(r % n);
+  }
+
+  for (size_t i = 0; i < n; ++i)
+  {
+    const uint64_t height = details.global_offsets[i];
+    bool added = false;
+
+    if (pos_mode)
     {
-      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen = *result_outs.outs.insert(result_outs.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry{});
+      const bool want_coinbase = (i != non_cb_slot);
+
+      // try to materialize the output from this height, of the required type (coinbase = from miner-tx block, non-coinbase = from any regular tx of this block)
+      added = add_block_local_out_with_type(result_outs, details.amount, height, want_coinbase,
+        this->get_core_runtime_config().hf4_minimum_mixins, /*use_only_forced_mix=*/false, req.height_upper_limit);
+    }
+
+    // if the PoS branch did not work (or we are not in PoS), retain the old v3 behavior
+    if (!added)
+    {
+      added = add_out_to_get_random_outs(result_outs, details.amount, height,
+        this->get_core_runtime_config().hf4_minimum_mixins, /*use_only_forced_mix=*/false, req.height_upper_limit);
+    }
+
+    // maintain the size - if it doesnt work, mark it as NOT_ALLOWED
+    if (!added)
+    {
+      auto& oen = *result_outs.outs.insert(result_outs.outs.end(), COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry{});
       oen.flags = RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_NOT_ALLOWED;
     }
   }
-  CHECK_AND_ASSERT_THROW_MES(details.global_offsets.size() == result_outs.outs.size(), "details.global_offsets.size() == result_outs.outs.size() check failed");  
+  CHECK_AND_ASSERT_THROW_MES(result_outs.outs.size() == n, "details.global_offsets.size() == result_outs.outs.size() check failed");
   return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::add_block_local_out_with_type(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, uint64_t amount, uint64_t height, bool prefer_coinbase, uint64_t mix_count, bool use_only_forced_mix, uint64_t height_upper_limit) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  if (m_db_blocks.size() == 0 || height >= m_db_blocks.size())
+  {
+    return false;
+  }
+
+  if (height_upper_limit != 0 && height > height_upper_limit)
+  {
+    return false;
+  }
+
+  // find out how many outputs of this amount appeared in this block (through pre-block increments of global indexes)
+  const auto bgi_ptr = m_db_per_block_gindex_incs.get(static_cast<uint32_t>(height));
+  if (!bgi_ptr)
+  {
+    return false;
+  }
+
+  uint32_t inc_count_for_amount = 0;
+  for (const auto& inc : bgi_ptr->increments)
+  {
+    if (inc.amount == amount)
+    {
+      inc_count_for_amount = inc.increment;
+      break;
+    }
+  }
+  if (inc_count_for_amount == 0)
+    return false;
+
+  // calculate the starting global index for a given amount at this height (using a ready-made "local" table constructed from height to the top)
+  std::map<uint64_t, uint64_t> gindex_at_height;
+  calculate_local_gindex_lookup_table_for_height(height, gindex_at_height);
+
+  const uint64_t outs_total_now = m_db_outputs.get_item_size(amount);
+  auto it_base = gindex_at_height.find(amount);
+  const uint64_t range_begin = (it_base != gindex_at_height.end()) ? it_base->second : outs_total_now;
+  // range of outputs created by this particular block: [range_begin, range_begin + inc_count_for_amount)
+  uint64_t range_end = range_begin + inc_count_for_amount;
+  if (range_begin > outs_total_now)
+    return false;
+  if (range_end > outs_total_now)
+    range_end = outs_total_now;
+
+  // select candidates by transaction type (coinbase vs non-coinbase) without height shift
+  std::vector<uint64_t> candidates;
+  candidates.reserve(inc_count_for_amount);
+
+  for (uint64_t gi = range_begin; gi < range_end; ++gi)
+  {
+    const auto out_ptr = m_db_outputs.get_subitem(amount, gi);
+    if (!out_ptr)
+      continue;
+
+    const auto tx_ptr = m_db_transactions.find(out_ptr->tx_id);
+    if (!tx_ptr)
+      continue;
+
+    const bool is_cb = is_coinbase(tx_ptr->tx);
+    if ((prefer_coinbase && is_cb) || (!prefer_coinbase && !is_cb))
+      candidates.push_back(gi);
+  }
+
+  if (candidates.empty())
+    return false;
+
+  // to eliminate systematic bias toward the first item when there are multiple candidates
+  const size_t m = candidates.size();
+  const size_t start = crypto::rand<size_t>() % m;
+
+  for (size_t k = 0; k < m; ++k)
+  {
+    const uint64_t gi = candidates[(start + k) % m];
+    if (add_out_to_get_random_outs(result_outs, amount, gi, mix_count, use_only_forced_mix, height_upper_limit))
+      return true;
+  }
+
+  return false;
 }
 //------------------------------------------------------------------
 bool blockchain_storage::get_random_outs_for_amounts3(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& res)const
