@@ -3518,18 +3518,18 @@ bool blockchain_storage::get_target_outs_for_postzarcanum(const COMMAND_RPC_GET_
 {
   const bool pos_mode = req.is_decoy_selection_for_pos;
   result_outs.amount = details.amount;
-  const size_t n = details.global_offsets.size();
+  const size_t glob_offsets_size = details.global_offsets.size();
   // TODO: exist method for rand?
   size_t non_cb_slot = std::numeric_limits<size_t>::max();
-  if (pos_mode && n)
+  if (pos_mode && glob_offsets_size)
   {
     uint64_t r = 0;
     crypto::generate_random_bytes(sizeof(r), &r);
     if ((r % 100) < 5) // TODO: do constant for 5%? and where?
-      non_cb_slot = static_cast<size_t>(r % n);
+      non_cb_slot = static_cast<size_t>(r % glob_offsets_size);
   }
 
-  for (size_t i = 0; i < n; ++i)
+  for (size_t i = 0; i < glob_offsets_size; ++i)
   {
     const uint64_t height = details.global_offsets[i];
     bool added = false;
@@ -3537,7 +3537,6 @@ bool blockchain_storage::get_target_outs_for_postzarcanum(const COMMAND_RPC_GET_
     if (pos_mode)
     {
       const bool want_coinbase = (i != non_cb_slot);
-
       // try to materialize the output from this height, of the required type (coinbase = from miner-tx block, non-coinbase = from any regular tx of this block)
       added = add_block_local_out_with_type(result_outs, details.amount, height, want_coinbase,
         this->get_core_runtime_config().hf4_minimum_mixins, /*use_only_forced_mix=*/false, req.height_upper_limit);
@@ -3557,7 +3556,7 @@ bool blockchain_storage::get_target_outs_for_postzarcanum(const COMMAND_RPC_GET_
       oen.flags = RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_NOT_ALLOWED;
     }
   }
-  CHECK_AND_ASSERT_THROW_MES(result_outs.outs.size() == n, "details.global_offsets.size() == result_outs.outs.size() check failed");
+  CHECK_AND_ASSERT_THROW_MES(result_outs.outs.size() == glob_offsets_size, "details.global_offsets.size() == result_outs.outs.size() check failed");
   return true;
 }
 //------------------------------------------------------------------
@@ -3640,7 +3639,6 @@ bool blockchain_storage::add_block_local_out_with_type(COMMAND_RPC_GET_RANDOM_OU
     if (add_out_to_get_random_outs(result_outs, amount, gi, mix_count, use_only_forced_mix, height_upper_limit))
       return true;
   }
-
   return false;
 }
 //------------------------------------------------------------------
