@@ -4981,7 +4981,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
     decoys_req.use_forced_mix_outs = use_only_forced_to_mix;
     decoys_req.decoys_count = required_decoys_count + 1; // one more to be able to skip a decoy in case it hits the real output
     decoys_req.is_coinbase_selection = true;
-    decoys_req.height_distribution.push_back(0); // request one batch of decoys for height -> amounts(hidden)
+    req.height_distributions.push_back(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::height_distribution()); // request one batch of decoys for height -> amounts(hidden)
     build_distribution_for_input(decoys_req.height_distributions, it->second.m_ptx_wallet_info->m_block_height, decoy_selection_generator::dist_kind::coinbase);
 
     r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3(decoys_req, decoys_resp);
