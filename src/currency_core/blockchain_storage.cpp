@@ -3114,7 +3114,7 @@ bool blockchain_storage::get_random_outs_for_amounts3(const COMMAND_RPC_GET_RAND
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::get_random_outs_for_amounts4(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request_height_outs& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response_height_outs& res) const
+bool blockchain_storage::get_random_outs_for_amounts4(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& res) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   return false; // not implemented yet

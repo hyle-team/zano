@@ -4967,7 +4967,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
   txin_zc_input& stake_input = boost::get<txin_zc_input>(b.miner_tx.vin[1]);
   const tx_out_zarcanum& stake_out = boost::get<tx_out_zarcanum>(stake_out_v);
 
-  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response_height_outs decoys_resp = AUTO_VAL_INIT(decoys_resp);
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response decoys_resp = AUTO_VAL_INIT(decoys_resp);
   std::vector<crypto::CLSAG_GGXXG_input_ref_t> ring;
   uint64_t secret_index = 0; // index of the real stake output
 
@@ -4976,21 +4976,19 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
   static bool use_only_forced_to_mix = false;       // TODO @#@# set them somewhere else
   if (required_decoys_count > 0 && !is_auditable())
   {
-    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request_height_outs decoys_req = AUTO_VAL_INIT(decoys_req);
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request decoys_req = AUTO_VAL_INIT(decoys_req);
     decoys_req.height_upper_limit = m_last_pow_block_h; // request decoys to be either older than, or the same age as stake output's height
-    decoys_req.use_forced_mix_outs = use_only_forced_to_mix;
-    decoys_req.height_count = required_decoys_count + 1; // one more to be able to skip a decoy in case it hits the real output
-    decoys_req.is_coinbase_selection = true;
-    decoys_req.height_distributions = {}; // request outs by heights distribution
-    build_distribution_for_input(decoys_req.height_distributions, td.m_ptx_wallet_info->m_block_height, decoy_selection_generator::dist_kind::coinbase);
+    decoys_req.lookup_for_strategy = LOOK_UP_STRATEGY_POS_COINBASE;
+    decoys_req.heights = {}; // request outs by heights distribution
+    build_distribution_for_input(decoys_req.heights, td.m_ptx_wallet_info->m_block_height, decoy_selection_generator::dist_kind::coinbase);
 
     r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(decoys_req, decoys_resp);
     // TODO @#@# do we need these exceptions?
     THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs1.bin");
     THROW_IF_FALSE_WALLET_EX(decoys_resp.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs1.bin");
     THROW_IF_FALSE_WALLET_EX(decoys_resp.status == API_RETURN_CODE_OK, error::get_random_outs_error, decoys_resp.status);
-    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(decoys_resp.outs.size() == 1, "got wrong number of decoys batches: " << decoys_resp.outs.size());
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoys_resp.outs[0].outs.size() == required_decoys_count + 1, "for PoS stake tx got less decoys to mix than requested: " << decoys_resp.outs[0].outs.size() << " < " << required_decoys_count + 1);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(decoys_resp.blocks.size() == 1, "got wrong number of decoys batches: " << decoys_resp.blocks.size());
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoys_resp.blocks.size() == required_decoys_count + 1, "for PoS stake tx got less blocks to mix than requested: " << decoys_resp.blocks.size() << " < " << required_decoys_count + 1);
 
     auto& decoys = decoys_resp.outs[0].outs;
     decoys.emplace_front(td.m_global_output_index, stake_out.stealth_address, stake_out.amount_commitment, stake_out.concealing_point, stake_out.blinded_asset_id);

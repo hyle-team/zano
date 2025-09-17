@@ -651,61 +651,53 @@ namespace currency
     typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response response;
   };
 
+  // decoy strategy for regular TX
+  #define LOOK_UP_STRATEGY_REGULAR_TX           "LOOK_UP_STRATEGY_REGULAR_TX"
+  // decoy strategy for PoS coinbase 
+  #define LOOK_UP_STRATEGY_POS_COINBASE         "LOOK_UP_STRATEGY_POS_COINBASE"
   struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4
   {
-    DOC_COMMAND("Version 4 of the command to retrieve random decoy outputs for specified heights, focusing on either pre-zarcanum or post-zarcanum zones based on the amount value.");
-    
-        struct outs_for_height
-        {
-          uint64_t height = 0;
-          std::list<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> outs;
+    DOC_COMMAND("Version 4 of the command to retrieve random decoy outputs for specified amounts, focusing on either pre-zarcanum or post-zarcanum zones based on the amount value.");
 
-          BEGIN_KV_SERIALIZE_MAP()
-            KV_SERIALIZE(height)                     DOC_DSCR("The height for which decoys are returned.") DOC_EXMP_AUTO(1) DOC_END
-            KV_SERIALIZE_CONTAINER_POD_AS_BLOB(outs) //DOC_DSCR("List of 'out_entry' structures, serialized as a blob.") DOC_END
-          END_KV_SERIALIZE_MAP()
-        };
+    struct request
+    {
+      std::vector<uint64_t> heights;                    // array heights derived from decoy selection algorithm, number of heights expected to be not less than minimal ring size
+      uint64_t              height_upper_limit;         // if nonzero, all the decoy outputs must be either older than, or the same age as this height
+      std::string           look_up_strategy;           // LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE                                                        // if lookup_for_non_coinbase if false, this means that node should look up for PoS blocks, so if heights[i] points to PoW, it should look up for nearest PoS 
 
-        struct response_height_outs
-        {
-          std::vector<outs_for_height> outs;
-          std::string status;
-          BEGIN_KV_SERIALIZE_MAP()
-            KV_SERIALIZE(outs)                       DOC_DSCR("List of 'outs_for_height' structures, each containing decoys for a specific height.") DOC_EXMP_AUTO(1) DOC_END
-            KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
-          END_KV_SERIALIZE_MAP()
-        };
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(heights)                     DOC_DSCR("array heights derived from decoy selection algorithm, number of heights expected to be not less than minimal ring size") DOC_EXMP_AUTO({ 1,2,3 }) DOC_END
+        KV_SERIALIZE(height_upper_limit)          DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_EXMP(2555000) DOC_END
+        KV_SERIALIZE(look_up_strategy)            DOC_DSCR("LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE") DOC_EXMP("LOOK_UP_STRATEGY_REGULAR_TX") DOC_END
 
-        struct height_distribution
-        {
-          uint64_t height; // place to look for outputs
-          std::vector<uint64_t> global_offsets; //[i] = global_index to pick up
-    
-          BEGIN_KV_SERIALIZE_MAP()
-            KV_SERIALIZE(height)                     DOC_DSCR("Height to look for outputs.") DOC_EXMP_AUTO(0) DOC_END
-            KV_SERIALIZE(global_offsets)             DOC_DSCR("List of global indices for picking decoys. Each index corresponds to a potential decoy output.") DOC_EXMP_AGGR(1, 3, 5928, 2811) DOC_END
-          END_KV_SERIALIZE_MAP()
-        };
-    
-        struct request_height_outs
-        {
-          std::vector<uint64_t> height_distributions;
-          uint64_t            height_upper_limit; // if nonzero, all the decoy outputs must be either older than, or the same age as this height
-          bool                use_forced_mix_outs;
-          uint64_t            height_count;
-          uint64_t            coinbase_percents;     //from 0 to 100, estimate percents of coinbase outputs included in decoy sets  
-          bool                is_coinbase_selection;
-          BEGIN_KV_SERIALIZE_MAP()
-            KV_SERIALIZE(height_distributions)       DOC_DSCR("List of height distributions specifying where to look for decoys, based on old bare outputs or ZC outputs.") DOC_EXMP_AUTO(1) DOC_END
-            KV_SERIALIZE(height_upper_limit)         DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_EXMP(2555000) DOC_END
-            KV_SERIALIZE(use_forced_mix_outs)        DOC_DSCR("If true, only outputs with a 'mix_attr' greater than 0 are used as decoys.") DOC_EXMP(false) DOC_END
-            KV_SERIALIZE(coinbase_percents)          DOC_DSCR("Specifies the estimated percentage of coinbase outputs to be included in the decoy sets, ranging from 0 to 100.") DOC_EXMP(15) DOC_END
-            KV_SERIALIZE(is_coinbase_selection)      DOC_DSCR("If true, use coinbase selection algorithm.") DOC_EXMP(false) DOC_END
-          END_KV_SERIALIZE_MAP()
-        };
+      END_KV_SERIALIZE_MAP()
+    };
 
-    typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response response;
+
+    struct outputs_in_block
+    {
+      uint64_t block_height;
+      std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> outputs;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(block_height)                      DOC_DSCR("Block's height") DOC_EXMP_AUTO(12345) DOC_END
+        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(outputs)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::vector<outputs_in_block> blocks;
+      std::string status;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(blocks)    DOC_DSCR("Blocks collected by node") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(status)    DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
   };
+
   //-----------------------------------------------
   struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY
   {

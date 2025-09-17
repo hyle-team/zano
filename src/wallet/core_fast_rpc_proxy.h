@@ -68,7 +68,7 @@ namespace tools
       return m_rpc.on_get_random_outs3(req, res, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
-    bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request_height_outs& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response_height_outs& res) override
+    bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& res) override
     {
       return m_rpc.on_get_random_outs4(req, res, m_cntxt_stub);
     }
