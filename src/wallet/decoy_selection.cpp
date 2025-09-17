@@ -22,10 +22,24 @@ uint64_t scaler::scale(uint64_t h)
   return static_cast<uint64_t>(std::round(y));
 }
 
-void decoy_selection_generator::init(uint64_t max_h)
+void decoy_selection_generator::init(uint64_t max_h, const std::vector<distribution_entry>& entries)
 {
+  load_distribution(entries, max_h);
+  m_is_initialized = true;
+  m_max = max_h;
+}
 
-  load_distribution(g_default_distribution, max_h);
+void decoy_selection_generator::init(uint64_t max_h, dist_kind kind)
+{
+  switch (kind)
+  {
+    case dist_kind::regular:
+      load_distribution(g_default_distribution, max_h);
+      break;
+    case dist_kind::coinbase:
+      load_distribution(g_default_coinbase_distribution, max_h);
+      break;
+  }
   m_is_initialized = true;
   m_max = max_h; // distribution INCLUDE m_max, count = m_max + 1
 }

@@ -69,9 +69,9 @@ namespace ph = boost::placeholders;
           { \
             auto writer = fail_msg_writer(); \
             writer << "not enough outputs for specified mixin_count = " << e.mixin_count() << ":"; \
-            for (const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& outs_for_amount : e.scanty_outs()) \
+            for (const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_height& outs_for_height : e.scanty_outs()) \
             { \
-              writer << "\noutput amount = " << print_money(outs_for_amount.amount) << ", fount outputs to mix = " << outs_for_amount.outs.size(); \
+              writer << "\noutput amount = " << print_money(outs_for_height.amount) << ", found outputs to mix = " << outs_for_height.outs.size(); \
             } \
           } \
           catch (const tools::error::tx_not_constructed&) \
