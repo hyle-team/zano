@@ -4976,15 +4976,15 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
   static bool use_only_forced_to_mix = false;       // TODO @#@# set them somewhere else
   if (required_decoys_count > 0 && !is_auditable())
   {
-    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request_height_outs decoys_req = AUTO_VAL_INIT(decoys_req);
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request_height_outs decoys_req = AUTO_VAL_INIT(decoys_req);
     decoys_req.height_upper_limit = m_last_pow_block_h; // request decoys to be either older than, or the same age as stake output's height
     decoys_req.use_forced_mix_outs = use_only_forced_to_mix;
     decoys_req.decoys_count = required_decoys_count + 1; // one more to be able to skip a decoy in case it hits the real output
     decoys_req.is_coinbase_selection = true;
-    req.height_distributions.push_back(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::height_distribution()); // request one batch of decoys for height -> amounts(hidden)
+    req.height_distributions.push_back(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::height_distribution()); // request one batch of decoys for height -> amounts(hidden)
     build_distribution_for_input(decoys_req.height_distributions, it->second.m_ptx_wallet_info->m_block_height, decoy_selection_generator::dist_kind::coinbase);
 
-    r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3(decoys_req, decoys_resp);
+    r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(decoys_req, decoys_resp);
     // TODO @#@# do we need these exceptions?
     THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs1.bin");
     THROW_IF_FALSE_WALLET_EX(decoys_resp.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs1.bin");

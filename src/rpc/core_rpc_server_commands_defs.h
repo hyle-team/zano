@@ -597,28 +597,6 @@ namespace currency
     };
 #pragma pack(pop)
 
-    struct outs_for_height
-    {
-      uint64_t height = 0;
-      std::list<out_entry> outs;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(height)                     DOC_DSCR("The height for which decoys are returned.") DOC_EXMP_AUTO(1) DOC_END
-        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(outs) //DOC_DSCR("List of 'out_entry' structures, serialized as a blob.") DOC_END
-      END_KV_SERIALIZE_MAP()
-    };
-
-    struct response_height_outs
-    {
-      std::vector<outs_for_height> outs;
-      std::string status;
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(outs)                       DOC_DSCR("List of 'outs_for_height' structures, each containing decoys for a specific height.") DOC_EXMP_AUTO(1) DOC_END
-        KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
-      END_KV_SERIALIZE_MAP()
-    };
-
-    //TODO: should be replaced with outs_for_height? 
     struct outs_for_amount
     {
       uint64_t amount = 0;
@@ -630,7 +608,6 @@ namespace currency
       END_KV_SERIALIZE_MAP()
     };
 
-    //TODO: should be replaced with response_height_outs? 
     struct response
     {
       std::vector<outs_for_amount> outs;
@@ -645,7 +622,60 @@ namespace currency
   struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3
   {
     DOC_COMMAND("Version 3 of the command to retrieve random decoy outputs for specified amounts, focusing on either pre-zarcanum or post-zarcanum zones based on the amount value.");
+
+    struct offsets_distribution
+    {
+      uint64_t amount; //if amount is 0 then lookup in post-zarcanum zone only, if not 0 then pre-zarcanum only
+      std::vector<uint64_t> global_offsets; //[i] = global_index to pick up
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(amount)                     DOC_DSCR("If set to 0, only ZC outputs are considered. If nonzero, only old bare outputs are considered.") DOC_EXMP_AUTO(0) DOC_END
+        KV_SERIALIZE(global_offsets)             DOC_DSCR("List of global indices for picking decoys. Each index corresponds to a potential decoy output.") DOC_EXMP_AGGR(1, 3, 5928, 2811) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct request
+    {
+      std::vector<offsets_distribution> amounts;
+      uint64_t            height_upper_limit; // if nonzero, all the decoy outputs must be either older than, or the same age as this height
+      bool                use_forced_mix_outs;
+      uint64_t            coinbase_percents;     //from 0 to 100, estimate percents of coinbase outputs included in decoy sets  
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(amounts)                    DOC_DSCR("List of amount distributions specifying where to look for decoys, based on old bare outputs or ZC outputs.") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(height_upper_limit)         DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_EXMP(2555000) DOC_END
+        KV_SERIALIZE(use_forced_mix_outs)        DOC_DSCR("If true, only outputs with a 'mix_attr' greater than 0 are used as decoys.") DOC_EXMP(false) DOC_END
+        KV_SERIALIZE(coinbase_percents)          DOC_DSCR("Specifies the estimated percentage of coinbase outputs to be included in the decoy sets, ranging from 0 to 100.") DOC_EXMP(15) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response response;
+  };
+
+  struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4
+  {
+    DOC_COMMAND("Version 4 of the command to retrieve random decoy outputs for specified heights, focusing on either pre-zarcanum or post-zarcanum zones based on the amount value.");
     
+        struct outs_for_height
+        {
+          uint64_t height = 0;
+          std::list<out_entry> outs;
+
+          BEGIN_KV_SERIALIZE_MAP()
+            KV_SERIALIZE(height)                     DOC_DSCR("The height for which decoys are returned.") DOC_EXMP_AUTO(1) DOC_END
+            KV_SERIALIZE_CONTAINER_POD_AS_BLOB(outs) //DOC_DSCR("List of 'out_entry' structures, serialized as a blob.") DOC_END
+          END_KV_SERIALIZE_MAP()
+        };
+
+        struct response_height_outs
+        {
+          std::vector<outs_for_height> outs;
+          std::string status;
+          BEGIN_KV_SERIALIZE_MAP()
+            KV_SERIALIZE(outs)                       DOC_DSCR("List of 'outs_for_height' structures, each containing decoys for a specific height.") DOC_EXMP_AUTO(1) DOC_END
+            KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+          END_KV_SERIALIZE_MAP()
+        };
+
         struct height_distribution
         {
           uint64_t height; // place to look for outputs
@@ -672,33 +702,6 @@ namespace currency
             KV_SERIALIZE(is_coinbase_selection)      DOC_DSCR("If true, use coinbase selection algorithm.") DOC_EXMP(false) DOC_END
           END_KV_SERIALIZE_MAP()
         };
-
-    //TODO: replace with height_distribution?
-    struct offsets_distribution
-    {
-      uint64_t amount; //if amount is 0 then lookup in post-zarcanum zone only, if not 0 then pre-zarcanum only
-      std::vector<uint64_t> global_offsets; //[i] = global_index to pick up
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(amount)                     DOC_DSCR("If set to 0, only ZC outputs are considered. If nonzero, only old bare outputs are considered.") DOC_EXMP_AUTO(0) DOC_END
-        KV_SERIALIZE(global_offsets)             DOC_DSCR("List of global indices for picking decoys. Each index corresponds to a potential decoy output.") DOC_EXMP_AGGR(1, 3, 5928, 2811) DOC_END
-      END_KV_SERIALIZE_MAP()
-    };
-
-    //TODO: should be replaced with request_height_outs?
-    struct request
-    {
-      std::vector<offsets_distribution> amounts;
-      uint64_t            height_upper_limit; // if nonzero, all the decoy outputs must be either older than, or the same age as this height
-      bool                use_forced_mix_outs;
-      uint64_t            coinbase_percents;     //from 0 to 100, estimate percents of coinbase outputs included in decoy sets  
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(amounts)                    DOC_DSCR("List of amount distributions specifying where to look for decoys, based on old bare outputs or ZC outputs.") DOC_EXMP_AUTO(1) DOC_END
-        KV_SERIALIZE(height_upper_limit)         DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_EXMP(2555000) DOC_END
-        KV_SERIALIZE(use_forced_mix_outs)        DOC_DSCR("If true, only outputs with a 'mix_attr' greater than 0 are used as decoys.") DOC_EXMP(false) DOC_END
-        KV_SERIALIZE(coinbase_percents)          DOC_DSCR("Specifies the estimated percentage of coinbase outputs to be included in the decoy sets, ranging from 0 to 100.") DOC_EXMP(15) DOC_END
-      END_KV_SERIALIZE_MAP()
-    };
 
     typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response response;
   };
