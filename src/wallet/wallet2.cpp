@@ -4982,7 +4982,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
     decoys_req.decoys_count = required_decoys_count + 1; // one more to be able to skip a decoy in case it hits the real output
     decoys_req.is_coinbase_selection = true;
     decoys_req.height_distribution.push_back(0); // request one batch of decoys for height -> amounts(hidden)
-
+    build_distribution(decoys_req.height_distribution, td.m_ptx_wallet_info->m_block_height, decoys_req.height_upper_limit, 1);
     r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3(decoys_req, decoys_resp);
     // TODO @#@# do we need these exceptions?
     THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs1.bin");
@@ -6725,7 +6725,7 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys
         //Zarcanum era
         rdisttib.amount = 0;
         //generate distribution in Zarcanum hardfork
-        build_distribution_for_input(rdisttib.height_distributions, it->second.m_global_output_index, decoy_selection_generator::dist_kind::regular); // TODO: change for height based distribution
+        build_distribution_for_input(rdisttib.height_distributions, it->second.m_ptx_wallet_info->m_block_height, decoy_selection_generator::dist_kind::regular); // TODO: change for height based distribution
         need_to_request = true;
       }
       else
