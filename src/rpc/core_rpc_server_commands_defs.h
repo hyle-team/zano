@@ -658,7 +658,7 @@ namespace currency
         struct outs_for_height
         {
           uint64_t height = 0;
-          std::list<out_entry> outs;
+          std::list<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> outs;
 
           BEGIN_KV_SERIALIZE_MAP()
             KV_SERIALIZE(height)                     DOC_DSCR("The height for which decoys are returned.") DOC_EXMP_AUTO(1) DOC_END
@@ -689,9 +689,10 @@ namespace currency
     
         struct request_height_outs
         {
-          std::vector<height_distribution> height_distributions;
+          std::vector<uint64_t> height_distributions;
           uint64_t            height_upper_limit; // if nonzero, all the decoy outputs must be either older than, or the same age as this height
           bool                use_forced_mix_outs;
+          uint64_t            height_count;
           uint64_t            coinbase_percents;     //from 0 to 100, estimate percents of coinbase outputs included in decoy sets  
           bool                is_coinbase_selection;
           BEGIN_KV_SERIALIZE_MAP()

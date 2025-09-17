@@ -4967,7 +4967,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
   txin_zc_input& stake_input = boost::get<txin_zc_input>(b.miner_tx.vin[1]);
   const tx_out_zarcanum& stake_out = boost::get<tx_out_zarcanum>(stake_out_v);
 
-  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response decoys_resp = AUTO_VAL_INIT(decoys_resp);
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response_height_outs decoys_resp = AUTO_VAL_INIT(decoys_resp);
   std::vector<crypto::CLSAG_GGXXG_input_ref_t> ring;
   uint64_t secret_index = 0; // index of the real stake output
 
@@ -4979,10 +4979,10 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request_height_outs decoys_req = AUTO_VAL_INIT(decoys_req);
     decoys_req.height_upper_limit = m_last_pow_block_h; // request decoys to be either older than, or the same age as stake output's height
     decoys_req.use_forced_mix_outs = use_only_forced_to_mix;
-    decoys_req.decoys_count = required_decoys_count + 1; // one more to be able to skip a decoy in case it hits the real output
+    decoys_req.height_count = required_decoys_count + 1; // one more to be able to skip a decoy in case it hits the real output
     decoys_req.is_coinbase_selection = true;
-    req.height_distributions.push_back(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::height_distribution()); // request one batch of decoys for height -> amounts(hidden)
-    build_distribution_for_input(decoys_req.height_distributions, it->second.m_ptx_wallet_info->m_block_height, decoy_selection_generator::dist_kind::coinbase);
+    decoys_req.height_distributions = {}; // request outs by heights distribution
+    build_distribution_for_input(decoys_req.height_distributions, td.m_ptx_wallet_info->m_block_height, decoy_selection_generator::dist_kind::coinbase);
 
     r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(decoys_req, decoys_resp);
     // TODO @#@# do we need these exceptions?
@@ -6702,12 +6702,12 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request req = AUTO_VAL_INIT(req);
     req.height_upper_limit = m_last_pow_block_h;  // request decoys to be either older than, or the same age as stake output's height
     req.use_forced_mix_outs = false; // TODO: add this feature to UI later
-    req.is_coinbase_selection = false;
     //req.decoys_count = fake_outputs_count + 1;    // one more to be able to skip a decoy in case it hits the real output
     for (uint64_t i : selected_indicies)
     {
-      req.height_distributions.push_back(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::height_distribution());
-      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::height_distribution& rdisttib = req.height_distributions.back();
+      // TODO: change it to height distrib
+      req.amounts.push_back(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution());
+      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution& rdisttib = req.amounts.back();
 
       auto it = m_transfers.find(i);
       WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_transfers.end(),
@@ -6726,7 +6726,7 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys
         //Zarcanum era
         rdisttib.amount = 0;
         //generate distribution in Zarcanum hardfork
-        build_distribution_for_input(rdisttib.height_distributions, it->second.m_ptx_wallet_info->m_block_height, decoy_selection_generator::dist_kind::regular);
+        build_distribution_for_input(rdisttib.global_offsets, it->second.m_global_output_index, decoy_selection_generator::dist_kind::regular);
         need_to_request = true;
       }
       else
@@ -6764,7 +6764,7 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys
         break;
       }
 
-      std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_height> scanty_outs;
+      std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount> scanty_outs;
       THROW_IF_FALSE_WALLET_EX(daemon_resp.outs.size() == req.amounts.size(), error::not_enough_outs_to_mix, scanty_outs, fake_outputs_count);
 
       if (!use_all_decoys_if_found_less_than_required)
@@ -6901,7 +6901,7 @@ typename t_obj_container::value_type extract_random_from_container(t_obj_contain
   return obj;
 }
 //----------------------------------------------------------------------------------------------------------------
-void wallet2::select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_height& amount_entry, uint64_t own_g_index)
+void wallet2::select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& amount_entry, uint64_t own_g_index)
 {
   THROW_IF_FALSE_WALLET_INT_ERR_EX(amount_entry.amount == 0, "Amount is not 0 in zc decoys entry");
   typedef currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry out_entry;
@@ -6934,7 +6934,7 @@ void wallet2::select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS
     }
 
 
-    local_outs.puсsh_back(entry);
+    local_outs.push_back(entry);
   }
 
   //extend with coin base outs if needed
