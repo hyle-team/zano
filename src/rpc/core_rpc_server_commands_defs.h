@@ -634,7 +634,6 @@ namespace currency
       END_KV_SERIALIZE_MAP()
     };
 
-
     struct request
     {
       std::vector<offsets_distribution> amounts;
@@ -651,6 +650,52 @@ namespace currency
 
     typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response response;
   };
+
+  //-----------------------------------------------
+  struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4
+  {
+    DOC_COMMAND("Version 4 of the command to retrieve random decoy outputs for specified amounts, focusing on either pre-zarcanum or post-zarcanum zones based on the amount value.");
+
+    struct request
+    {
+      std::vector<uint64_t> heights;                    // array heights derived from decoy selection algorithm, number of heights expected to be not less than minimal ring size
+      uint64_t              height_upper_limit;         // if nonzero, all the decoy outputs must be either older than, or the same age as this height
+      bool                  lookup_for_non_coinbase;    // if request is performed for regular tx(lookup_for_non_coinbase == true), then node should look up for non-empty blocks with regular txs(non-coinbase)
+                                                        // if lookup_for_non_coinbase if false, this means that node should look up for PoS blocks, so if heights[i] points to PoW, it should look up for nearest PoS 
+      
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(heights)                     DOC_DSCR("array heights derived from decoy selection algorithm, number of heights expected to be not less than minimal ring size") DOC_EXMP_AUTO({ 1,2,3 }) DOC_END
+        KV_SERIALIZE(height_upper_limit)          DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_EXMP(2555000) DOC_END
+        KV_SERIALIZE(lookup_for_non_coinbase)     DOC_DSCR("set this true if request is performed for regular tx, then node should look up for non-empty blocks with regular txs(non-coinbase)") DOC_EXMP(false) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+
+    struct outputs_in_block
+    {
+      uint64_t block_height;
+      std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> outputs;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(block_height)    DOC_DSCR("Block's height") DOC_EXMP_AUTO(12345) DOC_END
+        KV_SERIALIZE(outputs)         DOC_DSCR("Outputs related to this block") DOC_EXMP(1) DOC_END
+      END_KV_SERIALIZE_MAP()
+
+    };
+      
+    
+
+    struct response
+    {
+      std::vector<outputs_in_block> blocks;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(blocks)    DOC_DSCR("Blocks collected by node") DOC_EXMP_AUTO(1) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+  };
+
   //-----------------------------------------------
   struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY
   {
