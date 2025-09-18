@@ -981,7 +981,9 @@ namespace currency
       return true;
     }
 
-    if(!tvc.m_should_be_relayed)
+    //if transaction already existed in the pool or in the blockchain (m_already_existed == true)
+    //then it shouldn't look like an error
+    if(!tvc.m_should_be_relayed || !tvc.m_already_existed)
     {
       LOG_PRINT_L0("[on_send_raw_tx]: tx accepted, but not relayed, tx blob: " << req.tx_as_hex);
       res.status = "Not relayed";
