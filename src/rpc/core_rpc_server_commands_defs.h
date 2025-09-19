@@ -641,11 +641,13 @@ namespace currency
       uint64_t            height_upper_limit; // if nonzero, all the decoy outputs must be either older than, or the same age as this height
       bool                use_forced_mix_outs;
       uint64_t            coinbase_percents;     //from 0 to 100, estimate percents of coinbase outputs included in decoy sets  
+      bool                is_decoy_selection_for_pos;
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(amounts)                    DOC_DSCR("List of amount distributions specifying where to look for decoys, based on old bare outputs or ZC outputs.") DOC_EXMP_AUTO(1) DOC_END
         KV_SERIALIZE(height_upper_limit)         DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_EXMP(2555000) DOC_END
         KV_SERIALIZE(use_forced_mix_outs)        DOC_DSCR("If true, only outputs with a 'mix_attr' greater than 0 are used as decoys.") DOC_EXMP(false) DOC_END
         KV_SERIALIZE(coinbase_percents)          DOC_DSCR("Specifies the estimated percentage of coinbase outputs to be included in the decoy sets, ranging from 0 to 100.") DOC_EXMP(15) DOC_END
+        KV_SERIALIZE(is_decoy_selection_for_pos) DOC_DSCR("If true, decoy selection is optimized for PoS transactions.") DOC_EXMP_AUTO(false) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
