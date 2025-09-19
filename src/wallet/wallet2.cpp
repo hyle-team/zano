@@ -4973,12 +4973,11 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
 
   // get decoys outputs and construct miner tx
   const size_t required_decoys_count = m_core_runtime_config.hf4_minimum_mixins == 0 ? 4 /* <-- for tests */ : m_core_runtime_config.hf4_minimum_mixins;
-  static bool use_only_forced_to_mix = false;       // TODO @#@# set them somewhere else
   if (required_decoys_count > 0 && !is_auditable())
   {
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request decoys_req = AUTO_VAL_INIT(decoys_req);
     decoys_req.height_upper_limit = m_last_pow_block_h; // request decoys to be either older than, or the same age as stake output's height
-    decoys_req.lookup_for_strategy = LOOK_UP_STRATEGY_POS_COINBASE;
+    decoys_req.look_up_strategy = LOOK_UP_STRATEGY_POS_COINBASE;
     decoys_req.heights = {}; // request outs by heights distribution
     build_distribution_for_input(decoys_req.heights, td.m_ptx_wallet_info->m_block_height, decoy_selection_generator::dist_kind::coinbase);
 
@@ -4989,10 +4988,9 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
     THROW_IF_FALSE_WALLET_EX(decoys_resp.status == API_RETURN_CODE_OK, error::get_random_outs_error, decoys_resp.status);
     WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(decoys_resp.blocks.size() == 1, "got wrong number of decoys batches: " << decoys_resp.blocks.size());
     WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoys_resp.blocks.size() == required_decoys_count + 1, "for PoS stake tx got less blocks to mix than requested: " << decoys_resp.blocks.size() << " < " << required_decoys_count + 1);
-
-    auto& decoys = decoys_resp.outs[0].outs;
-    decoys.emplace_front(td.m_global_output_index, stake_out.stealth_address, stake_out.amount_commitment, stake_out.concealing_point, stake_out.blinded_asset_id);
-
+    //TODO: 95% and 5% choices
+    auto& decoys = decoys_resp.blocks[0].outs;
+    decoys.emplace_back(td.m_global_output_index, stake_out.stealth_address, stake_out.amount_commitment, stake_out.concealing_point, stake_out.blinded_asset_id);
     std::unordered_set<uint64_t> used_gindices;
     size_t good_outs_count = 0;
     for (auto it = decoys.begin(); it != decoys.end(); )
@@ -5011,9 +5009,8 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
       ++it;
     }
     WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoys.size() == required_decoys_count + 1, "for PoS stake got less good decoys than required: " << decoys.size() << " < " << required_decoys_count);
-
-    decoys.sort([](auto& l, auto& r) { return l.global_amount_index < r.global_amount_index; }); // sort them now (note absolute_sorted_output_offsets_to_relative_in_place() below)
-
+    //TODO: just for build, check sense later
+    std::sort(decoys.begin(), decoys.end(), [](const auto& l, const auto& r){ return l.global_amount_index < r.global_amount_index; });
     uint64_t i = 0;
     for (auto& el : decoys)
     {
@@ -6703,7 +6700,6 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys
     //req.decoys_count = fake_outputs_count + 1;    // one more to be able to skip a decoy in case it hits the real output
     for (uint64_t i : selected_indicies)
     {
-      // TODO: change it to height distrib
       req.amounts.push_back(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution());
       COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::offsets_distribution& rdisttib = req.amounts.back();
 

@@ -663,10 +663,10 @@ namespace currency
     {
       std::vector<uint64_t> heights;                    // array heights derived from decoy selection algorithm, number of heights expected to be not less than minimal ring size
       uint64_t              height_upper_limit;         // if nonzero, all the decoy outputs must be either older than, or the same age as this height
-      std::string           look_up_strategy;           // LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE                                                        // if lookup_for_non_coinbase if false, this means that node should look up for PoS blocks, so if heights[i] points to PoW, it should look up for nearest PoS 
+      std::string           look_up_strategy;           // LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(heights)                     DOC_DSCR("array heights derived from decoy selection algorithm, number of heights expected to be not less than minimal ring size") DOC_EXMP_AUTO({ 1,2,3 }) DOC_END
+        KV_SERIALIZE(heights)                     DOC_DSCR("array heights derived from decoy selection algorithm, number of heights expected to be not less than minimal ring size") DOC_EXMP_AGGR(1, 2, 3, 4) DOC_END
         KV_SERIALIZE(height_upper_limit)          DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_EXMP(2555000) DOC_END
         KV_SERIALIZE(look_up_strategy)            DOC_DSCR("LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE") DOC_EXMP("LOOK_UP_STRATEGY_REGULAR_TX") DOC_END
 
@@ -677,11 +677,11 @@ namespace currency
     struct outputs_in_block
     {
       uint64_t block_height;
-      std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> outputs;
+      std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> outs;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(block_height)                      DOC_DSCR("Block's height") DOC_EXMP_AUTO(12345) DOC_END
-        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(outputs)
+        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(outs)
       END_KV_SERIALIZE_MAP()
     };
 
