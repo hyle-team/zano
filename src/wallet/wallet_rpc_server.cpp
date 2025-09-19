@@ -22,6 +22,7 @@ DISABLE_VS_WARNINGS(4244)
 #include "jwt-cpp/jwt.h"
 POP_VS_WARNINGS
 #include "crypto/bitcoin/sha256_helper.h"
+#include "wallet_errors.h"
 
 #define JWT_TOKEN_EXPIRATION_MAXIMUM          (60 * 60 * 1000)
 #define JWT_TOKEN_CLAIM_NAME_BODY_HASH        "body_hash"
@@ -35,6 +36,12 @@ POP_VS_WARNINGS
 
 #define WALLET_RPC_BEGIN_TRY_ENTRY()     try { GET_WALLET();
 #define WALLET_RPC_CATCH_TRY_ENTRY()     } \
+        catch (const tools::error::wallet_error_with_rpc_code& e) \
+        { \
+          er.code = e.rpc_error_code(); \
+          er.message = e.rpc_error_message(); \
+          return false; \
+        } \
         catch (const tools::error::daemon_busy& e) \
         { \
           er.code = WALLET_RPC_ERROR_CODE_DAEMON_IS_BUSY; \

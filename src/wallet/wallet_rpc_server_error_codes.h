@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -16,3 +16,4 @@
 #define WALLET_RPC_ERROR_CODE_NOT_ENOUGH_MONEY                    -7
 #define WALLET_RPC_ERROR_CODE_WRONG_MIXINS_FOR_AUDITABLE_WALLET   -8
 #define WALLET_RPC_ERROR_CODE_GENERIC_ERROR                       -9
+#define WALLET_RPC_ERROR_CODE_KEY_IMAGE_ALREADY_SPENT             -10
