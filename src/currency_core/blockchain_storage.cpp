@@ -2852,7 +2852,7 @@ bool blockchain_storage::build_random_out_entry(uint64_t amount, size_t g_index,
   CHECK_AND_ASSERT_MES(tx_ptr->tx.vout.size() > out_ptr->out_no, false, "internal error: in global outs index, transaction out index="
     << out_ptr->out_no << " is greater than transaction outputs = " << tx_ptr->tx.vout.size() << ", for tx id = " << out_ptr->tx_id);
 
-    //CHECK_AND_ASSERT_MES(amount != 0 || height_upper_limit != 0, false, "height_upper_limit must be nonzero for hidden amounts (amount = 0)");
+  //CHECK_AND_ASSERT_MES(amount != 0 || height_upper_limit != 0, false, "height_upper_limit must be nonzero for hidden amounts (amount = 0)");
 
   if (height_upper_limit != 0 && tx_ptr->m_keeper_block_height > height_upper_limit)
     return false;
@@ -2860,11 +2860,11 @@ bool blockchain_storage::build_random_out_entry(uint64_t amount, size_t g_index,
   const transaction& tx = tx_ptr->tx;
   CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags.size() == tx.vout.size(), false, "internal error: spent_flag.size()=" << tx_ptr->m_spent_flags.size() << ", tx.vout.size()=" << tx.vout.size());
 
-    //do not use outputs that obviously spent for mixins
+  //do not use outputs that obviously spent for mixins
   if (tx_ptr->m_spent_flags[out_ptr->out_no])
     return false;
 
-      //check if transaction is unlocked
+  //check if transaction is unlocked
   if (!is_tx_spendtime_unlocked(get_tx_unlock_time(tx, out_ptr->out_no)))
     return false;
 
