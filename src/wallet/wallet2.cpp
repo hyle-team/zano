@@ -4978,51 +4978,114 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request decoys_req = AUTO_VAL_INIT(decoys_req);
     decoys_req.height_upper_limit = m_last_pow_block_h; // request decoys to be either older than, or the same age as stake output's height
     decoys_req.look_up_strategy = LOOK_UP_STRATEGY_POS_COINBASE;
-    decoys_req.heights = {}; // request outs by heights distribution
+    decoys_req.heights.clear(); // request outs by heights distribution
     build_distribution_for_input(decoys_req.heights, td.m_ptx_wallet_info->m_block_height, decoy_selection_generator::dist_kind::coinbase);
 
     r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(decoys_req, decoys_resp);
     // TODO @#@# do we need these exceptions?
-    THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs1.bin");
-    THROW_IF_FALSE_WALLET_EX(decoys_resp.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs1.bin");
+    THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs4.bin");
+    THROW_IF_FALSE_WALLET_EX(decoys_resp.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs4.bin");
     THROW_IF_FALSE_WALLET_EX(decoys_resp.status == API_RETURN_CODE_OK, error::get_random_outs_error, decoys_resp.status);
-    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(decoys_resp.blocks.size() == 1, "got wrong number of decoys batches: " << decoys_resp.blocks.size());
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoys_resp.blocks.size() == required_decoys_count + 1, "for PoS stake tx got less blocks to mix than requested: " << decoys_resp.blocks.size() << " < " << required_decoys_count + 1);
-    //TODO: 95% and 5% choices
-    auto& decoys = decoys_resp.blocks[0].outs;
-    decoys.emplace_back(td.m_global_output_index, stake_out.stealth_address, stake_out.amount_commitment, stake_out.concealing_point, stake_out.blinded_asset_id);
-    std::unordered_set<uint64_t> used_gindices;
-    size_t good_outs_count = 0;
-    for (auto it = decoys.begin(); it != decoys.end(); )
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!decoys_resp.blocks.empty(), "daemon returned no decoy blocks for PoS");
+
+    std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> coinbase_candidates;
+    std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> noncb_candidates;
+    coinbase_candidates.reserve(decoys_resp.blocks.size());
+
+    for (const auto& blk : decoys_resp.blocks)
     {
-      if (used_gindices.count(it->global_amount_index) != 0)
-      {
-        it = decoys.erase(it);
+      if (blk.outs.empty())
         continue;
-      }
-      used_gindices.insert(it->global_amount_index);
-      if (++good_outs_count == required_decoys_count + 1)
+
+      // outs[0] == coinbase
+      const auto& cb = blk.outs[0];
+      if (cb.global_amount_index != td.m_global_output_index)
+        coinbase_candidates.push_back(cb);
+
+      // outs[1..N] == non-coinbase
+      for (size_t i = 1; i < blk.outs.size(); ++i)
       {
-        decoys.erase(++it, decoys.end());
-        break;
+        const auto& ne = blk.outs[i];
+        if (ne.global_amount_index != td.m_global_output_index)
+          noncb_candidates.push_back(ne);
       }
-      ++it;
     }
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoys.size() == required_decoys_count + 1, "for PoS stake got less good decoys than required: " << decoys.size() << " < " << required_decoys_count);
-    //TODO: just for build, check sense later
-    std::sort(decoys.begin(), decoys.end(), [](const auto& l, const auto& r){ return l.global_amount_index < r.global_amount_index; });
-    uint64_t i = 0;
-    for (auto& el : decoys)
+
+    const uint32_t NONCB_SET_PROB_PERCENT = 5;
+    bool include_one_noncb = ((crypto::rand<uint32_t>() % 100) < NONCB_SET_PROB_PERCENT) && !noncb_candidates.empty();
+
+    auto rnd_shuffle = [](auto& v)
     {
-      uint64_t gindex = el.global_amount_index;
-      if (gindex == td.m_global_output_index)
+      for (size_t i = v.size(); i > 1; --i)
+        std::swap(v[i - 1], v[crypto::rand<size_t>() % i]);
+    };
+    rnd_shuffle(coinbase_candidates);
+    rnd_shuffle(noncb_candidates);
+
+    std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> selected_decoys;
+    selected_decoys.reserve(required_decoys_count);
+
+    std::unordered_set<uint64_t> used_gindices;
+    used_gindices.reserve(required_decoys_count * 2);
+    used_gindices.insert(td.m_global_output_index);
+
+    auto take_next_unique = [&](std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& pool, size_t& cursor) -> bool
+    {
+      while (cursor < pool.size())
+      {
+        const auto& cand = pool[cursor++];
+        if (!used_gindices.count(cand.global_amount_index))
+        {
+          used_gindices.insert(cand.global_amount_index);
+          selected_decoys.push_back(cand);
+          return true;
+        }
+      }
+      return false;
+    };
+
+    size_t cb_cur = 0, nc_cur = 0;
+
+    if (include_one_noncb)
+      take_next_unique(noncb_candidates, nc_cur);
+
+    // get the rest from coinbase if its out, fallback to non-сoinbase - mabye not need?
+    while (selected_decoys.size() < required_decoys_count)
+    {
+      if (take_next_unique(coinbase_candidates, cb_cur))
+        continue;
+
+      // coinbase is out of stock, adding non-coinbase
+      if (!take_next_unique(noncb_candidates, nc_cur))
+        break; // have no more decoys
+    }
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(selected_decoys.size() == required_decoys_count, "for PoS stake got less decoys than required: picked=" << selected_decoys.size()
+      << " < " << required_decoys_count << " (coinbase_candidates=" << coinbase_candidates.size() << ", noncb_pool=" << noncb_candidates.size() << ")");
+    // add real
+    selected_decoys.emplace_back(td.m_global_output_index, stake_out.stealth_address, 
+      stake_out.amount_commitment, stake_out.concealing_point, stake_out.blinded_asset_id);
+
+    std::sort(selected_decoys.begin(), selected_decoys.end(), [](const auto& l, const auto& r){ return l.global_amount_index < r.global_amount_index; });
+
+    ring.clear();
+    ring.reserve(selected_decoys.size());
+    stake_input.key_offsets.clear();
+    stake_input.key_offsets.reserve(selected_decoys.size());
+
+    uint64_t i = 0;
+    for (const auto& el : selected_decoys)
+    {
+      if (el.global_amount_index == td.m_global_output_index)
         secret_index = i;
-      ++i;
+
       ring.emplace_back(el.stealth_address, el.amount_commitment, el.blinded_asset_id, el.concealing_point);
       stake_input.key_offsets.push_back(el.global_amount_index);
+      ++i;
     }
-    r = absolute_sorted_output_offsets_to_relative_in_place(stake_input.key_offsets);
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "absolute_sorted_output_offsets_to_relative_in_place failed");
+
+    bool r_ok = absolute_sorted_output_offsets_to_relative_in_place(stake_input.key_offsets);
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r_ok, "absolute_sorted_output_offsets_to_relative_in_place failed");
+
   }
   else
   {
