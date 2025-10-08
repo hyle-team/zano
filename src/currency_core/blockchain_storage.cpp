@@ -2831,8 +2831,7 @@ size_t blockchain_storage::get_alternative_blocks_count() const
   return m_alternative_chains.size();
 }
 //------------------------------------------------------------------
-bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs,
-    uint64_t amount, size_t g_index, uint64_t mix_count, bool use_only_forced_to_mix, uint64_t height_upper_limit) const
+bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, uint64_t amount, size_t g_index, uint64_t mix_count, bool use_only_forced_to_mix, uint64_t height_upper_limit) const
 {
   COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry oen;
   if (!build_random_out_entry(amount, g_index, mix_count, use_only_forced_to_mix, height_upper_limit, oen))
@@ -2842,8 +2841,7 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::build_random_out_entry(uint64_t amount, size_t g_index, uint64_t mix_count, bool use_only_forced_to_mix,
-  uint64_t height_upper_limit, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen) const
+bool blockchain_storage::build_random_out_entry(uint64_t amount, size_t g_index, uint64_t mix_count, bool use_only_forced_to_mix, uint64_t height_upper_limit, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen) const
 {
  CRITICAL_REGION_LOCAL(m_read_lock);
   auto out_ptr = m_db_outputs.get_subitem(amount, g_index);
@@ -2860,17 +2858,17 @@ bool blockchain_storage::build_random_out_entry(uint64_t amount, size_t g_index,
 
   const transaction& tx = tx_ptr->tx;
   CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags.size() == tx.vout.size(), false, "internal error: spent_flag.size()=" << tx_ptr->m_spent_flags.size() << ", tx.vout.size()=" << tx.vout.size());
-
+  
   //do not use outputs that obviously spent for mixins
   if (tx_ptr->m_spent_flags[out_ptr->out_no])
     return false;
-
+  
   //check if transaction is unlocked
   if (!is_tx_spendtime_unlocked(get_tx_unlock_time(tx, out_ptr->out_no)))
     return false;
 
   const tx_out_v& out_v = tx.vout[out_ptr->out_no];
-
+  
   // do not use burned coins
   if (is_out_burned(out_v))
     return false;

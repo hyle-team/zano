@@ -707,6 +707,8 @@ namespace currency
     void on_abort_transaction();
     void load_targetdata_cache(bool is_pos) const;
 
+
+
     uint64_t get_adjusted_time()const;
     bool complete_timestamps_vector(uint64_t start_height, std::vector<uint64_t>& timestamps);
     bool update_next_comulative_size_limit();
