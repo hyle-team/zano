@@ -60,7 +60,7 @@ using namespace currency;
 
 #define WALLET_FETCH_RANDOM_OUTS_SIZE                                 200  
 
-
+#define WALLET_NONCB_SET_PROB_PERCENT                                 5
 
 #undef LOG_DEFAULT_CHANNEL
 #define LOG_DEFAULT_CHANNEL "wallet"
@@ -5021,8 +5021,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
       }
     }
 
-    const uint32_t NONCB_SET_PROB_PERCENT = 5;
-    bool include_one_noncb = ((crypto::rand<uint32_t>() % 100) < NONCB_SET_PROB_PERCENT) && !noncb_candidates.empty();
+    bool include_one_noncb = ((crypto::rand<uint32_t>() % 100) < WALLET_NONCB_SET_PROB_PERCENT) && !noncb_candidates.empty();
 
     auto rnd_shuffle = [](auto& v)
     {
@@ -5058,7 +5057,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
     if (include_one_noncb)
       take_next_unique(noncb_candidates, nc_cur);
 
-    // get the rest from coinbase if its out, fallback to non-сoinbase - mabye not need?
+    // get the rest from coinbase if its out, fallback to non-сoinbase
     while (selected_decoys.size() < required_decoys_count)
     {
       if (take_next_unique(coinbase_candidates, cb_cur))
@@ -5078,7 +5077,6 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
     selected_decoys.emplace_back(td.m_global_output_index, stake_out.stealth_address, stake_out.amount_commitment, stake_out.concealing_point, stake_out.blinded_asset_id);
     std::sort(selected_decoys.begin(), selected_decoys.end(), [](const auto& l, const auto& r){ return l.global_amount_index < r.global_amount_index; });
 
-    ring.clear();
     ring.reserve(selected_decoys.size());
     stake_input.key_offsets.clear();
     stake_input.key_offsets.reserve(selected_decoys.size());

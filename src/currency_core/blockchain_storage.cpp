@@ -71,7 +71,7 @@ using namespace currency;
 
 
 #define TARGETDATA_CACHE_SIZE                          DIFFICULTY_WINDOW + 10
-#define MAX_SEARCH_DELTA_HEIGHT                   3000
+#define MAX_SEARCH_DELTA_HEIGHT                        3000
 
 DISABLE_VS_WARNINGS(4267)
 
@@ -2862,7 +2862,7 @@ bool blockchain_storage::build_random_out_entry(uint64_t amount, size_t g_index,
   //do not use outputs that obviously spent for mixins
   if (tx_ptr->m_spent_flags[out_ptr->out_no])
     return false;
-  
+
   //check if transaction is unlocked
   if (!is_tx_spendtime_unlocked(get_tx_unlock_time(tx, out_ptr->out_no)))
     return false;
