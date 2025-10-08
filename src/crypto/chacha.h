@@ -22,6 +22,7 @@ namespace crypto
   }
 }
 #include "hash.h"
+#include "string_tools.h"
 
 namespace crypto
 {
