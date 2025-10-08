@@ -87,6 +87,7 @@ namespace tools
     const static command_line::arg_descriptor<std::string> arg_jwt_secret;
 
 
+
     static void init_options(boost::program_options::options_description& desc);
     bool init(const boost::program_options::variables_map& vm);
     bool run(bool do_mint, bool offline_mode, const currency::account_public_address& miner_address);
@@ -261,6 +262,7 @@ namespace tools
     std::string m_bind_ip;
     bool m_do_mint;
     bool m_deaf;
+    bool m_allow_legacy_payment_id_size;
     uint64_t m_last_wallet_store_height;
     std::string m_jwt_secret;
     epee::misc_utils::expirating_set<std::string, uint64_t> m_jwt_used_salts;

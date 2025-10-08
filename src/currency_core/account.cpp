@@ -62,12 +62,12 @@ namespace currency
   //-----------------------------------------------------------------
   void account_base::crypt_with_pass(const void* scr_data, std::size_t src_length, void* dst_data, const std::string& password)
   {
-    crypto::chacha8_key key = AUTO_VAL_INIT(key);
-    crypto::generate_chacha8_key(password, key);
+    crypto::chacha_key key{};
+    crypto::generate_chacha_key_legacy(password, key);
     crypto::hash pass_hash = crypto::cn_fast_hash(password.data(), password.size());
-    crypto::chacha8_iv  iv = AUTO_VAL_INIT(iv);
-    CHECK_AND_ASSERT_THROW_MES(sizeof(pass_hash) >= sizeof(iv), "Invalid configuration: hash size is less than keys_file_data.iv");
-    iv = *((crypto::chacha8_iv*)&pass_hash);
+    crypto::chacha_iv iv{};
+    static_assert(sizeof(pass_hash) >= sizeof(iv), "Invalid configuration: hash size is less than keys_file_data.iv");
+    iv = *((crypto::chacha_iv*)&pass_hash);
     crypto::chacha8(scr_data, src_length, key, iv, (char*)dst_data);
   }
   //-----------------------------------------------------------------

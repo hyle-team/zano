@@ -200,8 +200,9 @@ namespace currency
     bc_services::bc_offers_service& m_of;
     std::string m_port;
     std::string m_bind_ip;
-    bool m_ignore_offline_status;
+    bool m_ignore_offline_status = false;
     bool m_enabled_admin_api = false;
+    bool m_allow_legacy_payment_id_size = false;
     epee::net_utils::http::i_chain_handler* m_prpc_chain_handler = nullptr;
   };
 }

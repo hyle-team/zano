@@ -6393,6 +6393,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   bool var_is_after_hardfork_3_zone = m_core_runtime_config.is_hardfork_active_for_height(3, block_height);
   bool var_is_after_hardfork_4_zone = m_core_runtime_config.is_hardfork_active_for_height(4, block_height);
   bool var_is_after_hardfork_5_zone = m_core_runtime_config.is_hardfork_active_for_height(5, block_height);
+  bool var_is_after_hardfork_6_zone = m_core_runtime_config.is_hardfork_active_for_height(6, block_height);
 
   auto is_allowed_before_hardfork1 = [&](const auto& el) -> bool
   {
@@ -6430,6 +6431,15 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   auto is_allowed_after_hardfork4 = [&](const auto& el) -> bool
   {
     CHECK_AND_ASSERT_MES(el.type() != typeid(tx_out_bare), false, "tx " << tx_id << " contains tx_out_bare which is not allowed on height " << block_height);
+    return true;
+  };
+
+  auto is_allowed_after_hardfork6 = [&](const auto& el) -> bool
+  {
+    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_payer),         false, "tx contains tx_payer which is not allowed after HF6");
+    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_payer_old),     false, "tx contains tx_payer_old which is not allowed after HF6");
+    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_receiver),      false, "tx contains tx_receiver which is not allowed after HF6");
+    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_receiver_old),  false, "tx contains tx_ptx_receiver_oldayer which is not allowed after HF6");
     return true;
   };
   
@@ -6476,6 +6486,8 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       return false;
     if (var_is_after_hardfork_4_zone && !is_allowed_after_hardfork4(el))
       return false;
+    if (var_is_after_hardfork_6_zone && !is_allowed_after_hardfork6(el))
+      return false;
   }
 
   //attachments
@@ -6487,6 +6499,8 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     if (!var_is_after_hardfork_4_zone && !is_allowed_before_hardfork4(el))
       return false;
     if (var_is_after_hardfork_4_zone && !is_allowed_after_hardfork4(el))
+      return false;
+    if (var_is_after_hardfork_6_zone && !is_allowed_after_hardfork6(el))
       return false;
   }
   
@@ -6537,6 +6551,20 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       LOG_ERROR("asset_operation_ownership_proof_eth is not allowed prior to HF5");
       return false;
     }
+  }
+
+  if (var_is_after_hardfork_6_zone)
+  {
+    // intrinsic payment id can be used but they are incompartible with service attachment payment id
+    //if (has_tx_wide_payment_id(tx))
+    //{
+    //  for(const auto& out_v : tx.vout)
+    //  {
+    //    if (out_v.type() == typeid(tx_out_zarcanum))
+    //      boost::get<tx_out_zarcanum>(out_v).encrypted_payment_id
+
+    //  }
+    //}
   }
 
 

@@ -930,7 +930,7 @@ std::string simple_wallet::get_token_info_string(const crypto::public_key& asset
 void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
 {
 
-  if (wti.subtransfers.size() == 1)
+  /*if (wti.subtransfers.size() == 1)
   {
     epee::log_space::console_colors color = !wti.has_outgoing_entries() ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
     uint64_t decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
@@ -940,19 +940,21 @@ void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_inf
       ", tx " << wti.tx_hash <<
       " " << std::right << std::setw(18) << print_money_trailing_zeros_replaced_with_spaces(wti.subtransfers[0].amount, decimal_points) << (wti.subtransfers[0].is_income ? " received" : "    spent") << " " << token_info;
   }
-  else
+  else*/
   {
-    message_writer(epee::log_space::console_color_cyan, false) <<
-      "height " << wti.height <<
-      ", tx " << wti.tx_hash;
-    for (const auto& st : wti.subtransfers)
+    message_writer(epee::log_space::console_color_cyan, false) << "height " << wti.height << ", tx " << wti.tx_hash;
+    for(auto& stbp : wti.subtransfers_by_pid)
     {
-      [[maybe_unused]] epee::log_space::console_colors color = st.is_income ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
-      uint64_t decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
-      std::string token_info = get_token_info_string(st.asset_id, decimal_points);
+      std::string pid = epee::string_tools::buff_to_hex_nodelimer(stbp.payment_id);
+      for (auto& st : stbp.subtransfers)
+      {
+        epee::log_space::console_colors color = st.is_income ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
+        uint64_t decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
+        std::string token_info = get_token_info_string(st.asset_id, decimal_points);
 
-      message_writer(epee::log_space::console_color_cyan, false) << "    " 
-        << std::right << std::setw(24) << print_money_trailing_zeros_replaced_with_spaces(st.amount, decimal_points) << std::left << (st.is_income ? " received" : "    spent") << " " << token_info;
+        message_writer(color, false) << "    " 
+          << std::right << std::setw(24) << print_money_trailing_zeros_replaced_with_spaces(st.amount, decimal_points) << std::left << (st.is_income ? " received" : "    spent") << " " << token_info << " " << pid;
+      }
     }
   }
 
@@ -1097,8 +1099,8 @@ bool simple_wallet::print_wti(const tools::wallet_public::wallet_transfer_info& 
     cl = epee::log_space::console_color_magenta;
 
   std::string payment_id_placeholder;
-  if (wti.payment_id.size())
-    payment_id_placeholder = std::string("(payment_id:") + epee::string_tools::buff_to_hex_nodelimer(wti.payment_id) + ")";
+  if (wti.tx_wide_payment_id.size())
+    payment_id_placeholder = std::string("(tx_wide_payment_id:") + epee::string_tools::buff_to_hex_nodelimer(wti.tx_wide_payment_id) + ")";
 
   static const std::string separator = ", ";
   std::string remote_side;
@@ -1113,27 +1115,32 @@ bool simple_wallet::print_wti(const tools::wallet_public::wallet_transfer_info& 
       remote_side += remote_side.empty() ? it : (separator + it);
   }
 
-  if (wti.subtransfers.size() == 1)
+  /*if (wti.subtransfers.size() == 1)
   {
     success_msg_writer(cl) << "[" << wti.transfer_internal_index << "]" << epee::misc_utils::get_time_str_v2(wti.timestamp) << " "
       << (wti.subtransfers[0].is_income ? "Received " : "Sent    ")
       << print_money(wti.subtransfers[0].amount) << "(fee:" << print_money(wti.fee) << ")  "
       << remote_side
       << " " << wti.tx_hash << payment_id_placeholder;
-  }else
+  }else*/
   {
     success_msg_writer(cl) << "[" << wti.transfer_internal_index << "]" << epee::misc_utils::get_time_str_v2(wti.timestamp) << " (fee:" << print_money(wti.fee) << ")  "
       << remote_side
       << " " << wti.tx_hash << payment_id_placeholder;
-    for (auto& st: wti.subtransfers)
-    {
-      epee::log_space::console_colors cl = st.is_income ? epee::log_space::console_color_green: epee::log_space::console_color_magenta;
-      uint64_t decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
-      std::string token_info = get_token_info_string(st.asset_id, decimal_points);
 
-      success_msg_writer(cl) 
-        << (st.is_income ? "Received " : "Sent    ")
-        << print_money(st.amount, decimal_points) << token_info;
+    for(auto& stbp : wti.subtransfers_by_pid)
+    {
+      std::string pid = epee::string_tools::buff_to_hex_nodelimer(stbp.payment_id);
+      for (auto& st : stbp.subtransfers)
+      {
+        epee::log_space::console_colors cl = st.is_income ? epee::log_space::console_color_green: epee::log_space::console_color_magenta;
+        uint64_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT;
+        std::string token_info = get_token_info_string(st.asset_id, decimal_point);
+
+        success_msg_writer(cl) 
+          << (st.is_income ? "Received " : "Sent    ")
+          << print_money(st.amount, decimal_point) << token_info;
+      }
     }
   
   }

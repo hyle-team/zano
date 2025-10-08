@@ -30,7 +30,7 @@
 #include "common/unordered_containers_boost_serialization.h"
 #include "common/atomics_boost_serialization.h"
 #include "storages/portable_storage_template_helper.h"
-#include "crypto/chacha8.h"
+#include "crypto/chacha.h"
 #include "crypto/hash.h"
 #include "core_rpc_proxy.h"
 #include "core_default_rpc_proxy.h"
@@ -362,6 +362,7 @@ namespace tools
     uint64_t m_spent_height = 0;
     uint32_t m_flags = 0;
     uint64_t m_amount = 0;
+    uint64_t m_payment_id = 0; // intrinsic payment id
     std::shared_ptr<ZC_out_info> m_zc_info_ptr;
 
     uint64_t amount() const { return m_amount; }

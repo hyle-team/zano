@@ -1287,6 +1287,9 @@ int main(int argc, char* argv[])
     // HF5
     GENERATE_AND_PLAY_HF(hard_fork_5_tx_version, "5-*");
 
+    // HF6
+    GENERATE_AND_PLAY(hard_fork_6_intrinsic_payment_id_basic_test);
+
     // atomics
     //GENERATE_AND_PLAY(atomic_simple_test);
     //GENERATE_AND_PLAY(atomic_test_wrong_redeem_wrong_refund);    
@@ -1298,7 +1301,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(zarcanum_basic_test);
 
     GENERATE_AND_PLAY_HF(multiassets_basic_test, "4-*");
-    GENERATE_AND_PLAY(ionic_swap_basic_test);
+    GENERATE_AND_PLAY_HF(ionic_swap_basic_test, "4-*");
     GENERATE_AND_PLAY_HF(ionic_swap_exact_amounts_test, "4-*");
     GENERATE_AND_PLAY(zarcanum_test_n_inputs_validation);
     GENERATE_AND_PLAY(zarcanum_gen_time_balance);

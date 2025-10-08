@@ -93,6 +93,7 @@ namespace tools
     command_line::add_arg(desc, arg_miner_text_info);
     command_line::add_arg(desc, arg_deaf_mode);
     command_line::add_arg(desc, arg_jwt_secret);
+    command_line::add_arg(desc, command_line::arg_allow_legacy_payment_id_size);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   wallet_rpc_server::wallet_rpc_server(std::shared_ptr<wallet2> wptr):
@@ -101,6 +102,7 @@ namespace tools
     , m_do_mint(false)
     , m_deaf(false)
     , m_last_wallet_store_height(0)
+    , m_allow_legacy_payment_id_size(false)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
   wallet_rpc_server::wallet_rpc_server(i_wallet_provider* provider_ptr):
@@ -108,6 +110,7 @@ namespace tools
     , m_do_mint(false)
     , m_deaf(false)
     , m_last_wallet_store_height(0)
+    , m_allow_legacy_payment_id_size(false)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
 //   std::shared_ptr<wallet2> wallet_rpc_server::get_wallet()
@@ -199,6 +202,8 @@ namespace tools
     {
       w.get_wallet()->set_miner_text_info(command_line::get_arg(vm, arg_miner_text_info));
     }
+
+    m_allow_legacy_payment_id_size = command_line::has_arg(vm, command_line::arg_allow_legacy_payment_id_size);
 
     return true;
   }
@@ -464,7 +469,26 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_transfer(const wallet_public::COMMAND_RPC_TRANSFER::request& req, wallet_public::COMMAND_RPC_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
+    // Payment id handling:
+    // Before HF6:
+    //   - req.payment_id can be of any length;
+    //   - embedded_payment_id for any destination can be of any length;
+    //   - can be used only one of them
+    //   - intrinsic payment id in destinations must not be used
+    // After HF6:
+    //  m_allow_legacy_payment_id_size == false:
+    //   - req.payment_id length must be less then or equal to 8. If specified => all destinations have this as intrinsic pid
+    //   - embedded_payment_id for any destination can be of any length. If at least one has > 8 bytes => all destinations have this as intrinsic pid
+    //   - if legacy pid is used => any nonzero intrinsic pid is treated as error
+    //  m_allow_legacy_payment_id_size == true:
+    //   - req.payment_id can of any length. If specified and len <= 8 => all destinations have this as intrinsic pid, otherwise => tx wide legacy payment id
+    //   - embedded_payment_id for any destination can be of any length. If at least one has > 8 bytes => all destinations have this as intrinsic pid
+    //   - if legacy pid is used => any nonzero intrinsic pid is treated as error
+
     WALLET_RPC_BEGIN_TRY_ENTRY();
+
+    bool hf6_active = w.get_wallet()->is_in_hardfork_zone(ZANO_HARDFORK_06);
+
     if (req.fee < w.get_wallet()->get_core_runtime_config().tx_pool_min_fee)
     {
       er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
@@ -472,12 +496,25 @@ namespace tools
       return false;
     }
 
-    std::string payment_id;
-    if (!epee::string_tools::parse_hexstr_to_binbuff(req.payment_id, payment_id))
+    std::string legacy_tx_wide_payment_id;
+    if (!epee::string_tools::parse_hexstr_to_binbuff(req.payment_id, legacy_tx_wide_payment_id))
     {
       er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
       er.message = std::string("invalid encoded payment id: ") + req.payment_id + ", hex-encoded string was expected";
       return false;
+    }
+
+    uint64_t tx_wide_intrinsic_payment_id = 0; // if nonzero -- will be set to all destinations
+    if (hf6_active)
+    {
+      if (!m_allow_legacy_payment_id_size && legacy_tx_wide_payment_id.size() > CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE)
+      {
+        er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
+        er.message = std::string("payment_id is too long, maximum is ") + epee::string_tools::num_to_string_fast(CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE) + " bytes";
+        return false;
+      }
+      if (currency::convert_payment_id(legacy_tx_wide_payment_id, tx_wide_intrinsic_payment_id)) // if possible (length-wise), convert to intrinsic and clear legacy
+        legacy_tx_wide_payment_id.clear();
     }
 
     construct_tx_param ctp = w.get_wallet()->get_default_construct_tx_param_inital();
@@ -496,13 +533,14 @@ namespace tools
     
     for (auto it = req.destinations.begin(); it != req.destinations.end(); it++)
     {
-      currency::tx_destination_entry de;
+      currency::tx_destination_entry de{};
       de.addr.resize(1);
       std::string embedded_payment_id;
       //check if address looks like wrapped address
       if (currency::is_address_like_wrapped(it->address))
       {
-        if (wrap) {
+        if (wrap)
+        {
           LOG_ERROR("More then one entries in transactions");
           er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
           er.message = "Second wrap entry not supported in transactions";
@@ -530,22 +568,79 @@ namespace tools
         er.message = std::string("WALLET_RPC_ERROR_CODE_WRONG_ADDRESS: ") + it->address;
         return false;
       }
-      if (embedded_payment_id.size() != 0)
+
+      if (hf6_active)
       {
-        if (payment_id.size() != 0)
+        if (embedded_payment_id.size() != 0)
         {
-          er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
-          er.message = std::string("embedded payment id: ") + embedded_payment_id + " conflicts with previously set payment id: " + payment_id;
-          return false;
+          uint64_t intrinsic_embeded_payment_id = 0;
+          if (currency::convert_payment_id(embedded_payment_id, intrinsic_embeded_payment_id))
+          {
+            if (it->payment_id != 0)
+            {
+              er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
+              er.message = std::string("embedded payment id: ") + epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) + " conflicts with destination payment id: " + epee::string_tools::pod_to_hex(it->payment_id);
+              return false;
+            }
+            de.payment_id = intrinsic_embeded_payment_id;
+          }
+          else
+          {
+            // it means embedded_payment_id.size() > CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE
+            // optional check for m_allow_legacy_payment_id_size
+            if (tx_wide_intrinsic_payment_id != 0 || !legacy_tx_wide_payment_id.empty())
+            {
+              er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
+              er.message = std::string("embedded payment id: ") + epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) + " conflicts with previously set tx-wide payment id";
+              return false;
+            }
+            legacy_tx_wide_payment_id = embedded_payment_id;
+          }
         }
-        if (it != req.destinations.begin())
+
+        if (it->payment_id != 0)
         {
-          er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
-          er.message = std::string("payment id: ") + embedded_payment_id + " currently can only be set for the first destination (an so you can use integrated address only for the fist destination)";
-          return false;
+          if (tx_wide_intrinsic_payment_id != 0 || !legacy_tx_wide_payment_id.empty())
+          {
+            er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
+            er.message = std::string("destination payment id: ") + epee::string_tools::pod_to_hex(it->payment_id) + " conflicts with previously set tx-wide payment id";
+            return false;
+          }
+          de.payment_id = it->payment_id;
         }
-        payment_id = embedded_payment_id;
+        else
+        {
+          de.payment_id = tx_wide_intrinsic_payment_id;
+        }
       }
+      else
+      {
+        // before HF6
+        if (it->payment_id != 0)
+        {
+          er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
+          er.message = std::string("intrinsic payment id cannot be used before HF6");
+          return false;
+        }
+
+        if (embedded_payment_id.size() != 0)
+        {
+          if (legacy_tx_wide_payment_id.size() != 0)
+          {
+            er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
+            er.message = std::string("embedded payment id: ") + epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) + " conflicts with previously set payment id: " + epee::string_tools::buff_to_hex_nodelimer(legacy_tx_wide_payment_id);
+            return false;
+          }
+          if (it != req.destinations.begin())
+          {
+            er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
+            er.message = std::string("payment id: ") + epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) + " currently can only be set for the first destination (an so you can use integrated address only for the fist destination)";
+            return false;
+          }
+          legacy_tx_wide_payment_id = embedded_payment_id;
+        }
+      }
+      
       de.amount = it->amount;
       de.asset_id = (it->asset_id == currency::null_pkey ? currency::native_coin_asset_id : it->asset_id);
       dsts.push_back(de);
@@ -553,14 +648,14 @@ namespace tools
 
     std::vector<currency::attachment_v>& attachments = ctp.attachments;
     std::vector<currency::extra_v>& extra = ctp.extra;
-    if (!payment_id.empty() && !currency::set_payment_id_to_tx(attachments, payment_id, w.get_wallet()->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM)))
+    if (!legacy_tx_wide_payment_id.empty() && !currency::set_payment_id_to_tx(attachments, legacy_tx_wide_payment_id, w.get_wallet()->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM)))
     {
       er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
-      er.message = std::string("payment id ") + payment_id + " is invalid and can't be set";
+      er.message = std::string("payment id ") + legacy_tx_wide_payment_id + " is invalid and can't be set";
       return false;
     }
 
-    if (!req.comment.empty() && payment_id.empty())
+    if (!req.comment.empty() && legacy_tx_wide_payment_id.empty())
     {
       currency::tx_comment comment{};
       comment.comment = req.comment;

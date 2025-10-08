@@ -187,7 +187,7 @@ namespace crypto {
    * * The receiver can either derive the public key (to check that the transaction is addressed to him) or the private key (to spend the money).
    */
   inline bool generate_key_derivation(const public_key &key1, const secret_key &key2, key_derivation &derivation) {
-    return crypto_ops::generate_key_derivation(key1, key2, derivation);
+    return crypto_ops::generate_key_derivation(key1, key2, derivation); // derivation = 8 * key2 * key1
   }
   inline void derivation_to_scalar(const key_derivation &derivation, size_t output_index, ec_scalar &result) {
     crypto::crypto_ops::derivation_to_scalar(derivation, output_index, result);

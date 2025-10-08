@@ -360,6 +360,7 @@ namespace currency
     crypto::public_key  amount_commitment; // premultiplied by 1/8
     crypto::public_key  blinded_asset_id;  // group element T, premultiplied by 1/8
     uint64_t            encrypted_amount = 0;
+    uint64_t            encrypted_payment_id = 0;
     uint8_t             mix_attr = 0;
 
     BEGIN_SERIALIZE_OBJECT()
@@ -368,6 +369,7 @@ namespace currency
       FIELD(amount_commitment)
       FIELD(blinded_asset_id)
       FIELD(encrypted_amount)
+      FIELD(encrypted_payment_id)
       FIELD(mix_attr)
     END_SERIALIZE()
 
@@ -377,6 +379,7 @@ namespace currency
       BOOST_SERIALIZE(amount_commitment)
       BOOST_SERIALIZE(blinded_asset_id)
       BOOST_SERIALIZE(encrypted_amount)
+      BOOST_SERIALIZE(encrypted_payment_id)
       BOOST_SERIALIZE(mix_attr)
     END_BOOST_SERIALIZATION()
   };
@@ -608,7 +611,7 @@ namespace currency
 #define TX_SERVICE_ATTACHMENT_ENCRYPT_BODY                    static_cast<uint8_t>(1 << 0)
 #define TX_SERVICE_ATTACHMENT_DEFLATE_BODY                    static_cast<uint8_t>(1 << 1)
 
-// with this flag enabled body encrypted/decrypted with the key created as a derivation from onetime key and "spend keys" of receiver
+// with this flag enabled body encrypted/decrypted with the key created as a derivation of tx public key and receiver's _spend_ secret key
 #define TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE  static_cast<uint8_t>(1 << 2)  
 // add proof of content, without revealing secrete
 #define TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF               static_cast<uint8_t>(1 << 3)  

@@ -158,7 +158,8 @@ namespace currency
 
 
     TIME_MEASURE_START_PD(validate_amount_time);
-    CHECK_AND_ASSERT_MES(tx.vout.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS, false, "transaction has too many outs = " << tx.vout.size());
+    CHECK_AND_ASSERT_MES(tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
+    CHECK_AND_ASSERT_MES(tx.vout.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS,  false, "transaction has too many outputs = " << tx.vout.size());
 
     uint64_t tx_fee = 0;
     r = get_tx_fee(tx, tx_fee);
