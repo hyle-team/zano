@@ -71,6 +71,7 @@ using namespace currency;
 
 
 #define TARGETDATA_CACHE_SIZE                          DIFFICULTY_WINDOW + 10
+#define MAX_SEARCH_DELTA_HEIGHT                   3000
 
 DISABLE_VS_WARNINGS(4267)
 
@@ -2844,7 +2845,7 @@ bool blockchain_storage::add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPU
 bool blockchain_storage::build_random_out_entry(uint64_t amount, size_t g_index, uint64_t mix_count, bool use_only_forced_to_mix,
   uint64_t height_upper_limit, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen) const
 {
-  CRITICAL_REGION_LOCAL(m_read_lock);
+ CRITICAL_REGION_LOCAL(m_read_lock);
   auto out_ptr = m_db_outputs.get_subitem(amount, g_index);
   auto tx_ptr = m_db_transactions.find(out_ptr->tx_id);
   CHECK_AND_ASSERT_MES(tx_ptr, false, "internal error: transaction " << out_ptr->tx_id << " was not found in transaction DB, amount: " << print_money_brief(amount) <<
@@ -3131,87 +3132,100 @@ bool blockchain_storage::get_random_outs_for_amounts4(const COMMAND_RPC_GET_RAND
 
   if (req.look_up_strategy != LOOK_UP_STRATEGY_REGULAR_TX && req.look_up_strategy != LOOK_UP_STRATEGY_POS_COINBASE)
   {
-    LOG_ERROR("[get_random_outs_for_amounts4] Unknown look_up_strategy: " << req.look_up_strategy);
     return false;
   }
 
   const uint64_t top_block_height = get_current_blockchain_size() - 1;
   const uint64_t height_limit = (req.height_upper_limit && req.height_upper_limit <= top_block_height) ? req.height_upper_limit : top_block_height;
 
-  const uint64_t MAX_SEARCH_DELTA = 3000; //TODO: mabye define constant somewhere?
-
+  std::unordered_set<uint64_t> seen_heights;
   std::unordered_set<uint64_t> picked_heights;
-  picked_heights.reserve(req.heights.size()*2);
+  seen_heights.reserve(req.heights.size());
+  picked_heights.reserve(req.heights.size());
 
   res.blocks.clear();
   res.blocks.reserve(req.heights.size());
 
-  for (uint64_t seed_height : req.heights)
-  {
-    if (seed_height > height_limit)
-      seed_height = height_limit;
-
-    uint64_t delta = 0;
-    int step_direction = +1;
-
-    while (true)
+  auto search_pass = [&](const std::string& strategy) {
+    seen_heights.clear();
+    for (uint64_t seed_height_original : req.heights)
     {
-      bool inside_range = false;
-      uint64_t candidate_height = 0;
+      uint64_t seed_height = seed_height_original;
+      if (seed_height > height_limit)
+        seed_height = height_limit;
 
-      if (step_direction > 0)
-      {
-        if (seed_height + delta <= height_limit)
-        {
-          candidate_height = seed_height + delta;
-          inside_range = true;
-        }
-      }
-      else
-      {
-        if (seed_height >= delta)
-        {
-          candidate_height = seed_height - delta;
-          inside_range = true;
-        }
-      }
+      uint64_t delta = 0;
+      int step_direction = +1;
 
-      if (inside_range)
+      while (true)
       {
-        if (!picked_heights.count(candidate_height))
+        bool inside_range = false;
+        uint64_t candidate_height = 0;
+
+        if (step_direction > 0)
         {
-          if (is_block_fit_for_strategy(candidate_height, req.look_up_strategy))
+          if (seed_height + delta <= height_limit)
           {
-            std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> oe;
-            if (collect_all_outs_in_block(candidate_height, oe) && !oe.empty())
-            {
-              picked_heights.insert(candidate_height);
+            candidate_height = seed_height + delta;
+            inside_range = true;
+          }
+        }
+        else
+        {
+          if (seed_height >= delta)
+          {
+            candidate_height = seed_height - delta;
+            inside_range = true;
+          }
+        }
 
-              COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::outputs_in_block blk_outs{};
-              blk_outs.block_height = candidate_height;
-              blk_outs.outs = std::move(oe);
-              res.blocks.push_back(std::move(blk_outs));
-              break; // found for this seed
+        if (inside_range)
+        {
+          if (!picked_heights.count(candidate_height) && seen_heights.insert(candidate_height).second)
+          {
+            if (is_block_fit_for_strategy(candidate_height, strategy))
+            {
+              std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> oe;
+              if (collect_all_outs_in_block(candidate_height, oe) && !oe.empty())
+              {
+                picked_heights.insert(candidate_height);
+
+                COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::outputs_in_block blk_outs{};
+                blk_outs.block_height = candidate_height;
+                blk_outs.outs = std::move(oe);
+                res.blocks.push_back(std::move(blk_outs));
+                break; // found for this seed
+              }
             }
           }
         }
+
+        // change direction
+        step_direction = -step_direction;
+        if (step_direction > 0)
+          ++delta;
+
+        // out of diapason from both sides or exceeded radius limit
+        const bool out_of_right = (seed_height + delta) > height_limit;
+        const bool out_of_left  = (seed_height < delta);
+        if ((out_of_right && out_of_left) || (delta > MAX_SEARCH_DELTA_HEIGHT))
+        {
+          break;
+        }
       }
 
-      // change direction
-      step_direction = -step_direction;
-      if (step_direction > 0)
-        ++delta;
-
-      // out of diapason from both sides or exceeded radius limit
-      const bool out_of_right = (seed_height + delta) > height_limit;
-      const bool out_of_left  = (seed_height < delta);
-      if ( (out_of_right && out_of_left) || (delta > MAX_SEARCH_DELTA) )
+      // early exit - enough found
+      if (res.blocks.size() >= req.heights.size())
+      {
         break;
+      }
     }
+  };
 
-    // early exit - enought found
-    if (res.blocks.size() >= req.heights.size())
-      break;
+  search_pass(LOOK_UP_STRATEGY_POS_COINBASE);
+  if(res.blocks.size() == 0)
+  {
+    search_pass(LOOK_UP_STRATEGY_REGULAR_TX);
   }
 
   return true;
@@ -8767,14 +8781,21 @@ bool blockchain_storage::is_block_fit_for_strategy(uint64_t h, const std::string
 {
   block blk;
   if (!get_block_by_height(h, blk))
+  {
     return false;
+  }
 
   if (strategy == LOOK_UP_STRATEGY_REGULAR_TX)
   {
-    return !blk.tx_hashes.empty();
+    return true;
   }
   else if (strategy == LOOK_UP_STRATEGY_POS_COINBASE)
   {
+    if (get_last_x_block_height(/*pos=*/true) == 0)
+    {
+      return true;
+    }
+
     return is_pos_block(blk) && !blk.tx_hashes.empty();
   }
   else
@@ -8785,8 +8806,12 @@ bool blockchain_storage::is_block_fit_for_strategy(uint64_t h, const std::string
 //------------------------------------------------------------------
 bool blockchain_storage::collect_all_outs_in_block(uint64_t height, std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& outs) const
 {
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
   if (height >= m_db_blocks.size())
+  {
     return false;
+  }
 
   const block_extended_info& bei = *m_db_blocks[height];
   const block& bl = bei.bl;
@@ -8796,30 +8821,35 @@ bool blockchain_storage::collect_all_outs_in_block(uint64_t height, std::vector<
   {
     std::vector<uint64_t> gidx;
     if (!this->get_tx_outputs_gindexs(txid, gidx))
-      return; // have no indexes — skipping
+    {
+      return; // skipping
+    }
 
     if (gidx.size() != tx.vout.size())
-      return; // inconsistent — skipping
+    {
+      return; // inconsistent
+    }
 
     for (size_t i = 0; i < tx.vout.size(); ++i)
     {
       uint64_t amount = 0;
+      bool is_zc = false;
 
       VARIANT_SWITCH_BEGIN(tx.vout[i]);
       VARIANT_CASE_CONST(tx_out_bare, o)
       {
         amount = o.amount;
+        is_zc = false;
       }
-      VARIANT_CASE_CONST(tx_out_zarcanum, oz)
+      VARIANT_CASE_CONST(tx_out_zarcanum, dummy_zc)
       {
-        (void)oz;
         amount = 0;
+        is_zc = true;
       }
       VARIANT_SWITCH_END();
 
       COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry oen{};
-
-      if (this->build_random_out_entry(amount, gidx[i], mix_count, false, 0, oen))
+      if (this->build_random_out_entry(amount, gidx[i], mix_count, /*use_only_forced_to_mix=*/false, /*height_upper_limit=*/0, oen))
       {
         outs.emplace_back(oen);
       }
@@ -8837,10 +8867,12 @@ bool blockchain_storage::collect_all_outs_in_block(uint64_t height, std::vector<
   {
     auto tx_ptr = m_db_transactions.find(txid);
     if (!tx_ptr)
+    {
       continue; // cant find - skipping
+    }
 
     process_tx(txid, tx_ptr->tx);
   }
 
-  return true; // even if outputs were not added - this is not an error,caller check !outs.empty()
+  return true; // even if 0 outs
 }

@@ -448,6 +448,140 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
       return true;
     }
 
+    bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(
+        const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req,
+        currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& rsp) override
+    {
+      rsp.blocks.clear();
+
+      // Current "visible" height in the generator
+      const uint64_t top = m_blockchain.empty() ? 0 : (m_blockchain.size() - 1);
+
+      // Make sure we do not go out of the blockchain range
+      uint64_t hul_inclusive = req.height_upper_limit ? std::min<uint64_t>(req.height_upper_limit, top) : top;
+
+      // Important: make the boundary EXCLUSIVE - all decoys must be strictly older than the block we are building
+      // (otherwise, when replaying blocks, there will be a reference to outputs that do
+      const uint64_t hul_exclusive = (hul_inclusive == 0 ? 0 : hul_inclusive - 1);
+
+      bool zc_allowed = m_blockchain.size() >= CURRENCY_HF4_MANDATORY_MIN_COINAGE;
+      uint64_t zc_cap = 0;
+      if (zc_allowed)
+      {
+        const uint64_t zc_hard_cap = top - CURRENCY_HF4_MANDATORY_MIN_COINAGE;
+        zc_cap = std::min<uint64_t>(hul_exclusive, zc_hard_cap);
+      }
+
+      auto block_fits = [&](uint64_t h) -> bool
+      {
+        if (h >= m_blockchain.size())
+          return false;
+        if (h > hul_exclusive)
+          return false;
+
+        // do not filter by block/tx_cnt type like in main blockchain_storage version — take any
+        if (req.look_up_strategy == LOOK_UP_STRATEGY_REGULAR_TX || req.look_up_strategy == LOOK_UP_STRATEGY_POS_COINBASE)
+          return true;
+
+        return false; // unknown strategy
+      };
+
+      auto gather_from_tx = [&](uint64_t h, const currency::transaction& tx, const crypto::hash& txid, bool is_coinbase,
+        bool is_pos_block_flag, std::vector<currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& outs_vec)
+      {
+        const auto& gidx = get_tx_gindex_from_map(txid, m_txs_outs);
+        if (gidx.size() != tx.vout.size())
+          return;
+
+        for (size_t i = 0; i < tx.vout.size(); ++i)
+        {
+          const auto& out_v = tx.vout[i];
+
+          uint8_t mix_attr = 0;
+          if (!get_mix_attr_from_tx_out_v(out_v, mix_attr))
+            continue;
+          if (mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+            continue;
+
+          currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry oe{};
+          bool ok = false;
+
+          VARIANT_SWITCH_BEGIN(out_v)
+            VARIANT_CASE_CONST(currency::tx_out_zarcanum, zc)
+            {
+              // Skip ZC if minimum age HF4 is not met
+              if (!zc_allowed || h > zc_cap)
+                break;
+
+              oe = currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry(gidx[i], zc.stealth_address, zc.amount_commitment, zc.concealing_point, zc.blinded_asset_id);
+              ok = true;
+            }
+            VARIANT_CASE_CONST(currency::tx_out_bare, br)
+            {
+              if (h > hul_exclusive)
+                break;
+
+              if (br.target.type() == typeid(currency::txout_to_key))
+              {
+                const auto& t = boost::get<currency::txout_to_key>(br.target);
+                oe = currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry(gidx[i], t.key);
+                ok = true;
+              }
+            }
+          VARIANT_SWITCH_END();
+
+          if (!ok)
+            continue;
+
+          oe.flags = 0;
+          if (is_coinbase)
+          {
+            oe.flags |= RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_COINBASE;
+            if (is_pos_block_flag)
+              oe.flags |= RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_POS_COINBASE;
+          }
+
+          outs_vec.emplace_back(std::move(oe));
+        }
+      };
+
+      std::unordered_set<uint64_t> seen;
+      seen.reserve(req.heights.size() * 2);
+
+      for (uint64_t seed_h : req.heights)
+      {
+        if (seed_h == 0 && hul_exclusive == 0)
+          continue;
+        uint64_t h = seed_h > hul_exclusive ? hul_exclusive : seed_h;
+
+        if (!seen.insert(h).second)
+          continue;
+        if (!block_fits(h))
+          continue;
+
+        const auto& bi = *m_blockchain[h];
+        const auto& bl = bi.b;
+        const bool is_pos = is_pos_block(bl);
+
+        std::vector<currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> outs;
+        gather_from_tx(h, bl.miner_tx, get_transaction_hash(bl.miner_tx), /*is_coinbase=*/true, is_pos, outs);
+        const size_t tx_cnt = std::min(bl.tx_hashes.size(), bi.m_transactions.size());
+        for (size_t i = 0; i < tx_cnt; ++i)
+          gather_from_tx(h, bi.m_transactions[i], bl.tx_hashes[i], /*is_coinbase=*/false, is_pos, outs);
+
+        if (!outs.empty())
+        {
+          currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::outputs_in_block ob{};
+          ob.block_height = h;
+          ob.outs = std::move(outs);
+          rsp.blocks.emplace_back(std::move(ob));
+        }
+      }
+
+      rsp.status = API_RETURN_CODE_OK;
+      return true;
+    }
+
     bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& rqt, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& rsp) override
     {
       for (uint64_t amount : rqt.amounts)
@@ -516,7 +650,6 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
       rsp.status = API_RETURN_CODE_OK;
       return true;
     }
-
   }; // struct stub_core_proxy
 
   std::shared_ptr<tools::i_core_proxy> tmp_proxy(new stub_core_proxy(blockchain, txs_outs, oi, cc));
