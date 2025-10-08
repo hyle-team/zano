@@ -1895,7 +1895,7 @@ bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
   for(auto& el : found_amounts)
   {
     uint64_t requested_amount = amounts[el.first];
-    CHECK_AND_ASSERT(el.second >= requested_amount, false, "fill_tx_sources seemingly succsseded, but returned wrong amount for asset id " << el.first);
+    CHECK_AND_ASSERT_MES(el.second >= requested_amount, false, "fill_tx_sources seemingly succsseded, but returned wrong amount for asset id " << el.first);
     if (el.second > requested_amount)
       local_dst.push_back(tx_destination_entry(el.second - requested_amount, from.get_public_address(), el.first)); // add destination for change
   }
