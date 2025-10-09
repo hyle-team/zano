@@ -932,6 +932,7 @@ private:
     uint64_t get_alias_cost(const std::string& alias);
     detail::split_strategy_id_t get_current_split_strategy();
     void build_distribution_for_input(std::vector<uint64_t>& height_distrib, uint64_t own_height, decoy_selection_generator::dist_kind kind);
+    void build_distribution_for_input(std::vector<uint64_t>& offsets, uint64_t own_index);
     void select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount & amount_entry, uint64_t own_g_index);
 
     void submit_externally_signed_asset_tx_impl(const currency::finalized_tx& ft, const currency::transaction& tx, bool unlock_transfers_on_fail, currency::transaction& result_tx, bool& transfers_unlocked);

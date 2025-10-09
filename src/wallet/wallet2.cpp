@@ -58,9 +58,9 @@ using namespace currency;
 
 #define WALLET_TX_MAX_ALLOWED_FEE                                     (COIN * 100)
 
-#define WALLET_FETCH_RANDOM_OUTS_SIZE                                 200  
-
-#define WALLET_NONCB_SET_PROB_PERCENT                                 5
+#define WALLET_FETCH_RANDOM_BLOCK_SIZE                                 20
+#define WALLET_FETCH_RANDOM_OUTS_SIZE                                  200
+#define WALLET_NONCB_SET_PROB_PERCENT                                  5
 
 #undef LOG_DEFAULT_CHANNEL
 #define LOG_DEFAULT_CHANNEL "wallet"
@@ -4979,7 +4979,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request decoys_req = AUTO_VAL_INIT(decoys_req);
     decoys_req.height_upper_limit = m_last_pow_block_h; // request decoys to be either older than, or the same age as stake output's height
     decoys_req.look_up_strategy = LOOK_UP_STRATEGY_POS_COINBASE;
-    decoys_req.heights.clear(); // request outs by heights distribution
+    decoys_req.heights.resize(required_decoys_count + 1); // request outs by heights distribution
     build_distribution_for_input(decoys_req.heights, td.m_ptx_wallet_info->m_block_height, decoy_selection_generator::dist_kind::coinbase);
 
     r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(decoys_req, decoys_resp);
@@ -6791,7 +6791,7 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys
         //Zarcanum era
         rdisttib.amount = 0;
         //generate distribution in Zarcanum hardfork
-        build_distribution_for_input(rdisttib.global_offsets, it->second.m_global_output_index, decoy_selection_generator::dist_kind::regular);
+        build_distribution_for_input(rdisttib.global_offsets, it->second.m_global_output_index);
         need_to_request = true;
       }
       else
@@ -7023,13 +7023,33 @@ void wallet2::build_distribution_for_input(std::vector<uint64_t>& height_distrib
   if (max_height == 0)
     return;
 
+  uint64_t want = height_distrib.size();
+  
+  if (want == 0)
+  {
+    want = m_core_runtime_config.hf4_minimum_mixins;
+  }
+
   // limit how many heights we ask the daemon to materialize at once
   const uint64_t available = max_height > 0 ? (max_height - 1) : 0;
   if (available == 0)
     return;
 
-  const uint64_t want = std::min<uint64_t>(available, WALLET_FETCH_RANDOM_OUTS_SIZE);
-  height_distrib = zarcanum_decoy_set_generator.generate_unique_reversed_distribution(want, own_height);
+  const uint64_t actual_want = std::min<uint64_t>(want, available);
+  height_distrib = zarcanum_decoy_set_generator.generate_unique_reversed_distribution(actual_want, own_height);
+}
+//----------------------------------------------------------------------------------------------------------------
+void wallet2::build_distribution_for_input(std::vector<uint64_t>& offsets, uint64_t own_index)
+{
+  decoy_selection_generator zarcanum_decoy_set_generator;
+  zarcanum_decoy_set_generator.init(get_actual_zc_global_index(), decoy_selection_generator::dist_kind::regular);
+
+  THROW_IF_FALSE_WALLET_INT_ERR_EX(zarcanum_decoy_set_generator.is_initialized(), "zarcanum_decoy_set_generator are not initialized");
+  if (m_core_runtime_config.hf4_minimum_mixins)
+  {
+    uint64_t actual_zc_index = get_actual_zc_global_index();
+    offsets = zarcanum_decoy_set_generator.generate_unique_reversed_distribution(actual_zc_index - 1 > WALLET_FETCH_RANDOM_OUTS_SIZE ? WALLET_FETCH_RANDOM_OUTS_SIZE : actual_zc_index - 1, own_index);
+  }
 }
 //----------------------------------------------------------------------------------------------------------------
 bool wallet2::prepare_tx_sources(crypto::hash multisig_id, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money)
