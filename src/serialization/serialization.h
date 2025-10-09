@@ -258,11 +258,11 @@ template<typename destination_t>
 struct transition_t<true, destination_t>
 {
   template <typename archive, typename origin_type>
-  static bool chain_serialize(archive &ar, const origin_type& origin_tx)
+  static bool chain_serialize(archive &ar, const origin_type& origin_obj)
   {
-    destination_t dst_tx = AUTO_VAL_INIT(dst_tx);
-    transition_convert(origin_tx, dst_tx);
-    return dst_tx.do_serialize(ar);
+    destination_t dst_obj = AUTO_VAL_INIT(dst_obj);
+    transition_convert(origin_obj, dst_obj);
+    return ::do_serialize(ar, dst_obj);//dst_obj.do_serialize(ar);
   }
 };
 
@@ -270,17 +270,20 @@ template<typename destination_t>
 struct transition_t<false, destination_t>
 {
   template <typename archive, typename origin_type>
-  static bool chain_serialize(archive &ar, origin_type& origin_tx)
+  static bool chain_serialize(archive &ar, origin_type& origin_obj)
   {
-    // TODO: consider using move semantic for temporary 'dst_tx'
-    destination_t dst_tx = AUTO_VAL_INIT(dst_tx);
-    bool r = dst_tx.do_serialize(ar);
+    // TODO: consider using move semantic for temporary 'dst_obj'
+    destination_t dst_obj = AUTO_VAL_INIT(dst_obj);
+    //bool r = dst_obj.do_serialize(ar);
+    bool r = ::do_serialize(ar, dst_obj);
     if (!r) return r;
-    return transition_convert(dst_tx, origin_tx);
+    return transition_convert(dst_obj, origin_obj);
   }
 };
 
 #define CHAIN_TRANSITION_VER(tx_version, old_type)   if (tx_version == version) return transition_t<W, old_type>::chain_serialize(_ser_ar, *this);
+
+#define FIELD_TRANSITION_VER(transition_if_version_is_lower_than, field, old_type)   if (transition_if_version_is_lower_than > version) { return transition_t<W, old_type>::chain_serialize(_ser_ar, field);} else {FIELD(field)}
 
 #include "serialize_basic_types.h"
 #include "string.h"

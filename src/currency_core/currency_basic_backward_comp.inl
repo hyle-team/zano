@@ -144,6 +144,36 @@ struct asset_descriptor_operation_v1
   END_BOOST_SERIALIZATION()
 };
 
+struct tx_out_zarcanum_v1
+{
+  tx_out_zarcanum_v1() {}
+
+  // Boost's Assignable concept
+  tx_out_zarcanum_v1(const tx_out_zarcanum_v1&) = default;
+  tx_out_zarcanum_v1& operator=(const tx_out_zarcanum_v1&) = default;
+
+  crypto::public_key  stealth_address;
+  crypto::public_key  concealing_point;  // group element Q, see also Zarcanum paper, premultiplied by 1/8
+  crypto::public_key  amount_commitment; // premultiplied by 1/8
+  crypto::public_key  blinded_asset_id;  // group element T, premultiplied by 1/8
+  uint64_t            encrypted_amount = 0;
+  uint8_t             mix_attr = 0;
+
+  BEGIN_SERIALIZE_OBJECT()
+    FIELD(stealth_address)
+    FIELD(concealing_point)
+    FIELD(amount_commitment)
+    FIELD(blinded_asset_id)
+    FIELD(encrypted_amount)
+    FIELD(mix_attr)
+  END_SERIALIZE()
+
+};
+
+typedef boost::variant<tx_out_bare, tx_out_zarcanum_v1> tx_out_v_v1;
+
+
+
 template<typename asset_descriptor_operation_t>
 bool transition_convert(const asset_descriptor_operation_t& from, asset_descriptor_operation_v1& to)
 {
@@ -185,5 +215,90 @@ bool transition_convert(const asset_descriptor_operation_v1& from, asset_descrip
   to.opt_amount_commitment = from.amount_commitment;     
   to.opt_asset_id = from.opt_asset_id;      // target asset_id - for update/emit
   to.version = from.verion;
+  return true;
+}
+
+
+
+
+//template<typename asset_descriptor_operation_t>
+inline bool transition_convert(const tx_out_zarcanum& from, tx_out_zarcanum_v1& to)
+{
+  if (from.encrypted_payment_id != 0)
+  {
+    throw std::runtime_error(std::string("Unexpected: encrypted_payment_id during tx_out_zarcanum convention, looks like object slicing with information getting lost"));
+  }
+
+  if (from.version > 0)
+  {
+    throw std::runtime_error(std::string("Unexpected: version during tx_out_zarcanum convention, looks like object slicing with information getting lost"));
+  }
+
+  to.stealth_address = from.stealth_address;
+  to.concealing_point = from.concealing_point;
+  to.amount_commitment = from.amount_commitment;
+  to.blinded_asset_id = from.blinded_asset_id;
+  to.encrypted_amount = from.encrypted_amount;
+  to.mix_attr = from.mix_attr;
+  return true;
+}
+
+//template<typename asset_descriptor_operation_t>
+inline bool transition_convert(const tx_out_zarcanum_v1& from, tx_out_zarcanum& to)
+{
+
+  to.stealth_address = from.stealth_address;
+  to.concealing_point = from.concealing_point;
+  to.amount_commitment = from.amount_commitment;
+  to.blinded_asset_id = from.blinded_asset_id;
+  to.encrypted_amount = from.encrypted_amount;
+  to.mix_attr = from.mix_attr;
+  to.version = 0;
+  to.encrypted_payment_id = 0;
+
+  return true;
+}
+
+
+//template<typename asset_descriptor_operation_t>
+inline bool transition_convert(const std::vector<tx_out_v>& from, std::vector<tx_out_v_v1>& to)
+{
+  to.reserve(from.size());
+  for (const auto& v : from)
+  {
+    if (v.type() == typeid(tx_out_zarcanum))
+    {
+      tx_out_zarcanum_v1 v1 = AUTO_VAL_INIT(v1);
+      transition_convert(boost::get<tx_out_zarcanum>(v), v1);
+      to.push_back(std::move(v1));
+    }
+    else
+    {
+      to.push_back(boost::get<tx_out_bare>(std::move(v)));
+    }
+  }
+
+  return true;
+}
+
+//template<typename asset_descriptor_operation_t>
+inline bool transition_convert(const std::vector<tx_out_v_v1>& from, std::vector<tx_out_v>& to)
+{
+  to.reserve(from.size());
+  for (const auto& v1 : from)
+  {
+    if (v1.type() == typeid(tx_out_zarcanum_v1))
+    {
+      tx_out_zarcanum v = AUTO_VAL_INIT(v);
+      transition_convert(boost::get<tx_out_zarcanum_v1>(v1), v);
+      to.push_back(std::move(v));
+    }
+    else
+    {
+      to.push_back(boost::get<tx_out_bare>(std::move(v1)));
+    }
+  }
+
+  return true;
   return true;
 }
