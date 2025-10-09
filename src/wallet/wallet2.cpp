@@ -969,12 +969,6 @@ void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_i
 {
   PROFILE_FUNC("wallet2::prepare_wti_decrypted_attachments");
 
-  if (!wti.tx_wide_payment_id.empty())
-  {
-    LOG_ERROR("wti.tx_wide_payment_id is expected to be empty. Go ahead.");
-  }
-  get_payment_id_from_decrypted_container(decrypted_att, wti.tx_wide_payment_id);
-
   for (const auto& item : decrypted_att)
   {
     if (item.type() == typeid(currency::tx_service_attachment))
@@ -1318,7 +1312,7 @@ bool wallet2::handle_proposal(wallet_public::wallet_transfer_info& wti, const bc
   ed.is_a = cpd.a_addr.spend_public_key == m_account.get_keys().account_address.spend_public_key;
   change_contract_state(ed, wallet_public::escrow_contract_details_basic::proposal_sent, ms_id, wti);
   ed.private_detailes = cpd;
-  currency::get_payment_id_from_decrypted_container(decrypted_items, ed.payment_id);
+  currency::get_tx_wide_payment_id_from_decrypted_container(decrypted_items, ed.payment_id);
   ed.proposal = prop;
   ed.height = wti.height;
   wti.contract.resize(1);
@@ -1587,14 +1581,18 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, const proces
   {
     remove_field_of_type_from_extra<tx_comment>(decrypted_att);
   }
-  process_payment_id_for_wti_and_populate_subtransfers(wti, tx_process_context);
+  process_payment_id_for_wti_and_populate_subtransfers(wti, tx_process_context, decrypted_att);
   prepare_wti_decrypted_attachments(wti, decrypted_att); // should be called after wti subtransfer are populated
   process_contract_info(wti, decrypted_att); // should be called after attachments are decrypted
 
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::process_payment_id_for_wti_and_populate_subtransfers(wallet_public::wallet_transfer_info& wti, const process_transaction_context& ptc)
+bool wallet2::process_payment_id_for_wti_and_populate_subtransfers(wallet_public::wallet_transfer_info& wti, const process_transaction_context& ptc, const std::vector<currency::payload_items_v>& decrypted_items)
 {
+  if (!wti.tx_wide_payment_id.empty())
+    WLT_LOG_RED("wti.tx_wide_payment_id is expected to be empty. Go ahead.", LOG_LEVEL_0);
+  get_tx_wide_payment_id_from_decrypted_container(decrypted_items, wti.tx_wide_payment_id);
+
   if (wti.tx_wide_payment_id.empty())
   {
     // no legacy tx-wide payment id specified -- handle intrinsic payment ids
@@ -7232,7 +7230,7 @@ void wallet2::add_sent_tx_detailed_info(const transaction& tx, const std::vector
   const std::vector<uint64_t>& selected_transfers)
 {
   payment_id_t payment_id;
-  get_payment_id_from_decrypted_container(decrypted_att, payment_id);
+  get_tx_wide_payment_id_from_decrypted_container(decrypted_att, payment_id);
 
   std::vector<std::string> recipients;
   std::unordered_set<account_public_address> used_addresses;
@@ -8263,7 +8261,7 @@ void wallet2::check_and_throw_if_self_directed_tx_with_payment_id_requested(cons
 
   // it's self-directed tx
   payment_id_t pid;
-  bool has_payment_id = get_payment_id_from_decrypted_container(ctp.attachments, pid) && !pid.empty();
+  bool has_payment_id = get_tx_wide_payment_id_from_decrypted_container(ctp.attachments, pid) && !pid.empty();
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!has_payment_id, "sending funds to yourself with payment id is not allowed");
 }
 //----------------------------------------------------------------------------------------------------

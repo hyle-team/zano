@@ -714,9 +714,9 @@ namespace currency
   }
   //---------------------------------------------------------------
   template<typename t_container>
-  bool get_payment_id_from_decrypted_container(const t_container& att, std::string& payment_id)
+  bool get_tx_wide_payment_id_from_decrypted_container(const t_container& att, std::string& payment_id)
   {
-    tx_service_attachment sa = AUTO_VAL_INIT(sa);
+    tx_service_attachment sa{};
     if (bc_services::get_first_service_attachment_by_id(att, BC_PAYMENT_ID_SERVICE_ID, "", sa))
     {
       payment_id = sa.body;
