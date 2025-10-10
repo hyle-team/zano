@@ -58,7 +58,6 @@ using namespace currency;
 
 #define WALLET_TX_MAX_ALLOWED_FEE                                     (COIN * 100)
 
-#define WALLET_FETCH_RANDOM_BLOCK_SIZE                                 20
 #define WALLET_FETCH_RANDOM_OUTS_SIZE                                  200
 #define WALLET_NONCB_SET_PROB_PERCENT                                  5
 
@@ -4979,7 +4978,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request decoys_req = AUTO_VAL_INIT(decoys_req);
     decoys_req.height_upper_limit = m_last_pow_block_h; // request decoys to be either older than, or the same age as stake output's height
     decoys_req.look_up_strategy = LOOK_UP_STRATEGY_POS_COINBASE;
-    decoys_req.heights.resize(required_decoys_count + 1); // request outs by heights distribution
+    decoys_req.heights.resize((required_decoys_count + 1) * 2); // request outs by heights distribution
     build_distribution_for_input(decoys_req.heights, td.m_ptx_wallet_info->m_block_height, decoy_selection_generator::dist_kind::coinbase);
 
     r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(decoys_req, decoys_resp);
