@@ -454,7 +454,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
 
       // Current "visible" height in the generator
       const uint64_t top = m_blockchain.empty() ? 0 : (m_blockchain.size() - 1);
-
+ 
       // Make sure we do not go out of the blockchain range
       uint64_t hul_inclusive = req.height_upper_limit ? std::min<uint64_t>(req.height_upper_limit, top) : top;
 
@@ -2973,6 +2973,7 @@ test_chain_unit_base::test_chain_unit_base()
 void test_chain_unit_base::register_callback(const std::string& cb_name, verify_callback cb)
 {
   m_callbacks[cb_name] = cb;
+  std::cout << "Registered callback: " << cb_name << std::endl;
 }
 
 uint64_t test_chain_unit_base::get_tx_version_from_events(const std::vector<test_event_entry> &events) const
@@ -3054,6 +3055,7 @@ test_chain_unit_enchanced::test_chain_unit_enchanced()
 
 bool test_chain_unit_enchanced::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
+  std::cout << "ConFIIIIIIIIIIIIIIIIGURE CORE" << std::endl;
   currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
   pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
   pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
