@@ -905,3 +905,133 @@ TEST(Serialization, versioning2)
   ASSERT_TRUE(r);
 
 }
+
+void validate_blob_serialization(const transaction& tx)
+{
+  std::string blob1;
+  ASSERT_TRUE(serialization::dump_binary(tx, blob1));
+
+  transaction tx1;
+  ASSERT_TRUE(serialization::parse_binary(blob1, tx1));
+
+  std::string blob2;
+  ASSERT_TRUE(serialization::dump_binary(tx1, blob2));
+
+  ASSERT_EQ(blob1.size(), blob2.size()) << "blob sizes differ after round-trip";
+  ASSERT_EQ(blob1, blob2) << "blob bytes differ after round-trip";
+}
+
+template <typename T>
+inline T parse_hex_pod(const char* hex) {
+  return epee::string_tools::parse_tpod_from_hex_string<T>(hex);
+}
+
+template <typename T>
+inline T parse_hex_pod(std::string_view hex) {
+  return epee::string_tools::parse_tpod_from_hex_string<T>(std::string(hex));
+}
+
+using first_payload_t = typename boost::mpl::front<all_payload_types>::type;
+
+void fill_test_tx(currency::transaction& tx, uint64_t tx_version)
+{
+  using namespace currency;
+
+  tx = transaction{};
+  tx.attachment.clear();
+  tx.signatures.clear();
+  tx.proofs.clear();
+
+  tx.version = tx_version;
+
+  txin_to_key in1 = AUTO_VAL_INIT(in1);
+  in1.amount  = 11111;
+  in1.k_image = parse_hex_pod<crypto::key_image>(
+      "cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
+
+  ref_by_id rid1 = AUTO_VAL_INIT(rid1);
+  rid1.tx_id = parse_hex_pod<crypto::hash>(
+      "11608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
+  rid1.n = 12345;  in1.key_offsets.push_back(rid1);
+  rid1.n = 67890;  in1.key_offsets.push_back(rid1);
+
+  signed_parts sp = {1, 2};
+  in1.etc_details.push_back(sp);
+  tx.vin.push_back(in1);
+
+  txin_to_key in2 = AUTO_VAL_INIT(in2);
+  in2.amount  = 22222;
+  in2.k_image = parse_hex_pod<crypto::key_image>(
+      "22608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
+  ref_by_id rid2 = AUTO_VAL_INIT(rid2);
+  rid2.tx_id = parse_hex_pod<crypto::hash>(
+      "33608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
+  rid2.n = 111; in2.key_offsets.push_back(rid2);
+  rid2.n = 222; in2.key_offsets.push_back(rid2);
+  tx.vin.push_back(in2);
+
+  tx_comment c; c.comment = "dummy-comment";
+  tx.extra.push_back(c);
+
+  extra_alias_entry eae = AUTO_VAL_INIT(eae);
+  get_account_address_from_str(
+    eae.m_address,
+    "ZxDcDWmA7Yj32srfjMHAY6WPzBB8uqpvzKxEsAjDZU6NRg1yZsRfmr87mLXCvMRHXd5n2kdRWhbqA3WWTbEW4jLd1XxL46tnv");
+  eae.m_alias = "dummy-alias";
+  eae.m_text_comment = "dummy-note";
+  tx.extra.push_back(eae);
+
+  tx_out_bare o = AUTO_VAL_INIT(o);
+  o.amount = 33333;
+  txout_to_key tk = AUTO_VAL_INIT(tk);
+  tk.key = parse_hex_pod<crypto::public_key>(
+      "44f3a4e5b6c7d8e90112233445566778899aabbccddeeff0011223344556677");
+  tk.mix_attr = 22;
+  o.target = tk;
+  tx.vout.push_back(o);
+  tx.vout.push_back(o);
+
+  if (tx_version >= TRANSACTION_VERSION_POST_HF5) {
+    tx.hardfork_id = 1;
+  }
+
+  first_payload_t pl{};
+  tx.attachment.push_back(pl);
+
+  crypto::signature sig = parse_hex_pod<crypto::signature>(
+    "22608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852"
+    "22608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
+
+  currency::NLSAG_sig nls = AUTO_VAL_INIT(nls);
+  nls.s.push_back(sig);
+  nls.s.push_back(sig);
+  tx.signatures.clear();
+  tx.signatures.push_back(nls);
+
+  zc_balance_proof pr{};
+  tx.proofs.push_back(pr);
+}
+
+TEST(Serialization, deserialize_srialize_compare) {
+  using namespace currency;
+
+  transaction tx0;
+  fill_test_tx(tx0, TRANSACTION_VERSION_INITAL);
+  validate_blob_serialization(tx0);
+
+  transaction tx1;
+  fill_test_tx(tx1, TRANSACTION_VERSION_PRE_HF4);
+  validate_blob_serialization(tx1);
+
+  transaction tx2;
+  fill_test_tx(tx2, TRANSACTION_VERSION_POST_HF4);
+  validate_blob_serialization(tx2);
+
+  transaction tx3;
+  fill_test_tx(tx3, TRANSACTION_VERSION_POST_HF5);
+  validate_blob_serialization(tx3);
+
+  // transaction tx4;
+  // fill_test_tx(tx4, TRANSACTION_VERSION_POST_HF6);
+  // validate_blob_serialization(tx4);
+}
