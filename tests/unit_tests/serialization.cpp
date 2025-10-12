@@ -909,7 +909,8 @@ TEST(Serialization, versioning2)
 void validate_blob_serialization(const transaction& tx)
 {
   std::string blob1;
-  ASSERT_TRUE(serialization::dump_binary(tx, blob1));
+  transaction tx_copy = tx; // avoid warning about constness
+  ASSERT_TRUE(serialization::dump_binary(tx_copy, blob1));
 
   transaction tx1;
   ASSERT_TRUE(serialization::parse_binary(blob1, tx1));
@@ -946,12 +947,10 @@ void fill_test_tx(currency::transaction& tx, uint64_t tx_version)
 
   txin_to_key in1 = AUTO_VAL_INIT(in1);
   in1.amount  = 11111;
-  in1.k_image = parse_hex_pod<crypto::key_image>(
-      "cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
+  in1.k_image = parse_hex_pod<crypto::key_image>("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
 
   ref_by_id rid1 = AUTO_VAL_INIT(rid1);
-  rid1.tx_id = parse_hex_pod<crypto::hash>(
-      "11608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
+  rid1.tx_id = parse_hex_pod<crypto::hash>("11608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
   rid1.n = 12345;  in1.key_offsets.push_back(rid1);
   rid1.n = 67890;  in1.key_offsets.push_back(rid1);
 
@@ -961,11 +960,9 @@ void fill_test_tx(currency::transaction& tx, uint64_t tx_version)
 
   txin_to_key in2 = AUTO_VAL_INIT(in2);
   in2.amount  = 22222;
-  in2.k_image = parse_hex_pod<crypto::key_image>(
-      "22608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
+  in2.k_image = parse_hex_pod<crypto::key_image>("22608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
   ref_by_id rid2 = AUTO_VAL_INIT(rid2);
-  rid2.tx_id = parse_hex_pod<crypto::hash>(
-      "33608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
+  rid2.tx_id = parse_hex_pod<crypto::hash>("33608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852");
   rid2.n = 111; in2.key_offsets.push_back(rid2);
   rid2.n = 222; in2.key_offsets.push_back(rid2);
   tx.vin.push_back(in2);
@@ -974,9 +971,7 @@ void fill_test_tx(currency::transaction& tx, uint64_t tx_version)
   tx.extra.push_back(c);
 
   extra_alias_entry eae = AUTO_VAL_INIT(eae);
-  get_account_address_from_str(
-    eae.m_address,
-    "ZxDcDWmA7Yj32srfjMHAY6WPzBB8uqpvzKxEsAjDZU6NRg1yZsRfmr87mLXCvMRHXd5n2kdRWhbqA3WWTbEW4jLd1XxL46tnv");
+  get_account_address_from_str(eae.m_address, "ZxDcDWmA7Yj32srfjMHAY6WPzBB8uqpvzKxEsAjDZU6NRg1yZsRfmr87mLXCvMRHXd5n2kdRWhbqA3WWTbEW4jLd1XxL46tnv");
   eae.m_alias = "dummy-alias";
   eae.m_text_comment = "dummy-note";
   tx.extra.push_back(eae);
@@ -984,8 +979,7 @@ void fill_test_tx(currency::transaction& tx, uint64_t tx_version)
   tx_out_bare o = AUTO_VAL_INIT(o);
   o.amount = 33333;
   txout_to_key tk = AUTO_VAL_INIT(tk);
-  tk.key = parse_hex_pod<crypto::public_key>(
-      "44f3a4e5b6c7d8e90112233445566778899aabbccddeeff0011223344556677");
+  tk.key = parse_hex_pod<crypto::public_key>("44f3a4e5b6c7d8e90112233445566778899aabbccddeeff0011223344556677");
   tk.mix_attr = 22;
   o.target = tk;
   tx.vout.push_back(o);
