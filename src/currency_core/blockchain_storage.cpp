@@ -3133,7 +3133,7 @@ bool blockchain_storage::get_random_outs_for_amounts4(const COMMAND_RPC_GET_RAND
     return false;
   }
 
-  const uint64_t top_block_height = get_current_blockchain_size() - 1;
+  const uint64_t top_block_height = get_current_blockchain_size() - CURRENCY_MINED_MONEY_UNLOCK_WINDOW;
   const uint64_t height_limit = (req.height_upper_limit && req.height_upper_limit <= top_block_height) ? req.height_upper_limit : top_block_height;
 
   std::unordered_set<uint64_t> seen_heights;
