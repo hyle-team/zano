@@ -1271,7 +1271,7 @@ namespace currency
 
         crypto::scalar_t amount_mask   = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
         out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
-        if (tx.version > TRANSACTION_VERSION_POST_HF6)
+        if (tx.version >= TRANSACTION_VERSION_POST_HF6)
           out.encrypted_payment_id = de.payment_id ^ amount_mask.m_u64[1]; // different 64-bit slices of Keccak's output are computationally independent
       
         CHECK_AND_ASSERT_MES(~de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
@@ -1297,7 +1297,7 @@ namespace currency
       
         crypto::scalar_t amount_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
         out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
-        if (tx.version > TRANSACTION_VERSION_POST_HF6)
+        if (tx.version >= TRANSACTION_VERSION_POST_HF6)
           out.encrypted_payment_id = de.payment_id ^ amount_mask.m_u64[1]; // different 64-bit slices of Keccak's output are computationally independent
       
         CHECK_AND_ASSERT_MES(~de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
@@ -3540,7 +3540,7 @@ namespace currency
 
     crypto::scalar_t amount_mask   = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
     decoded_amount = zo.encrypted_amount ^ amount_mask.m_u64[0];
-    decoded_payment_id = zo.encrypted_payment_id ^ amount_mask.m_u64[1];
+    decoded_payment_id = zo.encrypted_payment_id != 0 ? zo.encrypted_payment_id ^ amount_mask.m_u64[1] : 0;
 
     amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_BLINDING_MASK, h); // f = Hs(domain_sep, h)
 
