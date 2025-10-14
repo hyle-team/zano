@@ -279,3 +279,12 @@ bool do_serialize(Archive<true> &ar, std::vector<bool> &v)
   ar.end_array();
   return true;
 }
+
+template<typename Archive, typename T>
+struct serializer<Archive, std::vector<T>>
+{
+  static bool serialize(Archive& ar, std::vector<T>& v)
+  {
+    return ::do_serialize(ar, v);
+  }
+};
