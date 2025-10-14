@@ -14,10 +14,10 @@
 
 
 //#include "serialization.h"
-template <template <bool> class Archive, class T>
-bool do_serialize(Archive<false> &ar, std::vector<T> &v);
-template <template <bool> class Archive, class T>
-bool do_serialize(Archive<true> &ar, std::vector<T> &v);
+//template <template <bool> class Archive, class T>
+//bool do_serialize(Archive<false> &ar, std::vector<T> &v);
+//template <template <bool> class Archive, class T>
+//bool do_serialize(Archive<true> &ar, std::vector<T> &v);
 
 namespace serialization
 {
@@ -38,8 +38,10 @@ namespace serialization
   }
 }
 
-template <template <bool> class Archive, class T>
-bool do_serialize(Archive<false> &ar, std::vector<T> &v)
+//template <template <bool> class Archive, class T>
+template<class Archive, class T,
+  typename std::enable_if<!Archive::is_saving::value, int>::type = 0>
+bool do_serialize(Archive& ar, std::vector<T> &v)
 {
   size_t cnt;
   ar.begin_array(cnt);
@@ -75,8 +77,9 @@ bool do_serialize(Archive<false> &ar, std::vector<T> &v)
   return true;
 }
 
-template <template <bool> class Archive, class T>
-bool do_serialize(Archive<true> &ar, std::vector<T> &v)
+template<class Archive, class T,
+  typename std::enable_if<Archive::is_saving::value, int>::type = 0>
+bool do_serialize(Archive &ar, std::vector<T> &v)
 {
   size_t cnt = v.size();
   ar.begin_array(cnt);
