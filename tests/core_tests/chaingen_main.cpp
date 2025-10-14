@@ -27,6 +27,7 @@ namespace
   const command_line::arg_descriptor<bool>        arg_generate_and_play_test_data  ("generate-and-play-test-data", "");
   const command_line::arg_descriptor<bool>        arg_test_transactions            ("test-transactions", "");
   const command_line::arg_descriptor<std::string> arg_run_single_test              ("run-single-test", "<TEST_NAME[@HF]> TEST_NAME -- name of a single test to run, HF -- specific hardfork id to run the test for" );
+  const command_line::arg_descriptor<std::string> arg_run_multiple_tests           ("run-multiple-tests", "comma-separated list of tests to run, OR text file <@filename> containing list of tests");
   const command_line::arg_descriptor<bool>        arg_enable_debug_asserts         ("enable-debug-asserts", "" );
   const command_line::arg_descriptor<bool>        arg_stop_on_fail                 ("stop-on-fail", "");
 
@@ -387,7 +388,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
 
 
 #define GENERATE_AND_PLAY(genclass)                                                                        \
-  if (!skip_all_till_the_end && ((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string(#genclass) == run_single_test))) \
+  if (is_test_eligible_to_run(#genclass))                                                                  \
   {                                                                                                        \
     TIME_MEASURE_START_MS(t);                                                                              \
     ++tests_count;                                                                                         \
@@ -404,7 +405,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
   }
 
 #define GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(genclass)                                     \
-  if (!skip_all_till_the_end && (run_single_test.empty() || run_single_test == #genclass))                 \
+  if (is_test_eligible_to_run(#genclass))                                                                  \
   {                                                                                                        \
     const char* testname = #genclass " (BC saveload)";                                                     \
     TIME_MEASURE_START_MS(t);                                                                              \
@@ -422,13 +423,13 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
   }
 
 #define GENERATE_AND_PLAY_HF(genclass, hardfork_str_mask)                                                  \
-  if (!skip_all_till_the_end && ((!postponed_tests.count(#genclass) && run_single_test.empty()) || (!run_single_test.empty() && std::string(#genclass) == run_single_test))) \
+  if (!skip_all_till_the_end)                                                                              \
   {                                                                                                        \
     std::vector<size_t> hardforks = parse_hardfork_str_mask(hardfork_str_mask);                            \
     CHECK_AND_ASSERT_MES(!hardforks.empty(), false, "invalid hardforks mask: " << hardfork_str_mask);      \
     for(size_t i = 0; i < hardforks.size() && !skip_all_till_the_end; ++i)                                 \
     {                                                                                                      \
-      if (run_single_test_hardfork != SIZE_MAX && hardforks[i] != run_single_test_hardfork)                \
+      if (!is_hf_test_eligible_to_run(#genclass, hardforks[i]))                                            \
         continue;                                                                                          \
       std::string tns = std::string(#genclass) + " @ HF " + epee::string_tools::num_to_string_fast(hardforks[i]);  \
       const char* testname = tns.c_str();                                                                  \
@@ -822,8 +823,82 @@ inline bool do_replay_file(const std::string& filename)
   t_test_class g;
   return do_replay_events(events, g);
 }
+//--------------------------------------------------------------------------
+bool parse_cmd_specific_tests_to_run(std::unordered_multimap<std::string, size_t>& specific_tests_to_run)
+{
+  auto parse_test = [](const std::string& str, std::string& test_name, size_t& hardfork, bool& show_error_and_stop) -> bool {
+    show_error_and_stop = false;
+    std::string line = boost::replace_first_copy(str, "FAILED:", "");
+    line = boost::replace_first_copy(line, " HF ", "");
+    line = boost::replace_all_copy(line, " ", "");
+    std::vector<std::string> items;
+    boost::split(items, line, boost::is_any_of("@"));
+    CHECK_AND_ASSERT_MES_CUSTOM(items.size() == 1 || items.size() == 2, false, show_error_and_stop = true, "Too many '@' symbols: " + line);
+    test_name = items[0];
+    if (test_name.empty())
+      return false;
+    hardfork = SIZE_MAX;
+    if (items.size() > 1)
+    {
+      int64_t val = 0;
+      epee::string_tools::string_to_num_fast(items[1], val);
+      hardfork = val;
+    }
+    return true;
+  };
 
+  bool show_error_and_stop = false;
+  if (command_line::has_arg(g_vm, arg_run_single_test))
+  {
+    std::string test_name;
+    size_t hardfork = SIZE_MAX; // SIZE_MAX means all hard forks, other values mean hardfork id
+    std::string arg = command_line::get_arg(g_vm, arg_run_single_test);
+    bool parsed = parse_test(arg, test_name, hardfork, show_error_and_stop);
+    CHECK_AND_ASSERT_MES(parsed && !show_error_and_stop, false, "unable to parse --run-single-test");
+    specific_tests_to_run.insert(std::make_pair(test_name, hardfork));
+  }
 
+  if (command_line::has_arg(g_vm, arg_run_multiple_tests))
+  {
+    CHECK_AND_ASSERT_MES(specific_tests_to_run.empty(), false, "--run-single-test and --run-multiple-tests cannot be used at the same time");
+    std::string arg = command_line::get_arg(g_vm, arg_run_multiple_tests);
+    if (arg[0] == '@')
+    {
+      // handle file with tests names
+      std::string filename = arg.substr(1);
+      std::filesystem::path filepath = filename;
+      CHECK_AND_ASSERT_MES(std::filesystem::exists(filepath), false, "Specified file does not exist: " + filename);
+      std::ifstream f(filepath, std::ios::in);
+      CHECK_AND_ASSERT_MES(f.is_open(), false, "Specified file could not be opened: " + filename);
+      std::string line, test_name;
+      size_t hardfork = SIZE_MAX;
+      while(std::getline(f, line))
+      {
+        if (parse_test(line, test_name, hardfork, show_error_and_stop))
+          specific_tests_to_run.insert(std::make_pair(test_name, hardfork));
+        CHECK_AND_ASSERT_MES(!show_error_and_stop, false, "Error on processing line: " + line);
+      }
+      f.close();
+    }
+    else
+    {
+      // handle comma-separated list of tests
+      std::string test_name;
+      size_t hardfork = SIZE_MAX;
+      std::vector<std::string> items;
+      boost::split(items, arg, boost::is_any_of(","));
+      for(const auto& item : items)
+      {
+        if (parse_test(item, test_name, hardfork, show_error_and_stop))
+          specific_tests_to_run.insert(std::make_pair(test_name, hardfork));
+        CHECK_AND_ASSERT_MES(!show_error_and_stop, false, "Could not parse test name: " + item);
+      }
+    }
+  }
+
+  return true;
+}
+//--------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {
   TRY_ENTRY();
@@ -852,7 +927,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_play_test_data);
   command_line::add_arg(desc_options, arg_generate_and_play_test_data);
   command_line::add_arg(desc_options, arg_test_transactions);
-  command_line::add_arg(desc_options, arg_run_single_test);  
+  command_line::add_arg(desc_options, arg_run_single_test);
+  command_line::add_arg(desc_options, arg_run_multiple_tests);
   command_line::add_arg(desc_options, arg_enable_debug_asserts);
   command_line::add_arg(desc_options, arg_stop_on_fail);
   command_line::add_arg(desc_options, command_line::arg_data_dir, std::string("."));
@@ -917,24 +993,38 @@ int main(int argc, char* argv[])
   {
     epee::debug::get_set_enable_assert(true, command_line::get_arg(g_vm, arg_enable_debug_asserts)); // don't comment out this: many tests have normal-negative checks (i.e. tx with invalid amount shouldn't be created), so be ready for MANY assertion breaks
 
-    std::string run_single_test;
-    size_t run_single_test_hardfork = SIZE_MAX; // SIZE_MAX means all hard forks, other values mean hardfork id
-    if (command_line::has_arg(g_vm, arg_run_single_test))
-    {
-      std::string arg = command_line::get_arg(g_vm, arg_run_single_test);
-      std::vector<std::string> items;
-      boost::split(items, arg, boost::is_any_of("@"));
-      CHECK_AND_ASSERT_MES(items.size() > 0, 2, "unable to parse arg_run_single_test");
-      run_single_test = items[0];
-      if (items.size() > 1)
+    std::unordered_multimap<std::string, size_t> specific_tests_to_run; // test_name -> hf; if empty, all tests should be run
+    CHECK_AND_ASSERT_MES(parse_cmd_specific_tests_to_run(specific_tests_to_run), 1, "Error while parsing specific tests to run");
+
+    std::set<std::string> postponed_tests;
+
+    auto is_hf_test_eligible_to_run = [&](const std::string& genclass_str, size_t hardfork) -> bool {
+      if (skip_all_till_the_end)
+        return false;
+      if (specific_tests_to_run.empty())
       {
-        int64_t val = 0;
-        epee::string_tools::string_to_num_fast(items[1], val);
-        run_single_test_hardfork = val;
+        if (postponed_tests.count(genclass_str) != 0)
+          return false;
       }
-    }
-    
-    if (run_single_test.empty())
+      else
+      {
+        auto it_pair = specific_tests_to_run.equal_range(genclass_str);
+        if (it_pair.first == it_pair.second)
+          return false;
+        bool match = false;
+        for(auto it = it_pair.first; it != it_pair.second; ++it)
+          if (it->second == SIZE_MAX || hardfork == SIZE_MAX || it->second == hardfork)
+            match = true;
+        if (!match)
+          return false;
+      }
+      LOG_PRINT_L0("good: " << genclass_str);
+      return true;
+    };
+
+    auto is_test_eligible_to_run = [&](const std::string& genclass_str) -> bool { return is_hf_test_eligible_to_run(genclass_str, SIZE_MAX); };
+
+    if (specific_tests_to_run.empty())
     {
       CALL_TEST("Random text test", get_random_text_test);
       CALL_TEST("Random state manipulation test", random_state_manupulation_test);
@@ -947,7 +1037,6 @@ int main(int argc, char* argv[])
     }
 
     //CALL_TEST("check_hash_and_difficulty_monte_carlo_test", check_hash_and_difficulty_monte_carlo_test); // it's rather an experiment with unclean results than a solid test, for further research...
-    std::set<std::string> postponed_tests;
 
     // Postponed tests - tests that may fail for the time being (believed that it's a serious issue and should be fixed later for some reason).
     // In a perfect world this list is empty.
