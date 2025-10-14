@@ -283,7 +283,7 @@ struct transition_t<false, destination_t>
 
 #define CHAIN_TRANSITION_VER(tx_version, old_type)   if (tx_version == version) return transition_t<W, old_type>::chain_serialize(_ser_ar, *this);
 
-#define FIELD_TRANSITION_VER(transition_if_version_is_lower_than, field, old_type)   if (transition_if_version_is_lower_than > version) { return transition_t<W, old_type>::chain_serialize(_ser_ar, field);} else {FIELD(field)}
+#define FIELD_TRANSITION_VER(transition_if_version_is_lower_than, field, old_type)   if (transition_if_version_is_lower_than > version) { transition_t<W, old_type>::chain_serialize(_ser_ar, field); } else { FIELD(field) }
 
 #include "serialize_basic_types.h"
 #include "string.h"
