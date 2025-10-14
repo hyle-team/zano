@@ -1257,7 +1257,7 @@ namespace currency
       CHECK_AND_ASSERT_MES(de.addr.size() == 1, false, "zarcanum multisig not implemented for tx_out_zarcanum yet");
       // TODO @#@# implement multisig support
 
-      tx_out_zarcanum out = AUTO_VAL_INIT(out);
+      tx_out_zarcanum out{};
 
       const account_public_address& apa = de.addr.front();
       if (apa.spend_public_key == null_pkey && apa.view_public_key == null_pkey)
@@ -1271,7 +1271,8 @@ namespace currency
 
         crypto::scalar_t amount_mask   = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
         out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
-        out.encrypted_payment_id = de.payment_id ^ amount_mask.m_u64[1]; // different 64-bit slices of Keccak�s output are computationally independent
+        if (tx.version > TRANSACTION_VERSION_POST_HF6)
+          out.encrypted_payment_id = de.payment_id ^ amount_mask.m_u64[1]; // different 64-bit slices of Keccak's output are computationally independent
       
         CHECK_AND_ASSERT_MES(~de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
         asset_blinding_mask = de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // s = Hs(domain_sep, Hs(8 * r * V, i))
@@ -1296,7 +1297,8 @@ namespace currency
       
         crypto::scalar_t amount_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
         out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
-        out.encrypted_payment_id = de.payment_id ^ amount_mask.m_u64[1]; // different 64-bit slices of Keccak�s output are computationally independent
+        if (tx.version > TRANSACTION_VERSION_POST_HF6)
+          out.encrypted_payment_id = de.payment_id ^ amount_mask.m_u64[1]; // different 64-bit slices of Keccak's output are computationally independent
       
         CHECK_AND_ASSERT_MES(~de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
         asset_blinding_mask = de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // s = Hs(domain_sep, Hs(8 * r * V, i))
@@ -1330,7 +1332,7 @@ namespace currency
     }
     else
     {
-      // create tx_out_bare, this section can be removed after HF4
+      // create tx_out_bare, this section is kept after HF4 only for tests and references
       CHECK_AND_ASSERT_MES(de.addr.size() == 1 || (de.addr.size() > 1 && de.minimum_sigs <= de.addr.size()), false, "Invalid destination entry: amount: " << de.amount << " minimum_sigs: " << de.minimum_sigs << " addr.size(): " << de.addr.size());
       CHECK_AND_ASSERT_MES(de.asset_id == currency::native_coin_asset_id, false, "assets are not allowed prior to HF4");
 
@@ -1338,7 +1340,7 @@ namespace currency
       target_keys.reserve(de.addr.size());
       for (auto& apa : de.addr)
       {
-        crypto::public_key out_eph_public_key = AUTO_VAL_INIT(out_eph_public_key);
+        crypto::public_key out_eph_public_key{};
         if (apa.spend_public_key == null_pkey && apa.view_public_key == null_pkey)
         {
           //burning money(for example alias reward)
@@ -1346,7 +1348,7 @@ namespace currency
         }
         else
         {
-          crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
+          crypto::key_derivation derivation{};
           bool r = derive_public_key_from_target_address(apa, tx_sec_key, output_index, out_eph_public_key, derivation);
           CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
 
@@ -1356,56 +1358,12 @@ namespace currency
         target_keys.push_back(out_eph_public_key);
       }
 
-      tx_out_bare out;
+      tx_out_bare out{};
       out.amount = de.amount;
-      if (de.htlc_options.expiration != 0)
-      {
-        const destination_option_htlc_out& htlc_dest = de.htlc_options;
-        //out htlc
-        CHECK_AND_ASSERT_MES(target_keys.size() == 1, false, "Unexpected htl keys count = " << target_keys.size() << ", expected ==1");
-        txout_htlc htlc = AUTO_VAL_INIT(htlc);
-        htlc.expiration = htlc_dest.expiration;
-        htlc.flags = 0; //0 - SHA256, 1 - RIPEMD160, by default leave SHA256
-        //receiver key
-        htlc.pkey_redeem = *target_keys.begin();
-        //generate refund key
-        crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-        crypto::public_key out_eph_public_key = AUTO_VAL_INIT(out_eph_public_key);
-        bool r = derive_public_key_from_target_address(self.account_address, tx_sec_key, output_index, out_eph_public_key, derivation);
-        CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
-        htlc.pkey_refund = out_eph_public_key;
-        //add derivation hint for refund address
-        uint16_t hint = get_derivation_hint(derivation);
-        deriv_cache.insert(hint); // won't be inserted if such hint already exists
-
-
-        if (htlc_dest.htlc_hash == null_hash)
-        {
-          //we use deterministic origin, to make possible access origin on different wallets copies
-        
-          result.htlc_origin = generate_origin_for_htlc(htlc, self);
-
-          //calculate hash
-          if (!htlc.flags&CURRENCY_TXOUT_HTLC_FLAGS_HASH_TYPE_MASK)
-          {
-            htlc.htlc_hash = crypto::sha256_hash(result.htlc_origin.data(), result.htlc_origin.size());
-          }
-          else
-          {
-            crypto::hash160 h160 = crypto::RIPEMD160_hash(result.htlc_origin.data(), result.htlc_origin.size());
-            std::memcpy(&htlc.htlc_hash, &h160, sizeof(h160));
-          }
-        }
-        else
-        {
-          htlc.htlc_hash = htlc_dest.htlc_hash;
-        }
-        out.target = htlc;
-      }
-      else if (target_keys.size() == 1)
+      if (target_keys.size() == 1)
       {
         //out to key
-        txout_to_key tk = AUTO_VAL_INIT(tk);
+        txout_to_key tk{};
         tk.key = target_keys.back();
 
         if (de.addr.front().is_auditable()) // check only the first address because there's only one in this branch
@@ -1418,7 +1376,7 @@ namespace currency
       else
       {
         //multisig out
-        txout_multisig ms = AUTO_VAL_INIT(ms);
+        txout_multisig ms{};
         ms.keys = std::move(target_keys);
         ms.minimum_sigs = de.minimum_sigs;
         out.target = ms;
