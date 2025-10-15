@@ -5074,7 +5074,8 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
       << " < " << required_decoys_count << " (coinbase_candidates=" << coinbase_candidates.size() << ", noncb_pool=" << noncb_candidates.size() << ")");
     // add real
     selected_decoys.emplace_back(td.m_global_output_index, stake_out.stealth_address, stake_out.amount_commitment, stake_out.concealing_point, stake_out.blinded_asset_id);
-    std::sort(selected_decoys.begin(), selected_decoys.end(), [](const auto& l, const auto& r){ return l.global_amount_index < r.global_amount_index; });
+    std::sort(selected_decoys.begin(), selected_decoys.end(), 
+      [](const auto& l, const auto& r){ return l.global_amount_index < r.global_amount_index; }); // sort them now (note absolute_sorted_output_offsets_to_relative_in_place() below)
 
     ring.reserve(selected_decoys.size());
     stake_input.key_offsets.clear();
@@ -5092,7 +5093,9 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
       stake_input.key_offsets.push_back(el.global_amount_index);
     }
 
-    absolute_sorted_output_offsets_to_relative_in_place(stake_input.key_offsets);
+    bool r = absolute_sorted_output_offsets_to_relative_in_place(stake_input.key_offsets);
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "absolute_sorted_output_offsets_to_relative_in_place failed");
+
   }
   else
   {
