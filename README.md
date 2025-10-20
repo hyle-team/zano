@@ -139,10 +139,12 @@ For instance, by adding the following lines to `~/.bashrc`
 ### Windows
 Recommended OS version: Windows 7 x64, Windows 11 x64.
 1. Install required prerequisites (Boost, Qt, CMake, OpenSSL).
-2. Edit paths in `utils/configure_local_paths.cmd`.
-3. Run one of `utils/configure_win64_msvsNNNN_gui.cmd` according to your MSVC version.
-4. Go to the build folder and open generated Zano.sln in MSVC.
-5. Build.
+    * For Qt: download the [online installer](https://download.qt.io/official_releases/online_installers/), then install the recommended release, according to the table above, including the corresponding MSVC binaries (ensure all filters are checked to see older releases if needed).
+    * For Boost: [download](https://www.boost.org/releases/latest/) x64 version of the recommended release, according to the table above, with prebuilt binaries. Mind the MSVC version!
+3. Edit paths in `utils/configure_local_paths.cmd`.
+4. Run one of `utils/configure_win64_msvsNNNN_gui.cmd` according to your MSVC version.
+5. Go to the build folder and open generated Zano.sln in MSVC.
+6. Build.
 
 In order to correctly deploy Qt GUI application, you also need to do the following:
 
@@ -154,7 +156,7 @@ In order to correctly deploy Qt GUI application, you also need to do the followi
 <br />
 
 ### macOS
-Recommended OS version: macOS Big Sur 11.4 x64.
+Recommended OS version: macOS Ventura 13.3.1 x64.
 1. Install required prerequisites.
 2. Set environment variables as stated in `utils/macosx_build_config.command`.
 3.  `mkdir build` <br> `cd build` <br> `cmake ..` <br> `make`
