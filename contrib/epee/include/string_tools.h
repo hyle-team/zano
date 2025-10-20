@@ -290,7 +290,7 @@ POP_GCC_WARNINGS
   {
     if (buff.size() != sizeof(pod_t))
       return false;
-    output = *reinterpret_cast<const pod_t*>(buff.data());
+		std::memcpy(std::addressof(output), buff.data(), sizeof(pod_t)); //output = *reinterpret_cast<const pod_t*>(buff.data());
     return true;
   }
 
@@ -596,7 +596,7 @@ POP_GCC_WARNINGS
     if(bin_buff.size()!=sizeof(s))
       return false;
 
-    s = *(t_pod_type*)bin_buff.data();
+		std::memcpy(std::addressof(s), bin_buff.data(), sizeof(t_pod_type)); //s = *(t_pod_type*)bin_buff.data();
     return true;
   }
   //----------------------------------------------------------------------------
