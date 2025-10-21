@@ -20,9 +20,9 @@ FUSD (Freedom Dollar)
 Asset id: 86143388bd056a8f0bab669f78f14873fac8e2dd8d57898cdb725a2d5e2e4f8f
 
 
-**Start** 3388594
+**Start** 3392744
 
-**End** 3408754
+**End** 3412904
 
 ---
 
@@ -34,9 +34,9 @@ BTCX (Wrapped Bitcoin)
 Asset id: 040a180aca4194a158c17945dd115db42086f6f074c1f77838621a4927fffa91
 
 
-**Start** 3388594
+**Start** 3392744
 
-**End** 3408754
+**End** 3412904
 
 ---
 
@@ -48,9 +48,9 @@ ETHX (Wrapped Ethereum)
 Asset id: 93da681503353509367e241cda3234299dedbbad9ec851de31e900490807bf0c
 
 
-**Start** 3388594
+**Start** 3392744
 
-**End** 3408754
+**End** 3412904
 
 
 
