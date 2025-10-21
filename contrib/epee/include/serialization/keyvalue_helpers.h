@@ -111,11 +111,12 @@ namespace epee
         throw std::runtime_error(std::string("Unable to transform \"") + a + "\" to pod type " + typeid(typename t_pod_type::value_type).name());
       return v;
     }
-
-
-    if (!epee::string_tools::hex_to_pod(a, res))
-      throw std::runtime_error(std::string("Unable to transform \"") + a + "\" to pod type " + typeid(t_pod_type).name());
-		return res;
+    else
+    {
+      if (!epee::string_tools::hex_to_pod(a, res))
+        throw std::runtime_error(std::string("Unable to transform \"") + a + "\" to pod type " + typeid(t_pod_type).name());
+      return res;
+    }
 	}
 
 
