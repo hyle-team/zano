@@ -586,6 +586,23 @@ POP_GCC_WARNINGS
     return buff_to_hex_nodelimer(buff);
   }
   //----------------------------------------------------------------------------
+  template<class t_pod_type>
+    typename std::enable_if<std::is_trivially_copyable<t_pod_type>::value, bool>::type
+  hex_to_pod(const std::string& hex_str, t_pod_type& s)
+  {
+    std::string hex_str_tr = trim(hex_str);
+    if(sizeof(s)*2 != hex_str.size())
+      return false;
+    std::string bin_buff;
+    if(!parse_hexstr_to_binbuff(hex_str_tr, bin_buff))
+      return false;
+    if(bin_buff.size()!=sizeof(s))
+      return false;
+
+    std::memcpy(std::addressof(s), bin_buff.data(), sizeof(t_pod_type)); //s = *(t_pod_type*)bin_buff.data();
+    return true;
+  }
+  //----------------------------------------------------------------------------
 	template<class T>
 	bool hex_to_pod(const std::string& hex_str, boost::optional<T>& opt)
 	{
@@ -605,23 +622,6 @@ POP_GCC_WARNINGS
 		opt = tmp;
 		return true;
 	}
-  //----------------------------------------------------------------------------
-  template<class t_pod_type>
-    typename std::enable_if<std::is_trivially_copyable<t_pod_type>::value, bool>::type
-  hex_to_pod(const std::string& hex_str, t_pod_type& s)
-  {
-    std::string hex_str_tr = trim(hex_str);
-    if(sizeof(s)*2 != hex_str.size())
-      return false;
-    std::string bin_buff;
-    if(!parse_hexstr_to_binbuff(hex_str_tr, bin_buff))
-      return false;
-    if(bin_buff.size()!=sizeof(s))
-      return false;
-
-    std::memcpy(std::addressof(s), bin_buff.data(), sizeof(t_pod_type)); //s = *(t_pod_type*)bin_buff.data();
-    return true;
-  }
   //----------------------------------------------------------------------------
   template<class t_pod_type>
   t_pod_type hex_to_pod(const std::string& hex_str)
