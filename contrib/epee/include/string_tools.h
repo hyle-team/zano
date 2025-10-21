@@ -29,6 +29,8 @@
 #include <locale>
 #include <cstdlib>
 #include <map>
+#include <type_traits>
+#include <boost/serialization/optional.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/lexical_cast.hpp>
@@ -584,8 +586,29 @@ POP_GCC_WARNINGS
     return buff_to_hex_nodelimer(buff);
   }
   //----------------------------------------------------------------------------
+	template<class T>
+	bool hex_to_pod(const std::string& hex_str, boost::optional<T>& opt)
+	{
+		std::string hex_str_tr = trim(hex_str);
+
+		if (hex_str_tr.empty())
+		{
+			opt = boost::none;
+			return true;
+		}
+
+		T tmp = AUTO_VAL_INIT(tmp);
+		// call base version for T (it will work if T is trivially copyable)
+		if (!hex_to_pod(hex_str_tr, tmp))
+			return false;
+
+		opt = tmp;
+		return true;
+	}
+  //----------------------------------------------------------------------------
   template<class t_pod_type>
-  bool hex_to_pod(const std::string& hex_str, t_pod_type& s)
+    typename std::enable_if<std::is_trivially_copyable<t_pod_type>::value, bool>::type
+  hex_to_pod(const std::string& hex_str, t_pod_type& s)
   {
     std::string hex_str_tr = trim(hex_str);
     if(sizeof(s)*2 != hex_str.size())
@@ -596,7 +619,7 @@ POP_GCC_WARNINGS
     if(bin_buff.size()!=sizeof(s))
       return false;
 
-		std::memcpy(std::addressof(s), bin_buff.data(), sizeof(t_pod_type)); //s = *(t_pod_type*)bin_buff.data();
+    std::memcpy(std::addressof(s), bin_buff.data(), sizeof(t_pod_type)); //s = *(t_pod_type*)bin_buff.data();
     return true;
   }
   //----------------------------------------------------------------------------
