@@ -354,12 +354,14 @@ namespace currency
     if(m_mempool.have_tx(tx_hash))
     {
       LOG_PRINT_L3("add_new_tx: already have tx " << tx_hash << " in the pool");
+      tvc.m_already_existed = true;
       return true;
     }
 
     if(m_blockchain_storage.have_tx(tx_hash))
     {
       LOG_PRINT_L3("add_new_tx: already have tx " << tx_hash << " in the blockchain");
+      tvc.m_already_existed = true;
       return true;
     }
 

@@ -223,7 +223,7 @@ namespace tools
   {
 
     auto it = std::find_if(query_info.m_header_info.m_etc_fields.begin(), query_info.m_header_info.m_etc_fields.end(), [](const auto& element)
-                           { return element.first == ZANO_ACCESS_TOKEN; });
+                           { return !epee::string_tools::compare_no_case(element.first, ZANO_ACCESS_TOKEN); });
     if(it == query_info.m_header_info.m_etc_fields.end())
       return false;
     
