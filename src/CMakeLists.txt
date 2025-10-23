@@ -207,6 +207,30 @@ if(BUILD_GUI)
   set(CMAKE_INCLUDE_CURRENT_DIR ON)
   SET(MACOSX_BUNDLE_ICON_FILE app.icns)
   add_executable(Zano WIN32 MACOSX_BUNDLE ${QTDAEMON} )
+
+  #####  embed html into resources  ######
+  set(HTML_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/layout/html)
+
+  file(GLOB_RECURSE HTML_FILES CONFIGURE_DEPENDS RELATIVE "${HTML_DIR}" "${HTML_DIR}/*")
+  list(FILTER HTML_FILES EXCLUDE REGEX "\\.(map|scss|ts|tsx)$")
+
+  set(GUI_QRC "${CMAKE_BINARY_DIR}/resources_gui.qrc")
+  file(WRITE "${GUI_QRC}" "<RCC>\n  <qresource prefix=\"/html\">\n")
+
+  # add each file (important forward slashes in paths)
+  foreach(f IN LISTS HTML_FILES)
+    file(TO_CMAKE_PATH "${HTML_DIR}/${f}" ABS_FPATH)
+    file(APPEND "${GUI_QRC}" "    <file alias=\"${f}\">${ABS_FPATH}</file>\n")
+  endforeach()
+
+  # сlose QRC
+  file(APPEND "${GUI_QRC}" "  </qresource>\n</RCC>\n")
+
+  qt5_add_resources(ZANO_RESOURCES "${GUI_QRC}")
+  target_sources(Zano PRIVATE ${ZANO_RESOURCES})
+  message(STATUS "[HTML-embed] Embedded ${HTML_COUNT} files into target 'Zano' via ${GUI_QRC}")
+  ##### end qt resources ######
+
   ENABLE_SHARED_PCH(Zano QTDAEMON)
   ENABLE_SHARED_PCH_EXECUTABLE(Zano)
 	  
@@ -229,7 +253,7 @@ if(BUILD_GUI)
   set_property(TARGET Zano PROPERTY FOLDER "prog")
   set_target_properties(Zano PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/Info.plist.in)
 
-  set(HTML_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/layout/html)
+  #set(HTML_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/layout/html)
   set_target_properties(Zano PROPERTIES VS_DEBUGGER_COMMAND_ARGUMENTS "--html-path=${HTML_DIR}")
 
   set(CMAKE_AUTOMOC OFF)
