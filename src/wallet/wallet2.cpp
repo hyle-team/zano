@@ -7029,7 +7029,7 @@ void wallet2::select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS
   amount_entry.outs = local_outs;
 }
 //----------------------------------------------------------------------------------------------------------------
-void wallet2::build_distribution_for_input(std::vector<uint64_t>& height_distrib, uint64_t own_height, decoy_selection_generator::dist_kind kind)
+void wallet2::build_distribution_for_input(std::vector<uint64_t>& height_distrib, uint64_t own_height, decoy_selection_generator::dist_kind kind) const
 {
   decoy_selection_generator zarcanum_decoy_set_generator;
   const uint64_t max_height = get_blockchain_current_size();
