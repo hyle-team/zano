@@ -18,6 +18,8 @@ hard_fork_6_intrinsic_payment_id_basic_test::hard_fork_6_intrinsic_payment_id_ba
 
 bool hard_fork_6_intrinsic_payment_id_basic_test::generate(std::vector<test_event_entry>& events) const
 {
+  // Test idea: check basics of legacy payment id + intrinsic payment id combination.
+
   bool r = false;
   uint64_t ts = test_core_time::get_time();
   m_accounts.resize(TOTAL_ACCS_COUNT);

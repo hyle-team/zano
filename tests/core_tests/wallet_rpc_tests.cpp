@@ -19,63 +19,6 @@
 
 using namespace currency;
 
-template<typename server_t>
-struct transport
-{
-  server_t& m_rpc_srv;
-  transport(server_t& rpc_srv) :m_rpc_srv(rpc_srv)
-  {}
-  epee::net_utils::http::http_response_info m_response;
-
-  bool is_connected() { return true; }
-  template<typename t_a, typename t_b, typename t_c>
-  bool connect(t_a ta, t_b tb, t_c tc) { return true; }
-
-  template<typename dummy_t>
-  bool invoke(const std::string uri, const std::string method_, const std::string& body, const epee::net_utils::http::http_response_info** ppresponse_info, const dummy_t& d)
-  {
-    epee::net_utils::http::http_request_info query_info;
-    query_info.m_URI = uri;
-    query_info.m_body = body;
-    tools::wallet_rpc_server::connection_context ctx;
-    bool r = m_rpc_srv.handle_http_request(query_info, m_response, ctx);
-    if (ppresponse_info)
-      *ppresponse_info = &m_response;
-    return r;
-  }
-};
-
-
-
-template<typename request_t, typename response_t, typename t_rpc_server>
-bool invoke_text_json_for_rpc(t_rpc_server& srv, const std::string& method_name, const request_t& req, response_t& resp)
-{
-  transport<t_rpc_server> tr(srv);
-
-  bool r = epee::net_utils::invoke_http_json_rpc("/json_rpc", method_name, req, resp, tr);
-  return r;
-}
-
-template<typename request_t, typename response_t>
-bool invoke_text_json_for_wallet(std::shared_ptr<tools::wallet2> wlt, const std::string& method_name, const request_t& req, response_t& resp)
-{
-  tools::wallet_rpc_server wlt_rpc_wrapper(wlt);
-  return invoke_text_json_for_rpc(wlt_rpc_wrapper, method_name, req, resp);
-}
-
-template<typename request_t, typename response_t>
-bool invoke_text_json_for_core(currency::core& c, const std::string& method_name, const request_t& req, response_t& resp)
-{
-  currency::t_currency_protocol_handler<currency::core> m_cprotocol(c, nullptr);
-  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > p2p(m_cprotocol);
-  bc_services::bc_offers_service of(nullptr); 
-
-  currency::core_rpc_server core_rpc_wrapper(c, p2p, of);
-  core_rpc_wrapper.set_ignore_connectivity_status(true);
-  return invoke_text_json_for_rpc(core_rpc_wrapper, method_name, req, resp);
-}
-
-
 
 wallet_rpc_integrated_address::wallet_rpc_integrated_address()
 {
@@ -1662,6 +1605,8 @@ bool wallet_rpc_multiple_receivers::c1(currency::core& c, size_t ev_index, const
 
   return true;
 }
+
+//------------------------------------------------------------------------------
 
 wallet_rpc_hardfork_verification::wallet_rpc_hardfork_verification()
 {
