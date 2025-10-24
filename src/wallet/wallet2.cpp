@@ -8108,6 +8108,7 @@ void wallet2::finalize_transaction(currency::finalize_tx_param& ftp, currency::f
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!broadcast_tx || store_tx_secret_key, "finalize_tx is requested to broadcast a tx without storing the key");
 
   THROW_IF_FALSE_WALLET_EX_MES(ftp.sources.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, error::tx_too_big, "Too many inputs: " << ftp.sources.size() << ", maximum allowed is " << CURRENCY_TX_MAX_ALLOWED_INPUTS << ".");
+  THROW_IF_FALSE_WALLET_EX_MES(ftp.prepared_destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS, error::tx_has_too_many_outs, "Too many outputs: " << ftp.prepared_destinations.size() << ", maximum allowed is " << CURRENCY_TX_MAX_ALLOWED_OUTS << ".");
 
   bool r = currency::construct_tx(m_account.get_keys(),
     ftp, result);

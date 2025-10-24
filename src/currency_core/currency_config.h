@@ -18,15 +18,15 @@
 
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
-#define CURRENCY_MAX_BLOCK_SIZE                         500000000  // block header blob limit, never used!
-#define CURRENCY_TX_MAX_ALLOWED_INPUTS                  256        // limited primarily by asset surjection proof
-#define CURRENCY_TX_MAX_ALLOWED_OUTS                    2000
-#define CURRENCY_TX_MIN_ALLOWED_OUTS                    2      // effective starting HF4 Zarcanum
-#define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           0xc5   // addresses start with 'Zx'
-#define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678 // integrated addresses start with 'iZ'
-#define CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX  0x36f8 // integrated addresses start with 'iZ' (new format)
-#define CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX 0x98c8 // auditable addresses start with 'aZx'
-#define CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX 0x8a49 // auditable integrated addresses start with 'aiZX'
+#define CURRENCY_MAX_BLOCK_SIZE                         500000000     // block header blob limit, never used!
+#define CURRENCY_TX_MAX_ALLOWED_INPUTS                  256           // limited primarily by asset surjection proof
+#define CURRENCY_TX_MAX_ALLOWED_OUTS                    32            // soft rule, but matches BPP aggregation values limit, which is a hard rule since HF4
+#define CURRENCY_TX_MIN_ALLOWED_OUTS                    2             // effective starting HF4 Zarcanum
+#define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           0xc5          // addresses start with 'Zx'
+#define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678        // integrated addresses start with 'iZ'
+#define CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX  0x36f8        // integrated addresses start with 'iZ' (new format)
+#define CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX 0x98c8        // auditable addresses start with 'aZx'
+#define CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX 0x8a49  // auditable integrated addresses start with 'aiZX'
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
 #define CURRENT_TRANSACTION_VERSION                     4
 #define TRANSACTION_VERSION_INITAL                      0
@@ -43,7 +43,7 @@
 #define CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE           15
 #define CURRENCY_HF4_MANDATORY_MIN_COINAGE              10
 #define CURRENCY_PRE_HARDFORK_TX_FREEZE_PERIOD          60 // number of blocks before the hardfork activation when no new txs are accepted (effective from HF5)
-#define CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE          8 // size of intrinsic payment id (per-output payment id)
+#define CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE          8 // size of intrinsic (per-output) payment id
 
 #define CURRENT_BLOCK_MINOR_VERSION                     0
 #define CURRENCY_BLOCK_FUTURE_TIME_LIMIT                60*60*2
