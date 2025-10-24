@@ -1014,8 +1014,6 @@ private:
 
 BOOST_CLASS_VERSION(tools::wallet2, WALLET_FILE_SERIALIZATION_VERSION)
 
-BOOST_CLASS_VERSION(tools::wallet_public::wallet_transfer_info, 12)
-
 namespace boost
 {
   namespace serialization

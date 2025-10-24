@@ -408,11 +408,13 @@ namespace tools
       KV_SERIALIZE(m_spent_height)
       KV_SERIALIZE(m_flags)
       KV_SERIALIZE(m_amount)
+      KV_SERIALIZE(m_payment_id)
       KV_SERIALIZE_N(m_zc_info_ptr, "zc_out_info")
       KV_SERIALIZE_EPHEMERAL_N(uint64_t, transfer_details_base_to_amount, "amount")
       KV_SERIALIZE_EPHEMERAL_N(std::string, transfer_details_base_to_tx_hash, "tx_id")
     END_KV_SERIALIZE_MAP()
 
+    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(3)
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(m_ptx_wallet_info)
       BOOST_SERIALIZE(m_internal_output_index)
@@ -420,7 +422,9 @@ namespace tools
       BOOST_SERIALIZE(m_spent_height)
       BOOST_SERIALIZE(m_amount)
       BOOST_SERIALIZE(m_zc_info_ptr)
-    END_BOOST_SERIALIZATION()
+      BOOST_END_VERSION_UNDER(3)
+      BOOST_SERIALIZE(m_payment_id)
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(7)
   };
 
 
@@ -453,6 +457,7 @@ namespace tools
       KV_CHAIN_BASE(transfer_details_base)
     END_KV_SERIALIZE_MAP()
 
+    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(3)
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(m_global_output_index)
       BOOST_SERIALIZE(m_key_image)
@@ -530,5 +535,5 @@ namespace tools
 
 }// namespace tools
 
-BOOST_CLASS_VERSION(tools::transfer_details, 3)
-BOOST_CLASS_VERSION(tools::transfer_details_base, 2)
+LOOP_BACK_BOOST_SERIALIZATION_VERSION(tools::transfer_details_base);
+LOOP_BACK_BOOST_SERIALIZATION_VERSION(tools::transfer_details);

@@ -387,7 +387,8 @@ namespace currency
       BOOST_SERIALIZE(encrypted_amount)
       BOOST_SERIALIZE(mix_attr)
       BOOST_END_VERSION_UNDER(1)
-      BOOST_SERIALIZE(encrypted_payment_id)      
+      BOOST_SERIALIZE(encrypted_payment_id)
+      BOOST_SERIALIZE(version)
     END_BOOST_SERIALIZATION()
   };
 

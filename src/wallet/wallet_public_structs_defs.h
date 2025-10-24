@@ -213,7 +213,9 @@ namespace wallet_public
       KV_SERIALIZE_EPHEMERAL_N(currency::asset_descriptor_operation, wallet_transfer_info_get_ado, "ado")   DOC_DSCR("\"Asset Descriptor Operation\" if it was present in transaction")   DOC_END
     END_KV_SERIALIZE_MAP()
 
+    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(13)
     BEGIN_BOOST_SERIALIZATION()
+      BOOST_CHAIN_TRANSITION_VER(12, tools::legacy::wallet_transfer_info_hf5)
       BOOST_SERIALIZE(timestamp)
       BOOST_SERIALIZE(tx_hash)
       BOOST_SERIALIZE(height)
@@ -2295,5 +2297,9 @@ namespace wallet_public
     };
   };
 
-} // namespace wallet_rpc
+} // namespace wallet_public
 } // namespace tools
+
+LOOP_BACK_BOOST_SERIALIZATION_VERSION(tools::wallet_public::wallet_transfer_info);
+
+#include "wallet_public_structs_backward_comp.h"
