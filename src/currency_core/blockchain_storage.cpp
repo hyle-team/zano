@@ -820,6 +820,8 @@ bool blockchain_storage::prune_ring_signatures_and_attachments_if_need()
   if (m_non_pruning_mode_enabled)
     return true;
 
+  // Pruning is temporary disabled to avoid unnecessary load delays. TODO: re-enable in future together with the checkpoints -- sowle
+  /*
   uint64_t top_block_height = get_top_block_height();
   uint64_t pruning_end_height = m_checkpoints.get_checkpoint_before_height(top_block_height);
   if (pruning_end_height > m_db_current_pruned_rs_height)
@@ -835,6 +837,7 @@ bool blockchain_storage::prune_ring_signatures_and_attachments_if_need()
     m_db_current_pruned_rs_height = pruning_end_height;
     LOG_PRINT_CYAN("Transaction pruning finished: " << sig_count << " signatures and " << attach_count << " attachments released in " << tx_count << " transactions.", LOG_LEVEL_0);
   }
+  */
   return true;
 }
 //------------------------------------------------------------------
