@@ -69,7 +69,7 @@ namespace tools::legacy
   template <class Archive>
   inline void serialize(Archive& a, offer_details_ex_hf5& x, const boost::serialization::version_type ver)
   {
-    a & static_cast<bc_services::offer_details&>(x);
+    a & static_cast<offer_details_hf5&>(x);
     a & x.timestamp;
     a & x.tx_hash;
     a & x.index_in_tx;
@@ -456,7 +456,7 @@ inline void transition_convert(std::list<tools::legacy::offers_attachment_t_hf5>
         t.tx_id       = co.tx_id;
         to.push_back(std::move(t));
       VARIANT_CASE_OTHER()
-        throw std::exception("transition_convert(offers_attachment_t_hf5) : other not implemented");
+        throw std::logic_error("transition_convert(offers_attachment_t_hf5) : other not implemented");
     VARIANT_SWITCH_END()
   }
 }
@@ -500,7 +500,7 @@ inline void transition_convert(tools::legacy::wallet_transfer_info_hf5&& from, t
 inline void transition_convert(const tools::wallet_public::wallet_transfer_info& from, tools::legacy::wallet_transfer_info_hf5& to)
 {
   // intentionally not implemented; we don't need to convert new data structures to old ones -- sowle
-  throw std::exception("transition_convert(wallet_transfer_info, wallet_transfer_info_hf5) not implemented");
+  throw std::logic_error("transition_convert(wallet_transfer_info, wallet_transfer_info_hf5) not implemented");
 }
 
 LOOP_BACK_BOOST_SERIALIZATION_VERSION(tools::legacy::wallet_transfer_info_hf5);

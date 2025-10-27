@@ -21,9 +21,12 @@ const uint64_t WALLET_GLOBAL_OUTPUT_INDEX_UNDEFINED = std::numeric_limits<uint64
 
 const boost::uuids::uuid RPC_INTERNAL_UI_CONTEXT = {0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 0, 1, 2, 1, 0, 0}; //Bender's nightmare 
 
-namespace tools
+namespace tools::legacy
 {
-namespace wallet_public
+  struct wallet_transfer_info_hf5;
+}
+  
+namespace tools::wallet_public
 {
 #define WALLET_RPC_STATUS_OK      "OK"
 #define WALLET_RPC_STATUS_BUSY    "BUSY"
@@ -2297,8 +2300,7 @@ namespace wallet_public
     };
   };
 
-} // namespace wallet_public
-} // namespace tools
+} // namespace tools::wallet_public
 
 LOOP_BACK_BOOST_SERIALIZATION_VERSION(tools::wallet_public::wallet_transfer_info);
 
