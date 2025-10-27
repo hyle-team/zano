@@ -2634,7 +2634,8 @@ namespace currency
 
     result.ftp = ftp;
     CHECK_AND_ASSERT_MES(sources.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS,    false, "Too many inputs: "  << sources.size()      << ", max allowed: " << CURRENCY_TX_MAX_ALLOWED_INPUTS << ". Tx cannot be constructed.");
-    CHECK_AND_ASSERT_MES(destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS, false, "Too many outputs: " << destinations.size() << ", max allowed: " << CURRENCY_TX_MAX_ALLOWED_OUTS   << ". Tx cannot be constructed.");
+    uint64_t tx_max_allowed_outs = ftp.tx_version >= TRANSACTION_VERSION_POST_HF4 ? CURRENCY_TX_MAX_ALLOWED_OUTS : CURRENCY_TX_MAX_ALLOWED_OUTS_PRE_HF4;
+    CHECK_AND_ASSERT_MES(destinations.size() <= tx_max_allowed_outs, false, "Too many outputs: " << destinations.size() << ", max allowed: " << tx_max_allowed_outs   << ". Tx cannot be constructed.");
 
     bool append_mode = false;
     if (flags&TX_FLAG_SIGNATURE_MODE_SEPARATE && tx.vin.size())
