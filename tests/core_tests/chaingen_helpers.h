@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -10,6 +10,11 @@
 #include "wallet/wallet2.h"
 #include "test_core_time.h"
 #include "chaingen.h"
+#include "wallet/wallet_rpc_server.h"
+#include "currency_protocol/currency_protocol_handler.h"
+#include "rpc/core_rpc_server.h"
+#include "currency_core/bc_offers_service.h"
+#include "p2p/net_node.h"
 
 // chaingen-independent helpers that may be used outside of core_tests (for ex. in functional_tests)
 
