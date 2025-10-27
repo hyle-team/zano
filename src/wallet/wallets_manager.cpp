@@ -2285,6 +2285,7 @@ void wallets_manager::wallet_vs_options::worker_func()
       if (do_mining && *plast_daemon_network_state == currency::COMMAND_RPC_GET_INFO::daemon_network_state_online)
       {
         pos_minin_interval.do_call([this](){
+          TIME_MEASURE_START_MS(mining_duration_ms);
           tools::wallet2::mining_context ctx = AUTO_VAL_INIT(ctx);
           LOG_PRINT_L1(get_log_prefix() + " Starting PoS mint iteration");
           if (!w->get()->fill_mining_context(ctx))
@@ -2305,7 +2306,8 @@ void wallets_manager::wallet_vs_options::worker_func()
           {
             w->get()->build_minted_block(ctx);
           }
-          LOG_PRINT_L1(get_log_prefix() << " PoS mining iteration finished, status: " << ctx.status << ", used " << ctx.total_items_checked << " entries with total amount: " << currency::print_money_brief(ctx.total_amount_checked) << ", processed: " << ctx.iterations_processed << " iter.");
+          TIME_MEASURE_FINISH_MS(mining_duration_ms);
+          LOG_PRINT_L1(get_log_prefix() << " PoS GUI mining: " << ctx.iterations_processed << " iterations finished (" << std::fixed << std::setprecision(2) << (mining_duration_ms / 1000.0f) << "s), status: " << ctx.status << ", " << ctx.total_items_checked << " entries with total amount: " << currency::print_money_brief(ctx.total_amount_checked));
           return true;
         });
       }
