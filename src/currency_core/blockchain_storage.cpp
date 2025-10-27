@@ -6558,16 +6558,9 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
 
   if (var_is_after_hardfork_6_zone)
   {
-    // intrinsic payment id can be used but they are incompartible with service attachment payment id
-    //if (has_tx_wide_payment_id(tx))
-    //{
-    //  for(const auto& out_v : tx.vout)
-    //  {
-    //    if (out_v.type() == typeid(tx_out_zarcanum))
-    //      boost::get<tx_out_zarcanum>(out_v).encrypted_payment_id
-
-    //  }
-    //}
+    // enforce explicitly existing soft limits (s.a. tx_memory_pool::add_tx) and implicit hard limits (verify_BGE_proof etc.)
+    CHECK_AND_ASSERT_MES(tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
+    CHECK_AND_ASSERT_MES(tx.vout.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS,  false, "transaction has too many outputs = " << tx.vout.size());
   }
 
 
