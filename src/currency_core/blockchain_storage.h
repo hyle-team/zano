@@ -319,6 +319,8 @@ namespace currency
     bool enumerate_aliases(cb_t cb) const;
     template<typename cb_t>
     bool get_aliases(cb_t cb, uint64_t offset, uint64_t count) const;
+    template<typename cb_t>
+    bool lookup_aliases_by_prefix(const std::string& prefix_raw, uint64_t n, cb_t cb) const;
     uint64_t get_aliases_count()const;
     uint64_t get_block_h_older_then(uint64_t timestamp) const;
     bool validate_tx_service_attachmens_in_services(const tx_service_attachment& a, size_t i, const transaction& tx)const;
@@ -984,6 +986,27 @@ namespace currency
       cb(alias, alias_entries.back());
       return true;
     });
+    return true;
+  }
+
+  template<typename cb_t>
+  bool blockchain_storage::lookup_aliases_by_prefix(const std::string& prefix_raw, uint64_t n, cb_t cb) const
+  {
+    CRITICAL_REGION_LOCAL(m_read_lock);
+
+    if (prefix_raw.empty() || n == 0)
+      return false;
+
+    m_db_aliases.enumerate_items_by_prefix(prefix_raw, n,
+        [&](uint64_t i, const std::string& alias, const std::list<extra_alias_entry_base>& entries)
+    {
+      if (entries.empty())
+        return true;
+
+      cb(alias, entries.back());
+      return true;
+    });
+
     return true;
   }
   //------------------------------------------------------------------

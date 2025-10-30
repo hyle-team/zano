@@ -374,6 +374,53 @@ namespace tools
       return true;
     }
 
+    bool lmdb_db_backend::enumerate_prefix(container_handle h,
+                                      const std::string& prefix,
+                                      uint64_t limit,
+                                      i_db_callback* pcb)
+    {
+      CHECK_AND_ASSERT_MES(pcb, false, "null callback ptr passed to enumerate_prefix");
+      MDB_val key = AUTO_VAL_INIT(key);
+      MDB_val data = AUTO_VAL_INIT(data);
+
+      bool need_to_commit = false;
+      if (!have_tx())
+      {
+        need_to_commit = true;
+        begin_transaction(true);
+      }
+
+      MDB_cursor* cursor_ptr = nullptr;
+      int res = mdb_cursor_open(get_current_tx(), static_cast<MDB_dbi>(h), &cursor_ptr);
+      CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_cursor_open");
+      CHECK_AND_ASSERT_MES(cursor_ptr, false, "cursor_ptr is null after mdb_cursor_open");
+
+      key.mv_data = const_cast<char*>(prefix.data());
+      key.mv_size = prefix.size();
+      res = mdb_cursor_get(cursor_ptr, &key, &data, MDB_SET_RANGE);
+
+      uint64_t count = 0;
+      while (res == MDB_SUCCESS && count < limit)
+      {
+        if (key.mv_size < prefix.size() || std::memcmp(key.mv_data, prefix.data(), prefix.size()) != 0) {
+          break;
+        }
+
+        if (!pcb->on_enum_item(count, key.mv_data, key.mv_size, data.mv_data, data.mv_size)) {
+          break;
+        }
+
+        ++count;
+        res = mdb_cursor_get(cursor_ptr, &key, &data, MDB_NEXT);
+      }
+
+      mdb_cursor_close(cursor_ptr);
+      if (need_to_commit)
+        commit_transaction();
+
+      return true;
+    }
+
     bool lmdb_db_backend::get_stat_info(tools::db::stat_info& si)
     {
       si = AUTO_VAL_INIT_T(tools::db::stat_info);

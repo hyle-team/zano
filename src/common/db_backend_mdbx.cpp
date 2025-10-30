@@ -381,6 +381,55 @@ namespace tools
       return true;
     }
 
+    bool mdbx_db_backend::enumerate_prefix(container_handle h,
+                                      const std::string& prefix,
+                                      uint64_t limit,
+                                      i_db_callback* pcb)
+  {
+    CHECK_AND_ASSERT_MES(pcb, false, "null callback ptr passed to enumerate_prefix");
+
+    MDBX_val key = AUTO_VAL_INIT(key);
+    MDBX_val data = AUTO_VAL_INIT(data);
+
+    bool need_to_commit = false;
+    if (!have_tx())
+    {
+      need_to_commit = true;
+      begin_transaction(true);
+    }
+
+    MDBX_cursor* cursor_ptr = nullptr;
+    int res = mdbx_cursor_open(get_current_tx(), static_cast<MDBX_dbi>(h), &cursor_ptr);
+    CHECK_AND_ASSERT_MESS_MDBX_DB(res, false, "Unable to mdbx_cursor_open");
+    CHECK_AND_ASSERT_MES(cursor_ptr, false, "cursor_ptr is null after mdbx_cursor_open");
+
+    key.iov_base = const_cast<char*>(prefix.data());
+    key.iov_len = prefix.size();
+
+    res = mdbx_cursor_get(cursor_ptr, &key, &data, MDBX_SET_RANGE);
+
+    uint64_t count = 0;
+    while (res == MDBX_SUCCESS && count < limit)
+    {
+      if (key.iov_len < prefix.size() || std::memcmp(key.iov_base, prefix.data(), prefix.size()) != 0) {
+        break;
+      }
+
+      if (!pcb->on_enum_item(count, key.iov_base, key.iov_len, data.iov_base, data.iov_len)) {
+        break;
+      }
+
+      ++count;
+      res = mdbx_cursor_get(cursor_ptr, &key, &data, MDBX_NEXT);
+    }
+
+    mdbx_cursor_close(cursor_ptr);
+    if (need_to_commit)
+      commit_transaction();
+
+    return true;
+  }
+
     bool mdbx_db_backend::get_stat_info(tools::db::stat_info& si)
     {
       si = AUTO_VAL_INIT_T(tools::db::stat_info);

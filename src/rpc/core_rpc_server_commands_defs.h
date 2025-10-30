@@ -1539,6 +1539,39 @@ namespace currency
 
   //-----------------------------------------------
 
+    #define MAX_N_OF_ITEMS_TO_RETURN 10
+
+    struct COMMAND_RPC_ALIAS_LOOKUP
+    {
+      DOC_COMMAND("Give an estimation of block height by the given date.")
+
+      struct request
+      {
+        std::string alias_first_leters;
+        uint64_t n_of_items_to_return;  //but not bigger then 10
+
+        BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(alias_first_leters)         DOC_DSCR("Prefix by which the search will be performed.") DOC_EXMP("al") DOC_END
+        KV_SERIALIZE(n_of_items_to_return)       DOC_DSCR("Maximum number of elements returned (not bigger then 10)") DOC_EXMP(10) DOC_END
+        END_KV_SERIALIZE_MAP()
+      };
+
+      struct response
+      {
+        std::string status;
+        std::string error_code;
+        std::list<currency::alias_rpc_details> aliases;
+
+        BEGIN_KV_SERIALIZE_MAP()
+          KV_SERIALIZE(status)                   DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+          KV_SERIALIZE(error_code)               DOC_DSCR("Error code, if any.") DOC_END
+          KV_SERIALIZE(aliases)                  DOC_DSCR("List of alias_rpc_details objects, each containing detailed information about each alias registered to the specified address.") DOC_EXMP_AUTO(1) DOC_END
+        END_KV_SERIALIZE_MAP()
+      };
+  };
+
+  //-----------------------------------------------
+
   struct COMMAND_RPC_RESET_TX_POOL
   {
     DOC_COMMAND("Clears transaction pool. (Admin API, requires CLI option, disabled by default)");
