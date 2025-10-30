@@ -1539,7 +1539,7 @@ namespace currency
 
   //-----------------------------------------------
 
-    #define MAX_N_OF_ITEMS_TO_RETURN 10
+    #define MAX_N_OF_LOOKUP_ALIASES_TO_RETURN 10
 
     struct COMMAND_RPC_ALIAS_LOOKUP
     {
