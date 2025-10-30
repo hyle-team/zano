@@ -4824,24 +4824,135 @@ bool wallet2::proxy_to_daemon(const std::string& uri, const std::string& body, i
   return m_core_proxy->call_COMMAND_RPC_INVOKE(uri, body, response_code, response_body);
 }
 //----------------------------------------------------------------------------------------------------
+using out_entry = currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry;
+
+template<typename vec_t>
+void rnd_shuffle(vec_t& v)
+{
+  for (size_t i = v.size(); i > 1; --i)
+    std::swap(v[i - 1], v[crypto::rand<size_t>() % i]);
+}
+
+void pick_decoys_from_pools(std::vector<out_entry>& coinbase_candidates, std::vector<out_entry>& noncb_candidates,
+  size_t wanted_decoys_count, uint64_t real_gindex, std::vector<out_entry>&  decoy_storage_out)
+{
+  decoy_storage_out.clear();
+
+  rnd_shuffle(coinbase_candidates);
+  rnd_shuffle(noncb_candidates);
+
+  bool include_one_noncb = ((crypto::rand<uint32_t>() % 100) < WALLET_NONCB_SET_PROB_PERCENT) && !noncb_candidates.empty();
+
+  std::unordered_set<uint64_t> used_gindices;
+  used_gindices.reserve(wanted_decoys_count + 1);
+  used_gindices.insert(real_gindex);
+
+  auto take_next_unique = [&](std::vector<out_entry>& pool, size_t& cursor) -> bool
+  {
+    while (cursor < pool.size())
+    {
+      const auto& cand = pool[cursor++];
+      if (!used_gindices.count(cand.global_amount_index))
+      {
+        used_gindices.insert(cand.global_amount_index);
+        decoy_storage_out.push_back(cand);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  size_t cb_cur = 0, nc_cur = 0;
+
+  if (include_one_noncb)
+    take_next_unique(noncb_candidates, nc_cur);
+
+  while (decoy_storage_out.size() < wanted_decoys_count)
+  {
+    if (take_next_unique(coinbase_candidates, cb_cur))
+      continue;
+
+    if (!take_next_unique(noncb_candidates, nc_cur))
+      break;
+  }
+
+  std::sort(decoy_storage_out.begin(), decoy_storage_out.end(),
+    [](const out_entry& l, const out_entry& r)
+    {
+      return l.global_amount_index < r.global_amount_index;
+    }
+  );
+}
+
+void build_pools_from_outs_for_amount(const std::list<out_entry>& resp_outs, uint64_t real_gindex, std::vector<out_entry>& coinbase_candidates, std::vector<out_entry>& noncb_candidates)
+{
+  coinbase_candidates.clear();
+  noncb_candidates.clear();
+
+  for (const auto& oe : resp_outs)
+  {
+    if (oe.global_amount_index == real_gindex)
+      continue;
+
+    if (oe.flags & RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_COINBASE)
+      coinbase_candidates.push_back(oe);
+    else
+      noncb_candidates.push_back(oe);
+  }
+}
+
+template<typename is_post_hf4_fn, typename block_filter_fn, typename entry_filter_fn>
+void build_pools_from_blocks(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& resp4, uint64_t real_gindex, const tools::wallet2& self,
+  is_post_hf4_fn&& is_post_hf4, block_filter_fn&& block_allowed, entry_filter_fn&& entry_allowed,
+  std::vector<out_entry>& coinbase_candidates, std::vector<out_entry>& noncb_candidates)
+{
+  coinbase_candidates.clear();
+  noncb_candidates.clear();
+
+  for (const auto& blk : resp4.blocks)
+  {
+    if (blk.outs.empty())
+      continue;
+
+    bool blk_is_post_hf4 = is_post_hf4(blk.block_height);
+
+    if (!block_allowed(blk.block_height, blk_is_post_hf4))
+      continue;
+
+    for (const auto& oe : blk.outs)
+    {
+      if (!entry_allowed(oe))
+        continue;
+
+      if (oe.global_amount_index == real_gindex)
+        continue;
+
+      if (oe.flags & RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_COINBASE)
+        coinbase_candidates.push_back(oe);
+      else
+        noncb_candidates.push_back(oe);
+    }
+  }
+}
+
 bool wallet2::prepare_pos_zc_input_and_ring(const transfer_details& td, const currency::tx_out_zarcanum& stake_out, currency::txin_zc_input& stake_input, 
   std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& decoy_storage, std::vector<crypto::CLSAG_GGXXG_input_ref_t>& ring, uint64_t& secret_index) const
 {
   bool r = false;
   ring.clear();
-  secret_index = 0; // index of the real stake output
+  secret_index = 0;  // index of the real stake output
   stake_input.key_offsets.clear();
   decoy_storage.clear();
-
-  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response decoys_resp = AUTO_VAL_INIT(decoys_resp);
 
   // get decoys outputs and construct miner tx
   const size_t required_decoys_count = m_core_runtime_config.hf4_minimum_mixins == 0 ? 4 /* <-- for tests */ : m_core_runtime_config.hf4_minimum_mixins;
 
   if (required_decoys_count > 0 && !is_auditable())
   {
-    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request decoys_req = AUTO_VAL_INIT(decoys_req);
-    decoys_req.height_upper_limit = m_last_pow_block_h;// request decoys to be either older than, or the same age as stake output's height
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request  decoys_req  = AUTO_VAL_INIT(decoys_req);
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response decoys_resp = AUTO_VAL_INIT(decoys_resp);
+
+    decoys_req.height_upper_limit = m_last_pow_block_h; // request decoys to be either older than, or the same age as stake output's height
     decoys_req.look_up_strategy = LOOK_UP_STRATEGY_POS_COINBASE;
     decoys_req.heights.resize((required_decoys_count + 1) * 2); // request outs by heights distribution
     build_distribution_for_input(decoys_req.heights, td.m_ptx_wallet_info->m_block_height, decoy_selection_generator::dist_kind::coinbase);
@@ -4853,82 +4964,19 @@ bool wallet2::prepare_pos_zc_input_and_ring(const transfer_details& td, const cu
     THROW_IF_FALSE_WALLET_EX(decoys_resp.status == API_RETURN_CODE_OK, error::get_random_outs_error, decoys_resp.status);
     WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!decoys_resp.blocks.empty(), "daemon returned no decoy blocks for PoS");
 
-    std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> coinbase_candidates;
-    std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> noncb_candidates;
-    coinbase_candidates.reserve(decoys_resp.blocks.size());
+    std::vector<out_entry> coinbase_candidates;
+    std::vector<out_entry> noncb_candidates;
 
-    for (const auto& blk : decoys_resp.blocks)
-    {
-      if (blk.outs.empty())
-        continue;
+    build_pools_from_blocks(decoys_resp, td.m_global_output_index, *this,
+      /* is_post_hf4 block = */ [&](uint64_t h) -> bool                             { return m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, h); },
+      /* block_allowed = */ [&](uint64_t blk_height, bool blk_is_post_hf4) -> bool  { return blk_is_post_hf4; }, // PoS stacke only zcarcanum-era outputs
+      /* entry_allowed = */ [&](const out_entry& oe) -> bool                        { (void)oe; return true; },
+      coinbase_candidates, noncb_candidates
+    );
 
-      for (const auto& oe : blk.outs)
-      {
-        const bool is_real = (oe.global_amount_index == td.m_global_output_index);
-        if (is_real)
-          continue;
-        if (!m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, blk.block_height))
-          continue;
+    pick_decoys_from_pools(coinbase_candidates, noncb_candidates, required_decoys_count, td.m_global_output_index, decoy_storage);
 
-        if (oe.flags & RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_COINBASE)
-          coinbase_candidates.push_back(oe);
-        else
-          noncb_candidates.push_back(oe);
-      }
-    }
-
-    bool include_one_noncb = ((crypto::rand<uint32_t>() % 100) < WALLET_NONCB_SET_PROB_PERCENT) && !noncb_candidates.empty();
-
-    auto rnd_shuffle = [](auto& v)
-    {
-      for (size_t i = v.size(); i > 1; --i)
-        std::swap(v[i - 1], v[crypto::rand<size_t>() % i]);
-    };
-    rnd_shuffle(coinbase_candidates);
-    rnd_shuffle(noncb_candidates);
-
-    decoy_storage.reserve(required_decoys_count + 1); // +1 real
-
-    std::unordered_set<uint64_t> used_gindices;
-    used_gindices.reserve(required_decoys_count + 1);
-    used_gindices.insert(td.m_global_output_index);
-
-    auto take_next_unique = [&](std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& out_pool, size_t& cursor) -> bool
-    {
-      while (cursor < out_pool.size())
-      {
-        const auto& cand = out_pool[cursor++];
-        if (!used_gindices.count(cand.global_amount_index))
-        {
-          used_gindices.insert(cand.global_amount_index);
-          decoy_storage.push_back(cand);
-          return true;
-        }
-      }
-      return false;
-    };
-
-    size_t cb_cur = 0, nc_cur = 0;
-
-    if (include_one_noncb)
-      take_next_unique(noncb_candidates, nc_cur);
-
-    // get the rest from coinbase if its out, fallback to non-сoinbase
-    while (decoy_storage.size() < required_decoys_count)
-    {
-      if (take_next_unique(coinbase_candidates, cb_cur))
-        continue;
-
-      // coinbase is out of stock, adding non-coinbase
-      if (!take_next_unique(noncb_candidates, nc_cur))
-        break; // have no more decoys
-    }
-
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoy_storage.size() == required_decoys_count,
-      "for PoS stake got less decoys than required: picked=" << decoy_storage.size()
-      << " < " << required_decoys_count
-      << " (coinbase_candidates=" << coinbase_candidates.size()
-      << ", noncb_pool=" << noncb_candidates.size() << ")");
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoy_storage.size() == required_decoys_count, "for PoS stake got less decoys than required: picked=" << decoy_storage.size() << " < " << required_decoys_count << " (coinbase_candidates=" << coinbase_candidates.size() << ", noncb_pool=" << noncb_candidates.size() << ")");
 
     // add real
     decoy_storage.emplace_back(td.m_global_output_index, stake_out.stealth_address, stake_out.amount_commitment, stake_out.concealing_point, stake_out.blinded_asset_id);
@@ -4991,66 +5039,11 @@ bool wallet2::collect_decoys_for_bare_input(const transfer_details& td, size_t w
   THROW_IF_FALSE_WALLET_EX(ok, error::no_connection_to_daemon, "get_random_outs.bin(v2)");
   THROW_IF_FALSE_WALLET_EX(resp.outs.size() == 1, error::get_random_outs_error, "wrong outs.size()");
 
-  const auto& res_for_amount = resp.outs[0];
-  std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> coinbase_candidates;
-  std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> noncb_candidates;
+  std::vector<out_entry> coinbase_candidates;
+  std::vector<out_entry> noncb_candidates;
 
-  for (const auto& oe : res_for_amount.outs)
-  {
-    if (oe.global_amount_index == td.m_global_output_index)
-      continue;
-
-    if (oe.flags & RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_COINBASE)
-      coinbase_candidates.push_back(oe);
-    else
-      noncb_candidates.push_back(oe);
-  }
-
-  auto rnd_shuffle = [](auto& v)
-  {
-    for (size_t i = v.size(); i > 1; --i)
-      std::swap(v[i - 1], v[crypto::rand<size_t>() % i]);
-  };
-
-  rnd_shuffle(coinbase_candidates);
-  rnd_shuffle(noncb_candidates);
-
-  bool include_one_noncb = ((crypto::rand<uint32_t>() % 100) < WALLET_NONCB_SET_PROB_PERCENT) && !noncb_candidates.empty();
-
-  std::unordered_set<uint64_t> used_gindices;
-  used_gindices.reserve(wanted_decoys_count + 1);
-  used_gindices.insert(td.m_global_output_index);
-
-  auto take_next_unique = [&](std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& pool, size_t& cursor) -> bool
-  {
-    while (cursor < pool.size())
-    {
-      const auto& cand = pool[cursor++];
-      if (!used_gindices.count(cand.global_amount_index))
-      {
-        used_gindices.insert(cand.global_amount_index);
-        decoy_storage.push_back(cand);
-        return true;
-      }
-    }
-    return false;
-  };
-
-  size_t cb_cur = 0, nc_cur = 0;
-
-  if (include_one_noncb)
-    take_next_unique(noncb_candidates, nc_cur);
-
-  while (decoy_storage.size() < wanted_decoys_count)
-  {
-    if (take_next_unique(coinbase_candidates, cb_cur))
-      continue;
-
-    if (!take_next_unique(noncb_candidates, nc_cur))
-      break;
-  }
-
-  std::sort(decoy_storage.begin(), decoy_storage.end(), [](const auto& l, const auto& r){ return l.global_amount_index < r.global_amount_index; });
+  build_pools_from_outs_for_amount(resp.outs[0].outs, td.m_global_output_index, coinbase_candidates, noncb_candidates);
+  pick_decoys_from_pools(coinbase_candidates, noncb_candidates, wanted_decoys_count, td.m_global_output_index, decoy_storage);
 
   return true;
 }
@@ -5066,10 +5059,10 @@ bool wallet2::collect_decoys_for_zc_input( const transfer_details& td, size_t wa
   COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response decoys_resp = AUTO_VAL_INIT(decoys_resp);
 
   decoys_req.height_upper_limit = m_last_pow_block_h;
-  decoys_req.look_up_strategy   = LOOK_UP_STRATEGY_REGULAR_TX;
-
+  decoys_req.look_up_strategy = LOOK_UP_STRATEGY_REGULAR_TX;
   decoys_req.heights.resize((wanted_decoys_count + 1) * 2);
-  build_distribution_for_input(decoys_req.heights, td.m_ptx_wallet_info->m_block_height, decoy_selection_generator::dist_kind::regular);
+
+  build_distribution_for_input(decoys_req.heights,td.m_ptx_wallet_info->m_block_height,decoy_selection_generator::dist_kind::regular);
 
   bool r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(decoys_req, decoys_resp);
   THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs4.bin");
@@ -5077,86 +5070,18 @@ bool wallet2::collect_decoys_for_zc_input( const transfer_details& td, size_t wa
   THROW_IF_FALSE_WALLET_EX(decoys_resp.status == API_RETURN_CODE_OK,  error::get_random_outs_error, decoys_resp.status);
 
   bool real_is_post_hf4 = m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, td.m_ptx_wallet_info->m_block_height);
-  std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> coinbase_candidates;
-  std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> noncb_candidates;
-  coinbase_candidates.reserve(decoys_resp.blocks.size());
 
-  for (const auto& blk : decoys_resp.blocks)
-  {
-    if (blk.outs.empty())
-      continue;
+  std::vector<out_entry> coinbase_candidates;
+  std::vector<out_entry> noncb_candidates;
 
-    bool blk_is_post_hf4 = m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, blk.block_height);
+  build_pools_from_blocks(decoys_resp, td.m_global_output_index, *this,
+    /* is_post_hf4 block = */ [&](uint64_t h) -> bool                             { return m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, h); },
+    /* block_allowed = */ [&](uint64_t blk_height, bool blk_is_post_hf4) -> bool  { return (real_is_post_hf4 == blk_is_post_hf4); },  // if real output is post-HF4 -> take only post-HF4 blocks
+    /* entry_allowed = */ [&](const out_entry& oe) -> bool                        { (void)oe; return true; }, // for regular zc-input we don't need extra restrictions
+    coinbase_candidates, noncb_candidates
+  );
 
-    if (real_is_post_hf4)
-    {
-      if (!blk_is_post_hf4)
-        continue;
-    }
-    else
-    {
-      if (blk_is_post_hf4)
-        continue;
-    }
-
-    for (const auto& oe : blk.outs)
-    {
-      if (oe.global_amount_index == td.m_global_output_index)
-        continue;
-
-      if (oe.flags & RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_COINBASE)
-        coinbase_candidates.push_back(oe);
-      else
-        noncb_candidates.push_back(oe);
-    }
-  }
-
-  auto rnd_shuffle = [](auto& v)
-  {
-    for (size_t i = v.size(); i > 1; --i)
-      std::swap(v[i - 1], v[crypto::rand<size_t>() % i]);
-  };
-
-  rnd_shuffle(coinbase_candidates);
-  rnd_shuffle(noncb_candidates);
-
-  bool include_one_noncb = ((crypto::rand<uint32_t>() % 100) < WALLET_NONCB_SET_PROB_PERCENT) && !noncb_candidates.empty();
-
-  std::unordered_set<uint64_t> used_gindices;
-  used_gindices.reserve(wanted_decoys_count + 1);
-  used_gindices.insert(td.m_global_output_index);
-
-  auto take_next_unique = [&](std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& pool, size_t& cursor) -> bool
-  {
-    while (cursor < pool.size())
-    {
-      const auto& cand = pool[cursor++];
-      if (!used_gindices.count(cand.global_amount_index))
-      {
-        used_gindices.insert(cand.global_amount_index);
-        decoy_storage.push_back(cand);
-        return true;
-      }
-    }
-    return false;
-  };
-
-  size_t cb_cur = 0, nc_cur = 0;
-
-  if (include_one_noncb)
-    take_next_unique(noncb_candidates, nc_cur);
-
-  while (decoy_storage.size() < wanted_decoys_count)
-  {
-    if (take_next_unique(coinbase_candidates, cb_cur))
-      continue;
-
-    if (!take_next_unique(noncb_candidates, nc_cur))
-      break;
-  }
-
-  std::sort(decoy_storage.begin(), decoy_storage.end(),
-    [](const auto& l, const auto& r){ return l.global_amount_index < r.global_amount_index; });
+  pick_decoys_from_pools(coinbase_candidates, noncb_candidates, wanted_decoys_count, td.m_global_output_index, decoy_storage);
 
   return true;
 }
