@@ -612,7 +612,7 @@ namespace tools
       }
 
       template<class t_cb>
-      void enumerate_items_by_prefix(const std::string& prefix, uint8_t limit, t_cb cb) const
+      void enumerate_items_by_prefix(const std::string& prefix, uint64_t limit, t_cb cb) const
       {
         items_accessor_cb<t_cb, t_key, t_value, access_strategy_selector<is_t_access_strategy>> local_enum_handler(cb);
         bdb.get_backend()->enumerate_prefix(m_h, prefix, limit, &local_enum_handler);

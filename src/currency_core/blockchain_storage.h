@@ -998,7 +998,7 @@ namespace currency
       return false;
 
     m_db_aliases.enumerate_items_by_prefix(prefix_raw, n,
-        [&](uint64_t i, const std::string& alias, const std::list<extra_alias_entry_base>& entries)
+      [&](uint64_t i, const std::string& alias, const std::list<extra_alias_entry_base>& entries)
     {
       if (entries.empty())
         return true;
