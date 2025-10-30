@@ -374,10 +374,7 @@ namespace tools
       return true;
     }
 
-    bool lmdb_db_backend::enumerate_prefix(container_handle h,
-                                      const std::string& prefix,
-                                      uint64_t limit,
-                                      i_db_callback* pcb)
+    bool lmdb_db_backend::enumerate_prefix(container_handle h, const std::string& prefix, uint64_t limit, i_db_callback* pcb)
     {
       CHECK_AND_ASSERT_MES(pcb, false, "null callback ptr passed to enumerate_prefix");
       MDB_val key = AUTO_VAL_INIT(key);
@@ -402,13 +399,11 @@ namespace tools
       uint64_t count = 0;
       while (res == MDB_SUCCESS && count < limit)
       {
-        if (key.mv_size < prefix.size() || std::memcmp(key.mv_data, prefix.data(), prefix.size()) != 0) {
+        if (key.mv_size < prefix.size() || std::memcmp(key.mv_data, prefix.data(), prefix.size()) != 0)
           break;
-        }
 
-        if (!pcb->on_enum_item(count, key.mv_data, key.mv_size, data.mv_data, data.mv_size)) {
+        if (!pcb->on_enum_item(count, key.mv_data, key.mv_size, data.mv_data, data.mv_size))
           break;
-        }
 
         ++count;
         res = mdb_cursor_get(cursor_ptr, &key, &data, MDB_NEXT);
