@@ -337,31 +337,21 @@ bool wallets_manager::init(view::i_view* pview_handler)
 
   //setting html path
   std::string path_to_html;
-  if (!command_line::has_arg(m_vm, arg_html_folder))
-  {
-    LOG_PRINT_L0("Detecting APPDIR... ");
-#if defined(__unix__) || defined(__linux__)
-    const char* env_p = std::getenv("APPDIR");
-    LOG_PRINT_L0("APPDIR = " << (void*)env_p);
-    if (env_p)
-    {
-      LOG_PRINT_L0("APPDIR: " << env_p);
-    }
-    if (env_p && std::strlen(env_p))
-    {
-      //app running inside AppImage
-      LOG_PRINT_L0("APPDIR SET: " << env_p);
-      path_to_html = std::string(env_p) + "/usr/bin/html";
-    }
-    else
-#endif
-    {
-      path_to_html = string_tools::get_current_module_folder() + "/html";
-    }
-  }
-  else
+  if (command_line::has_arg(m_vm, arg_html_folder))
   {
     path_to_html = command_line::get_arg(m_vm, arg_html_folder);
+  }
+#if defined(__unix__) || defined(__linux__)
+  else if (const char* env_p = std::getenv("APPDIR"); env_p && std::strlen(env_p))
+  {
+    LOG_PRINT_L0("APPDIR SET: " << env_p);
+    path_to_html = std::string(env_p) + "/usr/bin/html";
+  }
+#endif
+  else
+  {
+    // by default use embedded resources
+    path_to_html = "qrc:/html";
   }
 
   if (command_line::has_arg(m_vm, arg_remote_node))
