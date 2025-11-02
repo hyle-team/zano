@@ -64,6 +64,9 @@ using namespace currency;
 #undef LOG_DEFAULT_CHANNEL
 #define LOG_DEFAULT_CHANNEL "wallet"
 ENABLE_CHANNEL_BY_DEFAULT("wallet")
+
+using out_entry = currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry;
+
 namespace tools
 {
   wallet2::wallet2()
@@ -4824,22 +4827,13 @@ bool wallet2::proxy_to_daemon(const std::string& uri, const std::string& body, i
   return m_core_proxy->call_COMMAND_RPC_INVOKE(uri, body, response_code, response_body);
 }
 //----------------------------------------------------------------------------------------------------
-using out_entry = currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry;
-
-template<typename vec_t>
-void rnd_shuffle(vec_t& v)
-{
-  for (size_t i = v.size(); i > 1; --i)
-    std::swap(v[i - 1], v[crypto::rand<size_t>() % i]);
-}
-
 void pick_decoys_from_pools(std::vector<out_entry>& coinbase_candidates, std::vector<out_entry>& noncb_candidates,
   size_t wanted_decoys_count, uint64_t real_gindex, std::vector<out_entry>&  decoy_storage_out)
 {
   decoy_storage_out.clear();
 
-  rnd_shuffle(coinbase_candidates);
-  rnd_shuffle(noncb_candidates);
+  std::shuffle(coinbase_candidates.begin(), coinbase_candidates.end(), crypto::uniform_random_bit_generator());
+  std::shuffle(noncb_candidates.begin(), noncb_candidates.end(), crypto::uniform_random_bit_generator());
 
   bool include_one_noncb = ((crypto::rand<uint32_t>() % 100) < WALLET_NONCB_SET_PROB_PERCENT) && !noncb_candidates.empty();
 
@@ -4875,13 +4869,6 @@ void pick_decoys_from_pools(std::vector<out_entry>& coinbase_candidates, std::ve
     if (!take_next_unique(noncb_candidates, nc_cur))
       break;
   }
-
-  std::sort(decoy_storage_out.begin(), decoy_storage_out.end(),
-    [](const out_entry& l, const out_entry& r)
-    {
-      return l.global_amount_index < r.global_amount_index;
-    }
-  );
 }
 
 void build_pools_from_outs_for_amount(const std::list<out_entry>& resp_outs, uint64_t real_gindex, std::vector<out_entry>& coinbase_candidates, std::vector<out_entry>& noncb_candidates)
@@ -6947,6 +6934,7 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys
       }
     }
 
+    std::sort(local_decoys.begin(), local_decoys.end(), [](const out_entry& l, const out_entry& r) { return l.global_amount_index < r.global_amount_index; });
     //paste real transaction to the random index
     auto it_to_insert = std::find_if(src.outputs.begin(), src.outputs.end(), [&](const tx_output_entry& a)
     {
