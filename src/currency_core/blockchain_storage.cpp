@@ -3135,96 +3135,104 @@ bool blockchain_storage::get_random_outs_for_amounts4(const COMMAND_RPC_GET_RAND
 
   const uint64_t top_block_height = get_current_blockchain_size() - CURRENCY_MINED_MONEY_UNLOCK_WINDOW;
   const uint64_t height_limit = (req.height_upper_limit && req.height_upper_limit <= top_block_height) ? req.height_upper_limit : top_block_height;
+  res.blocks_batches.clear();
+  res.blocks_batches.reserve(req.batches.size());
 
-  std::unordered_set<uint64_t> seen_heights;
-  std::unordered_set<uint64_t> picked_heights;
-  seen_heights.reserve(req.heights.size());
-  picked_heights.reserve(req.heights.size());
-
-  res.blocks.clear();
-  res.blocks.reserve(req.heights.size());
-
-  auto search_pass = [&](const std::string& strategy)
+  for(size_t i = 0; i < req.batches.size(); ++i)
   {
-    seen_heights.clear();
-    for (uint64_t seed_height_original : req.heights)
+    std::unordered_set<uint64_t> seen_heights;
+    std::unordered_set<uint64_t> picked_heights;
+    seen_heights.reserve(req.batches[i].heights.size());
+    picked_heights.reserve(req.batches[i].heights.size());
+
+    res.blocks_batches.emplace_back();
+    auto& out_blocks = res.blocks_batches.back().blocks;
+    out_blocks.reserve(req.batches[i].heights.size());
+
+    auto search_pass = [&](const std::string& strategy)
     {
-      uint64_t seed_height = seed_height_original;
-      if (seed_height > height_limit)
-        seed_height = height_limit;
-
-      uint64_t delta = 0;
-      int step_direction = +1;
-
-      while (true)
+      seen_heights.clear();
+      for (uint64_t seed_height_original : req.batches[i].heights)
       {
-        bool inside_range = false;
-        uint64_t candidate_height = 0;
+        uint64_t seed_height = seed_height_original;
+        if (seed_height > height_limit)
+          seed_height = height_limit;
 
-        if (step_direction > 0)
-        {
-          if (seed_height + delta <= height_limit)
-          {
-            candidate_height = seed_height + delta;
-            inside_range = true;
-          }
-        }
-        else
-        {
-          if (seed_height >= delta)
-          {
-            candidate_height = seed_height - delta;
-            inside_range = true;
-          }
-        }
+        uint64_t delta = 0;
+        int step_direction = +1;
 
-        if (inside_range)
+        while (true)
         {
-          if (!picked_heights.count(candidate_height) && seen_heights.insert(candidate_height).second)
+          bool inside_range = false;
+          uint64_t candidate_height = 0;
+
+          if (step_direction > 0)
           {
-            if (is_block_fit_for_strategy(candidate_height, strategy))
+            if (seed_height + delta <= height_limit)
             {
-              std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> oe;
-              collect_all_outs_in_block(candidate_height, oe);
-              picked_heights.insert(candidate_height);
-
-              COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::outputs_in_block blk_outs{};
-              blk_outs.block_height = candidate_height;
-              blk_outs.outs = std::move(oe);
-              res.blocks.push_back(std::move(blk_outs));
-              break; // found for this seed
+              candidate_height = seed_height + delta;
+              inside_range = true;
             }
           }
+          else
+          {
+            if (seed_height >= delta)
+            {
+              candidate_height = seed_height - delta;
+              inside_range = true;
+            }
+          }
+
+          if (inside_range)
+          {
+            if (!picked_heights.count(candidate_height) && seen_heights.insert(candidate_height).second)
+            {
+              if (is_block_fit_for_strategy(candidate_height, strategy))
+              {
+                std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> oe;
+                collect_all_outs_in_block(req.batches[i].input_amount, candidate_height, oe);
+                picked_heights.insert(candidate_height);
+
+                if(!oe.empty())
+                {
+                  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::outputs_in_block blk_outs{};
+                  blk_outs.block_height = candidate_height;
+                  blk_outs.outs = std::move(oe);
+                  out_blocks.emplace_back(std::move(blk_outs));
+                  break; // found for this seed
+                }
+              }
+            }
+          }
+
+          // change direction
+          step_direction = -step_direction;
+          if (step_direction > 0)
+            ++delta;
+
+          // out of diapason from both sides or exceeded radius limit
+          const bool out_of_right = (seed_height + delta) > height_limit;
+          const bool out_of_left  = (seed_height < delta);
+          if ((out_of_right && out_of_left) || (delta > MAX_SEARCH_DELTA_HEIGHT))
+          {
+            break;
+          }
         }
 
-        // change direction
-        step_direction = -step_direction;
-        if (step_direction > 0)
-          ++delta;
-
-        // out of diapason from both sides or exceeded radius limit
-        const bool out_of_right = (seed_height + delta) > height_limit;
-        const bool out_of_left  = (seed_height < delta);
-        if ((out_of_right && out_of_left) || (delta > MAX_SEARCH_DELTA_HEIGHT))
+        // early exit - enough found
+        if (out_blocks.size() >= req.batches[i].heights.size())
         {
           break;
         }
       }
+    };
 
-      // early exit - enough found
-      if (res.blocks.size() >= req.heights.size())
-      {
-        break;
-      }
+    search_pass(req.look_up_strategy);
+    if(out_blocks.size() == 0 && req.look_up_strategy != LOOK_UP_STRATEGY_REGULAR_TX)
+    {
+      search_pass(LOOK_UP_STRATEGY_REGULAR_TX);
     }
-  };
-
-  search_pass(req.look_up_strategy);
-  if(res.blocks.size() == 0 && req.look_up_strategy != LOOK_UP_STRATEGY_REGULAR_TX)
-  {
-    search_pass(LOOK_UP_STRATEGY_REGULAR_TX);
   }
-
   return true;
 }
 //------------------------------------------------------------------
@@ -8796,7 +8804,7 @@ bool blockchain_storage::is_block_fit_for_strategy(uint64_t h, const std::string
   }
 }
 //------------------------------------------------------------------
-bool blockchain_storage::collect_all_outs_in_block(uint64_t height, std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& outs) const
+bool blockchain_storage::collect_all_outs_in_block(uint64_t input_amount, uint64_t height, std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& outs) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
@@ -8815,7 +8823,6 @@ bool blockchain_storage::collect_all_outs_in_block(uint64_t height, std::vector<
     CHECK_AND_ASSERT_MES(this->get_tx_outputs_gindexs(txid, gidx), false, "failed to get_tx_outputs_gindexs() for tx_id " << txid);
     CHECK_AND_ASSERT_MES(gidx.size() == tx.vout.size(), false, "gidx size (" << gidx.size() << ") != tx vout size (" << tx.vout.size() << ") for tx_id " << txid);
 
-
     for (size_t i = 0; i < tx.vout.size(); ++i)
     {
       uint64_t amount = 0;
@@ -8832,7 +8839,8 @@ bool blockchain_storage::collect_all_outs_in_block(uint64_t height, std::vector<
       VARIANT_SWITCH_END();
 
       COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry oen{};
-      if (this->build_random_out_entry(amount, gidx[i], mix_count, /*use_only_forced_to_mix=*/false, /*height_upper_limit=*/0, oen))
+      if (this->build_random_out_entry(amount, gidx[i], mix_count, /*use_only_forced_to_mix=*/false, /*height_upper_limit=*/0, oen) &&
+        amount == input_amount) // for pre-zc inputs
       {
         outs.emplace_back(oen);
       }

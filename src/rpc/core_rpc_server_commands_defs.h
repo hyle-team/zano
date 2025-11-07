@@ -658,17 +658,26 @@ namespace currency
   struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4
   {
     DOC_COMMAND("Version 4 of the command to retrieve random decoy outputs for specified amounts, focusing on either pre-zarcanum or post-zarcanum zones based on the amount value.");
+    struct request_batch
+    {
+      uint64_t input_amount;
+      std::vector<uint64_t> heights;
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(input_amount)            DOC_DSCR("Amount to be processed in the batch.") DOC_EXMP_AUTO(1000000) DOC_END
+        KV_SERIALIZE(heights)                 DOC_DSCR("Array of heights to be processed in the batch.") DOC_EXMP_AUTO(1) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
 
     struct request
     {
-      std::vector<uint64_t> heights;                    // array heights derived from decoy selection algorithm, number of heights expected to be not less than minimal ring size
+      std::vector<request_batch> batches;               // multiple amounts with heights to be processed in a single call
       uint64_t              height_upper_limit;         // if nonzero, all the decoy outputs must be either older than, or the same age as this height
       std::string           look_up_strategy;           // LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(heights)                     DOC_DSCR("array heights derived from decoy selection algorithm, number of heights expected to be not less than minimal ring size") DOC_EXMP_AGGR(1, 2, 3, 4) DOC_END
-        KV_SERIALIZE(height_upper_limit)          DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_EXMP(2555000) DOC_END
-        KV_SERIALIZE(look_up_strategy)            DOC_DSCR("LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE") DOC_EXMP("LOOK_UP_STRATEGY_REGULAR_TX") DOC_END
+        KV_SERIALIZE(batches)                 DOC_DSCR("List of request batches, each containing an amount and corresponding heights to be processed.") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(height_upper_limit)      DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_EXMP(2555000) DOC_END
+        KV_SERIALIZE(look_up_strategy)        DOC_DSCR("LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE") DOC_EXMP("LOOK_UP_STRATEGY_REGULAR_TX") DOC_END
 
       END_KV_SERIALIZE_MAP()
     };
@@ -685,14 +694,22 @@ namespace currency
       END_KV_SERIALIZE_MAP()
     };
 
-    struct response
+    struct blocks_batch
     {
       std::vector<outputs_in_block> blocks;
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(blocks)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::vector<blocks_batch> blocks_batches; // batches x blocks
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(blocks)    DOC_DSCR("Blocks collected by node") DOC_EXMP_AUTO(1) DOC_END
-        KV_SERIALIZE(status)    DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE(blocks_batches)    DOC_DSCR("Blocks collected by node") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(status)            DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 

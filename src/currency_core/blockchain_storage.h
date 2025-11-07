@@ -255,7 +255,7 @@ namespace currency
     //void get_all_known_block_ids(std::list<crypto::hash> &main, std::list<crypto::hash> &alt, std::list<crypto::hash> &invalid) const;
     bool is_pre_hardfork_tx_freeze_period_active() const;
     bool is_block_fit_for_strategy(uint64_t h, const std::string& strategy) const;
-    bool collect_all_outs_in_block(uint64_t height, std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& outs) const;
+    bool collect_all_outs_in_block(uint64_t input_amount, uint64_t height, std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& outs) const;
 
     bc_attachment_services_manager& get_attachment_services_manager(){ return m_services_mgr; }
 

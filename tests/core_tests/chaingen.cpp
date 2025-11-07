@@ -450,7 +450,8 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
 
     bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& rsp) override
     {
-      rsp.blocks.clear();
+      rsp.blocks_batches.clear();
+      rsp.blocks_batches.reserve(req.batches.size());
 
       // Current "visible" height in the generator
       const uint64_t top = m_blockchain.empty() ? 0 : (m_blockchain.size() - 1);
@@ -479,7 +480,7 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
       };
 
       auto gather_from_tx = [&](uint64_t h, const currency::transaction& tx, const crypto::hash& txid, bool is_coinbase,
-                                bool is_pos_block_flag, std::vector<currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& outs_vec)
+        bool is_pos_block_flag, std::vector<currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& outs_vec)
       {
         const auto& gidx = get_tx_gindex_from_map(txid, m_txs_outs);
         if (gidx.size() != tx.vout.size())
@@ -535,8 +536,9 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
         }
       };
 
-      // collect block at height h and add to rsp.blocks if outs are present
-      auto collect_from_height = [&](uint64_t h, std::unordered_set<uint64_t>& seen_set) -> size_t
+      // collect block at height h and add to out_blocks if outs are present
+      auto collect_from_height = [&](uint64_t h, std::unordered_set<uint64_t>& seen_set,
+        std::vector<currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::outputs_in_block>& out_blocks) -> size_t
       {
         if (h == 0 && hul_exclusive == 0)
           return 0;
@@ -562,75 +564,82 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
           currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::outputs_in_block ob{};
           ob.block_height = h;
           ob.outs = std::move(outs);
-          rsp.blocks.emplace_back(std::move(ob));
-          return rsp.blocks.back().outs.size();
+          out_blocks.emplace_back(std::move(ob));
+          return out_blocks.back().outs.size();
         }
         return 0;
       };
 
-      // Only req.heights, no fallbacks
-      std::unordered_set<uint64_t> seen;
-      seen.reserve(req.heights.size() * 3);
-
-      for (uint64_t seed_h : req.heights)
+      for (size_t bi = 0; bi < req.batches.size(); ++bi)
       {
-        uint64_t h = seed_h > hul_exclusive ? hul_exclusive : seed_h;
-        collect_from_height(h, seen);
-      }
+        rsp.blocks_batches.emplace_back();
+        auto& out_blocks = rsp.blocks_batches.back().blocks;
+        out_blocks.reserve(req.batches[bi].heights.size());
 
-      auto sum_outs = [&]() -> uint64_t {
-        uint64_t s = 0;
-        for (const auto& b : rsp.blocks) s += static_cast<uint64_t>(b.outs.size());
-        return s;
-      };
+        std::unordered_set<uint64_t> seen;
+        seen.reserve(req.batches[bi].heights.size() * 3);
 
-      uint64_t total = sum_outs();
-      const uint64_t target = static_cast<uint64_t>(req.heights.size());
-
-      // Fallback 2 - fill the gaps between the seeds
-      if (total < target)
-      {
-        std::vector<uint64_t> seeds;
-        seeds.reserve(req.heights.size());
-        for (uint64_t sh : req.heights)
+        // only req.batches[bi].heights, no fallbacks
+        for (uint64_t seed_h : req.batches[bi].heights)
         {
-          uint64_t hh = sh > hul_exclusive ? hul_exclusive : sh;
-          if (hh <= hul_exclusive)
-            seeds.push_back(hh);
+          uint64_t h = seed_h > hul_exclusive ? hul_exclusive : seed_h;
+          collect_from_height(h, seen, out_blocks);
         }
-        std::sort(seeds.begin(), seeds.end());
-        seeds.erase(std::unique(seeds.begin(), seeds.end()), seeds.end());
 
-        for (size_t i = 0; i + 1 < seeds.size() && total < target; ++i)
+        auto sum_outs = [&]() -> uint64_t {
+          uint64_t s = 0;
+          for (const auto& b : out_blocks) s += static_cast<uint64_t>(b.outs.size());
+          return s;
+        };
+
+        uint64_t total = sum_outs();
+        const uint64_t target = static_cast<uint64_t>(req.batches[bi].heights.size());
+
+        // Fallback 2 - fill the gaps between the seeds
+        if (total < target)
         {
-          uint64_t a = seeds[i];
-          uint64_t b = seeds[i + 1];
-          if (a + 1 >= b)
-            continue;
-
-          // go from the closest to a to b (or vice versa; determinism is important)
-          for (uint64_t h = a + 1; h < b && total < target; ++h)
+          std::vector<uint64_t> seeds;
+          seeds.reserve(req.batches[bi].heights.size());
+          for (uint64_t sh : req.batches[bi].heights)
           {
-            size_t added = collect_from_height(h, seen);
-            if (added)
-              total += added;
+            uint64_t hh = sh > hul_exclusive ? hul_exclusive : sh;
+            if (hh <= hul_exclusive)
+              seeds.push_back(hh);
+          }
+          std::sort(seeds.begin(), seeds.end());
+          seeds.erase(std::unique(seeds.begin(), seeds.end()), seeds.end());
+
+          for (size_t i = 0; i + 1 < seeds.size() && total < target; ++i)
+          {
+            uint64_t a = seeds[i];
+            uint64_t b = seeds[i + 1];
+            if (a + 1 >= b)
+              continue;
+
+            // go from the closest to a to b (or vice versa; determinism is important)
+            for (uint64_t h = a + 1; h < b && total < target; ++h)
+            {
+              size_t added = collect_from_height(h, seen, out_blocks);
+              if (added)
+                total += added;
+            }
           }
         }
-      }
 
-      // Fallback 3 - global passage through the remaining heights 
-      if (total < target)
-      {
-        // from hul_exclusive down to 1 (0 — genesis)
-        for (uint64_t h = hul_exclusive; h >= 1 && total < target; --h)
+        // Fallback 3 - global passage through the remaining heights 
+        if (total < target)
         {
-          if (seen.count(h))
-            continue;
-          size_t added = collect_from_height(h, seen);
-          if (added)
-            total += added;
-          if (h == 1)
-            break;
+          // from hul_exclusive down to 1 (0 — genesis)
+          for (uint64_t h = hul_exclusive; h >= 1 && total < target; --h)
+          {
+            if (seen.count(h))
+              continue;
+            size_t added = collect_from_height(h, seen, out_blocks);
+            if (added)
+              total += added;
+            if (h == 1)
+              break;
+          }
         }
       }
 
