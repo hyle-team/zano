@@ -367,6 +367,8 @@ namespace tools
   {
     WALLET_RPC_BEGIN_TRY_ENTRY();
     res.seed_phrase = w.get_wallet()->get_account().get_seed_phrase(req.seed_password);
+    w.get_wallet()->get_account().get_secret_derivation(res.derivation_secret, res.is_auditable, res.creation_timestamp);
+    
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }

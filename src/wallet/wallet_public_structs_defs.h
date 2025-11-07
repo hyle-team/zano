@@ -506,9 +506,15 @@ namespace wallet_public
     struct response
     {
       std::string               seed_phrase;
+      std::string               derivation_secret;
+      bool                      is_auditable = false;
+      uint64_t                  creation_timestamp = 0;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(seed_phrase)  DOC_DSCR("Wallet's seed(secured with password if it was provided in argument)")  DOC_EXMP("girlfriend unlike offer mutter tightly social silent expect constant bid nowhere reach flower bite salt becomeconversation dog rush quietly become usually lightning midnight each secret class") DOC_END
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(derivation_secret)  DOC_DSCR("Wallet's secret that is used for key derivations, presented in hex, 32 bytes")  DOC_EXMP("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852") DOC_END
+        KV_SERIALIZE(is_auditable)  DOC_DSCR("Point if the wallet is auditable or regular")  DOC_EXMP(false) DOC_END
+        KV_SERIALIZE(creation_timestamp)  DOC_DSCR("Prety mych self explanatory")  DOC_EXMP(212100) DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };

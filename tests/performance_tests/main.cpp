@@ -79,7 +79,7 @@ void test_plain_wallet()
   
   plain_wallet::configure_object conf = AUTO_VAL_INIT(conf);
   //plain_wallet::configure_response conf_resp = AUTO_VAL_INIT(conf_resp);
-  //conf.postponed_run_wallet = true;
+  conf.postponed_run_wallet = true;
   std::string r = plain_wallet::sync_call("configure", 0, epee::serialization::store_t_to_json(conf));
   
 
@@ -104,8 +104,38 @@ void test_plain_wallet()
   //std::string res___ = plain_wallet::get_wallet_files();
 
 
+
+
+
+
+
   uint64_t instance_id = 0;
   res = plain_wallet::open("test_restored_3.zan", "111");
+  epee::json_rpc::request<tools::wallet_public::COMMAND_RPC_GET_WALLET_RESTORE_INFO::request> req_secret = AUTO_VAL_INIT(req_secret);
+  req_secret.method = "get_restore_info";
+  res = plain_wallet::invoke(instance_id, epee::serialization::store_t_to_json(req_secret));
+  epee::json_rpc::response<tools::wallet_public::COMMAND_RPC_GET_WALLET_RESTORE_INFO::response, epee::json_rpc::dummy_error> resp_secret = AUTO_VAL_INIT(resp_secret);
+
+  std::string res_back = res;
+  epee::serialization::load_t_from_json(resp_secret, res);
+
+
+  uint64_t instance_id2 = 1;
+  view::restore_wallet_from_derivation_request rst_req;
+  rst_req.path = "test_restored_6.zan";
+  rst_req.pass = "";
+  rst_req.secret_derivation = resp_secret.result.derivation_secret;
+  rst_req.is_auditable = resp_secret.result.is_auditable;
+  rst_req.creation_timestamp = resp_secret.result.creation_timestamp;
+
+  res = plain_wallet::sync_call("restore_from_derivations", 0, epee::serialization::store_t_to_json(rst_req));
+
+
+  epee::json_rpc::request<tools::wallet_public::COMMAND_RPC_GET_WALLET_RESTORE_INFO::request> req2_secret = AUTO_VAL_INIT(req2_secret);
+  req2_secret.method = "get_restore_info";
+  std::string res2 = plain_wallet::invoke(1, epee::serialization::store_t_to_json(req2_secret));
+
+
   //res = plain_wallet::restore(seed,
   //  "test_restored_3.zan", "111", "test");
 
@@ -234,10 +264,10 @@ int main(int argc, char** argv)
   //  epee::log_space::log_singletone::get_default_log_file().c_str(),
   //  epee::log_space::log_singletone::get_default_log_folder().c_str());
   
-  multithread_test_of_get_coinbase_hash_cached();
+  //multithread_test_of_get_coinbase_hash_cached();
   //test_tx_json_serialization();
   //test_base64_serialization();
-  //test_plain_wallet();
+  test_plain_wallet();
   //parse_weird_tx();
   //thread_pool_tests();
 
