@@ -66,6 +66,7 @@ using namespace currency;
 ENABLE_CHANNEL_BY_DEFAULT("wallet")
 
 using out_entry = currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry;
+using tx_output_entry = currency::tx_source_entry::output_entry;
 
 namespace tools
 {
@@ -4922,6 +4923,200 @@ void build_pools_from_blocks(const std::vector<currency::COMMAND_RPC_GET_RANDOM_
   }
 }
 
+void wallet2::append_heights_with_distribution(std::vector<uint64_t>& heights, size_t oversample, uint64_t max_height, decoy_selection_generator::dist_kind kind) const
+{
+  if (oversample == 0)
+    return;
+  std::vector<uint64_t> tmp(oversample);
+  build_distribution_for_input(tmp, max_height, kind);
+  heights.reserve(heights.size() + tmp.size());
+  heights.insert(heights.end(), tmp.begin(), tmp.end());
+}
+
+void wallet2::plan_decoy_batches_for_sources( size_t fake_outputs_count_, const std::vector<uint64_t>& selected_indices, uint64_t hf4_height,
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req4, std::vector<mix_input_plan>& plans) const
+{
+  req4.height_upper_limit = m_last_pow_block_h;
+  req4.look_up_strategy = LOOK_UP_STRATEGY_REGULAR_TX;
+
+  plans.clear();
+  plans.reserve(selected_indices.size());
+
+  // local map: amount_key -> batch index
+  std::unordered_map<uint64_t, size_t> batch_index_by_amount;
+  batch_index_by_amount.reserve(selected_indices.size() + 1);
+
+  auto ensure_batch = [&](uint64_t amount_key) -> size_t
+  {
+    auto it = batch_index_by_amount.find(amount_key);
+    if (it != batch_index_by_amount.end())
+      return it->second;
+    const size_t idx = req4.batches.size();
+    req4.batches.resize(idx + 1);
+    req4.batches[idx].input_amount = amount_key; // 0 => ZC
+    batch_index_by_amount.emplace(amount_key, idx);
+    return idx;
+  };
+
+  for (size_t pos = 0; pos < selected_indices.size(); ++pos)
+  {
+    const uint64_t tr_idx = selected_indices[pos];
+    auto it = m_transfers.find(tr_idx);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_transfers.end(), "internal error: idx " << tr_idx << " not found in m_transfers");
+    const transfer_details& td = it->second;
+
+    size_t target_outputs = fake_outputs_count_;
+    if (td.is_zc() && !this->is_auditable())
+      target_outputs = m_core_runtime_config.hf4_minimum_mixins;
+
+    const bool needs_decoys = (!this->is_auditable() && target_outputs > 0);
+    const uint64_t amount_key = td.is_zc() ? uint64_t(0) : td.amount();
+    size_t batch_idx = SIZE_MAX;
+
+    if (needs_decoys)
+    {
+      batch_idx = ensure_batch(amount_key);
+      const size_t overs = (target_outputs + 1) * 2;
+      const uint64_t max_h = (td.is_zc() || td.m_ptx_wallet_info->m_block_height < hf4_height)
+        ? td.m_ptx_wallet_info->m_block_height
+        : hf4_height;
+
+      append_heights_with_distribution(req4.batches[batch_idx].heights, overs, max_h, decoy_selection_generator::dist_kind::regular);
+    }
+
+    const bool real_is_post = m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, td.m_ptx_wallet_info->m_block_height);
+
+    plans.push_back(mix_input_plan
+    {
+      /*selection_pos*/            pos,
+      /*transfer_index*/           tr_idx,
+      /*td*/                       &td,
+      /*target_decoy_count*/       target_outputs,
+      /*needs_decoys*/             needs_decoys,
+      /*is_real_output_post_hf4*/  real_is_post,
+      /*batch_key*/                amount_key,
+      /*batch_idx*/                batch_idx
+    });
+  }
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::distribute_decoys_and_build_sources(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& resp4, const std::vector<mix_input_plan>& plans,
+  bool use_all_decoys_if_found_less_than_required, std::vector<currency::tx_source_entry>& sources) const
+{
+  for (const mix_input_plan& plan : plans)
+  {
+    const transfer_details& td = *plan.td;
+
+    sources.push_back(AUTO_VAL_INIT(currency::tx_source_entry()));
+    currency::tx_source_entry& src = sources.back();
+    src.transfer_index = plan.transfer_index;
+    src.amount = td.amount();
+    src.asset_id = td.get_asset_id();
+
+    std::vector<out_entry> local_decoys;
+
+    if (plan.needs_decoys)
+    {
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(plan.batch_idx != SIZE_MAX, "batch_idx is not set for a plan that needs decoys");
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(plan.batch_idx < resp4.blocks_batches.size(), "blocks_batches index OOB");
+      const auto& blocks = resp4.blocks_batches[plan.batch_idx].blocks;
+
+      std::vector<out_entry> coinbase_candidates, noncb_candidates;
+      build_pools_from_blocks(
+        blocks, td.m_global_output_index,
+        /* is_post_hf4 */   [&](uint64_t h)                               { return m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, h); },
+        /* block_allowed */ [&](uint64_t /*blk_h*/, bool blk_is_post_hf4) { return (plan.is_real_output_post_hf4 == blk_is_post_hf4); },
+        /* entry_allowed */ [&](const out_entry& /*oe*/)                  { return true; },
+        coinbase_candidates, noncb_candidates);
+
+      pick_decoys_from_pools(coinbase_candidates, noncb_candidates, plan.target_decoy_count, td.m_global_output_index, local_decoys);
+    }
+
+    std::sort(local_decoys.begin(), local_decoys.end(),
+      [](const out_entry& l, const out_entry& r) { return l.global_amount_index < r.global_amount_index; });
+
+    for (const out_entry& oe_d : local_decoys)
+    {
+      if (td.m_global_output_index == oe_d.global_amount_index)
+        continue;
+
+      tx_output_entry oe = AUTO_VAL_INIT(oe);
+      oe.amount_commitment = oe_d.amount_commitment;
+      oe.concealing_point  = oe_d.concealing_point;
+      oe.out_reference     = oe_d.global_amount_index;
+      oe.stealth_address   = oe_d.stealth_address;
+      oe.blinded_asset_id  = oe_d.blinded_asset_id;  // TODO @#@# BAD DESIGN, consider refactoring -- sowle
+      src.outputs.push_back(oe);
+      if (src.outputs.size() >= plan.target_decoy_count)
+        break;
+    }
+
+    if (!use_all_decoys_if_found_less_than_required && src.outputs.size() < plan.target_decoy_count)
+    {
+      std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount> scanty_outs;
+      COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount ofa;
+      ofa.amount = td.amount();
+      scanty_outs.push_back(ofa);
+      THROW_IF_FALSE_WALLET_EX(false, error::not_enough_outs_to_mix, scanty_outs, plan.target_decoy_count);
+    }
+
+    //paste real transaction to the random index
+    auto it_to_insert = std::find_if(src.outputs.begin(), src.outputs.end(),
+      [&](const tx_output_entry& a)
+      {
+        if (a.out_reference.type().hash_code() == typeid(uint64_t).hash_code())
+          return boost::get<uint64_t>(a.out_reference) >= td.m_global_output_index;
+        return false; // TODO: implement deterministics real output placement in case there're ref_by_id outs
+      });
+
+    //size_t real_index = src.outputs.size() ? (rand() % src.outputs.size() ):0;
+    tx_output_entry real_oe = AUTO_VAL_INIT(real_oe);
+    real_oe.out_reference = td.m_global_output_index; // TODO: use ref_by_id when neccessary
+
+    VARIANT_SWITCH_BEGIN(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]);
+    VARIANT_CASE_CONST(tx_out_bare, o)
+    {
+      VARIANT_SWITCH_BEGIN(o.target);
+      VARIANT_CASE_CONST(txout_to_key, o)
+        real_oe.stealth_address = o.key;
+      VARIANT_CASE_OTHER()
+      {
+        WLT_THROW_IF_FALSE_WITH_CODE(false, "Internal error: unexpected type of target: " << o.target.type().name(), API_RETURN_CODE_INTERNAL_ERROR);
+      }
+      VARIANT_SWITCH_END();
+    }
+    VARIANT_CASE_CONST(tx_out_zarcanum, o)
+      real_oe.amount_commitment           = o.amount_commitment;
+      real_oe.concealing_point            = o.concealing_point;
+      real_oe.stealth_address             = o.stealth_address;
+      real_oe.blinded_asset_id            = o.blinded_asset_id;
+      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.is_zc(), "transfer #" << plan.transfer_index
+        << ", amount: " << print_money_brief(td.amount(), get_asset_decimal_point(td.get_asset_id(), CURRENCY_DISPLAY_DECIMAL_POINT))
+        << " is not a ZC");
+      src.real_out_amount_blinding_mask   = td.m_zc_info_ptr->amount_blinding_mask;
+      src.real_out_asset_id_blinding_mask = td.m_zc_info_ptr->asset_id_blinding_mask;
+      src.asset_id                        = td.m_zc_info_ptr->asset_id;
+#ifndef NDEBUG
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(crypto::point_t(src.asset_id) + src.real_out_asset_id_blinding_mask * crypto::c_point_X == crypto::point_t(real_oe.blinded_asset_id).modify_mul8(), "real_out_asset_id_blinding_mask doesn't match real_oe.blinded_asset_id");
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.m_amount * crypto::point_t(real_oe.blinded_asset_id).modify_mul8() + src.real_out_amount_blinding_mask * crypto::c_point_G == crypto::point_t(real_oe.amount_commitment).modify_mul8(), "real_out_amount_blinding_mask doesn't match real_oe.amount_commitment");
+#endif
+    VARIANT_SWITCH_END();
+
+    auto inserted_it = src.outputs.insert(it_to_insert, real_oe);
+    src.real_out_tx_key = get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
+    src.real_output = inserted_it - src.outputs.begin();
+    src.real_output_in_tx_index = td.m_internal_output_index;
+
+    if (epee::log_space::get_set_log_detalisation_level() >= LOG_LEVEL_1)
+    {
+      std::stringstream ss;
+      ss << "source entry [" << plan.selection_pos << "], td_idx: " << plan.transfer_index << ", ";
+      print_source_entry(ss, src);
+      WLT_LOG_L1(ss.str());
+    }
+  }
+}
+
 bool wallet2::prepare_pos_zc_input_and_ring(const transfer_details& td, const currency::tx_out_zarcanum& stake_out, currency::txin_zc_input& stake_input, 
   std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& decoy_storage, std::vector<crypto::CLSAG_GGXXG_input_ref_t>& ring, uint64_t& secret_index) const
 {
@@ -6800,83 +6995,18 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count, std::vector<currency
   return prepare_tx_sources(fake_outputs_count, false, sources, selected_indicies);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys_if_found_less_than_required, std::vector<currency::tx_source_entry>& sources, const std::vector<uint64_t>& selected_indicies)
+bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys_if_found_less_than_required, std::vector<currency::tx_source_entry>& sources, const std::vector<uint64_t>& selected_indices)
 {
-  using out_entry = COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry;
-  using tx_output_entry = currency::tx_source_entry::output_entry;
+  prefetch_global_indicies_if_needed(selected_indices);
 
-  prefetch_global_indicies_if_needed(selected_indicies);
+  const uint64_t hf4_height = m_core_runtime_config.hard_forks.get_height_the_hardfork_active_after(ZANO_HARDFORK_04_ZARCANUM);
 
-  uint64_t hf4_height = m_core_runtime_config.hard_forks.get_height_the_hardfork_active_after(ZANO_HARDFORK_04_ZARCANUM);
   COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request  req4  = AUTO_VAL_INIT(req4);
   COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response resp4 = AUTO_VAL_INIT(resp4);
 
-  req4.height_upper_limit = m_last_pow_block_h;
-  req4.look_up_strategy = LOOK_UP_STRATEGY_REGULAR_TX;
+  std::vector<mix_input_plan> plans;
+  plan_decoy_batches_for_sources(fake_outputs_count_, selected_indices, hf4_height, req4, plans);
 
-  // amount -> batch index in req4/resp4
-  std::unordered_map<uint64_t, size_t> amount2batch;
-  amount2batch.reserve(selected_indicies.size() + 1);
-
-  auto ensure_batch = [&](uint64_t amount_key) -> size_t
-  {
-    auto it = amount2batch.find(amount_key);
-    if (it != amount2batch.end())
-      return it->second;
-    size_t idx = req4.batches.size();
-    req4.batches.resize(idx + 1);
-    req4.batches[idx].input_amount = amount_key; // 0 => ZC
-    amount2batch.emplace(amount_key, idx);
-    return idx;
-  };
-
-  struct item_ctx
-  {
-    size_t       sel_pos;
-    uint64_t     tr_idx;
-    transfer_details* td;
-    size_t       wanted;
-    bool         need_decoys;
-    bool         real_is_post;
-    uint64_t     amount_key;
-    size_t       batch_idx;
-  };
-  std::vector<item_ctx> items;
-  items.reserve(selected_indicies.size());
-
-  for (size_t i = 0; i < selected_indicies.size(); ++i)
-  {
-    uint64_t tr_idx = selected_indicies[i];
-    auto it = m_transfers.find(tr_idx);
-    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(it != m_transfers.end(), "internal error: idx " << tr_idx << " not found in m_transfers");
-    transfer_details& td = it->second;
-
-    size_t wanted = fake_outputs_count_;
-    //redefine for hardfork
-    if (td.is_zc() && !this->is_auditable())
-      wanted = m_core_runtime_config.hf4_minimum_mixins;
-
-    bool need_decoys = (!this->is_auditable() && wanted > 0);
-
-    uint64_t amount_key = td.is_zc() ? uint64_t(0) : td.amount();
-    size_t batch_idx  = size_t(-1);
-    if (need_decoys)
-    {
-      batch_idx = ensure_batch(amount_key);
-      const size_t overs = (wanted + 1) * 2;
-      std::vector<uint64_t> tmp_heights(overs);
-      uint64_t distrib_max_height = (td.is_zc() || td.m_ptx_wallet_info->m_block_height < hf4_height) ? td.m_ptx_wallet_info->m_block_height : hf4_height;
-      build_distribution_for_input(tmp_heights, distrib_max_height, decoy_selection_generator::dist_kind::regular);
-
-      auto& heights_req = req4.batches[batch_idx].heights;
-      heights_req.reserve(heights_req.size() + tmp_heights.size());
-      heights_req.insert(heights_req.end(), tmp_heights.begin(), tmp_heights.end());
-    }
-
-    bool real_is_post = m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, td.m_ptx_wallet_info->m_block_height);
-
-    items.push_back(item_ctx{i, tr_idx, &td, wanted, need_decoys, real_is_post, amount_key, batch_idx});
-  }
 
   // if atleast one input wanted decoys - we make a single request
   if (!req4.batches.empty())
@@ -6895,125 +7025,9 @@ bool wallet2::prepare_tx_sources(size_t fake_outputs_count_, bool use_all_decoys
     resp4.blocks_batches.clear();
   }
 
-  // construct sources by distributing decoys across the inputs
-  for (const auto& itx : items)
-  {
-    const transfer_details& td = *itx.td;
-
-    sources.push_back(AUTO_VAL_INIT(currency::tx_source_entry()));
-    currency::tx_source_entry& src = sources.back();
-
-    src.transfer_index = itx.tr_idx;
-    src.amount = td.amount();
-    src.asset_id = td.get_asset_id();
-
-    std::vector<out_entry> local_decoys;
-
-    if (itx.need_decoys)
-    {
-      auto found = amount2batch.find(itx.amount_key);
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(found != amount2batch.end(), "batch not found for amount_key");
-      size_t bidx = found->second;
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(bidx < resp4.blocks_batches.size(), "blocks_batches index OOB");
-
-      const auto& blocks = resp4.blocks_batches[bidx].blocks;
-
-      std::vector<out_entry> coinbase_candidates, noncb_candidates;
-
-      build_pools_from_blocks(blocks, td.m_global_output_index,
-        /* is_post_hf4 */   [&](uint64_t h)                                     { return m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, h); },
-        /* block_allowed */ [&](uint64_t /*blk_height*/, bool blk_is_post_hf4)  { return (itx.real_is_post == blk_is_post_hf4); },
-        /* entry_allowed */ [&](const out_entry& oe)                            { (void)oe; return true; },
-      coinbase_candidates, noncb_candidates);
-
-      pick_decoys_from_pools(coinbase_candidates, noncb_candidates, itx.wanted, td.m_global_output_index, local_decoys);
-    }
-    
-    std::sort(local_decoys.begin(), local_decoys.end(), [](const out_entry& l, const out_entry& r) { return l.global_amount_index < r.global_amount_index; });
-    // move decoys to src.outputs (no more than itx.wanted)
-    for (const out_entry& daemon_oe : local_decoys)
-    {
-      if (td.m_global_output_index == daemon_oe.global_amount_index)
-        continue;
-      tx_output_entry oe = AUTO_VAL_INIT(oe);
-      oe.amount_commitment = daemon_oe.amount_commitment;
-      oe.concealing_point = daemon_oe.concealing_point;
-      oe.out_reference = daemon_oe.global_amount_index;
-      oe.stealth_address = daemon_oe.stealth_address;
-      oe.blinded_asset_id = daemon_oe.blinded_asset_id;       // TODO @#@# BAD DESIGN, consider refactoring -- sowle
-      src.outputs.push_back(oe);
-      if (src.outputs.size() >= itx.wanted)
-        break;
-    }
-
-    if (!use_all_decoys_if_found_less_than_required)
-    {
-      if (src.outputs.size() < itx.wanted)
-      {
-        std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount> scanty_outs;
-        COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount ofa;
-        ofa.amount = td.amount();
-        scanty_outs.push_back(ofa);
-        THROW_IF_FALSE_WALLET_EX(false, error::not_enough_outs_to_mix, scanty_outs, itx.wanted);
-      }
-    }
-
-    //paste real transaction to the random index
-    auto it_to_insert = std::find_if(src.outputs.begin(), src.outputs.end(), [&](const tx_output_entry& a)
-      {
-        if (a.out_reference.type().hash_code() == typeid(uint64_t).hash_code())
-          return static_cast<bool>(boost::get<uint64_t>(a.out_reference) >= td.m_global_output_index);
-        return false; // TODO: implement deterministics real output placement in case there're ref_by_id outs
-      });
-    //size_t real_index = src.outputs.size() ? (rand() % src.outputs.size() ):0;
-    tx_output_entry real_oe = AUTO_VAL_INIT(real_oe);
-    real_oe.out_reference = td.m_global_output_index; // TODO: use ref_by_id when neccessary
-    VARIANT_SWITCH_BEGIN(td.m_ptx_wallet_info->m_tx.vout[td.m_internal_output_index]);
-    VARIANT_CASE_CONST(tx_out_bare, o)
-    {
-      VARIANT_SWITCH_BEGIN(o.target);
-      VARIANT_CASE_CONST(txout_to_key, o)
-        real_oe.stealth_address = o.key;
-      VARIANT_CASE_OTHER()
-      {
-        WLT_THROW_IF_FALSE_WITH_CODE(false,
-          "Internal error: unexpected type of target: " << o.target.type().name(),
-          API_RETURN_CODE_INTERNAL_ERROR);
-      }
-      VARIANT_SWITCH_END();
-    }
-    VARIANT_CASE_CONST(tx_out_zarcanum, o)
-      real_oe.amount_commitment           = o.amount_commitment; // TODO @#@# consider using shorter code like in sweep_below() (or better reuse it)
-      real_oe.concealing_point            = o.concealing_point;
-      real_oe.stealth_address             = o.stealth_address;
-      real_oe.blinded_asset_id            = o.blinded_asset_id;
-      WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(td.is_zc(), "transfer #" << itx.tr_idx << ", amount: " << print_money_brief(td.amount(), get_asset_decimal_point(td.get_asset_id(), CURRENCY_DISPLAY_DECIMAL_POINT)) << " is not a ZC");
-      src.real_out_amount_blinding_mask   = td.m_zc_info_ptr->amount_blinding_mask;
-      src.real_out_asset_id_blinding_mask = td.m_zc_info_ptr->asset_id_blinding_mask;
-      src.asset_id                        = td.m_zc_info_ptr->asset_id;
-#ifndef NDEBUG
-      WLT_CHECK_AND_ASSERT_MES(crypto::point_t(src.asset_id) + src.real_out_asset_id_blinding_mask * crypto::c_point_X == crypto::point_t(real_oe.blinded_asset_id).modify_mul8(), false, "real_out_asset_id_blinding_mask doesn't match real_oe.blinded_asset_id");
-      WLT_CHECK_AND_ASSERT_MES(td.m_amount * crypto::point_t(real_oe.blinded_asset_id).modify_mul8() + src.real_out_amount_blinding_mask * crypto::c_point_G == crypto::point_t(real_oe.amount_commitment).modify_mul8(), false, "real_out_amount_blinding_mask doesn't match real_oe.amount_commitment");
-#endif
-    VARIANT_SWITCH_END();
-
-    auto inserted_it = src.outputs.insert(it_to_insert, real_oe);
-    src.real_out_tx_key = get_tx_pub_key_from_extra(td.m_ptx_wallet_info->m_tx);
-    src.real_output = inserted_it - src.outputs.begin();
-    src.real_output_in_tx_index = td.m_internal_output_index;
-
-    if (epee::log_space::get_set_log_detalisation_level() >= LOG_LEVEL_1)
-    {
-      std::stringstream ss;
-      ss << "source entry [" << itx.sel_pos << "], td_idx: " << itx.tr_idx << ", ";
-      print_source_entry(ss, src);
-      WLT_LOG_L1(ss.str());
-    }
-  }
+  distribute_decoys_and_build_sources(resp4, plans, use_all_decoys_if_found_less_than_required, sources);
   return true;
 }
-
-
 //----------------------------------------------------------------------------------------------------------------
 template<typename t_obj_container>
 typename t_obj_container::value_type extract_random_from_container(t_obj_container& container)
