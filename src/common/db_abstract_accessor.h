@@ -611,6 +611,13 @@ namespace tools
         bdb.get_backend()->enumerate(m_h, &local_enum_handler);
       }
 
+      template<class t_cb>
+      void enumerate_items_by_prefix(const std::string& prefix, uint64_t limit, t_cb cb) const
+      {
+        items_accessor_cb<t_cb, t_key, t_value, access_strategy_selector<is_t_access_strategy>> local_enum_handler(cb);
+        bdb.get_backend()->enumerate_prefix(m_h, prefix, limit, &local_enum_handler);
+      }
+
       template<class t_explicit_key, class t_explicit_value, class t_strategy>
       void explicit_set(const t_explicit_key& k, const t_explicit_value& v)
       {
