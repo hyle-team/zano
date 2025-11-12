@@ -285,6 +285,22 @@ DISABLE_VS_WARNINGS(4100)
 #define CHECK_AND_ASSERT_GREATER(A, B) CHECK_AND_ASSERT_MES((A) > (B), false, STR(A) " <= " STR(B) " because " << A << " <= " << B)
 #endif
 
+#ifndef CHECK_AND_ASSERT_SUCCESS
+#define CHECK_AND_ASSERT_SUCCESS(A) CHECK_AND_ASSERT_MES((A), false, STR(A) " failed")
+#endif
+
+#ifndef CHECK_AND_ASSERT_FAILURE
+#define CHECK_AND_ASSERT_FAILURE(A) CHECK_AND_ASSERT_MES(!(A), false, STR(A) " succeeded, but was expected to fail")
+#endif
+
+#ifndef CHECK_AND_ASSERT_TRUE
+#define CHECK_AND_ASSERT_TRUE(A) CHECK_AND_ASSERT_MES((A), false, STR(A) " is false")
+#endif
+
+#ifndef CHECK_AND_ASSERT_FALSE
+#define CHECK_AND_ASSERT_FALSE(A) CHECK_AND_ASSERT_MES(!(A), false, STR(A) " is true")
+#endif
+
 namespace epee
 {
 namespace debug

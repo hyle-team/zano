@@ -83,7 +83,9 @@ namespace crypto
       chacha_key key;
       chacha_iv iv;
     } hash_result;
-
+    
+    static_assert(sizeof hash_result == sizeof(chacha_key) + sizeof(chacha_iv), "size missmatch");
+    
     keccak((uint8_t*)buff.data(), (int)buff.size(), (uint8_t*)&hash_result, (int)(sizeof hash_result));
 
     key = hash_result.key;
