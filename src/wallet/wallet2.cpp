@@ -4824,12 +4824,8 @@ bool wallet2::proxy_to_daemon(const std::string& uri, const std::string& body, i
   return m_core_proxy->call_COMMAND_RPC_INVOKE(uri, body, response_code, response_body);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::prepare_pos_zc_input_and_ring(const transfer_details& td,
-                                            const currency::tx_out_zarcanum& stake_out,
-                                            currency::txin_zc_input& stake_input,
-                                            std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& decoy_storage,
-                                            std::vector<crypto::CLSAG_GGXXG_input_ref_t>& ring,
-                                            uint64_t& secret_index) const
+bool wallet2::prepare_pos_zc_input_and_ring(const transfer_details& td, const currency::tx_out_zarcanum& stake_out, currency::txin_zc_input& stake_input,
+  std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& decoy_storage, std::vector<crypto::CLSAG_GGXXG_input_ref_t>& ring, uint64_t& secret_index) const
 {
   bool r = false;
   ring.clear();
