@@ -36,6 +36,9 @@ namespace currency
     std::atomic<uint32_t> m_callback_request_count; //in debug purpose: problem with double callback rise
     //
     block_chain_shortener m_last_fetched_block_ids;
+    std::atomic<size_t> m_expected_NOTIFY_RESPONSE_GET_OBJECTS_count = 0;
+    std::atomic<size_t> m_expected_NOTIFY_RESPONSE_CHAIN_ENTRY_count = 0;
+
   };
 
   struct currency_connection_context: public epee::net_utils::connection_context_base

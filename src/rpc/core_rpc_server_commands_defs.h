@@ -655,11 +655,10 @@ namespace currency
     typedef COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response response;
   };
 
-// decoy strategy for regular TX
-#define LOOK_UP_STRATEGY_REGULAR_TX           "LOOK_UP_STRATEGY_REGULAR_TX"
+  // decoy strategy for regular TX
+  #define LOOK_UP_STRATEGY_REGULAR_TX           "LOOK_UP_STRATEGY_REGULAR_TX"
   // decoy strategy for PoS coinbase 
-#define LOOK_UP_STRATEGY_POS_COINBASE         "LOOK_UP_STRATEGY_POS_COINBASE"
-  //-----------------------------------------------
+  #define LOOK_UP_STRATEGY_POS_COINBASE         "LOOK_UP_STRATEGY_POS_COINBASE"
   struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4
   {
     DOC_COMMAND("Version 4 of the command to retrieve random decoy outputs for specified amounts, focusing on either pre-zarcanum or post-zarcanum zones based on the amount value.");
@@ -669,11 +668,12 @@ namespace currency
       std::vector<uint64_t> heights;                    // array heights derived from decoy selection algorithm, number of heights expected to be not less than minimal ring size
       uint64_t              height_upper_limit;         // if nonzero, all the decoy outputs must be either older than, or the same age as this height
       std::string           look_up_strategy;           // LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE
-      
+
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(heights)                     DOC_DSCR("array heights derived from decoy selection algorithm, number of heights expected to be not less than minimal ring size") DOC_EXMP_AUTO({ 1,2,3 }) DOC_END
+        KV_SERIALIZE(heights)                     DOC_DSCR("array heights derived from decoy selection algorithm, number of heights expected to be not less than minimal ring size") DOC_EXMP_AGGR(1, 2, 3, 4) DOC_END
         KV_SERIALIZE(height_upper_limit)          DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_EXMP(2555000) DOC_END
         KV_SERIALIZE(look_up_strategy)            DOC_DSCR("LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE") DOC_EXMP("LOOK_UP_STRATEGY_REGULAR_TX") DOC_END
+
       END_KV_SERIALIZE_MAP()
     };
 
@@ -681,22 +681,22 @@ namespace currency
     struct outputs_in_block
     {
       uint64_t block_height;
-      std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> outputs;
+      std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> outs;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(block_height)    DOC_DSCR("Block's height") DOC_EXMP_AUTO(12345) DOC_END
-        KV_SERIALIZE(outputs)         DOC_DSCR("Outputs related to this block") DOC_EXMP(1) DOC_END
+        KV_SERIALIZE(block_height)                      DOC_DSCR("Block's height") DOC_EXMP_AUTO(12345) DOC_END
+        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(outs)
       END_KV_SERIALIZE_MAP()
-
-    };      
-    
+    };
 
     struct response
     {
       std::vector<outputs_in_block> blocks;
+      std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(blocks)    DOC_DSCR("Blocks collected by node") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(status)    DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1539,6 +1539,39 @@ namespace currency
         KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
+  };
+
+  //-----------------------------------------------
+
+    #define MAX_N_OF_LOOKUP_ALIASES_TO_RETURN 10
+
+    struct COMMAND_RPC_ALIAS_LOOKUP
+    {
+      DOC_COMMAND("Give an estimation of block height by the given date.")
+
+      struct request
+      {
+        std::string alias_first_leters;
+        uint64_t n_of_items_to_return;  //but not bigger then 10
+
+        BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(alias_first_leters)         DOC_DSCR("Prefix by which the search will be performed.") DOC_EXMP("al") DOC_END
+        KV_SERIALIZE(n_of_items_to_return)       DOC_DSCR("Maximum number of elements returned (not bigger then 10)") DOC_EXMP(10) DOC_END
+        END_KV_SERIALIZE_MAP()
+      };
+
+      struct response
+      {
+        std::string status;
+        std::string error_code;
+        std::list<currency::alias_rpc_details> aliases;
+
+        BEGIN_KV_SERIALIZE_MAP()
+          KV_SERIALIZE(status)                   DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+          KV_SERIALIZE(error_code)               DOC_DSCR("Error code, if any.") DOC_END
+          KV_SERIALIZE(aliases)                  DOC_DSCR("List of alias_rpc_details objects, each containing detailed information about each alias registered to the specified address.") DOC_EXMP_AUTO(1) DOC_END
+        END_KV_SERIALIZE_MAP()
+      };
   };
 
   //-----------------------------------------------

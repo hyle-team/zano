@@ -21,6 +21,7 @@ using namespace epee;
 
 #define RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS                                       4000
 #define RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS                                    500
+#define RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3                                   300
 #define RPC_LIMIT_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES_TXIDS                               100
 #define RPC_LIMIT_COMMAND_RPC_CHECK_KEYIMAGES_IMAGES                                            1000
 #define RPC_LIMIT_COMMAND_RPC_GET_TRANSACTIONS_TXS_HASHES                                       5000
@@ -483,6 +484,19 @@ namespace currency
       return true;
     }
 
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_get_random_outs4(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& res, connection_context& cntx)
+  {
+    CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.heights.size(), RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS);
+    res.status = API_RETURN_CODE_FAIL;
+    if (!m_core.get_blockchain_storage().get_random_outs_for_amounts4(req, res))
+    {
+      return true;
+    }
     res.status = API_RETURN_CODE_OK;
     return true;
   }
@@ -1450,10 +1464,13 @@ namespace currency
       return false;
     }
 
-    m_core.get_blockchain_storage().get_aliases([&res](const std::string& alias, const currency::extra_alias_entry_base& ai){
+    m_core.get_blockchain_storage().get_aliases(
+      [&res](const std::string& alias, const currency::extra_alias_entry_base& ai)
+    {
       res.aliases.push_back(alias_rpc_details());
       alias_info_to_rpc_alias_info(alias, ai, res.aliases.back());
-    }, req.offset, req.count);
+    },
+    req.offset, req.count);
 
     res.status = API_RETURN_CODE_OK;
     return true;
@@ -1464,6 +1481,37 @@ namespace currency
   {
     res.reward = m_core.get_blockchain_storage().get_alias_coast(req.alias);
     res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_alias_lookup(const COMMAND_RPC_ALIAS_LOOKUP::request& req, COMMAND_RPC_ALIAS_LOOKUP::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
+  {
+    if(!check_core_ready())
+    {
+      error_resp.code = CORE_RPC_ERROR_CODE_CORE_BUSY;
+      error_resp.message = "Core is busy.";
+      return false;
+    }
+
+    auto to_lower_ascii = [](const std::string& s)
+    {
+      std::string out = s;
+      std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) { return std::tolower(c); });
+      return out;
+    };
+
+    std::string prefix = to_lower_ascii(req.alias_first_leters);
+    uint64_t n = std::min<uint64_t>(req.n_of_items_to_return, MAX_N_OF_LOOKUP_ALIASES_TO_RETURN);
+
+    m_core.get_blockchain_storage().lookup_aliases_by_prefix(prefix, n,
+      [&](const std::string& alias, const currency::extra_alias_entry_base& ai)
+    {
+      res.aliases.push_back(alias_rpc_details());
+      alias_info_to_rpc_alias_info(alias, ai, res.aliases.back());
+    });
+
+    res.status = API_RETURN_CODE_OK;
+
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------

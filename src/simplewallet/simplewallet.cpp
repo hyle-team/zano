@@ -424,6 +424,11 @@ void process_wallet_command_line_params(const po::variables_map& vm, tools::wall
     wal.set_connectivity_options(command_line::get_arg(vm, arg_set_timeout));
   }
 
+  if (command_line::has_arg(vm, arg_voting_config_file))
+  {
+    wal.set_votes_config_path(command_line::get_arg(vm, arg_voting_config_file));
+  }
+
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::init(const boost::program_options::variables_map& vm)

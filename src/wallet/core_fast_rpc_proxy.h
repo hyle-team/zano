@@ -68,6 +68,11 @@ namespace tools
       return m_rpc.on_get_random_outs3(req, res, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
+    bool call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& res) override
+    {
+      return m_rpc.on_get_random_outs4(req, res, m_cntxt_stub);
+    }
+    //------------------------------------------------------------------------------------------------------------------------------
     bool call_COMMAND_RPC_SEND_RAW_TX(const currency::COMMAND_RPC_SEND_RAW_TX::request& req, currency::COMMAND_RPC_SEND_RAW_TX::response& res) override
     {
       return m_rpc.on_send_raw_tx(req, res, m_cntxt_stub);
@@ -96,6 +101,11 @@ namespace tools
     bool call_COMMAND_RPC_GET_ALIAS_REWARD(const currency::COMMAND_RPC_GET_ALIAS_REWARD::request& req, currency::COMMAND_RPC_GET_ALIAS_REWARD::response& res) override
     { 
       return m_rpc.on_get_alias_reward(req, res, m_err_stub, m_cntxt_stub);
+    }
+    //------------------------------------------------------------------------------------------------------------------------------
+    bool call_COMMAND_RPC_ALIAS_LOOKUP(const currency::COMMAND_RPC_ALIAS_LOOKUP::request& req, currency::COMMAND_RPC_ALIAS_LOOKUP::response& res) override
+    { 
+      return m_rpc.on_alias_lookup(req, res, m_err_stub, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
     bool call_COMMAND_RPC_GET_TRANSACTIONS(const currency::COMMAND_RPC_GET_TRANSACTIONS::request& req, currency::COMMAND_RPC_GET_TRANSACTIONS::response& rsp) override
