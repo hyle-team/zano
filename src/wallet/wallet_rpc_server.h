@@ -254,6 +254,7 @@ namespace tools
     bool handle_command_line(const boost::program_options::variables_map& vm);
     void rpc_destinations_to_currency_destinations(const std::list<wallet_public::transfer_destination>& rpc_destinations, bool nullify_asset_id, bool try_to_split, std::vector<currency::tx_destination_entry>& currency_destinations);
 
+    void set_flag_allow_legacy_payment_id_size(bool value) { m_allow_legacy_payment_id_size = value; }
 
   private:
     std::shared_ptr<i_wallet_provider> m_pwallet_provider_sh_ptr;
