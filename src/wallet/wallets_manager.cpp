@@ -1088,9 +1088,12 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       if (w->is_watch_only() && !w->is_auditable())
         return API_RETURN_CODE_WALLET_WATCH_ONLY_NOT_SUPPORTED;
 
-      w->get_recent_transfers_history(owr.recent_history.history, 0, txs_to_return, owr.recent_history.total_history_items, owr.recent_history.last_item_index, exclude_mining_txs);
+      // @#@#TODO: remove this conversion -- sowle
+      std::vector<tools::wallet_public::wallet_transfer_info> wti_history;
+      w->get_recent_transfers_history(wti_history, 0, txs_to_return, owr.recent_history.total_history_items, owr.recent_history.last_item_index, exclude_mining_txs);
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
-      w->get_unconfirmed_transfers(owr.recent_history.history, exclude_mining_txs);
+      w->get_unconfirmed_transfers(wti_history, exclude_mining_txs);
+      std::for_each(wti_history.begin(), wti_history.end(), [&](auto& el){ owr.recent_history.history.push_back(tools::wallet_public::wallet_transfer_info_v2{el}); });
       w->set_use_assets_whitelisting(true);
       owr.wallet_local_bc_size = w->get_blockchain_current_size();
 
@@ -1170,8 +1173,11 @@ std::string wallets_manager::get_recent_transfers(size_t wallet_id, uint64_t off
     return API_RETURN_CODE_CORE_BUSY;
   }
 
-  w->get()->get_unconfirmed_transfers(tr_hist.unconfirmed, exclude_mining_txs);
-  w->get()->get_recent_transfers_history(tr_hist.history, offset, count, tr_hist.total_history_items, tr_hist.last_item_index, exclude_mining_txs);
+  // @#@#TODO: remove this conversion -- sowle
+  std::vector<tools::wallet_public::wallet_transfer_info> wti_history;
+  w->get()->get_unconfirmed_transfers(wti_history, exclude_mining_txs);
+  w->get()->get_recent_transfers_history(wti_history, offset, count, tr_hist.total_history_items, tr_hist.last_item_index, exclude_mining_txs);
+  std::for_each(wti_history.begin(), wti_history.end(), [&](auto& el){ tr_hist.history.push_back(tools::wallet_public::wallet_transfer_info_v2{el}); });
 
   auto fix_tx = [](tools::wallet_public::wallet_transfer_info& wti) -> void {
     wti.show_sender = currency::is_showing_sender_addres(wti.tx);
@@ -1533,123 +1539,70 @@ std::string wallets_manager::request_alias_update(const currency::alias_rpc_deta
   return API_RETURN_CODE_FILE_NOT_FOUND;
 }
 
+std::string convert_wallet_rpc_error_code_to_gui_code(const epee::json_rpc::error& json_error)
+{
+  switch(json_error.code)
+  {
+  case 0:
+    return std::string{API_RETURN_CODE_OK};
+  case WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID:
+    return std::string{API_RETURN_CODE_BAD_ARG_WRONG_PAYMENT_ID} + " : " + json_error.message;
+  case WALLET_RPC_ERROR_CODE_WRONG_ADDRESS:
+    return std::string{API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS} + " : " + json_error.message;
+  case WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT:
+    return std::string{API_RETURN_CODE_BAD_ARG} + " : " + json_error.message;
+  default:
+    return std::string{API_RETURN_CODE_FAIL} + " : " + json_error.message;
+  }
+}
 
 std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_params& tp, currency::transaction& res_tx)
 {
-  std::vector<currency::tx_destination_entry> dsts;
+  bool r = false;
   if(!tp.destinations.size())
     return API_RETURN_CODE_BAD_ARG_EMPTY_DESTINATIONS;
 
-  GET_WALLET_BY_ID(wallet_id, w);
+  GET_WALLET_OPT_BY_ID(wallet_id, wo);
 
-  uint64_t fee = tp.fee;
-  //payment_id
-  std::vector<currency::attachment_v> attachments;
-  std::vector<currency::extra_v> extra;
-  bool wrap = false;
-//  if (!currency::parse_amount(fee, tp.fee))
-//    return API_RETURN_CODE_BAD_ARG_WRONG_FEE;
+  auto locker_object = wo.w.lock();
+  auto& w = wo.w;
 
-  std::string payment_id = tp.payment_id;
-  for(auto& d: tp.destinations)
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request tr_req{};
+  tr_req.comment = tp.comment;
+  for(auto& d : tp.destinations)
   {
-    dsts.push_back(currency::tx_destination_entry());
-    dsts.back().addr.resize(1);
-    currency::tx_destination_entry& de = dsts.back();
-    std::string embedded_payment_id;
-    if (currency::is_address_like_wrapped(d.address))
-    {
-      CHECK_AND_ASSERT_MES(!wrap, API_RETURN_CODE_BAD_ARG, "Second wrap entry in one tx not allowed");
-      LOG_PRINT_L0("Address " << d.address << " recognized as wrapped address, creating wrapping transaction...");
-      //put into service attachment specially encrypted entry which will contain wrap address and network
-      currency::tx_service_attachment sa = AUTO_VAL_INIT(sa);
-      sa.service_id = BC_WRAP_SERVICE_ID;
-      sa.instruction = BC_WRAP_SERVICE_INSTRUCTION_ERC20;
-      sa.flags = TX_SERVICE_ATTACHMENT_ENCRYPT_BODY | TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE;
-      sa.body = d.address;
-      extra.push_back(sa);
+    tools::wallet_public::transfer_destination& result_dst = tr_req.destinations.emplace_back();
+    result_dst.address = d.address;
+    result_dst.asset_id = d.asset_id;
 
-
-      currency::account_public_address acc = AUTO_VAL_INIT(acc);
-      currency::get_account_address_from_str(acc, BC_WRAP_SERVICE_CUSTODY_WALLET);
-      de.addr.front() = acc;
-      wrap = true;
-    }
-    else if (!tools::get_transfer_address(d.address, dsts.back().addr.back(), embedded_payment_id, m_rpc_proxy.get()))
-    {
-      return API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS;
-    }
-    
     size_t decimal_point = 0;
     if (!w->get()->get_asset_decimal_point(d.asset_id, &decimal_point))
-    {
       return API_RETURN_CODE_BAD_ARG_UNKNOWN_DECIMAL_POINT;
-    }
 
-    if(!currency::parse_amount(d.amount, dsts.back().amount, decimal_point))
-    {
+    if(!currency::parse_amount(d.amount, result_dst.amount, decimal_point))
       return API_RETURN_CODE_BAD_ARG_WRONG_AMOUNT;
-    }
-    if (embedded_payment_id.size() != 0)
-    {
-      if (payment_id.size() != 0)
-        return API_RETURN_CODE_BAD_ARG_WRONG_PAYMENT_ID; // payment id is specified more than once
-      payment_id = embedded_payment_id;
-    }
-    dsts.back().asset_id = d.asset_id;
   }
+  tr_req.fee = tp.fee;
+  tr_req.mixin = tp.mixin_count;
 
-  if (payment_id.size())
-  {
-    if (!currency::is_payment_id_size_ok(payment_id))
-      return API_RETURN_CODE_BAD_ARG_WRONG_PAYMENT_ID; // payment id is too big
-
-    if (!currency::set_payment_id_to_tx(attachments, payment_id, w->get()->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM)))
-      return API_RETURN_CODE_INTERNAL_ERROR;
-  }
-
-
-  //set transaction unlock time if it was specified by user 
-  uint64_t unlock_time = 0;
-  if (tp.lock_time)
-  {
-    if (tp.lock_time > CURRENCY_MAX_BLOCK_NUMBER)
-      unlock_time = tp.lock_time;
-    else
-      unlock_time = w->get()->get_blockchain_current_size() + tp.lock_time;
-  }
-      
-    
-  //process attachments
-  if (tp.comment.size() && payment_id.empty())
-  {
-    currency::tx_comment tc = AUTO_VAL_INIT(tc);
-    tc.comment = tp.comment;
-    extra.push_back(tc);
-  }
-  if (tp.push_payer && !wrap)
-  {
-    currency::create_and_add_tx_payer_to_container_from_address(extra, w->get()->get_account().get_keys().account_address,  w->get()->get_top_block_height(),  w->get()->get_core_runtime_config());
-  }    
-  if (!tp.hide_receiver)
-  {
-    for (auto& d : dsts)
-    {
-      for (auto& a : d.addr)
-        currency::create_and_add_tx_receiver_to_container_from_address(extra, a, w->get()->get_top_block_height(),  w->get()->get_core_runtime_config());
-    }
-  }
-
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_res{};
+  epee::json_rpc::error json_error{};
+  tools::wallet_rpc_server::connection_context conn_ctx{};
 
   std::string api_return_code_result = API_RETURN_CODE_FAIL;
   do_exception_safe_call(
     [&]() {
-      w->get()->transfer(dsts, tp.mixin_count, unlock_time ? unlock_time + 1 : 0, fee, extra, attachments, res_tx);
-      api_return_code_result = API_RETURN_CODE_OK;
+      r = wo.rpc_wrapper->on_transfer(tr_req, tr_res, json_error, conn_ctx);
+      api_return_code_result = convert_wallet_rpc_error_code_to_gui_code(json_error);
+      if (!r && api_return_code_result.find(API_RETURN_CODE_OK) == 0)
+        api_return_code_result = API_RETURN_CODE_INTERNAL_ERROR + std::string{" (transfer returned false) " } + json_error.message;
     },
-    [&]() { return get_wallet_log_prefix(wallet_id) + "Transfer error: "; },
+    [&]() {
+      return get_wallet_log_prefix(wallet_id) + "Transfer error: ";
+    },
     api_return_code_result
     );
+  
   return api_return_code_result;
 }
 
@@ -2063,8 +2016,8 @@ void wallets_manager::on_new_block(size_t wallet_id, uint64_t /*height*/, const 
 
 void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
 {  
-  view::transfer_event_info tei = AUTO_VAL_INIT(tei);
-  tei.ti = wti;
+  view::transfer_event_info tei{};
+  tei.ti = tools::wallet_public::wallet_transfer_info_v2{wti}; // @#@#TODO: remove this conversion -- sowle
   tei.balances = balances;
   tei.total_mined = total_mined;
   tei.wallet_id = wallet_id;
@@ -2101,10 +2054,11 @@ void wallets_manager::on_sync_progress(size_t wallet_id, const uint64_t& percent
   wspp.wallet_id = wallet_id;
   m_pview->wallet_sync_progress(wspp);
 }
+
 void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti)
 {
-  view::transfer_event_info tei = AUTO_VAL_INIT(tei);
-  tei.ti = wti;
+  view::transfer_event_info tei{};
+  tei.ti = tools::wallet_public::wallet_transfer_info_v2{wti}; // @#@#TODO: remove this conversion -- sowle
 
   SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
   auto it = m_wallets.find(wallet_id);
