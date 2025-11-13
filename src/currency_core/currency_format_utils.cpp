@@ -1164,7 +1164,7 @@ namespace currency
     return dh;
   }
   //---------------------------------------------------------------
-  bool convert_payment_id(const payment_id_t& payment_id, uint64_t result)
+  bool convert_payment_id(const payment_id_t& payment_id, uint64_t& result)
   {
     if (payment_id.size() > CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE)
       return false;
@@ -1928,7 +1928,8 @@ namespace currency
       LOG_PRINT_GREEN("DECRYPTING ON KEY: " << epee::string_tools::pod_to_hex(derivation) << ", key decrypted from sender address: " << currency::get_account_address_as_str(acc_keys.account_address), LOG_LEVEL_0);
       //validate derivation we here. Yoda style
       crypto::hash hash_for_check_sum = crypto::cn_fast_hash(&derivation, sizeof(derivation));
-      CHECK_AND_ASSERT_MES(*(uint32_t*)&hash_for_check_sum == crypto_info.derivation_hash, null_derivation, "Derivation hash missmatched in tx id " << currency::get_transaction_hash(tx));
+      bool valid = *(uint32_t*)&hash_for_check_sum == crypto_info.derivation_hash;
+      CHECK_AND_ASSERT_MES(valid, null_derivation, "Derivation hash missmatched in tx id " << currency::get_transaction_hash(tx));
       return derivation;
     }
   }
@@ -1995,16 +1996,16 @@ namespace currency
 
     if (tx.version >= TRANSACTION_VERSION_POST_HF6)
     {
-      // new encryption
+      // new encryption, mind the order in which the containers are encrypted
       bool was_crypted_items = false;
       encrypt_payload_items_visitor v(was_crypted_items, derivation, tx_random_key.sec, destination_addr, sender_keys);
-      for (auto& a : tx.attachment)
-        boost::apply_visitor(v, a);
-      was_attachment_crypted_entries = was_crypted_items;
-      was_crypted_items = false;
       for (auto& a : tx.extra)
         boost::apply_visitor(v, a);
       was_extra_crypted_entries = was_crypted_items;
+      was_crypted_items = false;
+      for (auto& a : tx.attachment)
+        boost::apply_visitor(v, a);
+      was_attachment_crypted_entries = was_crypted_items;
 
       if (was_attachment_crypted_entries || was_extra_crypted_entries)
       {

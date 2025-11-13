@@ -394,7 +394,7 @@ namespace currency
   uint16_t get_derivation_hint(const crypto::key_derivation& derivation);
   tx_derivation_hint make_tx_derivation_hint_from_uint16(uint16_t hint);
 
-  bool convert_payment_id(const payment_id_t& payment_id, uint64_t result);
+  bool convert_payment_id(const payment_id_t& payment_id, uint64_t& result);
   payment_id_t convert_payment_id(uint64_t intrinsic_payment_id);
 
   std::string short_hash_str(const crypto::hash& h);
