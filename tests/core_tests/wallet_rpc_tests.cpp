@@ -118,7 +118,13 @@ bool wallet_rpc_integrated_address_transfer::c1(currency::core& c, size_t ev_ind
   std::string alice_integrated_address = get_account_address_and_payment_id_as_str(m_accounts[ALICE_ACC_IDX].get_public_address(), payment_id);
 
   // wallet RPC server
+  boost::program_options::options_description wallet_desc_options;
+  tools::wallet_rpc_server::init_options(wallet_desc_options);
+  boost::program_options::variables_map vm_allow_legacy_pid_size_wallet;
+  const char* const argv_w[] = {"", "--allow-legacy-payment-id-size", "--rpc-bind-port=0"};
+  boost::program_options::store(boost::program_options::parse_command_line(sizeof argv_w / sizeof argv_w[0], argv_w, wallet_desc_options), vm_allow_legacy_pid_size_wallet);
   tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
+  CHECK_AND_ASSERT_SUCCESS(miner_wlt_rpc.init(vm_allow_legacy_pid_size_wallet));
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
 
@@ -171,25 +177,26 @@ bool wallet_rpc_integrated_address_transfer::c1(currency::core& c, size_t ev_ind
   r = miner_wlt_rpc.on_transfer(req, res, je, ctx);
   CHECK_AND_ASSERT_MES(!r, false, "RPC call not failed as expected");
 
-  // 4. standard address + external payment id => success
+  // 4. standard address + external payment id => failure (payment id is deprecated)
   req.payment_id = "0A13fFEe";
-  epee::string_tools::parse_hexstr_to_binbuff(req.payment_id, payment_id);
+  std::string payment_id2;
+  epee::string_tools::parse_hexstr_to_binbuff(req.payment_id, payment_id2);
   je = AUTO_VAL_INIT(je);
   r = miner_wlt_rpc.on_transfer(req, res, je, ctx);
-  CHECK_AND_ASSERT_MES(r, false, "RPC call failed, code: " << je.code << ", msg: " << je.message);
+  CHECK_AND_ASSERT_MES(!r, false, "RPC call not failed as expected");
 
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "enexpected pool txs count: " << c.get_pool_transactions_count());
-  r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
-  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
-  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool is not empty: " << c.get_pool_transactions_count());
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "enexpected pool txs count: " << c.get_pool_transactions_count());
 
   alice_wlt->refresh();
 
   // check the transfer has been received
   payments.clear();
+  alice_wlt->get_payments(payment_id2, payments);
+  CHECK_AND_ASSERT_EQ(payments.size(), 0);
+  
   alice_wlt->get_payments(payment_id, payments);
   CHECK_AND_ASSERT_MES(payments.size() == 1, false, "Invalid payments count: " << payments.size());
-  CHECK_AND_ASSERT_MES(payments.front().m_amount == MK_TEST_COINS(7), false, "Invalid payment");
+  CHECK_AND_ASSERT_MES(payments.front().m_amount == MK_TEST_COINS(3), false, "Invalid payment");
   CHECK_AND_ASSERT_MES(check_mixin_value_for_each_input(0, payments.front().m_tx_hash, c), false, ""); // make sure number of decoys is correct
 
 
@@ -266,15 +273,14 @@ bool wallet_rpc_transfer::c1(currency::core& c, size_t ev_index, const std::vect
   CHECK_AND_ASSERT_MES(td.amount() == MK_TEST_COINS(3), false, "Invalid payment");
   CHECK_AND_ASSERT_MES(check_mixin_value_for_each_input(2, td.tx_hash(), c), false, "");
 
-  // make sure tx_received is set by default, but tx_payer is not
+  // make sure tx_receiver and tx_payer is not present
   std::shared_ptr<const transaction_chain_entry> pche = c.get_blockchain_storage().get_tx_chain_entry(td.tx_hash());
-  //CHECK_AND_ASSERT_MES(currency::count_type_in_variant_container<tx_receiver>(pche->tx.extra) == 1, false, "tx_receiver: incorrect count of items");
-  //CHECK_AND_ASSERT_MES(currency::count_type_in_variant_container<tx_payer>(pche->tx.extra) == 0, false, "tx_payer: incorrect count of items");
+  CHECK_AND_ASSERT_MES(currency::count_type_in_variant_container<tx_receiver>(pche->tx.extra) == 0, false, "tx_receiver: incorrect count of items");
+  CHECK_AND_ASSERT_MES(currency::count_type_in_variant_container<tx_payer>(pche->tx.extra) == 0, false, "tx_payer: incorrect count of items");
 
 
   // 2. check tx_receiver and tx_payer non-default
   req.mixin = 1;
-  req.hide_receiver = true;
   req.push_payer = true;
   tds.amount = MK_TEST_COINS(5);
   req.destinations.clear();
@@ -282,8 +288,9 @@ bool wallet_rpc_transfer::c1(currency::core& c, size_t ev_index, const std::vect
 
   res = AUTO_VAL_INIT(res);
 
-  r = miner_wlt_rpc.on_transfer(req, res, je, ctx);
-  CHECK_AND_ASSERT_MES(r, false, "RPC call failed, code: " << je.code << ", msg: " << je.message);
+  CHECK_AND_ASSERT_FAILURE(miner_wlt_rpc.on_transfer(req, res, je, ctx));
+
+  /*CHECK_AND_ASSERT_MES(r, false, "RPC call failed, code: " << je.code << ", msg: " << je.message);
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "enexpected pool txs count: " << c.get_pool_transactions_count());
 
@@ -302,7 +309,7 @@ bool wallet_rpc_transfer::c1(currency::core& c, size_t ev_index, const std::vect
   // make sure tx_received is set by default, but tx_payer is not
   pche = c.get_blockchain_storage().get_tx_chain_entry(td.tx_hash());
   //CHECK_AND_ASSERT_MES(currency::count_type_in_variant_container<tx_receiver>(pche->tx.extra) == 0, false, "tx_receiver: incorrect count of items");
-  //CHECK_AND_ASSERT_MES(currency::count_type_in_variant_container<tx_payer>(pche->tx.extra) == 1, false, "tx_payer: incorrect count of items");
+  //CHECK_AND_ASSERT_MES(currency::count_type_in_variant_container<tx_payer>(pche->tx.extra) == 1, false, "tx_payer: incorrect count of items");*/
 
 
   return true;

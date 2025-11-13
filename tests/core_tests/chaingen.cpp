@@ -2248,7 +2248,7 @@ bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name,
 
   bool r = true;
 
-#define _CHECK_BAL(v) if (!(expected_##v == INVALID_BALANCE_VAL || v == expected_##v)) { r = false; LOG_PRINT_RED_L0("invalid " #v " balance, expected: " << print_money_brief(expected_##v) << asset_id_str); }
+#define _CHECK_BAL(v) if (!(expected_##v == INVALID_BALANCE_VAL || v == expected_##v)) { r = false; LOG_PRINT_RED_L0("invalid " #v " balance, expected: " << print_money_brief(expected_##v, asset_decimal_point) << asset_id_str); }
   _CHECK_BAL(unlocked)
   _CHECK_BAL(awaiting_in)
   _CHECK_BAL(awaiting_out)
@@ -2258,7 +2258,7 @@ bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name,
 
   if (!r)
   {
-    LOG_PRINT(account_name << "'s transfers for asset_id " << asset_id << ": " << ENDL << w.dump_transfers(false, asset_id), LOG_LEVEL_0);
+    LOG_PRINT(account_name << "'s transfers" << asset_id_str << ":" << ENDL << w.dump_transfers(false, asset_id), LOG_LEVEL_0);
   }
 
   return r;

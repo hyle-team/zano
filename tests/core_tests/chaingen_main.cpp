@@ -1378,6 +1378,7 @@ int main(int argc, char* argv[])
 
     // HF6
     GENERATE_AND_PLAY(hard_fork_6_intrinsic_payment_id_basic_test);
+    GENERATE_AND_PLAY(hard_fork_6_intrinsic_payment_id_rpc_test);
 
     // atomics
     //GENERATE_AND_PLAY(atomic_simple_test);
