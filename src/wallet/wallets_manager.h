@@ -272,6 +272,7 @@ private:
 
   bool m_remote_node_mode;
   bool m_qt_logs_enbaled;
+  bool m_allow_legacy_payment_id_size;
   std::string m_qt_dev_tools;
   std::atomic<bool> m_is_pos_allowed;
   std::atomic<bool> m_use_tor;

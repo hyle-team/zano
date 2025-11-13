@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Boolberry developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -18,6 +18,7 @@
 #include "common/db_backend_selector.h"
 #include "common/pre_download.h"
 #include "wallet/wrap_service.h"
+#include "wallet_rpc_server_error_codes.h"
 
 #define GET_WALLET_OPT_BY_ID(wallet_id, name) \
   SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);    \
@@ -86,7 +87,8 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_qt_logs_enbaled(false), 
                                  m_dont_save_wallet_at_stop(false), 
                                  m_use_deffered_global_outputs(false), 
-                                 m_use_tor(true)
+                                 m_use_tor(true),
+                                 m_allow_legacy_payment_id_size(false)
 {
 #ifndef MOBILE_WALLET_BUILD
   m_offers_service.set_disabled(true);
@@ -170,11 +172,17 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   command_line::add_arg(desc_cmd_sett, command_line::arg_data_dir, tools::get_default_data_dir());
   command_line::add_arg(desc_cmd_only, command_line::arg_stop_after_height);
   command_line::add_arg(desc_cmd_only, command_line::arg_config_file);
-
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_dir);
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_level);
   command_line::add_arg(desc_cmd_sett, command_line::arg_console);
   command_line::add_arg(desc_cmd_only, command_line::arg_show_details);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_no_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_force_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_process_predownload_from_path);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
+  command_line::add_arg(desc_cmd_only, command_line::arg_deeplink);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_disable_ntp);
   
   command_line::add_arg(desc_cmd_sett, arg_alloc_win_console);
   command_line::add_arg(desc_cmd_sett, arg_sandbox_disable);
@@ -186,16 +194,9 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   command_line::add_arg(desc_cmd_sett, arg_enable_qt_logs);
   command_line::add_arg(desc_cmd_sett, arg_disable_logs_init);
   command_line::add_arg(desc_cmd_sett, arg_qt_dev_tools);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_no_predownload);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_force_predownload);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_process_predownload_from_path);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_validate_predownload);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
-  command_line::add_arg(desc_cmd_only, command_line::arg_deeplink);
-  command_line::add_arg(desc_cmd_sett, command_line::arg_disable_ntp);
   command_line::add_arg(desc_cmd_sett, arg_disable_price_fetch);
-  
 
+  
 
 #ifndef MOBILE_WALLET_BUILD
   currency::core::init_options(desc_cmd_sett);
@@ -317,6 +318,10 @@ bool wallets_manager::init(view::i_view* pview_handler)
   if (command_line::has_arg(m_vm, arg_disable_price_fetch) && command_line::get_arg(m_vm, arg_disable_price_fetch))
   {
     m_ui_opt.disable_price_fetch = true;
+  }
+  if (command_line::has_arg(m_vm, command_line::arg_allow_legacy_payment_id_size))
+  {
+    m_allow_legacy_payment_id_size = true;
   }
   
 
@@ -839,8 +844,11 @@ void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
   wo.pview = m_pview;  
   wo.has_related_alias_in_unconfirmed = false;
   wo.rpc_wrapper.reset(new tools::wallet_rpc_server(wo.w.unlocked_get()));
+  wo.rpc_wrapper->set_flag_allow_legacy_payment_id_size(m_allow_legacy_payment_id_size);
   if (m_remote_node_mode)
+  {
     wo.core_conf = currency::get_default_core_runtime_config();
+  }
   else
   {
 #ifndef MOBILE_WALLET_BUILD
