@@ -6556,8 +6556,14 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     CHECK_AND_ASSERT_MES(el.type() != typeid(tx_payer),         false, "tx contains tx_payer which is not allowed after HF6");
     CHECK_AND_ASSERT_MES(el.type() != typeid(tx_payer_old),     false, "tx contains tx_payer_old which is not allowed after HF6");
     CHECK_AND_ASSERT_MES(el.type() != typeid(tx_receiver),      false, "tx contains tx_receiver which is not allowed after HF6");
-    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_receiver_old),  false, "tx contains tx_ptx_receiver_oldayer which is not allowed after HF6");
+    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_receiver_old),  false, "tx contains tx_receiver_old which is not allowed after HF6");
     return true;
+  };
+
+  auto is_allowed_atfer_hardfork6_attachment = [&](const auto& el) -> bool
+  {
+    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_comment),       false, "tx contains tx_comment in attachment which is not allowed after HF6");
+    return is_allowed_after_hardfork6(el);
   };
   
   //inputs
@@ -6617,7 +6623,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       return false;
     if (var_is_after_hardfork_4_zone && !is_allowed_after_hardfork4(el))
       return false;
-    if (var_is_after_hardfork_6_zone && !is_allowed_after_hardfork6(el))
+    if (var_is_after_hardfork_6_zone && !is_allowed_atfer_hardfork6_attachment(el))
       return false;
   }
   
