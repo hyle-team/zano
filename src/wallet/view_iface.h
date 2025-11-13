@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Boolberry developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -49,23 +49,15 @@ namespace view
     uint64_t wallet_id;
     std::list<transfer_destination> destinations;
     uint64_t mixin_count;
-    uint64_t lock_time;
-    std::string payment_id;
     std::string comment;
     uint64_t fee;
-    bool push_payer;
-    bool hide_receiver;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(wallet_id)
       KV_SERIALIZE(destinations)
       KV_SERIALIZE(mixin_count)
-      KV_SERIALIZE(lock_time)
-      KV_SERIALIZE(payment_id)
       KV_SERIALIZE(comment)
       KV_SERIALIZE(fee)
-      KV_SERIALIZE(push_payer)
-      KV_SERIALIZE(hide_receiver)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -347,7 +339,7 @@ public:
 
   struct transfer_event_info
   {
-    tools::wallet_public::wallet_transfer_info ti;
+    tools::wallet_public::wallet_transfer_info_v2 ti;
     std::list<tools::wallet_public::asset_balance_entry> balances; 
 		uint64_t total_mined;
     uint64_t wallet_id;
@@ -364,8 +356,8 @@ public:
 
   struct transfers_array
   {
-    std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
-    std::vector<tools::wallet_public::wallet_transfer_info> history;
+    std::vector<tools::wallet_public::wallet_transfer_info_v2> unconfirmed;
+    std::vector<tools::wallet_public::wallet_transfer_info_v2> history;
     uint64_t total_history_items;
     uint64_t last_item_index;
 
@@ -835,4 +827,4 @@ public:
     virtual bool update_tor_status(const current_action_status & opt) { return true; }
   };
 
-}
+} // namespace view
