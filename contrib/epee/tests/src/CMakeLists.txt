@@ -54,30 +54,6 @@ target_link_libraries(tests PRIVATE
   ${OPENSSL_LIBS}
 )
 
-add_executable(socks5_probe
-  net/test_http_socks5.cpp
-  net/test_http_socks5_main.cpp
-)
-
-target_include_directories(socks5_probe PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../include
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../../
-  ${Boost_INCLUDE_DIRS}
-)
-
-if (MSVC)
-  target_compile_features(socks5_probe PRIVATE cxx_std_17)
-else()
-  target_compile_options(socks5_probe PRIVATE -std=gnu++17 -Wno-error=comment)
-endif()
-
-target_link_libraries(socks5_probe PRIVATE
-  zlibstatic
-  ${Boost_LIBRARIES}
-  Threads::Threads
-  ${OPENSSL_LIBS}
-)
-
 add_executable(levin_socks5_probe
   net/test_levin_socks5.cpp
   net/test_levin_socks5_main.cpp
