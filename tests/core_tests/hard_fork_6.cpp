@@ -377,7 +377,7 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   currency::core_rpc_server::init_options(core_desc_options);
   tools::wallet_rpc_server::init_options(wallet_desc_options);
   boost::program_options::variables_map vm_empty, vm_allow_legacy_pid_size_core, vm_allow_legacy_pid_size_wallet;
-  const char* const argv_c[] = {"", "--allow-legacy-payment-id-size"};
+  const char* const argv_c[] = {"", "--allow-legacy-payment-id-size", "--rpc-bind-port=0"};
   boost::program_options::store(boost::program_options::parse_command_line(sizeof argv_c / sizeof argv_c[0], argv_c, core_desc_options), vm_allow_legacy_pid_size_core);
   const char* const argv_w[] = {"", "--allow-legacy-payment-id-size", "--rpc-bind-port=0"};
   boost::program_options::store(boost::program_options::parse_command_line(sizeof argv_w / sizeof argv_w[0], argv_w, wallet_desc_options), vm_allow_legacy_pid_size_wallet);
