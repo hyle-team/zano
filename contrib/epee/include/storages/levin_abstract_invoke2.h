@@ -27,6 +27,7 @@
 
 #pragma once
 
+#include <type_traits>
 #include "portable_storage_template_helper.h"
 #include <boost/utility/value_init.hpp>
 #include "net/levin_base.h"
@@ -178,11 +179,33 @@ namespace epee
     }
     //----------------------------------------------------------------------------------------------------
     //----------------------------------------------------------------------------------------------------
+
+
+      template<typename, typename = void>
+      struct has_static_portable_storage_limits : std::false_type {};
+
+      template<typename T>
+      struct has_static_portable_storage_limits<T, std::void_t<decltype(T::local_portable_storage_limits)>> : std::true_type {};
+
+
+    //----------------------------------------------------------------------------------------------------
+    //----------------------------------------------------------------------------------------------------
     template<class t_owner, class t_in_type, class t_out_type, class t_context, class callback_t>
     int buff_to_t_adapter(int command, const std::string& in_buff, std::string& buff_out, callback_t cb, t_context& context )
     {
+
+      //get portable storage limits
+      const epee::serialization::portable_storage_limits& limits =
+        []() -> const epee::serialization::portable_storage_limits& {
+        if constexpr (has_static_portable_storage_limits<t_owner>::value)
+          return t_owner::local_portable_storage_limits;
+        else
+          return epee::serialization::gdefault_portable_storage_limits;
+        }();
+
+
       serialization::portable_storage strg;
-      if(!strg.load_from_binary(in_buff))
+      if(!strg.load_from_binary(in_buff, limits))
       {
         LOG_ERROR("Failed to load_from_binary in command " << command);
         return LEVIN_ERROR_FORMAT;
@@ -271,7 +294,7 @@ namespace epee
 
 #define HANDLE_INVOKE_T2(COMMAND, func) \
   if(!is_notify && COMMAND::ID == command) \
-  {handled=true;return epee::net_utils::buff_to_t_adapter<internal_owner_type_name, typename COMMAND::request, typename COMMAND::response>(command, in_buff, buff_out, boost::bind(func, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4), context);}
+  {handled=true; LOG_PRINT_YELLOW("HANDLE_INVOKE[" << #COMMAND << "]",LOG_LEVEL_2); return epee::net_utils::buff_to_t_adapter<internal_owner_type_name, typename COMMAND::request, typename COMMAND::response>(command, in_buff, buff_out, boost::bind(func, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3, boost::placeholders::_4), context);}
 
 
 #define HANDLE_NOTIFY2(command_id, func, type_name_in) \
@@ -280,7 +303,7 @@ namespace epee
 
 #define HANDLE_NOTIFY_T2(NOTIFY, func) \
   if(is_notify && NOTIFY::ID == command) \
-  {handled=true;return epee::net_utils::buff_to_t_adapter<internal_owner_type_name, typename NOTIFY::request>(this, command, in_buff, boost::bind(func, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3), context);}
+  {handled=true; LOG_PRINT_YELLOW("HANDLE_NOTIFY[" << #NOTIFY << "]", LOG_LEVEL_2); return epee::net_utils::buff_to_t_adapter<internal_owner_type_name, typename NOTIFY::request>(this, command, in_buff, boost::bind(func, this, boost::placeholders::_1, boost::placeholders::_2, boost::placeholders::_3), context);}
 
 
 #define CHAIN_INVOKE_MAP2(func) \
