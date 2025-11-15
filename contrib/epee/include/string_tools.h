@@ -792,6 +792,35 @@ POP_GCC_WARNINGS
 		return buff;	
 	}
 #endif
+
+
+	// yes, it's chatgpt-generated function, no shame in this
+	//
+  inline std::string format_bytes(uint64_t bytes, int decimals = 1)
+  {
+    static const std::array<const char*, 7> units = {
+        "B", "KB", "MB", "GB", "TB", "PB", "EB"
+    };
+
+    if (bytes == 0)
+      return "0 B";
+
+    double value = static_cast<double>(bytes);
+    std::size_t idx = 0;
+
+    while (value >= 1024.0 && idx + 1 < units.size()) {
+      value /= 1024.0;
+      ++idx;
+    }
+
+    // build format string like "%.1f %s" or "%.0f %s"
+    char buf[64];
+    const char* fmt = (decimals > 0) ? "%.1f %s" : "%.0f %s";
+
+    std::snprintf(buf, sizeof(buf), fmt, value, units[idx]);
+    return std::string(buf);
+  }
+
 } // namespace stringtools
 } // namwspace epee
 

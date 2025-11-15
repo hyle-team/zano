@@ -70,6 +70,105 @@ void test_tx_json_serialization()
   std::string json_tx = currency::obj_to_json_str(tx);
 }
 
+
+struct HeapSnapshot {
+  _CrtMemState state{};
+  explicit HeapSnapshot(bool take_now = false) {
+    if (take_now) take();
+  }
+  void take() {
+    _CrtMemCheckpoint(&state);
+  }
+};
+
+static const char* formatBytes(long bytes, char* buf, size_t bufSize) {
+  const char* suffixes[] = { "B", "K", "M", "G" };
+  double value = static_cast<double>(bytes);
+  int suffix = 0;
+  while (value >= 1024.0 && suffix < 3) {
+    value /= 1024.0;
+    ++suffix;
+  }
+  std::snprintf(buf, bufSize, "%.1f%s", value, suffixes[suffix]);
+  return buf;
+}
+
+static void printStats(const char* label, const _CrtMemState& s) {
+  char b1[32], b2[32], b3[32], b4[32], b5[32];
+  std::printf(
+    "%s:\n"
+    "  Bytes (normal): %s\n"
+    "  Bytes (CRT):    %s\n",
+    label,
+    formatBytes(s.lSizes[_NORMAL_BLOCK], b1, sizeof(b1)),
+    formatBytes(s.lSizes[_CRT_BLOCK], b2, sizeof(b2))
+  );
+}
+
+static void printDiff(const HeapSnapshot& a, const HeapSnapshot& b, const char* label = "Diff A->B") {
+  _CrtMemState diff{};
+  if (_CrtMemDifference(&diff, &a.state, &b.state)) {
+    printStats(label, diff);
+    std::puts("  (Positive bytes/blocks mean growth between A and B.)");
+  }
+  else {
+    std::puts("No detectable heap difference between snapshots.");
+  }
+}
+
+
+void populate_storate(epee::serialization::portable_storage& ps, epee::serialization::portable_storage::hsection h_sec, size_t recursion_count)
+{
+  recursion_count++;
+  if (recursion_count > 8)
+    return;
+
+  epee::serialization::portable_storage::hsection h_child = nullptr;
+  auto h_array = ps.insert_first_section("n", h_child, h_sec);
+  populate_storate(ps, h_child, recursion_count);
+  for (size_t i = 0; i != recursion_count+1; i++)
+  {
+    ps.insert_next_section(h_array, h_child);
+    populate_storate(ps, h_child, recursion_count);
+  }
+}
+
+
+void storage_test()
+{
+  int flags = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
+  flags |= _CRTDBG_ALLOC_MEM_DF;   // Turn on debug heap
+  flags |= _CRTDBG_LEAK_CHECK_DF;  // Report leaks at process exit
+  _CrtSetDbgFlag(flags);
+
+  HeapSnapshot A(true);
+
+  epee::serialization::portable_storage ps;
+  size_t recursion_counter = 0;
+  populate_storate(ps, nullptr, recursion_counter);
+  
+  
+  
+  HeapSnapshot B(true);  // Snapshot at point B
+  printDiff(A, B, "Delta (B - A)");
+
+  {
+    std::string buff;
+    ps.store_to_binary(buff);
+    char b1[32];
+    formatBytes(buff.size(), b1, sizeof(b1));
+    std::printf("storage_buffer: %s:\n", b1);
+
+
+
+    epee::serialization::portable_storage ps2;
+    ps2.load_from_binary(buff);
+  }
+
+
+
+}
+
 void test_plain_wallet()
 {
   //std::string res = plain_wallet::init("195.201.107.230", "33340", "C:\\Users\\roky\\home\\", 0);
@@ -267,9 +366,11 @@ int main(int argc, char** argv)
   //multithread_test_of_get_coinbase_hash_cached();
   //test_tx_json_serialization();
   //test_base64_serialization();
-  test_plain_wallet();
+  //test_plain_wallet();
   //parse_weird_tx();
   //thread_pool_tests();
+
+  storage_test();
 
 //   std::string buf1 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX);
 //   std::string buf2 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX);
