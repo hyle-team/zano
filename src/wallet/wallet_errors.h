@@ -593,6 +593,28 @@ namespace tools
       std::string m_message;
     };
     //----------------------------------------------------------------------------------------------------
+    struct tx_has_too_many_outs : public transfer_error
+    {
+      explicit tx_has_too_many_outs(std::string&& loc, const std::string& message)
+        : transfer_error(std::move(loc), API_RETURN_CODE_TX_HAS_TOO_MANY_OUTPUTS)
+        , m_message(message)
+      {
+      }
+
+      const std::string get_message() const { return m_message; }
+
+      /*std::string to_string() const
+      {
+        return API_RETURN_CODE_TX_HAS_TOO_MANY_OUTPUTS;
+      }
+      virtual const char* what() const noexcept
+      {
+        return API_RETURN_CODE_TX_HAS_TOO_MANY_OUTPUTS;
+      }*/
+    private:
+      std::string m_message;
+    };
+    //----------------------------------------------------------------------------------------------------
     struct zero_destination : public transfer_error
     {
       explicit zero_destination(std::string&& loc)
