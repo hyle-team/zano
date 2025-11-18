@@ -93,7 +93,7 @@ namespace epee
           CHECK_AND_ASSERT_THROW_MES(m_owner.m_array_elements_count < m_owner.m_limits.max_array_elements_count, "Wrong blob data in portable storage: max_array_elements_count (" << m_owner.m_limits.max_array_elements_count << ") exceeded");
           CHECK_AND_ASSERT_THROW_MES(m_owner.m_sections_entries_count < m_owner.m_limits.max_sections_entries_count, "Wrong blob data in portable storage: max_sections_entries_count (" << m_owner.m_limits.max_sections_entries_count << ") exceeded");
         }
-        ~mem_limitation_guard() BOOST_NOEXCEPT_IF(false)
+        ~mem_limitation_guard() noexcept(false)
         {
           CHECK_AND_ASSERT_THROW_MES(m_counter_ref != 0, "Internal error: m_counter_ref == 0 while ~mem_limitation_guard()");
           --m_counter_ref;

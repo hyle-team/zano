@@ -794,30 +794,29 @@ POP_GCC_WARNINGS
 #endif
 
 
-	// yes, it's chatgpt-generated function, no shame in this
-	//
-  inline std::string format_bytes(uint64_t bytes, int decimals = 1)
+  inline std::string format_bytes_human_readable(uint64_t bytes, int decimals = 1, bool use_mebibytes = false, size_t base_unit = 1024)
   {
-    static const std::array<const char*, 7> units = {
-        "B", "KB", "MB", "GB", "TB", "PB", "EB"
-    };
+    static const std::array<const char*, 7> units_mb  = { "B", "KB",  "MB",  "GB",  "TB",  "PB",  "EB"  };
+    static const std::array<const char*, 7> units_mib = { "B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB" };
+
+    const auto& units = use_mebibytes ? units_mib : units_mb;
 
     if (bytes == 0)
       return "0 B";
 
     double value = static_cast<double>(bytes);
-    std::size_t idx = 0;
+    size_t units_idx = 0;
 
-    while (value >= 1024.0 && idx + 1 < units.size()) {
-      value /= 1024.0;
-      ++idx;
+    while (value >= base_unit && units_idx + 1 < units.size())
+    {
+      value /= base_unit;
+      ++units_idx;
     }
 
-    // build format string like "%.1f %s" or "%.0f %s"
     char buf[64];
-    const char* fmt = (decimals > 0) ? "%.1f %s" : "%.0f %s";
+    const char* fmt = (decimals == 1) ? "%.1f %s" : (decimals == 2 ? "%.2f %s" : "%.0f %s");
 
-    std::snprintf(buf, sizeof(buf), fmt, value, units[idx]);
+    std::snprintf(buf, sizeof buf, fmt, value, units[units_idx]);
     return std::string(buf);
   }
 

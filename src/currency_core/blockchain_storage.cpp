@@ -7084,7 +7084,7 @@ bool blockchain_storage::collect_rangeproofs_data_from_tx(const transaction& tx,
 
       // convert amount commitments for aggregation from public_key to point_t form
       // TODO: consider refactoring this ugly code
-      for (uint8_t i = 0; i != zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size(); i++)
+      for (size_t i = 0; i != zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size(); i++)
         agregated_proofs.back().amount_commitments.emplace_back(zcrp.aggregation_proof.amount_commitments_for_rp_aggregation[i]);
 
       out_index_offset += zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size();

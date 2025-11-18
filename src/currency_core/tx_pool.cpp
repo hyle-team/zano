@@ -158,21 +158,14 @@ namespace currency
 
 
     TIME_MEASURE_START_PD(validate_amount_time);
-    CHECK_AND_ASSERT_MES(tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
-    const uint64_t tx_max_allowed_outs = tx.version >= TRANSACTION_VERSION_POST_HF4 ? CURRENCY_TX_MAX_ALLOWED_OUTS : CURRENCY_TX_MAX_ALLOWED_OUTS_PRE_HF4;
-    CHECK_AND_ASSERT_MES(tx.vout.size() <= tx_max_allowed_outs, false, "transaction has too many outputs = " << tx.vout.size());
+
+    r = check_inputs_and_outputs_size(tx);
+    CHECK_AND_ASSERT_MES(r, false, "check_inputs_and_outputs_size failed, tx rejected");
 
     uint64_t tx_fee = 0;
     r = get_tx_fee(tx, tx_fee);
     CHECK_AND_ASSERT_MES(r, false, "get_tx_fee failed");
 
-    // @#@# consider removing the following
-    //if (!check_tx_balance(tx)) // TODO (performance): check_tx_balance calls get_tx_fee as well, consider refactoring -- sowle
-    //{
-    //  LOG_PRINT_L0("balance check failed for tx " << id);
-    //  tvc.m_verification_failed = true;
-    //  return false;
-    //}
     TIME_MEASURE_FINISH_PD(validate_amount_time);
 
     TIME_MEASURE_START_PD(validate_alias_time);
