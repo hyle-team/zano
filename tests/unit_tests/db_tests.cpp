@@ -1246,5 +1246,127 @@ namespace db_test
     close_contaier_test<db::mdbx_db_backend>();
   }
 
+  //////////////////////////////////////////////////////////////////////////////
+  // key_value_prefix_enum_test  (backend::enumerate_prefix)
+  //////////////////////////////////////////////////////////////////////////////
+  template<typename db_backend_t>
+  void key_value_prefix_enum_test()
+  {
+    const std::string table_name("aliases_prefix_test");
 
+    std::shared_ptr<db_backend_t> backend_ptr = std::make_shared<db_backend_t>();
+    epee::shared_recursive_mutex db_lock;
+    db::basic_db_accessor dbb(backend_ptr, db_lock);
+
+    ASSERT_TRUE(dbb.open("key_value_prefix_enum_test"));
+
+    db::container_handle tid;
+    ASSERT_TRUE(backend_ptr->open_container(table_name, tid));
+    ASSERT_TRUE(backend_ptr->begin_transaction());
+    ASSERT_TRUE(backend_ptr->clear(tid));
+    ASSERT_TRUE(backend_ptr->commit_transaction());
+
+    ASSERT_TRUE(backend_ptr->begin_transaction());
+    auto put = [&](const std::string& key, const std::string& value) {
+      bool r = backend_ptr->set(
+        tid,
+        key.data(),   key.size(),
+        value.data(), value.size()
+      );
+      ASSERT_TRUE(r);
+    };
+
+    put("alice",   "Alice");
+    put("albert",  "Albert");
+    put("alex",    "Alex");
+    put("ally",    "Ally");
+    put("bob",     "Bob");
+    put("beta",    "Beta");
+    put("charlie", "Charlie");
+
+    ASSERT_TRUE(backend_ptr->commit_transaction());
+
+    struct collect_cb : public db::i_db_callback
+    {
+      std::vector<std::string> keys;
+      std::vector<std::string> values;
+      bool continue_all = true;
+
+      virtual bool on_enum_item(uint64_t i,
+                                const void* key_data,   uint64_t key_size,
+                                const void* value_data, uint64_t value_size) override
+      {
+        keys.emplace_back(static_cast<const char*>(key_data), key_size);
+        values.emplace_back(static_cast<const char*>(value_data), value_size);
+
+        if (!continue_all)
+          return false;
+
+        return true;
+      }
+    };
+
+    const std::set<std::string> expected_al_keys = {
+      "albert", "alice", "alex", "ally"
+    };
+
+    {
+      collect_cb cb;
+      bool ok = backend_ptr->enumerate_prefix(tid, "al", /*limit=*/100, &cb);
+      ASSERT_TRUE(ok);
+
+      for (const auto& k : cb.keys)
+        ASSERT_TRUE(k.rfind("al", 0) == 0); // starts_with("al")
+
+      std::set<std::string> got_keys(cb.keys.begin(), cb.keys.end());
+      ASSERT_EQ(got_keys, expected_al_keys);
+
+      ASSERT_EQ(cb.values.size(), cb.keys.size());
+    }
+
+    {
+      collect_cb cb;
+      bool ok = backend_ptr->enumerate_prefix(tid, "al", /*limit=*/2, &cb);
+      ASSERT_TRUE(ok);
+
+      ASSERT_EQ(cb.keys.size(), 2u);
+      for (const auto& k : cb.keys)
+      {
+        ASSERT_TRUE(k.rfind("al", 0) == 0);
+        ASSERT_TRUE(expected_al_keys.count(k) == 1);
+      }
+    }
+
+    {
+      collect_cb cb;
+      bool ok = backend_ptr->enumerate_prefix(tid, "zzz", /*limit=*/10, &cb);
+      ASSERT_TRUE(ok);
+      ASSERT_TRUE(cb.keys.empty());
+      ASSERT_TRUE(cb.values.empty());
+    }
+
+    {
+      collect_cb cb;
+      cb.continue_all = false;
+
+      bool ok = backend_ptr->enumerate_prefix(tid, "al", /*limit=*/100, &cb);
+      ASSERT_TRUE(ok);
+
+      ASSERT_EQ(cb.keys.size(), 1u);
+      ASSERT_TRUE(cb.keys[0].rfind("al", 0) == 0);
+      ASSERT_TRUE(expected_al_keys.count(cb.keys[0]) == 1);
+    }
+
+    ASSERT_TRUE(dbb.close());
+  }
+
+  TEST(lmdb, key_value_prefix_enum_test)
+  {
+    key_value_prefix_enum_test<db::lmdb_db_backend>();
+  }
+
+  TEST(mdbx, key_value_prefix_enum_test)
+  {
+    key_value_prefix_enum_test<db::mdbx_db_backend>();
+  }
 } // namespace lmdb_test
