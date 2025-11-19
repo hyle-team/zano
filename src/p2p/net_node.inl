@@ -91,6 +91,7 @@ namespace nodetool
     m_config.m_net_config.connection_timeout = P2P_DEFAULT_CONNECTION_TIMEOUT;
     m_config.m_net_config.ping_connection_timeout = P2P_DEFAULT_PING_CONNECTION_TIMEOUT;
     m_config.m_net_config.send_peerlist_sz = P2P_DEFAULT_PEERS_IN_HANDSHAKE;
+    m_config.m_net_config.default_max_inc_count = P2P_DEFAULT_MAX_INCOMING_CONNECTIONS_COUNT;
 
     m_first_connection_maker_call = true;
     CATCH_ENTRY_L0("node_server::init_config", false);
@@ -113,8 +114,18 @@ namespace nodetool
 
     if (is_incoming)
     {
-      if (m_p2p_manual_config.incoming_connections_limit && *m_p2p_manual_config.incoming_connections_limit >= get_incoming_connections_count())
-        return false;
+      size_t conn_count = get_incoming_connections_count();
+
+      if (m_p2p_manual_config.incoming_connections_limit)
+      {
+        if (conn_count >= *m_p2p_manual_config.incoming_connections_limit)
+          return false;
+      }
+      else
+      {
+        if (conn_count >= m_config.m_net_config.default_max_inc_count)
+          return false;        
+      }
 
       if (m_use_only_priority_peers)
         return false;

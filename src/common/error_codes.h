@@ -47,3 +47,4 @@
 #define API_RETURN_CODE_WRAP                                    "WRAP"
 #define API_RETURN_CODE_MISSING_ZC_INPUTS                       "MISSING_ZC_INPUTS"
 #define API_RETURN_CODE_ARG_OUT_OF_LIMITS                       "ARG_OUT_OF_LIMITS"
+#define API_RETURN_CODE_TX_HAS_TOO_MANY_OUTPUTS                 "TX_HAS_TOO_MANY_OUTPUTS"

@@ -922,10 +922,21 @@ bool MainWindow::init_ipc_server()
 }
 
 
-bool MainWindow::handle_ipc_event(const std::string& arguments)
+bool MainWindow::handle_ipc_event(const std::string& arguments_)
 {
+  std::string arguments = arguments_;
   std::string zzz = std::string("Received IPC: ") + arguments.c_str();
   std::cout << zzz;//message_box(zzz.c_str());
+  
+  const std::string prefix = "zano://";
+  const std::string target = "zano:";
+
+  // check if it starts with zano://
+  if (arguments.rfind(prefix, 0) == 0) {
+    // erase the extra slashes after "zano:"
+    arguments.replace(0, prefix.size(), target);
+  }
+
 
   handle_deeplink_click(arguments.c_str());
 
