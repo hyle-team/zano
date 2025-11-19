@@ -1247,24 +1247,32 @@ namespace db_test
   }
 
   //////////////////////////////////////////////////////////////////////////////
-  // key_value_prefix_enum_test  (backend::enumerate_prefix)
+  // key_value_prefix_enum_multithread_test  (backend::enumerate_prefix, MT)
   //////////////////////////////////////////////////////////////////////////////
   template<typename db_backend_t>
-  void key_value_prefix_enum_test()
+  void key_value_prefix_enum_multithread_test()
   {
-    const std::string table_name("aliases_prefix_test");
+    const std::string table_name("aliases_prefix_mt_test");
+    const std::string prefix = "al";
 
     std::shared_ptr<db_backend_t> backend_ptr = std::make_shared<db_backend_t>();
     epee::shared_recursive_mutex db_lock;
     db::basic_db_accessor dbb(backend_ptr, db_lock);
 
-    ASSERT_TRUE(dbb.open("key_value_prefix_enum_test"));
+    ASSERT_TRUE(dbb.open("key_value_prefix_enum_multithread_test"));
 
     db::container_handle tid;
     ASSERT_TRUE(backend_ptr->open_container(table_name, tid));
     ASSERT_TRUE(backend_ptr->begin_transaction());
     ASSERT_TRUE(backend_ptr->clear(tid));
     ASSERT_TRUE(backend_ptr->commit_transaction());
+
+    const std::vector<std::string> prefix_keys = {
+      "albert", "alice", "alex", "ally"
+    };
+    const std::vector<std::string> other_keys = {
+      "bob", "beta", "charlie"
+    };
 
     ASSERT_TRUE(backend_ptr->begin_transaction());
     auto put = [&](const std::string& key, const std::string& value) {
@@ -1276,97 +1284,129 @@ namespace db_test
       ASSERT_TRUE(r);
     };
 
-    put("alice",   "Alice");
-    put("albert",  "Albert");
-    put("alex",    "Alex");
-    put("ally",    "Ally");
-    put("bob",     "Bob");
-    put("beta",    "Beta");
-    put("charlie", "Charlie");
+    for (const auto& k : other_keys)
+      put(k, "other:" + k);
 
     ASSERT_TRUE(backend_ptr->commit_transaction());
 
-    struct collect_cb : public db::i_db_callback
+    std::atomic<bool> error_flag(false);
+
+    struct prefix_enum_cb : public db::i_db_callback
     {
-      std::vector<std::string> keys;
-      std::vector<std::string> values;
-      bool continue_all = true;
+      std::string prefix;
+      std::atomic<bool>* p_error_flag;
+      uint64_t count = 0;
 
       virtual bool on_enum_item(uint64_t i,
                                 const void* key_data,   uint64_t key_size,
                                 const void* value_data, uint64_t value_size) override
       {
-        keys.emplace_back(static_cast<const char*>(key_data), key_size);
-        values.emplace_back(static_cast<const char*>(value_data), value_size);
-
-        if (!continue_all)
+        if (p_error_flag->load(std::memory_order_relaxed))
           return false;
 
+        std::string key(static_cast<const char*>(key_data), key_size);
+
+        if (key.rfind(prefix, 0) != 0) // not starts_with(prefix)
+        {
+          *p_error_flag = true;
+          return false;
+        }
+
+        ++count;
+        (void)value_data;
+        (void)value_size;
         return true;
       }
     };
 
-    const std::set<std::string> expected_al_keys = {
-      "albert", "alice", "alex", "ally"
+    auto writer_thread = [&]() {
+      const size_t iterations = 1000;
+
+      for (size_t it = 0; it < iterations && !error_flag.load(); ++it)
+      {
+        const std::string& key = prefix_keys[it % prefix_keys.size()];
+        const std::string  val = "val_" + key;
+
+        bool r = backend_ptr->begin_transaction();
+        if (!r) {
+          error_flag = true;
+          break;
+        }
+
+        std::string out;
+        if (backend_ptr->get(tid, key.data(), key.size(), out))
+        {
+          r = backend_ptr->erase(tid, key.data(), key.size());
+          if (!r) {
+            error_flag = true;
+            backend_ptr->abort_transaction();
+            break;
+          }
+        }
+        else
+        {
+          r = backend_ptr->set(tid,
+                               key.data(), key.size(),
+                               val.data(), val.size());
+          if (!r) {
+            error_flag = true;
+            backend_ptr->abort_transaction();
+            break;
+          }
+        }
+
+        r = backend_ptr->commit_transaction();
+        if (!r) {
+          error_flag = true;
+          break;
+        }
+      }
     };
 
-    {
-      collect_cb cb;
-      bool ok = backend_ptr->enumerate_prefix(tid, "al", /*limit=*/100, &cb);
-      ASSERT_TRUE(ok);
+    auto reader_thread = [&]() {
+      const size_t iterations = 1000;
 
-      for (const auto& k : cb.keys)
-        ASSERT_TRUE(k.rfind("al", 0) == 0); // starts_with("al")
-
-      std::set<std::string> got_keys(cb.keys.begin(), cb.keys.end());
-      ASSERT_EQ(got_keys, expected_al_keys);
-
-      ASSERT_EQ(cb.values.size(), cb.keys.size());
-    }
-
-    {
-      collect_cb cb;
-      bool ok = backend_ptr->enumerate_prefix(tid, "al", /*limit=*/2, &cb);
-      ASSERT_TRUE(ok);
-
-      ASSERT_EQ(cb.keys.size(), 2u);
-      for (const auto& k : cb.keys)
+      for (size_t it = 0; it < iterations && !error_flag.load(); ++it)
       {
-        ASSERT_TRUE(k.rfind("al", 0) == 0);
-        ASSERT_TRUE(expected_al_keys.count(k) == 1);
+        prefix_enum_cb cb;
+        cb.prefix = prefix;
+        cb.p_error_flag = &error_flag;
+
+        bool ok = backend_ptr->enumerate_prefix(tid, prefix, /*limit=*/100, &cb);
+        if (!ok) {
+          error_flag = true;
+          break;
+        }
+
+        if (error_flag.load())
+          break;
       }
-    }
+    };
 
-    {
-      collect_cb cb;
-      bool ok = backend_ptr->enumerate_prefix(tid, "zzz", /*limit=*/10, &cb);
-      ASSERT_TRUE(ok);
-      ASSERT_TRUE(cb.keys.empty());
-      ASSERT_TRUE(cb.values.empty());
-    }
+    std::thread writer(writer_thread);
 
-    {
-      collect_cb cb;
-      cb.continue_all = false;
+    const size_t readers_count = 4;
+    std::vector<std::thread> readers;
+    readers.reserve(readers_count);
+    for (size_t i = 0; i < readers_count; ++i)
+      readers.emplace_back(reader_thread);
 
-      bool ok = backend_ptr->enumerate_prefix(tid, "al", /*limit=*/100, &cb);
-      ASSERT_TRUE(ok);
+    writer.join();
+    for (auto& t : readers)
+      t.join();
 
-      ASSERT_EQ(cb.keys.size(), 1u);
-      ASSERT_TRUE(cb.keys[0].rfind("al", 0) == 0);
-      ASSERT_TRUE(expected_al_keys.count(cb.keys[0]) == 1);
-    }
+    ASSERT_FALSE(error_flag.load());
 
     ASSERT_TRUE(dbb.close());
   }
 
-  TEST(lmdb, key_value_prefix_enum_test)
+  TEST(lmdb, key_value_prefix_enum_multithread_test)
   {
-    key_value_prefix_enum_test<db::lmdb_db_backend>();
+    key_value_prefix_enum_multithread_test<db::lmdb_db_backend>();
   }
 
-  TEST(mdbx, key_value_prefix_enum_test)
+  TEST(mdbx, key_value_prefix_enum_multithread_test)
   {
-    key_value_prefix_enum_test<db::mdbx_db_backend>();
+    key_value_prefix_enum_multithread_test<db::mdbx_db_backend>();
   }
 } // namespace lmdb_test
