@@ -1267,15 +1267,12 @@ namespace db_test
     ASSERT_TRUE(backend_ptr->clear(tid));
     ASSERT_TRUE(backend_ptr->commit_transaction());
 
-    const std::vector<std::string> prefix_keys = {
-      "albert", "alice", "alex", "ally"
-    };
-    const std::vector<std::string> other_keys = {
-      "bob", "beta", "charlie"
-    };
+    const std::vector<std::string> prefix_keys = { "albert", "alice", "alex", "ally" };
+    const std::vector<std::string> other_keys = { "bob", "beta", "charlie" };
 
     ASSERT_TRUE(backend_ptr->begin_transaction());
-    auto put = [&](const std::string& key, const std::string& value) {
+    auto put = [&](const std::string& key, const std::string& value)
+    {
       bool r = backend_ptr->set(
         tid,
         key.data(),   key.size(),
@@ -1297,9 +1294,7 @@ namespace db_test
       std::atomic<bool>* p_error_flag;
       uint64_t count = 0;
 
-      virtual bool on_enum_item(uint64_t i,
-                                const void* key_data,   uint64_t key_size,
-                                const void* value_data, uint64_t value_size) override
+      virtual bool on_enum_item(uint64_t i, const void* key_data, uint64_t key_size, const void* value_data, uint64_t value_size) override
       {
         if (p_error_flag->load(std::memory_order_relaxed))
           return false;
@@ -1319,7 +1314,8 @@ namespace db_test
       }
     };
 
-    auto writer_thread = [&]() {
+    auto writer_thread = [&]()
+    {
       const size_t iterations = 1000;
 
       for (size_t it = 0; it < iterations && !error_flag.load(); ++it)
@@ -1328,7 +1324,8 @@ namespace db_test
         const std::string  val = "val_" + key;
 
         bool r = backend_ptr->begin_transaction();
-        if (!r) {
+        if (!r)
+        {
           error_flag = true;
           break;
         }
@@ -1337,7 +1334,8 @@ namespace db_test
         if (backend_ptr->get(tid, key.data(), key.size(), out))
         {
           r = backend_ptr->erase(tid, key.data(), key.size());
-          if (!r) {
+          if (!r)
+          {
             error_flag = true;
             backend_ptr->abort_transaction();
             break;
@@ -1345,10 +1343,9 @@ namespace db_test
         }
         else
         {
-          r = backend_ptr->set(tid,
-                               key.data(), key.size(),
-                               val.data(), val.size());
-          if (!r) {
+          r = backend_ptr->set(tid, key.data(), key.size(), val.data(), val.size());
+          if (!r)
+          {
             error_flag = true;
             backend_ptr->abort_transaction();
             break;
@@ -1356,7 +1353,8 @@ namespace db_test
         }
 
         r = backend_ptr->commit_transaction();
-        if (!r) {
+        if (!r)
+        {
           error_flag = true;
           break;
         }
@@ -1373,7 +1371,8 @@ namespace db_test
         cb.p_error_flag = &error_flag;
 
         bool ok = backend_ptr->enumerate_prefix(tid, prefix, /*limit=*/100, &cb);
-        if (!ok) {
+        if (!ok)
+        {
           error_flag = true;
           break;
         }
