@@ -8,6 +8,7 @@
 #pragma once
 #include "include_base_utils.h"
 #include "net/http_client.h"
+#include "net/http_socks5_client.h"
 #include "core_rpc_proxy.h"
 #include "storages/http_abstract_invoke.h"
 
@@ -55,6 +56,8 @@ namespace tools
     bool call_COMMAND_RPC_GET_POOL_INFO(const currency::COMMAND_RPC_GET_POOL_INFO::request& req, currency::COMMAND_RPC_GET_POOL_INFO::response& res) override;
     bool call_COMMAND_RPC_GET_ASSET_INFO(const currency::COMMAND_RPC_GET_ASSET_INFO::request& req, currency::COMMAND_RPC_GET_ASSET_INFO::response& res) override;
     bool call_COMMAND_RPC_INVOKE(const std::string& uri, const std::string& body, int& response_code, std::string& response_body) override;
+
+    void set_block_submit_via_socks5(const tools::socks5_submit_cfg& cfg) override;
 
     bool check_connection() override;
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override;
@@ -116,6 +119,18 @@ namespace tools
         return r;
       });
     }
+    template<class t_request, class t_response>
+    inline bool invoke_http_json_rpc_with_client(epee::net_utils::http::http_universal_client& client,
+      const std::string& base_url, const std::string& method, const t_request& req, t_response& rsp)
+    {
+      return call_request([&]()
+      {
+        LOG_PRINT_L2("[INVOKE_JSON_METHOD via custom client] ---> " << method);
+        bool r = epee::net_utils::invoke_http_json_rpc(base_url + "/json_rpc", method, req, rsp, client);
+        LOG_PRINT_L2("[INVOKE_JSON_METHOD via custom client] <--- " << method);
+        return r;
+      });
+    }
     //------------------------------------------------------------------------------------------------------------------------------
     virtual time_t get_last_success_interract_time() override
     {
@@ -129,6 +144,9 @@ namespace tools
     unsigned int m_connection_timeout;
     size_t m_attempts_count;
 
+    socks5_submit_cfg m_block_submit_cfg;
+    std::unique_ptr<epee::net_utils::http::http_universal_client> m_http_client_block_submit; // http_socks5_client
+    std::string m_block_submit_base_url_;
   };
 }
 

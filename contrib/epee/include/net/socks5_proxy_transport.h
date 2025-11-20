@@ -1,121 +1,53 @@
 #pragma once
-#include <boost/asio.hpp>
-#include <cstdint>
 #include <string>
 #include <vector>
-#include <cstring>
-#include <algorithm>
+#include <cstdint>
+#include <boost/system/error_code.hpp>
+#include <boost/asio/ip/address.hpp>
 
 namespace tools {
 namespace socks5 {
 
-class socks5_proxy_transport
+template<class base_transport>
+class socks5_proxy_transport : public base_transport
 {
 public:
-  socks5_proxy_transport()
-  : io_(),
-    socket_(io_),
-    proxy_host_("127.0.0.1"),
-    proxy_port_(9050),
-    use_remote_dns_(true),
-    connection_timeout_ms_(0),
-    recv_timeout_ms_(0)
-  {}
+  socks5_proxy_transport() = default;
 
-  // proxy config
   void set_socks_proxy(const std::string& host, uint16_t port)
   {
-    proxy_host_ = host;
-    proxy_port_ = port;
+    m_proxy_host = host;
+    m_proxy_port = port;
   }
 
-  void set_use_remote_dns(bool v) { use_remote_dns_ = v; }
+  void set_use_remote_dns(bool v) { m_use_remote_dns = v; }
 
-  // connect(hostname, port, conn_tmo, recv_tmo, bind_ip)
-  bool connect(const std::string& dest_host, int dest_port, unsigned int conn_timeout_ms, unsigned int recv_timeout_ms, const std::string& bind_ip = "0.0.0.0")
+  bool connect(const std::string& dest_host, int dest_port, unsigned int connect_timeout_ms, unsigned int recv_timeout_ms,
+    const std::string& bind_ip = "0.0.0.0")
   {
-    connection_timeout_ms_ = conn_timeout_ms;
-    recv_timeout_ms_       = recv_timeout_ms;
-    return connect(dest_host, dest_port, conn_timeout_ms, bind_ip);
-  }
+    // 1) TCP connect to SOCKS5 proxy through BASE transport
+    if (!this->base_transport::connect(m_proxy_host, std::to_string(m_proxy_port), connect_timeout_ms, recv_timeout_ms, bind_ip))
+      return false;
 
-  // connect(ip, port, conn_tmo, recv_tmo, bind_ip)
-  bool connect(unsigned long ip_be, int dest_port, unsigned int conn_timeout_ms, unsigned int recv_timeout_ms, const std::string& bind_ip = "0.0.0.0")
-  {
-    connection_timeout_ms_ = conn_timeout_ms;
-    recv_timeout_ms_       = recv_timeout_ms;
-
-    // convert u_long (big-endian) to string
-    boost::asio::ip::address_v4::bytes_type b{};
-    b[0] = static_cast<unsigned char>( ip_be        & 0xFF);
-    b[1] = static_cast<unsigned char>((ip_be >> 8)  & 0xFF);
-    b[2] = static_cast<unsigned char>((ip_be >> 16) & 0xFF);
-    b[3] = static_cast<unsigned char>((ip_be >> 24) & 0xFF);
-    const auto addr = boost::asio::ip::address_v4(b).to_string();
-    return connect(addr, dest_port, conn_timeout_ms, bind_ip);
-  }
-
-  // прежний 4-арг. вариант, на него завязаны наши тесты
-  bool connect(const std::string& dest_host, int dest_port, unsigned int timeout_ms, const std::string& bind_ip = "0.0.0.0")
-  {
-    connection_timeout_ms_ = timeout_ms;
-    recv_timeout_ms_       = timeout_ms;
-
-    boost::system::error_code ec;
-
-    // 1) close previous connection
-    if (socket_.is_open())
-    {
-      boost::system::error_code ignore_ec; socket_.close(ignore_ec);
-    }
-
-    // 2) (optional) bind to local address
-    if (bind_ip != "0.0.0.0" && !bind_ip.empty())
-    {
-      boost::asio::ip::tcp::endpoint ep_local(boost::asio::ip::make_address(bind_ip, ec), 0);
-      if (!ec) socket_.open(ep_local.protocol(), ec);
-      if (!ec) socket_.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true), ec);
-      if (!ec) socket_.bind(ep_local, ec);
-
-      if (ec)
-        return false;
-    }
-    else
-    {
-      socket_.open(boost::asio::ip::tcp::v4(), ec);
-      if (ec)
-        return false;
-    }
-
-    // 3) connect к SOCKS5-proxy
-    {
-      boost::asio::ip::tcp::resolver resolver(io_);
-      auto results = resolver.resolve(proxy_host_, std::to_string(proxy_port_), ec);
-      if (ec) return false;
-
-      // just sync connect to the first valid endpoint
-      boost::asio::connect(socket_, results, ec);
-      if (ec) return false;
-    }
-
-    // 4) SOCKS5 greeting: [0x05, 0x01, 0x00] -> [0x05, 0x00]
+    // 2) SOCKS5 greeting: [0x05, 0x01, 0x00] -> [0x05, 0x00]
     {
       const unsigned char greet[] = {0x05, 0x01, 0x00};
-      if (!send(&greet[0], sizeof(greet)))
+      if (!this->base_transport::send(greet, sizeof(greet)))
         return false;
 
-      unsigned char resp[2] = {0,0};
-      if (!recv_n(resp, sizeof(resp)))
+      std::string resp;
+      if (!this->base_transport::recv_n(resp, 2))
+        return false;
+      if (resp.size() != 2)
         return false;
 
-      if (!(resp[0] == 0x05 && resp[1] == 0x00))
-      {
-        // unsupported auth
-        return false;
-      }
+      const unsigned char ver = static_cast<unsigned char>(resp[0]);
+      const unsigned char mth = static_cast<unsigned char>(resp[1]);
+      if (!(ver == 0x05 && mth == 0x00)) // 0x00 — "no authentication"
+        return false; // unsupported auth
     }
 
-    // 5) SOCKS5 CONNECT dest_host:dest_port
+    // 3) SOCKS5 CONNECT to the target host:port through the proxy
     {
       std::vector<unsigned char> req;
       req.reserve(4 + 1 + dest_host.size() + 2);
@@ -124,10 +56,12 @@ public:
       req.push_back(0x01); // CMD = CONNECT
       req.push_back(0x00); // RSV
 
-      // адрес
-      boost::system::error_code ignored;
+      // ATYP + DST.ADDR
+      boost::system::error_code ec;
       boost::asio::ip::address ip_parsed;
-      bool addr_is_ip = !use_remote_dns_ && !((ip_parsed = boost::asio::ip::make_address(dest_host, ignored)).is_unspecified());
+      const bool addr_is_ip =
+        !m_use_remote_dns &&
+        !((ip_parsed = boost::asio::ip::make_address(dest_host, ec)).is_unspecified());
 
       if (addr_is_ip && ip_parsed.is_v4())
       {
@@ -150,138 +84,90 @@ public:
         req.insert(req.end(), dest_host.begin(), dest_host.end());
       }
 
-      // port (network byte order)
+      // DST.PORT (network byte order)
       const uint16_t p = static_cast<uint16_t>(dest_port);
       req.push_back(static_cast<unsigned char>((p >> 8) & 0xFF));
-      req.push_back(static_cast<unsigned char>( p & 0xFF));
+      req.push_back(static_cast<unsigned char>( p       & 0xFF));
 
-      if (!send(req.data(), req.size()))
+      if (!this->base_transport::send(req.data(), req.size()))
         return false;
 
       // resp: VER REP RSV ATYP [BND.ADDR] [BND.PORT]
-      unsigned char head[4] = {0,0,0,0};
-      if (!recv_n(head, sizeof(head)))
+      std::string head;
+      if (!this->base_transport::recv_n(head, 4))
         return false;
-      if (head[0] != 0x05)
+      if (head.size() != 4)
         return false;
-      if (head[1] != 0x00)
-        return false; // 0x00 = succeeded
+
+      const unsigned char r_ver  = static_cast<unsigned char>(head[0]);
+      const unsigned char r_rep  = static_cast<unsigned char>(head[1]);
+      const unsigned char r_atyp = static_cast<unsigned char>(head[3]);
+
+      if (r_ver != 0x05)
+        return false;
+      if (r_rep != 0x00)
+        return false; // success
 
       size_t addr_len = 0;
-      if (head[3] == 0x01)
+      if (r_atyp == 0x01)
         addr_len = 4;
-      else if (head[3] == 0x04)
+      else if (r_atyp == 0x04)
         addr_len = 16;
-      else if (head[3] == 0x03)
+      else if (r_atyp == 0x03)
       {
-        unsigned char len = 0;
-        if (!recv_n(&len, 1))
+        std::string len_buf;
+        if (!this->base_transport::recv_n(len_buf, 1))
           return false;
-        addr_len = len;
+        if (len_buf.size() != 1)
+          return false;
+        addr_len = static_cast<unsigned char>(len_buf[0]);
       }
       else
       {
         return false;
       }
 
-      // read remaining BND.ADDR + BND.PORT (2 bytes)
-      std::vector<unsigned char> drain(addr_len + 2);
-      if (!recv_n(drain.data(), drain.size()))
+      // continue read BND.ADDR + BND.PORT (2 bytes)
+      std::string drain;
+      if (!this->base_transport::recv_n(drain, static_cast<int64_t>(addr_len + 2)))
+        return false;
+      if (drain.size() != addr_len + 2)
         return false;
     }
 
+    // on this step, we have established a TUNNEL to dest_host:dest_port
+    // TODO_SSL_HANDSHAKE: if HTTPS through SOCKS5 is ever needed,
+    // the base transport should be able to perform SSL handshake AFTER CONNECT,
+    // not immediately after TCP-connect to the proxy (see on_after_connect() in blocked_mode_client_t). :contentReference[oaicite:3]{index=3}
     return true;
+  }
+
+  bool connect(const std::string& dest_host, int dest_port, unsigned int timeout_ms, const std::string& bind_ip = "0.0.0.0")
+  {
+    return connect(dest_host, dest_port, timeout_ms, timeout_ms, bind_ip);
+  }
+
+  // u_long (BE) overload for compatibility
+  bool connect(unsigned long ip_be, int dest_port, unsigned int connect_timeout_ms, unsigned int recv_timeout_ms,
+    const std::string& bind_ip = "0.0.0.0")
+  {
+    unsigned char b0 = static_cast<unsigned char>( ip_be        & 0xFF);
+    unsigned char b1 = static_cast<unsigned char>((ip_be >> 8)  & 0xFF);
+    unsigned char b2 = static_cast<unsigned char>((ip_be >> 16) & 0xFF);
+    unsigned char b3 = static_cast<unsigned char>((ip_be >> 24) & 0xFF);
+    const std::string addr = std::to_string(b0) + "." + std::to_string(b1) + "." + std::to_string(b2) + "." + std::to_string(b3);
+    return connect(addr, dest_port, connect_timeout_ms, recv_timeout_ms, bind_ip);
   }
 
   bool connect(unsigned long ip_be, int dest_port, unsigned int timeout_ms, const std::string& bind_ip = "0.0.0.0")
   {
-    connection_timeout_ms_ = timeout_ms;
-    recv_timeout_ms_ = timeout_ms;
-
-    boost::asio::ip::address_v4::bytes_type b{};
-    b[0] = static_cast<unsigned char>( ip_be        & 0xFF);
-    b[1] = static_cast<unsigned char>((ip_be >> 8)  & 0xFF);
-    b[2] = static_cast<unsigned char>((ip_be >> 16) & 0xFF);
-    b[3] = static_cast<unsigned char>((ip_be >> 24) & 0xFF);
-    const auto addr = boost::asio::ip::address_v4(b).to_string();
-    return connect(addr, dest_port, timeout_ms, bind_ip);
+    return connect(ip_be, dest_port, timeout_ms, timeout_ms, bind_ip);
   }
-
-  bool is_connected() const { return socket_.is_open(); }
-
-  bool disconnect()
-  {
-    boost::system::error_code ec;
-    socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
-    socket_.close(ec);
-    return !ec;
-  }
-
-  bool send(const void* data, size_t cb)
-  {
-    boost::system::error_code ec;
-    boost::asio::write(socket_, boost::asio::buffer(data, cb), ec);
-    return !ec;
-  }
-
-  bool send(const std::string& s)
-  {
-    return send(s.data(), s.size());
-  }
-
-  // read "as much as available" (not necessarily needed for levin, but useful)
-  bool recv(std::string& out)
-  {
-    out.clear();
-    boost::system::error_code ec;
-    std::size_t avail = socket_.available(ec);
-    if (ec)
-      return false;
-    if (avail == 0)
-    {
-      // read at least 1 byte to avoid returning empty
-      char ch = 0;
-      std::size_t n = socket_.read_some(boost::asio::buffer(&ch, 1), ec);
-      if (ec || n == 0)
-        return false;
-      out.push_back(ch);
-      return true;
-    }
-    out.resize(avail);
-    std::size_t n = socket_.read_some(boost::asio::buffer(&out[0], out.size()), ec);
-    if (ec)
-      return false;
-    out.resize(n);
-    return true;
-  }
-
-  // exactly cb bytes
-  bool recv_n(void* data, size_t cb)
-  {
-    boost::system::error_code ec;
-    boost::asio::read(socket_, boost::asio::buffer(data, cb), ec);
-    return !ec;
-  }
-
-  // override for levin_client.inl: resize + read_exact
-  bool recv_n(std::string& buf, size_t cb)
-  {
-    buf.resize(cb);
-    return recv_n(&buf[0], cb);
-  }
-
-  boost::asio::ip::tcp::socket& get_socket() { return socket_; }
 
 private:
-  boost::asio::io_service io_;
-  boost::asio::ip::tcp::socket socket_;
-
-  std::string proxy_host_;
-  uint16_t proxy_port_;
-  bool use_remote_dns_;
-
-  unsigned int connection_timeout_ms_;
-  unsigned int recv_timeout_ms_;
+  std::string m_proxy_host = "127.0.0.1";
+  uint16_t m_proxy_port = 9050;
+  bool m_use_remote_dns = true;
 };
 
 } // namespace socks5

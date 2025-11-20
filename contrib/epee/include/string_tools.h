@@ -29,6 +29,7 @@
 #include <locale>
 #include <cstdlib>
 #include <map>
+#include <iomanip>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/lexical_cast.hpp>

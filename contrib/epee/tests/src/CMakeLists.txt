@@ -58,6 +58,10 @@ add_executable(levin_socks5_probe
   net/test_levin_socks5.cpp
   net/test_levin_socks5_main.cpp
 )
+add_executable(http_socks5_probe
+  net/test_http_socks5.cpp
+  net/test_http_socks5_main.cpp
+)
 
 target_link_libraries(levin_socks5_probe PRIVATE
   zlibstatic
@@ -68,4 +72,17 @@ target_link_libraries(levin_socks5_probe PRIVATE
 target_include_directories(levin_socks5_probe PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/../../include
   ${Boost_INCLUDE_DIRS}
+)
+
+target_include_directories(http_socks5_probe PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../include
+  ${CMAKE_CURRENT_SOURCE_DIR}/../../../
+  ${Boost_INCLUDE_DIRS}
+)
+
+target_link_libraries(http_socks5_probe PRIVATE
+  zlibstatic
+  ${Boost_LIBRARIES}
+  Threads::Threads
+  ${OPENSSL_LIBS}
 )

@@ -158,8 +158,29 @@ namespace tools
     return invoke_http_json_rpc_update_is_disconnect("submitblock", req, rsp);
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  void default_http_core_proxy::set_block_submit_via_socks5(const socks5_submit_cfg& cfg)
+  {
+    CRITICAL_REGION_LOCAL(m_lock);
+    m_block_submit_cfg = cfg;
+    m_http_client_block_submit.reset();
+
+    if (!cfg.enabled)
+      return;
+
+    m_http_client_block_submit.reset(new epee::net_utils::http::http_socks5_client(cfg.proxy_host, cfg.proxy_port));
+
+    m_block_submit_base_url_ = cfg.submit_base_url_override.empty() ? m_daemon_address : cfg.submit_base_url_override;
+    // TODO: https over socks5
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::call_COMMAND_RPC_SUBMITBLOCK2(const currency::COMMAND_RPC_SUBMITBLOCK2::request& req, currency::COMMAND_RPC_SUBMITBLOCK2::response& rsp)
   {
+    if (m_block_submit_cfg.enabled && m_http_client_block_submit)
+    {
+      return invoke_http_json_rpc_with_client(*m_http_client_block_submit, m_block_submit_base_url_,
+        "submitblock2", req, rsp);
+    }
+
     return invoke_http_json_rpc_update_is_disconnect("submitblock2", req, rsp);
   }
   //------------------------------------------------------------------------------------------------------------------------------

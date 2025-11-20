@@ -14,7 +14,7 @@
 #include <boost/serialization/shared_ptr.hpp>
 #include <boost/serialization/optional.hpp>
 #include <atomic>
-
+#include <type_traits>
 
 #include "include_base_utils.h"
 #include "profile_tools.h"
@@ -152,6 +152,17 @@ namespace tools
     std::list<std::pair<uint64_t, wallet_event_t>> m_rollback_events;
     std::list<std::pair<uint64_t, uint64_t> > m_last_zc_global_indexs; // <height, last_zc_global_indexs>, biggest height comes in front
    
+    struct socks5_relay_config
+    {
+      bool        enable_proxy        = false;
+      std::string ip                  = "127.0.0.1";
+      uint16_t    port                = 9050;
+      bool        use_remote_dns      = true;
+      unsigned    connect_timeout_ms  = 15000;
+      unsigned    recv_timeout_ms     = 15000;
+
+      void clear() { *this = socks5_relay_config(); }
+    };
 
     //variables that not being serialized
     std::atomic<uint64_t> m_last_bc_timestamp = 0;
@@ -593,6 +604,14 @@ namespace tools
       add_transfers_to_transfers_cache(tids);
     }
 
+    // SOCKS5 relay API (runtime)
+    void configure_socks_relay(const socks5_relay_config& cfg);
+    bool configure_socks_relay(const std::string& addr_port); // "ip:port"
+    void disable_socks_relay();
+    const socks5_relay_config& get_socks5_relay_config() const;
+    template <class transport_t>
+    void apply_socks_relay_to(transport_t& tr) const;
+
     // PoS mining
     void do_pos_mining_prepare_entry(mining_context& cxt, const transfer_details& td);
     bool do_pos_mining_iteration(mining_context& cxt, uint64_t ts);
@@ -944,8 +963,10 @@ private:
     void wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
     void wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
     void wti_to_json_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
+    
+    bool send_block_via_socks5(const currency::block& bl);
 
-
+    
 
     /*     
      
@@ -993,6 +1014,9 @@ private:
     bool m_use_deffered_global_outputs;
     bool m_disable_tor_relay;
     mutable current_operation_context m_current_context;
+
+    socks5_relay_config m_socks5_relay_cfg{};
+    socks5_relay_config m_block_socks5_relay_cfg{};
 
     std::string m_votes_config_path;
     tools::wallet_public::wallet_vote_config m_votes_config;
@@ -1270,8 +1294,51 @@ namespace tools
       if (!cb(el.second))
         break;
   }
+namespace detail
+{
+  // set_socks_proxy(host, port)
+  template<class T>
+  inline auto try_set_socks_proxy(T& tr, const std::string& host, uint16_t port, int)
+    -> decltype(tr.set_socks_proxy(std::string(), uint16_t()), void())
+  {
+    tr.set_socks_proxy(host, port);
+  }
+  template<class T>
+  inline void try_set_socks_proxy(T&, const std::string&, uint16_t, long) {}
 
+  // set_use_remote_dns(bool)
+  template<class T>
+  inline auto try_set_use_remote_dns(T& tr, bool v, int)
+    -> decltype(tr.set_use_remote_dns(bool()), void())
+  {
+    tr.set_use_remote_dns(v);
+  }
+  template<class T>
+  inline void try_set_use_remote_dns(T&, bool, long) {}
+
+  // set_timeouts(connect_ms, recv_ms)
+  template<class T>
+  inline auto try_set_timeouts(T& tr, unsigned conn_ms, unsigned recv_ms, int)
+    -> decltype(tr.set_timeouts(unsigned(), unsigned()), void())
+  {
+    tr.set_timeouts(conn_ms, recv_ms);
+  }
+  template<class T>
+  inline void try_set_timeouts(T&, unsigned, unsigned, long) {}
+} // namespace detail
+
+template <class transport_t>
+inline void wallet2::apply_socks_relay_to(transport_t& tr) const
+{
+  if (!m_socks5_relay_cfg.enable_proxy)
+    return;
+  detail::try_set_socks_proxy   (tr, m_socks5_relay_cfg.ip,   m_socks5_relay_cfg.port, 0);
+  detail::try_set_use_remote_dns(tr, m_socks5_relay_cfg.use_remote_dns,                0);
+  detail::try_set_timeouts      (tr, m_socks5_relay_cfg.connect_timeout_ms,
+                                     m_socks5_relay_cfg.recv_timeout_ms,               0);
+}
 } // namespace tools
+
 
 #if !defined(KEEP_WALLET_LOG_MACROS)
 #undef WLT_LOG

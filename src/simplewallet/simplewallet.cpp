@@ -143,6 +143,9 @@ namespace
   const command_line::arg_descriptor<bool>          arg_seed_doctor("seed-doctor", "Experimental: if your seed is not working for recovery this is likely because you've made a mistake whene you were doing back up(typo, wrong words order, missing word). This experimental code will attempt to recover seed phrase from with few approaches.");
   const command_line::arg_descriptor<bool>          arg_no_whitelist("no-white-list", "Do not load white list from interned.");
   const command_line::arg_descriptor<std::string>   arg_restore_ki_in_wo_wallet("restore-ki-in-wo-wallet", "Watch-only missing key images restoration. Please, DON'T use it unless you 100% sure of what are you doing.", "");
+  const command_line::arg_descriptor<std::string>   arg_enable_tx_socks5_relay_proxy("enable-tx-socks5-relay-proxy", "Enable SOCKS5 relay proxy for Transactions", "");
+  const command_line::arg_descriptor<std::string>   arg_enable_block_socks5_relay_proxy("enable-block-socks5-relay-proxy", "Enable SOCKS5 relay proxy for Blocks", "");
+  const command_line::arg_descriptor<std::string>   arg_block_relay_url("block-relay-url", "Override base URL used to submit PoS blocks when --enable-block-socks5-relay-proxy is set (e.g. http://37.27.100.59:10505)", "");
   const command_line::arg_descriptor<bool>          arg_no_idle_unlock_spent("no-idle-unlock-utxo", "Do not unlock utxo that looks like it should be unlocked(marked as spent but no unconfirmed tx that spends it).");
 
 
@@ -429,6 +432,58 @@ void process_wallet_command_line_params(const po::variables_map& vm, tools::wall
     wal.set_votes_config_path(command_line::get_arg(vm, arg_voting_config_file));
   }
 
+  if (command_line::has_arg(vm, arg_enable_tx_socks5_relay_proxy))
+  {
+    std::string socks5_addr = command_line::get_arg(vm, arg_enable_tx_socks5_relay_proxy);
+    if (!socks5_addr.empty())
+    {
+      if (wal.configure_socks_relay(socks5_addr))
+      {
+        message_writer(epee::log_space::console_color_default, true, std::string(), LOG_LEVEL_0) 
+          << "SOCKS5 transaction relay proxy configured: " << socks5_addr;
+      }
+      else
+      {
+        LOG_ERROR("Failed to configure SOCKS5 transaction relay proxy: " << socks5_addr);
+      }
+    }
+  }
+
+  {
+    tools::socks5_submit_cfg blocks_socks_cfg{};
+
+    const auto brp = command_line::get_arg(vm, arg_enable_block_socks5_relay_proxy);
+    if (!brp.empty())
+    {
+      auto pos = brp.find(':');
+      if (pos != std::string::npos)
+      {
+        blocks_socks_cfg.enabled    = true;
+        blocks_socks_cfg.proxy_host = brp.substr(0, pos);
+        blocks_socks_cfg.proxy_port = static_cast<uint16_t>(std::stoi(brp.substr(pos + 1)));
+      }
+      else
+      {
+        LOG_PRINT_L0("Invalid value for --enable-block-socks5-relay-proxy, expected host:port");
+      }
+    }
+
+    const auto relay_url = command_line::get_arg(vm, arg_block_relay_url);
+    if (!relay_url.empty())
+      blocks_socks_cfg.submit_base_url_override = relay_url;
+
+    if (auto cp = wal.get_core_proxy())
+    {
+      cp->set_block_submit_via_socks5(blocks_socks_cfg);
+      if (blocks_socks_cfg.enabled)
+      {
+        LOG_PRINT_L0(std::string("Block submit via SOCKS5 configured: ")
+          + blocks_socks_cfg.proxy_host + ":" + std::to_string(blocks_socks_cfg.proxy_port)
+          + (blocks_socks_cfg.submit_base_url_override.empty() ? "" :
+            (", submit url: " + blocks_socks_cfg.submit_base_url_override)));
+      }
+    }
+  }
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::init(const boost::program_options::variables_map& vm)
@@ -574,6 +629,9 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_no_whitelist = command_line::get_arg(vm, arg_no_whitelist);
   m_restore_ki_in_wo_wallet = command_line::get_arg(vm, arg_restore_ki_in_wo_wallet);
   m_do_not_unlock_reserved_on_idle = command_line::get_arg(vm, arg_no_idle_unlock_spent);
+  m_enable_tx_socks5_relay_proxy = command_line::get_arg(vm, arg_enable_tx_socks5_relay_proxy);
+  m_enable_block_socks5_relay_proxy = command_line::get_arg(vm, arg_enable_block_socks5_relay_proxy);
+  m_block_relay_url = command_line::get_arg(vm, arg_block_relay_url);
 
 } 
 //----------------------------------------------------------------------------------------------------
@@ -3371,7 +3429,9 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_no_whitelist);
   command_line::add_arg(desc_params, arg_restore_ki_in_wo_wallet);
   command_line::add_arg(desc_params, arg_no_idle_unlock_spent);
-  
+  command_line::add_arg(desc_params, arg_enable_tx_socks5_relay_proxy);
+  command_line::add_arg(desc_params, arg_enable_block_socks5_relay_proxy);
+  command_line::add_arg(desc_params, arg_block_relay_url);
 
 
   tools::wallet_rpc_server::init_options(desc_params);
