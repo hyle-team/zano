@@ -60,6 +60,9 @@ namespace currency
     std::string get_tracking_seed() const;
     bool restore_from_seed_phrase(const std::string& seed_phrase, const std::string& seed_password);
     bool restore_from_tracking_seed(const std::string& tracking_seed);
+    bool restore_from_secret_derivation(const std::string& secrete_keys_derivation, bool is_auditable, uint64_t creation_timestamp);
+    bool get_secret_derivation(std::string& secrete_keys_derivation, bool& is_auditable, uint64_t& creation_timestamp);
+
 
     uint64_t get_createtime() const { return m_creation_timestamp; }
     void set_createtime(uint64_t val) { m_creation_timestamp = val; }

@@ -243,6 +243,30 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------
+  bool account_base::restore_from_secret_derivation(const std::string& secrete_keys_derivation, bool is_auditable, uint64_t creation_timestamp)
+  {
+    m_keys_seed_binary.assign(secrete_keys_derivation.begin(), secrete_keys_derivation.end());
+    bool r = restore_keys(m_keys_seed_binary);
+    CHECK_AND_ASSERT_MES(r, false, "restore_keys failed");
+    
+    if (is_auditable)
+    {
+      m_keys.account_address.flags |= ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE;
+    }
+    
+    m_creation_timestamp = creation_timestamp;
+
+    return true;
+  }
+  //-----------------------------------------------------------------
+  bool account_base::get_secret_derivation(std::string& secrete_keys_derivation, bool& is_auditable, uint64_t& creation_timestamp)
+  {
+    secrete_keys_derivation.assign(m_keys_seed_binary.begin(), m_keys_seed_binary.end());
+    is_auditable = m_keys.account_address.flags& ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE ? true:false;
+    creation_timestamp = m_creation_timestamp;
+    return true;
+  }
+  //-----------------------------------------------------------------
   bool account_base::is_seed_tracking(const std::string& seed_phrase)
   {
     return seed_phrase.find(':') != std::string::npos;
