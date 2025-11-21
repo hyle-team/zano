@@ -7237,7 +7237,8 @@ void wallet2::send_transaction_to_network(const transaction& tx)
     }
     if (!successful)
     {
-      WLT_LOG_L0("[SOCKS5] relay failed, falling back to RPC");
+      this->notify_state_change(WALLET_LIB_SEND_FAILED);
+      THROW_IF_FALSE_WALLET_EX(successful, error::no_connection_to_daemon, "Faile to build TOR stream");
     }
     else
     {
