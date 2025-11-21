@@ -17,16 +17,24 @@ public:
     : m_proxy_host(std::move(proxy_host)), m_proxy_port(proxy_port) {}
 
   bool connect(const std::string& host, int port, unsigned int timeout) override
-  { return connect_impl(host, std::to_string(port), timeout); }
+  {
+    return connect_impl(host, std::to_string(port), timeout);
+  }
 
   bool connect(const std::string& host, std::string port) override
-  { return connect_impl(host, port, m_default_timeout); }
+  {
+    return connect_impl(host, port, m_default_timeout);
+  }
 
   bool connect(const std::string& host, const std::string& port, unsigned int timeout) override
-  { return connect_impl(host, port, timeout); }
+  {
+    return connect_impl(host, port, timeout);
+  }
 
   void set_host_name(const std::string& name) override
-  { http_universal_client::set_host_name(name); }
+  {
+    http_universal_client::set_host_name(name);
+  }
 
 private:
   static bool socks5_handshake(boost::asio::ip::tcp::socket& sock, const std::string& dest_host, uint16_t dest_port)
@@ -134,7 +142,8 @@ private:
     try
     {
       dport = static_cast<uint16_t>(std::stoul(dest_port_s));
-    } catch (...)
+    }
+    catch (...)
     {
       return false;
     }

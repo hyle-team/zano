@@ -11,7 +11,8 @@ namespace epee {
 namespace net_utils {
 namespace http {
 
-struct i_tcp_connector {
+struct i_tcp_connector
+{
   virtual ~i_tcp_connector() = default;
 
   virtual bool establish(boost::asio::ip::tcp::socket& sock, const std::function<bool(const std::string&, int, unsigned int)>& tcp_connect,
@@ -22,18 +23,19 @@ struct i_tcp_connector {
 class direct_connector final : public i_tcp_connector
 {
 public:
-  explicit direct_connector(std::string bind_if = {}) : _bind_if(std::move(bind_if)) {}
+  explicit direct_connector(std::string bind_if = {})
+    : m_bind_if(std::move(bind_if)) {}
 
   bool establish(boost::asio::ip::tcp::socket& /*sock*/, const std::function<bool(const std::string&, int, unsigned int)>& tcp_connect,
     const std::string& dst_host, uint16_t dst_port, unsigned int timeout_ms) override
   {
     // just connect to the destination directly via provided tcp_connect
-    (void)_bind_if;
+    (void)m_bind_if;
     return tcp_connect(dst_host, static_cast<int>(dst_port), timeout_ms);
   }
 
 private:
-  std::string _bind_if; // reserved for future "bind to interface"
+  std::string m_bind_if; // reserved for future "bind to interface"
 };
 
 // SOCKS5 (NO-AUTH) connector
@@ -41,7 +43,7 @@ class socks5_connector final : public i_tcp_connector
 {
 public:
   socks5_connector(std::string proxy_host, uint16_t proxy_port)
-    : _proxy_host(std::move(proxy_host)), _proxy_port(proxy_port) {}
+    : m_proxy_host(std::move(proxy_host)), m_proxy_port(proxy_port) {}
 
   bool establish(boost::asio::ip::tcp::socket& sock, const std::function<bool(const std::string&, int, unsigned int)>& tcp_connect,
     const std::string& dst_host, uint16_t dst_port, unsigned int timeout_ms) override
@@ -49,7 +51,7 @@ public:
     (void)timeout_ms;
 
     // 1) TCP to proxy
-    if (!tcp_connect(_proxy_host, static_cast<int>(_proxy_port), timeout_ms))
+    if (!tcp_connect(m_proxy_host, static_cast<int>(m_proxy_port), timeout_ms))
       return false;
 
     // 2) SOCKS5 CONNECT dst_host:dst_port
@@ -61,8 +63,8 @@ public:
   }
 
 private:
-  std::string _proxy_host;
-  uint16_t    _proxy_port;
+  std::string m_proxy_host;
+  uint16_t    m_proxy_port;
 };
 
 // adapter client: http_universal_client + injected connector
