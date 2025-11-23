@@ -1296,6 +1296,15 @@ namespace tools
   }
 namespace detail
 {
+  // SOCKS5 adapter helpers (SFINAE)
+  // Apply proxy/DNS/timeout to any transport iff it has:
+  //   set_socks_proxy(std::string,uint16_t)
+  //   set_use_remote_dns(bool)
+  //   set_timeouts(unsigned,unsigned)
+  // Otherwise it’s a no-op.
+  // Usage: apply_socks_relay_to(tr); before connect()/invoke().
+  // Config: wallet::m_socks5_relay_cfg. To support a new transport, implement the setters.
+
   // set_socks_proxy(host, port)
   template<class T>
   inline auto try_set_socks_proxy(T& tr, const std::string& host, uint16_t port, int)
