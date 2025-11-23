@@ -23,19 +23,14 @@ struct i_tcp_connector
 class direct_connector final : public i_tcp_connector
 {
 public:
-  explicit direct_connector(std::string bind_if = {})
-    : m_bind_if(std::move(bind_if)) {}
+  direct_connector() {}
 
   bool establish(boost::asio::ip::tcp::socket& /*sock*/, const std::function<bool(const std::string&, int, unsigned int)>& tcp_connect,
     const std::string& dst_host, uint16_t dst_port, unsigned int timeout_ms) override
   {
     // just connect to the destination directly via provided tcp_connect
-    (void)m_bind_if;
     return tcp_connect(dst_host, static_cast<int>(dst_port), timeout_ms);
   }
-
-private:
-  std::string m_bind_if; // reserved for future "bind to interface"
 };
 
 // SOCKS5 (NO-AUTH) connector
@@ -48,8 +43,6 @@ public:
   bool establish(boost::asio::ip::tcp::socket& sock, const std::function<bool(const std::string&, int, unsigned int)>& tcp_connect,
     const std::string& dst_host, uint16_t dst_port, unsigned int timeout_ms) override
   {
-    (void)timeout_ms;
-
     // 1) TCP to proxy
     if (!tcp_connect(m_proxy_host, static_cast<int>(m_proxy_port), timeout_ms))
       return false;
