@@ -458,7 +458,7 @@ void process_wallet_command_line_params(const po::variables_map& vm, tools::wall
       auto pos = brp.find(':');
       if (pos != std::string::npos)
       {
-        blocks_socks_cfg.enabled    = true;
+        blocks_socks_cfg.enabled = true;
         blocks_socks_cfg.proxy_host = brp.substr(0, pos);
         blocks_socks_cfg.proxy_port = static_cast<uint16_t>(std::stoi(brp.substr(pos + 1)));
       }

@@ -8,7 +8,9 @@
 
 #include "net/http_client.h"
 
-namespace epee { namespace net_utils { namespace http {
+namespace epee {
+namespace net_utils {
+namespace http {
 
 class http_socks5_client : public http_universal_client
 {
@@ -64,7 +66,7 @@ private:
     }
 
     // 2) CONNECT request: ver=5, cmd=1, rsv=0, atyp=3 (domain),
-    //                     dst.addr=LEN + host bytes, dst.port=2 bytes (BE)
+    // dst.addr=LEN + host bytes, dst.port=2 bytes (BE)
     {
       std::vector<uint8_t> req;
       req.reserve(4 + 1 + dest_host.size() + 2);
@@ -115,7 +117,8 @@ private:
       {
         std::vector<uint8_t> sink(to_read);
         read(sock, buffer(sink.data(), sink.size()), ec);
-        if (ec) return false;
+        if (ec)
+          return false;
       }
 
       // bnd.port (2 bytes)
@@ -147,11 +150,13 @@ private:
     {
       return false;
     }
-
+    
+    // through SOCKS5 proxy to the target host:port
     auto& sock = get_socket();
     if (!socks5_handshake(sock, dest_host, dport))
       return false;
 
+    // TODO: here should be TLS handshake if is_ssl==true (not implemented yet)
     return true;
   }
 
@@ -161,4 +166,6 @@ private:
   unsigned int m_default_timeout = 15000;
 };
 
-}}} // namespace epee::net_utils::http
+}
+}
+} // namespace epee::net_utils::http

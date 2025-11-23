@@ -123,8 +123,7 @@ namespace tools
     inline bool invoke_http_json_rpc_with_client(epee::net_utils::http::http_universal_client& client,
       const std::string& base_url, const std::string& method, const t_request& req, t_response& rsp)
     {
-      return call_request([&]()
-      {
+      return call_request([&](){
         LOG_PRINT_L2("[INVOKE_JSON_METHOD via custom client] ---> " << method);
         bool r = epee::net_utils::invoke_http_json_rpc(base_url + "/json_rpc", method, req, rsp, client);
         LOG_PRINT_L2("[INVOKE_JSON_METHOD via custom client] <--- " << method);
@@ -146,7 +145,7 @@ namespace tools
 
     socks5_submit_cfg m_block_submit_cfg;
     std::unique_ptr<epee::net_utils::http::http_universal_client> m_http_client_block_submit; // http_socks5_client
-    std::string m_block_submit_base_url_;
+    std::string m_block_submit_base_url;
   };
 }
 

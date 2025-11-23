@@ -179,10 +179,9 @@ namespace tools
       return time(nullptr); 
     }
     //------------------------------------------------------------------------------------------------------------------------------
-    void core_fast_rpc_proxy::set_block_submit_via_socks5(const tools::socks5_submit_cfg& cfg) override
+    void set_block_submit_via_socks5(const tools::socks5_submit_cfg& /*cfg*/) override
     {
-      // We do no-op to satisfy the interface
-      (void)cfg;
+      // TODO: We do no-op to satisfy the interface
     }
 
   private:

@@ -3,7 +3,8 @@
 #include "net/levin_socks5.h"
 #include "net/socks5_proxy_transport.h"
 
-namespace epee { namespace tests {
+namespace epee {
+namespace tests {
 
 bool run_levin_socks5_connect_probe(const std::string& proxy_host, uint16_t proxy_port,
   const std::string& dest_host,uint16_t dest_port, unsigned int timeout_ms)
@@ -19,4 +20,5 @@ bool run_levin_socks5_connect_probe(const std::string& proxy_host, uint16_t prox
   return true;
 }
 
-}} // namespace
+}
+} // namespace

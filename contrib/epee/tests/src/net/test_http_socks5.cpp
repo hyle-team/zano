@@ -5,7 +5,8 @@
 
 #include "net/test_http_socks5.h"
 
-namespace epee { namespace tests {
+namespace epee {
+namespace tests {
 
 bool run_http_socks5_http_probe(const std::string& proxy_host, uint16_t proxy_port, const std::string& url, unsigned int timeout_ms)
 {
@@ -34,4 +35,5 @@ bool run_http_socks5_http_probe(const std::string& proxy_host, uint16_t proxy_po
   return true;
 }
 
-}} // namespaces
+}
+} // namespaces
