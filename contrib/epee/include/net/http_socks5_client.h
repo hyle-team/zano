@@ -60,7 +60,7 @@ private:
         return false;
       if (resp[0] != 0x05 || resp[1] != 0x00)
       {
-        // сервер не согласился на no-auth
+        // if server didnt accept no-auth method
         return false;
       }
     }
