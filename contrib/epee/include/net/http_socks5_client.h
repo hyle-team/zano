@@ -94,7 +94,7 @@ private:
       if (head[0] != 0x05)
         return false;
       if (head[1] != 0x00)
-        return false; // rep != 0 => ошибка
+        return false; // rep != 0 => error
 
       // read the bound address (dummy, just consume bytes by type) 
       size_t to_read = 0;
