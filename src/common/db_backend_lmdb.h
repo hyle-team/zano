@@ -36,8 +36,6 @@ namespace tools
       public:
         lmdb_txn(lmdb_db_backend& db);
         lmdb_txn(lmdb_db_backend& db, bool is_read_only);
-        //lmdb_txn(lmdb_txn&&) noexcept;
-        //lmdb_txn& operator=(lmdb_txn&&) noexcept;
         lmdb_txn(const lmdb_txn&) = delete;
         lmdb_txn& operator=(const lmdb_txn&) = delete;
 
@@ -48,25 +46,15 @@ namespace tools
         void abort();
         bool is_empty();
 
-
-        //void mark_finished(); // mark when commit or abort is called, to avoid double commit/abort and correct delete in destructor
-
         MDB_txn* m_ptx{nullptr};
         bool m_read_only{false};
         uint64_t m_ref_count{ 0 };
-        // needed for thread-top transaction, for figure out if we need to unlock exclusive access
-        //size_t m_nested_count{0};   //count of read-only nested emulated transactions
-
-        //uint64_t m_dbg_id{0};        // human readable transaction id
-        //uint32_t m_stack_level{0};   // depth of the stack at the moment of opening (number of elements before push)
         std::thread::id m_owner{};
       private:
         bool validate_empty();
         void check_thread_id();
 
         std::reference_wrapper<lmdb_db_backend> m_db;
-        //bool m_marked_finished{true};
-
       };
 
 
@@ -103,9 +91,6 @@ namespace tools
         std::list<std::shared_ptr<each_call_handler> > m_calls; //this one is purely for extra validation and debug purposes 
         std::list<std::shared_ptr<lmdb_txn>> m_txs;
       };
-
-
-      //typedef std::list<std::shared_ptr<lmdb_txn>> transactions_list;
 
       std::string m_path;
       MDB_env *m_penv;

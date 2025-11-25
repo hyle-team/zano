@@ -35,7 +35,6 @@ extern "C" void print_log_to_journal(const char* message)
   lmdb_journal.push_back( epee::log_space::get_prefix_entry() + std::string(message));
   if (lmdb_journal.size() > LMDB_JOURNAL_LIMIT)
     lmdb_journal.pop_front();
-  //LOG_PRINT_L0("[LMDB] " << message);
 }
 
 void print_journal(size_t limit)
@@ -47,8 +46,6 @@ void print_journal(size_t limit)
   {
     ss << *it << ENDL;
     ++count;
-    //if (count > limit)
-    //  break;
   }
   LOG_PRINT_L0("JOUNRAL: " << ENDL << ss.str());
 }
@@ -196,22 +193,7 @@ namespace tools
               LOG_ERROR("not cleared W-transactions on db close");
             }
           }
-
-          //for (auto& txe : tx_thread.second)
-          //{
-          //  int res = MDB_SUCCESS;
-            //if(txe.read_only)
-            //  txe.abort();
-            //else
-         //     res = txe.commit();
-
-          //  if (res != MDB_SUCCESS)
-          //  {
-          //    LOG_ERROR("[DB ERROR]: On close tranactions: " << mdb_strerror(res));
-          //  }
-          //}
         }
-        //m_txs./ clear();
       }
       if (m_penv)
       {
@@ -370,7 +352,7 @@ namespace tools
       bool ret = false;
       print_log_to_journal("[BACK] commit_transaction()");
       PROFILE_FUNC("lmdb_db_backend::commit_transaction");
-      {        
+      {
         std::lock_guard<boost::recursive_mutex> lock(m_cs);
         ret = pop_the_call(true);
       }
@@ -420,17 +402,9 @@ namespace tools
       key.mv_data = (void*)k;
       key.mv_size = ks;
       BEGIN_TX_LOCAL(true);
-//      bool need_to_commit = false;
-//       if (!have_tx())
-//       {
-//         need_to_commit = true;
-//         begin_transaction(true);
-//       }
 
       res = mdb_get(get_current_tx(), static_cast<MDB_dbi>(h), &key, &data);
 
-//      if (need_to_commit)
-//        commit_transaction();
       COMMIT_TX_LOCAL();
 
       if (res == MDB_NOTFOUND)
@@ -457,16 +431,8 @@ namespace tools
       PROFILE_FUNC("lmdb_db_backend::size");
       MDB_stat container_stat = AUTO_VAL_INIT(container_stat);
       BEGIN_TX_LOCAL(true);
-//      bool need_to_commit = false;
-//      if (!have_tx())
-//      {
-//        need_to_commit = true;
-//        begin_transaction(true);
-//      }
       int res = mdb_stat(get_current_tx(), static_cast<MDB_dbi>(h), &container_stat);
 
-//      if (need_to_commit)
-//        commit_transaction();
       COMMIT_TX_LOCAL();
       CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_stat");
       return container_stat.ms_entries;
@@ -494,12 +460,6 @@ namespace tools
       MDB_val data = AUTO_VAL_INIT(data);
 
       BEGIN_TX_LOCAL(true);
-//      bool need_to_commit = false;
-//      if (!have_tx())
-//      {
-//        need_to_commit = true;
-//        begin_transaction(true);
-//      }
       MDB_cursor* cursor_ptr = nullptr;
       int res = mdb_cursor_open(get_current_tx(), static_cast<MDB_dbi>(h), &cursor_ptr);
       CHECK_AND_ASSERT_MESS_LMDB_DB(res, false, "Unable to mdb_cursor_open");
@@ -517,8 +477,6 @@ namespace tools
       } while (cursor_ptr);
 
       mdb_cursor_close(cursor_ptr);
-//      if (need_to_commit)
-//        commit_transaction();
       COMMIT_TX_LOCAL();
       return true;
     }
@@ -680,7 +638,6 @@ namespace tools
       if (res != MDB_SUCCESS)
       {
         CHECK_AND_ASSERT_THROW_MES(false, "[DB ERROR]: Unable to commit transaction, error : " << mdb_strerror(res) << ", m_read_only= " << m_read_only);
-        //LOG_ERROR("[DB ERROR]: Unable to commit transaction, error: " << mdb_strerror(res));
       }
       m_ptx = nullptr;
       return res;
@@ -716,8 +673,6 @@ namespace tools
       if (m_ptx || m_ref_count)
       {
         LOG_ERROR("[LMDB ERROR]: m_ptx" << (m_ptx == nullptr ? "null" : "not_null") << ", m_ref_count(" << m_ref_count << ") on destructor");
-        //mdb_txn_abort(m_ptx);
-        //m_ptx = nullptr;
         return false;
       }
       return true;
