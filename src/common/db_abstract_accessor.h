@@ -45,7 +45,7 @@ namespace tools
       static_assert(std::is_pod<t_pod_key>::value, "t_pod_key must be a POD type.");
       CHECK_AND_ASSERT_THROW_MES(sizeof(t_pod_key) == ks, "size missmatch");
       CHECK_AND_ASSERT_THROW_MES(pkey, "wrog ptr(null)");
-      k = *(t_pod_key*)pkey;
+      std::memcpy(std::addressof(k), pkey, sizeof(t_pod_key));//k = *(t_pod_key*)pkey;
     }
     inline
     void key_from_ptr(std::string& k, const void* pkey, uint64_t ks)
@@ -346,7 +346,7 @@ namespace tools
         CHECK_AND_ASSERT_MES(sizeof(t_pod_object) == res_buff.size(), false, "sizes missmath at get_pod_object_from_db(). returned size = "
           << res_buff.size() << "expected: " << sizeof(t_pod_object));
 
-        obj = *(t_pod_object*)res_buff.data();
+        std::memcpy(std::addressof(obj), res_buff.data(), sizeof(t_pod_object));//obj = *(t_pod_object*)res_buff.data();
         return true;
         //CATCH_ENTRY_L0("get_t_object_from_db", false);
       }
@@ -382,7 +382,7 @@ namespace tools
         CHECK_AND_ASSERT_THROW_MES(sizeof(t_value) == vs, "sizes missmath at get_pod_object_from_db(). returned size = " 
           << vs << "expected: " << sizeof(t_value));
 
-        v = *(t_value*)pv;
+        std::memcpy(std::addressof(v), pv, sizeof(t_value)); //v = *(t_value*)pv;
 
         return true;
       }
@@ -609,6 +609,13 @@ namespace tools
       {
         items_accessor_cb<t_cb, t_key, t_value, access_strategy_selector<is_t_access_strategy> > local_enum_handler(cb);
         bdb.get_backend()->enumerate(m_h, &local_enum_handler);
+      }
+
+      template<class t_cb>
+      void enumerate_items_by_prefix(const std::string& prefix, uint64_t limit, t_cb cb) const
+      {
+        items_accessor_cb<t_cb, t_key, t_value, access_strategy_selector<is_t_access_strategy>> local_enum_handler(cb);
+        bdb.get_backend()->enumerate_prefix(m_h, prefix, limit, &local_enum_handler);
       }
 
       template<class t_explicit_key, class t_explicit_value, class t_strategy>

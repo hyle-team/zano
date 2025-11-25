@@ -55,6 +55,7 @@ namespace tools
       uint64_t size(container_handle h) override;
       bool set(container_handle h, const char* k, size_t s, const char* v, size_t vs) override;
       bool enumerate(container_handle h, i_db_callback* pcb) override;
+      bool enumerate_prefix(container_handle h, const std::string& prefix, uint64_t limit, i_db_callback* pcb) override;
       bool get_stat_info(tools::db::stat_info& si) override;
       const char* name() override;
       //-------------------------------------------------------------------------------------

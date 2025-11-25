@@ -337,31 +337,21 @@ bool wallets_manager::init(view::i_view* pview_handler)
 
   //setting html path
   std::string path_to_html;
-  if (!command_line::has_arg(m_vm, arg_html_folder))
-  {
-    LOG_PRINT_L0("Detecting APPDIR... ");
-#if defined(__unix__) || defined(__linux__)
-    const char* env_p = std::getenv("APPDIR");
-    LOG_PRINT_L0("APPDIR = " << (void*)env_p);
-    if (env_p)
-    {
-      LOG_PRINT_L0("APPDIR: " << env_p);
-    }
-    if (env_p && std::strlen(env_p))
-    {
-      //app running inside AppImage
-      LOG_PRINT_L0("APPDIR SET: " << env_p);
-      path_to_html = std::string(env_p) + "/usr/bin/html";
-    }
-    else
-#endif
-    {
-      path_to_html = string_tools::get_current_module_folder() + "/html";
-    }
-  }
-  else
+  if (command_line::has_arg(m_vm, arg_html_folder))
   {
     path_to_html = command_line::get_arg(m_vm, arg_html_folder);
+  }
+#if defined(__unix__) || defined(__linux__)
+  else if (const char* env_p = std::getenv("APPDIR"); env_p && std::strlen(env_p))
+  {
+    LOG_PRINT_L0("APPDIR SET: " << env_p);
+    path_to_html = std::string(env_p) + "/usr/bin/html";
+  }
+#endif
+  else
+  {
+    // by default use embedded resources
+    path_to_html = "qrc:/html";
   }
 
   if (command_line::has_arg(m_vm, arg_remote_node))
@@ -1294,7 +1284,8 @@ void wallets_manager::get_gui_options(view::gui_options& opt)
 {
   opt = m_ui_opt;
 }
-std::string wallets_manager::restore_wallet(const std::wstring& path, const std::string& password, const std::string& seed_phrase, const std::string& seed_password, view::open_wallet_response& owr)
+
+std::string wallets_manager::restore_wallet(const std::wstring& path, const std::string& password, const std::function<bool(tools::wallet2&)>& cb, view::open_wallet_response& owr)
 {
   std::shared_ptr<tools::wallet2> w(new tools::wallet2());
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
@@ -1318,13 +1309,15 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   currency::account_base acc;
   try
   {
-    bool is_tracking = currency::account_base::is_seed_tracking(seed_phrase);
-    w->restore(path, password, seed_phrase, is_tracking, seed_password);
+
+    bool r = cb(*w.get());
+    CHECK_AND_ASSERT_MES(r, API_RETURN_CODE_WRONG_SEED, "failed to restore wallet");
+
     owr.seed = w->get_account().get_seed_phrase("");
     auto& keys = w->get_account().get_keys();
 
     owr.private_view_key = epee::string_tools::pod_to_hex(keys.view_secret_key);
-    owr.public_view_key  = epee::string_tools::pod_to_hex(keys.account_address.view_public_key);
+    owr.public_view_key = epee::string_tools::pod_to_hex(keys.account_address.view_public_key);
     owr.private_spend_key = epee::string_tools::pod_to_hex(keys.spend_secret_key);
     owr.public_spend_key = epee::string_tools::pod_to_hex(keys.account_address.spend_public_key);
   }
@@ -1336,7 +1329,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   {
     return API_RETURN_CODE_WRONG_SEED;
   }
-  
+
   catch (const std::exception& e)
   {
     return std::string(API_RETURN_CODE_FAIL) + ":" + e.what();
@@ -1347,7 +1340,30 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   init_wallet_entry(wo, owr.wallet_id);
   get_wallet_info(wo, owr.wi);
   return API_RETURN_CODE_OK;
+
 }
+
+std::string wallets_manager::restore_wallet(const std::wstring& path, const std::string& password, const std::string& secret_derivation, bool is_auditabe_wallet, uint64_t creation_timestamp, view::open_wallet_response& owr)
+{
+  auto cb = [&](tools::wallet2& x)
+    {
+      x.restore(path, password, secret_derivation, is_auditabe_wallet, creation_timestamp);
+      return true;
+    };
+  return restore_wallet(path, password, cb, owr);
+}
+
+std::string wallets_manager::restore_wallet(const std::wstring& path, const std::string& password, const std::string& seed_phrase, const std::string& seed_password, view::open_wallet_response& owr)
+{
+  auto cb = [&](tools::wallet2& x)
+    {
+      bool is_tracking = currency::account_base::is_seed_tracking(seed_phrase);
+      x.restore(path, password, seed_phrase, is_tracking, seed_password);
+      return true;
+    };
+  return restore_wallet(path, password, cb, owr);
+}
+
 std::string wallets_manager::close_wallet(size_t wallet_id)
 {
   EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);

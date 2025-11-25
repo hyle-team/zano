@@ -84,12 +84,13 @@ namespace epee
       //delete entry (section, value or array)
       bool        delete_entry(const std::string& pentry_name, hsection hparent_section = nullptr);      
       //-------------------------------------------------------------------------------
-      bool		store_to_binary(binarybuffer& target);
-      bool		load_from_binary(const binarybuffer& target);
+      bool      store_to_binary(binarybuffer& target);
+      bool      load_from_binary(const binarybuffer& source, const portable_storage_limits& limits);
+      bool      load_from_binary(const binarybuffer& source);
       template<class trace_policy>
-      bool		  dump_as_xml(std::string& targetObj, const std::string& root_name = "");
-      bool		  dump_as_json(std::string& targetObj, size_t indent = 0/*, end_of_line_t eol = eol_crlf*/);
-      bool		  load_from_json(const std::string& source);
+      bool      dump_as_xml(std::string& targetObj, const std::string& root_name = "");
+      bool      dump_as_json(std::string& targetObj, size_t indent = 0/*, end_of_line_t eol = eol_crlf*/);
+      bool      load_from_json(const std::string& source);
       void      set_entry_description(hsection hparent_section, const std::string& name, const std::string& description) {}
 
       template<typename cb_t>
@@ -159,6 +160,12 @@ namespace epee
     template<typename t_section>
     bool portable_storage_base<t_section>::load_from_binary(const binarybuffer& source)
     {
+      return this->load_from_binary(source, gdefault_portable_storage_limits);
+    }
+
+    template<typename t_section>
+    bool portable_storage_base<t_section>::load_from_binary(const binarybuffer& source, const portable_storage_limits& limits)
+    {
       m_root.m_entries.clear();
       if(source.size() < sizeof(storage_block_header))
       {
@@ -179,8 +186,15 @@ namespace epee
         return false;
       }
       TRY_ENTRY();
-      throwable_buffer_reader buf_reader(source.data()+sizeof(storage_block_header), source.size()-sizeof(storage_block_header));
+      throwable_buffer_reader buf_reader(source.data()+sizeof(storage_block_header), source.size()-sizeof(storage_block_header), limits);
       buf_reader.read(m_root);
+      //@#@
+      LOG_PRINT_YELLOW("[STORAGE_STAT:] size: " << epee::string_tools::format_bytes_human_readable(source.size()) <<ENDL
+        << "buf_reader.m_storage_entries_count: " << buf_reader.m_storage_entries_count << ENDL
+        << "buf_reader.m_arrays_count: " << buf_reader.m_arrays_count << ENDL
+        << "buf_reader.m_array_elements_count: " << buf_reader.m_array_elements_count << ENDL
+        << "buf_reader.m_sections_entries_count: " << buf_reader.m_sections_entries_count << ENDL, LOG_LEVEL_4);
+
       return true;//TODO:
       CATCH_ENTRY("portable_storage_base<t_section>::load_from_binary", false);
     }

@@ -526,7 +526,7 @@ TEST(levin_protocol_variant_memcpy, memcpy_variant_verify)
   buf.push_back(static_cast<char>(1 << 2));
   buf.append(sizeof(array_entry), char(0x41));
 
-  throwable_buffer_reader reader(reinterpret_cast<const uint8_t*>(buf.data()), buf.size());
+  throwable_buffer_reader reader(reinterpret_cast<const uint8_t*>(buf.data()), buf.size(), epee::serialization::gdefault_portable_storage_limits);
 
   EXPECT_THROW(
     reader.load_storage_array_entry(SERIALIZE_TYPE_ARRAY),
