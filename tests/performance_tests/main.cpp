@@ -71,7 +71,9 @@ void test_tx_json_serialization()
 }
 
 
+#if defined(WIN32)
 struct HeapSnapshot {
+
   _CrtMemState state{};
   explicit HeapSnapshot(bool take_now = false) {
     if (take_now) take();
@@ -80,8 +82,9 @@ struct HeapSnapshot {
     _CrtMemCheckpoint(&state);
   }
 };
+#endif
 
-static const char* formatBytes(long bytes, char* buf, size_t bufSize) {
+[[maybe_unused]] static const char* formatBytes(long bytes, char* buf, size_t bufSize) {
   const char* suffixes[] = { "B", "K", "M", "G" };
   double value = static_cast<double>(bytes);
   int suffix = 0;
@@ -93,6 +96,7 @@ static const char* formatBytes(long bytes, char* buf, size_t bufSize) {
   return buf;
 }
 
+#if defined(WIN32)
 static void printStats(const char* label, const _CrtMemState& s) {
   char b1[32], b2[32], b3[32], b4[32], b5[32];
   std::printf(
@@ -104,7 +108,9 @@ static void printStats(const char* label, const _CrtMemState& s) {
     formatBytes(s.lSizes[_CRT_BLOCK], b2, sizeof(b2))
   );
 }
+#endif
 
+#if defined(WIN32)
 static void printDiff(const HeapSnapshot& a, const HeapSnapshot& b, const char* label = "Diff A->B") {
   _CrtMemState diff{};
   if (_CrtMemDifference(&diff, &a.state, &b.state)) {
@@ -115,6 +121,7 @@ static void printDiff(const HeapSnapshot& a, const HeapSnapshot& b, const char* 
     std::puts("No detectable heap difference between snapshots.");
   }
 }
+#endif
 
 
 void populate_storate(epee::serialization::portable_storage& ps, epee::serialization::portable_storage::hsection h_sec, size_t recursion_count)
@@ -136,6 +143,8 @@ void populate_storate(epee::serialization::portable_storage& ps, epee::serializa
 
 void storage_test()
 {
+
+#if defined(WIN32)
   int flags = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
   flags |= _CRTDBG_ALLOC_MEM_DF;   // Turn on debug heap
   flags |= _CRTDBG_LEAK_CHECK_DF;  // Report leaks at process exit
@@ -165,7 +174,7 @@ void storage_test()
     ps2.load_from_binary(buff);
   }
 
-
+#endif
 
 }
 
@@ -219,7 +228,7 @@ void test_plain_wallet()
   epee::serialization::load_t_from_json(resp_secret, res);
 
 
-  uint64_t instance_id2 = 1;
+  [[maybe_unused]] uint64_t instance_id2 = 1;
   view::restore_wallet_from_derivation_request rst_req;
   rst_req.path = "test_restored_6.zan";
   rst_req.pass = "";
