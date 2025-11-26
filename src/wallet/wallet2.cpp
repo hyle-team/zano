@@ -58,8 +58,9 @@ using namespace currency;
 
 #define WALLET_TX_MAX_ALLOWED_FEE                                     (COIN * 100)
 
-#define WALLET_FETCH_RANDOM_OUTS_SIZE                                  200
-#define WALLET_NONCB_SET_PROB_PERCENT                                  5
+#define WALLET_FETCH_RANDOM_OUTS_SIZE                                 200  
+
+
 
 #undef LOG_DEFAULT_CHANNEL
 #define LOG_DEFAULT_CHANNEL "wallet"
@@ -4840,150 +4841,6 @@ bool wallet2::proxy_to_daemon(const std::string& uri, const std::string& body, i
   return m_core_proxy->call_COMMAND_RPC_INVOKE(uri, body, response_code, response_body);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::prepare_pos_zc_input_and_ring(const transfer_details& td,
-                                            const currency::tx_out_zarcanum& stake_out,
-                                            currency::txin_zc_input& stake_input,
-                                            std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& decoy_storage,
-                                            std::vector<crypto::CLSAG_GGXXG_input_ref_t>& ring,
-                                            uint64_t& secret_index) const
-{
-  bool r = false;
-  ring.clear();
-  secret_index = 0; // index of the real stake output
-  stake_input.key_offsets.clear();
-  decoy_storage.clear();
-
-  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response decoys_resp = AUTO_VAL_INIT(decoys_resp);
-
-  // get decoys outputs and construct miner tx
-  const size_t required_decoys_count = m_core_runtime_config.hf4_minimum_mixins == 0 ? 4 /* <-- for tests */ : m_core_runtime_config.hf4_minimum_mixins;
-
-  if (required_decoys_count > 0 && !is_auditable())
-  {
-    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request decoys_req = AUTO_VAL_INIT(decoys_req);
-    decoys_req.height_upper_limit = m_last_pow_block_h;// request decoys to be either older than, or the same age as stake output's height
-    decoys_req.look_up_strategy = LOOK_UP_STRATEGY_POS_COINBASE;
-    decoys_req.heights.resize((required_decoys_count + 1) * 2); // request outs by heights distribution
-    build_distribution_for_input(decoys_req.heights, td.m_ptx_wallet_info->m_block_height, decoy_selection_generator::dist_kind::coinbase);
-
-    r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4(decoys_req, decoys_resp);
-    // TODO @#@# do we need these exceptions?
-    THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs4.bin");
-    THROW_IF_FALSE_WALLET_EX(decoys_resp.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs4.bin");
-    THROW_IF_FALSE_WALLET_EX(decoys_resp.status == API_RETURN_CODE_OK, error::get_random_outs_error, decoys_resp.status);
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!decoys_resp.blocks.empty(), "daemon returned no decoy blocks for PoS");
-
-    std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> coinbase_candidates;
-    std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> noncb_candidates;
-    coinbase_candidates.reserve(decoys_resp.blocks.size());
-
-    for (const auto& blk : decoys_resp.blocks)
-    {
-      if (blk.outs.empty())
-        continue;
-
-      for (const auto& oe : blk.outs)
-      {
-        const bool is_real = (oe.global_amount_index == td.m_global_output_index);
-        if (is_real)
-          continue;
-        if (!m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, blk.block_height))
-          continue;
-
-        if (oe.flags & RANDOM_OUTPUTS_FOR_AMOUNTS_FLAGS_COINBASE)
-          coinbase_candidates.push_back(oe);
-        else
-          noncb_candidates.push_back(oe);
-      }
-    }
-
-    bool include_one_noncb = ((crypto::rand<uint32_t>() % 100) < WALLET_NONCB_SET_PROB_PERCENT) && !noncb_candidates.empty();
-
-    auto rnd_shuffle = [](auto& v)
-    {
-      for (size_t i = v.size(); i > 1; --i)
-        std::swap(v[i - 1], v[crypto::rand<size_t>() % i]);
-    };
-    rnd_shuffle(coinbase_candidates);
-    rnd_shuffle(noncb_candidates);
-
-    decoy_storage.reserve(required_decoys_count + 1); // +1 real
-
-    std::unordered_set<uint64_t> used_gindices;
-    used_gindices.reserve(required_decoys_count + 1);
-    used_gindices.insert(td.m_global_output_index);
-
-    auto take_next_unique = [&](std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& out_pool, size_t& cursor) -> bool
-    {
-      while (cursor < out_pool.size())
-      {
-        const auto& cand = out_pool[cursor++];
-        if (!used_gindices.count(cand.global_amount_index))
-        {
-          used_gindices.insert(cand.global_amount_index);
-          decoy_storage.push_back(cand);
-          return true;
-        }
-      }
-      return false;
-    };
-
-    size_t cb_cur = 0, nc_cur = 0;
-
-    if (include_one_noncb)
-      take_next_unique(noncb_candidates, nc_cur);
-
-    // get the rest from coinbase if its out, fallback to non-сoinbase
-    while (decoy_storage.size() < required_decoys_count)
-    {
-      if (take_next_unique(coinbase_candidates, cb_cur))
-        continue;
-
-      // coinbase is out of stock, adding non-coinbase
-      if (!take_next_unique(noncb_candidates, nc_cur))
-        break; // have no more decoys
-    }
-
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoy_storage.size() == required_decoys_count,
-      "for PoS stake got less decoys than required: picked=" << decoy_storage.size()
-      << " < " << required_decoys_count
-      << " (coinbase_candidates=" << coinbase_candidates.size()
-      << ", noncb_pool=" << noncb_candidates.size() << ")");
-
-    // add real
-    decoy_storage.emplace_back(td.m_global_output_index, stake_out.stealth_address, stake_out.amount_commitment, stake_out.concealing_point, stake_out.blinded_asset_id);
-
-    std::sort(decoy_storage.begin(), decoy_storage.end(), // sort them now (note absolute_sorted_output_offsets_to_relative_in_place() below)
-      [](const auto& l, const auto& r){ return l.global_amount_index < r.global_amount_index; });
-
-    ring.reserve(decoy_storage.size());
-    stake_input.key_offsets.reserve(decoy_storage.size());
-
-    uint64_t i = 0;
-    for (auto& el : decoy_storage)
-    {
-      if (el.global_amount_index == td.m_global_output_index)
-        secret_index = i;
-      ++i;
-
-      ring.emplace_back(el.stealth_address, el.amount_commitment, el.blinded_asset_id, el.concealing_point);
-      stake_input.key_offsets.push_back(el.global_amount_index);
-    }
-
-    r = absolute_sorted_output_offsets_to_relative_in_place(stake_input.key_offsets);
-    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "absolute_sorted_output_offsets_to_relative_in_place failed");
-  }
-  else
-  {
-    ring.emplace_back(stake_out.stealth_address, stake_out.amount_commitment, stake_out.blinded_asset_id, stake_out.concealing_point);
-    stake_input.key_offsets.push_back(td.m_global_output_index);
-    secret_index = 0;
-  }
-
-  return true;
-}
-
-//----------------------------------------------------------------------------------------------------
 bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t full_block_reward, const currency::pos_entry& pe, currency::tx_generation_context& miner_tx_tgc, currency::block& b) const
 {
   bool r = false;
@@ -5126,13 +4983,72 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
   txin_zc_input& stake_input = boost::get<txin_zc_input>(b.miner_tx.vin[1]);
   const tx_out_zarcanum& stake_out = boost::get<tx_out_zarcanum>(stake_out_v);
 
-  std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry> decoy_storage;
+  COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response decoys_resp = AUTO_VAL_INIT(decoys_resp);
   std::vector<crypto::CLSAG_GGXXG_input_ref_t> ring;
-  uint64_t secret_index = 0;
+  uint64_t secret_index = 0; // index of the real stake output
 
-  bool ok = prepare_pos_zc_input_and_ring(td, stake_out, stake_input, decoy_storage, ring, secret_index);
-  WLT_CHECK_AND_ASSERT_MES(ok, false, "prepare_pos_zc_input_and_ring failed");
+  // get decoys outputs and construct miner tx
+  const size_t required_decoys_count = m_core_runtime_config.hf4_minimum_mixins == 0 ? 4 /* <-- for tests */ : m_core_runtime_config.hf4_minimum_mixins;
+  static bool use_only_forced_to_mix = false;       // TODO @#@# set them somewhere else
+  if (required_decoys_count > 0 && !is_auditable())
+  {
+    COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request decoys_req = AUTO_VAL_INIT(decoys_req);
+    decoys_req.height_upper_limit = m_last_pow_block_h; // request decoys to be either older than, or the same age as stake output's height
+    decoys_req.use_forced_mix_outs = use_only_forced_to_mix;
+    decoys_req.decoys_count = required_decoys_count + 1; // one more to be able to skip a decoy in case it hits the real output
+    decoys_req.amounts.push_back(0); // request one batch of decoys for hidden amounts
 
+    r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(decoys_req, decoys_resp);
+    // TODO @#@# do we need these exceptions?
+    THROW_IF_FALSE_WALLET_EX(r, error::no_connection_to_daemon, "getrandom_outs1.bin");
+    THROW_IF_FALSE_WALLET_EX(decoys_resp.status != API_RETURN_CODE_BUSY, error::daemon_busy, "getrandom_outs1.bin");
+    THROW_IF_FALSE_WALLET_EX(decoys_resp.status == API_RETURN_CODE_OK, error::get_random_outs_error, decoys_resp.status);
+    WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(decoys_resp.outs.size() == 1, "got wrong number of decoys batches: " << decoys_resp.outs.size());
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoys_resp.outs[0].outs.size() == required_decoys_count + 1, "for PoS stake tx got less decoys to mix than requested: " << decoys_resp.outs[0].outs.size() << " < " << required_decoys_count + 1);
+
+    auto& decoys = decoys_resp.outs[0].outs;
+    decoys.emplace_front(td.m_global_output_index, stake_out.stealth_address, stake_out.amount_commitment, stake_out.concealing_point, stake_out.blinded_asset_id);
+
+    std::unordered_set<uint64_t> used_gindices;
+    size_t good_outs_count = 0;
+    for (auto it = decoys.begin(); it != decoys.end(); )
+    {
+      if (used_gindices.count(it->global_amount_index) != 0)
+      {
+        it = decoys.erase(it);
+        continue;
+      }
+      used_gindices.insert(it->global_amount_index);
+      if (++good_outs_count == required_decoys_count + 1)
+      {
+        decoys.erase(++it, decoys.end());
+        break;
+      }
+      ++it;
+    }
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(decoys.size() == required_decoys_count + 1, "for PoS stake got less good decoys than required: " << decoys.size() << " < " << required_decoys_count);
+
+    decoys.sort([](auto& l, auto& r) { return l.global_amount_index < r.global_amount_index; }); // sort them now (note absolute_sorted_output_offsets_to_relative_in_place() below)
+
+    uint64_t i = 0;
+    for (auto& el : decoys)
+    {
+      uint64_t gindex = el.global_amount_index;
+      if (gindex == td.m_global_output_index)
+        secret_index = i;
+      ++i;
+      ring.emplace_back(el.stealth_address, el.amount_commitment, el.blinded_asset_id, el.concealing_point);
+      stake_input.key_offsets.push_back(el.global_amount_index);
+    }
+    r = absolute_sorted_output_offsets_to_relative_in_place(stake_input.key_offsets);
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "absolute_sorted_output_offsets_to_relative_in_place failed");
+  }
+  else
+  {
+    // no decoys, the ring consist of one element -- the real stake output
+    ring.emplace_back(stake_out.stealth_address, stake_out.amount_commitment, stake_out.blinded_asset_id, stake_out.concealing_point);
+    stake_input.key_offsets.push_back(td.m_global_output_index);
+  }
   stake_input.k_image = pe.keyimage;
 
   crypto::point_t stake_out_blinded_asset_id_pt = currency::native_coin_asset_id_pt + td.m_zc_info_ptr->asset_id_blinding_mask * crypto::c_point_X;
@@ -7045,6 +6961,7 @@ void wallet2::select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS
   amount_entry.outs = local_outs;
 }
 //----------------------------------------------------------------------------------------------------------------
+<<<<<<< HEAD
 void wallet2::build_distribution_for_input(std::vector<uint64_t>& height_distrib, uint64_t own_height, decoy_selection_generator::dist_kind kind) const
 {
   decoy_selection_generator zarcanum_decoy_set_generator;
@@ -7074,7 +6991,7 @@ void wallet2::build_distribution_for_input(std::vector<uint64_t>& height_distrib
 void wallet2::build_distribution_for_input(std::vector<uint64_t>& offsets, uint64_t own_index)
 {
   decoy_selection_generator zarcanum_decoy_set_generator;
-  zarcanum_decoy_set_generator.init(get_actual_zc_global_index(), decoy_selection_generator::dist_kind::regular);
+  zarcanum_decoy_set_generator.init(get_actual_zc_global_index());
 
   THROW_IF_FALSE_WALLET_INT_ERR_EX(zarcanum_decoy_set_generator.is_initialized(), "zarcanum_decoy_set_generator are not initialized");
   if (m_core_runtime_config.hf4_minimum_mixins)

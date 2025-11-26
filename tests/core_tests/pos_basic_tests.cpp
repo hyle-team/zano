@@ -331,7 +331,7 @@ bool pos_and_no_pow_blocks_between_output_and_stake::generate(std::vector<test_e
   MAKE_GENESIS_BLOCK(events, blk_0, miner, ts);
   DO_CALLBACK(events, "configure_core");
 
-  REWIND_BLOCKS_N(events, blk_1r, blk_0, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + TESTS_POS_CONFIG_POS_MINIMUM_HEIGH + 25);
+  REWIND_BLOCKS_N(events, blk_1r, blk_0, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + TESTS_POS_CONFIG_POS_MINIMUM_HEIGH);
 
   MAKE_TX(events, tx_0, miner, bob, MK_TEST_COINS(9000), blk_1r);
   MAKE_NEXT_BLOCK_TX1(events, blk_5, blk_1r, miner, tx_0);
@@ -353,100 +353,83 @@ bool pos_and_no_pow_blocks_between_output_and_stake::generate(std::vector<test_e
 
   REWIND_POS_BLOCKS_N_WITH_TIME(events, blk_3r, blk_2r, miner, { miner }, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
-  // Case 1: valid real output (PoW) + INVALID decoy (from PoS) ===
-  // Expected: reject, because max_related_block_height (PoS) > last_pow_block_height
+  // case 1: Provide valid tx output and invalid decoy
+  // Expected error: stake input refs' max related block height is 20 while last PoW block height is 19
   const currency::block& prev_block = blk_3r;
+  const transaction& stake          = tx_4;  // valid output
+
   size_t height        = get_block_height(prev_block) + 1;
   crypto::hash prev_id = get_block_hash(prev_block);
-  {
-    std::vector<tx_source_entry> sources;
-    bool r = fill_tx_sources(
-        sources,
-        events,
-        prev_block,
-        alice.get_keys(),
-        MK_TEST_COINS(9000),
-        0,
-        true,
-        true,
-        false);
-    CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
-    CHECK_AND_ASSERT_MES(shuffle_source_entries(sources), false, "");
 
-    auto it = std::max_element(
+  std::vector<tx_source_entry> sources;
+
+  /**
+   * Fills output entries with the real output and a number of decoys using linear search.
+   * Decoy outputs are selected sequentially from the list, without any randomization.
+   */
+  bool r = fill_tx_sources(
+      sources,
+      events,
+      prev_block,
+      alice.get_keys(),
+      MK_TEST_COINS(9000),
+      80,  // invalid decoy
+      true,
+      true,
+      false);
+
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
+  CHECK_AND_ASSERT_MES(shuffle_source_entries(sources), false, "");
+
+  auto it = std::max_element(
       sources.begin(), sources.end(),
-      [](const tx_source_entry& lhs, const tx_source_entry& rhs)
+      [&](const tx_source_entry& lhs, const tx_source_entry& rhs)
       {
         return lhs.amount < rhs.amount;
       });
-    CHECK_AND_ASSERT_MES(it != sources.end(), false, "no sources");
-    tx_source_entry& se = *it;
+  const tx_source_entry& se               = *it;
+  const tx_source_entry::output_entry& oe = se.outputs[se.real_output];
 
-    const tx_source_entry::output_entry oe_real = se.outputs[se.real_output];
-
-    {
-      const crypto::hash head_id  = get_block_hash(prev_block);
-      const crypto::hash bad_txid = get_transaction_hash(tx_to_alice);
-      const uint64_t bad_gix  = generator.get_tx_out_gindex(head_id, bad_txid, /*out_idx=*/0);
-
-      const bool already = std::any_of(se.outputs.begin(), se.outputs.end(),
-        [&](const tx_source_entry::output_entry& x)
-        {
-          if (const uint64_t* g = boost::get<uint64_t>(&x.out_reference))
-            return *g == bad_gix;
-          return false;
-        });
-
-      if (!already)
-      {
-        tx_source_entry::output_entry bad_oe{};
-        bad_oe.out_reference = bad_gix;
-        se.outputs.push_back(bad_oe);
-      }
-    }
-
-    const tx_source_entry::output_entry& oe = oe_real;
-
-    crypto::key_image stake_output_key_image {};
-    currency::keypair ephemeral_keys {};
-    r = generate_key_image_helper(
+  crypto::key_image stake_output_key_image {};
+  currency::keypair ephemeral_keys {};
+  r = generate_key_image_helper(
       alice.get_keys(),
       se.real_out_tx_key,
       se.real_output_in_tx_index,
       ephemeral_keys,
       stake_output_key_image);
-    CHECK_AND_ASSERT_MES(r, false, "generate_key_image_helper failed");
+  CHECK_AND_ASSERT_MES(r, false, "generate_key_image_helper failed");
 
-    const uint64_t stake_output_gindex = boost::get<uint64_t>(oe.out_reference);
+  uint64_t stake_output_gindex = boost::get<uint64_t>(oe.out_reference);
 
-    currency::wide_difficulty_type pos_diff {};
-    crypto::hash last_pow_block_hash {}, last_pos_block_kernel_hash {};
-    r = generator.get_params_for_next_pos_block(
-        prev_id,
-        pos_diff,
-        last_pow_block_hash,
-        last_pos_block_kernel_hash);
-    CHECK_AND_ASSERT_MES(r, false, "get_params_for_next_pos_block failed");
+  currency::wide_difficulty_type pos_diff {};
+  crypto::hash last_pow_block_hash {}, last_pos_block_kernel_hash {};
+  r = generator.get_params_for_next_pos_block(
+      prev_id,
+      pos_diff,
+      last_pow_block_hash,
+      last_pos_block_kernel_hash);
+  CHECK_AND_ASSERT_MES(r, false, "get_params_for_next_pos_block failed");
 
-    pos_block_builder pb;
-    pb.step1_init_header(generator.get_hardforks(), height, prev_id);
-    pb.step2_set_txs(std::vector<transaction>());
-    pb.step3a(pos_diff, last_pow_block_hash, last_pos_block_kernel_hash);
-    pb.step3b(se.amount, stake_output_key_image, se.real_out_tx_key, se.real_output_in_tx_index, se.real_out_amount_blinding_mask, alice.get_keys().view_secret_key,
-              stake_output_gindex, prev_block.timestamp, POS_SCAN_WINDOW, POS_SCAN_STEP);
-    pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), alice.get_public_address());
-    pb.step5_sign(se, alice.get_keys());
+  pos_block_builder pb;
+  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
+  pb.step2_set_txs(std::vector<transaction>());
+  pb.step3a(pos_diff, last_pow_block_hash, last_pos_block_kernel_hash);
+  pb.step3b(se.amount, stake_output_key_image, se.real_out_tx_key, se.real_output_in_tx_index, se.real_out_amount_blinding_mask, alice.get_keys().view_secret_key,
+            stake_output_gindex, prev_block.timestamp, POS_SCAN_WINDOW, POS_SCAN_STEP);
+  pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(prev_block), alice.get_public_address());
+  pb.step5_sign(se, alice.get_keys());
 
-    DO_CALLBACK(events, "mark_invalid_block");
-    events.push_back(pb.m_block);
+  DO_CALLBACK(events, "mark_invalid_block");
+  events.push_back(pb.m_block);
 
-    DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_3r));
-  }
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(blk_3r));
 
   // case 2: Provide invalid tx output
   // Expected error: stake input refs' max related block height is 20 while last PoW block height is 19
   {
     const currency::block& prev_block = blk_3r;
+    const transaction& stake          = tx_to_alice;
     bool r                            = false;
     std::vector<tx_source_entry> sources;
 
@@ -527,6 +510,7 @@ bool pos_and_no_pow_blocks_between_output_and_stake::generate(std::vector<test_e
   // Expected valid: stake input refs' max related block height is 20 while last PoW block height is 21
   {
     const currency::block& prev_block = blk_3ra;
+    const transaction& stake          = tx_to_alice;
     bool r                            = false;
     std::vector<tx_source_entry> sources;
 

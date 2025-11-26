@@ -40,13 +40,7 @@ public:
     double v;
   };
  
-  enum class dist_kind 
-  { 
-    regular,
-    coinbase
-  };
-  void init(uint64_t max_h, dist_kind kind);
-  void init(uint64_t max_h, const std::vector<distribution_entry>& entries);
+  void init(uint64_t max_h);
   bool load_distribution_from_file(const char* path);
   std::vector<uint64_t> generate_distribution(uint64_t count);
   std::vector<uint64_t> generate_unique_reversed_distribution(uint64_t count, uint64_t preincluded_item);

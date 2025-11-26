@@ -21,7 +21,6 @@ using namespace epee;
 
 #define RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS                                       4000
 #define RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS                                    500
-#define RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3                                   300
 #define RPC_LIMIT_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES_TXIDS                               100
 #define RPC_LIMIT_COMMAND_RPC_CHECK_KEYIMAGES_IMAGES                                            1000
 #define RPC_LIMIT_COMMAND_RPC_GET_TRANSACTIONS_TXS_HASHES                                       5000
@@ -484,19 +483,6 @@ namespace currency
       return true;
     }
 
-    res.status = API_RETURN_CODE_OK;
-    return true;
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
-  bool core_rpc_server::on_get_random_outs4(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& res, connection_context& cntx)
-  {
-    CHECK_CORE_READY();
-    CHECK_RPC_LIMITS(req.heights.size(), RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS);
-    res.status = API_RETURN_CODE_FAIL;
-    if (!m_core.get_blockchain_storage().get_random_outs_for_amounts4(req, res))
-    {
-      return true;
-    }
     res.status = API_RETURN_CODE_OK;
     return true;
   }
