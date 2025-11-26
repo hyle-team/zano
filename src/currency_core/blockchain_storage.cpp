@@ -788,13 +788,11 @@ bool blockchain_storage::set_checkpoints(checkpoints&& chk_pts)
   }
   catch (const std::exception& ex)
   {
-    //m_db.abort_transaction();
     LOG_ERROR("UNKNOWN EXCEPTION WHILE SETTING CHECKPOINTS: " << ex.what());
     return false;
   }
   catch (...)
   {
-    //m_db.abort_transaction();
     LOG_ERROR("UNKNOWN EXCEPTION WHILE SETTING CHECKPOINTS.");
     return false;
   }
@@ -7681,7 +7679,6 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
   {
     bvc.m_verification_failed = true;
     bvc.m_added_to_main_chain = false;
-    //m_db.abort_transaction();
     m_tx_pool.on_finalize_db_transaction();
     on_abort_transaction();
     LOG_ERROR("UNKNOWN EXCEPTION WHILE ADDINIG NEW BLOCK: " << ex.what());
@@ -7692,7 +7689,6 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
   {
     bvc.m_verification_failed = true;
     bvc.m_added_to_main_chain = false;
-    //m_db.abort_transaction();
     m_tx_pool.on_finalize_db_transaction();
     on_abort_transaction();
     LOG_ERROR("UNKNOWN EXCEPTION WHILE ADDINIG NEW BLOCK.");
