@@ -6961,33 +6961,6 @@ void wallet2::select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS
   amount_entry.outs = local_outs;
 }
 //----------------------------------------------------------------------------------------------------------------
-<<<<<<< HEAD
-void wallet2::build_distribution_for_input(std::vector<uint64_t>& height_distrib, uint64_t own_height, decoy_selection_generator::dist_kind kind) const
-{
-  decoy_selection_generator zarcanum_decoy_set_generator;
-  const uint64_t max_height = get_blockchain_current_size();
-  zarcanum_decoy_set_generator.init(max_height, kind);
-  THROW_IF_FALSE_WALLET_INT_ERR_EX(zarcanum_decoy_set_generator.is_initialized(), "decoy_selection_generator is not initialized");
-
-  if (max_height == 0)
-    return;
-
-  uint64_t want = height_distrib.size();
-  
-  if (want == 0)
-  {
-    want = m_core_runtime_config.hf4_minimum_mixins;
-  }
-
-  // limit how many heights we ask the daemon to materialize at once
-  const uint64_t available = max_height > 0 ? (max_height - 1) : 0;
-  if (available == 0)
-    return;
-
-  const uint64_t actual_want = std::min<uint64_t>(want, available);
-  height_distrib = zarcanum_decoy_set_generator.generate_unique_reversed_distribution(actual_want, own_height);
-}
-//----------------------------------------------------------------------------------------------------------------
 void wallet2::build_distribution_for_input(std::vector<uint64_t>& offsets, uint64_t own_index)
 {
   decoy_selection_generator zarcanum_decoy_set_generator;
