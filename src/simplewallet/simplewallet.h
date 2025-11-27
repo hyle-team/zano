@@ -204,6 +204,9 @@ namespace currency
     bool m_no_password_confirmations = false;
     bool m_no_whitelist = false;
     std::string m_restore_ki_in_wo_wallet;
+    std::string m_enable_tx_socks5_relay_proxy;
+    std::string m_enable_block_socks5_relay_proxy;
+    std::string m_block_relay_url;
     
     crypto::hash m_password_hash;
     uint64_t m_password_salt;
