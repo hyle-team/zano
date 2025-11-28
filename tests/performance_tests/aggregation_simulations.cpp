@@ -26,6 +26,7 @@
 
 namespace mp = boost::multiprecision;
 const mp::uint256_t c_scalar_L("7237005577332262213973186563042994240857116359379907606001950938285454250989"); // L is the order of the main subgroup
+const mp::uint256_t c_zarcanum_z_coeff_mp = mp::pow(mp::uint256_t(2), 64); // 2^64
 
 static thread_local std::mt19937_64 rng(std::random_device{}());
 static thread_local std::uniform_int_distribution<uint64_t> dist_uint64;
@@ -41,7 +42,6 @@ bool is_utxo_eligibile(uint64_t amount, mp::uint256_t random, mp::uint128_t pos_
   if (random >= c_scalar_L)
     throw std::runtime_error("random value must be in [0; L)");
   //////////////
-  static const mp::uint256_t c_zarcanum_z_coeff_mp = mp::pow(mp::uint256_t(2), 64); // 2^64
   mp::uint256_t z_l_div_z_D = c_zarcanum_z_coeff_mp * (c_scalar_L / (c_zarcanum_z_coeff_mp * pos_difficulty)); // == z * floor( l / (z * D) )
   mp::uint256_t lhs = random; // use random here, originally it was scalar_t lhs_s = scalar_t(kernel_hash) * (blinding_mask + secret_q + last_pow_block_id_hashed); // == h * (f + q + f') mod l
   mp::uint512_t rhs = static_cast<mp::uint512_t>(z_l_div_z_D) * amount; // == floor( l / (z * D) ) * z * a
@@ -95,7 +95,29 @@ uint64_t do_simulation_for_D(mp::uint128_t D)
 
 }
 
-int run_simulations() {
+////// this block may be entirely skipped
+#include "crypto/crypto-sugar.h"
+bool check_constants()
+{
+  if (c_scalar_L != crypto::c_scalar_L.as_boost_mp_type<mp::uint256_t>())
+    return false;
+  if (c_zarcanum_z_coeff_mp != crypto::c_scalar_2p64.as_boost_mp_type<mp::uint256_t>())
+    return false;
+  return true;
+}
+////// end of block
+
+
+
+int run_simulations()
+{
+  if (!check_constants())
+  {
+    std::cout << "ERROR: check_constants() failed" << std::endl;
+    return 1;
+  }
+
+
   mp::uint128_t D = COIN;
   D *= 200'000'000;
   for (size_t i = 0; i != 100; i++)
@@ -105,5 +127,5 @@ int run_simulations() {
   }
 
   //do_simulation_for_D(D);
-  return true;
+  return 0;
 }
