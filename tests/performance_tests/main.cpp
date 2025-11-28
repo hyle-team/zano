@@ -28,6 +28,7 @@
 #include "wallet/view_iface.h"
 #include "wallet/plain_wallet_api_defs.h"
 #include "math_helper.h"
+#include "aggregation_simulations.h"
   
 PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4244)
@@ -370,7 +371,8 @@ int main(int argc, char** argv)
   //parse_weird_tx();
   //thread_pool_tests();
 
-  storage_test();
+  run_simulations();
+  //storage_test();
 
 //   std::string buf1 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX);
 //   std::string buf2 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX);
