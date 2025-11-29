@@ -71,15 +71,15 @@ uint64_t do_simulation_for_D(mp::uint128_t D)
   parties.push_back(party{ 5'000'000 * COIN, 0 });
 
   //100 stakers with 50000 coins each
-  for (i = 0; i != 100; i++)
+  for (i = 0; i != 10000; i++)
   {
-    parties.push_back(party{ 50'000 * COIN, 0 });
+    parties.push_back(party{ 500 * COIN, 0 });
   }
 
 
   for (i = 0; i != 432000; i++)
   {
-    for (auto p : parties)
+    for (auto& p : parties)
     {
       if (is_utxo_eligibile(p.stake_amount, dist_256(rng), D, i))
       {
