@@ -72,6 +72,7 @@ void test_tx_json_serialization()
 }
 
 
+#ifdef WIN32
 struct HeapSnapshot {
   _CrtMemState state{};
   explicit HeapSnapshot(bool take_now = false) {
@@ -169,6 +170,7 @@ void storage_test()
 
 
 }
+#endif // WIN32
 
 void test_plain_wallet()
 {
