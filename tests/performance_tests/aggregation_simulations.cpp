@@ -153,7 +153,7 @@ uint64_t do_simulation_for_D(const mp::uint128_t& D, size_t slots_count, size_t 
     << ", Found blocks total: " << number_of_blocks
     << ", Adversary blocks: " << parties[0].blocks_staked
     << ", Adversary made percents: " << std::fixed << std::setprecision(2) << (static_cast<double>(parties[0].blocks_staked) / number_of_blocks * 100.0) << "%"
-    << ", alt blocks: " << alt_blocks_count << " (avg. per slot: " << std::fixed << std::setprecision(3) << 0.01 * alt_blocks_count / slots_count << "%)"
+    << ", alt blocks: " << alt_blocks_count << " (avg. per slot: " << std::fixed << std::setprecision(3) << 100.0 * alt_blocks_count / slots_count << "%)"
     << ", ns per slot: " << ns_per_slot
     << std::endl
     << std::endl;
