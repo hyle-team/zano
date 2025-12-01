@@ -20,8 +20,12 @@
 
 
 
+
+
+
 namespace tools
 {
+
   class default_http_core_proxy final : public i_core_proxy
   {
   public:
@@ -63,6 +67,16 @@ namespace tools
     void set_plast_daemon_is_disconnected(std::atomic<bool> *plast_daemon_is_disconnected);   
     default_http_core_proxy();
   private:
+    static constexpr epee::serialization::portable_storage_limits gwallet_rpc_proxy_limits{ 100000, 100000, 100000 };
+    struct storage_limits_wallet_rpc
+    {
+      static inline const epee::serialization::portable_storage_limits& get_storage_limits()
+      {
+        return gwallet_rpc_proxy_limits;
+      }
+    };
+
+
 
     template <class t_method>
     bool call_request(t_method request)
@@ -101,7 +115,7 @@ namespace tools
     {
       return call_request([&](){
         LOG_PRINT_L2("[INVOKE_BIN] --->" << typeid(t_request).name())
-        bool r = epee::net_utils::invoke_http_bin_remote_command2(m_daemon_address + url, req, res, m_http_client, m_connection_timeout);
+        bool r = epee::net_utils::invoke_http_bin_remote_command2_limits<storage_limits_wallet_rpc>(m_daemon_address + url, req, res, m_http_client, m_connection_timeout);
         LOG_PRINT_L2("[INVOKE_BIN] <---" << typeid(t_request).name())
         return r;
       });
