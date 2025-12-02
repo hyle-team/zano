@@ -77,6 +77,7 @@ namespace currency
     bool on_get_aliases(const COMMAND_RPC_GET_ALIASES::request& req, COMMAND_RPC_GET_ALIASES::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_aliases_by_address(const COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& req, COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_get_alias_reward(const COMMAND_RPC_GET_ALIAS_REWARD::request& req, COMMAND_RPC_GET_ALIAS_REWARD::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);  
+    bool on_alias_lookup(const COMMAND_RPC_ALIAS_LOOKUP::request& req, COMMAND_RPC_ALIAS_LOOKUP::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_reset_transaction_pool(const COMMAND_RPC_RESET_TX_POOL::request& req, COMMAND_RPC_RESET_TX_POOL::response& res, connection_context& cntx);
     bool on_remove_tx_from_pool(const COMMAND_RPC_REMOVE_TX_FROM_POOL::request& req, COMMAND_RPC_REMOVE_TX_FROM_POOL::response& res, connection_context& cntx);
     bool on_get_pos_mining_details(const COMMAND_RPC_GET_POS_MINING_DETAILS::request& req, COMMAND_RPC_GET_POS_MINING_DETAILS::response& res, connection_context& cntx);
@@ -142,6 +143,7 @@ namespace currency
         MAP_JON_RPC_WE("get_alias_details",           on_get_alias_details,           COMMAND_RPC_GET_ALIAS_DETAILS)
         MAP_JON_RPC_WE("get_alias_by_address",        on_aliases_by_address,          COMMAND_RPC_GET_ALIASES_BY_ADDRESS)
         MAP_JON_RPC_WE("get_alias_reward",            on_get_alias_reward,            COMMAND_RPC_GET_ALIAS_REWARD)
+        MAP_JON_RPC_WE("alias_lookup",                on_alias_lookup,                COMMAND_RPC_ALIAS_LOOKUP)
         MAP_JON_RPC   ("get_est_height_from_date",    on_get_est_height_from_date,    COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE)
         MAP_JON_RPC_WE("find_outs_in_recent_blocks",  on_find_outs_in_recent_blocks,  COMMAND_RPC_FIND_OUTS_IN_RECENT_BLOCKS)
         MAP_JON_RPC_WE("get_integrated_address",      on_get_integrated_address,      COMMAND_RPC_GET_INTEGRATED_ADDRESS)

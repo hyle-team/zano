@@ -518,14 +518,17 @@ namespace plain_wallet
     PLAIN_WALLET_CATCH();
   }
 
-  std::string restore(const std::string& seed, const std::string& path, const std::string& password, const std::string& seed_password)
+  std::string restore(const std::string& path, const std::string& password, const std::function<std::string(wallets_manager&gwm, view::open_wallet_response& rsp, const std::wstring& path_full)>& cb)
   {
     PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
 
     std::string full_path = get_wallets_folder() + path;
     epee::json_rpc::response<view::open_wallet_response, epee::json_rpc::dummy_error> ok_response = AUTO_VAL_INIT(ok_response);
-    std::string rsp = inst_ptr->gwm.restore_wallet(epee::string_encoding::convert_to_unicode(full_path), password, seed, seed_password, ok_response.result);
+    
+    std::string rsp = cb(inst_ptr->gwm, ok_response.result, epee::string_encoding::convert_to_unicode(full_path));
+    //std::string rsp = inst_ptr->gwm.restore_wallet(epee::string_encoding::convert_to_unicode(full_path), password, seed, seed_password, );
+
     if (rsp == API_RETURN_CODE_OK || rsp == API_RETURN_CODE_FILE_RESTORED)
     {
       if (rsp == API_RETURN_CODE_FILE_RESTORED)
@@ -542,6 +545,26 @@ namespace plain_wallet
     err_result.error.code = rsp;
     return sanitized_store_to_json(err_result);
     PLAIN_WALLET_CATCH();
+  }
+
+  std::string restore(const std::string& seed, const std::string& path, const std::string& password, const std::string& seed_password)
+  {
+    auto cb = [&](wallets_manager& gwm, view::open_wallet_response& rsp, const std::wstring& path_full)
+      {
+        return gwm.restore_wallet(path_full, password, seed, seed_password, rsp);
+      };
+
+    return restore(path, password, cb);
+  }
+
+  std::string restore(const std::string& path, const std::string& password, const std::string& secret_derivation, bool auditable_wallet, uint64_t creation_timestamp)
+  {
+    auto cb = [&](wallets_manager& gwm, view::open_wallet_response& rsp, const std::wstring& path_full)
+      {
+        return gwm.restore_wallet(path_full, password, secret_derivation, auditable_wallet, creation_timestamp, rsp);
+      };
+
+    return restore(path, password, cb);
   }
 
   std::string generate(const std::string& path, const std::string& password)
@@ -786,6 +809,20 @@ namespace plain_wallet
         else
         {
           res = restore(rwr.seed_phrase, rwr.path, rwr.pass, rwr.seed_pass);
+        }
+      }
+      else if (method_name == "restore_from_derivations")
+      {
+        view::restore_wallet_from_derivation_request rwr = AUTO_VAL_INIT(rwr);
+        if (!epee::serialization::load_t_from_json(rwr, params))
+        {
+          view::api_response ar = AUTO_VAL_INIT(ar);
+          ar.error_code = "Wrong parameter";
+          res = sanitized_store_to_json(ar);
+        }
+        else
+        {
+          res = restore(rwr.path, rwr.pass, rwr.secret_derivation, rwr.is_auditable, rwr.creation_timestamp);
         }
       }
       else if (method_name == "get_seed_phrase_info")

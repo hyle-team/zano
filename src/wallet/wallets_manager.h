@@ -102,6 +102,7 @@ public:
   std::string open_wallet(const std::wstring& path, const std::string& password, uint64_t txs_to_return, view::open_wallet_response& owr, bool exclude_mining_txs = false);
   std::string generate_wallet(const std::wstring& path, const std::string& password, view::open_wallet_response& owr);
   std::string restore_wallet(const std::wstring& path, const std::string& password, const std::string& seed_phrase, const std::string& seed_password, view::open_wallet_response& owr);
+  std::string restore_wallet(const std::wstring& path, const std::string& password, const std::string& secret_derivation, bool auditable_walet, uint64_t creation_timestamp, view::open_wallet_response& owr);
   std::string invoke(uint64_t wallet_id, std::string params);
   std::string get_wallet_status(uint64_t wallet_id);
   std::string run_wallet(uint64_t wallet_id);
@@ -181,6 +182,7 @@ public:
   bool is_remote_node_mode() const { return m_remote_node_mode; }
 
 private:
+  std::string restore_wallet(const std::wstring& path, const std::string& password, const std::function<bool(tools::wallet2&)>& cb, view::open_wallet_response& owr);
   void main_worker(const po::variables_map& vm);
   bool init_local_daemon();
   bool deinit_local_daemon();

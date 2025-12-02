@@ -61,7 +61,7 @@ namespace epee
       if(!stg.get_value(pname, blob, hparent_section))
         return false;
       CHECK_AND_ASSERT_MES(blob.size() == sizeof(d), false, "unserialize_t_val_as_blob: size of " << typeid(t_type).name() << " = " << sizeof(t_type) << ", but stored blod size = " << blob.size() << ", value name = " << pname);
-      d = *(const t_type*)blob.data();
+      std::memcpy(std::addressof(d), blob.data(), sizeof(t_type)); //d = *(const t_type*)blob.data();
       return true;
     } 
     //-------------------------------------------------------------------------------------------------------------------

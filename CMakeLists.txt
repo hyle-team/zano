@@ -44,7 +44,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "Android")
 endif()
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-
 # build types
 if (UNIX AND NOT APPLE)
   # single configurations, defaults to Release

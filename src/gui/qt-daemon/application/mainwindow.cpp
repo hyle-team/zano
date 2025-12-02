@@ -528,21 +528,56 @@ void MainWindow::init_tray_icon(const std::string& html_path)
   m_tray_icon_menu->addSeparator();
   m_tray_icon_menu->addAction(m_quit_action.get());
 
+#ifdef TARGET_OS_MAC
+  const char* normal_rel = "/files/app22macos.png"; // X11 tray icon size is 22x22
+  const char* blocked_rel = "/files/app22macos_blocked.png"; // X11 tray icon size is 22x22
+#else
+  const char* normal_rel = "/files/app22windows.png"; // X11 tray icon size is 22x22
+  const char* blocked_rel = "/files/app22windows_blocked.png"; // X11 tray icon size
+#endif
+
+  // setup qrc or fs paths
+  QString base = QString::fromStdString(html_path).trimmed();
+  QIcon tray_icon;
+
+  if (base.startsWith("qrc:/", Qt::CaseInsensitive))
+  {
+    // in webengine we use "qrc:/", but QIcon loads through ":/"
+    // in CMake we have a resource prefix /html, so icons are at :/html/...
+    const QString res_normal  = QString(":/html%1").arg(normal_rel);
+    const QString res_blocked = QString(":/html%1").arg(blocked_rel);
+
+    tray_icon = QIcon(res_normal);
+    tray_icon.setIsMask(true);
+
+    m_normal_icon_path = res_normal.toStdString();
+    m_blocked_icon_path = res_blocked.toStdString();
+  }
+  else
+  {
+    QFileInfo fi(base);
+    QDir dir = fi.isDir() ? QDir(base) : fi.dir();
+
+    QString rel_normal = QString::fromLatin1(normal_rel);
+    QString rel_blocked = QString::fromLatin1(blocked_rel);
+    if (rel_normal.startsWith('/'))
+      rel_normal.remove(0, 1);
+    if (rel_blocked.startsWith('/'))
+      rel_blocked.remove(0, 1);
+
+    const QString file_normal = dir.filePath(rel_normal);
+    const QString file_blocked = dir.filePath(rel_blocked);
+
+    tray_icon = QIcon(file_normal);
+    tray_icon.setIsMask(true);
+
+    m_normal_icon_path  = file_normal.toStdString();
+    m_blocked_icon_path = file_blocked.toStdString();
+  }
+
   m_tray_icon = std::unique_ptr<QSystemTrayIcon>(new QSystemTrayIcon(this));
   m_tray_icon->setContextMenu(m_tray_icon_menu.get());
-
-  //setup icon
-#ifdef TARGET_OS_MAC
-  m_normal_icon_path = html_path + "/files/app22macos.png"; // X11 tray icon size is 22x22
-  m_blocked_icon_path = html_path + "/files/app22macos_blocked.png"; // X11 tray icon size is 22x22
-#else
-  m_normal_icon_path = html_path + "/files/app22windows.png"; // X11 tray icon size is 22x22
-  m_blocked_icon_path = html_path + "/files/app22windows_blocked.png"; // X11 tray icon size
-#endif
-                                                                      //setWindowIcon(QIcon(iconPath.c_str()));
-  QIcon qi( QString::fromWCharArray(epee::string_encoding::utf8_to_wstring(m_normal_icon_path).c_str()) );
-  qi.setIsMask(true);
-  m_tray_icon->setIcon(qi);
+  m_tray_icon->setIcon(tray_icon);
   m_tray_icon->setToolTip(CURRENCY_NAME_BASE);
   connect(m_tray_icon.get(), SIGNAL(activated(QSystemTrayIcon::ActivationReason)),
     this, SLOT(trayIconActivated(QSystemTrayIcon::ActivationReason)));
@@ -560,7 +595,7 @@ void MainWindow::bool_toggle_icon(const QString& param)
   else
     path = m_normal_icon_path;
 
-  QIcon qi( QString::fromWCharArray(epee::string_encoding::utf8_to_wstring(path).c_str()) );
+  QIcon qi(QString::fromStdString(path));
   qi.setIsMask(true);
   m_tray_icon->setIcon(qi);
   CATCH_ENTRY2(void());
@@ -666,8 +701,12 @@ void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
 void MainWindow::load_file(const QString &fileName)
 {
   TRY_ENTRY();
-  LOG_PRINT_L0("Loading html from path: " << fileName.toStdString());
-  QUrl url = QUrl::fromLocalFile(QFileInfo(fileName).absoluteFilePath());
+  LOG_PRINT_L0("Loading qrc/path: " << fileName.toStdString());
+  QUrl url;
+  if (fileName.startsWith("qrc:/", Qt::CaseInsensitive))
+    url = QUrl(fileName);
+  else
+    url = QUrl::fromLocalFile(QFileInfo(fileName).absoluteFilePath());
   m_view->load(url);
   CATCH_ENTRY2(void());
 }
@@ -883,10 +922,21 @@ bool MainWindow::init_ipc_server()
 }
 
 
-bool MainWindow::handle_ipc_event(const std::string& arguments)
+bool MainWindow::handle_ipc_event(const std::string& arguments_)
 {
+  std::string arguments = arguments_;
   std::string zzz = std::string("Received IPC: ") + arguments.c_str();
   std::cout << zzz;//message_box(zzz.c_str());
+  
+  const std::string prefix = "zano://";
+  const std::string target = "zano:";
+
+  // check if it starts with zano://
+  if (arguments.rfind(prefix, 0) == 0) {
+    // erase the extra slashes after "zano:"
+    arguments.replace(0, prefix.size(), target);
+  }
+
 
   handle_deeplink_click(arguments.c_str());
 
@@ -1228,14 +1278,27 @@ bool MainWindow::wallet_sync_progress(const view::wallet_sync_progres_param& p)
 bool MainWindow::set_html_path(const std::string& path)
 {
   TRY_ENTRY();
-  //init_tray_icon(path);
-#ifdef _MSC_VER
-  QString url = QString::fromUtf8(path.c_str()) + "/index.html";
-  load_file(url);
-#else
-//  load_file(QString((std::string("file://") + path + "/index.html").c_str()));
-  load_file(QString((std::string("") + path + "/index.html").c_str()));
-#endif
+  QString s = QString::fromStdString(path).trimmed();
+  QUrl url;
+
+  if (s.startsWith("qrc:/", Qt::CaseInsensitive))
+  {
+    if (!s.endsWith(".html", Qt::CaseInsensitive))
+      s += "/index.html";
+    url = QUrl(s);
+  }
+  else
+  {
+    QFileInfo fi(s);
+    if (fi.exists() && fi.isDir())
+      url = QUrl::fromLocalFile(QDir(s).filePath("index.html"));
+    else if (fi.exists())
+      url = QUrl::fromLocalFile(fi.absoluteFilePath());
+    else
+      url = s.contains("://") ? QUrl(s) : QUrl::fromLocalFile(s);
+  }
+
+  m_view->load(url);
   return true;
   CATCH_ENTRY2(false);
 }

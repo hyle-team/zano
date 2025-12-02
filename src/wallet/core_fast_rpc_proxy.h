@@ -103,6 +103,11 @@ namespace tools
       return m_rpc.on_get_alias_reward(req, res, m_err_stub, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
+    bool call_COMMAND_RPC_ALIAS_LOOKUP(const currency::COMMAND_RPC_ALIAS_LOOKUP::request& req, currency::COMMAND_RPC_ALIAS_LOOKUP::response& res) override
+    { 
+      return m_rpc.on_alias_lookup(req, res, m_err_stub, m_cntxt_stub);
+    }
+    //------------------------------------------------------------------------------------------------------------------------------
     bool call_COMMAND_RPC_GET_TRANSACTIONS(const currency::COMMAND_RPC_GET_TRANSACTIONS::request& req, currency::COMMAND_RPC_GET_TRANSACTIONS::response& rsp) override
     {
       return m_rpc.on_get_transactions(req, rsp, m_cntxt_stub);

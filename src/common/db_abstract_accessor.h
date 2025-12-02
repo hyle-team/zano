@@ -45,7 +45,7 @@ namespace tools
       static_assert(std::is_pod<t_pod_key>::value, "t_pod_key must be a POD type.");
       CHECK_AND_ASSERT_THROW_MES(sizeof(t_pod_key) == ks, "size missmatch");
       CHECK_AND_ASSERT_THROW_MES(pkey, "wrog ptr(null)");
-      k = *(t_pod_key*)pkey;
+      std::memcpy(std::addressof(k), pkey, sizeof(t_pod_key));//k = *(t_pod_key*)pkey;
     }
     inline
     void key_from_ptr(std::string& k, const void* pkey, uint64_t ks)
@@ -85,6 +85,9 @@ namespace tools
         epee::math_helper::average<uint64_t, 10> backend_get_t_time;
         epee::math_helper::average<uint64_t, 10> get_serialize_t_time;
       };
+
+      typedef db_transaction_wrapper<basic_db_accessor> db_tx_obj;
+      typedef std::shared_ptr<db_tx_obj> db_tx_ptr;
     private:
       mutable performance_data m_gperformance_data;
       mutable std::unordered_map<container_handle, performance_data> m_performance_data_map;
@@ -149,9 +152,29 @@ namespace tools
         return r;
       }
 
+      std::shared_ptr<db_tx_obj> begin_transaction_obj(bool readonly = false)
+      {   
+        std::shared_ptr<db_tx_obj> tx_tr(new db_tx_obj(*this));
+
+        bool r = tx_tr->begin_transaction(readonly);
+        if (r)
+        {          
+          return tx_tr;
+        }
+        else
+        {
+          return std::shared_ptr<db_tx_obj>();
+        }        
+      }
+
       bool begin_readonly_transaction()const
       {
         return const_cast<basic_db_accessor&>(*this).begin_transaction(true);
+      }
+
+      std::shared_ptr<db_tx_obj> begin_readonly_transaction_obj()const
+      {
+        return const_cast<basic_db_accessor&>(*this).begin_transaction_obj(true);
       }
 
       void commit_transaction()const
@@ -203,7 +226,7 @@ namespace tools
           CRITICAL_REGION_LOCAL(m_transactions_stack_lock);
           std::vector<bool>& this_thread_tx_stack = m_transactions_stack[std::this_thread::get_id()];
           CHECK_AND_ASSERT_THROW_MES(this_thread_tx_stack.size(), "Internal error: this_thread_tx_stack.size = 0 at abort tx");
-          CHECK_AND_ASSERT_THROW_MES(!this_thread_tx_stack.back(), "Internal error: abort on readonly tx");
+          //CHECK_AND_ASSERT_THROW_MES(!this_thread_tx_stack.back(), "Internal error: abort on readonly tx");
           is_writer_tx = !this_thread_tx_stack.back();
         }
         if (is_writer_tx)
@@ -215,10 +238,10 @@ namespace tools
 
           std::vector<bool>& this_thread_tx_stack = m_transactions_stack[std::this_thread::get_id()];
           CHECK_AND_ASSERT_THROW_MES(this_thread_tx_stack.size(), "Internal error: this_thread_tx_stack.size = 0 at abort tx");
-          CHECK_AND_ASSERT_THROW_MES(!this_thread_tx_stack.back(), "Internal error: abort on readonly tx");
+          //CHECK_AND_ASSERT_THROW_MES(!this_thread_tx_stack.back(), "Internal error: abort on readonly tx");
           this_thread_tx_stack.pop_back();
           bool has_other_writers_on_stack = has_writer_tx_in_stack(this_thread_tx_stack);
-          if (!has_other_writers_on_stack)
+          if (is_writer_tx && !has_other_writers_on_stack)
           {
             LOG_PRINT_CYAN("[WRITE_TX_ABORT]", LOG_LEVEL_2);
             for (auto cnt_ptr : m_binded_containers)
@@ -346,7 +369,7 @@ namespace tools
         CHECK_AND_ASSERT_MES(sizeof(t_pod_object) == res_buff.size(), false, "sizes missmath at get_pod_object_from_db(). returned size = "
           << res_buff.size() << "expected: " << sizeof(t_pod_object));
 
-        obj = *(t_pod_object*)res_buff.data();
+        std::memcpy(std::addressof(obj), res_buff.data(), sizeof(t_pod_object));//obj = *(t_pod_object*)res_buff.data();
         return true;
         //CATCH_ENTRY_L0("get_t_object_from_db", false);
       }
@@ -382,7 +405,7 @@ namespace tools
         CHECK_AND_ASSERT_THROW_MES(sizeof(t_value) == vs, "sizes missmath at get_pod_object_from_db(). returned size = " 
           << vs << "expected: " << sizeof(t_value));
 
-        v = *(t_value*)pv;
+        std::memcpy(std::addressof(v), pv, sizeof(t_value)); //v = *(t_value*)pv;
 
         return true;
       }
@@ -565,6 +588,9 @@ namespace tools
         bdb.abort_transaction();
       }
 
+      basic_db_accessor& get_db_accessor() { return bdb; }
+      const basic_db_accessor& get_db_accessor() const { return bdb; }
+
       bool init(const std::string& container_name)
       {
 #ifdef ENABLE_PROFILING
@@ -609,6 +635,13 @@ namespace tools
       {
         items_accessor_cb<t_cb, t_key, t_value, access_strategy_selector<is_t_access_strategy> > local_enum_handler(cb);
         bdb.get_backend()->enumerate(m_h, &local_enum_handler);
+      }
+
+      template<class t_cb>
+      void enumerate_items_by_prefix(const std::string& prefix, uint64_t limit, t_cb cb) const
+      {
+        items_accessor_cb<t_cb, t_key, t_value, access_strategy_selector<is_t_access_strategy>> local_enum_handler(cb);
+        bdb.get_backend()->enumerate_prefix(m_h, prefix, limit, &local_enum_handler);
       }
 
       template<class t_explicit_key, class t_explicit_value, class t_strategy>

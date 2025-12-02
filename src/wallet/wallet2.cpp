@@ -3347,6 +3347,22 @@ void wallet2::restore(const std::wstring& path, const std::string& pass, const s
   store();
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::restore(const std::wstring& path, const std::string& pass, const std::string& secret_derivation, bool is_auditabe_wallet, uint64_t creation_timestamp)
+{
+  bool r = false;
+  clear();
+  prepare_file_names(path);
+  m_password = pass;
+
+  r = m_account.restore_from_secret_derivation(secret_derivation, is_auditabe_wallet, creation_timestamp);
+  init_log_prefix();
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(r, "Could not load  wallet from a given secrete derivation");
+
+  boost::system::error_code ignored_ec;
+  THROW_IF_TRUE_WALLET_EX(boost::filesystem::exists(m_wallet_file, ignored_ec), error::file_exists, epee::string_encoding::convert_to_ansii(m_wallet_file));
+  store();
+}
+//----------------------------------------------------------------------------------------------------
 bool wallet2::check_connection()
 {
   return m_core_proxy->check_connection();
@@ -8204,6 +8220,7 @@ void wallet2::finalize_transaction(currency::finalize_tx_param& ftp, currency::f
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!broadcast_tx || store_tx_secret_key, "finalize_tx is requested to broadcast a tx without storing the key");
 
   THROW_IF_FALSE_WALLET_EX_MES(ftp.sources.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, error::tx_too_big, "Too many inputs: " << ftp.sources.size() << ", maximum allowed is " << CURRENCY_TX_MAX_ALLOWED_INPUTS << ".");
+  THROW_IF_FALSE_WALLET_EX_MES(ftp.prepared_destinations.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS, error::tx_has_too_many_outs, "Too many outputs: " << ftp.prepared_destinations.size() << ", maximum allowed is " << CURRENCY_TX_MAX_ALLOWED_OUTS << ".");
 
   bool r = currency::construct_tx(m_account.get_keys(),
     ftp, result);

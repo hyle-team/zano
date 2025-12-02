@@ -1,11 +1,11 @@
-// Copyright (c) 2018-2019 Zano Project
+// Copyright (c) 2018-2025 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
-
-
 #include "tx_semantic_validation.h"
 #include "currency_format_utils.h"
+#include "currency_format_utils_transactions.h"
+#include "misc_log_ex.h"
+#include "currency_config.h"
 
 namespace currency
 {
@@ -34,6 +34,17 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------------------------------------
+  bool check_inputs_and_outputs_size(const transaction& tx)
+  {
+    CHECK_AND_ASSERT_MES(tx.vin.size() != 0, false, "transaction has no inputs");
+    CHECK_AND_ASSERT_MES(tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
+    
+    const uint64_t tx_max_allowed_outs = tx.version >= TRANSACTION_VERSION_POST_HF4 ? CURRENCY_TX_MAX_ALLOWED_OUTS : CURRENCY_TX_MAX_ALLOWED_OUTS_PRE_HF4;
+    CHECK_AND_ASSERT_MES(tx.vout.size() <= tx_max_allowed_outs, false, "transaction has too many outputs = " << tx.vout.size());
+    
+    return true;
+  }
+  //-----------------------------------------------------------------------------------------------
   bool validate_tx_semantic(const transaction& tx, size_t tx_blob_size)
   {
     if (tx_blob_size >= CURRENCY_MAX_TRANSACTION_BLOB_SIZE)
@@ -42,9 +53,9 @@ namespace currency
       return false;
     }
 
-    if (!tx.vin.size())
+    if (!check_inputs_and_outputs_size(tx))
     {
-      LOG_PRINT_RED_L0("tx with empty inputs, rejected for tx id= " << get_transaction_hash(tx));
+      LOG_PRINT_RED_L0("invalid inputs/outputs size for tx id= " << get_transaction_hash(tx));
       return false;
     }
 
@@ -92,4 +103,4 @@ namespace currency
 
     return true;
   }
-}
+} // namespace currency
