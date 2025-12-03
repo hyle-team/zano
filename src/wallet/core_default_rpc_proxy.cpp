@@ -162,22 +162,20 @@ namespace tools
   {
     CRITICAL_REGION_LOCAL(m_lock);
     m_block_submit_cfg = cfg;
-    m_http_client_block_submit.reset();
 
     if (!cfg.enabled)
       return;
-
-    auto socks = std::make_unique<epee::net_utils::http::http_socks5_client>(cfg.proxy_host, cfg.proxy_port);
+    m_socks5_client.get_transport().set_socks_proxy(cfg.proxy_host, cfg.proxy_port);
+    m_socks5_client.get_transport().set_use_remote_dns(true);
 
     // TODO: TLS over SOCKS5 is not implemented yet
 
-    m_http_client_block_submit = std::move(socks);
     m_block_submit_base_url = cfg.submit_base_url_override.empty() ? m_daemon_address : cfg.submit_base_url_override;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::call_COMMAND_RPC_SUBMITBLOCK2(const currency::COMMAND_RPC_SUBMITBLOCK2::request& req, currency::COMMAND_RPC_SUBMITBLOCK2::response& rsp)
   {
-    if (m_block_submit_cfg.enabled && m_http_client_block_submit)
+    if (m_block_submit_cfg.enabled)
     {
       epee::net_utils::http::url_content u = AUTO_VAL_INIT(u);
       epee::net_utils::parse_url(m_block_submit_base_url, u);
@@ -188,14 +186,14 @@ namespace tools
       if (u.schema == "https")
         LOG_PRINT_YELLOW("submitblock2 over SOCKS5: HTTPS requested, but TLS-over-SOCKS is not supported yet", LOG_LEVEL_0);
 
-      m_http_client_block_submit->set_is_ssl(false);
+      // TODO: here could be ssl
 
       // http_socks5_client by himself create TCP connection to SOCKS5,
       // do CONNECT to dest host:port and return ready tunnel
-      if (!m_http_client_block_submit->connect(u.host, std::to_string(u.port), m_connection_timeout))
+      if (!m_socks5_client->connect(u.host, u.port, m_connection_timeout))
         return false;
 
-      return epee::net_utils::invoke_http_json_rpc("/json_rpc", "submitblock2", req, rsp, *m_http_client_block_submit);
+      return epee::net_utils::invoke_http_json_rpc("/json_rpc", "submitblock2", req, rsp, *m_socks5_client);
     }
 
     return invoke_http_json_rpc_update_is_disconnect("submitblock2", req, rsp);

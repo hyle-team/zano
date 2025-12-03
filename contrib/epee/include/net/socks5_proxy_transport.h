@@ -170,5 +170,46 @@ private:
   bool m_use_remote_dns = true;
 };
 
+namespace detail
+{
+  // SOCKS5 adapter helpers (SFINAE)
+  // Apply proxy/DNS/timeout to any transport iff it has:
+  //   set_socks_proxy(std::string,uint16_t)
+  //   set_use_remote_dns(bool)
+  //   set_timeouts(unsigned,unsigned)
+  // Otherwise it’s a no-op.
+  // Usage: apply_socks_relay_to(tr); before connect()/invoke().
+  // Config: wallet::m_socks5_relay_cfg. To support a new transport, implement the setters.
+
+  // set_socks_proxy(host, port)
+  template<class T>
+  inline auto try_set_socks_proxy(T& tr, const std::string& host, uint16_t port, int)
+    -> decltype(tr.set_socks_proxy(std::string(), uint16_t()), void())
+  {
+    tr.set_socks_proxy(host, port);
+  }
+  template<class T>
+  inline void try_set_socks_proxy(T&, const std::string&, uint16_t, long) {}
+
+  // set_use_remote_dns(bool)
+  template<class T>
+  inline auto try_set_use_remote_dns(T& tr, bool v, int)
+    -> decltype(tr.set_use_remote_dns(bool()), void())
+  {
+    tr.set_use_remote_dns(v);
+  }
+  template<class T>
+  inline void try_set_use_remote_dns(T&, bool, long) {}
+
+  // set_timeouts(connect_ms, recv_ms)
+  template<class T>
+  inline auto try_set_timeouts(T& tr, unsigned conn_ms, unsigned recv_ms, int)
+    -> decltype(tr.set_timeouts(unsigned(), unsigned()), void())
+  {
+    tr.set_timeouts(conn_ms, recv_ms);
+  }
+  template<class T>
+  inline void try_set_timeouts(T&, unsigned, unsigned, long) {}
+} // namespace detail
 } // namespace socks5
 } // namespace tools
