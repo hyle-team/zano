@@ -29,7 +29,7 @@ namespace tools
   static constexpr pre_download_entry c_pre_download_mdbx             = { "", "", 0, 0 };
   static constexpr pre_download_entry c_pre_download_lmdb             = { "", "", 0, 0 };
   static constexpr pre_download_entry c_pre_download_mdbx_unpruned    = { "", "", 0, 0 };
-  static constexpr pre_download_entry c_pre_download_mdbx_unpruned    = { "", "", 0, 0 };
+  static constexpr pre_download_entry c_pre_download_lmdb_unpruned    = { "", "", 0, 0 };
 #endif
 
   static constexpr uint64_t pre_download_min_size_difference = 512 * 1024 * 1024; // minimum difference in size between local DB and the downloadable one to start downloading
