@@ -11,6 +11,7 @@
 #include <vector>
 #include <boost/algorithm/string.hpp>
 
+#include "wallet/wallet2.h"
 #include "currency_core/currency_format_utils.h"
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "include_base_utils.h"
@@ -442,17 +443,25 @@ namespace tools
       typedef std::vector<currency::tx_source_entry> sources_t;
       typedef std::vector<currency::tx_destination_entry> destinations_t;
 
-      explicit tx_not_constructed(std::string&& loc, const sources_t& sources, const destinations_t& destinations, uint64_t unlock_time)
+      explicit tx_not_constructed(std::string&& loc, const sources_t& sources, const destinations_t& destinations, uint64_t unlock_time, const std::unordered_map<crypto::public_key, size_t>& asset_dp)
         : transfer_error(std::move(loc), "transaction was not constructed")
         , m_sources(sources)
         , m_destinations(destinations)
         , m_unlock_time(unlock_time)
+        , m_asset_decimal_point(asset_dp)
       {
       }
 
       const sources_t& sources() const { return m_sources; }
       const destinations_t& destinations() const { return m_destinations; }
       uint64_t unlock_time() const { return m_unlock_time; }
+      size_t get_decimal_point(crypto::public_key asset_id) const 
+      {
+        auto it = m_asset_decimal_point.find(asset_id);
+        if (it != m_asset_decimal_point.end())
+          return it->second;
+        return CURRENCY_DISPLAY_DECIMAL_POINT;
+      }
 
       std::string to_string() const
       {
@@ -463,7 +472,7 @@ namespace tools
         {
           const currency::tx_source_entry& src = m_sources[i];
           ss << "\n  " << i << ": ";
-          ss << " amount: " << std::setw(21) << currency::print_money(src.amount);
+          ss << " amount: " << std::setw(21) << currency::print_money(src.amount, get_decimal_point(src.asset_id));
           ss << (src.is_zc() ? " ZC  " : " old ");
           ss << " asset_id: " << src.asset_id;
            for (size_t j = 0; j < src.outputs.size(); ++j)
@@ -497,7 +506,7 @@ namespace tools
           {
             ss << currency::get_account_address_as_str(a) << ";";
           } 
-          ss << " amount: " << std::setw(21) << currency::print_money(dst.amount);
+          ss << " amount: " << std::setw(21) << currency::print_money(dst.amount, get_decimal_point(dst.asset_id));
           ss << " asset_id: " << dst.asset_id;
         }
 
@@ -510,6 +519,7 @@ namespace tools
       sources_t m_sources;
       destinations_t m_destinations;
       uint64_t m_unlock_time;
+      std::unordered_map<crypto::public_key, size_t> m_asset_decimal_point;
     };
     //----------------------------------------------------------------------------------------------------
     struct tx_rejected : public transfer_error
@@ -540,15 +550,24 @@ namespace tools
     //----------------------------------------------------------------------------------------------------
     struct tx_sum_overflow : public transfer_error
     {
-      tx_sum_overflow(std::string&& loc, const std::vector<currency::tx_destination_entry>& destinations, uint64_t fee)
+      tx_sum_overflow(std::string&& loc, const std::vector<currency::tx_destination_entry>& destinations, uint64_t fee, std::unordered_map<crypto::public_key, size_t> asset_dp)
         : transfer_error(std::move(loc), "transaction sum + fee exceeds " + currency::print_money(std::numeric_limits<uint64_t>::max()))
         , m_destinations(destinations)
         , m_fee(fee)
+        , m_asset_decimal_point(asset_dp)
       {
       }
 
       const std::vector<currency::tx_destination_entry>& destinations() const { return m_destinations; }
       uint64_t fee() const { return m_fee; }
+
+      size_t get_decimal_point(crypto::public_key asset_id) const 
+      {
+        auto it = m_asset_decimal_point.find(asset_id);
+        if (it != m_asset_decimal_point.end())
+          return it->second;
+        return CURRENCY_DISPLAY_DECIMAL_POINT;
+      }
 
       std::string to_string() const
       {
@@ -558,7 +577,7 @@ namespace tools
           ", destinations:";
         for (const auto& dst : m_destinations)
         {
-          ss << '\n' << currency::print_money(dst.amount) << " -> ";
+          ss << '\n' << currency::print_money(dst.amount, get_decimal_point(dst.asset_id)) << " -> ";
           for (const auto& a : dst.addr)
             ss << currency::get_account_address_as_str(a) << " ";
         }
@@ -568,6 +587,7 @@ namespace tools
     private:
       std::vector<currency::tx_destination_entry> m_destinations;
       uint64_t m_fee;
+      std::unordered_map<crypto::public_key, size_t> m_asset_decimal_point;
     };
     //----------------------------------------------------------------------------------------------------
     struct tx_too_big : public transfer_error
@@ -589,6 +609,28 @@ namespace tools
       {
         return API_RETURN_CODE_TX_IS_TOO_BIG;
       }
+    private:
+      std::string m_message;
+    };
+    //----------------------------------------------------------------------------------------------------
+    struct tx_has_too_many_outs : public transfer_error
+    {
+      explicit tx_has_too_many_outs(std::string&& loc, const std::string& message)
+        : transfer_error(std::move(loc), API_RETURN_CODE_TX_HAS_TOO_MANY_OUTPUTS)
+        , m_message(message)
+      {
+      }
+
+      const std::string get_message() const { return m_message; }
+
+      /*std::string to_string() const
+      {
+        return API_RETURN_CODE_TX_HAS_TOO_MANY_OUTPUTS;
+      }
+      virtual const char* what() const noexcept
+      {
+        return API_RETURN_CODE_TX_HAS_TOO_MANY_OUTPUTS;
+      }*/
     private:
       std::string m_message;
     };
@@ -664,6 +706,38 @@ namespace tools
       std::string m_wallet_file;
     };
     //----------------------------------------------------------------------------------------------------
+    struct wallet_error_with_rpc_code : public wallet_logic_error
+    {
+      const std::string& rpc_error_message() const { return m_rpc_error_message; }
+      int64_t rpc_error_code() const { return m_rpc_error_code; }
+
+      std::string to_string() const
+      {
+        std::ostringstream ss;
+        ss << wallet_logic_error::to_string() << ", code = " << m_rpc_error_code << ", message = " << m_rpc_error_message;
+        return ss.str();
+      }
+
+      wallet_error_with_rpc_code(std::string&& loc, int64_t rpc_error_code, const std::string& rpc_error_message)
+        : wallet_logic_error(std::move(loc), rpc_error_message)
+        , m_rpc_error_code(rpc_error_code)
+        , m_rpc_error_message(rpc_error_message)
+      {
+      }
+
+      wallet_error_with_rpc_code(std::string&& loc, int64_t rpc_error_code, const std::string& rpc_error_message, const std::string& message)
+        : wallet_logic_error(std::move(loc), message)
+        , m_rpc_error_code(rpc_error_code)
+        , m_rpc_error_message(rpc_error_message)
+      {
+      }
+
+    private:
+      int64_t m_rpc_error_code;
+      std::string m_rpc_error_message;
+    };
+    //----------------------------------------------------------------------------------------------------
+
 
     template<typename TException, typename... TArgs>
     void throw_wallet_ex(std::string&& loc, const TArgs&... args)

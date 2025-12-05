@@ -32,3 +32,8 @@ struct pos_mining_with_decoys : public wallet_test
   bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct pos_and_no_pow_blocks_between_output_and_stake : public wallet_test
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};

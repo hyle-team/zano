@@ -198,6 +198,7 @@ namespace currency
     bool m_do_pos_mining;
     bool m_offline_mode;
     bool m_disable_tor;
+    bool m_do_not_unlock_reserved_on_idle = false;
     std::string m_restore_wallet;
     std::string m_voting_config_file;
     bool m_no_password_confirmations = false;

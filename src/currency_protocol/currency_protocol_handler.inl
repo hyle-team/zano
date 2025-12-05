@@ -78,6 +78,7 @@ namespace currency
       m_core.get_short_chain_history(r.block_ids);
       LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_CHAIN(on_callback): m_block_ids.size()=" << r.block_ids.size());
       LOG_PRINT_L3("[NOTIFY]NOTIFY_REQUEST_CHAIN(on_callback): " << ENDL << print_kv_structure(r));
+      ++context.m_priv.m_expected_NOTIFY_RESPONSE_CHAIN_ENTRY_count;
       post_notify<NOTIFY_REQUEST_CHAIN>(r, context);
     }
 
@@ -521,9 +522,18 @@ namespace currency
   template<class t_core>
   int t_currency_protocol_handler<t_core>::handle_response_get_objects(int command, NOTIFY_RESPONSE_GET_OBJECTS::request& arg, currency_connection_context& context)
   {
+    //LOG_PRINT_MAGENTA("[NOTIFY_RESPONSE_GET_OBJECTS] count=" << context.m_priv.m_expected_NOTIFY_RESPONSE_GET_OBJECTS_count, LOG_LEVEL_0);
+    if (context.m_priv.m_expected_NOTIFY_RESPONSE_GET_OBJECTS_count == 0)
+    {
+      LOG_ERROR_CCONTEXT("m_expected_NOTIFY_RESPONSE_GET_OBJECTS_count is 0, unsolicited NOTIFY_RESPONSE_GET_OBJECTS ignored, dropping connection");
+      m_p2p->drop_connection(context);
+      return 1;
+    }
+    --context.m_priv.m_expected_NOTIFY_RESPONSE_GET_OBJECTS_count;
+
     //do not process requests if it comes from node wich is debugged
     if (m_debug_ip_address != 0 && context.m_remote_ip == m_debug_ip_address)
-      return 1;
+      return 1;    
 
     LOG_PRINT_L2("[HANDLE]NOTIFY_RESPONSE_GET_OBJECTS: arg.blocks.size()=" << arg.blocks.size() << ", arg.missed_ids.size()=" << arg.missed_ids.size() << ", arg.txs.size()=" << arg.txs.size());
     LOG_PRINT_L3("[HANDLE]NOTIFY_RESPONSE_GET_OBJECTS: " << ENDL << currency::print_kv_structure(arg));
@@ -726,6 +736,7 @@ namespace currency
     }
     LOG_PRINT_L2("[NOTIFY]NOTIFY_RESPONSE_CHAIN_ENTRY: m_start_height=" << r.start_height << ", m_total_height=" << r.total_height << ", m_block_ids.size()=" << r.m_block_ids.size());
     LOG_PRINT_L3("[NOTIFY]NOTIFY_RESPONSE_CHAIN_ENTRY: " << print_kv_structure(r));
+
     post_notify<NOTIFY_RESPONSE_CHAIN_ENTRY>(r, context);
     return 1;
   }
@@ -755,6 +766,7 @@ namespace currency
 
       LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_GET_OBJECTS(req_missing): requested_cumulative_size=" << requested_cumulative_size << ", blocks.size()=" << req.blocks.size() << ", txs.size()=" << req.txs.size());
       LOG_PRINT_L3("[NOTIFY]NOTIFY_REQUEST_GET_OBJECTS(req_missing): " << ENDL << currency::print_kv_structure(req));
+      context.m_priv.m_expected_NOTIFY_RESPONSE_GET_OBJECTS_count++;
       post_notify<NOTIFY_REQUEST_GET_OBJECTS>(req, context);    
     }else if(context.m_last_response_height < context.m_remote_blockchain_size-1)
     {//we have to fetch more objects ids, request blockchain entry
@@ -986,6 +998,17 @@ namespace currency
   template<class t_core> 
   int t_currency_protocol_handler<t_core>::handle_response_chain_entry(int command, NOTIFY_RESPONSE_CHAIN_ENTRY::request& arg, currency_connection_context& context)
   {
+    //LOG_PRINT_MAGENTA("[NOTIFY_RESPONSE_CHAIN_ENTRY] count=" << context.m_priv.m_expected_NOTIFY_RESPONSE_CHAIN_ENTRY_count, LOG_LEVEL_0);
+    if (context.m_priv.m_expected_NOTIFY_RESPONSE_CHAIN_ENTRY_count == 0)
+    {
+      LOG_ERROR_CCONTEXT("m_expected_NOTIFY_RESPONSE_CHAIN_ENTRY_count is 0, unsolicited NOTIFY_RESPONSE_CHAIN_ENTRY ignored, dropping connection");
+      m_p2p->drop_connection(context);
+      return 1;
+    }
+    --context.m_priv.m_expected_NOTIFY_RESPONSE_CHAIN_ENTRY_count;
+    
+
+
     //do not process requests if it comes from node wich is debugged
     if (m_debug_ip_address != 0 && context.m_remote_ip == m_debug_ip_address)
       return 1;
