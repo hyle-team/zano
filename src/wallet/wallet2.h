@@ -47,6 +47,7 @@
 #include "view_iface.h"
 #include "wallet2_base.h"
 #include "decoy_selection.h"
+#include "net/socks5_proxy_transport.h"
 
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               CURRENCY_HF4_MANDATORY_MIN_COINAGE
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
@@ -151,18 +152,6 @@ namespace tools
     uint64_t m_last_pow_block_h = 0;
     std::list<std::pair<uint64_t, wallet_event_t>> m_rollback_events;
     std::list<std::pair<uint64_t, uint64_t> > m_last_zc_global_indexs; // <height, last_zc_global_indexs>, biggest height comes in front
-   
-    struct socks5_relay_config
-    {
-      bool        enable_proxy        = false;
-      std::string ip                  = "127.0.0.1";
-      uint16_t    port                = 9050;
-      bool        use_remote_dns      = true;
-      unsigned    connect_timeout_ms  = 15000;
-      unsigned    recv_timeout_ms     = 15000;
-
-      void clear() { *this = socks5_relay_config(); }
-    };
 
     //variables that not being serialized
     std::atomic<uint64_t> m_last_bc_timestamp = 0;
@@ -606,10 +595,10 @@ namespace tools
     }
 
     // SOCKS5 relay API (runtime)
-    void configure_socks_relay(const socks5_relay_config& cfg);
+    void configure_socks_relay(const socks5::socks5_proxy_settings& cfg);
     bool configure_socks_relay(const std::string& addr_port); // "ip:port"
     void disable_socks_relay();
-    const socks5_relay_config& get_socks5_relay_config() const;
+    const socks5::socks5_proxy_settings& get_socks5_relay_config() const;
     template <class transport_t>
     void apply_socks_relay_to(transport_t& tr) const;
 
@@ -1016,8 +1005,8 @@ private:
     bool m_disable_tor_relay;
     mutable current_operation_context m_current_context;
 
-    socks5_relay_config m_socks5_relay_cfg{};
-    socks5_relay_config m_block_socks5_relay_cfg{};
+    socks5::socks5_proxy_settings m_socks5_relay_cfg {};
+    socks5::socks5_proxy_settings m_block_socks5_relay_cfg {};
 
     std::string m_votes_config_path;
     tools::wallet_public::wallet_vote_config m_votes_config;
@@ -1299,12 +1288,12 @@ namespace tools
 template <class transport_t>
 inline void wallet2::apply_socks_relay_to(transport_t& tr) const
 {
-  if (!m_socks5_relay_cfg.enable_proxy)
+  if (!m_socks5_relay_cfg.enabled)
     return;
-  socks5::detail::try_set_socks_proxy   (tr, m_socks5_relay_cfg.ip,   m_socks5_relay_cfg.port, 0);
-  socks5::detail::try_set_use_remote_dns(tr, m_socks5_relay_cfg.use_remote_dns,                0);
+  socks5::detail::try_set_socks_proxy   (tr, m_socks5_relay_cfg.proxy_host, m_socks5_relay_cfg.proxy_port, 0);
+  socks5::detail::try_set_use_remote_dns(tr, m_socks5_relay_cfg.use_remote_dns, 0);
   socks5::detail::try_set_timeouts      (tr, m_socks5_relay_cfg.connect_timeout_ms,
-                                             m_socks5_relay_cfg.recv_timeout_ms,               0);
+                                             m_socks5_relay_cfg.recv_timeout_ms, 0);
 }
 } // namespace tools
 

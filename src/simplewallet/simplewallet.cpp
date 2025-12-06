@@ -450,7 +450,7 @@ void process_wallet_command_line_params(const po::variables_map& vm, tools::wall
   }
 
   {
-    tools::socks5_submit_cfg blocks_socks_cfg{};
+    tools::socks5::socks5_proxy_settings blocks_socks_cfg{};
 
     const auto brp = command_line::get_arg(vm, arg_enable_block_socks5_relay_proxy);
     if (!brp.empty())
@@ -474,7 +474,7 @@ void process_wallet_command_line_params(const po::variables_map& vm, tools::wall
 
     if (auto cp = wal.get_core_proxy())
     {
-      cp->set_block_submit_via_socks5(blocks_socks_cfg);
+      cp->set_socks5_proxy(blocks_socks_cfg);
       if (blocks_socks_cfg.enabled)
       {
         LOG_PRINT_L0(std::string("Block submit via SOCKS5 configured: ")

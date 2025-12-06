@@ -80,7 +80,7 @@ namespace tools
     , m_votes_config_path(tools::get_default_data_dir() + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME)
   {
     m_core_runtime_config = currency::get_default_core_runtime_config();
-    m_socks5_relay_cfg = socks5_relay_config{};
+    m_socks5_relay_cfg = socks5::socks5_proxy_settings{};
   }
   //---------------------------------------------------------------
   wallet2::~wallet2()
@@ -7220,7 +7220,7 @@ void wallet2::send_transaction_to_network(const transaction& tx)
     tools::levin_over_socks5_client p2p_client;
     apply_socks_relay_to(p2p_client.get_transport());
     WLT_LOG_L1("[SOCKS5] Sending transaction " << get_transaction_hash(tx) << " via SOCKS5 relay "
-      << m_socks5_relay_cfg.ip << ":" << m_socks5_relay_cfg.port);
+      << m_socks5_relay_cfg.proxy_host << ":" << m_socks5_relay_cfg.proxy_port);
 
     bool successful = false;
     for (size_t i = 0; i != 3; ++i)
@@ -8701,16 +8701,14 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::configure_socks_relay(const socks5_relay_config& cfg)
+void wallet2::configure_socks_relay(const socks5::socks5_proxy_settings& cfg)
 {
   m_socks5_relay_cfg = cfg;
-  if (m_socks5_relay_cfg.enable_proxy)
+  if (m_socks5_relay_cfg.enabled)
   {
     WLT_LOG_L0("SOCKS5 relay enabled: "
-      << m_socks5_relay_cfg.ip << ":" << m_socks5_relay_cfg.port
-      << ", remote DNS: " << (m_socks5_relay_cfg.use_remote_dns ? "on" : "off")
-      << ", timeouts(ms): connect=" << m_socks5_relay_cfg.connect_timeout_ms
-      << ", recv=" << m_socks5_relay_cfg.recv_timeout_ms);
+      << m_socks5_relay_cfg.proxy_host << ":" << m_socks5_relay_cfg.proxy_port
+      << ", remote DNS: " << (m_socks5_relay_cfg.use_remote_dns ? "on" : "off"));
   }
   else
   {
@@ -8727,9 +8725,9 @@ bool wallet2::configure_socks_relay(const std::string& addr_port)
     return false;
   }
 
-  socks5_relay_config cfg = m_socks5_relay_cfg;
-  cfg.enable_proxy = true;
-  cfg.ip = addr_port.substr(0, pos);
+  socks5::socks5_proxy_settings cfg = m_socks5_relay_cfg;
+  cfg.enabled = true;
+  cfg.proxy_host = addr_port.substr(0, pos);
 
   uint16_t p = 0;
   try
@@ -8741,7 +8739,7 @@ bool wallet2::configure_socks_relay(const std::string& addr_port)
     WLT_LOG_L0("configure_socks_relay: wrong port in " << addr_port);
     return false;
   }
-  cfg.port = p;
+  cfg.proxy_port = p;
 
   configure_socks_relay(cfg);
   return true;
@@ -8749,11 +8747,10 @@ bool wallet2::configure_socks_relay(const std::string& addr_port)
 //----------------------------------------------------------------------------------------------------
 void wallet2::disable_socks_relay()
 {
-  socks5_relay_config off; // enable_proxy=false by default
-  configure_socks_relay(off);
+  m_socks5_relay_cfg.enabled = false;
 }
 //----------------------------------------------------------------------------------------------------
-const wallet2::socks5_relay_config& wallet2::get_socks5_relay_config() const
+const socks5::socks5_proxy_settings& wallet2::get_socks5_relay_config() const
 {
   return m_socks5_relay_cfg;
 }

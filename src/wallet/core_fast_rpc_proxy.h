@@ -184,7 +184,7 @@ namespace tools
       return time(nullptr); 
     }
     //------------------------------------------------------------------------------------------------------------------------------
-    void set_block_submit_via_socks5(const tools::socks5_submit_cfg& /*cfg*/) override
+    void set_socks5_proxy(const socks5::socks5_proxy_settings& /*cfg*/) override
     {
       // TODO: We do no-op to satisfy the interface
     }

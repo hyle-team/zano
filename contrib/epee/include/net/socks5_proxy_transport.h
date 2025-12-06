@@ -7,6 +7,19 @@
 
 namespace tools {
 namespace socks5 {
+// socks5_base_cfg
+struct socks5_proxy_settings
+{
+  bool        enabled = false;
+  std::string proxy_host{};
+  uint16_t    proxy_port = 0;
+  bool        use_remote_dns = false;
+
+  unsigned int connect_timeout_ms = 15000;
+  unsigned int recv_timeout_ms = 15000;
+
+  std::string submit_base_url_override{};
+};
 
 template<class base_transport>
 class socks5_proxy_transport : public base_transport
@@ -22,7 +35,7 @@ public:
 
   void set_use_remote_dns(bool v) { m_use_remote_dns = v; }
 
-  bool connect(const std::string& dest_host, int dest_port, unsigned int connect_timeout_ms, unsigned int recv_timeout_ms,
+  bool connect(const std::string& dest_host, const std::string& dest_port, unsigned int connect_timeout_ms, unsigned int recv_timeout_ms,
     const std::string& bind_ip = "0.0.0.0")
   {
     // 1) TCP connect to SOCKS5 proxy through BASE transport
@@ -85,7 +98,11 @@ public:
       }
 
       // DST.PORT (network byte order)
-      const uint16_t p = static_cast<uint16_t>(dest_port);
+      int port;
+      try { port = std::stoi(dest_port); }
+      catch (...) { return false; }
+
+      const uint16_t p = static_cast<uint16_t>(port);
       req.push_back(static_cast<unsigned char>((p >> 8) & 0xFF));
       req.push_back(static_cast<unsigned char>( p       & 0xFF));
 
@@ -144,7 +161,12 @@ public:
 
   bool connect(const std::string& dest_host, int dest_port, unsigned int timeout_ms, const std::string& bind_ip = "0.0.0.0")
   {
-    return connect(dest_host, dest_port, timeout_ms, timeout_ms, bind_ip);
+    return connect(dest_host, std::to_string(dest_port), timeout_ms, timeout_ms, bind_ip);
+  }
+
+  bool connect(const std::string& dest_host, int dest_port, unsigned int connect_timeout_ms, unsigned int recv_timeout_ms, const std::string& bind_ip = "0.0.0.0")
+  {
+    return connect(dest_host, std::to_string(dest_port), connect_timeout_ms, recv_timeout_ms, bind_ip);
   }
 
   // u_long (BE) overload for compatibility
@@ -166,7 +188,7 @@ public:
 
 private:
   std::string m_proxy_host = "127.0.0.1";
-  uint16_t m_proxy_port = 9050;
+  int m_proxy_port = 9050;
   bool m_use_remote_dns = true;
 };
 
@@ -179,7 +201,7 @@ namespace detail
   //   set_timeouts(unsigned,unsigned)
   // Otherwise it’s a no-op.
   // Usage: apply_socks_relay_to(tr); before connect()/invoke().
-  // Config: wallet::m_socks5_relay_cfg. To support a new transport, implement the setters.
+  // Config: socks5_proxy_settings. To support a new transport, implement the setters.
 
   // set_socks_proxy(host, port)
   template<class T>
@@ -188,6 +210,7 @@ namespace detail
   {
     tr.set_socks_proxy(host, port);
   }
+
   template<class T>
   inline void try_set_socks_proxy(T&, const std::string&, uint16_t, long) {}
 
@@ -198,6 +221,7 @@ namespace detail
   {
     tr.set_use_remote_dns(v);
   }
+
   template<class T>
   inline void try_set_use_remote_dns(T&, bool, long) {}
 
@@ -208,8 +232,22 @@ namespace detail
   {
     tr.set_timeouts(conn_ms, recv_ms);
   }
+
   template<class T>
   inline void try_set_timeouts(T&, unsigned, unsigned, long) {}
+
+  template<typename Transport>
+  void apply_socks5_cfg(Transport& tr, const socks5_proxy_settings& cfg)
+  {
+    if (!cfg.enabled)
+      return;
+
+    detail::try_set_socks_proxy(tr, cfg.proxy_host, cfg.proxy_port, 0);
+    detail::try_set_use_remote_dns(tr, cfg.use_remote_dns, 0);
+
+    if (cfg.connect_timeout_ms || cfg.recv_timeout_ms)
+      detail::try_set_timeouts(tr, cfg.connect_timeout_ms, cfg.recv_timeout_ms, 0);
+  }
 } // namespace detail
 } // namespace socks5
 } // namespace tools

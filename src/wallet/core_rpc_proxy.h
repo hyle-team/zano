@@ -7,6 +7,7 @@
 
 #pragma once
 #include "rpc/core_rpc_server_commands_defs.h"
+#include "net/socks5_proxy_transport.h"
 #include "currency_core/account.h"
 
 namespace tools
@@ -18,14 +19,6 @@ namespace tools
     std::atomic<bool> is_busy;
     std::atomic<time_t> last_success_interract_time;
     std::atomic<bool> last_daemon_is_disconnected;
-  };
-
-  struct socks5_submit_cfg
-  {
-    bool        enabled = false;
-    std::string proxy_host;
-    uint16_t    proxy_port = 0;
-    std::string submit_base_url_override;
   };
 
   /*
@@ -71,7 +64,7 @@ namespace tools
       m_pdiganostic_info.reset(new proxy_diagnostic_info());
     }
 
-    virtual void set_block_submit_via_socks5(const socks5_submit_cfg& cfg) = 0;
+    virtual void set_socks5_proxy(const socks5::socks5_proxy_settings& cfg) { };
     virtual bool check_connection(){ return false; }
     virtual time_t get_last_success_interract_time() { return 0; }
     std::shared_ptr<const proxy_diagnostic_info> get_proxy_diagnostic_info() const { return m_pdiganostic_info; }

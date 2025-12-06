@@ -158,15 +158,15 @@ namespace tools
     return invoke_http_json_rpc_update_is_disconnect("submitblock", req, rsp);
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  void default_http_core_proxy::set_block_submit_via_socks5(const socks5_submit_cfg& cfg)
+  void default_http_core_proxy::set_socks5_proxy(const socks5::socks5_proxy_settings& cfg)
   {
     CRITICAL_REGION_LOCAL(m_lock);
-    m_block_submit_cfg = cfg;
+    m_socks5_cfg = cfg;
 
     if (!cfg.enabled)
       return;
     m_socks5_client.get_transport().set_socks_proxy(cfg.proxy_host, cfg.proxy_port);
-    m_socks5_client.get_transport().set_use_remote_dns(true);
+    m_socks5_client.get_transport().set_use_remote_dns(cfg.use_remote_dns);
 
     // TODO: TLS over SOCKS5 is not implemented yet
 
@@ -175,7 +175,7 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::call_COMMAND_RPC_SUBMITBLOCK2(const currency::COMMAND_RPC_SUBMITBLOCK2::request& req, currency::COMMAND_RPC_SUBMITBLOCK2::response& rsp)
   {
-    if (m_block_submit_cfg.enabled)
+    if (m_socks5_cfg.enabled)
     {
       epee::net_utils::http::url_content u = AUTO_VAL_INIT(u);
       epee::net_utils::parse_url(m_block_submit_base_url, u);
@@ -190,10 +190,10 @@ namespace tools
 
       // http_socks5_client by himself create TCP connection to SOCKS5,
       // do CONNECT to dest host:port and return ready tunnel
-      if (!m_socks5_client->connect(u.host, u.port, m_connection_timeout))
+      if (!m_socks5_client.connect(u.host, u.port, m_connection_timeout))
         return false;
 
-      return epee::net_utils::invoke_http_json_rpc("/json_rpc", "submitblock2", req, rsp, *m_socks5_client);
+      return invoke_http_json_socks5(m_socks5_cfg.submit_base_url_override, "submitblock2", req, rsp);
     }
 
     return invoke_http_json_rpc_update_is_disconnect("submitblock2", req, rsp);
