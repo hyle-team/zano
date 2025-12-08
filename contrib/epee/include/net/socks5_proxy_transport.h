@@ -244,10 +244,14 @@ namespace detail
 
     detail::try_set_socks_proxy(tr, cfg.proxy_host, cfg.proxy_port, 0);
     detail::try_set_use_remote_dns(tr, cfg.use_remote_dns, 0);
-
-    if (cfg.connect_timeout_ms || cfg.recv_timeout_ms)
-      detail::try_set_timeouts(tr, cfg.connect_timeout_ms, cfg.recv_timeout_ms, 0);
+    detail::try_set_timeouts(tr, cfg.connect_timeout_ms, cfg.recv_timeout_ms, 0);
   }
 } // namespace detail
+// public helper
+template<typename Transport>
+inline void apply_socks5_cfg(Transport& tr, const socks5_proxy_settings& cfg)
+{
+  detail::apply_socks5_cfg(tr, cfg);
+}
 } // namespace socks5
 } // namespace tools

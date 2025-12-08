@@ -8747,7 +8747,7 @@ bool wallet2::configure_socks_relay(const std::string& addr_port)
 //----------------------------------------------------------------------------------------------------
 void wallet2::disable_socks_relay()
 {
-  m_socks5_relay_cfg.enabled = false;
+  m_socks5_relay_cfg = socks5::socks5_proxy_settings();
 }
 //----------------------------------------------------------------------------------------------------
 const socks5::socks5_proxy_settings& wallet2::get_socks5_relay_config() const

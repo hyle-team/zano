@@ -163,11 +163,7 @@ namespace tools
     CRITICAL_REGION_LOCAL(m_lock);
     m_socks5_cfg = cfg;
 
-    if (!cfg.enabled)
-      return;
-    m_socks5_client.get_transport().set_socks_proxy(cfg.proxy_host, cfg.proxy_port);
-    m_socks5_client.get_transport().set_use_remote_dns(cfg.use_remote_dns);
-
+    tools::socks5::apply_socks5_cfg(m_socks5_client, m_socks5_cfg);
     // TODO: TLS over SOCKS5 is not implemented yet
 
     m_block_submit_base_url = cfg.submit_base_url_override.empty() ? m_daemon_address : cfg.submit_base_url_override;
@@ -177,27 +173,46 @@ namespace tools
   {
     if (m_socks5_cfg.enabled)
     {
-      epee::net_utils::http::url_content u = AUTO_VAL_INIT(u);
-      epee::net_utils::parse_url(m_block_submit_base_url, u);
-      if (!u.port)
-        u.port = (u.schema == "https" ? 443 : 8081);
+      
+      return call_request([&]()
+      {
+        epee::net_utils::http::url_content u = AUTO_VAL_INIT(u);
+        if (!epee::net_utils::parse_url(m_block_submit_base_url, u))
+        {
+          LOG_PRINT_L0("submitblock2 over SOCKS5: failed to parse url " << m_block_submit_base_url);
+          return false;
+        }
 
-      // TODO: HTTPS over SOCKS5 while not supported yet
-      if (u.schema == "https")
-        LOG_PRINT_YELLOW("submitblock2 over SOCKS5: HTTPS requested, but TLS-over-SOCKS is not supported yet", LOG_LEVEL_0);
+        if (!u.port)
+          u.port = (u.schema == "https" ? 443 : 8081);
 
-      // TODO: here could be ssl
+        // TODO: HTTPS over SOCKS5
+        if (u.schema == "https")
+          LOG_PRINT_YELLOW("submitblock2 over SOCKS5: HTTPS requested, but TLS-over-SOCKS is not supported yet", LOG_LEVEL_0);
 
-      // http_socks5_client by himself create TCP connection to SOCKS5,
-      // do CONNECT to dest host:port and return ready tunnel
-      if (!m_socks5_client.connect(u.host, u.port, m_connection_timeout))
-        return false;
+        http_socks5_client socks5_client;
 
-      return invoke_http_json_socks5(m_socks5_cfg.submit_base_url_override, "submitblock2", req, rsp);
-    }
+        socks5_client.get_transport().set_socks_proxy(m_socks5_cfg.proxy_host, m_socks5_cfg.proxy_port);
+        socks5_client.get_transport().set_use_remote_dns(true);
+        if (!socks5_client.connect(u.host, static_cast<int>(u.port), m_connection_timeout))
+        {
+          LOG_PRINT_L0("submitblock2 over SOCKS5: connect to " << u.host << ":" << u.port << " failed");
+          return false;
+        }
 
-    return invoke_http_json_rpc_update_is_disconnect("submitblock2", req, rsp);
+        const std::string& base = m_socks5_cfg.submit_base_url_override;
+        const std::string  rpc_uri = base.empty() ? "/json_rpc" : (base + "/json_rpc");
+
+        LOG_PRINT_L2("[INVOKE_JSON_METHOD SOCKS5] ---> submitblock2");
+        bool r = epee::net_utils::invoke_http_json_rpc(rpc_uri, "submitblock2", req, rsp, socks5_client);
+        LOG_PRINT_L2("[INVOKE_JSON_METHOD SOCKS5] <--- submitblock2");
+
+        return r;
+      });
   }
+
+  return invoke_http_json_rpc_update_is_disconnect("submitblock2", req, rsp);
+}
   //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::check_connection()
   {

@@ -137,6 +137,7 @@ namespace tools
 
     socks5::socks5_proxy_settings m_socks5_cfg;
     std::string m_block_submit_base_url;
+    tools::levin_over_socks5_client m_socks5_client;
   };
 }
 
