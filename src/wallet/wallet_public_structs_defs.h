@@ -6,6 +6,7 @@
 
 #pragma once
 #include <vector>
+#include "serialization/keyvalue_helper_structs.h"
 #include "currency_protocol/currency_protocol_defs.h"
 #include "currency_core/currency_basic.h"
 #include "crypto/hash.h"
@@ -462,7 +463,11 @@ namespace wallet_public
 
     struct request
     {
+      bool    collect_utxo_data = false;  //this might be quite slow, don't use it by default
+
+
       BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(collect_utxo_data)        DOC_DSCR("Collect utxo statistics data(might slow down request, don't use it by default)")  DOC_EXMP(false) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -474,8 +479,9 @@ namespace wallet_public
       uint64_t                  transfer_entries_count;
       bool                      is_whatch_only;
       bool                      has_bare_unspent_outputs;
-      std::vector<std::string>  utxo_distribution;
+      std::vector<epee::kvserializable_pair<std::string, std::vector<std::string>>> utxo_distribution;
       uint64_t                  current_height;
+
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(address)                  DOC_DSCR("string; standard public address of the wallet.")  DOC_EXMP("ZxDNaMeZjwCjnHuU5gUNyrP1pM3U5vckbakzzV6dEHyDYeCpW8XGLBFTshcaY8LkG9RQn7FsQx8w2JeJzJwPwuDm2NfixPAXf") DOC_END
@@ -484,7 +490,7 @@ namespace wallet_public
         KV_SERIALIZE(transfer_entries_count)   DOC_DSCR("Represent number of internal entries count(each entry represent tx output that have been addressed to this wallet)")  DOC_EXMP(24) DOC_END
         KV_SERIALIZE(is_whatch_only)           DOC_DSCR("Shows if the wallet is watch-only")  DOC_EXMP(false) DOC_END
         KV_SERIALIZE(has_bare_unspent_outputs) DOC_DSCR("Shows if the wallet still has UTXO from pre-zarcanum era")  DOC_EXMP(false) DOC_END
-        KV_SERIALIZE(utxo_distribution)        DOC_DSCR("UTXO distribution for this particular wallet: disabled right now")  DOC_EXMP_AUTO(1, "1") DOC_END
+        KV_SERIALIZE(utxo_distribution)        DOC_DSCR("UTXO distribution for this particular wallet: disabled right now")  DOC_END
         KV_SERIALIZE(current_height)           DOC_DSCR("Current wallet/daemon height")  DOC_EXMP(112132) DOC_END
       END_KV_SERIALIZE_MAP()
     };
@@ -506,9 +512,15 @@ namespace wallet_public
     struct response
     {
       std::string               seed_phrase;
+      std::string               derivation_secret;
+      bool                      is_auditable = false;
+      uint64_t                  creation_timestamp = 0;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(seed_phrase)  DOC_DSCR("Wallet's seed(secured with password if it was provided in argument)")  DOC_EXMP("girlfriend unlike offer mutter tightly social silent expect constant bid nowhere reach flower bite salt becomeconversation dog rush quietly become usually lightning midnight each secret class") DOC_END
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(derivation_secret)  DOC_DSCR("Wallet's secret that is used for key derivations, presented in hex, 32 bytes")  DOC_EXMP("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852") DOC_END
+        KV_SERIALIZE(is_auditable)  DOC_DSCR("Point if the wallet is auditable or regular")  DOC_EXMP(false) DOC_END
+        KV_SERIALIZE(creation_timestamp)  DOC_DSCR("Prety mych self explanatory")  DOC_EXMP(212100) DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };

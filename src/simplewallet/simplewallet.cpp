@@ -143,6 +143,8 @@ namespace
   const command_line::arg_descriptor<bool>          arg_seed_doctor("seed-doctor", "Experimental: if your seed is not working for recovery this is likely because you've made a mistake whene you were doing back up(typo, wrong words order, missing word). This experimental code will attempt to recover seed phrase from with few approaches.");
   const command_line::arg_descriptor<bool>          arg_no_whitelist("no-white-list", "Do not load white list from interned.");
   const command_line::arg_descriptor<std::string>   arg_restore_ki_in_wo_wallet("restore-ki-in-wo-wallet", "Watch-only missing key images restoration. Please, DON'T use it unless you 100% sure of what are you doing.", "");
+  const command_line::arg_descriptor<bool>          arg_no_idle_unlock_spent("no-idle-unlock-utxo", "Do not unlock utxo that looks like it should be unlocked(marked as spent but no unconfirmed tx that spends it).");
+
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command  ("command", "");
 
@@ -422,6 +424,11 @@ void process_wallet_command_line_params(const po::variables_map& vm, tools::wall
     wal.set_connectivity_options(command_line::get_arg(vm, arg_set_timeout));
   }
 
+  if (command_line::has_arg(vm, arg_voting_config_file))
+  {
+    wal.set_votes_config_path(command_line::get_arg(vm, arg_voting_config_file));
+  }
+
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::init(const boost::program_options::variables_map& vm)
@@ -566,6 +573,8 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_no_password_confirmations = command_line::get_arg(vm, arg_no_password_confirmations);  
   m_no_whitelist = command_line::get_arg(vm, arg_no_whitelist);
   m_restore_ki_in_wo_wallet = command_line::get_arg(vm, arg_restore_ki_in_wo_wallet);
+  m_do_not_unlock_reserved_on_idle = command_line::get_arg(vm, arg_no_idle_unlock_spent);
+
 } 
 //----------------------------------------------------------------------------------------------------
 
@@ -1463,11 +1472,22 @@ bool simple_wallet::scan_transfers_for_ki(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::print_utxo_distribution(const std::vector<std::string> &args)
 {
-  std::map<uint64_t, uint64_t> distribution;
+  std::unordered_map<crypto::public_key, std::map<uint64_t, uint64_t>> distribution;
   m_wallet->get_utxo_distribution(distribution);
-  for (auto& e : distribution)
-  {    
-    message_writer() << std::left << setw(25) << print_money(e.first) << "|" << e.second;
+  for (auto& asset_entry : distribution)
+  { 
+    size_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT;
+    uint32_t flags = 0;
+    currency::asset_descriptor_base adb = AUTO_VAL_INIT(adb);
+    if (m_wallet->get_asset_info(asset_entry.first, adb, flags, false))
+    {
+      decimal_point = adb.decimal_point;
+    }
+    message_writer() << "asset_id: " << asset_entry.first;
+    for (auto& amount : asset_entry.second)
+    {
+      message_writer()  << std::left << setw(25) << print_money(amount.first, decimal_point) << "|" << amount.second;
+    }    
   }
   return true;
 }
@@ -3350,6 +3370,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_derive_custom_seed);
   command_line::add_arg(desc_params, arg_no_whitelist);
   command_line::add_arg(desc_params, arg_restore_ki_in_wo_wallet);
+  command_line::add_arg(desc_params, arg_no_idle_unlock_spent);
+  
 
 
   tools::wallet_rpc_server::init_options(desc_params);
@@ -3526,8 +3548,13 @@ int main(int argc, char* argv[])
         wallets.back().wallet_id = 0;
         tools::get_wallet_info(*m_wlt_ptr, wallets.back().wi);
       }
-
     };
+
+    if (command_line::has_arg(vm, arg_no_idle_unlock_spent))
+    {
+      wal.set_do_not_unlock_reserved_on_idle(command_line::get_arg(vm, arg_no_idle_unlock_spent));
+    }
+
 
     std::shared_ptr<tools::i_wallet2_callback> callback(new wallet_rpc_local_callback(wallet_ptr));
 
@@ -3570,7 +3597,7 @@ int main(int argc, char* argv[])
         LOG_PRINT_YELLOW("PoS reward will be sent to another address: " << arg_pos_mining_reward_address_str, LOG_LEVEL_0);
       }
     }
-
+    
     if (command_line::has_arg(vm, arg_pos_mining_defrag))
     {
       std::string arg_pos_mining_defrag_str = command_line::get_arg(vm, arg_pos_mining_defrag);

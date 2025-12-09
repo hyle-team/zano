@@ -202,6 +202,11 @@ namespace tools
     return invoke_http_json_rpc_update_is_disconnect("get_alias_reward", req, rsp);
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool default_http_core_proxy::call_COMMAND_RPC_ALIAS_LOOKUP(const currency::COMMAND_RPC_ALIAS_LOOKUP::request& req, currency::COMMAND_RPC_ALIAS_LOOKUP::response& rsp)
+  {
+    return invoke_http_json_rpc_update_is_disconnect("alias_lookup", req, rsp);
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::call_COMMAND_RPC_GET_POOL_INFO(const currency::COMMAND_RPC_GET_POOL_INFO::request& req, currency::COMMAND_RPC_GET_POOL_INFO::response& res)
   {
     return invoke_http_json_rpc_update_is_disconnect("get_pool_info", req, res);

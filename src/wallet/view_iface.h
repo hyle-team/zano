@@ -446,6 +446,24 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
+  struct restore_wallet_from_derivation_request
+  {
+    std::string pass;
+    std::string path;
+    std::string secret_derivation;
+    bool is_auditable = false;
+    uint64_t creation_timestamp;
+
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(pass)
+      KV_SERIALIZE(path)
+      KV_SERIALIZE_BLOB_AS_HEX_STRING(secret_derivation)
+      KV_SERIALIZE(is_auditable)
+      KV_SERIALIZE(creation_timestamp)
+    END_KV_SERIALIZE_MAP()
+  };
+
   struct open_wallet_response
   {
     uint64_t wallet_id;

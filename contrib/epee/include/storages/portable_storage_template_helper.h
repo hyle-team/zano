@@ -34,12 +34,13 @@ namespace epee
   namespace serialization
   {
     //-----------------------------------------------------------------------------------------------------------
+
     template<class t_struct>
     bool load_t_from_json(t_struct& out, const std::string& json_buff)
     {
       portable_storage ps;
       bool rs = ps.load_from_json(json_buff);
-      if(!rs)
+      if (!rs)
         return false;
 
       return out.load(ps);
@@ -81,14 +82,20 @@ namespace epee
     }
     //-----------------------------------------------------------------------------------------------------------
     template<class t_struct>
-    bool load_t_from_binary(t_struct& out, const std::string& binary_buff)
+    bool load_t_from_binary(t_struct& out, const std::string& binary_buff, const portable_storage_limits& limits)
     {
       portable_storage ps;
-      bool rs = ps.load_from_binary(binary_buff);
-      if(!rs)
+      bool rs = ps.load_from_binary(binary_buff, limits);
+      if (!rs)
         return false;
 
       return out.load(ps);
+    }
+    //-----------------------------------------------------------------------------------------------------------
+    template<class t_struct>
+    bool load_t_from_binary(t_struct& out, const std::string& binary_buff)
+    {
+      return load_t_from_binary(out, binary_buff, gdefault_portable_storage_limits);
     }
     //-----------------------------------------------------------------------------------------------------------
     template<class t_struct>

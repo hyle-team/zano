@@ -18,15 +18,16 @@
 
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
-#define CURRENCY_MAX_BLOCK_SIZE                         500000000  // block header blob limit, never used!
-#define CURRENCY_TX_MAX_ALLOWED_INPUTS                  256        // limited primarily by asset surjection proof
-#define CURRENCY_TX_MAX_ALLOWED_OUTS                    2000
-#define CURRENCY_TX_MIN_ALLOWED_OUTS                    2      // effective starting HF4 Zarcanum
-#define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           0xc5   // addresses start with 'Zx'
-#define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678 // integrated addresses start with 'iZ'
-#define CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX  0x36f8 // integrated addresses start with 'iZ' (new format)
-#define CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX 0x98c8 // auditable addresses start with 'aZx'
-#define CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX 0x8a49 // auditable integrated addresses start with 'aiZX'
+#define CURRENCY_MAX_BLOCK_SIZE                         500000000     // block header blob limit, never used!
+#define CURRENCY_TX_MAX_ALLOWED_INPUTS                  256           // limited primarily by asset surjection proof
+#define CURRENCY_TX_MAX_ALLOWED_OUTS                    32            // soft rule, but matches BPP aggregation values limit; hard rule since HF6
+#define CURRENCY_TX_MAX_ALLOWED_OUTS_PRE_HF4            2000
+#define CURRENCY_TX_MIN_ALLOWED_OUTS                    2             // effective starting HF4 Zarcanum
+#define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           0xc5          // addresses start with 'Zx'
+#define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678        // integrated addresses start with 'iZ'
+#define CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX  0x36f8        // integrated addresses start with 'iZ' (new format)
+#define CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX 0x98c8        // auditable addresses start with 'aZx'
+#define CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX 0x8a49  // auditable integrated addresses start with 'aiZX'
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
 #define CURRENT_TRANSACTION_VERSION                     3
 #define TRANSACTION_VERSION_INITAL                      0
@@ -146,6 +147,7 @@
 #define P2P_DEFAULT_HANDSHAKE_INVOKE_TIMEOUT            10000      //10 seconds
 #define P2P_DEFAULT_WHITELIST_CONNECTIONS_PERCENT       70
 #define P2P_FAILED_ADDR_FORGET_SECONDS                  (60*5)     //5 minutes
+#define P2P_DEFAULT_MAX_INCOMING_CONNECTIONS_COUNT      200
 
 #define P2P_IP_BLOCKTIME                                (60*60*24) //24 hours
 #define P2P_IP_FAILS_BEFOR_BLOCK                        10

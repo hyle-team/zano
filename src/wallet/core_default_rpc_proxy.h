@@ -20,8 +20,12 @@
 
 
 
+
+
+
 namespace tools
 {
+
   class default_http_core_proxy final : public i_core_proxy
   {
   public:
@@ -43,6 +47,7 @@ namespace tools
     bool call_COMMAND_RPC_GET_ALL_ALIASES(currency::COMMAND_RPC_GET_ALL_ALIASES::response& rsp) override;
     bool call_COMMAND_RPC_GET_ALIAS_DETAILS(const currency::COMMAND_RPC_GET_ALIAS_DETAILS::request& req, currency::COMMAND_RPC_GET_ALIAS_DETAILS::response& rsp) override;
     bool call_COMMAND_RPC_GET_ALIAS_REWARD(const currency::COMMAND_RPC_GET_ALIAS_REWARD::request& req, currency::COMMAND_RPC_GET_ALIAS_REWARD::response& rsp) override;
+    bool call_COMMAND_RPC_ALIAS_LOOKUP(const currency::COMMAND_RPC_ALIAS_LOOKUP::request& req, currency::COMMAND_RPC_ALIAS_LOOKUP::response& rsp) override;
     bool call_COMMAND_RPC_GET_TRANSACTIONS(const currency::COMMAND_RPC_GET_TRANSACTIONS::request& req, currency::COMMAND_RPC_GET_TRANSACTIONS::response& rsp) override;
     bool call_COMMAND_RPC_COMMAND_RPC_CHECK_KEYIMAGES(const currency::COMMAND_RPC_CHECK_KEYIMAGES::request& req, currency::COMMAND_RPC_CHECK_KEYIMAGES::response& rsp) override;
     bool call_COMMAND_RPC_GETBLOCKTEMPLATE(const currency::COMMAND_RPC_GETBLOCKTEMPLATE::request& req, currency::COMMAND_RPC_GETBLOCKTEMPLATE::response& rsp) override;
@@ -61,6 +66,16 @@ namespace tools
     void set_plast_daemon_is_disconnected(std::atomic<bool> *plast_daemon_is_disconnected);   
     default_http_core_proxy();
   private:
+    static constexpr epee::serialization::portable_storage_limits gwallet_rpc_proxy_limits{ 100000, 100000, 100000 };
+    struct storage_limits_wallet_rpc
+    {
+      static inline const epee::serialization::portable_storage_limits& get_storage_limits()
+      {
+        return gwallet_rpc_proxy_limits;
+      }
+    };
+
+
 
     template <class t_method>
     bool call_request(t_method request)
@@ -99,7 +114,7 @@ namespace tools
     {
       return call_request([&](){
         LOG_PRINT_L2("[INVOKE_BIN] --->" << typeid(t_request).name())
-        bool r = epee::net_utils::invoke_http_bin_remote_command2(m_daemon_address + url, req, res, m_http_client, m_connection_timeout);
+        bool r = epee::net_utils::invoke_http_bin_remote_command2_limits<storage_limits_wallet_rpc>(m_daemon_address + url, req, res, m_http_client, m_connection_timeout);
         LOG_PRINT_L2("[INVOKE_BIN] <---" << typeid(t_request).name())
         return r;
       });

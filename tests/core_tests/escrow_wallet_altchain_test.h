@@ -520,6 +520,7 @@ struct escrow_altchain_meta_test_data<8>
 struct escrow_altchain_meta_impl : public wallet_test
 {
   escrow_altchain_meta_impl(const eam_test_data_t &etd);
+  bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool handle_event_proposal(currency::core& c, std::shared_ptr<tools::wallet2> alice_wlt, const eam_event_proposal& se);
@@ -546,6 +547,7 @@ struct escrow_altchain_meta_test : virtual public test_chain_unit_base
     : m_impl(escrow_altchain_meta_test_data<test_data_idx>().data)
   {
     REGISTER_CALLBACK_METHOD(this_t, c1);
+    REGISTER_CALLBACK_METHOD(this_t, configure_core);
   }
 
   bool generate(std::vector<test_event_entry>& events) const
@@ -556,6 +558,11 @@ struct escrow_altchain_meta_test : virtual public test_chain_unit_base
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
   {
     return m_impl.c1(c, ev_index, events);
+  }
+
+  bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+  {
+    return m_impl.configure_core(c, ev_index, events);
   }
 
   // test_chain_unit_base
