@@ -162,10 +162,7 @@ namespace tools
   {
     CRITICAL_REGION_LOCAL(m_lock);
     m_socks5_cfg = cfg;
-
-    tools::socks5::apply_socks5_cfg(m_socks5_client, m_socks5_cfg);
     // TODO: TLS over SOCKS5 is not implemented yet
-
     m_block_submit_base_url = cfg.submit_base_url_override.empty() ? m_daemon_address : cfg.submit_base_url_override;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -191,9 +188,9 @@ namespace tools
           LOG_PRINT_YELLOW("submitblock2 over SOCKS5: HTTPS requested, but TLS-over-SOCKS is not supported yet", LOG_LEVEL_0);
 
         http_socks5_client socks5_client;
-
-        socks5_client.get_transport().set_socks_proxy(m_socks5_cfg.proxy_host, m_socks5_cfg.proxy_port);
+        tools::socks5::apply_socks5_cfg(socks5_client.get_transport(), m_socks5_cfg);
         socks5_client.get_transport().set_use_remote_dns(true);
+
         if (!socks5_client.connect(u.host, static_cast<int>(u.port), m_connection_timeout))
         {
           LOG_PRINT_L0("submitblock2 over SOCKS5: connect to " << u.host << ":" << u.port << " failed");

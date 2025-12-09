@@ -200,7 +200,7 @@ namespace detail
   //   set_use_remote_dns(bool)
   //   set_timeouts(unsigned,unsigned)
   // Otherwise it’s a no-op.
-  // Usage: apply_socks_relay_to(tr); before connect()/invoke().
+  // Usage: apply_socks5_cfg(tr); before connect()/invoke().
   // Config: socks5_proxy_settings. To support a new transport, implement the setters.
 
   // set_socks_proxy(host, port)

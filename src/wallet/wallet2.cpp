@@ -76,7 +76,6 @@ namespace tools
     , m_max_utxo_count_for_defragmentation_tx(0)
     , m_decoys_count_for_defragmentation_tx(SIZE_MAX)
     , m_use_deffered_global_outputs(false)
-    , m_disable_tor_relay(false)
     , m_votes_config_path(tools::get_default_data_dir() + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME)
   {
     m_core_runtime_config = currency::get_default_core_runtime_config();
@@ -7200,7 +7199,7 @@ assets_selection_context wallet2::get_needed_money(uint64_t fee, const std::vect
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::set_disable_tor_relay(bool disable)
 {
-  m_disable_tor_relay = disable;
+  m_socks5_relay_cfg.enabled = !disable;
 }
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::notify_state_change(const std::string& state_code, const std::string& details)
@@ -7211,22 +7210,22 @@ void wallet2::notify_state_change(const std::string& state_code, const std::stri
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::send_transaction_to_network(const transaction& tx)
 {
-  if (!m_disable_tor_relay)
+  if (m_socks5_relay_cfg.enabled)
   {
     //TODO check that core synchronized
     //epee::net_utils::levin_client2 p2p_client;
 
     //make few attempts
     tools::levin_over_socks5_client p2p_client;
-    apply_socks_relay_to(p2p_client.get_transport());
+    apply_socks5_cfg(p2p_client.get_transport(), m_socks5_relay_cfg);
     WLT_LOG_L1("[SOCKS5] Sending transaction " << get_transaction_hash(tx) << " via SOCKS5 relay "
       << m_socks5_relay_cfg.proxy_host << ":" << m_socks5_relay_cfg.proxy_port);
 
-    bool successful = false;
+    bool succeseful_sent = false;
     for (size_t i = 0; i != 3; ++i)
     {
       WLT_LOG_L0("[SOCKS5] attempt " << (i+1));
-      if (!p2p_client.connect("144.76.183.143", 2121, 10000))
+      if (!p2p_client.connect("195.201.107.230", 11311, 10000))
       {
         WLT_LOG_L0("[SOCKS5] connect failed");
         continue;//THROW_IF_FALSE_WALLET_EX(false, error::no_connection_to_daemon, "Failed to connect to TOR node");
@@ -7236,13 +7235,20 @@ void wallet2::send_transaction_to_network(const transaction& tx)
       currency::NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::response p2p_rsp = AUTO_VAL_INIT(p2p_rsp);
       p2p_req.txs.push_back(t_serializable_object_to_blob(tx));
       this->notify_state_change(WALLET_LIB_STATE_SENDING);
-      epee::net_utils::invoke_remote_command2(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::ID, p2p_req, p2p_rsp, p2p_client);
+      bool ok = epee::net_utils::invoke_remote_command2(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::ID, p2p_req, p2p_rsp, p2p_client);
+      if (!ok)
+      {
+        this->notify_state_change(WALLET_LIB_SEND_FAILED);
+        WLT_LOG_L0("[SOCKS5] P2P invoke is ERROR: " << p2p_rsp.code);
+        continue;
+      }
+
       p2p_client.disconnect();
       if (p2p_rsp.code == API_RETURN_CODE_OK)
       {
         this->notify_state_change(WALLET_LIB_SENT_SUCCESS);
         WLT_LOG_L0("[SOCKS5] P2P relay OK");
-        successful = true;
+        succeseful_sent = true;
         break;
       }
 
@@ -7251,10 +7257,10 @@ void wallet2::send_transaction_to_network(const transaction& tx)
       //checking if transaction got relayed to other nodes and 
       //return;
     }
-    if (!successful)
+    if (!succeseful_sent)
     {
       this->notify_state_change(WALLET_LIB_SEND_FAILED);
-      THROW_IF_FALSE_WALLET_EX(successful, error::no_connection_to_daemon, "Faile to build TOR stream");
+      THROW_IF_FALSE_WALLET_EX(succeseful_sent, error::no_connection_to_daemon, "Faile to build TOR stream");
     }
     else
     {

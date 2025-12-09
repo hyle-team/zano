@@ -599,8 +599,6 @@ namespace tools
     bool configure_socks_relay(const std::string& addr_port); // "ip:port"
     void disable_socks_relay();
     const socks5::socks5_proxy_settings& get_socks5_relay_config() const;
-    template <class transport_t>
-    void apply_socks_relay_to(transport_t& tr) const;
 
     // PoS mining
     void do_pos_mining_prepare_entry(mining_context& cxt, const transfer_details& td);
@@ -1002,11 +1000,10 @@ private:
     std::string m_miner_text_info;
 
     bool m_use_deffered_global_outputs;
-    bool m_disable_tor_relay;
     mutable current_operation_context m_current_context;
 
-    socks5::socks5_proxy_settings m_socks5_relay_cfg {};
-    socks5::socks5_proxy_settings m_block_socks5_relay_cfg {};
+    socks5::socks5_proxy_settings m_socks5_relay_cfg{};
+    socks5::socks5_proxy_settings m_block_socks5_relay_cfg{};
 
     std::string m_votes_config_path;
     tools::wallet_public::wallet_vote_config m_votes_config;
@@ -1284,17 +1281,6 @@ namespace tools
       if (!cb(el.second))
         break;
   }
-
-template <class transport_t>
-inline void wallet2::apply_socks_relay_to(transport_t& tr) const
-{
-  if (!m_socks5_relay_cfg.enabled)
-    return;
-  socks5::detail::try_set_socks_proxy   (tr, m_socks5_relay_cfg.proxy_host, m_socks5_relay_cfg.proxy_port, 0);
-  socks5::detail::try_set_use_remote_dns(tr, m_socks5_relay_cfg.use_remote_dns, 0);
-  socks5::detail::try_set_timeouts      (tr, m_socks5_relay_cfg.connect_timeout_ms,
-                                             m_socks5_relay_cfg.recv_timeout_ms, 0);
-}
 } // namespace tools
 
 
