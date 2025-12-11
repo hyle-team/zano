@@ -206,10 +206,10 @@ namespace tools
 
         return r;
       });
-  }
+    }
 
-  return invoke_http_json_rpc_update_is_disconnect("submitblock2", req, rsp);
-}
+    return invoke_http_json_rpc_update_is_disconnect("submitblock2", req, rsp);
+  }
   //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::check_connection()
   {

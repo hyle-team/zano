@@ -43,6 +43,8 @@ using namespace epee;
 #include "wallet_debug_events_definitions.h"
 #include "decoy_selection.h"
 
+#include "net/levin_socks5.h"
+
 using namespace currency;
 
 #define SET_CONTEXT_OBJ_FOR_SCOPE(name, obj)  m_current_context.name = &obj; \
@@ -5391,7 +5393,51 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   if (tmpl_req.explicit_transaction.size())
     subm_req.explicit_txs.push_back(hexemizer{ tmpl_req.explicit_transaction });
 
-  m_core_proxy->call_COMMAND_RPC_SUBMITBLOCK2(subm_req, subm_rsp);
+  if (m_socks5_relay_cfg.enabled)
+  {
+    WLT_LOG_L0("PoS block " << block_hash << " will be submitted via SOCKS5 proxy " << m_socks5_relay_cfg.proxy_host << ":" << m_socks5_relay_cfg.proxy_port);
+    
+    epee::net_utils::http::url_content u = AUTO_VAL_INIT(u);
+    const std::string& url_str = m_socks5_relay_cfg.submit_base_url_override;
+    if (!epee::net_utils::parse_url(url_str, u))
+    {
+      WLT_LOG_L0("submitblock2 over SOCKS5: failed to parse url " << url_str);
+      return false;
+    }
+
+    if (!u.port)
+      u.port = (u.schema == "https" ? 443 : 80);
+
+    // TODO: HTTPS over SOCKS5
+    if (u.schema == "https")
+      WLT_LOG_YELLOW("submitblock2 over SOCKS5: HTTPS requested, but TLS-over-SOCKS is not supported yet", LOG_LEVEL_0);
+
+    http_socks5_client socks5_client;
+    tools::socks5::apply_socks5_cfg(socks5_client.get_transport(), m_socks5_relay_cfg);
+    socks5_client.get_transport().set_use_remote_dns(true);
+
+    if(!socks5_client.connect(u.host, std::to_string(u.port), m_socks5_relay_cfg.connect_timeout_ms))
+    {
+      WLT_LOG_ERROR("submitblock2 over SOCKS5: connect to " << u.host << ":" << u.port << " failed");
+      return false;
+    }
+
+    const std::string rpc_uri = u.uri.empty() ? "/json_rpc" : u.uri;
+
+    WLT_LOG_L2("[INVOKE_JSON_METHOD SOCKS5] ---> submitblock2");
+    bool r = epee::net_utils::invoke_http_json_rpc(rpc_uri, "submitblock2", subm_req, subm_rsp, socks5_client);
+    WLT_LOG_L2("[INVOKE_JSON_METHOD SOCKS5] <--- submitblock2, result: " << r);
+    if (!r)
+    {
+      WLT_LOG_ERROR("invoke_http_json_rpc failed for submitblock2 over SOCKS5");
+      return false;
+    }
+  }
+  else
+  {
+    // fallback to the old method if SOCKS5 is disabled
+    m_core_proxy->call_COMMAND_RPC_SUBMITBLOCK2(subm_req, subm_rsp);
+  }
   if (subm_rsp.status != API_RETURN_CODE_OK)
   {
     WLT_LOG_ERROR("Constructed block " << print16(block_hash) << " was rejected by the core, status: " << subm_rsp.status);

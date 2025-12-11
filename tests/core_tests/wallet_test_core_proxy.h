@@ -25,11 +25,6 @@ struct wallet_test_core_proxy : public tools::i_core_proxy
   virtual bool call_COMMAND_RPC_GET_TX_POOL(const currency::COMMAND_RPC_GET_TX_POOL::request& rqt, currency::COMMAND_RPC_GET_TX_POOL::response& rsp) override;
   virtual bool call_COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN(const currency::COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::request& req, currency::COMMAND_RPC_GET_CURRENT_CORE_TX_EXPIRATION_MEDIAN::response& res) override;
   virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override;
-  virtual void set_socks5_proxy(const tools::socks5_proxy_settings& cfg) override
-  {
-    // Do no-op to satisfy the interface for in-proc fast RPC.
-    (void)cfg;
-  }
 
   const std::vector<uint64_t>& get_tx_gindex(const crypto::hash& tx_id);
 

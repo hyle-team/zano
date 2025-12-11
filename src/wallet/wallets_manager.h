@@ -270,6 +270,7 @@ private:
   tools::wallet_rpc_server m_wallet_rpc_server;
   wallet_vs_options::wallet_lock_object m_current_wallet_locked_object;
   uint64_t m_rpc_selected_wallet_id = 0;
+  tools::socks5::socks5_proxy_settings m_socks5_cfg;
 #endif
 
   bool m_remote_node_mode;

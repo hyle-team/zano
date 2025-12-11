@@ -195,7 +195,9 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_ntp);
   command_line::add_arg(desc_cmd_sett, arg_disable_price_fetch);
   
-
+  command_line::add_arg(desc_cmd_sett, command_line::arg_enable_tx_socks5_relay_proxy);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_enable_block_socks5_relay_proxy);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_block_relay_url);
 
 #ifndef MOBILE_WALLET_BUILD
   currency::core::init_options(desc_cmd_sett);
@@ -371,6 +373,57 @@ bool wallets_manager::init(view::i_view* pview_handler)
     //LOG_PRINT("Module folder: " << argv[0], LOG_LEVEL_0);
   }
 
+  if(command_line::has_arg(m_vm, command_line::arg_enable_tx_socks5_relay_proxy))
+  {
+    std::string socks5_addr = command_line::get_arg(m_vm, command_line::arg_enable_tx_socks5_relay_proxy);
+    if (!socks5_addr.empty())
+    {
+      auto pos = socks5_addr.find(':');
+      if (pos != std::string::npos)
+      {
+        m_socks5_cfg.enabled    = true;
+        m_socks5_cfg.proxy_host = socks5_addr.substr(0, pos);
+        m_socks5_cfg.proxy_port = static_cast<uint16_t>(std::stoi(socks5_addr.substr(pos + 1)));
+      }
+      else
+      {
+        LOG_PRINT_L0("Invalid value for --enable-tx-socks5-relay-proxy, expected host:port");
+        return false;
+      }
+      LOG_PRINT_L0("SOCKS5 transaction relay proxy configured: " << socks5_addr);
+    }
+  }
+
+  {
+    if(command_line::has_arg(m_vm, command_line::arg_enable_block_socks5_relay_proxy))
+    {
+      const auto brp = command_line::get_arg(m_vm, command_line::arg_enable_block_socks5_relay_proxy);
+      if(!brp.empty())
+      {
+        auto pos = brp.find(':');
+        if(pos != std::string::npos)
+        {
+          m_socks5_cfg.enabled    = true;
+          m_socks5_cfg.proxy_host = brp.substr(0, pos);
+          m_socks5_cfg.proxy_port = static_cast<uint16_t>(std::stoi(brp.substr(pos + 1)));
+        }
+        else
+        {
+          LOG_PRINT_L0("Invalid value for --enable-block-socks5-relay-proxy, expected host:port");
+        }
+      }
+
+      const auto relay_url = command_line::get_arg(m_vm, command_line::arg_block_relay_url);
+      if(!relay_url.empty())
+        m_socks5_cfg.submit_base_url_override = relay_url;
+
+      if(m_socks5_cfg.enabled)
+      {
+        LOG_PRINT_L0(std::string("Block submit via SOCKS5 configured: ") + m_socks5_cfg.proxy_host + ":" + std::to_string(m_socks5_cfg.proxy_port) + (m_socks5_cfg.submit_base_url_override.empty() ? "" : (", submit url: " + m_socks5_cfg.submit_base_url_override)));
+      }
+    }
+  }
+  
   m_pview->init(path_to_html);
 
   return true;
@@ -849,7 +902,7 @@ void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
     m_wallet_log_prefixes[id] = std::string("[") + epee::string_tools::num_to_string_fast(id) + ":" + wo.w->get()->get_account().get_public_address_str().substr(0, 6) + "] ";
   }
   
-  wo.w->get()->set_disable_tor_relay(!m_use_tor);
+  //wo.w->get()->set_disable_tor_relay(!m_use_tor);
 }
 
 
@@ -1053,6 +1106,8 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
   {
 #ifndef MOBILE_WALLET_BUILD
     w->set_core_proxy(std::shared_ptr<tools::i_core_proxy>(new tools::core_fast_rpc_proxy(m_rpc_server)));
+    if(m_socks5_cfg.enabled)
+      w->configure_socks_relay(m_socks5_cfg);
 #else 
     LOG_ERROR("Unexpected location reached");
 #endif

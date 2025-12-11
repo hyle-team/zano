@@ -184,10 +184,6 @@ namespace tools
       return time(nullptr); 
     }
     //------------------------------------------------------------------------------------------------------------------------------
-    void set_socks5_proxy(const socks5::socks5_proxy_settings& /*cfg*/) override
-    {
-      // TODO: We do no-op to satisfy the interface
-    }
 
   private:
     currency::core_rpc_server& m_rpc;

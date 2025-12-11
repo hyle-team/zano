@@ -706,11 +706,6 @@ bool test_generator::build_wallets(const blockchain_vector& blockchain,
       rsp.status = API_RETURN_CODE_OK;
       return true;
     }
-    void set_socks5_proxy(const tools::socks5_proxy_settings& cfg)
-    {
-      // Do nothing for in-proc fast RPC.
-      (void)cfg;
-    }
   }; // struct stub_core_proxy
 
   std::shared_ptr<tools::i_core_proxy> tmp_proxy(new stub_core_proxy(blockchain, txs_outs, oi, cc));

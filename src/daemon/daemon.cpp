@@ -174,6 +174,10 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_sett, arg_rpc_server_threads);
   command_line::add_arg(desc_cmd_sett, arg_do_warp_mode); 
 
+  command_line::add_arg(desc_cmd_sett, command_line::arg_enable_tx_socks5_relay_proxy);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_enable_block_socks5_relay_proxy);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_block_relay_url);
+
   arg_market_disable.default_value = true;
   arg_market_disable.use_default = true;
 
