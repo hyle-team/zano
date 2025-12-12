@@ -863,6 +863,7 @@ namespace currency
     m_p2p->get_connections(connections);
     for (auto& cc : connections)
     {
+      size_t count = 0;
       NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request req = AUTO_VAL_INIT(req);
       for (auto& qe : que)
       {
@@ -870,6 +871,9 @@ namespace currency
         if (qe.second.m_connection_id == cc.m_connection_id)
           continue;
         req.txs.insert(req.txs.begin(), qe.first.txs.begin(), qe.first.txs.end());
+        count++;
+        if (req.txs.size() >= CURRENCY_RELAY_TXS_MAX_COUNT) 
+          break;
       }
       if (req.txs.size())
       {
