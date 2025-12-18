@@ -3826,7 +3826,7 @@ bool wallet2::balance(std::unordered_map<crypto::public_key, wallet_public::asse
 
   }
 
-  if (balances.empty())
+  if (balances.count(currency::native_coin_asset_id) == 0)
     balances[currency::native_coin_asset_id] = wallet_public::asset_balance_entry_base{};
 
   return true;

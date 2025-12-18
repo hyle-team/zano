@@ -497,7 +497,7 @@ namespace crypto
     {
       MP_type result = 0;
       static_assert(sizeof result >= sizeof *this, "size missmatch"); // to avoid using types less than uint256_t
-      unsigned int sz = sizeof *this / sizeof(boost::multiprecision::limb_type);
+      size_t sz = sizeof *this / sizeof(boost::multiprecision::limb_type);
       result.backend().resize(sz, sz);
       memcpy(result.backend().limbs(), &m_s[0], sizeof *this);
       result.backend().normalize();
