@@ -21,15 +21,15 @@ namespace tools
   };
 
 #ifndef TESTNET
-  static constexpr pre_download_entry c_pre_download_mdbx             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_mdbx_95_3150000.pak", "296d3129fee9253adea332d6c6128941aa5ef67eecaba49b9f8327f8c2d86ea1", 9388521394, 14226862080 };
-  static constexpr pre_download_entry c_pre_download_lmdb             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_lmdb_95_3150000.pak", "bdb9d651636b36fd7d1f216c4afe89b1e7ec887da6eac7455ea18253a93345e8", 11287228509, 13988814848 };
-  static constexpr pre_download_entry c_pre_download_mdbx_non_pruned  = { "https://f005.backblazeb2.com/file/zano-predownload/zano_mdbx_95_3141000_non_pruned.pak", "0703902d535253627a2dd3c8697b305844b0241dfffefce5ec9d9e8e3475cdab", 10065877170, 15032156160 };
-  static constexpr pre_download_entry c_pre_download_lmdb_non_pruned  = { "https://f005.backblazeb2.com/file/zano-predownload/zano_lmdb_95_3141000_non_pruned.pak", "fe407e332d42a124d42781f6ccc6d2456728348230d7f05d94203ac405c37e63", 12081697874, 14824468480 };
+  static constexpr pre_download_entry c_pre_download_mdbx             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_mdbx_95_3451000.pak", "1e05d3382e7c371575ffc131287d635fa07f00c910d869db704ffb1ded86cd98", 12956227561, 18790195200 };
+  static constexpr pre_download_entry c_pre_download_lmdb             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_lmdb_95_3451000.pak", "dc08ff57e9d376958c8d30ec6d2b3623e6de1fe6403047cc983dfb5f460c1b1b", 15343628413, 18730594304 };
+  static constexpr pre_download_entry c_pre_download_mdbx_unpruned    = { "https://f005.backblazeb2.com/file/zano-predownload/zano_mdbx_95_3451000_unpruned.pak", "3756d41abac7936e2423fe97fb88beea0ade2055f10587457da809aa0aebe816", 13872491244, 20132352000 };
+  static constexpr pre_download_entry c_pre_download_lmdb_unpruned    = { "https://f005.backblazeb2.com/file/zano-predownload/zano_lmdb_95_3451000_unpruned.pak", "66e32a6668354122d0ffac8fb74e04b1c7ffc0b32c07df908697c5d6cccb5b16", 16443645725, 19882643456 };
 #else
-  static constexpr pre_download_entry c_pre_download_mdbx             = { "", "", 0, 0 };
-  static constexpr pre_download_entry c_pre_download_lmdb             = { "", "", 0, 0 };
-  static constexpr pre_download_entry c_pre_download_mdbx_non_pruned  = { "", "", 0, 0 };
-  static constexpr pre_download_entry c_pre_download_lmdb_non_pruned  = { "", "", 0, 0 };
+  static constexpr pre_download_entry c_pre_download_mdbx             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_testnet_mdbx_95_424500.pak", "4896f60f1c9de05cb246d08d417449f403dff6176496cd4c29ec2cdc26016cae", 2214577844, 3758039040 };
+  static constexpr pre_download_entry c_pre_download_lmdb             = { "https://f005.backblazeb2.com/file/zano-predownload/zano_testnet_lmdb_95_424500.pak", "3f5e3c410200a48d124a998ea41732443ecfa2b4b2c82a0527a95994e5fe6dde", 2592465297, 3693678592 };
+  static constexpr pre_download_entry c_pre_download_mdbx_unpruned    = { "", "", 0, 0 };
+  static constexpr pre_download_entry c_pre_download_lmdb_unpruned    = { "", "", 0, 0 };
 #endif
 
   static constexpr uint64_t pre_download_min_size_difference = 512 * 1024 * 1024; // minimum difference in size between local DB and the downloadable one to start downloading
@@ -46,7 +46,7 @@ namespace tools
     std::string db_main_file_path = working_folder + "/" + dbbs.get_db_main_file_name();
 
     bool non_pruning_mode_enabled = tools::is_non_pruning_mode_enabled(vm);
-    pre_download_entry pre_download = dbbs.get_engine_type() == db::db_lmdb ? (non_pruning_mode_enabled ? c_pre_download_lmdb_non_pruned : c_pre_download_lmdb) : (non_pruning_mode_enabled ? c_pre_download_mdbx_non_pruned : c_pre_download_mdbx);
+    pre_download_entry pre_download = dbbs.get_engine_type() == db::db_lmdb ? (non_pruning_mode_enabled ? c_pre_download_lmdb_unpruned : c_pre_download_lmdb) : (non_pruning_mode_enabled ? c_pre_download_mdbx_unpruned : c_pre_download_mdbx);
     
     // override pre-download link if necessary
     std::string url = pre_download.url;

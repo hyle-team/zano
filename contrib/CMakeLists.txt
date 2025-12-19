@@ -6,6 +6,10 @@ set(ZLIB_BUILD_EXAMPLES OFF CACHE INTERNAL "" FORCE)
 add_subdirectory(zlib)
 
 add_subdirectory(db)
+if(MSVC)
+  target_compile_options(lmdb PRIVATE "/UWIN32_LEAN_AND_MEAN")
+endif()
+
 add_subdirectory(ethereum)
 
 if(USE_BITCOIN_SECP256K1_FOR_ECDSA)

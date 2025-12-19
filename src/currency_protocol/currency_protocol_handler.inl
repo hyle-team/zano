@@ -485,6 +485,7 @@ namespace currency
     {
       LOG_ERROR_CCONTEXT("Requested objects count is to big (" << arg.blocks.size() <<")expected not more then " << CURRENCY_PROTOCOL_MAX_BLOCKS_REQUEST_COUNT);
       m_p2p->drop_connection(context);
+      return  1;
     }
 
     NOTIFY_RESPONSE_GET_OBJECTS::request rsp;
@@ -492,6 +493,7 @@ namespace currency
     {
       LOG_ERROR_CCONTEXT("failed to handle request NOTIFY_REQUEST_GET_OBJECTS, dropping connection");
       m_p2p->drop_connection(context);
+      return 1;
     }
 
     LOG_PRINT_L2("[NOTIFY]NOTIFY_RESPONSE_GET_OBJECTS: blocks.size()=" << rsp.blocks.size() << ", txs.size()=" << rsp.txs.size() 
@@ -863,6 +865,7 @@ namespace currency
     m_p2p->get_connections(connections);
     for (auto& cc : connections)
     {
+      size_t count = 0;
       NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request req = AUTO_VAL_INIT(req);
       for (auto& qe : que)
       {
@@ -870,6 +873,9 @@ namespace currency
         if (qe.second.m_connection_id == cc.m_connection_id)
           continue;
         req.txs.insert(req.txs.begin(), qe.first.txs.begin(), qe.first.txs.end());
+        count++;
+        if (req.txs.size() >= CURRENCY_RELAY_TXS_MAX_COUNT) 
+          break;
       }
       if (req.txs.size())
       {
@@ -1043,6 +1049,7 @@ namespace currency
                                                                          << "\r\nm_block_ids.size()=" << arg.m_block_ids.size());
       m_p2p->drop_connection(context);
       m_p2p->add_ip_fail(context.m_remote_ip);
+      return 1;
     }
 
     uint64_t height = arg.start_height;
