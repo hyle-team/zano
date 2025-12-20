@@ -15,9 +15,12 @@ call_app()
   if [ $? -ne 0 ]; then
     echo $'\n\n\x1b[1mIf Zano fails to launch, it might need to install xinerama extension for the X C Binding with this command:\n\x1b[2m   sudo apt-get install libxcb-xinerama0\n\n'
   fi
+
   popd
   exit
 }
+
+
 create_desktop_icon()
 {
     target_file_name=$1
