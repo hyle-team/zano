@@ -15,12 +15,9 @@ call_app()
   if [ $? -ne 0 ]; then
     echo $'\n\n\x1b[1mIf Zano fails to launch, it might need to install xinerama extension for the X C Binding with this command:\n\x1b[2m   sudo apt-get install libxcb-xinerama0\n\n'
   fi
-
   popd
   exit
 }
-
-
 create_desktop_icon()
 {
     target_file_name=$1
@@ -45,7 +42,6 @@ create_desktop_icon()
     echo "MimeType=x-scheme-handler/zano;" | tee -a $target_file_name  > /dev/null
     echo "StartupWMClass=Zano" | tee -a $target_file_name  > /dev/null
 }
-
 
 create_desktop_icon $out_file_name
 
