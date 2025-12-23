@@ -332,10 +332,10 @@ private:
 
     if (tx_chain_entry)
     {
-      currency::block_extended_info bei = AUTO_VAL_INIT(bei);
-      CHECK_AND_ASSERT_MES(bcs.get_block_extended_info_by_height(tx_chain_entry->m_keeper_block_height, bei), false, "cannot find block by height " << tx_chain_entry->m_keeper_block_height);
+      std::shared_ptr<const currency::block_extended_info> bei_ptr;
+      CHECK_AND_ASSERT_MES(bcs.get_block_extended_info_by_height(tx_chain_entry->m_keeper_block_height, bei_ptr), false, "cannot find block by height " << tx_chain_entry->m_keeper_block_height);
 
-      LOG_PRINT_L0("Key image found in tx: " << tx_id << " height " << tx_chain_entry->m_keeper_block_height << " (ts: " << epee::misc_utils::get_time_str_v2(currency::get_block_datetime(bei.bl)) << ")" << ENDL
+      LOG_PRINT_L0("Key image found in tx: " << tx_id << " height " << tx_chain_entry->m_keeper_block_height << " (ts: " << epee::misc_utils::get_time_str_v2(currency::get_block_datetime(bei_ptr->bl)) << ")" << ENDL
         << obj_to_json_str(tx_chain_entry->tx));
     }
     else
@@ -652,15 +652,15 @@ private:
 
     for (uint64_t height = 0; height <= last_block_height; height++, blocks++)
     {
-      currency::block_extended_info bei = AUTO_VAL_INIT(bei);
-      bool r = bcs.get_block_extended_info_by_height(height, bei);
+      std::shared_ptr<const currency::block_extended_info> bei_ptr;
+      bool r = bcs.get_block_extended_info_by_height(height, bei_ptr);
       if (!r)
       {
         LOG_PRINT_RED("Failed to get block #" << height, LOG_LEVEL_0);
         break;
       }
 
-      for (const auto& h : bei.bl.tx_hashes)
+      for (const auto& h : bei_ptr->bl.tx_hashes)
       {
         auto ptx = bcs.get_tx(h);
         CHECK_AND_ASSERT_MES(ptx != nullptr, false, "failed to find transaction " << h << " in blockchain index, in block on height = " << height);

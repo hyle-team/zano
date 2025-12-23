@@ -98,12 +98,21 @@ bool generate_events(currency::core& c, cct_events_t& events, const cct_wallets_
   CHECK_AND_ASSERT_MES(c.get_current_blockchain_size() == 1, false, "");
   bool r = false;
 
+  auto get_bei_copy_by_height = [&](uint64_t h, block_extended_info& out) -> bool
+  {
+    std::shared_ptr<const block_extended_info> p;
+    if (!bcs.get_block_extended_info_by_height(h, p) || !p)
+      return false;
+    out = *p;
+    return true;
+  };
+
   uint64_t height = 1;
   size_t altchain_max_size = 0; // used to limit size of alt chains in some cases
   size_t last_altchain_block_height = 0;
   bool alt_chains_enabled = false;
   block_extended_info prev_block = AUTO_VAL_INIT(prev_block), current_block = AUTO_VAL_INIT(current_block);
-  r = bcs.get_block_extended_info_by_height(0, prev_block);
+  r = get_bei_copy_by_height(0, prev_block);
   CHECK_AND_ASSERT_MES(r, false, "get_block_extended_info_by_height failed");
 
   for (size_t block_index = 1; block_index < blocks_count; ++block_index)
@@ -166,7 +175,7 @@ bool generate_events(currency::core& c, cct_events_t& events, const cct_wallets_
       // alt chain gone wild (ex: block triggered reorganization which failed) -- return back to main chain
       events.push_back(b);
       LOG_PRINT_CYAN("\n==============================================\n" "EVENT[" << events.size() - 1 << "]: INVALID BLOCK at " << current_block.height << " in alt chain\n==============================================", LOG_LEVEL_1);
-      bcs.get_block_extended_info_by_height(bcs.get_top_block_height(), prev_block); // return back to main chain
+      get_bei_copy_by_height(bcs.get_top_block_height(), prev_block); // return back to main chain
       continue;
     }
     CHECK_AND_NO_ASSERT_MES(!bvc.m_verification_failed && !bvc.m_marked_as_orphaned && !bvc.m_already_exists, false, "block verification context check failed");
@@ -269,7 +278,7 @@ bool generate_events(currency::core& c, cct_events_t& events, const cct_wallets_
         altchain_max_size = random_in_range(0, 1) == 0 ? SIZE_MAX : random_in_range(1, altchain_depth); // limit altchain size to certain value (or don't limit so switching do will eventually occur)
 
         // start next block as altchain from old block
-        bcs.get_block_extended_info_by_height(current_block.height - altchain_depth, prev_block);
+        get_bei_copy_by_height(current_block.height - altchain_depth, prev_block);
       }
       else if (!is_in_main_chain)
       {
@@ -282,7 +291,7 @@ bool generate_events(currency::core& c, cct_events_t& events, const cct_wallets_
         else
         {
           // return back to main chain
-          bcs.get_block_extended_info_by_height(bcs.get_top_block_height(), prev_block);
+          get_bei_copy_by_height(bcs.get_top_block_height(), prev_block);
         }
       }
 
