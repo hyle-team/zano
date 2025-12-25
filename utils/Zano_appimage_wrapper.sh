@@ -1,22 +1,31 @@
 #!/bin/bash
 script_dir=$( dirname "$(readlink -f "$0")" )
 
-out_dir=~/.local/share/applications
+desktop_dir=~/.local/share/applications
+icon_dir=~/.local/share/icons/hicolor/256x256/apps
 version="$(echo ${APPIMAGE} | rev | cut -d '-' -f1,2 | rev | sed 's/\.AppImage$//')"
-out_file_name="${out_dir}/Zano-${version}.desktop"
+out_file_name="${desktop_dir}/Zano-${version}.desktop"
 
 export QTWEBENGINE_DISABLE_SANDBOX=1
 
 call_app()
 {
-  pushd $script_dir
-  usr/bin/Zano "$@"
-  if [ $? -ne 0 ]; then
+  pushd "$script_dir" >/dev/null
+
+  # handle situation with empy deeplink, for example when app launched by double click on icon
+  if [ -n "$1" ] && printf '%s' "$1" | grep -qiE '^zano:'; then
+    usr/bin/Zano --deeplink-params="$1"
+  else
+    usr/bin/Zano "$@"
+  fi
+
+  rc=$?
+  if [ $rc -ne 0 ]; then
     echo $'\n\n\x1b[1mIf Zano fails to launch, it might need to install xinerama extension for the X C Binding with this command:\n\x1b[2m   sudo apt-get install libxcb-xinerama0\n\n'
   fi
 
-  popd
-  exit
+  popd >/dev/null
+  exit $rc
 }
 
 
@@ -24,17 +33,20 @@ create_desktop_icon()
 {
     target_file_name=$1
     echo "Generating icon file: $target_file_name..."
-    rm -f "${out_dir}/Zano.png"
+    mkdir -p "${desktop_dir}"
+    mkdir -p "${icon_dir}"
     rm -f $target_file_name
-    cp -Rv "${APPDIR}/usr/share/icons/hicolor/256x256/apps/Zano.png" "${out_dir}/Zano.png"
+    rm -f "${icon_dir}/Zano.png"
+    cp -f "${APPDIR}/usr/share/icons/hicolor/256x256/apps/Zano.png" "${icon_dir}/Zano.png"
+    icon_path="${icon_dir}/Zano.png"
     echo [Desktop Entry] | tee -a $target_file_name  > /dev/null
     echo Version=1.0 | tee -a $target_file_name  > /dev/null
     echo Name=Zano | tee -a $target_file_name > /dev/null
     echo GenericName=Zano | tee -a $target_file_name  > /dev/null
     echo Comment=Privacy blockchain | tee -a $target_file_name > /dev/null
-    echo Icon=${out_dir}/Zano.png | tee -a $target_file_name > /dev/null
+    echo Icon=${icon_path} | tee -a $target_file_name > /dev/null
     echo TryExec="${APPIMAGE}" | tee -a "${target_file_name}" >/dev/null
-    echo Exec=$APPIMAGE --deeplink-params=\\\\\\\"%u\\\\\\\" | tee -a $target_file_name  > /dev/null
+    echo Exec=$APPIMAGE %u | tee -a $target_file_name  > /dev/null
     echo Terminal=false | tee -a $target_file_name  > /dev/null
     echo Type=Application | tee -a $target_file_name  > /dev/null
     echo "Categories=Qt;Utility;" | tee -a $target_file_name  > /dev/null
