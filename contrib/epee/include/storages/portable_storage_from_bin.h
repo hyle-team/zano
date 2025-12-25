@@ -43,9 +43,9 @@ namespace epee
   {
     struct portable_storage_limits
     {
-      size_t max_storage_entries_count = 10000;
-      size_t max_array_elements_count = 10000;
-      size_t max_sections_entries_count = 10000;
+      size_t max_storage_entries_count = 1000000;
+      size_t max_array_elements_count = 1000000;
+      size_t max_sections_entries_count = 1000000;
     };
 
     inline static constexpr portable_storage_limits gdefault_portable_storage_limits{};
