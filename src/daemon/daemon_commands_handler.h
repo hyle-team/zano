@@ -82,6 +82,7 @@ public:
     m_cmd_binder.set_handler("full_db_cache_warmup", boost::bind(&daemon_commands_handler::full_db_cache_warmup, this, ph::_1), "(Experimental) Perform full DB loading to RAM cache(make sense only with big numbers passed to --db-cache-l2 option)");
     m_cmd_binder.set_handler("print_cache_state", boost::bind(&daemon_commands_handler::print_cache_state, this, ph::_1), "Print db l2 cache state");
     m_cmd_binder.set_handler("reload_p2p_manual_config", boost::bind(&daemon_commands_handler::reload_p2p_manual_config, this, ph::_1), "Reload manual p2p config from '" P2P_MANUAL_CONFIG_FILENAME "'");
+    m_cmd_binder.set_handler("version", boost::bind(&daemon_commands_handler::print_version, this, ph::_1), "Prints \"" CURRENCY_NAME " v" PROJECT_VERSION_LONG "\"");
 #ifdef _DEBUG
     m_cmd_binder.set_handler("debug_set_time_adj", boost::bind(&daemon_commands_handler::debug_set_time_adj, this, ph::_1), "DEBUG: set core time adjustment");
 #endif
@@ -1022,6 +1023,12 @@ private:
   bool print_deadlock_guard(const std::vector<std::string>& args)
   {
     LOG_PRINT_L0(ENDL << epee::deadlock_guard_singleton::get_dlg_state());
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool print_version(const std::vector<std::string>& args)
+  {
+    LOG_PRINT_GREEN_L0(CURRENCY_NAME " v" PROJECT_VERSION_LONG);
     return true;
   }
   //--------------------------------------------------------------------------------
