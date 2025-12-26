@@ -491,7 +491,12 @@ namespace currency
   bool core_rpc_server::on_get_random_outs4(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
-    CHECK_RPC_LIMITS(req.heights.size(), RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS);
+    size_t total_heights = 0;
+    for(size_t i = 0; i < req.batches.size(); ++i)
+    {
+      total_heights += req.batches[i].heights.size();
+      CHECK_RPC_LIMITS(total_heights, RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS);
+    }
     res.status = API_RETURN_CODE_FAIL;
     if (!m_core.get_blockchain_storage().get_random_outs_for_amounts4(req, res))
     {
