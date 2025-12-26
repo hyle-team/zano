@@ -86,6 +86,7 @@ namespace currency
     bool enable_console_logger(const std::vector<std::string> &args);
     bool integrated_address(const std::vector<std::string> &args);
     bool get_tx_key(const std::vector<std::string> &args_);
+    bool check_all_tx_keys(const std::vector<std::string> &args_);
     bool tracking_seed(const std::vector<std::string> &args_);
     bool save_watch_only(const std::vector<std::string> &args);
     bool sign_transfer(const std::vector<std::string> &args);
@@ -204,6 +205,7 @@ namespace currency
     bool m_no_password_confirmations = false;
     bool m_no_whitelist = false;
     std::string m_restore_ki_in_wo_wallet;
+    bool m_concise_mode = false;
     
     crypto::hash m_password_hash;
     uint64_t m_password_salt;
