@@ -3566,6 +3566,7 @@ int main(int argc, char* argv[])
       }
     }
 
+    // TODO: consider calling simple_wallet::handle_command_line() instead or somehow remove code duplication -- sowle
     std::string wallet_file = command_line::get_arg(vm, arg_wallet_file);
     std::string daemon_address = command_line::get_arg(vm, arg_daemon_address);
     std::string daemon_host = command_line::get_arg(vm, arg_daemon_host);
@@ -3616,6 +3617,10 @@ int main(int argc, char* argv[])
     {
       wal.set_do_not_unlock_reserved_on_idle(command_line::get_arg(vm, arg_no_idle_unlock_spent));
     }
+
+    bool concise_mode = command_line::get_arg(vm, arg_concise_mode) == 1;
+    wal.set_concise_mode(concise_mode);
+    LOG_PRINT_L0("concise mode: " << ( concise_mode ? "on" : "off"));
 
 
     std::shared_ptr<tools::i_wallet2_callback> callback(new wallet_rpc_local_callback(wallet_ptr));
