@@ -617,6 +617,10 @@ namespace tools
     template<typename callback_t>
     void enumerate_unconfirmed_transfers(callback_t cb) const;
 
+    // callback: (const crypto::hash& tx_id, const crypto::secret_key& tx_key) -> bool, true -- continue, false -- stop
+    template<typename callback_t>
+    void enumerate_tx_keys(callback_t cb) const;
+
     bool is_watch_only() const { return m_watch_only; }
     bool is_auditable() const { return m_account.get_public_address().is_auditable(); }
     void sign_transfer(const std::string& tx_sources_blob, std::string& signed_tx_blob, currency::transaction& tx);
@@ -715,6 +719,7 @@ namespace tools
     bool get_contracts(escrow_contracts_container& contracts);
     const std::list<expiration_entry_info>& get_expiration_entries() const { return m_money_expirations; };
     bool get_tx_key(const crypto::hash &txid, crypto::secret_key &tx_key) const;
+    size_t get_tx_keys_count() const { return m_tx_keys.size(); }
 
     bool prepare_transaction(construct_tx_param& ctp, currency::finalize_tx_param& ftp, const mode_separate_context& emode_separate = mode_separate_context());
 
@@ -774,6 +779,7 @@ namespace tools
     void set_concise_mode(bool enabled) { m_concise_mode = enabled; }
     void set_concise_mode_reorg_max_reorg_blocks(uint64_t max_blocks) { m_wallet_concise_mode_max_reorg_blocks = max_blocks; }
     void set_concise_mode_truncate_history(uint64_t max_entries) { m_truncate_history_max_entries = max_entries; }
+    bool get_concise_mode() const { return m_concise_mode; }
     bool find_unconfirmed_tx(const crypto::hash& tx_id, wallet_public::wallet_transfer_info& res) const;
 
     construct_tx_param get_default_construct_tx_param();
@@ -1271,6 +1277,15 @@ namespace tools
       if (!cb(el.second))
         break;
   }
+
+  template<typename callback_t>
+  void wallet2::enumerate_tx_keys(callback_t cb) const
+  {
+    for(auto it = m_tx_keys.begin(); it != m_tx_keys.end(); ++it)
+      if (!cb(it->first, it->second))
+        break;
+  }
+
 
 } // namespace tools
 
