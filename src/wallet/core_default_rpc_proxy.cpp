@@ -163,51 +163,11 @@ namespace tools
     CRITICAL_REGION_LOCAL(m_lock);
     m_socks5_cfg = cfg;
     // TODO: TLS over SOCKS5 is not implemented yet
-    m_block_submit_base_url = cfg.submit_base_url_override.empty() ? m_daemon_address : cfg.submit_base_url_override;
+    m_socks5_cfg.submit_base_url_override = cfg.submit_base_url_override.empty() ? m_daemon_address : cfg.submit_base_url_override;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::call_COMMAND_RPC_SUBMITBLOCK2(const currency::COMMAND_RPC_SUBMITBLOCK2::request& req, currency::COMMAND_RPC_SUBMITBLOCK2::response& rsp)
   {
-    if (m_socks5_cfg.enabled)
-    {
-      
-      return call_request([&]()
-      {
-        epee::net_utils::http::url_content u = AUTO_VAL_INIT(u);
-        if (!epee::net_utils::parse_url(m_block_submit_base_url, u))
-        {
-          LOG_PRINT_L0("submitblock2 over SOCKS5: failed to parse url " << m_block_submit_base_url);
-          return false;
-        }
-
-        if (!u.port)
-          u.port = (u.schema == "https" ? 443 : 8081);
-
-        // TODO: HTTPS over SOCKS5
-        if (u.schema == "https")
-          LOG_PRINT_YELLOW("submitblock2 over SOCKS5: HTTPS requested, but TLS-over-SOCKS is not supported yet", LOG_LEVEL_0);
-
-        http_socks5_client socks5_client;
-        tools::socks5::apply_socks5_cfg(socks5_client.get_transport(), m_socks5_cfg);
-        socks5_client.get_transport().set_use_remote_dns(true);
-
-        if (!socks5_client.connect(u.host, static_cast<int>(u.port), m_connection_timeout))
-        {
-          LOG_PRINT_L0("submitblock2 over SOCKS5: connect to " << u.host << ":" << u.port << " failed");
-          return false;
-        }
-
-        const std::string& base = m_socks5_cfg.submit_base_url_override;
-        const std::string  rpc_uri = base.empty() ? "/json_rpc" : (base + "/json_rpc");
-
-        LOG_PRINT_L2("[INVOKE_JSON_METHOD SOCKS5] ---> submitblock2");
-        bool r = epee::net_utils::invoke_http_json_rpc(rpc_uri, "submitblock2", req, rsp, socks5_client);
-        LOG_PRINT_L2("[INVOKE_JSON_METHOD SOCKS5] <--- submitblock2");
-
-        return r;
-      });
-    }
-
     return invoke_http_json_rpc_update_is_disconnect("submitblock2", req, rsp);
   }
   //------------------------------------------------------------------------------------------------------------------------------
