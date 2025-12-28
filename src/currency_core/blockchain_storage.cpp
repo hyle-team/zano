@@ -375,11 +375,14 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         res = db_addr_to_alias_old.init(BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS);
         CHECK_AND_ASSERT_MES(res, false, "Unable to init db_addr_to_alias_old");
 
-        // temporary set db compatibility version to zero during migration in order to trigger db reinit on the next lanunch in case the process stops in the middle
-        m_db.begin_transaction();
-        uint64_t tmp_db_maj_version = m_db_storage_major_compatibility_version;
-        m_db_storage_major_compatibility_version = 0;
-        m_db.commit_transaction();
+        // temporary set db compatibility version to zero during migration in order to trigger db reinit on the next launch in case the process stops in the middle
+        uint64_t tmp_db_maj_version = 0;
+        {
+          auto db_tx_ptr = m_db.begin_transaction_obj();
+          tmp_db_maj_version = m_db_storage_major_compatibility_version;
+          m_db_storage_major_compatibility_version = 0;
+          db_tx_ptr->commit_transaction();
+        }
 
         typedef std::vector<std::pair<std::string, std::list<extra_alias_entry_base>>> tmp_container_t;
         tmp_container_t temp_container;
@@ -400,10 +403,12 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         });
 
         // clear and close old format container
-        m_db.begin_transaction();
-        db_aliases_old.clear();
-        db_addr_to_alias_old.clear();
-        m_db.commit_transaction();
+        {
+          auto db_tx_ptr = m_db.begin_transaction_obj();
+          db_aliases_old.clear();
+          db_addr_to_alias_old.clear();
+          db_tx_ptr->commit_transaction();
+        }
         db_aliases_old.deinit();
         db_addr_to_alias_old.deinit();
   
@@ -413,18 +418,24 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         CHECK_AND_ASSERT_MES(res, false, "Unable to init m_db_addr_to_alias");
 
         // re-populate all alias entries back
-        m_db.begin_transaction();
-        for(auto& el : temp_container)
-          m_db_aliases.set(el.first, el.second);
+        {
+          auto db_tx_ptr = m_db.begin_transaction_obj();
+          
+          for (auto& el : temp_container)
+            m_db_aliases.set(el.first, el.second);
 
-        for(auto& el : addr_to_alias_container)
-          m_db_addr_to_alias.set(el.first, el.second);
-        m_db.commit_transaction();
+          for (auto& el : addr_to_alias_container)
+            m_db_addr_to_alias.set(el.first, el.second);
+          
+          db_tx_ptr->commit_transaction();
+        }
 
         // restore db maj compartibility
-        m_db.begin_transaction();
-        m_db_storage_major_compatibility_version = tmp_db_maj_version;
-        m_db.commit_transaction();
+        {
+          auto db_tx_ptr = m_db.begin_transaction_obj();
+          m_db_storage_major_compatibility_version = tmp_db_maj_version;
+          db_tx_ptr->commit_transaction();
+        }
 
         LOG_PRINT_MAGENTA("Migrating DB: successfully done", LOG_LEVEL_0);
       }
@@ -465,38 +476,46 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         // such version means that DB has unpopulated container m_db_per_block_gindex_incs, fix it now
         LOG_PRINT_MAGENTA("DB version is " << DB_MAJ_VERSION_FOR_PER_BLOCK_GINDEX_FIX << ".1, migrating m_db_per_block_gindex_incs to ver. " << DB_MAJ_VERSION_FOR_PER_BLOCK_GINDEX_FIX << ".2...", LOG_LEVEL_0);
 
+        uint64_t tmp_db_maj_version = 0;
         // temporary set db compatibility version to zero during migration in order to trigger db reinit on the next lanunch in case the process stops in the middle
-        m_db.begin_transaction();
-        uint64_t tmp_db_maj_version = m_db_storage_major_compatibility_version;
-        m_db_storage_major_compatibility_version = 0;
-        m_db.commit_transaction();
-
-        m_db.begin_transaction();
-        std::unordered_map<uint64_t, uint32_t> gindices;
-        for(size_t height = ZANO_HARDFORK_04_AFTER_HEIGHT + 1, size = m_db_blocks.size(); height < size; ++height)
         {
-          auto block_ptr = m_db_blocks[height];
-          gindices.clear();
-          append_per_block_increments_for_tx(block_ptr->bl.miner_tx, gindices);
-          for(const crypto::hash& tx_id : block_ptr->bl.tx_hashes)
-          {
-            auto tx_ptr = m_db_transactions.get(tx_id);
-            if (!tx_ptr)
-            {
-              LOG_ERROR("Internal error: couldn't find a transactions with id " << tx_id << ", migration stops now and full resync is triggered in attempt to fix this.");
-              need_reinit = true;
-              break;
-            }
-            append_per_block_increments_for_tx(tx_ptr->tx, gindices);
-          }
-          push_block_to_per_block_increments(height, gindices);
+          auto db_tx_ptr = m_db.begin_transaction_obj();
+          tmp_db_maj_version = m_db_storage_major_compatibility_version;
+          m_db_storage_major_compatibility_version = 0;
+          db_tx_ptr->commit_transaction();
         }
-        m_db.commit_transaction();
+
+        {
+          auto db_tx_ptr = m_db.begin_transaction_obj();
+          std::unordered_map<uint64_t, uint32_t> gindices;
+          for (size_t height = ZANO_HARDFORK_04_AFTER_HEIGHT + 1, size = m_db_blocks.size(); height < size; ++height)
+          {
+            auto block_ptr = m_db_blocks[height];
+            gindices.clear();
+            append_per_block_increments_for_tx(block_ptr->bl.miner_tx, gindices);
+            for (const crypto::hash& tx_id : block_ptr->bl.tx_hashes)
+            {
+              auto tx_ptr = m_db_transactions.get(tx_id);
+              if (!tx_ptr)
+              {
+                LOG_ERROR("Internal error: couldn't find a transactions with id " << tx_id << ", migration stops now and full resync is triggered in attempt to fix this.");
+                need_reinit = true;
+                break;
+              }
+              append_per_block_increments_for_tx(tx_ptr->tx, gindices);
+            }
+            push_block_to_per_block_increments(height, gindices);
+          }
+          db_tx_ptr->commit_transaction();
+        }
+
 
         // restore db maj compatibility
-        m_db.begin_transaction();
-        m_db_storage_major_compatibility_version = tmp_db_maj_version;
-        m_db.commit_transaction();
+        {
+          auto db_tx_ptr = m_db.begin_transaction_obj();
+          m_db_storage_major_compatibility_version = tmp_db_maj_version;
+          db_tx_ptr->commit_transaction();
+        }
         LOG_PRINT_MAGENTA("migration of m_db_per_block_gindex_incs completed successfully", LOG_LEVEL_0);
       }
 
@@ -590,9 +609,12 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
   if(!m_db_blocks.back()->bl.timestamp)
     timestamp_diff = m_core_runtime_config.get_core_time() - 1341378000;
 
-  m_db.begin_transaction();
-  set_lost_tx_unmixable();
-  m_db.commit_transaction();
+  {
+    auto db_tx_ptr = m_db.begin_transaction_obj();
+    set_lost_tx_unmixable();
+    db_tx_ptr->commit_transaction();
+
+  }
 
   LOG_PRINT_GREEN("Blockchain initialized, ver: " << m_db_storage_major_compatibility_version << "." << m_db_storage_minor_compatibility_version << ENDL 
     << "  genesis:                " << get_block_hash(m_db_blocks[0]->bl) << ENDL
@@ -711,12 +733,12 @@ void  blockchain_storage::patch_out_if_needed(txout_to_key& out, const crypto::h
 //------------------------------------------------------------------
 void blockchain_storage::store_db_solo_options_values()
 {
-  m_db.begin_transaction();
+  auto db_tx_ptr = m_db.begin_transaction_obj();
   m_db_storage_major_compatibility_version = BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION;
   m_db_storage_minor_compatibility_version = BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION;
   m_db_last_worked_version = std::string(PROJECT_VERSION_LONG);
   m_db_most_recent_hardfork_id = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(get_top_block_height() + 1 /* <-- next block height */);
-  m_db.commit_transaction();
+  db_tx_ptr->commit_transaction();
 }
 //------------------------------------------------------------------
 bool blockchain_storage::deinit()
@@ -758,22 +780,20 @@ bool blockchain_storage::set_checkpoints(checkpoints&& chk_pts)
   m_checkpoints = chk_pts;
   try
   {
-    m_db.begin_transaction();
+    auto db_tx_ptr = m_db.begin_transaction_obj();
     if (m_db_blocks.size() < m_checkpoints.get_top_checkpoint_height())
       m_is_in_checkpoint_zone = !m_non_pruning_mode_enabled; // set to true unless non-pruning mode is on
     prune_ring_signatures_and_attachments_if_need();
-    m_db.commit_transaction();
+    db_tx_ptr->commit_transaction();
     return true;
   }
   catch (const std::exception& ex)
   {
-    m_db.abort_transaction();
     LOG_ERROR("UNKNOWN EXCEPTION WHILE SETTING CHECKPOINTS: " << ex.what());
     return false;
   }
   catch (...)
   {
-    m_db.abort_transaction();
     LOG_ERROR("UNKNOWN EXCEPTION WHILE SETTING CHECKPOINTS.");
     return false;
   }
@@ -842,24 +862,26 @@ bool blockchain_storage::prune_ring_signatures_and_attachments_if_need()
 bool blockchain_storage::clear()
 {
   //CRITICAL_REGION_LOCAL(m_read_lock);
-  m_db.begin_transaction();
+  {
+    auto db_tx_ptr = m_db.begin_transaction_obj();
 
-  m_db_blocks.clear();
-  m_db_blocks_index.clear();
-  m_db_transactions.clear();
-  m_db_spent_keys.clear();
-  m_db_solo_options.clear();
-  store_db_solo_options_values();
-  m_db_outputs.clear();
-  m_db_multisig_outs.clear();
-  m_db_aliases.clear();
-  m_db_assets.clear();
-  m_db_addr_to_alias.clear();
-  m_db_per_block_gindex_incs.clear();
-  m_pos_targetdata_cache.clear();
-  m_pow_targetdata_cache.clear();
+    m_db_blocks.clear();
+    m_db_blocks_index.clear();
+    m_db_transactions.clear();
+    m_db_spent_keys.clear();
+    m_db_solo_options.clear();
+    store_db_solo_options_values();
+    m_db_outputs.clear();
+    m_db_multisig_outs.clear();
+    m_db_aliases.clear();
+    m_db_assets.clear();
+    m_db_addr_to_alias.clear();
+    m_db_per_block_gindex_incs.clear();
+    m_pos_targetdata_cache.clear();
+    m_pow_targetdata_cache.clear();
 
-  m_db.commit_transaction();
+    db_tx_ptr->commit_transaction();
+  }
   
 
   {
@@ -5247,7 +5269,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
 bool blockchain_storage::rebuild_tx_fee_medians()
 {
   uint64_t sz = m_db_blocks.size();
-  m_db.begin_transaction(); 
+  auto db_tx_ptr = m_db.begin_transaction_obj(); 
   LOG_PRINT_L0("Started reinitialization of median fee...");
   math_helper::once_a_time_seconds<10> log_idle;
 
@@ -5313,7 +5335,7 @@ bool blockchain_storage::rebuild_tx_fee_medians()
     blocks_median.scan_items(cb, cb_final_eraser);
   }
 
-  m_db.commit_transaction();
+  db_tx_ptr->commit_transaction();
   LOG_PRINT_L0("Reinitialization of median fee finished!")
   return true;
 }
@@ -5658,9 +5680,9 @@ void blockchain_storage::do_full_db_warm_up() const
 //------------------------------------------------------------------
 void blockchain_storage::on_hardfork_activated(size_t hardfork_id)
 {
-  m_db.begin_transaction();
+  auto db_tx_ptr = m_db.begin_transaction_obj();
   m_db_most_recent_hardfork_id = hardfork_id;
-  m_db.commit_transaction();
+  db_tx_ptr->commit_transaction();
 }
 //------------------------------------------------------------------
 bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const
@@ -7702,7 +7724,7 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
       return false;
     }
 
-    m_db.begin_transaction();
+    auto db_tx_ptr = m_db.begin_transaction_obj();
 
     //block bl = bl_;
     crypto::hash id = get_block_hash(bl);
@@ -7712,7 +7734,7 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
     {
       LOG_PRINT_L3("block with id = " << id << " already exists");
       bvc.m_already_exists = true;
-      m_db.commit_transaction();
+      db_tx_ptr->commit_transaction();
       CHECK_AND_ASSERT_MES(validate_blockchain_prev_links(), false, "EPIC FAIL! 1");
       return false;
     }
@@ -7722,7 +7744,7 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
       LOG_PRINT_RED_L0("block with id = " << id << " failed to prevalidate");
       bvc.m_added_to_main_chain = false;
       bvc.m_verification_failed = true;
-      m_db.commit_transaction();
+      db_tx_ptr->commit_transaction();
       return false;
     }
     
@@ -7733,12 +7755,12 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
       bool r = handle_alternative_block(bl, id, bvc);
       if (!r || bvc.m_verification_failed)
       {
-        m_db.abort_transaction();
+        db_tx_ptr->abort_transaction();
         CHECK_AND_ASSERT_MES(validate_blockchain_prev_links(), false, "EPIC FAIL! 2.2");
         m_tx_pool.on_finalize_db_transaction();
         return r;
       }
-      m_db.commit_transaction();
+      db_tx_ptr->commit_transaction();
       CHECK_AND_ASSERT_MES(validate_blockchain_prev_links(), false, "EPIC FAIL! 2");
       m_tx_pool.on_finalize_db_transaction();
       return r;
@@ -7749,13 +7771,13 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
     bool res = handle_block_to_main_chain(bl, id, bvc);
     if (bvc.m_verification_failed || !res)
     {
-      m_db.abort_transaction();
+      db_tx_ptr->abort_transaction();
       m_tx_pool.on_finalize_db_transaction();
       on_abort_transaction();
       if (m_event_handler) m_event_handler->on_clear_events();
       return res;
     }
-    m_db.commit_transaction();
+    db_tx_ptr->commit_transaction();
     CHECK_AND_ASSERT_MES(validate_blockchain_prev_links(), false, "EPIC FAIL! 3");
     m_tx_pool.on_finalize_db_transaction();
     if (m_event_handler) m_event_handler->on_complete_events();
@@ -7771,7 +7793,6 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
   {
     bvc.m_verification_failed = true;
     bvc.m_added_to_main_chain = false;
-    m_db.abort_transaction();
     m_tx_pool.on_finalize_db_transaction();
     on_abort_transaction();
     LOG_ERROR("UNKNOWN EXCEPTION WHILE ADDINIG NEW BLOCK: " << ex.what());
@@ -7782,7 +7803,6 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
   {
     bvc.m_verification_failed = true;
     bvc.m_added_to_main_chain = false;
-    m_db.abort_transaction();
     m_tx_pool.on_finalize_db_transaction();
     on_abort_transaction();
     LOG_ERROR("UNKNOWN EXCEPTION WHILE ADDINIG NEW BLOCK.");
@@ -7792,7 +7812,7 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
 //------------------------------------------------------------------
 bool blockchain_storage::truncate_blockchain(uint64_t to_blockchain_size)
 {
-  m_db.begin_transaction();
+  auto db_tx_ptr = m_db.begin_transaction_obj();
   uint64_t inital_blockchain_size = get_current_blockchain_size();
   while (get_current_blockchain_size() > to_blockchain_size)
   {
@@ -7804,7 +7824,7 @@ bool blockchain_storage::truncate_blockchain(uint64_t to_blockchain_size)
   m_altblocks_keyimages.clear();
   m_alternative_chains_txs.clear();
   LOG_PRINT_MAGENTA("Blockchain truncated from size " << inital_blockchain_size << " to size " << get_current_blockchain_size() << ". Alt blocks cleared.", LOG_LEVEL_0);
-  m_db.commit_transaction();
+  db_tx_ptr->commit_transaction();
   return true;
 }
 //------------------------------------------------------------------
