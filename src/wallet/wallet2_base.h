@@ -257,7 +257,7 @@ namespace tools
     crypto::public_key asset_id = currency::null_pkey;
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(asset_id)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(1)
 
   };
 
@@ -279,7 +279,7 @@ namespace tools
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(asset_id)
       BOOST_SERIALIZE(own_context)
-      END_BOOST_SERIALIZATION()
+      END_BOOST_SERIALIZATION_TOTAL_FIELDS(2)
   };
 
   struct asset_unown_event
@@ -290,7 +290,7 @@ namespace tools
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(asset_id)
       BOOST_SERIALIZE(own_context)
-      END_BOOST_SERIALIZATION()
+      END_BOOST_SERIALIZATION_TOTAL_FIELDS(2)
   };
 
   typedef boost::variant<asset_register_event, asset_update_event, asset_unown_event> wallet_event_t;
@@ -311,7 +311,7 @@ namespace tools
       BOOST_SERIALIZE(m_block_height)
       BOOST_SERIALIZE(m_block_timestamp)
       BOOST_SERIALIZE(m_tx)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(3)
 
   };
 
@@ -337,10 +337,10 @@ namespace tools
   {
     struct ZC_out_info // TODO: @#@# consider using wallet_out_info instead
     {
-      ZC_out_info() = default;
+      /*ZC_out_info() = default;
       ZC_out_info(const crypto::scalar_t& amount_blinding_mask, const crypto::scalar_t& asset_id_blinding_mask, const crypto::public_key& asset_id)
         : amount_blinding_mask(amount_blinding_mask), asset_id_blinding_mask(asset_id_blinding_mask), asset_id(asset_id)
-      {}
+      {} */
       crypto::scalar_t amount_blinding_mask = 0;
       crypto::scalar_t asset_id_blinding_mask = 0;
       crypto::public_key asset_id = currency::null_pkey; // not blinded, not multiplied by 1/8 TODO: @#@# consider changing to point_t, also consider using wallet wallet_out_info
@@ -354,7 +354,7 @@ namespace tools
         BOOST_SERIALIZE(amount_blinding_mask)
         BOOST_SERIALIZE(asset_id_blinding_mask)
         BOOST_SERIALIZE(asset_id)
-      END_BOOST_SERIALIZATION()
+      END_BOOST_SERIALIZATION_TOTAL_FIELDS(3)
     };
 
     std::shared_ptr<transaction_wallet_info> m_ptx_wallet_info;
@@ -419,7 +419,7 @@ namespace tools
       BOOST_SERIALIZE(m_spent_height)
       BOOST_SERIALIZE(m_amount)
       BOOST_SERIALIZE(m_zc_info_ptr)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(6)
   };
 
 
@@ -433,7 +433,7 @@ namespace tools
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(origin)
       BOOST_SERIALIZE(redeem_tx_id)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(2)
   };
 
 
@@ -469,7 +469,7 @@ namespace tools
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(is_wallet_owns_redeem)
       BOOST_SERIALIZE(transfer_index)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(2)
   };
 
 
@@ -481,7 +481,7 @@ namespace tools
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(asset_id)
       BOOST_SERIALIZE(amount)
-      END_BOOST_SERIALIZATION()
+      END_BOOST_SERIALIZATION_TOTAL_FIELDS(2)
   };
 
   struct payment_details
@@ -498,7 +498,7 @@ namespace tools
       BOOST_SERIALIZE(m_block_height)
       BOOST_SERIALIZE(m_unlock_time)
       BOOST_SERIALIZE(subtransfers)
-      END_BOOST_SERIALIZATION()
+      END_BOOST_SERIALIZATION_TOTAL_FIELDS(5)
   };
 
   struct expiration_entry_info
@@ -513,7 +513,7 @@ namespace tools
       BOOST_SERIALIZE(expiration_time)
       BOOST_SERIALIZE(related_tx_id)
       BOOST_SERIALIZE(receved)
-      END_BOOST_SERIALIZATION()
+      END_BOOST_SERIALIZATION_TOTAL_FIELDS(4)
   };
 
   typedef std::unordered_multimap<std::string, payment_details> payment_container;

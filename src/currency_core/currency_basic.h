@@ -378,7 +378,7 @@ namespace currency
       BOOST_SERIALIZE(blinded_asset_id)
       BOOST_SERIALIZE(encrypted_amount)
       BOOST_SERIALIZE(mix_attr)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(6)
   };
 
   struct zarcanum_tx_data_v1
@@ -391,7 +391,7 @@ namespace currency
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(fee)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(1)
   };
 
   struct zc_asset_surjection_proof
@@ -404,7 +404,7 @@ namespace currency
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(bge_proofs)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(1)
   };
 
   // non-consoditated txs must have one of this objects in the attachments (elements count == vout.size())
@@ -422,7 +422,7 @@ namespace currency
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(bpp)
       BOOST_SERIALIZE(aggregation_proof)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(2)
   };
 
   // Zarcanum-aware CLSAG signature (one per ZC input)
@@ -442,7 +442,7 @@ namespace currency
       BOOST_SERIALIZE(pseudo_out_amount_commitment)
       BOOST_SERIALIZE(pseudo_out_blinded_asset_id)
       BOOST_SERIALIZE(clsags_ggx)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(3)
   };
 
   // First part of a double Schnorr proof:
@@ -460,7 +460,7 @@ namespace currency
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(dss)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(1)
   };
 
 
@@ -780,6 +780,8 @@ namespace currency
     END_KV_SERIALIZE_MAP()
   };
 
+  
+
 
   struct asset_descriptor_with_id: public asset_descriptor_base
   {
@@ -881,7 +883,7 @@ namespace currency
       BOOST_SERIALIZE(opt_amount_commitment_g_proof)
       BOOST_END_VERSION_UNDER(1)
       BOOST_SERIALIZE(version)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(3)
   };
 
 
@@ -899,7 +901,7 @@ namespace currency
       BOOST_SERIALIZE(gss)
       BOOST_END_VERSION_UNDER(1)
       BOOST_SERIALIZE(version)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(2)
   };
 
 
@@ -915,7 +917,7 @@ namespace currency
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(eth_sig)
       BOOST_SERIALIZE(version)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(2)
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE_POD_AS_HEX_STRING(eth_sig)    DOC_DSCR("HEX-encoded ETH signature (64 bytes)") DOC_EXMP("674bb56a5b4fa562e679ccacc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6add697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
@@ -1011,7 +1013,7 @@ namespace currency
 
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(s)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(1)
   };
 
   struct void_sig
@@ -1021,7 +1023,7 @@ namespace currency
     END_SERIALIZE()
 
     BEGIN_BOOST_SERIALIZATION()
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(0)
   };
 
   typedef boost::variant<NLSAG_sig, void_sig, ZC_sig, zarcanum_sig> signature_v;

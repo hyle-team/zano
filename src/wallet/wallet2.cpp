@@ -822,7 +822,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
 
           if (out_type_zc)
           {
-            td.m_zc_info_ptr.reset(new transfer_details_base::ZC_out_info(out.amount_blinding_mask, out.asset_id_blinding_mask, out.asset_id));
+            td.m_zc_info_ptr.reset(new transfer_details_base::ZC_out_info{ out.amount_blinding_mask, out.asset_id_blinding_mask, out.asset_id });
           }
 
           size_t transfer_index = new_index;

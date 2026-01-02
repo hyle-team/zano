@@ -141,7 +141,7 @@ struct asset_descriptor_operation_v1
     BOOST_SERIALIZE(amount_commitment)
     //BOOST_END_VERSION_UNDER(1)
     BOOST_SERIALIZE(opt_asset_id)
-  END_BOOST_SERIALIZATION()
+  END_BOOST_SERIALIZATION_TOTAL_FIELDS(5)
 };
 
 template<typename asset_descriptor_operation_t>
