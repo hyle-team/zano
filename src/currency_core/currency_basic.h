@@ -349,16 +349,10 @@ namespace currency
 
   struct tx_out_zarcanum
   {
-    tx_out_zarcanum() {}
-    
-    // Boost's Assignable concept
-    tx_out_zarcanum(const tx_out_zarcanum&)            = default;
-    tx_out_zarcanum& operator=(const tx_out_zarcanum&) = default;
-
-    crypto::public_key  stealth_address;
-    crypto::public_key  concealing_point;  // group element Q, see also Zarcanum paper, premultiplied by 1/8
-    crypto::public_key  amount_commitment; // premultiplied by 1/8
-    crypto::public_key  blinded_asset_id;  // group element T, premultiplied by 1/8
+    crypto::public_key  stealth_address = null_pkey;
+    crypto::public_key  concealing_point = null_pkey;  // group element Q, see also Zarcanum paper, premultiplied by 1/8
+    crypto::public_key  amount_commitment = null_pkey; // premultiplied by 1/8
+    crypto::public_key  blinded_asset_id = null_pkey;  // group element T, premultiplied by 1/8
     uint64_t            encrypted_amount = 0;
     uint8_t             mix_attr = 0;
 
