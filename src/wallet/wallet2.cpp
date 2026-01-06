@@ -5393,12 +5393,13 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   if (tmpl_req.explicit_transaction.size())
     subm_req.explicit_txs.push_back(hexemizer{ tmpl_req.explicit_transaction });
 
-  if (m_socks5_relay_cfg.enabled)
+  if (m_socks5_relay_cfg.blocks)
   {
-    WLT_LOG_L0("PoS block " << block_hash << " will be submitted via SOCKS5 proxy " << m_socks5_relay_cfg.proxy_host << ":" << m_socks5_relay_cfg.proxy_port);
+    const auto& block_socks = *m_socks5_relay_cfg.blocks;
+    WLT_LOG_L0("PoS block " << block_hash << " will be submitted via SOCKS5 proxy " << block_socks.proxy.proxy_host << ":" << block_socks.proxy.proxy_port);
     
     epee::net_utils::http::url_content u = AUTO_VAL_INIT(u);
-    const std::string& url_str = m_socks5_relay_cfg.submit_base_url_override;
+    const std::string& url_str = block_socks.target_url;
     if (!epee::net_utils::parse_url(url_str, u))
     {
       WLT_LOG_L0("submitblock2 over SOCKS5: failed to parse url " << url_str);
@@ -5413,10 +5414,10 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
       WLT_LOG_YELLOW("submitblock2 over SOCKS5: HTTPS requested, but TLS-over-SOCKS is not supported yet", LOG_LEVEL_0);
 
     http_socks5_client socks5_client;
-    tools::socks5::apply_socks5_cfg(socks5_client.get_transport(), m_socks5_relay_cfg);
-    socks5_client.get_transport().set_use_remote_dns(true);
+    tools::socks5::apply_socks5_cfg(socks5_client.get_transport(), block_socks.proxy);
+    socks5_client.get_transport().set_use_remote_dns(block_socks.proxy.use_remote_dns);
 
-    if(!socks5_client.connect(u.host, std::to_string(u.port), m_socks5_relay_cfg.connect_timeout_ms))
+    if(!socks5_client.connect(u.host, std::to_string(u.port), block_socks.proxy.connect_timeout_ms))
     {
       WLT_LOG_ERROR("submitblock2 over SOCKS5: connect to " << u.host << ":" << u.port << " failed");
       return false;
@@ -7245,7 +7246,11 @@ assets_selection_context wallet2::get_needed_money(uint64_t fee, const std::vect
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::set_disable_tor_relay(bool disable)
 {
-  m_socks5_relay_cfg.enabled = !disable;
+  if (disable)
+  {
+      m_socks5_relay_cfg.blocks = std::nullopt;
+      m_socks5_relay_cfg.transactions = std::nullopt;
+  }
 }
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::notify_state_change(const std::string& state_code, const std::string& details)
@@ -7256,16 +7261,17 @@ void wallet2::notify_state_change(const std::string& state_code, const std::stri
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::send_transaction_to_network(const transaction& tx)
 {
-  if (m_socks5_relay_cfg.enabled)
+  if (m_socks5_relay_cfg.transactions.has_value())
   {
+    const auto tx_socks = m_socks5_relay_cfg.transactions.value();
     //TODO check that core synchronized
     //epee::net_utils::levin_client2 p2p_client;
 
     //make few attempts
     tools::levin_over_socks5_client p2p_client;
-    apply_socks5_cfg(p2p_client.get_transport(), m_socks5_relay_cfg);
+    apply_socks5_cfg(p2p_client.get_transport(), tx_socks.proxy);
     WLT_LOG_L1("[SOCKS5] Sending transaction " << get_transaction_hash(tx) << " via SOCKS5 relay "
-      << m_socks5_relay_cfg.proxy_host << ":" << m_socks5_relay_cfg.proxy_port);
+      << tx_socks.proxy.proxy_host << ":" << tx_socks.proxy.proxy_port);
 
     bool succeseful_sent = false;
     for (size_t i = 0; i != 3; ++i)
@@ -8756,42 +8762,59 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
 void wallet2::configure_socks_relay(const socks5::socks5_proxy_settings& cfg)
 {
   m_socks5_relay_cfg = cfg;
-  if (m_socks5_relay_cfg.enabled)
+
+  if(m_socks5_relay_cfg.transactions)
   {
-    WLT_LOG_L0("SOCKS5 relay enabled: "
-      << m_socks5_relay_cfg.proxy_host << ":" << m_socks5_relay_cfg.proxy_port
-      << ", remote DNS: " << (m_socks5_relay_cfg.use_remote_dns ? "on" : "off"));
+    const auto& ep = *m_socks5_relay_cfg.transactions;
+    WLT_LOG_L0("SOCKS5 tx relay enabled: " << ep.proxy.proxy_host << ":" << ep.proxy.proxy_port
+      << (ep.target_url.empty() ? "" : (", relay url: " + ep.target_url)));
   }
   else
   {
-    WLT_LOG_L0("SOCKS5 relay disabled");
+    WLT_LOG_L0("SOCKS5 tx relay disabled");
+  }
+
+  if(m_socks5_relay_cfg.blocks)
+  {
+    const auto& ep = *m_socks5_relay_cfg.blocks;
+    WLT_LOG_L0("SOCKS5 block submit enabled: " << ep.proxy.proxy_host << ":" << ep.proxy.proxy_port
+      << (ep.target_url.empty() ? "" : (", submit url: " + ep.target_url)));
+  }
+  else
+  {
+    WLT_LOG_L0("SOCKS5 block submit disabled");
   }
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::configure_socks_relay(const std::string& addr_port)
 {
-  const std::string::size_type pos = addr_port.rfind(':');
-  if (pos == std::string::npos || pos + 1 >= addr_port.size())
+  if(addr_port.empty())
   {
-    WLT_LOG_L0("configure_socks_relay: wrong address format: " << addr_port << ", expected ip:port or host:port");
+    socks5::socks5_proxy_settings cfg = m_socks5_relay_cfg;
+    cfg.transactions.reset();
+    configure_socks_relay(cfg);
+    return true;
+  }
+
+  std::string host;
+  uint16_t port = 0;
+  if(!epee::net_utils::parse_proxy_addr_host_port(addr_port, host, port))
+  {
+    WLT_LOG_L0("configure_socks_relay: wrong address format: " << addr_port << ", expected host:port or [ipv6]:port");
     return false;
   }
 
   socks5::socks5_proxy_settings cfg = m_socks5_relay_cfg;
-  cfg.enabled = true;
-  cfg.proxy_host = addr_port.substr(0, pos);
 
-  uint16_t p = 0;
-  try
-  {
-    p = static_cast<uint16_t>(std::stoul(addr_port.substr(pos + 1)));
-  }
-  catch (...)
-  {
-    WLT_LOG_L0("configure_socks_relay: wrong port in " << addr_port);
-    return false;
-  }
-  cfg.proxy_port = p;
+  socks5::socks5_endpoint_config ep {};
+  // if already configured — keep timeouts/use_remote_dns/target_url
+  if(cfg.transactions)
+    ep = *cfg.transactions;
+
+  ep.proxy.proxy_host = host;
+  ep.proxy.proxy_port = port;
+
+  cfg.transactions = ep;
 
   configure_socks_relay(cfg);
   return true;

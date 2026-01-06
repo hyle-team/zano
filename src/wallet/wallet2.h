@@ -1003,7 +1003,6 @@ private:
     mutable current_operation_context m_current_context;
 
     socks5::socks5_proxy_settings m_socks5_relay_cfg{};
-    socks5::socks5_proxy_settings m_block_socks5_relay_cfg{};
 
     std::string m_votes_config_path;
     tools::wallet_public::wallet_vote_config m_votes_config;

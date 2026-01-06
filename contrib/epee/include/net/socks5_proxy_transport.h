@@ -7,18 +7,26 @@
 
 namespace tools {
 namespace socks5 {
-// socks5_base_cfg
-struct socks5_proxy_settings
+struct socks5_proxy_params
 {
-  bool        enabled = false;
-  std::string proxy_host{};
-  uint16_t    proxy_port = 0;
+  std::string proxy_host = "127.0.0.1";
+  uint16_t    proxy_port = 9150;
   bool        use_remote_dns = false;
 
   unsigned int connect_timeout_ms = 15000;
   unsigned int recv_timeout_ms = 15000;
+};
 
-  std::string submit_base_url_override{};
+struct socks5_endpoint_config
+{
+  socks5_proxy_params proxy{};
+  std::string target_url{};
+};
+
+struct socks5_proxy_settings
+{
+  std::optional<socks5_endpoint_config> transactions;
+  std::optional<socks5_endpoint_config> blocks;
 };
 
 template<class base_transport>
@@ -237,21 +245,28 @@ namespace detail
   inline void try_set_timeouts(T&, unsigned, unsigned, long) {}
 
   template<typename Transport>
-  void apply_socks5_cfg(Transport& tr, const socks5_proxy_settings& cfg)
+  inline void apply_socks5_cfg(Transport& tr, const socks5_proxy_params& p)
   {
-    if (!cfg.enabled)
+    if (p.proxy_host.empty() || p.proxy_port == 0)
       return;
 
-    detail::try_set_socks_proxy(tr, cfg.proxy_host, cfg.proxy_port, 0);
-    detail::try_set_use_remote_dns(tr, cfg.use_remote_dns, 0);
-    detail::try_set_timeouts(tr, cfg.connect_timeout_ms, cfg.recv_timeout_ms, 0);
+    detail::try_set_socks_proxy(tr, p.proxy_host, p.proxy_port, 0);
+    detail::try_set_use_remote_dns(tr, p.use_remote_dns, 0);
+    detail::try_set_timeouts(tr, p.connect_timeout_ms, p.recv_timeout_ms, 0);
   }
 } // namespace detail
-// public helper
+
+// public helpers
 template<typename Transport>
-inline void apply_socks5_cfg(Transport& tr, const socks5_proxy_settings& cfg)
+inline void apply_socks5_cfg(Transport& tr, const socks5_proxy_params& p)
 {
-  detail::apply_socks5_cfg(tr, cfg);
+  detail::apply_socks5_cfg(tr, p);
+}
+
+template<typename Transport>
+inline void apply_socks5_cfg(Transport& tr, const socks5_endpoint_config& ep)
+{
+  detail::apply_socks5_cfg(tr, ep.proxy);
 }
 } // namespace socks5
 } // namespace tools

@@ -236,6 +236,7 @@ namespace command_line
   extern const arg_descriptor<std::string> arg_deeplink;
   extern const arg_descriptor<std::string> arg_generate_rpc_autodoc;
   extern const arg_descriptor<std::string> arg_enable_tx_socks5_relay_proxy;
+  extern const arg_descriptor<std::string> arg_tx_relay_url;
   extern const arg_descriptor<std::string> arg_enable_block_socks5_relay_proxy;
   extern const arg_descriptor<std::string> arg_block_relay_url;
   
