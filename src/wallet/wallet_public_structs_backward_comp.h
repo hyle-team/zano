@@ -2,10 +2,7 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #pragma once
-#include "currency_core/currency_basic.h"
-#include "currency_core/offers_service_basics.h"
 #include <common/variant_helper.h>
-//#include "wallet_public_structs_defs.h"
 
 namespace tools::legacy
 {
@@ -375,9 +372,6 @@ namespace tools::legacy
   };
 
 
-} // namespace tools::legacy
-
-
 inline void transition_convert(tools::legacy::employed_tx_entries_hf5&& from, tools::wallet_public::employed_tx_entries& to)
 {
   for(auto& el : from.receive)
@@ -502,5 +496,8 @@ inline void transition_convert(const tools::wallet_public::wallet_transfer_info&
   // intentionally not implemented; we don't need to convert new data structures to old ones -- sowle
   throw std::logic_error("transition_convert(wallet_transfer_info, wallet_transfer_info_hf5) not implemented");
 }
+
+} // namespace tools::legacy
+
 
 LOOP_BACK_BOOST_SERIALIZATION_VERSION(tools::legacy::wallet_transfer_info_hf5);

@@ -29,7 +29,6 @@
 #include "currency_format_utils_transactions.h"
 #include "core_runtime_config.h"
 #include "wallet/wallet_public_structs_defs.h"
-#include "wallet/wallet_public_structs_defs.h"
 #include "bc_attachments_helpers.h"
 #include "bc_payments_id_service.h"
 #include "bc_offers_service_basic.h"

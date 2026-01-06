@@ -26,7 +26,6 @@ using namespace epee;
 #include "common/util.h"
 
 #include "common/boost_serialization_helper.h"
-#include "wallet_public_structs_backward_comp.h"
 #include "crypto/crypto.h"
 #include "serialization/binary_utils.h"
 #include "currency_core/bc_payments_id_service.h"

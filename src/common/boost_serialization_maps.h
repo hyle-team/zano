@@ -60,7 +60,7 @@ struct boost_transition_t<true, destination_t>
   static void chain_serialize(archive& ar, const origin_type& origin_tx, const unsigned int ver)
   {
     destination_t dst_tx{};
-    transition_convert(origin_tx, dst_tx);
+    transition_convert(origin_tx, dst_tx); // <- dependent name, use ADL wisely and put your transition_convert implementation into proper namespace -- sowle
     //ar & dst_tx;
     boost::serialization::serialize(ar, dst_tx, ver);
   }
@@ -74,7 +74,7 @@ struct boost_transition_t<false, destination_t>
   {
     destination_t dst_tx{};
     boost::serialization::serialize(ar, dst_tx, ver);
-    transition_convert(std::move(dst_tx), origin_tx);
+    transition_convert(std::move(dst_tx), origin_tx); // <- dependent name, use ADL wisely and put your transition_convert implementation into proper namespace -- sowle
   }
 };
 
