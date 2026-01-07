@@ -172,7 +172,6 @@ namespace tools
         LOG_PRINT_MAGENTA("Serializing file with ver: " << ver, LOG_LEVEL_0);
       }
 
-
       // do not load wallet if data version is greather than the code version 
       if (ver > WALLET_FILE_SERIALIZATION_VERSION)
       {
@@ -200,21 +199,12 @@ namespace tools
           return;
         }
       }
+
       //convert from old version
       a & m_chain;
       a & m_minimum_height;
       a & m_amount_gindex_to_transfer_id;
-      if (ver <= 167)
-      {
-        std::deque<transfer_details> transfer_container_old;
-        a& transfer_container_old;
-        for (size_t i = 0; i != transfer_container_old.size(); i++){m_transfers[i] = transfer_container_old[i];}
-      }
-      else
-      {
-        a& m_transfers;
-      }
-      
+      a & m_transfers;      
       a & m_multisig_transfers;
       a & m_key_images;
       a & m_unconfirmed_txs;
@@ -235,24 +225,7 @@ namespace tools
       a & m_rollback_events;
       a & m_whitelisted_assets;
       a & m_use_assets_whitelisting;
-      if (ver <= 165)
-      {
-        uint64_t last_zc_global_index = 0;
-        a& last_zc_global_index;
-        m_last_zc_global_indexs.push_back(std::make_pair(uint64_t(0), last_zc_global_index));
-        return;
-      }
-      a& m_last_zc_global_indexs;
-      if (ver == 166 && m_last_zc_global_indexs.size())
-      {
-        //workaround for m_last_zc_global_indexs holding invalid index for last item
-        m_last_zc_global_indexs.pop_front();
-      } 
-      if (ver <= 167)
-      {
-        return;
-      }
-      
+      a & m_last_zc_global_indexs;      
     }
   };
   
