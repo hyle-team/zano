@@ -172,7 +172,7 @@ static asset_operation_descriptor get_ado(const asset_base_descriptor& base_desc
 enum class serialization_method : uint8_t
 {
   native,
-  boost,
+  //boost,
   key_value
 };
 
@@ -192,9 +192,9 @@ static std::optional<std::string> serialize(serialization_method method, const a
     serialization_function = static_cast<bool(*)(const asset_operation_descriptor&, std::string&)>(t_serializable_object_to_blob);
     break;
 
-  case serialization_method::boost:
-    serialization_function = static_cast<bool(*)(const asset_operation_descriptor&, std::string&)>(tools::serialize_obj_to_buff);
-    break;
+  //case serialization_method::boost:
+  //  serialization_function = static_cast<bool(*)(const asset_operation_descriptor&, std::string&)>(tools::serialize_obj_to_buff);
+  //  break;
 
   case serialization_method::key_value:
     serialization_function = [](const asset_operation_descriptor& descriptor, std::string& presentation) -> bool
@@ -228,9 +228,9 @@ static std::optional<asset_operation_descriptor> deserialize(serialization_metho
     deserialization_function = t_unserializable_object_from_blob<asset_operation_descriptor>;
     break;
 
-  case serialization_method::boost:
-    deserialization_function = tools::unserialize_obj_from_buff<asset_operation_descriptor>;
-    break;
+  //case serialization_method::boost:
+  //  deserialization_function = tools::unserialize_obj_from_buff<asset_operation_descriptor>;
+  //  break;
 
   case serialization_method::key_value:
     deserialization_function = epee::serialization::load_t_from_json<asset_operation_descriptor>;
