@@ -7284,10 +7284,10 @@ void wallet2::send_transaction_to_network(const transaction& tx)
     bool succeseful_sent = false;
     for (size_t i = 0; i != 3; ++i)
     {
-      WLT_LOG_L0("[SOCKS5] attempt " << (i+1));
+      WLT_LOG_L1("[SOCKS5] attempt " << (i+1));
       if(!p2p_client.connect(relay_host, relay_port, tx_socks.proxy.connect_timeout_ms))
       {
-        WLT_LOG_L0("[SOCKS5] connect failed");
+        WLT_LOG_L1("[SOCKS5] connect failed");
         continue;//THROW_IF_FALSE_WALLET_EX(false, error::no_connection_to_daemon, "Failed to connect to TOR node");
       }
 
@@ -7307,13 +7307,11 @@ void wallet2::send_transaction_to_network(const transaction& tx)
       if (p2p_rsp.code == API_RETURN_CODE_OK)
       {
         this->notify_state_change(WALLET_LIB_SENT_SUCCESS);
-        WLT_LOG_L0("[SOCKS5] P2P relay OK");
         succeseful_sent = true;
         break;
       }
 
       this->notify_state_change(WALLET_LIB_SEND_FAILED);
-      WLT_LOG_L0("[SOCKS5] P2P relay returned code " << p2p_rsp.code);
       //checking if transaction got relayed to other nodes and 
       //return;
     }
