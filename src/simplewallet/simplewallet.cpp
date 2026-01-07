@@ -514,6 +514,7 @@ void process_wallet_command_line_params(const po::variables_map& vm, tools::wall
     if (auto cp = wal.get_core_proxy())
     {
       cp->set_socks5_proxy(socks_cfg);
+      wal.configure_socks_relay(socks_cfg);
     }
     else
     {

@@ -81,7 +81,6 @@ namespace tools
     , m_votes_config_path(tools::get_default_data_dir() + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME)
   {
     m_core_runtime_config = currency::get_default_core_runtime_config();
-    m_socks5_relay_cfg = socks5::socks5_proxy_settings{};
   }
   //---------------------------------------------------------------
   wallet2::~wallet2()
@@ -7272,12 +7271,21 @@ void wallet2::send_transaction_to_network(const transaction& tx)
     apply_socks5_cfg(p2p_client.get_transport(), tx_socks.proxy);
     WLT_LOG_L1("[SOCKS5] Sending transaction " << get_transaction_hash(tx) << " via SOCKS5 relay "
       << tx_socks.proxy.proxy_host << ":" << tx_socks.proxy.proxy_port);
+    std::string relay_host {};
+    uint16_t relay_port{};
+    epee::net_utils::http::url_content u = AUTO_VAL_INIT(u);
+    if(epee::net_utils::parse_url(tx_socks.target_url, u) && !u.host.empty())
+    {
+      if(u.port != 0 && u.port <= 65535)
+        relay_port = static_cast<uint16_t>(u.port);
 
+      relay_host = u.host;
+    }
     bool succeseful_sent = false;
     for (size_t i = 0; i != 3; ++i)
     {
       WLT_LOG_L0("[SOCKS5] attempt " << (i+1));
-      if (!p2p_client.connect("195.201.107.230", 11311, 10000))
+      if(!p2p_client.connect(relay_host, relay_port, tx_socks.proxy.connect_timeout_ms))
       {
         WLT_LOG_L0("[SOCKS5] connect failed");
         continue;//THROW_IF_FALSE_WALLET_EX(false, error::no_connection_to_daemon, "Failed to connect to TOR node");
