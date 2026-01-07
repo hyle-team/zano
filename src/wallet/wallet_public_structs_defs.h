@@ -51,7 +51,7 @@ namespace tools::wallet_public
       BOOST_SERIALIZE(amount)
       BOOST_SERIALIZE(asset_id)
       BOOST_SERIALIZE(payment_id)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(4)
 
   };
 
@@ -68,7 +68,7 @@ namespace tools::wallet_public
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(receive)
       BOOST_SERIALIZE(spent)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(2)
   };
 
   struct escrow_contract_details_basic
@@ -140,7 +140,7 @@ namespace tools::wallet_public
       BOOST_SERIALIZE(amount) 
       BOOST_SERIALIZE(is_income)
       BOOST_SERIALIZE(asset_id)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(3)
   };
 
   struct wallet_sub_transfers_by_pid_info
@@ -235,7 +235,7 @@ namespace tools::wallet_public
       BOOST_SERIALIZE(unlock_time)
       BOOST_SERIALIZE(service_entries)
       BOOST_SERIALIZE(subtransfers_by_pid)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(24)
 
     wallet_sub_transfers_by_pid_info& get_or_add_subtransfers_by_pid(const currency::payment_id_t& pid)
     {

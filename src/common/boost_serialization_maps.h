@@ -38,8 +38,17 @@ template<size_t A, size_t B> struct TAssertEquality {
   fields to the structure but forgets to update the serialization map, the compilation will fail. Any update to "num_fields" must
   be accompanied by a thorough review of the serialization map to ensure no fields are omitted.
 **********************************************************************************************************************************/
+
+template <std::size_t Expected, std::size_t Actual>
+struct if_you_see_this_check_END_BOOST_SERIALIZATION_TOTAL_FIELDS_macro;
+
+template <class T, std::size_t Expected>
+using validate_fields_t = std::conditional_t<(boost::pfr::tuple_size_v<T> == Expected), int, if_you_see_this_check_END_BOOST_SERIALIZATION_TOTAL_FIELDS_macro<Expected, boost::pfr::tuple_size_v<T>>>;
+
+
+
 #ifndef DISABLE_PFR_SERIALIZATION_SELFCHECK
-  #define END_BOOST_SERIALIZATION_TOTAL_FIELDS(num_fields)  static_assert(num_fields == boost::pfr::tuple_size<std::remove_reference<decltype(*this)>::type>::value, "Unexpected number of fields!"); }
+  #define END_BOOST_SERIALIZATION_TOTAL_FIELDS(num_fields) { using _check = validate_fields_t<std::remove_reference<decltype(*this)>::type, num_fields>; static_assert(sizeof(_check) != 999, "Dummy Assert"); } }
 #else
   #define END_BOOST_SERIALIZATION_TOTAL_FIELDS(num_fields) END_BOOST_SERIALIZATION()
 #endif
@@ -99,6 +108,6 @@ struct boost_transition_t<false, destination_t>
       if(ver < xxx) return;
       BOOST_SERIALIZE(m_user_data_blob)
       BOOST_SERIALIZE(m_attachment_info)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(0)
   };
 */

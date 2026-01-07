@@ -57,7 +57,7 @@ namespace currency
       BOOST_SERIALIZE(meta_info)
       BOOST_SERIALIZE(owner)
       BOOST_SERIALIZE(hidden_supply)
-      END_BOOST_SERIALIZATION()
+      END_BOOST_SERIALIZATION_TOTAL_FIELDS(9)
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(total_max_supply)  DOC_DSCR("Maximum possible supply for given asset, can't be changed after deployment") DOC_EXMP(1000000000000000000)   DOC_END
@@ -95,7 +95,7 @@ namespace currency
       BOOST_SERIALIZE(amount_commitment)
       BOOST_END_VERSION_UNDER(1)
       BOOST_SERIALIZE(opt_asset_id)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(5)
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(operation_type)    DOC_DSCR("Asset operation type identifier") DOC_EXMP(1) DOC_END
