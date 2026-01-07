@@ -86,6 +86,7 @@ namespace currency
     bool enable_console_logger(const std::vector<std::string> &args);
     bool integrated_address(const std::vector<std::string> &args);
     bool get_tx_key(const std::vector<std::string> &args_);
+    bool check_all_tx_keys(const std::vector<std::string> &args_);
     bool tracking_seed(const std::vector<std::string> &args_);
     bool save_watch_only(const std::vector<std::string> &args);
     bool sign_transfer(const std::vector<std::string> &args);
@@ -208,6 +209,7 @@ namespace currency
     std::string m_tx_relay_url;
     std::string m_enable_block_socks5_relay_proxy;
     std::string m_block_relay_url;
+    bool m_concise_mode = false;
     
     crypto::hash m_password_hash;
     uint64_t m_password_salt;

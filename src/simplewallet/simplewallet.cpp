@@ -144,7 +144,7 @@ namespace
   const command_line::arg_descriptor<bool>          arg_no_whitelist("no-white-list", "Do not load white list from interned.");
   const command_line::arg_descriptor<std::string>   arg_restore_ki_in_wo_wallet("restore-ki-in-wo-wallet", "Watch-only missing key images restoration. Please, DON'T use it unless you 100% sure of what are you doing.", "");
   const command_line::arg_descriptor<bool>          arg_no_idle_unlock_spent("no-idle-unlock-utxo", "Do not unlock utxo that looks like it should be unlocked(marked as spent but no unconfirmed tx that spends it).");
-
+  const command_line::arg_descriptor<int>           arg_concise_mode("concise-mode", "When in concise mode (=1, default) the wallet removes spent UTXO/txs from history after some time to keep its size sane. Can be disabled (=0) if necessary.", 1);
 
   const command_line::arg_descriptor< std::vector<std::string> > arg_command  ("command", "");
 
@@ -330,6 +330,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("viewkey",  boost::bind(&simple_wallet::viewkey, this,ph::_1), "Display secret view key");
   
   m_cmd_binder.set_handler("get_tx_key", boost::bind(&simple_wallet::get_tx_key, this,ph::_1), "Get transaction one-time secret key (r) for a given <txid>");
+  m_cmd_binder.set_handler("check_all_tx_keys", boost::bind(&simple_wallet::check_all_tx_keys, this, ph::_1), "Check one-time secret key status for all sent transactions");
 
   m_cmd_binder.set_handler("tracking_seed", boost::bind(&simple_wallet::tracking_seed, this,ph::_1), "For auditable wallets: prints tracking seed for wallet's audit by a third party");
 
@@ -670,6 +671,7 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_enable_block_socks5_relay_proxy = command_line::get_arg(vm, command_line::arg_enable_block_socks5_relay_proxy);
   m_block_relay_url = command_line::get_arg(vm, command_line::arg_block_relay_url);
 
+  m_concise_mode    = command_line::get_arg(vm, arg_concise_mode) == 1;
 } 
 //----------------------------------------------------------------------------------------------------
 
@@ -724,6 +726,7 @@ bool simple_wallet::new_wallet(const string &wallet_file, const std::string& pas
   m_wallet->callback(this->shared_from_this());
   if (!m_voting_config_file.empty())
     m_wallet->set_votes_config_path(m_voting_config_file);
+  m_wallet->set_concise_mode(m_concise_mode);
 
   m_wallet->set_do_rise_transfer(false);
   try
@@ -760,6 +763,7 @@ bool simple_wallet::restore_wallet(const std::string& wallet_file, const std::st
   m_wallet->callback(this->shared_from_this());
   if (!m_voting_config_file.empty())
     m_wallet->set_votes_config_path(m_voting_config_file);
+  m_wallet->set_concise_mode(m_concise_mode);
 
   m_wallet->set_do_rise_transfer(true);
   try
@@ -820,9 +824,11 @@ bool simple_wallet::open_wallet(const string &wallet_file, const std::string& pa
   m_wallet->callback(shared_from_this());
   if (!m_voting_config_file.empty())
     m_wallet->set_votes_config_path(m_voting_config_file);
+  m_wallet->set_concise_mode(m_concise_mode);
 
   auto print_wallet_opened_msg = [&](){
     message_writer(epee::log_space::console_color_white, true) << "Opened" << (m_wallet->is_auditable() ? " auditable" : "") << (m_wallet->is_watch_only() ? " watch-only" : "") << " wallet: " << m_wallet->get_account().get_public_address_str();
+    LOG_PRINT_L0("concise mode: " << ( m_concise_mode ? "on" : "off"));
   };
 
 
@@ -2172,6 +2178,63 @@ bool simple_wallet::get_tx_key(const std::vector<std::string> &args_)
   }
 }
 //----------------------------------------------------------------------------------------------------
+bool simple_wallet::check_all_tx_keys(const std::vector<std::string> &args_)
+{
+  if (m_wallet->get_concise_mode())
+  {
+    fail_msg_writer() << "This command is meaningless when the wallet is in concise mode. Consider disabling concise mode, resyncing, refreshing and trying again.";
+    return true;
+  }
+
+  size_t txs_with_known_key = 0, txs_with_unknown_key = 0;
+  std::set<crypto::hash> tx_seen_in_history;
+
+  m_wallet->enumerate_transfers_history([&](const tools::wallet_public::wallet_transfer_info& wti) -> bool
+    {
+      tx_seen_in_history.insert(wti.tx_hash);
+      if (!wti.has_outgoing_entries())
+        return true;
+      crypto::secret_key tx_secret_key{};
+      if (m_wallet->get_tx_key(wti.tx_hash, tx_secret_key))
+      {
+        message_writer(epee::log_space::console_color_green, true, "", LOG_LEVEL_0) << "tx " << wti.tx_hash << " @ " << wti.height << " : " << tx_secret_key;
+        ++txs_with_known_key;
+      }
+      else
+      {
+        auto mw = message_writer(epee::log_space::console_color_red, true, "", LOG_LEVEL_0);
+        mw << "tx " << wti.tx_hash << " @ " << wti.height << " : secret key missing, spends:";
+        for(auto& st : wti.subtransfers)
+        {
+          if (!st.is_income)
+          {
+            mw << "\n  " << print_money(st.amount, m_wallet->get_asset_decimal_point(st.asset_id));
+            if (st.asset_id != native_coin_asset_id)
+              mw << ", asset_id: " << st.asset_id;
+          }
+        }
+        ++txs_with_unknown_key;
+      }
+      return true;
+    }, true);
+
+  if (m_wallet->get_tx_keys_count() != txs_with_known_key)
+  {
+    success_msg_writer() << "\nwallet's tx secret keys:";
+    m_wallet->enumerate_tx_keys([&](const crypto::hash& tx_id, const crypto::secret_key& tx_key) -> bool
+      {
+        success_msg_writer() << "tx " << tx_id << " -> " << tx_key << (tx_seen_in_history.count(tx_id) == 0 ? "  tx is not in transfer history" : "");
+        return true;
+      });
+  }
+
+  success_msg_writer() << "";
+  success_msg_writer() << m_wallet->get_tx_keys_count() << " tx keys are stored in the wallet";
+  success_msg_writer() << txs_with_known_key << " txs with known secret keys found in history, " << txs_with_unknown_key << " txs have unknown secret key";
+
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
 bool simple_wallet::tracking_seed(const std::vector<std::string> &args_)
 {
   if (!m_wallet->is_auditable())
@@ -3470,6 +3533,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, command_line::arg_tx_relay_url);
   command_line::add_arg(desc_params, command_line::arg_enable_block_socks5_relay_proxy);
   command_line::add_arg(desc_params, command_line::arg_block_relay_url);
+  command_line::add_arg(desc_params, arg_concise_mode);
 
 
   tools::wallet_rpc_server::init_options(desc_params);
@@ -3602,6 +3666,7 @@ int main(int argc, char* argv[])
       }
     }
 
+    // TODO: consider calling simple_wallet::handle_command_line() instead or somehow remove code duplication -- sowle
     std::string wallet_file = command_line::get_arg(vm, arg_wallet_file);
     std::string daemon_address = command_line::get_arg(vm, arg_daemon_address);
     std::string daemon_host = command_line::get_arg(vm, arg_daemon_host);
@@ -3652,6 +3717,10 @@ int main(int argc, char* argv[])
     {
       wal.set_do_not_unlock_reserved_on_idle(command_line::get_arg(vm, arg_no_idle_unlock_spent));
     }
+
+    bool concise_mode = command_line::get_arg(vm, arg_concise_mode) == 1;
+    wal.set_concise_mode(concise_mode);
+    LOG_PRINT_L0("concise mode: " << ( concise_mode ? "on" : "off"));
 
 
     std::shared_ptr<tools::i_wallet2_callback> callback(new wallet_rpc_local_callback(wallet_ptr));
