@@ -347,6 +347,9 @@ namespace currency
     END_BOOST_SERIALIZATION()
   };
 
+
+#define TX_OUT_ZARCANUM_CURRENT_VERSION    0
+
   struct tx_out_zarcanum
   {
     crypto::public_key  stealth_address = null_pkey;
@@ -354,17 +357,21 @@ namespace currency
     crypto::public_key  amount_commitment = null_pkey; // premultiplied by 1/8
     crypto::public_key  blinded_asset_id = null_pkey;  // group element T, premultiplied by 1/8
     uint64_t            encrypted_amount = 0;
+    uint64_t            encrypted_payment_id = 0;
     uint8_t             mix_attr = 0;
+    uint8_t             version = TX_OUT_ZARCANUM_CURRENT_VERSION;
 
-    BEGIN_SERIALIZE_OBJECT()
+    BEGIN_VERSIONED_SERIALIZE(TX_OUT_ZARCANUM_CURRENT_VERSION, version)
       FIELD(stealth_address)
       FIELD(concealing_point)
       FIELD(amount_commitment)
       FIELD(blinded_asset_id)
       FIELD(encrypted_amount)
+      FIELD(encrypted_payment_id)
       FIELD(mix_attr)
     END_SERIALIZE()
 
+    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(1)
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(stealth_address)
       BOOST_SERIALIZE(concealing_point)
@@ -372,7 +379,10 @@ namespace currency
       BOOST_SERIALIZE(blinded_asset_id)
       BOOST_SERIALIZE(encrypted_amount)
       BOOST_SERIALIZE(mix_attr)
-    END_BOOST_SERIALIZATION_TOTAL_FIELDS(6)
+      BOOST_END_VERSION_UNDER(1)
+      BOOST_SERIALIZE(encrypted_payment_id)
+      BOOST_SERIALIZE(version)
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(8)
   };
 
   struct zarcanum_tx_data_v1
@@ -602,7 +612,7 @@ namespace currency
 #define TX_SERVICE_ATTACHMENT_ENCRYPT_BODY                    static_cast<uint8_t>(1 << 0)
 #define TX_SERVICE_ATTACHMENT_DEFLATE_BODY                    static_cast<uint8_t>(1 << 1)
 
-// with this flag enabled body encrypted/decrypted with the key created as a derivation from onetime key and "spend keys" of receiver
+// with this flag enabled body encrypted/decrypted with the key created as a derivation of tx public key and receiver's _spend_ secret key
 #define TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE  static_cast<uint8_t>(1 << 2)  
 // add proof of content, without revealing secrete
 #define TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF               static_cast<uint8_t>(1 << 3)  
@@ -1044,7 +1054,7 @@ namespace currency
       if(CURRENT_TRANSACTION_VERSION < version) return false;
       FIELD(vin)
       FIELD(extra)
-      FIELD(vout)
+      FIELD_TRANSITION_VER(TRANSACTION_VERSION_POST_HF6, vout, std::vector<tx_out_v_v1>) //FIELD(vout)
       if(version < TRANSACTION_VERSION_POST_HF5) return true;
       FIELD(hardfork_id)
     END_SERIALIZE()
@@ -1230,6 +1240,7 @@ LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_descriptor_base);
 LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_operation_proof);
 LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::asset_operation_ownership_proof);
 LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::transaction);
+LOOP_BACK_BOOST_SERIALIZATION_VERSION(currency::tx_out_zarcanum);
 
 
 // txin_v variant currency
@@ -1286,7 +1297,7 @@ SET_VARIANT_TAGS(currency::tx_out_bare, 36, "tx_out_bare");
 
 // Zarcanum
 SET_VARIANT_TAGS(currency::txin_zc_input, 37, "txin_zc_input");
-SET_VARIANT_TAGS(currency::tx_out_zarcanum, 38, "tx_out_zarcanum");
+SET_VARIANT_TAGS(currency::tx_out_zarcanum_v1, 38, "tx_out_zarcanum_v1");
 SET_VARIANT_TAGS(currency::zarcanum_tx_data_v1, 39, "zarcanum_tx_data_v1");
 SET_VARIANT_TAGS(crypto::bpp_signature_serialized, 40, "bpp_signature_serialized");
 SET_VARIANT_TAGS(crypto::bppe_signature_serialized, 41, "bppe_signature_serialized");
@@ -1306,6 +1317,7 @@ SET_VARIANT_TAGS(currency::asset_operation_ownership_proof_eth, 52, "asset_opera
 SET_VARIANT_TAGS(crypto::eth_public_key, 60, "eth_public_key");
 //SET_VARIANT_TAGS(crypto::eth_signature, 61, "eth_signature");
 SET_VARIANT_TAGS(currency::dummy, 62, "dummy");
+SET_VARIANT_TAGS(currency::tx_out_zarcanum, 63, "tx_out_zarcanum");
 
 
 

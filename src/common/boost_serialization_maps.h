@@ -66,11 +66,12 @@ template<typename destination_t>
 struct boost_transition_t<true, destination_t>
 {
   template <typename archive, typename origin_type>
-  static void chain_serialize(archive& ar, const origin_type& origin_tx)
+  static void chain_serialize(archive& ar, const origin_type& origin_tx, const unsigned int ver)
   {
-    destination_t dst_tx = AUTO_VAL_INIT(dst_tx);
-    transition_convert(origin_tx, dst_tx);
-    ar & dst_tx;
+    destination_t dst_tx{};
+    transition_convert(origin_tx, dst_tx); // <- dependent name, use ADL wisely and put your transition_convert implementation into proper namespace -- sowle
+    //ar & dst_tx;
+    boost::serialization::serialize(ar, dst_tx, ver);
   }
 };
 
@@ -78,19 +79,18 @@ template<typename destination_t>
 struct boost_transition_t<false, destination_t>
 {
   template <typename archive, typename origin_type>
-  static void chain_serialize(archive& ar, origin_type& origin_tx)
+  static void chain_serialize(archive& ar, origin_type& origin_tx, const unsigned int ver)
   {
-    // TODO: consider using move semantic for temporary 'dst_tx'
-    destination_t dst_tx = AUTO_VAL_INIT(dst_tx);
-    ar & dst_tx;    
-    transition_convert(dst_tx, origin_tx);
+    destination_t dst_tx{};
+    boost::serialization::serialize(ar, dst_tx, ver);
+    transition_convert(std::move(dst_tx), origin_tx); // <- dependent name, use ADL wisely and put your transition_convert implementation into proper namespace -- sowle
   }
 };
 
 
-#define BOOST_CHAIN_TRANSITION_VER(obj_version, old_type)   if (obj_version == ver)  {boost_transition_t<t_archive::is_saving::value, old_type>::chain_serialize(_arch, *this);return;}
+#define BOOST_CHAIN_TRANSITION_VER(obj_version, old_type)   if (obj_version == ver)  {boost_transition_t<t_archive::is_saving::value, old_type>::chain_serialize(_arch, *this, ver);return;}
 
-#define BOOST_CHAIN_TRANSITION_IF_COND_TRUE(condition, old_type)   if (condition)  {boost_transition_t<t_archive::is_saving::value, old_type>::chain_serialize(_arch, *this);return;}
+#define BOOST_CHAIN_TRANSITION_IF_COND_TRUE(condition, old_type)   if (condition)  {boost_transition_t<t_archive::is_saving::value, old_type>::chain_serialize(_arch, *this, ver);return;}
 
 /*
   example of use: 

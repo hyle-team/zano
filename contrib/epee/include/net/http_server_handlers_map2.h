@@ -323,7 +323,7 @@ namespace epee {
 
 #define BEGIN_URI_MAP2_VIRTUAL()   virtual bool handle_http_request_map(const epee::net_utils::http::http_request_info& query_info, \
   epee::net_utils::http::http_response_info& response_info, \
-  epee::net_utils::connection_context_base& m_conn_context, bool& call_found, documentation& docs = epee::net_utils::http::i_chain_handler::m_empty_documentation) { \
+  epee::net_utils::connection_context_base& m_conn_context, bool& call_found, documentation& docs = epee::net_utils::http::i_chain_handler::m_empty_documentation) override { \
   call_found = false; \
   if(false) return true; //just a stub to have "else if"
 

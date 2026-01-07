@@ -31,7 +31,7 @@
 #include "common/unordered_containers_boost_serialization.h"
 #include "common/atomics_boost_serialization.h"
 #include "storages/portable_storage_template_helper.h"
-#include "crypto/chacha8.h"
+#include "crypto/chacha.h"
 #include "crypto/hash.h"
 #include "core_rpc_proxy.h"
 #include "core_default_rpc_proxy.h"
@@ -305,7 +305,7 @@ namespace tools
 
     struct keys_file_data_old
     {
-      crypto::chacha8_iv iv;
+      crypto::chacha_iv iv;
       std::string account_data;
 
       BEGIN_SERIALIZE_OBJECT()
@@ -317,7 +317,7 @@ namespace tools
     struct keys_file_data
     {
       uint8_t             version;
-      crypto::chacha8_iv  iv;
+      crypto::chacha_iv   iv;
       std::string         account_data;
 
       static keys_file_data from_old(const keys_file_data_old& v)
@@ -350,16 +350,20 @@ namespace tools
       //PoW block don't have change, so all outs supposed to be marked as "mined"
       bool is_derived_from_coinbase = false;
       size_t i = 0;
-      size_t sub_i = 0;
       uint64_t height = 0;
       uint64_t timestamp = 0;
       std::unordered_map<crypto::public_key, boost::multiprecision::int128_t> total_balance_change;
+      std::unordered_map<uint64_t, std::unordered_map<crypto::public_key, boost::multiprecision::int128_t>> total_balance_change_per_payment_id; // { intrinsic_payment_id -> { asset_id -> balance_change } }
       std::vector<std::string> recipients;
       std::vector<std::string> remote_aliases;
       multisig_entries_map* pmultisig_entries = nullptr;
       crypto::public_key tx_pub_key = currency::null_pkey;
       uint64_t tx_expiration_ts_median = 0;
       uint64_t max_out_unlock_time = 0;
+      //currency::payment_id_t tx_wide_payment_id;
+
+      void handle_incoming_tx_input(size_t transfer_index, const transfer_details& td, size_t input_index);
+      void handle_incoming_tx_output(const currency::wallet_out_info& woi, size_t transfer_index = SIZE_MAX);
 
       const crypto::hash& tx_hash() const
       {
@@ -832,7 +836,7 @@ private:
     void prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_att);    
     void handle_money(const currency::block& b, const process_transaction_context& tx_process_context);
     void load_wti_from_process_transaction_context(wallet_public::wallet_transfer_info& wti, const process_transaction_context& tx_process_context);
-    bool process_payment_id_for_wti(wallet_public::wallet_transfer_info& wti, const process_transaction_context& tx_process_context);
+    bool process_payment_id_for_wti_and_populate_subtransfers(wallet_public::wallet_transfer_info& wti, const process_transaction_context& tx_process_context, const std::vector<currency::payload_items_v>& decrypted_items);
     void add_to_last_zc_global_indexs(uint64_t h, uint64_t last_zc_output_index);
     uint64_t get_actual_zc_global_index();
     void handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop,
@@ -1022,8 +1026,6 @@ private:
 
 BOOST_CLASS_VERSION(tools::wallet2, WALLET_FILE_SERIALIZATION_VERSION)
 
-BOOST_CLASS_VERSION(tools::wallet_public::wallet_transfer_info, 12)
-
 namespace boost
 {
   namespace serialization
@@ -1128,22 +1130,23 @@ namespace tools
       auto it_tr = m_transfers.find(tr_index);
       if (it_tr == m_transfers.end())
       {
+        WLT_LOG_L0("process_input_t: transfer with index " << tr_index << " could not be found when handling input in tx " << get_transaction_hash(tx) << ", triggering resync...");
         throw tools::error::wallet_error_resync_needed();
       }
       transfer_details& td = it_tr->second;
             
-      ptc.total_balance_change[td.get_asset_id()] -= td.amount();
-      if (td.is_native_coin())
-      {
-        ptc.spent_own_native_inputs = true;
-      }
+      //ptc.total_balance_change[td.get_asset_id()] -= td.amount();
+      //if (td.is_native_coin())
+      //{
+      //  ptc.spent_own_native_inputs = true;
+      //}
       uint32_t flags_before = td.m_flags;
       td.m_flags |= WALLET_TRANSFER_DETAIL_FLAG_SPENT;
       td.m_spent_height = ptc.height;
-      if (ptc.coin_base_tx && td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER)
-        ptc.is_derived_from_coinbase = true;
-      else
-        ptc.is_derived_from_coinbase = false;
+      //if (ptc.coin_base_tx && td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER)
+      //  ptc.is_derived_from_coinbase = true;
+      //else
+      //  ptc.is_derived_from_coinbase = false;
 
       if (td.is_native_coin())
       {
@@ -1156,7 +1159,8 @@ namespace tools
           << ", with tx: " << get_transaction_hash(tx) << ", at height " << ptc.height << "; flags: " << flags_before << " -> " << td.m_flags);
       }
       
-      ptc.employed_entries.spent.push_back(wallet_public::employed_tx_entry{ ptc.i, td.amount(), td.get_asset_id()});
+      //ptc.employed_entries.spent.push_back(wallet_public::employed_tx_entry{ ptc.i, td.amount(), td.get_asset_id()});
+      ptc.handle_incoming_tx_input(tr_index, td, ptc.i);
       remove_transfer_from_expiration_list(tr_index);
     }
     return true;

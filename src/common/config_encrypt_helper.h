@@ -35,7 +35,7 @@ namespace tools
       return API_RETURN_CODE_INVALID_FILE;
     }
 
-    crypto::chacha_crypt(app_data_buff, key);
+    crypto::chacha_crypt_legacy(app_data_buff, key);
 
     const app_data_file_binary_header* phdr = reinterpret_cast<const app_data_file_binary_header*>(app_data_buff.data());
     if (phdr->m_signature != signature)
@@ -54,7 +54,7 @@ namespace tools
     phdr->m_cb_body = 0; // for future use
 
     buff.append(body);
-    crypto::chacha_crypt(buff, key);
+    crypto::chacha_crypt_legacy(buff, key);
 
     bool r = epee::file_io_utils::save_string_to_file(path, buff);
     if (r)

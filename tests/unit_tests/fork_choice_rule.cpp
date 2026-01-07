@@ -82,8 +82,8 @@ bool if_alt_chain_stronger_hf4(const currency::wide_difficulty_type& pos, const 
   alt_cumul_diff.pos_diff = pos;
   currency::wide_difficulty_type difficulty_pos_at_split_point = main_cumul_diff.pos_diff;
   currency::wide_difficulty_type difficulty_pow_at_split_point = main_cumul_diff.pow_diff;
-  boost::multiprecision::uint1024_t main = currency::get_a_to_b_relative_cumulative_difficulty_hf4(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
-  boost::multiprecision::uint1024_t alt = currency::get_a_to_b_relative_cumulative_difficulty_hf4(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
+  boost::multiprecision::uint1024_t main = currency::get_a_to_b_relative_cumulative_difficulty_hf6(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
+  boost::multiprecision::uint1024_t alt = currency::get_a_to_b_relative_cumulative_difficulty_hf6(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
   if (alt > main)
     return true;
   return false;
