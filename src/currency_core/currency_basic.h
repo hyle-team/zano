@@ -319,6 +319,39 @@ namespace currency
   };
 
 
+
+  /////////////////////////////////////////////////////////////////////////////
+  // Gateway structures
+
+  struct txin_gateway
+  {
+    crypto::hash gateway_addr = null_hash;
+    uint64_t amount = 0;
+    uint8_t version = 0;
+
+    BEGIN_VERSIONED_SERIALIZE(0)
+      FIELD(gateway_addr)
+      VARINT_FIELD(amount)
+      VARINT_FIELD(version)
+    END_SERIALIZE()
+
+  };
+
+  struct tx_out_gateway
+  {
+    crypto::hash gateway_addr = null_hash;
+    uint64_t amount = 0;
+    uint8_t version = 0;
+
+    BEGIN_VERSIONED_SERIALIZE(0)
+      FIELD(gateway_addr)
+      VARINT_FIELD(amount)
+      VARINT_FIELD(version) 
+    END_SERIALIZE()
+  };
+
+
+
   /////////////////////////////////////////////////////////////////////////////
   // Zarcanum structures
   //
