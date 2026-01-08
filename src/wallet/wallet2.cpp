@@ -14,6 +14,8 @@
 #include <boost/utility/value_init.hpp>
 #include "include_base_utils.h"
 #include "net/levin_client.h"
+#include "net/levin_socks5.h"
+
 using namespace epee;
 
 #include "string_coding.h"
@@ -21,6 +23,7 @@ using namespace epee;
 #include "wallet2.h"
 #include "currency_core/currency_format_utils.h"
 #include "currency_core/bc_offers_service_basic.h"
+#include "currency_protocol/currency_protocol_defs.h"
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "misc_language.h"
 #include "common/util.h"
@@ -33,20 +36,14 @@ using namespace epee;
 #include "common/encryption_filter.h"
 #include "crypto/bitcoin/sha256_helper.h"
 
-#ifndef DISABLE_TOR
-#  define DISABLE_TOR
-#endif
-
-#ifndef DISABLE_TOR
-#include "common/tor_helper.h"
-#endif
-
 #include "storages/levin_abstract_invoke2.h"
 #include "common/variant_helper.h"
 #include "currency_core/crypto_config.h"
 #include "crypto/zarcanum.h"
 #include "wallet_debug_events_definitions.h"
 #include "decoy_selection.h"
+
+#include "net/levin_socks5.h"
 
 using namespace currency;
 
@@ -81,11 +78,6 @@ namespace tools
     , m_max_utxo_count_for_defragmentation_tx(0)
     , m_decoys_count_for_defragmentation_tx(SIZE_MAX)
     , m_use_deffered_global_outputs(false)
-#ifdef DISABLE_TOR
-    , m_disable_tor_relay(true)
-#else
-    , m_disable_tor_relay(false)
-#endif
     , m_votes_config_path(tools::get_default_data_dir() + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME)
   {
     m_core_runtime_config = currency::get_default_core_runtime_config();
@@ -4911,12 +4903,8 @@ bool wallet2::proxy_to_daemon(const std::string& uri, const std::string& body, i
   return m_core_proxy->call_COMMAND_RPC_INVOKE(uri, body, response_code, response_body);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::prepare_pos_zc_input_and_ring(const transfer_details& td,
-                                            const currency::tx_out_zarcanum& stake_out,
-                                            currency::txin_zc_input& stake_input,
-                                            std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& decoy_storage,
-                                            std::vector<crypto::CLSAG_GGXXG_input_ref_t>& ring,
-                                            uint64_t& secret_index) const
+bool wallet2::prepare_pos_zc_input_and_ring(const transfer_details& td, const currency::tx_out_zarcanum& stake_out, currency::txin_zc_input& stake_input,
+  std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& decoy_storage, std::vector<crypto::CLSAG_GGXXG_input_ref_t>& ring, uint64_t& secret_index) const
 {
   bool r = false;
   ring.clear();
@@ -5475,7 +5463,53 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   if (tmpl_req.explicit_transaction.size())
     subm_req.explicit_txs.push_back(hexemizer{ tmpl_req.explicit_transaction });
 
-  m_core_proxy->call_COMMAND_RPC_SUBMITBLOCK2(subm_req, subm_rsp);
+  if (m_socks5_relay_cfg.blocks)
+  {
+    const auto& block_socks = *m_socks5_relay_cfg.blocks;
+    WLT_LOG_L0("PoS block " << block_hash << " will be submitted via SOCKS5 proxy " << block_socks.proxy.proxy_host << ":" << block_socks.proxy.proxy_port);
+    
+    epee::net_utils::http::url_content u = AUTO_VAL_INIT(u);
+    const std::string& url_str = block_socks.target_url;
+    if (!epee::net_utils::parse_url(url_str, u))
+    {
+      WLT_LOG_L0("submitblock2 over SOCKS5: failed to parse url " << url_str);
+      return false;
+    }
+
+    if (!u.port)
+      u.port = (u.schema == "https" ? 443 : 80);
+
+    // TODO: HTTPS over SOCKS5
+    if (u.schema == "https")
+      WLT_LOG_YELLOW("submitblock2 over SOCKS5: HTTPS requested, but TLS-over-SOCKS is not supported yet", LOG_LEVEL_0);
+    using http_socks5_client = epee::net_utils::http::http_simple_client_t<false, tools::socks5::socks5_proxy_transport<epee::net_utils::blocked_mode_client>>;
+
+    http_socks5_client socks5_client;
+    tools::socks5::apply_socks5_cfg(socks5_client.get_transport(), block_socks.proxy);
+    socks5_client.get_transport().set_use_remote_dns(block_socks.proxy.use_remote_dns);
+
+    if(!socks5_client.connect(u.host, std::to_string(u.port), block_socks.proxy.connect_timeout_ms))
+    {
+      WLT_LOG_ERROR("submitblock2 over SOCKS5: connect to " << u.host << ":" << u.port << " failed");
+      return false;
+    }
+
+    const std::string rpc_uri = u.uri.empty() ? "/json_rpc" : u.uri;
+
+    WLT_LOG_L2("[INVOKE_JSON_METHOD SOCKS5] ---> submitblock2");
+    bool r = epee::net_utils::invoke_http_json_rpc(rpc_uri, "submitblock2", subm_req, subm_rsp, socks5_client);
+    WLT_LOG_L2("[INVOKE_JSON_METHOD SOCKS5] <--- submitblock2, result: " << r);
+    if (!r)
+    {
+      WLT_LOG_ERROR("invoke_http_json_rpc failed for submitblock2 over SOCKS5");
+      return false;
+    }
+  }
+  else
+  {
+    // fallback to the old method if SOCKS5 is disabled
+    m_core_proxy->call_COMMAND_RPC_SUBMITBLOCK2(subm_req, subm_rsp);
+  }
   if (subm_rsp.status != API_RETURN_CODE_OK)
   {
     WLT_LOG_ERROR("Constructed block " << print16(block_hash) << " was rejected by the core, status: " << subm_rsp.status);
@@ -7283,7 +7317,11 @@ assets_selection_context wallet2::get_needed_money(uint64_t fee, const std::vect
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::set_disable_tor_relay(bool disable)
 {
-  m_disable_tor_relay = disable;
+  if (disable)
+  {
+      m_socks5_relay_cfg.blocks = std::nullopt;
+      m_socks5_relay_cfg.transactions = std::nullopt;
+  }
 }
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::notify_state_change(const std::string& state_code, const std::string& details)
@@ -7294,29 +7332,49 @@ void wallet2::notify_state_change(const std::string& state_code, const std::stri
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::send_transaction_to_network(const transaction& tx)
 {
-#ifndef DISABLE_TOR
-  if (!m_disable_tor_relay)
+  if (m_socks5_relay_cfg.transactions.has_value())
   {
+    const auto tx_socks = m_socks5_relay_cfg.transactions.value();
     //TODO check that core synchronized
     //epee::net_utils::levin_client2 p2p_client;
 
     //make few attempts
-    tools::levin_over_tor_client p2p_client;
-    p2p_client.get_transport().set_notifier(this);
-    bool succeseful_sent = false;
-    for (size_t i = 0; i != 3; i++)
+    tools::levin_over_socks5_client p2p_client;
+    apply_socks5_cfg(p2p_client.get_transport(), tx_socks.proxy);
+    WLT_LOG_L1("[SOCKS5] Sending transaction " << get_transaction_hash(tx) << " via SOCKS5 relay "
+      << tx_socks.proxy.proxy_host << ":" << tx_socks.proxy.proxy_port);
+    std::string relay_host {};
+    uint16_t relay_port{};
+    epee::net_utils::http::url_content u = AUTO_VAL_INIT(u);
+    if(epee::net_utils::parse_url(tx_socks.target_url, u) && !u.host.empty())
     {
-      if (!p2p_client.connect("144.76.183.143", 2121, 10000))
+      if(u.port != 0 && u.port <= 65535)
+        relay_port = static_cast<uint16_t>(u.port);
+
+      relay_host = u.host;
+    }
+    bool succeseful_sent = false;
+    for (size_t i = 0; i != 3; ++i)
+    {
+      WLT_LOG_L1("[SOCKS5] attempt " << (i+1));
+      if(!p2p_client.connect(relay_host, relay_port, tx_socks.proxy.connect_timeout_ms))
       {
+        WLT_LOG_L1("[SOCKS5] connect failed");
         continue;//THROW_IF_FALSE_WALLET_EX(false, error::no_connection_to_daemon, "Failed to connect to TOR node");
       }
 
-
-      currency::NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request p2p_req = AUTO_VAL_INIT(p2p_req);
+      currency::NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request  p2p_req = AUTO_VAL_INIT(p2p_req);
       currency::NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::response p2p_rsp = AUTO_VAL_INIT(p2p_rsp);
       p2p_req.txs.push_back(t_serializable_object_to_blob(tx));
       this->notify_state_change(WALLET_LIB_STATE_SENDING);
-      epee::net_utils::invoke_remote_command2(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::ID, p2p_req, p2p_rsp, p2p_client);
+      bool ok = epee::net_utils::invoke_remote_command2(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::ID, p2p_req, p2p_rsp, p2p_client);
+      if (!ok)
+      {
+        this->notify_state_change(WALLET_LIB_SEND_FAILED);
+        WLT_LOG_L0("[SOCKS5] P2P invoke is ERROR: " << p2p_rsp.code);
+        continue;
+      }
+
       p2p_client.disconnect();
       if (p2p_rsp.code == API_RETURN_CODE_OK)
       {
@@ -7324,6 +7382,7 @@ void wallet2::send_transaction_to_network(const transaction& tx)
         succeseful_sent = true;
         break;
       }
+
       this->notify_state_change(WALLET_LIB_SEND_FAILED);
       //checking if transaction got relayed to other nodes and 
       //return;
@@ -7333,22 +7392,23 @@ void wallet2::send_transaction_to_network(const transaction& tx)
       this->notify_state_change(WALLET_LIB_SEND_FAILED);
       THROW_IF_FALSE_WALLET_EX(succeseful_sent, error::no_connection_to_daemon, "Faile to build TOR stream");
     }
-  }
-  else
-#endif //
-  {
-    COMMAND_RPC_SEND_RAW_TX::request req;
-    req.tx_as_hex = epee::string_tools::buff_to_hex_nodelimer(tx_to_blob(tx));
-    COMMAND_RPC_SEND_RAW_TX::response daemon_send_resp;
-    bool r = m_core_proxy->call_COMMAND_RPC_SEND_RAW_TX(req, daemon_send_resp);
-    THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "sendrawtransaction");
-    THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_BUSY, error::daemon_busy, "sendrawtransaction");
-    THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_DISCONNECTED, error::no_connection_to_daemon, "Transfer attempt while daemon offline");
-    THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status != API_RETURN_CODE_OK, error::tx_rejected, tx, daemon_send_resp.status);
-
-    WLT_LOG_L0("transaction " << get_transaction_hash(tx) << " sent to daemon:" << ENDL << currency::obj_to_json_str(tx));
+    else
+    {
+      return; // already sent - do nothing further
+    }
   }
 
+  // default path via rpc daemon
+  COMMAND_RPC_SEND_RAW_TX::request req;
+  req.tx_as_hex = epee::string_tools::buff_to_hex_nodelimer(tx_to_blob(tx));
+  COMMAND_RPC_SEND_RAW_TX::response daemon_send_resp;
+  const bool r = m_core_proxy->call_COMMAND_RPC_SEND_RAW_TX(req, daemon_send_resp);
+  THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "sendrawtransaction");
+  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_BUSY, error::daemon_busy, "sendrawtransaction");
+  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_DISCONNECTED, error::no_connection_to_daemon, "Transfer attempt while daemon offline");
+  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status != API_RETURN_CODE_OK, error::tx_rejected, tx, daemon_send_resp.status);
+
+  WLT_LOG_L0("transaction " << get_transaction_hash(tx) << " sent to daemon:" << ENDL << currency::obj_to_json_str(tx));
 }
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::add_sent_tx_detailed_info(const transaction& tx, const std::vector<currency::attachment_v>& decrypted_att,
@@ -8775,8 +8835,77 @@ void wallet2::sweep_below(size_t fake_outs_count, const currency::account_public
     clear_transfers_from_flag(ftp.selected_transfers, WALLET_TRANSFER_DETAIL_FLAG_SPENT, std::string("exception on sweep_below, tx id (might be wrong): ") + epee::string_tools::pod_to_hex(get_transaction_hash(*p_tx)));
     throw;
   }
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::configure_socks_relay(const socks5::socks5_proxy_settings& cfg)
+{
+  m_socks5_relay_cfg = cfg;
 
+  if(m_socks5_relay_cfg.transactions)
+  {
+    const auto& ep = *m_socks5_relay_cfg.transactions;
+    WLT_LOG_L0("SOCKS5 tx relay enabled: " << ep.proxy.proxy_host << ":" << ep.proxy.proxy_port
+      << (ep.target_url.empty() ? "" : (", relay url: " + ep.target_url)));
+  }
+  else
+  {
+    WLT_LOG_L0("SOCKS5 tx relay disabled");
+  }
 
+  if(m_socks5_relay_cfg.blocks)
+  {
+    const auto& ep = *m_socks5_relay_cfg.blocks;
+    WLT_LOG_L0("SOCKS5 block submit enabled: " << ep.proxy.proxy_host << ":" << ep.proxy.proxy_port
+      << (ep.target_url.empty() ? "" : (", submit url: " + ep.target_url)));
+  }
+  else
+  {
+    WLT_LOG_L0("SOCKS5 block submit disabled");
+  }
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::configure_socks_relay(const std::string& addr_port)
+{
+  if(addr_port.empty())
+  {
+    socks5::socks5_proxy_settings cfg = m_socks5_relay_cfg;
+    cfg.transactions.reset();
+    configure_socks_relay(cfg);
+    return true;
+  }
+
+  std::string host;
+  uint16_t port = 0;
+  if(!epee::net_utils::parse_proxy_addr_host_port(addr_port, host, port))
+  {
+    WLT_LOG_L0("configure_socks_relay: wrong address format: " << addr_port << ", expected host:port or [ipv6]:port");
+    return false;
+  }
+
+  socks5::socks5_proxy_settings cfg = m_socks5_relay_cfg;
+
+  socks5::socks5_endpoint_config ep {};
+  // if already configured — keep timeouts/use_remote_dns/target_url
+  if(cfg.transactions)
+    ep = *cfg.transactions;
+
+  ep.proxy.proxy_host = host;
+  ep.proxy.proxy_port = port;
+
+  cfg.transactions = ep;
+
+  configure_socks_relay(cfg);
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::disable_socks_relay()
+{
+  m_socks5_relay_cfg = socks5::socks5_proxy_settings();
+}
+//----------------------------------------------------------------------------------------------------
+const socks5::socks5_proxy_settings& wallet2::get_socks5_relay_config() const
+{
+  return m_socks5_relay_cfg;
 }
 
 } // namespace tools

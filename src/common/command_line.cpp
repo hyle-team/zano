@@ -42,6 +42,11 @@ namespace command_line
   const arg_descriptor<std::string> arg_predownload_link      ( "predownload-link", "Override url for blockchain database pre-downloading");
   const arg_descriptor<bool>        arg_non_pruning_mode      ( "non-pruning-mode", "Enables a special operational mode with full retention of all tx signatures. Will terminate if the DB was previously in (normal) pruning mode. Use only if you know what you do.");
 
+  const arg_descriptor<std::string>   arg_enable_tx_socks5_relay_proxy("enable-tx-socks5-relay-proxy", "Enable SOCKS5 relay proxy for Transactions", "");
+  const arg_descriptor<std::string>   arg_tx_relay_url("tx-relay-url", "Override base URL used to send tx via proxy when --enable-tx-socks5-relay-proxy is set", "");
+  const arg_descriptor<std::string>   arg_enable_block_socks5_relay_proxy("enable-block-socks5-relay-proxy", "Enable SOCKS5 relay proxy for Blocks", "");
+  const arg_descriptor<std::string>   arg_block_relay_url("block-relay-url", "Override base URL used to submit PoS blocks when --enable-block-socks5-relay-proxy is set", "");
+
   const arg_descriptor<std::string> arg_deeplink  ( "deeplink-params", "Deeplink parameter, in that case app just forward params to running app");
 
   const arg_descriptor<bool>        arg_allow_legacy_payment_id_size ("allow-legacy-payment-id-size", "Temporary removes requirement for payment id to be 8 bytes long");

@@ -14,7 +14,7 @@
 #include <boost/serialization/shared_ptr.hpp>
 #include <boost/serialization/optional.hpp>
 #include <atomic>
-
+#include <type_traits>
 
 #include "include_base_utils.h"
 #include "profile_tools.h"
@@ -47,6 +47,7 @@
 #include "view_iface.h"
 #include "wallet2_base.h"
 #include "decoy_selection.h"
+#include "net/socks5_proxy_transport.h"
 
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               CURRENCY_HF4_MANDATORY_MIN_COINAGE
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
@@ -151,7 +152,6 @@ namespace tools
     uint64_t m_last_pow_block_h = 0;
     std::list<std::pair<uint64_t, wallet_event_t>> m_rollback_events;
     std::list<std::pair<uint64_t, uint64_t> > m_last_zc_global_indexs; // <height, last_zc_global_indexs>, biggest height comes in front
-   
 
     //variables that not being serialized
     std::atomic<uint64_t> m_last_bc_timestamp = 0;
@@ -571,6 +571,12 @@ namespace tools
       add_transfers_to_transfers_cache(tids);
     }
 
+    // SOCKS5 relay API (runtime)
+    void configure_socks_relay(const socks5::socks5_proxy_settings& cfg);
+    bool configure_socks_relay(const std::string& addr_port); // "ip:port"
+    void disable_socks_relay();
+    const socks5::socks5_proxy_settings& get_socks5_relay_config() const;
+
     // PoS mining
     void do_pos_mining_prepare_entry(mining_context& cxt, const transfer_details& td);
     bool do_pos_mining_iteration(mining_context& cxt, uint64_t ts);
@@ -928,8 +934,10 @@ private:
     void wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
     void wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
     void wti_to_json_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
+    
+    bool send_block_via_socks5(const currency::block& bl);
 
-
+    
 
     /*     
      
@@ -975,8 +983,9 @@ private:
     std::string m_miner_text_info;
 
     bool m_use_deffered_global_outputs;
-    bool m_disable_tor_relay;
     mutable current_operation_context m_current_context;
+
+    socks5::socks5_proxy_settings m_socks5_relay_cfg{};
 
     std::string m_votes_config_path;
     tools::wallet_public::wallet_vote_config m_votes_config;
@@ -1265,6 +1274,7 @@ namespace tools
 
 
 } // namespace tools
+
 
 #if !defined(KEEP_WALLET_LOG_MACROS)
 #undef WLT_LOG

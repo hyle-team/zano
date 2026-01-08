@@ -430,6 +430,88 @@ void process_wallet_command_line_params(const po::variables_map& vm, tools::wall
     wal.set_votes_config_path(command_line::get_arg(vm, arg_voting_config_file));
   }
 
+  if(command_line::has_arg(vm, command_line::arg_enable_tx_socks5_relay_proxy))
+  {
+    std::string socks5_addr = command_line::get_arg(vm, command_line::arg_enable_tx_socks5_relay_proxy);
+    if (!socks5_addr.empty())
+    {
+      if (wal.configure_socks_relay(socks5_addr))
+      {
+        message_writer(epee::log_space::console_color_default, true, std::string(), LOG_LEVEL_0) 
+          << "SOCKS5 transaction relay proxy configured: " << socks5_addr;
+      }
+      else
+      {
+        LOG_ERROR("Failed to configure SOCKS5 transaction relay proxy: " << socks5_addr);
+      }
+    }
+  }
+
+{
+    tools::socks5::socks5_proxy_settings socks_cfg{};
+
+    // --- Transactions SOCKS5 ---
+    {
+      const std::string tx_proxy_addr = command_line::get_arg(vm, command_line::arg_enable_tx_socks5_relay_proxy);
+      const std::string tx_relay_url  = command_line::get_arg(vm, command_line::arg_tx_relay_url);
+
+      if (!tx_proxy_addr.empty())
+      {
+        tools::socks5::socks5_endpoint_config ep{};
+        if (epee::net_utils::parse_proxy_addr_host_port(tx_proxy_addr, ep.proxy.proxy_host, ep.proxy.proxy_port))
+        {
+          if (!tx_relay_url.empty())
+            ep.target_url = tx_relay_url;
+
+          socks_cfg.transactions = ep;
+
+          LOG_PRINT_L0(std::string("SOCKS5 tx relay proxy configured: ")
+            + ep.proxy.proxy_host + ":" + std::to_string(ep.proxy.proxy_port)
+            + (ep.target_url.empty() ? "" : (", relay url: " + ep.target_url)));
+        }
+        else
+        {
+          LOG_ERROR("Invalid value for --enable-tx-socks5-relay-proxy, expected host:port (or [ipv6]:port)");
+        }
+      }
+      else if (!tx_relay_url.empty())
+      {
+        LOG_ERROR("Ignoring --tx-relay-url because --enable-tx-socks5-relay-proxy is not set");
+      }
+    }
+
+    // --- Blocks SOCKS5 ---
+    {
+      const std::string bl_proxy_addr = command_line::get_arg(vm, command_line::arg_enable_block_socks5_relay_proxy);
+      const std::string bl_relay_url  = command_line::get_arg(vm, command_line::arg_block_relay_url);
+
+      if (!bl_proxy_addr.empty())
+      {
+        tools::socks5::socks5_endpoint_config ep{};
+        if (epee::net_utils::parse_proxy_addr_host_port(bl_proxy_addr, ep.proxy.proxy_host, ep.proxy.proxy_port))
+        {
+          if (!bl_relay_url.empty())
+            ep.target_url = bl_relay_url;
+
+          socks_cfg.blocks = ep;
+
+          LOG_PRINT_L0(std::string("SOCKS5 block relay proxy configured: ")
+            + ep.proxy.proxy_host + ":" + std::to_string(ep.proxy.proxy_port)
+            + (ep.target_url.empty() ? "" : (", submit url: " + ep.target_url)));
+        }
+        else
+        {
+          LOG_ERROR("Invalid value for --enable-block-socks5-relay-proxy, expected host:port (or [ipv6]:port)");
+        }
+      }
+      else if (!bl_relay_url.empty())
+      {
+        LOG_ERROR("Ignoring --block-relay-url because --enable-block-socks5-relay-proxy is not set");
+      }
+    }
+
+    wal.configure_socks_relay(socks_cfg);
+  }
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::init(const boost::program_options::variables_map& vm)
@@ -575,6 +657,11 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_no_whitelist = command_line::get_arg(vm, arg_no_whitelist);
   m_restore_ki_in_wo_wallet = command_line::get_arg(vm, arg_restore_ki_in_wo_wallet);
   m_do_not_unlock_reserved_on_idle = command_line::get_arg(vm, arg_no_idle_unlock_spent);
+  m_enable_tx_socks5_relay_proxy = command_line::get_arg(vm, command_line::arg_enable_tx_socks5_relay_proxy);
+  m_tx_relay_url = command_line::get_arg(vm, command_line::arg_tx_relay_url);
+  m_enable_block_socks5_relay_proxy = command_line::get_arg(vm, command_line::arg_enable_block_socks5_relay_proxy);
+  m_block_relay_url = command_line::get_arg(vm, command_line::arg_block_relay_url);
+
   m_concise_mode    = command_line::get_arg(vm, arg_concise_mode) == 1;
 } 
 //----------------------------------------------------------------------------------------------------
@@ -3444,6 +3531,10 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_no_whitelist);
   command_line::add_arg(desc_params, arg_restore_ki_in_wo_wallet);
   command_line::add_arg(desc_params, arg_no_idle_unlock_spent);
+  command_line::add_arg(desc_params, command_line::arg_enable_tx_socks5_relay_proxy);
+  command_line::add_arg(desc_params, command_line::arg_tx_relay_url);
+  command_line::add_arg(desc_params, command_line::arg_enable_block_socks5_relay_proxy);
+  command_line::add_arg(desc_params, command_line::arg_block_relay_url);
   command_line::add_arg(desc_params, arg_concise_mode);
 
 
