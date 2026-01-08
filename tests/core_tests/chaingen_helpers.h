@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -10,6 +10,11 @@
 #include "wallet/wallet2.h"
 #include "test_core_time.h"
 #include "chaingen.h"
+#include "wallet/wallet_rpc_server.h"
+#include "currency_protocol/currency_protocol_handler.h"
+#include "rpc/core_rpc_server.h"
+#include "currency_core/bc_offers_service.h"
+#include "p2p/net_node.h"
 
 // chaingen-independent helpers that may be used outside of core_tests (for ex. in functional_tests)
 
@@ -370,6 +375,7 @@ inline std::string print_tx_size_breakdown(const currency::transaction& tx)
 }
 
 //---------------------------------------------------------------
+
 namespace currency
 {
   //this lookup_acc_outs overload is mostly for backward compatibility for tests, ineffective from performance perspective, should not be used in wallet
@@ -404,4 +410,63 @@ namespace currency
   }
  
 
+} // namespace currency
+
+//---------------------------------------------------------------
+
+template<typename server_t>
+struct tests_rpc_transport
+{
+  server_t& m_rpc_srv;
+  tests_rpc_transport(server_t& rpc_srv) :m_rpc_srv(rpc_srv)
+  {}
+  epee::net_utils::http::http_response_info m_response;
+
+  bool is_connected() { return true; }
+  template<typename t_a, typename t_b, typename t_c>
+  bool connect(t_a ta, t_b tb, t_c tc) { return true; }
+
+  template<typename dummy_t>
+  bool invoke(const std::string uri, const std::string method_, const std::string& body, const epee::net_utils::http::http_response_info** ppresponse_info, const dummy_t& d)
+  {
+    epee::net_utils::http::http_request_info query_info;
+    query_info.m_URI = uri;
+    query_info.m_body = body;
+    tools::wallet_rpc_server::connection_context ctx;
+    bool r = m_rpc_srv.handle_http_request(query_info, m_response, ctx);
+    if (ppresponse_info)
+      *ppresponse_info = &m_response;
+    return r;
+  }
+};
+
+template<typename request_t, typename response_t, typename t_rpc_server>
+bool invoke_text_json_for_rpc(t_rpc_server& srv, const std::string& method_name, const request_t& req, response_t& resp)
+{
+  tests_rpc_transport<t_rpc_server> tr(srv);
+
+  bool r = epee::net_utils::invoke_http_json_rpc("/json_rpc", method_name, req, resp, tr);
+  return r;
 }
+
+template<typename request_t, typename response_t>
+bool invoke_text_json_for_wallet(std::shared_ptr<tools::wallet2> wlt, const std::string& method_name, const request_t& req, response_t& resp)
+{
+  tools::wallet_rpc_server wlt_rpc_wrapper(wlt);
+  return invoke_text_json_for_rpc(wlt_rpc_wrapper, method_name, req, resp);
+}
+
+template<typename request_t, typename response_t>
+bool invoke_text_json_for_core(currency::core& c, const std::string& method_name, const request_t& req, response_t& resp)
+{
+  currency::t_currency_protocol_handler<currency::core> m_cprotocol(c, nullptr);
+  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > p2p(m_cprotocol);
+  bc_services::bc_offers_service of(nullptr); 
+
+  currency::core_rpc_server core_rpc_wrapper(c, p2p, of);
+  core_rpc_wrapper.set_ignore_connectivity_status(true);
+  return invoke_text_json_for_rpc(core_rpc_wrapper, method_name, req, resp);
+}
+
+//---------------------------------------------------------------
+

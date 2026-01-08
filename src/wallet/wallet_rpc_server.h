@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -24,6 +24,7 @@ namespace tools
 //#ifndef MOBILE_WALLET_BUILD
     virtual std::shared_ptr<wallet2> get_wallet() = 0;
 //#endif
+    virtual ~i_wallet_provider() = default;
   };
 
   struct wallet_rpc_locker
@@ -87,12 +88,13 @@ namespace tools
     const static command_line::arg_descriptor<std::string> arg_jwt_secret;
 
 
+
     static void init_options(boost::program_options::options_description& desc);
     bool init(const boost::program_options::variables_map& vm);
     bool run(bool do_mint, bool offline_mode, const currency::account_public_address& miner_address);
 
     virtual bool handle_http_request(const epee::net_utils::http::http_request_info& query_info, epee::net_utils::http::http_response_info& response_info,
-      connection_context& conn_context)
+      connection_context& conn_context) override
     {
       bool  call_found = false;
       return this->handle_http_request(query_info, response_info, conn_context, call_found, epee::net_utils::http::i_chain_handler::m_empty_documentation);
@@ -253,6 +255,7 @@ namespace tools
     bool handle_command_line(const boost::program_options::variables_map& vm);
     void rpc_destinations_to_currency_destinations(const std::list<wallet_public::transfer_destination>& rpc_destinations, bool nullify_asset_id, bool try_to_split, std::vector<currency::tx_destination_entry>& currency_destinations);
 
+    void set_flag_allow_legacy_payment_id_size(bool value) { m_allow_legacy_payment_id_size = value; }
 
   private:
     std::shared_ptr<i_wallet_provider> m_pwallet_provider_sh_ptr;
@@ -261,6 +264,7 @@ namespace tools
     std::string m_bind_ip;
     bool m_do_mint;
     bool m_deaf;
+    bool m_allow_legacy_payment_id_size;
     uint64_t m_last_wallet_store_height;
     std::string m_jwt_secret;
     epee::misc_utils::expirating_set<std::string, uint64_t> m_jwt_used_salts;

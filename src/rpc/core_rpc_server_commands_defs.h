@@ -206,12 +206,14 @@ namespace currency
       std::string address;
       crypto::public_key asset_id;
       uint64_t out_index;
+      uint64_t payment_id;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(amount)                      DOC_DSCR("Amount begin transferred.") DOC_EXMP(10000000000000)     DOC_END
         KV_SERIALIZE(address)                     DOC_DSCR("Destination address.") DOC_EXMP("ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp")     DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Asset id.") DOC_EXMP("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852")     DOC_END
         KV_SERIALIZE(out_index)                   DOC_DSCR("Index of the corresponding output in the transaction.") DOC_EXMP(1) DOC_END
+        KV_SERIALIZE(payment_id)                  DOC_DSCR("[optional] Intrinsic per-output 8 byte long payment id") DOC_EXMP(0) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -366,6 +368,7 @@ namespace currency
     struct out_entry
     {
       uint64_t            amount;
+      uint64_t            payment_id;
       crypto::public_key  asset_id;
       crypto::hash        tx_id;
       int64_t             tx_block_height;
@@ -377,6 +380,7 @@ namespace currency
         KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Transaction ID where the output is present, if found.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
         KV_SERIALIZE(tx_block_height)            DOC_DSCR("Block height where the transaction is present.") DOC_EXMP(2555000) DOC_END
         KV_SERIALIZE(output_tx_index)            DOC_DSCR("Index of the output in the transaction.") DOC_EXMP(2) DOC_END
+        KV_SERIALIZE(payment_id)                 DOC_DSCR("[optional] 8-bytes long intrinsic payment id") DOC_EXMP(0) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 

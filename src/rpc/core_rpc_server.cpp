@@ -52,7 +52,7 @@ namespace currency
     command_line::add_arg(desc, arg_rpc_bind_port);
     command_line::add_arg(desc, arg_rpc_ignore_offline_status);
     command_line::add_arg(desc, arg_rpc_enable_admin_api);
-    
+    command_line::add_arg(desc, command_line::arg_allow_legacy_payment_id_size);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   core_rpc_server::core_rpc_server(core& cr, nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >& p2p,
@@ -60,7 +60,6 @@ namespace currency
     : m_core(cr)
     , m_p2p(p2p)
     , m_of(of)
-    , m_ignore_offline_status(false)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::handle_command_line(const boost::program_options::variables_map& vm)
@@ -82,7 +81,8 @@ namespace currency
     {
       m_enabled_admin_api = command_line::get_arg(vm, arg_rpc_enable_admin_api);
     }
-    
+    m_allow_legacy_payment_id_size = command_line::has_arg(vm, command_line::arg_allow_legacy_payment_id_size);
+
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -91,7 +91,16 @@ namespace currency
     m_net_server.set_threads_prefix("RPC");
     bool r = handle_command_line(vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to process command line in core_rpc_server");
-    return epee::http_server_impl_base<core_rpc_server, connection_context>::init(m_port, m_bind_ip);
+
+    bool do_server_init = true;
+    int port_num = 0;
+    if (epee::string_tools::string_to_num_fast(m_port, port_num) && port_num == 0)
+      do_server_init = false;
+
+    if (do_server_init)
+      r = epee::http_server_impl_base<core_rpc_server, connection_context>::init(m_port, m_bind_ip);
+
+    return r;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::check_core_ready_(const std::string& calling_method)
@@ -895,7 +904,7 @@ namespace currency
       decoded_out.out_index = i;
       decoded_out.address = req.outputs_addresses[i];
       crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
-      LOCAL_CHECK(currency::decode_output_amount_and_asset_id(zo, derivation, i, decoded_out.amount, decoded_out.asset_id, amount_blinding_mask, asset_id_blinding_mask), "output #" + epee::string_tools::num_to_string_fast(i) + ": cannot be decoded");
+      LOCAL_CHECK(currency::decode_output_data(zo, derivation, i, decoded_out.amount, decoded_out.asset_id, amount_blinding_mask, asset_id_blinding_mask, decoded_out.payment_id), "output #" + epee::string_tools::num_to_string_fast(i) + ": cannot be decoded");
     }
 
     res.tx_in_json = currency::obj_to_json_str(tx);
@@ -1588,10 +1597,10 @@ namespace currency
         if (outv.type() != typeid(tx_out_zarcanum))
           continue;
 
-        uint64_t decoded_amount = 0;
+        uint64_t decoded_amount = 0, decoded_payment_id = 0;
         crypto::public_key decoded_asset_id{};
         crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
-        if (!is_out_to_acc(req.address, boost::get<tx_out_zarcanum>(outv), derivation, i, decoded_amount, decoded_asset_id, amount_blinding_mask, asset_id_blinding_mask))
+        if (!is_out_to_acc(req.address, boost::get<tx_out_zarcanum>(outv), derivation, i, decoded_amount, decoded_asset_id, amount_blinding_mask, asset_id_blinding_mask, decoded_payment_id))
           continue;
 
         auto& el = resp.outputs.emplace_back();
@@ -1600,6 +1609,7 @@ namespace currency
         el.tx_id            = tx_id;
         el.tx_block_height  = height;
         el.output_tx_index  = i;
+        el.payment_id       = decoded_payment_id;
       }
       return true;
     };
@@ -1640,7 +1650,7 @@ namespace currency
       return false;
     }
 
-    if (!currency::is_payment_id_size_ok(payment_id))
+    if (!currency::is_payment_id_size_ok(payment_id, m_allow_legacy_payment_id_size))
     {
       error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
       error_resp.message = std::string("given payment id is too long: \'") + req.payment_id + "\'";

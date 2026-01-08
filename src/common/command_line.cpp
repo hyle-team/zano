@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2019 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -43,5 +43,7 @@ namespace command_line
   const arg_descriptor<bool>        arg_non_pruning_mode      ( "non-pruning-mode", "Enables a special operational mode with full retention of all tx signatures. Will terminate if the DB was previously in (normal) pruning mode. Use only if you know what you do.");
 
   const arg_descriptor<std::string> arg_deeplink  ( "deeplink-params", "Deeplink parameter, in that case app just forward params to running app");
+
+  const arg_descriptor<bool>        arg_allow_legacy_payment_id_size ("allow-legacy-payment-id-size", "Temporary removes requirement for payment id to be 8 bytes long");
 
 }

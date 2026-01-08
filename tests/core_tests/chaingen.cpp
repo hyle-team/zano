@@ -1357,6 +1357,7 @@ struct output_index
   crypto::scalar_t amount_blinding_mask = 0;   // zc outs only
   crypto::scalar_t asset_id_blinding_mask = 0; // zc outs only
   crypto::public_key asset_id = currency::native_coin_asset_id;
+  uint64_t payment_id = 0;
 
   output_index(const currency::tx_out_v &_out_v, uint64_t _a, size_t tno, size_t ono, const currency::block *_pb, const currency::transaction *_pt)
     : out_v(_out_v), amount(_a), tx_no(tno), out_no(ono), p_blk(_pb), p_tx(_pt)
@@ -1375,6 +1376,7 @@ struct output_index
       << " spent=" << spent
       << " zc_out=" << zc_out
       << " asset=" << (asset_id == currency::native_coin_asset_id ? std::string("native") : print16(asset_id))
+      << " payment_id=" << payment_id
       << "}";
     return ss.str();
   }
@@ -1450,15 +1452,16 @@ bool init_output_indices(map_output_idx_t& outs, map_output_t& outs_mine, const 
           oi.idx = out_global_idx;
           outs_vec.emplace_back(std::move(oi));
 
-          uint64_t decoded_amount = 0;
+          uint64_t decoded_amount = 0, decoded_payment_id = 0;
           crypto::public_key decoded_asset_id{};
           crypto::scalar_t decoded_amount_blinding_mask{}, decoded_asset_id_blinding_mask{};
-          if (is_out_to_acc(acc_keys.account_address, out, derivation, j, decoded_amount, decoded_asset_id, decoded_amount_blinding_mask, decoded_asset_id_blinding_mask))
+          if (is_out_to_acc(acc_keys.account_address, out, derivation, j, decoded_amount, decoded_asset_id, decoded_amount_blinding_mask, decoded_asset_id_blinding_mask, decoded_payment_id))
           {
             outs_vec.back().amount                  = decoded_amount;
             outs_vec.back().amount_blinding_mask    = decoded_amount_blinding_mask;
             outs_vec.back().asset_id                = decoded_asset_id;
             outs_vec.back().asset_id_blinding_mask  = decoded_asset_id_blinding_mask;
+            outs_vec.back().payment_id              = decoded_payment_id;
             outs_mine[0].push_back(out_global_idx);
           }
         VARIANT_SWITCH_END()
@@ -1789,6 +1792,28 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
       break;
   }
 
+  if (!sources_found)
+  {
+    std::stringstream ss;
+    ss << "fill_tx_sources failed (not enough money), found sources (amount, asset_id):" << ENDL;
+    for(auto& el : sources)
+    {
+      ss << "  " << std::setw(20) << std::right << el.amount << " ";
+      if (!el.is_native_coin())
+        ss << el.asset_id;
+      ss << ENDL;
+    }
+    ss << "requested (amount, asset_id):" << ENDL;
+    for(auto& el : amounts)
+    {
+      ss << "  " << std::setw(20) << std::right << el.second << "  ";
+      if (el.first != native_coin_asset_id)
+        ss << el.first;
+      ss << ENDL;
+    }
+    LOG_PRINT_RED(ss.str(), LOG_LEVEL_0);
+  }
+
   return sources_found;
 }
 
@@ -2017,31 +2042,52 @@ bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
                          uint64_t fee /* = TX_POOL_MINIMUM_FEE */, 
                          size_t nmix /* = 0 */, 
                          uint8_t mix_attr /* = CURRENCY_TO_KEY_OUT_RELAXED */, 
-                         const std::vector<currency::extra_v>& extr /* = empty_extra */,
-                         const std::vector<currency::attachment_v>& att /* = empty_attachment */, 
+                         const std::vector<currency::payload_items_v>& extr /* = empty_extra */,
+                         const std::vector<currency::payload_items_v>& att /* = empty_attachment */, 
                          bool check_for_spends /* = true */,
                          bool check_for_unlocktime /* = true */,
                          bool use_ref_by_id /* = false */)
 {
   [[maybe_unused]] crypto::secret_key sk; // stub
-  uint64_t spending_amount = fee;
-  for(auto& el: destinations)
-    spending_amount += el.amount;
 
+  std::unordered_map<crypto::public_key, uint64_t> amounts;
+  amounts[native_coin_asset_id] = fee;
+  for(auto& el: destinations)
+  {
+    if (el.asset_id != null_pkey)
+      amounts[el.asset_id] += el.amount;
+  }
+
+  // std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
+  //const currency::block& blk_head, const currency::account_keys& from, const std::unordered_map<crypto::public_key, uint64_t>& amounts, size_t nmix,
+  //const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, std::unordered_map<crypto::public_key, uint64_t>* p_sources_amounts /* = nullptr */,
+  //const mixins_per_input* nmix_map /* = nullptr */)
+
+
+  const std::vector<currency::tx_source_entry> sources_to_avoid;
+  uint64_t fts_flags =
+    (check_for_spends     ? fts_check_for_spends      : fts_none) |
+    (check_for_unlocktime ? fts_check_for_unlocktime  : fts_none) |
+    (use_ref_by_id        ? fts_use_ref_by_id         : fts_none) |
+    fts_check_for_hf4_min_coinage;
   std::vector<tx_source_entry> sources;
-  if (!fill_tx_sources(sources, events, blk_head, from.get_keys(), spending_amount, nmix, check_for_spends, check_for_unlocktime, use_ref_by_id))
+  if (!fill_tx_sources(sources, events, blk_head, from.get_keys(), amounts, nmix, sources_to_avoid, fts_flags))
     return false;
 
   uint64_t tx_expected_block_height = get_block_height(blk_head) + 1;
   size_t tx_hardfork_id = 0;
   uint64_t tx_version = currency::get_tx_version_and_hardfork_id(tx_expected_block_height, hf, tx_hardfork_id);
-  uint64_t sources_amount = get_sources_total_amount(sources);
-  if (sources_amount < spending_amount)
-    return false; // should never happen if fill_tx_sources succeded
-  if (sources_amount == spending_amount)
-    return construct_tx(from.get_keys(), sources, destinations, extr, att, tx, tx_version, tx_hardfork_id, sk, 0, mix_attr);
+
   std::vector<tx_destination_entry> local_dst = destinations;
-  local_dst.push_back(tx_destination_entry(sources_amount - spending_amount, from.get_public_address()));
+  std::unordered_map<crypto::public_key, uint64_t> found_amounts;
+  get_sources_total_amount(sources, found_amounts);
+  for(auto& el : found_amounts)
+  {
+    uint64_t requested_amount = amounts[el.first];
+    CHECK_AND_ASSERT_MES(el.second >= requested_amount, false, "fill_tx_sources seemingly succsseded, but returned wrong amount for asset id " << el.first);
+    if (el.second > requested_amount)
+      local_dst.push_back(tx_destination_entry(el.second - requested_amount, from.get_public_address(), el.first)); // add destination for change
+  }
   return construct_tx(from.get_keys(), sources, local_dst, extr, att, tx, tx_version, tx_hardfork_id, sk, 0, mix_attr);
 }
 
@@ -2079,8 +2125,8 @@ bool construct_tx_with_many_outputs(const currency::hard_forks_descriptor& hf, s
 bool construct_tx(const account_keys& sender_account_keys,
                   const std::vector<tx_source_entry>& sources,
                   const std::vector<tx_destination_entry>& destinations,
-                  const std::vector<extra_v>& extra,
-                  const std::vector<attachment_v>& attachments,
+                  const std::vector<payload_items_v>& extra,
+                  const std::vector<payload_items_v>& attachments,
                   transaction& tx,
                   uint64_t tx_version,
                   size_t tx_hardfork_id,
@@ -2123,8 +2169,8 @@ bool construct_tx(const account_keys& sender_account_keys,
 bool construct_tx(const account_keys& sender_account_keys,
                   const std::vector<tx_source_entry>& sources,
                   const std::vector<tx_destination_entry>& destinations,
-                  const std::vector<extra_v>& extra,
-                  const std::vector<attachment_v>& attachments,
+                  const std::vector<payload_items_v>& extra,
+                  const std::vector<payload_items_v>& attachments,
                   transaction& tx,
                   uint64_t tx_version,
                   crypto::secret_key& one_time_secret_key,
@@ -2168,8 +2214,8 @@ bool construct_tx(const account_keys& sender_account_keys,
 bool construct_tx(const currency::account_keys& sender_account_keys,
                   const std::vector<currency::tx_source_entry>& sources,
                   const std::vector<currency::tx_destination_entry>& destinations,
-                  const std::vector<currency::extra_v>& extra,
-                  const std::vector<currency::attachment_v>& attachments,
+                  const std::vector<currency::payload_items_v>& extra,
+                  const std::vector<currency::payload_items_v>& attachments,
                   currency::transaction& tx,
                   uint64_t tx_version,
                   crypto::secret_key& one_time_secret_key,
@@ -2197,8 +2243,8 @@ bool construct_tx(const currency::account_keys& sender_account_keys,
 bool construct_tx(const currency::account_keys& sender_account_keys,
                   const std::vector<currency::tx_source_entry>& sources,
                   const std::vector<currency::tx_destination_entry>& destinations,
-                  const std::vector<currency::extra_v>& extra,
-                  const std::vector<currency::attachment_v>& attachments,
+                  const std::vector<currency::payload_items_v>& extra,
+                  const std::vector<currency::payload_items_v>& attachments,
                   currency::transaction& tx,
                   uint64_t tx_version)
 {
@@ -2391,7 +2437,7 @@ bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name,
 
   bool r = true;
 
-#define _CHECK_BAL(v) if (!(expected_##v == INVALID_BALANCE_VAL || v == expected_##v)) { r = false; LOG_PRINT_RED_L0("invalid " #v " balance, expected: " << print_money_brief(expected_##v) << asset_id_str); }
+#define _CHECK_BAL(v) if (!(expected_##v == INVALID_BALANCE_VAL || v == expected_##v)) { r = false; LOG_PRINT_RED_L0("invalid " #v " balance, expected: " << print_money_brief(expected_##v, asset_decimal_point) << asset_id_str); }
   _CHECK_BAL(unlocked)
   _CHECK_BAL(awaiting_in)
   _CHECK_BAL(awaiting_out)
@@ -2401,7 +2447,7 @@ bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name,
 
   if (!r)
   {
-    LOG_PRINT(account_name << "'s transfers for asset_id " << asset_id << ": " << ENDL << w.dump_transfers(false, asset_id), LOG_LEVEL_0);
+    LOG_PRINT(account_name << "'s transfers" << asset_id_str << ":" << ENDL << w.dump_transfers(false, asset_id), LOG_LEVEL_0);
   }
 
   return r;

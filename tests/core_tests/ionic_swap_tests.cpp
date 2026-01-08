@@ -74,10 +74,10 @@ ionic_swap_basic_test::ionic_swap_basic_test()
   REGISTER_CALLBACK_METHOD(ionic_swap_basic_test, configure_core);
   REGISTER_CALLBACK_METHOD(ionic_swap_basic_test, c1);
 
-  m_hardforks.set_hardfork_height(1, 1);
-  m_hardforks.set_hardfork_height(2, 1);
-  m_hardforks.set_hardfork_height(3, 1);
-  m_hardforks.set_hardfork_height(4, 2);
+  //m_hardforks.set_hardfork_height(1, 1);
+  //m_hardforks.set_hardfork_height(2, 1);
+  //m_hardforks.set_hardfork_height(3, 1);
+  //m_hardforks.set_hardfork_height(4, 2);
 }
 
 bool ionic_swap_basic_test::generate(std::vector<test_event_entry>& events) const

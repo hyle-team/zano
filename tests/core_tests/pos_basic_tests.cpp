@@ -521,7 +521,9 @@ bool pos_and_no_pow_blocks_between_output_and_stake::generate(std::vector<test_e
   // Expected: max_related_block_height (20) < last_pow_block_height (21)
 
   MAKE_NEXT_BLOCK(events, blk_1a, blk_2r, miner);  // last pow block
-  REWIND_POS_BLOCKS_N_WITH_TIME(events, blk_3ra, blk_1a, miner, { miner }, CURRENCY_MINED_MONEY_UNLOCK_WINDOW - 1);
+  
+  // +8 is due to intermediate PoW blocks drops dynamic of PoS difficulty building, it wasn't important on adjusted diff but make diff at hf6
+  REWIND_POS_BLOCKS_N_WITH_TIME(events, blk_3ra, blk_1a, miner, { miner }, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 8); 
 
   // case 3: Provide valid tx output
   // Expected valid: stake input refs' max related block height is 20 while last PoW block height is 21
@@ -585,6 +587,8 @@ bool pos_and_no_pow_blocks_between_output_and_stake::generate(std::vector<test_e
     pb.step5_sign(se, alice.get_keys());
 
     events.push_back(pb.m_block);
+
+
 
     DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(pb.m_block));
   }
