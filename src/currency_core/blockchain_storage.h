@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -151,8 +151,6 @@ namespace currency
     struct scan_for_keys_context
     {
       bool check_hf4_coinage_rule = true;                      // input
-      bool htlc_is_expired;                                    // output
-      std::list<txout_htlc> htlc_outs;                         // output, legacy
       std::list<tx_out_zarcanum> zc_outs;                      // output
     };
 
@@ -330,7 +328,6 @@ namespace currency
     uint64_t get_assets(uint64_t offset, uint64_t count, std::list<asset_descriptor_with_id>& assets) const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
-    bool check_tx_input(const transaction& tx, size_t in_index, const txin_htlc& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_zc_input& zc_in, const crypto::hash& tx_prefix_hash, check_tx_inputs_context& ctic) const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, check_tx_inputs_context& ctic)const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash) const;
@@ -742,7 +739,6 @@ namespace currency
     bool is_output_allowed_for_input(const tx_out_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height) const;
     bool is_output_allowed_for_input(const txout_target_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height) const;
     bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v) const;
-    bool is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height) const;
     bool is_output_allowed_for_input(const tx_out_zarcanum& out, const txin_v& in_v) const;
     void remove_old_dbs();
 
@@ -841,15 +837,6 @@ namespace currency
       //CHECKED_GET_SPECIFIC_VARIANT(tx_ptr->tx.vout[n].target, const txout_to_key, outtk, false);
       CHECK_AND_ASSERT_MES(key_offsets.size() >= 1, false, "internal error: tx input has empty key_offsets"); // should never happen as input correctness must be handled by the caller
 
-      /*
-      TxOutput | TxInput | Allowed
-      ----------------------------
-      HTLC     |  HTLC   | ONLY IF HTLC NOT EXPIRED
-      HTLC     |  TO_KEY | ONLY IF HTLC IS EXPIRED
-      TO_KEY   |  HTLC   | NOT
-      TO_KEY   |  TO_KEY | YES
-      */
-
       VARIANT_SWITCH_BEGIN(tx_ptr->tx.vout[n]);
       VARIANT_CASE_CONST(tx_out_bare, o)
       {
@@ -869,31 +856,6 @@ namespace currency
             bool legit_output_key = validate_output_key_legit(outtk.key);
             CHECK_AND_ASSERT_MES(legit_output_key, false, "tx input ref #" << output_index << " violates public key restrictions: tx.version = " << tx_ptr->tx.version << ", outtk.key = " << outtk.key);
           }
-        }
-        else if (o.target.type() == typeid(txout_htlc))
-        {
-          //check for spend flags
-          CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags.size() > n, false,
-            "Internal error: tx_ptr->m_spent_flags.size(){" << tx_ptr->m_spent_flags.size() << "} > n{" << n << "}");
-          CHECK_AND_ASSERT_MES(tx_ptr->m_spent_flags[n] == false, false, "HTLC out already spent, double spent attempt detected");
-
-          const txout_htlc& htlc_out = boost::get<txout_htlc>(o.target);
-          if (htlc_out.expiration > get_current_blockchain_size() - tx_ptr->m_keeper_block_height)
-          {
-            //HTLC IS NOT expired, can be used ONLY by pkey_before_expiration and ONLY by HTLC input
-            scan_context.htlc_is_expired = false;
-          }
-          else
-          {
-            //HTLC IS expired, can be used ONLY by pkey_after_expiration and ONLY by to_key input
-            scan_context.htlc_is_expired = true;
-          }
-          if (hf4)
-          {
-            bool legit_output_key = validate_output_key_legit(scan_context.htlc_is_expired ? htlc_out.pkey_refund : htlc_out.pkey_redeem);
-            CHECK_AND_ASSERT_MES(legit_output_key, false, "tx input ref #" << output_index << " violates public key restrictions: tx.version = " << tx_ptr->tx.version << ", outtk.key = " << static_cast<const crypto::public_key&>(scan_context.htlc_is_expired ? htlc_out.pkey_refund : htlc_out.pkey_redeem));
-          }
-
         }
         else
         {

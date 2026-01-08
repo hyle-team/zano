@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 Zano Project
+// Copyright (c) 2018-2026 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -221,7 +221,7 @@ namespace currency
       size_t operator()(const txin_gen& /*txin*/) const   { return 0; }
       size_t operator()(const txin_to_key& txin) const    { return tools::get_varint_packed_size(txin.key_offsets.size() + a) + sizeof(crypto::signature) * (txin.key_offsets.size() + a); }
       size_t operator()(const txin_multisig& txin) const  { return tools::get_varint_packed_size(txin.sigs_count + a) + sizeof(crypto::signature) * (txin.sigs_count + a); }
-      size_t operator()(const txin_htlc& txin) const      { return tools::get_varint_packed_size(1 + a) + sizeof(crypto::signature) * (1 + a);  }
+      size_t operator()(const txin_dummy& txin) const     { throw std::runtime_error("txin_signature_size_visitor: txin_dummy not implemented"); }
       size_t operator()(const txin_zc_input& txin) const  { return 96 + tools::get_varint_packed_size(txin.key_offsets.size()) + txin.key_offsets.size() * 32; }
     };
 
@@ -293,7 +293,7 @@ namespace currency
     std::unordered_set<crypto::key_image> ki;
     for(const auto& in : tx.vin)
     {
-      if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc) || in.type() == typeid(txin_zc_input))
+      if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_zc_input))
       {
          
         if (!ki.insert(get_key_image_from_txin_v(in)).second)

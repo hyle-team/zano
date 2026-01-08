@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Zano Project
+// Copyright (c) 2025-2026 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -88,7 +88,6 @@ bool fill_tx_rpc_inputs::generate(std::vector<test_event_entry>& events) const
     tx.vin.reserve(5);
     tx.vin.push_back(std::move(currency::txin_gen{}));
     tx.vin.push_back(std::move(currency::txin_to_key{}));
-    tx.vin.push_back(std::move(currency::txin_htlc{}));
 
     {
       currency::txin_zc_input input{};
@@ -123,20 +122,6 @@ bool fill_tx_rpc_inputs::generate(std::vector<test_event_entry>& events) const
         0xa2, 0xb2, 0xbf, 0xb1, 0x0c}}.to_key_image();
       input.etc_details.push_back(std::move(currency::signed_parts{/* .n_outs = */ 2613407258u, /* .n_extras = */ 347754399u}));
       input.etc_details.push_back(std::move(currency::extra_attachment_info{/* .sz = */ 5559118977069213037ull, /* .hsh = */ currency::null_hash, /* cnt = */ 8106306627691316520ull}));
-      tx.vin.push_back(std::move(input));
-    }
-
-    {
-      currency::txin_htlc input{};
-
-      input.key_offsets.push_back(9536097715806449708ull);
-      input.key_offsets.push_back(std::move(currency::ref_by_id{/* .tx_id = */ currency::get_transaction_hash(tx_0), /* .n = */ 9u}));
-      input.amount = 11357119244607763967ull;
-      input.k_image = crypto::point_t{{0xcb, 0xec, 0xfb, 0x36, 0x02, 0x1c, 0xe5, 0x64, 0xee, 0x6a, 0xb8, 0x67, 0xb2, 0x8e, 0xe9, 0xef, 0x80, 0x17, 0x34, 0x6f, 0xa8, 0x67, 0x3e, 0x45, 0x3a, 0xe0, 0xd4,
-        0x8b, 0x1a, 0x13, 0x75, 0xe2}}.to_key_image();
-      input.etc_details.push_back(std::move(currency::signed_parts{/* .n_outs = */ 517318753u, /* .n_extras = */ 1367922888u}));
-      input.etc_details.push_back(std::move(currency::extra_attachment_info{/* .sz = */ 10987762797757012676ull, /* .hsh = */ currency::null_hash, /* .cnt = */ 10767056422067827733ull}));
-      input.hltc_origin = "htlc-origin";
       tx.vin.push_back(std::move(input));
     }
 
@@ -247,7 +232,6 @@ bool fill_tx_rpc_inputs::c2(const currency::core& core, const size_t event_posit
     {
       CHECK_AND_ASSERT_EQ(info.ins.front().amount, 0);
       CHECK_AND_ASSERT_EQ(info.ins.front().multisig_count, 0);
-      CHECK_AND_ASSERT_EQ(info.ins.front().htlc_origin.empty(), true);
       CHECK_AND_ASSERT_EQ(info.ins.front().kimage_or_ms_id, epee::string_tools::pod_to_hex(currency::null_ki));
       CHECK_AND_ASSERT_EQ(info.ins.front().global_indexes.empty(), true);
       CHECK_AND_ASSERT_EQ(info.ins.front().etc_options.empty(), true);
@@ -285,7 +269,6 @@ bool fill_tx_rpc_inputs::c3(const currency::core& core, const size_t event_posit
     {
       CHECK_AND_ASSERT_EQ(info.ins.front().amount, 0);
       CHECK_AND_ASSERT_EQ(info.ins.front().multisig_count, 0);
-      CHECK_AND_ASSERT_EQ(info.ins.front().htlc_origin.empty(), true);
       CHECK_AND_ASSERT_EQ(info.ins.front().kimage_or_ms_id, epee::string_tools::pod_to_hex(currency::null_ki));
       CHECK_AND_ASSERT_EQ(info.ins.front().global_indexes.empty(), true);
       CHECK_AND_ASSERT_EQ(info.ins.front().etc_options.empty(), true);
@@ -323,7 +306,6 @@ bool fill_tx_rpc_inputs::c4(const currency::core& core, const size_t event_posit
     {
       CHECK_AND_ASSERT_EQ(info.ins.front().amount, 0);
       CHECK_AND_ASSERT_EQ(info.ins.front().multisig_count, 0);
-      CHECK_AND_ASSERT_EQ(info.ins.front().htlc_origin.empty(), true);
       CHECK_AND_ASSERT_EQ(info.ins.front().kimage_or_ms_id, epee::string_tools::pod_to_hex(currency::null_ki));
       CHECK_AND_ASSERT_EQ(info.ins.front().global_indexes.empty(), true);
       CHECK_AND_ASSERT_EQ(info.ins.front().etc_options.empty(), true);
@@ -332,7 +314,6 @@ bool fill_tx_rpc_inputs::c4(const currency::core& core, const size_t event_posit
     {
       CHECK_AND_ASSERT_EQ(info.ins.at(1).amount, UINT64_MAX);
       CHECK_AND_ASSERT_EQ(info.ins.at(1).multisig_count, 0);
-      CHECK_AND_ASSERT_EQ(info.ins.at(1).htlc_origin.empty(), true);
       CHECK_AND_ASSERT_EQ(info.ins.at(1).kimage_or_ms_id, epee::string_tools::pod_to_hex(currency::null_ki));
       CHECK_AND_ASSERT_EQ(info.ins.at(1).global_indexes.empty(), true);
       CHECK_AND_ASSERT_EQ(info.ins.at(1).etc_options.empty(), true);
@@ -341,7 +322,6 @@ bool fill_tx_rpc_inputs::c4(const currency::core& core, const size_t event_posit
     {
       CHECK_AND_ASSERT_EQ(info.ins.back().amount, 16730018105294876523ull);
       CHECK_AND_ASSERT_EQ(info.ins.back().multisig_count, 0);
-      CHECK_AND_ASSERT_EQ(info.ins.back().htlc_origin.empty(), true);
       CHECK_AND_ASSERT_EQ(info.ins.back().kimage_or_ms_id, epee::string_tools::pod_to_hex(currency::null_ki));
       CHECK_AND_ASSERT_EQ(info.ins.back().global_indexes.empty(), true);
       CHECK_AND_ASSERT_EQ(info.ins.back().etc_options.empty(), true);
@@ -374,13 +354,12 @@ bool fill_tx_rpc_inputs::c5(const currency::core& core, const size_t event_posit
   CHECK_AND_ASSERT_EQ(info.outs.empty(), true);
 
   {
-    CHECK_AND_ASSERT_EQ(info.ins.size(), 5);
+    CHECK_AND_ASSERT_EQ(info.ins.size(), 4);
 
     for (size_t position{}; position < info.ins.size(); ++position)
     {
       CHECK_AND_ASSERT_EQ(info.ins.at(position).amount, 0);
       CHECK_AND_ASSERT_EQ(info.ins.at(position).multisig_count, 0);
-      CHECK_AND_ASSERT_EQ(info.ins.at(position).htlc_origin.empty(), true);
 
       if (position == 0)
       {
@@ -423,12 +402,11 @@ bool fill_tx_rpc_inputs::c6(const currency::core& core, const size_t event_posit
   CHECK_AND_ASSERT_EQ(info.outs.empty(), true);
 
   {
-    CHECK_AND_ASSERT_EQ(info.ins.size(), 5);
+    CHECK_AND_ASSERT_EQ(info.ins.size(), 4);
 
     {
       CHECK_AND_ASSERT_EQ(info.ins.front().amount, 0ull);
       CHECK_AND_ASSERT_EQ(info.ins.front().multisig_count, 0ull);
-      CHECK_AND_ASSERT_EQ(info.ins.front().htlc_origin.empty(), true);
       CHECK_AND_ASSERT_EQ(info.ins.front().kimage_or_ms_id.empty(), true);
       CHECK_AND_ASSERT_EQ(info.ins.front().global_indexes.empty(), true);
       CHECK_AND_ASSERT_EQ(info.ins.front().etc_options.empty(), true);
@@ -437,7 +415,6 @@ bool fill_tx_rpc_inputs::c6(const currency::core& core, const size_t event_posit
     {
       CHECK_AND_ASSERT_EQ(info.ins.at(1).amount, 2341818593703234797ull);
       CHECK_AND_ASSERT_EQ(info.ins.at(1).multisig_count, 0ull);
-      CHECK_AND_ASSERT_EQ(info.ins.at(1).htlc_origin.empty(), true);
       CHECK_AND_ASSERT_EQ(info.ins.at(1).kimage_or_ms_id, "8172e80b8da3bcbce2ee7df42466627bb3559b80bb504f1fd56b460eedbc2ce9");
       CHECK_AND_ASSERT_EQ(info.ins.at(1).global_indexes.size(), 2ull);
 
@@ -455,14 +432,13 @@ bool fill_tx_rpc_inputs::c6(const currency::core& core, const size_t event_posit
     }
 
     {
-      CHECK_AND_ASSERT_EQ(info.ins.at(2).amount, 11357119244607763967ull);
+      CHECK_AND_ASSERT_EQ(info.ins.at(2).amount, 0ull);
       CHECK_AND_ASSERT_EQ(info.ins.at(2).multisig_count, 0ull);
-      CHECK_AND_ASSERT_EQ(info.ins.at(2).htlc_origin, epee::string_tools::buff_to_hex_nodelimer(std::string{"htlc-origin"}));
-      CHECK_AND_ASSERT_EQ(info.ins.at(2).kimage_or_ms_id, "f15201980333d6ca8fda90c73814baea0864eb56597e40c38061ec77644585ea");
+      CHECK_AND_ASSERT_EQ(info.ins.at(2).kimage_or_ms_id, "c08b36a7f77185f31a570a7f51aa550122026985e5de7941218510a1e973202e");
       CHECK_AND_ASSERT_EQ(info.ins.at(2).global_indexes.size(), 2ull);
 
       {
-        CHECK_AND_ASSERT_EQ(info.ins.at(2).global_indexes.front(), 9536097715806449708ull);
+        CHECK_AND_ASSERT_EQ(info.ins.at(2).global_indexes.front(), 16540286509618649069ull);
         CHECK_AND_ASSERT_EQ(info.ins.at(2).global_indexes.back(), 0ull);
       }
 
@@ -475,36 +451,15 @@ bool fill_tx_rpc_inputs::c6(const currency::core& core, const size_t event_posit
     }
 
     {
-      CHECK_AND_ASSERT_EQ(info.ins.at(3).amount, 0ull);
+      CHECK_AND_ASSERT_EQ(info.ins.at(3).amount, 14073369620052150183ull);
       CHECK_AND_ASSERT_EQ(info.ins.at(3).multisig_count, 0ull);
-      CHECK_AND_ASSERT_EQ(info.ins.at(3).htlc_origin.empty(), true);
-      CHECK_AND_ASSERT_EQ(info.ins.at(3).kimage_or_ms_id, "c08b36a7f77185f31a570a7f51aa550122026985e5de7941218510a1e973202e");
-      CHECK_AND_ASSERT_EQ(info.ins.at(3).global_indexes.size(), 2ull);
-
-      {
-        CHECK_AND_ASSERT_EQ(info.ins.at(3).global_indexes.front(), 16540286509618649069ull);
-        CHECK_AND_ASSERT_EQ(info.ins.at(3).global_indexes.back(), 0ull);
-      }
-
+      CHECK_AND_ASSERT_EQ(info.ins.at(3).kimage_or_ms_id, "aacdff6018af0aae84d7a836a7f0b4309b51a28bfc4f566657c67b903a3ccba5");
+      CHECK_AND_ASSERT_EQ(info.ins.at(3).global_indexes.size(), 0ull);
       CHECK_AND_ASSERT_EQ(info.ins.at(3).etc_options.size(), 2ull);
 
       {
-        CHECK_AND_ASSERT_EQ(info.ins.at(3).etc_options.front(), "n_outs: 517318753, n_extras: 1367922888");
-        CHECK_AND_ASSERT_EQ(info.ins.at(3).etc_options.back(), "cnt: 10767056422067827733, sz: 10987762797757012676, hsh: " + std::string(64, '0'));
-      }
-    }
-
-    {
-      CHECK_AND_ASSERT_EQ(info.ins.at(4).amount, 14073369620052150183ull);
-      CHECK_AND_ASSERT_EQ(info.ins.at(4).multisig_count, 0ull);
-      CHECK_AND_ASSERT_EQ(info.ins.at(4).htlc_origin.empty(), true);
-      CHECK_AND_ASSERT_EQ(info.ins.at(4).kimage_or_ms_id, "aacdff6018af0aae84d7a836a7f0b4309b51a28bfc4f566657c67b903a3ccba5");
-      CHECK_AND_ASSERT_EQ(info.ins.at(4).global_indexes.size(), 0ull);
-      CHECK_AND_ASSERT_EQ(info.ins.at(4).etc_options.size(), 2ull);
-
-      {
-        CHECK_AND_ASSERT_EQ(info.ins.at(4).etc_options.front(), "n_outs: 1801772931, n_extras: 167800219");
-        CHECK_AND_ASSERT_EQ(info.ins.at(4).etc_options.back(), "cnt: 13515222808659969031, sz: 12438971857615319230, hsh: " + std::string(64, '0'));
+        CHECK_AND_ASSERT_EQ(info.ins.at(3).etc_options.front(), "n_outs: 1801772931, n_extras: 167800219");
+        CHECK_AND_ASSERT_EQ(info.ins.at(3).etc_options.back(), "cnt: 13515222808659969031, sz: 12438971857615319230, hsh: " + std::string(64, '0'));
       }
     }
   }

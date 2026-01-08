@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -48,8 +48,6 @@
 #define       GUI_TX_TYPE_ESCROW_RELEASE_BURN     10
 #define       GUI_TX_TYPE_ESCROW_CANCEL_PROPOSAL  11
 #define       GUI_TX_TYPE_ESCROW_RELEASE_CANCEL   12
-#define       GUI_TX_TYPE_HTLC_DEPOSIT            13
-#define       GUI_TX_TYPE_HTLC_REDEEM             14
 
 
 
@@ -132,11 +130,6 @@ namespace currency
 		  KV_SERIALIZE(payments)
 		  KV_SERIALIZE(proof_string)
 	  END_KV_SERIALIZE_MAP()
-  };
-
-  struct htlc_info
-  {
-    bool hltc_our_out_is_before_expiration;
   };
 
   struct asset_eth_signer_i
@@ -381,7 +374,6 @@ namespace currency
   bool is_out_to_acc(const account_public_address& addr, const txout_multisig& out_multisig, const crypto::key_derivation& derivation, size_t output_index);
   bool is_out_to_acc(const account_public_address& addr, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount, crypto::public_key& decoded_asset_id, crypto::scalar_t& amount_blinding_mask, crypto::scalar_t& asset_id_blinding_mask, uint64_t& decoded_payment_id);
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, crypto::key_derivation& derivation);
-  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, crypto::key_derivation& derivation, std::list<htlc_info>& htlc_info_list);
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, std::vector<wallet_out_info>& outs, crypto::key_derivation& derivation);
   bool get_tx_fee(const transaction& tx, uint64_t & fee);
   uint64_t get_tx_fee(const transaction& tx);
@@ -407,7 +399,6 @@ namespace currency
   bool is_address_like_wrapped(const std::string& addr);
   void load_wallet_transfer_info_flags(tools::wallet_public::wallet_transfer_info& x);
   uint64_t get_tx_type(const transaction& tx);
-  uint64_t get_tx_type_ex(const transaction& tx, tx_out_bare& htlc_out, txin_htlc& htlc_in);
   size_t get_multisig_out_index(const std::vector<tx_out_v>& outs);
   size_t get_multisig_in_index(const std::vector<txin_v>& inputs);
 
@@ -482,7 +473,6 @@ namespace currency
   uint64_t get_timestamp_from_word(std::string word, bool& password_used);
   bool parse_vote(const std::string& buff, std::list<std::pair<std::string, bool>>& votes);
 
-  std::string generate_origin_for_htlc(const txout_htlc& htlc, const account_keys& acc_keys);
   bool validate_ado_update_allowed(const asset_descriptor_base& a, const asset_descriptor_base& b);
   bool validate_ado_initial(const asset_descriptor_base& a);
 
@@ -498,8 +488,6 @@ namespace currency
       return boost::get<txin_to_key>(in).etc_details;
     else if (in.type() == typeid(txin_multisig))
       return boost::get<txin_multisig>(in).etc_details;
-    else if (in.type() == typeid(txin_htlc))
-      return boost::get<txin_htlc>(in).etc_details;
     else if (in.type() == typeid(txin_zc_input))
       return boost::get<txin_zc_input>(in).etc_details;
     else
@@ -858,7 +846,6 @@ namespace currency
       size_t operator()(const txin_gen& txin) const           { return 0; }
       size_t operator()(const txin_to_key& txin) const            { return txin.key_offsets.size(); }
       size_t operator()(const txin_multisig& txin) const          { return txin.sigs_count; }
-      size_t operator()(const txin_htlc& txin) const              { return 1; }
       size_t operator()(const txin_zc_input& txin) const          { throw std::runtime_error("Not implemented yet"); }
     };
 
@@ -874,8 +861,8 @@ namespace currency
       size_t operator()(const txin_gen& /*txin*/) const   { return 0; }
       size_t operator()(const txin_to_key& txin) const    { return tools::get_varint_packed_size(txin.key_offsets.size() + a) + sizeof(crypto::signature) * (txin.key_offsets.size() + a); }
       size_t operator()(const txin_multisig& txin) const  { return tools::get_varint_packed_size(txin.sigs_count + a) + sizeof(crypto::signature) * (txin.sigs_count + a); }
-      size_t operator()(const txin_htlc& txin) const      { return tools::get_varint_packed_size(1 + a) + sizeof(crypto::signature) * (1 + a);  }
       size_t operator()(const txin_zc_input& txin) const  { return 97 + tools::get_varint_packed_size(txin.key_offsets.size()) + txin.key_offsets.size() * 32; }
+      size_t operator()(const txin_dummy&) const          { return 0; } // TODO@#@# replace with gateway -- sowle
     };
 
     return boost::apply_visitor(txin_signature_size_visitor(last_input_in_separately_signed_tx ? 1 : 0), tx_in);
@@ -889,8 +876,6 @@ namespace currency
       return &boost::get<txin_to_key>(in).etc_details;
     if (in.type() == typeid(txin_multisig))
       return &boost::get<txin_multisig>(in).etc_details;
-    if (in.type() == typeid(txin_htlc))
-      return &boost::get<txin_htlc>(in).etc_details;
     if (in.type() == typeid(txin_zc_input))
       return &boost::get<txin_zc_input>(in).etc_details;
     return nullptr;
@@ -902,6 +887,7 @@ namespace currency
     uint64_t operator()(const t_input& i)             const { return i.amount; }
     uint64_t operator()(const txin_zc_input&)         const { return 0; }
     uint64_t operator()(const txin_gen& i)            const { return 0; }
+    uint64_t operator()(const txin_dummy&)            const { return 0; } // TODO@#@# replace with gateway -- sowle
   };
   inline uint64_t get_amount_from_variant(const txin_v& v) noexcept
   {

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2014-2015 The Boolberry developers
@@ -251,12 +251,9 @@ namespace currency
     END_SERIALIZE()
   };
 
-  struct txin_htlc: public txin_to_key
+  struct txin_dummy // TODO: CZ, please replace it with gateway -- sowle
   {
-    std::string hltc_origin;
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(hltc_origin)
-      FIELDS(*static_cast<txin_to_key*>(this))
+    BEGIN_SERIALIZE()
     END_SERIALIZE()
   };
 
@@ -287,26 +284,7 @@ namespace currency
     END_SERIALIZE()
   };
 
-#define CURRENCY_TXOUT_HTLC_FLAGS_HASH_TYPE_MASK   0x01 // 0 - SHA256, 1 - RIPEMD160
-
-  struct txout_htlc
-  {
-    crypto::hash htlc_hash;
-    uint8_t flags;      //select type of the hash, may be some extra info in future
-    uint64_t expiration; 
-    crypto::public_key pkey_redeem; //works before expiration
-    crypto::public_key pkey_refund; //works after expiration
-
-    BEGIN_SERIALIZE_OBJECT()
-      FIELD(htlc_hash)
-      FIELD(flags)
-      VARINT_FIELD(expiration)
-      FIELD(pkey_redeem)
-      FIELD(pkey_refund)
-    END_SERIALIZE()
-  };
-
-  typedef boost::variant<txout_to_key, txout_multisig, txout_htlc> txout_target_v;
+  typedef boost::variant<txout_to_key, txout_multisig> txout_target_v;
 
   //typedef std::pair<uint64_t, txout> out_t;
   struct tx_out_bare
@@ -507,7 +485,7 @@ namespace currency
 
 //#pragma pack(pop)
 
-  typedef boost::variant<txin_gen, txin_to_key, txin_multisig, txin_htlc, txin_zc_input> txin_v;
+  typedef boost::variant<txin_gen, txin_to_key, txin_multisig, txin_dummy /* <- can be reused */, txin_zc_input> txin_v;
 
   typedef boost::variant<tx_out_bare, tx_out_zarcanum> tx_out_v;
 
@@ -1203,7 +1181,7 @@ namespace currency
   bool operator ==(const currency::txin_gen& a, const currency::txin_gen& b);
   bool operator ==(const currency::txin_to_key& a, const currency::txin_to_key& b);
   bool operator ==(const currency::txin_multisig& a, const currency::txin_multisig& b);
-  bool operator ==(const currency::txin_htlc& a, const currency::txin_htlc& b);
+  bool operator ==(const currency::txin_dummy&, const currency::txin_dummy&);
   bool operator ==(const currency::txin_zc_input& a, const currency::txin_zc_input& b);
 } // namespace currency
 
@@ -1273,8 +1251,8 @@ SET_VARIANT_TAGS(currency::tx_receiver, 32, "receiver2");
 SET_VARIANT_TAGS(currency::extra_alias_entry, 33, "alias_entry2");
 
 //htlc
-SET_VARIANT_TAGS(currency::txin_htlc, 34, "txin_htlc");
-SET_VARIANT_TAGS(currency::txout_htlc, 35, "txout_htlc");
+SET_VARIANT_TAGS(currency::txin_dummy, 34, "none"); // <- CZ, can be reused for gateway -- sowle
+//SET_VARIANT_TAGS(currency::txout_htlc, 35, "txout_htlc");
 
 SET_VARIANT_TAGS(currency::tx_out_bare, 36, "tx_out_bare");
 
