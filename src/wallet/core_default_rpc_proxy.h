@@ -25,11 +25,9 @@
 
 namespace tools
 {
-
   class default_http_core_proxy final : public i_core_proxy
   {
   public:
-
 
     bool set_connection_addr(const std::string& url) override;
     void set_connectivity(unsigned int connection_timeout, size_t repeats_count) override;
@@ -143,7 +141,6 @@ namespace tools
 
     unsigned int m_connection_timeout;
     size_t m_attempts_count;
-
   };
 }
 

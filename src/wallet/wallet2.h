@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -14,7 +14,7 @@
 #include <boost/serialization/shared_ptr.hpp>
 #include <boost/serialization/optional.hpp>
 #include <atomic>
-
+#include <type_traits>
 
 #include "include_base_utils.h"
 #include "profile_tools.h"
@@ -47,6 +47,7 @@
 #include "view_iface.h"
 #include "wallet2_base.h"
 #include "decoy_selection.h"
+#include "net/socks5_proxy_transport.h"
 
 #define WALLET_DEFAULT_TX_SPENDABLE_AGE                               CURRENCY_HF4_MANDATORY_MIN_COINAGE
 #define WALLET_POS_MINT_CHECK_HEIGHT_INTERVAL                         1
@@ -143,6 +144,7 @@ namespace tools
     std::unordered_map<crypto::public_key, currency::asset_descriptor_base> m_custom_assets; //assets that manually added by user
     mutable std::unordered_map<crypto::public_key, currency::asset_descriptor_base> m_whitelisted_assets; //assets that whitelisted
     escrow_contracts_container m_contracts;
+    // 3 lines below -- HTLCTODO: wallet serialization -- sowle
     std::multimap<uint64_t, htlc_expiration_trigger> m_htlcs; //map [expired_if_more_then] -> height of expiration
     amount_gindex_to_transfer_id_container m_active_htlcs; // map [amount; gindex] -> transfer index
     std::unordered_map<crypto::hash, uint64_t> m_active_htlcs_txid; // map [txid] -> transfer index, limitation: 1 transactiom -> 1 htlc
@@ -151,7 +153,6 @@ namespace tools
     uint64_t m_last_pow_block_h = 0;
     std::list<std::pair<uint64_t, wallet_event_t>> m_rollback_events;
     std::list<std::pair<uint64_t, uint64_t> > m_last_zc_global_indexs; // <height, last_zc_global_indexs>, biggest height comes in front
-   
 
     //variables that not being serialized
     std::atomic<uint64_t> m_last_bc_timestamp = 0;
@@ -571,6 +572,12 @@ namespace tools
       add_transfers_to_transfers_cache(tids);
     }
 
+    // SOCKS5 relay API (runtime)
+    void configure_socks_relay(const socks5::socks5_proxy_settings& cfg);
+    bool configure_socks_relay(const std::string& addr_port); // "ip:port"
+    void disable_socks_relay();
+    const socks5::socks5_proxy_settings& get_socks5_relay_config() const;
+
     // PoS mining
     void do_pos_mining_prepare_entry(mining_context& cxt, const transfer_details& td);
     bool do_pos_mining_iteration(mining_context& cxt, uint64_t ts);
@@ -651,8 +658,6 @@ namespace tools
       const currency::block_direct_data_entry& bche, 
       const crypto::hash& bl_id,
       uint64_t height);
-    void process_htlc_triggers_on_block_added(uint64_t height);
-    void unprocess_htlc_triggers_on_block_removed(uint64_t height);
     
     bool get_pos_entries(std::vector<currency::pos_entry>& entries); // TODO: make it const
     size_t get_pos_entries_count();
@@ -827,7 +832,6 @@ private:
     bool prepare_tx_sources(size_t fake_outputs_count, std::vector<currency::tx_source_entry>& sources, const std::vector<uint64_t>& selected_indicies);
     bool prepare_tx_sources(size_t fake_outputs_count, bool use_all_decoys_if_found_less_than_required, std::vector<currency::tx_source_entry>& sources, const std::vector<uint64_t>& selected_indicies);
     bool prepare_tx_sources(crypto::hash multisig_id, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
-    bool prepare_tx_sources_htlc(crypto::hash htlc_tx_id, const std::string& origin, std::vector<currency::tx_source_entry>& sources, uint64_t& found_money);
     bool prepare_tx_sources_for_defragmentation_tx(std::vector<currency::tx_source_entry>& sources, std::vector<uint64_t>& selected_indicies, uint64_t& found_money);
     void prefetch_global_indicies_if_needed(const std::vector<uint64_t>& selected_indicies);
     assets_selection_context get_needed_money(uint64_t fee, const std::vector<currency::tx_destination_entry>& dsts);
@@ -912,7 +916,7 @@ private:
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_to_key& intk);
     uint64_t get_directly_spent_transfer_index_by_input_in_tracking_wallet(const currency::txin_zc_input& inzc);
     uint8_t out_get_mixin_attr(const currency::tx_out_v& out_t);
-    const crypto::public_key& out_get_pub_key(const currency::tx_out_v& out_t, std::list<currency::htlc_info>& htlc_info_list);
+    const crypto::public_key& out_get_pub_key(const currency::tx_out_v& out_t);
     bool expand_selection_with_zc_input(assets_selection_context& needed_money_map, uint64_t fake_outputs_count, std::vector<uint64_t>& selected_indexes);
 
     void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
@@ -928,14 +932,16 @@ private:
     void wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
     void wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
     void wti_to_json_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
+    
+    bool send_block_via_socks5(const currency::block& bl);
 
-
+    
 
     /*     
      
      !!!!! IMPORTAN !!!!! 
 
-     All variables that supposed to hold wallet state of synchronization(i.e. transfers, assets, htlc, swaps, contracts) - should 
+     All variables that supposed to hold wallet state of synchronization(i.e. transfers, assets, swaps, contracts) - should 
      be placed in wallet2_base_state base class to avoid typical bugs when it's forgotten to be included in reset/resync/serialize functions     
      
      */
@@ -975,8 +981,9 @@ private:
     std::string m_miner_text_info;
 
     bool m_use_deffered_global_outputs;
-    bool m_disable_tor_relay;
     mutable current_operation_context m_current_context;
+
+    socks5::socks5_proxy_settings m_socks5_relay_cfg{};
 
     std::string m_votes_config_path;
     tools::wallet_public::wallet_vote_config m_votes_config;
@@ -1265,6 +1272,7 @@ namespace tools
 
 
 } // namespace tools
+
 
 #if !defined(KEEP_WALLET_LOG_MACROS)
 #undef WLT_LOG

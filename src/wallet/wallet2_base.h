@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -50,7 +50,7 @@
 #define   WALLET_TRANSFER_DETAIL_FLAG_ESCROW_PROPOSAL_RESERVATION      uint32_t(1 << 2)
 #define   WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER                   uint32_t(1 << 3)
 #define   WALLET_TRANSFER_DETAIL_FLAG_COLD_SIG_RESERVATION             uint32_t(1 << 4) // transfer is reserved for cold-signing (unsigned tx was created and passed for signing)
-#define   WALLET_TRANSFER_DETAIL_FLAG_HTLC_REDEEM                      uint32_t(1 << 5) // for htlc keeps info if this htlc belong as redeem or as refund
+// 1 << 5 is free
 #define   WALLET_TRANSFER_DETAIL_CONCISE_MODE_PRESERVE                 uint32_t(1 << 6) // do not truncate this output with CONCISE mode
 #define   WALLET_TRANSFER_DETAIL_FLAG_ASSET_OP_RESERVATION             uint32_t(1 << 7) // transfer is reserved for an ongoing asset operation with external signing
 
@@ -84,11 +84,6 @@ namespace tools
         if (de.addr.size() > 1)
         {
           //for multisig we don't split
-          splitted_dsts.push_back(de);
-        }
-        else if (de.htlc_options.expiration != 0)
-        {
-          //for htlc we don't do split
           splitted_dsts.push_back(de);
         }
         else
@@ -212,9 +207,6 @@ namespace tools
     uint8_t flags = 0;
     uint8_t split_strategy_id = 0;
     bool mark_tx_as_complete = false;
-
-    crypto::hash htlc_tx_id;
-    std::string htlc_origin;
 
     // constructing tx
     uint64_t unlock_time = 0;
@@ -381,13 +373,6 @@ namespace tools
     bool is_zc() const { return m_zc_info_ptr.get(); }
     const crypto::public_key& get_asset_id() const { if (m_zc_info_ptr.get()) { return m_zc_info_ptr->asset_id; } else { return currency::native_coin_asset_id; } }
     bool is_native_coin() const { return m_zc_info_ptr.get() ? (m_zc_info_ptr->asset_id == currency::native_coin_asset_id) : true; }
-    bool is_htlc() const {
-
-      if (m_ptx_wallet_info->m_tx.vout[m_internal_output_index].type() == typeid(currency::tx_out_bare) &&
-        boost::get<currency::tx_out_bare>(m_ptx_wallet_info->m_tx.vout[m_internal_output_index]).target.type() == typeid(currency::txout_htlc))
-        return true;
-      return false;
-    }
     static inline bool transfer_details_base_to_amount(const transfer_details_base& tdb, uint64_t& val)
     {
       val = tdb.amount();
@@ -430,6 +415,7 @@ namespace tools
 
 
 
+  // HTLCTODO: wallet serialization -- sowle
   struct transfer_details_extra_option_htlc_info
   {
     std::string origin;  //this field filled only if htlc had been redeemed
@@ -444,6 +430,7 @@ namespace tools
 
   typedef boost::variant<transfer_details_extra_option_htlc_info, currency::tx_payer> transfer_details_extra_options_v;
 
+  // HTLCTODO: wallet serialization -- sowle
   struct transfer_details : public transfer_details_base
   {
     uint64_t m_global_output_index = 0;
@@ -466,7 +453,7 @@ namespace tools
     END_BOOST_SERIALIZATION()
   };
 
-  //used in wallet 
+  // HTLCTODO: wallet serialization -- sowle
   struct htlc_expiration_trigger
   {
     bool is_wallet_owns_redeem = false; //specify if this HTLC belong to this wallet by pkey_redeem or by pkey_refund

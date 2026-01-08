@@ -217,7 +217,7 @@ namespace epee
         virtual bool invoke_post(const std::string& uri, const std::string& body, const http_response_info** ppresponse_info = NULL, const fields_list& additional_params = fields_list()) = 0;
       };
 
-      template<bool is_ssl>
+      template<bool is_ssl, class net_client_t = blocked_mode_client_t<is_ssl>>
       class http_simple_client_t : public i_target_handler, 
                                    public i_http_client
       {
@@ -245,7 +245,7 @@ namespace epee
         };
 
 
-        blocked_mode_client_t<is_ssl> m_net_client;
+        net_client_t m_net_client;
         std::string m_host_buff;
         std::string m_port;
         //unsigned int m_timeout;
@@ -373,6 +373,11 @@ namespace epee
         {
           CRITICAL_REGION_LOCAL(m_lock);
           return invoke(uri, "POST", body, ppresponse_info, additional_params);
+        }
+        //---------------------------------------------------------------------------
+        net_client_t& get_transport()
+        {
+          return m_net_client;
         }
       private:
         //---------------------------------------------------------------------------
@@ -1219,7 +1224,6 @@ namespace epee
         }
 
       }
-
     } // namespace http
 
   } // namespace net_utils

@@ -22,7 +22,6 @@
 #include "blake2_test.h"
 #include "print_struct_to_json.h"
 #include "free_space_check.h"
-#include "htlc_hash_tests.h"
 #include "threads_pool_tests.h"
 #include "wallet/plain_wallet_api.h"  
 #include "wallet/view_iface.h"
@@ -389,7 +388,6 @@ int main(int argc, char** argv)
 //   std::cout << "Buf5: " << epee::string_tools::buff_to_hex_nodelimer(buf5) << ENDL;
 // 
 //   
-  //do_htlc_hash_tests();
   //run_serialization_performance_test();
   //return 1;
   //run_core_market_performance_tests(100000);

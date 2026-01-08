@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -302,8 +302,6 @@ namespace currency
       VARIANT_SWITCH_BEGIN(vin);
       VARIANT_CASE_CONST(txin_to_key, tk)
         bare_inputs_sum += tk.amount;
-      VARIANT_CASE_CONST(txin_htlc, foo);
-        CHECK_AND_ASSERT_MES(false, false, "unexpected txin_htlc input");
       VARIANT_CASE_CONST(txin_multisig, ms);
         //bare_inputs_sum += ms.amount;
         CHECK_AND_ASSERT_MES(false, false, "unexpected txin_multisig input"); // TODO @#@# check support for multisig inputs
@@ -649,8 +647,6 @@ namespace currency
         VARIANT_SWITCH_BEGIN(vin);
         VARIANT_CASE_CONST(txin_to_key, tk)
           bare_inputs_sum += tk.amount;
-        VARIANT_CASE_CONST(txin_htlc, htlc);
-          bare_inputs_sum += htlc.amount;
         VARIANT_CASE_CONST(txin_multisig, ms);
           bare_inputs_sum += ms.amount;
         VARIANT_CASE_CONST(txin_zc_input, foo);
@@ -1188,18 +1184,6 @@ namespace currency
     hint = *((uint16_t*)dh.msg.data());
     return true;
   }  
-  //---------------------------------------------------------------
-  std::string generate_origin_for_htlc(const txout_htlc& htlc, const account_keys& acc_keys)
-  {
-    std::string blob;
-    string_tools::append_pod_to_strbuff(htlc.pkey_redeem, blob);
-    string_tools::append_pod_to_strbuff(htlc.pkey_refund, blob);
-    string_tools::append_pod_to_strbuff(acc_keys.spend_secret_key, blob);
-    crypto::hash origin_hs = crypto::cn_fast_hash(blob.data(), blob.size());
-    std::string origin_blob;
-    string_tools::append_pod_to_strbuff(origin_hs, origin_blob);
-    return origin_blob;
-  }
   //---------------------------------------------------------------
   bool validate_ado_update_allowed(const asset_descriptor_base& new_ado, const asset_descriptor_base& prev_ado)
   {
@@ -2067,19 +2051,12 @@ namespace currency
     else
       x.fee = 0;
     x.show_sender = currency::is_showing_sender_addres(x.tx);
-    tx_out_bare htlc_out = AUTO_VAL_INIT(htlc_out);
-    txin_htlc htlc_in = AUTO_VAL_INIT(htlc_in);
 
-    x.tx_type = get_tx_type_ex(x.tx, htlc_out, htlc_in);
-    if(x.tx_type == GUI_TX_TYPE_HTLC_DEPOSIT && !x.has_outgoing_entries())
-    {
-      //need to override amount
-      x.get_native_income_amount() = htlc_out.amount;
-    }
+    x.tx_type = get_tx_type(x.tx);
   }
 
   //---------------------------------------------------------------
-  uint64_t get_tx_type_ex(const transaction& tx, tx_out_bare& htlc_out, txin_htlc& htlc_in)
+  uint64_t get_tx_type(const transaction& tx)
   {
     if (is_coinbase(tx))
       return GUI_TX_TYPE_COIN_BASE;
@@ -2125,33 +2102,7 @@ namespace currency
     if (bc_services::get_first_service_attachment_by_id(tx, BC_ESCROW_SERVICE_ID, BC_ESCROW_SERVICE_INSTRUCTION_CANCEL_PROPOSAL, tsa))
       return GUI_TX_TYPE_ESCROW_CANCEL_PROPOSAL;
 
-    for (auto ov : tx.vout)
-    {
-      VARIANT_SWITCH_BEGIN(ov);
-      VARIANT_CASE_CONST(tx_out_bare, o)
-        if (o.target.type() == typeid(txout_htlc))
-        {
-          htlc_out = o;
-          return GUI_TX_TYPE_HTLC_DEPOSIT;
-        }
-      VARIANT_SWITCH_END();
-
-    }
-
-    if (get_type_in_variant_container(tx.vin, htlc_in))
-    {
-      return GUI_TX_TYPE_HTLC_REDEEM;
-    }
-
-
     return GUI_TX_TYPE_NORMAL;
-  }
-  //---------------------------------------------------------------
-  uint64_t get_tx_type(const transaction& tx)
-  {
-    tx_out_bare htlc_out = AUTO_VAL_INIT(htlc_out);
-    txin_htlc htlc_in = AUTO_VAL_INIT(htlc_in);
-    return get_tx_type_ex(tx, htlc_out, htlc_in);
   }
   //---------------------------------------------------------------
   size_t get_multisig_out_index(const std::vector<tx_out_v>& outs)
@@ -2377,7 +2328,7 @@ namespace currency
     }
     else
     {
-      // regular txin_to_key or htlc
+      // regular txin_to_key
       if (pss_ring_s)
         *pss_ring_s << "input #" << input_index << ", pub_keys:" << ENDL;
 
@@ -2697,42 +2648,6 @@ namespace currency
         tx.vin.push_back(input_multisig);
         has_non_zc_inputs = true;
       }
-      else if (src_entr.htlc_origin.size())
-      {
-        //htlc redeem
-        keypair& in_ephemeral = in_context.in_ephemeral;
-        //txin_to_key
-        if (src_entr.outputs.size() != 1)
-        {
-          LOG_ERROR("htlc in: wrong output src_entr.outputs.size() = " << src_entr.outputs.size());
-          return false;
-        }
-
-        //key_derivation recv_derivation;
-        crypto::key_image img;
-        if (!generate_key_image_helper(sender_account_keys, src_entr.real_out_tx_key, src_entr.real_output_in_tx_index, in_ephemeral, img))
-          return false;
-
-        //check that derivated key is equal with real output key
-        if (!(in_ephemeral.pub == src_entr.outputs.front().stealth_address))
-        {
-          LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
-            << string_tools::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
-            << string_tools::pod_to_hex(src_entr.outputs.front().stealth_address));
-          return false;
-        }
-        key_images_total.push_back(img);
-
-        //put key image into tx input
-        txin_htlc input_to_key;
-        input_to_key.amount = src_entr.amount;
-        input_to_key.k_image = img;
-        input_to_key.hltc_origin = src_entr.htlc_origin;
-        input_to_key.key_offsets.push_back(src_entr.outputs.front().out_reference);
-
-        tx.vin.push_back(input_to_key);
-        has_non_zc_inputs = true;
-      }
       else
       {
         // txin_to_key or txin_zc_input
@@ -2760,7 +2675,7 @@ namespace currency
           key_offsets.push_back(out_entry.out_reference);
 
         //TODO: Might need some refactoring since this scheme is not the clearest one(did it this way for now to keep less changes to not broke anything)
-        //potentially this approach might help to support htlc and multisig without making to complicated code
+        //potentially this approach might help to support multisig without making to complicated code
         if (src_entr.is_zc())
         {
           ++zc_inputs_count;
@@ -3296,7 +3211,6 @@ namespace currency
       CHECK_AND_ASSERT_MES(
         in.type() == typeid(txin_to_key) ||
         in.type() == typeid(txin_multisig) ||
-        in.type() == typeid(txin_htlc) ||
         in.type() == typeid(txin_zc_input), 
         false, "wrong input type: " << in.type().name() << ", in transaction " << get_transaction_hash(tx));
     }
@@ -3372,11 +3286,6 @@ namespace currency
         VARIANT_CASE_CONST(txout_to_key, tk)
           if (!check_key(tk.key))
             return false;
-        VARIANT_CASE_CONST(txout_htlc, htlc)
-          if (!check_key(htlc.pkey_redeem))
-            return false;
-          if (!check_key(htlc.pkey_refund))
-            return false;
         VARIANT_CASE_CONST(txout_multisig, ms)
           if (!(ms.keys.size() > 0 && ms.minimum_sigs > 0 && ms.minimum_sigs <= ms.keys.size()))
           {
@@ -3424,11 +3333,6 @@ namespace currency
       {
         CHECKED_GET_SPECIFIC_VARIANT(in, const txin_multisig, ms_in, false);
         this_amount = ms_in.amount;
-      }
-      else if (in.type() == typeid(txin_htlc))
-      {
-        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_htlc, htlc_in, false);
-        this_amount = htlc_in.amount;
       }
       else if (in.type() == typeid(txin_zc_input))
       {
@@ -3646,12 +3550,6 @@ namespace currency
   //---------------------------------------------------------------
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, crypto::key_derivation& derivation)
   {
-    std::list<htlc_info> htlc_info_list;
-    return lookup_acc_outs(acc, tx, tx_pub_key, outs, derivation, htlc_info_list);
-  }
-  //---------------------------------------------------------------
-  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, crypto::key_derivation& derivation, std::list<htlc_info>& htlc_info_list)
-  {
     bool r = generate_key_derivation(tx_pub_key, acc.view_secret_key, derivation);
     CHECK_AND_ASSERT_MES(r, false, "unable to generate derivation from tx_pub = " << tx_pub_key << " * view_sec, invalid tx_pub?");
 
@@ -3682,24 +3580,6 @@ namespace currency
             outs.emplace_back(output_index, o.amount); // TODO: @#@# consider this
             //don't cout this money in sum_of_native_outs
           }
-        VARIANT_CASE_CONST(txout_htlc, htlc)
-          htlc_info hi = AUTO_VAL_INIT(hi);
-          if (is_out_to_acc(acc.account_address, htlc.pkey_redeem, derivation, output_index))
-          {
-            hi.hltc_our_out_is_before_expiration = true;
-            htlc_info_list.push_back(hi);
-          }
-          else if (is_out_to_acc(acc.account_address, htlc.pkey_refund, derivation, output_index))
-          {
-            hi.hltc_our_out_is_before_expiration = false;
-            htlc_info_list.push_back(hi);
-          }
-          else
-          {
-            LOG_ERROR("lookup_acc_outs: handling txout_htlc went wrong, output_index: " << output_index);
-            return false;
-          }
-          outs.emplace_back(output_index, o.amount);
         VARIANT_CASE_OTHER()
           LOG_ERROR("Wrong type at lookup_acc_outs, unexpected type is: " << o.target.type().name());
           return false;
@@ -4190,7 +4070,7 @@ namespace currency
   {
     for (const auto& e : tx.vin)
     {
-      if (e.type() != typeid(txin_to_key) || e.type() != typeid(txin_multisig) || e.type() != typeid(txin_htlc))
+      if (e.type() != typeid(txin_to_key) || e.type() != typeid(txin_multisig))
         return false;
       if (boost::get<txin_to_key>(e).key_offsets.size() < 2)
         return false;
@@ -4280,9 +4160,6 @@ namespace currency
             tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(k));
           }
           tei.outs.back().minimum_sigs = otm.minimum_sigs;
-        VARIANT_CASE_CONST(txout_htlc, otk)
-          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_redeem) + "(htlc_pkey_redeem)");
-          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_refund) + "(htlc_pkey_refund)");
         VARIANT_SWITCH_END();
       }
       VARIANT_CASE_CONST(tx_out_zarcanum, o)
@@ -4308,9 +4185,8 @@ namespace currency
       {
         entry_to_fill.amount = 0;
       }
-      else if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc) || in.type() == typeid(txin_zc_input))
+      else if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_zc_input))
       {
-        //TODO: add htlc info
         entry_to_fill.amount = get_amount_from_variant(in);
         entry_to_fill.kimage_or_ms_id = epee::string_tools::pod_to_hex(get_key_image_from_txin_v(in));
         const std::vector<txout_ref_v>& key_offsets = get_key_offsets_from_txin_v(in);
@@ -4327,10 +4203,6 @@ namespace currency
             //disable for the reset at the moment 
             entry_to_fill.global_indexes.back() = std::numeric_limits<uint64_t>::max();
           }
-        }
-        if (in.type() == typeid(txin_htlc))
-        {
-          entry_to_fill.htlc_origin = epee::string_tools::buff_to_hex_nodelimer(boost::get<txin_htlc>(in).hltc_origin);
         }
         //tk.etc_details -> visualize it may be later
       }
@@ -4385,7 +4257,7 @@ namespace currency
     {
       VARIANT_SWITCH_BEGIN(tx.vout[n]);
       VARIANT_CASE_CONST(tx_out_bare, o)
-        if (o.target.type() == typeid(txout_to_key) || o.target.type() == typeid(txout_htlc))
+        if (o.target.type() == typeid(txout_to_key))
         {
           uint64_t amount = o.amount;
           gindices[amount] += 1;
@@ -4911,14 +4783,9 @@ namespace currency
       a.multisig_out_id == b.multisig_out_id &&
       a.sigs_count      == b.sigs_count;
   }
-  bool operator ==(const currency::txin_htlc& a, const currency::txin_htlc& b)
+  bool operator ==(const currency::txin_dummy&, const currency::txin_dummy&) // TODO@#@# replace this -- sowle
   {
-    return
-      a.amount      == b.amount &&
-      a.etc_details == b.etc_details &&
-      a.hltc_origin == b.hltc_origin &&
-      a.key_offsets == b.key_offsets &&
-      a.k_image     == b.k_image;
+    throw std::runtime_error("operator ==: txin_dummy not implemented");
   }
   bool operator ==(const currency::txin_zc_input& a, const currency::txin_zc_input& b)
   {

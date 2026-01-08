@@ -171,5 +171,50 @@ namespace net_utils
     return true;
   }
 
+  inline bool parse_proxy_addr_host_port(const std::string& s, std::string& host, uint16_t& port)
+  {
+    host.clear();
+    port = 0;
+
+    if (s.empty())
+      return false;
+
+    // IPv6 support: [::1]:9050
+    if (s.front() == '[')
+    {
+      const auto rb = s.find(']');
+      if (rb == std::string::npos || rb + 2 > s.size() || s[rb + 1] != ':')
+        return false;
+
+      const std::string host_v6 = s.substr(1, rb - 1);
+      const std::string port_str = s.substr(rb + 2);
+
+      uint64_t port_u64 = 0;
+      if (!epee::string_tools::get_xtype_from_string(port_u64, port_str))
+        return false;
+      if (port_u64 == 0 || port_u64 > 65535)
+        return false;
+
+      host = host_v6;
+      port = static_cast<uint16_t>(port_u64);
+      return true;
+    }
+
+    // host:port via epee parser
+    epee::net_utils::http::url_content uc{};
+    if (!epee::net_utils::parse_url(s, uc))
+      return false;
+
+    // reject extra path/query/fragment
+    if (!uc.uri.empty())
+      return false;
+
+    if (uc.host.empty() || uc.port == 0 || uc.port > 65535)
+      return false;
+
+    host = uc.host;
+    port = static_cast<uint16_t>(uc.port);
+    return true;
+  }
 }
 }

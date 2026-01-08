@@ -195,6 +195,11 @@ bool wallets_manager::init_command_line(int argc, char* argv[], std::string& fai
   command_line::add_arg(desc_cmd_sett, arg_disable_logs_init);
   command_line::add_arg(desc_cmd_sett, arg_qt_dev_tools);
   command_line::add_arg(desc_cmd_sett, arg_disable_price_fetch);
+  
+  command_line::add_arg(desc_cmd_sett, command_line::arg_enable_tx_socks5_relay_proxy);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_tx_relay_url);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_enable_block_socks5_relay_proxy);
+  command_line::add_arg(desc_cmd_sett, command_line::arg_block_relay_url);
 
   
 
@@ -376,6 +381,71 @@ bool wallets_manager::init(view::i_view* pview_handler)
     //LOG_PRINT("Module folder: " << argv[0], LOG_LEVEL_0);
   }
 
+  {
+    tools::socks5::socks5_proxy_settings socks_cfg{};
+
+    // TX relay socks5
+    {
+      const std::string tx_proxy_addr = command_line::get_arg(m_vm, command_line::arg_enable_tx_socks5_relay_proxy);
+      const std::string tx_relay_url = command_line::get_arg(m_vm, command_line::arg_tx_relay_url);
+
+      if (!tx_proxy_addr.empty())
+      {
+        tools::socks5::socks5_endpoint_config ep{};
+        if (!epee::net_utils::parse_proxy_addr_host_port(tx_proxy_addr, ep.proxy.proxy_host, ep.proxy.proxy_port))
+        {
+          LOG_PRINT_L0("Invalid value for --enable-tx-socks5-relay-proxy, expected host:port (or [ipv6]:port)");
+          return false;
+        }
+
+        if (!tx_relay_url.empty())
+          ep.target_url = tx_relay_url;
+
+        socks_cfg.transactions = ep;
+
+        LOG_PRINT_L0("SOCKS5 transaction relay proxy configured: "
+          << ep.proxy.proxy_host << ":" << std::to_string(ep.proxy.proxy_port)
+          << (ep.target_url.empty() ? "" : (", relay url: " + ep.target_url)));
+      }
+      else if (!tx_relay_url.empty())
+      {
+        LOG_PRINT_L0("Ignoring --tx-relay-url because --enable-tx-socks5-relay-proxy is not set");
+      }
+    }
+
+    // Blocks submit socks5
+    {
+      const std::string bl_proxy_addr = command_line::get_arg(m_vm, command_line::arg_enable_block_socks5_relay_proxy);
+      const std::string bl_submit_url = command_line::get_arg(m_vm, command_line::arg_block_relay_url);
+
+      if (!bl_proxy_addr.empty())
+      {
+        tools::socks5::socks5_endpoint_config ep{};
+        if (!epee::net_utils::parse_proxy_addr_host_port(bl_proxy_addr, ep.proxy.proxy_host, ep.proxy.proxy_port))
+        {
+          LOG_PRINT_L0("Invalid value for --enable-block-socks5-relay-proxy, expected host:port (or [ipv6]:port)");
+        }
+        else
+        {
+          if (!bl_submit_url.empty())
+            ep.target_url = bl_submit_url;
+
+          socks_cfg.blocks = ep;
+
+          LOG_PRINT_L0("Block submit via SOCKS5 configured: "
+            << ep.proxy.proxy_host << ":" << std::to_string(ep.proxy.proxy_port)
+            << (ep.target_url.empty() ? "" : (", submit url: " + ep.target_url)));
+        }
+      }
+      else if (!bl_submit_url.empty())
+      {
+        LOG_PRINT_L0("Ignoring --block-relay-url because --enable-block-socks5-relay-proxy is not set");
+      }
+    }
+
+    m_socks5_cfg = socks_cfg;
+  }
+  
   m_pview->init(path_to_html);
 
   return true;
@@ -857,7 +927,7 @@ void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
     m_wallet_log_prefixes[id] = std::string("[") + epee::string_tools::num_to_string_fast(id) + ":" + wo.w->get()->get_account().get_public_address_str().substr(0, 6) + "] ";
   }
   
-  wo.w->get()->set_disable_tor_relay(!m_use_tor);
+  //wo.w->get()->set_disable_tor_relay(!m_use_tor);
 }
 
 
@@ -1061,6 +1131,8 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
   {
 #ifndef MOBILE_WALLET_BUILD
     w->set_core_proxy(std::shared_ptr<tools::i_core_proxy>(new tools::core_fast_rpc_proxy(m_rpc_server)));
+    if(m_socks5_cfg.transactions || m_socks5_cfg.blocks)
+      w->configure_socks_relay(m_socks5_cfg);
 #else 
     LOG_ERROR("Unexpected location reached");
 #endif
