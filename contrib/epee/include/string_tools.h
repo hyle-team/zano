@@ -281,7 +281,7 @@ POP_GCC_WARNINGS
 	typedef std::map<std::wstring, std::wstring> command_line_params_w;
 
   template<typename t_pod_data>
-  void append_pod_to_strbuff(std::string& buff, const t_pod_data& pod)
+  void append_pod_to_strbuff(const t_pod_data& pod, std::string& buff)
   {
     buff.append(reinterpret_cast<const char*>(&pod), sizeof(pod));
   }

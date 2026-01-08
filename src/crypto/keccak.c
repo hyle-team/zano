@@ -5,6 +5,14 @@
 #include "hash-ops.h"
 #include "keccak.h"
 
+#ifndef KECCAK_ROUNDS
+#define KECCAK_ROUNDS 24
+#endif
+
+#ifndef ROTL64
+#define ROTL64(x, y) (((x) << (y)) | ((x) >> (64 - (y))))
+#endif
+
 const uint64_t keccakf_rndc[24] = 
 {
     0x0000000000000001, 0x0000000000008082, 0x800000000000808a,

@@ -650,8 +650,8 @@ bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
                          size_t nmix, 
                          crypto::secret_key& sk,
                          uint8_t mix_attr = CURRENCY_TO_KEY_OUT_RELAXED, 
-                         const std::vector<currency::extra_v>& extr = std::vector<currency::extra_v>(),
-                         const std::vector<currency::attachment_v>& att = std::vector<currency::attachment_v>(),
+                         const std::vector<currency::payload_items_v>& extr = std::vector<currency::extra_v>(),
+                         const std::vector<currency::payload_items_v>& att = std::vector<currency::attachment_v>(),
                          bool check_for_spends = true,
                          bool check_for_unlocktime = true);
 
@@ -664,8 +664,8 @@ bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
                          uint64_t fee = TESTS_DEFAULT_FEE, 
                          size_t nmix = 0, 
                          uint8_t mix_attr = CURRENCY_TO_KEY_OUT_RELAXED, 
-                         const std::vector<currency::extra_v>& extr = empty_extra,
-                         const std::vector<currency::attachment_v>& att = empty_attachment, 
+                         const std::vector<currency::payload_items_v>& extr = empty_extra,
+                         const std::vector<currency::payload_items_v>& att = empty_attachment, 
                          bool check_for_spends = true,
                          bool check_for_unlocktime = true,
                          bool use_ref_by_id = false);
@@ -681,8 +681,8 @@ bool construct_tx_with_many_outputs(const currency::hard_forks_descriptor& hf, s
 bool construct_tx(const currency::account_keys& sender_account_keys,
                   const std::vector<currency::tx_source_entry>& sources,
                   const std::vector<currency::tx_destination_entry>& destinations,
-                  const std::vector<currency::extra_v>& extra,
-                  const std::vector<currency::attachment_v>& attachments,
+                  const std::vector<currency::payload_items_v>& extra,
+                  const std::vector<currency::payload_items_v>& attachments,
                   currency::transaction& tx,
                   uint64_t tx_version,
                   crypto::secret_key& one_time_secret_key,
@@ -697,8 +697,8 @@ bool construct_tx(const currency::account_keys& sender_account_keys,
 bool construct_tx(const currency::account_keys& sender_account_keys,
                   const std::vector<currency::tx_source_entry>& sources,
                   const std::vector<currency::tx_destination_entry>& destinations,
-                  const std::vector<currency::extra_v>& extra,
-                  const std::vector<currency::attachment_v>& attachments,
+                  const std::vector<currency::payload_items_v>& extra,
+                  const std::vector<currency::payload_items_v>& attachments,
                   currency::transaction& tx,
                   uint64_t tx_version,
                   size_t tx_hardfork_id,
@@ -714,8 +714,8 @@ bool construct_tx(const currency::account_keys& sender_account_keys,
 bool construct_tx(const currency::account_keys& sender_account_keys,
                   const std::vector<currency::tx_source_entry>& sources,
                   const std::vector<currency::tx_destination_entry>& destinations,
-                  const std::vector<currency::extra_v>& extra,
-                  const std::vector<currency::attachment_v>& attachments,
+                  const std::vector<currency::payload_items_v>& extra,
+                  const std::vector<currency::payload_items_v>& attachments,
                   currency::transaction& tx,
                   uint64_t tx_version,
                   crypto::secret_key& one_time_secret_key,
@@ -724,8 +724,8 @@ bool construct_tx(const currency::account_keys& sender_account_keys,
 bool construct_tx(const currency::account_keys& sender_account_keys,
                   const std::vector<currency::tx_source_entry>& sources,
                   const std::vector<currency::tx_destination_entry>& destinations,
-                  const std::vector<currency::extra_v>& extra,
-                  const std::vector<currency::attachment_v>& attachments,
+                  const std::vector<currency::payload_items_v>& extra,
+                  const std::vector<currency::payload_items_v>& attachments,
                   currency::transaction& tx,
                   uint64_t tx_version);
 
@@ -1109,7 +1109,8 @@ inline uint64_t get_sources_total_amount(const std::vector<currency::tx_source_e
 {
   uint64_t result = 0;
   for (auto& e : s)
-    result += e.amount;
+    if (e.is_native_coin())
+      result += e.amount;
   return result;
 }
 
@@ -1154,12 +1155,43 @@ void append_vector_by_another_vector(U& dst, const V& src)
   dst.insert(dst.end(), src.begin(), src.end());
 }
 
+//------------------------------------------------------------------------------
+//@#@  TODO: subject for refactoring: this fill_ado*/fill_adb* are copy/paste clones of wallet's, need to be implemented in one place at some point
+//----------------------------------------------------------------------------------------------------
+inline void fill_ado_version_based_onhardfork(currency::asset_descriptor_operation& asset_reg_info, size_t current_latest_hf)
+{
+  if (current_latest_hf < ZANO_HARDFORK_05)
+  {
+    asset_reg_info.version = ASSET_DESCRIPTOR_OPERATION_HF4_VER;
+  }
+  else
+  {
+    asset_reg_info.version = ASSET_DESCRIPTOR_OPERATION_LAST_VER;
+  }
+}
+
+inline void fill_adb_version_based_onhardfork(currency::asset_descriptor_base& asset_base, size_t current_latest_hf)
+{
+  if (current_latest_hf < ZANO_HARDFORK_05)
+  {
+    asset_base.version = ASSET_DESCRIPTOR_BASE_HF4_VER;
+  }
+  else
+  {
+    asset_base.version = ASSET_DESCRIPTOR_BASE_LAST_VER;
+  }
+}
+
 
 //--------------------------------------------------------------------------
 
 
-#define PRINT_EVENT_N(VEC_EVENTS)            std::cout << concolor::yellow << ">EVENT # " << VEC_EVENTS.size() << ", line " << STR(__LINE__) << concolor::normal << std::endl
-#define PRINT_EVENT_N_TEXT(VEC_EVENTS, text) std::cout << concolor::yellow << ">EVENT # " << VEC_EVENTS.size() << ", line " << STR(__LINE__) << "  " << text << concolor::normal << std::endl
+//#define PRINT_EVENT_N(VEC_EVENTS)            std::cout << concolor::yellow << ">EVENT # " << VEC_EVENTS.size() << ", line " << STR(__LINE__) << concolor::normal << std::endl
+//#define PRINT_EVENT_N_TEXT(VEC_EVENTS, text) std::cout << concolor::yellow << ">EVENT # " << VEC_EVENTS.size() << ", line " << STR(__LINE__) << "  " << text << concolor::normal << std::endl
+
+#define PRINT_EVENT_N(VEC_EVENTS)            LOG_PRINT_COLOR_NO_PREFIX(">EVENT # " << VEC_EVENTS.size() << ", line " << STR(__LINE__), LOG_LEVEL_0, LOG_COLOR_YELLOW)
+#define PRINT_EVENT_N_TEXT(VEC_EVENTS, text) LOG_PRINT_COLOR_NO_PREFIX(">EVENT # " << VEC_EVENTS.size() << ", line " << STR(__LINE__) << "  " << text, LOG_LEVEL_0, LOG_COLOR_YELLOW)
+
 
 
 #define GENERATE_ACCOUNT(account)                                                     \

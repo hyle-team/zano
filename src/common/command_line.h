@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -239,5 +239,6 @@ namespace command_line
   extern const arg_descriptor<std::string> arg_tx_relay_url;
   extern const arg_descriptor<std::string> arg_enable_block_socks5_relay_proxy;
   extern const arg_descriptor<std::string> arg_block_relay_url;
+  extern const arg_descriptor<bool>        arg_allow_legacy_payment_id_size;
   
 }

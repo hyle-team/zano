@@ -915,10 +915,10 @@ bool gen_crypted_attachments::check_crypted_tx(currency::core& c, size_t ev_inde
   std::vector<std::string> test_array2 = test_array;
 
   for (auto& v : test_array2)
-    chacha_crypt(v, test_key);
+    chacha_crypt_legacy(v, test_key);
 
   for (auto& v : test_array2)
-    chacha_crypt(v, test_key);
+    chacha_crypt_legacy(v, test_key);
 
   if (test_array2 != test_array)
   {

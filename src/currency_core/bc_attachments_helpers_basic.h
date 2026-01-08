@@ -66,4 +66,20 @@ namespace bc_services
     return false;
   }
 
+  template<class t_attachment_type_container_t>
+  bool has_service_attachment_with_given_id(const t_attachment_type_container_t& tx_items, const std::string& id)
+  {
+    for (const auto& item : tx_items)
+    {
+      typedef type_selector<is_boost_variant<typename t_attachment_type_container_t::value_type>::value> TS;
+      if (TS::get_type(item) == typeid(currency::tx_service_attachment))
+      {
+        const currency::tx_service_attachment& tsa = TS::template get<decltype(item), currency::tx_service_attachment>(item);
+        if (tsa.service_id == id)
+          return true;
+      }
+    }
+    return false;
+  }
+
 }

@@ -114,6 +114,7 @@ namespace currency
     destination_option_htlc_out htlc_options;           // htlc options    
     crypto::public_key asset_id = currency::native_coin_asset_id; // not blinded, not premultiplied
     uint64_t flags = 0;                                 // set of flags (see tx_destination_entry_flags)
+    uint64_t payment_id = 0;                            // intrinsic payment id
     
     tx_destination_entry() = default;
     tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad) {}
@@ -134,6 +135,7 @@ namespace currency
       FIELD(htlc_options)
       FIELD(asset_id)
       FIELD(flags)
+      FIELD(payment_id)
     END_SERIALIZE()
   };
   //---------------------------------------------------------------

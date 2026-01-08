@@ -10,7 +10,7 @@
 #include <boost/iostreams/categories.hpp>  // sink_tag
 #include <boost/iostreams/operations.hpp>  // boost::iostreams::write, boost::iostreams::read
 #include "include_base_utils.h"
-#include "crypto/chacha8.h"
+#include "crypto/chacha.h"
 #include "crypto/chacha8_stream.h"
 
 
@@ -29,9 +29,11 @@ namespace tools
     //typedef boost::iostreams::flushable_tag    category;
     static const uint32_t block_size = ECRYPT_BLOCKLENGTH;
 
-    encrypt_chacha_processer_base(std::string const &pass, const crypto::chacha8_iv& iv) :m_iv(iv), m_ctx(AUTO_VAL_INIT(m_ctx))
+    encrypt_chacha_processer_base(std::string const &pass, const crypto::chacha_iv& iv)
+      : m_iv(iv)
+      , m_ctx{}
     {
-      crypto::generate_chacha8_key(pass, m_key);
+      crypto::generate_chacha_key_legacy(pass, m_key);
       ECRYPT_keysetup(&m_ctx, &m_key.data[0], sizeof(m_key.data) * 8, sizeof(m_iv.data) * 8);
       ECRYPT_ivsetup(&m_ctx, &m_iv.data[0]);
     }
@@ -83,10 +85,10 @@ namespace tools
     }
 
   private:
-    const crypto::chacha8_iv& m_iv;
+    const crypto::chacha_iv& m_iv;
     mutable ECRYPT_ctx m_ctx;
     //std::ostream &m_underlying_stream;
-    crypto::chacha8_key m_key;
+    crypto::chacha_key m_key;
     mutable std::string m_buff;
   };
 
@@ -104,7 +106,7 @@ namespace tools
       public boost::iostreams::flushable_tag
     { };
 
-    encrypt_chacha_out_filter(std::string const &pass, const crypto::chacha8_iv& iv) :encrypt_chacha_processer_base(pass, iv)
+    encrypt_chacha_out_filter(std::string const &pass, const crypto::chacha_iv& iv) :encrypt_chacha_processer_base(pass, iv)
     {
     }
     ~encrypt_chacha_out_filter()
@@ -146,7 +148,7 @@ namespace tools
       public boost::iostreams::flushable_tag
       //public boost::iostreams::seekable_filter_tag
     { };
-    encrypt_chacha_in_filter(std::string const &pass, const crypto::chacha8_iv& iv) :encrypt_chacha_processer_base(pass, iv), m_was_eof(false)
+    encrypt_chacha_in_filter(std::string const &pass, const crypto::chacha_iv& iv) :encrypt_chacha_processer_base(pass, iv), m_was_eof(false)
     {
     }
     ~encrypt_chacha_in_filter()

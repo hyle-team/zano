@@ -841,6 +841,8 @@ bool blockchain_storage::prune_ring_signatures_and_attachments_if_need()
   if (m_non_pruning_mode_enabled)
     return true;
 
+  // Pruning is temporary disabled to avoid unnecessary load delays. TODO: re-enable in future together with the checkpoints -- sowle
+  /*
   uint64_t top_block_height = get_top_block_height();
   uint64_t pruning_end_height = m_checkpoints.get_checkpoint_before_height(top_block_height);
   if (pruning_end_height > m_db_current_pruned_rs_height)
@@ -856,6 +858,7 @@ bool blockchain_storage::prune_ring_signatures_and_attachments_if_need()
     m_db_current_pruned_rs_height = pruning_end_height;
     LOG_PRINT_CYAN("Transaction pruning finished: " << sig_count << " signatures and " << attach_count << " attachments released in " << tx_count << " transactions.", LOG_LEVEL_0);
   }
+  */
   return true;
 }
 //------------------------------------------------------------------
@@ -2339,6 +2342,23 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
   }
   else if (m_core_runtime_config.is_hardfork_active_for_height(1, alt_chain_bei.height))
   {
+    if (m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_06, alt_chain_bei.height))
+    {
+      uint64_t split_length = alt_chain_bei.height > m_db_blocks.back()->height ? m_db_blocks.back()->height - connection_point.height: alt_chain_bei.height - connection_point.height;
+      if (split_length < 30)
+      {
+        wide_difficulty_type dummy;
+        //performance effective quick check
+        wide_difficulty_type alt_chain_pos_diff_precise = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain, alt_chain_bei.height, true, dummy);
+        wide_difficulty_type main_chain_pos_diff_precise = get_last_alt_x_block_cumulative_precise_difficulty(alt_chain_type(), m_db_blocks.size() - 1, true, dummy);
+        if (main_chain_pos_diff_precise > alt_chain_pos_diff_precise)
+          return false;
+        else if (main_chain_pos_diff_precise < alt_chain_pos_diff_precise)
+          return true;
+      }
+    }
+
+
     //new rules, applied after HARD_FORK_1
     //to learn this algo please read https://github.com/hyle-team/docs/blob/master/zano/PoS_Analysis_and_improvements_proposal.pdf
 
@@ -2367,15 +2387,16 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
 
     boost::multiprecision::uint1024_t alt = 0;
     boost::multiprecision::uint1024_t main = 0;
-    if (m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, alt_chain_bei.height))
+    if (!m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_06, alt_chain_bei.height))
     {
       alt = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
       main = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
     }
     else
     {
-      alt = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
-      main = get_a_to_b_relative_cumulative_difficulty(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
+      //HF6 formula
+      alt = get_a_to_b_relative_cumulative_difficulty_hf6(difficulty_pos_at_split_point, difficulty_pow_at_split_point, alt_cumul_diff, main_cumul_diff);
+      main = get_a_to_b_relative_cumulative_difficulty_hf6(difficulty_pos_at_split_point, difficulty_pow_at_split_point, main_cumul_diff, alt_cumul_diff);
     }
     LOG_PRINT_L1("[FORK_CHOICE]: " << ENDL 
       << "difficulty_pow_at_split_point:" << difficulty_pow_at_split_point << ENDL
@@ -6511,6 +6532,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   bool var_is_after_hardfork_3_zone = m_core_runtime_config.is_hardfork_active_for_height(3, block_height);
   bool var_is_after_hardfork_4_zone = m_core_runtime_config.is_hardfork_active_for_height(4, block_height);
   bool var_is_after_hardfork_5_zone = m_core_runtime_config.is_hardfork_active_for_height(5, block_height);
+  bool var_is_after_hardfork_6_zone = m_core_runtime_config.is_hardfork_active_for_height(6, block_height);
 
   auto is_allowed_before_hardfork1 = [&](const auto& el) -> bool
   {
@@ -6549,6 +6571,21 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   {
     CHECK_AND_ASSERT_MES(el.type() != typeid(tx_out_bare), false, "tx " << tx_id << " contains tx_out_bare which is not allowed on height " << block_height);
     return true;
+  };
+
+  auto is_allowed_after_hardfork6 = [&](const auto& el) -> bool
+  {
+    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_payer),         false, "tx contains tx_payer which is not allowed after HF6");
+    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_payer_old),     false, "tx contains tx_payer_old which is not allowed after HF6");
+    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_receiver),      false, "tx contains tx_receiver which is not allowed after HF6");
+    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_receiver_old),  false, "tx contains tx_receiver_old which is not allowed after HF6");
+    return true;
+  };
+
+  auto is_allowed_atfer_hardfork6_attachment = [&](const auto& el) -> bool
+  {
+    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_comment),       false, "tx contains tx_comment in attachment which is not allowed after HF6");
+    return is_allowed_after_hardfork6(el);
   };
   
   //inputs
@@ -6594,6 +6631,8 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       return false;
     if (var_is_after_hardfork_4_zone && !is_allowed_after_hardfork4(el))
       return false;
+    if (var_is_after_hardfork_6_zone && !is_allowed_after_hardfork6(el))
+      return false;
   }
 
   //attachments
@@ -6605,6 +6644,8 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     if (!var_is_after_hardfork_4_zone && !is_allowed_before_hardfork4(el))
       return false;
     if (var_is_after_hardfork_4_zone && !is_allowed_after_hardfork4(el))
+      return false;
+    if (var_is_after_hardfork_6_zone && !is_allowed_atfer_hardfork6_attachment(el))
       return false;
   }
   
@@ -6655,6 +6696,13 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       LOG_ERROR("asset_operation_ownership_proof_eth is not allowed prior to HF5");
       return false;
     }
+  }
+
+  if (var_is_after_hardfork_6_zone)
+  {
+    // enforce explicitly existing soft limits (s.a. tx_memory_pool::add_tx) and implicit hard limits (verify_BGE_proof etc.)
+    CHECK_AND_ASSERT_MES(tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
+    CHECK_AND_ASSERT_MES(tx.vout.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS,  false, "transaction has too many outputs = " << tx.vout.size());
   }
 
 
