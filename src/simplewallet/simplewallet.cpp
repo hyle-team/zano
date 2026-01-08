@@ -510,17 +510,7 @@ void process_wallet_command_line_params(const po::variables_map& vm, tools::wall
       }
     }
 
-    // apply to core proxy
-    if (auto cp = wal.get_core_proxy())
-    {
-      cp->set_socks5_proxy(socks_cfg);
-      wal.configure_socks_relay(socks_cfg);
-    }
-    else
-    {
-      if (socks_cfg.transactions || socks_cfg.blocks)
-        LOG_ERROR("SOCKS5 proxy settings were provided, but core proxy is not available");
-    }
+    wal.configure_socks_relay(socks_cfg);
   }
 }
 //----------------------------------------------------------------------------------------------------

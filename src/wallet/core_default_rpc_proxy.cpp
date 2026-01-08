@@ -158,15 +158,6 @@ namespace tools
     return invoke_http_json_rpc_update_is_disconnect("submitblock", req, rsp);
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  void default_http_core_proxy::set_socks5_proxy(const socks5::socks5_proxy_settings& cfg)
-  {
-    CRITICAL_REGION_LOCAL(m_lock);
-    m_socks5_cfg = cfg;
-    // TODO: TLS over SOCKS5 is not implemented yet
-    if (m_socks5_cfg.blocks && m_socks5_cfg.blocks->target_url.empty())
-      m_socks5_cfg.blocks->target_url = m_daemon_address;
-  }
-  //------------------------------------------------------------------------------------------------------------------------------
   bool default_http_core_proxy::call_COMMAND_RPC_SUBMITBLOCK2(const currency::COMMAND_RPC_SUBMITBLOCK2::request& req, currency::COMMAND_RPC_SUBMITBLOCK2::response& rsp)
   {
     return invoke_http_json_rpc_update_is_disconnect("submitblock2", req, rsp);

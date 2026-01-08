@@ -64,7 +64,6 @@ namespace tools
       m_pdiganostic_info.reset(new proxy_diagnostic_info());
     }
 
-    virtual void set_socks5_proxy(const socks5::socks5_proxy_settings& cfg) { };
     virtual bool check_connection(){ return false; }
     virtual time_t get_last_success_interract_time() { return 0; }
     std::shared_ptr<const proxy_diagnostic_info> get_proxy_diagnostic_info() const { return m_pdiganostic_info; }

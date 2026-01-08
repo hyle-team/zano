@@ -63,8 +63,6 @@ namespace tools
     bool call_COMMAND_RPC_GET_ASSET_INFO(const currency::COMMAND_RPC_GET_ASSET_INFO::request& req, currency::COMMAND_RPC_GET_ASSET_INFO::response& res) override;
     bool call_COMMAND_RPC_INVOKE(const std::string& uri, const std::string& body, int& response_code, std::string& response_body) override;
 
-    void set_socks5_proxy(const socks5::socks5_proxy_settings& cfg) override;
-
     bool check_connection() override;
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override;
 
@@ -147,8 +145,6 @@ namespace tools
 
     unsigned int m_connection_timeout;
     size_t m_attempts_count;
-
-    socks5::socks5_proxy_settings m_socks5_cfg;
   };
 }
 
