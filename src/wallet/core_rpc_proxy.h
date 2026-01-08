@@ -7,7 +7,6 @@
 
 #pragma once
 #include "rpc/core_rpc_server_commands_defs.h"
-#include "net/socks5_proxy_transport.h"
 #include "currency_core/account.h"
 
 namespace tools
