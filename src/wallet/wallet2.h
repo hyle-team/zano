@@ -358,7 +358,20 @@ namespace tools
       uint64_t additional_tid_amount = 0;
     };
 
+    private:
+      struct mix_input_plan
+      {
+        size_t            selection_pos;               // position in the input list of selected_indices
+        uint64_t          transfer_index;              // key in m_transfers
+        const transfer_details* td;
+        size_t            target_decoy_count;          // how many decoys we want
+        bool              needs_decoys;                // (!auditable && target_decoy_count > 0)
+        bool              is_real_output_post_hf4;     // zone HF real output
+        uint64_t          batch_key;                   // 0 for ZC, otherwise td.amount()
+        size_t            batch_idx;                   // batch index in req4/resp4 (SIZE_MAX if not needed)
+      };
 
+    public:
 
     void assign_account(const currency::account_base& acc);
     void generate(const std::wstring& path, const std::string& password, bool auditable_wallet);
@@ -644,9 +657,11 @@ namespace tools
     void set_genesis(const crypto::hash& genesis_hash);
     bool prepare_and_sign_pos_block(const mining_context& cxt, uint64_t full_block_reward, const currency::pos_entry& pe, currency::tx_generation_context& miner_tx_tgc, currency::block& b) const;
     bool prepare_pos_zc_input_and_ring(const transfer_details& td, const currency::tx_out_zarcanum& stake_out, currency::txin_zc_input& stake_input,
-      std::vector<currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& decoy_storage,
-      std::vector<crypto::CLSAG_GGXXG_input_ref_t>& ring,
-      uint64_t& secret_index) const;
+      std::vector<currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& decoy_storage, std::vector<crypto::CLSAG_GGXXG_input_ref_t>& ring, uint64_t& secret_index) const;
+    void distribute_decoys_and_build_sources(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& resp4, const std::vector<mix_input_plan>& plans,
+      bool use_all_decoys_if_found_less_than_required, std::vector<currency::tx_source_entry>& sources) const;
+    void plan_decoy_batches_for_sources( size_t fake_outputs_count_, const std::vector<uint64_t>& selected_indices, uint64_t hf4_height,
+      currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req4, std::vector<mix_input_plan>& plans) const;
     void process_new_blockchain_entry(const currency::block& b, 
       const currency::block_direct_data_entry& bche, 
       const crypto::hash& bl_id,
@@ -919,6 +934,7 @@ private:
     void remove_transfer_from_amount_gindex_map(uint64_t tid);
     uint64_t get_alias_cost(const std::string& alias);
     detail::split_strategy_id_t get_current_split_strategy();
+    void append_heights_with_distribution(std::vector<uint64_t>& heights, size_t oversample, uint64_t max_height, decoy_selection_generator::dist_kind kind) const;
     void build_distribution_for_input(std::vector<uint64_t>& height_distrib, uint64_t own_height, decoy_selection_generator::dist_kind kind) const;
     void build_distribution_for_input(std::vector<uint64_t>& offsets, uint64_t own_index);
     void select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount & amount_entry, uint64_t own_g_index);
@@ -928,8 +944,6 @@ private:
     void wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
     void wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
     void wti_to_json_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
-
-
 
     /*     
      
