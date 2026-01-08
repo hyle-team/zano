@@ -5411,6 +5411,7 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
     // TODO: HTTPS over SOCKS5
     if (u.schema == "https")
       WLT_LOG_YELLOW("submitblock2 over SOCKS5: HTTPS requested, but TLS-over-SOCKS is not supported yet", LOG_LEVEL_0);
+    using http_socks5_client = epee::net_utils::http::http_simple_client_t<false, tools::socks5::socks5_proxy_transport<epee::net_utils::blocked_mode_client>>;
 
     http_socks5_client socks5_client;
     tools::socks5::apply_socks5_cfg(socks5_client.get_transport(), block_socks.proxy);

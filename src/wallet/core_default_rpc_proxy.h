@@ -10,7 +10,6 @@
 #include "net/http_client.h"
 #include "core_rpc_proxy.h"
 #include "storages/http_abstract_invoke.h"
-#include "net/levin_socks5.h"
 
 #ifdef NDEBUG
 #define WALLET_RCP_CONNECTION_TIMEOUT                          5000
@@ -26,9 +25,6 @@
 
 namespace tools
 {
-  using socks5_net_client  = tools::socks5::socks5_proxy_transport<epee::net_utils::blocked_mode_client>;
-  using http_socks5_client = epee::net_utils::http::http_simple_client_t<false, socks5_net_client>;
-
   class default_http_core_proxy final : public i_core_proxy
   {
   public:
