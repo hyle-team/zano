@@ -42,8 +42,6 @@
 #include <mach/mach.h>
 #endif
 
-#include <boost/stacktrace.hpp>
-
 #pragma once 
 namespace epee
 {
@@ -111,13 +109,32 @@ namespace misc_utils
 #endif
 	}
 
+
+#if defined(__GNUC__) && !defined(__ANDROID__)
+#include <execinfo.h>
+#include <boost/core/demangle.hpp>
+#endif
   inline std::string print_trace_default() noexcept
   {
     try
     {
       std::stringstream ss;
+#if defined(__GNUC__) && !defined(__ANDROID__)
       ss << std::endl << "STACK" << std::endl;
-      ss << boost::stacktrace::stacktrace() << std::endl;
+      const size_t max_depth = 100;
+      size_t stack_depth;
+      void *stack_addrs[max_depth];
+      char **stack_strings;
+
+      stack_depth = backtrace(stack_addrs, max_depth);
+      stack_strings = backtrace_symbols(stack_addrs, stack_depth);
+
+      for (size_t i = 1; i < stack_depth; i++) 
+      {      
+        ss << boost::core::demangle(stack_strings[i]) << std::endl;
+      }
+      free(stack_strings); // malloc()ed by backtrace_symbols
+#endif
       return ss.str();
     }
     catch(...)
