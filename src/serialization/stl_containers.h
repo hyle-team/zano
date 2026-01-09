@@ -43,7 +43,7 @@ template<class Archive, class T,
   typename std::enable_if<!Archive::is_saving::value, int>::type = 0>
 bool do_serialize(Archive& ar, std::vector<T> &v)
 {
-  size_t cnt;
+  size_t cnt = 0;
   ar.begin_array(cnt);
   if (!ar.stream().good())
     return false;
@@ -100,7 +100,7 @@ bool do_serialize(Archive &ar, std::vector<T> &v)
 template <template <bool> class Archive, class T>
 bool do_serialize(Archive<false> &ar, std::list<T> &v)
 {
-  size_t cnt;
+  size_t cnt = 0;
   ar.begin_array(cnt);
   if (!ar.stream().good())
     return false;
@@ -148,7 +148,7 @@ bool do_serialize(Archive<true> &ar, std::list<T> &v)
 template <template <bool> class Archive, class T>
 bool do_serialize(Archive<false> &ar, std::set<T> &v)
 {
-  size_t cnt;
+  size_t cnt = 0;
   ar.begin_array(cnt);
   if (!ar.stream().good())
     return false;
@@ -195,6 +195,78 @@ bool do_serialize(Archive<true> &ar, std::set<T> &v)
   ar.end_array();
   return true;
 }
+
+template <template <bool> class Archive, class T, class K>
+bool do_serialize(Archive<false>& ar, std::map<K, T>& v)
+{
+  size_t cnt = 0;
+  ar.begin_array(cnt);
+  if (!ar.stream().good())
+    return false;
+  v.clear();
+
+  // very basic sanity check
+  if (ar.remaining_bytes() < cnt) {
+    ar.stream().setstate(std::ios::failbit);
+    return false;
+  }
+
+  for (size_t i = 0; i < cnt; i++)
+  {
+    if (i > 0)
+      ar.delimit_array();
+    
+    std::map<K, T>::value_type vt = AUTO_VAL_INIT(vt);
+    
+    K& k = vt.first;
+    T& t = vt.second;
+    if (!::serialization::detail::serialize_container_element(ar, k))
+      return false;
+    if (!ar.stream().good())
+      return false;
+    
+    if (!::serialization::detail::serialize_container_element(ar, t))
+      return false;
+    if (!ar.stream().good())
+      return false;
+
+    auto res = v.insert(vt);
+    if(res.second == false)
+      return false;
+  }
+  ar.end_array();
+  return true;
+}
+
+template <template <bool> class Archive, class T, class K>
+bool do_serialize(Archive<true>& ar, std::map<K, T>& v)
+{
+  size_t cnt = v.size();
+  ar.begin_array(cnt);
+  for (auto it = v.begin(); it != v.end(); it++)
+  {
+    if (!ar.stream().good())
+      return false;
+    if (it != v.begin())
+      ar.delimit_array();
+    //TODO: refactoring needed to remove const_cast 
+    if (!::serialization::detail::serialize_container_element(ar, const_cast<K&>(it->first)))
+      return false;
+    if (!ar.stream().good())
+      return false;
+
+    //TODO: refactoring needed to remove const_cast 
+    if (!::serialization::detail::serialize_container_element(ar, const_cast<T&>(it->second)))
+      return false;
+    if (!ar.stream().good())
+      return false;
+
+
+  }
+  ar.end_array();
+  return true;
+}
+
 
 template <template <bool> class Archive, class A, class B>
 bool do_serialize(Archive<false> &ar, std::pair<A, B> &v)

@@ -862,7 +862,7 @@ namespace currency
       size_t operator()(const txin_to_key& txin) const    { return tools::get_varint_packed_size(txin.key_offsets.size() + a) + sizeof(crypto::signature) * (txin.key_offsets.size() + a); }
       size_t operator()(const txin_multisig& txin) const  { return tools::get_varint_packed_size(txin.sigs_count + a) + sizeof(crypto::signature) * (txin.sigs_count + a); }
       size_t operator()(const txin_zc_input& txin) const  { return 97 + tools::get_varint_packed_size(txin.key_offsets.size()) + txin.key_offsets.size() * 32; }
-      size_t operator()(const txin_dummy&) const          { return 0; } // TODO@#@# replace with gateway -- sowle
+      size_t operator()(const txin_gateway& txin) const   { throw(std::runtime_error("Not implemented yet")); }
     };
 
     return boost::apply_visitor(txin_signature_size_visitor(last_input_in_separately_signed_tx ? 1 : 0), tx_in);

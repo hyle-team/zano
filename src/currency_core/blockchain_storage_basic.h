@@ -190,7 +190,31 @@ namespace currency
     END_KV_SERIALIZE_MAP()
   };
 
+  //////////////////////////////////////////////////////////////////////////
+  // Gateway address container
 
+  struct gateway_address_balance
+  {
+    uint8_t version = 0;
+    uint64_t amount = 0;
+    //TODO: add hidden amounts machinery support here
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(amount)
+    END_SERIALIZE()
+  };
+
+  struct gateway_address_data
+  {
+    uint8_t version = 0;
+    std::vector<gateway_address_descriptor_base>  info;
+    std::map<crypto::public_key, gateway_address_balance> balances; // asset_id -> balance 
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(info)
+      FIELD(balances)
+    END_SERIALIZE()
+  };
 
 
 

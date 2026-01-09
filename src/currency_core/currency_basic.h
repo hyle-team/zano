@@ -309,7 +309,7 @@ namespace currency
     uint64_t amount = 0;
     uint8_t version = 0;
 
-    BEGIN_VERSIONED_SERIALIZE(0)
+    BEGIN_VERSIONED_SERIALIZE(0, version)
       FIELD(gateway_addr)
       VARINT_FIELD(amount)
       VARINT_FIELD(version)
@@ -323,7 +323,7 @@ namespace currency
     uint64_t amount = 0;
     uint8_t version = 0;
 
-    BEGIN_VERSIONED_SERIALIZE(0)
+    BEGIN_VERSIONED_SERIALIZE(0, version)
       FIELD(gateway_addr)
       VARINT_FIELD(amount)
       VARINT_FIELD(version) 
@@ -518,9 +518,9 @@ namespace currency
 
 //#pragma pack(pop)
 
-  typedef boost::variant<txin_gen, txin_to_key, txin_multisig, txin_dummy /* <- can be reused */, txin_zc_input> txin_v;
+  typedef boost::variant<txin_gen, txin_to_key, txin_multisig, /*txin_gateway, */txin_zc_input> txin_v;
 
-  typedef boost::variant<tx_out_bare, tx_out_zarcanum> tx_out_v;
+  typedef boost::variant<tx_out_bare, tx_out_zarcanum/*, tx_out_gateway */ > tx_out_v;
 
 
   struct tx_comment
@@ -1007,6 +1007,44 @@ namespace currency
 
 
 
+
+  ///////////////////////////////////////////////////////////////////////////////////
+  // Gateway addresses structures
+
+  typedef boost::variant<dummy> gateway_base_etc_fields;
+  typedef boost::variant<crypto::public_key, crypto::eth_public_key> v_gateway_owner_key;
+
+
+
+  struct gateway_address_descriptor_base
+  {
+    uint8_t                 version = 0;
+    v_gateway_owner_key     owner_key;
+    crypto::public_key      view_key;
+    std::vector<gateway_base_etc_fields> etc;  //container for future use if we would be adding some optional parameters that is not known yet, but without mess related to format version
+
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(owner_key)
+      FIELD(view_key)
+      FIELD(etc)
+    END_SERIALIZE()
+
+      /*
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(version)       DOC_DSCR("Struct vrsion.") DOC_EXMP(0)   DOC_END
+        KV_SERIALIZE(owner_key)     DOC_DSCR(".") DOC_EXMP(500000000000000000)    DOC_END
+        KV_SERIALIZE(view_key)      DOC_DSCR("Decimal point.")                      DOC_EXMP(12)                        DOC_END
+        KV_SERIALIZE(etc)           DOC_DSCR("Ticker associated with the asset.")   DOC_EXMP("ZABC")                    DOC_END
+      END_KV_SERIALIZE_MAP()
+      */
+  };
+
+
+
+
+  ///////////////////////////////////////////////////////////////////////////////////
+  // Legacy structures
 
   //classic CryptoNote signature by Nicolas Van Saberhagen
   struct NLSAG_sig

@@ -333,6 +333,8 @@ namespace currency
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash) const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height, crypto::hash& max_used_block_id)const;
     bool check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const transaction& source_tx, size_t out_n) const;
+    bool blockchain_storage::validate_tx_for_hardfork_specific_terms_types_new(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
+    bool blockchain_storage::validate_tx_for_hardfork_specific_terms_types_old(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
     bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
     bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id) const;
     bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_v& verified_input, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase, scan_for_keys_context& scan_context) const;
@@ -548,6 +550,9 @@ namespace currency
     
     typedef tools::db::cached_key_value_accessor<crypto::public_key, std::list<asset_descriptor_operation>, true, false> assets_container; // TODO @#@# consider storing tx_id as well for reference -- sowle 
 
+    // Gateway addresses
+    typedef tools::db::cached_key_value_accessor<crypto::hash, gateway_address_data, true, false> gateway_addresses_container;
+
 
     //-----------------------------------------
 
@@ -593,7 +598,7 @@ namespace currency
     per_block_gindex_increments_container m_db_per_block_gindex_incs;
     
     assets_container m_db_assets;
-
+    gateway_addresses_container m_db_gateway_addresses;
 
 
 

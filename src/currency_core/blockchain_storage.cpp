@@ -47,19 +47,20 @@ using namespace std;
 using namespace epee;
 using namespace currency;
 
-#define BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS           "blocks"
-#define BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS_INDEX     "blocks_index"
-#define BLOCKCHAIN_STORAGE_CONTAINER_TRANSACTIONS     "transactions"
-#define BLOCKCHAIN_STORAGE_CONTAINER_SPENT_KEYS       "spent_keys"
-#define BLOCKCHAIN_STORAGE_CONTAINER_OUTPUTS          "outputs"
-#define BLOCKCHAIN_STORAGE_CONTAINER_MULTISIG_OUTS    "multisig_outs"
-#define BLOCKCHAIN_STORAGE_CONTAINER_INVALID_BLOCKS   "invalid_blocks"
-#define BLOCKCHAIN_STORAGE_CONTAINER_SOLO_OPTIONS     "solo"
-#define BLOCKCHAIN_STORAGE_CONTAINER_ALIASES          "aliases"
-#define BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS    "addr_to_alias"
-#define BLOCKCHAIN_STORAGE_CONTAINER_TX_FEE_MEDIAN    "median_fee2"
-#define BLOCKCHAIN_STORAGE_CONTAINER_GINDEX_INCS      "gindex_increments"
-#define BLOCKCHAIN_STORAGE_CONTAINER_ASSETS           "assets"
+#define BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS            "blocks"
+#define BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS_INDEX      "blocks_index"
+#define BLOCKCHAIN_STORAGE_CONTAINER_TRANSACTIONS      "transactions"
+#define BLOCKCHAIN_STORAGE_CONTAINER_SPENT_KEYS        "spent_keys"
+#define BLOCKCHAIN_STORAGE_CONTAINER_OUTPUTS           "outputs"
+#define BLOCKCHAIN_STORAGE_CONTAINER_MULTISIG_OUTS     "multisig_outs"
+#define BLOCKCHAIN_STORAGE_CONTAINER_INVALID_BLOCKS    "invalid_blocks"
+#define BLOCKCHAIN_STORAGE_CONTAINER_SOLO_OPTIONS      "solo"
+#define BLOCKCHAIN_STORAGE_CONTAINER_ALIASES           "aliases"
+#define BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS     "addr_to_alias"
+#define BLOCKCHAIN_STORAGE_CONTAINER_TX_FEE_MEDIAN     "median_fee2"
+#define BLOCKCHAIN_STORAGE_CONTAINER_GINDEX_INCS       "gindex_increments"
+#define BLOCKCHAIN_STORAGE_CONTAINER_ASSETS            "assets"
+#define BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_ADDRESSES "gateway_addresses"
 
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_BLOCK_CUMUL_SZ_LIMIT          0
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_PRUNED_RS_HEIGHT              1
@@ -89,7 +90,8 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
                                                                  m_db_solo_options(m_db),
                                                                  m_db_aliases(m_db),
                                                                  m_db_assets(m_db),
-                                                                 m_db_addr_to_alias(m_db), 
+                                                                 m_db_addr_to_alias(m_db),
+                                                                 m_db_gateway_addresses(m_db),
                                                                  m_read_lock(m_rw_lock),
                                                                  m_db_current_block_cumul_sz_limit(BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_BLOCK_CUMUL_SZ_LIMIT, m_db_solo_options),
                                                                  m_db_current_pruned_rs_height(BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_PRUNED_RS_HEIGHT, m_db_solo_options),
@@ -220,6 +222,7 @@ void blockchain_storage::set_db_l2_cache_size(uint64_t ceched_elements) const
   m_db_solo_options.set_cache_size(ceched_elements);
   m_db_aliases.set_cache_size(ceched_elements);
   m_db_assets.set_cache_size(ceched_elements);
+  m_db_gateway_addresses.set_cache_size(ceched_elements);
   m_db_addr_to_alias.set_cache_size(ceched_elements);
 }
 //------------------------------------------------------------------
@@ -236,6 +239,7 @@ std::string blockchain_storage::get_db_l2_cache_state_str() const
   PRINT_CACHE_STATE(m_db_solo_options);
   PRINT_CACHE_STATE(m_db_aliases);
   PRINT_CACHE_STATE(m_db_assets);
+  PRINT_CACHE_STATE(m_db_gateway_addresses);
   PRINT_CACHE_STATE(m_db_addr_to_alias);
   return ss.str();
 }
@@ -340,6 +344,8 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     res = m_db_addr_to_alias.init(BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
     res = m_db_per_block_gindex_incs.init(BLOCKCHAIN_STORAGE_CONTAINER_GINDEX_INCS);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    res = m_db_gateway_addresses.init(BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_ADDRESSES);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
 
     if (command_line::has_arg(vm, arg_db_cache_l2))
@@ -575,6 +581,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
       m_db_assets.deinit();
       m_db_addr_to_alias.deinit();
       m_db_per_block_gindex_incs.deinit();
+      m_db_gateway_addresses.deinit();
       m_db.close();
       size_t files_removed = boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(db_folder_path));
       LOG_PRINT_L1(files_removed << " files at " << db_folder_path << " removed");
@@ -882,6 +889,7 @@ bool blockchain_storage::clear()
     m_db_per_block_gindex_incs.clear();
     m_pos_targetdata_cache.clear();
     m_pow_targetdata_cache.clear();
+    m_db_gateway_addresses.clear();
 
     db_tx_ptr->commit_transaction();
   }
@@ -1894,6 +1902,7 @@ void blockchain_storage::reset_db_cache() const
   m_db_multisig_outs.clear_cache();
   m_db_aliases.clear_cache();
   m_db_assets.clear_cache();
+  m_db_gateway_addresses.clear_cache();
   m_db_addr_to_alias.clear_cache();
 
 }
@@ -3646,6 +3655,7 @@ void blockchain_storage::print_db_cache_perfeormance_data() const
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_solo_options) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_aliases) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_assets) << ENDL
+    DB_CONTAINER_PERF_DATA_ENTRY(m_db_gateway_addresses) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_addr_to_alias) << ENDL
     //DB_CONTAINER_PERF_DATA_ENTRY(m_db_per_block_gindex_incs) << ENDL
     //DB_CONTAINER_PERF_DATA_ENTRY(m_tx_fee_median) << ENDL
@@ -6439,9 +6449,89 @@ struct visitor_proxy : public boost::static_visitor<const x_type*>
 };
 
 
-bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
+bool blockchain_storage::validate_tx_for_hardfork_specific_terms_types_new(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
 {
-  size_t most_recent_hardfork_id_for_height = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(block_height);
+  enum allowance
+  {
+    no = 0,
+    one = 1,
+    many = 2
+  };
+
+  const uint8_t input = 0x01;
+  const uint8_t output = 0x02;
+  const uint8_t extra = 0x04;
+  const uint8_t attach = 0x08;
+  const uint8_t signtr = 0x10;
+  const uint8_t proofs = 0x20; 
+
+  struct hardfork_to_type_entry 
+  {
+    allowance hf0, hf1, hf2, hf3, hf4, hf5, hf6, hf7;
+    const std::type_info& tp;
+    uint8_t contains_types;
+  };
+
+  //TODO: Replace this with type-traits based approach, to avoid search in the array
+  const hardfork_to_type_entry tx_entries[] = { 
+  //hard fork id:    
+  //       0     1     2     3     4     5     6     7
+  //payloads
+        {  many, many, many, many, many, many, many, many,   typeid(tx_service_attachment),            extra|attach    },
+        {  one,  one,  one,  one,  one,  one,  no,   no,     typeid(tx_comment),                       extra           },
+        {  one,  one,  one,  one,  one,  one,  no,   no,     typeid(tx_payer_old),                     extra|attach    },
+        {  one,  one,  one,  one,  one,  one,  no,   no,     typeid(tx_receiver_old),                  extra|attach    },
+        {  no,   no,   one,  one,  one,  one,  no,   no,     typeid(tx_payer),                         extra|attach    },
+        {  no,   no,   one,  one,  one,  one,  no,   no,     typeid(tx_receiver),                      extra|attach    },
+        {  many, many, many, many, many, many, many, many,   typeid(tx_derivation_hint),               extra           },
+        {  many, many, many, many, many, many, many, many,   typeid(std::string),                      extra|attach    },
+        {  many, many, many, many, many, many, many, many,   typeid(tx_crypto_checksum),               extra|attach    },
+        {  one,  one,  one,  one,  one,  one,  one,  one,    typeid(etc_tx_time),                      extra           },
+        {  one,  one,  one,  one,  one,  one,  no,   no,     typeid(etc_tx_details_unlock_time),       extra           },
+        {  no,   one,  one,  one,  one,  one,  no,   no,     typeid(etc_tx_details_unlock_time2),      extra           },
+        {  one,  one,  one,  one,  one,  one,  one,  one,    typeid(etc_tx_details_expiration_time),   extra           },
+        {  one,  one,  one,  one,  one,  one,  one,  one,    typeid(etc_tx_details_flags),             extra           },
+        {  one,  one,  one,  one,  one,  one,  one,  one,    typeid(crypto::public_key),               extra           },
+        {  one,  one,  one,  one,  one,  one,  one,  one,    typeid(extra_attachment_info),            extra           },
+        {  one,  one,  no,   no,   no,   no,   no,   no,     typeid(extra_alias_entry_old),            extra           },
+        {  one,  one,  one,  one,  one,  one,  one,  one,    typeid(extra_user_data),                  extra           },   //how we use this? 
+        {  one,  one,  one,  one,  one,  one,  one,  one,    typeid(extra_padding),                    extra           },
+        {  one,  one,  one,  one,  one,  one,  one,  one,    typeid(etc_tx_flags16_t),                 extra           },
+        {  no,   no,   one,  one,  one,  one,  one,  one,    typeid(extra_alias_entry),                extra           },
+        {  no,   no,   no,   no,   one,  one,  one,  one,    typeid(zarcanum_tx_data_v1),              extra           },
+        {  no,   no,   no,   no,   one,  one,  one,  one,    typeid(asset_descriptor_operation),       extra           },
+  //inputs
+        {  one,  one,  one,  one,  one,  one,  one,  one,    typeid(txin_gen),                            input        },
+        {  many, many, many, many, many, many, many, many,   typeid(txin_to_key),                         input        },
+        {  many, many, many, many, many, many, many, many,   typeid(txin_multisig),                       input        },
+        {  no,   no,   no,   no,   many, many, many, many,   typeid(txin_zc_input),                       input        },
+        {  no,   no,   no,   no,   no,   no,   many, many,   typeid(txin_gateway),                        input        },
+  //outputs
+
+        {  many, many, many, many, no,   no,   no,   no,     typeid(tx_out_bare),                         output       },
+        {  no,   no,   no,   no,   many, many, many, many,   typeid(tx_out_zarcanum),                     output       },
+        {  no,   no,   no,   no,   no,   no,   many, many,   typeid(tx_out_gateway),                      output       },
+  //signatures
+        {  many, many, many, many, many, many, many, many,   typeid(NLSAG_sig),                           signtr       },
+        {  no,   no,   no,   no,   many, many, many, many,   typeid(void_sig),                            signtr       },
+        {  no,   no,   no,   no,   many, many, many, many,   typeid(ZC_sig),                              signtr       },
+        {  no,   no,   no,   no,   many, many, many, many,   typeid(zarcanum_sig),                        signtr       },
+  //proofs
+        {  no,   no,   no,   no,   many, many, many, many,   typeid(zc_asset_surjection_proof),           signtr       },
+        {  no,   no,   no,   no,   many, many, many, many,   typeid(zc_outs_range_proof),                 signtr       },
+        {  no,   no,   no,   no,   one,  one,  one,  one,    typeid(zc_balance_proof),                    signtr       },
+        {  no,   no,   no,   no,   one,  one,  one,  one,    typeid(asset_operation_proof),               signtr       },
+        {  no,   no,   no,   no,   one,  one,  one,  one,    typeid(asset_operation_ownership_proof),     signtr       },
+        {  no,   no,   no,   no,   one,  one,  one,  one,    typeid(asset_operation_ownership_proof_eth), signtr       }
+  };
+
+
+  return true;
+}
+
+//TODO: this function might be removed after HF6 is activated on mainnet
+bool blockchain_storage::validate_tx_for_hardfork_specific_terms_types_old(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
+{
   bool var_is_after_hardfork_1_zone = m_core_runtime_config.is_hardfork_active_for_height(1, block_height);
   bool var_is_after_hardfork_2_zone = m_core_runtime_config.is_hardfork_active_for_height(2, block_height);
   bool var_is_after_hardfork_3_zone = m_core_runtime_config.is_hardfork_active_for_height(3, block_height);
@@ -6450,53 +6540,53 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   bool var_is_after_hardfork_6_zone = m_core_runtime_config.is_hardfork_active_for_height(6, block_height);
 
   auto is_allowed_before_hardfork1 = [&](const auto& el) -> bool
-  {
-    CHECK_AND_ASSERT_MES(el.type() != typeid(etc_tx_details_unlock_time2), false, "tx " << tx_id << " contains etc_tx_details_unlock_time2 which is not allowed on height " << block_height);
-    return true;
-  };
+    {
+      CHECK_AND_ASSERT_MES(el.type() != typeid(etc_tx_details_unlock_time2), false, "tx " << tx_id << " contains etc_tx_details_unlock_time2 which is not allowed on height " << block_height);
+      return true;
+    };
 
   auto is_allowed_before_hardfork2 = [&](const auto& el) -> bool
-  {
-    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_payer), false, "tx " << tx_id << " contains tx_payer which is not allowed on height " << block_height);
-    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_receiver), false, "tx " << tx_id << " contains tx_receiver which is not allowed on height " << block_height);
-    CHECK_AND_ASSERT_MES(el.type() != typeid(extra_alias_entry), false, "tx " << tx_id << " contains extra_alias_entry which is not allowed on height " << block_height);
-    return true;
-  }; 
+    {
+      CHECK_AND_ASSERT_MES(el.type() != typeid(tx_payer), false, "tx " << tx_id << " contains tx_payer which is not allowed on height " << block_height);
+      CHECK_AND_ASSERT_MES(el.type() != typeid(tx_receiver), false, "tx " << tx_id << " contains tx_receiver which is not allowed on height " << block_height);
+      CHECK_AND_ASSERT_MES(el.type() != typeid(extra_alias_entry), false, "tx " << tx_id << " contains extra_alias_entry which is not allowed on height " << block_height);
+      return true;
+    };
 
   auto is_allowed_before_hardfork3 = [&](const auto& el) -> bool
-  {
-    return true;
-  };
+    {
+      return true;
+    };
 
   auto is_allowed_before_hardfork4 = [&](const auto& el) -> bool
-  {
-    CHECK_AND_ASSERT_MES(el.type() != typeid(zarcanum_tx_data_v1), false, "tx " << tx_id << " contains zarcanum_tx_data_v1 which is not allowed on height " << block_height);
-    CHECK_AND_ASSERT_MES(el.type() != typeid(txin_zc_input), false, "tx " << tx_id << " contains txin_zc_input which is not allowed on height " << block_height);
-    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_out_zarcanum), false, "tx " << tx_id << " contains tx_out_zarcanum which is not allowed on height " << block_height);
-    return true;
-  };
+    {
+      CHECK_AND_ASSERT_MES(el.type() != typeid(zarcanum_tx_data_v1), false, "tx " << tx_id << " contains zarcanum_tx_data_v1 which is not allowed on height " << block_height);
+      CHECK_AND_ASSERT_MES(el.type() != typeid(txin_zc_input), false, "tx " << tx_id << " contains txin_zc_input which is not allowed on height " << block_height);
+      CHECK_AND_ASSERT_MES(el.type() != typeid(tx_out_zarcanum), false, "tx " << tx_id << " contains tx_out_zarcanum which is not allowed on height " << block_height);
+      return true;
+    };
 
   auto is_allowed_after_hardfork4 = [&](const auto& el) -> bool
-  {
-    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_out_bare), false, "tx " << tx_id << " contains tx_out_bare which is not allowed on height " << block_height);
-    return true;
-  };
+    {
+      CHECK_AND_ASSERT_MES(el.type() != typeid(tx_out_bare), false, "tx " << tx_id << " contains tx_out_bare which is not allowed on height " << block_height);
+      return true;
+    };
 
   auto is_allowed_after_hardfork6 = [&](const auto& el) -> bool
-  {
-    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_payer),         false, "tx contains tx_payer which is not allowed after HF6");
-    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_payer_old),     false, "tx contains tx_payer_old which is not allowed after HF6");
-    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_receiver),      false, "tx contains tx_receiver which is not allowed after HF6");
-    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_receiver_old),  false, "tx contains tx_receiver_old which is not allowed after HF6");
-    return true;
-  };
+    {
+      CHECK_AND_ASSERT_MES(el.type() != typeid(tx_payer), false, "tx contains tx_payer which is not allowed after HF6");
+      CHECK_AND_ASSERT_MES(el.type() != typeid(tx_payer_old), false, "tx contains tx_payer_old which is not allowed after HF6");
+      CHECK_AND_ASSERT_MES(el.type() != typeid(tx_receiver), false, "tx contains tx_receiver which is not allowed after HF6");
+      CHECK_AND_ASSERT_MES(el.type() != typeid(tx_receiver_old), false, "tx contains tx_receiver_old which is not allowed after HF6");
+      return true;
+    };
 
   auto is_allowed_atfer_hardfork6_attachment = [&](const auto& el) -> bool
-  {
-    CHECK_AND_ASSERT_MES(el.type() != typeid(tx_comment),       false, "tx contains tx_comment in attachment which is not allowed after HF6");
-    return is_allowed_after_hardfork6(el);
-  };
-  
+    {
+      CHECK_AND_ASSERT_MES(el.type() != typeid(tx_comment), false, "tx contains tx_comment in attachment which is not allowed after HF6");
+      return is_allowed_after_hardfork6(el);
+    };
+
   //inputs
   for (const auto& in : tx.vin)
   {
@@ -6557,10 +6647,28 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     if (var_is_after_hardfork_6_zone && !is_allowed_atfer_hardfork6_attachment(el))
       return false;
   }
+
+  return true;
+}
+
+
+bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
+{
+  bool r = false;
+  if (m_core_runtime_config.is_hardfork_active_for_height(6, block_height))
+  {
+     r = validate_tx_for_hardfork_specific_terms_types_new(tx, tx_id, block_height);
+  }
+  else
+  {
+     r = validate_tx_for_hardfork_specific_terms_types_old(tx, tx_id, block_height);
+  }
+  CHECK_AND_ASSERT_MES(r, false, "Transaction validation failed for hardfork specific terms");
+
   
   // TODO @#@# consider: 1) tx.proofs, 2) new proof data structures
 
-
+  bool var_is_after_hardfork_4_zone = m_core_runtime_config.is_hardfork_active_for_height(4, block_height);
   if (var_is_after_hardfork_4_zone)
   {    
     CHECK_AND_ASSERT_MES(tx.version > TRANSACTION_VERSION_PRE_HF4, false, "HF4: tx with version " << tx.version << " is not allowed");
@@ -6580,6 +6688,14 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       LOG_ERROR("TX_FLAG_SIGNATURE_MODE_SEPARATE not allowed for coinbase tx");
       return false;
     }
+
+    size_t count_ado = 0;
+    //extra
+    for (const auto& el : tx.extra)
+    {
+      if (el.type() == typeid(asset_descriptor_operation))
+        count_ado++;
+    }
     if (count_ado > 1)
     {
       LOG_ERROR("More then 1 asset_descriptor_operation not allowed in tx");
@@ -6591,11 +6707,12 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       return false;
     }
   }
-
+  bool var_is_after_hardfork_5_zone = m_core_runtime_config.is_hardfork_active_for_height(5, block_height);
   if (var_is_after_hardfork_5_zone)
   {
     CHECK_AND_ASSERT_MES(tx.version >= TRANSACTION_VERSION_POST_HF5, false, "HF5: tx with version " << tx.version << " is not allowed");
     // starting from HF5 each tx must have hardfork_id corresponding to the current active hardfork
+    size_t most_recent_hardfork_id_for_height = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(block_height);
     CHECK_AND_ASSERT_MES(tx.hardfork_id == most_recent_hardfork_id_for_height, false, "tx's hardfork_id is " << (int)tx.hardfork_id << ", but the current hardfork is " << most_recent_hardfork_id_for_height << ", rejected");
   }
   else
@@ -6606,7 +6723,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       return false;
     }
   }
-
+  bool var_is_after_hardfork_6_zone = m_core_runtime_config.is_hardfork_active_for_height(6, block_height);
   if (var_is_after_hardfork_6_zone)
   {
     // enforce explicitly existing soft limits (s.a. tx_memory_pool::add_tx) and implicit hard limits (verify_BGE_proof etc.)
