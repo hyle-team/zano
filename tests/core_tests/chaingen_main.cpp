@@ -14,10 +14,20 @@
 #include "random_helper.h"
 #include "core_state_helper.h"
 #include "common/db_backend_selector.h"
+#include <boost/process.hpp>
+#include <filesystem>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <fstream>
+#include <chrono>
+#include <thread>
+#include <mutex>
 
 #define TX_BLOBSIZE_CHECKER_LOG_FILENAME "get_object_blobsize(tx).log"
 
 namespace po = boost::program_options;
+namespace bp = boost::process;
+namespace pt = boost::property_tree;
 
 namespace
 {
@@ -30,6 +40,39 @@ namespace
   const command_line::arg_descriptor<std::string> arg_run_multiple_tests           ("run-multiple-tests", "comma-separated list of tests to run, OR text file <@filename> containing list of tests");
   const command_line::arg_descriptor<bool>        arg_enable_debug_asserts         ("enable-debug-asserts", "" );
   const command_line::arg_descriptor<bool>        arg_stop_on_fail                 ("stop-on-fail", "");
+  const command_line::arg_descriptor<uint32_t>    arg_processes                    ("processes", "Number of worker processes", 1);
+  const command_line::arg_descriptor<int32_t>     arg_worker_id                    ("worker-id", "Internal: worker index", -1);
+  const command_line::arg_descriptor<std::string> arg_run_root                     ("run-root", "Internal: run root dir", "");
+
+  const char* JSON_WORKER_ID           = "worker_id";
+  const char* JSON_PROCESSES           = "processes";
+  const char* JSON_TESTS_COUNT         = "tests_count";
+  const char* JSON_UNIQUE_TESTS_COUNT  = "unique_tests_count";
+  const char* JSON_TOTAL_TIME_MS       = "total_time_ms";
+  const char* JSON_SKIP_ALL_TILL_END   = "skip_all_till_the_end";
+  const char* JSON_EXIT_CODE           = "exit_code";
+
+  const char* JSON_FAILED_TESTS        = "failed_tests";
+  const char* JSON_TESTS_RUNNING_TIME  = "tests_running_time";
+
+  const char* JSON_NAME                = "name";
+  const char* JSON_MS                  = "ms";
+
+  const char* WORKER_STDOUT_FILENAME   = "worker_stdout.log";
+  const char* WORKER_STDERR_FILENAME   = "worker_stderr.log";
+  const char* WORKER_REPORT_FILENAME   = "coretests_report.json";
+
+  const char* ARG_WORKER_ID            = "--worker-id";
+  const char* ARG_WORKER_ID_EQ         = "--worker-id=";
+
+  const char* ARG_DATA_DIR             = "--data-dir";
+  const char* ARG_DATA_DIR_EQ          = "--data-dir=";
+  const char* WORKER_DIR_PREFIX        = "w";
+  const char* TAKEN_TESTS_LOG_FILENAME = "taken_tests.log";
+
+  // Console output locking to avoid broken lines
+  static std::mutex cout_mx;
+  static std::mutex cerr_mx;
 
   boost::program_options::variables_map g_vm;
 }
@@ -56,6 +99,57 @@ namespace
     return 1; \
   }
 
+#define REGISTER_TEST(genclass) \
+  do { \
+    const std::string __test_name = #genclass; \
+    g_test_jobs.push_back(test_job{ \
+      __test_name, \
+      [&, __test_name]() -> bool { \
+        if (!is_test_eligible_to_run(__test_name)) \
+          return true; \
+        return run_one_test_job( \
+          __test_name, \
+          [&]() -> bool { return generate_and_play<genclass>(__test_name.c_str()); }, \
+          stop_on_first_fail, \
+          skip_all_till_the_end, \
+          tests_count, \
+          unique_tests_count, \
+          failed_tests, \
+          tests_running_time); \
+      } \
+    }); \
+  } while (0)
+
+#define REGISTER_TEST_HF(genclass, hardfork_str_mask) \
+  do { \
+    const std::string __gen_name = #genclass; \
+    std::vector<size_t> __hardforks = parse_hardfork_str_mask(hardfork_str_mask); \
+    if (__hardforks.empty()) { \
+      LOG_ERROR("invalid hardforks mask: " << hardfork_str_mask << " for test " << __gen_name); \
+      break; \
+    } \
+    for (size_t __i = 0; __i < __hardforks.size(); ++__i) \
+    { \
+      const size_t __hf_id = __hardforks[__i]; \
+      const std::string __test_name = __gen_name + " @ HF " + epee::string_tools::num_to_string_fast(__hf_id); \
+      g_test_jobs.push_back(test_job{ \
+        __test_name, \
+        [&, __test_name, __gen_name, __hf_id]() -> bool { \
+          if (!is_hf_test_eligible_to_run(__gen_name, __hf_id)) \
+            return true; \
+          return run_one_test_job( \
+            __test_name, \
+            [&]() -> bool { return generate_and_play<genclass>(__test_name.c_str(), __hf_id); }, \
+            stop_on_first_fail, \
+            skip_all_till_the_end, \
+            tests_count, \
+            unique_tests_count, \
+            failed_tests, \
+            tests_running_time); \
+        } \
+      }); \
+    } \
+  } while (0)
 
 std::vector<size_t> parse_hardfork_str_mask(std::string s /* intentionally passing by value */)
 {
@@ -386,24 +480,6 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
   return r;
 }
 
-
-#define GENERATE_AND_PLAY(genclass)                                                                        \
-  if (is_test_eligible_to_run(#genclass))                                                                  \
-  {                                                                                                        \
-    TIME_MEASURE_START_MS(t);                                                                              \
-    ++tests_count;                                                                                         \
-    ++unique_tests_count;                                                                                  \
-    if (!generate_and_play<genclass>(#genclass))                                                           \
-    {                                                                                                      \
-      failed_tests.insert(#genclass);                                                                      \
-      LOCAL_ASSERT(false);                                                                                 \
-      if (stop_on_first_fail)                                                                              \
-        skip_all_till_the_end = true;                                                                      \
-    }                                                                                                      \
-    TIME_MEASURE_FINISH_MS(t);                                                                             \
-    tests_running_time.push_back(std::make_pair(#genclass, t));                                            \
-  }
-
 #define GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(genclass)                                     \
   if (is_test_eligible_to_run(#genclass))                                                                  \
   {                                                                                                        \
@@ -422,36 +498,7 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
     tests_running_time.push_back(std::make_pair(testname, t));                                             \
   }
 
-#define GENERATE_AND_PLAY_HF(genclass, hardfork_str_mask)                                                  \
-  if (!skip_all_till_the_end)                                                                              \
-  {                                                                                                        \
-    std::vector<size_t> hardforks = parse_hardfork_str_mask(hardfork_str_mask);                            \
-    CHECK_AND_ASSERT_MES(!hardforks.empty(), false, "invalid hardforks mask: " << hardfork_str_mask);      \
-    for(size_t i = 0; i < hardforks.size() && !skip_all_till_the_end; ++i)                                 \
-    {                                                                                                      \
-      if (!is_hf_test_eligible_to_run(#genclass, hardforks[i]))                                            \
-        continue;                                                                                          \
-      std::string tns = std::string(#genclass) + " @ HF " + epee::string_tools::num_to_string_fast(hardforks[i]);  \
-      const char* testname = tns.c_str();                                                                  \
-      TIME_MEASURE_START_MS(t);                                                                            \
-      ++tests_count;                                                                                       \
-      if (!generate_and_play<genclass>(testname, hardforks[i]))                                            \
-      {                                                                                                    \
-        failed_tests.insert(testname);                                                                     \
-        LOCAL_ASSERT(false);                                                                               \
-        if (stop_on_first_fail)                                                                            \
-          skip_all_till_the_end = true;                                                                    \
-      }                                                                                                    \
-      TIME_MEASURE_FINISH_MS(t);                                                                           \
-      tests_running_time.push_back(std::make_pair(testname, t));                                           \
-    }                                                                                                      \
-    ++unique_tests_count;                                                                                  \
-  }
-
-
-
 //#define GENERATE_AND_PLAY(genclass) GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(genclass)
-
 
 #define CALL_TEST(test_name, function)                                                                     \
   {                                                                                                        \
@@ -703,6 +750,31 @@ private:
   }
 };
 //--------------------------------------------------------------------------
+struct test_job
+{
+  std::string name;
+  std::function<bool()> run;
+};
+
+static std::vector<test_job> g_test_jobs;
+
+struct worker_report
+{
+  uint32_t worker_id = 0;
+  uint32_t processes = 1;
+
+  size_t tests_count = 0;
+  size_t unique_tests_count = 0;
+
+  uint64_t total_time_ms = 0;
+
+  std::vector<std::pair<std::string, uint64_t>> tests_running_time;
+  std::set<std::string> failed_tests;
+  bool skip_all_till_the_end = false;
+
+  int exit_code = 0;
+};
+//--------------------------------------------------------------------------
 template<class t_test_class>
 inline bool replay_events_through_core(currency::core& cr, const std::vector<test_event_entry>& events, t_test_class& validator, test_core_listener* core_listener, size_t event_index_from = 0, size_t event_index_to = SIZE_MAX)
 {
@@ -727,25 +799,6 @@ inline bool replay_events_through_core(currency::core& cr, const std::vector<tes
   return r;
 
   CATCH_ENTRY_L0("replay_events_through_core", false);
-}
-//--------------------------------------------------------------------------
-std::shared_ptr<boost::program_options::variables_map> prepare_variables_map()
-{
-  boost::program_options::options_description desc("Allowed options");
-  currency::core::init_options(desc);
-  command_line::add_arg(desc, command_line::arg_data_dir);
-  std::shared_ptr<boost::program_options::variables_map> vm(new boost::program_options::variables_map);
-  bool r = command_line::handle_error_helper(desc, [&]()
-  {
-    boost::program_options::store(boost::program_options::basic_parsed_options<char>(&desc), *vm.get());
-    boost::program_options::notify(*vm.get());
-    return true;
-  });
-
-  if (!r)
-    return nullptr;
-
-  return vm;
 }
 //--------------------------------------------------------------------------
 template<class t_test_class>
@@ -898,25 +951,1095 @@ bool parse_cmd_specific_tests_to_run(std::unordered_multimap<std::string, size_t
 
   return true;
 }
+
+static bool arg_has_prefix(const std::string& arg, const std::string& prefix)
+{
+  return arg.size() >= prefix.size() && arg.compare(0, prefix.size(), prefix) == 0;
+}
+
+static std::filesystem::path get_run_root_path()
+{
+  std::string run_root = command_line::get_arg(g_vm, arg_run_root);
+  if (run_root.empty())
+    run_root = "chaingen_runs";
+
+  std::filesystem::path run_root_path(run_root);
+
+  // Make it absolute to avoid nesting when workers use start_dir.
+  if (run_root_path.is_relative())
+    run_root_path = std::filesystem::absolute(run_root_path);
+
+  return run_root_path;
+}
+
+static std::filesystem::path get_worker_dir_path(uint32_t worker_id)
+{
+  return get_run_root_path() / (WORKER_DIR_PREFIX+ std::to_string(worker_id));
+}
+
+static std::filesystem::path get_worker_taken_tests_log_path(uint32_t worker_id)
+{
+  return get_worker_dir_path(worker_id) / TAKEN_TESTS_LOG_FILENAME;
+}
+
+static std::filesystem::path get_single_process_taken_tests_log_path()
+{
+  std::string data_dir = command_line::get_arg(g_vm, command_line::arg_data_dir);
+  return std::filesystem::path(data_dir) / TAKEN_TESTS_LOG_FILENAME;
+}
+
+static void log_test_taken_by_this_process(const std::string& test_name)
+{
+  // Append-only log: one line per test, written when the test is about to start.
+  try
+  {
+    const uint32_t processes = command_line::get_arg(g_vm, arg_processes);
+    const int32_t worker_id  = command_line::get_arg(g_vm, arg_worker_id);
+
+    std::filesystem::path p;
+
+    if (processes > 1 && worker_id >= 0)
+    {
+      const uint32_t wid = static_cast<uint32_t>(worker_id);
+      std::filesystem::create_directories(get_worker_dir_path(wid));
+      p = get_worker_taken_tests_log_path(wid);
+    }
+    else
+    {
+      std::filesystem::create_directories(command_line::get_arg(g_vm, command_line::arg_data_dir));
+      p = get_single_process_taken_tests_log_path();
+    }
+
+    std::ofstream f(p, std::ios::out | std::ios::binary | std::ios::app);
+    if (!f.is_open())
+      return;
+
+    f << test_name << "\n";
+    f.flush();
+  }
+  catch (...) {}
+}
+//--------------------------------------------------------------------------
+static bool run_one_test_job(
+  const std::string& test_name,
+  const std::function<bool()>& fn,
+  bool& stop_on_first_fail,
+  bool& skip_all_till_the_end,
+  size_t& tests_count,
+  size_t& unique_tests_count,
+  std::set<std::string>& failed_tests,
+  std::vector<std::pair<std::string, uint64_t>>& tests_running_time)
+{
+  if (skip_all_till_the_end)
+    return true;
+
+  TIME_MEASURE_START_MS(t);
+
+  ++tests_count;
+  ++unique_tests_count;
+
+  log_test_taken_by_this_process(test_name);
+  bool ok = fn();
+
+  if (!ok)
+  {
+    failed_tests.insert(test_name);
+    LOCAL_ASSERT(false);
+    if (stop_on_first_fail)
+      skip_all_till_the_end = true;
+  }
+
+  TIME_MEASURE_FINISH_MS(t);
+  tests_running_time.push_back(std::make_pair(test_name, t));
+
+  return ok;
+}
+
+static bool run_registered_tests(
+  bool& stop_on_first_fail,
+  bool& skip_all_till_the_end,
+  size_t& tests_count,
+  size_t& unique_tests_count,
+  std::set<std::string>& failed_tests,
+  std::vector<std::pair<std::string, uint64_t>>& tests_running_time,
+  const std::function<bool(const std::string&)>& /*is_test_eligible_to_run*/,
+  const std::function<bool(const std::string&, size_t)>& /*is_hf_test_eligible_to_run*/)
+{
+  bool all_ok = true;
+
+  const uint32_t processes = command_line::get_arg(g_vm, arg_processes);
+  const int32_t worker_id = command_line::get_arg(g_vm, arg_worker_id);
+
+  size_t job_index = 0;
+
+  for (auto& j : g_test_jobs)
+  {
+    if (skip_all_till_the_end)
+      break;
+
+    if (processes > 1 && worker_id >= 0)
+    {
+      if ((job_index % processes) != static_cast<size_t>(worker_id))
+      {
+        ++job_index;
+        continue;
+      }
+    }
+
+    bool ok = j.run();
+    if (!ok)
+      all_ok = false;
+
+    ++job_index;
+  }
+
+  return all_ok;
+}
+//--------------------------------------------------------------------------
+static void register_all_tests(
+  bool& stop_on_first_fail,
+  bool& skip_all_till_the_end,
+  size_t& tests_count,
+  size_t& unique_tests_count,
+  std::set<std::string>& failed_tests,
+  std::vector<std::pair<std::string, uint64_t>>& tests_running_time,
+  const std::function<bool(const std::string&)>& is_test_eligible_to_run,
+  const std::function<bool(const std::string&, size_t)>& is_hf_test_eligible_to_run)
+{
+
+  g_test_jobs.clear();
+
+  // TODO // REGISTER_TEST(wallet_spend_form_auditable_and_track);
+  REGISTER_TEST(gen_block_big_major_version);
+
+  REGISTER_TEST(pos_minting_tx_packing);
+
+  REGISTER_TEST(multisig_wallet_test);
+  REGISTER_TEST(multisig_wallet_test_many_dst);
+  REGISTER_TEST(multisig_wallet_heterogenous_dst);
+  REGISTER_TEST(multisig_wallet_same_dst_addr);
+  REGISTER_TEST(multisig_wallet_ms_to_ms);
+  REGISTER_TEST(multisig_minimum_sigs);
+  REGISTER_TEST(multisig_and_fake_outputs);
+  REGISTER_TEST(multisig_and_unlock_time);
+  REGISTER_TEST(multisig_and_coinbase);
+  REGISTER_TEST(multisig_with_same_id_in_pool);
+  REGISTER_TEST_HF(multisig_and_checkpoints, "0"); // TODO: fix for HF 1-3 (checkpoint hash check)
+  REGISTER_TEST(multisig_and_checkpoints_bad_txs);
+  REGISTER_TEST(multisig_and_altchains);
+  REGISTER_TEST(multisig_out_make_and_spent_in_altchain);
+  REGISTER_TEST(multisig_unconfirmed_transfer_and_multiple_scan_pool_calls);
+  REGISTER_TEST(multisig_out_spent_in_altchain_case_b4);
+  REGISTER_TEST(multisig_n_participants_seq_signing);
+
+  REGISTER_TEST(ref_by_id_basics);
+  REGISTER_TEST(ref_by_id_mixed_inputs_types);
+
+  REGISTER_TEST(escrow_wallet_test);
+  REGISTER_TEST(escrow_w_and_fake_outputs);
+  REGISTER_TEST(escrow_incorrect_proposal);
+  REGISTER_TEST(escrow_proposal_expiration);
+  REGISTER_TEST(escrow_proposal_and_accept_expiration);
+  REGISTER_TEST(escrow_incorrect_proposal_acceptance);
+  REGISTER_TEST(escrow_custom_test);
+  REGISTER_TEST(escrow_incorrect_cancel_proposal);
+  REGISTER_TEST(escrow_proposal_not_enough_money);
+  REGISTER_TEST(escrow_cancellation_and_tx_order);
+  REGISTER_TEST(escrow_cancellation_proposal_expiration);
+  REGISTER_TEST(escrow_cancellation_acceptance_expiration);
+  // REGISTER_TEST(escrow_proposal_acceptance_in_alt_chain); -- work in progress
+  REGISTER_TEST(escrow_zero_amounts);
+  REGISTER_TEST(escrow_balance);
+
+  REGISTER_TEST(escrow_altchain_meta_test<0>);
+  REGISTER_TEST(escrow_altchain_meta_test<1>);
+  REGISTER_TEST(escrow_altchain_meta_test<2>);
+  REGISTER_TEST(escrow_altchain_meta_test<3>);
+  REGISTER_TEST(escrow_altchain_meta_test<4>);
+  REGISTER_TEST(escrow_altchain_meta_test<5>);
+  REGISTER_TEST(escrow_altchain_meta_test<6>);
+  REGISTER_TEST(escrow_altchain_meta_test<7>);
+  REGISTER_TEST(escrow_altchain_meta_test<8>);
+  static_assert(escrow_altchain_meta_test_data<9>::empty_marker, ""); // make sure there are no sub-tests left
+
+  REGISTER_TEST(offers_expiration_test);
+  REGISTER_TEST(offers_tests);
+  REGISTER_TEST(offers_filtering_1);
+  //REGISTER_TEST(offers_handling_on_chain_switching);
+  REGISTER_TEST(offer_removing_and_selected_output);
+  REGISTER_TEST(offers_multiple_update);
+  REGISTER_TEST(offer_sig_validity_in_update_and_cancel);
+  REGISTER_TEST(offer_lifecycle_via_tx_pool);
+  REGISTER_TEST(offers_updating_hack);
+  REGISTER_TEST(offer_cancellation_with_zero_fee);
+
+  REGISTER_TEST(gen_crypted_attachments);
+  REGISTER_TEST(gen_checkpoints_attachments_basic);
+  REGISTER_TEST(gen_checkpoints_invalid_keyimage);
+  REGISTER_TEST(gen_checkpoints_altblock_before_and_after_cp);
+  REGISTER_TEST(gen_checkpoints_block_in_future);
+  REGISTER_TEST(gen_checkpoints_altchain_far_before_cp);
+  REGISTER_TEST(gen_checkpoints_block_in_future_after_cp);
+  REGISTER_TEST(gen_checkpoints_prun_txs_after_blockchain_load);
+  REGISTER_TEST(gen_checkpoints_reorganize);
+  REGISTER_TEST(gen_checkpoints_pos_validation_on_altchain);
+  REGISTER_TEST(gen_checkpoints_and_invalid_tx_to_pool);
+  REGISTER_TEST(gen_checkpoints_set_after_switching_to_altchain);
+  REGISTER_TEST_HF(gen_no_attchments_in_coinbase, "3");
+  REGISTER_TEST(gen_no_attchments_in_coinbase_gentime);
+
+  REGISTER_TEST_HF(gen_alias_tests, "3-*");
+  REGISTER_TEST_HF(gen_alias_strange_data, "3-*");
+  REGISTER_TEST_HF(gen_alias_concurrency_with_switch, "3-*");
+  REGISTER_TEST_HF(gen_alias_same_alias_in_tx_pool, "3-*");   
+  REGISTER_TEST_HF(gen_alias_switch_and_tx_pool, "3-*");
+  REGISTER_TEST_HF(gen_alias_update_after_addr_changed, "3-*");
+  REGISTER_TEST_HF(gen_alias_blocking_reg_by_invalid_tx, "3-*");
+  REGISTER_TEST_HF(gen_alias_blocking_update_by_invalid_tx, "3-*");
+  REGISTER_TEST_HF(gen_alias_reg_with_locked_money, "*");
+  REGISTER_TEST_HF(gen_alias_too_small_reward, "3-*");
+  REGISTER_TEST_HF(gen_alias_too_much_reward, "3-*");
+  REGISTER_TEST_HF(gen_alias_tx_no_outs, "*");
+  REGISTER_TEST_HF(gen_alias_switch_and_check_block_template, "3-*");
+  REGISTER_TEST_HF(gen_alias_too_many_regs_in_block_template, "3"); // disabled in HF4 due to tx outputs count limitation
+  REGISTER_TEST_HF(gen_alias_update_for_free, "3-*");
+  REGISTER_TEST_HF(gen_alias_in_coinbase, "3-*");
+
+  REGISTER_TEST(gen_wallet_basic_transfer);
+  REGISTER_TEST(gen_wallet_refreshing_on_chain_switch);
+  REGISTER_TEST(gen_wallet_refreshing_on_chain_switch_2);
+  REGISTER_TEST(gen_wallet_unconfirmed_tx_from_tx_pool);
+  REGISTER_TEST_HF(gen_wallet_save_load_and_balance, "*");
+  REGISTER_TEST_HF(gen_wallet_mine_pos_block, "3-*");
+  REGISTER_TEST(gen_wallet_unconfirmed_outdated_tx);
+  REGISTER_TEST(gen_wallet_unlock_by_block_and_by_time);
+  REGISTER_TEST(gen_wallet_payment_id);
+  REGISTER_TEST(gen_wallet_oversized_payment_id);
+  REGISTER_TEST(gen_wallet_transfers_and_outdated_unconfirmed_txs);
+  REGISTER_TEST(gen_wallet_transfers_and_chain_switch);
+  REGISTER_TEST(gen_wallet_decrypted_payload_items);
+  REGISTER_TEST_HF(gen_wallet_alias_and_unconfirmed_txs, "3-*");
+  REGISTER_TEST_HF(gen_wallet_alias_via_special_wallet_funcs, "3-*");
+  REGISTER_TEST(gen_wallet_fake_outputs_randomness);
+  REGISTER_TEST(gen_wallet_fake_outputs_not_enough);
+  REGISTER_TEST(gen_wallet_offers_basic);
+  REGISTER_TEST(gen_wallet_offers_size_limit);
+  REGISTER_TEST(gen_wallet_dust_to_account);
+  REGISTER_TEST(gen_wallet_selecting_pos_entries);
+  REGISTER_TEST(gen_wallet_spending_coinstake_after_minting);
+  REGISTER_TEST(gen_wallet_fake_outs_while_having_too_little_own_outs);
+  // REGISTER_TEST(premine_wallet_test);  // tests premine wallets; wallet files nedded; by demand only
+  REGISTER_TEST(mined_balance_wallet_test);
+  REGISTER_TEST(wallet_outputs_with_same_key_image);
+  REGISTER_TEST(wallet_unconfirmed_tx_expiration);
+  REGISTER_TEST(wallet_unconfimed_tx_balance);
+  REGISTER_TEST_HF(packing_outputs_on_pos_minting_wallet, "3");
+  REGISTER_TEST_HF(wallet_watch_only_and_chain_switch, "3");
+  REGISTER_TEST_HF(wallet_and_sweep_below, "3-*");
+
+  REGISTER_TEST(wallet_rpc_integrated_address);
+  REGISTER_TEST(wallet_rpc_integrated_address_transfer);
+  REGISTER_TEST(wallet_rpc_transfer);
+  REGISTER_TEST(wallet_rpc_alias_tests);
+  REGISTER_TEST_HF(wallet_rpc_exchange_suite, "3,4");
+  REGISTER_TEST_HF(wallet_true_rpc_pos_mining, "4-*");
+  REGISTER_TEST_HF(wallet_rpc_cold_signing, "3,5-*");
+  // REGISTER_TEST_HF(wallet_rpc_multiple_receivers, "5-*"); work in progress -- sowle
+  REGISTER_TEST_HF(wallet_chain_switch_with_spending_the_same_ki, "3");
+  REGISTER_TEST(wallet_sending_to_integrated_address);
+  REGISTER_TEST_HF(block_template_blacklist_test, "4-*");
+  REGISTER_TEST_HF(wallet_rpc_hardfork_verification, "5");
+
+  // REGISTER_TEST(emission_test); // simulate 1 year of blockchain, too long run (1 y ~= 1 hr), by demand only
+  // LOG_ERROR2("print_reward_change_first_blocks.log", currency::print_reward_change_first_blocks(525601).str()); // outputs first 1 year of blocks' rewards (simplier)
+
+  // pos tests
+  GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(gen_pos_basic_tests);
+  // REGISTER_TEST(gen_pos_basic_tests); -- commented as this test is run intermittedly by previous line; uncomment if necessary (ex. for debugging)
+  REGISTER_TEST(gen_pos_coinstake_already_spent);
+  REGISTER_TEST(gen_pos_incorrect_timestamp);
+  REGISTER_TEST(gen_pos_too_early_pos_block);
+  REGISTER_TEST_HF(gen_pos_extra_nonce, "3-*");
+  REGISTER_TEST(gen_pos_min_allowed_height);
+  REGISTER_TEST(gen_pos_invalid_coinbase);
+  // REGISTER_TEST(pos_wallet_minting_same_amount_diff_outs); // Long test! Takes ~10 hours to simulate 6000 blocks on 2015 middle-end computer
+  //REGISTER_TEST(pos_emission_test); // Long test! by demand only
+  REGISTER_TEST(pos_wallet_big_block_test);
+  //REGISTER_TEST(block_template_against_txs_size); // Long test! by demand only
+  REGISTER_TEST_HF(pos_altblocks_validation, "3-*");
+  REGISTER_TEST_HF(pos_mining_with_decoys, "3");
+  REGISTER_TEST_HF(pos_and_no_pow_blocks_between_output_and_stake, "4-*");
+
+  // alternative blocks and generic chain-switching tests
+  REGISTER_TEST(gen_chain_switch_pow_pos);
+  REGISTER_TEST(pow_pos_reorganize_specific_case);
+  REGISTER_TEST(gen_chain_switch_1);
+  REGISTER_TEST(bad_chain_switching_with_rollback);
+  REGISTER_TEST(chain_switching_and_tx_with_attachment_blobsize);
+  REGISTER_TEST_HF(chain_switching_when_gindex_spent_in_both_chains, "3-*");
+  REGISTER_TEST(alt_chain_coins_pow_mined_then_spent);
+  REGISTER_TEST(gen_simple_chain_split_1);
+  REGISTER_TEST_HF(alt_blocks_validation_and_same_new_amount_in_two_txs, "3-*");
+  REGISTER_TEST_HF(alt_blocks_with_the_same_txs, "3-*");
+  REGISTER_TEST_HF(chain_switching_when_out_spent_in_alt_chain_mixin, "3-*");
+  REGISTER_TEST_HF(chain_switching_when_out_spent_in_alt_chain_ref_id, "3-*");
+  REGISTER_TEST_HF(alt_chain_and_block_tx_fee_median, "3-*");
+
+  // miscellaneous tests
+  REGISTER_TEST(test_blockchain_vs_spent_keyimges);
+  REGISTER_TEST(test_blockchain_vs_spent_multisig_outs);
+  REGISTER_TEST(block_template_vs_invalid_txs_from_pool);
+  REGISTER_TEST(cumulative_difficulty_adjustment_test);
+  REGISTER_TEST(cumulative_difficulty_adjustment_test_alt);
+  REGISTER_TEST(prun_ring_signatures);
+  REGISTER_TEST(gen_simple_chain_001);
+  REGISTER_TEST(one_block);
+  REGISTER_TEST(gen_ring_signature_1);
+  REGISTER_TEST(gen_ring_signature_2);
+  REGISTER_TEST(fill_tx_rpc_inputs);
+  //REGISTER_TEST(gen_ring_signature_big); // Takes up to XXX hours (if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10)
+
+  // tests for outputs mixing in
+  REGISTER_TEST(get_random_outs_test);
+  REGISTER_TEST(mix_attr_tests);
+  REGISTER_TEST(mix_in_spent_outs);
+  REGISTER_TEST(random_outs_and_burnt_coins);
+
+  // Block verification tests
+  REGISTER_TEST_HF(gen_block_big_major_version, "0,3");
+  REGISTER_TEST_HF(gen_block_big_minor_version, "0,3");
+  REGISTER_TEST_HF(gen_block_ts_not_checked, "0,3");
+  REGISTER_TEST_HF(gen_block_ts_in_past, "0,3");
+  REGISTER_TEST_HF(gen_block_ts_in_future, "0,3");
+  //REGISTER_TEST(gen_block_invalid_prev_id); disabled because impossible to generate text chain with wrong prev_id - pow hash not works without chaining
+  REGISTER_TEST_HF(gen_block_invalid_nonce, "0,3");
+  REGISTER_TEST_HF(gen_block_no_miner_tx, "0,3");
+  REGISTER_TEST_HF(gen_block_unlock_time_is_low, "0,3");
+  REGISTER_TEST_HF(gen_block_unlock_time_is_high, "0,3");
+  REGISTER_TEST_HF(gen_block_unlock_time_is_timestamp_in_past, "0,3");
+  REGISTER_TEST_HF(gen_block_unlock_time_is_timestamp_in_future, "0,3");
+  REGISTER_TEST_HF(gen_block_height_is_low, "0,3");
+  REGISTER_TEST_HF(gen_block_height_is_high, "0,3");
+  REGISTER_TEST_HF(block_with_correct_prev_id_on_wrong_height, "3-*");
+  REGISTER_TEST_HF(block_reward_in_main_chain_basic, "3-*");
+  REGISTER_TEST_HF(block_reward_in_alt_chain_basic, "3-*");
+  REGISTER_TEST_HF(gen_block_miner_tx_has_2_tx_gen_in, "0,3");
+  REGISTER_TEST_HF(gen_block_miner_tx_has_2_in, "0,3");
+  REGISTER_TEST_HF(gen_block_miner_tx_with_txin_to_key, "0,3");
+  REGISTER_TEST_HF(gen_block_miner_tx_out_is_small, "0,3");
+  REGISTER_TEST_HF(gen_block_miner_tx_out_is_big, "0,3");
+  REGISTER_TEST_HF(gen_block_miner_tx_has_no_out, "0,3");
+  REGISTER_TEST_HF(gen_block_miner_tx_has_out_to_initiator, "0,3");
+  REGISTER_TEST_HF(gen_block_has_invalid_tx, "0,3");
+  REGISTER_TEST_HF(gen_block_is_too_big, "0,3");
+  REGISTER_TEST_HF(gen_block_wrong_version_agains_hardfork, "0,3");
+  REGISTER_TEST_HF(block_choice_rule_bigger_fee, "4-*"); 
+  //REGISTER_TEST(gen_block_invalid_binary_format); // Takes up to 3 hours, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 500, up to 30 minutes, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10
+  
+  // Transaction verification tests
+  REGISTER_TEST(gen_broken_attachments);
+  REGISTER_TEST(gen_tx_big_version);
+  REGISTER_TEST(gen_tx_unlock_time);
+  REGISTER_TEST(gen_tx_input_is_not_txin_to_key);
+  REGISTER_TEST(gen_tx_no_inputs_no_outputs);
+  REGISTER_TEST(gen_tx_no_inputs_has_outputs);
+  REGISTER_TEST(gen_tx_has_inputs_no_outputs);
+  REGISTER_TEST(gen_tx_invalid_input_amount);
+  REGISTER_TEST(gen_tx_input_wo_key_offsets);
+  REGISTER_TEST(gen_tx_sender_key_offest_not_exist);
+  REGISTER_TEST(gen_tx_key_offest_points_to_foreign_key);
+  REGISTER_TEST(gen_tx_mixed_key_offest_not_exist);
+  REGISTER_TEST(gen_tx_key_image_not_derive_from_tx_key);
+  REGISTER_TEST(gen_tx_key_image_is_invalid);
+  REGISTER_TEST(gen_tx_check_input_unlock_time);
+  REGISTER_TEST(gen_tx_txout_to_key_has_invalid_key);
+  REGISTER_TEST(gen_tx_output_with_zero_amount);
+  REGISTER_TEST(gen_tx_output_is_not_txout_to_key);
+  REGISTER_TEST(gen_tx_signatures_are_invalid);
+  REGISTER_TEST(gen_tx_extra_double_entry);
+  REGISTER_TEST(gen_tx_double_key_image);
+  REGISTER_TEST(tx_expiration_time);
+  REGISTER_TEST(tx_expiration_time_and_block_template);
+  REGISTER_TEST(tx_expiration_time_and_chain_switching);
+  REGISTER_TEST(tx_key_image_pool_conflict);
+  //REGISTER_TEST_HF(tx_version_against_hardfork, "4-*");
+  /* To execute the check of bare balance (function "check_tx_bare_balance") we need to run the test "tx_pool_semantic_validation" on the HF 3. By default behaviour bare outputs are disallowed on
+  the heights >= 10. */
+  REGISTER_TEST_HF(tx_pool_semantic_validation, "3");
+  REGISTER_TEST(input_refers_to_incompatible_by_type_output);
+  REGISTER_TEST_HF(tx_pool_validation_and_chain_switch, "4-5");
+  REGISTER_TEST_HF(tx_coinbase_separate_sig_flag, "4-*");
+  REGISTER_TEST(tx_input_mixins);
+
+  // Double spend
+  REGISTER_TEST(gen_double_spend_in_tx<false>);
+  REGISTER_TEST(gen_double_spend_in_tx<true>);
+  REGISTER_TEST(gen_double_spend_in_the_same_block<false>);
+  REGISTER_TEST(gen_double_spend_in_the_same_block<true>);
+  REGISTER_TEST(gen_double_spend_in_different_blocks<false>);
+  REGISTER_TEST(gen_double_spend_in_different_blocks<true>);
+  REGISTER_TEST(gen_double_spend_in_different_chains);
+  REGISTER_TEST(gen_double_spend_in_alt_chain_in_the_same_block<false>);
+  REGISTER_TEST(gen_double_spend_in_alt_chain_in_the_same_block<true>);
+  REGISTER_TEST(gen_double_spend_in_alt_chain_in_different_blocks<false>);
+  REGISTER_TEST(gen_double_spend_in_alt_chain_in_different_blocks<true>);
+
+  REGISTER_TEST(gen_uint_overflow_1);
+  REGISTER_TEST(gen_uint_overflow_2);
+
+  // Hardfok 1 tests
+  REGISTER_TEST(before_hard_fork_1_cumulative_difficulty);
+  REGISTER_TEST(inthe_middle_hard_fork_1_cumulative_difficulty);
+  REGISTER_TEST(after_hard_fork_1_cumulative_difficulty);
+  REGISTER_TEST(hard_fork_1_locked_mining_test);
+  REGISTER_TEST(hard_fork_1_bad_pos_source);
+  REGISTER_TEST(hard_fork_1_unlock_time_2_in_normal_tx);
+  REGISTER_TEST(hard_fork_1_unlock_time_2_in_coinbase);
+  REGISTER_TEST(hard_fork_1_chain_switch_pow_only);
+  REGISTER_TEST(hard_fork_1_checkpoint_basic_test);
+  REGISTER_TEST(hard_fork_1_pos_locked_height_vs_time);
+  REGISTER_TEST(hard_fork_1_pos_and_locked_coins);
+
+  // Hardfork 2 tests
+  //REGISTER_TEST(hard_fork_2_tx_payer_in_wallet);
+  //REGISTER_TEST(hard_fork_2_tx_receiver_in_wallet);
+  REGISTER_TEST(hard_fork_2_tx_extra_alias_entry_in_wallet);
+  REGISTER_TEST_HF(hard_fork_2_auditable_addresses_basics, "2-*");
+  REGISTER_TEST(hard_fork_2_no_new_structures_before_hf);
+  REGISTER_TEST(hard_fork_2_awo_wallets_basic_test<true>);
+  REGISTER_TEST(hard_fork_2_awo_wallets_basic_test<false>);
+  REGISTER_TEST(hard_fork_2_alias_update_using_old_tx<true>);
+  REGISTER_TEST(hard_fork_2_alias_update_using_old_tx<false>);
+  REGISTER_TEST(hard_fork_2_incorrect_alias_update<true>);
+  REGISTER_TEST(hard_fork_2_incorrect_alias_update<false>);
+
+  // HF4
+  REGISTER_TEST_HF(hard_fork_4_consolidated_txs, "3-*");
+  REGISTER_TEST_HF(hardfork_4_wallet_transfer_with_mandatory_mixins, "3-*");
+  REGISTER_TEST(hardfork_4_wallet_sweep_bare_outs);
+  REGISTER_TEST_HF(hardfork_4_pop_tx_from_global_index, "4-*");
+
+  // HF5
+  REGISTER_TEST_HF(hard_fork_5_tx_version, "5-*");
+
+  // HF6
+  REGISTER_TEST(hard_fork_6_intrinsic_payment_id_basic_test);
+  REGISTER_TEST(hard_fork_6_intrinsic_payment_id_rpc_test);
+
+  REGISTER_TEST_HF(isolate_auditable_and_proof, "2-*");
+  
+  REGISTER_TEST(zarcanum_basic_test);
+
+  REGISTER_TEST_HF(multiassets_basic_test, "4-*");
+  REGISTER_TEST_HF(ionic_swap_basic_test, "4-*");
+  REGISTER_TEST_HF(ionic_swap_exact_amounts_test, "4-*");
+  REGISTER_TEST(zarcanum_test_n_inputs_validation);
+  REGISTER_TEST(zarcanum_gen_time_balance);
+  REGISTER_TEST(zarcanum_txs_with_big_shuffled_decoy_set_shuffled);
+  REGISTER_TEST(zarcanum_pos_block_math);
+  REGISTER_TEST(zarcanum_in_alt_chain);
+  REGISTER_TEST_HF(zarcanum_in_alt_chain_2, "4-*");
+  REGISTER_TEST(assets_and_explicit_native_coins_in_outs);
+  REGISTER_TEST(zarcanum_block_with_txs);
+  REGISTER_TEST(asset_depoyment_and_few_zc_utxos);
+  REGISTER_TEST_HF(assets_and_pos_mining, "4-*");
+  REGISTER_TEST_HF(asset_emission_and_unconfirmed_balance, "4-*");
+  REGISTER_TEST_HF(asset_operation_in_consolidated_tx, "4-*");
+  REGISTER_TEST_HF(asset_operation_and_hardfork_checks, "4-*");
+  REGISTER_TEST_HF(eth_signed_asset_basics, "5-*");  // TODO: make HF4 version
+  REGISTER_TEST_HF(eth_signed_asset_via_rpc, "5-*"); // TODO: make HF4 version
+  //REGISTER_TEST_HF(asset_current_and_total_supplies_comparative_constraints, "4-*"); <-- temporary disabled, waiting for Stepan's fix -- sowle
+  REGISTER_TEST_HF(several_asset_emit_burn_txs_in_pool, "5-*");
+  REGISTER_TEST_HF(assets_transfer_with_smallest_amount, "4-*");
+  REGISTER_TEST_HF(asset_operations_and_chain_switching, "4-*");
+
+  REGISTER_TEST_HF(pos_fuse_test, "4-*");
+  REGISTER_TEST_HF(wallet_reorganize_and_trim_test, "4-*");
+  REGISTER_TEST_HF(wallet_rpc_thirdparty_custody, "5-*");    
+
+  REGISTER_TEST_HF(attachment_isolation_test, "4-*");
+
+  // REGISTER_TEST(gen_block_reward);
+  // END OF TESTS  */
+}
+
+static void fill_postponed_tests_set(std::set<std::string>& postponed_tests)
+{
+  postponed_tests.clear();
+
+#define MARK_TEST_AS_POSTPONED(genclass) postponed_tests.insert(#genclass)
+  MARK_TEST_AS_POSTPONED(gen_checkpoints_reorganize);
+  MARK_TEST_AS_POSTPONED(gen_alias_update_after_addr_changed);
+  MARK_TEST_AS_POSTPONED(gen_alias_blocking_reg_by_invalid_tx);
+  MARK_TEST_AS_POSTPONED(gen_alias_blocking_update_by_invalid_tx);
+  MARK_TEST_AS_POSTPONED(gen_wallet_fake_outputs_randomness);
+  MARK_TEST_AS_POSTPONED(gen_wallet_fake_outputs_not_enough);
+  MARK_TEST_AS_POSTPONED(gen_wallet_spending_coinstake_after_minting);
+  MARK_TEST_AS_POSTPONED(gen_wallet_fake_outs_while_having_too_little_own_outs);
+  MARK_TEST_AS_POSTPONED(gen_uint_overflow_1);
+
+  MARK_TEST_AS_POSTPONED(after_hard_fork_1_cumulative_difficulty);
+  MARK_TEST_AS_POSTPONED(before_hard_fork_1_cumulative_difficulty);
+  MARK_TEST_AS_POSTPONED(inthe_middle_hard_fork_1_cumulative_difficulty);
+#undef MARK_TEST_AS_POSTPONED
+}
+//--------------------------------------------------------------------------
+static std::vector<std::string> build_base_args_without_worker_specific(int argc, char* argv[])
+{
+  std::vector<std::string> args;
+  args.reserve(static_cast<size_t>(argc));
+
+  for (int i = 1; i < argc; ++i)
+  {
+    std::string current_arg = argv[i];
+
+    // Strip worker-specific args to avoid duplicates
+    if (current_arg == ARG_WORKER_ID || arg_has_prefix(current_arg, ARG_WORKER_ID_EQ))
+    {
+      if (current_arg == ARG_WORKER_ID && i + 1 < argc) ++i;
+      continue;
+    }
+
+    if (current_arg == ARG_DATA_DIR || arg_has_prefix(current_arg, ARG_DATA_DIR_EQ))
+    {
+      if (current_arg == ARG_DATA_DIR && i + 1 < argc) ++i;
+      continue;
+    }
+
+    args.emplace_back(std::move(current_arg));
+  }
+
+  return args;
+}
+//--------------------------------------------------------------------------
+static std::string make_worker_data_dir(const std::filesystem::path& run_root_abs, int worker_id)
+{
+  std::filesystem::path worker_dir = run_root_abs / (std::string(WORKER_DIR_PREFIX) + std::to_string(worker_id));
+  std::filesystem::create_directories(worker_dir);
+  return worker_dir.string();
+}
+
+static std::filesystem::path get_worker_stdout_path(uint32_t worker_id)
+{
+  return get_worker_dir_path(worker_id) / WORKER_STDOUT_FILENAME;
+}
+
+static std::filesystem::path get_worker_stderr_path(uint32_t worker_id)
+{
+  return get_worker_dir_path(worker_id) / WORKER_STDERR_FILENAME;
+}
+
+static std::filesystem::path get_worker_report_path(uint32_t worker_id)
+{
+  return get_worker_dir_path(worker_id) / WORKER_REPORT_FILENAME;
+}
+//--------------------------------------------------------------------------
+static bool write_worker_report_file(const worker_report& rep)
+{
+  try
+  {
+    std::filesystem::create_directories(get_worker_dir_path(rep.worker_id));
+
+    pt::ptree root;
+    root.put("worker_id", rep.worker_id);
+    root.put("processes", rep.processes);
+    root.put("tests_count", static_cast<uint64_t>(rep.tests_count));
+    root.put("unique_tests_count", static_cast<uint64_t>(rep.unique_tests_count));
+    root.put("total_time_ms", rep.total_time_ms);
+    root.put("skip_all_till_the_end", rep.skip_all_till_the_end);
+    root.put("exit_code", rep.exit_code);
+
+    pt::ptree failed_arr;
+    for (const auto& s : rep.failed_tests)
+    {
+      pt::ptree v;
+      v.put("", s);
+      failed_arr.push_back(std::make_pair("", v));
+    }
+    root.add_child("failed_tests", failed_arr);
+
+    pt::ptree times_arr;
+    for (const auto& it : rep.tests_running_time)
+    {
+      pt::ptree node;
+      node.put("name", it.first);
+      node.put("ms", it.second);
+      times_arr.push_back(std::make_pair("", node));
+    }
+    root.add_child("tests_running_time", times_arr);
+
+    std::ofstream out(get_worker_report_path(rep.worker_id));
+    if (!out.is_open())
+      return false;
+
+    pt::write_json(out, root, /*pretty*/true);
+    return true;
+  }
+  catch (...)
+  {
+    return false;
+  }
+}
+
+static bool read_worker_report_file(uint32_t worker_id, worker_report& rep)
+{
+  try
+  {
+    const auto path = get_worker_report_path(worker_id);
+    if (!std::filesystem::exists(path))
+      return false;
+
+    pt::ptree root;
+    pt::read_json(path.string(), root);
+
+    rep.worker_id = root.get<uint32_t>(JSON_WORKER_ID, worker_id);
+    rep.processes = root.get<uint32_t>(JSON_PROCESSES, 1);
+
+    rep.tests_count = static_cast<size_t>(root.get<uint64_t>(JSON_TESTS_COUNT, 0));
+    rep.unique_tests_count = static_cast<size_t>(root.get<uint64_t>(JSON_UNIQUE_TESTS_COUNT, 0));
+    rep.total_time_ms = root.get<uint64_t>(JSON_TOTAL_TIME_MS, 0);
+
+    rep.skip_all_till_the_end = root.get<bool>(JSON_SKIP_ALL_TILL_END, false);
+    rep.exit_code = root.get<int>(JSON_EXIT_CODE, 1);
+
+    for (const auto& v : root.get_child(JSON_FAILED_TESTS, pt::ptree()))
+    {
+      const std::string name = v.second.get_value<std::string>();
+      if (!name.empty())
+        rep.failed_tests.insert(name);
+    }
+
+    for (const auto& v : root.get_child(JSON_TESTS_RUNNING_TIME, pt::ptree()))
+    {
+      const auto& node = v.second;
+      const std::string name = node.get<std::string>(JSON_NAME, "");
+      const uint64_t ms = node.get<uint64_t>(JSON_MS, 0);
+      if (!name.empty())
+        rep.tests_running_time.emplace_back(name, ms);
+    }
+
+    return true;
+  }
+  catch (...)
+  {
+    return false;
+  }
+}
+
+static int print_aggregated_report_and_return_rc(uint32_t processes, uint64_t wall_time_ms)
+{
+  std::vector<worker_report> reps;
+  reps.reserve(processes);
+
+  bool any_missing = false;
+  int failed_workers = 0;
+
+  for (uint32_t i = 0; i < processes; ++i)
+  {
+    worker_report r;
+    if (!read_worker_report_file(i, r))
+    {
+      any_missing = true;
+      continue;
+    }
+    reps.push_back(std::move(r));
+  }
+
+  for (const auto& r : reps)
+    if (r.exit_code != 0)
+      ++failed_workers;
+
+  std::set<std::string> postponed_tests;
+  fill_postponed_tests_set(postponed_tests);
+
+  size_t total_tests_count = 0;
+  size_t total_unique_tests_count = 0;
+
+  std::set<std::string> failed_tests_union;
+
+  for (const auto& r : reps)
+  {
+    total_tests_count += r.tests_count;
+    total_unique_tests_count += r.unique_tests_count;
+
+    failed_tests_union.insert(r.failed_tests.begin(), r.failed_tests.end());
+  }
+
+  size_t failed_postponed_tests_count = 0;
+  for (const auto& t : failed_tests_union)
+    if (postponed_tests.count(t) != 0)
+      ++failed_postponed_tests_count;
+
+  const size_t serious_failures_count = failed_tests_union.size() - failed_postponed_tests_count;
+
+  std::cout << (serious_failures_count == 0 && failed_workers == 0 && !any_missing ? concolor::green : concolor::magenta);
+
+  std::cout << "\nREPORT (aggregated):\n";
+  std::cout << "  Workers:          " << processes << "\n";
+  if (any_missing)
+    std::cout << "  Warning:          some worker reports are missing\n";
+  std::cout << "  Worker failures:  " << failed_workers << "\n";
+
+  std::cout << "  Unique tests run: " << total_unique_tests_count << "\n";
+  std::cout << "  Total tests run:  " << total_tests_count << "\n";
+  std::cout << "  Failures:         " << serious_failures_count
+            << " (postponed failures: " << failed_postponed_tests_count << ")\n";
+  std::cout << "  Postponed:        " << postponed_tests.size() << "\n";
+  std::cout << "  Total time:       " << (wall_time_ms / 1000) << " s. ("
+            << (total_tests_count > 0 ? (wall_time_ms / total_tests_count) : 0)
+            << " ms per test in average)\n";
+  if (!failed_tests_union.empty())
+  {
+    std::cout << "FAILED/POSTPONED TESTS:\n";
+    for (const auto& name : failed_tests_union)
+    {
+      const bool postponed = postponed_tests.count(name) != 0;
+      std::cout << "  " << (postponed ? "POSTPONED: " : "FAILED:    ") << name << "\n";
+    }
+  }
+
+  std::cout << concolor::normal << std::endl;
+
+  // If any report missing or worker failed, treat as failure
+  if (any_missing || failed_workers != 0)
+    return 1;
+
+  return serious_failures_count == 0 ? 0 : 1;
+}
+//--------------------------------------------------------------------------
+static std::string tail_file_lines(const std::filesystem::path& p, size_t max_lines)
+{
+  std::ifstream f(p, std::ios::in | std::ios::binary);
+  if (!f.is_open())
+    return std::string();
+
+  f.seekg(0, std::ios::end);
+  std::streamoff size = f.tellg();
+  if (size <= 0)
+    return std::string();
+
+  const std::streamoff chunk = 64 * 1024; // 64 KB
+  std::streamoff from = size > chunk ? (size - chunk) : 0;
+  f.seekg(from, std::ios::beg);
+
+  std::string buf;
+  buf.resize(static_cast<size_t>(size - from));
+  f.read(&buf[0], buf.size());
+
+  std::vector<std::string> lines;
+  lines.reserve(max_lines + 10);
+  std::string cur;
+
+  for (char c : buf)
+  {
+    if (c == '\r')
+      continue;
+    if (c == '\n')
+    {
+      lines.emplace_back(std::move(cur));
+      cur.clear();
+    }
+    else
+    {
+      cur.push_back(c);
+    }
+  }
+  if (!cur.empty())
+    lines.emplace_back(std::move(cur));
+
+  if (lines.empty())
+    return std::string();
+
+  size_t start = lines.size() > max_lines ? (lines.size() - max_lines) : 0;
+  std::ostringstream out;
+  for (size_t i = start; i < lines.size(); ++i)
+    out << lines[i] << "\n";
+
+  return out.str();
+}
+
+static void print_worker_failure_reasons(uint32_t processes, const std::vector<int>& worker_exit_codes)
+{
+  bool any = false;
+
+  for (uint32_t i = 0; i < processes; ++i)
+  {
+    const bool report_exists = std::filesystem::exists(get_worker_report_path(i));
+    const int ec = (i < worker_exit_codes.size() ? worker_exit_codes[i] : -999);
+
+    if (ec == 0 && report_exists)
+      continue;
+
+    if (!any)
+    {
+      std::cout << "\nFAILURE REASONS (workers):\n";
+      any = true;
+    }
+
+    std::cout << "  Worker " << i << ":\n";
+    std::cout << "    exit_code: " << ec << "\n";
+    if (!report_exists)
+      std::cout << "    report: missing (" << get_worker_report_path(i).string() << ")\n";
+    else
+      std::cout << "    report: " << get_worker_report_path(i).string() << "\n";
+
+    const auto stderr_path = get_worker_stderr_path(i);
+    const auto stdout_path = get_worker_stdout_path(i);
+
+    std::cout << "    stderr: " << stderr_path.string() << "\n";
+    std::string err_tail = tail_file_lines(stderr_path, 40);
+    if (!err_tail.empty())
+    {
+      std::cout << "    --- stderr tail ---\n";
+      std::cout << err_tail;
+      std::cout << "    --- end stderr tail ---\n";
+    }
+
+    std::cout << "    stdout: " << stdout_path.string() << "\n";
+    std::string out_tail = tail_file_lines(stdout_path, 20);
+    if (!out_tail.empty())
+    {
+      std::cout << "    --- stdout tail ---\n";
+      std::cout << out_tail;
+      std::cout << "    --- end stdout tail ---\n";
+    }
+  }
+}
+//--------------------------------------------------------------------------
+static int run_workers_and_wait(int argc, char* argv[])
+{
+  const uint32_t processes = command_line::get_arg(g_vm, arg_processes);
+  const int32_t worker_id  = command_line::get_arg(g_vm, arg_worker_id);
+
+  // Only parent (multi-process mode, worker_id not set) spawns workers.
+  if (processes <= 1 || worker_id >= 0)
+    return -1;
+
+  // Do not spawn workers for these modes.
+  if (command_line::get_arg(g_vm, command_line::arg_help)) return -1;
+  if (command_line::get_arg(g_vm, arg_list_tests)) return -1;
+  if (command_line::get_arg(g_vm, arg_generate_test_data)) return -1;
+  if (command_line::get_arg(g_vm, arg_play_test_data)) return -1;
+  if (command_line::get_arg(g_vm, arg_generate_and_play_test_data)) return -1;
+  if (command_line::get_arg(g_vm, arg_test_transactions)) return -1;
+
+  const std::string run_root = command_line::get_arg(g_vm, arg_run_root);
+  std::vector<std::string> base_args = build_base_args_without_worker_specific(argc, argv);
+
+  auto has_flag = [&](const char* flag, const std::string& prefix) -> bool
+  {
+    for (const auto& a : base_args)
+      if (a == flag || arg_has_prefix(a, prefix))
+        return true;
+    return false;
+  };
+
+  if (!has_flag("--processes", "--processes="))
+  {
+    base_args.emplace_back("--processes");
+    base_args.emplace_back(std::to_string(processes));
+  }
+
+  std::filesystem::path run_root_abs = run_root.empty()
+    ? std::filesystem::path("chaingen_runs")
+    : std::filesystem::path(run_root);
+
+  if (run_root_abs.is_relative())
+    run_root_abs = std::filesystem::absolute(run_root_abs);
+
+  if (!has_flag("--run-root", "--run-root="))
+  {
+    base_args.emplace_back("--run-root");
+    base_args.emplace_back(run_root_abs.string());
+  }
+
+  // Resolve executable path and make it absolute.
+  std::string exe = (argv && argv[0]) ? std::string(argv[0]) : std::string();
+  if (exe.empty())
+  {
+    std::cout << concolor::magenta
+              << "Cannot spawn workers: empty executable path (argv[0])"
+              << concolor::normal << std::endl;
+    return 1;
+  }
+
+  try
+  {
+    std::filesystem::path exe_path(exe);
+
+    // If no directory component is present, try PATH lookup first.
+    if (exe.find('/') == std::string::npos && exe.find('\\') == std::string::npos)
+    {
+      boost::filesystem::path resolved = bp::search_path(exe);
+      if (!resolved.empty())
+        exe_path = std::filesystem::path(resolved.string());
+    }
+
+    // Make absolute because workers will run with start_dir = worker directory.
+    if (exe_path.is_relative())
+      exe_path = std::filesystem::absolute(exe_path);
+
+    exe = exe_path.string();
+  }
+  catch (...)
+  {
+    // Keep exe as-is; spawning will fail with a clear message if it's invalid.
+  }
+
+  if (exe.empty() || !std::filesystem::exists(std::filesystem::path(exe)))
+  {
+    std::cout << concolor::magenta
+              << "Cannot spawn workers: failed to resolve executable: " << exe
+              << concolor::normal << std::endl;
+    return 1;
+  }
+
+  std::vector<bp::child> kids;
+  kids.reserve(processes);
+
+  std::vector<int> worker_exit_codes(processes, -1);
+
+  // Streams for tee
+  std::vector<std::unique_ptr<bp::ipstream>> kids_out(processes);
+  std::vector<std::unique_ptr<bp::ipstream>> kids_err(processes);
+
+  // Tee threads
+  std::vector<std::thread> tee_threads;
+  tee_threads.reserve(static_cast<size_t>(processes) * 2);
+
+  const auto wall_t0 = std::chrono::steady_clock::now();
+
+  for (uint32_t i = 0; i < processes; ++i)
+  {
+    std::vector<std::string> args = base_args;
+
+    args.emplace_back("--worker-id");
+    args.emplace_back(std::to_string(i));
+
+    const std::string worker_data_dir = make_worker_data_dir(run_root_abs, static_cast<int>(i));
+    args.emplace_back("--data-dir");
+    args.emplace_back(worker_data_dir);
+
+    try
+    {
+      const auto worker_dir = get_worker_dir_path(i);
+      std::filesystem::create_directories(worker_dir);
+
+      const auto stdout_path = get_worker_stdout_path(i);
+      const auto stderr_path = get_worker_stderr_path(i);
+
+      kids_out[i] = std::make_unique<bp::ipstream>();
+      kids_err[i] = std::make_unique<bp::ipstream>();
+
+      kids.emplace_back(bp::child(
+        exe,
+        bp::args(args),
+        bp::start_dir = worker_dir.string(),
+        bp::std_out > *kids_out[i],
+        bp::std_err > *kids_err[i]
+      ));
+
+      // Tee stdout: worker -> console + file
+      tee_threads.emplace_back([p = stdout_path, s = kids_out[i].get()]()
+      {
+        std::ofstream f(p, std::ios::out | std::ios::binary | std::ios::app);
+        std::string line;
+        while (std::getline(*s, line))
+        {
+          f << line << "\n";
+          f.flush();
+
+          std::lock_guard<std::mutex> lk(cout_mx);
+          std::cout << line << std::endl;
+        }
+      });
+
+      // Tee stderr: worker -> console(stderr) + file
+      tee_threads.emplace_back([p = stderr_path, s = kids_err[i].get()]()
+      {
+        std::ofstream f(p, std::ios::out | std::ios::binary | std::ios::app);
+        std::string line;
+        while (std::getline(*s, line))
+        {
+          f << line << "\n";
+          f.flush();
+
+          std::lock_guard<std::mutex> lk(cerr_mx);
+          std::cerr << line << std::endl;
+        }
+      });
+    }
+    catch (const std::exception& e)
+    {
+      std::cout << concolor::magenta
+                << "Failed to spawn worker " << i << ": " << e.what()
+                << concolor::normal << std::endl;
+
+      for (auto& c : kids)
+        if (c.running())
+          c.terminate();
+      for (auto& c : kids)
+        c.wait();
+
+      for (auto& t : tee_threads)
+        if (t.joinable())
+          t.join();
+
+      return 1;
+    }
+  }
+
+  int failed_workers = 0;
+  for (uint32_t i = 0; i < kids.size(); ++i)
+  {
+    kids[i].wait();
+    worker_exit_codes[i] = kids[i].exit_code();
+    if (worker_exit_codes[i] != 0)
+      ++failed_workers;
+  }
+
+  // Wait tee threads after children exit (streams will close).
+  for (auto& t : tee_threads)
+    if (t.joinable())
+      t.join();
+
+  const auto wall_t1 = std::chrono::steady_clock::now();
+  const uint64_t wall_ms =
+    static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(wall_t1 - wall_t0).count());
+
+  // Aggregated report first.
+  const int aggregated_rc = print_aggregated_report_and_return_rc(processes, wall_ms);
+
+  // Then print diagnostics.
+  if (failed_workers != 0)
+    print_worker_failure_reasons(processes, worker_exit_codes);
+
+  // Any worker non-zero => fail.
+  if (failed_workers != 0)
+    return 1;
+
+  return aggregated_rc;
+}
 //--------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {
   TRY_ENTRY();
   string_tools::set_module_name_and_folder(argv[0]);
 
-  //set up logging options
+  // set up logging options
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
   log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_4);
-  
-  log_space::log_singletone::add_logger(LOGGER_FILE, 
-    log_space::log_singletone::get_default_log_file().c_str(), 
+
+  log_space::log_singletone::add_logger(
+    LOGGER_FILE,
+    log_space::log_singletone::get_default_log_file().c_str(),
     log_space::log_singletone::get_default_log_folder().c_str());
 
   log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet", false);
 
   tools::signal_handler::install_fatal([](int sig_number, void* address) {
     LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
-    std::fflush(nullptr); // all open output streams are flushed
+    std::fflush(nullptr); // flush all open output streams
   });
 
   po::options_description desc_options("Allowed options");
@@ -934,9 +2057,14 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, command_line::arg_data_dir, std::string("."));
   command_line::add_arg(desc_options, command_line::arg_stop_after_height);
   command_line::add_arg(desc_options, command_line::arg_disable_ntp);
+  command_line::add_arg(desc_options, arg_processes);
+  command_line::add_arg(desc_options, arg_worker_id);
+  command_line::add_arg(desc_options, arg_run_root);
+  command_line::add_arg(desc_options, arg_list_tests);
 
   currency::core::init_options(desc_options);
   tools::db::db_backend_selector::init_options(desc_options);
+
   bool stop_on_first_fail = false;
   bool r = command_line::handle_error_helper(desc_options, [&]()
   {
@@ -947,6 +2075,14 @@ int main(int argc, char* argv[])
   if (!r)
     return 1;
 
+  // Parent spawns workers and must print aggregated report inside run_workers_and_wait().
+  // Workers will return -1 here and continue into normal execution path.
+  {
+    int parent_rc = run_workers_and_wait(argc, argv);
+    if (parent_rc != -1)
+      return parent_rc;
+  }
+
   if (command_line::get_arg(g_vm, command_line::arg_help))
   {
     std::cout << desc_options << std::endl;
@@ -956,7 +2092,8 @@ int main(int argc, char* argv[])
   if (command_line::has_arg(g_vm, command_line::arg_log_level))
   {
     int new_log_level = command_line::get_arg(g_vm, command_line::arg_log_level);
-    if (new_log_level >= LOG_LEVEL_MIN && new_log_level <= LOG_LEVEL_MAX && log_space::get_set_log_detalisation_level(false) != new_log_level)
+    if (new_log_level >= LOG_LEVEL_MIN && new_log_level <= LOG_LEVEL_MAX &&
+        log_space::get_set_log_detalisation_level(false) != new_log_level)
     {
       log_space::get_set_log_detalisation_level(true, new_log_level);
       LOG_PRINT_L0("LOG_LEVEL set to " << new_log_level);
@@ -968,15 +2105,19 @@ int main(int argc, char* argv[])
     stop_on_first_fail = command_line::get_arg(g_vm, arg_stop_on_fail);
   }
 
-  
+  const uint32_t processes = command_line::get_arg(g_vm, arg_processes);
+  const int32_t worker_id = command_line::get_arg(g_vm, arg_worker_id);
+  const bool is_worker = (processes > 1 && worker_id >= 0);
+
   bool skip_all_till_the_end = false;
   size_t tests_count = 0;
   size_t unique_tests_count = 0;
   size_t serious_failures_count = 0;
   std::set<std::string> failed_tests;
-  std::string tests_folder = command_line::get_arg(g_vm, arg_test_data_path);
+
   typedef std::vector<std::pair<std::string, uint64_t>> tests_running_time_t;
   tests_running_time_t tests_running_time;
+
   if (command_line::get_arg(g_vm, arg_generate_test_data))
   {
     GENERATE("chain001.dat", gen_simple_chain_001);
@@ -991,7 +2132,8 @@ int main(int argc, char* argv[])
   }
   else
   {
-    epee::debug::get_set_enable_assert(true, command_line::get_arg(g_vm, arg_enable_debug_asserts)); // don't comment out this: many tests have normal-negative checks (i.e. tx with invalid amount shouldn't be created), so be ready for MANY assertion breaks
+    // Do not comment this out: many tests have normal-negative checks.
+    epee::debug::get_set_enable_assert(true, command_line::get_arg(g_vm, arg_enable_debug_asserts));
 
     std::unordered_multimap<std::string, size_t> specific_tests_to_run; // test_name -> hf; if empty, all tests should be run
     CHECK_AND_ASSERT_MES(parse_cmd_specific_tests_to_run(specific_tests_to_run), 1, "Error while parsing specific tests to run");
@@ -1001,6 +2143,7 @@ int main(int argc, char* argv[])
     auto is_hf_test_eligible_to_run = [&](const std::string& genclass_str, size_t hardfork) -> bool {
       if (skip_all_till_the_end)
         return false;
+
       if (specific_tests_to_run.empty())
       {
         if (postponed_tests.count(genclass_str) != 0)
@@ -1011,18 +2154,23 @@ int main(int argc, char* argv[])
         auto it_pair = specific_tests_to_run.equal_range(genclass_str);
         if (it_pair.first == it_pair.second)
           return false;
+
         bool match = false;
-        for(auto it = it_pair.first; it != it_pair.second; ++it)
+        for (auto it = it_pair.first; it != it_pair.second; ++it)
           if (it->second == SIZE_MAX || hardfork == SIZE_MAX || it->second == hardfork)
             match = true;
+
         if (!match)
           return false;
       }
+
       LOG_PRINT_L0("good: " << genclass_str);
       return true;
     };
 
-    auto is_test_eligible_to_run = [&](const std::string& genclass_str) -> bool { return is_hf_test_eligible_to_run(genclass_str, SIZE_MAX); };
+    auto is_test_eligible_to_run = [&](const std::string& genclass_str) -> bool {
+      return is_hf_test_eligible_to_run(genclass_str, SIZE_MAX);
+    };
 
     if (specific_tests_to_run.empty())
     {
@@ -1036,442 +2184,143 @@ int main(int argc, char* argv[])
       CALL_TEST("test_parse_hardfork_str_mask", test_parse_hardfork_str_mask);
     }
 
-    //CALL_TEST("check_hash_and_difficulty_monte_carlo_test", check_hash_and_difficulty_monte_carlo_test); // it's rather an experiment with unclean results than a solid test, for further research...
+    // Postponed tests list.
+    fill_postponed_tests_set(postponed_tests);
 
-    // Postponed tests - tests that may fail for the time being (believed that it's a serious issue and should be fixed later for some reason).
-    // In a perfect world this list is empty.
-#define MARK_TEST_AS_POSTPONED(genclass) postponed_tests.insert(#genclass)
-    MARK_TEST_AS_POSTPONED(gen_checkpoints_reorganize);
-    MARK_TEST_AS_POSTPONED(gen_alias_update_after_addr_changed);
-    MARK_TEST_AS_POSTPONED(gen_alias_blocking_reg_by_invalid_tx);
-    MARK_TEST_AS_POSTPONED(gen_alias_blocking_update_by_invalid_tx);
-    MARK_TEST_AS_POSTPONED(gen_wallet_fake_outputs_randomness);
-    MARK_TEST_AS_POSTPONED(gen_wallet_fake_outputs_not_enough);
-    MARK_TEST_AS_POSTPONED(gen_wallet_spending_coinstake_after_minting);
-    MARK_TEST_AS_POSTPONED(gen_wallet_fake_outs_while_having_too_little_own_outs);
-    MARK_TEST_AS_POSTPONED(gen_uint_overflow_1);
+    register_all_tests(
+      stop_on_first_fail,
+      skip_all_till_the_end,
+      tests_count,
+      unique_tests_count,
+      failed_tests,
+      tests_running_time,
+      is_test_eligible_to_run,
+      is_hf_test_eligible_to_run);
 
-    MARK_TEST_AS_POSTPONED(after_hard_fork_1_cumulative_difficulty); // reason: set_pos_to_low_timestamp is not supported anymore
-    MARK_TEST_AS_POSTPONED(before_hard_fork_1_cumulative_difficulty);
-    MARK_TEST_AS_POSTPONED(inthe_middle_hard_fork_1_cumulative_difficulty);
-
-#undef MARK_TEST_AS_POSTPONED
-
-
-    // TODO // GENERATE_AND_PLAY(wallet_spend_form_auditable_and_track);
-    GENERATE_AND_PLAY(gen_block_big_major_version);
-
-    GENERATE_AND_PLAY(pos_minting_tx_packing);
-
-    GENERATE_AND_PLAY(multisig_wallet_test);
-    GENERATE_AND_PLAY(multisig_wallet_test_many_dst);
-    GENERATE_AND_PLAY(multisig_wallet_heterogenous_dst);
-    GENERATE_AND_PLAY(multisig_wallet_same_dst_addr);
-    GENERATE_AND_PLAY(multisig_wallet_ms_to_ms);
-    GENERATE_AND_PLAY(multisig_minimum_sigs);
-    GENERATE_AND_PLAY(multisig_and_fake_outputs);
-    GENERATE_AND_PLAY(multisig_and_unlock_time);
-    GENERATE_AND_PLAY(multisig_and_coinbase);
-    GENERATE_AND_PLAY(multisig_with_same_id_in_pool);
-    GENERATE_AND_PLAY_HF(multisig_and_checkpoints, "0"); // TODO: fix for HF 1-3 (checkpoint hash check)
-    GENERATE_AND_PLAY(multisig_and_checkpoints_bad_txs);
-    GENERATE_AND_PLAY(multisig_and_altchains);
-    GENERATE_AND_PLAY(multisig_out_make_and_spent_in_altchain);
-    GENERATE_AND_PLAY(multisig_unconfirmed_transfer_and_multiple_scan_pool_calls);
-    GENERATE_AND_PLAY(multisig_out_spent_in_altchain_case_b4);
-    GENERATE_AND_PLAY(multisig_n_participants_seq_signing);
-
-    GENERATE_AND_PLAY(ref_by_id_basics);
-    GENERATE_AND_PLAY(ref_by_id_mixed_inputs_types);
-
-    GENERATE_AND_PLAY(escrow_wallet_test);
-    GENERATE_AND_PLAY(escrow_w_and_fake_outputs);
-    GENERATE_AND_PLAY(escrow_incorrect_proposal);
-    GENERATE_AND_PLAY(escrow_proposal_expiration);
-    GENERATE_AND_PLAY(escrow_proposal_and_accept_expiration);
-    GENERATE_AND_PLAY(escrow_incorrect_proposal_acceptance);
-    GENERATE_AND_PLAY(escrow_custom_test);
-    GENERATE_AND_PLAY(escrow_incorrect_cancel_proposal);
-    GENERATE_AND_PLAY(escrow_proposal_not_enough_money);
-    GENERATE_AND_PLAY(escrow_cancellation_and_tx_order);
-    GENERATE_AND_PLAY(escrow_cancellation_proposal_expiration);
-    GENERATE_AND_PLAY(escrow_cancellation_acceptance_expiration);
-    // GENERATE_AND_PLAY(escrow_proposal_acceptance_in_alt_chain); -- work in progress
-    GENERATE_AND_PLAY(escrow_zero_amounts);
-    GENERATE_AND_PLAY(escrow_balance);
-
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<0>);
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<1>);
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<2>);
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<3>);
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<4>);
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<5>);
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<6>);
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<7>);
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<8>);
-    static_assert(escrow_altchain_meta_test_data<9>::empty_marker, ""); // make sure there are no sub-tests left
-
-    GENERATE_AND_PLAY(offers_expiration_test);
-    GENERATE_AND_PLAY(offers_tests);
-    GENERATE_AND_PLAY(offers_filtering_1);
-    //GENERATE_AND_PLAY(offers_handling_on_chain_switching);
-    GENERATE_AND_PLAY(offer_removing_and_selected_output);
-    GENERATE_AND_PLAY(offers_multiple_update);
-    GENERATE_AND_PLAY(offer_sig_validity_in_update_and_cancel);
-    GENERATE_AND_PLAY(offer_lifecycle_via_tx_pool);
-    GENERATE_AND_PLAY(offers_updating_hack);
-    GENERATE_AND_PLAY(offer_cancellation_with_zero_fee);
-
-    GENERATE_AND_PLAY(gen_crypted_attachments);
-    GENERATE_AND_PLAY(gen_checkpoints_attachments_basic);
-    GENERATE_AND_PLAY(gen_checkpoints_invalid_keyimage);
-    GENERATE_AND_PLAY(gen_checkpoints_altblock_before_and_after_cp);
-    GENERATE_AND_PLAY(gen_checkpoints_block_in_future);
-    GENERATE_AND_PLAY(gen_checkpoints_altchain_far_before_cp);
-    GENERATE_AND_PLAY(gen_checkpoints_block_in_future_after_cp);
-    GENERATE_AND_PLAY(gen_checkpoints_prun_txs_after_blockchain_load);
-    GENERATE_AND_PLAY(gen_checkpoints_reorganize);
-    GENERATE_AND_PLAY(gen_checkpoints_pos_validation_on_altchain);
-    GENERATE_AND_PLAY(gen_checkpoints_and_invalid_tx_to_pool);
-    GENERATE_AND_PLAY(gen_checkpoints_set_after_switching_to_altchain);
-    GENERATE_AND_PLAY_HF(gen_no_attchments_in_coinbase, "3");
-    GENERATE_AND_PLAY(gen_no_attchments_in_coinbase_gentime);
-
-    GENERATE_AND_PLAY_HF(gen_alias_tests, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_strange_data, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_concurrency_with_switch, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_same_alias_in_tx_pool, "3-*");   
-    GENERATE_AND_PLAY_HF(gen_alias_switch_and_tx_pool, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_update_after_addr_changed, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_blocking_reg_by_invalid_tx, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_blocking_update_by_invalid_tx, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_reg_with_locked_money, "*");
-    GENERATE_AND_PLAY_HF(gen_alias_too_small_reward, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_too_much_reward, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_tx_no_outs, "*");
-    GENERATE_AND_PLAY_HF(gen_alias_switch_and_check_block_template, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_too_many_regs_in_block_template, "3"); // disabled in HF4 due to tx outputs count limitation
-    GENERATE_AND_PLAY_HF(gen_alias_update_for_free, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_in_coinbase, "3-*");
-
-    GENERATE_AND_PLAY(gen_wallet_basic_transfer);
-    GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch);
-    GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch_2);
-    GENERATE_AND_PLAY(gen_wallet_unconfirmed_tx_from_tx_pool);
-    GENERATE_AND_PLAY_HF(gen_wallet_save_load_and_balance, "*");
-    GENERATE_AND_PLAY_HF(gen_wallet_mine_pos_block, "3-*");
-    GENERATE_AND_PLAY(gen_wallet_unconfirmed_outdated_tx);
-    GENERATE_AND_PLAY(gen_wallet_unlock_by_block_and_by_time);
-    GENERATE_AND_PLAY(gen_wallet_payment_id);
-    GENERATE_AND_PLAY(gen_wallet_oversized_payment_id);
-    GENERATE_AND_PLAY(gen_wallet_transfers_and_outdated_unconfirmed_txs);
-    GENERATE_AND_PLAY(gen_wallet_transfers_and_chain_switch);
-    GENERATE_AND_PLAY(gen_wallet_decrypted_payload_items);
-    GENERATE_AND_PLAY_HF(gen_wallet_alias_and_unconfirmed_txs, "3-*");
-    GENERATE_AND_PLAY_HF(gen_wallet_alias_via_special_wallet_funcs, "3-*");
-    GENERATE_AND_PLAY(gen_wallet_fake_outputs_randomness);
-    GENERATE_AND_PLAY(gen_wallet_fake_outputs_not_enough);
-    GENERATE_AND_PLAY(gen_wallet_offers_basic);
-    GENERATE_AND_PLAY(gen_wallet_offers_size_limit);
-    GENERATE_AND_PLAY(gen_wallet_dust_to_account);
-    GENERATE_AND_PLAY(gen_wallet_selecting_pos_entries);
-    GENERATE_AND_PLAY(gen_wallet_spending_coinstake_after_minting);
-    GENERATE_AND_PLAY(gen_wallet_fake_outs_while_having_too_little_own_outs);
-    // GENERATE_AND_PLAY(premine_wallet_test);  // tests premine wallets; wallet files nedded; by demand only
-    GENERATE_AND_PLAY(mined_balance_wallet_test);
-    GENERATE_AND_PLAY(wallet_outputs_with_same_key_image);
-    GENERATE_AND_PLAY(wallet_unconfirmed_tx_expiration);
-    GENERATE_AND_PLAY(wallet_unconfimed_tx_balance);
-    GENERATE_AND_PLAY_HF(packing_outputs_on_pos_minting_wallet, "3");
-    GENERATE_AND_PLAY_HF(wallet_watch_only_and_chain_switch, "3");
-    GENERATE_AND_PLAY_HF(wallet_and_sweep_below, "3-*");
-
-    GENERATE_AND_PLAY(wallet_rpc_integrated_address);
-    GENERATE_AND_PLAY(wallet_rpc_integrated_address_transfer);
-    GENERATE_AND_PLAY(wallet_rpc_transfer);
-    GENERATE_AND_PLAY(wallet_rpc_alias_tests);
-    GENERATE_AND_PLAY_HF(wallet_rpc_exchange_suite, "3,4");
-    GENERATE_AND_PLAY_HF(wallet_true_rpc_pos_mining, "4-*");
-    GENERATE_AND_PLAY_HF(wallet_rpc_cold_signing, "3,5-*");
-    // GENERATE_AND_PLAY_HF(wallet_rpc_multiple_receivers, "5-*"); work in progress -- sowle
-    GENERATE_AND_PLAY_HF(wallet_chain_switch_with_spending_the_same_ki, "3");
-    GENERATE_AND_PLAY(wallet_sending_to_integrated_address);
-    GENERATE_AND_PLAY_HF(block_template_blacklist_test, "4-*");
-    GENERATE_AND_PLAY_HF(wallet_rpc_hardfork_verification, "5");
-    
-
-    // GENERATE_AND_PLAY(emission_test); // simulate 1 year of blockchain, too long run (1 y ~= 1 hr), by demand only
-    // LOG_ERROR2("print_reward_change_first_blocks.log", currency::print_reward_change_first_blocks(525601).str()); // outputs first 1 year of blocks' rewards (simplier)
-
-    // pos tests
-    GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(gen_pos_basic_tests);
-    // GENERATE_AND_PLAY(gen_pos_basic_tests); -- commented as this test is run intermittedly by previous line; uncomment if necessary (ex. for debugging)
-    GENERATE_AND_PLAY(gen_pos_coinstake_already_spent);
-    GENERATE_AND_PLAY(gen_pos_incorrect_timestamp);
-    GENERATE_AND_PLAY(gen_pos_too_early_pos_block);
-    GENERATE_AND_PLAY_HF(gen_pos_extra_nonce, "3-*");
-    GENERATE_AND_PLAY(gen_pos_min_allowed_height);
-    GENERATE_AND_PLAY(gen_pos_invalid_coinbase);
-    // GENERATE_AND_PLAY(pos_wallet_minting_same_amount_diff_outs); // Long test! Takes ~10 hours to simulate 6000 blocks on 2015 middle-end computer
-    //GENERATE_AND_PLAY(pos_emission_test); // Long test! by demand only
-    GENERATE_AND_PLAY(pos_wallet_big_block_test);
-    //GENERATE_AND_PLAY(block_template_against_txs_size); // Long test! by demand only
-    GENERATE_AND_PLAY_HF(pos_altblocks_validation, "3-*");
-    GENERATE_AND_PLAY_HF(pos_mining_with_decoys, "3");
-    GENERATE_AND_PLAY_HF(pos_and_no_pow_blocks_between_output_and_stake, "4-*");
-
-    // alternative blocks and generic chain-switching tests
-    GENERATE_AND_PLAY(gen_chain_switch_pow_pos);
-    GENERATE_AND_PLAY(pow_pos_reorganize_specific_case);
-    GENERATE_AND_PLAY(gen_chain_switch_1);
-    GENERATE_AND_PLAY(bad_chain_switching_with_rollback);
-    GENERATE_AND_PLAY(chain_switching_and_tx_with_attachment_blobsize);
-    GENERATE_AND_PLAY_HF(chain_switching_when_gindex_spent_in_both_chains, "3-*");
-    GENERATE_AND_PLAY(alt_chain_coins_pow_mined_then_spent);
-    GENERATE_AND_PLAY(gen_simple_chain_split_1);
-    GENERATE_AND_PLAY_HF(alt_blocks_validation_and_same_new_amount_in_two_txs, "3-*");
-    GENERATE_AND_PLAY_HF(alt_blocks_with_the_same_txs, "3-*");
-    GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_mixin, "3-*");
-    GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_ref_id, "3-*");
-    GENERATE_AND_PLAY_HF(alt_chain_and_block_tx_fee_median, "3-*");
-
-    // miscellaneous tests
-    GENERATE_AND_PLAY(test_blockchain_vs_spent_keyimges);
-    GENERATE_AND_PLAY(test_blockchain_vs_spent_multisig_outs);
-    GENERATE_AND_PLAY(block_template_vs_invalid_txs_from_pool);
-    GENERATE_AND_PLAY(cumulative_difficulty_adjustment_test);
-    GENERATE_AND_PLAY(cumulative_difficulty_adjustment_test);
-    GENERATE_AND_PLAY(cumulative_difficulty_adjustment_test_alt);
-    GENERATE_AND_PLAY(prun_ring_signatures);
-    GENERATE_AND_PLAY(gen_simple_chain_001);
-    GENERATE_AND_PLAY(one_block);
-    GENERATE_AND_PLAY(gen_ring_signature_1);
-    GENERATE_AND_PLAY(gen_ring_signature_2);
-    GENERATE_AND_PLAY(fill_tx_rpc_inputs);
-    //GENERATE_AND_PLAY(gen_ring_signature_big); // Takes up to XXX hours (if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10)
-
-    // tests for outputs mixing in
-    GENERATE_AND_PLAY(get_random_outs_test);
-    GENERATE_AND_PLAY(mix_attr_tests);
-    GENERATE_AND_PLAY(mix_in_spent_outs);
-    GENERATE_AND_PLAY(random_outs_and_burnt_coins);
-
-    // Block verification tests
-    GENERATE_AND_PLAY_HF(gen_block_big_major_version, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_big_minor_version, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_ts_not_checked, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_ts_in_past, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_ts_in_future, "0,3");
-    //GENERATE_AND_PLAY(gen_block_invalid_prev_id); disabled because impossible to generate text chain with wrong prev_id - pow hash not works without chaining
-    GENERATE_AND_PLAY_HF(gen_block_invalid_nonce, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_no_miner_tx, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_low, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_high, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_timestamp_in_past, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_timestamp_in_future, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_height_is_low, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_height_is_high, "0,3");
-    GENERATE_AND_PLAY_HF(block_with_correct_prev_id_on_wrong_height, "3-*");
-    GENERATE_AND_PLAY_HF(block_reward_in_main_chain_basic, "3-*");
-    GENERATE_AND_PLAY_HF(block_reward_in_alt_chain_basic, "3-*");
-    GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_tx_gen_in, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_in, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_miner_tx_with_txin_to_key, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_miner_tx_out_is_small, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_miner_tx_out_is_big, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_no_out, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_out_to_initiator, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_has_invalid_tx, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_is_too_big, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_wrong_version_agains_hardfork, "0,3");
-    GENERATE_AND_PLAY_HF(block_choice_rule_bigger_fee, "4-*"); 
-    //GENERATE_AND_PLAY(gen_block_invalid_binary_format); // Takes up to 3 hours, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 500, up to 30 minutes, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10
-
-
-    
-    // Transaction verification tests
-    GENERATE_AND_PLAY(gen_broken_attachments);
-    GENERATE_AND_PLAY(gen_tx_big_version);
-    GENERATE_AND_PLAY(gen_tx_unlock_time);
-    GENERATE_AND_PLAY(gen_tx_input_is_not_txin_to_key);
-    GENERATE_AND_PLAY(gen_tx_no_inputs_no_outputs);
-    GENERATE_AND_PLAY(gen_tx_no_inputs_has_outputs);
-    GENERATE_AND_PLAY(gen_tx_has_inputs_no_outputs);
-    GENERATE_AND_PLAY(gen_tx_invalid_input_amount);
-    GENERATE_AND_PLAY(gen_tx_input_wo_key_offsets);
-    GENERATE_AND_PLAY(gen_tx_sender_key_offest_not_exist);
-    GENERATE_AND_PLAY(gen_tx_key_offest_points_to_foreign_key);
-    GENERATE_AND_PLAY(gen_tx_mixed_key_offest_not_exist);
-    GENERATE_AND_PLAY(gen_tx_key_image_not_derive_from_tx_key);
-    GENERATE_AND_PLAY(gen_tx_key_image_is_invalid);
-    GENERATE_AND_PLAY(gen_tx_check_input_unlock_time);
-    GENERATE_AND_PLAY(gen_tx_txout_to_key_has_invalid_key);
-    GENERATE_AND_PLAY(gen_tx_output_with_zero_amount);
-    GENERATE_AND_PLAY(gen_tx_output_is_not_txout_to_key);
-    GENERATE_AND_PLAY(gen_tx_signatures_are_invalid);
-    GENERATE_AND_PLAY(gen_tx_extra_double_entry);
-    GENERATE_AND_PLAY(gen_tx_double_key_image);
-    GENERATE_AND_PLAY(tx_expiration_time);
-    GENERATE_AND_PLAY(tx_expiration_time_and_block_template);
-    GENERATE_AND_PLAY(tx_expiration_time_and_chain_switching);
-    GENERATE_AND_PLAY(tx_key_image_pool_conflict);
-    //GENERATE_AND_PLAY_HF(tx_version_against_hardfork, "4-*");
-    /* To execute the check of bare balance (function "check_tx_bare_balance") we need to run the test "tx_pool_semantic_validation" on the HF 3. By default behaviour bare outputs are disallowed on
-    the heights >= 10. */
-    GENERATE_AND_PLAY_HF(tx_pool_semantic_validation, "3");
-    GENERATE_AND_PLAY(input_refers_to_incompatible_by_type_output);
-    GENERATE_AND_PLAY_HF(tx_pool_validation_and_chain_switch, "4-5");
-    GENERATE_AND_PLAY_HF(tx_coinbase_separate_sig_flag, "4-*");
-    GENERATE_AND_PLAY(tx_input_mixins);
-
-    // Double spend
-    GENERATE_AND_PLAY(gen_double_spend_in_tx<false>);
-    GENERATE_AND_PLAY(gen_double_spend_in_tx<true>);
-    GENERATE_AND_PLAY(gen_double_spend_in_the_same_block<false>);
-    GENERATE_AND_PLAY(gen_double_spend_in_the_same_block<true>);
-    GENERATE_AND_PLAY(gen_double_spend_in_different_blocks<false>);
-    GENERATE_AND_PLAY(gen_double_spend_in_different_blocks<true>);
-    GENERATE_AND_PLAY(gen_double_spend_in_different_chains);
-    GENERATE_AND_PLAY(gen_double_spend_in_alt_chain_in_the_same_block<false>);
-    GENERATE_AND_PLAY(gen_double_spend_in_alt_chain_in_the_same_block<true>);
-    GENERATE_AND_PLAY(gen_double_spend_in_alt_chain_in_different_blocks<false>);
-    GENERATE_AND_PLAY(gen_double_spend_in_alt_chain_in_different_blocks<true>);
-
-    GENERATE_AND_PLAY(gen_uint_overflow_1);
-    GENERATE_AND_PLAY(gen_uint_overflow_2);
-
-
-    // Hardfok 1 tests
-    GENERATE_AND_PLAY(before_hard_fork_1_cumulative_difficulty);
-    GENERATE_AND_PLAY(inthe_middle_hard_fork_1_cumulative_difficulty);
-    GENERATE_AND_PLAY(after_hard_fork_1_cumulative_difficulty);
-    GENERATE_AND_PLAY(hard_fork_1_locked_mining_test);
-    GENERATE_AND_PLAY(hard_fork_1_bad_pos_source);
-    GENERATE_AND_PLAY(hard_fork_1_unlock_time_2_in_normal_tx);
-    GENERATE_AND_PLAY(hard_fork_1_unlock_time_2_in_coinbase);
-    GENERATE_AND_PLAY(hard_fork_1_chain_switch_pow_only);
-    GENERATE_AND_PLAY(hard_fork_1_checkpoint_basic_test);
-    GENERATE_AND_PLAY(hard_fork_1_pos_locked_height_vs_time);
-    GENERATE_AND_PLAY(hard_fork_1_pos_and_locked_coins);
-
-    // Hardfork 2 tests
-    //GENERATE_AND_PLAY(hard_fork_2_tx_payer_in_wallet);
-    //GENERATE_AND_PLAY(hard_fork_2_tx_receiver_in_wallet);
-    GENERATE_AND_PLAY(hard_fork_2_tx_extra_alias_entry_in_wallet);
-    GENERATE_AND_PLAY_HF(hard_fork_2_auditable_addresses_basics, "2-*");
-    GENERATE_AND_PLAY(hard_fork_2_no_new_structures_before_hf);
-    GENERATE_AND_PLAY(hard_fork_2_awo_wallets_basic_test<true>);
-    GENERATE_AND_PLAY(hard_fork_2_awo_wallets_basic_test<false>);
-    GENERATE_AND_PLAY(hard_fork_2_alias_update_using_old_tx<true>);
-    GENERATE_AND_PLAY(hard_fork_2_alias_update_using_old_tx<false>);
-    GENERATE_AND_PLAY(hard_fork_2_incorrect_alias_update<true>);
-    GENERATE_AND_PLAY(hard_fork_2_incorrect_alias_update<false>);
-
-    // HF4
-    GENERATE_AND_PLAY_HF(hard_fork_4_consolidated_txs, "3-*");
-    GENERATE_AND_PLAY_HF(hardfork_4_wallet_transfer_with_mandatory_mixins, "3-*");
-    GENERATE_AND_PLAY(hardfork_4_wallet_sweep_bare_outs);
-    GENERATE_AND_PLAY_HF(hardfork_4_pop_tx_from_global_index, "4-*");
-
-    // HF5
-    GENERATE_AND_PLAY_HF(hard_fork_5_tx_version, "5-*");
-
-    // HF6
-    GENERATE_AND_PLAY(hard_fork_6_intrinsic_payment_id_basic_test);
-    GENERATE_AND_PLAY(hard_fork_6_intrinsic_payment_id_rpc_test);
-
-    GENERATE_AND_PLAY_HF(isolate_auditable_and_proof, "2-*");
-    
-    GENERATE_AND_PLAY(zarcanum_basic_test);
-
-    GENERATE_AND_PLAY_HF(multiassets_basic_test, "4-*");
-    GENERATE_AND_PLAY_HF(ionic_swap_basic_test, "4-*");
-    GENERATE_AND_PLAY_HF(ionic_swap_exact_amounts_test, "4-*");
-    GENERATE_AND_PLAY(zarcanum_test_n_inputs_validation);
-    GENERATE_AND_PLAY(zarcanum_gen_time_balance);
-    GENERATE_AND_PLAY(zarcanum_txs_with_big_shuffled_decoy_set_shuffled);
-    GENERATE_AND_PLAY(zarcanum_pos_block_math);
-    GENERATE_AND_PLAY(zarcanum_in_alt_chain);
-    GENERATE_AND_PLAY_HF(zarcanum_in_alt_chain_2, "4-*");
-    GENERATE_AND_PLAY(assets_and_explicit_native_coins_in_outs);
-    GENERATE_AND_PLAY(zarcanum_block_with_txs);
-    GENERATE_AND_PLAY(asset_depoyment_and_few_zc_utxos);
-    GENERATE_AND_PLAY_HF(assets_and_pos_mining, "4-*");
-    GENERATE_AND_PLAY_HF(asset_emission_and_unconfirmed_balance, "4-*");
-    GENERATE_AND_PLAY_HF(asset_operation_in_consolidated_tx, "4-*");
-    GENERATE_AND_PLAY_HF(asset_operation_and_hardfork_checks, "4-*");
-    GENERATE_AND_PLAY_HF(eth_signed_asset_basics, "5-*");  // TODO: make HF4 version
-    GENERATE_AND_PLAY_HF(eth_signed_asset_via_rpc, "5-*"); // TODO: make HF4 version
-    //GENERATE_AND_PLAY_HF(asset_current_and_total_supplies_comparative_constraints, "4-*"); <-- temporary disabled, waiting for Stepan's fix -- sowle
-    GENERATE_AND_PLAY_HF(several_asset_emit_burn_txs_in_pool, "5-*");
-    GENERATE_AND_PLAY_HF(assets_transfer_with_smallest_amount, "4-*");
-    GENERATE_AND_PLAY_HF(asset_operations_and_chain_switching, "4-*");
-
-    GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
-    GENERATE_AND_PLAY_HF(wallet_reorganize_and_trim_test, "4-*");
-    GENERATE_AND_PLAY_HF(wallet_rpc_thirdparty_custody, "5-*");    
-
-    GENERATE_AND_PLAY_HF(attachment_isolation_test, "4-*");
-
-    // GENERATE_AND_PLAY(gen_block_reward);
-    // END OF TESTS  */
+    // run
+    run_registered_tests(
+      stop_on_first_fail,
+      skip_all_till_the_end,
+      tests_count,
+      unique_tests_count,
+      failed_tests,
+      tests_running_time,
+      is_test_eligible_to_run,
+      is_hf_test_eligible_to_run);
 
     size_t failed_postponed_tests_count = 0;
     uint64_t total_time = 0;
+
     if (!tests_running_time.empty())
     {
-      uint64_t max_time = std::max_element(tests_running_time.begin(), tests_running_time.end(), [](tests_running_time_t::value_type& lhs, tests_running_time_t::value_type& rhs)->bool { return lhs.second < rhs.second; })->second;
-      uint64_t max_test_name_len = std::max_element(tests_running_time.begin(), tests_running_time.end(), [](tests_running_time_t::value_type& lhs, tests_running_time_t::value_type& rhs)->bool { return lhs.first.size() < rhs.first.size(); })->first.size();
-      size_t bar_width = 70;
-      for (auto i : tests_running_time)
+      uint64_t max_time = std::max_element(
+        tests_running_time.begin(), tests_running_time.end(),
+        [](tests_running_time_t::value_type& lhs, tests_running_time_t::value_type& rhs) -> bool {
+          return lhs.second < rhs.second;
+        })->second;
+
+      uint64_t max_test_name_len = std::max_element(
+        tests_running_time.begin(), tests_running_time.end(),
+        [](tests_running_time_t::value_type& lhs, tests_running_time_t::value_type& rhs) -> bool {
+          return lhs.first.size() < rhs.first.size();
+        })->first.size();
+
+      const size_t bar_width = 70;
+
+      // Optional: keep this only in single-process mode to reduce console noise.
+      if (!is_worker)
       {
-        bool failed = failed_tests.count(i.first) != 0;
-        bool postponed = postponed_tests.count(i.first) != 0;
-        if (failed && postponed)
-          ++failed_postponed_tests_count;
-        std::string bar(bar_width * i.second / max_time, '#');
-        std::cout << (failed ? (postponed ? concolor::yellow : concolor::magenta) : concolor::green) << std::left << std::setw(max_test_name_len + 1) << i.first << "\t" << std::setw(10) << i.second << " ms \t" << bar << std::endl;
-        total_time += i.second;
+        for (const auto& i : tests_running_time)
+        {
+          const bool failed = failed_tests.count(i.first) != 0;
+          const bool postponed = postponed_tests.count(i.first) != 0;
+          if (failed && postponed)
+            ++failed_postponed_tests_count;
+
+          std::string bar(bar_width * i.second / max_time, '#');
+          std::cout << (failed ? (postponed ? concolor::yellow : concolor::magenta) : concolor::green)
+                    << std::left << std::setw(max_test_name_len + 1) << i.first
+                    << "\t" << std::setw(10) << i.second << " ms \t" << bar << std::endl;
+
+          total_time += i.second;
+        }
+      }
+      else
+      {
+        // Workers still must compute totals.
+        for (const auto& i : tests_running_time)
+          total_time += i.second;
+
+        for (const auto& name : failed_tests)
+          if (postponed_tests.count(name) != 0)
+            ++failed_postponed_tests_count;
       }
     }
 
-    if (skip_all_till_the_end)
-      std::cout << ENDL << concolor::yellow << "(execution interrupted at the first failure; not all tests were run)" << ENDL; 
+    if (skip_all_till_the_end && !is_worker)
+      std::cout << ENDL << concolor::yellow
+                << "(execution interrupted at the first failure; not all tests were run)"
+                << ENDL;
 
     serious_failures_count = failed_tests.size() - failed_postponed_tests_count;
 
-    if (!postponed_tests.empty())
+    // Workers write per-worker report for parent aggregation.
+    if (is_worker)
     {
-      std::cout << concolor::yellow << std::endl << postponed_tests.size() << " POSTPONED TESTS:" << std::endl;
-      for(auto& el : postponed_tests)
-        std::cout << "  " << el << std::endl;
+      worker_report rep;
+      rep.worker_id = static_cast<uint32_t>(worker_id);
+      rep.processes = processes;
+      rep.tests_count = tests_count;
+      rep.unique_tests_count = unique_tests_count;
+      rep.total_time_ms = total_time;
+      rep.tests_running_time = tests_running_time;
+      rep.failed_tests = failed_tests;
+      rep.skip_all_till_the_end = skip_all_till_the_end;
+      rep.exit_code = (serious_failures_count == 0 ? 0 : 1);
+
+      (void)write_worker_report_file(rep);
     }
-    
-    std::cout << (serious_failures_count == 0 ? concolor::green : concolor::magenta);
-    std::cout << "\nREPORT:\n";
-    std::cout << "  Unique tests run: " << unique_tests_count << std::endl;
-    std::cout << "  Total tests run:  " << tests_count << std::endl;
-    
-    std::cout << "  Failures:         " << serious_failures_count << " (postponed failures: " << failed_postponed_tests_count << ")" << std::endl;
-    std::cout << "  Postponed:        " << postponed_tests.size() << std::endl;
-    std::cout << "  Total time:       " << total_time / 1000 << " s. (" << (tests_count > 0 ? total_time / tests_count : 0) << " ms per test in average)" << std::endl;
-    if (!failed_tests.empty())
+
+    // Single-process run: keep local report (parent aggregation is only for multi-process mode).
+    if (!is_worker)
     {
-      std::cout << "FAILED/POSTPONED TESTS:\n";
-      for (auto test_name : failed_tests)
+      if (!postponed_tests.empty())
       {
-        bool postponed = postponed_tests.count(test_name);
-        std::cout << "  " << (postponed ? "POSTPONED: " : "FAILED:    ") << test_name << '\n';
+        std::cout << concolor::yellow << std::endl << postponed_tests.size() << " POSTPONED TESTS:" << std::endl;
+        for (const auto& el : postponed_tests)
+          std::cout << "  " << el << std::endl;
       }
+
+      std::cout << (serious_failures_count == 0 ? concolor::green : concolor::magenta);
+      std::cout << "\nREPORT:\n";
+      std::cout << "  Unique tests run: " << unique_tests_count << std::endl;
+      std::cout << "  Total tests run:  " << tests_count << std::endl;
+
+      std::cout << "  Failures:         " << serious_failures_count
+                << " (postponed failures: " << failed_postponed_tests_count << ")"
+                << std::endl;
+
+      std::cout << "  Postponed:        " << postponed_tests.size() << std::endl;
+
+      std::cout << "  Total time:       " << total_time / 1000
+                << " s. (" << (tests_count > 0 ? total_time / tests_count : 0)
+                << " ms per test in average)"
+                << std::endl;
+
+      if (!failed_tests.empty())
+      {
+        std::cout << "FAILED/POSTPONED TESTS:\n";
+        for (const auto& test_name : failed_tests)
+        {
+          const bool postponed = postponed_tests.count(test_name) != 0;
+          std::cout << "  " << (postponed ? "POSTPONED: " : "FAILED:    ") << test_name << '\n';
+        }
+      }
+
+      std::cout << concolor::normal << std::endl;
     }
-    std::cout << concolor::normal << std::endl;
   }
 
-  /*{
-    std::cout << concolor::magenta << "Wrong arguments" << concolor::normal << std::endl;
-    std::cout << desc_options << std::endl;
-    return 2;
-  }*/
 #ifdef _WIN32
   ::Beep(1050, 1000);
 #endif
