@@ -25,11 +25,11 @@
 
 #include "include_base_utils.h"
 
+#include "serialization/serialization.h"
 #include "common/boost_version_check.h"
 #include "serialization/binary_archive.h"
 #include "common/crypto_serialization.h"
-#include "serialization/stl_containers.h"
-#include "serialization/serialization.h"
+//#include "serialization/stl_containers.h"
 #include "serialization/variant.h"
 #include "serialization/boost_types.h"
 #include "serialization/json_archive.h"
@@ -306,11 +306,13 @@ namespace currency
   struct txin_gateway
   {
     crypto::hash gateway_addr = null_hash;
+    crypto::public_key asset_id = null_pkey;
     uint64_t amount = 0;
     uint8_t version = 0;
 
     BEGIN_VERSIONED_SERIALIZE(0, version)
       FIELD(gateway_addr)
+      FIELD(asset_id)
       VARINT_FIELD(amount)
       VARINT_FIELD(version)
     END_SERIALIZE()
@@ -518,7 +520,7 @@ namespace currency
 
 //#pragma pack(pop)
 
-  typedef boost::variant<txin_gen, txin_to_key, txin_multisig, /*txin_gateway, */txin_zc_input> txin_v;
+  typedef boost::variant<txin_gen, txin_to_key, txin_multisig, txin_gateway, txin_zc_input> txin_v;
 
   typedef boost::variant<tx_out_bare, tx_out_zarcanum/*, tx_out_gateway */ > tx_out_v;
 
@@ -1254,6 +1256,7 @@ namespace currency
   bool operator ==(const currency::txin_multisig& a, const currency::txin_multisig& b);
   bool operator ==(const currency::txin_dummy&, const currency::txin_dummy&);
   bool operator ==(const currency::txin_zc_input& a, const currency::txin_zc_input& b);
+  bool operator ==(const currency::txin_gateway& a, const currency::txin_gateway& b);
 } // namespace currency
 
 POD_MAKE_HASHABLE(currency, account_public_address);

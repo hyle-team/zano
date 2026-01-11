@@ -16,6 +16,10 @@
 
 #include "include_base_utils.h"
 
+#include "common/crypto_blob_serializer_defs.h"
+#include "serialization/serialization.h"
+
+
 #include "common/db_backend_selector.h"
 #include "common/command_line.h"
 
@@ -973,9 +977,9 @@ bool blockchain_storage::purge_transaction_keyimages_from_blockchain(const trans
       }
       return true;
     }
-    bool operator()(const txin_dummy&) const // TODO@#@# replace this -- sowle
+    bool operator()(const txin_gateway& in_gw) const
     {
-      throw std::runtime_error("purge_transaction_keyimages_from_blockchain,txin_dummy: not implemented");
+      return m_bcs.unprocess_gateway_input(in_gw);
     }
     bool operator()(const txin_zc_input& inp) const
     {
@@ -5082,6 +5086,49 @@ bool blockchain_storage::validate_tx_service_attachmens_in_services(const tx_ser
   return m_services_mgr.validate_entry(a, i, tx);
 }
 //------------------------------------------------------------------
+bool blockchain_storage::process_gateway_input(const crypto::hash& tx_id, const crypto::hash& bl_id, const uint64_t bl_height, const txin_gateway& in_gw)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  //check if getaway exists
+  auto gw_adr_entry_ptr = m_db_gateway_addresses[in_gw.gateway_addr];
+  CHECK_AND_ASSERT_MES(gw_adr_entry_ptr, false, "Failed to find gateway addr " << in_gw.gateway_addr << " in input of tx: " << tx_id );
+
+  //check the balance
+  gateway_addresses_container::t_value_type gw_address_entry = *gw_adr_entry_ptr;
+
+  auto& balance_entry = gw_address_entry.balances[in_gw.asset_id];
+
+  CHECK_AND_ASSERT_MES(balance_entry.amount >= in_gw.amount, false, "Balance is not enought on the gateway address");
+
+  //update balance
+  balance_entry.amount -= in_gw.amount;
+  //update db
+  m_db_gateway_addresses.set(in_gw.gateway_addr, gw_address_entry);
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::unprocess_gateway_input(const txin_gateway& in_gw)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  //check if getaway exists
+  auto gw_adr_entry_ptr = m_db_gateway_addresses[in_gw.gateway_addr];
+  CHECK_AND_ASSERT_THROW_MES(gw_adr_entry_ptr, "Failed to find gateway addr " << in_gw.gateway_addr);
+
+  gateway_addresses_container::t_value_type gw_address_entry = *gw_adr_entry_ptr;
+
+  //check the balance
+  auto& balance_entry = gw_address_entry.balances[in_gw.asset_id];
+
+  CHECK_AND_ASSERT_THROW_MES(balance_entry.amount > std::numeric_limits<uint64_t>::max() - in_gw.amount, "Uint64 overflow in gateway addresses");
+  
+  //update balance
+  balance_entry.amount += in_gw.amount;
+  //update db
+  m_db_gateway_addresses.set(in_gw.gateway_addr, gw_address_entry);
+  return true;
+}
+
+//------------------------------------------------------------------
 namespace currency
 {
   struct add_transaction_input_visitor : public boost::static_visitor<bool>
@@ -5131,9 +5178,9 @@ namespace currency
     {
       return visit(in.amount, in.k_image, in.key_offsets);
     }
-    bool operator()(const txin_dummy&) const // TODO@#@# replace this -- sowle
+    bool operator()(const txin_gateway& in_gw) const 
     {
-      throw std::runtime_error("add_transaction_input_visitor: txin_dummy not implemented");
+      return m_bcs.process_gateway_input(m_tx_id, m_bl_id, m_bl_height, in_gw);//  
     }
     bool operator()(const txin_gen& in) const { return true; }
     bool operator()(const txin_multisig& in) const

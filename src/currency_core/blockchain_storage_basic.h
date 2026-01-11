@@ -208,7 +208,7 @@ namespace currency
   {
     uint8_t version = 0;
     std::vector<gateway_address_descriptor_base>  info;
-    std::map<crypto::public_key, gateway_address_balance> balances; // asset_id -> balance 
+    std::unordered_map<crypto::public_key, gateway_address_balance> balances; // asset_id -> balance 
 
     BEGIN_VERSIONED_SERIALIZE(0, version)
       FIELD(info)

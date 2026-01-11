@@ -197,7 +197,7 @@ bool do_serialize(Archive<true> &ar, std::set<T> &v)
 }
 
 template <template <bool> class Archive, class T, class K>
-bool do_serialize(Archive<false>& ar, std::map<K, T>& v)
+bool do_serialize(Archive<false>& ar, std::unordered_map<K, T>& v)
 {
   size_t cnt = 0;
   ar.begin_array(cnt);
@@ -216,16 +216,16 @@ bool do_serialize(Archive<false>& ar, std::map<K, T>& v)
     if (i > 0)
       ar.delimit_array();
     
-    std::map<K, T>::value_type vt = AUTO_VAL_INIT(vt);
+    std::unordered_map<K, T>::value_type vt = AUTO_VAL_INIT(vt);
     
-    K& k = vt.first;
+    const K& k = vt.first;
     T& t = vt.second;
-    if (!::serialization::detail::serialize_container_element(ar, k))
+    if (!::do_serialize(ar, k))
       return false;
     if (!ar.stream().good())
       return false;
-    
-    if (!::serialization::detail::serialize_container_element(ar, t))
+
+    if (!::do_serialize(ar, t))
       return false;
     if (!ar.stream().good())
       return false;
@@ -239,7 +239,7 @@ bool do_serialize(Archive<false>& ar, std::map<K, T>& v)
 }
 
 template <template <bool> class Archive, class T, class K>
-bool do_serialize(Archive<true>& ar, std::map<K, T>& v)
+bool do_serialize(Archive<true>& ar, std::unordered_map<K, T>& v)
 {
   size_t cnt = v.size();
   ar.begin_array(cnt);
@@ -250,13 +250,13 @@ bool do_serialize(Archive<true>& ar, std::map<K, T>& v)
     if (it != v.begin())
       ar.delimit_array();
     //TODO: refactoring needed to remove const_cast 
-    if (!::serialization::detail::serialize_container_element(ar, const_cast<K&>(it->first)))
+    if (!::do_serialize(ar, const_cast<K&>(it->first)))
       return false;
     if (!ar.stream().good())
       return false;
 
     //TODO: refactoring needed to remove const_cast 
-    if (!::serialization::detail::serialize_container_element(ar, const_cast<T&>(it->second)))
+    if (!::do_serialize(ar, const_cast<T&>(it->second)))
       return false;
     if (!ar.stream().good())
       return false;

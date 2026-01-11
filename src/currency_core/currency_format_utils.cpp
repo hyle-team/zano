@@ -4794,6 +4794,14 @@ namespace currency
       a.key_offsets == b.key_offsets &&
       a.k_image     == b.k_image;
   }
+
+  bool operator ==(const currency::txin_gateway& a, const currency::txin_gateway& b)
+  {
+    return
+      a.amount == b.amount &&
+      a.asset_id == b.asset_id &&
+      a.gateway_addr == b.gateway_addr;
+  }
   //--------------------------------------------------------------------------------
   boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,
     const wide_difficulty_type& difficulty_pow_at_split_point,

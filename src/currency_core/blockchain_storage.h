@@ -19,6 +19,7 @@
 #include <atomic>
 
 #include "file_io_utils.h"
+#include "common/crypto_blob_serializer_defs.h"
 #include "serialization/serialization.h"
 #include "serialization/string.h"
 #include "serialization/multiprecision.h"
@@ -735,7 +736,10 @@ namespace currency
     bool update_spent_tx_flags_for_input(uint64_t amount, uint64_t global_index, bool spent);
     bool update_spent_tx_flags_for_input(const crypto::hash& multisig_id, uint64_t spent_height);
     bool update_spent_tx_flags_for_input(const crypto::hash& tx_id, size_t n, bool spent);
-    
+
+    bool process_gateway_input(const crypto::hash& tx_id, const crypto::hash& bl_id, const uint64_t bl_height, const txin_gateway& in_gw);
+    bool unprocess_gateway_input(const txin_gateway& in_gw);
+
     void push_block_to_per_block_increments(uint64_t height_, std::unordered_map<uint64_t, uint32_t>& gindices);
     void pop_block_from_per_block_increments(uint64_t height_);
     void calculate_local_gindex_lookup_table_for_height(uint64_t split_height, std::map<uint64_t, uint64_t>& increments) const;

@@ -243,28 +243,6 @@ namespace crypto
 
 } // namespace crypto
 
-BLOB_SERIALIZER(crypto::chacha_iv);
-BLOB_SERIALIZER(crypto::hash);
-BLOB_SERIALIZER(crypto::public_key);
-BLOB_SERIALIZER(crypto::secret_key);
-BLOB_SERIALIZER(crypto::key_derivation);
-BLOB_SERIALIZER(crypto::key_image);
-BLOB_SERIALIZER(crypto::signature);
-BLOB_SERIALIZER(crypto::scalar_t);
-BLOB_SERIALIZER(crypto::point_t);
-BLOB_SERIALIZER(crypto::eth_public_key);
-BLOB_SERIALIZER(crypto::eth_signature);
-
-VARIANT_TAG(debug_archive, crypto::hash, "hash");
-VARIANT_TAG(debug_archive, crypto::public_key, "public_key");
-VARIANT_TAG(debug_archive, crypto::secret_key, "secret_key");
-VARIANT_TAG(debug_archive, crypto::key_derivation, "key_derivation");
-VARIANT_TAG(debug_archive, crypto::key_image, "key_image");
-VARIANT_TAG(debug_archive, crypto::signature, "signature");
-VARIANT_TAG(debug_archive, crypto::eth_public_key, "eth_public_key");
-VARIANT_TAG(debug_archive, crypto::eth_signature, "eth_signature");
-
-
 //
 // Key-value serialization
 //
