@@ -32,6 +32,7 @@
 #include "common/boost_serialization_helper.h"
 #include "warnings.h"
 #include "crypto/hash.h"
+#include "crypto/eddsa_signature.h"
 #include "storages/portable_storage_template_helper.h"
 #include "basic_pow_helpers.h"
 #include "version.h"
@@ -5655,6 +5656,14 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
         return false;
       }
     }
+    VARIANT_CASE_CONST(txin_gateway, in_gw)
+    {
+      if (!check_tx_input(tx, sig_index, in_gw, tx_prefix_hash, ctic))
+      {
+        LOG_ERROR("Failed to validate gw input #" << sig_index << " in tx: " << tx_prefix_hash);
+        return false;
+      }
+    }
     VARIANT_CASE_THROW_ON_OTHER();
     VARIANT_SWITCH_END();
 
@@ -6104,6 +6113,60 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 
   return true;
 }
+
+//------------------------------------------------------------------
+bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_gateway& gw_in, const crypto::hash& tx_prefix_hash, check_tx_inputs_context& ctic) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  if (m_is_in_checkpoint_zone) // TODO @#@# reconsider placement of this check
+    return true;
+
+
+  // calculate corresponding tx prefix hash
+  crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(tx, in_index, tx_prefix_hash);
+  CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "prepare_prefix_hash_for_sign failed");
+
+  CHECK_AND_ASSERT_MES(tx.signatures[in_index].type() == typeid(gateway_sig), false, "Gateway input validation failed: tx.signatures[in_index].type() != typeid(gateway_sig)");
+
+  const gateway_sig& sig = boost::get<gateway_sig>(tx.signatures[in_index]);
+
+  auto gw_entry_ptr = m_db_gateway_addresses.find(gw_in.gateway_addr);
+
+  CHECK_AND_ASSERT_MES(gw_entry_ptr, false, "Gateway input validation failed: gateway address " << gw_in.gateway_addr << " not found in db"); 
+
+  CHECK_AND_ASSERT_MES(gw_entry_ptr->info_history.size(), false, "Gateway input validation failed: gateway address " << gw_in.gateway_addr << " has no info history");
+
+  const v_gateway_owner_key& gw_owner_key = gw_entry_ptr->info_history.back().owner_key;
+  VARIANT_SWITCH_BEGIN(gw_owner_key);
+  VARIANT_CASE_CONST(crypto::public_key, pkey)
+  {
+    CHECK_AND_ASSERT_THROW_MES(sig.s.type() == typeid(crypto::signature), "Unexpected signature type("<< sig.s.type().name() <<
+      ") for gw_in.gateway_addr" << gw_in.gateway_addr << "(expected crypto::signature) in tx: " << tx_prefix_hash);
+    const crypto::signature& signature = boost::get<crypto::signature>(sig.s);
+    bool r = crypto::check_signature(tx_hash_for_signature, pkey, signature);
+  }
+  VARIANT_CASE_CONST(crypto::eth_public_key, pkey)
+  {
+    CHECK_AND_ASSERT_THROW_MES(sig.s.type() == typeid(crypto::eth_signature), "Unexpected signature type(" << sig.s.type().name() <<
+      ") for gw_in.gateway_addr" << gw_in.gateway_addr << "(expected crypto::eth_signature) in tx: " << tx_prefix_hash);
+    const crypto::eth_signature& signature = boost::get<crypto::eth_signature>(sig.s);
+    bool r = crypto::verify_eth_signature(tx_hash_for_signature, pkey, signature);
+  }
+  VARIANT_CASE_CONST(crypto::eddsa_public_key, pkey)
+  {
+    CHECK_AND_ASSERT_THROW_MES(sig.s.type() == typeid(crypto::eddsa_signature), "Unexpected signature type(" << sig.s.type().name() <<
+      ") for gw_in.gateway_addr" << gw_in.gateway_addr << "(expected crypto::eddsa_signature) in tx: " << tx_prefix_hash);
+    const crypto::eddsa_signature& signature = boost::get<crypto::eddsa_signature>(sig.s);
+    bool r = crypto::verify_eddsa_signature(tx_hash_for_signature, pkey, signature);
+  }
+  VARIANT_CASE_THROW_ON_OTHER();
+  VARIANT_SWITCH_END();
+
+
+  return true;
+}
+
 //------------------------------------------------------------------
 uint64_t blockchain_storage::get_adjusted_time() const
 {
@@ -6560,13 +6623,14 @@ struct visitor_proxy : public boost::static_visitor<const x_type*>
   DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   signtr,            void_sig                           );
   DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   signtr,            ZC_sig                             );
   DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   signtr,            zarcanum_sig                       );
+  DEFINE_TERMS(   no,   no,   no,   no,   no  , no,   many, many,   signtr,            gateway_sig                        );
     //proofs
-  DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   signtr,            zc_asset_surjection_proof          );
-  DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   signtr,            zc_outs_range_proof                );
-  DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    signtr,            zc_balance_proof                   );
-  DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    signtr,            asset_operation_proof              );
-  DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    signtr,            asset_operation_ownership_proof    );
-  DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    signtr,            asset_operation_ownership_proof_eth);
+  DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   proofs,            zc_asset_surjection_proof          );
+  DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   proofs,            zc_outs_range_proof                );
+  DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    proofs,            zc_balance_proof                   );
+  DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    proofs,            asset_operation_proof              );
+  DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    proofs,            asset_operation_ownership_proof    );
+  DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    proofs,            asset_operation_ownership_proof_eth);
 
 
 

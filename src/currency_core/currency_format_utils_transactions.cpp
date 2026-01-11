@@ -221,7 +221,7 @@ namespace currency
       size_t operator()(const txin_gen& /*txin*/) const   { return 0; }
       size_t operator()(const txin_to_key& txin) const    { return tools::get_varint_packed_size(txin.key_offsets.size() + a) + sizeof(crypto::signature) * (txin.key_offsets.size() + a); }
       size_t operator()(const txin_multisig& txin) const  { return tools::get_varint_packed_size(txin.sigs_count + a) + sizeof(crypto::signature) * (txin.sigs_count + a); }
-      size_t operator()(const txin_dummy& txin) const     { throw std::runtime_error("txin_signature_size_visitor: txin_dummy not implemented"); }
+      size_t operator()(const txin_gateway& txin) const   { throw    std::runtime_error("txin_signature_size_visitor: txin_gateway not implemented"); } //TODO: implement this
       size_t operator()(const txin_zc_input& txin) const  { return 96 + tools::get_varint_packed_size(txin.key_offsets.size()) + txin.key_offsets.size() * 32; }
     };
 

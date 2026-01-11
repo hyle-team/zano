@@ -207,11 +207,11 @@ namespace currency
   struct gateway_address_data
   {
     uint8_t version = 0;
-    std::vector<gateway_address_descriptor_base>  info;
+    std::vector<gateway_address_descriptor_base>  info_history;
     std::unordered_map<crypto::public_key, gateway_address_balance> balances; // asset_id -> balance 
 
     BEGIN_VERSIONED_SERIALIZE(0, version)
-      FIELD(info)
+      FIELD(info_history)
       FIELD(balances)
     END_SERIALIZE()
   };

@@ -22,6 +22,7 @@
 #include "crypto/zarcanum.h"
 #include "crypto/one_out_of_many_proofs.h"
 #include "crypto/eth_signature.h"
+#include "crypto/eddsa_signature.h"
 #include "boost_serialization_maps.h"
 #include "serialization/keyvalue_enable_POD_serialize_as_string.h"
 //
@@ -254,6 +255,8 @@ BLOB_SERIALIZER(crypto::scalar_t);
 BLOB_SERIALIZER(crypto::point_t);
 BLOB_SERIALIZER(crypto::eth_public_key);
 BLOB_SERIALIZER(crypto::eth_signature);
+BLOB_SERIALIZER(crypto::eddsa_public_key);
+BLOB_SERIALIZER(crypto::eddsa_signature);
 
 VARIANT_TAG(debug_archive, crypto::hash, "hash");
 VARIANT_TAG(debug_archive, crypto::public_key, "public_key");

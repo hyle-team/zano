@@ -314,7 +314,7 @@ namespace currency
   //---------------------------------------------------------------
   inline bool compare_variant_by_types(const txin_gen& left, const txin_gen& right)
   {
-    //actually this should never happen, should we leave it in case it happen in unit tests? @sowle 
+    //actually this should never happen, should we` leave it in case it happen in unit tests? @sowle 
     return (left.height < right.height);
   }
   //---------------------------------------------------------------

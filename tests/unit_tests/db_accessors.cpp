@@ -85,6 +85,49 @@ TEST(db_accessor_tests_2, recoursive_tx_test)
 
 }
 
+
+TEST(db_accessor_tests_2, db_cache_test_with_abort)
+{
+  epee::shared_recursive_mutex m_rw_lock;
+  tools::db::basic_db_accessor m_db(std::shared_ptr<tools::db::i_db_backend>(new tools::db::lmdb_db_backend), m_rw_lock);
+  tools::db::cached_key_value_accessor<uint64_t, uint64_t, false, true> m_container(m_db);
+
+  const std::string folder_name = "./TEST_db_recursive_tx";
+  tools::create_directories_if_necessary(folder_name);
+  uint64_t cache_size = CACHE_SIZE;
+  ASSERT_TRUE(m_db.open(folder_name, cache_size));
+  ASSERT_TRUE(m_container.init("zzzz"));
+
+  bool tx_result = m_container.begin_transaction();
+  ASSERT_TRUE(tx_result);
+
+  m_container.set(10, 10);
+  m_container.set(11, 11);
+
+  tx_result = m_container.begin_transaction(true);
+  ASSERT_TRUE(tx_result);
+  tx_result = m_container.begin_transaction(true);
+  ASSERT_TRUE(tx_result);
+  uint64_t r = *m_container.get(10);
+  ASSERT_TRUE(r == 10);
+
+  tx_result = m_container.begin_transaction();
+
+  m_container.set(13, 13);
+  m_container.set(14, 14);
+  r = *m_container.get(14);
+  ASSERT_TRUE(r == 14);
+
+  m_container.commit_transaction();
+  r = *m_container.get(14);
+  ASSERT_TRUE(r == 14);
+
+  m_container.commit_transaction();
+  m_container.commit_transaction();
+  m_container.commit_transaction();
+
+}
+
 template<typename key_t, typename data_t>
 struct naive_median
 {

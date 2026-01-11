@@ -354,6 +354,7 @@ const crypto::public_key& wallet2::out_get_pub_key(const currency::tx_out_v& out
       return boost::get<currency::txout_to_key>(out.target).key;
     }
     THROW_IF_FALSE_WALLET_INT_ERR_EX(false, "Unexpected out type in target wallet: " << out.target.type().name());
+    return null_pkey; //this line just to avoid warning C4715: not all control paths return a value
   }
   else
   {
