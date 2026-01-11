@@ -1264,6 +1264,7 @@ namespace currency
   bool operator ==(const currency::ZC_sig& a, const currency::ZC_sig& b);
   bool operator ==(const currency::zarcanum_sig& a, const currency::zarcanum_sig& b);
   bool operator ==(const currency::ref_by_id& a, const currency::ref_by_id& b);
+  bool operator ==(const currency::gateway_sig& a, const currency::gateway_sig& b);
 
   // TODO: REPLACE all of the following operators to "bool operator==(..) const = default" once we moved to C++20 -- sowle
   bool operator ==(const currency::signed_parts& a, const currency::signed_parts& b);

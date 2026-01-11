@@ -98,33 +98,26 @@ TEST(db_accessor_tests_2, db_cache_test_with_abort)
   ASSERT_TRUE(m_db.open(folder_name, cache_size));
   ASSERT_TRUE(m_container.init("zzzz"));
 
-  bool tx_result = m_container.begin_transaction();
+  bool tx_result = m_db.begin_transaction();
   ASSERT_TRUE(tx_result);
 
   m_container.set(10, 10);
   m_container.set(11, 11);
 
-  tx_result = m_container.begin_transaction(true);
+  m_db.commit_transaction();
+
+  tx_result = m_db.begin_transaction();
   ASSERT_TRUE(tx_result);
-  tx_result = m_container.begin_transaction(true);
-  ASSERT_TRUE(tx_result);
-  uint64_t r = *m_container.get(10);
-  ASSERT_TRUE(r == 10);
+  m_container.set(10, 0);
+  m_container.set(11, 0);
+  
+  m_db.abort_transaction();
 
-  tx_result = m_container.begin_transaction();
+  auto val_ptr10 = m_container.get(10);
+  auto val_ptr11 = m_container.get(11);
 
-  m_container.set(13, 13);
-  m_container.set(14, 14);
-  r = *m_container.get(14);
-  ASSERT_TRUE(r == 14);
-
-  m_container.commit_transaction();
-  r = *m_container.get(14);
-  ASSERT_TRUE(r == 14);
-
-  m_container.commit_transaction();
-  m_container.commit_transaction();
-  m_container.commit_transaction();
+  ASSERT_TRUE(*val_ptr10 == 10);
+  ASSERT_TRUE(*val_ptr11 == 11);
 
 }
 

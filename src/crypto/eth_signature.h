@@ -60,6 +60,16 @@ namespace crypto
     return !(lhs == rhs);
   }
 
+  inline bool operator==(const eth_signature& lhs, const eth_signature& rhs)
+  {
+    return memcmp(lhs.data, rhs.data, sizeof lhs.data) == 0;
+  }
+
+  inline bool operator!=(const eth_signature& lhs, const eth_signature& rhs)
+  {
+    return !(lhs == rhs);
+  }
+
   std::ostream& operator<<(std::ostream& o, const eth_secret_key& v);
   std::ostream& operator<<(std::ostream& o, const eth_public_key& v);
   std::ostream& operator<<(std::ostream& o, const eth_signature& v);

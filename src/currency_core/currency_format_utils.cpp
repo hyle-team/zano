@@ -4757,6 +4757,12 @@ namespace currency
     return a.n == b.n && a.tx_id == b.tx_id;
   }
   //--------------------------------------------------------------------------------
+  bool operator ==(const currency::gateway_sig& a, const currency::gateway_sig& b)
+  {
+    return a.s == b.s;
+  }
+
+  //--------------------------------------------------------------------------------
   bool operator ==(const currency::signed_parts& a, const currency::signed_parts& b)
   {
     return

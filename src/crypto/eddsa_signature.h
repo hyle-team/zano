@@ -63,6 +63,16 @@ namespace crypto
     return !(lhs == rhs);
   }
 
+  inline bool operator==(const eddsa_signature& lhs, const eddsa_signature& rhs)
+  {
+    return memcmp(lhs.data, rhs.data, sizeof lhs.data) == 0;
+  }
+
+  inline bool operator!=(const eddsa_signature& lhs, const eddsa_signature& rhs)
+  {
+    return !(lhs == rhs);
+  }
+
   std::ostream& operator<<(std::ostream& o, const eddsa_secret_key & v);
   std::ostream& operator<<(std::ostream& o, const eddsa_public_key& v);
   std::ostream& operator<<(std::ostream& o, const eddsa_signature& v);
