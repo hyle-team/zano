@@ -14,12 +14,11 @@
 
 #include "misc_log_ex.h"
 #include "binary_archive.h"
-#include "serialization_base_traits.h"
-#include "crypto/crypto.h"
 
-
-template<> struct is_blob_type<crypto::public_key> { typedef boost::true_type type; };
-
+template <class T>
+struct is_blob_type { typedef boost::false_type type; };
+template <class T>
+struct has_free_serializer { typedef boost::true_type type; };
 
 template <class Archive, class T>
 struct serializer
@@ -55,6 +54,12 @@ inline bool do_serialize(Archive &ar, T &v)
 #endif
 #endif
 
+#define BLOB_SERIALIZER(T) \
+  template<> struct is_blob_type<T> { typedef boost::true_type type; }
+#define FREE_SERIALIZER(T) \
+  template<> struct has_free_serializer<T> { typedef boost::true_type type; }
+#define VARIANT_TAG(A, T, Tg) \
+  template <bool W> struct variant_serialization_traits<A<W>, T> { static inline typename A<W>::variant_tag_type get_tag() { return Tg; } }
 #define BEGIN_SERIALIZE() BEGIN_SERIALIZE_OBJECT()
 //  template <bool W, template <bool> class Archive> bool do_serialize(Archive<W> &_ser_ar) {uint8_t s_current_version ATTRIBUTE_UNUSED = 0; uint8_t s_version ATTRIBUTE_UNUSED = 0;
 #define BEGIN_SERIALIZE_OBJECT() \

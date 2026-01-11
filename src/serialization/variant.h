@@ -13,8 +13,11 @@
 #include <boost/mpl/front.hpp>
 #include <boost/mpl/pop_front.hpp>
 #include "serialization.h"
-#include "serialization_base_traits.h"
 
+template <class Archive, class T>
+struct variant_serialization_traits
+{
+};
 
 template <class Archive, class Variant, class TBegin, class TEnd>
 struct variant_reader

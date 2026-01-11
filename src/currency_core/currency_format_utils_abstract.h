@@ -302,10 +302,9 @@ namespace currency
     return false;
   }
   //---------------------------------------------------------------
-  // TODO@#@# replace with gateway -- sowle
-  inline bool compare_variant_by_types(const txin_dummy& left, const txin_dummy& right)
+  inline bool compare_variant_by_types(const txin_gateway& left, const txin_gateway& right)
   {
-    return false;
+    return (left.gateway_addr < right.gateway_addr);
   }
   //---------------------------------------------------------------
   inline bool compare_variant_by_types(const txin_multisig& left, const txin_multisig& right)

@@ -19,7 +19,6 @@
 #include <atomic>
 
 #include "file_io_utils.h"
-#include "common/crypto_blob_serializer_defs.h"
 #include "serialization/serialization.h"
 #include "serialization/string.h"
 #include "serialization/multiprecision.h"

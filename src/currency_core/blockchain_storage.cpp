@@ -16,8 +16,6 @@
 
 #include "include_base_utils.h"
 
-#include "common/crypto_blob_serializer_defs.h"
-#include "serialization/serialization.h"
 
 
 #include "common/db_backend_selector.h"

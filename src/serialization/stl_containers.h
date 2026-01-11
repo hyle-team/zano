@@ -220,7 +220,7 @@ bool do_serialize(Archive<false>& ar, std::unordered_map<K, T>& v)
     
     const K& k = vt.first;
     T& t = vt.second;
-    if (!::do_serialize(ar, k))
+    if (!::do_serialize(ar, const_cast<K&>(k)))
       return false;
     if (!ar.stream().good())
       return false;
@@ -256,7 +256,7 @@ bool do_serialize(Archive<true>& ar, std::unordered_map<K, T>& v)
       return false;
 
     //TODO: refactoring needed to remove const_cast 
-    if (!::do_serialize(ar, const_cast<T&>(it->second)))
+    if (!do_serialize(ar, const_cast<T&>(it->second)))
       return false;
     if (!ar.stream().good())
       return false;

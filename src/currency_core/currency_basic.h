@@ -25,11 +25,11 @@
 
 #include "include_base_utils.h"
 
-#include "serialization/serialization.h"
 #include "common/boost_version_check.h"
 #include "serialization/binary_archive.h"
 #include "common/crypto_serialization.h"
-//#include "serialization/stl_containers.h"
+#include "serialization/stl_containers.h"
+#include "serialization/serialization.h"
 #include "serialization/variant.h"
 #include "serialization/boost_types.h"
 #include "serialization/json_archive.h"
@@ -1354,6 +1354,9 @@ SET_VARIANT_TAGS(crypto::eth_public_key, 60, "eth_public_key");
 SET_VARIANT_TAGS(currency::dummy, 62, "dummy");
 SET_VARIANT_TAGS(currency::tx_out_zarcanum, 63, "tx_out_zarcanum");
 
+//Gateway addresses
+SET_VARIANT_TAGS(currency::txin_gateway, 65, "txin_gateway");
+SET_VARIANT_TAGS(currency::tx_out_gateway, 66, "txin_gateway");
 
 
 
