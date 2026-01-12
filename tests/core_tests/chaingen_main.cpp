@@ -97,7 +97,7 @@ namespace
     return 1; \
   }
 
-#define REGISTER_TEST(genclass) \
+#define GENERATE_AND_PLAY(genclass) \
   do { \
     const std::string __test_name = #genclass; \
     g_test_jobs.push_back(test_job{ \
@@ -118,7 +118,7 @@ namespace
     }); \
   } while (0)
 
-#define REGISTER_TEST_HF(genclass, hardfork_str_mask) \
+#define GENERATE_AND_PLAY_HF(genclass, hardfork_str_mask) \
   do { \
     const std::string __gen_name = #genclass; \
     std::vector<size_t> __hardforks = parse_hardfork_str_mask(hardfork_str_mask); \
@@ -1105,357 +1105,357 @@ static void register_all_tests(
 
   g_test_jobs.clear();
 
-  // TODO // REGISTER_TEST(wallet_spend_form_auditable_and_track);
-  REGISTER_TEST(gen_block_big_major_version);
+  // TODO // GENERATE_AND_PLAY(wallet_spend_form_auditable_and_track);
+  GENERATE_AND_PLAY(gen_block_big_major_version);
 
-  REGISTER_TEST(pos_minting_tx_packing);
+  GENERATE_AND_PLAY(pos_minting_tx_packing);
 
-  REGISTER_TEST(multisig_wallet_test);
-  REGISTER_TEST(multisig_wallet_test_many_dst);
-  REGISTER_TEST(multisig_wallet_heterogenous_dst);
-  REGISTER_TEST(multisig_wallet_same_dst_addr);
-  REGISTER_TEST(multisig_wallet_ms_to_ms);
-  REGISTER_TEST(multisig_minimum_sigs);
-  REGISTER_TEST(multisig_and_fake_outputs);
-  REGISTER_TEST(multisig_and_unlock_time);
-  REGISTER_TEST(multisig_and_coinbase);
-  REGISTER_TEST(multisig_with_same_id_in_pool);
-  REGISTER_TEST_HF(multisig_and_checkpoints, "0"); // TODO: fix for HF 1-3 (checkpoint hash check)
-  REGISTER_TEST(multisig_and_checkpoints_bad_txs);
-  REGISTER_TEST(multisig_and_altchains);
-  REGISTER_TEST(multisig_out_make_and_spent_in_altchain);
-  REGISTER_TEST(multisig_unconfirmed_transfer_and_multiple_scan_pool_calls);
-  REGISTER_TEST(multisig_out_spent_in_altchain_case_b4);
-  REGISTER_TEST(multisig_n_participants_seq_signing);
+  GENERATE_AND_PLAY(multisig_wallet_test);
+  GENERATE_AND_PLAY(multisig_wallet_test_many_dst);
+  GENERATE_AND_PLAY(multisig_wallet_heterogenous_dst);
+  GENERATE_AND_PLAY(multisig_wallet_same_dst_addr);
+  GENERATE_AND_PLAY(multisig_wallet_ms_to_ms);
+  GENERATE_AND_PLAY(multisig_minimum_sigs);
+  GENERATE_AND_PLAY(multisig_and_fake_outputs);
+  GENERATE_AND_PLAY(multisig_and_unlock_time);
+  GENERATE_AND_PLAY(multisig_and_coinbase);
+  GENERATE_AND_PLAY(multisig_with_same_id_in_pool);
+  GENERATE_AND_PLAY_HF(multisig_and_checkpoints, "0"); // TODO: fix for HF 1-3 (checkpoint hash check)
+  GENERATE_AND_PLAY(multisig_and_checkpoints_bad_txs);
+  GENERATE_AND_PLAY(multisig_and_altchains);
+  GENERATE_AND_PLAY(multisig_out_make_and_spent_in_altchain);
+  GENERATE_AND_PLAY(multisig_unconfirmed_transfer_and_multiple_scan_pool_calls);
+  GENERATE_AND_PLAY(multisig_out_spent_in_altchain_case_b4);
+  GENERATE_AND_PLAY(multisig_n_participants_seq_signing);
 
-  REGISTER_TEST(ref_by_id_basics);
-  REGISTER_TEST(ref_by_id_mixed_inputs_types);
+  GENERATE_AND_PLAY(ref_by_id_basics);
+  GENERATE_AND_PLAY(ref_by_id_mixed_inputs_types);
 
-  REGISTER_TEST(escrow_wallet_test);
-  REGISTER_TEST(escrow_w_and_fake_outputs);
-  REGISTER_TEST(escrow_incorrect_proposal);
-  REGISTER_TEST(escrow_proposal_expiration);
-  REGISTER_TEST(escrow_proposal_and_accept_expiration);
-  REGISTER_TEST(escrow_incorrect_proposal_acceptance);
-  REGISTER_TEST(escrow_custom_test);
-  REGISTER_TEST(escrow_incorrect_cancel_proposal);
-  REGISTER_TEST(escrow_proposal_not_enough_money);
-  REGISTER_TEST(escrow_cancellation_and_tx_order);
-  REGISTER_TEST(escrow_cancellation_proposal_expiration);
-  REGISTER_TEST(escrow_cancellation_acceptance_expiration);
-  // REGISTER_TEST(escrow_proposal_acceptance_in_alt_chain); -- work in progress
-  REGISTER_TEST(escrow_zero_amounts);
-  REGISTER_TEST(escrow_balance);
+  GENERATE_AND_PLAY(escrow_wallet_test);
+  GENERATE_AND_PLAY(escrow_w_and_fake_outputs);
+  GENERATE_AND_PLAY(escrow_incorrect_proposal);
+  GENERATE_AND_PLAY(escrow_proposal_expiration);
+  GENERATE_AND_PLAY(escrow_proposal_and_accept_expiration);
+  GENERATE_AND_PLAY(escrow_incorrect_proposal_acceptance);
+  GENERATE_AND_PLAY(escrow_custom_test);
+  GENERATE_AND_PLAY(escrow_incorrect_cancel_proposal);
+  GENERATE_AND_PLAY(escrow_proposal_not_enough_money);
+  GENERATE_AND_PLAY(escrow_cancellation_and_tx_order);
+  GENERATE_AND_PLAY(escrow_cancellation_proposal_expiration);
+  GENERATE_AND_PLAY(escrow_cancellation_acceptance_expiration);
+  // GENERATE_AND_PLAY(escrow_proposal_acceptance_in_alt_chain); -- work in progress
+  GENERATE_AND_PLAY(escrow_zero_amounts);
+  GENERATE_AND_PLAY(escrow_balance);
 
-  REGISTER_TEST(escrow_altchain_meta_test<0>);
-  REGISTER_TEST(escrow_altchain_meta_test<1>);
-  REGISTER_TEST(escrow_altchain_meta_test<2>);
-  REGISTER_TEST(escrow_altchain_meta_test<3>);
-  REGISTER_TEST(escrow_altchain_meta_test<4>);
-  REGISTER_TEST(escrow_altchain_meta_test<5>);
-  REGISTER_TEST(escrow_altchain_meta_test<6>);
-  REGISTER_TEST(escrow_altchain_meta_test<7>);
-  REGISTER_TEST(escrow_altchain_meta_test<8>);
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<0>);
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<1>);
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<2>);
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<3>);
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<4>);
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<5>);
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<6>);
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<7>);
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<8>);
   static_assert(escrow_altchain_meta_test_data<9>::empty_marker, ""); // make sure there are no sub-tests left
 
-  REGISTER_TEST(offers_expiration_test);
-  REGISTER_TEST(offers_tests);
-  REGISTER_TEST(offers_filtering_1);
-  //REGISTER_TEST(offers_handling_on_chain_switching);
-  REGISTER_TEST(offer_removing_and_selected_output);
-  REGISTER_TEST(offers_multiple_update);
-  REGISTER_TEST(offer_sig_validity_in_update_and_cancel);
-  REGISTER_TEST(offer_lifecycle_via_tx_pool);
-  REGISTER_TEST(offers_updating_hack);
-  REGISTER_TEST(offer_cancellation_with_zero_fee);
+  GENERATE_AND_PLAY(offers_expiration_test);
+  GENERATE_AND_PLAY(offers_tests);
+  GENERATE_AND_PLAY(offers_filtering_1);
+  //GENERATE_AND_PLAY(offers_handling_on_chain_switching);
+  GENERATE_AND_PLAY(offer_removing_and_selected_output);
+  GENERATE_AND_PLAY(offers_multiple_update);
+  GENERATE_AND_PLAY(offer_sig_validity_in_update_and_cancel);
+  GENERATE_AND_PLAY(offer_lifecycle_via_tx_pool);
+  GENERATE_AND_PLAY(offers_updating_hack);
+  GENERATE_AND_PLAY(offer_cancellation_with_zero_fee);
 
-  REGISTER_TEST(gen_crypted_attachments);
-  REGISTER_TEST(gen_checkpoints_attachments_basic);
-  REGISTER_TEST(gen_checkpoints_invalid_keyimage);
-  REGISTER_TEST(gen_checkpoints_altblock_before_and_after_cp);
-  REGISTER_TEST(gen_checkpoints_block_in_future);
-  REGISTER_TEST(gen_checkpoints_altchain_far_before_cp);
-  REGISTER_TEST(gen_checkpoints_block_in_future_after_cp);
-  REGISTER_TEST(gen_checkpoints_prun_txs_after_blockchain_load);
-  REGISTER_TEST(gen_checkpoints_reorganize);
-  REGISTER_TEST(gen_checkpoints_pos_validation_on_altchain);
-  REGISTER_TEST(gen_checkpoints_and_invalid_tx_to_pool);
-  REGISTER_TEST(gen_checkpoints_set_after_switching_to_altchain);
-  REGISTER_TEST_HF(gen_no_attchments_in_coinbase, "3");
-  REGISTER_TEST(gen_no_attchments_in_coinbase_gentime);
+  GENERATE_AND_PLAY(gen_crypted_attachments);
+  GENERATE_AND_PLAY(gen_checkpoints_attachments_basic);
+  GENERATE_AND_PLAY(gen_checkpoints_invalid_keyimage);
+  GENERATE_AND_PLAY(gen_checkpoints_altblock_before_and_after_cp);
+  GENERATE_AND_PLAY(gen_checkpoints_block_in_future);
+  GENERATE_AND_PLAY(gen_checkpoints_altchain_far_before_cp);
+  GENERATE_AND_PLAY(gen_checkpoints_block_in_future_after_cp);
+  GENERATE_AND_PLAY(gen_checkpoints_prun_txs_after_blockchain_load);
+  GENERATE_AND_PLAY(gen_checkpoints_reorganize);
+  GENERATE_AND_PLAY(gen_checkpoints_pos_validation_on_altchain);
+  GENERATE_AND_PLAY(gen_checkpoints_and_invalid_tx_to_pool);
+  GENERATE_AND_PLAY(gen_checkpoints_set_after_switching_to_altchain);
+  GENERATE_AND_PLAY_HF(gen_no_attchments_in_coinbase, "3");
+  GENERATE_AND_PLAY(gen_no_attchments_in_coinbase_gentime);
 
-  REGISTER_TEST_HF(gen_alias_tests, "3-*");
-  REGISTER_TEST_HF(gen_alias_strange_data, "3-*");
-  REGISTER_TEST_HF(gen_alias_concurrency_with_switch, "3-*");
-  REGISTER_TEST_HF(gen_alias_same_alias_in_tx_pool, "3-*");   
-  REGISTER_TEST_HF(gen_alias_switch_and_tx_pool, "3-*");
-  REGISTER_TEST_HF(gen_alias_update_after_addr_changed, "3-*");
-  REGISTER_TEST_HF(gen_alias_blocking_reg_by_invalid_tx, "3-*");
-  REGISTER_TEST_HF(gen_alias_blocking_update_by_invalid_tx, "3-*");
-  REGISTER_TEST_HF(gen_alias_reg_with_locked_money, "*");
-  REGISTER_TEST_HF(gen_alias_too_small_reward, "3-*");
-  REGISTER_TEST_HF(gen_alias_too_much_reward, "3-*");
-  REGISTER_TEST_HF(gen_alias_tx_no_outs, "*");
-  REGISTER_TEST_HF(gen_alias_switch_and_check_block_template, "3-*");
-  REGISTER_TEST_HF(gen_alias_too_many_regs_in_block_template, "3"); // disabled in HF4 due to tx outputs count limitation
-  REGISTER_TEST_HF(gen_alias_update_for_free, "3-*");
-  REGISTER_TEST_HF(gen_alias_in_coinbase, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_tests, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_strange_data, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_concurrency_with_switch, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_same_alias_in_tx_pool, "3-*");   
+  GENERATE_AND_PLAY_HF(gen_alias_switch_and_tx_pool, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_update_after_addr_changed, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_blocking_reg_by_invalid_tx, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_blocking_update_by_invalid_tx, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_reg_with_locked_money, "*");
+  GENERATE_AND_PLAY_HF(gen_alias_too_small_reward, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_too_much_reward, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_tx_no_outs, "*");
+  GENERATE_AND_PLAY_HF(gen_alias_switch_and_check_block_template, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_too_many_regs_in_block_template, "3"); // disabled in HF4 due to tx outputs count limitation
+  GENERATE_AND_PLAY_HF(gen_alias_update_for_free, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_in_coinbase, "3-*");
 
-  REGISTER_TEST(gen_wallet_basic_transfer);
-  REGISTER_TEST(gen_wallet_refreshing_on_chain_switch);
-  REGISTER_TEST(gen_wallet_refreshing_on_chain_switch_2);
-  REGISTER_TEST(gen_wallet_unconfirmed_tx_from_tx_pool);
-  REGISTER_TEST_HF(gen_wallet_save_load_and_balance, "*");
-  REGISTER_TEST_HF(gen_wallet_mine_pos_block, "3-*");
-  REGISTER_TEST(gen_wallet_unconfirmed_outdated_tx);
-  REGISTER_TEST(gen_wallet_unlock_by_block_and_by_time);
-  REGISTER_TEST(gen_wallet_payment_id);
-  REGISTER_TEST(gen_wallet_oversized_payment_id);
-  REGISTER_TEST(gen_wallet_transfers_and_outdated_unconfirmed_txs);
-  REGISTER_TEST(gen_wallet_transfers_and_chain_switch);
-  REGISTER_TEST(gen_wallet_decrypted_payload_items);
-  REGISTER_TEST_HF(gen_wallet_alias_and_unconfirmed_txs, "3-*");
-  REGISTER_TEST_HF(gen_wallet_alias_via_special_wallet_funcs, "3-*");
-  REGISTER_TEST(gen_wallet_fake_outputs_randomness);
-  REGISTER_TEST(gen_wallet_fake_outputs_not_enough);
-  REGISTER_TEST(gen_wallet_offers_basic);
-  REGISTER_TEST(gen_wallet_offers_size_limit);
-  REGISTER_TEST(gen_wallet_dust_to_account);
-  REGISTER_TEST(gen_wallet_selecting_pos_entries);
-  REGISTER_TEST(gen_wallet_spending_coinstake_after_minting);
-  REGISTER_TEST(gen_wallet_fake_outs_while_having_too_little_own_outs);
-  // REGISTER_TEST(premine_wallet_test);  // tests premine wallets; wallet files nedded; by demand only
-  REGISTER_TEST(mined_balance_wallet_test);
-  REGISTER_TEST(wallet_outputs_with_same_key_image);
-  REGISTER_TEST(wallet_unconfirmed_tx_expiration);
-  REGISTER_TEST(wallet_unconfimed_tx_balance);
-  REGISTER_TEST_HF(packing_outputs_on_pos_minting_wallet, "3");
-  REGISTER_TEST_HF(wallet_watch_only_and_chain_switch, "3");
-  REGISTER_TEST_HF(wallet_and_sweep_below, "3-*");
+  GENERATE_AND_PLAY(gen_wallet_basic_transfer);
+  GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch);
+  GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch_2);
+  GENERATE_AND_PLAY(gen_wallet_unconfirmed_tx_from_tx_pool);
+  GENERATE_AND_PLAY_HF(gen_wallet_save_load_and_balance, "*");
+  GENERATE_AND_PLAY_HF(gen_wallet_mine_pos_block, "3-*");
+  GENERATE_AND_PLAY(gen_wallet_unconfirmed_outdated_tx);
+  GENERATE_AND_PLAY(gen_wallet_unlock_by_block_and_by_time);
+  GENERATE_AND_PLAY(gen_wallet_payment_id);
+  GENERATE_AND_PLAY(gen_wallet_oversized_payment_id);
+  GENERATE_AND_PLAY(gen_wallet_transfers_and_outdated_unconfirmed_txs);
+  GENERATE_AND_PLAY(gen_wallet_transfers_and_chain_switch);
+  GENERATE_AND_PLAY(gen_wallet_decrypted_payload_items);
+  GENERATE_AND_PLAY_HF(gen_wallet_alias_and_unconfirmed_txs, "3-*");
+  GENERATE_AND_PLAY_HF(gen_wallet_alias_via_special_wallet_funcs, "3-*");
+  GENERATE_AND_PLAY(gen_wallet_fake_outputs_randomness);
+  GENERATE_AND_PLAY(gen_wallet_fake_outputs_not_enough);
+  GENERATE_AND_PLAY(gen_wallet_offers_basic);
+  GENERATE_AND_PLAY(gen_wallet_offers_size_limit);
+  GENERATE_AND_PLAY(gen_wallet_dust_to_account);
+  GENERATE_AND_PLAY(gen_wallet_selecting_pos_entries);
+  GENERATE_AND_PLAY(gen_wallet_spending_coinstake_after_minting);
+  GENERATE_AND_PLAY(gen_wallet_fake_outs_while_having_too_little_own_outs);
+  // GENERATE_AND_PLAY(premine_wallet_test);  // tests premine wallets; wallet files nedded; by demand only
+  GENERATE_AND_PLAY(mined_balance_wallet_test);
+  GENERATE_AND_PLAY(wallet_outputs_with_same_key_image);
+  GENERATE_AND_PLAY(wallet_unconfirmed_tx_expiration);
+  GENERATE_AND_PLAY(wallet_unconfimed_tx_balance);
+  GENERATE_AND_PLAY_HF(packing_outputs_on_pos_minting_wallet, "3");
+  GENERATE_AND_PLAY_HF(wallet_watch_only_and_chain_switch, "3");
+  GENERATE_AND_PLAY_HF(wallet_and_sweep_below, "3-*");
 
-  REGISTER_TEST(wallet_rpc_integrated_address);
-  REGISTER_TEST(wallet_rpc_integrated_address_transfer);
-  REGISTER_TEST(wallet_rpc_transfer);
-  REGISTER_TEST(wallet_rpc_alias_tests);
-  REGISTER_TEST_HF(wallet_rpc_exchange_suite, "3,4");
-  REGISTER_TEST_HF(wallet_true_rpc_pos_mining, "4-*");
-  REGISTER_TEST_HF(wallet_rpc_cold_signing, "3,5-*");
-  // REGISTER_TEST_HF(wallet_rpc_multiple_receivers, "5-*"); work in progress -- sowle
-  REGISTER_TEST_HF(wallet_chain_switch_with_spending_the_same_ki, "3");
-  REGISTER_TEST(wallet_sending_to_integrated_address);
-  REGISTER_TEST_HF(block_template_blacklist_test, "4-*");
-  REGISTER_TEST_HF(wallet_rpc_hardfork_verification, "5");
+  GENERATE_AND_PLAY(wallet_rpc_integrated_address);
+  GENERATE_AND_PLAY(wallet_rpc_integrated_address_transfer);
+  GENERATE_AND_PLAY(wallet_rpc_transfer);
+  GENERATE_AND_PLAY(wallet_rpc_alias_tests);
+  GENERATE_AND_PLAY_HF(wallet_rpc_exchange_suite, "3,4");
+  GENERATE_AND_PLAY_HF(wallet_true_rpc_pos_mining, "4-*");
+  GENERATE_AND_PLAY_HF(wallet_rpc_cold_signing, "3,5-*");
+  // GENERATE_AND_PLAY_HF(wallet_rpc_multiple_receivers, "5-*"); work in progress -- sowle
+  GENERATE_AND_PLAY_HF(wallet_chain_switch_with_spending_the_same_ki, "3");
+  GENERATE_AND_PLAY(wallet_sending_to_integrated_address);
+  GENERATE_AND_PLAY_HF(block_template_blacklist_test, "4-*");
+  GENERATE_AND_PLAY_HF(wallet_rpc_hardfork_verification, "5");
 
-  // REGISTER_TEST(emission_test); // simulate 1 year of blockchain, too long run (1 y ~= 1 hr), by demand only
+  // GENERATE_AND_PLAY(emission_test); // simulate 1 year of blockchain, too long run (1 y ~= 1 hr), by demand only
   // LOG_ERROR2("print_reward_change_first_blocks.log", currency::print_reward_change_first_blocks(525601).str()); // outputs first 1 year of blocks' rewards (simplier)
 
   // pos tests
   GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(gen_pos_basic_tests);
-  // REGISTER_TEST(gen_pos_basic_tests); -- commented as this test is run intermittedly by previous line; uncomment if necessary (ex. for debugging)
-  REGISTER_TEST(gen_pos_coinstake_already_spent);
-  REGISTER_TEST(gen_pos_incorrect_timestamp);
-  REGISTER_TEST(gen_pos_too_early_pos_block);
-  REGISTER_TEST_HF(gen_pos_extra_nonce, "3-*");
-  REGISTER_TEST(gen_pos_min_allowed_height);
-  REGISTER_TEST(gen_pos_invalid_coinbase);
-  // REGISTER_TEST(pos_wallet_minting_same_amount_diff_outs); // Long test! Takes ~10 hours to simulate 6000 blocks on 2015 middle-end computer
-  //REGISTER_TEST(pos_emission_test); // Long test! by demand only
-  REGISTER_TEST(pos_wallet_big_block_test);
-  //REGISTER_TEST(block_template_against_txs_size); // Long test! by demand only
-  REGISTER_TEST_HF(pos_altblocks_validation, "3-*");
-  REGISTER_TEST_HF(pos_mining_with_decoys, "3");
-  REGISTER_TEST_HF(pos_and_no_pow_blocks_between_output_and_stake, "4-*");
+  // GENERATE_AND_PLAY(gen_pos_basic_tests); -- commented as this test is run intermittedly by previous line; uncomment if necessary (ex. for debugging)
+  GENERATE_AND_PLAY(gen_pos_coinstake_already_spent);
+  GENERATE_AND_PLAY(gen_pos_incorrect_timestamp);
+  GENERATE_AND_PLAY(gen_pos_too_early_pos_block);
+  GENERATE_AND_PLAY_HF(gen_pos_extra_nonce, "3-*");
+  GENERATE_AND_PLAY(gen_pos_min_allowed_height);
+  GENERATE_AND_PLAY(gen_pos_invalid_coinbase);
+  // GENERATE_AND_PLAY(pos_wallet_minting_same_amount_diff_outs); // Long test! Takes ~10 hours to simulate 6000 blocks on 2015 middle-end computer
+  //GENERATE_AND_PLAY(pos_emission_test); // Long test! by demand only
+  GENERATE_AND_PLAY(pos_wallet_big_block_test);
+  //GENERATE_AND_PLAY(block_template_against_txs_size); // Long test! by demand only
+  GENERATE_AND_PLAY_HF(pos_altblocks_validation, "3-*");
+  GENERATE_AND_PLAY_HF(pos_mining_with_decoys, "3");
+  GENERATE_AND_PLAY_HF(pos_and_no_pow_blocks_between_output_and_stake, "4-*");
 
   // alternative blocks and generic chain-switching tests
-  REGISTER_TEST(gen_chain_switch_pow_pos);
-  REGISTER_TEST(pow_pos_reorganize_specific_case);
-  REGISTER_TEST(gen_chain_switch_1);
-  REGISTER_TEST(bad_chain_switching_with_rollback);
-  REGISTER_TEST(chain_switching_and_tx_with_attachment_blobsize);
-  REGISTER_TEST_HF(chain_switching_when_gindex_spent_in_both_chains, "3-*");
-  REGISTER_TEST(alt_chain_coins_pow_mined_then_spent);
-  REGISTER_TEST(gen_simple_chain_split_1);
-  REGISTER_TEST_HF(alt_blocks_validation_and_same_new_amount_in_two_txs, "3-*");
-  REGISTER_TEST_HF(alt_blocks_with_the_same_txs, "3-*");
-  REGISTER_TEST_HF(chain_switching_when_out_spent_in_alt_chain_mixin, "3-*");
-  REGISTER_TEST_HF(chain_switching_when_out_spent_in_alt_chain_ref_id, "3-*");
-  REGISTER_TEST_HF(alt_chain_and_block_tx_fee_median, "3-*");
+  GENERATE_AND_PLAY(gen_chain_switch_pow_pos);
+  GENERATE_AND_PLAY(pow_pos_reorganize_specific_case);
+  GENERATE_AND_PLAY(gen_chain_switch_1);
+  GENERATE_AND_PLAY(bad_chain_switching_with_rollback);
+  GENERATE_AND_PLAY(chain_switching_and_tx_with_attachment_blobsize);
+  GENERATE_AND_PLAY_HF(chain_switching_when_gindex_spent_in_both_chains, "3-*");
+  GENERATE_AND_PLAY(alt_chain_coins_pow_mined_then_spent);
+  GENERATE_AND_PLAY(gen_simple_chain_split_1);
+  GENERATE_AND_PLAY_HF(alt_blocks_validation_and_same_new_amount_in_two_txs, "3-*");
+  GENERATE_AND_PLAY_HF(alt_blocks_with_the_same_txs, "3-*");
+  GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_mixin, "3-*");
+  GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_ref_id, "3-*");
+  GENERATE_AND_PLAY_HF(alt_chain_and_block_tx_fee_median, "3-*");
 
   // miscellaneous tests
-  REGISTER_TEST(test_blockchain_vs_spent_keyimges);
-  REGISTER_TEST(test_blockchain_vs_spent_multisig_outs);
-  REGISTER_TEST(block_template_vs_invalid_txs_from_pool);
-  REGISTER_TEST(cumulative_difficulty_adjustment_test);
-  REGISTER_TEST(cumulative_difficulty_adjustment_test_alt);
-  REGISTER_TEST(prun_ring_signatures);
-  REGISTER_TEST(gen_simple_chain_001);
-  REGISTER_TEST(one_block);
-  REGISTER_TEST(gen_ring_signature_1);
-  REGISTER_TEST(gen_ring_signature_2);
-  REGISTER_TEST(fill_tx_rpc_inputs);
-  //REGISTER_TEST(gen_ring_signature_big); // Takes up to XXX hours (if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10)
+  GENERATE_AND_PLAY(test_blockchain_vs_spent_keyimges);
+  GENERATE_AND_PLAY(test_blockchain_vs_spent_multisig_outs);
+  GENERATE_AND_PLAY(block_template_vs_invalid_txs_from_pool);
+  GENERATE_AND_PLAY(cumulative_difficulty_adjustment_test);
+  GENERATE_AND_PLAY(cumulative_difficulty_adjustment_test_alt);
+  GENERATE_AND_PLAY(prun_ring_signatures);
+  GENERATE_AND_PLAY(gen_simple_chain_001);
+  GENERATE_AND_PLAY(one_block);
+  GENERATE_AND_PLAY(gen_ring_signature_1);
+  GENERATE_AND_PLAY(gen_ring_signature_2);
+  GENERATE_AND_PLAY(fill_tx_rpc_inputs);
+  //GENERATE_AND_PLAY(gen_ring_signature_big); // Takes up to XXX hours (if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10)
 
   // tests for outputs mixing in
-  REGISTER_TEST(get_random_outs_test);
-  REGISTER_TEST(mix_attr_tests);
-  REGISTER_TEST(mix_in_spent_outs);
-  REGISTER_TEST(random_outs_and_burnt_coins);
+  GENERATE_AND_PLAY(get_random_outs_test);
+  GENERATE_AND_PLAY(mix_attr_tests);
+  GENERATE_AND_PLAY(mix_in_spent_outs);
+  GENERATE_AND_PLAY(random_outs_and_burnt_coins);
 
   // Block verification tests
-  REGISTER_TEST_HF(gen_block_big_major_version, "0,3");
-  REGISTER_TEST_HF(gen_block_big_minor_version, "0,3");
-  REGISTER_TEST_HF(gen_block_ts_not_checked, "0,3");
-  REGISTER_TEST_HF(gen_block_ts_in_past, "0,3");
-  REGISTER_TEST_HF(gen_block_ts_in_future, "0,3");
-  //REGISTER_TEST(gen_block_invalid_prev_id); disabled because impossible to generate text chain with wrong prev_id - pow hash not works without chaining
-  REGISTER_TEST_HF(gen_block_invalid_nonce, "0,3");
-  REGISTER_TEST_HF(gen_block_no_miner_tx, "0,3");
-  REGISTER_TEST_HF(gen_block_unlock_time_is_low, "0,3");
-  REGISTER_TEST_HF(gen_block_unlock_time_is_high, "0,3");
-  REGISTER_TEST_HF(gen_block_unlock_time_is_timestamp_in_past, "0,3");
-  REGISTER_TEST_HF(gen_block_unlock_time_is_timestamp_in_future, "0,3");
-  REGISTER_TEST_HF(gen_block_height_is_low, "0,3");
-  REGISTER_TEST_HF(gen_block_height_is_high, "0,3");
-  REGISTER_TEST_HF(block_with_correct_prev_id_on_wrong_height, "3-*");
-  REGISTER_TEST_HF(block_reward_in_main_chain_basic, "3-*");
-  REGISTER_TEST_HF(block_reward_in_alt_chain_basic, "3-*");
-  REGISTER_TEST_HF(gen_block_miner_tx_has_2_tx_gen_in, "0,3");
-  REGISTER_TEST_HF(gen_block_miner_tx_has_2_in, "0,3");
-  REGISTER_TEST_HF(gen_block_miner_tx_with_txin_to_key, "0,3");
-  REGISTER_TEST_HF(gen_block_miner_tx_out_is_small, "0,3");
-  REGISTER_TEST_HF(gen_block_miner_tx_out_is_big, "0,3");
-  REGISTER_TEST_HF(gen_block_miner_tx_has_no_out, "0,3");
-  REGISTER_TEST_HF(gen_block_miner_tx_has_out_to_initiator, "0,3");
-  REGISTER_TEST_HF(gen_block_has_invalid_tx, "0,3");
-  REGISTER_TEST_HF(gen_block_is_too_big, "0,3");
-  REGISTER_TEST_HF(gen_block_wrong_version_agains_hardfork, "0,3");
-  REGISTER_TEST_HF(block_choice_rule_bigger_fee, "4-*"); 
-  //REGISTER_TEST(gen_block_invalid_binary_format); // Takes up to 3 hours, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 500, up to 30 minutes, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10
+  GENERATE_AND_PLAY_HF(gen_block_big_major_version, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_big_minor_version, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_ts_not_checked, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_ts_in_past, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_ts_in_future, "0,3");
+  //GENERATE_AND_PLAY(gen_block_invalid_prev_id); disabled because impossible to generate text chain with wrong prev_id - pow hash not works without chaining
+  GENERATE_AND_PLAY_HF(gen_block_invalid_nonce, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_no_miner_tx, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_low, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_high, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_timestamp_in_past, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_timestamp_in_future, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_height_is_low, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_height_is_high, "0,3");
+  GENERATE_AND_PLAY_HF(block_with_correct_prev_id_on_wrong_height, "3-*");
+  GENERATE_AND_PLAY_HF(block_reward_in_main_chain_basic, "3-*");
+  GENERATE_AND_PLAY_HF(block_reward_in_alt_chain_basic, "3-*");
+  GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_tx_gen_in, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_in, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_miner_tx_with_txin_to_key, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_miner_tx_out_is_small, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_miner_tx_out_is_big, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_no_out, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_out_to_initiator, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_has_invalid_tx, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_is_too_big, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_wrong_version_agains_hardfork, "0,3");
+  GENERATE_AND_PLAY_HF(block_choice_rule_bigger_fee, "4-*"); 
+  //GENERATE_AND_PLAY(gen_block_invalid_binary_format); // Takes up to 3 hours, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 500, up to 30 minutes, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10
   
   // Transaction verification tests
-  REGISTER_TEST(gen_broken_attachments);
-  REGISTER_TEST(gen_tx_big_version);
-  REGISTER_TEST(gen_tx_unlock_time);
-  REGISTER_TEST(gen_tx_input_is_not_txin_to_key);
-  REGISTER_TEST(gen_tx_no_inputs_no_outputs);
-  REGISTER_TEST(gen_tx_no_inputs_has_outputs);
-  REGISTER_TEST(gen_tx_has_inputs_no_outputs);
-  REGISTER_TEST(gen_tx_invalid_input_amount);
-  REGISTER_TEST(gen_tx_input_wo_key_offsets);
-  REGISTER_TEST(gen_tx_sender_key_offest_not_exist);
-  REGISTER_TEST(gen_tx_key_offest_points_to_foreign_key);
-  REGISTER_TEST(gen_tx_mixed_key_offest_not_exist);
-  REGISTER_TEST(gen_tx_key_image_not_derive_from_tx_key);
-  REGISTER_TEST(gen_tx_key_image_is_invalid);
-  REGISTER_TEST(gen_tx_check_input_unlock_time);
-  REGISTER_TEST(gen_tx_txout_to_key_has_invalid_key);
-  REGISTER_TEST(gen_tx_output_with_zero_amount);
-  REGISTER_TEST(gen_tx_output_is_not_txout_to_key);
-  REGISTER_TEST(gen_tx_signatures_are_invalid);
-  REGISTER_TEST(gen_tx_extra_double_entry);
-  REGISTER_TEST(gen_tx_double_key_image);
-  REGISTER_TEST(tx_expiration_time);
-  REGISTER_TEST(tx_expiration_time_and_block_template);
-  REGISTER_TEST(tx_expiration_time_and_chain_switching);
-  REGISTER_TEST(tx_key_image_pool_conflict);
-  //REGISTER_TEST_HF(tx_version_against_hardfork, "4-*");
+  GENERATE_AND_PLAY(gen_broken_attachments);
+  GENERATE_AND_PLAY(gen_tx_big_version);
+  GENERATE_AND_PLAY(gen_tx_unlock_time);
+  GENERATE_AND_PLAY(gen_tx_input_is_not_txin_to_key);
+  GENERATE_AND_PLAY(gen_tx_no_inputs_no_outputs);
+  GENERATE_AND_PLAY(gen_tx_no_inputs_has_outputs);
+  GENERATE_AND_PLAY(gen_tx_has_inputs_no_outputs);
+  GENERATE_AND_PLAY(gen_tx_invalid_input_amount);
+  GENERATE_AND_PLAY(gen_tx_input_wo_key_offsets);
+  GENERATE_AND_PLAY(gen_tx_sender_key_offest_not_exist);
+  GENERATE_AND_PLAY(gen_tx_key_offest_points_to_foreign_key);
+  GENERATE_AND_PLAY(gen_tx_mixed_key_offest_not_exist);
+  GENERATE_AND_PLAY(gen_tx_key_image_not_derive_from_tx_key);
+  GENERATE_AND_PLAY(gen_tx_key_image_is_invalid);
+  GENERATE_AND_PLAY(gen_tx_check_input_unlock_time);
+  GENERATE_AND_PLAY(gen_tx_txout_to_key_has_invalid_key);
+  GENERATE_AND_PLAY(gen_tx_output_with_zero_amount);
+  GENERATE_AND_PLAY(gen_tx_output_is_not_txout_to_key);
+  GENERATE_AND_PLAY(gen_tx_signatures_are_invalid);
+  GENERATE_AND_PLAY(gen_tx_extra_double_entry);
+  GENERATE_AND_PLAY(gen_tx_double_key_image);
+  GENERATE_AND_PLAY(tx_expiration_time);
+  GENERATE_AND_PLAY(tx_expiration_time_and_block_template);
+  GENERATE_AND_PLAY(tx_expiration_time_and_chain_switching);
+  GENERATE_AND_PLAY(tx_key_image_pool_conflict);
+  //GENERATE_AND_PLAY_HF(tx_version_against_hardfork, "4-*");
   /* To execute the check of bare balance (function "check_tx_bare_balance") we need to run the test "tx_pool_semantic_validation" on the HF 3. By default behaviour bare outputs are disallowed on
   the heights >= 10. */
-  REGISTER_TEST_HF(tx_pool_semantic_validation, "3");
-  REGISTER_TEST(input_refers_to_incompatible_by_type_output);
-  REGISTER_TEST_HF(tx_pool_validation_and_chain_switch, "4-5");
-  REGISTER_TEST_HF(tx_coinbase_separate_sig_flag, "4-*");
-  REGISTER_TEST(tx_input_mixins);
+  GENERATE_AND_PLAY_HF(tx_pool_semantic_validation, "3");
+  GENERATE_AND_PLAY(input_refers_to_incompatible_by_type_output);
+  GENERATE_AND_PLAY_HF(tx_pool_validation_and_chain_switch, "4-5");
+  GENERATE_AND_PLAY_HF(tx_coinbase_separate_sig_flag, "4-*");
+  GENERATE_AND_PLAY(tx_input_mixins);
 
   // Double spend
-  REGISTER_TEST(gen_double_spend_in_tx<false>);
-  REGISTER_TEST(gen_double_spend_in_tx<true>);
-  REGISTER_TEST(gen_double_spend_in_the_same_block<false>);
-  REGISTER_TEST(gen_double_spend_in_the_same_block<true>);
-  REGISTER_TEST(gen_double_spend_in_different_blocks<false>);
-  REGISTER_TEST(gen_double_spend_in_different_blocks<true>);
-  REGISTER_TEST(gen_double_spend_in_different_chains);
-  REGISTER_TEST(gen_double_spend_in_alt_chain_in_the_same_block<false>);
-  REGISTER_TEST(gen_double_spend_in_alt_chain_in_the_same_block<true>);
-  REGISTER_TEST(gen_double_spend_in_alt_chain_in_different_blocks<false>);
-  REGISTER_TEST(gen_double_spend_in_alt_chain_in_different_blocks<true>);
+  GENERATE_AND_PLAY(gen_double_spend_in_tx<false>);
+  GENERATE_AND_PLAY(gen_double_spend_in_tx<true>);
+  GENERATE_AND_PLAY(gen_double_spend_in_the_same_block<false>);
+  GENERATE_AND_PLAY(gen_double_spend_in_the_same_block<true>);
+  GENERATE_AND_PLAY(gen_double_spend_in_different_blocks<false>);
+  GENERATE_AND_PLAY(gen_double_spend_in_different_blocks<true>);
+  GENERATE_AND_PLAY(gen_double_spend_in_different_chains);
+  GENERATE_AND_PLAY(gen_double_spend_in_alt_chain_in_the_same_block<false>);
+  GENERATE_AND_PLAY(gen_double_spend_in_alt_chain_in_the_same_block<true>);
+  GENERATE_AND_PLAY(gen_double_spend_in_alt_chain_in_different_blocks<false>);
+  GENERATE_AND_PLAY(gen_double_spend_in_alt_chain_in_different_blocks<true>);
 
-  REGISTER_TEST(gen_uint_overflow_1);
-  REGISTER_TEST(gen_uint_overflow_2);
+  GENERATE_AND_PLAY(gen_uint_overflow_1);
+  GENERATE_AND_PLAY(gen_uint_overflow_2);
 
   // Hardfok 1 tests
-  REGISTER_TEST(before_hard_fork_1_cumulative_difficulty);
-  REGISTER_TEST(inthe_middle_hard_fork_1_cumulative_difficulty);
-  REGISTER_TEST(after_hard_fork_1_cumulative_difficulty);
-  REGISTER_TEST(hard_fork_1_locked_mining_test);
-  REGISTER_TEST(hard_fork_1_bad_pos_source);
-  REGISTER_TEST(hard_fork_1_unlock_time_2_in_normal_tx);
-  REGISTER_TEST(hard_fork_1_unlock_time_2_in_coinbase);
-  REGISTER_TEST(hard_fork_1_chain_switch_pow_only);
-  REGISTER_TEST(hard_fork_1_checkpoint_basic_test);
-  REGISTER_TEST(hard_fork_1_pos_locked_height_vs_time);
-  REGISTER_TEST(hard_fork_1_pos_and_locked_coins);
+  GENERATE_AND_PLAY(before_hard_fork_1_cumulative_difficulty);
+  GENERATE_AND_PLAY(inthe_middle_hard_fork_1_cumulative_difficulty);
+  GENERATE_AND_PLAY(after_hard_fork_1_cumulative_difficulty);
+  GENERATE_AND_PLAY(hard_fork_1_locked_mining_test);
+  GENERATE_AND_PLAY(hard_fork_1_bad_pos_source);
+  GENERATE_AND_PLAY(hard_fork_1_unlock_time_2_in_normal_tx);
+  GENERATE_AND_PLAY(hard_fork_1_unlock_time_2_in_coinbase);
+  GENERATE_AND_PLAY(hard_fork_1_chain_switch_pow_only);
+  GENERATE_AND_PLAY(hard_fork_1_checkpoint_basic_test);
+  GENERATE_AND_PLAY(hard_fork_1_pos_locked_height_vs_time);
+  GENERATE_AND_PLAY(hard_fork_1_pos_and_locked_coins);
 
   // Hardfork 2 tests
-  //REGISTER_TEST(hard_fork_2_tx_payer_in_wallet);
-  //REGISTER_TEST(hard_fork_2_tx_receiver_in_wallet);
-  REGISTER_TEST(hard_fork_2_tx_extra_alias_entry_in_wallet);
-  REGISTER_TEST_HF(hard_fork_2_auditable_addresses_basics, "2-*");
-  REGISTER_TEST(hard_fork_2_no_new_structures_before_hf);
-  REGISTER_TEST(hard_fork_2_awo_wallets_basic_test<true>);
-  REGISTER_TEST(hard_fork_2_awo_wallets_basic_test<false>);
-  REGISTER_TEST(hard_fork_2_alias_update_using_old_tx<true>);
-  REGISTER_TEST(hard_fork_2_alias_update_using_old_tx<false>);
-  REGISTER_TEST(hard_fork_2_incorrect_alias_update<true>);
-  REGISTER_TEST(hard_fork_2_incorrect_alias_update<false>);
+  //GENERATE_AND_PLAY(hard_fork_2_tx_payer_in_wallet);
+  //GENERATE_AND_PLAY(hard_fork_2_tx_receiver_in_wallet);
+  GENERATE_AND_PLAY(hard_fork_2_tx_extra_alias_entry_in_wallet);
+  GENERATE_AND_PLAY_HF(hard_fork_2_auditable_addresses_basics, "2-*");
+  GENERATE_AND_PLAY(hard_fork_2_no_new_structures_before_hf);
+  GENERATE_AND_PLAY(hard_fork_2_awo_wallets_basic_test<true>);
+  GENERATE_AND_PLAY(hard_fork_2_awo_wallets_basic_test<false>);
+  GENERATE_AND_PLAY(hard_fork_2_alias_update_using_old_tx<true>);
+  GENERATE_AND_PLAY(hard_fork_2_alias_update_using_old_tx<false>);
+  GENERATE_AND_PLAY(hard_fork_2_incorrect_alias_update<true>);
+  GENERATE_AND_PLAY(hard_fork_2_incorrect_alias_update<false>);
 
   // HF4
-  REGISTER_TEST_HF(hard_fork_4_consolidated_txs, "3-*");
-  REGISTER_TEST_HF(hardfork_4_wallet_transfer_with_mandatory_mixins, "3-*");
-  REGISTER_TEST(hardfork_4_wallet_sweep_bare_outs);
-  REGISTER_TEST_HF(hardfork_4_pop_tx_from_global_index, "4-*");
+  GENERATE_AND_PLAY_HF(hard_fork_4_consolidated_txs, "3-*");
+  GENERATE_AND_PLAY_HF(hardfork_4_wallet_transfer_with_mandatory_mixins, "3-*");
+  GENERATE_AND_PLAY(hardfork_4_wallet_sweep_bare_outs);
+  GENERATE_AND_PLAY_HF(hardfork_4_pop_tx_from_global_index, "4-*");
 
   // HF5
-  REGISTER_TEST_HF(hard_fork_5_tx_version, "5-*");
+  GENERATE_AND_PLAY_HF(hard_fork_5_tx_version, "5-*");
 
   // HF6
-  REGISTER_TEST(hard_fork_6_intrinsic_payment_id_basic_test);
-  REGISTER_TEST(hard_fork_6_intrinsic_payment_id_rpc_test);
+  GENERATE_AND_PLAY(hard_fork_6_intrinsic_payment_id_basic_test);
+  GENERATE_AND_PLAY(hard_fork_6_intrinsic_payment_id_rpc_test);
 
-  REGISTER_TEST_HF(isolate_auditable_and_proof, "2-*");
+  GENERATE_AND_PLAY_HF(isolate_auditable_and_proof, "2-*");
   
-  REGISTER_TEST(zarcanum_basic_test);
+  GENERATE_AND_PLAY(zarcanum_basic_test);
 
-  REGISTER_TEST_HF(multiassets_basic_test, "4-*");
-  REGISTER_TEST_HF(ionic_swap_basic_test, "4-*");
-  REGISTER_TEST_HF(ionic_swap_exact_amounts_test, "4-*");
-  REGISTER_TEST(zarcanum_test_n_inputs_validation);
-  REGISTER_TEST(zarcanum_gen_time_balance);
-  REGISTER_TEST(zarcanum_txs_with_big_shuffled_decoy_set_shuffled);
-  REGISTER_TEST(zarcanum_pos_block_math);
-  REGISTER_TEST(zarcanum_in_alt_chain);
-  REGISTER_TEST_HF(zarcanum_in_alt_chain_2, "4-*");
-  REGISTER_TEST(assets_and_explicit_native_coins_in_outs);
-  REGISTER_TEST(zarcanum_block_with_txs);
-  REGISTER_TEST(asset_depoyment_and_few_zc_utxos);
-  REGISTER_TEST_HF(assets_and_pos_mining, "4-*");
-  REGISTER_TEST_HF(asset_emission_and_unconfirmed_balance, "4-*");
-  REGISTER_TEST_HF(asset_operation_in_consolidated_tx, "4-*");
-  REGISTER_TEST_HF(asset_operation_and_hardfork_checks, "4-*");
-  REGISTER_TEST_HF(eth_signed_asset_basics, "5-*");  // TODO: make HF4 version
-  REGISTER_TEST_HF(eth_signed_asset_via_rpc, "5-*"); // TODO: make HF4 version
-  //REGISTER_TEST_HF(asset_current_and_total_supplies_comparative_constraints, "4-*"); <-- temporary disabled, waiting for Stepan's fix -- sowle
-  REGISTER_TEST_HF(several_asset_emit_burn_txs_in_pool, "5-*");
-  REGISTER_TEST_HF(assets_transfer_with_smallest_amount, "4-*");
-  REGISTER_TEST_HF(asset_operations_and_chain_switching, "4-*");
+  GENERATE_AND_PLAY_HF(multiassets_basic_test, "4-*");
+  GENERATE_AND_PLAY_HF(ionic_swap_basic_test, "4-*");
+  GENERATE_AND_PLAY_HF(ionic_swap_exact_amounts_test, "4-*");
+  GENERATE_AND_PLAY(zarcanum_test_n_inputs_validation);
+  GENERATE_AND_PLAY(zarcanum_gen_time_balance);
+  GENERATE_AND_PLAY(zarcanum_txs_with_big_shuffled_decoy_set_shuffled);
+  GENERATE_AND_PLAY(zarcanum_pos_block_math);
+  GENERATE_AND_PLAY(zarcanum_in_alt_chain);
+  GENERATE_AND_PLAY_HF(zarcanum_in_alt_chain_2, "4-*");
+  GENERATE_AND_PLAY(assets_and_explicit_native_coins_in_outs);
+  GENERATE_AND_PLAY(zarcanum_block_with_txs);
+  GENERATE_AND_PLAY(asset_depoyment_and_few_zc_utxos);
+  GENERATE_AND_PLAY_HF(assets_and_pos_mining, "4-*");
+  GENERATE_AND_PLAY_HF(asset_emission_and_unconfirmed_balance, "4-*");
+  GENERATE_AND_PLAY_HF(asset_operation_in_consolidated_tx, "4-*");
+  GENERATE_AND_PLAY_HF(asset_operation_and_hardfork_checks, "4-*");
+  GENERATE_AND_PLAY_HF(eth_signed_asset_basics, "5-*");  // TODO: make HF4 version
+  GENERATE_AND_PLAY_HF(eth_signed_asset_via_rpc, "5-*"); // TODO: make HF4 version
+  //GENERATE_AND_PLAY_HF(asset_current_and_total_supplies_comparative_constraints, "4-*"); <-- temporary disabled, waiting for Stepan's fix -- sowle
+  GENERATE_AND_PLAY_HF(several_asset_emit_burn_txs_in_pool, "5-*");
+  GENERATE_AND_PLAY_HF(assets_transfer_with_smallest_amount, "4-*");
+  GENERATE_AND_PLAY_HF(asset_operations_and_chain_switching, "4-*");
 
-  REGISTER_TEST_HF(pos_fuse_test, "4-*");
-  REGISTER_TEST_HF(wallet_reorganize_and_trim_test, "4-*");
-  REGISTER_TEST_HF(wallet_rpc_thirdparty_custody, "5-*");    
+  GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
+  GENERATE_AND_PLAY_HF(wallet_reorganize_and_trim_test, "4-*");
+  GENERATE_AND_PLAY_HF(wallet_rpc_thirdparty_custody, "5-*");    
 
-  REGISTER_TEST_HF(attachment_isolation_test, "4-*");
+  GENERATE_AND_PLAY_HF(attachment_isolation_test, "4-*");
 
-  // REGISTER_TEST(gen_block_reward);
+  // GENERATE_AND_PLAY(gen_block_reward);
   // END OF TESTS  */
 }
 
