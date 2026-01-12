@@ -30,7 +30,7 @@ namespace po = boost::program_options;
 namespace bp = boost::process;
 namespace pt = boost::property_tree;
 
-extern const char* TAKEN_TESTS_LOG_FILENAME;
+extern std::string TAKEN_TESTS_LOG_FILENAME;
 
 command_line::arg_descriptor<std::string> arg_test_data_path               ("test-data-path", "", "");
 command_line::arg_descriptor<bool>        arg_generate_test_data           ("generate-test-data", "");
@@ -76,10 +76,11 @@ namespace
 #define GENERATE_AND_PLAY(genclass) \
   do { \
     const std::string __test_name = #genclass; \
+    auto __is_test_eligible_to_run = is_test_eligible_to_run; \
     g_test_jobs.push_back(test_job{ \
       __test_name, \
-      [&, __test_name]() -> bool { \
-        if (!is_test_eligible_to_run(__test_name)) \
+      [&, __test_name, __is_test_eligible_to_run]() -> bool { \
+        if (!__is_test_eligible_to_run(__test_name)) \
           return true; \
         return run_one_test_job( \
           __test_name, \
@@ -102,14 +103,15 @@ namespace
       LOG_ERROR("invalid hardforks mask: " << hardfork_str_mask << " for test " << __gen_name); \
       break; \
     } \
+    auto __hf_filter = is_hf_test_eligible_to_run; \
     for (size_t __i = 0; __i < __hardforks.size(); ++__i) \
     { \
       const size_t __hf_id = __hardforks[__i]; \
       const std::string __test_name = __gen_name + " @ HF " + epee::string_tools::num_to_string_fast(__hf_id); \
       g_test_jobs.push_back(test_job{ \
         __test_name, \
-        [&, __test_name, __gen_name, __hf_id]() -> bool { \
-          if (!is_hf_test_eligible_to_run(__gen_name, __hf_id)) \
+        [&, __test_name, __gen_name, __hf_id, __hf_filter]() -> bool { \
+          if (!__hf_filter(__gen_name, __hf_id)) \
             return true; \
           return run_one_test_job( \
             __test_name, \
@@ -952,15 +954,8 @@ static void log_test_taken_by_this_process(const std::string& test_name)
   catch (...) {}
 }
 //--------------------------------------------------------------------------
-static bool run_one_test_job(
-  const std::string& test_name,
-  const std::function<bool()>& fn,
-  bool& stop_on_first_fail,
-  bool& skip_all_till_the_end,
-  size_t& tests_count,
-  size_t& unique_tests_count,
-  std::set<std::string>& failed_tests,
-  std::vector<std::pair<std::string, uint64_t>>& tests_running_time)
+static bool run_one_test_job(const std::string& test_name, const std::function<bool()>& fn, bool& stop_on_first_fail, bool& skip_all_till_the_end,
+  size_t& tests_count, size_t& unique_tests_count, std::set<std::string>& failed_tests, std::vector<std::pair<std::string, uint64_t>>& tests_running_time)
 {
   if (skip_all_till_the_end)
     return true;
@@ -987,15 +982,9 @@ static bool run_one_test_job(
   return ok;
 }
 
-static bool run_registered_tests(
-  bool& stop_on_first_fail,
-  bool& skip_all_till_the_end,
-  size_t& tests_count,
-  size_t& unique_tests_count,
-  std::set<std::string>& failed_tests,
-  std::vector<std::pair<std::string, uint64_t>>& tests_running_time,
-  const std::function<bool(const std::string&)>& /*is_test_eligible_to_run*/,
-  const std::function<bool(const std::string&, size_t)>& /*is_hf_test_eligible_to_run*/)
+static bool run_registered_tests(bool& stop_on_first_fail, bool& skip_all_till_the_end, size_t& tests_count, size_t& unique_tests_count,
+  std::set<std::string>& failed_tests, std::vector<std::pair<std::string, uint64_t>>& tests_running_time,
+  const std::function<bool(const std::string&)>& /*is_test_eligible_to_run*/, const std::function<bool(const std::string&, size_t)>& /*is_hf_test_eligible_to_run*/)
 {
   bool all_ok = true;
 
@@ -1028,15 +1017,9 @@ static bool run_registered_tests(
   return all_ok;
 }
 //--------------------------------------------------------------------------
-static void register_all_tests(
-  bool& stop_on_first_fail,
-  bool& skip_all_till_the_end,
-  size_t& tests_count,
-  size_t& unique_tests_count,
-  std::set<std::string>& failed_tests,
-  std::vector<std::pair<std::string, uint64_t>>& tests_running_time,
-  const std::function<bool(const std::string&)>& is_test_eligible_to_run,
-  const std::function<bool(const std::string&, size_t)>& is_hf_test_eligible_to_run)
+static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the_end, size_t& tests_count, size_t& unique_tests_count,
+  std::set<std::string>& failed_tests, std::vector<std::pair<std::string, uint64_t>>& tests_running_time,
+  std::function<bool(const std::string&)> is_test_eligible_to_run, std::function<bool(const std::string&, size_t)> is_hf_test_eligible_to_run)
 {
 
   g_test_jobs.clear();
