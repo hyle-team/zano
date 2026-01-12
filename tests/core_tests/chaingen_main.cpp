@@ -58,8 +58,6 @@ namespace
   const char* JSON_NAME                = "name";
   const char* JSON_MS                  = "ms";
 
-  const char* WORKER_STDOUT_FILENAME   = "worker_stdout.log";
-  const char* WORKER_STDERR_FILENAME   = "worker_stderr.log";
   const char* WORKER_REPORT_FILENAME   = "coretests_report.json";
 
   const char* ARG_WORKER_ID            = "--worker-id";
@@ -965,7 +963,6 @@ static std::filesystem::path get_run_root_path()
 
   std::filesystem::path run_root_path(run_root);
 
-  // Make it absolute to avoid nesting when workers use start_dir.
   if (run_root_path.is_relative())
     run_root_path = std::filesystem::absolute(run_root_path);
 
@@ -990,7 +987,6 @@ static std::filesystem::path get_single_process_taken_tests_log_path()
 
 static void log_test_taken_by_this_process(const std::string& test_name)
 {
-  // Append-only log: one line per test, written when the test is about to start.
   try
   {
     const uint32_t processes = command_line::get_arg(g_vm, arg_processes);
@@ -1519,16 +1515,6 @@ static std::string make_worker_data_dir(const std::filesystem::path& run_root_ab
   return worker_dir.string();
 }
 
-static std::filesystem::path get_worker_stdout_path(uint32_t worker_id)
-{
-  return get_worker_dir_path(worker_id) / WORKER_STDOUT_FILENAME;
-}
-
-static std::filesystem::path get_worker_stderr_path(uint32_t worker_id)
-{
-  return get_worker_dir_path(worker_id) / WORKER_STDERR_FILENAME;
-}
-
 static std::filesystem::path get_worker_report_path(uint32_t worker_id)
 {
   return get_worker_dir_path(worker_id) / WORKER_REPORT_FILENAME;
@@ -1707,55 +1693,114 @@ static int print_aggregated_report_and_return_rc(uint32_t processes, uint64_t wa
   return serious_failures_count == 0 ? 0 : 1;
 }
 //--------------------------------------------------------------------------
-static std::string tail_file_lines(const std::filesystem::path& p, size_t max_lines)
+static std::string sanitize_filename(std::string s)
 {
-  std::ifstream f(p, std::ios::in | std::ios::binary);
-  if (!f.is_open())
-    return std::string();
-
-  f.seekg(0, std::ios::end);
-  std::streamoff size = f.tellg();
-  if (size <= 0)
-    return std::string();
-
-  const std::streamoff chunk = 64 * 1024; // 64 KB
-  std::streamoff from = size > chunk ? (size - chunk) : 0;
-  f.seekg(from, std::ios::beg);
-
-  std::string buf;
-  buf.resize(static_cast<size_t>(size - from));
-  f.read(&buf[0], buf.size());
-
-  std::vector<std::string> lines;
-  lines.reserve(max_lines + 10);
-  std::string cur;
-
-  for (char c : buf)
+  for (char& c : s)
   {
-    if (c == '\r')
-      continue;
-    if (c == '\n')
+    const bool ok =
+      (c >= 'a' && c <= 'z') ||
+      (c >= 'A' && c <= 'Z') ||
+      (c >= '0' && c <= '9') ||
+      c == '.' || c == '_' || c == '-';
+    if (!ok)
+      c = '_';
+  }
+
+  // Avoid empty name
+  if (s.empty())
+    s = "unnamed_test";
+
+  // Keep filenames reasonably short
+  constexpr size_t kMax = 180;
+  if (s.size() > kMax)
+    s.resize(kMax);
+
+  return s;
+}
+
+static std::filesystem::path make_unique_log_path(const std::filesystem::path& dir, const std::string& base_name_no_ext)
+{
+  std::filesystem::path p = dir / (base_name_no_ext + ".log");
+  if (!std::filesystem::exists(p))
+    return p;
+
+  for (size_t i = 2; i < 10000; ++i)
+  {
+    std::filesystem::path alt = dir / (base_name_no_ext + "_" + std::to_string(i) + ".log");
+    if (!std::filesystem::exists(alt))
+      return alt;
+  }
+
+  return p; // fallback
+}
+
+static bool parse_test_name_from_header(const std::string& line, std::string& out_name)
+{
+  constexpr const char* kPrefix = "#TEST# >>>>";
+  auto pos = line.find(kPrefix);
+  if (pos != 0)
+    return false;
+
+  std::string rest = line.substr(std::strlen(kPrefix));
+  // trim left
+  while (!rest.empty() && std::isspace(static_cast<unsigned char>(rest.front())))
+    rest.erase(rest.begin());
+
+  auto end = rest.find("<<<<");
+  if (end == std::string::npos)
+    return false;
+
+  std::string name = rest.substr(0, end);
+  // trim right
+  while (!name.empty() && std::isspace(static_cast<unsigned char>(name.back())))
+    name.pop_back();
+
+  if (name.empty())
+    return false;
+
+  out_name = name;
+  return true;
+}
+
+static std::vector<std::filesystem::path> find_logs_for_test(
+  const std::filesystem::path& worker_dir,
+  const std::string& test_name)
+{
+  std::vector<std::filesystem::path> result;
+
+  const std::string base = sanitize_filename(test_name);
+  const std::string base_prefix = base + "_";
+
+  try
+  {
+    for (auto& de : std::filesystem::directory_iterator(worker_dir))
     {
-      lines.emplace_back(std::move(cur));
-      cur.clear();
-    }
-    else
-    {
-      cur.push_back(c);
+      if (!de.is_regular_file())
+        continue;
+
+      const auto p = de.path();
+      if (p.extension() != ".log")
+        continue;
+
+      const std::string stem = p.stem().string();
+      if (stem == base || stem.rfind(base_prefix, 0) == 0)
+        result.push_back(p);
     }
   }
-  if (!cur.empty())
-    lines.emplace_back(std::move(cur));
+  catch (...) {}
 
-  if (lines.empty())
-    return std::string();
+  std::sort(result.begin(), result.end(),
+    [](const std::filesystem::path& a, const std::filesystem::path& b)
+    {
+      std::error_code ec1, ec2;
+      const auto ta = std::filesystem::last_write_time(a, ec1);
+      const auto tb = std::filesystem::last_write_time(b, ec2);
+      if (!ec1 && !ec2 && ta != tb)
+        return ta > tb;
+      return a.string() < b.string();
+    });
 
-  size_t start = lines.size() > max_lines ? (lines.size() - max_lines) : 0;
-  std::ostringstream out;
-  for (size_t i = start; i < lines.size(); ++i)
-    out << lines[i] << "\n";
-
-  return out.str();
+  return result;
 }
 
 static void print_worker_failure_reasons(uint32_t processes, const std::vector<int>& worker_exit_codes)
@@ -1764,10 +1809,13 @@ static void print_worker_failure_reasons(uint32_t processes, const std::vector<i
 
   for (uint32_t i = 0; i < processes; ++i)
   {
-    const bool report_exists = std::filesystem::exists(get_worker_report_path(i));
     const int ec = (i < worker_exit_codes.size() ? worker_exit_codes[i] : -999);
 
-    if (ec == 0 && report_exists)
+    worker_report rep;
+    const bool report_ok = read_worker_report_file(i, rep);
+
+    // Skip successful workers that produced a report with exit_code 0.
+    if (report_ok && ec == 0 && rep.exit_code == 0)
       continue;
 
     if (!any)
@@ -1776,32 +1824,39 @@ static void print_worker_failure_reasons(uint32_t processes, const std::vector<i
       any = true;
     }
 
+    const auto worker_dir = get_worker_dir_path(i);
+    const auto report_path = get_worker_report_path(i);
+
     std::cout << "  Worker " << i << ":\n";
     std::cout << "    exit_code: " << ec << "\n";
-    if (!report_exists)
-      std::cout << "    report: missing (" << get_worker_report_path(i).string() << ")\n";
-    else
-      std::cout << "    report: " << get_worker_report_path(i).string() << "\n";
+    std::cout << "    report: " << (std::filesystem::exists(report_path) ? report_path.string() : ("missing (" + report_path.string() + ")")) << "\n";
+    std::cout << "    logs dir: " << worker_dir.string() << "\n";
 
-    const auto stderr_path = get_worker_stderr_path(i);
-    const auto stdout_path = get_worker_stdout_path(i);
-
-    std::cout << "    stderr: " << stderr_path.string() << "\n";
-    std::string err_tail = tail_file_lines(stderr_path, 40);
-    if (!err_tail.empty())
+    if (!report_ok)
     {
-      std::cout << "    --- stderr tail ---\n";
-      std::cout << err_tail;
-      std::cout << "    --- end stderr tail ---\n";
+      std::cout << "    failed tests: (cannot read report)\n";
+      continue;
     }
 
-    std::cout << "    stdout: " << stdout_path.string() << "\n";
-    std::string out_tail = tail_file_lines(stdout_path, 20);
-    if (!out_tail.empty())
+    if (rep.failed_tests.empty())
     {
-      std::cout << "    --- stdout tail ---\n";
-      std::cout << out_tail;
-      std::cout << "    --- end stdout tail ---\n";
+      std::cout << "    failed tests: (none in report)\n";
+      continue;
+    }
+
+    std::cout << "    failed tests:\n";
+    for (const auto& test_name : rep.failed_tests)
+    {
+      std::cout << "      - " << test_name << "\n";
+
+      const auto logs = find_logs_for_test(worker_dir, test_name);
+      if (logs.empty())
+      {
+        std::cout << "        log: (not found, expected prefix: " << sanitize_filename(test_name) << ")\n";
+        continue;
+      }
+
+      std::cout << "        log: " << logs.front().string() << "\n";
     }
   }
 }
@@ -1817,7 +1872,6 @@ static int run_workers_and_wait(int argc, char* argv[])
 
   // Do not spawn workers for these modes.
   if (command_line::get_arg(g_vm, command_line::arg_help)) return -1;
-  if (command_line::get_arg(g_vm, arg_list_tests)) return -1;
   if (command_line::get_arg(g_vm, arg_generate_test_data)) return -1;
   if (command_line::get_arg(g_vm, arg_play_test_data)) return -1;
   if (command_line::get_arg(g_vm, arg_generate_and_play_test_data)) return -1;
@@ -1881,10 +1935,7 @@ static int run_workers_and_wait(int argc, char* argv[])
 
     exe = exe_path.string();
   }
-  catch (...)
-  {
-    // Keep exe as-is; spawning will fail with a clear message if it's invalid.
-  }
+  catch (...) {}
 
   if (exe.empty() || !std::filesystem::exists(std::filesystem::path(exe)))
   {
@@ -1925,9 +1976,6 @@ static int run_workers_and_wait(int argc, char* argv[])
       const auto worker_dir = get_worker_dir_path(i);
       std::filesystem::create_directories(worker_dir);
 
-      const auto stdout_path = get_worker_stdout_path(i);
-      const auto stderr_path = get_worker_stderr_path(i);
-
       kids_out[i] = std::make_unique<bp::ipstream>();
       kids_err[i] = std::make_unique<bp::ipstream>();
 
@@ -1939,31 +1987,113 @@ static int run_workers_and_wait(int argc, char* argv[])
         bp::std_err > *kids_err[i]
       ));
 
-      // Tee stdout: worker -> console + file
-      tee_threads.emplace_back([p = stdout_path, s = kids_out[i].get()]()
+      // Tee stdout: worker -> console; capture per-test log ONLY if failed
+      tee_threads.emplace_back([worker_dir, s = kids_out[i].get()]()
       {
-        std::ofstream f(p, std::ios::out | std::ios::binary | std::ios::app);
+        std::filesystem::create_directories(worker_dir);
+
+        bool capturing = false;
+        std::string current_test_header;
+        std::filesystem::path current_log_path;
+        std::ofstream f_log;
+
+        auto close_log = [&]()
+        {
+          if (f_log.is_open())
+            f_log.close();
+        };
+
+        auto start_capture = [&](const std::string& header_line)
+        {
+          close_log();
+          capturing = true;
+          current_test_header = header_line;
+
+          std::string test_name;
+          if (!parse_test_name_from_header(header_line, test_name))
+            test_name = "unknown_test";
+
+          const std::string safe = sanitize_filename(test_name);
+          current_log_path = make_unique_log_path(worker_dir, safe);
+
+          f_log.open(current_log_path, std::ios::out | std::ios::binary | std::ios::trunc);
+          if (f_log.is_open())
+          {
+            f_log << "===== TEST OUTPUT BEGIN: " << header_line << " =====\n";
+            f_log.flush();
+          }
+        };
+
+        auto discard_capture = [&]()
+        {
+          close_log();
+          capturing = false;
+          current_test_header.clear();
+
+          if (!current_log_path.empty())
+          {
+            std::error_code ec;
+            std::filesystem::remove(current_log_path, ec);
+          }
+          current_log_path.clear();
+        };
+
+        auto commit_capture = [&]()
+        {
+          if (f_log.is_open())
+          {
+            f_log << "===== TEST OUTPUT END (FAILED): " << current_test_header << " =====\n";
+            f_log.flush();
+          }
+          close_log();
+
+          capturing = false;
+          current_test_header.clear();
+          current_log_path.clear();
+        };
+
         std::string line;
         while (std::getline(*s, line))
         {
-          f << line << "\n";
-          f.flush();
+          // Start marker
+          if (line.rfind("#TEST# >>>>", 0) == 0)
+            start_capture(line);
 
-          std::lock_guard<std::mutex> lk(cout_mx);
-          std::cout << line << std::endl;
+          // If capturing, write everything into per-test log
+          if (capturing && f_log.is_open())
+          {
+            f_log << line << "\n";
+            f_log.flush();
+          }
+
+          // End markers
+          if (capturing && line.find("<<<< Succeeded") != std::string::npos)
+          {
+            discard_capture();
+          }
+          else if (capturing && line.find("<<<< FAILED") != std::string::npos)
+          {
+            commit_capture();
+          }
+
+          // Console output
+          {
+            std::lock_guard<std::mutex> lk(cout_mx);
+            std::cout << line << std::endl;
+          }
         }
+
+        // Worker died mid-test without FAILED marker: keep log as failed
+        if (capturing)
+          commit_capture();
       });
 
-      // Tee stderr: worker -> console(stderr) + file
-      tee_threads.emplace_back([p = stderr_path, s = kids_err[i].get()]()
+      // Tee stderr: worker -> console(stderr) ONLY (no worker_stderr.log)
+      tee_threads.emplace_back([s = kids_err[i].get()]()
       {
-        std::ofstream f(p, std::ios::out | std::ios::binary | std::ios::app);
         std::string line;
         while (std::getline(*s, line))
         {
-          f << line << "\n";
-          f.flush();
-
           std::lock_guard<std::mutex> lk(cerr_mx);
           std::cerr << line << std::endl;
         }
@@ -2060,7 +2190,6 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_processes);
   command_line::add_arg(desc_options, arg_worker_id);
   command_line::add_arg(desc_options, arg_run_root);
-  command_line::add_arg(desc_options, arg_list_tests);
 
   currency::core::init_options(desc_options);
   tools::db::db_backend_selector::init_options(desc_options);
@@ -2132,10 +2261,9 @@ int main(int argc, char* argv[])
   }
   else
   {
-    // Do not comment this out: many tests have normal-negative checks.
     epee::debug::get_set_enable_assert(true, command_line::get_arg(g_vm, arg_enable_debug_asserts));
 
-    std::unordered_multimap<std::string, size_t> specific_tests_to_run; // test_name -> hf; if empty, all tests should be run
+    std::unordered_multimap<std::string, size_t> specific_tests_to_run;
     CHECK_AND_ASSERT_MES(parse_cmd_specific_tests_to_run(specific_tests_to_run), 1, "Error while parsing specific tests to run");
 
     std::set<std::string> postponed_tests;
@@ -2227,7 +2355,6 @@ int main(int argc, char* argv[])
 
       const size_t bar_width = 70;
 
-      // Optional: keep this only in single-process mode to reduce console noise.
       if (!is_worker)
       {
         for (const auto& i : tests_running_time)
