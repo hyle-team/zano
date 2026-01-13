@@ -104,6 +104,18 @@ namespace epee
         SSL_set_tlsext_host_name(m_socket.native_handle(), domain_name.c_str());
       }
 
+      void set_delay_handshake(bool delay)
+      {
+        m_delay_handshake = delay;
+      }
+
+      void do_handshake()
+      {
+        LOG_PRINT_L2("SSL Handshake....");
+        m_socket.handshake(boost::asio::ssl::stream_base::client);
+        LOG_PRINT_L2("SSL Handshake OK");
+      }
+
       boost::asio::ip::tcp::socket& get_socket()
       {
         return m_socket.next_layer();
@@ -116,14 +128,14 @@ namespace epee
 
       void on_after_connect()
       {
-        LOG_PRINT_L2("SSL Handshake....");
-        m_socket.handshake(boost::asio::ssl::stream_base::client);
-        LOG_PRINT_L2("SSL Handshake OK");
+        if (!m_delay_handshake)
+          do_handshake();
       }
 
     private: 
       boost::asio::ssl::context m_ssl_context;
       boost::asio::ssl::stream<boost::asio::ip::tcp::socket> m_socket;
+      bool m_delay_handshake = false;
     };
 
     template<>
@@ -140,6 +152,16 @@ namespace epee
       void set_domain(const std::string& domain_name)
       {
         
+      }
+
+      void set_delay_handshake(bool delay)
+      {
+
+      }
+
+      void do_handshake()
+      {
+
       }
 
       boost::asio::ip::tcp::socket& get_stream()
@@ -175,6 +197,16 @@ namespace epee
       void set_domain(const std::string& domain_name)
       {
         return m_pbackend->set_domain(domain_name);
+      }
+
+      void set_delay_handshake(bool delay)
+      {
+        return m_pbackend->set_delay_handshake(delay);
+      }
+
+      void do_handshake()
+      {
+        return m_pbackend->do_handshake();
       }
 
       auto& get_stream()
@@ -685,6 +717,21 @@ namespace epee
         return m_sct_back.get_socket();
       }
 
+      void set_delay_handshake(bool delay)
+      {
+        m_sct_back.set_delay_handshake(delay);
+      }
+
+      void set_domain(const std::string& domain_name)
+      {
+        m_sct_back.set_domain(domain_name);
+      }
+
+      void do_handshake()
+      {
+        m_sct_back.do_handshake();
+      }
+
     private:
 
       void check_deadline()
@@ -840,5 +887,7 @@ namespace epee
 
     typedef blocked_mode_client_t<false> blocked_mode_client;
     typedef async_blocked_mode_client_t<false> async_blocked_mode_client;
+    typedef blocked_mode_client_t<true> blocked_mode_ssl_client;
+    typedef async_blocked_mode_client_t<true> async_blocked_mode_ssl_client;
   }
 }

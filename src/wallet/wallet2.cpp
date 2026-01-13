@@ -5305,27 +5305,38 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
 
     if (!u.port)
       u.port = (u.schema == "https" ? 443 : 80);
-
-    // TODO: HTTPS over SOCKS5
-    if (u.schema == "https")
-      WLT_LOG_YELLOW("submitblock2 over SOCKS5: HTTPS requested, but TLS-over-SOCKS is not supported yet", LOG_LEVEL_0);
-    using http_socks5_client = epee::net_utils::http::http_simple_client_t<false, tools::socks5::socks5_proxy_transport<epee::net_utils::blocked_mode_client>>;
-
-    http_socks5_client socks5_client;
-    tools::socks5::apply_socks5_cfg(socks5_client.get_transport(), block_socks.proxy);
-    socks5_client.get_transport().set_use_remote_dns(block_socks.proxy.use_remote_dns);
-
-    if(!socks5_client.connect(u.host, std::to_string(u.port), block_socks.proxy.connect_timeout_ms))
-    {
-      WLT_LOG_ERROR("submitblock2 over SOCKS5: connect to " << u.host << ":" << u.port << " failed");
-      return false;
-    }
+    
+    //TODO move that to smth place
+    using socks5_http_transport = tools::socks5::socks5_proxy_transport<false, epee::net_utils::blocked_mode_client>;
+    using socks5_https_transport = tools::socks5::socks5_proxy_transport<true, epee::net_utils::blocked_mode_ssl_client>;
+    using http_socks5_client_http = epee::net_utils::http::http_simple_client_t<false, socks5_http_transport>;
+    using http_socks5_client_https = epee::net_utils::http::http_simple_client_t<true, socks5_https_transport>;
 
     const std::string rpc_uri = u.uri.empty() ? "/json_rpc" : u.uri;
 
-    WLT_LOG_L2("[INVOKE_JSON_METHOD SOCKS5] ---> submitblock2");
-    bool r = epee::net_utils::invoke_http_json_rpc(rpc_uri, "submitblock2", subm_req, subm_rsp, socks5_client);
-    WLT_LOG_L2("[INVOKE_JSON_METHOD SOCKS5] <--- submitblock2, result: " << r);
+    auto do_submit = [&](auto& client) -> bool
+    {
+      tools::socks5::apply_socks5_cfg(client.get_transport(), block_socks.proxy);
+      client.get_transport().set_use_remote_dns(block_socks.proxy.use_remote_dns);
+      client.get_transport().set_recv_timeout(block_socks.proxy.recv_timeout_ms);
+
+      if (!client.connect(u.host, std::to_string(u.port), block_socks.proxy.connect_timeout_ms))
+        return false;
+
+      return epee::net_utils::invoke_http_json_rpc(rpc_uri, "submitblock2", subm_req, subm_rsp, client);
+    };
+
+    bool r = false;
+    if (u.schema == "https")
+    {
+      http_socks5_client_https c;
+      r = do_submit(c);
+    }
+    else
+    {
+      http_socks5_client_http c;
+      r = do_submit(c);
+    }
     if (!r)
     {
       WLT_LOG_ERROR("invoke_http_json_rpc failed for submitblock2 over SOCKS5");

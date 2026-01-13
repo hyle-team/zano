@@ -29,7 +29,7 @@ struct socks5_proxy_settings
   std::optional<socks5_endpoint_config> blocks;
 };
 
-template<class base_transport>
+template<bool is_ssl, class base_transport = epee::net_utils::blocked_mode_client_t<is_ssl>>
 class socks5_proxy_transport : public base_transport
 {
 public:
@@ -46,6 +46,12 @@ public:
   bool connect(const std::string& dest_host, const std::string& dest_port, unsigned int connect_timeout_ms, unsigned int recv_timeout_ms,
     const std::string& bind_ip = "0.0.0.0")
   {
+    // https over socks5
+    if constexpr (is_ssl)
+    {
+      this->set_delay_handshake(true);
+    }
+
     // 1) TCP connect to SOCKS5 proxy through BASE transport
     if (!this->base_transport::connect(m_proxy_host, std::to_string(m_proxy_port), connect_timeout_ms, recv_timeout_ms, bind_ip))
       return false;
@@ -160,10 +166,12 @@ public:
         return false;
     }
 
-    // on this step, we have established a TUNNEL to dest_host:dest_port
-    // TODO_SSL_HANDSHAKE: if HTTPS through SOCKS5 is ever needed,
-    // the base transport should be able to perform SSL handshake AFTER CONNECT,
-    // not immediately after TCP-connect to the proxy (see on_after_connect() in blocked_mode_client_t). :contentReference[oaicite:3]{index=3}
+    // here we have established a tunnel to dest_host:dest_port
+    if constexpr (is_ssl)
+    {
+      this->set_domain(dest_host);
+      this->do_handshake();
+    }
     return true;
   }
 
