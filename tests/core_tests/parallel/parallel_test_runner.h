@@ -33,6 +33,9 @@ public:
   std::filesystem::path get_worker_dir_path(uint32_t worker_id) const;
   bool write_worker_report(const worker_report& rep) const;
 
+  std::filesystem::path get_taken_tests_log_path_for_this_process() const;
+  void log_test_taken_by_this_process(const std::string& test_name) const;
+
 private:
   const boost::program_options::variables_map& m_vm;
 
@@ -77,4 +80,10 @@ struct worker_log_sink
     f << line << "\n";
     f.flush();
   }
+};
+
+struct test_job
+{
+  std::string name;
+  std::function<bool()> run;
 };

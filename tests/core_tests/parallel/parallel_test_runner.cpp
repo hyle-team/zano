@@ -12,20 +12,13 @@
 #include <boost/process.hpp>
 
 #include "parallel_test_runner.h"
+#include "../chaingen_args.h"
 #include "../../src/common/command_line.h"
+
+using namespace chaingen_args;
 
 namespace bp = boost::process;
 namespace pt = boost::property_tree;
-
-extern command_line::arg_descriptor<std::string> arg_run_root;
-extern command_line::arg_descriptor<uint32_t> arg_processes;
-extern command_line::arg_descriptor<int32_t> arg_worker_id;
-extern command_line::arg_descriptor<bool> arg_generate_test_data;
-extern command_line::arg_descriptor<bool> arg_play_test_data;
-extern command_line::arg_descriptor<bool> arg_generate_and_play_test_data;
-extern command_line::arg_descriptor<bool> arg_test_transactions;
-
-std::string TAKEN_TESTS_LOG_FILENAME = "taken_tests.log";
 
 namespace
 {
@@ -43,6 +36,7 @@ namespace
   const char* JSON_NAME                = "name";
   const char* JSON_MS                  = "ms";
 
+  const char* TAKEN_TESTS_LOG_FILENAME = "taken_tests.log";
   const char* WORKER_REPORT_FILENAME   = "coretests_report.json";
   const char* WORKER_LOG_FILENAME      = "worker.log";
 
@@ -213,7 +207,6 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
 
   std::cout << concolor::normal << std::endl;
 
-  // If any report missing or worker failed, treat as failure
   if (any_missing || failed_workers != 0)
     return 1;
 
@@ -231,7 +224,6 @@ void parallel_test_runner::print_worker_failure_reasons(uint32_t processes, cons
     worker_report rep;
     const bool report_ok = read_worker_report_file(i, rep);
 
-    // Skip successful workers that produced a report with exit_code 0.
     if (report_ok && ec == 0 && rep.exit_code == 0)
       continue;
 
@@ -283,11 +275,9 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
   const uint32_t processes = command_line::get_arg(m_vm, arg_processes);
   const int32_t worker_id  = command_line::get_arg(m_vm, arg_worker_id);
 
-  // Only parent (multi-process mode, worker_id not set) spawns workers.
   if (processes <= 1 || worker_id >= 0)
     return -1;
 
-  // Do not spawn workers for these modes.
   if (command_line::get_arg(m_vm, command_line::arg_help)) return -1;
   if (command_line::get_arg(m_vm, arg_generate_test_data)) return -1;
   if (command_line::get_arg(m_vm, arg_play_test_data)) return -1;
@@ -324,7 +314,6 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
     base_args.emplace_back(run_root_abs.string());
   }
 
-  // Resolve executable path and make it absolute.
   std::string exe = (argv && argv[0]) ? std::string(argv[0]) : std::string();
   if (exe.empty())
   {
@@ -338,7 +327,6 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
   {
     std::filesystem::path exe_path(exe);
 
-    // If no directory component is present, try PATH lookup first.
     if (exe.find('/') == std::string::npos && exe.find('\\') == std::string::npos)
     {
       boost::filesystem::path resolved = bp::search_path(exe);
@@ -346,7 +334,6 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
         exe_path = std::filesystem::path(resolved.string());
     }
 
-    // Make absolute because workers will run with start_dir = worker directory.
     if (exe_path.is_relative())
       exe_path = std::filesystem::absolute(exe_path);
 
@@ -367,11 +354,9 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
 
   std::vector<int> worker_exit_codes(processes, -1);
 
-  // Streams for tee
   std::vector<std::unique_ptr<bp::ipstream>> kids_out(processes);
   std::vector<std::unique_ptr<bp::ipstream>> kids_err(processes);
 
-  // Tee threads
   std::vector<std::thread> tee_threads;
   tee_threads.reserve(static_cast<size_t>(processes) * 2);
 
@@ -407,7 +392,6 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
       std::shared_ptr<worker_log_sink> sink(new worker_log_sink());
       sink->open(get_worker_dir_path(i) / WORKER_LOG_FILENAME);
 
-      // Tee stdout: worker -> console; capture per-test log ONLY if failed
       tee_threads.emplace_back([worker_dir, s = kids_out[i].get(), sink]()
       {
         std::filesystem::create_directories(worker_dir);
@@ -423,7 +407,6 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
         }
       });
 
-      // Tee stderr: worker -> console(stderr) ONLY (no worker_stderr.log)
       tee_threads.emplace_back([s = kids_err[i].get(), sink]()
       {
         std::string line;
@@ -464,7 +447,6 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
       ++failed_workers;
   }
 
-  // Wait tee threads after children exit (streams will close).
   for (auto& t : tee_threads)
     if (t.joinable())
       t.join();
@@ -473,14 +455,11 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
   const uint64_t wall_ms =
     static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(wall_t1 - wall_t0).count());
 
-  // Aggregated report first.
   const int aggregated_rc = print_aggregated_report_and_return_rc(processes, wall_ms);
 
-  // Then print diagnostics.
   if (failed_workers != 0)
     print_worker_failure_reasons(processes, worker_exit_codes);
 
-  // Any worker non-zero => fail.
   if (failed_workers != 0)
     return 1;
 
@@ -500,11 +479,9 @@ std::string parallel_test_runner::sanitize_filename(std::string s)
       c = '_';
   }
 
-  // Avoid empty name
   if (s.empty())
     s = "unnamed_test";
 
-  // Keep filenames reasonably short
   constexpr size_t kMax = 180;
   if (s.size() > kMax)
     s.resize(kMax);
@@ -638,8 +615,16 @@ bool parallel_test_runner::write_worker_report_file(const worker_report& rep) co
     pt::write_json(out, root, /*pretty*/true);
     return true;
   }
+  catch (const std::exception& e)
+  {
+    std::lock_guard<std::mutex> lk(cerr_mx);
+    std::cerr << "write_worker_report_file: exception: " << e.what() << ", worker_id=" << rep.worker_id << std::endl;
+    return false;
+  }
   catch (...)
   {
+    std::lock_guard<std::mutex> lk(cerr_mx);
+    std::cerr << "write_worker_report_file: unknown exception, worker_id=" << rep.worker_id << std::endl;
     return false;
   }
 }
@@ -683,8 +668,16 @@ bool parallel_test_runner::read_worker_report_file(uint32_t worker_id, worker_re
 
     return true;
   }
+  catch (const std::exception& e)
+  {
+    std::lock_guard<std::mutex> lk(cerr_mx);
+    std::cerr << "read_worker_report_file: exception: " << e.what() << ", worker_id=" << worker_id << ", path=" << get_worker_report_path(worker_id).string() << std::endl;
+    return false;
+  }
   catch (...)
   {
+    std::lock_guard<std::mutex> lk(cerr_mx);
+    std::cerr << "read_worker_report_file: unknown exception" << ", worker_id=" << worker_id << ", path=" << get_worker_report_path(worker_id).string() << std::endl;
     return false;
   }
 }
@@ -692,4 +685,47 @@ bool parallel_test_runner::read_worker_report_file(uint32_t worker_id, worker_re
 std::filesystem::path parallel_test_runner::get_worker_log_path(uint32_t worker_id) const
 {
   return get_worker_dir_path(worker_id) / WORKER_LOG_FILENAME;
+}
+
+std::filesystem::path parallel_test_runner::get_taken_tests_log_path_for_this_process() const
+{
+  const uint32_t processes = command_line::get_arg(m_vm, arg_processes);
+  const int32_t worker_id  = command_line::get_arg(m_vm, arg_worker_id);
+
+  if (processes > 1 && worker_id >= 0)
+  {
+    const uint32_t wid = static_cast<uint32_t>(worker_id);
+    std::filesystem::create_directories(get_worker_dir_path(wid));
+    return get_worker_dir_path(wid) / TAKEN_TESTS_LOG_FILENAME;
+  }
+
+  const std::string data_dir = command_line::get_arg(m_vm, command_line::arg_data_dir);
+  std::filesystem::create_directories(data_dir);
+  return std::filesystem::path(data_dir) / TAKEN_TESTS_LOG_FILENAME;
+}
+
+void parallel_test_runner::log_test_taken_by_this_process(const std::string& test_name) const
+{
+  std::filesystem::path p;
+
+  try
+  {
+    p = get_taken_tests_log_path_for_this_process();
+
+    std::ofstream f(p, std::ios::out | std::ios::binary | std::ios::app);
+    if (!f.is_open())
+      return;
+
+    f << test_name << '\n';
+  }
+  catch (const std::exception& e)
+  {
+    std::lock_guard<std::mutex> lk(cerr_mx);
+    std::cerr << "parallel_test_runner::log_test_taken_by_this_process: exception: " << e.what() << ", test=" << test_name << ", path=" << p.string() << std::endl;
+  }
+  catch (...)
+  {
+    std::lock_guard<std::mutex> lk(cerr_mx);
+    std::cerr << "parallel_test_runner::log_test_taken_by_this_process: unknown exception" << ", test=" << test_name << ", path=" << p.string() << std::endl;
+  }
 }
