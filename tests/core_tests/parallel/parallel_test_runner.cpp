@@ -207,6 +207,8 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
 
   std::cout << concolor::normal << std::endl;
 
+  (void)write_workers_report_file(processes, reps);
+  
   if (any_missing || failed_workers != 0)
     return 1;
 
@@ -727,5 +729,83 @@ void parallel_test_runner::log_test_taken_by_this_process(const std::string& tes
   {
     std::lock_guard<std::mutex> lk(cerr_mx);
     std::cerr << "parallel_test_runner::log_test_taken_by_this_process: unknown exception" << ", test=" << test_name << ", path=" << p.string() << std::endl;
+  }
+}
+
+std::filesystem::path parallel_test_runner::get_workers_report_path() const
+{
+  return get_run_root_path() / WORKERS_REPORT_FILENAME;
+}
+
+bool parallel_test_runner::write_workers_report_file(
+  uint32_t processes,
+  const std::vector<worker_report>& reps) const
+{
+  try
+  {
+    std::unordered_map<std::string, uint64_t> ms_by_test;
+    ms_by_test.reserve(8192);
+
+    for (const auto& r : reps)
+    {
+      for (const auto& it : r.tests_running_time)
+      {
+        const std::string& name = it.first;
+        const uint64_t ms = it.second;
+        auto ins = ms_by_test.emplace(name, ms);
+        if (!ins.second)
+          ins.first->second = std::max(ins.first->second, ms);
+      }
+    }
+
+    std::vector<std::pair<std::string, uint64_t>> tests;
+    tests.reserve(ms_by_test.size());
+    for (auto& kv : ms_by_test)
+      tests.emplace_back(std::move(kv.first), kv.second);
+
+    std::sort(tests.begin(), tests.end(), [](const auto& a, const auto& b)
+      {
+        if (a.second != b.second) return a.second > b.second;
+        return a.first < b.first;
+      }
+    );
+
+    pt::ptree root;
+    root.put("format", 1);
+    root.put("processes", processes);
+
+    pt::ptree arr;
+    for (const auto& t : tests)
+    {
+      pt::ptree node;
+      node.put("name", t.first);
+      node.put("ms", t.second);
+      arr.push_back(std::make_pair("", node));
+    }
+    root.add_child("tests", arr);
+
+    std::filesystem::path path = get_workers_report_path();
+    std::ofstream out(path);
+    if (!out.is_open())
+    {
+      std::lock_guard<std::mutex> lk(cerr_mx);
+      std::cerr << "write_workers_report_file: cannot open file: " << path.string() << std::endl;
+      return false;
+    }
+
+    pt::write_json(out, root, /*pretty*/true);
+    return true;
+  }
+  catch (const std::exception& e)
+  {
+    std::lock_guard<std::mutex> lk(cerr_mx);
+    std::cerr << "write_workers_report_file: exception: " << e.what() << ", path=" << get_workers_report_path().string() << std::endl;
+    return false;
+  }
+  catch (...)
+  {
+    std::lock_guard<std::mutex> lk(cerr_mx);
+    std::cerr << "write_workers_report_file: unknown exception, path=" << get_workers_report_path().string() << std::endl;
+    return false;
   }
 }

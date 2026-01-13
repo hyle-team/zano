@@ -5,6 +5,8 @@
 
 namespace chaingen_args
 {
+  extern const char* WORKERS_REPORT_FILENAME;
+
   extern command_line::arg_descriptor<std::string> arg_test_data_path;
   extern command_line::arg_descriptor<bool>        arg_generate_test_data;
   extern command_line::arg_descriptor<bool>        arg_play_test_data;

@@ -2,6 +2,8 @@
 
 namespace chaingen_args
 {
+  const char* WORKERS_REPORT_FILENAME = "workers_report.json";
+
   command_line::arg_descriptor<std::string> arg_test_data_path               ("test-data-path", "", "");
   command_line::arg_descriptor<bool>        arg_generate_test_data           ("generate-test-data", "");
   command_line::arg_descriptor<bool>        arg_play_test_data               ("play-test-data", "");

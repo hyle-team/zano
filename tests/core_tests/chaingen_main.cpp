@@ -20,9 +20,6 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <fstream>
-#include <chrono>
-#include <thread>
-#include <mutex>
 
 #define TX_BLOBSIZE_CHECKER_LOG_FILENAME "get_object_blobsize(tx).log"
 
@@ -412,6 +409,24 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
     }); \
   } while (0)
 
+#define GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(genclass)                                     \
+  if (is_test_eligible_to_run(#genclass))                                                                  \
+  {                                                                                                        \
+    const char* testname = #genclass " (BC saveload)";                                                     \
+    TIME_MEASURE_START_MS(t);                                                                              \
+    ++tests_count;                                                                                         \
+    ++unique_tests_count;                                                                                  \
+    if (!gen_and_play_intermitted_by_blockchain_saveload<genclass>(testname))                              \
+    {                                                                                                      \
+      failed_tests.insert(testname);                                                                       \
+      LOCAL_ASSERT(false);                                                                                 \
+      if (stop_on_first_fail)                                                                              \
+        skip_all_till_the_end = true;                                                                      \
+    }                                                                                                      \
+    TIME_MEASURE_FINISH_MS(t);                                                                             \
+    tests_running_time.push_back(std::make_pair(testname, t));                                             \
+  }
+
 #define GENERATE_AND_PLAY_HF(genclass, hardfork_str_mask) \
   do { \
     const std::string __gen_name = #genclass; \
@@ -443,24 +458,6 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
       }); \
     } \
   } while (0)
-
-#define GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(genclass)                                     \
-  if (is_test_eligible_to_run(#genclass))                                                                  \
-  {                                                                                                        \
-    const char* testname = #genclass " (BC saveload)";                                                     \
-    TIME_MEASURE_START_MS(t);                                                                              \
-    ++tests_count;                                                                                         \
-    ++unique_tests_count;                                                                                  \
-    if (!gen_and_play_intermitted_by_blockchain_saveload<genclass>(testname))                              \
-    {                                                                                                      \
-      failed_tests.insert(testname);                                                                       \
-      LOCAL_ASSERT(false);                                                                                 \
-      if (stop_on_first_fail)                                                                              \
-        skip_all_till_the_end = true;                                                                      \
-    }                                                                                                      \
-    TIME_MEASURE_FINISH_MS(t);                                                                             \
-    tests_running_time.push_back(std::make_pair(testname, t));                                             \
-  }
 
 //#define GENERATE_AND_PLAY(genclass) GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(genclass)
 
@@ -897,6 +894,90 @@ static void log_test_taken_by_this_process(const std::string& test_name)
     g_runner->log_test_taken_by_this_process(test_name);
 }
 //--------------------------------------------------------------------------
+static bool read_workers_report_ms_map(
+  const std::filesystem::path& path,
+  std::unordered_map<std::string, uint64_t>& out_ms_by_test)
+{
+  out_ms_by_test.clear();
+
+  try
+  {
+    if (!std::filesystem::exists(path))
+      return false;
+
+    pt::ptree root;
+    pt::read_json(path.string(), root);
+
+    for (const auto& v : root.get_child("tests", pt::ptree()))
+    {
+      const auto& node = v.second;
+      const std::string name = node.get<std::string>("name", "");
+      const uint64_t ms = node.get<uint64_t>("ms", 0);
+      if (!name.empty())
+        out_ms_by_test[name] = ms;
+    }
+
+    return !out_ms_by_test.empty();
+  }
+  catch (...)
+  {
+    return false;
+  }
+}
+//--------------------------------------------------------------------------
+static std::vector<int> build_lpt_owner_plan(
+  const std::vector<test_job>& jobs,
+  uint32_t processes,
+  const std::unordered_map<std::string, uint64_t>& ms_by_test)
+{
+  const size_t n = jobs.size();
+  std::vector<int> owner(n, 0);
+
+  struct item_t { uint64_t ms; std::string name; size_t idx; };
+  std::vector<item_t> items;
+  items.reserve(n);
+
+  std::vector<uint64_t> known;
+  known.reserve(ms_by_test.size());
+  for (const auto& kv : ms_by_test)
+    known.push_back(kv.second);
+  std::sort(known.begin(), known.end());
+  const uint64_t fallback =
+    known.empty() ? 1 : known[known.size() / 2];
+
+  for (size_t i = 0; i < n; ++i)
+  {
+    const std::string& name = jobs[i].name;
+    auto it = ms_by_test.find(name);
+    const uint64_t ms = (it != ms_by_test.end() ? it->second : fallback);
+    items.push_back(item_t{ms, name, i});
+  }
+
+  std::sort(items.begin(), items.end(),
+    [](const item_t& a, const item_t& b)
+    {
+      if (a.ms != b.ms) return a.ms > b.ms;
+      return a.name < b.name;
+    });
+
+  std::vector<uint64_t> load(processes, 0);
+
+  for (const auto& it : items)
+  {
+    uint32_t best_w = 0;
+    for (uint32_t w = 1; w < processes; ++w)
+    {
+      if (load[w] < load[best_w])
+        best_w = w;
+    }
+
+    owner[it.idx] = static_cast<int>(best_w);
+    load[best_w] += it.ms;
+  }
+
+  return owner;
+}
+//--------------------------------------------------------------------------
 static bool run_one_test_job(const std::string& test_name, const std::function<bool()>& fn, bool& stop_on_first_fail, bool& skip_all_till_the_end,
   size_t& tests_count, size_t& unique_tests_count, std::set<std::string>& failed_tests, std::vector<std::pair<std::string, uint64_t>>& tests_running_time)
 {
@@ -925,36 +1006,53 @@ static bool run_one_test_job(const std::string& test_name, const std::function<b
   return ok;
 }
 
-static bool run_registered_tests(bool& stop_on_first_fail, bool& skip_all_till_the_end, size_t& tests_count, size_t& unique_tests_count,
-  std::set<std::string>& failed_tests, std::vector<std::pair<std::string, uint64_t>>& tests_running_time,
-  const std::function<bool(const std::string&)>& /*is_test_eligible_to_run*/, const std::function<bool(const std::string&, size_t)>& /*is_hf_test_eligible_to_run*/)
+static bool run_registered_tests(bool& stop_on_first_fail, bool& skip_all_till_the_end, size_t& tests_count, size_t& unique_tests_count, std::set<std::string>& failed_tests,
+  std::vector<std::pair<std::string, uint64_t>>& tests_running_time, const std::function<bool(const std::string&)>& /*is_test_eligible_to_run*/,const std::function<bool(const std::string&, size_t)>& /*is_hf_test_eligible_to_run*/)
 {
   bool all_ok = true;
 
   const uint32_t processes = command_line::get_arg(g_vm, arg_processes);
   const int32_t worker_id = command_line::get_arg(g_vm, arg_worker_id);
 
-  size_t job_index = 0;
+  std::vector<int> owner_plan;
+  bool has_plan = false;
 
-  for (auto& j : g_test_jobs)
+  if (processes > 1 && worker_id >= 0)
+  {
+    std::filesystem::path run_root_abs = command_line::get_arg(g_vm, arg_run_root);
+    if (run_root_abs.empty())
+      run_root_abs = std::filesystem::path("chaingen_runs");
+    if (run_root_abs.is_relative())
+      run_root_abs = std::filesystem::absolute(run_root_abs);
+
+    const auto report_path = run_root_abs / WORKERS_REPORT_FILENAME;
+
+    std::unordered_map<std::string, uint64_t> ms_by_test;
+    if (read_workers_report_ms_map(report_path, ms_by_test))
+    {
+      owner_plan = build_lpt_owner_plan(g_test_jobs, processes, ms_by_test);
+      has_plan = (owner_plan.size() == g_test_jobs.size());
+    }
+  }
+
+  for (size_t i = 0; i < g_test_jobs.size(); ++i)
   {
     if (skip_all_till_the_end)
       break;
 
     if (processes > 1 && worker_id >= 0)
     {
-      if ((job_index % processes) != static_cast<size_t>(worker_id))
-      {
-        ++job_index;
+      const int expected_owner = has_plan
+        ? owner_plan[i]
+        : static_cast<int>(i % processes);
+
+      if (expected_owner != worker_id)
         continue;
-      }
     }
 
-    bool ok = j.run();
+    bool ok = g_test_jobs[i].run();
     if (!ok)
       all_ok = false;
-
-    ++job_index;
   }
 
   return all_ok;
@@ -1351,8 +1449,9 @@ int main(int argc, char* argv[])
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
   log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_4);
 
-  log_space::log_singletone::add_logger(LOGGER_FILE,
-    log_space::log_singletone::get_default_log_file().c_str(), log_space::log_singletone::get_default_log_folder().c_str());
+  log_space::log_singletone::add_logger(LOGGER_FILE, 
+    log_space::log_singletone::get_default_log_file().c_str(), 
+    log_space::log_singletone::get_default_log_folder().c_str());
 
   log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet", false);
 
@@ -1519,32 +1618,20 @@ int main(int argc, char* argv[])
     uint64_t total_time = 0;
     if (!tests_running_time.empty())
     {
-      uint64_t max_time = std::max_element(
-        tests_running_time.begin(), tests_running_time.end(),
-        [](tests_running_time_t::value_type& lhs, tests_running_time_t::value_type& rhs) -> bool {
-          return lhs.second < rhs.second;
-        })->second;
-
-      uint64_t max_test_name_len = std::max_element(
-        tests_running_time.begin(), tests_running_time.end(),
-        [](tests_running_time_t::value_type& lhs, tests_running_time_t::value_type& rhs) -> bool {
-          return lhs.first.size() < rhs.first.size();
-        })->first.size();
-
-      const size_t bar_width = 70;
+      uint64_t max_time = std::max_element(tests_running_time.begin(), tests_running_time.end(), [](tests_running_time_t::value_type& lhs, tests_running_time_t::value_type& rhs)->bool { return lhs.second < rhs.second; })->second;
+      uint64_t max_test_name_len = std::max_element(tests_running_time.begin(), tests_running_time.end(), [](tests_running_time_t::value_type& lhs, tests_running_time_t::value_type& rhs)->bool { return lhs.first.size() < rhs.first.size(); })->first.size();
+      size_t bar_width = 70;
 
       if (!is_worker)
       {
         for (const auto& i : tests_running_time)
         {
-          const bool failed = failed_tests.count(i.first) != 0;
-          const bool postponed = postponed_tests.count(i.first) != 0;
+          bool failed = failed_tests.count(i.first) != 0;
+          bool postponed = postponed_tests.count(i.first) != 0;
           if (failed && postponed)
             ++failed_postponed_tests_count;
-
           std::string bar(bar_width * i.second / max_time, '#');
           std::cout << (failed ? (postponed ? concolor::yellow : concolor::magenta) : concolor::green) << std::left << std::setw(max_test_name_len + 1) << i.first << "\t" << std::setw(10) << i.second << " ms \t" << bar << std::endl;
-
           total_time += i.second;
         }
       }
@@ -1560,7 +1647,7 @@ int main(int argc, char* argv[])
     }
 
     if (skip_all_till_the_end && !is_worker)
-      std::cout << ENDL << concolor::yellow << "(execution interrupted at the first failure; not all tests were run)" << ENDL;
+      std::cout << ENDL << concolor::yellow << "(execution interrupted at the first failure; not all tests were run)" << ENDL; 
 
     serious_failures_count = failed_tests.size() - failed_postponed_tests_count;
 

@@ -36,6 +36,9 @@ public:
   std::filesystem::path get_taken_tests_log_path_for_this_process() const;
   void log_test_taken_by_this_process(const std::string& test_name) const;
 
+  std::filesystem::path get_workers_report_path() const;
+  bool write_workers_report_file(uint32_t processes, const std::vector<worker_report>& reps) const;
+
 private:
   const boost::program_options::variables_map& m_vm;
 
