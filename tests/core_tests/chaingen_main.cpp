@@ -1448,7 +1448,7 @@ int main(int argc, char* argv[])
   //set up logging options
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
   log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_4);
-
+  
   log_space::log_singletone::add_logger(LOGGER_FILE, 
     log_space::log_singletone::get_default_log_file().c_str(), 
     log_space::log_singletone::get_default_log_folder().c_str());
@@ -1505,8 +1505,7 @@ int main(int argc, char* argv[])
   if (command_line::has_arg(g_vm, command_line::arg_log_level))
   {
     int new_log_level = command_line::get_arg(g_vm, command_line::arg_log_level);
-    if (new_log_level >= LOG_LEVEL_MIN && new_log_level <= LOG_LEVEL_MAX &&
-        log_space::get_set_log_detalisation_level(false) != new_log_level)
+    if (new_log_level >= LOG_LEVEL_MIN && new_log_level <= LOG_LEVEL_MAX && log_space::get_set_log_detalisation_level(false) != new_log_level)
     {
       log_space::get_set_log_detalisation_level(true, new_log_level);
       LOG_PRINT_L0("LOG_LEVEL set to " << new_log_level);
@@ -1571,7 +1570,6 @@ int main(int argc, char* argv[])
         if (!match)
           return false;
       }
-
       LOG_PRINT_L0("good: " << genclass_str);
       return true;
     };
@@ -1624,7 +1622,7 @@ int main(int argc, char* argv[])
 
       if (!is_worker)
       {
-        for (const auto& i : tests_running_time)
+        for (auto& i : tests_running_time)
         {
           bool failed = failed_tests.count(i.first) != 0;
           bool postponed = postponed_tests.count(i.first) != 0;
