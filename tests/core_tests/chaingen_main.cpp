@@ -15,18 +15,13 @@
 #include "common/db_backend_selector.h"
 #include "parallel/parallel_test_runner.h"
 #include "chaingen_args.h"
-#include <boost/process.hpp>
-#include <filesystem>
-#include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
-#include <fstream>
 
 #define TX_BLOBSIZE_CHECKER_LOG_FILENAME "get_object_blobsize(tx).log"
 
 using namespace chaingen_args;
 
 namespace po = boost::program_options;
-namespace bp = boost::process;
 namespace pt = boost::property_tree;
 
 namespace
@@ -34,6 +29,8 @@ namespace
   boost::program_options::variables_map g_vm;
   std::unique_ptr<parallel_test_runner> g_runner;
   std::vector<test_job> g_test_jobs;
+  coretests_shm::shared_state* g_shm_state = nullptr;
+  std::unique_ptr<boost::interprocess::mapped_region> g_shm_region;
 }
 
 #define GENERATE(filename, genclass) \
@@ -387,76 +384,82 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
   return r;
 }
 
-#define GENERATE_AND_PLAY(genclass) \
-  do { \
-    const std::string __test_name = #genclass; \
-    auto __is_test_eligible_to_run = is_test_eligible_to_run; \
-    g_test_jobs.push_back(test_job{ \
-      __test_name, \
-      [&, __test_name, __is_test_eligible_to_run]() -> bool { \
-        if (!__is_test_eligible_to_run(__test_name)) \
-          return true; \
-        return run_one_test_job( \
-          __test_name, \
-          [&]() -> bool { return generate_and_play<genclass>(__test_name.c_str()); }, \
-          stop_on_first_fail, \
-          skip_all_till_the_end, \
-          tests_count, \
-          unique_tests_count, \
-          failed_tests, \
-          tests_running_time); \
-      } \
-    }); \
+#define GENERATE_AND_PLAY(genclass)                                                                        \
+  do {                                                                                                     \
+    const std::string __test_name = #genclass;                                                             \
+    auto __is_test_eligible_to_run = is_test_eligible_to_run;                                              \
+    g_test_jobs.push_back(test_job{                                                                        \
+      __test_name,                                                                                         \
+      [&, __test_name, __is_test_eligible_to_run]() -> bool {                                              \
+        if (!__is_test_eligible_to_run(__test_name))                                                       \
+          return true;                                                                                     \
+        return run_one_test_job(                                                                           \
+          __test_name,                                                                                     \
+          [&]() -> bool { return generate_and_play<genclass>(__test_name.c_str()); },                      \
+          stop_on_first_fail,                                                                              \
+          skip_all_till_the_end,                                                                           \
+          tests_count,                                                                                     \
+          unique_tests_count,                                                                              \
+          failed_tests,                                                                                    \
+          tests_running_time);                                                                             \
+      }                                                                                                    \
+    });                                                                                                    \
   } while (0)
 
 #define GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(genclass)                                     \
-  if (is_test_eligible_to_run(#genclass))                                                                  \
-  {                                                                                                        \
-    const char* testname = #genclass " (BC saveload)";                                                     \
-    TIME_MEASURE_START_MS(t);                                                                              \
-    ++tests_count;                                                                                         \
-    ++unique_tests_count;                                                                                  \
-    if (!gen_and_play_intermitted_by_blockchain_saveload<genclass>(testname))                              \
-    {                                                                                                      \
-      failed_tests.insert(testname);                                                                       \
-      LOCAL_ASSERT(false);                                                                                 \
-      if (stop_on_first_fail)                                                                              \
-        skip_all_till_the_end = true;                                                                      \
-    }                                                                                                      \
-    TIME_MEASURE_FINISH_MS(t);                                                                             \
-    tests_running_time.push_back(std::make_pair(testname, t));                                             \
-  }
+  do {                                                                                                     \
+    const std::string __test_name = std::string(#genclass) + " (BC saveload)";                             \
+    auto __is_test_eligible_to_run = is_test_eligible_to_run;                                              \
+    g_test_jobs.push_back(test_job{                                                                        \
+      __test_name,                                                                                         \
+      [&, __test_name, __is_test_eligible_to_run]() -> bool {                                              \
+        if (!__is_test_eligible_to_run(#genclass))                                                         \
+          return true;                                                                                     \
+        return run_one_test_job(                                                                           \
+          __test_name,                                                                                     \
+          [&]() -> bool { return gen_and_play_intermitted_by_blockchain_saveload<genclass>(__test_name.c_str()); }, \
+          stop_on_first_fail,                                                                              \
+          skip_all_till_the_end,                                                                           \
+          tests_count,                                                                                     \
+          unique_tests_count,                                                                              \
+          failed_tests,                                                                                    \
+          tests_running_time);                                                                             \
+      }                                                                                                    \
+    });                                                                                                    \
+  } while (0)
 
-#define GENERATE_AND_PLAY_HF(genclass, hardfork_str_mask) \
-  do { \
-    const std::string __gen_name = #genclass; \
-    std::vector<size_t> __hardforks = parse_hardfork_str_mask(hardfork_str_mask); \
-    if (__hardforks.empty()) { \
-      LOG_ERROR("invalid hardforks mask: " << hardfork_str_mask << " for test " << __gen_name); \
-      break; \
-    } \
-    auto __hf_filter = is_hf_test_eligible_to_run; \
-    for (size_t __i = 0; __i < __hardforks.size(); ++__i) \
-    { \
-      const size_t __hf_id = __hardforks[__i]; \
-      const std::string __test_name = __gen_name + " @ HF " + epee::string_tools::num_to_string_fast(__hf_id); \
-      g_test_jobs.push_back(test_job{ \
-        __test_name, \
-        [&, __test_name, __gen_name, __hf_id, __hf_filter]() -> bool { \
-          if (!__hf_filter(__gen_name, __hf_id)) \
-            return true; \
-          return run_one_test_job( \
-            __test_name, \
-            [&]() -> bool { return generate_and_play<genclass>(__test_name.c_str(), __hf_id); }, \
-            stop_on_first_fail, \
-            skip_all_till_the_end, \
-            tests_count, \
-            unique_tests_count, \
-            failed_tests, \
-            tests_running_time); \
-        } \
-      }); \
-    } \
+#define GENERATE_AND_PLAY_HF(genclass, hardfork_str_mask)                                                  \
+  do {                                                                                                     \
+    const std::string __gen_name = #genclass;                                                              \
+    std::vector<size_t> __hardforks = parse_hardfork_str_mask(hardfork_str_mask);                          \
+    if (__hardforks.empty())                                                                               \
+    {                                                                                                      \
+      LOG_ERROR("invalid hardforks mask: " << hardfork_str_mask << " for test " << __gen_name);            \
+      LOCAL_ASSERT(false);                                                                                 \
+      break;                                                                                               \
+    }                                                                                                      \
+    auto __hf_filter = is_hf_test_eligible_to_run;                                                         \
+    for (size_t __i = 0; __i < __hardforks.size(); ++__i)                                                  \
+    {                                                                                                      \
+      const size_t __hf_id = __hardforks[__i];                                                             \
+      const std::string __test_name = __gen_name + " @ HF " + epee::string_tools::num_to_string_fast(__hf_id);  \
+      g_test_jobs.push_back(test_job{                                                                      \
+        __test_name,                                                                                       \
+        [&, __test_name, __gen_name, __hf_id, __hf_filter]() -> bool {                                     \
+          if (!__hf_filter(__gen_name, __hf_id))                                                           \
+            return true;                                                                                   \
+          return run_one_test_job(                                                                         \
+            __test_name,                                                                                   \
+            [&]() -> bool { return generate_and_play<genclass>(__test_name.c_str(), __hf_id); },           \
+            stop_on_first_fail,                                                                            \
+            skip_all_till_the_end,                                                                         \
+            tests_count,                                                                                   \
+            unique_tests_count,                                                                            \
+            failed_tests,                                                                                  \
+            tests_running_time);                                                                           \
+        }                                                                                                  \
+      });                                                                                                  \
+    }                                                                                                      \
   } while (0)
 
 //#define GENERATE_AND_PLAY(genclass) GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(genclass)
@@ -894,9 +897,7 @@ static void log_test_taken_by_this_process(const std::string& test_name)
     g_runner->log_test_taken_by_this_process(test_name);
 }
 //--------------------------------------------------------------------------
-static bool read_workers_report_ms_map(
-  const std::filesystem::path& path,
-  std::unordered_map<std::string, uint64_t>& out_ms_by_test)
+static bool read_workers_report_ms_map(const std::filesystem::path& path, std::unordered_map<std::string, uint64_t>& out_ms_by_test)
 {
   out_ms_by_test.clear();
 
@@ -925,10 +926,7 @@ static bool read_workers_report_ms_map(
   }
 }
 //--------------------------------------------------------------------------
-static std::vector<int> build_lpt_owner_plan(
-  const std::vector<test_job>& jobs,
-  uint32_t processes,
-  const std::unordered_map<std::string, uint64_t>& ms_by_test)
+static std::vector<int> build_lpt_owner_plan(const std::vector<test_job>& jobs, uint32_t processes, const std::unordered_map<std::string, uint64_t>& ms_by_test)
 {
   const size_t n = jobs.size();
   std::vector<int> owner(n, 0);
@@ -996,6 +994,12 @@ static bool run_one_test_job(const std::string& test_name, const std::function<b
   {
     failed_tests.insert(test_name);
     LOCAL_ASSERT(false);
+
+    const int32_t wid = command_line::get_arg(g_vm, chaingen_args::arg_worker_id);
+    const uint32_t procs = command_line::get_arg(g_vm, chaingen_args::arg_processes);
+    if (procs > 1 && wid >= 0 && g_shm_state)
+      g_shm_state->record_fail(static_cast<uint32_t>(wid), test_name.c_str());
+
     if (stop_on_first_fail)
       skip_all_till_the_end = true;
   }
@@ -1440,6 +1444,26 @@ void fill_postponed_tests_set(std::set<std::string>& postponed_tests)
 #undef MARK_TEST_AS_POSTPONED
 }
 //--------------------------------------------------------------------------
+static void init_shared_fail_report_if_needed()
+{
+  const std::string shm_name = command_line::get_arg(g_vm, chaingen_args::arg_shm_name);
+  if (shm_name.empty())
+    return;
+
+  namespace bip = boost::interprocess;
+  try
+  {
+    bip::shared_memory_object shm(bip::open_only, shm_name.c_str(), bip::read_write);
+    g_shm_region.reset(new bip::mapped_region(shm, bip::read_write));
+    g_shm_state = static_cast<coretests_shm::shared_state*>(g_shm_region->get_address());
+  }
+  catch (...)
+  {
+    g_shm_state = nullptr;
+    g_shm_region.reset();
+  }
+}
+//--------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {
   TRY_ENTRY();
@@ -1478,6 +1502,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, arg_processes);
   command_line::add_arg(desc_options, arg_worker_id);
   command_line::add_arg(desc_options, arg_run_root);
+  command_line::add_arg(desc_options, arg_shm_name);
 
   currency::core::init_options(desc_options);
   tools::db::db_backend_selector::init_options(desc_options);
@@ -1521,6 +1546,9 @@ int main(int argc, char* argv[])
   const int32_t worker_id = command_line::get_arg(g_vm, arg_worker_id);
   const bool is_worker = (processes > 1 && worker_id >= 0);
 
+  if (is_worker)
+    init_shared_fail_report_if_needed();
+
   bool skip_all_till_the_end = false;
   size_t tests_count = 0;
   size_t unique_tests_count = 0;
@@ -1545,7 +1573,7 @@ int main(int argc, char* argv[])
   {
     epee::debug::get_set_enable_assert(true, command_line::get_arg(g_vm, arg_enable_debug_asserts)); // don't comment out this: many tests have normal-negative checks (i.e. tx with invalid amount shouldn't be created), so be ready for MANY assertion breaks
 
-    std::unordered_multimap<std::string, size_t> specific_tests_to_run;
+    std::unordered_multimap<std::string, size_t> specific_tests_to_run; // test_name -> hf; if empty, all tests should be run
     CHECK_AND_ASSERT_MES(parse_cmd_specific_tests_to_run(specific_tests_to_run), 1, "Error while parsing specific tests to run");
 
     std::set<std::string> postponed_tests;

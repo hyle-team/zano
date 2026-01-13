@@ -4,7 +4,7 @@
   #include "../chaingen.h"
 #endif
 
-#include <cstring>
+#include <chrono>
 #include <cctype>
 #include <mutex>
 #include <boost/property_tree/ptree.hpp>
@@ -39,13 +39,14 @@ namespace
   const char* TAKEN_TESTS_LOG_FILENAME = "taken_tests.log";
   const char* WORKER_REPORT_FILENAME   = "coretests_report.json";
   const char* WORKER_LOG_FILENAME      = "worker.log";
+  const char* ARG_WORKER_ID            = "--multiprocess-worker-id";
+  const char* ARG_WORKER_ID_EQ         = "--multiprocess-worker-id=";
 
-  const char* ARG_WORKER_ID            = "--worker-id";
-  const char* ARG_WORKER_ID_EQ         = "--worker-id=";
+  const char* ARG_RUN_ROOT             = "--multiprocess-run-root";
+  const char* ARG_RUN_ROOT_EQ          = "--multiprocess-run-root=";
 
-  const char* ARG_DATA_DIR             = "--data-dir";
-  const char* ARG_DATA_DIR_EQ          = "--data-dir=";
-  const char* WORKER_DIR_PREFIX        = "w";
+  const char* ARG_PROCESSES            = "--multiprocess-run";
+  const char* ARG_PROCESSES_EQ         = "--multiprocess-run=";  const char* WORKER_DIR_PREFIX        = "w";
 
   std::mutex cout_mx;
   std::mutex cerr_mx;
@@ -64,7 +65,7 @@ parallel_test_runner::parallel_test_runner(
 int parallel_test_runner::run_parent_if_needed(int argc, char* argv[]) const
 {
   const int rc = run_workers_and_wait(argc, argv);
-  return rc;
+  return (rc < 0) ? k_not_parent : rc;
 }
 
 bool parallel_test_runner::write_worker_report(const worker_report& rep) const
@@ -119,9 +120,15 @@ std::vector<std::string> parallel_test_runner::build_base_args_without_worker_sp
       continue;
     }
 
-    if (current_arg == ARG_DATA_DIR || arg_has_prefix(current_arg, ARG_DATA_DIR_EQ))
+    if (current_arg == ARG_PROCESSES || arg_has_prefix(current_arg, ARG_PROCESSES_EQ))
     {
-      if (current_arg == ARG_DATA_DIR && i + 1 < argc) ++i;
+      if (current_arg == ARG_PROCESSES && i + 1 < argc) ++i;
+      continue;
+    }
+
+    if (current_arg == ARG_RUN_ROOT || arg_has_prefix(current_arg, ARG_RUN_ROOT_EQ))
+    {
+      if (current_arg == ARG_RUN_ROOT && i + 1 < argc) ++i;
       continue;
     }
 
@@ -133,7 +140,7 @@ std::vector<std::string> parallel_test_runner::build_base_args_without_worker_sp
 
 void fill_postponed_tests_set(std::set<std::string>& postponed_tests);
 
-int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t processes, uint64_t wall_time_ms) const
+int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t processes, uint64_t wall_time_ms, const coretests_shm::shared_state* shm_state) const
 {
   std::vector<worker_report> reps;
   reps.reserve(processes);
@@ -168,8 +175,21 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
   {
     total_tests_count += r.tests_count;
     total_unique_tests_count += r.unique_tests_count;
-
     failed_tests_union.insert(r.failed_tests.begin(), r.failed_tests.end());
+  }
+
+  if (shm_state)
+  {
+    uint32_t n_fails = shm_state->write_idx.load(std::memory_order_relaxed);
+    if (n_fails > coretests_shm::k_max_fails)
+      n_fails = coretests_shm::k_max_fails;
+
+    for (uint32_t j = 0; j < n_fails; ++j)
+    {
+      const auto& e = shm_state->entries[j];
+      if (e.test_name[0] != '\0')
+        failed_tests_union.insert(std::string(e.test_name));
+    }
   }
 
   size_t failed_postponed_tests_count = 0;
@@ -177,10 +197,10 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
     if (postponed_tests.count(t) != 0)
       ++failed_postponed_tests_count;
 
-  const size_t serious_failures_count = failed_tests_union.size() - failed_postponed_tests_count;
+  const size_t serious_failures_count = failed_tests_union.size() >= failed_postponed_tests_count ? (failed_tests_union.size() - failed_postponed_tests_count) : 0;
+  const bool ok = (!any_missing && failed_workers == 0 && serious_failures_count == 0);
 
-  std::cout << (serious_failures_count == 0 && failed_workers == 0 && !any_missing ? concolor::green : concolor::magenta);
-
+  std::cout << (ok ? concolor::green : concolor::magenta);
   std::cout << "\nREPORT (aggregated):\n";
   std::cout << "  Workers:          " << processes << "\n";
   if (any_missing)
@@ -189,12 +209,10 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
 
   std::cout << "  Unique tests run: " << total_unique_tests_count << "\n";
   std::cout << "  Total tests run:  " << total_tests_count << "\n";
-  std::cout << "  Failures:         " << serious_failures_count
-            << " (postponed failures: " << failed_postponed_tests_count << ")\n";
+  std::cout << "  Failures:         " << serious_failures_count << " (postponed failures: " << failed_postponed_tests_count << ")\n";
   std::cout << "  Postponed:        " << postponed_tests.size() << "\n";
-  std::cout << "  Total time:       " << (wall_time_ms / 1000) << " s. ("
-            << (total_tests_count > 0 ? (wall_time_ms / total_tests_count) : 0)
-            << " ms per test in average)\n";
+  std::cout << "  Total time:       " << (wall_time_ms / 1000) << " s. (" << (total_tests_count > 0 ? (wall_time_ms / total_tests_count) : 0) << " ms per test in average)\n";
+
   if (!failed_tests_union.empty())
   {
     std::cout << "FAILED/POSTPONED TESTS:\n";
@@ -205,10 +223,11 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
     }
   }
 
-  std::cout << concolor::normal << std::endl;
+  std::cout << concolor::normal << '\n';
 
-  (void)write_workers_report_file(processes, reps);
-  
+  if (!reps.empty())
+    (void)write_workers_report_file(processes, reps);
+
   if (any_missing || failed_workers != 0)
     return 1;
 
@@ -257,18 +276,7 @@ void parallel_test_runner::print_worker_failure_reasons(uint32_t processes, cons
 
     std::cout << "    failed tests:\n";
     for (const auto& test_name : rep.failed_tests)
-    {
       std::cout << "      - " << test_name << "\n";
-
-      const auto logs = find_logs_for_test(worker_dir, test_name);
-      if (logs.empty())
-      {
-        std::cout << "        log: (not found, expected prefix: " << sanitize_filename(test_name) << ")\n";
-        continue;
-      }
-
-      std::cout << "        log: " << logs.front().string() << "\n";
-    }
   }
 }
 
@@ -286,6 +294,7 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
   if (command_line::get_arg(m_vm, arg_generate_and_play_test_data)) return -1;
   if (command_line::get_arg(m_vm, arg_test_transactions)) return -1;
 
+  const auto t0 = std::chrono::steady_clock::now();
   const std::string run_root = command_line::get_arg(m_vm, arg_run_root);
   std::vector<std::string> base_args = build_base_args_without_worker_specific(argc, argv);
 
@@ -297,9 +306,9 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
     return false;
   };
 
-  if (!has_flag("--processes", "--processes="))
+  if (!has_flag(ARG_PROCESSES, ARG_PROCESSES_EQ))
   {
-    base_args.emplace_back("--processes");
+    base_args.emplace_back(ARG_PROCESSES);
     base_args.emplace_back(std::to_string(processes));
   }
 
@@ -310,18 +319,16 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
   if (run_root_abs.is_relative())
     run_root_abs = std::filesystem::absolute(run_root_abs);
 
-  if (!has_flag("--run-root", "--run-root="))
+  if (!has_flag(ARG_RUN_ROOT, ARG_RUN_ROOT_EQ))
   {
-    base_args.emplace_back("--run-root");
+    base_args.emplace_back(ARG_RUN_ROOT);
     base_args.emplace_back(run_root_abs.string());
   }
 
   std::string exe = (argv && argv[0]) ? std::string(argv[0]) : std::string();
   if (exe.empty())
   {
-    std::cout << concolor::magenta
-              << "Cannot spawn workers: empty executable path (argv[0])"
-              << concolor::normal << std::endl;
+    std::cout << concolor::magenta << "Cannot spawn workers: empty executable path (argv[0])" << concolor::normal << '\n';
     return 1;
   }
 
@@ -341,239 +348,199 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
 
     exe = exe_path.string();
   }
-  catch (...) {}
+  catch (const std::exception& e)
+  {
+    std::cout << concolor::magenta << "Failed to resolve executable path: " << e.what() << concolor::normal << '\n';
+  }
+  catch (...)
+  {
+    std::cout << concolor::magenta << "Failed to resolve executable path: unknown error" << concolor::normal << '\n';
+  }
 
   if (exe.empty() || !std::filesystem::exists(std::filesystem::path(exe)))
   {
-    std::cout << concolor::magenta
-              << "Cannot spawn workers: failed to resolve executable: " << exe
-              << concolor::normal << std::endl;
+    std::cout << concolor::magenta << "Cannot spawn workers: failed to resolve executable: " << exe << concolor::normal << '\n';
     return 1;
   }
 
-  std::vector<bp::child> kids;
-  kids.reserve(processes);
+  const uint32_t parent_pid =
+#ifdef _WIN32
+    static_cast<uint32_t>(::GetCurrentProcessId());
+#else
+    static_cast<uint32_t>(::getpid());
+#endif
 
-  std::vector<int> worker_exit_codes(processes, -1);
+  const std::string shm_name = "zano_coretests_fail_" + std::to_string(parent_pid);
 
-  std::vector<std::unique_ptr<bp::ipstream>> kids_out(processes);
-  std::vector<std::unique_ptr<bp::ipstream>> kids_err(processes);
+  namespace bip = boost::interprocess;
 
-  std::vector<std::thread> tee_threads;
-  tee_threads.reserve(static_cast<size_t>(processes) * 2);
-
-  const auto wall_t0 = std::chrono::steady_clock::now();
-
-  for (uint32_t i = 0; i < processes; ++i)
-  {
-    std::vector<std::string> args = base_args;
-
-    args.emplace_back("--worker-id");
-    args.emplace_back(std::to_string(i));
-
-    const std::string worker_data_dir = make_worker_data_dir(run_root_abs, static_cast<int>(i));
-    args.emplace_back("--data-dir");
-    args.emplace_back(worker_data_dir);
-
-    try
-    {
-      const auto worker_dir = get_worker_dir_path(i);
-      std::filesystem::create_directories(worker_dir);
-
-      kids_out[i] = std::make_unique<bp::ipstream>();
-      kids_err[i] = std::make_unique<bp::ipstream>();
-
-      kids.emplace_back(bp::child(
-        exe,
-        bp::args(args),
-        bp::start_dir = worker_dir.string(),
-        bp::std_out > *kids_out[i],
-        bp::std_err > *kids_err[i]
-      ));
-
-      std::shared_ptr<worker_log_sink> sink(new worker_log_sink());
-      sink->open(get_worker_dir_path(i) / WORKER_LOG_FILENAME);
-
-      tee_threads.emplace_back([worker_dir, s = kids_out[i].get(), sink]()
-      {
-        std::filesystem::create_directories(worker_dir);
-
-        std::string line;
-        while (std::getline(*s, line))
-        {
-          sink->write_line(line);
-          {
-            std::lock_guard<std::mutex> lk(cout_mx);
-            std::cout << line << std::endl;
-          }
-        }
-      });
-
-      tee_threads.emplace_back([s = kids_err[i].get(), sink]()
-      {
-        std::string line;
-        while (std::getline(*s, line))
-        {
-          sink->write_line(std::string("[stderr] ") + line);
-          std::lock_guard<std::mutex> lk(cerr_mx);
-          std::cerr << line << std::endl;
-        }
-      });
-    }
-    catch (const std::exception& e)
-    {
-      std::cout << concolor::magenta
-                << "Failed to spawn worker " << i << ": " << e.what()
-                << concolor::normal << std::endl;
-
-      for (auto& c : kids)
-        if (c.running())
-          c.terminate();
-      for (auto& c : kids)
-        c.wait();
-
-      for (auto& t : tee_threads)
-        if (t.joinable())
-          t.join();
-
-      return 1;
-    }
-  }
+  bip::shared_memory_object::remove(shm_name.c_str());
 
   int failed_workers = 0;
-  for (uint32_t i = 0; i < kids.size(); ++i)
-  {
-    kids[i].wait();
-    worker_exit_codes[i] = kids[i].exit_code();
-    if (worker_exit_codes[i] != 0)
-      ++failed_workers;
-  }
-
-  for (auto& t : tee_threads)
-    if (t.joinable())
-      t.join();
-
-  const auto wall_t1 = std::chrono::steady_clock::now();
-  const uint64_t wall_ms =
-    static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(wall_t1 - wall_t0).count());
-
-  const int aggregated_rc = print_aggregated_report_and_return_rc(processes, wall_ms);
-
-  if (failed_workers != 0)
-    print_worker_failure_reasons(processes, worker_exit_codes);
-
-  if (failed_workers != 0)
-    return 1;
-
-  return aggregated_rc;
-}
-
-std::string parallel_test_runner::sanitize_filename(std::string s)
-{
-  for (char& c : s)
-  {
-    const bool ok =
-      (c >= 'a' && c <= 'z') ||
-      (c >= 'A' && c <= 'Z') ||
-      (c >= '0' && c <= '9') ||
-      c == '.' || c == '_' || c == '-';
-    if (!ok)
-      c = '_';
-  }
-
-  if (s.empty())
-    s = "unnamed_test";
-
-  constexpr size_t kMax = 180;
-  if (s.size() > kMax)
-    s.resize(kMax);
-
-  return s;
-}
-
-bool parallel_test_runner::parse_test_name_from_header(const std::string& line, std::string& out_name)
-{
-  constexpr const char* kPrefix = "#TEST# >>>>";
-  auto pos = line.find(kPrefix);
-  if (pos != 0)
-    return false;
-
-  std::string rest = line.substr(std::strlen(kPrefix));
-  // trim left
-  while (!rest.empty() && std::isspace(static_cast<unsigned char>(rest.front())))
-    rest.erase(rest.begin());
-
-  auto end = rest.find("<<<<");
-  if (end == std::string::npos)
-    return false;
-
-  std::string name = rest.substr(0, end);
-  // trim right
-  while (!name.empty() && std::isspace(static_cast<unsigned char>(name.back())))
-    name.pop_back();
-
-  if (name.empty())
-    return false;
-
-  out_name = name;
-  return true;
-}
-
-std::filesystem::path parallel_test_runner::make_unique_log_path(const std::filesystem::path& dir, const std::string& base_name_no_ext)
-{
-  std::filesystem::path p = dir / (base_name_no_ext + ".log");
-  if (!std::filesystem::exists(p))
-    return p;
-
-  for (size_t i = 2; i < 10000; ++i)
-  {
-    std::filesystem::path alt = dir / (base_name_no_ext + "_" + std::to_string(i) + ".log");
-    if (!std::filesystem::exists(alt))
-      return alt;
-  }
-
-  return p; // fallback
-}
-
-std::vector<std::filesystem::path> parallel_test_runner::find_logs_for_test(
-  const std::filesystem::path& worker_dir,
-  const std::string& test_name)
-{
-  std::vector<std::filesystem::path> result;
-
-  const std::string base = sanitize_filename(test_name);
-  const std::string base_prefix = base + "_";
+  int rc = 1;
 
   try
   {
-    for (auto& de : std::filesystem::directory_iterator(worker_dir))
+    bip::shared_memory_object shm(bip::create_only, shm_name.c_str(), bip::read_write);
+    shm.truncate(sizeof(coretests_shm::shared_state));
+    bip::mapped_region region(shm, bip::read_write);
+
+    auto* st = new (region.get_address()) coretests_shm::shared_state();
+    st->init();
+
+    if (!has_flag("--multiprocess-shm-name", std::string("--multiprocess-shm-name=")))
     {
-      if (!de.is_regular_file())
-        continue;
-
-      const auto p = de.path();
-      if (p.extension() != ".log")
-        continue;
-
-      const std::string stem = p.stem().string();
-      if (stem == base || stem.rfind(base_prefix, 0) == 0)
-        result.push_back(p);
+      base_args.emplace_back("--multiprocess-shm-name");
+      base_args.emplace_back(shm_name);
     }
-  }
-  catch (...) {}
 
-  std::sort(result.begin(), result.end(),
-    [](const std::filesystem::path& a, const std::filesystem::path& b)
+    struct worker_proc
     {
-      std::error_code ec1, ec2;
-      const auto ta = std::filesystem::last_write_time(a, ec1);
-      const auto tb = std::filesystem::last_write_time(b, ec2);
-      if (!ec1 && !ec2 && ta != tb)
-        return ta > tb;
-      return a.string() < b.string();
-    });
+      bp::child child;
+      std::unique_ptr<bp::ipstream> out;
+      std::unique_ptr<std::ofstream> file;
+      std::thread reader;
+      uint32_t wid = 0;
+    };
 
-  return result;
+    std::vector<worker_proc> kids;
+    kids.reserve(processes);
+
+    std::mutex cout_mutex;
+
+    for (uint32_t i = 0; i < processes; ++i)
+    {
+      std::vector<std::string> args = base_args;
+
+      args.emplace_back(ARG_WORKER_ID);
+      args.emplace_back(std::to_string(i));
+
+      const std::string worker_data_dir = make_worker_data_dir(run_root_abs, static_cast<int>(i));
+      args.emplace_back("--data-dir");
+      args.emplace_back(worker_data_dir);
+
+      const auto worker_dir = get_worker_dir_path(i);
+      std::filesystem::create_directories(worker_dir);
+
+      try
+      {
+        const auto log_path = (worker_dir / WORKER_LOG_FILENAME).string();
+
+        worker_proc wp;
+        wp.wid = i;
+        wp.out = std::make_unique<bp::ipstream>();
+        wp.file = std::make_unique<std::ofstream>(log_path, std::ios::out | std::ios::app);
+
+        if (!wp.file->is_open())
+        {
+          std::cout << concolor::magenta << "Failed to open log file for worker " << i << ": " << log_path << concolor::normal << '\n';
+          failed_workers = 1;
+          break;
+        }
+
+        wp.child = bp::child(
+          exe,
+          bp::args(args),
+          bp::start_dir = worker_dir.string(),
+          bp::std_out > *wp.out
+        );
+
+        wp.reader = std::thread([&, out = wp.out.get(), f = wp.file.get()]()
+        {
+          std::string line;
+          std::string buffer;
+          buffer.reserve(64 * 1024);
+
+          std::function<void()> flush = [&]()
+          {
+            if (!buffer.empty())
+            {
+              (*f) << buffer;
+
+              {
+                std::lock_guard<std::mutex> lk(cout_mutex);
+                std::cout << buffer;
+              }
+
+              buffer.clear();
+            }
+          };
+
+          while (std::getline(*out, line))
+          {
+            buffer.append(line);
+            buffer.push_back('\n');
+
+            if (buffer.size() >= 64 * 1024)
+              flush();
+          }
+
+          flush();
+        });
+
+        kids.emplace_back(std::move(wp));
+      }
+      catch (const std::exception& e)
+      {
+        std::cout << concolor::magenta << "Failed to spawn worker " << i << ": " << e.what() << concolor::normal << '\n';
+
+        for (auto& p : kids)
+          if (p.child.running())
+            p.child.terminate();
+        for (auto& p : kids)
+          p.child.wait();
+        for (auto& p : kids)
+          if (p.reader.joinable())
+            p.reader.join();
+
+        failed_workers = 1;
+        break;
+      }
+    }
+
+    for (auto& p : kids)
+      p.child.wait();
+
+    for (auto& p : kids)
+      if (p.reader.joinable())
+        p.reader.join();
+
+    for (const auto& p : kids)
+      if (p.child.exit_code() != 0)
+        ++failed_workers;
+
+    const auto t1 = std::chrono::steady_clock::now();
+    const uint64_t wall_time_ms =
+      static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
+
+    rc = print_aggregated_report_and_return_rc(processes, wall_time_ms, st);
+
+    if (failed_workers != 0 && rc == 0)
+      rc = 1;
+
+    std::vector<int> exit_codes;
+    exit_codes.reserve(kids.size());
+    for (const auto& p : kids)
+      exit_codes.push_back(p.child.exit_code());
+
+    const uint32_t spawned = static_cast<uint32_t>(kids.size());
+
+    if (failed_workers != 0 || rc != 0)
+      print_worker_failure_reasons(spawned, exit_codes);
+  }
+  catch (const std::exception& e)
+  {
+    std::cout << concolor::magenta << "Cannot spawn workers: " << e.what() << concolor::normal << std::endl;
+    rc = 1;
+  }
+  catch (...)
+  {
+    std::cout << concolor::magenta << "Cannot spawn workers: unknown error" << concolor::normal << std::endl;
+    rc = 1;
+  }
+
+  bip::shared_memory_object::remove(shm_name.c_str());
+  return rc;
 }
 
 bool parallel_test_runner::write_worker_report_file(const worker_report& rep) const
@@ -737,9 +704,7 @@ std::filesystem::path parallel_test_runner::get_workers_report_path() const
   return get_run_root_path() / WORKERS_REPORT_FILENAME;
 }
 
-bool parallel_test_runner::write_workers_report_file(
-  uint32_t processes,
-  const std::vector<worker_report>& reps) const
+bool parallel_test_runner::write_workers_report_file( uint32_t processes, const std::vector<worker_report>& reps) const
 {
   try
   {

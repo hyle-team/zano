@@ -19,4 +19,5 @@ namespace chaingen_args
   extern command_line::arg_descriptor<uint32_t>    arg_processes;
   extern command_line::arg_descriptor<int32_t>     arg_worker_id;
   extern command_line::arg_descriptor<std::string> arg_run_root;
+  extern command_line::arg_descriptor<std::string> arg_shm_name;
 }

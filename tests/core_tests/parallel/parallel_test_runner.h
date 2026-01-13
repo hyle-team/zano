@@ -1,9 +1,43 @@
 #pragma once
 
 #include <boost/program_options/variables_map.hpp>
+#include <boost/interprocess/shared_memory_object.hpp>
+#include <boost/interprocess/mapped_region.hpp>
 #include <filesystem>
 #include <string>
 #include <vector>
+
+namespace coretests_shm
+{
+  constexpr uint32_t k_max_fails = 16384;
+  constexpr uint32_t k_name_max  = 256;
+
+  struct fail_entry
+  {
+    uint32_t worker_id;
+    char     test_name[k_name_max];
+  };
+
+  struct shared_state
+  {
+    std::atomic<uint32_t> write_idx;
+    fail_entry entries[k_max_fails];
+
+    void init() { write_idx.store(0, std::memory_order_relaxed); }
+
+    void record_fail(uint32_t worker_id, const char* name)
+    {
+      uint32_t idx = write_idx.fetch_add(1, std::memory_order_relaxed);
+      if (idx >= k_max_fails)
+        return;
+
+      entries[idx].worker_id = worker_id;
+
+      std::strncpy(entries[idx].test_name, name ? name : "", k_name_max - 1);
+      entries[idx].test_name[k_name_max - 1] = '\0';
+    }
+  };
+}
 
 class parallel_test_runner
 {
@@ -50,39 +84,13 @@ private:
 
   int run_workers_and_wait(int argc, char* argv[]) const;
 
-  int print_aggregated_report_and_return_rc(uint32_t processes, uint64_t wall_time_ms) const;
+  int print_aggregated_report_and_return_rc(uint32_t processes, uint64_t wall_time_ms, const coretests_shm::shared_state* shm_state) const;
   void print_worker_failure_reasons(uint32_t processes, const std::vector<int>& worker_exit_codes) const;
-
-  static std::string sanitize_filename(std::string s);
-  static bool parse_test_name_from_header(const std::string& line, std::string& out_name);
-  static std::filesystem::path make_unique_log_path(const std::filesystem::path& dir, const std::string& base_name_no_ext);
-  static std::vector<std::filesystem::path> find_logs_for_test(const std::filesystem::path& worker_dir, const std::string& test_name);
 
   bool write_worker_report_file(const worker_report& rep) const;
   bool read_worker_report_file(uint32_t worker_id, worker_report& rep) const;
 
   std::filesystem::path get_worker_log_path(uint32_t worker_id) const;
-};
-
-struct worker_log_sink
-{
-  std::mutex mx;
-  std::ofstream f;
-
-  void open(const std::filesystem::path& path)
-  {
-    std::filesystem::create_directories(path.parent_path());
-    f.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
-  }
-
-  void write_line(const std::string& line)
-  {
-    std::lock_guard<std::mutex> lk(mx);
-    if (!f.is_open())
-      return;
-    f << line << "\n";
-    f.flush();
-  }
 };
 
 struct test_job
