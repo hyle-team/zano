@@ -1,3 +1,9 @@
+#if defined(_WIN32)
+  #include "chaingen.h"
+#else
+  #include "../chaingen.h"
+#endif
+
 #include <cstring>
 #include <cctype>
 #include <mutex>
@@ -7,7 +13,6 @@
 
 #include "parallel_test_runner.h"
 #include "../../src/common/command_line.h"
-#include "../chaingen.h"
 
 namespace bp = boost::process;
 namespace pt = boost::property_tree;
@@ -39,6 +44,7 @@ namespace
   const char* JSON_MS                  = "ms";
 
   const char* WORKER_REPORT_FILENAME   = "coretests_report.json";
+  const char* WORKER_LOG_FILENAME      = "worker.log";
 
   const char* ARG_WORKER_ID            = "--worker-id";
   const char* ARG_WORKER_ID_EQ         = "--worker-id=";
@@ -237,11 +243,11 @@ void parallel_test_runner::print_worker_failure_reasons(uint32_t processes, cons
 
     const auto worker_dir = get_worker_dir_path(i);
     const auto report_path = get_worker_report_path(i);
+    const auto log_path = worker_dir / WORKER_LOG_FILENAME;
 
-    std::cout << "  Worker " << i << ":\n";
-    std::cout << "    exit_code: " << ec << "\n";
     std::cout << "    report: " << (std::filesystem::exists(report_path) ? report_path.string() : ("missing (" + report_path.string() + ")")) << "\n";
     std::cout << "    logs dir: " << worker_dir.string() << "\n";
+    std::cout << "    log file: " << (std::filesystem::exists(log_path) ? log_path.string() : ("missing (" + log_path.string() + ")")) << "\n";
 
     if (!report_ok)
     {
@@ -398,113 +404,32 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
         bp::std_err > *kids_err[i]
       ));
 
+      std::shared_ptr<worker_log_sink> sink(new worker_log_sink());
+      sink->open(get_worker_dir_path(i) / WORKER_LOG_FILENAME);
+
       // Tee stdout: worker -> console; capture per-test log ONLY if failed
-      tee_threads.emplace_back([worker_dir, s = kids_out[i].get()]()
+      tee_threads.emplace_back([worker_dir, s = kids_out[i].get(), sink]()
       {
         std::filesystem::create_directories(worker_dir);
-
-        bool capturing = false;
-        std::string current_test_header;
-        std::filesystem::path current_log_path;
-        std::ofstream f_log;
-
-        auto close_log = [&]()
-        {
-          if (f_log.is_open())
-            f_log.close();
-        };
-
-        auto start_capture = [&](const std::string& header_line)
-        {
-          close_log();
-          capturing = true;
-          current_test_header = header_line;
-
-          std::string test_name;
-          if (!parse_test_name_from_header(header_line, test_name))
-            test_name = "unknown_test";
-
-          const std::string safe = sanitize_filename(test_name);
-          current_log_path = make_unique_log_path(worker_dir, safe);
-
-          f_log.open(current_log_path, std::ios::out | std::ios::binary | std::ios::trunc);
-          if (f_log.is_open())
-          {
-            f_log << "===== TEST OUTPUT BEGIN: " << header_line << " =====\n";
-            f_log.flush();
-          }
-        };
-
-        auto discard_capture = [&]()
-        {
-          close_log();
-          capturing = false;
-          current_test_header.clear();
-
-          if (!current_log_path.empty())
-          {
-            std::error_code ec;
-            std::filesystem::remove(current_log_path, ec);
-          }
-          current_log_path.clear();
-        };
-
-        auto commit_capture = [&]()
-        {
-          if (f_log.is_open())
-          {
-            f_log << "===== TEST OUTPUT END (FAILED): " << current_test_header << " =====\n";
-            f_log.flush();
-          }
-          close_log();
-
-          capturing = false;
-          current_test_header.clear();
-          current_log_path.clear();
-        };
 
         std::string line;
         while (std::getline(*s, line))
         {
-          // Start marker
-          if (line.rfind("#TEST# >>>>", 0) == 0)
-            start_capture(line);
-
-          // If capturing, write everything into per-test log
-          if (capturing && f_log.is_open())
-          {
-            f_log << line << "\n";
-            f_log.flush();
-          }
-
-          // End markers
-          if (capturing && line.find("<<<< Succeeded") != std::string::npos)
-          {
-            discard_capture();
-          }
-          else if (capturing && line.find("<<<< FAILED") != std::string::npos)
-          {
-            commit_capture();
-          }
-
-          // Console output
+          sink->write_line(line);
           {
             std::lock_guard<std::mutex> lk(cout_mx);
             std::cout << line << std::endl;
           }
         }
-
-        // Worker died mid-test without FAILED marker: keep log as failed
-        if (capturing)
-          commit_capture();
       });
 
       // Tee stderr: worker -> console(stderr) ONLY (no worker_stderr.log)
-      tee_threads.emplace_back([s = kids_err[i].get()]()
+      tee_threads.emplace_back([s = kids_err[i].get(), sink]()
       {
         std::string line;
         while (std::getline(*s, line))
         {
+          sink->write_line(std::string("[stderr] ") + line);
           std::lock_guard<std::mutex> lk(cerr_mx);
           std::cerr << line << std::endl;
         }
@@ -762,4 +687,9 @@ bool parallel_test_runner::read_worker_report_file(uint32_t worker_id, worker_re
   {
     return false;
   }
+}
+
+std::filesystem::path parallel_test_runner::get_worker_log_path(uint32_t worker_id) const
+{
+  return get_worker_dir_path(worker_id) / WORKER_LOG_FILENAME;
 }

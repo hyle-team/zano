@@ -1454,7 +1454,7 @@ int main(int argc, char* argv[])
 
   g_runner = std::make_unique<parallel_test_runner>(g_vm);
   const int parent_rc = g_runner->run_parent_if_needed(argc, argv);
-  if (parent_rc != parallel_test_runner::kNotParent)
+  if (parent_rc != parallel_test_runner::k_not_parent)
     return parent_rc;
 
   if (command_line::get_arg(g_vm, command_line::arg_help))

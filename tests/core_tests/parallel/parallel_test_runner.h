@@ -8,7 +8,7 @@
 class parallel_test_runner
 {
 public:
-  static constexpr int kNotParent = -1;
+  static constexpr int k_not_parent = -1;
 
   explicit parallel_test_runner(const boost::program_options::variables_map& vm);
 
@@ -54,4 +54,27 @@ private:
 
   bool write_worker_report_file(const worker_report& rep) const;
   bool read_worker_report_file(uint32_t worker_id, worker_report& rep) const;
+
+  std::filesystem::path get_worker_log_path(uint32_t worker_id) const;
+};
+
+struct worker_log_sink
+{
+  std::mutex mx;
+  std::ofstream f;
+
+  void open(const std::filesystem::path& path)
+  {
+    std::filesystem::create_directories(path.parent_path());
+    f.open(path, std::ios::out | std::ios::binary | std::ios::trunc);
+  }
+
+  void write_line(const std::string& line)
+  {
+    std::lock_guard<std::mutex> lk(mx);
+    if (!f.is_open())
+      return;
+    f << line << "\n";
+    f.flush();
+  }
 };
