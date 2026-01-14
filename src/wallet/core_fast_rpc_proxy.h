@@ -5,7 +5,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #pragma  once
 #include "rpc/core_rpc_server.h"
-#include "wallet/core_rpc_proxy.h"
+#include "wallet/i_core_rpc_proxy.h"
 #include "currency_core/alias_helper.h"
 namespace tools
 {
@@ -173,11 +173,16 @@ namespace tools
       response_code = response.m_response_code;
       return res;
     }
-    //------------------------------------------------------------------------------------------------------------------------------
-    virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override
-    {
-      return tools::get_transfer_address(adr_str, addr, payment_id, this);
-    }
+//     //------------------------------------------------------------------------------------------------------------------------------
+//     virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override
+//     {
+//       return tools::get_transfer_address(adr_str, addr, payment_id, this);
+//     }
+//     //------------------------------------------------------------------------------------------------------------------------------
+//     bool get_transfer_address(const std::string& adr_str, v_address& addr, std::string& payment_id) override
+//     {
+//       return tools::get_transfer_address(adr_str, addr, payment_id, this);
+//     }
     //------------------------------------------------------------------------------------------------------------------------------
     virtual time_t get_last_success_interract_time() override
     { 

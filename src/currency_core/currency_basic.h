@@ -153,7 +153,30 @@ namespace currency
 #pragma pack(pop)
 
 
+  /************************************************************************/
+  /* gateway address                                                      */
+  /************************************************************************/
+  
+  typedef crypto::public_key gateway_address_type;
+
+  struct gateway_address_serialized_to_str
+  {
+    gateway_address_type gateway_addr;
+    boost::optional<uint64_t> o_payment_id;
+    uint8_t version;
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(gateway_addr)
+      FIELD(o_payment_id)
+    END_SERIALIZE()
+  };
+
+
+
   const static account_public_address null_pub_addr = AUTO_VAL_INIT(null_pub_addr);
+
+
+  typedef boost::variant<account_public_address, gateway_address_type> v_address;
 
   typedef std::vector<crypto::signature> ring_signature;
 
@@ -306,7 +329,7 @@ namespace currency
 
   struct txin_gateway
   {
-    crypto::hash gateway_addr = null_hash;
+    gateway_address_type gateway_addr = null_pkey;
     crypto::public_key asset_id = null_pkey;
     uint64_t amount = 0;
     uint8_t version = 0;
@@ -322,14 +345,17 @@ namespace currency
 
   struct tx_out_gateway
   {
-    crypto::hash gateway_addr = null_hash;
-    uint64_t amount = 0;
     uint8_t version = 0;
+    gateway_address_type gateway_addr = null_pkey;
+    uint64_t amount = 0;    
+    crypto::public_key asset_id = null_pkey;
+    uint64_t payment_id = 0; 
 
     BEGIN_VERSIONED_SERIALIZE(0, version)
       FIELD(gateway_addr)
+      FIELD(asset_id)
       VARINT_FIELD(amount)
-      VARINT_FIELD(version) 
+      FIELD(payment_id)
     END_SERIALIZE()
   };
 
@@ -523,7 +549,7 @@ namespace currency
 
   typedef boost::variant<txin_gen, txin_to_key, txin_multisig, txin_gateway, txin_zc_input> txin_v;
 
-  typedef boost::variant<tx_out_bare, tx_out_zarcanum/*, tx_out_gateway */ > tx_out_v;
+  typedef boost::variant<tx_out_bare, tx_out_zarcanum, tx_out_gateway> tx_out_v;
 
 
   struct tx_comment
@@ -1379,6 +1405,8 @@ SET_VARIANT_TAGS(crypto::eddsa_signature, 68, "eddsa_signature");
 SET_VARIANT_TAGS(crypto::eddsa_public_key, 69, "eddsa_public_key");
 SET_VARIANT_TAGS(crypto::signature, 70, "schnorr_signature");
 SET_VARIANT_TAGS(crypto::eth_signature, 71, "eth_signature");
+
+SET_VARIANT_TAGS(currency::account_public_address, 72, "account_public_address");
 
 
 

@@ -67,7 +67,8 @@ namespace tools
     virtual time_t get_last_success_interract_time() { return 0; }
     std::shared_ptr<const proxy_diagnostic_info> get_proxy_diagnostic_info() const { return m_pdiganostic_info; }
     std::shared_ptr<proxy_diagnostic_info> get_editable_proxy_diagnostic_info() { return m_pdiganostic_info; }
-    virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id){ return false; }
+    virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
+    virtual bool get_transfer_address(const std::string& adr_str, currency::v_address& addr, std::string& payment_id);
     virtual void set_connectivity(unsigned int connection_timeout, size_t repeats_count) {}
     // This method determines if the daemons share the same address space as the caller (which may help decide if some RPC calls can be skipped).
     virtual bool is_daemon_inbox() { return false; }

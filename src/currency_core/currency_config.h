@@ -23,11 +23,16 @@
 #define CURRENCY_TX_MAX_ALLOWED_OUTS                    32            // soft rule, but matches BPP aggregation values limit; hard rule since HF6
 #define CURRENCY_TX_MAX_ALLOWED_OUTS_PRE_HF4            2000
 #define CURRENCY_TX_MIN_ALLOWED_OUTS                    2             // effective starting HF4 Zarcanum
+
 #define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           0xc5          // addresses start with 'Zx'
 #define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678        // integrated addresses start with 'iZ'
 #define CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX  0x36f8        // integrated addresses start with 'iZ' (new format)
 #define CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX 0x98c8        // auditable addresses start with 'aZx'
 #define CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX 0x8a49  // auditable integrated addresses start with 'aiZX'
+
+#define CURRENCY_PUBLIC_GATEWAY_BASE58_PREFIX           0x656e     // gateway addresses start with "gwZ"
+#define CURRENCY_PUBLIC_INTEG_GATEWAY_BASE58_PREFIX     0x14276e   // integrated gateway addresses start with "gwiZ"
+
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
 #define CURRENT_TRANSACTION_VERSION                     4
 #define TRANSACTION_VERSION_INITAL                      0

@@ -9,12 +9,13 @@
 #include <string>
 #include "currency_core/currency_basic.h"
 #include "rpc/core_rpc_server_commands_defs.h"
-#include "wallet/core_rpc_proxy.h"
+#include "wallet/i_core_rpc_proxy.h"
+#include "currency_core/currency_format_utils.h"
 //---------------------------------------------------------------
 namespace tools
 {
   template<typename callback_t>
-  bool get_transfer_address_cb(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id, callback_t cb)
+  bool get_transfer_address_cb(const std::string& adr_str, currency::v_address& v_addr, std::string& payment_id, callback_t cb)
   {
     if (!adr_str.size())
       return false;
@@ -43,19 +44,36 @@ namespace tools
       addr_str_local = alias_info.alias_details.address;
     }
 
-    return get_account_address_and_payment_id_from_str(addr, payment_id, addr_str_local);
+    return get_account_address_and_payment_id_from_str(v_addr, payment_id, addr_str_local);
   }
   
+
   inline 
-  bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id, i_core_proxy* proxy)
+  bool get_transfer_address(const std::string& adr_str, currency::v_address& v_addr, std::string& payment_id, i_core_proxy* proxy)
   {
-    return get_transfer_address_cb(adr_str, addr, payment_id, [&proxy](currency::COMMAND_RPC_GET_ALIAS_DETAILS::request& req_alias_info,
+    return get_transfer_address_cb(adr_str, v_addr, payment_id, [&proxy](currency::COMMAND_RPC_GET_ALIAS_DETAILS::request& req_alias_info,
                                                                         currency::COMMAND_RPC_GET_ALIAS_DETAILS::response& alias_info)
     {
       return proxy->call_COMMAND_RPC_GET_ALIAS_DETAILS(req_alias_info, alias_info);
     });
   }
 
+  inline
+    bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id, i_core_proxy* proxy)
+  {
+    currency::v_address v_addr;
+    if (!get_transfer_address(adr_str, v_addr, payment_id, proxy))
+      return false;
+
+    if (v_addr.type() != typeid(currency::account_public_address))
+    {
+      LOG_ERROR("Wrong version of address function called, need refactoring");
+      return false;
+    }
+
+    addr = boost::get<currency::account_public_address>(v_addr);
+    return true;
+  }
   /*
   inline
   bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, epee::net_utils::http::http_simple_client& http_client, const std::string& daemon_address)

@@ -4633,6 +4633,10 @@ bool wallet2::get_transfer_address(const std::string& adr_str, currency::account
 {
   return m_core_proxy->get_transfer_address(adr_str, addr, payment_id);
 }
+bool wallet2::get_transfer_address(const std::string& adr_str, currency::v_address& addr, std::string& payment_id)
+{
+  return m_core_proxy->get_transfer_address(adr_str, addr, payment_id);
+}
 //----------------------------------------------------------------------------------------------------
 bool wallet2::is_transfer_okay_for_pos(const transfer_details& tr, bool is_zarcanum_hf, uint64_t& stake_unlock_time) const
 {
@@ -5555,9 +5559,11 @@ void wallet2::request_alias_registration(currency::extra_alias_entry& ai, curren
 
   push_alias_info_to_extra_according_to_hf_status(ai, extra);
 
+  account_public_address dst_acc;
+  get_aliases_reward_account(dst_acc);
   currency::tx_destination_entry tx_dest_alias_reward;
-  tx_dest_alias_reward.addr.resize(1);
-  get_aliases_reward_account(tx_dest_alias_reward.addr.back());
+  tx_dest_alias_reward.addr.push_back(dst_acc);
+
   tx_dest_alias_reward.amount = reward;
   tx_dest_alias_reward.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask;
   destinations.push_back(tx_dest_alias_reward);
@@ -7191,12 +7197,35 @@ void wallet2::add_sent_tx_detailed_info(const transaction& tx, const std::vector
 
   std::vector<std::string> recipients;
   std::unordered_set<account_public_address> used_addresses;
+  std::unordered_set<gateway_address_type> used_gw_addresses;
   for (const auto& d : destinations)
   {
+
     for (const auto& addr : d.addr)
     {
-      if (used_addresses.insert(addr).second && addr != m_account.get_public_address())
-        recipients.push_back(payment_id.empty() ? get_account_address_as_str(addr) : get_account_address_and_payment_id_as_str(addr, payment_id));
+      bool need_to_add_address = false;
+      if (addr.type() == typeid(account_public_address))
+      {
+        account_public_address a = boost::get<account_public_address>(addr);
+        if(used_addresses.insert(a).second && a != m_account.get_public_address())
+        {
+          need_to_add_address = true;
+        }
+      }
+      else if (addr.type() == typeid(gateway_address_type))
+      {
+        gateway_address_type ga = boost::get<gateway_address_type>(addr);
+        need_to_add_address = used_gw_addresses.insert(ga).second;
+      }
+      else
+      {
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(false, "unknown address type in tx_destination_entry");
+      }
+
+      if (need_to_add_address)
+      {
+        recipients.push_back(payment_id.empty() ? get_account_address_as_str(addr) : get_account_address_as_str(addr, payment_id));
+      }
     }
   }
   if (!recipients.size())
@@ -8212,7 +8241,8 @@ void wallet2::check_and_throw_if_self_directed_tx_with_payment_id_requested(cons
   {
     for (auto& addr : d.addr)
     {
-      if (addr != m_account.get_public_address())
+      if(addr.type() == typeid(account_public_address))
+      if ( boost::get<account_public_address>(addr) != m_account.get_public_address())
         return; // at least one destination address is not our address -- it's not self-directed tx
     }
   }

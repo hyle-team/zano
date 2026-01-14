@@ -222,10 +222,15 @@ namespace tools
     return invoke_http_json_rpc_update_is_disconnect("get_asset_info", req, res);
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  bool default_http_core_proxy::get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id)
-  {
-    return tools::get_transfer_address(adr_str, addr, payment_id, this);
-  }
+//   bool default_http_core_proxy::get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id)
+//   {
+//     return tools::get_transfer_address(adr_str, addr, payment_id, this);
+//   }
+//   //------------------------------------------------------------------------------------------------------------------------------
+//   bool default_http_core_proxy::get_transfer_address(const std::string& adr_str, v_address& addr, std::string& payment_id)
+//   {
+//     return tools::get_transfer_address(adr_str, addr, payment_id, this);
+//   }
   //------------------------------------------------------------------------------------------------------------------------------
 //   void default_http_core_proxy::set_plast_daemon_is_disconnected(std::atomic<bool> *plast_daemon_is_disconnected)
 //   {

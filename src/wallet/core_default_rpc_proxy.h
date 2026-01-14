@@ -8,7 +8,7 @@
 #pragma once
 #include "include_base_utils.h"
 #include "net/http_client.h"
-#include "core_rpc_proxy.h"
+#include "i_core_rpc_proxy.h"
 #include "storages/http_abstract_invoke.h"
 
 #ifdef NDEBUG
@@ -60,7 +60,8 @@ namespace tools
     bool call_COMMAND_RPC_INVOKE(const std::string& uri, const std::string& body, int& response_code, std::string& response_body) override;
 
     bool check_connection() override;
-    bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override;
+//    bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override;
+///    bool get_transfer_address(const std::string& adr_str, v_address& addr, std::string& payment_id) override;
 
     void set_plast_daemon_is_disconnected(std::atomic<bool> *plast_daemon_is_disconnected);   
     default_http_core_proxy();

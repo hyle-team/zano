@@ -32,7 +32,7 @@
 #include "storages/portable_storage_template_helper.h"
 #include "crypto/chacha.h"
 #include "crypto/hash.h"
-#include "core_rpc_proxy.h"
+#include "i_core_rpc_proxy.h"
 #include "core_default_rpc_proxy.h"
 #include "wallet_errors.h"
 #include "currency_core/core_runtime_config.h"

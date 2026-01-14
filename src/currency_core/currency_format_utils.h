@@ -535,9 +535,12 @@ namespace currency
   uint64_t get_base_block_reward(uint64_t height);
   bool is_payment_id_size_ok(const payment_id_t& payment_id, bool allow_legacy_payment_id_size = true);
   std::string get_account_address_as_str(const account_public_address& addr);
+  std::string get_account_address_as_str(const gateway_address_type& addr, const payment_id_t& payment_id = payment_id_t());
+  std::string get_account_address_as_str(const v_address& addr, const payment_id_t& payment_id = payment_id_t());
   std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const payment_id_t& payment_id);
   bool get_account_address_from_str(account_public_address& addr, const std::string& str);
   bool get_account_address_and_payment_id_from_str(account_public_address& addr, payment_id_t& payment_id, const std::string& str);
+  bool get_account_address_and_payment_id_from_str(v_address& v_addr, payment_id_t& payment_id, const std::string& str);
   bool parse_payment_id_from_hex_str(const std::string& payment_id_str, payment_id_t& payment_id);
   bool is_coinbase(const transaction& tx);
   bool is_coinbase(const transaction& tx, bool& pos_coinbase);

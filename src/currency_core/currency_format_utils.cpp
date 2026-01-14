@@ -1230,6 +1230,162 @@ namespace currency
     return construct_tx_out(de, tx_sec_key, output_index, tx, deriv_cache, self, asset_blinding_mask, amount_blinding_mask, blinded_asset_id, amount_commitment, result, tx_outs_attr);
   }
   //---------------------------------------------------------------
+  bool construct_bare_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache,
+    const account_keys& self, crypto::scalar_t& asset_blinding_mask, crypto::scalar_t& amount_blinding_mask, crypto::point_t& blinded_asset_id, crypto::point_t& amount_commitment,
+    finalized_tx& result, uint8_t tx_outs_attr)
+  {
+    // create tx_out_bare, this section is kept after HF4 only for tests and references
+    CHECK_AND_ASSERT_MES(de.addr.size() == 1 || (de.addr.size() > 1 && de.minimum_sigs <= de.addr.size()), false, "Invalid destination entry: amount: " << de.amount << " minimum_sigs: " << de.minimum_sigs << " addr.size(): " << de.addr.size());
+    CHECK_AND_ASSERT_MES(de.asset_id == currency::native_coin_asset_id, false, "assets are not allowed prior to HF4");
+
+    std::vector<crypto::public_key> target_keys;
+    target_keys.reserve(de.addr.size());
+    for (auto& apa_ : de.addr)
+    {
+      auto& apa = boost::get<account_public_address>(apa_);
+
+      crypto::public_key out_eph_public_key{};
+      if (apa.spend_public_key == null_pkey && apa.view_public_key == null_pkey)
+      {
+        //burning money(for example alias reward)
+        out_eph_public_key = null_pkey;
+      }
+      else
+      {
+        crypto::key_derivation derivation{};
+        bool r = derive_public_key_from_target_address(apa, tx_sec_key, output_index, out_eph_public_key, derivation);
+        CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
+
+        uint16_t hint = get_derivation_hint(derivation);
+        deriv_cache.insert(hint); // won't be inserted if such hint already exists
+      }
+      target_keys.push_back(out_eph_public_key);
+    }
+
+    tx_out_bare out{};
+    out.amount = de.amount;
+    if (target_keys.size() == 1)
+    {
+      //out to key
+      txout_to_key tk{};
+      tk.key = target_keys.back();
+
+      if (boost::get<account_public_address>(de.addr.front()).is_auditable()) // check only the first address because there's only one in this branch
+        tk.mix_attr = CURRENCY_TO_KEY_OUT_FORCED_NO_MIX; // override mix_attr to 1 for auditable target addresses
+      else
+        tk.mix_attr = tx_outs_attr;
+
+      out.target = tk;
+    }
+    else
+    {
+      //multisig out
+      txout_multisig ms{};
+      ms.keys = std::move(target_keys);
+      ms.minimum_sigs = de.minimum_sigs;
+      out.target = ms;
+    }
+    tx.vout.push_back(out);
+    return true;
+  }
+  //---------------------------------------------------------------
+  bool construct_zarcanum_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache,
+    const account_keys& self, crypto::scalar_t& asset_blinding_mask, crypto::scalar_t& amount_blinding_mask, crypto::point_t& blinded_asset_id, crypto::point_t& amount_commitment,
+    finalized_tx& result, uint8_t tx_outs_attr)
+  {
+    tx_out_zarcanum out{};
+
+    const account_public_address& apa = boost::get<account_public_address>(de.addr.front());
+    if (apa.spend_public_key == null_pkey && apa.view_public_key == null_pkey)
+    {
+      // burn money
+      // calculate encrypted_amount and amount_commitment anyway, but using modified derivation
+      crypto::scalar_t h = crypto::hash_helper_t::hs(crypto::scalar_t(tx_sec_key), output_index); // h = Hs(r, i)
+
+      out.stealth_address = null_pkey;
+      out.concealing_point = null_pkey;
+
+      crypto::scalar_t amount_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
+      out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
+      if (tx.version >= TRANSACTION_VERSION_POST_HF6)
+        out.encrypted_payment_id = de.payment_id ^ amount_mask.m_u64[1]; // different 64-bit slices of Keccak's output are computationally independent
+
+      CHECK_AND_ASSERT_MES(~de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
+      asset_blinding_mask = de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // s = Hs(domain_sep, Hs(8 * r * V, i))
+      blinded_asset_id = crypto::point_t(de.asset_id) + asset_blinding_mask * crypto::c_point_X;
+      out.blinded_asset_id = (crypto::c_scalar_1div8 * blinded_asset_id).to_public_key(); // T = 1/8 * (H_asset + s * X)
+
+      amount_blinding_mask = de.flags & tx_destination_entry_flags::tdef_zero_amount_blinding_mask ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_BLINDING_MASK, h); // y = Hs(domain_sep, Hs(8 * r * V, i))
+      amount_commitment = de.amount * blinded_asset_id + amount_blinding_mask * crypto::c_point_G;
+      out.amount_commitment = (crypto::c_scalar_1div8 * amount_commitment).to_public_key(); // E = 1/8 * e * T + 1/8 * y * G
+
+      out.mix_attr = tx_outs_attr; // TODO @#@# @CZ check this
+    }
+    else
+    {
+      // normal output
+      crypto::public_key derivation = (crypto::scalar_t(tx_sec_key) * crypto::point_t(apa.view_public_key)).modify_mul8().to_public_key(); // d = 8 * r * V
+      crypto::scalar_t h = 0;
+      crypto::derivation_to_scalar((const crypto::key_derivation&)derivation, output_index, h.as_secret_key()); // h = Hs(8 * r * V, i)
+
+      out.stealth_address = (h * crypto::c_point_G + crypto::point_t(apa.spend_public_key)).to_public_key();
+      out.concealing_point = (crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * crypto::point_t(apa.view_public_key)).to_public_key(); // Q = 1/8 * Hs(domain_sep, Hs(8 * r * V, i) ) * 8 * V
+
+      crypto::scalar_t amount_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
+      out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
+      if (tx.version >= TRANSACTION_VERSION_POST_HF6)
+        out.encrypted_payment_id = de.payment_id ^ amount_mask.m_u64[1]; // different 64-bit slices of Keccak's output are computationally independent
+
+      CHECK_AND_ASSERT_MES(~de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
+      asset_blinding_mask = de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // s = Hs(domain_sep, Hs(8 * r * V, i))
+      blinded_asset_id = crypto::point_t(de.asset_id) + asset_blinding_mask * crypto::c_point_X;
+      out.blinded_asset_id = (crypto::c_scalar_1div8 * blinded_asset_id).to_public_key(); // T = 1/8 * (H_asset + s * X)
+
+      amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_BLINDING_MASK, h); // y = Hs(domain_sep, Hs(8 * r * V, i))
+      amount_commitment = de.amount * blinded_asset_id + amount_blinding_mask * crypto::c_point_G;
+      out.amount_commitment = (crypto::c_scalar_1div8 * amount_commitment).to_public_key(); // E = 1/8 * e * T + 1/8 * y * G
+
+      DBG_VAL_PRINT(output_index);
+      DBG_VAL_PRINT(de.amount);
+      DBG_VAL_PRINT(de.asset_id);
+      DBG_VAL_PRINT(amount_mask);
+      DBG_VAL_PRINT(asset_blinding_mask);
+      DBG_VAL_PRINT(blinded_asset_id);
+      DBG_VAL_PRINT(amount_blinding_mask);
+      DBG_VAL_PRINT(amount_mask);
+      DBG_VAL_PRINT(amount_commitment);
+
+      if (apa.is_auditable())
+        out.mix_attr = CURRENCY_TO_KEY_OUT_FORCED_NO_MIX; // override mix_attr to 1 for auditable target addresses
+      else
+        out.mix_attr = tx_outs_attr;
+
+      uint16_t hint = get_derivation_hint(reinterpret_cast<crypto::key_derivation&>(derivation));
+      deriv_cache.insert(hint); // won't be inserted if such hint already exists
+    }
+
+    tx.vout.push_back(out);
+    return true;
+  }
+
+  //---------------------------------------------------------------
+  bool construct_gateway_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache,
+    const account_keys& self, crypto::scalar_t& asset_blinding_mask, crypto::scalar_t& amount_blinding_mask, crypto::point_t& blinded_asset_id, crypto::point_t& amount_commitment,
+    finalized_tx& result, uint8_t tx_outs_attr)
+  {
+
+    const gateway_address_type& gwa = boost::get<gateway_address_type>(de.addr.front());
+
+    tx_out_gateway gw_out = AUTO_VAL_INIT(gw_out);
+    gw_out.gateway_addr = gwa;
+    gw_out.amount = de.amount;
+    gw_out.asset_id = de.asset_id;
+    gw_out.payment_id = de.payment_id; //@#@ payment id is open for now, need to figure out how to encrypt it
+
+    tx.vout.push_back(gw_out);
+    return true;
+  }
+  //---------------------------------------------------------------
   bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache,
     const account_keys& self, crypto::scalar_t& asset_blinding_mask, crypto::scalar_t& amount_blinding_mask, crypto::point_t& blinded_asset_id, crypto::point_t& amount_commitment,
     finalized_tx& result, uint8_t tx_outs_attr)
@@ -1241,131 +1397,18 @@ namespace currency
       CHECK_AND_ASSERT_MES(de.addr.size() == 1, false, "zarcanum multisig not implemented for tx_out_zarcanum yet");
       // TODO @#@# implement multisig support
 
-      tx_out_zarcanum out{};
-
-      const account_public_address& apa = de.addr.front();
-      if (apa.spend_public_key == null_pkey && apa.view_public_key == null_pkey)
+      if (de.addr.front().type() == typeid(account_public_address))
       {
-        // burn money
-        // calculate encrypted_amount and amount_commitment anyway, but using modified derivation
-        crypto::scalar_t h = crypto::hash_helper_t::hs(crypto::scalar_t(tx_sec_key), output_index); // h = Hs(r, i)
-
-        out.stealth_address = null_pkey;
-        out.concealing_point = null_pkey;
-
-        crypto::scalar_t amount_mask   = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
-        out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
-        if (tx.version >= TRANSACTION_VERSION_POST_HF6)
-          out.encrypted_payment_id = de.payment_id ^ amount_mask.m_u64[1]; // different 64-bit slices of Keccak's output are computationally independent
-      
-        CHECK_AND_ASSERT_MES(~de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
-        asset_blinding_mask = de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // s = Hs(domain_sep, Hs(8 * r * V, i))
-        blinded_asset_id = crypto::point_t(de.asset_id) + asset_blinding_mask * crypto::c_point_X;
-        out.blinded_asset_id = (crypto::c_scalar_1div8 * blinded_asset_id).to_public_key(); // T = 1/8 * (H_asset + s * X)
-        
-        amount_blinding_mask = de.flags & tx_destination_entry_flags::tdef_zero_amount_blinding_mask ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_BLINDING_MASK, h); // y = Hs(domain_sep, Hs(8 * r * V, i))
-        amount_commitment = de.amount * blinded_asset_id + amount_blinding_mask * crypto::c_point_G;
-        out.amount_commitment = (crypto::c_scalar_1div8 * amount_commitment).to_public_key(); // E = 1/8 * e * T + 1/8 * y * G
-
-        out.mix_attr = tx_outs_attr; // TODO @#@# @CZ check this
+        return construct_zarcanum_tx_out(de, tx_sec_key, output_index, tx, deriv_cache, self, asset_blinding_mask, amount_blinding_mask, blinded_asset_id, amount_commitment, result, tx_outs_attr);
       }
-      else
+      else if (de.addr.front().type() == typeid(gateway_address_type))
       {
-        // normal output
-        crypto::public_key derivation = (crypto::scalar_t(tx_sec_key) * crypto::point_t(apa.view_public_key)).modify_mul8().to_public_key(); // d = 8 * r * V
-        crypto::scalar_t h = 0;
-        crypto::derivation_to_scalar((const crypto::key_derivation&)derivation, output_index, h.as_secret_key()); // h = Hs(8 * r * V, i)
-
-        out.stealth_address = (h * crypto::c_point_G + crypto::point_t(apa.spend_public_key)).to_public_key();
-        out.concealing_point = (crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_CONCEALING_POINT, h) * crypto::point_t(apa.view_public_key)).to_public_key(); // Q = 1/8 * Hs(domain_sep, Hs(8 * r * V, i) ) * 8 * V
-      
-        crypto::scalar_t amount_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
-        out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
-        if (tx.version >= TRANSACTION_VERSION_POST_HF6)
-          out.encrypted_payment_id = de.payment_id ^ amount_mask.m_u64[1]; // different 64-bit slices of Keccak's output are computationally independent
-      
-        CHECK_AND_ASSERT_MES(~de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
-        asset_blinding_mask = de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // s = Hs(domain_sep, Hs(8 * r * V, i))
-        blinded_asset_id = crypto::point_t(de.asset_id) + asset_blinding_mask * crypto::c_point_X;
-        out.blinded_asset_id = (crypto::c_scalar_1div8 * blinded_asset_id).to_public_key(); // T = 1/8 * (H_asset + s * X)
-
-        amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_BLINDING_MASK, h); // y = Hs(domain_sep, Hs(8 * r * V, i))
-        amount_commitment = de.amount * blinded_asset_id + amount_blinding_mask * crypto::c_point_G;
-        out.amount_commitment = (crypto::c_scalar_1div8 * amount_commitment).to_public_key(); // E = 1/8 * e * T + 1/8 * y * G
-
-        DBG_VAL_PRINT(output_index);
-        DBG_VAL_PRINT(de.amount);
-        DBG_VAL_PRINT(de.asset_id);
-        DBG_VAL_PRINT(amount_mask);
-        DBG_VAL_PRINT(asset_blinding_mask);
-        DBG_VAL_PRINT(blinded_asset_id);
-        DBG_VAL_PRINT(amount_blinding_mask);
-        DBG_VAL_PRINT(amount_mask);
-        DBG_VAL_PRINT(amount_commitment);
-        
-        if (de.addr.front().is_auditable())
-          out.mix_attr = CURRENCY_TO_KEY_OUT_FORCED_NO_MIX; // override mix_attr to 1 for auditable target addresses
-        else
-          out.mix_attr = tx_outs_attr;
-
-        uint16_t hint = get_derivation_hint(reinterpret_cast<crypto::key_derivation&>(derivation));
-        deriv_cache.insert(hint); // won't be inserted if such hint already exists
+        return construct_gateway_tx_out(de, tx_sec_key, output_index, tx, deriv_cache, self, asset_blinding_mask, amount_blinding_mask, blinded_asset_id, amount_commitment, result, tx_outs_attr);
       }
-
-      tx.vout.push_back(out);
     }
     else
     {
-      // create tx_out_bare, this section is kept after HF4 only for tests and references
-      CHECK_AND_ASSERT_MES(de.addr.size() == 1 || (de.addr.size() > 1 && de.minimum_sigs <= de.addr.size()), false, "Invalid destination entry: amount: " << de.amount << " minimum_sigs: " << de.minimum_sigs << " addr.size(): " << de.addr.size());
-      CHECK_AND_ASSERT_MES(de.asset_id == currency::native_coin_asset_id, false, "assets are not allowed prior to HF4");
-
-      std::vector<crypto::public_key> target_keys;
-      target_keys.reserve(de.addr.size());
-      for (auto& apa : de.addr)
-      {
-        crypto::public_key out_eph_public_key{};
-        if (apa.spend_public_key == null_pkey && apa.view_public_key == null_pkey)
-        {
-          //burning money(for example alias reward)
-          out_eph_public_key = null_pkey;
-        }
-        else
-        {
-          crypto::key_derivation derivation{};
-          bool r = derive_public_key_from_target_address(apa, tx_sec_key, output_index, out_eph_public_key, derivation);
-          CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
-
-          uint16_t hint = get_derivation_hint(derivation);
-          deriv_cache.insert(hint); // won't be inserted if such hint already exists
-        }
-        target_keys.push_back(out_eph_public_key);
-      }
-
-      tx_out_bare out{};
-      out.amount = de.amount;
-      if (target_keys.size() == 1)
-      {
-        //out to key
-        txout_to_key tk{};
-        tk.key = target_keys.back();
-
-        if (de.addr.front().is_auditable()) // check only the first address because there's only one in this branch
-          tk.mix_attr = CURRENCY_TO_KEY_OUT_FORCED_NO_MIX; // override mix_attr to 1 for auditable target addresses
-        else
-          tk.mix_attr = tx_outs_attr;
-      
-        out.target = tk;
-      }
-      else
-      {
-        //multisig out
-        txout_multisig ms{};
-        ms.keys = std::move(target_keys);
-        ms.minimum_sigs = de.minimum_sigs;
-        out.target = ms;
-      }
-      tx.vout.push_back(out);
+      return construct_bare_tx_out(de, tx_sec_key, output_index, tx, deriv_cache, self, asset_blinding_mask, amount_blinding_mask, blinded_asset_id, amount_commitment, result, tx_outs_attr);
     }
     return true;
   }
@@ -4418,22 +4461,68 @@ namespace currency
     return tools::base58::encode_addr(CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX, t_serializable_object_to_blob(addr) + payment_id); // new format integrated Zano address (normal)
   }
   //-----------------------------------------------------------------------
-  bool get_account_address_from_str(account_public_address& addr, const std::string& str)
+  std::string get_account_address_as_str(const gateway_address_type& addr, const payment_id_t& payment_id)
   {
-    std::string integrated_payment_id; // won't be used
-    return get_account_address_and_payment_id_from_str(addr, integrated_payment_id, str);
+    gateway_address_serialized_to_str gwserialized = AUTO_VAL_INIT(gwserialized);
+
+    gwserialized.gateway_addr = addr;
+    if (payment_id.size())
+    {
+      CHECK_AND_ASSERT_THROW_MES(payment_id.size() == sizeof(uint64_t), "Unexpected payment id size");
+      uint64_t val = 0;
+      std::memcpy(&val, payment_id.data(), sizeof(val));
+      gwserialized.o_payment_id = val;
+    }
+
+
+    uint64_t tag = payment_id.size() ? CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX : CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX;
+    return tools::base58::encode_addr(tag, t_serializable_object_to_blob(gwserialized));
+
   }
   //-----------------------------------------------------------------------
-  bool get_account_address_and_payment_id_from_str(account_public_address& addr, payment_id_t& payment_id, const std::string& str)
+  std::string get_account_address_as_str(const v_address& v_addr, const payment_id_t& payment_id)
+  {
+    if (v_addr.type() == typeid(gateway_address_type))
+      return get_account_address_as_str(boost::get<gateway_address_type>(v_addr), payment_id);
+    else if (v_addr.type() == typeid(account_public_address))
+      return get_account_address_and_payment_id_as_str(boost::get<account_public_address>(v_addr), payment_id);
+    else
+    {
+      throw std::runtime_error("Unknown type of address in get_account_address_as_str");
+    }
+  }
+  //-----------------------------------------------------------------------
+  bool get_account_address_and_payment_id_from_str(v_address& v_addr, payment_id_t& payment_id, const std::string& str)
   {
     payment_id.clear();
     blobdata blob;
     uint64_t prefix{};
+
+
     if (!tools::base58::decode_addr(str, prefix, blob))
     {
       LOG_PRINT_L1("Invalid address format: base58 decoding failed for \"" << str << "\"");
       return false;
     }
+    if (prefix == CURRENCY_PUBLIC_GATEWAY_BASE58_PREFIX || prefix == CURRENCY_PUBLIC_INTEG_GATEWAY_BASE58_PREFIX)
+    {
+      gateway_address_serialized_to_str gwserialized = AUTO_VAL_INIT(gwserialized);
+      if (!::serialization::parse_binary(blob, gwserialized))
+      {
+        LOG_PRINT_L1("Gateway address cannot be parsed from \"" << str << "\"");
+        return false;
+      }
+      if (gwserialized.o_payment_id)
+      {
+        epee::string_tools::append_pod_to_strbuff(*gwserialized.o_payment_id, payment_id);
+      }
+      v_addr = gwserialized.gateway_addr;
+      return true;
+    }
+    
+    v_addr = account_public_address();
+    account_public_address& addr = boost::get<account_public_address>(v_addr);
+    
 
     if (blob.size() < sizeof(account_public_address_old))
     {
@@ -4521,6 +4610,34 @@ namespace currency
     }
 
     return true;
+  }
+  //-----------------------------------------------------------------------
+  bool get_account_address_and_payment_id_from_str(account_public_address& addr, payment_id_t& payment_id, const std::string& str)
+  {
+    v_address v_addr;
+    if (!get_account_address_and_payment_id_from_str(v_addr, payment_id, str))
+      return false;
+
+    if (v_addr.type() != typeid(account_public_address))
+    {
+      LOG_ERROR("Wrong version of address function called, need refactoring");
+      return false;
+    }
+
+    addr = boost::get<account_public_address>(v_addr);
+    return true;
+  }
+  //-----------------------------------------------------------------------
+  bool get_account_address_from_str(account_public_address& addr, const std::string& str)
+  {
+    std::string integrated_payment_id; // won't be used
+    return get_account_address_and_payment_id_from_str(addr, integrated_payment_id, str);
+  }
+  //-----------------------------------------------------------------------
+  bool get_account_address_from_str(v_address& v_addr, const std::string& str)
+  {
+    std::string integrated_payment_id; // won't be used
+    return get_account_address_and_payment_id_from_str(v_addr, integrated_payment_id, str);
   }
   //---------------------------------------------------------------
   bool parse_payment_id_from_hex_str(const std::string& payment_id_str, payment_id_t& payment_id)

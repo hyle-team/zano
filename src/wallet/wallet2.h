@@ -33,7 +33,7 @@
 #include "storages/portable_storage_template_helper.h"
 #include "crypto/chacha.h"
 #include "crypto/hash.h"
-#include "core_rpc_proxy.h"
+#include "i_core_rpc_proxy.h"
 #include "core_default_rpc_proxy.h"
 #include "wallet_errors.h"
 #include "eos/portable_archive.hpp"
@@ -621,6 +621,7 @@ namespace tools
       uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
 
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
+    bool get_transfer_address(const std::string& adr_str, currency::v_address& addr, std::string& payment_id);
     inline uint64_t get_blockchain_current_size() const {
       return m_chain.get_blockchain_current_size();
     }

@@ -552,7 +552,7 @@ namespace currency
     typedef tools::db::cached_key_value_accessor<crypto::public_key, std::list<asset_descriptor_operation>, true, false> assets_container; // TODO @#@# consider storing tx_id as well for reference -- sowle 
 
     // Gateway addresses
-    typedef tools::db::cached_key_value_accessor<crypto::hash, gateway_address_data, true, false> gateway_addresses_container;
+    typedef tools::db::cached_key_value_accessor<gateway_address_type, gateway_address_data, true, false> gateway_addresses_container;
 
 
     //-----------------------------------------

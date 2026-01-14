@@ -17,8 +17,22 @@ namespace currency
   {
     for (const auto& de : destinations)
     {
-      if (de.addr.size() == 1 && sender_account_keys.account_address != de.addr.back())
-        return de.addr.back();                    // return the first destination address that is non-multisig and not equal to the sender's address
+      if (de.addr.size() == 1)
+      {
+        if (de.addr.back().type() == typeid(gateway_address_type))
+        {
+          account_public_address fake_account_address = AUTO_VAL_INIT(fake_account_address);// TODO: refactoring might be needed, this probably not the best idea
+          fake_account_address.spend_public_key = boost::get<gateway_address_type>(de.addr.back());
+          fake_account_address.view_public_key = boost::get<gateway_address_type>(de.addr.back());
+          return fake_account_address;
+        }
+        else if (de.addr.back().type() == typeid(account_public_address))
+        {
+          if (sender_account_keys.account_address != boost::get<account_public_address>(de.addr.back()))
+            return boost::get<account_public_address>(de.addr.back());                    // return the first destination address that is non-multisig and not equal to the sender's address
+        }
+
+      }
     }
     return sender_account_keys.account_address; // otherwise, fallback to sender's address
   }
@@ -516,6 +530,18 @@ namespace currency
   {
     CHECK_AND_ASSERT_THROW_MES(false, "transform_str_to_tx shoruld never be called");
     return transaction();
+  }
+
+
+  tx_destination_entry::tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr_) : amount(a), minimum_sigs(addr.size()) 
+  {
+    for(const auto& ad: addr_)
+      addr.push_back(ad);
+  }
+  tx_destination_entry::tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr_, const crypto::public_key& aid) : amount(a), minimum_sigs(addr.size()), asset_id(aid) 
+  {
+    for (const auto& ad : addr_)
+      addr.push_back(ad);
   }
 
 
