@@ -75,6 +75,8 @@ public:
 
 private:
   const boost::program_options::variables_map& m_vm;
+  mutable std::mutex cout_mx;
+  mutable std::mutex cerr_mx;
 
   std::filesystem::path get_run_root_path() const;
   std::filesystem::path get_worker_report_path(uint32_t worker_id) const;

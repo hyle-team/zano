@@ -46,10 +46,8 @@ namespace
   const char* ARG_RUN_ROOT_EQ          = "--multiprocess-run-root=";
 
   const char* ARG_PROCESSES            = "--multiprocess-run";
-  const char* ARG_PROCESSES_EQ         = "--multiprocess-run=";  const char* WORKER_DIR_PREFIX        = "w";
-
-  std::mutex cout_mx;
-  std::mutex cerr_mx;
+  const char* ARG_PROCESSES_EQ         = "--multiprocess-run=";
+  const char* WORKER_DIR_PREFIX        = "w";
 
   bool arg_has_prefix(const std::string& arg, const std::string& prefix)
   {
