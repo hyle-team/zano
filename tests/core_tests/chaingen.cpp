@@ -3045,7 +3045,7 @@ bool replace_coinbase_in_genesis_block(const std::vector<currency::tx_destinatio
   for(size_t output_index = 0; output_index < destinations.size() + 1; ++output_index)
   {
     uint64_t amount = output_index < destinations.size() ? destinations[output_index].amount : premine_amount - total_amount;
-    const account_public_address& addr = output_index < destinations.size() ? destinations[output_index].addr.back() : destinations.back().addr.back();
+    const account_public_address& addr = output_index < destinations.size() ? boost::get<currency::account_public_address>(destinations[output_index].addr.back()) : boost::get<currency::account_public_address>(destinations.back().addr.back());
     if (amount == 0)
       break;
 
