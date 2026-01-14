@@ -94,9 +94,7 @@ std::string parallel_test_runner::make_worker_data_dir(const std::filesystem::pa
   return worker_dir.string();
 }
 
-// Builds a base argument list by removing all worker-specific command-line options.
-// This is needed to avoid duplicating multiprocess-related arguments when spawning
-// child worker processes, while preserving all common arguments unchanged.
+// Removes worker-specific arguments from the command line
 std::vector<std::string> parallel_test_runner::build_base_args_without_worker_specific(int argc, char* argv[]) const
 {
     static const std::set<std::string> worker_specific_args = {
