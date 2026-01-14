@@ -432,12 +432,8 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
   do {                                                                                                     \
     const std::string __gen_name = #genclass;                                                              \
     std::vector<size_t> __hardforks = parse_hardfork_str_mask(hardfork_str_mask);                          \
-    if (__hardforks.empty())                                                                               \
-    {                                                                                                      \
-      LOG_ERROR("invalid hardforks mask: " << hardfork_str_mask << " for test " << __gen_name);            \
-      LOCAL_ASSERT(false);                                                                                 \
-      break;                                                                                               \
-    }                                                                                                      \
+    CHECK_AND_ASSERT_MES_CUSTOM(!__hardforks.empty(), /*fail_ret_val=*/,                                   \
+      /*custom_code=*/skip_all_till_the_end = true, "invalid hardforks mask: " << hardfork_str_mask << " for test " << __gen_name); \
     auto __hf_filter = is_hf_test_eligible_to_run;                                                         \
     for (size_t __i = 0; __i < __hardforks.size(); ++__i)                                                  \
     {                                                                                                      \
