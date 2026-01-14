@@ -39,14 +39,6 @@ namespace
   const char* TAKEN_TESTS_LOG_FILENAME = "taken_tests.log";
   const char* WORKER_REPORT_FILENAME   = "coretests_report.json";
   const char* WORKER_LOG_FILENAME      = "worker.log";
-  const char* ARG_WORKER_ID            = "--multiprocess-worker-id";
-  const char* ARG_WORKER_ID_EQ         = "--multiprocess-worker-id=";
-
-  const char* ARG_RUN_ROOT             = "--multiprocess-run-root";
-  const char* ARG_RUN_ROOT_EQ          = "--multiprocess-run-root=";
-
-  const char* ARG_PROCESSES            = "--multiprocess-run";
-  const char* ARG_PROCESSES_EQ         = "--multiprocess-run=";
   const char* WORKER_DIR_PREFIX        = "w";
 
   bool arg_has_prefix(const std::string& arg, const std::string& prefix)
@@ -102,38 +94,33 @@ std::string parallel_test_runner::make_worker_data_dir(const std::filesystem::pa
   return worker_dir.string();
 }
 
+// Builds a base argument list by removing all worker-specific command-line options.
+// This is needed to avoid duplicating multiprocess-related arguments when spawning
+// child worker processes, while preserving all common arguments unchanged.
 std::vector<std::string> parallel_test_runner::build_base_args_without_worker_specific(int argc, char* argv[]) const
 {
-  std::vector<std::string> args;
-  args.reserve(static_cast<size_t>(argc));
+    static const std::set<std::string> worker_specific_args = {
+        "--multiprocess-worker-id", "--multiprocess-run", "--multiprocess-run-root"
+    };
 
-  for (int i = 1; i < argc; ++i)
-  {
-    std::string current_arg = argv[i];
-
-    // Strip worker-specific args to avoid duplicates
-    if (current_arg == ARG_WORKER_ID || arg_has_prefix(current_arg, ARG_WORKER_ID_EQ))
+    std::vector<std::string> args;
+    for (int i = 1; i < argc; ++i)
     {
-      if (current_arg == ARG_WORKER_ID && i + 1 < argc) ++i;
-      continue;
+        std::string current_arg = argv[i];
+        bool skip = false;
+        for (const auto& wa : worker_specific_args)
+        {
+            if (current_arg == wa || current_arg.find(wa + "=") == 0)
+            {
+                if (current_arg == wa && i + 1 < argc) ++i;
+                skip = true;
+                break;
+            }
+        }
+        if (!skip)
+            args.emplace_back(std::move(current_arg));
     }
-
-    if (current_arg == ARG_PROCESSES || arg_has_prefix(current_arg, ARG_PROCESSES_EQ))
-    {
-      if (current_arg == ARG_PROCESSES && i + 1 < argc) ++i;
-      continue;
-    }
-
-    if (current_arg == ARG_RUN_ROOT || arg_has_prefix(current_arg, ARG_RUN_ROOT_EQ))
-    {
-      if (current_arg == ARG_RUN_ROOT && i + 1 < argc) ++i;
-      continue;
-    }
-
-    args.emplace_back(std::move(current_arg));
-  }
-
-  return args;
+    return args;
 }
 
 void fill_postponed_tests_set(std::set<std::string>& postponed_tests);
@@ -304,9 +291,9 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
     return false;
   };
 
-  if (!has_flag(ARG_PROCESSES, ARG_PROCESSES_EQ))
+  if (!has_flag("--multiprocess-run", "--multiprocess-run="))
   {
-    base_args.emplace_back(ARG_PROCESSES);
+    base_args.emplace_back("--multiprocess-run");
     base_args.emplace_back(std::to_string(processes));
   }
 
@@ -317,9 +304,9 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
   if (run_root_abs.is_relative())
     run_root_abs = std::filesystem::absolute(run_root_abs);
 
-  if (!has_flag(ARG_RUN_ROOT, ARG_RUN_ROOT_EQ))
+  if (!has_flag("--multiprocess-run-root", "--multiprocess-run-root="))
   {
-    base_args.emplace_back(ARG_RUN_ROOT);
+    base_args.emplace_back("--multiprocess-run-root");
     base_args.emplace_back(run_root_abs.string());
   }
 
@@ -410,7 +397,7 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
     {
       std::vector<std::string> args = base_args;
 
-      args.emplace_back(ARG_WORKER_ID);
+      args.emplace_back("--multiprocess-worker-id");
       args.emplace_back(std::to_string(i));
 
       const std::string worker_data_dir = make_worker_data_dir(run_root_abs, static_cast<int>(i));
