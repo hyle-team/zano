@@ -227,7 +227,7 @@ namespace tools
 //     return tools::get_transfer_address(adr_str, addr, payment_id, this);
 //   }
 //   //------------------------------------------------------------------------------------------------------------------------------
-//   bool default_http_core_proxy::get_transfer_address(const std::string& adr_str, v_address& addr, std::string& payment_id)
+//   bool default_http_core_proxy::get_transfer_address(const std::string& adr_str, address_v& addr, std::string& payment_id)
 //   {
 //     return tools::get_transfer_address(adr_str, addr, payment_id, this);
 //   }

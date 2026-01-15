@@ -107,7 +107,7 @@ namespace currency
   struct tx_destination_entry
   {
     uint64_t amount = 0;                                // money
-    std::list<v_address>   addr;                        // destination address, in case of 1 address - txout_to_key, in case of more - txout_multisig
+    std::list<address_v>   addr;                        // destination address, in case of 1 address - txout_to_key, in case of more - txout_multisig
     size_t   minimum_sigs = 0;                          // if txout_multisig: minimum signatures that are required to spend this output (minimum_sigs <= addr.size())  IF txout_to_key - not used
     uint64_t amount_to_provide = 0;                     // amount money that provided by initial creator of tx, used with partially created transactions
     uint64_t unlock_time = 0;
@@ -120,8 +120,8 @@ namespace currency
     tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad) {}
     tx_destination_entry(uint64_t a, const account_public_address& ad, const crypto::public_key& aid) : amount(a), addr(1, ad), asset_id(aid) {}
     tx_destination_entry(uint64_t a, const account_public_address& ad, uint64_t ut) : amount(a), addr(1, ad), unlock_time(ut) {}
-    tx_destination_entry(uint64_t a, const std::list<v_address>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()){}
-    tx_destination_entry(uint64_t a, const std::list<v_address>& addr, const crypto::public_key& aid) : amount(a), addr(addr), minimum_sigs(addr.size()), asset_id(aid) {}
+    tx_destination_entry(uint64_t a, const std::list<address_v>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()){}
+    tx_destination_entry(uint64_t a, const std::list<address_v>& addr, const crypto::public_key& aid) : amount(a), addr(addr), minimum_sigs(addr.size()), asset_id(aid) {}
 
     tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr);// : amount(a), addr(addr), minimum_sigs(addr.size()){}
     tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr, const crypto::public_key& aid);// : amount(a), addr(addr), minimum_sigs(addr.size()), asset_id(aid) {}

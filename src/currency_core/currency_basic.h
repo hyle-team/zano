@@ -157,11 +157,11 @@ namespace currency
   /* gateway address                                                      */
   /************************************************************************/
   
-  typedef crypto::public_key gateway_address_type;
+  typedef crypto::public_key gateway_address_id_type;
 
   struct gateway_address_serialized_to_str
   {
-    gateway_address_type gateway_addr;
+    gateway_address_id_type gateway_addr;
     boost::optional<uint64_t> o_payment_id;
     uint8_t version;
 
@@ -176,7 +176,7 @@ namespace currency
   const static account_public_address null_pub_addr = AUTO_VAL_INIT(null_pub_addr);
 
 
-  typedef boost::variant<account_public_address, gateway_address_type> v_address;
+  typedef boost::variant<account_public_address, gateway_address_id_type> address_v;
 
   typedef std::vector<crypto::signature> ring_signature;
 
@@ -329,7 +329,7 @@ namespace currency
 
   struct txin_gateway
   {
-    gateway_address_type gateway_addr = null_pkey;
+    gateway_address_id_type gateway_addr = null_pkey;
     crypto::public_key asset_id = null_pkey;
     uint64_t amount = 0;
     uint8_t version = 0;
@@ -346,7 +346,7 @@ namespace currency
   struct tx_out_gateway
   {
     uint8_t version = 0;
-    gateway_address_type gateway_addr = null_pkey;
+    gateway_address_id_type gateway_addr = null_pkey;
     uint64_t amount = 0;    
     crypto::public_key asset_id = null_pkey;
     uint64_t payment_id = 0; 
