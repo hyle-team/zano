@@ -157,11 +157,26 @@ namespace currency
   /* gateway address                                                      */
   /************************************************************************/
   
-  typedef crypto::public_key gateway_address_type;
+  struct gateway_address_index // POD, used for referencing gateway addresses
+  {
+    uint64_t index;
+  };
+  
+  struct gateway_address_target // used internally in tx construction, tx_destination_entry, etc.
+  {
+    gateway_address_index gw_index;
+    crypto::public_key view_key;
+    uint8_t version;
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(gw_index)
+      FIELD(view_key)
+    END_SERIALIZE()
+  };
 
   struct gateway_address_serialized_to_str
   {
-    gateway_address_type gateway_addr;
+    gateway_address_index gateway_addr;
     boost::optional<uint64_t> o_payment_id;
     uint8_t version;
 
@@ -176,7 +191,7 @@ namespace currency
   const static account_public_address null_pub_addr = AUTO_VAL_INIT(null_pub_addr);
 
 
-  typedef boost::variant<account_public_address, gateway_address_type> v_address;
+  typedef boost::variant<account_public_address, gateway_address_target> address_v;
 
   typedef std::vector<crypto::signature> ring_signature;
 
@@ -329,13 +344,13 @@ namespace currency
 
   struct txin_gateway
   {
-    gateway_address_type gateway_addr = null_pkey;
+    gateway_address_index gateway_addr_idx;
     crypto::public_key asset_id = null_pkey;
     uint64_t amount = 0;
     uint8_t version = 0;
 
     BEGIN_VERSIONED_SERIALIZE(0, version)
-      FIELD(gateway_addr)
+      FIELD(gateway_addr_idx)
       FIELD(asset_id)
       VARINT_FIELD(amount)
       VARINT_FIELD(version)
@@ -346,13 +361,13 @@ namespace currency
   struct tx_out_gateway
   {
     uint8_t version = 0;
-    gateway_address_type gateway_addr = null_pkey;
+    gateway_address_index gateway_addr_idx;
     uint64_t amount = 0;    
     crypto::public_key asset_id = null_pkey;
     uint64_t payment_id = 0; 
 
     BEGIN_VERSIONED_SERIALIZE(0, version)
-      FIELD(gateway_addr)
+      FIELD(gateway_addr_idx)
       FIELD(asset_id)
       VARINT_FIELD(amount)
       FIELD(payment_id)
@@ -1304,8 +1319,11 @@ namespace currency
 
 POD_MAKE_HASHABLE(currency, account_public_address);
 POD_MAKE_HASHABLE(currency, account_public_address_old);
+POD_MAKE_HASHABLE(currency, gateway_address_index);
+POD_MAKE_HASHABLE(currency, gateway_address_target); // @#@# reconsider this -- sowle
 
 BLOB_SERIALIZER(currency::txout_to_key);
+BLOB_SERIALIZER(currency::gateway_address_index);
 
 #define SET_VARIANT_TAGS(type_name, id, json_tag)  \
   VARIANT_TAG(binary_archive, type_name, id); \
@@ -1393,18 +1411,19 @@ SET_VARIANT_TAGS(currency::asset_operation_ownership_proof, 51, "asset_operation
 SET_VARIANT_TAGS(currency::asset_operation_ownership_proof_eth, 52, "asset_operation_ownership_proof_eth");
 
 SET_VARIANT_TAGS(crypto::eth_public_key, 60, "eth_public_key");
-//SET_VARIANT_TAGS(crypto::eth_signature, 61, "eth_signature");
+SET_VARIANT_TAGS(crypto::eth_signature, 61, "eth_signature");
 SET_VARIANT_TAGS(currency::dummy, 62, "dummy");
 SET_VARIANT_TAGS(currency::tx_out_zarcanum, 63, "tx_out_zarcanum");
 
 //Gateway addresses
+SET_VARIANT_TAGS(currency::gateway_address_index, 64, "gateway_address_index");
 SET_VARIANT_TAGS(currency::txin_gateway, 65, "txin_gateway");
 SET_VARIANT_TAGS(currency::tx_out_gateway, 66, "tx_out_gateway");
 SET_VARIANT_TAGS(currency::gateway_sig, 67, "gateway_signature");
 SET_VARIANT_TAGS(crypto::eddsa_signature, 68, "eddsa_signature");
 SET_VARIANT_TAGS(crypto::eddsa_public_key, 69, "eddsa_public_key");
 SET_VARIANT_TAGS(crypto::signature, 70, "schnorr_signature");
-SET_VARIANT_TAGS(crypto::eth_signature, 71, "eth_signature");
+SET_VARIANT_TAGS(currency::gateway_address_target, 71, "gateway_address_target");
 
 SET_VARIANT_TAGS(currency::account_public_address, 72, "account_public_address");
 

@@ -5089,8 +5089,8 @@ bool blockchain_storage::process_gateway_input(const crypto::hash& tx_id, const 
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   //check if getaway exists
-  auto gw_adr_entry_ptr = m_db_gateway_addresses[in_gw.gateway_addr];
-  CHECK_AND_ASSERT_MES(gw_adr_entry_ptr, false, "Failed to find gateway addr " << in_gw.gateway_addr << " in input of tx: " << tx_id );
+  auto gw_adr_entry_ptr = m_db_gateway_addresses[in_gw.gateway_addr_idx];
+  CHECK_AND_ASSERT_MES(gw_adr_entry_ptr, false, "Failed to find gateway addr " << in_gw.gateway_addr_idx << " in input of tx: " << tx_id );
 
   //check the balance
   gateway_addresses_container::t_value_type gw_address_entry = *gw_adr_entry_ptr;
@@ -5102,7 +5102,7 @@ bool blockchain_storage::process_gateway_input(const crypto::hash& tx_id, const 
   //update balance
   balance_entry.amount -= in_gw.amount;
   //update db
-  m_db_gateway_addresses.set(in_gw.gateway_addr, gw_address_entry);
+  m_db_gateway_addresses.set(in_gw.gateway_addr_idx, gw_address_entry);
   return true;
 }
 //------------------------------------------------------------------
@@ -5110,8 +5110,8 @@ bool blockchain_storage::unprocess_gateway_input(const txin_gateway& in_gw)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   //check if getaway exists
-  auto gw_adr_entry_ptr = m_db_gateway_addresses[in_gw.gateway_addr];
-  CHECK_AND_ASSERT_THROW_MES(gw_adr_entry_ptr, "Failed to find gateway addr " << in_gw.gateway_addr);
+  auto gw_adr_entry_ptr = m_db_gateway_addresses[in_gw.gateway_addr_idx];
+  CHECK_AND_ASSERT_THROW_MES(gw_adr_entry_ptr, "Failed to find gateway addr " << in_gw.gateway_addr_idx);
 
   gateway_addresses_container::t_value_type gw_address_entry = *gw_adr_entry_ptr;
 
@@ -5123,7 +5123,7 @@ bool blockchain_storage::unprocess_gateway_input(const txin_gateway& in_gw)
   //update balance
   balance_entry.amount += in_gw.amount;
   //update db
-  m_db_gateway_addresses.set(in_gw.gateway_addr, gw_address_entry);
+  m_db_gateway_addresses.set(in_gw.gateway_addr_idx, gw_address_entry);
   return true;
 }
 
@@ -6131,32 +6131,32 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 
   const gateway_sig& sig = boost::get<gateway_sig>(tx.signatures[in_index]);
 
-  auto gw_entry_ptr = m_db_gateway_addresses.find(gw_in.gateway_addr);
+  auto gw_entry_ptr = m_db_gateway_addresses.find(gw_in.gateway_addr_idx);
 
-  CHECK_AND_ASSERT_MES(gw_entry_ptr, false, "Gateway input validation failed: gateway address " << gw_in.gateway_addr << " not found in db"); 
+  CHECK_AND_ASSERT_MES(gw_entry_ptr, false, "Gateway input validation failed: gateway address " << gw_in.gateway_addr_idx << " not found in db"); 
 
-  CHECK_AND_ASSERT_MES(gw_entry_ptr->info_history.size(), false, "Gateway input validation failed: gateway address " << gw_in.gateway_addr << " has no info history");
+  CHECK_AND_ASSERT_MES(gw_entry_ptr->info_history.size(), false, "Gateway input validation failed: gateway address " << gw_in.gateway_addr_idx << " has no info history");
 
   const v_gateway_owner_key& gw_owner_key = gw_entry_ptr->info_history.back().owner_key;
   VARIANT_SWITCH_BEGIN(gw_owner_key);
   VARIANT_CASE_CONST(crypto::public_key, pkey)
   {
     CHECK_AND_ASSERT_THROW_MES(sig.s.type() == typeid(crypto::signature), "Unexpected signature type("<< sig.s.type().name() <<
-      ") for gw_in.gateway_addr" << gw_in.gateway_addr << "(expected crypto::signature) in tx: " << tx_prefix_hash);
+      ") for gw_in.gateway_addr" << gw_in.gateway_addr_idx << "(expected crypto::signature) in tx: " << tx_prefix_hash);
     const crypto::signature& signature = boost::get<crypto::signature>(sig.s);
     bool r = crypto::check_signature(tx_hash_for_signature, pkey, signature);
   }
   VARIANT_CASE_CONST(crypto::eth_public_key, pkey)
   {
     CHECK_AND_ASSERT_THROW_MES(sig.s.type() == typeid(crypto::eth_signature), "Unexpected signature type(" << sig.s.type().name() <<
-      ") for gw_in.gateway_addr" << gw_in.gateway_addr << "(expected crypto::eth_signature) in tx: " << tx_prefix_hash);
+      ") for gw_in.gateway_addr" << gw_in.gateway_addr_idx << "(expected crypto::eth_signature) in tx: " << tx_prefix_hash);
     const crypto::eth_signature& signature = boost::get<crypto::eth_signature>(sig.s);
     bool r = crypto::verify_eth_signature(tx_hash_for_signature, pkey, signature);
   }
   VARIANT_CASE_CONST(crypto::eddsa_public_key, pkey)
   {
     CHECK_AND_ASSERT_THROW_MES(sig.s.type() == typeid(crypto::eddsa_signature), "Unexpected signature type(" << sig.s.type().name() <<
-      ") for gw_in.gateway_addr" << gw_in.gateway_addr << "(expected crypto::eddsa_signature) in tx: " << tx_prefix_hash);
+      ") for gw_in.gateway_addr" << gw_in.gateway_addr_idx << "(expected crypto::eddsa_signature) in tx: " << tx_prefix_hash);
     const crypto::eddsa_signature& signature = boost::get<crypto::eddsa_signature>(sig.s);
     bool r = crypto::verify_eddsa_signature(tx_hash_for_signature, pkey, signature);
   }

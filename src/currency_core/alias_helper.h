@@ -15,7 +15,7 @@
 namespace tools
 {
   template<typename callback_t>
-  bool get_transfer_address_cb(const std::string& adr_str, currency::v_address& v_addr, std::string& payment_id, callback_t cb)
+  bool get_transfer_address_cb(const std::string& adr_str, currency::address_v& v_addr, std::string& payment_id, callback_t cb)
   {
     if (!adr_str.size())
       return false;
@@ -49,7 +49,7 @@ namespace tools
   
 
   inline 
-  bool get_transfer_address(const std::string& adr_str, currency::v_address& v_addr, std::string& payment_id, i_core_proxy* proxy)
+  bool get_transfer_address(const std::string& adr_str, currency::address_v& v_addr, std::string& payment_id, i_core_proxy* proxy)
   {
     return get_transfer_address_cb(adr_str, v_addr, payment_id, [&proxy](currency::COMMAND_RPC_GET_ALIAS_DETAILS::request& req_alias_info,
                                                                         currency::COMMAND_RPC_GET_ALIAS_DETAILS::response& alias_info)
@@ -61,7 +61,7 @@ namespace tools
   inline
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id, i_core_proxy* proxy)
   {
-    currency::v_address v_addr;
+    currency::address_v v_addr;
     if (!get_transfer_address(adr_str, v_addr, payment_id, proxy))
       return false;
 

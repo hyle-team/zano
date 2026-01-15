@@ -12,7 +12,7 @@ namespace tools
   {
     return tools::get_transfer_address(adr_str, addr, payment_id, this);
   }
-  bool i_core_proxy::get_transfer_address(const std::string& adr_str, currency::v_address& addr, std::string& payment_id)
+  bool i_core_proxy::get_transfer_address(const std::string& adr_str, currency::address_v& addr, std::string& payment_id)
   {
     return tools::get_transfer_address(adr_str, addr, payment_id, this);
   }

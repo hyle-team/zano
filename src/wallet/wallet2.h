@@ -621,7 +621,7 @@ namespace tools
       uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
 
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
-    bool get_transfer_address(const std::string& adr_str, currency::v_address& addr, std::string& payment_id);
+    bool get_transfer_address(const std::string& adr_str, currency::address_v& addr, std::string& payment_id);
     inline uint64_t get_blockchain_current_size() const {
       return m_chain.get_blockchain_current_size();
     }

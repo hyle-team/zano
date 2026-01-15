@@ -1374,10 +1374,10 @@ namespace currency
     finalized_tx& result, uint8_t tx_outs_attr)
   {
 
-    const gateway_address_type& gwa = boost::get<gateway_address_type>(de.addr.front());
+    const gateway_address_target& gwat = boost::get<gateway_address_target>(de.addr.front());
 
-    tx_out_gateway gw_out = AUTO_VAL_INIT(gw_out);
-    gw_out.gateway_addr = gwa;
+    tx_out_gateway gw_out{};
+    gw_out.gateway_addr_idx = gwat.gw_index;
     gw_out.amount = de.amount;
     gw_out.asset_id = de.asset_id;
     gw_out.payment_id = de.payment_id; //@#@ payment id is open for now, need to figure out how to encrypt it
@@ -1401,7 +1401,7 @@ namespace currency
       {
         return construct_zarcanum_tx_out(de, tx_sec_key, output_index, tx, deriv_cache, self, asset_blinding_mask, amount_blinding_mask, blinded_asset_id, amount_commitment, result, tx_outs_attr);
       }
-      else if (de.addr.front().type() == typeid(gateway_address_type))
+      else if (de.addr.front().type() == typeid(gateway_address_target))
       {
         return construct_gateway_tx_out(de, tx_sec_key, output_index, tx, deriv_cache, self, asset_blinding_mask, amount_blinding_mask, blinded_asset_id, amount_commitment, result, tx_outs_attr);
       }
@@ -4461,29 +4461,26 @@ namespace currency
     return tools::base58::encode_addr(CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX, t_serializable_object_to_blob(addr) + payment_id); // new format integrated Zano address (normal)
   }
   //-----------------------------------------------------------------------
-  std::string get_account_address_as_str(const gateway_address_type& addr, const payment_id_t& payment_id)
+  std::string get_account_address_and_payment_id_as_str(const gateway_address_target& addr, const payment_id_t& payment_id)
   {
-    gateway_address_serialized_to_str gwserialized = AUTO_VAL_INIT(gwserialized);
+    gateway_address_serialized_to_str gwserialized{};
 
-    gwserialized.gateway_addr = addr;
+    gwserialized.gateway_addr = addr.gw_index;
     if (payment_id.size())
     {
-      CHECK_AND_ASSERT_THROW_MES(payment_id.size() == sizeof(uint64_t), "Unexpected payment id size");
-      uint64_t val = 0;
-      std::memcpy(&val, payment_id.data(), sizeof(val));
-      gwserialized.o_payment_id = val;
+      uint64_t pid = 0;
+      CHECK_AND_ASSERT_THROW_MES(convert_payment_id(payment_id, pid), "Unexpected payment id size");
+      gwserialized.o_payment_id = pid;
     }
-
 
     uint64_t tag = payment_id.size() ? CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX : CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX;
     return tools::base58::encode_addr(tag, t_serializable_object_to_blob(gwserialized));
-
   }
   //-----------------------------------------------------------------------
-  std::string get_account_address_as_str(const v_address& v_addr, const payment_id_t& payment_id)
+  std::string get_account_address_and_payment_id_as_str(const address_v& v_addr, const payment_id_t& payment_id)
   {
-    if (v_addr.type() == typeid(gateway_address_type))
-      return get_account_address_as_str(boost::get<gateway_address_type>(v_addr), payment_id);
+    if (v_addr.type() == typeid(gateway_address_target))
+      return get_account_address_and_payment_id_as_str(boost::get<gateway_address_target>(v_addr), payment_id);
     else if (v_addr.type() == typeid(account_public_address))
       return get_account_address_and_payment_id_as_str(boost::get<account_public_address>(v_addr), payment_id);
     else
@@ -4492,7 +4489,7 @@ namespace currency
     }
   }
   //-----------------------------------------------------------------------
-  bool get_account_address_and_payment_id_from_str(v_address& v_addr, payment_id_t& payment_id, const std::string& str)
+  bool get_account_address_and_payment_id_from_str(address_v& addr_v, payment_id_t& payment_id, const std::string& str)
   {
     payment_id.clear();
     blobdata blob;
@@ -4506,7 +4503,7 @@ namespace currency
     }
     if (prefix == CURRENCY_PUBLIC_GATEWAY_BASE58_PREFIX || prefix == CURRENCY_PUBLIC_INTEG_GATEWAY_BASE58_PREFIX)
     {
-      gateway_address_serialized_to_str gwserialized = AUTO_VAL_INIT(gwserialized);
+      gateway_address_serialized_to_str gwserialized{};
       if (!::serialization::parse_binary(blob, gwserialized))
       {
         LOG_PRINT_L1("Gateway address cannot be parsed from \"" << str << "\"");
@@ -4516,12 +4513,14 @@ namespace currency
       {
         epee::string_tools::append_pod_to_strbuff(*gwserialized.o_payment_id, payment_id);
       }
-      v_addr = gwserialized.gateway_addr;
+      // TODO @#@# for gateway address this method requires request to daemon's DB
+      //addr_v = gwserialized.gateway_addr;
+      throw std::runtime_error("unsupported");
       return true;
     }
     
-    v_addr = account_public_address();
-    account_public_address& addr = boost::get<account_public_address>(v_addr);
+    addr_v = account_public_address();
+    account_public_address& addr = boost::get<account_public_address>(addr_v);
     
 
     if (blob.size() < sizeof(account_public_address_old))
@@ -4614,7 +4613,7 @@ namespace currency
   //-----------------------------------------------------------------------
   bool get_account_address_and_payment_id_from_str(account_public_address& addr, payment_id_t& payment_id, const std::string& str)
   {
-    v_address v_addr;
+    address_v v_addr;
     if (!get_account_address_and_payment_id_from_str(v_addr, payment_id, str))
       return false;
 
@@ -4634,7 +4633,7 @@ namespace currency
     return get_account_address_and_payment_id_from_str(addr, integrated_payment_id, str);
   }
   //-----------------------------------------------------------------------
-  bool get_account_address_from_str(v_address& v_addr, const std::string& str)
+  bool get_account_address_from_str(address_v& v_addr, const std::string& str)
   {
     std::string integrated_payment_id; // won't be used
     return get_account_address_and_payment_id_from_str(v_addr, integrated_payment_id, str);
@@ -4805,6 +4804,11 @@ namespace currency
     return o << ti.name();
   }
   //--------------------------------------------------------------------------------
+  std::ostream& operator <<(std::ostream& o, const gateway_address_index& gwai)
+  {
+    return o << "[gw:" << gwai.index << "]";
+  }
+  //--------------------------------------------------------------------------------
 #ifndef MOBILE_WALLET_BUILD
   const std::locale& utf8_get_conversion_locale()
   {
@@ -4906,10 +4910,6 @@ namespace currency
       a.multisig_out_id == b.multisig_out_id &&
       a.sigs_count      == b.sigs_count;
   }
-  bool operator ==(const currency::txin_dummy&, const currency::txin_dummy&) // TODO@#@# replace this -- sowle
-  {
-    throw std::runtime_error("operator ==: txin_dummy not implemented");
-  }
   bool operator ==(const currency::txin_zc_input& a, const currency::txin_zc_input& b)
   {
     return
@@ -4923,9 +4923,16 @@ namespace currency
     return
       a.amount == b.amount &&
       a.asset_id == b.asset_id &&
-      a.gateway_addr == b.gateway_addr;
+      a.gateway_addr_idx == b.gateway_addr_idx;
   }
-  //--------------------------------------------------------------------------------
+
+  /*bool operator ==(const currency::gateway_address_target& a, const currency::gateway_address_target& b)
+  {
+    return
+      a.gw_index == b.gw_index &&
+      a.view_key == b.view_key;
+  }*/
+//--------------------------------------------------------------------------------
   boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty(const wide_difficulty_type& difficulty_pos_at_split_point,
     const wide_difficulty_type& difficulty_pow_at_split_point,
     const difficulties& a_diff,

@@ -4633,7 +4633,7 @@ bool wallet2::get_transfer_address(const std::string& adr_str, currency::account
 {
   return m_core_proxy->get_transfer_address(adr_str, addr, payment_id);
 }
-bool wallet2::get_transfer_address(const std::string& adr_str, currency::v_address& addr, std::string& payment_id)
+bool wallet2::get_transfer_address(const std::string& adr_str, currency::address_v& addr, std::string& payment_id)
 {
   return m_core_proxy->get_transfer_address(adr_str, addr, payment_id);
 }
@@ -7197,7 +7197,7 @@ void wallet2::add_sent_tx_detailed_info(const transaction& tx, const std::vector
 
   std::vector<std::string> recipients;
   std::unordered_set<account_public_address> used_addresses;
-  std::unordered_set<gateway_address_type> used_gw_addresses;
+  std::unordered_set<gateway_address_target> used_gw_addresses;
   for (const auto& d : destinations)
   {
 
@@ -7212,9 +7212,9 @@ void wallet2::add_sent_tx_detailed_info(const transaction& tx, const std::vector
           need_to_add_address = true;
         }
       }
-      else if (addr.type() == typeid(gateway_address_type))
+      else if (addr.type() == typeid(gateway_address_target))
       {
-        gateway_address_type ga = boost::get<gateway_address_type>(addr);
+        gateway_address_target ga = boost::get<gateway_address_target>(addr);
         need_to_add_address = used_gw_addresses.insert(ga).second;
       }
       else
@@ -7224,7 +7224,7 @@ void wallet2::add_sent_tx_detailed_info(const transaction& tx, const std::vector
 
       if (need_to_add_address)
       {
-        recipients.push_back(payment_id.empty() ? get_account_address_as_str(addr) : get_account_address_as_str(addr, payment_id));
+        recipients.push_back(payment_id.empty() ? get_account_address_and_payment_id_as_str(addr) : get_account_address_and_payment_id_as_str(addr, payment_id));
       }
     }
   }

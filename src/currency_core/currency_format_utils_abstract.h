@@ -304,7 +304,7 @@ namespace currency
   //---------------------------------------------------------------
   inline bool compare_variant_by_types(const txin_gateway& left, const txin_gateway& right)
   {
-    return (left.gateway_addr < right.gateway_addr);
+    return (left.gateway_addr_idx.index < right.gateway_addr_idx.index);
   }
   //---------------------------------------------------------------
   inline bool compare_variant_by_types(const txin_multisig& left, const txin_multisig& right)

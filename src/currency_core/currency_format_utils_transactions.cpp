@@ -19,11 +19,12 @@ namespace currency
     {
       if (de.addr.size() == 1)
       {
-        if (de.addr.back().type() == typeid(gateway_address_type))
+        if (de.addr.back().type() == typeid(gateway_address_target))
         {
           account_public_address fake_account_address = AUTO_VAL_INIT(fake_account_address);// TODO: refactoring might be needed, this probably not the best idea
-          fake_account_address.spend_public_key = boost::get<gateway_address_type>(de.addr.back());
-          fake_account_address.view_public_key = boost::get<gateway_address_type>(de.addr.back());
+          //TODO @#@#@ reconsider this -- sowle
+          //fake_account_address.spend_public_key = boost::get<gateway_address_target>(de.addr.back()).view_key;
+          fake_account_address.view_public_key = boost::get<gateway_address_target>(de.addr.back()).view_key;
           return fake_account_address;
         }
         else if (de.addr.back().type() == typeid(account_public_address))

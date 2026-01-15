@@ -1502,7 +1502,7 @@ namespace tools
     data.tx_secret_key = ft.one_time_key;
     std::vector<std::string>& outs_addr = data.outputs_addresses;
     for (auto d : ft.ftp.prepared_destinations)
-      outs_addr.push_back(currency::get_account_address_as_str(d.addr.back()));
+      outs_addr.push_back(currency::get_account_address_and_payment_id_as_str(d.addr.back()));
     data.finalized_tx = t_serializable_object_to_blob(ft);
   }
   //------------------------------------------------------------------------------------------------------------------------------

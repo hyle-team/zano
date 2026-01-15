@@ -504,7 +504,7 @@ namespace tools
           ss << "\n  " << i << ": ";
           for (auto & a : dst.addr)
           {
-            ss << currency::get_account_address_as_str(a) << ";";
+            ss << currency::get_account_address_and_payment_id_as_str(a) << ";";
           } 
           ss << " amount: " << std::setw(21) << currency::print_money(dst.amount, get_decimal_point(dst.asset_id));
           ss << " asset_id: " << dst.asset_id;
@@ -579,7 +579,7 @@ namespace tools
         {
           ss << '\n' << currency::print_money(dst.amount, get_decimal_point(dst.asset_id)) << " -> ";
           for (const auto& a : dst.addr)
-            ss << currency::get_account_address_as_str(a) << " ";
+            ss << currency::get_account_address_and_payment_id_as_str(a) << " ";
         }
         return ss.str();
       }
