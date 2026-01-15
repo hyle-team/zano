@@ -17,6 +17,8 @@
 using namespace chaingen_args;
 namespace bp = boost::process;
 
+constexpr const std::size_t k_worker_stdout_buffer_size = 64 * 1024;
+
 parallel_test_runner::parallel_test_runner(
   const boost::program_options::variables_map& vm)
   : m_vm(vm)
@@ -250,10 +252,7 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std
   const auto wall_start = std::chrono::steady_clock::now();
   const std::string run_root = command_line::get_arg(m_vm, arg_run_root);
   std::vector<std::string> base_args = build_base_args_without_worker_specific(argc, argv);
-
-  std::filesystem::path run_root_abs = run_root.empty()
-    ? std::filesystem::path(paths::default_run_root)
-    : std::filesystem::path(run_root);
+  std::filesystem::path run_root_abs = run_root.empty() ? std::filesystem::path(paths::default_run_root) : std::filesystem::path(run_root);
 
   if (run_root_abs.is_relative())
     run_root_abs = std::filesystem::absolute(run_root_abs);
@@ -382,7 +381,7 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std
         {
           std::string line;
           std::string buffer;
-          buffer.reserve(64 * 1024);
+          buffer.reserve(k_worker_stdout_buffer_size);
 
           std::function<void()> flush = [&]()
           {
@@ -404,7 +403,7 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std
             buffer.append(line);
             buffer.push_back('\n');
 
-            if (buffer.size() >= 64 * 1024)
+            if (buffer.size() >= k_worker_stdout_buffer_size)
               flush();
           }
 
