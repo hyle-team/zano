@@ -887,91 +887,6 @@ bool parse_cmd_specific_tests_to_run(std::unordered_multimap<std::string, size_t
   return true;
 }
 //--------------------------------------------------------------------------
-static void log_test_taken_by_this_process(const std::string& test_name)
-{
-  if (g_runner)
-    g_runner->log_test_taken_by_this_process(test_name);
-}
-//--------------------------------------------------------------------------
-static bool read_workers_report_ms_map(const std::filesystem::path& path, std::unordered_map<std::string, uint64_t>& out_ms_by_test)
-{
-  out_ms_by_test.clear();
-
-  try
-  {
-    if (!std::filesystem::exists(path))
-      return false;
-
-    pt::ptree root;
-    pt::read_json(path.string(), root);
-
-    for (const auto& v : root.get_child("tests", pt::ptree()))
-    {
-      const auto& node = v.second;
-      const std::string name = node.get<std::string>("name", "");
-      const uint64_t ms = node.get<uint64_t>("ms", 0);
-      if (!name.empty())
-        out_ms_by_test[name] = ms;
-    }
-
-    return !out_ms_by_test.empty();
-  }
-  catch (...)
-  {
-    return false;
-  }
-}
-//--------------------------------------------------------------------------
-static std::vector<int> build_lpt_owner_plan(const std::vector<test_job>& jobs, uint32_t processes, const std::unordered_map<std::string, uint64_t>& ms_by_test)
-{
-  const size_t n = jobs.size();
-  std::vector<int> owner(n, 0);
-
-  struct item_t { uint64_t ms; std::string name; size_t idx; };
-  std::vector<item_t> items;
-  items.reserve(n);
-
-  std::vector<uint64_t> known;
-  known.reserve(ms_by_test.size());
-  for (const auto& kv : ms_by_test)
-    known.push_back(kv.second);
-  std::sort(known.begin(), known.end());
-  const uint64_t fallback =
-    known.empty() ? 1 : known[known.size() / 2];
-
-  for (size_t i = 0; i < n; ++i)
-  {
-    const std::string& name = jobs[i].name;
-    auto it = ms_by_test.find(name);
-    const uint64_t ms = (it != ms_by_test.end() ? it->second : fallback);
-    items.push_back(item_t{ms, name, i});
-  }
-
-  std::sort(items.begin(), items.end(),
-    [](const item_t& a, const item_t& b)
-    {
-      if (a.ms != b.ms) return a.ms > b.ms;
-      return a.name < b.name;
-    });
-
-  std::vector<uint64_t> load(processes, 0);
-
-  for (const auto& it : items)
-  {
-    uint32_t best_w = 0;
-    for (uint32_t w = 1; w < processes; ++w)
-    {
-      if (load[w] < load[best_w])
-        best_w = w;
-    }
-
-    owner[it.idx] = static_cast<int>(best_w);
-    load[best_w] += it.ms;
-  }
-
-  return owner;
-}
-//--------------------------------------------------------------------------
 static bool run_one_test_job(const std::string& test_name, const std::function<bool()>& fn, bool& stop_on_first_fail, bool& skip_all_till_the_end,
   size_t& tests_count, size_t& unique_tests_count, std::set<std::string>& failed_tests, std::vector<std::pair<std::string, uint64_t>>& tests_running_time)
 {
@@ -983,9 +898,10 @@ static bool run_one_test_job(const std::string& test_name, const std::function<b
   ++tests_count;
   ++unique_tests_count;
 
-  log_test_taken_by_this_process(test_name);
-  bool ok = fn();
+  if (g_runner)
+    g_runner->log_test_taken_by_this_process(test_name);
 
+  bool ok = fn();
   if (!ok)
   {
     failed_tests.insert(test_name);
@@ -1011,58 +927,56 @@ static bool run_registered_tests(bool& stop_on_first_fail, bool& skip_all_till_t
 {
   bool all_ok = true;
 
-  const uint32_t processes = command_line::get_arg(g_vm, arg_processes);
   const int32_t worker_id = command_line::get_arg(g_vm, arg_worker_id);
+  const bool is_worker = (worker_id >= 0);
 
-  std::vector<int> owner_plan;
-  bool has_plan = false;
-
-  if (processes > 1 && worker_id >= 0)
+  if (!is_worker)
   {
-    std::filesystem::path run_root_abs = command_line::get_arg(g_vm, arg_run_root);
-    if (run_root_abs.empty())
-      run_root_abs = std::filesystem::path("chaingen_runs");
-    if (run_root_abs.is_relative())
-      run_root_abs = std::filesystem::absolute(run_root_abs);
-
-    const auto report_path = run_root_abs / WORKERS_REPORT_FILENAME;
-
-    std::unordered_map<std::string, uint64_t> ms_by_test;
-    if (read_workers_report_ms_map(report_path, ms_by_test))
+    for (size_t i = 0; i < g_test_jobs.size() && !skip_all_till_the_end; ++i)
     {
-      owner_plan = build_lpt_owner_plan(g_test_jobs, processes, ms_by_test);
-      has_plan = (owner_plan.size() == g_test_jobs.size());
+      const bool ok = g_test_jobs[i].run();
+      all_ok = all_ok && ok;
     }
+    return all_ok;
   }
 
-  for (size_t i = 0; i < g_test_jobs.size(); ++i)
+  if (!g_shm_state)
+    return all_ok;
+
+  while (!skip_all_till_the_end)
   {
-    if (skip_all_till_the_end)
+    if (g_shm_state->stop_all.load(std::memory_order_acquire))
       break;
 
-    if (processes > 1 && worker_id >= 0)
+    uint32_t job_idx = 0;
+    if (!g_shm_state->try_take_next(job_idx))
+      break;
+
+    if (job_idx >= g_test_jobs.size())
+      continue;
+
+    const bool ok = g_test_jobs[job_idx].run();
+    if (ok)
+      continue;
+
+    all_ok = false;
+
+    if (stop_on_first_fail)
     {
-      const int expected_owner = has_plan
-        ? owner_plan[i]
-        : static_cast<int>(i % processes);
-
-      if (expected_owner != worker_id)
-        continue;
+      skip_all_till_the_end = true;
+      g_shm_state->stop_all.store(true, std::memory_order_release);
+      break;
     }
-
-    bool ok = g_test_jobs[i].run();
-    if (!ok)
-      all_ok = false;
   }
 
   return all_ok;
 }
 //--------------------------------------------------------------------------
+// parameters are used inside macros
 static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the_end, size_t& tests_count, size_t& unique_tests_count,
   std::set<std::string>& failed_tests, std::vector<std::pair<std::string, uint64_t>>& tests_running_time,
   std::function<bool(const std::string&)> is_test_eligible_to_run, std::function<bool(const std::string&, size_t)> is_hf_test_eligible_to_run)
 {
-
   g_test_jobs.clear();
 
   // TODO // GENERATE_AND_PLAY(wallet_spend_form_auditable_and_track);
@@ -1513,9 +1427,6 @@ int main(int argc, char* argv[])
     return 1;
 
   g_runner = std::make_unique<parallel_test_runner>(g_vm);
-  const int parent_rc = g_runner->run_parent_if_needed(argc, argv);
-  if (parent_rc != parallel_test_runner::k_not_parent)
-    return parent_rc;
 
   if (command_line::get_arg(g_vm, command_line::arg_help))
   {
@@ -1538,9 +1449,8 @@ int main(int argc, char* argv[])
     stop_on_first_fail = command_line::get_arg(g_vm, arg_stop_on_fail);
   }
 
-  const uint32_t processes = command_line::get_arg(g_vm, arg_processes);
   const int32_t worker_id = command_line::get_arg(g_vm, arg_worker_id);
-  const bool is_worker = (processes > 1 && worker_id >= 0);
+  const bool is_worker = (worker_id >= 0);
 
   if (is_worker)
     init_shared_fail_report_if_needed();
@@ -1625,6 +1535,10 @@ int main(int argc, char* argv[])
       is_test_eligible_to_run,
       is_hf_test_eligible_to_run);
 
+    const int parent_rc = g_runner->run_parent_if_needed(argc, argv, g_test_jobs);
+    if (parent_rc != parallel_test_runner::k_not_parent)
+      return parent_rc;
+
     // run
     run_registered_tests(
       stop_on_first_fail,
@@ -1677,7 +1591,7 @@ int main(int argc, char* argv[])
     {
       parallel_test_runner::worker_report rep;
       rep.worker_id = static_cast<uint32_t>(worker_id);
-      rep.processes = processes;
+      rep.processes = command_line::get_arg(g_vm, chaingen_args::arg_processes);
       rep.tests_count = tests_count;
       rep.unique_tests_count = unique_tests_count;
       rep.total_time_ms = total_time;

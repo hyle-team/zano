@@ -7,7 +7,6 @@
 #include <chrono>
 #include <cctype>
 #include <mutex>
-#include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/process.hpp>
 
@@ -16,45 +15,16 @@
 #include "../../src/common/command_line.h"
 
 using namespace chaingen_args;
-
 namespace bp = boost::process;
-namespace pt = boost::property_tree;
-
-namespace
-{
-  const char* JSON_WORKER_ID           = "worker_id";
-  const char* JSON_PROCESSES           = "processes";
-  const char* JSON_TESTS_COUNT         = "tests_count";
-  const char* JSON_UNIQUE_TESTS_COUNT  = "unique_tests_count";
-  const char* JSON_TOTAL_TIME_MS       = "total_time_ms";
-  const char* JSON_SKIP_ALL_TILL_END   = "skip_all_till_the_end";
-  const char* JSON_EXIT_CODE           = "exit_code";
-
-  const char* JSON_FAILED_TESTS        = "failed_tests";
-  const char* JSON_TESTS_RUNNING_TIME  = "tests_running_time";
-
-  const char* JSON_NAME                = "name";
-  const char* JSON_MS                  = "ms";
-
-  const char* TAKEN_TESTS_LOG_FILENAME = "taken_tests.log";
-  const char* WORKER_REPORT_FILENAME   = "coretests_report.json";
-  const char* WORKER_LOG_FILENAME      = "worker.log";
-  const char* WORKER_DIR_PREFIX        = "w";
-
-  bool arg_has_prefix(const std::string& arg, const std::string& prefix)
-  {
-    return arg.size() >= prefix.size() && arg.compare(0, prefix.size(), prefix) == 0;
-  }
-}
 
 parallel_test_runner::parallel_test_runner(
   const boost::program_options::variables_map& vm)
   : m_vm(vm)
 {}
 
-int parallel_test_runner::run_parent_if_needed(int argc, char* argv[]) const
+int parallel_test_runner::run_parent_if_needed(int argc, char* argv[], const std::vector<test_job>& g_test_jobs) const
 {
-  const int rc = run_workers_and_wait(argc, argv);
+  const int rc = run_workers_and_wait(argc, argv, g_test_jobs);
   return (rc < 0) ? k_not_parent : rc;
 }
 
@@ -67,7 +37,7 @@ std::filesystem::path parallel_test_runner::get_run_root_path() const
 {
   std::string run_root = command_line::get_arg(m_vm, arg_run_root);
   if (run_root.empty())
-    run_root = "chaingen_runs";
+    run_root = paths::default_run_root;
 
   std::filesystem::path run_root_path(run_root);
 
@@ -79,17 +49,17 @@ std::filesystem::path parallel_test_runner::get_run_root_path() const
 
 std::filesystem::path parallel_test_runner::get_worker_dir_path(uint32_t worker_id) const
 {
-  return get_run_root_path() / (WORKER_DIR_PREFIX+ std::to_string(worker_id));
+  return get_run_root_path() / (paths::worker_dir_prefix + std::to_string(worker_id));
 }
 
 std::filesystem::path parallel_test_runner::get_worker_report_path(uint32_t worker_id) const
 {
-  return get_worker_dir_path(worker_id) / WORKER_REPORT_FILENAME;
+  return get_worker_dir_path(worker_id) / files::worker_report;
 }
 
 std::string parallel_test_runner::make_worker_data_dir(const std::filesystem::path& run_root_abs, int worker_id) const
 {
-  std::filesystem::path worker_dir = run_root_abs / (std::string(WORKER_DIR_PREFIX) + std::to_string(worker_id));
+  std::filesystem::path worker_dir = run_root_abs / (std::string(paths::worker_dir_prefix) + std::to_string(worker_id));
   std::filesystem::create_directories(worker_dir);
   return worker_dir.string();
 }
@@ -97,28 +67,29 @@ std::string parallel_test_runner::make_worker_data_dir(const std::filesystem::pa
 // Removes worker-specific arguments from the command line
 std::vector<std::string> parallel_test_runner::build_base_args_without_worker_specific(int argc, char* argv[]) const
 {
-    static const std::set<std::string> worker_specific_args = {
-        "--multiprocess-worker-id", "--multiprocess-run", "--multiprocess-run-root"
-    };
+  static const std::set<std::string> worker_specific_args = {
+    cli_args::multiprocess_worker_id, cli_args::multiprocess_run, cli_args::multiprocess_run_root,
+    cli_args::multiprocess_shm_name, cli_args::data_dir,
+  };
 
-    std::vector<std::string> args;
-    for (int i = 1; i < argc; ++i)
+  std::vector<std::string> args;
+  for (int i = 1; i < argc; ++i)
+  {
+    std::string current_arg = argv[i];
+    bool skip = false;
+    for (const auto& wa : worker_specific_args)
     {
-        std::string current_arg = argv[i];
-        bool skip = false;
-        for (const auto& wa : worker_specific_args)
-        {
-            if (current_arg == wa || current_arg.find(wa + "=") == 0)
-            {
-                if (current_arg == wa && i + 1 < argc) ++i;
-                skip = true;
-                break;
-            }
-        }
-        if (!skip)
-            args.emplace_back(std::move(current_arg));
+      if (current_arg == wa || current_arg.find(wa + "=") == 0)
+      {
+        if (current_arg == wa && i + 1 < argc) ++i;
+        skip = true;
+        break;
+      }
     }
-    return args;
+    if (!skip)
+      args.emplace_back(std::move(current_arg));
+  }
+  return args;
 }
 
 void fill_postponed_tests_set(std::set<std::string>& postponed_tests);
@@ -142,13 +113,6 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
     reps.push_back(std::move(r));
   }
 
-  for (const auto& r : reps)
-    if (r.exit_code != 0)
-      ++failed_workers;
-
-  std::set<std::string> postponed_tests;
-  fill_postponed_tests_set(postponed_tests);
-
   size_t total_tests_count = 0;
   size_t total_unique_tests_count = 0;
 
@@ -156,10 +120,16 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
 
   for (const auto& r : reps)
   {
+    if (r.exit_code != 0)
+      ++failed_workers;
+
     total_tests_count += r.tests_count;
     total_unique_tests_count += r.unique_tests_count;
     failed_tests_union.insert(r.failed_tests.begin(), r.failed_tests.end());
   }
+
+  std::set<std::string> postponed_tests;
+  fill_postponed_tests_set(postponed_tests);
 
   if (shm_state)
   {
@@ -169,7 +139,7 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
 
     for (uint32_t j = 0; j < n_fails; ++j)
     {
-      const auto& e = shm_state->entries[j];
+      const coretests_shm::fail_entry& e = shm_state->entries[j];
       if (e.test_name[0] != '\0')
         failed_tests_union.insert(std::string(e.test_name));
     }
@@ -237,9 +207,9 @@ void parallel_test_runner::print_worker_failure_reasons(uint32_t processes, cons
       any = true;
     }
 
-    const auto worker_dir = get_worker_dir_path(i);
-    const auto report_path = get_worker_report_path(i);
-    const auto log_path = worker_dir / WORKER_LOG_FILENAME;
+    const std::filesystem::path worker_dir = get_worker_dir_path(i);
+    const std::filesystem::path report_path = get_worker_report_path(i);
+    const std::filesystem::path log_path = worker_dir / files::worker_log;
 
     std::cout << "    report: " << (std::filesystem::exists(report_path) ? report_path.string() : ("missing (" + report_path.string() + ")")) << "\n";
     std::cout << "    logs dir: " << worker_dir.string() << "\n";
@@ -263,12 +233,12 @@ void parallel_test_runner::print_worker_failure_reasons(uint32_t processes, cons
   }
 }
 
-int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
+int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std::vector<test_job>& g_test_jobs) const
 {
   const uint32_t processes = command_line::get_arg(m_vm, arg_processes);
   const int32_t worker_id  = command_line::get_arg(m_vm, arg_worker_id);
 
-  if (processes <= 1 || worker_id >= 0)
+  if (worker_id >= 0)
     return -1;
 
   if (command_line::get_arg(m_vm, command_line::arg_help)) return -1;
@@ -277,36 +247,19 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
   if (command_line::get_arg(m_vm, arg_generate_and_play_test_data)) return -1;
   if (command_line::get_arg(m_vm, arg_test_transactions)) return -1;
 
-  const auto t0 = std::chrono::steady_clock::now();
+  const auto wall_start = std::chrono::steady_clock::now();
   const std::string run_root = command_line::get_arg(m_vm, arg_run_root);
   std::vector<std::string> base_args = build_base_args_without_worker_specific(argc, argv);
 
-  auto has_flag = [&](const char* flag, const std::string& prefix) -> bool
-  {
-    for (const auto& a : base_args)
-      if (a == flag || arg_has_prefix(a, prefix))
-        return true;
-    return false;
-  };
-
-  if (!has_flag("--multiprocess-run", "--multiprocess-run="))
-  {
-    base_args.emplace_back("--multiprocess-run");
-    base_args.emplace_back(std::to_string(processes));
-  }
-
   std::filesystem::path run_root_abs = run_root.empty()
-    ? std::filesystem::path("chaingen_runs")
+    ? std::filesystem::path(paths::default_run_root)
     : std::filesystem::path(run_root);
 
   if (run_root_abs.is_relative())
     run_root_abs = std::filesystem::absolute(run_root_abs);
 
-  if (!has_flag("--multiprocess-run-root", "--multiprocess-run-root="))
-  {
-    base_args.emplace_back("--multiprocess-run-root");
-    base_args.emplace_back(run_root_abs.string());
-  }
+  base_args.emplace_back(cli_args::multiprocess_run_root);
+  base_args.emplace_back(run_root_abs.string());
 
   std::string exe = (argv && argv[0]) ? std::string(argv[0]) : std::string();
   if (exe.empty())
@@ -368,14 +321,11 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
     shm.truncate(sizeof(coretests_shm::shared_state));
     bip::mapped_region region(shm, bip::read_write);
 
-    auto* st = new (region.get_address()) coretests_shm::shared_state();
+    coretests_shm::shared_state* st = new (region.get_address()) coretests_shm::shared_state();
     st->init();
 
-    if (!has_flag("--multiprocess-shm-name", std::string("--multiprocess-shm-name=")))
-    {
-      base_args.emplace_back("--multiprocess-shm-name");
-      base_args.emplace_back(shm_name);
-    }
+    base_args.emplace_back(cli_args::multiprocess_shm_name);
+    base_args.emplace_back(shm_name);
 
     struct worker_proc
     {
@@ -388,26 +338,26 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
 
     std::vector<worker_proc> kids;
     kids.reserve(processes);
-
     std::mutex cout_mutex;
+    fill_shm_work_order(st, g_test_jobs);
 
     for (uint32_t i = 0; i < processes; ++i)
     {
       std::vector<std::string> args = base_args;
 
-      args.emplace_back("--multiprocess-worker-id");
+      args.emplace_back(cli_args::multiprocess_worker_id);
       args.emplace_back(std::to_string(i));
 
       const std::string worker_data_dir = make_worker_data_dir(run_root_abs, static_cast<int>(i));
-      args.emplace_back("--data-dir");
+      args.emplace_back(cli_args::data_dir);
       args.emplace_back(worker_data_dir);
 
-      const auto worker_dir = get_worker_dir_path(i);
+      const std::filesystem::path worker_dir = get_worker_dir_path(i);
       std::filesystem::create_directories(worker_dir);
 
       try
       {
-        const auto log_path = (worker_dir / WORKER_LOG_FILENAME).string();
+        const std::filesystem::path log_path = (worker_dir / files::worker_log).string();
 
         worker_proc wp;
         wp.wid = i;
@@ -492,9 +442,8 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
       if (p.child.exit_code() != 0)
         ++failed_workers;
 
-    const auto t1 = std::chrono::steady_clock::now();
-    const uint64_t wall_time_ms =
-      static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
+    const auto wall_end = std::chrono::steady_clock::now();
+    const uint64_t wall_time_ms = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(wall_end - wall_start).count());
 
     rc = print_aggregated_report_and_return_rc(processes, wall_time_ms, st);
 
@@ -526,20 +475,34 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[]) const
   return rc;
 }
 
+void parallel_test_runner::fill_worker_report_header(pt::ptree& root, const worker_report& rep) const {
+  root.put(worker_report_json::worker_id, rep.worker_id);
+  root.put(worker_report_json::processes, rep.processes);
+  root.put(worker_report_json::tests_count, static_cast<uint64_t>(rep.tests_count));
+  root.put(worker_report_json::unique_tests_count, static_cast<uint64_t>(rep.unique_tests_count));
+  root.put(worker_report_json::total_time_ms, rep.total_time_ms);
+  root.put(worker_report_json::skip_all_till_end, rep.skip_all_till_the_end);
+  root.put(worker_report_json::exit_code, rep.exit_code);
+}
+
+void parallel_test_runner::read_worker_report_header(const pt::ptree& root, uint32_t worker_id_fallback, worker_report& rep) const
+{
+  rep.worker_id = root.get<uint32_t>(worker_report_json::worker_id, worker_id_fallback);
+  rep.processes = root.get<uint32_t>(worker_report_json::processes, 1);
+  rep.tests_count = static_cast<size_t>(root.get<uint64_t>(worker_report_json::tests_count, 0));
+  rep.unique_tests_count = static_cast<size_t>(root.get<uint64_t>(worker_report_json::unique_tests_count, 0));
+  rep.total_time_ms = root.get<uint64_t>(worker_report_json::total_time_ms, 0);
+  rep.skip_all_till_the_end = root.get<bool>(worker_report_json::skip_all_till_end, false);
+  rep.exit_code = root.get<int>(worker_report_json::exit_code, 1);
+}
+
 bool parallel_test_runner::write_worker_report_file(const worker_report& rep) const
 {
   try
   {
-    std::filesystem::create_directories(get_worker_dir_path(rep.worker_id));
-
     pt::ptree root;
-    root.put("worker_id", rep.worker_id);
-    root.put("processes", rep.processes);
-    root.put("tests_count", static_cast<uint64_t>(rep.tests_count));
-    root.put("unique_tests_count", static_cast<uint64_t>(rep.unique_tests_count));
-    root.put("total_time_ms", rep.total_time_ms);
-    root.put("skip_all_till_the_end", rep.skip_all_till_the_end);
-    root.put("exit_code", rep.exit_code);
+    std::filesystem::create_directories(get_worker_dir_path(rep.worker_id));
+    fill_worker_report_header(root, rep);
 
     pt::ptree failed_arr;
     for (const auto& s : rep.failed_tests)
@@ -548,17 +511,17 @@ bool parallel_test_runner::write_worker_report_file(const worker_report& rep) co
       v.put("", s);
       failed_arr.push_back(std::make_pair("", v));
     }
-    root.add_child("failed_tests", failed_arr);
+    root.add_child(worker_report_json::failed_tests, failed_arr);
 
     pt::ptree times_arr;
     for (const auto& it : rep.tests_running_time)
     {
       pt::ptree node;
-      node.put("name", it.first);
-      node.put("ms", it.second);
+      node.put(worker_report_json::name, it.first);
+      node.put(worker_report_json::ms, it.second);
       times_arr.push_back(std::make_pair("", node));
     }
-    root.add_child("tests_running_time", times_arr);
+    root.add_child(worker_report_json::tests_running_time, times_arr);
 
     std::ofstream out(get_worker_report_path(rep.worker_id));
     if (!out.is_open())
@@ -585,35 +548,26 @@ bool parallel_test_runner::read_worker_report_file(uint32_t worker_id, worker_re
 {
   try
   {
-    const auto path = get_worker_report_path(worker_id);
+    const std::filesystem::path path = get_worker_report_path(worker_id);
     if (!std::filesystem::exists(path))
       return false;
 
     pt::ptree root;
     pt::read_json(path.string(), root);
+    read_worker_report_header(root, worker_id, rep);
 
-    rep.worker_id = root.get<uint32_t>(JSON_WORKER_ID, worker_id);
-    rep.processes = root.get<uint32_t>(JSON_PROCESSES, 1);
-
-    rep.tests_count = static_cast<size_t>(root.get<uint64_t>(JSON_TESTS_COUNT, 0));
-    rep.unique_tests_count = static_cast<size_t>(root.get<uint64_t>(JSON_UNIQUE_TESTS_COUNT, 0));
-    rep.total_time_ms = root.get<uint64_t>(JSON_TOTAL_TIME_MS, 0);
-
-    rep.skip_all_till_the_end = root.get<bool>(JSON_SKIP_ALL_TILL_END, false);
-    rep.exit_code = root.get<int>(JSON_EXIT_CODE, 1);
-
-    for (const auto& v : root.get_child(JSON_FAILED_TESTS, pt::ptree()))
+    for (const auto& v : root.get_child(worker_report_json::failed_tests, pt::ptree()))
     {
       const std::string name = v.second.get_value<std::string>();
       if (!name.empty())
         rep.failed_tests.insert(name);
     }
 
-    for (const auto& v : root.get_child(JSON_TESTS_RUNNING_TIME, pt::ptree()))
+    for (const auto& v : root.get_child(worker_report_json::tests_running_time, pt::ptree()))
     {
       const auto& node = v.second;
-      const std::string name = node.get<std::string>(JSON_NAME, "");
-      const uint64_t ms = node.get<uint64_t>(JSON_MS, 0);
+      const std::string name = node.get<std::string>(worker_report_json::name, "");
+      const uint64_t ms = node.get<uint64_t>(worker_report_json::ms, 0);
       if (!name.empty())
         rep.tests_running_time.emplace_back(name, ms);
     }
@@ -636,7 +590,7 @@ bool parallel_test_runner::read_worker_report_file(uint32_t worker_id, worker_re
 
 std::filesystem::path parallel_test_runner::get_worker_log_path(uint32_t worker_id) const
 {
-  return get_worker_dir_path(worker_id) / WORKER_LOG_FILENAME;
+  return get_worker_dir_path(worker_id) / files::worker_log;
 }
 
 std::filesystem::path parallel_test_runner::get_taken_tests_log_path_for_this_process() const
@@ -648,12 +602,12 @@ std::filesystem::path parallel_test_runner::get_taken_tests_log_path_for_this_pr
   {
     const uint32_t wid = static_cast<uint32_t>(worker_id);
     std::filesystem::create_directories(get_worker_dir_path(wid));
-    return get_worker_dir_path(wid) / TAKEN_TESTS_LOG_FILENAME;
+    return get_worker_dir_path(wid) / files::taken_tests_log;
   }
 
   const std::string data_dir = command_line::get_arg(m_vm, command_line::arg_data_dir);
   std::filesystem::create_directories(data_dir);
-  return std::filesystem::path(data_dir) / TAKEN_TESTS_LOG_FILENAME;
+  return std::filesystem::path(data_dir) / files::taken_tests_log;
 }
 
 void parallel_test_runner::log_test_taken_by_this_process(const std::string& test_name) const
@@ -719,18 +673,18 @@ bool parallel_test_runner::write_workers_report_file( uint32_t processes, const 
     );
 
     pt::ptree root;
-    root.put("format", 1);
-    root.put("processes", processes);
+    root.put(worker_report_json::format, 1);
+    root.put(worker_report_json::processes, processes);
 
     pt::ptree arr;
     for (const auto& t : tests)
     {
       pt::ptree node;
-      node.put("name", t.first);
-      node.put("ms", t.second);
+      node.put(worker_report_json::name, t.first);
+      node.put(worker_report_json::ms, t.second);
       arr.push_back(std::make_pair("", node));
     }
-    root.add_child("tests", arr);
+    root.add_child(worker_report_json::tests, arr);
 
     std::filesystem::path path = get_workers_report_path();
     std::ofstream out(path);
@@ -756,4 +710,89 @@ bool parallel_test_runner::write_workers_report_file( uint32_t processes, const 
     std::cerr << "write_workers_report_file: unknown exception, path=" << get_workers_report_path().string() << std::endl;
     return false;
   }
+}
+
+bool parallel_test_runner::read_workers_report_ms_map(const std::filesystem::path& path, std::unordered_map<std::string, uint64_t>& out_ms_by_test) const
+{
+  out_ms_by_test.clear();
+
+  try
+  {
+    if (!std::filesystem::exists(path))
+      return false;
+
+    pt::ptree root;
+    pt::read_json(path.string(), root);
+
+    for (const auto& v : root.get_child("tests", pt::ptree()))
+    {
+      const auto& node = v.second;
+      const std::string name = node.get<std::string>("name", "");
+      const uint64_t ms = node.get<uint64_t>("ms", 0);
+      if (!name.empty())
+        out_ms_by_test[name] = ms;
+    }
+
+    return !out_ms_by_test.empty();
+  }
+  catch (...)
+  {
+    return false;
+  }
+}
+
+bool parallel_test_runner::fill_shm_work_order(coretests_shm::shared_state* st, const std::vector<test_job>& jobs) const
+{
+  if (!st)
+    return false;
+
+  std::unordered_map<std::string, uint64_t> ms_by_test;
+  const std::filesystem::path report_path = get_workers_report_path();
+  (void)read_workers_report_ms_map(report_path, ms_by_test);
+
+  struct item_t { uint64_t ms; uint32_t idx; };
+  std::vector<item_t> items;
+  items.reserve(jobs.size());
+
+  uint64_t fallback = 1;
+  if (!ms_by_test.empty())
+  {
+    std::vector<uint64_t> known;
+    known.reserve(ms_by_test.size());
+    for (const auto& kv : ms_by_test) known.push_back(kv.second);
+    std::sort(known.begin(), known.end());
+    fallback = known[known.size() / 2];
+  }
+
+  for (uint32_t i = 0; i < jobs.size(); ++i)
+  {
+    const auto it = ms_by_test.find(jobs[i].name);
+    const uint64_t ms = (it != ms_by_test.end() ? it->second : fallback);
+    items.push_back(item_t{ms, i});
+  }
+
+  std::sort(items.begin(), items.end(), [](const item_t& a, const item_t& b) {
+    if (a.ms != b.ms) return a.ms > b.ms;
+    return a.idx < b.idx;
+  });
+
+  const uint32_t total = static_cast<uint32_t>(items.size());
+  if (total > coretests_shm::k_max_tests)
+  {
+    st->tests_total.store(coretests_shm::k_max_tests, std::memory_order_release);
+    st->next_pos.store(0, std::memory_order_release);
+    st->stop_all.store(false, std::memory_order_release);
+    for (uint32_t i = 0; i < coretests_shm::k_max_tests; ++i)
+      st->order[i] = i;
+    return false;
+  }
+
+  st->tests_total.store(total, std::memory_order_release);
+  st->next_pos.store(0, std::memory_order_release);
+  st->stop_all.store(false, std::memory_order_release);
+
+  for (uint32_t pos = 0; pos < total; ++pos)
+    st->order[pos] = items[pos].idx;
+
+  return true;
 }

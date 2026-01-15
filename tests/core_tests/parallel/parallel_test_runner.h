@@ -3,13 +3,23 @@
 #include <boost/program_options/variables_map.hpp>
 #include <boost/interprocess/shared_memory_object.hpp>
 #include <boost/interprocess/mapped_region.hpp>
+#include <boost/property_tree/ptree.hpp>
 #include <filesystem>
 #include <string>
 #include <vector>
 
+namespace pt = boost::property_tree;
+
+struct test_job
+{
+  std::string name;
+  std::function<bool()> run;
+};
+
 namespace coretests_shm
 {
-  constexpr uint32_t k_max_fails = 16384;
+  constexpr uint32_t k_max_fails = 4096;
+  constexpr uint32_t k_max_tests = 20000;
   constexpr uint32_t k_name_max  = 256;
 
   struct fail_entry
@@ -20,21 +30,45 @@ namespace coretests_shm
 
   struct shared_state
   {
-    std::atomic<uint32_t> write_idx;
+    // fail reporting
+    std::atomic<uint32_t> write_idx{0};
     fail_entry entries[k_max_fails];
 
-    void init() { write_idx.store(0, std::memory_order_relaxed); }
+    // work distribution
+    std::atomic<uint32_t> next_pos{0};
+    std::atomic<uint32_t> tests_total{0};
+    std::atomic<bool> stop_all{false};
 
-    void record_fail(uint32_t worker_id, const char* name)
+    uint32_t order[k_max_tests];
+
+    void record_fail(uint32_t wid, const char* name)
     {
-      uint32_t idx = write_idx.fetch_add(1, std::memory_order_relaxed);
-      if (idx >= k_max_fails)
+      const uint32_t pos = write_idx.fetch_add(1, std::memory_order_acq_rel);
+      if (pos >= k_max_fails)
         return;
 
-      entries[idx].worker_id = worker_id;
+      entries[pos].worker_id = wid;
+      std::strncpy(entries[pos].test_name, name ? name : "", k_name_max - 1);
+      entries[pos].test_name[k_name_max - 1] = '\0';
+    }
 
-      std::strncpy(entries[idx].test_name, name ? name : "", k_name_max - 1);
-      entries[idx].test_name[k_name_max - 1] = '\0';
+    void init()
+    {
+      write_idx.store(0, std::memory_order_relaxed);
+      next_pos.store(0, std::memory_order_relaxed);
+      tests_total.store(0, std::memory_order_relaxed);
+      stop_all.store(false, std::memory_order_relaxed);
+    }
+
+    bool try_take_next(uint32_t& out_test_idx)
+    {
+      const uint32_t total = tests_total.load(std::memory_order_acquire);
+      const uint32_t pos = next_pos.fetch_add(1, std::memory_order_acq_rel);
+      if (pos >= total)
+        return false;
+
+      out_test_idx = order[pos];
+      return true;
     }
   };
 }
@@ -63,40 +97,75 @@ public:
     int exit_code = 0;
   };
 
-  int run_parent_if_needed(int argc, char* argv[]) const;
-  std::filesystem::path get_worker_dir_path(uint32_t worker_id) const;
+  int run_parent_if_needed(int argc, char* argv[], const std::vector<test_job>& g_test_jobs) const;
   bool write_worker_report(const worker_report& rep) const;
-
-  std::filesystem::path get_taken_tests_log_path_for_this_process() const;
   void log_test_taken_by_this_process(const std::string& test_name) const;
 
-  std::filesystem::path get_workers_report_path() const;
-  bool write_workers_report_file(uint32_t processes, const std::vector<worker_report>& reps) const;
-
 private:
+  struct worker_report_json
+  {
+    static constexpr const char* worker_id              = "worker_id";
+    static constexpr const char* processes              = "processes";
+    static constexpr const char* tests_count            = "tests_count";
+    static constexpr const char* unique_tests_count     = "unique_tests_count";
+    static constexpr const char* total_time_ms          = "total_time_ms";
+    static constexpr const char* skip_all_till_end      = "skip_all_till_the_end";
+    static constexpr const char* exit_code              = "exit_code";
+    static constexpr const char* format                 = "format";
+    static constexpr const char* tests                  = "tests";
+
+    static constexpr const char* failed_tests           = "failed_tests";
+    static constexpr const char* tests_running_time     = "tests_running_time";
+    static constexpr const char* name                   = "name";
+    static constexpr const char* ms                     = "ms";
+  };
+
+  struct paths
+  {
+    static constexpr const char* default_run_root       = "chaingen_runs";
+    static constexpr const char* worker_dir_prefix          = "w";
+  };
+
+  struct files
+  {
+    static constexpr const char* taken_tests_log        = "taken_tests.log";
+    static constexpr const char* worker_report          = "coretests_report.json";
+    static constexpr const char* worker_log             = "worker.log";
+  };
+
+  struct cli_args
+  {
+    static constexpr const char* multiprocess_worker_id = "--multiprocess-worker-id";
+    static constexpr const char* multiprocess_run       = "--multiprocess-run";
+    static constexpr const char* multiprocess_run_root  = "--multiprocess-run-root";
+    static constexpr const char* multiprocess_shm_name  = "--multiprocess-shm-name";
+    static constexpr const char* data_dir               = "--data-dir";
+  };
+
   const boost::program_options::variables_map& m_vm;
-  mutable std::mutex cout_mx;
   mutable std::mutex cerr_mx;
 
   std::filesystem::path get_run_root_path() const;
   std::filesystem::path get_worker_report_path(uint32_t worker_id) const;
+  std::filesystem::path get_worker_log_path(uint32_t worker_id) const;
   std::string make_worker_data_dir(const std::filesystem::path& run_root_abs, int worker_id) const;
+  std::filesystem::path get_worker_dir_path(uint32_t worker_id) const;
+  std::filesystem::path get_taken_tests_log_path_for_this_process() const;
+  std::filesystem::path get_workers_report_path() const;
 
   std::vector<std::string> build_base_args_without_worker_specific(int argc, char* argv[]) const;
 
-  int run_workers_and_wait(int argc, char* argv[]) const;
-
+  int run_workers_and_wait(int argc, char* argv[], const std::vector<test_job>& g_test_jobs) const;
   int print_aggregated_report_and_return_rc(uint32_t processes, uint64_t wall_time_ms, const coretests_shm::shared_state* shm_state) const;
   void print_worker_failure_reasons(uint32_t processes, const std::vector<int>& worker_exit_codes) const;
 
+  bool fill_shm_work_order(coretests_shm::shared_state* st, const std::vector<test_job>& jobs) const;
+
+  bool write_workers_report_file(uint32_t processes, const std::vector<worker_report>& reps) const;
   bool write_worker_report_file(const worker_report& rep) const;
   bool read_worker_report_file(uint32_t worker_id, worker_report& rep) const;
+  void fill_worker_report_header(pt::ptree& root, const worker_report& rep) const;
+  void read_worker_report_header(const pt::ptree& root, uint32_t worker_id_fallback, worker_report& rep) const;
 
-  std::filesystem::path get_worker_log_path(uint32_t worker_id) const;
-};
-
-struct test_job
-{
-  std::string name;
-  std::function<bool()> run;
+  bool read_workers_report_ms_map(const std::filesystem::path& path, std::unordered_map<std::string, uint64_t>& out_ms_by_test) const;
 };
