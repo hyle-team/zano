@@ -3468,6 +3468,7 @@ void wallet2::store_watch_only(const std::wstring& path_to_save, const std::stri
 
   wo.m_watch_only = true;
   wo.m_account = m_account;
+  wo.m_password = password;
   wo.m_account.make_account_watch_only();
   wo.prepare_file_names(path_to_save);
 

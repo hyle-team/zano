@@ -1114,6 +1114,7 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_getblocktemplate(const COMMAND_RPC_GETBLOCKTEMPLATE::request& req, COMMAND_RPC_GETBLOCKTEMPLATE::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
+    TIME_MEASURE_START(t);
     if(!check_core_ready())
     {
       error_resp.code = CORE_RPC_ERROR_CODE_CORE_BUSY;
@@ -1188,7 +1189,10 @@ namespace currency
     res.seed = currency::ethash_epoch_to_seed(currency::ethash_height_to_epoch(res.height));
 
     res.status = API_RETURN_CODE_OK;
-    LOG_PRINT_L1("COMMAND_RPC_GETBLOCKTEMPLATE OK, response block: " << ENDL << currency::obj_to_json_str(resp.b));
+
+    TIME_MEASURE_FINISH(t);
+    LOG_PRINT_L1("COMMAND_RPC_GETBLOCKTEMPLATE -- OK  (took " << std::setprecision(2) << t / 1000.0 << " ms)");
+    LOG_PRINT_L2("response block: " << ENDL << currency::obj_to_json_str(resp.b));
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
