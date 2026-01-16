@@ -8062,7 +8062,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   bool pos_miner_tx = is_pos_miner_tx(input_tx);
 
   // eventually we should found all required public keys for all outputs this input refers to, because it's required for ring signature check
-  std::vector<crypto::public_key> pub_keys(abs_key_offsets.size(), null_pkey);  // old bare outputs
+  std::vector<std::shared_ptr<const transaction_chain_entry>> output_tx_entries;// to keep ownership for pointers and references till the end
   std::vector<const crypto::public_key*> pub_key_pointers;                      // old bare outputs (pointers)
   vector<crypto::CLSAG_GGX_input_ref_t> zc_input_ring;                          // ZC outputs
   vector<crypto::CLSAG_GGXXG_input_ref_t> zarcanum_input_ring;                  // Zarcanum outputs
@@ -8073,12 +8073,11 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
       {
         VARIANT_SWITCH_BEGIN(bo.target)
           VARIANT_CASE_CONST(txout_to_key, ttk)
-            pub_keys[index] = ttk.key;
-            pub_key_pointers.push_back(&pub_keys[index]);
+            pub_key_pointers.push_back(&ttk.key);
           VARIANT_CASE_CONST(txout_htlc, out_htlc)
             bool htlc_expired = out_htlc.expiration > top_minus_source_height ? false : true;
-            pub_keys[index] = htlc_expired ? out_htlc.pkey_refund : out_htlc.pkey_redeem;
-            pub_key_pointers.push_back(&pub_keys[index]);
+            const crypto::public_key *pkp = htlc_expired ? &out_htlc.pkey_refund : &out_htlc.pkey_redeem;
+            pub_key_pointers.push_back(pkp);
           VARIANT_CASE_OTHER()
             return false;
         VARIANT_SWITCH_END()
@@ -8099,9 +8098,8 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
 
   uint64_t height_of_current_alt_block = alt_chain.size() ? alt_chain.back()->second.height + 1 : split_height + 1;
 
-  for (size_t pk_n = 0; pk_n < pub_keys.size(); ++pk_n)
+  for (size_t pk_n = 0; pk_n < abs_key_offsets.size(); ++pk_n)
   {
-    [[maybe_unused]] crypto::public_key& pk = pub_keys[pk_n];
     crypto::hash tx_id = null_hash;
     uint64_t out_n = UINT64_MAX;
     auto &off = abs_key_offsets[pk_n];
@@ -8189,6 +8187,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
     auto p = m_db_transactions.get(tx_id);
     CHECK_AND_ASSERT_MES(p != nullptr && out_n < p->tx.vout.size(), false, "can't find output #" << out_n << " for tx " << tx_id << " referred by offset #" << pk_n);
     const tx_out_v& out_in_main = p->tx.vout[out_n];
+    output_tx_entries.push_back(p); // keeping the ownership till the end
 
     uint64_t height_of_source_block = p->m_keeper_block_height;
     CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
@@ -8235,7 +8234,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
     r = check_input_signature(input_tx, input_index, input_htlc, input_tx_hash, pub_key_pointers);
     CHECK_AND_ASSERT_MES(r, false, "to_key input validation failed");
   VARIANT_CASE_CONST(txin_zc_input, input_zc);
-    if (is_pos_miner_tx(input_tx))
+    if (pos_miner_tx)
     {
       // Zarcanum signature (PoS block miner tx)
       stake_kernel sk{};
