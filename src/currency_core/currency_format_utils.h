@@ -65,6 +65,7 @@ namespace currency
     std::string m_user_data_blob;
     extra_attachment_info m_attachment_info;
     asset_descriptor_operation m_asset_operation;
+    std::optional<gateway_address_descriptor_operation> m_opt_gateway_address_operation;
   };
 
   //---------------------------------------------------------------------------------------------------------------

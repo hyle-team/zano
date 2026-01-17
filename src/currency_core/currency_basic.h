@@ -158,12 +158,16 @@ namespace currency
   /************************************************************************/
   
   typedef crypto::public_key gateway_address_id_type;
+  typedef boost::variant<crypto::public_key, crypto::eth_public_key, crypto::eddsa_public_key> gateway_owner_key_v;
+  typedef boost::variant<crypto::generic_schnorr_sig_s, crypto::eth_signature, crypto::eddsa_signature> gateway_owner_signature_v;
+  typedef boost::variant<account_public_address, gateway_address_id_type> address_v;
+  const static account_public_address null_pub_addr = {};
 
   struct gateway_address_serialized_to_str
   {
+    uint8_t version;
     gateway_address_id_type gateway_addr;
     boost::optional<uint64_t> o_payment_id;
-    uint8_t version;
 
     BEGIN_VERSIONED_SERIALIZE(0, version)
       FIELD(gateway_addr)
@@ -173,11 +177,17 @@ namespace currency
 
 
 
-  const static account_public_address null_pub_addr = AUTO_VAL_INIT(null_pub_addr);
+  struct gateway_address_ownership_proof
+  {
+    uint8_t version = 0;
+    gateway_owner_signature_v sign;
 
-
-  typedef boost::variant<account_public_address, gateway_address_id_type> address_v;
-
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(sign)
+    END_SERIALIZE()
+  };
+  
+  
   typedef std::vector<crypto::signature> ring_signature;
 
   /************************************************************************/
@@ -1024,10 +1034,73 @@ namespace currency
     END_SERIALIZE()
   };
 
-  typedef boost::mpl::vector23<
+
+  ///////////////////////////////////////////////////////////////////////////////////
+// Gateway addresses structures
+
+  typedef boost::variant<dummy> gateway_base_etc_fields;
+
+  struct gateway_address_descriptor_base
+  {
+    uint8_t                 version = 0;
+    gateway_owner_key_v     owner_key;
+    std::vector<gateway_base_etc_fields> etc;  //container for future use if we would be adding some optional parameters that is not known yet, but without mess related to format version
+
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(owner_key)
+      //  FIELD(view_key)
+      FIELD(etc)
+      END_SERIALIZE()
+  };
+
+  struct gateway_address_descriptor_operation_register
+  {
+    uint8_t     version = 0;
+    crypto::public_key              view_pub_key = null_pkey;
+    gateway_address_descriptor_base descriptor;
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(view_pub_key)
+      FIELD(descriptor)
+      END_SERIALIZE()
+  };
+
+  struct gateway_address_descriptor_operation_update
+  {
+    uint8_t     version = 0;
+    gateway_address_id_type         address_id = null_pkey;
+    gateway_address_descriptor_base descriptor;
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(address_id)
+      FIELD(descriptor)
+      END_SERIALIZE()
+  };
+
+  typedef boost::variant<gateway_address_descriptor_operation_register, gateway_address_descriptor_operation_update> gateway_address_descriptor_operation_v;
+
+  struct gateway_address_descriptor_operation
+  {
+    uint8_t     version = 0;
+    gateway_address_descriptor_operation_v operation;
+
+    BEGIN_VERSIONED_SERIALIZE(0, version)
+      FIELD(operation)
+      END_SERIALIZE()
+  };
+
+
+
+
+
+
+  typedef boost::mpl::vector24<
     tx_service_attachment, tx_comment, tx_payer_old, tx_receiver_old, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time,
     etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry_old, extra_user_data, extra_padding, etc_tx_flags16_t, etc_tx_details_unlock_time2,
-    tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, asset_descriptor_operation
+    tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, asset_descriptor_operation, 
+    //hf6
+    gateway_address_descriptor_operation
   > all_payload_types;
   
   typedef boost::make_variant_over<all_payload_types>::type payload_items_v;
@@ -1035,39 +1108,6 @@ namespace currency
   typedef payload_items_v attachment_v;
 
 
-
-
-  ///////////////////////////////////////////////////////////////////////////////////
-  // Gateway addresses structures
-
-  typedef boost::variant<dummy> gateway_base_etc_fields;
-  typedef boost::variant<crypto::public_key, crypto::eth_public_key, crypto::eddsa_public_key> v_gateway_owner_key;
-
-
-
-  struct gateway_address_descriptor_base
-  {
-    uint8_t                 version = 0;
-    v_gateway_owner_key     owner_key;
-    crypto::public_key      view_key;
-    std::vector<gateway_base_etc_fields> etc;  //container for future use if we would be adding some optional parameters that is not known yet, but without mess related to format version
-
-
-    BEGIN_VERSIONED_SERIALIZE(0, version)
-      FIELD(owner_key)
-      FIELD(view_key)
-      FIELD(etc)
-    END_SERIALIZE()
-
-      /*
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(version)       DOC_DSCR("Struct vrsion.") DOC_EXMP(0)   DOC_END
-        KV_SERIALIZE(owner_key)     DOC_DSCR(".") DOC_EXMP(500000000000000000)    DOC_END
-        KV_SERIALIZE(view_key)      DOC_DSCR("Decimal point.")                      DOC_EXMP(12)                        DOC_END
-        KV_SERIALIZE(etc)           DOC_DSCR("Ticker associated with the asset.")   DOC_EXMP("ZABC")                    DOC_END
-      END_KV_SERIALIZE_MAP()
-      */
-  };
 
 
 
@@ -1116,7 +1156,7 @@ namespace currency
 
   typedef boost::variant<NLSAG_sig, void_sig, ZC_sig, zarcanum_sig, gateway_sig> signature_v;
 
-  typedef boost::variant<zc_asset_surjection_proof, zc_outs_range_proof, zc_balance_proof, asset_operation_proof, asset_operation_ownership_proof, asset_operation_ownership_proof_eth> proof_v;
+  typedef boost::variant<zc_asset_surjection_proof, zc_outs_range_proof, zc_balance_proof, asset_operation_proof, asset_operation_ownership_proof, asset_operation_ownership_proof_eth, gateway_address_ownership_proof> proof_v;
 
 
   //include backward compatibility defintions
@@ -1407,6 +1447,14 @@ SET_VARIANT_TAGS(crypto::signature, 70, "schnorr_signature");
 SET_VARIANT_TAGS(crypto::eth_signature, 71, "eth_signature");
 
 SET_VARIANT_TAGS(currency::account_public_address, 72, "account_public_address");
+SET_VARIANT_TAGS(currency::gateway_address_descriptor_operation, 73, "gateway_address_descriptor_operation");
+
+SET_VARIANT_TAGS(currency::gateway_address_descriptor_operation_register, 74, "gateway_address_descriptor_operation_register");
+SET_VARIANT_TAGS(currency::gateway_address_descriptor_operation_update, 75, "gateway_address_descriptor_operation_update"); 
+
+SET_VARIANT_TAGS(currency::gateway_address_ownership_proof, 76, "gateway_address_ownership_proof");
+SET_VARIANT_TAGS(crypto::generic_schnorr_sig_s, 70, "generic_schnorr_sig_s");
+
 
 
 

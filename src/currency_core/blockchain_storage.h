@@ -718,13 +718,20 @@ namespace currency
     bool complete_timestamps_vector(uint64_t start_height, std::vector<uint64_t>& timestamps);
     bool update_next_comulative_size_limit();
     bool process_blockchain_tx_extra(const transaction& tx, const crypto::hash& tx_id, const uint64_t height);
-    bool unprocess_blockchain_tx_extra(const transaction& tx, const uint64_t height);
+    bool unprocess_blockchain_tx_extra(const transaction& tx, const uint64_t height, const crypto::hash& tx_id);
     bool process_blockchain_tx_attachments(const transaction& tx, uint64_t h, const crypto::hash& bl_id, uint64_t timestamp);
     bool unprocess_blockchain_tx_attachments(const transaction& tx, uint64_t h, uint64_t timestamp);
     bool pop_alias_info(const extra_alias_entry& ai);
     bool put_alias_info(const transaction& tx, extra_alias_entry& ai);
     bool pop_asset_info(const asset_descriptor_operation& ado, const uint64_t height);
     bool put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, const uint64_t height);
+    bool put_gw_address_operation(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation& ado, const uint64_t height);
+    bool pop_gw_address_operation(const gateway_address_descriptor_operation& ado, const uint64_t height, const crypto::hash& tx_id);
+
+    bool put_gw_address_operation_register(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation_register& gao, const uint64_t height);
+    bool put_gw_address_operation_update(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation_update& gao, const uint64_t height);
+    bool validate_gw_address_ownership(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation_update& gao, const gateway_address_data& gad, const uint64_t height);
+
     void fill_addr_to_alias_dict();
     //bool resync_spent_tx_flags();
     bool prune_ring_signatures_and_attachments_if_need();

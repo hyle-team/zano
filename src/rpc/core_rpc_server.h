@@ -183,6 +183,10 @@ namespace currency
         //
         MAP_JON_RPC_WE("marketplace_global_get_offers_ex", on_get_offers_ex,          COMMAND_RPC_GET_OFFERS_EX)        
         MAP_JON_RPC_WE("validate_signature",          on_validate_signature,          COMMAND_VALIDATE_SIGNATURE)
+        
+        //gateway addresses api
+        //MAP_JON_RPC_WE("register",       on_get_gateway_addresses,      COMMAND_RPC_GET_GATEWAY_ADDRESSES)
+
         CHAIN_TO_PHANDLER(m_prpc_chain_handler)
       END_JSON_RPC_MAP()
       CHAIN_TO_PHANDLER(m_prpc_chain_handler)

@@ -1007,7 +1007,7 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
   fee = get_tx_fee(tx_res_ptr->tx);
   purge_transaction_keyimages_from_blockchain(tx, true);
   
-  bool r = unprocess_blockchain_tx_extra(tx, tx_res_ptr->m_keeper_block_height);
+  bool r = unprocess_blockchain_tx_extra(tx, tx_res_ptr->m_keeper_block_height, tx_id);
   CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra for tx " << tx_id);
  
   r = unprocess_blockchain_tx_attachments(tx, get_current_blockchain_size(), 0/*TODO: add valid timestamp here in future if need*/);
@@ -4207,7 +4207,7 @@ bool blockchain_storage::pop_transaction_from_global_index(const transaction& tx
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx, const uint64_t height)
+bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx, const uint64_t height, const crypto::hash& tx_id)
 {
   tx_extra_info ei = AUTO_VAL_INIT(ei);
   bool r = parse_and_validate_tx_extra(tx, ei);
@@ -4223,6 +4223,13 @@ bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx, co
     r = pop_asset_info(ei.m_asset_operation, height);
     CHECK_AND_ASSERT_MES(r, false, "failed to pop_alias_info");
   }
+
+  if (ei.m_opt_gateway_address_operation)
+  {
+    r = pop_gw_address_operation(*ei.m_opt_gateway_address_operation, height, tx_id);
+    CHECK_AND_ASSERT_MES(r, false, "failed to pop_gw_address_operation");
+  }
+
   return true;
 }
 //------------------------------------------------------------------
@@ -4976,7 +4983,117 @@ bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx, cons
     CHECK_AND_ASSERT_MES(r, false, "failed to put_asset_info");
   }
 
+  if (ei.m_opt_gateway_address_operation)
+  {
+    r = put_gw_address_operation(tx, tx_id, ei.m_opt_gateway_address_operation.value(), height);
+    CHECK_AND_ASSERT_MES(r, false, "failed to put_gateway_address_operation");
+  } 
+
   return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::put_gw_address_operation_register(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation_register& gao, const uint64_t height)
+{
+  auto add_entry_ptr = m_db_gateway_addresses.find(gao.view_pub_key);
+  CHECK_AND_ASSERT_MES(!add_entry_ptr, false, "gateway_address_descriptor_operation_register for tx " << tx_id << " trying to register address " << gao.view_pub_key << " which is already registered");
+
+  gateway_address_data gad{};
+  gad.info_history.push_back(gao.descriptor);
+  m_db_gateway_addresses.set(gao.view_pub_key, gad);
+
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::put_gw_address_operation_update(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation_update& gao, const uint64_t height)
+{
+  auto upd_entry_ptr = m_db_gateway_addresses.find(gao.address_id);
+  CHECK_AND_ASSERT_MES(upd_entry_ptr, false, "gateway_address_descriptor_operation_update for tx " << tx_id << " trying to update address " << gao.address_id << " which is not exist");
+  bool r = validate_gw_address_ownership(tx, tx_id, gao, *upd_entry_ptr, height);
+  CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed for gateway address " << gao.address_id << " in tx " << tx_id);
+  
+  gateway_address_data local_gad = *upd_entry_ptr;
+  local_gad.info_history.push_back(gao.descriptor);
+  m_db_gateway_addresses.set(gao.address_id, local_gad);
+
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::validate_gw_address_ownership(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation_update& gao, const gateway_address_data& gad, const uint64_t height)
+{
+  gateway_address_ownership_proof gaoop{};
+  bool r = get_type_in_variant_container(tx.proofs, gaoop);
+  CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed: gateway_address_ownership_proof is missing for gw address " << gao.address_id << " in tx " << tx_id);
+  CHECK_AND_ASSERT_MES(gad.info_history.size(), false, "Ownership validation failed: gateway_address_info_history is empty for gw address " << gao.address_id << " in tx " << tx_id);
+
+  const gateway_address_descriptor_base address_desciptor = gad.info_history.back();
+
+  VARIANT_SWITCH_BEGIN(address_desciptor.owner_key)
+  VARIANT_CASE_CONST(crypto::public_key, o)
+  {
+    CHECK_AND_ASSERT_MES(gaoop.sign.type() == typeid(crypto::generic_schnorr_sig_s), false, "Ownership validation failed: invalid signature type for gw address " << gao.address_id << " in tx " << tx_id);
+    r = crypto::verify_schnorr_sig(tx_id, o, boost::get<crypto::generic_schnorr_sig_s>(gaoop.sign));
+  }
+  VARIANT_CASE_CONST(crypto::eth_public_key, u)
+  {
+    CHECK_AND_ASSERT_MES(gaoop.sign.type() == typeid(crypto::eth_signature), false, "Ownership validation failed: invalid signature type for gw address " << gao.address_id << " in tx " << tx_id);
+    r = crypto::verify_eth_signature(tx_id, u, boost::get<crypto::eth_signature>(gaoop.sign));
+  }
+  VARIANT_CASE_CONST(crypto::eddsa_public_key, u)
+  {
+    CHECK_AND_ASSERT_MES(gaoop.sign.type() == typeid(crypto::eddsa_signature), false, "Ownership validation failed: invalid signature type for gw address " << gao.address_id << " in tx " << tx_id);
+    r = crypto::verify_eddsa_signature(tx_id, u, boost::get<crypto::eddsa_signature>(gaoop.sign));
+  }
+  VARIANT_SWITCH_END();
+
+  CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed: signature verification failed for gw address " << gao.address_id << " in tx " << tx_id);
+  return r;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::put_gw_address_operation(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation& gao, const uint64_t height)
+{
+  VARIANT_SWITCH_BEGIN(gao.operation);
+  VARIANT_CASE_CONST(gateway_address_descriptor_operation_register, o)
+  {
+    return put_gw_address_operation_register(tx, tx_id, o, height);
+  }
+  VARIANT_CASE_CONST(gateway_address_descriptor_operation_update, u)
+  {
+    return put_gw_address_operation_update(tx, tx_id, u, height);
+  }
+  VARIANT_SWITCH_END();
+  return false;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::pop_gw_address_operation(const gateway_address_descriptor_operation& gao, const uint64_t height, const crypto::hash& tx_id)
+{
+  gateway_address_id_type address_id = null_pkey;
+  VARIANT_SWITCH_BEGIN(gao.operation);
+  VARIANT_CASE_CONST(gateway_address_descriptor_operation_register, o)
+  {
+    address_id = o.view_pub_key;
+  }
+  VARIANT_CASE_CONST(gateway_address_descriptor_operation_update, u)
+  {
+    address_id = u.address_id;
+  }
+  VARIANT_SWITCH_END();
+
+
+
+  auto upd_entry_ptr = m_db_gateway_addresses.find(address_id);
+  CHECK_AND_ASSERT_MES(upd_entry_ptr, false, "Internal error: pop_gw_address_operation for tx " << tx_id << " trying to pop address " << address_id << " which is not exist");
+
+  gateway_address_data local_gad = *upd_entry_ptr;
+
+  CHECK_AND_ASSERT_MES(local_gad.info_history.size(), false, "Internal error: pop_gw_address_operation for tx " << tx_id << " trying to pop address " << address_id << " which has zero info_history.size()");
+
+  local_gad.info_history.pop_back();
+  if(local_gad.info_history.size())
+    m_db_gateway_addresses.set(address_id, local_gad);
+  else
+    m_db_gateway_addresses.erase(address_id);
+
+  return false;
 }
 //------------------------------------------------------------------
 bool blockchain_storage::get_outs_index_stat(outs_index_stat& outs_stat) const
@@ -5231,7 +5348,7 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
     {
       LOG_ERROR("critical internal error: add_transaction_input_visitor failed. but key_images should be already checked");
       purge_transaction_keyimages_from_blockchain(tx, false);
-      bool r = unprocess_blockchain_tx_extra(tx, bl_height);
+      bool r = unprocess_blockchain_tx_extra(tx, bl_height, tx_id);
       CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra");
       
       unprocess_blockchain_tx_attachments(tx, bl_height, timestamp);
@@ -5252,7 +5369,7 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   {
     LOG_ERROR("critical internal error: tx with id: " << tx_id << " in block id: " << bl_id << " already in blockchain");
     purge_transaction_keyimages_from_blockchain(tx, true);
-    bool r = unprocess_blockchain_tx_extra(tx, bl_height);
+    bool r = unprocess_blockchain_tx_extra(tx, bl_height, tx_id);
     CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra");
 
     unprocess_blockchain_tx_attachments(tx, bl_height, timestamp);
@@ -6137,7 +6254,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 
   CHECK_AND_ASSERT_MES(gw_entry_ptr->info_history.size(), false, "Gateway input validation failed: gateway address " << gw_in.gateway_addr << " has no info history");
 
-  const v_gateway_owner_key& gw_owner_key = gw_entry_ptr->info_history.back().owner_key;
+  const gateway_owner_key_v& gw_owner_key = gw_entry_ptr->info_history.back().owner_key;
   VARIANT_SWITCH_BEGIN(gw_owner_key);
   VARIANT_CASE_CONST(crypto::public_key, pkey)
   {
@@ -6607,6 +6724,7 @@ struct visitor_proxy : public boost::static_visitor<const x_type*>
   DEFINE_TERMS(   no,   no,   one,  one,  one,  one,  one,  one,    extra,             extra_alias_entry                  );
   DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    extra,             zarcanum_tx_data_v1                );
   DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    extra,             asset_descriptor_operation         );
+  DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  one,    extra,             gateway_address_descriptor_operation);
     //inputs
   DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,    input,             txin_gen                           );
   DEFINE_TERMS(   many, many, many, many, many, many, many, many,   input,             txin_to_key                        );
@@ -6614,7 +6732,6 @@ struct visitor_proxy : public boost::static_visitor<const x_type*>
   DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   input,             txin_zc_input                      );
   DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   many, many,   input,             txin_gateway                       );
     //outputs
-
   DEFINE_TERMS(   many, many, many, many, no,   no,   no,   no,     output,            tx_out_bare                        );
   DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   output,            tx_out_zarcanum                    );
   DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   many, many,   output,            tx_out_gateway                     );
@@ -6631,6 +6748,7 @@ struct visitor_proxy : public boost::static_visitor<const x_type*>
   DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    proofs,            asset_operation_proof              );
   DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    proofs,            asset_operation_ownership_proof    );
   DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    proofs,            asset_operation_ownership_proof_eth);
+  DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  one,    proofs,            gateway_address_ownership_proof    );
 
 
 

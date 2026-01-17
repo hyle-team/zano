@@ -975,6 +975,8 @@ namespace currency
     mutable bool was_userdata = false;
     mutable bool was_alias = false;
     mutable bool was_asset = false;
+    mutable bool was_gateway = false;
+
 
     tx_extra_info& rei;
     const transaction& rtx;
@@ -1007,6 +1009,12 @@ namespace currency
     {
       ENSURE_ONETIME(was_asset, "asset");
       rei.m_asset_operation = ado;
+      return true;
+    }
+    bool operator()(const gateway_address_descriptor_operation& gao) const
+    {
+      ENSURE_ONETIME(was_gateway, "gateway");
+      rei.m_opt_gateway_address_operation = gao;
       return true;
     }
     bool operator()(const extra_alias_entry_old& ae) const

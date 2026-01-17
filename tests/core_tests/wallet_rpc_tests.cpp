@@ -467,6 +467,7 @@ std::string transfer_(std::shared_ptr<tools::wallet2> wlt, const std::string& ad
   return tr_resp.tx_hash;
 }
 
+
 bool test_payment_ids_generation(tools::wallet_rpc_server& custody_wlt_rpc)
 {
   //check make_integrated_address/split_integrated_address
@@ -1707,6 +1708,55 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
   }
 
   miner_wlt->callback(std::make_shared<tools::i_wallet2_callback>());
+
+  return true;
+}
+
+wallet_rpc_gateway_address::wallet_rpc_gateway_address()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_gateway_address, c1);
+}
+
+bool wallet_rpc_gateway_address::generate(std::vector<test_event_entry>& events) const
+{
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core"); // default callback will initialize core runtime config with m_hardforks
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+
+bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+
+  bool r = false;
+  account_base alice_acc;
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, alice_acc);
+
+  r = mine_next_pow_blocks_in_playtime(alice_wlt->get_account().get_public_address(), c, 3);
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+
+
+
+  // wallet RPC server
+  tools::wallet_rpc_server alice_wlt_rpc(alice_wlt);
+
+  std::string alice_payment_id = gen_payment_id(alice_wlt_rpc);
+
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, 3), false, "");
+
+
+#define TRANSFER_AMOUNT   COIN / 10
+
+  std::string alice_tx1 = transfer_(alice_wlt, get_integr_addr(custody_wlt_rpc, alice_payment_id), TRANSFER_AMOUNT);
+
 
   return true;
 }

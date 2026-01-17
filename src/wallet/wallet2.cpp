@@ -5595,6 +5595,54 @@ void wallet2::fill_adb_version_based_onhardfork(currency::asset_descriptor_base&
   }
 }
 //----------------------------------------------------------------------------------------------------
+void wallet2::register_gateway_address(const wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request& req, wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response& res, currency::finalized_tx& ft)
+{
+  gateway_address_descriptor_operation_register operation_register = {};
+  gateway_address_descriptor_operation gateway_operation = {};
+
+  size_t count_keys = 0;
+  if(req.opt_owner_custom_schnorr_pub_key)
+    count_keys++;
+  if(req.opt_owner_eddsa_pub_key)
+    count_keys++;
+  if(req.opt_owner_eth_pub_key)
+    count_keys++; 
+  
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(count_keys == 1, "Exactly one owner public key must be provided");
+
+  if(req.opt_owner_custom_schnorr_pub_key)
+  {
+    operation_register.descriptor.owner_key = req.opt_owner_custom_schnorr_pub_key.value();
+  }
+  else if(req.opt_owner_eddsa_pub_key)
+  {
+    operation_register.descriptor.owner_key = req.opt_owner_eddsa_pub_key.value();
+  }
+  else if(req.opt_owner_eth_pub_key)
+  {
+    operation_register.descriptor.owner_key = req.opt_owner_eth_pub_key.value();
+  }
+   
+  operation_register.view_pub_key = req.view_pub_key;
+  gateway_operation.operation = operation_register;
+
+  construct_tx_param ctp = get_default_construct_tx_param();
+
+
+  tx_destination_entry td = AUTO_VAL_INIT(td);
+  td.addr.push_back(this->get_account().get_public_address());
+  td.amount = COIN / 100; // 0.01 ZANO to make tx valid
+  td.asset_id = currency::native_coin_asset_id;
+  ctp.dsts.push_back(td);
+
+  ctp.extra.push_back(gateway_operation);
+  ctp.need_at_least_1_zc = true;
+  ctp.tx_meaning_for_logs = "gateway registration";
+
+  this->transfer(ctp, ft, true, nullptr);
+  res.address_id = operation_register.view_pub_key;
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::finalized_tx& ft, crypto::public_key& new_asset_id)
 {
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(asset_info.decimal_point <= 18, "too big decimal point: " << (int)asset_info.decimal_point);
