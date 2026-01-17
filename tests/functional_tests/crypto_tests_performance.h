@@ -140,6 +140,45 @@ TEST(perf, primitives)
     return run_cn_fash_hash::run(t, rounds, 2048ull);
   });
 
+  run("Hp(32 bytes)", 10000, [](timer_t& t, size_t rounds) {
+    std::vector<size_t> rnd_indecies;
+    helper::make_rnd_indicies(rnd_indecies, rounds);
+
+    scalar_vec_t randoms;
+    randoms.resize_and_make_random(rounds);
+
+    std::vector<point_t> result(rounds);
+
+    t.start();
+    for (size_t i = 0; i < rounds; ++i)
+    {
+      result[i] = hash_helper_t::hp(randoms[rnd_indecies[i]].data(), sizeof(scalar_t));
+    }
+    t.stop();
+
+    return HASH_64_VEC(result);
+  });
+
+  run("Hp(point_t)", 10000, [](timer_t& t, size_t rounds) {
+    std::vector<size_t> rnd_indecies;
+    helper::make_rnd_indicies(rnd_indecies, rounds);
+
+    std::vector<point_t> points(rounds);
+    std::vector<point_t> result(rounds);
+
+    for (size_t i = 0; i < rounds; ++i)
+      points[i] = scalar_t::random() * c_point_G;
+
+    t.start();
+    for (size_t i = 0; i < rounds; ++i)
+    {
+      result[i] = hash_helper_t::hp(points[rnd_indecies[i]]);
+    }
+    t.stop();
+
+    return HASH_64_VEC(result);
+  });
+
   LOG_PRINT_L0(ENDL << "native crypto primitives:");
 
   run("sc_reduce", 30000, [](timer_t& t, size_t rounds) {
