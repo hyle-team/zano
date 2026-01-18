@@ -485,8 +485,12 @@ namespace currency
       if (!add_tx_extra_userdata(tx, extra_nonce))
         return false;
 
-    //at this moment we do apply_unlock_time only for coin_base transactions 
-    apply_unlock_time(destinations, tx);
+    //at this moment we do apply_unlock_time only for coin_base transactions and only before hf6
+    if (tx_hadrfork_id < ZANO_HARDFORK_06)
+    {
+      apply_unlock_time(destinations, tx);
+    }
+
     //we always add extra_padding with 2 bytes length to make possible for get_block_template to adjust cumulative size
     tx.extra.push_back(extra_padding());
 
@@ -540,7 +544,7 @@ namespace currency
     if (tx.attachment.size())
       add_attachments_info_to_extra(tx.extra, tx.attachment);
 
-    if (!have_type_in_variant_container<etc_tx_details_unlock_time2>(tx.extra))
+    if (tx_hadrfork_id < ZANO_HARDFORK_06 && !have_type_in_variant_container<etc_tx_details_unlock_time2>(tx.extra))
     {
       //if stake unlock time was not set, then we can use simple "whole transaction" lock scheme 
       set_tx_unlock_time(tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);

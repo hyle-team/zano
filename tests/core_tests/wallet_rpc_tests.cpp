@@ -1736,13 +1736,16 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
 
   bool r = false;
   account_base alice_acc;
+  alice_acc.generate();
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, alice_acc);
 
   r = mine_next_pow_blocks_in_playtime(alice_wlt->get_account().get_public_address(), c, 3);
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
-
+  alice_wlt->refresh(); 
+  //transfer_(alice_wlt, miner_wlt->get_account().get_public_address_str(), COIN);
+  //r = mine_next_pow_blocks_in_playtime(alice_wlt->get_account().get_public_address(), c, 3);
 
 
   // wallet RPC server
@@ -1750,12 +1753,16 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
 
   std::string alice_payment_id = gen_payment_id(alice_wlt_rpc);
 
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, 3), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, 3 * COIN), false, "");
 
+  crypto::public_key gw_addr_public_key{};
+  crypto::secret_key gw_addr_secret_key{};
+  crypto::generate_keys(gw_addr_public_key, gw_addr_secret_key);
 
+  std::string gw_address = currency::get_account_address_as_str(gw_addr_public_key);
 #define TRANSFER_AMOUNT   COIN / 10
 
-  std::string alice_tx1 = transfer_(alice_wlt, get_integr_addr(custody_wlt_rpc, alice_payment_id), TRANSFER_AMOUNT);
+  std::string alice_tx1 = transfer_(alice_wlt, gw_address, TRANSFER_AMOUNT);
 
 
   return true;

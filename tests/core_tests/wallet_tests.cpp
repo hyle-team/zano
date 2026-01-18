@@ -53,8 +53,9 @@ bool determine_tx_real_inputs(currency::core& c, const currency::transaction& tx
       , m_found(false)
     {}
 
-    bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out_v& out_v, uint64_t source_tx_output_index)
+    bool handle_output(std::shared_ptr<const transaction_chain_entry> source_tx_ptr, const transaction& validated_tx, const tx_out_v& out_v, uint64_t source_tx_output_index)
     {
+      const transaction& source_tx = source_tx_ptr->tx;
       CHECK_AND_ASSERT_MES(!m_found, false, "Internal error: m_found is true but the visitor is still being applied");
       /*
       auto is_even = [&](const tx_out_v& v) { return boost::get<tx_out_bare>(v) == out; };

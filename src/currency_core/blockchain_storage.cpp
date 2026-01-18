@@ -1600,13 +1600,16 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
 
   if (is_hardfork_active_for_height(ZANO_HARDFORK_01, height))
   {
-    // new rules that allow different unlock time in coinbase outputs
-    uint64_t max_unlock_time = 0;
-    uint64_t min_unlock_time = 0;
-    bool r = get_tx_max_min_unlock_time(b.miner_tx, max_unlock_time, min_unlock_time);
-    CHECK_AND_ASSERT_MES(r && min_unlock_time >= height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW,
-      false,
-      "coinbase transaction has wrong min_unlock_time: " << min_unlock_time << ", expected to be greater than or equal to " << height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+    if (!is_hardfork_active_for_height(ZANO_HARDFORK_06, height))
+    {
+      // new rules that allow different unlock time in coinbase outputs
+      uint64_t max_unlock_time = 0;
+      uint64_t min_unlock_time = 0;
+      bool r = get_tx_max_min_unlock_time(b.miner_tx, max_unlock_time, min_unlock_time);
+      CHECK_AND_ASSERT_MES(r && min_unlock_time >= height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW,
+        false,
+        "coinbase transaction has wrong min_unlock_time: " << min_unlock_time << ", expected to be greater than or equal to " << height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+    }
   }
   else
   {
@@ -5899,8 +5902,28 @@ struct outputs_visitor
     , m_scan_context(scan_context)
   {}
 
-  bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out_v& out_v, uint64_t out_i)
+  bool handle_output(std::shared_ptr<const transaction_chain_entry> source_tx_ptr, const transaction& validated_tx, const tx_out_v& out_v, uint64_t out_i)
   {
+    //as in hardfork 6 lock time entries are not allowed anymore, we would need now explicitly check coinbase outputs for needed confirmation time
+    if (m_bch.is_hardfork_active(ZANO_HARDFORK_06))
+    {
+      if (is_coinbase(source_tx_ptr->tx))
+      {
+        uint64_t required_confirmations = m_bch.get_core_runtime_config().min_coinstake_age;
+        uint64_t source_tx_block_height = source_tx_ptr->m_keeper_block_height;
+        uint64_t current_blockchain_size = m_bch.get_current_blockchain_size();
+        CHECK_AND_ASSERT_MES(current_blockchain_size >= source_tx_block_height, false, "internal error: current_blockchain_size=" << current_blockchain_size << " is less than source_tx_block_height=" << source_tx_block_height);
+        uint64_t confirmations = current_blockchain_size - source_tx_block_height;
+        if (confirmations < required_confirmations)
+        {
+          LOG_PRINT_L0("Source coinbase tx output #" << out_i << " has only " << confirmations << " confirmations, required are " << required_confirmations);
+          return false;
+        }
+      }
+    }
+    
+
+    const transaction& source_tx = source_tx_ptr->tx;
     //check tx unlock time
     uint64_t source_out_unlock_time = get_tx_unlock_time(source_tx, out_i);
     //let coinbase sources for PoS block to have locked inputs, the outputs supposed to be locked same way, except the reward 
@@ -6702,7 +6725,7 @@ struct visitor_proxy : public boost::static_visitor<const x_type*>
  // 
  //payloads
   DEFINE_TERMS(   many, many, many, many, many, many, many, many,   extra|attach,      tx_service_attachment              );
-  DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  no,   no,     extra,             tx_comment                         );
+  DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,    extra,             tx_comment                         );
   DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  no,   no,     extra|attach,      tx_payer_old                       );
   DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  no,   no,     extra|attach,      tx_receiver_old                    );
   DEFINE_TERMS(   no,   no,   one,  one,  one,  one,  no,   no,     extra|attach,      tx_payer                           );
@@ -6779,17 +6802,24 @@ struct visitor_proxy : public boost::static_visitor<const x_type*>
       switch (t_traits::hf[m_current_hard_fork_id])
       {
       case no:
+        LOG_ERROR("Transaction contains type " << typeid(T).name() << " at hf " << m_current_hard_fork_id << ", which is not allowed at current hardfork id " << m_current_hard_fork_id);
         return false;
       case one:
         if (type_count > 1)
+        {
+          LOG_ERROR("Transaction contains type " << typeid(T).name() << " at hf " << m_current_hard_fork_id << ", more than once which is not allowed at current hardfork id " << m_current_hard_fork_id);
           return false;
+        }
         else
           return true;
       case many:
         return true;
       default:
+        LOG_ERROR("Transaction contains type " << typeid(T).name() << " at hf " << m_current_hard_fork_id << ", unknown allowance type which is not allowed at current hardfork id " << m_current_hard_fork_id);
         return false; //unknown type on terms map
       }
+
+      LOG_ERROR("Transaction contains type " << typeid(T).name() << " at hf " << m_current_hard_fork_id << ", unknown error");
       return false;
     }
   };
