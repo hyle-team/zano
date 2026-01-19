@@ -423,33 +423,6 @@ bool multiassets_basic_test::c1(currency::core& c, size_t ev_index, const std::v
   return true;
 }
 
-//------------------------------------------------------------------------------
-//@#@  TODO: subject for refactoring: this fill_ado*/fill_adb* are copy/paste clones of wallet's, need to be implemented in one place at some point
-//----------------------------------------------------------------------------------------------------
-void fill_ado_version_based_onhardfork(currency::asset_descriptor_operation& asset_reg_info, size_t current_latest_hf)
-{
-  if (current_latest_hf < ZANO_HARDFORK_05)
-  {
-    asset_reg_info.version = ASSET_DESCRIPTOR_OPERATION_HF4_VER;
-  }
-  else
-  {
-    asset_reg_info.version = ASSET_DESCRIPTOR_OPERATION_LAST_VER;
-  }
-}
-
-void fill_adb_version_based_onhardfork(currency::asset_descriptor_base& asset_base, size_t current_latest_hf)
-{
-  if (current_latest_hf < ZANO_HARDFORK_05)
-  {
-    asset_base.version = ASSET_DESCRIPTOR_BASE_HF4_VER;
-  }
-  else
-  {
-    asset_base.version = ASSET_DESCRIPTOR_BASE_LAST_VER;
-  }
-}
-
 //----------------------------------------------------------------------------------------------------
 
 

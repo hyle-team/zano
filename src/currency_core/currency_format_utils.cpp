@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -302,8 +302,6 @@ namespace currency
       VARIANT_SWITCH_BEGIN(vin);
       VARIANT_CASE_CONST(txin_to_key, tk)
         bare_inputs_sum += tk.amount;
-      VARIANT_CASE_CONST(txin_htlc, foo);
-        CHECK_AND_ASSERT_MES(false, false, "unexpected txin_htlc input");
       VARIANT_CASE_CONST(txin_multisig, ms);
         //bare_inputs_sum += ms.amount;
         CHECK_AND_ASSERT_MES(false, false, "unexpected txin_multisig input"); // TODO @#@# check support for multisig inputs
@@ -649,8 +647,6 @@ namespace currency
         VARIANT_SWITCH_BEGIN(vin);
         VARIANT_CASE_CONST(txin_to_key, tk)
           bare_inputs_sum += tk.amount;
-        VARIANT_CASE_CONST(txin_htlc, htlc);
-          bare_inputs_sum += htlc.amount;
         VARIANT_CASE_CONST(txin_multisig, ms);
           bare_inputs_sum += ms.amount;
         VARIANT_CASE_CONST(txin_zc_input, foo);
@@ -1164,6 +1160,23 @@ namespace currency
     return dh;
   }
   //---------------------------------------------------------------
+  bool convert_payment_id(const payment_id_t& payment_id, uint64_t& result)
+  {
+    if (payment_id.size() > CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE)
+      return false;
+    epee::string_tools::get_pod_from_strbuff(std::string(CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE - payment_id.size(), '\0') + payment_id, result);
+    return true;
+  }
+  //---------------------------------------------------------------
+  payment_id_t convert_payment_id(uint64_t intrinsic_payment_id)
+  {
+    payment_id_t result;
+    if (intrinsic_payment_id == 0)
+      return result;
+    epee::string_tools::append_pod_to_strbuff(intrinsic_payment_id, result);
+    return result;
+  }
+  //---------------------------------------------------------------
   bool get_uint16_from_tx_derivation_hint(const tx_derivation_hint& dh, uint16_t& hint)
   {
     if (dh.msg.size() != sizeof(hint))
@@ -1171,18 +1184,6 @@ namespace currency
     hint = *((uint16_t*)dh.msg.data());
     return true;
   }  
-  //---------------------------------------------------------------
-  std::string generate_origin_for_htlc(const txout_htlc& htlc, const account_keys& acc_keys)
-  {
-    std::string blob;
-    string_tools::append_pod_to_strbuff(blob, htlc.pkey_redeem);
-    string_tools::append_pod_to_strbuff(blob, htlc.pkey_refund);
-    string_tools::append_pod_to_strbuff(blob, acc_keys.spend_secret_key);
-    crypto::hash origin_hs = crypto::cn_fast_hash(blob.data(), blob.size());
-    std::string origin_blob;
-    string_tools::append_pod_to_strbuff(origin_blob, origin_hs);
-    return origin_blob;
-  }
   //---------------------------------------------------------------
   bool validate_ado_update_allowed(const asset_descriptor_base& new_ado, const asset_descriptor_base& prev_ado)
   {
@@ -1240,7 +1241,7 @@ namespace currency
       CHECK_AND_ASSERT_MES(de.addr.size() == 1, false, "zarcanum multisig not implemented for tx_out_zarcanum yet");
       // TODO @#@# implement multisig support
 
-      tx_out_zarcanum out = AUTO_VAL_INIT(out);
+      tx_out_zarcanum out{};
 
       const account_public_address& apa = de.addr.front();
       if (apa.spend_public_key == null_pkey && apa.view_public_key == null_pkey)
@@ -1254,6 +1255,8 @@ namespace currency
 
         crypto::scalar_t amount_mask   = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
         out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
+        if (tx.version >= TRANSACTION_VERSION_POST_HF6)
+          out.encrypted_payment_id = de.payment_id ^ amount_mask.m_u64[1]; // different 64-bit slices of Keccak's output are computationally independent
       
         CHECK_AND_ASSERT_MES(~de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
         asset_blinding_mask = de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // s = Hs(domain_sep, Hs(8 * r * V, i))
@@ -1278,6 +1281,8 @@ namespace currency
       
         crypto::scalar_t amount_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
         out.encrypted_amount = de.amount ^ amount_mask.m_u64[0];
+        if (tx.version >= TRANSACTION_VERSION_POST_HF6)
+          out.encrypted_payment_id = de.payment_id ^ amount_mask.m_u64[1]; // different 64-bit slices of Keccak's output are computationally independent
       
         CHECK_AND_ASSERT_MES(~de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id || de.asset_id == currency::native_coin_asset_id, false, "explicit_native_asset_id may be used only with native asset id");
         asset_blinding_mask = de.flags & tx_destination_entry_flags::tdef_explicit_native_asset_id ? 0 : crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // s = Hs(domain_sep, Hs(8 * r * V, i))
@@ -1311,7 +1316,7 @@ namespace currency
     }
     else
     {
-      // create tx_out_bare, this section can be removed after HF4
+      // create tx_out_bare, this section is kept after HF4 only for tests and references
       CHECK_AND_ASSERT_MES(de.addr.size() == 1 || (de.addr.size() > 1 && de.minimum_sigs <= de.addr.size()), false, "Invalid destination entry: amount: " << de.amount << " minimum_sigs: " << de.minimum_sigs << " addr.size(): " << de.addr.size());
       CHECK_AND_ASSERT_MES(de.asset_id == currency::native_coin_asset_id, false, "assets are not allowed prior to HF4");
 
@@ -1319,7 +1324,7 @@ namespace currency
       target_keys.reserve(de.addr.size());
       for (auto& apa : de.addr)
       {
-        crypto::public_key out_eph_public_key = AUTO_VAL_INIT(out_eph_public_key);
+        crypto::public_key out_eph_public_key{};
         if (apa.spend_public_key == null_pkey && apa.view_public_key == null_pkey)
         {
           //burning money(for example alias reward)
@@ -1327,7 +1332,7 @@ namespace currency
         }
         else
         {
-          crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
+          crypto::key_derivation derivation{};
           bool r = derive_public_key_from_target_address(apa, tx_sec_key, output_index, out_eph_public_key, derivation);
           CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
 
@@ -1337,56 +1342,12 @@ namespace currency
         target_keys.push_back(out_eph_public_key);
       }
 
-      tx_out_bare out;
+      tx_out_bare out{};
       out.amount = de.amount;
-      if (de.htlc_options.expiration != 0)
-      {
-        const destination_option_htlc_out& htlc_dest = de.htlc_options;
-        //out htlc
-        CHECK_AND_ASSERT_MES(target_keys.size() == 1, false, "Unexpected htl keys count = " << target_keys.size() << ", expected ==1");
-        txout_htlc htlc = AUTO_VAL_INIT(htlc);
-        htlc.expiration = htlc_dest.expiration;
-        htlc.flags = 0; //0 - SHA256, 1 - RIPEMD160, by default leave SHA256
-        //receiver key
-        htlc.pkey_redeem = *target_keys.begin();
-        //generate refund key
-        crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-        crypto::public_key out_eph_public_key = AUTO_VAL_INIT(out_eph_public_key);
-        bool r = derive_public_key_from_target_address(self.account_address, tx_sec_key, output_index, out_eph_public_key, derivation);
-        CHECK_AND_ASSERT_MES(r, false, "failed to derive_public_key_from_target_address");
-        htlc.pkey_refund = out_eph_public_key;
-        //add derivation hint for refund address
-        uint16_t hint = get_derivation_hint(derivation);
-        deriv_cache.insert(hint); // won't be inserted if such hint already exists
-
-
-        if (htlc_dest.htlc_hash == null_hash)
-        {
-          //we use deterministic origin, to make possible access origin on different wallets copies
-        
-          result.htlc_origin = generate_origin_for_htlc(htlc, self);
-
-          //calculate hash
-          if (!htlc.flags&CURRENCY_TXOUT_HTLC_FLAGS_HASH_TYPE_MASK)
-          {
-            htlc.htlc_hash = crypto::sha256_hash(result.htlc_origin.data(), result.htlc_origin.size());
-          }
-          else
-          {
-            crypto::hash160 h160 = crypto::RIPEMD160_hash(result.htlc_origin.data(), result.htlc_origin.size());
-            std::memcpy(&htlc.htlc_hash, &h160, sizeof(h160));
-          }
-        }
-        else
-        {
-          htlc.htlc_hash = htlc_dest.htlc_hash;
-        }
-        out.target = htlc;
-      }
-      else if (target_keys.size() == 1)
+      if (target_keys.size() == 1)
       {
         //out to key
-        txout_to_key tk = AUTO_VAL_INIT(tk);
+        txout_to_key tk{};
         tk.key = target_keys.back();
 
         if (de.addr.front().is_auditable()) // check only the first address because there's only one in this branch
@@ -1399,7 +1360,7 @@ namespace currency
       else
       {
         //multisig out
-        txout_multisig ms = AUTO_VAL_INIT(ms);
+        txout_multisig ms{};
         ms.keys = std::move(target_keys);
         ms.minimum_sigs = de.minimum_sigs;
         out.target = ms;
@@ -1461,8 +1422,8 @@ namespace currency
     images.sort([](const crypto::key_image& a, const crypto::key_image& b) {return memcmp(&a, &b, sizeof(a)); });
     std::string hashing_buff;
     for (const auto& im : images)
-      epee::string_tools::append_pod_to_strbuff(hashing_buff, im);
-    epee::string_tools::append_pod_to_strbuff(hashing_buff, acc.spend_secret_key);
+      epee::string_tools::append_pod_to_strbuff(im, hashing_buff);
+    epee::string_tools::append_pod_to_strbuff(acc.spend_secret_key, hashing_buff);
     hashing_buff.append(CRYPTO_HDS_DETERMINISTIC_TX_KEY);
     crypto::scalar_t sec_key = crypto::hash_helper_t::hs(hashing_buff.data(), hashing_buff.length());
     sec_key *= 8;
@@ -1492,7 +1453,201 @@ namespace currency
 
   //---------------------------------------------------------------
 
-  struct encrypt_attach_visitor : public boost::static_visitor<void>
+
+  struct encrypt_payload_items_visitor : public boost::static_visitor<void>
+  {
+    bool& m_was_crypted_entries;
+    const crypto::secret_key& m_tx_sec_key;
+    const account_public_address& m_destination_addr;
+    const crypto::key_derivation& m_derivation;
+    const account_keys& m_sender_account_keys;
+
+    crypto::chacha_key m_chacha_key;
+    crypto::chacha_iv m_chacha_iv;
+
+    encrypt_payload_items_visitor(bool& was_crypted_entries, const crypto::key_derivation& derivation, const crypto::secret_key& tx_sec_key, const account_public_address& destination_addr, const account_keys& sender_account_keys)
+      : m_was_crypted_entries(was_crypted_entries)
+      , m_derivation(derivation)
+      , m_tx_sec_key(tx_sec_key)
+      , m_destination_addr(destination_addr)
+      , m_sender_account_keys(sender_account_keys)
+    {
+      crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_TX_PAYLOAD_ITEMS, &derivation, sizeof derivation, 0, m_chacha_key, m_chacha_iv);
+    }
+    
+    void operator()(tx_comment& comment)
+    {
+      crypto::chacha20_inplace(m_chacha_key, m_chacha_iv, comment.comment);
+      ++m_chacha_iv;
+      m_was_crypted_entries = true;
+    }
+
+    void operator()(tx_service_attachment& sa)
+    {
+      const std::string original_body = sa.body;
+      if (sa.flags&TX_SERVICE_ATTACHMENT_DEFLATE_BODY)
+      {
+        zlib_helper::pack(sa.body);
+      }
+
+      if (sa.flags&TX_SERVICE_ATTACHMENT_ENCRYPT_BODY)
+      {
+        static_assert(sizeof(crypto::public_key) == sizeof(crypto::key_derivation), "size missmatch, sa.security cannot be used by the code below");
+        crypto::key_derivation derivation_local = m_derivation;
+        if (sa.flags&TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE)
+        {
+          CHECK_AND_ASSERT_THROW_MES(m_destination_addr.spend_public_key != currency::null_pkey, "encrypt with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: spend_public_key is null");
+          CHECK_AND_ASSERT_THROW_MES(m_tx_sec_key != currency::null_skey, "encrypt with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: m_tx_sec_key is null");
+          // in this mode normal shared secret is overriden by (8 * tx_sec * spend_pub), so auditable/wo wallet cannot decrypt it
+          bool r = crypto::generate_key_derivation(m_destination_addr.spend_public_key, m_tx_sec_key, derivation_local);
+          CHECK_AND_ASSERT_THROW_MES(r, "encrypt with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: Failed to make derivation");
+          
+          //crypto::chacha_crypt_legacy(sa.body, derivation_local);
+          crypto::chacha_key chacha_tmp_key{};
+          crypto::chacha_iv stub{};
+          crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_TX_PI_ISOLATE_AUDITABLE, &derivation_local, sizeof derivation_local, 0, chacha_tmp_key, stub);
+          crypto::chacha20_inplace(chacha_tmp_key, m_chacha_iv, sa.body);
+          // intentionnally skip incrementing m_chacha_iv here
+          
+          // add derivation encrypted with sender spend secret key, so sender can derive information later if the wallet got restored from the seed
+          crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_TX_PI_ISOLATE_AUDITABLE, &m_sender_account_keys.spend_secret_key, sizeof m_sender_account_keys.spend_secret_key, 0, chacha_tmp_key, stub);
+          crypto::chacha20_pod_inplace(chacha_tmp_key, m_chacha_iv, derivation_local);
+          ++m_chacha_iv;
+          sa.security.push_back(*(crypto::public_key*)&derivation_local);
+        }
+        else
+        {
+          //crypto::chacha_crypt_legacy(sa.body, derivation_local);
+          crypto::chacha20_inplace(m_chacha_key, m_chacha_iv, sa.body);
+          ++m_chacha_iv;
+        }
+
+        //if (sa.flags&TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF)
+        //{
+        //  // add proof:
+        //  // sa.security = Hs( sa.body || Hs(derivation_local) )
+        //  //take hash from derivation and use it as a salt
+        //  crypto::hash derivation_hash = crypto::cn_fast_hash(&derivation_local, sizeof(derivation_local));
+        //  std::string salted_body = original_body;
+        //  string_tools::append_pod_to_strbuff(salted_body, derivation_hash);
+        //  crypto::hash proof_hash = crypto::cn_fast_hash(salted_body.data(), salted_body.size());
+        //  sa.security.push_back(*(crypto::public_key*)&proof_hash);
+        //}
+        m_was_crypted_entries = true;
+      }
+    }
+
+    template<typename T>
+    void operator()(T& payload_item)
+    {}
+  };
+
+  struct decrypt_payload_items_visitor : public boost::static_visitor<void>
+  {
+    const bool m_is_income;
+    const transaction& m_tx;
+    const account_keys& m_sender_account_keys;
+    const crypto::public_key& m_tx_onetime_pubkey;
+    const crypto::key_derivation& m_derivation;
+    std::vector<payload_items_v>& decrypted_items;
+    crypto::chacha_key m_chacha_key;
+    crypto::chacha_iv  m_chacha_iv;
+
+    decrypt_payload_items_visitor(const crypto::key_derivation& derivation, std::vector<payload_items_v>& decrypted_att, const account_keys& sender_account_keys, bool is_income, const transaction& tx,
+      const crypto::public_key& tx_onetime_pubkey = null_pkey)
+      : m_derivation(derivation)
+      , m_tx(tx)
+      , m_is_income(is_income)
+      , decrypted_items(decrypted_att)
+      , m_sender_account_keys(sender_account_keys)
+      , m_tx_onetime_pubkey(tx_onetime_pubkey)
+    {
+      crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_TX_PAYLOAD_ITEMS, &derivation, sizeof derivation, 0, m_chacha_key, m_chacha_iv);
+    }
+
+    void operator()(const tx_comment& encrypted_comment)
+    {
+      tx_comment decrypted_comment{};
+      decrypted_comment.comment = crypto::chacha20(m_chacha_key, m_chacha_iv, encrypted_comment.comment);
+      ++m_chacha_iv;
+      decrypted_items.push_back(decrypted_comment);
+    }
+
+    void operator()(const tx_service_attachment& sa)
+    {
+      tx_service_attachment local_sa = sa;
+      crypto::key_derivation derivation_local = m_derivation;
+
+      if (sa.flags&TX_SERVICE_ATTACHMENT_ENCRYPT_BODY)
+      {
+        if (sa.flags&TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE)
+        {
+          // in this mode normal shared secret is overriden by (8 * spend_sec * tx_pub), so auditable/wo wallet cannot decrypt it
+          crypto::chacha_key chacha_tmp_key{};
+          crypto::chacha_iv stub{};
+          crypto::chacha_iv chacha_iv_for_decryption = m_chacha_iv;
+          ++m_chacha_iv; // increment here and one time intentionally, to avoid missed increments
+
+          if (!m_is_income)
+          {
+            // outgoing tx -- try to decrypt shared secret key from sa.security[0]
+            if (sa.security.size() < 1)
+              return; // invisible for the sender, skip
+            derivation_local = *(crypto::key_derivation*)&sa.security[0];
+            crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_TX_PI_ISOLATE_AUDITABLE, &m_sender_account_keys.spend_secret_key, sizeof m_sender_account_keys.spend_secret_key, 0, chacha_tmp_key, stub);
+            crypto::chacha20_pod_inplace(chacha_tmp_key, chacha_iv_for_decryption, derivation_local);
+          }
+          else
+          {
+            // incoming tx -- calculate shared secret key normally as (8 * spend_sec * tx_pub)
+            if (m_sender_account_keys.spend_secret_key == currency::null_skey)
+              return; // invisible for watch-only receiver, skip
+            CHECK_AND_ASSERT_THROW_MES(m_sender_account_keys.spend_secret_key != currency::null_skey, "decrypt with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: spend_secret_key is null");
+            CHECK_AND_ASSERT_THROW_MES(m_tx_onetime_pubkey != currency::null_pkey, "decrypt with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: m_tx_onetime_pubkey is null");
+            bool r = crypto::generate_key_derivation(m_tx_onetime_pubkey, m_sender_account_keys.spend_secret_key, derivation_local);
+            CHECK_AND_ASSERT_THROW_MES(r, "decrypt with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: generate_key_derivation failed");
+          }
+
+          crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_TX_PI_ISOLATE_AUDITABLE, &derivation_local, sizeof derivation_local, 0, chacha_tmp_key, stub);
+          crypto::chacha20_inplace(chacha_tmp_key, chacha_iv_for_decryption, local_sa.body);
+        }
+        else
+        {
+          crypto::chacha20_inplace(m_chacha_key, m_chacha_iv, local_sa.body);
+          ++m_chacha_iv;
+        }  
+      }
+
+      if (sa.flags&TX_SERVICE_ATTACHMENT_DEFLATE_BODY)
+      {
+        zlib_helper::unpack(local_sa.body);
+      }
+
+      //if (sa.flags&TX_SERVICE_ATTACHMENT_ENCRYPT_BODY && sa.flags&TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF)
+      //{
+      //  CHECK_AND_ASSERT_MES(sa.security.size() >= 1, void(), "Unexpected key in tx_service_attachment with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE");
+      //  //take hash from derivation and use it as a salt
+      //  crypto::hash derivation_hash = crypto::cn_fast_hash(&derivation_local, sizeof(derivation_local));
+      //  std::string salted_body = local_sa.body;
+      //  string_tools::append_pod_to_strbuff(salted_body, derivation_hash);
+      //  crypto::hash proof_hash = crypto::cn_fast_hash(salted_body.data(), salted_body.size()); // proof_hash = Hs(local_sa.body || Hs(8 * s * R)), s - spend secret, R - tx pub
+      //  CHECK_AND_ASSERT_MES(*(crypto::public_key*)&proof_hash == sa.security.back(), void(), "Proof hash missmatch on decrypting with TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF");
+      //}
+
+      decrypted_items.push_back(local_sa);
+    }
+
+    template<typename T>
+    void operator()(const T& payload_item)
+    {
+      decrypted_items.push_back(payload_item);
+    }
+  };
+
+//---------------------------------------------------------------
+
+
+  struct encrypt_attach_visitor_legacy : public boost::static_visitor<void>
   {
     bool& m_was_crypted_entries;
     const keypair& m_onetime_keypair;
@@ -1500,32 +1655,32 @@ namespace currency
     const crypto::key_derivation& m_key;
     const account_keys& m_sender_account_keys;
 
-    encrypt_attach_visitor(bool& was_crypted_entries, const crypto::key_derivation& key, const  keypair& onetime_keypair, const account_public_address& destination_addr, const account_keys& sender_account_keys) :
+    encrypt_attach_visitor_legacy(bool& was_crypted_entries, const crypto::key_derivation& key, const  keypair& onetime_keypair, const account_public_address& destination_addr, const account_keys& sender_account_keys) :
       m_was_crypted_entries(was_crypted_entries), m_key(key), m_onetime_keypair(onetime_keypair), m_destination_addr(destination_addr), m_sender_account_keys(sender_account_keys)
     {}
     void operator()(tx_comment& comment)
     {
-      crypto::chacha_crypt(comment.comment, m_key);
+      crypto::chacha_crypt_legacy(comment.comment, m_key);
       m_was_crypted_entries = true;
     }
     void operator()(tx_payer& pr)
     {
-      crypto::chacha_crypt(pr.acc_addr, m_key);
+      crypto::chacha_crypt_legacy(pr.acc_addr, m_key);
       m_was_crypted_entries = true;
     }
     void operator()(tx_receiver& m)
     {
-      crypto::chacha_crypt(m.acc_addr, m_key);
+      crypto::chacha_crypt_legacy(m.acc_addr, m_key);
       m_was_crypted_entries = true;
     }
     void operator()(tx_payer_old& pr)
     {
-      crypto::chacha_crypt(pr.acc_addr, m_key);
+      crypto::chacha_crypt_legacy(pr.acc_addr, m_key);
       m_was_crypted_entries = true;
     }
     void operator()(tx_receiver_old& m)
     {
-      crypto::chacha_crypt(m.acc_addr, m_key);
+      crypto::chacha_crypt_legacy(m.acc_addr, m_key);
       m_was_crypted_entries = true;
     }
     void operator()(tx_service_attachment& sa)
@@ -1545,21 +1700,21 @@ namespace currency
           //encrypt with "spend keys" only, to prevent auditable watchers decrypt it
           bool r = crypto::generate_key_derivation(m_destination_addr.spend_public_key, m_onetime_keypair.sec, derivation_local);
           CHECK_AND_ASSERT_THROW_MES(r, "tx_service_attachment with TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE: Failed to make derivation");
-          crypto::chacha_crypt(sa.body, derivation_local);
+          crypto::chacha_crypt_legacy(sa.body, derivation_local);
           //we add derivation encrypted with sender spend key, so sender can derive information later if the wallet got restored from seed
           sa.security.push_back(*(crypto::public_key*)&derivation_local);
-          crypto::chacha_crypt(sa.security.back(), m_sender_account_keys.spend_secret_key);
+          crypto::chacha_crypt_legacy(sa.security.back(), m_sender_account_keys.spend_secret_key);
         }
         else
         {
-          crypto::chacha_crypt(sa.body, derivation_local);
+          crypto::chacha_crypt_legacy(sa.body, derivation_local);
         }
         if (sa.flags&TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF)
         {
           //take hash from derivation and use it as a salt
           crypto::hash derivation_hash = crypto::cn_fast_hash(&derivation_local, sizeof(derivation_local));
           std::string salted_body = original_body;
-          string_tools::append_pod_to_strbuff(salted_body, derivation_hash);
+          string_tools::append_pod_to_strbuff(derivation_hash, salted_body);
           crypto::hash proof_hash = crypto::cn_fast_hash(salted_body.data(), salted_body.size());
           sa.security.push_back(*(crypto::public_key*)&proof_hash);
         }
@@ -1572,7 +1727,7 @@ namespace currency
     {}
   };
 
-  struct decrypt_attach_visitor : public boost::static_visitor<void>
+  struct decrypt_attach_visitor_legacy : public boost::static_visitor<void>
   {
     const bool m_is_income;
     const transaction& m_tx;
@@ -1580,7 +1735,7 @@ namespace currency
     const crypto::public_key& m_tx_onetime_pubkey;
     const crypto::key_derivation& rkey;
     std::vector<payload_items_v>& rdecrypted_att;
-    decrypt_attach_visitor(const crypto::key_derivation& key,
+    decrypt_attach_visitor_legacy(const crypto::key_derivation& key,
       std::vector<payload_items_v>& decrypted_att, 
       const account_keys& acc_keys,
       bool is_income,
@@ -1596,7 +1751,7 @@ namespace currency
     void operator()(const tx_comment& comment)
     {
       tx_comment local_comment = comment;
-      crypto::chacha_crypt(local_comment.comment, rkey);
+      crypto::chacha_crypt_legacy(local_comment.comment, rkey);
       rdecrypted_att.push_back(local_comment);
     }
 
@@ -1617,7 +1772,7 @@ namespace currency
             }
             //decrypting derivation 
             derivation_local = *(crypto::key_derivation*)&sa.security[0];
-            crypto::chacha_crypt(derivation_local, m_acc_keys.spend_secret_key);
+            crypto::chacha_crypt_legacy(derivation_local, m_acc_keys.spend_secret_key);
           }
           else {
             if (m_acc_keys.spend_secret_key == currency::null_skey)
@@ -1629,11 +1784,11 @@ namespace currency
             bool r = crypto::generate_key_derivation(m_tx_onetime_pubkey, m_acc_keys.spend_secret_key, derivation_local);
             CHECK_AND_ASSERT_THROW_MES(r, "Failed to generate_key_derivation at TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE");
           }
-          crypto::chacha_crypt(local_sa.body, derivation_local);
+          crypto::chacha_crypt_legacy(local_sa.body, derivation_local);
         }
         else
         {
-          crypto::chacha_crypt(local_sa.body, derivation_local);
+          crypto::chacha_crypt_legacy(local_sa.body, derivation_local);
         }  
       }
 
@@ -1648,7 +1803,7 @@ namespace currency
         //take hash from derivation and use it as a salt
         crypto::hash derivation_hash = crypto::cn_fast_hash(&derivation_local, sizeof(derivation_local));
         std::string salted_body = local_sa.body;
-        string_tools::append_pod_to_strbuff(salted_body, derivation_hash);
+        string_tools::append_pod_to_strbuff(derivation_hash, salted_body);
         crypto::hash proof_hash = crypto::cn_fast_hash(salted_body.data(), salted_body.size()); // proof_hash = Hs(local_sa.body || Hs(s * R)), s - spend secret, R - tx pub
         CHECK_AND_ASSERT_MES(*(crypto::public_key*)&proof_hash == sa.security.back(), void(), "Proof hash missmatch on decrypting with TX_SERVICE_ATTACHMENT_ENCRYPT_ADD_PROOF");
       }
@@ -1659,25 +1814,25 @@ namespace currency
     void operator()(const tx_payer& pr)
     {
       tx_payer payer_local = pr;
-      crypto::chacha_crypt(payer_local.acc_addr, rkey);
+      crypto::chacha_crypt_legacy(payer_local.acc_addr, rkey);
       rdecrypted_att.push_back(payer_local);
     }
     void operator()(const tx_receiver& pr)
     {
       tx_receiver receiver_local = pr;
-      crypto::chacha_crypt(receiver_local.acc_addr, rkey);
+      crypto::chacha_crypt_legacy(receiver_local.acc_addr, rkey);
       rdecrypted_att.push_back(receiver_local);
     }
     void operator()(const tx_payer_old& pr)
     {
       tx_payer_old payer_local = pr;
-      crypto::chacha_crypt(payer_local.acc_addr, rkey);
+      crypto::chacha_crypt_legacy(payer_local.acc_addr, rkey);
       rdecrypted_att.push_back(payer_local);
     }
     void operator()(const tx_receiver_old& pr)
     {
       tx_receiver_old receiver_local = pr;
-      crypto::chacha_crypt(receiver_local.acc_addr, rkey);
+      crypto::chacha_crypt_legacy(receiver_local.acc_addr, rkey);
       rdecrypted_att.push_back(receiver_local);
     }
     template<typename attachment_t>
@@ -1686,17 +1841,16 @@ namespace currency
       rdecrypted_att.push_back(att);
     }
   };
-
   //---------------------------------------------------------------
-  template<class items_container_t>
-  bool decrypt_payload_items(const crypto::key_derivation& derivation, const items_container_t& items_to_decrypt, std::vector<payload_items_v>& decrypted_att, bool is_income, const transaction& tx, const account_keys& acc_keys = null_acc_keys,
-    const crypto::public_key& tx_onetime_pubkey = null_pkey)
+  void encrypt_decrypt_key_derivation_for_sender(const crypto::public_key& tx_pub, const crypto::secret_key& spend_sec, crypto::key_derivation& in_out)
   {
-    decrypt_attach_visitor v(derivation, decrypted_att, acc_keys, is_income, tx, tx_onetime_pubkey);
-    for (auto& a : items_to_decrypt)
-      boost::apply_visitor(v, a);
-
-    return true;
+    crypto::key_derivation tmp_derivation;
+    bool r = crypto::generate_key_derivation(tx_pub, spend_sec, tmp_derivation);
+    CHECK_AND_ASSERT_THROW_MES(r, "generate_key_derivation failed");
+    crypto::chacha_key ck{};
+    crypto::chacha_iv civ{};
+    crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_TX_PAYLOAD_SENDER_DER, &tmp_derivation, sizeof tmp_derivation, 0, ck, civ);
+    crypto::chacha20_pod_inplace(ck, civ, in_out);
   }
   //---------------------------------------------------------------
   bool is_derivation_used_to_encrypt(const transaction& tx, const crypto::key_derivation& derivation)
@@ -1718,12 +1872,21 @@ namespace currency
   crypto::key_derivation get_encryption_key_derivation(bool is_income, const transaction& tx, const account_keys& acc_keys)
   {
     crypto::key_derivation derivation = null_derivation;
+    crypto::public_key tx_pub_key = currency::get_tx_pub_key_from_extra(tx);
+
     if (is_income)
     {
-      crypto::public_key tx_pub_key = currency::get_tx_pub_key_from_extra(tx);
-
-      bool r = crypto::generate_key_derivation(tx_pub_key, acc_keys.view_secret_key, derivation);
+      bool r = crypto::generate_key_derivation(tx_pub_key, acc_keys.view_secret_key, derivation); // derivation = 8 * view_secret * tx_pub_key
       CHECK_AND_ASSERT_MES(r, null_derivation, "failed to generate_key_derivation");
+
+      tx_crypto_checksum crypto_info{};
+      if (get_type_in_variant_container(tx.extra, crypto_info) || get_type_in_variant_container(tx.attachment, crypto_info))
+      {
+        crypto::hash hash_for_check_sum = crypto::cn_fast_hash(&derivation, sizeof(derivation));
+        if (*(uint32_t*)&hash_for_check_sum != crypto_info.derivation_hash)
+          return null_derivation; // Derivation hash missmatched, meaning this receiver cannot decrypt encrypted payload items, because they were crypted using different derivation (for other receiver)
+      }
+
       LOG_PRINT_GREEN("DECRYPTING ON KEY: " << epee::string_tools::pod_to_hex(derivation) << ", key derived from destination addr: " << currency::get_account_address_as_str(acc_keys.account_address), LOG_LEVEL_0);
       return derivation;
     }
@@ -1742,11 +1905,15 @@ namespace currency
       }
 
       derivation = crypto_info.encrypted_key_derivation;
-      crypto::chacha_crypt(derivation, acc_keys.spend_secret_key);
+      if (tx.version >= TRANSACTION_VERSION_POST_HF6)
+        encrypt_decrypt_key_derivation_for_sender(tx_pub_key, acc_keys.spend_secret_key, derivation);
+      else
+        crypto::chacha_crypt_legacy(derivation, acc_keys.spend_secret_key);
       LOG_PRINT_GREEN("DECRYPTING ON KEY: " << epee::string_tools::pod_to_hex(derivation) << ", key decrypted from sender address: " << currency::get_account_address_as_str(acc_keys.account_address), LOG_LEVEL_0);
       //validate derivation we here. Yoda style
       crypto::hash hash_for_check_sum = crypto::cn_fast_hash(&derivation, sizeof(derivation));
-      CHECK_AND_ASSERT_MES(*(uint32_t*)&hash_for_check_sum == crypto_info.derivation_hash, null_derivation, "Derivation hash missmatched in tx id " << currency::get_transaction_hash(tx));
+      bool valid = *(uint32_t*)&hash_for_check_sum == crypto_info.derivation_hash;
+      CHECK_AND_ASSERT_MES(valid, null_derivation, "Derivation hash missmatched in tx id " << currency::get_transaction_hash(tx));
       return derivation;
     }
   }
@@ -1781,8 +1948,25 @@ namespace currency
     }
     const crypto::public_key onetime_pub = get_tx_pub_key_from_extra(tx);
     
-    decrypt_payload_items(derivation, tx.extra, decrypted_items, is_income, tx, acc_keys, onetime_pub);
-    decrypt_payload_items(derivation, tx.attachment, decrypted_items, is_income, tx, acc_keys, onetime_pub);
+    if (tx.version >= TRANSACTION_VERSION_POST_HF6)
+    {
+      // new encryption
+      decrypt_payload_items_visitor v(derivation, decrypted_items, acc_keys, is_income, tx, onetime_pub);
+      for (auto& a : tx.extra)
+        boost::apply_visitor(v, a);
+      for (auto& a : tx.attachment)
+        boost::apply_visitor(v, a);
+    }
+    else
+    {
+      // legacy encryption
+      decrypt_attach_visitor_legacy v(derivation, decrypted_items, acc_keys, is_income, tx, onetime_pub);
+      for (auto& a : tx.extra)
+        boost::apply_visitor(v, a);
+      decrypt_attach_visitor_legacy v2(derivation, decrypted_items, acc_keys, is_income, tx, onetime_pub);
+      for (auto& a : tx.attachment)
+        boost::apply_visitor(v2, a);
+    }
     return true;
   }
 
@@ -1794,28 +1978,60 @@ namespace currency
     bool was_attachment_crypted_entries = false;
     bool was_extra_crypted_entries = false;
 
-    encrypt_attach_visitor v(was_attachment_crypted_entries, derivation, tx_random_key, destination_addr, sender_keys);
-    for (auto& a : tx.attachment)
-      boost::apply_visitor(v, a);
-
-    encrypt_attach_visitor v2(was_extra_crypted_entries, derivation, tx_random_key, destination_addr, sender_keys);
-    for (auto& a : tx.extra)
-      boost::apply_visitor(v2, a);
-
-
-    if (was_attachment_crypted_entries || was_extra_crypted_entries)
+    if (tx.version >= TRANSACTION_VERSION_POST_HF6)
     {
-      crypto::hash hash_for_check_sum = crypto::cn_fast_hash(&derivation, sizeof(derivation));
-      tx_crypto_checksum chs;
-      //put derivation hash to be sure that we decrypting right way
-      chs.derivation_hash = *(uint32_t*)&hash_for_check_sum;
-      //put encrypted derivation to let sender decrypt all this data from attachment/extra
-      chs.encrypted_key_derivation = derivation;
-      crypto::chacha_crypt(chs.encrypted_key_derivation, sender_keys.spend_secret_key);
-      if (was_extra_crypted_entries)
-        tx.extra.push_back(chs);
-      else
-        tx.attachment.push_back(chs);
+      // new encryption, mind the order in which the containers are encrypted
+      bool was_crypted_items = false;
+      encrypt_payload_items_visitor v(was_crypted_items, derivation, tx_random_key.sec, destination_addr, sender_keys);
+      for (auto& a : tx.extra)
+        boost::apply_visitor(v, a);
+      was_extra_crypted_entries = was_crypted_items;
+      was_crypted_items = false;
+      for (auto& a : tx.attachment)
+        boost::apply_visitor(v, a);
+      was_attachment_crypted_entries = was_crypted_items;
+
+      if (was_attachment_crypted_entries || was_extra_crypted_entries)
+      {
+        crypto::hash hash_for_check_sum = crypto::cn_fast_hash(&derivation, sizeof(derivation));
+        tx_crypto_checksum chs;
+        //put derivation hash to be sure that we decrypting right way
+        chs.derivation_hash = *(uint32_t*)&hash_for_check_sum;
+        //put encrypted derivation to let sender decrypt all this data from attachment/extra
+        chs.encrypted_key_derivation = derivation;
+        encrypt_decrypt_key_derivation_for_sender(tx_random_key.pub, sender_keys.spend_secret_key, chs.encrypted_key_derivation);
+        if (was_extra_crypted_entries)
+          tx.extra.push_back(chs);
+        else
+          tx.attachment.push_back(chs);
+      }
+    }
+    else
+    {
+      // legacy encryption
+      encrypt_attach_visitor_legacy v(was_attachment_crypted_entries, derivation, tx_random_key, destination_addr, sender_keys);
+      for (auto& a : tx.attachment)
+        boost::apply_visitor(v, a);
+
+      encrypt_attach_visitor_legacy v2(was_extra_crypted_entries, derivation, tx_random_key, destination_addr, sender_keys);
+      for (auto& a : tx.extra)
+        boost::apply_visitor(v2, a);
+
+
+      if (was_attachment_crypted_entries || was_extra_crypted_entries)
+      {
+        crypto::hash hash_for_check_sum = crypto::cn_fast_hash(&derivation, sizeof(derivation));
+        tx_crypto_checksum chs;
+        //put derivation hash to be sure that we decrypting right way
+        chs.derivation_hash = *(uint32_t*)&hash_for_check_sum;
+        //put encrypted derivation to let sender decrypt all this data from attachment/extra
+        chs.encrypted_key_derivation = derivation;
+        crypto::chacha_crypt_legacy(chs.encrypted_key_derivation, sender_keys.spend_secret_key);
+        if (was_extra_crypted_entries)
+          tx.extra.push_back(chs);
+        else
+          tx.attachment.push_back(chs);
+      }
     }
   }
   //---------------------------------------------------------------
@@ -1835,19 +2051,12 @@ namespace currency
     else
       x.fee = 0;
     x.show_sender = currency::is_showing_sender_addres(x.tx);
-    tx_out_bare htlc_out = AUTO_VAL_INIT(htlc_out);
-    txin_htlc htlc_in = AUTO_VAL_INIT(htlc_in);
 
-    x.tx_type = get_tx_type_ex(x.tx, htlc_out, htlc_in);
-    if(x.tx_type == GUI_TX_TYPE_HTLC_DEPOSIT && !x.has_outgoing_entries())
-    {
-      //need to override amount
-      x.get_native_income_amount() = htlc_out.amount;
-    }
+    x.tx_type = get_tx_type(x.tx);
   }
 
   //---------------------------------------------------------------
-  uint64_t get_tx_type_ex(const transaction& tx, tx_out_bare& htlc_out, txin_htlc& htlc_in)
+  uint64_t get_tx_type(const transaction& tx)
   {
     if (is_coinbase(tx))
       return GUI_TX_TYPE_COIN_BASE;
@@ -1893,33 +2102,7 @@ namespace currency
     if (bc_services::get_first_service_attachment_by_id(tx, BC_ESCROW_SERVICE_ID, BC_ESCROW_SERVICE_INSTRUCTION_CANCEL_PROPOSAL, tsa))
       return GUI_TX_TYPE_ESCROW_CANCEL_PROPOSAL;
 
-    for (auto ov : tx.vout)
-    {
-      VARIANT_SWITCH_BEGIN(ov);
-      VARIANT_CASE_CONST(tx_out_bare, o)
-        if (o.target.type() == typeid(txout_htlc))
-        {
-          htlc_out = o;
-          return GUI_TX_TYPE_HTLC_DEPOSIT;
-        }
-      VARIANT_SWITCH_END();
-
-    }
-
-    if (get_type_in_variant_container(tx.vin, htlc_in))
-    {
-      return GUI_TX_TYPE_HTLC_REDEEM;
-    }
-
-
     return GUI_TX_TYPE_NORMAL;
-  }
-  //---------------------------------------------------------------
-  uint64_t get_tx_type(const transaction& tx)
-  {
-    tx_out_bare htlc_out = AUTO_VAL_INIT(htlc_out);
-    txin_htlc htlc_in = AUTO_VAL_INIT(htlc_in);
-    return get_tx_type_ex(tx, htlc_out, htlc_in);
   }
   //---------------------------------------------------------------
   size_t get_multisig_out_index(const std::vector<tx_out_v>& outs)
@@ -2145,7 +2328,7 @@ namespace currency
     }
     else
     {
-      // regular txin_to_key or htlc
+      // regular txin_to_key
       if (pss_ring_s)
         *pss_ring_s << "input #" << input_index << ", pub_keys:" << ENDL;
 
@@ -2465,42 +2648,6 @@ namespace currency
         tx.vin.push_back(input_multisig);
         has_non_zc_inputs = true;
       }
-      else if (src_entr.htlc_origin.size())
-      {
-        //htlc redeem
-        keypair& in_ephemeral = in_context.in_ephemeral;
-        //txin_to_key
-        if (src_entr.outputs.size() != 1)
-        {
-          LOG_ERROR("htlc in: wrong output src_entr.outputs.size() = " << src_entr.outputs.size());
-          return false;
-        }
-
-        //key_derivation recv_derivation;
-        crypto::key_image img;
-        if (!generate_key_image_helper(sender_account_keys, src_entr.real_out_tx_key, src_entr.real_output_in_tx_index, in_ephemeral, img))
-          return false;
-
-        //check that derivated key is equal with real output key
-        if (!(in_ephemeral.pub == src_entr.outputs.front().stealth_address))
-        {
-          LOG_ERROR("derived public key missmatch with output public key! " << ENDL << "derived_key:"
-            << string_tools::pod_to_hex(in_ephemeral.pub) << ENDL << "real output_public_key:"
-            << string_tools::pod_to_hex(src_entr.outputs.front().stealth_address));
-          return false;
-        }
-        key_images_total.push_back(img);
-
-        //put key image into tx input
-        txin_htlc input_to_key;
-        input_to_key.amount = src_entr.amount;
-        input_to_key.k_image = img;
-        input_to_key.hltc_origin = src_entr.htlc_origin;
-        input_to_key.key_offsets.push_back(src_entr.outputs.front().out_reference);
-
-        tx.vin.push_back(input_to_key);
-        has_non_zc_inputs = true;
-      }
       else
       {
         // txin_to_key or txin_zc_input
@@ -2528,7 +2675,7 @@ namespace currency
           key_offsets.push_back(out_entry.out_reference);
 
         //TODO: Might need some refactoring since this scheme is not the clearest one(did it this way for now to keep less changes to not broke anything)
-        //potentially this approach might help to support htlc and multisig without making to complicated code
+        //potentially this approach might help to support multisig without making to complicated code
         if (src_entr.is_zc())
         {
           ++zc_inputs_count;
@@ -2601,7 +2748,12 @@ namespace currency
       std::vector<extra_v> extra_local = extra;
       std::vector<attachment_v> attachments_local = attachments;
 
-      encrypt_attach_visitor v(was_attachment_crypted_entries, derivation, gen_context.tx_key, account_public_address(), sender_account_keys);
+      if (extra.size() > 0 || attachments.size() > 0)
+      {
+        std::cout << "===ok,here===" << std::endl;
+      }
+
+      encrypt_attach_visitor_legacy v(was_attachment_crypted_entries, derivation, gen_context.tx_key, account_public_address(), sender_account_keys);
       for (auto& a : attachments_local)
         boost::apply_visitor(v, a);
       for (auto& a : extra_local)
@@ -2850,6 +3002,10 @@ namespace currency
     {
       return TRANSACTION_VERSION_POST_HF4;
     }
+    if (!hfd.is_hardfork_active_for_height(ZANO_HARDFORK_06, tx_expected_block_height))
+    {
+      return TRANSACTION_VERSION_POST_HF5;
+    }
     return CURRENT_TRANSACTION_VERSION;
   }
   //---------------------------------------------------------------
@@ -3055,7 +3211,6 @@ namespace currency
       CHECK_AND_ASSERT_MES(
         in.type() == typeid(txin_to_key) ||
         in.type() == typeid(txin_multisig) ||
-        in.type() == typeid(txin_htlc) ||
         in.type() == typeid(txin_zc_input), 
         false, "wrong input type: " << in.type().name() << ", in transaction " << get_transaction_hash(tx));
     }
@@ -3131,11 +3286,6 @@ namespace currency
         VARIANT_CASE_CONST(txout_to_key, tk)
           if (!check_key(tk.key))
             return false;
-        VARIANT_CASE_CONST(txout_htlc, htlc)
-          if (!check_key(htlc.pkey_redeem))
-            return false;
-          if (!check_key(htlc.pkey_refund))
-            return false;
         VARIANT_CASE_CONST(txout_multisig, ms)
           if (!(ms.keys.size() > 0 && ms.minimum_sigs > 0 && ms.minimum_sigs <= ms.keys.size()))
           {
@@ -3183,11 +3333,6 @@ namespace currency
       {
         CHECKED_GET_SPECIFIC_VARIANT(in, const txin_multisig, ms_in, false);
         this_amount = ms_in.amount;
-      }
-      else if (in.type() == typeid(txin_htlc))
-      {
-        CHECKED_GET_SPECIFIC_VARIANT(in, const txin_htlc, htlc_in, false);
-        this_amount = htlc_in.amount;
       }
       else if (in.type() == typeid(txin_zc_input))
       {
@@ -3245,10 +3390,10 @@ namespace currency
       VARIANT_CASE_CONST(tx_out_zarcanum, zo)
         if (process_hidden_amounts)
         {
-          uint64_t decoded_amount = 0;
+          uint64_t decoded_amount = 0, decoded_payment_id = 0;
           crypto::public_key decoded_asset_id{};
           crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
-          if (is_out_to_acc(keys.account_address, zo, derivation, output_index, decoded_amount, decoded_asset_id, amount_blinding_mask, asset_id_blinding_mask))
+          if (is_out_to_acc(keys.account_address, zo, derivation, output_index, decoded_amount, decoded_asset_id, amount_blinding_mask, asset_id_blinding_mask, decoded_payment_id))
           {
             if (decoded_asset_id == currency::native_coin_asset_id)
               outputs_amount += decoded_amount;
@@ -3289,8 +3434,8 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
-  bool decode_output_amount_and_asset_id(const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, const size_t output_index, uint64_t& decoded_amount, crypto::public_key& decoded_asset_id,
-    crypto::scalar_t& amount_blinding_mask, crypto::scalar_t& asset_id_blinding_mask, crypto::scalar_t* derived_h_ptr /* = nullptr */)
+  bool decode_output_data(const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, const size_t output_index, uint64_t& decoded_amount, crypto::public_key& decoded_asset_id,
+    crypto::scalar_t& amount_blinding_mask, crypto::scalar_t& asset_id_blinding_mask, uint64_t& decoded_payment_id, crypto::scalar_t* derived_h_ptr /* = nullptr */)
   {
     crypto::scalar_t local_h{};
     if (derived_h_ptr == nullptr)
@@ -3301,6 +3446,7 @@ namespace currency
 
     crypto::scalar_t amount_mask   = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
     decoded_amount = zo.encrypted_amount ^ amount_mask.m_u64[0];
+    decoded_payment_id = zo.encrypted_payment_id != 0 ? zo.encrypted_payment_id ^ amount_mask.m_u64[1] : 0;
 
     amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_BLINDING_MASK, h); // f = Hs(domain_sep, h)
 
@@ -3324,11 +3470,18 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
+  bool decode_output_amount_and_asset_id(const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, const size_t output_index, uint64_t& decoded_amount, crypto::public_key& decoded_asset_id,
+    crypto::scalar_t& amount_blinding_mask, crypto::scalar_t& asset_id_blinding_mask, crypto::scalar_t* derived_h_ptr /* = nullptr */)
+  {
+    uint64_t decoded_payment_id{};
+    return decode_output_data(zo, derivation, output_index, decoded_amount, decoded_asset_id, amount_blinding_mask, asset_id_blinding_mask, decoded_payment_id, derived_h_ptr);
+  }
+  //---------------------------------------------------------------
   bool is_out_to_acc(const account_public_address& addr, const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, size_t output_index, uint64_t& decoded_amount, crypto::public_key& decoded_asset_id,
-    crypto::scalar_t& amount_blinding_mask, crypto::scalar_t& asset_id_blinding_mask)
+    crypto::scalar_t& amount_blinding_mask, crypto::scalar_t& asset_id_blinding_mask, uint64_t& decoded_payment_id)
   {
     crypto::scalar_t h{};
-    if (!decode_output_amount_and_asset_id(zo, derivation, output_index, decoded_amount, decoded_asset_id, amount_blinding_mask, asset_id_blinding_mask, &h))
+    if (!decode_output_data(zo, derivation, output_index, decoded_amount, decoded_asset_id, amount_blinding_mask, asset_id_blinding_mask, decoded_payment_id, &h))
       return false;
 
     crypto::point_t P_prime = h * crypto::c_point_G + crypto::point_t(addr.spend_public_key); // P =? Hs(8rV, i) * G + S
@@ -3397,12 +3550,6 @@ namespace currency
   //---------------------------------------------------------------
   bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, crypto::key_derivation& derivation)
   {
-    std::list<htlc_info> htlc_info_list;
-    return lookup_acc_outs(acc, tx, tx_pub_key, outs, derivation, htlc_info_list);
-  }
-  //---------------------------------------------------------------
-  bool lookup_acc_outs(const account_keys& acc, const transaction& tx, const crypto::public_key& tx_pub_key, std::vector<wallet_out_info>& outs, crypto::key_derivation& derivation, std::list<htlc_info>& htlc_info_list)
-  {
     bool r = generate_key_derivation(tx_pub_key, acc.view_secret_key, derivation);
     CHECK_AND_ASSERT_MES(r, false, "unable to generate derivation from tx_pub = " << tx_pub_key << " * view_sec, invalid tx_pub?");
 
@@ -3433,24 +3580,6 @@ namespace currency
             outs.emplace_back(output_index, o.amount); // TODO: @#@# consider this
             //don't cout this money in sum_of_native_outs
           }
-        VARIANT_CASE_CONST(txout_htlc, htlc)
-          htlc_info hi = AUTO_VAL_INIT(hi);
-          if (is_out_to_acc(acc.account_address, htlc.pkey_redeem, derivation, output_index))
-          {
-            hi.hltc_our_out_is_before_expiration = true;
-            htlc_info_list.push_back(hi);
-          }
-          else if (is_out_to_acc(acc.account_address, htlc.pkey_refund, derivation, output_index))
-          {
-            hi.hltc_our_out_is_before_expiration = false;
-            htlc_info_list.push_back(hi);
-          }
-          else
-          {
-            LOG_ERROR("lookup_acc_outs: handling txout_htlc went wrong, output_index: " << output_index);
-            return false;
-          }
-          outs.emplace_back(output_index, o.amount);
         VARIANT_CASE_OTHER()
           LOG_ERROR("Wrong type at lookup_acc_outs, unexpected type is: " << o.target.type().name());
           return false;
@@ -3458,14 +3587,14 @@ namespace currency
       }
       VARIANT_CASE_CONST(tx_out_zarcanum, zo)
       {
-        uint64_t amount = 0;
+        uint64_t amount = 0, payment_id = 0;
         crypto::public_key asset_id{};
         crypto::scalar_t amount_blinding_mask = 0, asset_id_blinding_mask = 0;
-        if (is_out_to_acc(acc.account_address, zo, derivation, output_index, amount, asset_id, amount_blinding_mask, asset_id_blinding_mask))
+        if (is_out_to_acc(acc.account_address, zo, derivation, output_index, amount, asset_id, amount_blinding_mask, asset_id_blinding_mask, payment_id))
         {
           crypto::point_t asset_id_pt = crypto::point_t(zo.blinded_asset_id).modify_mul8() - asset_id_blinding_mask * crypto::c_point_X;
           crypto::public_key asset_id = asset_id_pt.to_public_key();
-          outs.emplace_back(output_index, amount, amount_blinding_mask, asset_id_blinding_mask, asset_id);
+          outs.emplace_back(output_index, amount, amount_blinding_mask, asset_id_blinding_mask, asset_id, payment_id);
         }
       }
       VARIANT_SWITCH_END();
@@ -3544,8 +3673,8 @@ namespace currency
   crypto::hash hash_together(const pod_operand_a& a, const pod_operand_b& b)
   {
     std::string blob;
-    string_tools::append_pod_to_strbuff(blob, a);
-    string_tools::append_pod_to_strbuff(blob, b);
+    string_tools::append_pod_to_strbuff(a, blob);
+    string_tools::append_pod_to_strbuff(b, blob);
     return crypto::cn_fast_hash(blob.data(), blob.size());
   }
   //------------------------------------------------------------------
@@ -3639,7 +3768,7 @@ namespace currency
     sa.service_id = BC_BLOCK_DATETIME_SERVICE_ID;
     sa.instruction = BC_BLOCK_DATETIME_INSTRUCTION_DEFAULT;
     sa.flags = 0;
-    epee::string_tools::append_pod_to_strbuff(sa.body, datetime);
+    epee::string_tools::append_pod_to_strbuff(datetime, sa.body);
     b.miner_tx.extra.push_back(sa);
   }
   //------------------------------------------------------------------
@@ -3941,7 +4070,7 @@ namespace currency
   {
     for (const auto& e : tx.vin)
     {
-      if (e.type() != typeid(txin_to_key) || e.type() != typeid(txin_multisig) || e.type() != typeid(txin_htlc))
+      if (e.type() != typeid(txin_to_key) || e.type() != typeid(txin_multisig))
         return false;
       if (boost::get<txin_to_key>(e).key_offsets.size() < 2)
         return false;
@@ -4031,9 +4160,6 @@ namespace currency
             tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(k));
           }
           tei.outs.back().minimum_sigs = otm.minimum_sigs;
-        VARIANT_CASE_CONST(txout_htlc, otk)
-          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_redeem) + "(htlc_pkey_redeem)");
-          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.pkey_refund) + "(htlc_pkey_refund)");
         VARIANT_SWITCH_END();
       }
       VARIANT_CASE_CONST(tx_out_zarcanum, o)
@@ -4059,9 +4185,8 @@ namespace currency
       {
         entry_to_fill.amount = 0;
       }
-      else if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_htlc) || in.type() == typeid(txin_zc_input))
+      else if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_zc_input))
       {
-        //TODO: add htlc info
         entry_to_fill.amount = get_amount_from_variant(in);
         entry_to_fill.kimage_or_ms_id = epee::string_tools::pod_to_hex(get_key_image_from_txin_v(in));
         const std::vector<txout_ref_v>& key_offsets = get_key_offsets_from_txin_v(in);
@@ -4078,10 +4203,6 @@ namespace currency
             //disable for the reset at the moment 
             entry_to_fill.global_indexes.back() = std::numeric_limits<uint64_t>::max();
           }
-        }
-        if (in.type() == typeid(txin_htlc))
-        {
-          entry_to_fill.htlc_origin = epee::string_tools::buff_to_hex_nodelimer(boost::get<txin_htlc>(in).hltc_origin);
         }
         //tk.etc_details -> visualize it may be later
       }
@@ -4136,7 +4257,7 @@ namespace currency
     {
       VARIANT_SWITCH_BEGIN(tx.vout[n]);
       VARIANT_CASE_CONST(tx_out_bare, o)
-        if (o.target.type() == typeid(txout_to_key) || o.target.type() == typeid(txout_htlc))
+        if (o.target.type() == typeid(txout_to_key))
         {
           uint64_t amount = o.amount;
           gindices[amount] += 1;
@@ -4261,8 +4382,10 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------------
-  bool is_payment_id_size_ok(const payment_id_t& payment_id)
+  bool is_payment_id_size_ok(const payment_id_t& payment_id, bool allow_legacy_payment_id_size /* = true */)
   {
+    if (!allow_legacy_payment_id_size)
+      return payment_id.size() <= CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE;
     return payment_id.size() <= BC_PAYMENT_ID_SERVICE_SIZE_MAX;
   }
   //-----------------------------------------------------------------------
@@ -4660,14 +4783,9 @@ namespace currency
       a.multisig_out_id == b.multisig_out_id &&
       a.sigs_count      == b.sigs_count;
   }
-  bool operator ==(const currency::txin_htlc& a, const currency::txin_htlc& b)
+  bool operator ==(const currency::txin_dummy&, const currency::txin_dummy&) // TODO@#@# replace this -- sowle
   {
-    return
-      a.amount      == b.amount &&
-      a.etc_details == b.etc_details &&
-      a.hltc_origin == b.hltc_origin &&
-      a.key_offsets == b.key_offsets &&
-      a.k_image     == b.k_image;
+    throw std::runtime_error("operator ==: txin_dummy not implemented");
   }
   bool operator ==(const currency::txin_zc_input& a, const currency::txin_zc_input& b)
   {
@@ -4721,7 +4839,7 @@ namespace currency
 
   const boost::multiprecision::uint1024_t adjusting_multiplier = get_adjuster_for_fork_choice_rule_hf4();
 
-  boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty_hf4(const wide_difficulty_type& difficulty_pos_at_split_point,
+  boost::multiprecision::uint1024_t get_a_to_b_relative_cumulative_difficulty_hf6(const wide_difficulty_type& difficulty_pos_at_split_point,
     const wide_difficulty_type& difficulty_pow_at_split_point,
     const difficulties& a_diff,
     const difficulties& b_diff)

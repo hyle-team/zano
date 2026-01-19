@@ -389,6 +389,7 @@ namespace currency
       LOG_PRINT_MAGENTA("State changed to state_synchronizing.", LOG_LEVEL_2);
       LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_CHAIN(on_orphaned): m_block_ids.size()=" << r.block_ids.size() );
       LOG_PRINT_L3("[NOTIFY]NOTIFY_REQUEST_CHAIN(on_orphaned): " << ENDL << print_kv_structure(r));
+      ++context.m_priv.m_expected_NOTIFY_RESPONSE_CHAIN_ENTRY_count;
       post_notify<NOTIFY_REQUEST_CHAIN>(r, context);
     }
       
@@ -806,6 +807,7 @@ namespace currency
       }
       LOG_PRINT_L2("[NOTIFY]NOTIFY_REQUEST_CHAIN: m_block_ids.size()=" << r.block_ids.size());
       LOG_PRINT_L3("[NOTIFY]NOTIFY_REQUEST_CHAIN: " << ENDL << print_kv_structure(r));
+      ++context.m_priv.m_expected_NOTIFY_RESPONSE_CHAIN_ENTRY_count;
       post_notify<NOTIFY_REQUEST_CHAIN>(r, context);
 
     }else

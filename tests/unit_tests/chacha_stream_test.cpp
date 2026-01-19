@@ -28,7 +28,7 @@ TEST(chacha_stream_test, basic_test_with_serialization_on_top)
   }
 
   std::list<currency::block_extended_info> verification_list;
-  crypto::chacha8_iv iv = crypto::rand<crypto::chacha8_iv>();
+  crypto::chacha_iv iv = crypto::rand<crypto::chacha_iv>();
   boost::filesystem::ofstream store_data_file;
   store_data_file.open("./test.bin", std::ios_base::binary | std::ios_base::out | std::ios::trunc);
   tools::encrypt_chacha_out_filter encrypt_filter("pass", iv);
@@ -81,7 +81,7 @@ TEST(chacha_stream_test, diversity_test_on_different_stream_behaviour)
     buff[i] = i % 255;
   }
 
-  crypto::chacha8_iv iv = crypto::rand<crypto::chacha8_iv>();
+  crypto::chacha_iv iv = crypto::rand<crypto::chacha_iv>();
   boost::filesystem::ofstream store_data_file;
   store_data_file.open("./test.bin", std::ios_base::binary | std::ios_base::out | std::ios::trunc);
   tools::encrypt_chacha_out_filter encrypt_filter("pass", iv);

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -171,10 +171,8 @@ struct input_refers_to_incompatible_by_type_output : public test_chain_unit_ench
 {
   input_refers_to_incompatible_by_type_output();
   bool generate(std::vector<test_event_entry>& events) const;
-  bool assert_htlc_input_refers_to_key_output_is_wrong(const currency::core& c, const size_t ev_index, const std::vector<test_event_entry>& events) const;
   bool assert_to_key_input_refers_zarcanum_output_is_wrong(const currency::core& c, const size_t ev_index, const std::vector<test_event_entry>& events) const;
   bool assert_zc_input_refers_bare_output_is_wrong(const currency::core& c, const size_t ev_index, const std::vector<test_event_entry>& events) const;
-  bool assert_htlc_input_refers_zarcanum_output_is_wrong(const currency::core& c, const size_t ev_index, const std::vector<test_event_entry>& events) const;
 };
 
 struct tx_pool_validation_and_chain_switch : public wallet_test

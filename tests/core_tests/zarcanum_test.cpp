@@ -929,7 +929,8 @@ bool zarcanum_in_alt_chain_2::generate(std::vector<test_event_entry>& events) co
   MAKE_NEXT_BLOCK(events, blk_2a, blk_1r, miner_acc);
   MAKE_NEXT_BLOCK(events, blk_3a, blk_2a, miner_acc);
   MAKE_NEXT_BLOCK(events, blk_4a, blk_3a, miner_acc);
-  MAKE_NEXT_BLOCK(events, blk_5a, blk_4a, miner_acc);
+  REWIND_POS_BLOCKS_N_WITH_TIME(events, blk_between_4a_and_blk_5a, blk_4a, miner_acc, { miner_acc }, 2)   //event 41
+  MAKE_NEXT_BLOCK(events, blk_5a, blk_between_4a_and_blk_5a, miner_acc);                                                     //event 43
   // this altchain should win and previous PoS block are now in alt chain
   DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block{blk_5a});
 

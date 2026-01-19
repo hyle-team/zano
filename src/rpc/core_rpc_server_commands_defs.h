@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -206,12 +206,14 @@ namespace currency
       std::string address;
       crypto::public_key asset_id;
       uint64_t out_index;
+      uint64_t payment_id;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(amount)                      DOC_DSCR("Amount begin transferred.") DOC_EXMP(10000000000000)     DOC_END
         KV_SERIALIZE(address)                     DOC_DSCR("Destination address.") DOC_EXMP("ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp")     DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Asset id.") DOC_EXMP("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852")     DOC_END
         KV_SERIALIZE(out_index)                   DOC_DSCR("Index of the corresponding output in the transaction.") DOC_EXMP(1) DOC_END
+        KV_SERIALIZE(payment_id)                  DOC_DSCR("[optional] Intrinsic per-output 8 byte long payment id") DOC_EXMP(0) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -366,6 +368,7 @@ namespace currency
     struct out_entry
     {
       uint64_t            amount;
+      uint64_t            payment_id;
       crypto::public_key  asset_id;
       crypto::hash        tx_id;
       int64_t             tx_block_height;
@@ -377,6 +380,7 @@ namespace currency
         KV_SERIALIZE_POD_AS_HEX_STRING(tx_id)    DOC_DSCR("Transaction ID where the output is present, if found.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
         KV_SERIALIZE(tx_block_height)            DOC_DSCR("Block height where the transaction is present.") DOC_EXMP(2555000) DOC_END
         KV_SERIALIZE(output_tx_index)            DOC_DSCR("Index of the output in the transaction.") DOC_EXMP(2) DOC_END
+        KV_SERIALIZE(payment_id)                 DOC_DSCR("[optional] 8-bytes long intrinsic payment id") DOC_EXMP(0) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1690,13 +1694,11 @@ namespace currency
   {
     uint64_t amount;
     uint64_t multisig_count;
-    std::string htlc_origin;
-    std::string kimage_or_ms_id;
+   std::string kimage_or_ms_id;
     std::vector<uint64_t> global_indexes;
     std::vector<std::string> etc_options;
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(amount)                       DOC_DSCR("The amount of coins being transacted.") DOC_EXMP(1000000000000) DOC_END
-      KV_SERIALIZE(htlc_origin)                  DOC_DSCR("Origin hash for HTLC (Hash Time Locked Contract).") DOC_END
       KV_SERIALIZE(kimage_or_ms_id)              DOC_DSCR("Contains either the key image for the input or the multisig output ID, depending on the input type.") DOC_EXMP("2540e0544b1fed3b104976f803dbd83681335c427f9d601d9d5aecf86ef276d2") DOC_END
       KV_SERIALIZE(global_indexes)               DOC_DSCR("List of global indexes indicating the outputs referenced by this input, where only one is actually being spent.") DOC_EXMP_AGGR(0,2,12,27) DOC_END
       KV_SERIALIZE(multisig_count)               DOC_DSCR("Number of multisig signatures used, relevant only for multisig outputs.") DOC_EXMP(0) DOC_END

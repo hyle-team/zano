@@ -14,7 +14,7 @@
 
 #include "serialization/serialization.h"
 #include "serialization/debug_archive.h"
-#include "crypto/chacha8.h"
+#include "crypto/chacha.h"
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
 #include "crypto/range_proofs.h"
@@ -243,7 +243,7 @@ namespace crypto
 
 } // namespace crypto
 
-BLOB_SERIALIZER(crypto::chacha8_iv);
+BLOB_SERIALIZER(crypto::chacha_iv);
 BLOB_SERIALIZER(crypto::hash);
 BLOB_SERIALIZER(crypto::public_key);
 BLOB_SERIALIZER(crypto::secret_key);

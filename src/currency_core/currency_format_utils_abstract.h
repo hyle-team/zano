@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2019 Zano Project
+// Copyright (c) 2018-2026 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -211,12 +211,6 @@ namespace currency
         result = boost::get<txin_to_key>(in_v).k_image;
         return true;
       }
-    
-      if (in_v.type() == typeid(txin_htlc))
-      {
-        result = boost::get<txin_htlc>(in_v).k_image;
-        return true;
-      }
     }
     catch(...)
     {
@@ -235,9 +229,6 @@ namespace currency
     if (in_v.type() == typeid(txin_to_key))
       return boost::get<txin_to_key>(in_v).k_image;
     
-    if (in_v.type() == typeid(txin_htlc))
-      return boost::get<txin_htlc>(in_v).k_image;
-
     CHECK_AND_ASSERT_THROW_MES(false, "[get_key_image_from_txin_v] Wrong type: " << in_v.type().name());
   }
   //---------------------------------------------------------------
@@ -250,9 +241,6 @@ namespace currency
     if (in_v.type() == typeid(txin_to_key))
       return boost::get<txin_to_key>(in_v).key_offsets;
     
-    if (in_v.type() == typeid(txin_htlc))
-      return boost::get<txin_htlc>(in_v).key_offsets;
-
     CHECK_AND_ASSERT_THROW_MES(false, "[get_key_offsets_from_txin_v] Wrong type: " << in_v.type().name());
   }
   //---------------------------------------------------------------
@@ -314,7 +302,12 @@ namespace currency
     return false;
   }
   //---------------------------------------------------------------
-  //, txin_htlc, txin_zc_input
+  // TODO@#@# replace with gateway -- sowle
+  inline bool compare_variant_by_types(const txin_dummy& left, const txin_dummy& right)
+  {
+    return false;
+  }
+  //---------------------------------------------------------------
   inline bool compare_variant_by_types(const txin_multisig& left, const txin_multisig& right)
   {
     return (left.multisig_out_id < right.multisig_out_id);

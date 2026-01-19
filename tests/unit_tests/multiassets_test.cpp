@@ -57,7 +57,7 @@ namespace currency
       BOOST_SERIALIZE(meta_info)
       BOOST_SERIALIZE(owner)
       BOOST_SERIALIZE(hidden_supply)
-      END_BOOST_SERIALIZATION()
+      END_BOOST_SERIALIZATION_TOTAL_FIELDS(9)
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(total_max_supply)  DOC_DSCR("Maximum possible supply for given asset, can't be changed after deployment") DOC_EXMP(1000000000000000000)   DOC_END
@@ -95,7 +95,7 @@ namespace currency
       BOOST_SERIALIZE(amount_commitment)
       BOOST_END_VERSION_UNDER(1)
       BOOST_SERIALIZE(opt_asset_id)
-    END_BOOST_SERIALIZATION()
+    END_BOOST_SERIALIZATION_TOTAL_FIELDS(5)
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(operation_type)    DOC_DSCR("Asset operation type identifier") DOC_EXMP(1) DOC_END
@@ -172,7 +172,7 @@ static asset_operation_descriptor get_ado(const asset_base_descriptor& base_desc
 enum class serialization_method : uint8_t
 {
   native,
-  boost,
+  //boost,
   key_value
 };
 
@@ -192,9 +192,9 @@ static std::optional<std::string> serialize(serialization_method method, const a
     serialization_function = static_cast<bool(*)(const asset_operation_descriptor&, std::string&)>(t_serializable_object_to_blob);
     break;
 
-  case serialization_method::boost:
-    serialization_function = static_cast<bool(*)(const asset_operation_descriptor&, std::string&)>(tools::serialize_obj_to_buff);
-    break;
+  //case serialization_method::boost:
+  //  serialization_function = static_cast<bool(*)(const asset_operation_descriptor&, std::string&)>(tools::serialize_obj_to_buff);
+  //  break;
 
   case serialization_method::key_value:
     serialization_function = [](const asset_operation_descriptor& descriptor, std::string& presentation) -> bool
@@ -228,9 +228,9 @@ static std::optional<asset_operation_descriptor> deserialize(serialization_metho
     deserialization_function = t_unserializable_object_from_blob<asset_operation_descriptor>;
     break;
 
-  case serialization_method::boost:
-    deserialization_function = tools::unserialize_obj_from_buff<asset_operation_descriptor>;
-    break;
+  //case serialization_method::boost:
+  //  deserialization_function = tools::unserialize_obj_from_buff<asset_operation_descriptor>;
+  //  break;
 
   case serialization_method::key_value:
     deserialization_function = epee::serialization::load_t_from_json<asset_operation_descriptor>;

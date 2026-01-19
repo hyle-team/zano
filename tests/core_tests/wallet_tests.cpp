@@ -1543,6 +1543,7 @@ bool gen_wallet_decrypted_payload_items::generate(std::vector<test_event_entry>&
   REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, WALLET_DEFAULT_TX_SPENDABLE_AGE);
 
   MAKE_TX_EXTRA_ATTACH_FEE(events, tx_1, alice_acc, miner_acc, MK_TEST_COINS(100), TESTS_DEFAULT_FEE, blk_2r, std::vector<currency::payload_items_v>({ a_tx_comment }), std::vector<currency::payload_items_v>({ a_tx_payer, a_tx_message }));
+  //LOG_PRINT_L0("tx_1: " << get_transaction_hash(tx_1) << ENDL << obj_to_json_str(tx_1) << ENDL);
   MAKE_NEXT_BLOCK(events, blk_3, blk_2r, miner_acc); // don't put tx_1 into this block, the block is only necessary to trigger tx_pool scan on in wallet2::refresh()
 
   // Spend tx was not sent via Alice wallet instance, so wallet can't obtain destination address and pass it to callback (although, it decrypts attachments & extra)
@@ -1621,9 +1622,10 @@ void gen_wallet_decrypted_payload_items::on_transfer2(const tools::wallet_public
     std::string remote_addresses;
     for (auto it : wti.remote_addresses)
       remote_addresses += remote_addresses.empty() ? it : (", " + it);
-    CHECK_AND_ASSERT_THROW_MES(wti.comment == m_comment_to_be_checked &&
-      ((m_address_to_be_checked.empty() && wti.remote_addresses.empty()) || std::count(wti.remote_addresses.begin(), wti.remote_addresses.end(), m_address_to_be_checked) == 1),
-      "Wrongs wti received: comment: " << wti.comment << " remote addr: " << remote_addresses << std::endl << "  EXPECTED: comment: " << m_comment_to_be_checked << " remote addr: " << m_address_to_be_checked);
+
+    CHECK_AND_ASSERT_THROW_MES(wti.comment == m_comment_to_be_checked, "Wrong wti comment for tx " << wti.tx_hash << ", got: '" << wti.comment << "', expected: '" << m_comment_to_be_checked << "'");
+    bool condition = ((m_address_to_be_checked.empty() && wti.remote_addresses.empty()) || std::count(wti.remote_addresses.begin(), wti.remote_addresses.end(), m_address_to_be_checked) == 1);
+    CHECK_AND_ASSERT_THROW_MES(condition, "Wrongs wti remote address for tx " << wti.tx_hash << ", remote addrs got: " << remote_addresses << std::endl << "  remote addr expected: " << m_address_to_be_checked);
   //}
   //catch (...) { LOG_ERROR("!!!!!!!\n!!!!!!!\n!!!!!!!!\n!!!!!!\n!!!!!!!!\n!!!!!!!\n"); }
 }
@@ -3543,10 +3545,10 @@ bool wallet_sending_to_integrated_address::c1(currency::core& c, size_t ev_index
   bool callback_succeded = false;
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(
     [&](const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) -> bool {
-    LOG_PRINT_YELLOW("on_transfer: " << print_money_brief(wti.get_native_amount()) << " pid len: " << wti.payment_id.size() << " remote addr: " << (wti.remote_addresses.size() > 0 ? wti.remote_addresses[0] : ""), LOG_LEVEL_0);
-    if (wti.payment_id.empty())
+    LOG_PRINT_YELLOW("on_transfer: " << print_money_brief(wti.get_native_amount()) << " pid len: " << wti.tx_wide_payment_id.size() << " remote addr: " << (wti.remote_addresses.size() > 0 ? wti.remote_addresses[0] : ""), LOG_LEVEL_0);
+    if (wti.tx_wide_payment_id.empty())
       return true; // skip another outputs
-    CHECK_AND_ASSERT_MES(wti.payment_id == payment_id, false, "incorrect payment id");
+    CHECK_AND_ASSERT_MES(wti.tx_wide_payment_id == payment_id, false, "incorrect payment id");
     // below: tx_payer and tx_receiver are temporary disabled, @#@#TODO -- sowle
     //CHECK_AND_ASSERT_MES(wti.remote_addresses.size() == 1, false, "remote_addressed.size() = " << wti.remote_addresses.size());
     //CHECK_AND_ASSERT_MES(wti.remote_addresses[0] == alice_integrated_address, false, "incorrect remote address");

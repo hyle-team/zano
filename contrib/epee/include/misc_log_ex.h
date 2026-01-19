@@ -138,6 +138,10 @@ DISABLE_VS_WARNINGS(4100)
 #define LOG_PRINT_CHANNEL_COLOR2_CB(log_channel, log_name, x, y, color, cb) {if ( (y) <= epee::log_space::log_singletone::get_log_detalisation_level() && epee::log_space::log_singletone::channel_enabled(log_channel))\
   {TRY_ENTRY();std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << x << std::endl;epee::log_space::log_singletone::do_log_message(ss________.str(), y, color, false, log_name); cb(ss________.str());CATCH_ALL_DO_NOTHING();}}
 
+#define LOG_PRINT_CHANNEL_COLOR2_CB_NO_PREFIX(log_channel, log_name, x, y, color, cb) {if ( (y) <= epee::log_space::log_singletone::get_log_detalisation_level() && epee::log_space::log_singletone::channel_enabled(log_channel))\
+  {TRY_ENTRY();std::stringstream ss________; ss________ << x << std::endl;epee::log_space::log_singletone::do_log_message(ss________.str(), y, color, false, log_name); cb(ss________.str());CATCH_ALL_DO_NOTHING();}}
+
+
 #define LOG_PRINT_CHANNEL_2_JORNAL(log_channel, log_name, x, y) {if ( (y) <= epee::log_space::log_singletone::get_log_detalisation_level() && epee::log_space::log_singletone::channel_enabled(log_channel))\
   {TRY_ENTRY();std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << x << std::endl;epee::log_space::log_singletone::do_log_message(ss________.str(), y, epee::log_space::console_color_default, true, log_name);CATCH_ALL_DO_NOTHING();}}
 
@@ -147,6 +151,7 @@ DISABLE_VS_WARNINGS(4100)
 #define LOG_ERROR2(log_name, x) LOG_ERROR2_CB(log_name, x, epee::log_space::log_stub)
 #define LOG_PRINT_CHANNEL2(log_channel, log_name, x, y) LOG_PRINT_CHANNEL2_CB(log_channel, log_name, x, y, epee::log_space::log_stub)
 #define LOG_PRINT_CHANNEL_COLOR2(log_channel, log_name, x, y, color) LOG_PRINT_CHANNEL_COLOR2_CB(log_channel, log_name, x, y, color, epee::log_space::log_stub)
+#define LOG_PRINT_CHANNEL_COLOR2_NO_PREFIX(log_channel, log_name, x, y, color) LOG_PRINT_CHANNEL_COLOR2_CB_NO_PREFIX(log_channel, log_name, x, y, color, epee::log_space::log_stub)
 
 #define LOG_FRAME2(log_name, x, y) epee::log_space::log_frame frame(x, y, log_name)
 
@@ -169,6 +174,7 @@ DISABLE_VS_WARNINGS(4100)
 #define LOG_PRINT2(log_name, x, y)                              LOG_PRINT_CHANNEL2(LOG_DEFAULT_CHANNEL, log_name, x, y)
 #define LOG_PRINT2_CB(log_name, x, y, cb)                       LOG_PRINT_CHANNEL2_CB(LOG_DEFAULT_CHANNEL, log_name, x, y, cb)
 #define LOG_PRINT_COLOR2(log_name, x, y, color)                 LOG_PRINT_CHANNEL_COLOR2(LOG_DEFAULT_CHANNEL, log_name, x, y, color)
+#define LOG_PRINT_COLOR2_NO_PREFIX(log_name, x, y, color)       LOG_PRINT_CHANNEL_COLOR2_NO_PREFIX(LOG_DEFAULT_CHANNEL, log_name, x, y, color)
 #define LOG_PRINT_COLOR2_CB(log_name, x, y, color, cb)          LOG_PRINT_CHANNEL_COLOR2_CB(LOG_DEFAULT_CHANNEL, log_name, x, y, color, cb)
 #define LOG_PRINT2_JORNAL(log_name, x, y)                       LOG_PRINT_CHANNEL_2_JORNAL(LOG_DEFAULT_CHANNEL, log_name, x, y)
 
@@ -192,6 +198,9 @@ DISABLE_VS_WARNINGS(4100)
 #define LOG_COLOR_MAGENTA         epee::log_space::console_color_magenta
  
 #define LOG_PRINT_COLOR(mess, level, color)       LOG_PRINT_COLOR2(LOG_DEFAULT_TARGET, mess, level, color)
+#define LOG_PRINT_COLOR_NO_PREFIX(mess, level, color)       LOG_PRINT_COLOR2_NO_PREFIX(LOG_DEFAULT_TARGET, mess, level, color)
+
+
 #define LOG_PRINT_RED(mess, level)        LOG_PRINT_COLOR2(LOG_DEFAULT_TARGET, mess, level, LOG_COLOR_RED)
 #define LOG_PRINT_GREEN(mess, level)        LOG_PRINT_COLOR2(LOG_DEFAULT_TARGET, mess, level, LOG_COLOR_GREEN)
 #define LOG_PRINT_BLUE(mess, level)       LOG_PRINT_COLOR2(LOG_DEFAULT_TARGET, mess, level, LOG_COLOR_BLUE)
@@ -274,6 +283,22 @@ DISABLE_VS_WARNINGS(4100)
 
 #ifndef CHECK_AND_ASSERT_GREATER
 #define CHECK_AND_ASSERT_GREATER(A, B) CHECK_AND_ASSERT_MES((A) > (B), false, STR(A) " <= " STR(B) " because " << A << " <= " << B)
+#endif
+
+#ifndef CHECK_AND_ASSERT_SUCCESS
+#define CHECK_AND_ASSERT_SUCCESS(A) CHECK_AND_ASSERT_MES((A), false, STR(A) " failed")
+#endif
+
+#ifndef CHECK_AND_ASSERT_FAILURE
+#define CHECK_AND_ASSERT_FAILURE(A) CHECK_AND_ASSERT_MES(!(A), false, STR(A) " succeeded, but was expected to fail")
+#endif
+
+#ifndef CHECK_AND_ASSERT_TRUE
+#define CHECK_AND_ASSERT_TRUE(A) CHECK_AND_ASSERT_MES((A), false, STR(A) " is false")
+#endif
+
+#ifndef CHECK_AND_ASSERT_FALSE
+#define CHECK_AND_ASSERT_FALSE(A) CHECK_AND_ASSERT_MES(!(A), false, STR(A) " is true")
 #endif
 
 namespace epee

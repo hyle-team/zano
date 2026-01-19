@@ -31,7 +31,6 @@ usage:
       VARIANT_SWITCH_BEGIN(o);
       VARIANT_CASE_CONST(txout_to_key, o);
       VARIANT_CASE_CONST(txout_multisig, ms);
-      VARIANT_CASE_CONST(txout_htlc, htlc);
       VARIANT_CASE_THROW_ON_OTHER();
       VARIANT_SWITCH_END();
 

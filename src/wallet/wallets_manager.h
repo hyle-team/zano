@@ -270,10 +270,12 @@ private:
   tools::wallet_rpc_server m_wallet_rpc_server;
   wallet_vs_options::wallet_lock_object m_current_wallet_locked_object;
   uint64_t m_rpc_selected_wallet_id = 0;
+  tools::socks5::socks5_proxy_settings m_socks5_cfg;
 #endif
 
   bool m_remote_node_mode;
   bool m_qt_logs_enbaled;
+  bool m_allow_legacy_payment_id_size;
   std::string m_qt_dev_tools;
   std::atomic<bool> m_is_pos_allowed;
   std::atomic<bool> m_use_tor;

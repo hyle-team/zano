@@ -15,7 +15,7 @@
 #include "common/boost_serialization_helper.h"
 
 
-bool perform_crypt_stream_iteration(const std::list<currency::block_extended_info>& test_list, const crypto::chacha8_iv& iv)
+bool perform_crypt_stream_iteration(const std::list<currency::block_extended_info>& test_list, const crypto::chacha_iv& iv)
 {
   std::list<currency::block_extended_info> verification_list;
   boost::filesystem::ofstream store_data_file;
@@ -54,7 +54,7 @@ bool perform_crypt_stream_iteration(const std::list<currency::block_extended_inf
   return true;
 }
 
-bool perform_just_substream_stream_iteration(const std::list<currency::block_extended_info>& test_list, const crypto::chacha8_iv& iv)
+bool perform_just_substream_stream_iteration(const std::list<currency::block_extended_info>& test_list, const crypto::chacha_iv& iv)
 {
   std::list<currency::block_extended_info> verification_list;
   boost::filesystem::ofstream store_data_file;
@@ -94,7 +94,7 @@ bool perform_just_substream_stream_iteration(const std::list<currency::block_ext
 }
 
 
-bool perform_no_crypt_stream_iteration(const std::list<currency::block_extended_info>& test_list, const crypto::chacha8_iv& iv)
+bool perform_no_crypt_stream_iteration(const std::list<currency::block_extended_info>& test_list, const crypto::chacha_iv& iv)
 {
   std::list<currency::block_extended_info> verification_list;
   boost::filesystem::ofstream store_data_file;
@@ -145,7 +145,7 @@ bool do_chacha_stream_performance_test()
   }
 
 
-  crypto::chacha8_iv iv = crypto::rand<crypto::chacha8_iv>();
+  crypto::chacha_iv iv = crypto::rand<crypto::chacha_iv>();
   LOG_PRINT_L0("Running substream stream performance tests...");
   TIME_MEASURE_START(substream_version);
   for (size_t i = 0; i != 100; i++)

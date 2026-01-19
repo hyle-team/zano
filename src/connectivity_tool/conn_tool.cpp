@@ -60,6 +60,7 @@ namespace
   const command_line::arg_descriptor<bool>        arg_get_anonymized_peers( "get-anonymized-peers", "Retrieves anonymized peers connected to the specified peer.");
   const command_line::arg_descriptor<bool>        arg_do_consloe_log     ( "do-console-log", "Tool generates debug console output(debug purposes)");
   const command_line::arg_descriptor<std::string> arg_generate_integrated_address  ( "generate-integrated-address", "Tool create integrated address from simple address and payment_id");
+  const command_line::arg_descriptor<bool>        arg_allow_legacy_payment_id_size ( "allow-legacy-payment-id-size", "Temporary (till HF6) removes requirement for payment id to be 8 bytes long");
   const command_line::arg_descriptor<std::string> arg_pack_file           ("pack-file", "perform gzip-packing and calculate hash for a given file");
   const command_line::arg_descriptor<std::string> arg_unpack_file         ("unpack-file", "Perform gzip-unpacking and calculate hash for a given file");
   const command_line::arg_descriptor<std::string> arg_target_file         ("target-file", "Specify target file for pack-file and unpack-file commands");
@@ -969,6 +970,12 @@ bool handle_generate_integrated_address(po::variables_map& vm)
     payment_id_bin = payment_id;
   }
 
+  if (payment_id_bin.size() != CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE && !command_line::has_arg(vm, arg_allow_legacy_payment_id_size))
+  {
+    std::cout << "ERROR: invalid payment id size: " << payment_id_bin.size() << " bytes. Expected: " << CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE << " bytes." << ENDL;
+    return false;
+  }
+
   if (address.empty() || payment_id_bin.empty())
   {
     std::cout << "ERROR: wrong syntax, address or paymentd_id not set" << ENDL;
@@ -1208,6 +1215,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_get_anonymized_peers);
   command_line::add_arg(desc_params, arg_do_consloe_log);
   command_line::add_arg(desc_params, arg_generate_integrated_address);
+  command_line::add_arg(desc_params, arg_allow_legacy_payment_id_size);
   command_line::add_arg(desc_params, arg_pack_file);
   command_line::add_arg(desc_params, arg_unpack_file);
   command_line::add_arg(desc_params, arg_target_file);
