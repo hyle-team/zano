@@ -53,17 +53,17 @@ public:
     }
 
     // 1) TCP connect to SOCKS5 proxy through BASE transport
-    if (!this->base_transport::connect(m_proxy_host, std::to_string(m_proxy_port), connect_timeout_ms, recv_timeout_ms, bind_ip))
+    if (!base_transport::connect(m_proxy_host, std::to_string(m_proxy_port), connect_timeout_ms, recv_timeout_ms, bind_ip))
       return false;
 
     // 2) SOCKS5 greeting: [0x05, 0x01, 0x00] -> [0x05, 0x00]
     {
       const unsigned char greet[] = {0x05, 0x01, 0x00};
-      if (!this->base_transport::send(greet, sizeof(greet)))
+      if (!base_transport::send(greet, sizeof(greet)))
         return false;
 
       std::string resp;
-      if (!this->base_transport::recv_n(resp, 2))
+      if (!base_transport::recv_n(resp, 2))
         return false;
       if (resp.size() != 2)
         return false;
@@ -85,10 +85,8 @@ public:
 
       // ATYP + DST.ADDR
       boost::system::error_code ec;
-      boost::asio::ip::address ip_parsed;
-      const bool addr_is_ip =
-        !m_use_remote_dns &&
-        !((ip_parsed = boost::asio::ip::make_address(dest_host, ec)).is_unspecified());
+      auto ip_parsed = boost::asio::ip::make_address(dest_host, ec);
+      const bool addr_is_ip = (!m_use_remote_dns && !ec);
 
       if (addr_is_ip && ip_parsed.is_v4())
       {
@@ -120,12 +118,12 @@ public:
       req.push_back(static_cast<unsigned char>((p >> 8) & 0xFF));
       req.push_back(static_cast<unsigned char>( p       & 0xFF));
 
-      if (!this->base_transport::send(req.data(), req.size()))
+      if (!base_transport::send(req.data(), req.size()))
         return false;
 
       // resp: VER REP RSV ATYP [BND.ADDR] [BND.PORT]
       std::string head;
-      if (!this->base_transport::recv_n(head, 4))
+      if (!base_transport::recv_n(head, 4))
         return false;
       if (head.size() != 4)
         return false;
@@ -147,7 +145,7 @@ public:
       else if (r_atyp == 0x03)
       {
         std::string len_buf;
-        if (!this->base_transport::recv_n(len_buf, 1))
+        if (!base_transport::recv_n(len_buf, 1))
           return false;
         if (len_buf.size() != 1)
           return false;
@@ -160,7 +158,7 @@ public:
 
       // continue read BND.ADDR + BND.PORT (2 bytes)
       std::string drain;
-      if (!this->base_transport::recv_n(drain, static_cast<int64_t>(addr_len + 2)))
+      if (!base_transport::recv_n(drain, static_cast<int64_t>(addr_len + 2)))
         return false;
       if (drain.size() != addr_len + 2)
         return false;

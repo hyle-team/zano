@@ -5307,10 +5307,6 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
       u.port = (u.schema == "https" ? 443 : 80);
     
     //TODO move that to smth place
-    using socks5_http_transport = tools::socks5::socks5_proxy_transport<false, epee::net_utils::blocked_mode_client>;
-    using socks5_https_transport = tools::socks5::socks5_proxy_transport<true, epee::net_utils::blocked_mode_ssl_client>;
-    using http_socks5_client_http = epee::net_utils::http::http_simple_client_t<false, socks5_http_transport>;
-    using http_socks5_client_https = epee::net_utils::http::http_simple_client_t<true, socks5_https_transport>;
 
     const std::string rpc_uri = u.uri.empty() ? "/json_rpc" : u.uri;
 
@@ -7113,17 +7109,14 @@ void wallet2::notify_state_change(const std::string& state_code, const std::stri
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::send_transaction_to_network(const transaction& tx)
 {
-  if (m_socks5_relay_cfg.transactions.has_value())
+  if(m_socks5_relay_cfg.transactions.has_value())
   {
     const auto tx_socks = m_socks5_relay_cfg.transactions.value();
-    //TODO check that core synchronized
-    //epee::net_utils::levin_client2 p2p_client;
+    // TODO check that core synchronized
 
     //make few attempts
-    tools::levin_over_socks5_client p2p_client;
-    apply_socks5_cfg(p2p_client.get_transport(), tx_socks.proxy);
     WLT_LOG_L1("[SOCKS5] Sending transaction " << get_transaction_hash(tx) << " via SOCKS5 relay "
-      << tx_socks.proxy.proxy_host << ":" << tx_socks.proxy.proxy_port);
+        << tx_socks.proxy.proxy_host << ":" << tx_socks.proxy.proxy_port);
     std::string relay_host {};
     uint16_t relay_port{};
     epee::net_utils::http::url_content u = AUTO_VAL_INIT(u);
@@ -7131,51 +7124,73 @@ void wallet2::send_transaction_to_network(const transaction& tx)
     {
       if(u.port != 0 && u.port <= 65535)
         relay_port = static_cast<uint16_t>(u.port);
+      else
+        relay_port = (u.schema == "https" ? 443 : 80); // fallback to default ports
 
       relay_host = u.host;
     }
     bool succeseful_sent = false;
-    for (size_t i = 0; i != 3; ++i)
+    auto do_send_socks_http_json = [&](auto& http_client) -> bool
     {
-      WLT_LOG_L1("[SOCKS5] attempt " << (i+1));
-      if(!p2p_client.connect(relay_host, relay_port, tx_socks.proxy.connect_timeout_ms))
-      {
-        WLT_LOG_L1("[SOCKS5] connect failed");
-        continue;//THROW_IF_FALSE_WALLET_EX(false, error::no_connection_to_daemon, "Failed to connect to TOR node");
-      }
+      tools::socks5::apply_socks5_cfg(http_client.get_transport(), tx_socks.proxy);
 
-      currency::NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request  p2p_req = AUTO_VAL_INIT(p2p_req);
-      currency::NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::response p2p_rsp = AUTO_VAL_INIT(p2p_rsp);
-      p2p_req.txs.push_back(t_serializable_object_to_blob(tx));
+      COMMAND_RPC_SEND_RAW_TX::request req  = AUTO_VAL_INIT(req);
+      COMMAND_RPC_SEND_RAW_TX::response res = AUTO_VAL_INIT(res);
+
+      req.tx_as_hex = epee::string_tools::buff_to_hex_nodelimer(tx_to_blob(tx));
       this->notify_state_change(WALLET_LIB_STATE_SENDING);
-      bool ok = epee::net_utils::invoke_remote_command2(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::ID, p2p_req, p2p_rsp, p2p_client);
+      std::string target_url = tx_socks.target_url + "/sendrawtransaction";
+      const bool ok = epee::net_utils::invoke_http_json_remote_command2(
+        target_url, req, res, http_client, tx_socks.proxy.connect_timeout_ms);
+
+      http_client.disconnect();
+
       if (!ok)
       {
         this->notify_state_change(WALLET_LIB_SEND_FAILED);
-        WLT_LOG_L0("[SOCKS5] P2P invoke is ERROR: " << p2p_rsp.code);
-        continue;
+        WLT_LOG_L1("[SOCKS5] HTTP JSON-RPC invoke failed");
+        return false;
       }
 
-      p2p_client.disconnect();
-      if (p2p_rsp.code == API_RETURN_CODE_OK)
+      if (res.status == API_RETURN_CODE_OK)
       {
         this->notify_state_change(WALLET_LIB_SENT_SUCCESS);
+        return true;
+      }
+
+      this->notify_state_change(WALLET_LIB_SEND_FAILED);
+      WLT_LOG_L1("[SOCKS5] sendrawtransaction status: " << res.status);
+      return false;
+    };
+
+    for (size_t i = 0; i != 3; ++i)
+    {
+      WLT_LOG_L1("[SOCKS5] attempt " << (i + 1));
+      bool ok = false;
+      if (u.schema == "https")
+      {
+        tools::http_socks5_client_https cli;
+        ok = do_send_socks_http_json(cli);
+      }
+      else
+      {
+        tools::http_socks5_client_http cli;
+        ok = do_send_socks_http_json(cli);
+      }
+      if (ok)
+      {
         succeseful_sent = true;
         break;
       }
-
-      this->notify_state_change(WALLET_LIB_SEND_FAILED);
-      //checking if transaction got relayed to other nodes and 
-      //return;
     }
-    if (!succeseful_sent)
+    if(!succeseful_sent)
     {
       this->notify_state_change(WALLET_LIB_SEND_FAILED);
-      THROW_IF_FALSE_WALLET_EX(succeseful_sent, error::no_connection_to_daemon, "Faile to build TOR stream");
+      THROW_IF_FALSE_WALLET_EX(succeseful_sent, error::no_connection_to_daemon, "Failed to build TOR stream");
     }
     else
     {
-      return; // already sent - do nothing further
+      return;  // already sent - do nothing further
     }
   }
 

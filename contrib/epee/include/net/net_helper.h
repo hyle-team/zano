@@ -1,4 +1,4 @@
-  // Copyright (c) 2019, anonimal, <anonimal@zano.org>
+﻿  // Copyright (c) 2019, anonimal, <anonimal@zano.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
@@ -315,6 +315,11 @@ namespace epee
           // Get a list of endpoints corresponding to the server name.
 
           m_sct_back.reset();
+          m_sct_back.set_delay_handshake(m_delay_handshake_cfg);
+          if (is_ssl && m_delay_handshake_cfg)
+            m_ssl_io_active = false;
+          else if (is_ssl && !m_delay_handshake_cfg)
+            m_ssl_io_active = true;
           //////////////////////////////////////////////////////////////////////////
 
           boost::asio::ip::tcp::resolver resolver(m_io_service);
@@ -430,8 +435,10 @@ namespace epee
           // object is used as a callback and will update the ec variable when the
           // operation completes. The blocking_udp_client.cpp example shows how you
           // can use boost::bind rather than boost::lambda.
-          boost::asio::async_write(m_sct_back.get_stream(), boost::asio::buffer(buff), boost::lambda::var(ec) = boost::lambda::_1);
-
+          if (is_ssl && !m_ssl_io_active)
+            boost::asio::async_write(m_sct_back.get_socket(), boost::asio::buffer(buff), boost::lambda::var(ec) = boost::lambda::_1);
+          else
+            boost::asio::async_write(m_sct_back.get_stream(), boost::asio::buffer(buff), boost::lambda::var(ec) = boost::lambda::_1);
           // Block until the asynchronous operation has completed.
           while (ec == boost::asio::error::would_block)
           {
@@ -493,8 +500,11 @@ namespace epee
           */
           boost::system::error_code ec;
 
-          size_t writen = m_sct_back.get_stream().write_some(boost::asio::buffer(data, sz), ec);
-
+          size_t writen = 0;
+          if (is_ssl && !m_ssl_io_active)
+            writen = m_sct_back.get_socket().write_some(boost::asio::buffer(data, sz), ec);
+          else
+            writen = m_sct_back.get_stream().write_some(boost::asio::buffer(data, sz), ec);
 
 
           if (!writen || ec)
@@ -562,7 +572,10 @@ namespace epee
 
           char local_buff[10000] = { 0 };
           //m_socket.async_read_some(boost::asio::buffer(local_buff, sizeof(local_buff)), hndlr);
-          boost::asio::async_read(m_sct_back.get_stream(), boost::asio::buffer(local_buff, sizeof(local_buff)), boost::asio::transfer_at_least(1), hndlr);
+          if (is_ssl && !m_ssl_io_active)
+            boost::asio::async_read(m_sct_back.get_socket(), boost::asio::buffer(local_buff, sizeof(local_buff)), boost::asio::transfer_at_least(1), hndlr);
+          else
+            boost::asio::async_read(m_sct_back.get_stream(), boost::asio::buffer(local_buff, sizeof(local_buff)), boost::asio::transfer_at_least(1), hndlr);
 
           // Block until the asynchronous operation has completed.
           while (ec == boost::asio::error::would_block && !boost::interprocess::ipcdetail::atomic_read32(&m_shutdowned))
@@ -646,8 +659,10 @@ namespace epee
           handler_obj hndlr(ec, bytes_transfered);
 
           //char local_buff[10000] = {0};
-          boost::asio::async_read(m_sct_back.get_stream(), boost::asio::buffer((char*)buff.data(), buff.size()), boost::asio::transfer_at_least(buff.size()), hndlr);
-
+          if (is_ssl && !m_ssl_io_active)
+            boost::asio::async_read(m_sct_back.get_socket(), boost::asio::buffer((char*)buff.data(), buff.size()), boost::asio::transfer_at_least(buff.size()), hndlr);
+          else
+            boost::asio::async_read(m_sct_back.get_stream(), boost::asio::buffer((char*)buff.data(), buff.size()), boost::asio::transfer_at_least(buff.size()), hndlr);
           // Block until the asynchronous operation has completed.
           while (ec == boost::asio::error::would_block && !boost::interprocess::ipcdetail::atomic_read32(&m_shutdowned))
           {
@@ -719,7 +734,12 @@ namespace epee
 
       void set_delay_handshake(bool delay)
       {
+        m_delay_handshake_cfg = delay;
         m_sct_back.set_delay_handshake(delay);
+
+        // if ssl mode and handshake are deferred, i\o must go through raw TCP
+        if (is_ssl && delay)
+          m_ssl_io_active = false;
       }
 
       void set_domain(const std::string& domain_name)
@@ -730,6 +750,8 @@ namespace epee
       void do_handshake()
       {
         m_sct_back.do_handshake();
+        if (is_ssl)
+          m_ssl_io_active = true;
       }
 
     private:
@@ -768,6 +790,8 @@ namespace epee
       bool m_connected;
       boost::asio::deadline_timer m_deadline;
       volatile uint32_t m_shutdowned;
+      bool m_delay_handshake_cfg = false;   // delay the TLS handshake on the next connect()
+      bool m_ssl_io_active = true;          // if true -> read/write via ssl::stream, otherwise via raw tcp::socket
     };
 
 
