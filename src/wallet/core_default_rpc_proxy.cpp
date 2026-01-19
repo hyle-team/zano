@@ -228,6 +228,11 @@ namespace tools
 //     m_plast_daemon_is_disconnected = plast_daemon_is_disconnected ? plast_daemon_is_disconnected : &m_last_daemon_is_disconnected_stub;
 //   }
   //------------------------------------------------------------------------------------------------------------------------------
+  uint64_t default_http_core_proxy::get_download_speed()
+  {
+    return m_http_client.get_download_speed();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   void default_http_core_proxy::set_connectivity(unsigned int connection_timeout, size_t repeats_count)
   {
     m_connection_timeout = connection_timeout;
