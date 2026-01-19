@@ -5306,8 +5306,6 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
     if (!u.port)
       u.port = (u.schema == "https" ? 443 : 80);
     
-    //TODO move that to smth place
-
     const std::string rpc_uri = u.uri.empty() ? "/json_rpc" : u.uri;
 
     auto do_submit = [&](auto& client) -> bool
