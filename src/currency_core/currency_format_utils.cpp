@@ -4487,7 +4487,7 @@ namespace currency
     }
 
 
-    uint64_t tag = payment_id.size() ? CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX : CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX;
+    uint64_t tag = payment_id.size() ? CURRENCY_PUBLIC_INTEG_GATEWAY_BASE58_PREFIX : CURRENCY_PUBLIC_GATEWAY_BASE58_PREFIX;
     return tools::base58::encode_addr(tag, t_serializable_object_to_blob(gwserialized));
 
   }
