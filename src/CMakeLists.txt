@@ -50,8 +50,11 @@ MACRO(ENABLE_SHARED_PCH_EXECUTABLE target)
 ENDMACRO(ENABLE_SHARED_PCH_EXECUTABLE)
 #####  End of Precompiled Headers macros  ######
 
-
-
+if(UNIX AND NOT APPLE)
+  add_compile_definitions(BOOST_STACKTRACE_USE_BACKTRACE)
+  link_libraries(backtrace dl)
+  add_link_options(-rdynamic)
+endif()
 
 file(GLOB_RECURSE PCH pch/*)
 file(GLOB_RECURSE COMMON common/*)
