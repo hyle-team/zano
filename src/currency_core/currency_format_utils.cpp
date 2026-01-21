@@ -2055,7 +2055,7 @@ namespace currency
     
     if (x.tx_type == GUI_TX_TYPE_NEW_ALIAS || x.tx_type == GUI_TX_TYPE_UPDATE_ALIAS)
     {
-      tx_extra_info ei = AUTO_VAL_INIT(ei);
+      tx_extra_info ei{};
       if (parse_and_validate_tx_extra(x.tx, ei) && ei.m_alias.m_alias.size())
       {
         x.comment = ei.m_alias.m_text_comment;
