@@ -339,16 +339,16 @@ namespace currency
 
   struct txin_gateway
   {
-    gateway_address_id_type gateway_addr = null_pkey;
-    crypto::public_key asset_id = null_pkey;
-    uint64_t amount = 0;
     uint8_t version = 0;
+    gateway_address_id_type gateway_addr = null_pkey;
+    crypto::public_key asset_id = null_pkey;                     // premultiplied by 1/8
+    uint64_t amount = 0;
 
     BEGIN_VERSIONED_SERIALIZE(0, version)
       FIELD(gateway_addr)
       FIELD(asset_id)
       VARINT_FIELD(amount)
-      VARINT_FIELD(version)
+      VARINT_FIELD(version) // do we really need it? -- sowle
     END_SERIALIZE()
 
   };
@@ -357,8 +357,8 @@ namespace currency
   {
     uint8_t version = 0;
     gateway_address_id_type gateway_addr = null_pkey;
+    crypto::public_key asset_id = null_pkey;                     // premultiplied by 1/8
     uint64_t amount = 0;    
-    crypto::public_key asset_id = null_pkey;
     uint64_t payment_id = 0; 
 
     BEGIN_VERSIONED_SERIALIZE(0, version)
