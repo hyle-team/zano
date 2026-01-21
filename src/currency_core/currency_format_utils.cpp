@@ -2044,6 +2044,7 @@ namespace currency
   void load_wallet_transfer_info_flags(tools::wallet_public::wallet_transfer_info& x)
   {
     x.is_service = currency::is_service_tx(x.tx);
+    x.tx_type = currency::get_tx_type(x.tx);
     x.is_mixing = currency::does_tx_have_only_mixin_inputs(x.tx);
     x.is_mining = currency::is_coinbase(x.tx);
     if (!x.is_mining)
@@ -2051,8 +2052,15 @@ namespace currency
     else
       x.fee = 0;
     x.show_sender = currency::is_showing_sender_addres(x.tx);
-
-    x.tx_type = get_tx_type(x.tx);
+    
+    if (x.tx_type == GUI_TX_TYPE_NEW_ALIAS || x.tx_type == GUI_TX_TYPE_UPDATE_ALIAS)
+    {
+      tx_extra_info ei = AUTO_VAL_INIT(ei);
+      if (parse_and_validate_tx_extra(x.tx, ei) && ei.m_alias.m_alias.size())
+      {
+        x.comment = ei.m_alias.m_text_comment;
+      }
+    }
   }
 
   //---------------------------------------------------------------
