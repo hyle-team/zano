@@ -5153,7 +5153,7 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_append_rl_wait);
   
   TIME_MEASURE_START_PD(tx_append_is_expired);
-  CHECK_AND_ASSERT_MES(!is_tx_expired(tx), false, "Transaction can't be added to the blockchain since it's already expired. tx expiration time: " << get_tx_expiration_time(tx) << ", blockchain median time: " << get_tx_expiration_median());
+  CHECK_AND_ASSERT_MES(!this->is_tx_expired(tx), false, "Transaction can't be added to the blockchain since it's already expired. tx expiration time: " << get_tx_expiration_time(tx) << ", blockchain median time: " << get_tx_expiration_median());
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_append_is_expired);
 
   CHECK_AND_ASSERT_MES(validate_tx_for_hardfork_specific_terms(tx, tx_id, bl_height), false, "tx " << tx_id << ": hardfork-specific validation failed");
@@ -6132,7 +6132,15 @@ bool blockchain_storage::check_block_timestamp(std::vector<uint64_t> timestamps,
 //------------------------------------------------------------------
 bool blockchain_storage::is_tx_expired(const transaction& tx) const
 {
-  return currency::is_tx_expired(tx, get_tx_expiration_median());
+  if (is_hardfork_active(ZANO_HARDFORK_06))
+  {
+    return currency::is_tx_expired_post_hf6(tx, get_tx_expiration_median(), this->get_top_block_height());
+  }
+  else
+  {
+    return currency::is_tx_expired_pre_hf6(tx, get_tx_expiration_median());
+  }
+  
 }
 //------------------------------------------------------------------
 std::shared_ptr<const transaction_chain_entry> blockchain_storage::find_key_image_and_related_tx(const crypto::key_image& ki, crypto::hash& id_result) const

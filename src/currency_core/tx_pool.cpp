@@ -462,6 +462,18 @@ namespace currency
     m_remove_stuck_tx_interval.do_call([this](){return remove_stuck_transactions();});
   }
   //---------------------------------------------------------------------------------
+  bool tx_memory_pool::is_tx_expired(const transaction& tx, uint64_t expiration_ts_median)
+  {
+    if (m_blockchain.is_hardfork_active(ZANO_HARDFORK_06))
+    {
+      return is_tx_expired_post_hf6(tx, expiration_ts_median, m_blockchain.get_top_block_height());
+    }
+    else
+    {
+      return is_tx_expired_pre_hf6(tx, expiration_ts_median);
+    }
+  }
+  //---------------------------------------------------------------------------------
   bool tx_memory_pool::remove_stuck_transactions()
   {    
     if (!CRITICAL_SECTION_TRY_LOCK(m_remove_stuck_txs_lock))
@@ -503,7 +515,7 @@ namespace currency
       }
 
       // expiration time check - remove expired
-      if (is_tx_expired(tx_entry.tx, tx_expiration_ts_median) )
+      if (this->is_tx_expired(tx_entry.tx, tx_expiration_ts_median))
       {
         LOG_PRINT_L0("tx " << h << " is about to be removed from tx pool, reason: expired, expiration time: " << get_tx_expiration_time(tx_entry.tx) << ", blockchain median: " << tx_expiration_ts_median);
         to_delete.push_back(tx_to_delete_entry(h, tx_entry.tx, tx_entry.kept_by_block));
@@ -1153,7 +1165,7 @@ namespace currency
       txv &tx(txs_v[txs[i]]);
 
       // expiration time check -- skip expired transactions
-      if (is_tx_expired(tx.second->tx, tx_expiration_ts_median))
+      if (this->is_tx_expired(tx.second->tx, tx_expiration_ts_median))
       {
           txs[i] = SIZE_MAX;
           continue;

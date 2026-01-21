@@ -360,6 +360,7 @@ const crypto::public_key& wallet2::out_get_pub_key(const currency::tx_out_v& out
     THROW_IF_FALSE_WALLET_INT_ERR_EX(out_t.type() == typeid(currency::tx_out_zarcanum), "Unexpected out type im wallet: " << out_t.type().name());
     return boost::get<currency::tx_out_zarcanum>(out_t).stealth_address;
   }
+  THROW_IF_FALSE_WALLET_INT_ERR_EX(false, "Unexpected out type in target wallet: " << out_t.type().name());
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_operation& ado, process_transaction_context& ptc)
@@ -2486,7 +2487,7 @@ void wallet2::handle_unconfirmed_tx(process_transaction_context& ptc)
       has_out_transfers = true;
     }
   }
-  if (!is_tx_expired(tx, ptc.tx_expiration_ts_median) && (new_multisig_spend_detected || has_in_transfers || has_out_transfers || (currency::is_derivation_used_to_encrypt(tx, derivation))))
+  if (!this->is_tx_expired(tx, ptc.tx_expiration_ts_median) && (new_multisig_spend_detected || has_in_transfers || has_out_transfers || (currency::is_derivation_used_to_encrypt(tx, derivation))))
   {
     m_unconfirmed_in_transfers[ptc.tx_hash()] = tx;
     if (m_unconfirmed_txs.count(ptc.tx_hash()))
@@ -2504,6 +2505,18 @@ void wallet2::handle_unconfirmed_tx(process_transaction_context& ptc)
     }
     rise_on_transfer2(unconfirmed_wti);
   }
+}
+
+bool wallet2::is_tx_expired(const currency::transaction& tx, uint64_t expiration_ts_median)
+{
+    if (is_in_hardfork_zone(ZANO_HARDFORK_06))
+    { 
+      return currency::is_tx_expired_post_hf6(tx, expiration_ts_median, this->get_top_block_height());
+    }
+    else
+    {
+      return currency::is_tx_expired_pre_hf6(tx, expiration_ts_median);
+    }
 }
 
 
@@ -2629,7 +2642,7 @@ bool wallet2::scan_not_compliant_unconfirmed_txs()
       remove_this_tx = true;
       reason_ss << "outdated, ";
     }
-    if (is_tx_expired(it->second.tx, tx_expiration_ts_median))
+    if (this->is_tx_expired(it->second.tx, tx_expiration_ts_median))
     {
       remove_this_tx = true;
       reason_ss << "expired, ";
@@ -2826,11 +2839,11 @@ void wallet2::handle_contract_expirations(uint64_t tx_expiration_ts_median)
     switch (contract.second.state)
     {
     case tools::wallet_public::escrow_contract_details_basic::contract_cancel_proposal_sent:
-      if (is_tx_expired(contract.second.cancel_body.tx_cancel_template, tx_expiration_ts_median))
+      if (this->is_tx_expired(contract.second.cancel_body.tx_cancel_template, tx_expiration_ts_median))
         change_contract_state(contract.second, tools::wallet_public::escrow_contract_details_basic::contract_accepted, contract.first, "cancel proposal expiration");
       break;
     case tools::wallet_public::escrow_contract_details_basic::contract_released_cancelled:
-      if (contract.second.height == 0 && is_tx_expired(contract.second.cancel_body.tx_cancel_template, tx_expiration_ts_median))
+      if (contract.second.height == 0 && this->is_tx_expired(contract.second.cancel_body.tx_cancel_template, tx_expiration_ts_median))
         change_contract_state(contract.second, tools::wallet_public::escrow_contract_details_basic::contract_accepted, contract.first, "cancel acceptance expiration");
       break;
     }

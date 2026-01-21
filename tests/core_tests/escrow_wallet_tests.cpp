@@ -2674,7 +2674,7 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // make sure enough time has passed for cancellation accept template to be expired
-  CHECK_AND_ASSERT_MES(is_tx_expired(tx_cancel_template, c.get_blockchain_storage().get_tx_expiration_median()), false, "tx_cancel_template did not expire");
+  CHECK_AND_ASSERT_MES(is_tx_expired_pre_hf6(tx_cancel_template, c.get_blockchain_storage().get_tx_expiration_median()), false, "tx_cancel_template did not expire");
 
   // try to accept cancellation request - should fail
   r = false;
@@ -2746,7 +2746,7 @@ bool escrow_cancellation_proposal_expiration::c1(currency::core& c, size_t ev_in
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // make sure enough time has passed for cancellation accept template to be expired
-  CHECK_AND_ASSERT_MES(is_tx_expired(tx_cancel_template, c.get_blockchain_storage().get_tx_expiration_median()), false, "tx_cancel_template did not expire");
+  CHECK_AND_ASSERT_MES(is_tx_expired_pre_hf6(tx_cancel_template, c.get_blockchain_storage().get_tx_expiration_median()), false, "tx_cancel_template did not expire");
 
   // try to accept cancellation request - should fail
   r = false;
@@ -2914,7 +2914,7 @@ bool escrow_cancellation_acceptance_expiration::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 1, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
 
   // make sure enough time has passed for cancellation acceptance to be expired
-  CHECK_AND_ASSERT_MES(is_tx_expired(cancel_accept_tx, c.get_blockchain_storage().get_tx_expiration_median()), false, "cancel_accept_tx did not expire");
+  CHECK_AND_ASSERT_MES(is_tx_expired_pre_hf6(cancel_accept_tx, c.get_blockchain_storage().get_tx_expiration_median()), false, "cancel_accept_tx did not expire");
 
   // as cancellation acceptance is expired, contract state should be contract_accepted for both
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_1_contract_state("Alice", alice_wlt, tools::wallet_public::escrow_contract_details::contract_accepted, 7), false, "");

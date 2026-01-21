@@ -932,7 +932,7 @@ private:
     void wti_to_csv_entry(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
     void wti_to_txt_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
     void wti_to_json_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
-    
+    bool is_tx_expired(const currency::transaction& tx, uint64_t expiration_ts_median);
     bool send_block_via_socks5(const currency::block& bl);
 
     

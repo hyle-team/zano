@@ -166,6 +166,7 @@ namespace currency
     void set_taken(const crypto::hash& id);
     void reset_all_taken();
     bool load_keyimages_cache();
+    bool is_tx_expired(const transaction& tx, uint64_t expiration_ts_median);
     
     typedef tools::db::cached_key_value_accessor<crypto::hash, tx_details, true, false> transactions_container;
     typedef tools::db::cached_key_value_accessor<crypto::hash, bool, false, false> hash_container; 

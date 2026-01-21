@@ -23,7 +23,7 @@ namespace currency
     return sender_account_keys.account_address; // otherwise, fallback to sender's address
   }
   //------------------------------------------------------------------
-  bool is_tx_expired(const transaction& tx, uint64_t expiration_ts_median)
+  bool is_tx_expired_pre_hf6(const transaction& tx, uint64_t expiration_ts_median)
   {
     if (expiration_ts_median == 0)
       return false;
@@ -32,6 +32,27 @@ namespace currency
     uint64_t expiration_time = get_tx_expiration_time(tx);
     if (expiration_time == 0)
       return false; // 0 means it never expires
+    return expiration_time <= expiration_ts_median + TX_EXPIRATION_MEDIAN_SHIFT;
+  }
+  //---------------------------------------------------------------
+  bool is_tx_expired_post_hf6(const transaction& tx, uint64_t expiration_ts_median, uint64_t top_block_height)
+  {
+    if (expiration_ts_median == 0)
+      return false;
+    /// tx expiration condition (tx is ok if the following is true)
+    /// tx_expiration_time - TX_EXPIRATION_MEDIAN_SHIFT > get_last_n_blocks_timestamps_median(TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW)
+    uint64_t expiration_time = get_tx_expiration_time(tx);
+    if (expiration_time == 0)
+      return false; // 0 means it never expires
+
+    if (expiration_time < CURRENCY_MAX_BLOCK_NUMBER)
+    {
+      // expiration_time is block height
+      if (top_block_height >= expiration_time)
+        return true;
+      return false;
+    }
+
     return expiration_time <= expiration_ts_median + TX_EXPIRATION_MEDIAN_SHIFT;
   }
   //---------------------------------------------------------------

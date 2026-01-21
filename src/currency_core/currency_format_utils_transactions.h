@@ -197,7 +197,8 @@ namespace currency
   account_public_address get_crypt_address_from_destinations(const account_keys& sender_account_keys, const std::vector<tx_destination_entry>& destinations);
   //-----------------------------------------------------------------------------------------------
 
-  bool is_tx_expired(const transaction& tx, uint64_t expiration_ts_median);
+  bool is_tx_expired_post_hf6(const transaction& tx, uint64_t expiration_ts_median, uint64_t top_block_height);
+  bool is_tx_expired_pre_hf6(const transaction& tx, uint64_t expiration_ts_median);
   uint64_t get_burned_amount(const transaction& tx);
   void get_transaction_prefix_hash(const transaction_prefix& tx, crypto::hash& h);
   crypto::hash get_transaction_prefix_hash(const transaction_prefix& tx);
