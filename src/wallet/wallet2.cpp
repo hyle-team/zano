@@ -42,6 +42,7 @@ using namespace epee;
 #include "crypto/zarcanum.h"
 #include "wallet_debug_events_definitions.h"
 #include "decoy_selection.h"
+#include "wallet_helpers.h"
 
 #include "net/levin_socks5.h"
 
@@ -165,6 +166,11 @@ void wallet2::init(const std::string& daemon_address)
     }
     WLT_LOG_L0(ss.str());
   }
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::reset_connection_addr(const std::string& daemon_address)
+{
+  m_core_proxy->set_connection_addr(daemon_address);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy)
@@ -2003,6 +2009,17 @@ void wallet2::handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop
 uint64_t wallet2::get_sync_progress()
 {
   return m_last_sync_percent;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::get_is_remote_daemon_connected()
+{
+  std::shared_ptr<const proxy_diagnostic_info> diag_info = m_core_proxy->get_proxy_diagnostic_info();
+  return tools::get_is_remote_daemon_connected_from_diag_info(diag_info);
+}
+//----------------------------------------------------------------------------------------------------
+uint64_t wallet2::get_sync_speed() const
+{
+  return m_core_proxy->get_download_speed();
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::refresh()

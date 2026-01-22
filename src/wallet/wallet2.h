@@ -387,6 +387,9 @@ namespace tools
     void stop() { m_stop.store(true, std::memory_order_relaxed); }
     void reset_creation_time(uint64_t timestamp);
 
+    void reset_connection_addr(const std::string& daemon_address);
+    uint64_t get_sync_speed()const;
+
     //i_wallet2_callback* callback() const { return m_wcallback; }
     //void callback(i_wallet2_callback* callback) { m_callback = callback; }
     void callback(std::shared_ptr<i_wallet2_callback> callback) { m_wcallback = callback; m_do_rise_transfer = (callback != nullptr); }
@@ -712,6 +715,7 @@ namespace tools
     static uint64_t get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const wallet_public::employed_tx_entries& td);
     bool get_utxo_distribution(std::unordered_map<crypto::public_key, std::map<uint64_t, uint64_t>>& distribution);
     uint64_t get_sync_progress();
+    bool get_is_remote_daemon_connected();
     uint64_t get_wallet_file_size()const;
     void set_use_deffered_global_outputs(bool use);
     void set_do_not_unlock_reserved_on_idle(bool val) {m_do_not_unlock_reserved_on_idle = val;}

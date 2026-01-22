@@ -128,6 +128,9 @@ namespace nodetool
     void get_ip_block_list(std::map<uint32_t, time_t>& blocklist);
     bool reload_p2p_manual_config(bool silent = true);
     typedef COMMAND_REQUEST_STAT_INFO_T<typename t_payload_net_handler::stat_info> COMMAND_REQUEST_STAT_INFO;
+
+    inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{10000, 10000, 10000};
+
   private:
 
 
