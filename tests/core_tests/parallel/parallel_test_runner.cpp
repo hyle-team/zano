@@ -1,4 +1,4 @@
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(_WIN64) || defined(__WINDOWS__) || defined(__MINGW32__) || defined(__MINGW64__)
   #include "chaingen.h"
 #else
   #include "../chaingen.h"
@@ -300,7 +300,7 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std
   }
 
   const uint32_t parent_pid =
-#ifdef _WIN32
+#if defined(_WIN32) || defined(_WIN64) || defined(__WINDOWS__) || defined(__MINGW32__) || defined(__MINGW64__)
     static_cast<uint32_t>(::GetCurrentProcessId());
 #else
     static_cast<uint32_t>(::getpid());
