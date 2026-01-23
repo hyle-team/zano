@@ -3468,6 +3468,7 @@ void wallet2::store_watch_only(const std::wstring& path_to_save, const std::stri
 
   wo.m_watch_only = true;
   wo.m_account = m_account;
+  wo.m_password = password;
   wo.m_account.make_account_watch_only();
   wo.prepare_file_names(path_to_save);
 
@@ -8225,15 +8226,6 @@ void wallet2::check_and_throw_if_self_directed_tx_with_payment_id_requested(cons
 void wallet2::check_and_throw_if_smth_not_good_with_comment_or_payment_id(const construct_tx_param& ctp)
 {
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(!have_type_in_variant_container<currency::tx_comment>(ctp.attachments), "tx_comment is not allowed to be in attachments");
-  
-  if (ctp.dsts.size() > 1 && have_type_in_variant_container<currency::tx_comment>(ctp.extra))
-  {
-    const auto& first_destination = ctp.dsts.front();
-    for(size_t i = 1; i < ctp.dsts.size(); ++i)
-    {
-      WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(ctp.dsts[i].addr == first_destination.addr, "currently tx_comment cannot be used with multi-destination transfer");
-    }
-  }
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::transfer(construct_tx_param& ctp,

@@ -734,7 +734,7 @@ namespace currency
     NOTIFY_RESPONSE_CHAIN_ENTRY::request r;
     if(!m_core.find_blockchain_supplement(arg.block_ids, r))
     {
-      LOG_ERROR_CCONTEXT("Failed to handle NOTIFY_REQUEST_CHAIN.");
+      LOG_PRINT_CC_RED(m_connection_context, "[HANDLE]NOTIFY_REQUEST_CHAIN: failed (find_blockchain_supplement failed, arg.block_ids.size()=" << arg.block_ids.size() << ").", LOG_LEVEL_1);
       return 1;
     }
     LOG_PRINT_L2("[NOTIFY]NOTIFY_RESPONSE_CHAIN_ENTRY: m_start_height=" << r.start_height << ", m_total_height=" << r.total_height << ", m_block_ids.size()=" << r.m_block_ids.size());
@@ -1046,9 +1046,11 @@ namespace currency
     context.m_last_response_height = arg.start_height + arg.m_block_ids.size()-1;
     if(context.m_last_response_height > context.m_remote_blockchain_size)
     {
-      LOG_ERROR_CCONTEXT("sent wrong NOTIFY_RESPONSE_CHAIN_ENTRY, with \r\nm_total_height=" << arg.total_height
-                                                                         << "\r\nm_start_height=" << arg.start_height
-                                                                         << "\r\nm_block_ids.size()=" << arg.m_block_ids.size());
+      LOG_PRINT_CC_RED(m_connection_context, "sent wrong NOTIFY_RESPONSE_CHAIN_ENTRY, with " <<
+        "m_total_height=" << arg.total_height <<
+        ", m_start_height=" << arg.start_height << 
+        ", m_block_ids.size()=" << arg.m_block_ids.size(),
+        LOG_LEVEL_1);
       m_p2p->drop_connection(context);
       m_p2p->add_ip_fail(context.m_remote_ip);
       return 1;

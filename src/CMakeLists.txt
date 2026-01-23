@@ -6,7 +6,6 @@
 # define USE_PCH to YES for using precomiled headers
 # Windows: using custom-made shared PCH -- this is unusual case for MSVC... so mystery, such hack, many wow. See also: https://stackoverflow.com/questions/645747/sharing-precompiled-headers-between-projects-in-visual-studio/4170902#4170902
 # Linux: using CMake-enabled shared PCH (which appeared in CMake 3.16)
-
 MACRO(INIT_SHARED_PCH)
   IF(USE_PCH)
     MESSAGE( STATUS " ...... enabling precompiled headers, making new library: pch" )
@@ -51,8 +50,11 @@ MACRO(ENABLE_SHARED_PCH_EXECUTABLE target)
 ENDMACRO(ENABLE_SHARED_PCH_EXECUTABLE)
 #####  End of Precompiled Headers macros  ######
 
-
-
+if(UNIX AND NOT APPLE)
+  add_compile_definitions(BOOST_STACKTRACE_USE_BACKTRACE)
+  link_libraries(backtrace dl)
+  add_link_options(-rdynamic)
+endif()
 
 file(GLOB_RECURSE PCH pch/*)
 file(GLOB_RECURSE COMMON common/*)
@@ -178,11 +180,6 @@ target_link_libraries(currency_core lmdb mdbx)
 add_executable(daemon ${DAEMON} ${P2P} ${CURRENCY_PROTOCOL})
 add_dependencies(daemon version)
 target_link_libraries(daemon rpc stratum currency_core crypto common libminiupnpc-static zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
-if(UNIX AND NOT APPLE)
-  add_compile_definitions(BOOST_STACKTRACE_USE_ADDR2LINE)
-  target_link_options(daemon PRIVATE -rdynamic) # for Mac -g flag - enough, -rdynamic and dl is Linux-specific
-  target_link_libraries(daemon dl)
-endif()
 ENABLE_SHARED_PCH(daemon DAEMON)
 ENABLE_SHARED_PCH_EXECUTABLE(daemon)
                      
@@ -244,6 +241,9 @@ if(BUILD_GUI)
   find_package(Qt5PrintSupport REQUIRED)
 
   target_link_libraries(Zano wallet rpc currency_core crypto common zlibstatic ethash Qt5::WebChannel Qt5::WebEngineWidgets Qt5::PrintSupport ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
+  if (UNIX AND NOT APPLE)
+	target_link_libraries(Zano rt)
+  endif()
 
   if(APPLE)
     target_link_libraries(Zano ${COCOA_LIBRARY})
