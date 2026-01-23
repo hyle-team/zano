@@ -192,7 +192,7 @@ void test_plain_wallet_concurent()
   rst_req.path = "temp_" + s + ".zan";
   rst_req.pass = "";
   rst_req.secret_derivation.clear();
-  epee::string_tools::append_pod_to_strbuff(rst_req.secret_derivation, derivation_tmp);
+  epee::string_tools::append_pod_to_strbuff(derivation_tmp, rst_req.secret_derivation);
   rst_req.is_auditable = false;
   rst_req.creation_timestamp = 1705656815;
 
@@ -201,20 +201,20 @@ void test_plain_wallet_concurent()
   std::generate(s.begin(), s.end(), []() {return '0' + rand() % 10; });
   rst_req.path = "temp_" + s + ".zan";
   rst_req.secret_derivation.clear();
-  epee::string_tools::append_pod_to_strbuff(rst_req.secret_derivation, derivation_tmp);
+  epee::string_tools::append_pod_to_strbuff(derivation_tmp, rst_req.secret_derivation);
 
   res = plain_wallet::sync_call("restore_from_derivations", 0, epee::serialization::store_t_to_json(rst_req));
 
   std::generate(s.begin(), s.end(), []() {return '0' + rand() % 10; });
   rst_req.path = "temp_" + s + ".zan";
   rst_req.secret_derivation.clear();
-  epee::string_tools::append_pod_to_strbuff(rst_req.secret_derivation, derivation_tmp);
+  epee::string_tools::append_pod_to_strbuff(derivation_tmp, rst_req.secret_derivation);
   res = plain_wallet::sync_call("restore_from_derivations", 0, epee::serialization::store_t_to_json(rst_req));
 
   std::generate(s.begin(), s.end(), []() {return '0' + rand() % 10; });
   rst_req.path = "temp_" + s + ".zan";
   rst_req.secret_derivation.clear();
-  epee::string_tools::append_pod_to_strbuff(rst_req.secret_derivation, derivation_tmp);
+  epee::string_tools::append_pod_to_strbuff(derivation_tmp, rst_req.secret_derivation);
   res = plain_wallet::sync_call("restore_from_derivations", 0, epee::serialization::store_t_to_json(rst_req));
 
 
