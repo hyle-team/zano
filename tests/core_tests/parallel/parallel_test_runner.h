@@ -166,6 +166,4 @@ private:
   bool read_worker_report_file(uint32_t worker_id, worker_report& rep) const;
   void fill_worker_report_header(pt::ptree& root, const worker_report& rep) const;
   void read_worker_report_header(const pt::ptree& root, uint32_t worker_id_fallback, worker_report& rep) const;
-
-  bool read_workers_report_ms_map(const std::filesystem::path& path, std::unordered_map<std::string, uint64_t>& out_ms_by_test) const;
 };

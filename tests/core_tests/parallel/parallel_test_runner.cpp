@@ -13,6 +13,7 @@
 #include "parallel_test_runner.h"
 #include "../chaingen_args.h"
 #include "../../src/common/command_line.h"
+#include "tests_distribution_entry.h"
 
 using namespace chaingen_args;
 namespace bp = boost::process;
@@ -711,66 +712,24 @@ bool parallel_test_runner::write_workers_report_file( uint32_t processes, const 
   }
 }
 
-bool parallel_test_runner::read_workers_report_ms_map(const std::filesystem::path& path, std::unordered_map<std::string, uint64_t>& out_ms_by_test) const
-{
-  out_ms_by_test.clear();
-
-  try
-  {
-    if (!std::filesystem::exists(path))
-      return false;
-
-    pt::ptree root;
-    pt::read_json(path.string(), root);
-
-    for (const auto& v : root.get_child("tests", pt::ptree()))
-    {
-      const auto& node = v.second;
-      const std::string name = node.get<std::string>("name", "");
-      const uint64_t ms = node.get<uint64_t>("ms", 0);
-      if (!name.empty())
-        out_ms_by_test[name] = ms;
-    }
-
-    return !out_ms_by_test.empty();
-  }
-  catch (...)
-  {
-    return false;
-  }
-}
-
 bool parallel_test_runner::fill_shm_work_order(coretests_shm::shared_state* st, const std::vector<test_job>& jobs) const
 {
   if (!st)
     return false;
 
-  std::unordered_map<std::string, uint64_t> ms_by_test;
-  const std::filesystem::path report_path = get_workers_report_path();
-  (void)read_workers_report_ms_map(report_path, ms_by_test);
-
   struct item_t { uint64_t ms; uint32_t idx; };
+
   std::vector<item_t> items;
   items.reserve(jobs.size());
 
-  uint64_t fallback = 1;
-  if (!ms_by_test.empty())
-  {
-    std::vector<uint64_t> known;
-    known.reserve(ms_by_test.size());
-    for (const auto& kv : ms_by_test) known.push_back(kv.second);
-    std::sort(known.begin(), known.end());
-    fallback = known[known.size() / 2];
-  }
-
   for (uint32_t i = 0; i < jobs.size(); ++i)
   {
-    const auto it = ms_by_test.find(jobs[i].name);
-    const uint64_t ms = (it != ms_by_test.end() ? it->second : fallback);
+    const uint64_t ms = get_test_estimated_ms(jobs[i].name);
     items.push_back(item_t{ms, i});
   }
 
-  std::sort(items.begin(), items.end(), [](const item_t& a, const item_t& b) {
+  std::sort(items.begin(), items.end(), [](const item_t& a, const item_t& b)
+  {
     if (a.ms != b.ms) return a.ms > b.ms;
     return a.idx < b.idx;
   });
