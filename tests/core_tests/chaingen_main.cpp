@@ -1312,8 +1312,9 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_tx_extra_double_entry);
     GENERATE_AND_PLAY(gen_tx_double_key_image);
     GENERATE_AND_PLAY(tx_expiration_time);
-    GENERATE_AND_PLAY(tx_expiration_time_and_block_template);
-    GENERATE_AND_PLAY(tx_expiration_time_and_chain_switching);
+    GENERATE_AND_PLAY_HF(tx_expiration_time_and_block_template, "*");
+    GENERATE_AND_PLAY_HF(tx_expiration_time_and_chain_switching, "*");
+    GENERATE_AND_PLAY_HF(tx_expiration_height_and_pool_purge, "*");
     GENERATE_AND_PLAY(tx_key_image_pool_conflict);
     //GENERATE_AND_PLAY_HF(tx_version_against_hardfork, "4-*");
     /* To execute the check of bare balance (function "check_tx_bare_balance") we need to run the test "tx_pool_semantic_validation" on the HF 3. By default behaviour bare outputs are disallowed on

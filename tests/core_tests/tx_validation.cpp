@@ -1309,6 +1309,7 @@ bool tx_expiration_time_and_block_template::generate(std::vector<test_event_entr
 
   GENERATE_ACCOUNT(miner_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
   REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   uint64_t ts_median = generator.get_timestamps_median(get_block_hash(blk_0r), TX_EXPIRATION_TIMESTAMP_CHECK_WINDOW);
@@ -1323,12 +1324,23 @@ bool tx_expiration_time_and_block_template::generate(std::vector<test_event_entr
   bool r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), miner_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_1{};
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, events, this, tx_1);
+  uint64_t tx_1_expiration_time = ts_median + TX_EXPIRATION_MEDIAN_SHIFT + 1; // one second greather than minimum allowed
+
+  size_t tx_hardfork_id{};
+  uint64_t tx_version = this->get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id);
+
+  account_public_address crypt_destination_addr =
+    get_crypt_address_from_destinations(miner_acc.get_keys(), destinations);
+
+  crypto::secret_key one_time_secret_key{};
+  r = construct_tx(
+    miner_acc.get_keys(), sources, destinations, std::vector<extra_v>{},
+    empty_attachment, tx_1, tx_version, tx_hardfork_id, one_time_secret_key, 0 /* unlock_time */,
+    crypt_destination_addr, tx_1_expiration_time, CURRENCY_TO_KEY_OUT_RELAXED, true /* shuffle */, 0 /* flags */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
-  uint64_t tx_1_expiration_time = ts_median + TX_EXPIRATION_MEDIAN_SHIFT + 1;  // one second greather than minimum allowed
-  set_tx_expiration_time(tx_1, tx_1_expiration_time);
-  r = resign_tx(miner_acc.get_keys(), sources, tx_1);
-  CHECK_AND_ASSERT_MES(r, false, "resign_tx failed");
+
+  CHECK_AND_ASSERT_MES(get_tx_expiration_time(tx_1) == tx_1_expiration_time,
+    false, "tx expiration wasn't set (construct_tx overwrote extra?)");
 
   events.push_back(tx_1); // should normally pass into tx pool
 
@@ -1376,6 +1388,7 @@ bool tx_expiration_time_and_chain_switching::generate(std::vector<test_event_ent
   bool r = false;
   GENERATE_ACCOUNT(miner_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
   //
   // chain A
   //
@@ -1394,23 +1407,33 @@ bool tx_expiration_time_and_chain_switching::generate(std::vector<test_event_ent
   std::vector<tx_destination_entry> destinations;
   r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), miner_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
+
+  size_t tx_hardfork_id = 0;
+  uint64_t tx_version = get_tx_version_and_hardfork_id(get_block_height(blk_0r) + 1, m_hardforks, tx_hardfork_id);
+  CHECK_AND_ASSERT_MES(ts_median >= CURRENCY_MAX_BLOCK_NUMBER, false, "ts_median looks too small");
+
   transaction tx_0{};
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, events, this, tx_0);
+  secret_key one_time_sk_0{};
+  uint64_t tx_0_expiration_time = ts_median + TX_EXPIRATION_MEDIAN_SHIFT;  // one second less than minimum allowed (see condition above)
+
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<extra_v>{}, std::vector<attachment_v>{}, 
+    tx_0, tx_version, tx_hardfork_id, one_time_sk_0, 0, miner_acc.get_public_address(),
+    tx_0_expiration_time, CURRENCY_TO_KEY_OUT_RELAXED, true, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
-  uint64_t tx_0_expiration_time = ts_median + TX_EXPIRATION_MEDIAN_SHIFT + 0;  // one second less than minimum allowed (see condition above)
-  set_tx_expiration_time(tx_0, tx_0_expiration_time);
-  r = resign_tx(miner_acc.get_keys(), sources, tx_0);
-  CHECK_AND_ASSERT_MES(r, false, "resign_tx failed");
-  
+
   DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(tx_0); // should not pass at tx pool as it has expiration time exactly at the right boundary of allowed period
 
   // tx_1 is the same except the expiration time
-  transaction tx_1 = tx_0;
+  transaction tx_1{};
+  crypto::secret_key one_time_sk_1{};
   uint64_t tx_1_expiration_time = ts_median + TX_EXPIRATION_MEDIAN_SHIFT + 1;  // minimum allowed ts (see condition above)
-  set_tx_expiration_time(tx_1, tx_1_expiration_time);
-  r = resign_tx(miner_acc.get_keys(), sources, tx_1);
-  CHECK_AND_ASSERT_MES(r, false, "resign_tx failed");
+
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<extra_v>{},
+    std::vector<attachment_v>{}, tx_1, tx_version, tx_hardfork_id, one_time_sk_1,
+    0, miner_acc.get_public_address(), tx_1_expiration_time, CURRENCY_TO_KEY_OUT_RELAXED, true, 0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+
   events.push_back(tx_1); // should pass
 
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_1); // tx_1 and blk_1 should pass
@@ -2628,5 +2651,143 @@ bool tx_input_mixins::generate(std::vector<test_event_entry>& events) const
 
   MAKE_NEXT_BLOCK_TX1(events, blk_6, blk_5r, miner_acc, tx_c);
 
+  return true;
+}
+
+tx_expiration_height_and_pool_purge::tx_expiration_height_and_pool_purge()
+{
+  REGISTER_CALLBACK_METHOD(tx_expiration_height_and_pool_purge, c1);
+}
+
+bool tx_expiration_height_and_pool_purge::generate(std::vector<test_event_entry>& events) const
+{
+  // 1. Before HF6: expiration by block height does NOT work (the value is interpreted as a timestamp)
+  // 2. After HF6: expiration by block height works correctly
+
+  GENERATE_ACCOUNT(miner_acc);
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  uint64_t current_height = get_block_height(blk_0r);
+  size_t current_hf_id = m_hardforks.get_the_most_recent_hardfork_id_for_height(current_height + 1);
+
+  if (current_hf_id < ZANO_HARDFORK_06)
+  {
+    
+    uint64_t expiration_as_height = current_height + 10; // like timestamp ~30
+    
+    std::vector<tx_source_entry> sources;
+    std::vector<tx_destination_entry> destinations;
+    bool r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), 
+      miner_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
+    CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
+
+    size_t tx_hardfork_id{};
+    uint64_t tx_version = this->get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id);
+
+    account_public_address crypt_destination_addr = get_crypt_address_from_destinations(miner_acc.get_keys(), destinations);
+
+    transaction tx_with_height_expiration{};
+    crypto::secret_key one_time_sk{};
+    r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<extra_v>{},
+      empty_attachment, tx_with_height_expiration, tx_version, tx_hardfork_id, one_time_sk, 0,
+      crypt_destination_addr, expiration_as_height, CURRENCY_TO_KEY_OUT_RELAXED, true, 0);
+    CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+    
+    // before HF6 less value of expiration is interpreted as timestamp -> timestamp=30 it is 1970-01-01 -> cancel tx
+    DO_CALLBACK(events, "mark_invalid_tx");
+    events.push_back(tx_with_height_expiration);
+    DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+    
+    return true;
+  }
+  else
+  {
+    // HF6+ expiration by height should work fine
+    uint64_t hf6_activation_height = m_hardforks.get_height_the_hardfork_active_after(ZANO_HARDFORK_06);
+    
+    block blk_prev = blk_0r;
+    while (get_block_height(blk_prev) <= hf6_activation_height + 2)
+    {
+      MAKE_NEXT_BLOCK(events, blk_next, blk_prev, miner_acc);
+      blk_prev = blk_next;
+    }
+    block blk_hf6 = blk_prev;
+    current_height = get_block_height(blk_hf6);
+    
+    // test 1 - tx with expiration_height in future should be accepted
+    uint64_t expiration_height = current_height + 5;
+    
+    std::vector<tx_source_entry> sources;
+    std::vector<tx_destination_entry> destinations;
+    bool r = fill_tx_sources_and_destinations(events, blk_hf6, miner_acc.get_keys(), 
+      miner_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources, destinations);
+    CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
+
+    size_t tx_hardfork_id{};
+    uint64_t tx_version = this->get_tx_version_and_harfork_id_from_events(events, tx_hardfork_id);
+
+    account_public_address crypt_destination_addr = get_crypt_address_from_destinations(miner_acc.get_keys(), destinations);
+
+    transaction tx_valid{};
+    crypto::secret_key one_time_sk{};
+    r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<extra_v>{},
+      empty_attachment, tx_valid, tx_version, tx_hardfork_id, one_time_sk, 0,
+      crypt_destination_addr, expiration_height, CURRENCY_TO_KEY_OUT_RELAXED, true, 0);
+    CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+    
+    events.push_back(tx_valid);
+    DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(1));
+    
+    // test 2 - add blocks until expiration_height is passed
+    blk_prev = blk_hf6;
+    for (uint64_t i = 0; i < 6; ++i)
+    {
+      MAKE_NEXT_BLOCK(events, blk_next, blk_prev, miner_acc);
+      blk_prev = blk_next;
+    }
+    block blk_after_expiration = blk_prev;
+    
+    DO_CALLBACK(events, "c1");
+    
+    // test 3 - tx with expiration_height in the past should be rejected
+    uint64_t expired_height = 10;
+    
+    std::vector<tx_source_entry> sources2;
+    std::vector<tx_destination_entry> destinations2;
+    r = fill_tx_sources_and_destinations(events, blk_after_expiration, miner_acc.get_keys(), 
+      miner_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, 0, sources2, destinations2);
+    CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
+
+    transaction tx_expired{};
+    crypto::secret_key one_time_sk2{};
+    r = construct_tx(miner_acc.get_keys(), sources2, destinations2, std::vector<extra_v>{},
+      empty_attachment, tx_expired, tx_version, tx_hardfork_id, one_time_sk2, 0,
+      get_crypt_address_from_destinations(miner_acc.get_keys(), destinations2), 
+      expired_height, CURRENCY_TO_KEY_OUT_RELAXED, true, 0);
+    CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+    
+    DO_CALLBACK(events, "mark_invalid_tx");
+    events.push_back(tx_expired);
+    
+    DO_CALLBACK_PARAMS(events, "check_tx_pool_count", static_cast<size_t>(0));
+
+    return true;
+  }
+}
+
+bool tx_expiration_height_and_pool_purge::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  LOG_PRINT("tx pool before on_idle:" << ENDL << c.get_tx_pool().print_pool(true), LOG_LEVEL_0);
+  
+  c.get_tx_pool().on_idle();
+  
+  LOG_PRINT("tx pool after on_idle:" << ENDL << c.get_tx_pool().print_pool(true), LOG_LEVEL_0);
+  
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, 
+    "Incorrect tx count in the pool after expiration: " << c.get_pool_transactions_count() 
+    << " (expected 0 - tx should be purged due to height expiration)");
+  
   return true;
 }
