@@ -18,7 +18,13 @@
 using namespace chaingen_args;
 namespace bp = boost::process;
 
-constexpr const std::size_t k_worker_stdout_buffer_size = 64 * 1024;
+namespace
+{
+  constexpr const int UNKNOWN_ERROR_EXIT_CODE = -999;
+  constexpr const int MS_PER_SECOND = 1000;
+  constexpr const int WORKER_STDOUT_BUFFER_SIZE = 64 * 1024;
+  constexpr const int RESERVE_UNIQUE_TESTS_HINT = 8192;
+}
 
 parallel_test_runner::parallel_test_runner(
   const boost::program_options::variables_map& vm)
@@ -167,7 +173,7 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
   std::cout << "  Total tests run:  " << total_tests_count << "\n";
   std::cout << "  Failures:         " << serious_failures_count << " (postponed failures: " << failed_postponed_tests_count << ")\n";
   std::cout << "  Postponed:        " << postponed_tests.size() << "\n";
-  std::cout << "  Total time:       " << (wall_time_ms / 1000) << " s. (" << (total_tests_count > 0 ? (wall_time_ms / total_tests_count) : 0) << " ms per test in average)\n";
+  std::cout << "  Total time:       " << (wall_time_ms / MS_PER_SECOND) << " s. (" << (total_tests_count > 0 ? (wall_time_ms / total_tests_count) : 0) << " ms per test in average)\n";
 
   if (!failed_tests_union.empty())
   {
@@ -196,7 +202,7 @@ void parallel_test_runner::print_worker_failure_reasons(uint32_t processes, cons
 
   for (uint32_t i = 0; i < processes; ++i)
   {
-    const int ec = (i < worker_exit_codes.size() ? worker_exit_codes[i] : -999);
+    const int ec = (i < worker_exit_codes.size() ? worker_exit_codes[i] : UNKNOWN_ERROR_EXIT_CODE);
 
     worker_report rep;
     const bool report_ok = read_worker_report_file(i, rep);
@@ -382,7 +388,7 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std
         {
           std::string line;
           std::string buffer;
-          buffer.reserve(k_worker_stdout_buffer_size);
+          buffer.reserve(WORKER_STDOUT_BUFFER_SIZE);
 
           std::function<void()> flush = [&]()
           {
@@ -404,7 +410,7 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std
             buffer.append(line);
             buffer.push_back('\n');
 
-            if (buffer.size() >= k_worker_stdout_buffer_size)
+            if (buffer.size() >= WORKER_STDOUT_BUFFER_SIZE)
               flush();
           }
 
@@ -647,7 +653,7 @@ bool parallel_test_runner::write_workers_report_file(uint32_t processes, const s
   try
   {
     std::unordered_map<std::string, uint64_t> ms_by_test;
-    ms_by_test.reserve(8192);
+    ms_by_test.reserve(RESERVE_UNIQUE_TESTS_HINT);
 
     for (const auto& r : reps)
     {
