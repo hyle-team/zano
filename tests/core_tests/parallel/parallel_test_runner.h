@@ -102,6 +102,28 @@ public:
   void log_test_taken_by_this_process(const std::string& test_name) const;
 
 private:
+  struct paths
+  {
+    static constexpr const char* default_run_root       = "chaingen_runs";
+    static constexpr const char* worker_dir_prefix      = "w";
+  };
+
+  struct files
+  {
+    static constexpr const char* taken_tests_log        = "taken_tests.log";
+    static constexpr const char* worker_report          = "coretests_report.json";
+    static constexpr const char* worker_log             = "worker.log";
+  };
+
+  struct cli_args
+  {
+    static constexpr const char* multiprocess_worker_id = "--multiprocess-worker-id";
+    static constexpr const char* multiprocess_run       = "--multiprocess-run";
+    static constexpr const char* multiprocess_run_root  = "--multiprocess-run-root";
+    static constexpr const char* multiprocess_shm_name  = "--multiprocess-shm-name";
+    static constexpr const char* data_dir               = "--data-dir";
+  };
+
   const boost::program_options::variables_map& m_vm;
   mutable std::mutex cerr_mx;
 
