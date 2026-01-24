@@ -65,6 +65,7 @@ namespace tools
 
     virtual bool check_connection(){ return false; }
     virtual time_t get_last_success_interract_time() { return 0; }
+    virtual uint64_t get_download_speed() { return 0; }
     std::shared_ptr<const proxy_diagnostic_info> get_proxy_diagnostic_info() const { return m_pdiganostic_info; }
     std::shared_ptr<proxy_diagnostic_info> get_editable_proxy_diagnostic_info() { return m_pdiganostic_info; }
     virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);

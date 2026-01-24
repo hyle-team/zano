@@ -275,7 +275,7 @@ namespace currency
     // 2. attachments (try to find extra_attachment_info in tx prefix and count it in if succeed)
     extra_attachment_info eai = AUTO_VAL_INIT(eai);
     bool got_eai = false;
-    if (separately_signed_tx)
+    if (separately_signed_tx && !t.vin.empty())
     {
       // for separately-signed tx, try to obtain extra_attachment_info from the last input's etc_details
       const std::vector<txin_etc_details_v>* p_etc_details = get_input_etc_details(t.vin.back());
