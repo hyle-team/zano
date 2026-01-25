@@ -1,8 +1,4 @@
-#if defined(_WIN32) || defined(_WIN64)
-  #include "chaingen.h"
-#else
-  #include "../chaingen.h"
-#endif
+#include "../chaingen.h"
 
 #include <chrono>
 #include <cctype>
