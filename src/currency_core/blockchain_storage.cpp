@@ -6167,7 +6167,11 @@ bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, 
   return true;
 #undef LOC_CHK
 }
-
+std::shared_ptr<const gateway_address_data> blockchain_storage::get_gateway_address_info(const gateway_address_id_type& address_id) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  return m_db_gateway_addresses.find(address_id);
+}
 //------------------------------------------------------------------
 bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height) const
 {

@@ -1045,13 +1045,15 @@ namespace currency
     uint8_t                 version = 0;
     gateway_owner_key_v     owner_key;
     std::vector<gateway_base_etc_fields> etc;  //container for future use if we would be adding some optional parameters that is not known yet, but without mess related to format version
+    std::string             meta_info;  
 
 
     BEGIN_VERSIONED_SERIALIZE(0, version)
       FIELD(owner_key)
       //  FIELD(view_key)
       FIELD(etc)
-      END_SERIALIZE()
+      FIELD(meta_info)
+    END_SERIALIZE()
   };
 
   struct gateway_address_descriptor_operation_register

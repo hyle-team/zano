@@ -1671,8 +1671,7 @@ namespace tools
     try
     {
       currency::finalized_tx ft{};
-      w.get_wallet()->register_gateway_address(req, res, ft);
-      res.tx_id = ft.tx_id;
+      w.get_wallet()->register_gateway_address(req, res, ft);  
       res.status = API_RETURN_CODE_OK;
       return true;
     }

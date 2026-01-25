@@ -372,6 +372,7 @@ namespace currency
     bool validate_instance(const std::string& path);
     bool is_tx_expired(const transaction& tx) const;
     std::shared_ptr<const transaction_chain_entry> find_key_image_and_related_tx(const crypto::key_image& ki, crypto::hash& id_result) const;
+    std::shared_ptr<const gateway_address_data> get_gateway_address_info(const gateway_address_id_type& address_id) const;
 
     // returns true as soon as the hardfork is active for the NEXT upcoming block (not for the top block in the blockchain storage)
     bool is_hardfork_active(size_t hardfork_id) const;

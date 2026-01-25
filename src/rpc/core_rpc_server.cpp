@@ -661,6 +661,82 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_get_address_info(const COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    currency::gateway_address_id_type addr_id = {};
+    address_v v_addr = {};
+
+    bool r = currency::get_account_address_and_payment_id_from_str(v_addr, res.payment_id, req.gateway_address);
+    if(!r)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS;
+      return true;
+    }
+    if (v_addr.type() == typeid(currency::gateway_address_id_type))
+    {
+      addr_id = boost::get<currency::gateway_address_id_type>(v_addr);
+    }
+    else
+    {
+      res.status = API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS_TYPE;
+      return true;
+    }
+
+    auto addr_data_ptr = m_core.get_blockchain_storage().get_gateway_address_info(addr_id);
+
+    if (!addr_data_ptr) 
+    {
+      res.status = API_RETURN_CODE_NOT_FOUND;
+      return true;
+    }
+
+    res.gateway_view_pub_key = addr_id;
+    if (!addr_data_ptr->info_history.size())
+    {
+      res.status = API_RETURN_CODE_INTERNAL_ERROR;
+      return true;
+    }
+
+    const auto& last_info = addr_data_ptr->info_history.back();
+    res.descriptor_info.meta_info = last_info.meta_info;
+    VARIANT_SWITCH_BEGIN(last_info.owner_key);
+    VARIANT_CASE_CONST(crypto::public_key, owner_key)
+    {
+      res.descriptor_info.opt_owner_custom_schnorr_pub_key = owner_key;
+    }
+    VARIANT_CASE_CONST(crypto::eth_public_key, owner_key)
+    {
+      res.descriptor_info.opt_owner_eth_pub_key = owner_key;
+    }
+    VARIANT_CASE_CONST(crypto::eddsa_public_key, owner_key)
+    {
+      res.descriptor_info.opt_owner_eddsa_pub_key = owner_key;
+    }
+    VARIANT_CASE_THROW_ON_OTHER();
+    VARIANT_SWITCH_END();
+
+    for (const auto& [asset_id, balance_entry] : addr_data_ptr->balances)
+    {
+      gateway_balance_entry be = {};
+      be.asset_id = asset_id;
+      be.amount = balance_entry.amount;
+      res.balances.push_back(be);
+    }
+    
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_create_transfer(const COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request& req, COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_sign_transfer(const COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request& req, COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_pos_mining_details(const COMMAND_RPC_GET_POS_MINING_DETAILS::request& req, COMMAND_RPC_GET_POS_MINING_DETAILS::response& res, connection_context& cntx)
   {
     if (!m_ignore_offline_status && !m_p2p.get_connections_count())

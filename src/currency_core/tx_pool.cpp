@@ -177,6 +177,15 @@ namespace currency
     //check key images for transaction if it is not kept by block
     if(!from_core && !kept_by_block)
     {
+      if (!check_gateway_address(tx))
+      {
+        // tx semantics check failed
+        LOG_PRINT_RED_L0("Transaction " << id << " semantics check failed ");
+        tvc.m_verification_failed = true;
+        tvc.m_should_be_relayed = false;
+        tvc.m_added_to_pool = false;
+        return false;
+      }
 
       if(!validate_tx_semantic(tx, blob_size))
       {          
@@ -363,6 +372,33 @@ namespace currency
     for (auto& alias_info : aliases_local)
     {
       ++aliases[alias_info.m_alias];
+    }
+    return true;
+  }
+  //---------------------------------------------------------------------------------
+  bool tx_memory_pool::check_gateway_address(const transaction& tx) const
+  {
+    tx_extra_info ei = AUTO_VAL_INIT(ei);
+    bool r = parse_and_validate_tx_extra(tx, ei);
+    CHECK_AND_ASSERT_MES(r, false, "failed to validate transaction extra on check_gateway_address");
+    if (ei.m_opt_gateway_address_operation)
+    {
+      VARIANT_SWITCH_BEGIN(ei.m_opt_gateway_address_operation->operation);
+      VARIANT_CASE_CONST(gateway_address_descriptor_operation_register, op_reg)
+      {
+#ifdef NDEBUG
+  #error "This part is not implemented yet"
+#endif
+      }
+      VARIANT_CASE_CONST(gateway_address_descriptor_operation_update, op_upd)
+      {
+#ifdef NDEBUG
+#error "This part is not implemented yet"
+#endif
+      }
+      VARIANT_CASE_THROW_ON_OTHER();
+      VARIANT_SWITCH_END();
+
     }
     return true;
   }

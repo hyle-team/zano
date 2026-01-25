@@ -468,6 +468,22 @@ std::string transfer_(std::shared_ptr<tools::wallet2> wlt, const std::string& ad
 }
 
 
+std::string transfer_new(std::shared_ptr<tools::wallet2> wlt, const std::string& address, uint64_t amount)
+{
+  tools::wallet_rpc_server custody_wlt_rpc(wlt);
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request tr_req = AUTO_VAL_INIT(tr_req);
+  tr_req.comment = TRANSFER_COMMENT;
+  tr_req.destinations.resize(1);
+  tr_req.destinations.back().address = address;
+  tr_req.destinations.back().amount = amount;
+  tr_req.fee = TX_DEFAULT_FEE;
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_resp = AUTO_VAL_INIT(tr_resp);
+  bool r = invoke_text_json_for_rpc(custody_wlt_rpc, "transfer", tr_req, tr_resp);
+  CHECK_AND_ASSERT_MES(r, "", "failed to call");
+  return tr_resp.tx_hash;
+}
+
+
 bool test_payment_ids_generation(tools::wallet_rpc_server& custody_wlt_rpc)
 {
   //check make_integrated_address/split_integrated_address
@@ -1730,7 +1746,6 @@ bool wallet_rpc_gateway_address::generate(std::vector<test_event_entry>& events)
   return true;
 }
 
-
 bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
 
@@ -1744,6 +1759,9 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   alice_wlt->refresh(); 
+
+
+  //uncomment this when it works
   //transfer_(alice_wlt, miner_wlt->get_account().get_public_address_str(), COIN);
   //r = mine_next_pow_blocks_in_playtime(alice_wlt->get_account().get_public_address(), c, 3);
 
@@ -1762,8 +1780,59 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   std::string gw_address = currency::get_account_address_as_str(gw_addr_public_key);
 #define TRANSFER_AMOUNT   COIN / 10
 
-  std::string alice_tx1 = transfer_(alice_wlt, gw_address, TRANSFER_AMOUNT);
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request gw_reg_req = {};
+  gw_reg_req.view_pub_key = gw_addr_public_key;
+  gw_reg_req.descriptor_info.opt_owner_custom_schnorr_pub_key = gw_addr_public_key;
+  gw_reg_req.descriptor_info.meta_info = "sdcscsdc";
 
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response gw_reg_resp = {};
+  r = invoke_text_json_for_rpc(alice_wlt_rpc, "register_gateway_address", gw_reg_req, gw_reg_resp);
+  CHECK_AND_ASSERT_MES(r, "", "failed to call");
+
+  r = mine_next_pow_blocks_in_playtime(alice_wlt->get_account().get_public_address(), c, 3);
+
+  //make core rpc server wrapper
+  currency::t_currency_protocol_handler<currency::core> cprotocol(c, NULL);
+  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > dummy_p2p(cprotocol);
+  bc_services::bc_offers_service dummy_bc(nullptr);
+  currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
+
+
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request gw_get_info_req = {};
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response gw_get_info_resp = {};
+
+  gw_get_info_req.gateway_address = gw_reg_resp.address;
+  r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_get_address_info", gw_get_info_req, gw_get_info_resp);
+  CHECK_AND_ASSERT_MES(r, "", "failed to call");
+
+  currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request gw_create_transfer_req = {};
+  currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response gw_create_transfer_resp = {};
+  gw_create_transfer_req.destinations.push_back({ TRANSFER_AMOUNT, miner_wlt->get_account().get_public_address_str()});
+  gw_create_transfer_req.fee = TESTS_DEFAULT_FEE;
+  gw_create_transfer_req.comment = "sdsdsd";
+  r = invoke_text_json_for_rpc(core_rpc_wrapper, "create_gateway_transfer", gw_create_transfer_req, gw_create_transfer_resp);
+  CHECK_AND_ASSERT_MES(r, "", "failed to call");
+
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request gw_sign_transfer_req = {};
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response gw_sign_transfer_resp = {}; 
+
+  //TODO: gw_sign_transfer_req.opt_custom_schnorr_signature = 
+  crypto::generic_schnorr_sig_s sig{};
+  r = crypto::generate_schnorr_sig(gw_create_transfer_resp.tx_hash_to_sign, gw_addr_secret_key, sig);
+  CHECK_AND_ASSERT_MES(r, "", "failed to call generate_schnorr_sig");
+  gw_sign_transfer_req.opt_custom_schnorr_signature = sig;
+  gw_sign_transfer_req.tx_blob_in_hex = gw_create_transfer_resp.tx_blob_in_hex;
+  gw_sign_transfer_req.tx_hash_to_sign = gw_create_transfer_resp.tx_hash_to_sign;
+  r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_sign_transfer", gw_sign_transfer_req, gw_sign_transfer_resp);
+  CHECK_AND_ASSERT_MES(r, "", "failed to call");
+
+  currency::COMMAND_RPC_SEND_RAW_TX::request send_raw_tx_req = {};
+  currency::COMMAND_RPC_SEND_RAW_TX::response send_raw_tx_resp = {};
+  send_raw_tx_req.tx_as_hex = gw_sign_transfer_resp.signed_tx_blob_in_hex;
+  r = invoke_text_json_for_rpc(core_rpc_wrapper, "COMMAND_RPC_SEND_RAW_TX", send_raw_tx_req, send_raw_tx_resp);
+  CHECK_AND_ASSERT_MES(r, "", "failed to call");
+
+  r = mine_next_pow_blocks_in_playtime(alice_wlt->get_account().get_public_address(), c, 3);
 
   return true;
 }

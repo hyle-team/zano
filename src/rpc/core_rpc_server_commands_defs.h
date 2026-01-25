@@ -2152,5 +2152,130 @@ namespace currency
     END_KV_SERIALIZE_MAP()
   };
 
+
+  struct gateway_balance_entry
+  {
+    crypto::public_key asset_id;
+    uint64_t amount;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("The asset ID for the gateway balance entry.") DOC_EXMP("729811f9340537e8d5641949e6cc58261f91f109687a706f39bae9514757e819") DOC_END
+      KV_SERIALIZE(amount)                      DOC_DSCR("The amount of the specified currency in the gateway balance entry.") DOC_EXMP(100000000) DOC_END
+    END_KV_SERIALIZE_MAP()
+  };
+
+
+  struct gateway_descriptor_api_info
+  {
+    std::optional<crypto::eth_public_key>   opt_owner_eth_pub_key;
+    std::optional<crypto::eddsa_public_key> opt_owner_eddsa_pub_key;
+    std::optional<crypto::public_key>       opt_owner_custom_schnorr_pub_key;  //Zano specific generic schnorr signature public key
+    std::string meta_info;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE_POD_AS_HEX_STRING(opt_owner_eth_pub_key)                 DOC_DSCR("owner's Ethereum public key")                  DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8e2") DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(opt_owner_eddsa_pub_key)               DOC_DSCR("owner's EdDSA public key")                     DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(opt_owner_custom_schnorr_pub_key)      DOC_DSCR("owner's custom Schnorr signature public key")  DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+      KV_SERIALIZE(meta_info)                                               DOC_DSCR("Additional metadata about the gateway")       DOC_EXMP("Some metadata") DOC_END
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO
+  {
+    DOC_COMMAND("Retrieves information about a gateway address.");
+    struct request
+    {
+      std::string gateway_address;
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(gateway_address)            DOC_DSCR("The gateway address for which information is being requested.") DOC_EXMP("gateway1qxyz...") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      currency::gateway_descriptor_api_info descriptor_info;
+      std::list<gateway_balance_entry> balances;
+      payment_id_t payment_id;
+      crypto::public_key gateway_view_pub_key;
+      std::string status;
+
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(descriptor_info)            DOC_DSCR("Information about the specified gateway address.") DOC_END
+        KV_SERIALIZE(balances)                   DOC_DSCR("List of balances for different asset_id associated with the gateway address.") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE(payment_id)                 DOC_DSCR("Payment ID associated with the gateway address.") DOC_EXMP("4cf2c7c7e16d1a2a") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(gateway_view_pub_key) DOC_DSCR("Gateway view public key associated with the gateway address.") DOC_EXMP("0feef5e2ea0e88b592c0a0e6639ce73e12ea9b3136d89464748fcb60bb6f18f5") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_RPC_GATEWAY_CREATE_TRANSFER
+  {
+    DOC_COMMAND("Initiates a transfer from gateway address. Create tx that need to be signed.");
+    struct request
+    {
+      std::list<currency::transfer_destination> destinations;
+      uint64_t fee;
+      std::string comment;
+      std::vector<currency::tx_service_attachment> service_entries;
+      bool service_entries_permanent;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(destinations)                   DOC_DSCR("Details of the gateway transfer destinations.") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(fee)                            DOC_DSCR("Transaction fee for the gateway transfer.") DOC_EXMP(100000000) DOC_END
+        KV_SERIALIZE(comment)                        DOC_DSCR("Comment for the gateway transfer.") DOC_EXMP("Some comment") DOC_END
+        KV_SERIALIZE(service_entries)                DOC_DSCR("Service entries for the gateway transfer.") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(service_entries_permanent)      DOC_DSCR("Whether the service entries are permanent.") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+      crypto::hash tx_hash_to_sign;
+      std::string tx_blob_in_hex;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)                               DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)    DOC_DSCR("Hash of the transaction created for the gateway transfer.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob_in_hex)    DOC_DSCR("Hex representation of the transaction blob.") DOC_EXMP("0100000001...") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_RPC_GATEWAY_SIGN_TRANSFER
+  {
+    DOC_COMMAND("Signs a transfer from gateway address.");
+    struct request
+    {
+      std::string tx_blob_in_hex;
+      crypto::hash tx_hash_to_sign;
+
+      std::optional<crypto::eth_signature>          opt_eth_signature;
+      std::optional<crypto::eddsa_signature>        opt_eddsa_signature;
+      std::optional<crypto::generic_schnorr_sig_s>  opt_custom_schnorr_signature;  //Zano specific generic schnorr signature public key
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(tx_blob_in_hex)    DOC_DSCR("Hex representation of the transaction blob to sign.") DOC_EXMP("0100000001...") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)               DOC_DSCR("Hash of the transaction to sign.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_eth_signature)             DOC_DSCR("Ethereum signature for signing the transaction.") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_eddsa_signature)           DOC_DSCR("EdDSA signature for signing the transaction.") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_custom_schnorr_signature)  DOC_DSCR("Custom Schnorr signature for signing the transaction.") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+      std::string signed_tx_blob_in_hex;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)                                      DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(signed_tx_blob_in_hex)    DOC_DSCR("Hex representation of the signed transaction blob.") DOC_EXMP("0100000001...") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
 }
 

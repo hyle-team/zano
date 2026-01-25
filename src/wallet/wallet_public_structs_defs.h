@@ -789,19 +789,8 @@ namespace tools::wallet_public
   };
 
   
-  struct transfer_destination
-  {
-    uint64_t amount = 0;
-    std::string address;
-    crypto::public_key asset_id = currency::native_coin_asset_id;
-    uint64_t payment_id = 0;
-    BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(amount)                      DOC_DSCR("Amount to transfer to destination") DOC_EXMP(10000000000000)     DOC_END
-      KV_SERIALIZE(address)                     DOC_DSCR("Destination address") DOC_EXMP("ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp")     DOC_END
-      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("Asset id to transfer") DOC_EXMP("cc608f59f8080e2fbfe3c8c80eb6e6a953d47cf2d6aebd345bada3a1cab99852")     DOC_END
-      KV_SERIALIZE(payment_id)                  DOC_DSCR("[optional] Intrinsic 8-byte payment id for this destination. Incompatible with integrated addresses.") DOC_EXMP(1020394) DOC_END
-    END_KV_SERIALIZE_MAP()
-  };
+  typedef currency::transfer_destination transfer_destination; // probably better to rename it later to currency::transfer_destination everywhere instead of typedef
+
 
   struct COMMAND_RPC_TRANSFER
   {
@@ -2184,22 +2173,19 @@ namespace tools::wallet_public
     };
   };
 
+
   struct COMMAND_GATEWAY_REGISTER_ADDRESS
   {
     DOC_COMMAND("Register gateway address to be used in further transfers.")
     struct request
     {
       crypto::public_key                      view_pub_key = {};     //Zano specific generic Schnorr signature public key
-      //one of the boost::variant<crypto::public_key, crypto::eth_public_key, crypto::eddsa_public_key> gateway_owner_key_v;
-      std::optional<crypto::eth_public_key>   opt_owner_eth_pub_key;
-      std::optional<crypto::eddsa_public_key> opt_owner_eddsa_pub_key;
-      std::optional<crypto::public_key>       opt_owner_custom_schnorr_pub_key;  //Zano specific generic schnorr signature public key
+
+      currency::gateway_descriptor_api_info   descriptor_info = {};     
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_POD_AS_HEX_STRING(view_pub_key)               DOC_DSCR("View address to register")                     DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(opt_owner_eth_pub_key)                 DOC_DSCR("owner's Ethereum public key")                  DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8e2") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(opt_owner_eddsa_pub_key)               DOC_DSCR("owner's EdDSA public key")                     DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(opt_owner_custom_schnorr_pub_key)      DOC_DSCR("owner's custom Schnorr signature public key")  DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE(descriptor_info)                              DOC_DSCR("Descriptor information for the gateway")       DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -2207,14 +2193,16 @@ namespace tools::wallet_public
     {
       std::string status;
       currency::gateway_address_id_type address_id = {};
+      std::string address;
       //currency::gateway_address_descriptor_base descriptor = {};
       crypto::hash tx_id = currency::null_hash;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status) DOC_DSCR("Result (OK if success)") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(address_id) DOC_DSCR("Registered gateway address id") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
-        //KV_SERIALIZE(descriptor) DOC_DSCR("Registered gateway address descriptor") DOC_EXMP_AGGR() DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id) DOC_DSCR("Transaction id") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        //KV_SERIALIZE(descriptor) DOC_DSCR("Registered gateway address descriptor")         DOC_EXMP_AGGR() DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_id) DOC_DSCR("Transaction id")                     DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE(address)                 DOC_DSCR("Addres starting from gwZ or gwiZ")   DOC_EXMP("") DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
