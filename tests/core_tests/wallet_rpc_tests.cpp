@@ -1821,7 +1821,7 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   r = crypto::generate_schnorr_sig(gw_create_transfer_resp.tx_hash_to_sign, gw_addr_secret_key, sig);
   CHECK_AND_ASSERT_MES(r, "", "failed to call generate_schnorr_sig");
   gw_sign_transfer_req.opt_custom_schnorr_signature = sig;
-  gw_sign_transfer_req.tx_blob_in_hex = gw_create_transfer_resp.tx_blob_in_hex;
+  gw_sign_transfer_req.tx_blob = gw_create_transfer_resp.tx_blob;
   gw_sign_transfer_req.tx_hash_to_sign = gw_create_transfer_resp.tx_hash_to_sign;
   r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_sign_transfer", gw_sign_transfer_req, gw_sign_transfer_resp);
   CHECK_AND_ASSERT_MES(r, "", "failed to call");
