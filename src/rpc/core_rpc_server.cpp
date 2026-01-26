@@ -804,12 +804,71 @@ namespace currency
     res.tx_blob = t_serializable_object_to_blob(ftx.tx);
     res.tx_hash_to_sign = get_transaction_hash(ftx.tx);
 
-
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_gateway_sign_transfer(const COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request& req, COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
+    transaction tx = {};
+
+    bool r = t_unserializable_object_from_blob(tx, req.tx_blob);
+    if (!r)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      return true;
+    }
+
+    crypto::hash tx_id = get_transaction_hash(tx);
+    if(tx_id != req.tx_hash_to_sign)
+    {
+      LOG_ERROR("Transaction hash mismatch in on_gateway_sign_transfer: " << tx_id << "!=" << req.tx_hash_to_sign);
+      res.status = API_RETURN_CODE_BAD_ARG;
+      return true;
+    }
+
+    size_t gw_sig_count = 0;
+    gateway_signature_v gw_sig;
+    if(req.opt_eth_signature)
+    {
+      gw_sig = req.opt_eth_signature.value();
+      gw_sig_count++;
+    }
+    if(req.opt_custom_schnorr_signature)
+    {
+      gw_sig = req.opt_custom_schnorr_signature.value();
+      gw_sig_count++;
+    }
+    if(req.opt_eddsa_signature)
+    {
+      gw_sig = req.opt_eddsa_signature.value();
+      gw_sig_count++;
+    }
+
+    if(gw_sig_count != 1)
+    {
+      LOG_ERROR("Expected exactly one gateway signature in on_gateway_sign_transfer, got: " << gw_sig_count);
+      res.status = API_RETURN_CODE_BAD_ARG;
+      return true;
+    }
+    
+    for(const auto& sig : tx.signatures)
+    {
+      if (sig.type() == typeid(gateway_sig))
+      {
+        gateway_sig& gw_sig_in_tx = boost::get<gateway_sig&>(sig);
+        gw_sig_in_tx.s = gw_sig;
+      }
+      else
+      {
+        // Right now we assume that gateway-originated tx might have only gateway_inputs in it
+        LOG_ERROR("Unexpected signature type in on_gateway_sign_transfer");
+        res.status = API_RETURN_CODE_BAD_ARG;
+        return true;
+      }
+    }
+    res.signed_tx_blob = t_serializable_object_to_blob(tx);
+
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------

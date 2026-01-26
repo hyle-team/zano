@@ -1141,10 +1141,12 @@ namespace currency
     //END_BOOST_SERIALIZATION_TOTAL_FIELDS(0)
   };
 
+  typedef boost::variant<crypto::generic_schnorr_sig_s, crypto::eth_signature, crypto::eddsa_signature> gateway_signature_v;
+
   struct gateway_sig
   {
     uint8_t version = 0;
-    boost::variant<crypto::signature, crypto::eth_signature, crypto::eddsa_signature> s;
+    gateway_signature_v s;
 
     BEGIN_VERSIONED_SERIALIZE(0, version)
       FIELD(s)

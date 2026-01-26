@@ -2270,11 +2270,11 @@ namespace currency
     struct response
     {
       std::string status;
-      std::string signed_tx_blob_in_hex;
+      std::string signed_tx_blob;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(status)                                      DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
-        KV_SERIALIZE_BLOB_AS_HEX_STRING(signed_tx_blob_in_hex)    DOC_DSCR("Hex representation of the signed transaction blob.") DOC_EXMP("0100000001...") DOC_END
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(signed_tx_blob)    DOC_DSCR("Hex representation of the signed transaction blob.") DOC_EXMP("0100000001...") DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
