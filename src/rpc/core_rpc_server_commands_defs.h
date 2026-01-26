@@ -2215,6 +2215,7 @@ namespace currency
     DOC_COMMAND("Initiates a transfer from gateway address. Create tx that need to be signed.");
     struct request
     {
+      currency::gateway_address_id_type origin_gateway_id;
       std::list<currency::transfer_destination> destinations;
       uint64_t fee;
       std::string comment;
@@ -2222,11 +2223,12 @@ namespace currency
       bool service_entries_permanent;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(destinations)                   DOC_DSCR("Details of the gateway transfer destinations.") DOC_EXMP_AUTO(1) DOC_END
-        KV_SERIALIZE(fee)                            DOC_DSCR("Transaction fee for the gateway transfer.") DOC_EXMP(100000000) DOC_END
-        KV_SERIALIZE(comment)                        DOC_DSCR("Comment for the gateway transfer.") DOC_EXMP("Some comment") DOC_END
-        KV_SERIALIZE(service_entries)                DOC_DSCR("Service entries for the gateway transfer.") DOC_EXMP_AUTO(1) DOC_END
-        KV_SERIALIZE(service_entries_permanent)      DOC_DSCR("Whether the service entries are permanent.") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(origin_gateway_id)  DOC_DSCR("Origin gateway ID for the transfer.")           DOC_EXMP("gateway1qxyz...") DOC_END
+        KV_SERIALIZE(destinations)                         DOC_DSCR("Details of the gateway transfer destinations.") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(fee)                                  DOC_DSCR("Transaction fee for the gateway transfer.")     DOC_EXMP(100000000) DOC_END
+        KV_SERIALIZE(comment)                              DOC_DSCR("Comment for the gateway transfer.")             DOC_EXMP("Some comment") DOC_END
+        KV_SERIALIZE(service_entries)                      DOC_DSCR("Service entries for the gateway transfer.")     DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(service_entries_permanent)            DOC_DSCR("Whether the service entries are permanent.")    DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -2234,12 +2236,12 @@ namespace currency
     {
       std::string status;
       crypto::hash tx_hash_to_sign;
-      std::string tx_blob_in_hex;
+      std::string tx_blob;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(status)                               DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
-        KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)    DOC_DSCR("Hash of the transaction created for the gateway transfer.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
-        KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob_in_hex)    DOC_DSCR("Hex representation of the transaction blob.") DOC_EXMP("0100000001...") DOC_END
+        KV_SERIALIZE(status)                                          DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)               DOC_DSCR("Hash of the transaction created for the gateway transfer.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)                    DOC_DSCR("Hex representation of the transaction blob.") DOC_EXMP("0100000001...") DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };

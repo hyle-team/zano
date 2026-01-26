@@ -58,6 +58,9 @@ namespace currency
     bool separately_signed_tx_complete = false;               //for separately signed tx only: denotes the last source entry in complete tx to explicitly mark the final step of tx creation
     std::string htlc_origin;                                  //for htlc, specify origin
     crypto::public_key asset_id = currency::native_coin_asset_id; //asset id (not blinded, not premultiplied by 1/8) TODO @#@# consider changing to crypto::point_t
+    
+    currency::gateway_address_id_type gateway_origin = {}; // for gateway transfers, the source gateway address id
+
 
     bool is_multisig() const    { return ms_sigs_count > 0; }
     bool is_zc() const          { return !real_out_amount_blinding_mask.is_zero(); }
@@ -79,6 +82,7 @@ namespace currency
       FIELD(separately_signed_tx_complete)
       FIELD(htlc_origin)
       FIELD(asset_id)
+      FIELD(gateway_origin)
     END_SERIALIZE()
   };
 

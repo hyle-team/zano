@@ -15,6 +15,8 @@ using namespace epee;
 #include "misc_language.h"
 #include "crypto/hash.h"
 #include "core_rpc_server_error_codes.h"
+#include "wallet/core_fast_rpc_proxy.h"
+#include "wallet/fill_destination_helper.h"
 
 #define CHECK_RPC_LIMITS(var, limit)    if(var > limit)  {res.status = API_RETURN_CODE_ARG_OUT_OF_LIMITS; return true;}
 
@@ -729,6 +731,80 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_gateway_create_transfer(const COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request& req, COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
+    //TODO: Some of the code presented here might need to be moved to separate library/module as it touch privacy-sensitive operations
+    currency::account_keys dummy_keys = {};
+    currency::finalize_tx_param ftp = {};
+    currency::finalized_tx ftx = {};
+
+    std::unordered_map<crypto::public_key, uint64_t> total_coins_needed; //asset_id -> amount
+    for(const auto& dest : req.destinations)
+    {
+      total_coins_needed[dest.asset_id] += dest.amount;
+    }
+
+    total_coins_needed[currency::native_coin_asset_id] += req.fee;
+
+
+    for (const auto& [asset_id, amount] : total_coins_needed)
+    {
+      tx_source_entry source = {};
+      source.asset_id = asset_id;
+      source.amount = amount;
+      source.gateway_origin = req.origin_gateway_id;
+      ftp.sources.push_back(source);
+    }
+
+    std::string legacy_tx_wide_payment_id;
+    bool r = rpc_fill_destinations_helper(req.destinations, ftp.prepared_destinations, ftp.extra, true, er, legacy_tx_wide_payment_id, false, [&](const std::string& address, currency::address_v& addr_v, std::string& embedded_payment_id) {
+      tools::core_fast_rpc_proxy tmp_proxy(*this);
+      if (!tmp_proxy.get_transfer_address(address, addr_v, embedded_payment_id))
+      {
+        er.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
+        er.message = std::string("WALLET_RPC_ERROR_CODE_WRONG_ADDRESS: ") + address;
+        return false;
+      }
+      return true;
+    });
+    if (!r)
+    {
+      // er is already filled inside rpc_fill_destinations_helper
+      return false;
+    }
+
+    if(!ftp.prepared_destinations.size() || ftp.prepared_destinations.begin()->addr.size() != 1)
+    {
+      er.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
+      er.message = "No valid destinations were found after processing";
+      return false;
+    }
+    const address_v& addr = ftp.prepared_destinations.begin()->addr.back();
+    VARIANT_SWITCH_BEGIN(addr);
+    VARIANT_CASE_CONST(account_public_address, a_pub_addr)
+    {
+      ftp.crypt_address = a_pub_addr;
+    }
+    VARIANT_CASE_CONST(gateway_address_id_type, a_gw_address)
+    {
+      ftp.crypt_address.view_public_key = a_gw_address;
+      ftp.crypt_address.spend_public_key = a_gw_address;
+    }
+    VARIANT_CASE_THROW_ON_OTHER();
+    VARIANT_SWITCH_END();
+
+    ftp.tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED;
+    ftp.spend_pub_key = req.origin_gateway_id;
+
+    r = currency::construct_tx(dummy_keys, ftp, ftx);
+    if(!r)
+    {
+      res.status = API_RETURN_CODE_FAIL;
+      return true;
+    }
+
+    res.tx_blob = t_serializable_object_to_blob(ftx.tx);
+    res.tx_hash_to_sign = get_transaction_hash(ftx.tx);
+
+
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
