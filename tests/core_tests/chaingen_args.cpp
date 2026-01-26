@@ -1,3 +1,4 @@
+#include "chaingen.h"
 #include "chaingen_args.h"
 
 namespace chaingen_args
