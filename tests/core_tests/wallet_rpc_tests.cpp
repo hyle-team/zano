@@ -1828,7 +1828,7 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
 
   currency::COMMAND_RPC_SEND_RAW_TX::request send_raw_tx_req = {};
   currency::COMMAND_RPC_SEND_RAW_TX::response send_raw_tx_resp = {};
-  send_raw_tx_req.tx_as_hex = gw_sign_transfer_resp.signed_tx_blob_in_hex;
+  send_raw_tx_req.tx_as_hex = gw_sign_transfer_resp.signed_tx_blob;
   r = invoke_text_json_for_rpc(core_rpc_wrapper, "COMMAND_RPC_SEND_RAW_TX", send_raw_tx_req, send_raw_tx_resp);
   CHECK_AND_ASSERT_MES(r, "", "failed to call");
 
