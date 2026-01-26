@@ -1,4 +1,4 @@
-#include "../chaingen.h"
+#include "chaingen.h"
 
 #include <chrono>
 #include <cctype>
