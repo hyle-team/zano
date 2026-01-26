@@ -2633,6 +2633,14 @@ namespace currency
       -pseudo_out_asset_id_blinding_mask, in_context.real_out_index, sig.clsags_ggx);
   }
   //--------------------------------------------------------------------------------
+  bool generate_gateway_sig_dummy(const crypto::hash& tx_hash_for_signature, const crypto::hash& tx_prefix_hash, size_t input_index, const tx_source_entry& src_entr,
+    const account_keys& sender_account_keys, const input_generation_context_data& in_context, const keypair& txkey, const uint64_t tx_flags, transaction& tx, std::stringstream* pss_ring_s)
+  {
+    // TODO: just append a dummy signature, @sowle do we need to do anything else here?
+    tx.signatures.push_back(gateway_sig());
+    return true;
+  }
+  //--------------------------------------------------------------------------------
   bool generate_NLSAG_sig(const crypto::hash& tx_hash_for_signature, const crypto::hash& tx_prefix_hash, size_t input_index, const tx_source_entry& src_entr,
     const account_keys& sender_account_keys, const input_generation_context_data& in_context, const keypair& txkey, const uint64_t tx_flags, transaction& tx, std::stringstream* pss_ring_s)
   {
@@ -3005,6 +3013,13 @@ namespace currency
           zc_in.k_image = img;
           zc_in.key_offsets = std::move(key_offsets);
           tx.vin.push_back(zc_in);
+        }else if (src_entr.gateway_origin != currency::null_pkey)
+        {
+          txin_gateway input_gateway = {};
+          input_gateway.amount = src_entr.amount;
+          input_gateway.asset_id = src_entr.asset_id;
+          input_gateway.gateway_addr = src_entr.gateway_origin;
+          tx.vin.push_back(input_gateway);
         }
         else
         {
@@ -3237,6 +3252,10 @@ namespace currency
         CHECK_AND_ASSERT_MES(r, false, "generate_ZC_sigs failed");
         gen_context.zc_input_amounts[zc_input_index] = source_entry.amount;
         zc_input_index++;
+      }else if (source_entry.gateway_origin != currency::null_pkey)
+      {
+        //TODO: Do nothing here as it will be signed after? @sowle
+        generate_gateway_sig_dummy(tx_hash_for_signature, tx_prefix_hash, i_ + input_starter_index, source_entry, sender_account_keys, in_contexts[i_mapped], gen_context.tx_key, flags, tx, &ss_ring_s);
       }
       else
       {
