@@ -14,6 +14,7 @@
 #include "random_helper.h"
 #include "core_state_helper.h"
 #include "common/db_backend_selector.h"
+#include "common/callstack_helper.h"
 
 #define TX_BLOBSIZE_CHECKER_LOG_FILENAME "get_object_blobsize(tx).log"
 
@@ -918,6 +919,9 @@ int main(int argc, char* argv[])
     LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
     std::fflush(nullptr); // all open output streams are flushed
   });
+
+  // setup custom callstack retrieving function
+  epee::misc_utils::get_callstack(tools::get_empty_callstack);
 
   po::options_description desc_options("Allowed options");
   command_line::add_arg(desc_options, command_line::arg_help);

@@ -62,6 +62,7 @@ namespace tools
     bool check_connection() override;
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override;
 
+    uint64_t get_download_speed() override;
     void set_plast_daemon_is_disconnected(std::atomic<bool> *plast_daemon_is_disconnected);   
     default_http_core_proxy();
   private:

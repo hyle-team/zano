@@ -59,6 +59,71 @@ namespace epee
   namespace net_utils
   {
 
+
+    class speed_meter
+    {
+    public:
+      speed_meter()
+        : m_last_measure_time(clock_t::now())
+      {
+      }
+
+      void on_bytes(uint64_t bytes_processed)
+      {
+        m_total_bytes += bytes_processed;
+      }
+
+      uint64_t get_bytes_per_second()
+      {
+        auto now = clock_t::now();
+        auto elapsed_ms =
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+            now - m_last_measure_time).count();
+
+        if (elapsed_ms == 0)
+          return get_average();
+
+        uint64_t bytes_delta = m_total_bytes - m_last_bytes;
+        uint64_t bps = (bytes_delta * 1000) / elapsed_ms;
+
+        m_last_bytes = m_total_bytes;
+        m_last_measure_time = now;
+
+        m_samples[m_sample_index] = bps;
+        m_sample_index = (m_sample_index + 1) % m_samples.size();
+        if (m_sample_count < m_samples.size())
+          ++m_sample_count;
+
+        return get_average();
+      }
+
+    private:
+      using clock_t = std::chrono::steady_clock;
+
+      uint64_t get_average() const
+      {
+        if (m_sample_count == 0)
+          return 0;
+
+        uint64_t sum = 0;
+        for (size_t i = 0; i < m_sample_count; ++i)
+          sum += m_samples[i];
+
+        return sum / m_sample_count;
+      }
+
+    private:
+      uint64_t m_total_bytes = 0;
+      uint64_t m_last_bytes = 0;
+
+      clock_t::time_point m_last_measure_time;
+
+      std::array<uint64_t, 5> m_samples{};
+      size_t m_sample_index = 0;
+      size_t m_sample_count = 0;
+    };
+
+
     template<bool is_ssl>
     struct socket_backend;
 
@@ -236,13 +301,14 @@ namespace epee
     {
       struct handler_obj
       {
-        handler_obj(boost::system::error_code& error, size_t& bytes_transferred) :ref_error(error), ref_bytes_transferred(bytes_transferred)
+        handler_obj(boost::system::error_code& error, size_t& bytes_transferred, speed_meter& speed) :ref_error(error), ref_bytes_transferred(bytes_transferred), ref_speed(speed)
         {}
-        handler_obj(const handler_obj& other_obj) :ref_error(other_obj.ref_error), ref_bytes_transferred(other_obj.ref_bytes_transferred)
+        handler_obj(const handler_obj& other_obj, speed_meter& speed) :ref_error(other_obj.ref_error), ref_bytes_transferred(other_obj.ref_bytes_transferred), ref_speed(speed)
         {}
 
         boost::system::error_code& ref_error;
         size_t& ref_bytes_transferred;
+        speed_meter& ref_speed;
 
         void operator()(const boost::system::error_code& error, // Result of operation.
           std::size_t bytes_transferred           // Number of bytes read.
@@ -250,6 +316,7 @@ namespace epee
         {
           ref_error = error;
           ref_bytes_transferred = bytes_transferred;
+          ref_speed.on_bytes(bytes_transferred);
         }
       };
 
@@ -291,6 +358,11 @@ namespace epee
       inline void set_recv_timeout(int reciev_timeout)
       {
         m_reciev_timeout = reciev_timeout;
+      }
+
+      uint64_t get_download_speed() const
+      {
+        return m_download_speed_meter.get_bytes_per_second();
       }
 
       inline
@@ -530,7 +602,7 @@ namespace epee
           LOG_ERROR("Some fatal problems.");
           return false;
         }
-
+        m_download_speed_meter.on_bytes(sz);
         return true;
       }
 
@@ -568,7 +640,7 @@ namespace epee
           boost::system::error_code ec = boost::asio::error::would_block;
           size_t bytes_transfered = 0;
 
-          handler_obj hndlr(ec, bytes_transfered);
+          handler_obj hndlr(ec, bytes_transfered, m_download_speed_meter);
 
           char local_buff[10000] = { 0 };
           //m_socket.async_read_some(boost::asio::buffer(local_buff, sizeof(local_buff)), hndlr);
@@ -656,7 +728,7 @@ namespace epee
           size_t bytes_transfered = 0;
 
 
-          handler_obj hndlr(ec, bytes_transfered);
+          handler_obj hndlr(ec, bytes_transfered, m_download_speed_meter);
 
           //char local_buff[10000] = {0};
           if (is_ssl && !m_ssl_io_active)
@@ -792,6 +864,9 @@ namespace epee
       volatile uint32_t m_shutdowned;
       bool m_delay_handshake_cfg = false;   // delay the TLS handshake on the next connect()
       bool m_ssl_io_active = true;          // if true -> read/write via ssl::stream, otherwise via raw tcp::socket
+
+      mutable speed_meter m_download_speed_meter;
+      mutable speed_meter m_upload_speed_meter;
     };
 
 
