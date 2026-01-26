@@ -614,6 +614,7 @@ public:
     uint64_t progress;
     uint64_t current_daemon_height;
     uint64_t current_wallet_height;
+    uint64_t sync_speed; //download speed, bytes per second
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(is_daemon_connected)
@@ -622,6 +623,7 @@ public:
       KV_SERIALIZE(progress)
       KV_SERIALIZE(current_daemon_height)
       KV_SERIALIZE(current_wallet_height)
+      KV_SERIALIZE(sync_speed)
     END_KV_SERIALIZE_MAP()
   };
 

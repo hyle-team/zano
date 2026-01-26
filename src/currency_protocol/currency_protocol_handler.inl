@@ -486,7 +486,7 @@ namespace currency
     {
       LOG_ERROR_CCONTEXT("Requested objects count is to big (" << arg.blocks.size() <<")expected not more then " << CURRENCY_PROTOCOL_MAX_BLOCKS_REQUEST_COUNT);
       m_p2p->drop_connection(context);
-      return  1;
+      return 1;
     }
 
     NOTIFY_RESPONSE_GET_OBJECTS::request rsp;
