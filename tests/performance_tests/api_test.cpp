@@ -3,7 +3,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 
-#include "wallet/core_rpc_proxy.h"
 #include "wallet/core_default_rpc_proxy.h"
 
 int test_get_rand_outs()

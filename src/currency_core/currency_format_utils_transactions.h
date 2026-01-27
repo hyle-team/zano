@@ -293,6 +293,7 @@ namespace currency
     // per tx data
     keypair             tx_key                              {};                       //
     crypto::point_t     tx_pub_key_p                        = crypto::c_point_0;      // == tx_key.pub
+    uint8_t             tx_outs_attr                        = CURRENCY_TO_KEY_OUT_RELAXED;
 
     // consider redesign, some data may possibly be excluded from kv serialization -- sowle
     BEGIN_KV_SERIALIZE_MAP()
@@ -319,11 +320,13 @@ namespace currency
       KV_SERIALIZE_POD_AS_HEX_STRING(ao_commitment_in_outputs)
       KV_SERIALIZE_POD_AS_HEX_STRING(tx_key)
       KV_SERIALIZE_POD_AS_HEX_STRING(tx_pub_key_p)
+      KV_SERIALIZE(tx_outs_attr)
     END_KV_SERIALIZE_MAP()
   
     // solely for consolidated txs, asset opration fields are not serialized
+#define TX_GEN_CONTEXT_VERSION 1
     BEGIN_SERIALIZE_OBJECT()
-      VERSION(0)
+      VERSION(TX_GEN_CONTEXT_VERSION)
       FIELD(asset_ids)
       FIELD(blinded_asset_ids)
       FIELD(amount_commitments)
@@ -351,10 +354,19 @@ namespace currency
       FIELD(tx_key.pub) // TODO: change to sane serialization FIELD(tx_key)
       FIELD(tx_key.sec)
       FIELD(tx_pub_key_p)
+      
+      END_VERSION_UNDER(1)
+
+      FIELD(tx_outs_attr)
     END_SERIALIZE()
   }; // struct tx_generation_context
 
   bool validate_tx_details_against_tx_generation_context(const transaction& tx, const tx_generation_context& gen_context);
+
+  bool generate_tx_balance_proof_hf4(const transaction &tx, const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, currency::zc_balance_proof& proof);
+  bool generate_tx_balance_proof_hf6(const transaction &tx, const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, currency::zc_balance_proof& proof);
+  bool verify_balance_proof_hf4(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
+  bool verify_balance_proof_hf6(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
 
   std::string transform_tx_to_str(const transaction& tx);
   transaction transform_str_to_tx(const std::string& tx_str);

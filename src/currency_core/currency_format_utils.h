@@ -267,7 +267,7 @@ namespace currency
   };
 
   bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs);
-  bool generate_asset_surjection_proof(const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, zc_asset_surjection_proof& result);
+  bool generate_asset_surjection_proof(uint64_t tx_version, const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, zc_asset_surjection_proof& result);
   bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id);
   bool generate_tx_balance_proof(const transaction &tx, const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, zc_balance_proof& proof);
   bool generate_zc_outs_range_proof(const crypto::hash& context_hash, const tx_generation_context& outs_gen_context,
@@ -303,8 +303,8 @@ namespace currency
                                                         );
   //---------------------------------------------------------------
   uint64_t get_string_uint64_hash(const std::string& str);
-  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, crypto::scalar_t& asset_blinding_mask, crypto::scalar_t& amount_blinding_mask, crypto::point_t& blinded_asset_id, crypto::point_t& amount_commitment, finalized_tx& result, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
-  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
+  bool construct_tx_out(const tx_destination_entry& de, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, tx_generation_context& tgc);
+  //bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
 
   bool validate_alias_name(const std::string& al);
   bool validate_password(const std::string& password);

@@ -979,10 +979,14 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
   //fill outputs
   size_t output_index = 0;
   std::set<uint16_t> der_hints;
+  tx_generation_context tgc{};
+  tgc.set_tx_key(txkey);
+  tgc.tx_outs_attr = tx_outs_attr;
+  tgc.resize(0, shuffled_dsts.size());
   BOOST_FOREACH(const currency::tx_destination_entry& dst_entr, shuffled_dsts)
   {
     CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount);
-    bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, der_hints, sender_account_keys, tx_outs_attr);
+    bool r = construct_tx_out(dst_entr, output_index, tx, der_hints, tgc);
     CHECK_AND_ASSERT_MES(r, false, "Failed to construc tx out");
     output_index++;
     summary_outs_money += dst_entr.amount;

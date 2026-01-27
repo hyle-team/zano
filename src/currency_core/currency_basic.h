@@ -519,6 +519,19 @@ namespace currency
 //     END_BOOST_SERIALIZATION_TOTAL_FIELDS(1)
   };
 
+  // First part of a linear composition proof:
+  //   for txs without a ZC input AND with assets in OUTs: proves that balance point = lin(G, X)
+  // Second part:
+  //   proof of knowing transaction secret key (with respect to G)
+  struct zc_gw_balance_proof
+  {
+    crypto::generic_linear_composition_and_schnorr_sig_s lcss;
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(dss)
+    END_SERIALIZE()
+  };
+
 
   struct zarcanum_sig : public crypto::zarcanum_proof
   {

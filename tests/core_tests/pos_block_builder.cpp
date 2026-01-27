@@ -278,7 +278,7 @@ void pos_block_builder::step5_sign(const currency::tx_source_entry& se, const cu
 
     // asset surjection proof
     currency::zc_asset_surjection_proof asp{};
-    r = generate_asset_surjection_proof(miner_tx_id, false, m_miner_tx_tgc, asp);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs 
+    r = generate_asset_surjection_proof(m_miner_tx_version, miner_tx_id, false, m_miner_tx_tgc, asp);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs 
     CHECK_AND_ASSERT_THROW_MES(r, "generete_asset_surjection_proof failed");
     m_block.miner_tx.proofs.emplace_back(std::move(asp));
 

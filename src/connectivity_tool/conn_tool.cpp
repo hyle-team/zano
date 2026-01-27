@@ -352,8 +352,10 @@ bool generate_genesis(const std::string& path_config, uint64_t premine_split_amo
   for (auto& p: gcp.payments)
   {
 
-    bool r = get_account_address_from_str(de.addr.back(), p.address_this);
+    account_public_address addr{};
+    bool r = get_account_address_from_str(addr, p.address_this);
     CHECK_AND_ASSERT_MES(r, false, "wrong address string: " << p.address_this);
+    de.addr.push_back(addr);
 
     de.amount = p.amount_this_coin_int; //std::cout << de.amount << ENDL;
     summary_premine_coins += de.amount;

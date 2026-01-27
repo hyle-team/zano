@@ -1728,6 +1728,8 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
   return true;
 }
 
+//------------------------------------------------------------------------------
+
 wallet_rpc_gateway_address::wallet_rpc_gateway_address()
 {
   REGISTER_CALLBACK_METHOD(wallet_rpc_gateway_address, c1);

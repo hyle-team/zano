@@ -6285,10 +6285,10 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   VARIANT_SWITCH_BEGIN(gw_owner_key);
   VARIANT_CASE_CONST(crypto::public_key, pkey)
   {
-    CHECK_AND_ASSERT_THROW_MES(sig.s.type() == typeid(crypto::signature), "Unexpected signature type("<< sig.s.type().name() <<
+    CHECK_AND_ASSERT_THROW_MES(sig.s.type() == typeid(crypto::generic_schnorr_sig_s), "Unexpected signature type("<< sig.s.type().name() <<
       ") for gw_in.gateway_addr" << gw_in.gateway_addr << "(expected crypto::signature) in tx: " << tx_prefix_hash);
-    const crypto::signature& signature = boost::get<crypto::signature>(sig.s);
-    bool r = crypto::check_signature(tx_hash_for_signature, pkey, signature);
+    const crypto::generic_schnorr_sig_s& signature = boost::get<crypto::generic_schnorr_sig_s>(sig.s);
+    bool r = crypto::verify_schnorr_sig(tx_hash_for_signature, pkey, signature);
   }
   VARIANT_CASE_CONST(crypto::eth_public_key, pkey)
   {
