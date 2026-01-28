@@ -1628,6 +1628,12 @@ bool blockchain_storage::validate_miner_transaction(const transaction& miner_tx,
   // before HF4: add tx fee to the block reward; after HF4: burn fees, so they don't count in block_reward
   if (miner_tx.version < TRANSACTION_VERSION_POST_HF4)
   {
+    // Check for integer overflow when adding fee to block reward
+    if (block_reward > UINT64_MAX - fee)
+    {
+      LOG_ERROR("Integer overflow detected in block reward calculation: " << block_reward << " + " << fee);
+      return false;
+    }
     block_reward += fee;
   }
 
@@ -3710,7 +3716,6 @@ bool blockchain_storage::get_est_height_from_date(uint64_t date, uint64_t& res_h
   {
     return true;
   }
-
 
   uint64_t calculated_estimated_height = (date - get_blockchain_launch_timestamp()) / DIFFICULTY_TOTAL_TARGET;
   

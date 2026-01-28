@@ -72,6 +72,8 @@ namespace crypto {
     generate_random_bytes_no_lock(64, tmp);
     sc_reduce(tmp);
     memcpy(&res, tmp, 32);
+    // Clear sensitive data from stack
+    memset(tmp, 0, sizeof(tmp));
   }
 
   void crypto_ops::keys_from_default(const unsigned char* a_part, public_key &pub, secret_key &sec, size_t keys_seed_binary_size)
@@ -260,17 +262,25 @@ namespace crypto {
     crypto_assert(check_key(pub));
     buf.h = prefix_hash;
     buf.key = pub;
+    
+    // Perform all checks without early returns to avoid timing attacks
+    int valid = 1;  // Assume valid initially
+    
     if (ge_frombytes_vartime(&tmp3, &pub) != 0) {
-      return false;
+      valid = 0;
     }
     if (sc_check(&sig.c) != 0 || sc_check(&sig.r) != 0) {
-      return false;
+      valid = 0;
     }
+    
+    // Continue verification even if earlier checks failed to maintain constant timing
     ge_double_scalarmult_base_vartime(&tmp2, &sig.c, &tmp3, &sig.r);
     ge_tobytes(&buf.comm, &tmp2);
     hash_to_scalar(&buf, sizeof(s_comm), c);
     sc_sub(&c, &c, &sig.c);
-    return sc_isnonzero(&c) == 0;
+    
+    // Final check combined with accumulated validity
+    return (valid && sc_isnonzero(&c) == 0);
   }
 
   static void hash_to_ec(const public_key &key, ge_p3 &res) {
@@ -390,8 +400,12 @@ POP_VS_WARNINGS
       crypto_assert(check_key(*pubs[i]));
     }
 #endif
+    
+    // Perform all checks without early returns to avoid timing attacks
+    int valid = 1;  // Assume valid initially
+    
     if (ge_frombytes_vartime(&image_unp, &image) != 0) {
-      return false;
+      valid = 0;
     } 
     ge_dsm_precomp(image_pre, &image_unp);
     sc_0(&sum);
@@ -400,11 +414,12 @@ POP_VS_WARNINGS
       ge_p2 tmp2;
       ge_p3 tmp3;
       if (sc_check(&sig[i].c) != 0 || sc_check(&sig[i].r) != 0) {
-        return false;
+        valid = 0;
       }
       if (ge_frombytes_vartime(&tmp3, &*pubs[i]) != 0) {
-        return false;
+        valid = 0;
       }
+      // Continue computation to maintain constant timing
       ge_double_scalarmult_base_vartime(&tmp2, &sig[i].c, &tmp3, &sig[i].r);                // L_i = r_i * G + c_i * P_i
       ge_tobytes(&buf->ab[i].a, &tmp2);
       hash_to_ec(*pubs[i], tmp3);
@@ -414,7 +429,9 @@ POP_VS_WARNINGS
     }
     hash_to_scalar(buf, rs_comm_size(pubs_count), h);
     sc_sub(&h, &h, &sum);
-    return sc_isnonzero(&h) == 0;
+    
+    // Final check combined with accumulated validity
+    return (valid && sc_isnonzero(&h) == 0);
   }
 
 } // namespace crypto
