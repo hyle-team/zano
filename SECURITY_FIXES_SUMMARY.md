@@ -3,36 +3,40 @@
 ## Critical Vulnerabilities Fixed
 
 ### 1. Integer Overflow in Block Reward (CRITICAL)
-- **Location:** `blockchain_storage.cpp:1631`
+- **Location:** `blockchain_storage.cpp:1631-1637`
 - **Risk:** Monetary inflation attack
 - **Fix:** Added overflow check before fee addition
 - **Status:** ✅ FIXED
 
-### 2. Timing Attack in Signature Verification (HIGH)
-- **Location:** `crypto.cpp:255-274`
-- **Risk:** Information leakage via timing side-channel
-- **Fix:** Removed early returns, constant-time verification
-- **Status:** ✅ FIXED
-
-### 3. Timing Attack in Ring Signature Verification (HIGH)
-- **Location:** `crypto.cpp:380-418`
-- **Risk:** Privacy compromise via timing analysis
-- **Fix:** Removed early returns, constant-time verification
-- **Status:** ✅ FIXED
-
-### 4. Sensitive Data Left on Stack (MEDIUM)
-- **Location:** `crypto.cpp:69-75`
+### 2. Sensitive Data Left on Stack (HIGH)
+- **Location:** `crypto.cpp:69-77`
 - **Risk:** Cryptographic key material leakage
 - **Fix:** Added memset to clear stack buffer
 - **Status:** ✅ FIXED
 
+## Security Issues Documented (Require More Extensive Changes)
+
+### 3. Timing Attack in Signature Verification (HIGH)
+- **Location:** `crypto.cpp:255-274`
+- **Risk:** Information leakage via timing side-channel
+- **Why Not Fixed:** Requires replacing all variable-time cryptographic primitives with constant-time equivalents
+- **Status:** ⚠️ DOCUMENTED
+
+### 4. Timing Attack in Ring Signature Verification (HIGH)
+- **Location:** `crypto.cpp:380-418`
+- **Risk:** Privacy compromise via timing analysis
+- **Why Not Fixed:** Requires replacing all variable-time cryptographic primitives with constant-time equivalents
+- **Status:** ⚠️ DOCUMENTED
+
 ## Deployment Recommendation
 
-**DEPLOY IMMEDIATELY** - These fixes address:
-- Consensus integrity (monetary policy)
-- Cryptographic security (signature verification)
-- Privacy protection (ring signatures)
-- Memory safety (sensitive data handling)
+**DEPLOY IMMEDIATELY** - The fixes address:
+- ✅ Consensus integrity (monetary policy)
+- ✅ Memory safety (sensitive data handling)
+
+**FUTURE WORK** - Address timing attacks:
+- Replace `_vartime` cryptographic functions with constant-time equivalents
+- This requires more extensive changes than appropriate for minimal-change audit
 
 All changes are minimal, surgical, and maintain backward compatibility.
 
@@ -41,7 +45,7 @@ All changes are minimal, surgical, and maintain backward compatibility.
 - [x] Code changes verified
 - [x] Security audit documented
 - [ ] Build verification needed
-- [ ] Unit tests needed
+- [ ] Unit tests needed (especially for overflow condition)
 - [ ] Integration tests needed
 
 See SECURITY_AUDIT_FINDINGS.md for full details.

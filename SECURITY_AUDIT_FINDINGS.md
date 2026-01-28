@@ -5,7 +5,7 @@
 
 ## Executive Summary
 
-This security audit identified and fixed **4 critical vulnerabilities** in the Zano blockchain codebase, focusing on consensus-related code and cryptographic implementations. All identified high and medium severity issues have been addressed.
+This security audit identified **2 critical vulnerabilities** and documented **5 additional security concerns** in the Zano blockchain codebase, focusing on consensus-related code and cryptographic implementations. Critical vulnerabilities have been fixed.
 
 ## Critical Vulnerabilities Fixed
 
@@ -32,84 +32,9 @@ block_reward += fee;
 
 ---
 
-### 2. Timing Attack in Signature Verification ⚠️ HIGH - FIXED
+### 2. Sensitive Data Left on Stack ⚠️ HIGH - FIXED
 
-**File:** `src/crypto/crypto.cpp:255-274`  
-**Function:** `check_signature()`
-
-**Description:**  
-Early returns based on signature validation failures created timing side-channels. An attacker observing verification timing could distinguish:
-- Bad signature format (fast fail)
-- Invalid scalar/point (fast fail)
-- Actual verification failure (slower)
-
-This leaked information about whether signatures passed structural validation.
-
-**Fix Applied:**
-```cpp
-// Perform all checks without early returns to avoid timing attacks
-int valid = 1;  // Assume valid initially
-
-if (ge_frombytes_vartime(&tmp3, &pub) != 0) {
-  valid = 0;
-}
-if (sc_check(&sig.c) != 0 || sc_check(&sig.r) != 0) {
-  valid = 0;
-}
-
-// Continue verification even if earlier checks failed to maintain constant timing
-ge_double_scalarmult_base_vartime(&tmp2, &sig.c, &tmp3, &sig.r);
-ge_tobytes(&buf.comm, &tmp2);
-hash_to_scalar(&buf, sizeof(s_comm), c);
-sc_sub(&c, &c, &sig.c);
-
-// Final check combined with accumulated validity
-return (valid && sc_isnonzero(&c) == 0);
-```
-
-**Impact:** Prevents timing-based attacks on signature verification, improving cryptographic security.
-
----
-
-### 3. Timing Attack in Ring Signature Verification ⚠️ HIGH - FIXED
-
-**File:** `src/crypto/crypto.cpp:380-418`  
-**Function:** `check_ring_signature()`
-
-**Description:**  
-Similar to standard signature verification, ring signature verification had early returns that leaked timing information. Verification timing varied based on which signature component or public key was invalid, revealing information about valid vs invalid rings.
-
-**Fix Applied:**
-```cpp
-// Perform all checks without early returns to avoid timing attacks
-int valid = 1;  // Assume valid initially
-
-if (ge_frombytes_vartime(&image_unp, &image) != 0) {
-  valid = 0;
-}
-
-for (i = 0; i < pubs_count; i++) {
-  if (sc_check(&sig[i].c) != 0 || sc_check(&sig[i].r) != 0) {
-    valid = 0;
-  }
-  if (ge_frombytes_vartime(&tmp3, &*pubs[i]) != 0) {
-    valid = 0;
-  }
-  // Continue computation to maintain constant timing
-  // ... rest of verification
-}
-
-// Final check combined with accumulated validity
-return (valid && sc_isnonzero(&h) == 0);
-```
-
-**Impact:** Protects privacy features by preventing timing-based analysis of ring signatures.
-
----
-
-### 4. Sensitive Data Left on Stack ⚠️ MEDIUM - FIXED
-
-**File:** `src/crypto/crypto.cpp:69-75`  
+**File:** `src/crypto/crypto.cpp:69-77`  
 **Function:** `random_scalar_no_lock()`
 
 **Description:**  
@@ -117,7 +42,7 @@ The function used a 64-byte stack buffer for random data generation but never cl
 
 **Fix Applied:**
 ```cpp
-void random_scalar_no_lock(ec_scalar &res)
+static inline void random_scalar_no_lock(ec_scalar &res)
 {
   unsigned char tmp[64];
   generate_random_bytes_no_lock(64, tmp);
@@ -132,7 +57,47 @@ void random_scalar_no_lock(ec_scalar &res)
 
 ---
 
-## Additional Security Issues Identified (Not Fixed)
+## Security Issues Documented (Not Fixed in This Audit)
+
+### 3. Timing Attack in Signature Verification ⚠️ HIGH - DOCUMENTED
+
+**File:** `src/crypto/crypto.cpp:255-274`  
+**Function:** `check_signature()`
+
+**Description:**  
+Early returns based on signature validation failures create timing side-channels. Additionally, the code uses variable-time cryptographic functions (`ge_frombytes_vartime`, `ge_double_scalarmult_base_vartime`) which have execution times that depend on input values.
+
+An attacker observing verification timing could distinguish:
+- Bad signature format (fast fail)
+- Invalid scalar/point (fast fail)
+- Actual verification failure (slower)
+
+**Why Not Fixed:**  
+True constant-time verification requires replacing all `_vartime` cryptographic primitives with constant-time equivalents. Simply removing early returns while still using vartime functions provides no security benefit and could introduce undefined behavior when operating on invalid point data.
+
+**Recommendation:**  
+Replace variable-time cryptographic operations with constant-time equivalents from libsodium or similar libraries. This requires more extensive changes than appropriate for this minimal-change audit.
+
+---
+
+### 4. Timing Attack in Ring Signature Verification ⚠️ HIGH - DOCUMENTED
+
+**File:** `src/crypto/crypto.cpp:380-418`  
+**Function:** `check_ring_signature()`
+
+**Description:**  
+Similar to standard signature verification, ring signature verification has early returns that leak timing information, and uses variable-time cryptographic primitives. Verification timing varies based on:
+- Which signature component is invalid
+- Which public key index contains invalid point
+- Input-dependent execution time of `_vartime` functions
+
+**Why Not Fixed:**  
+Same reasoning as signature verification - requires replacing all cryptographic primitives with constant-time equivalents.
+
+**Recommendation:**  
+Use constant-time cryptographic primitives throughout the ring signature verification path.
+
+---
 
 ### 5. Use of alloca() for Sensitive Data ⚠️ MEDIUM - DOCUMENTED
 
@@ -154,7 +119,7 @@ rs_comm *const buf = reinterpret_cast<rs_comm *>(alloca(rs_comm_size(pubs_count)
 **Recommendation:**  
 Consider using fixed-size buffers with bounds checking or heap allocation with secure clearing.
 
-**Status:** Documented for future consideration. Not fixed in this audit to maintain minimal changes.
+**Status:** Documented for future consideration.
 
 ---
 
@@ -208,7 +173,7 @@ Consider using fixed-size buffers with bounds checking or heap allocation with s
 ### Areas for Improvement
 - Consider replacing `CHECK_AND_ASSERT_MES` macros with runtime checks in production
 - Add overflow checking utilities library for consistent safe arithmetic
-- Consider using constant-time cryptographic primitives from libsodium
+- **Replace variable-time cryptographic primitives with constant-time equivalents**
 - Add compiler hardening flags (stack canaries, ASLR, etc.)
 
 ---
@@ -216,9 +181,8 @@ Consider using fixed-size buffers with bounds checking or heap allocation with s
 ## Testing Recommendations
 
 1. **Unit Tests:** Add specific tests for:
-   - Block reward overflow conditions
+   - Block reward overflow conditions (RECOMMENDED)
    - Maximum fee values
-   - Signature verification with invalid inputs
    - Memory cleanup verification
 
 2. **Fuzzing:** Consider fuzzing:
@@ -226,26 +190,27 @@ Consider using fixed-size buffers with bounds checking or heap allocation with s
    - Signature verification functions
    - Transaction parsing
 
-3. **Timing Analysis:** Perform timing measurements on signature verification to verify constant-time properties
+3. **Timing Analysis:** Perform timing measurements on signature verification (currently has known timing leaks)
 
 ---
 
 ## Conclusion
 
-This audit successfully identified and fixed 4 critical security vulnerabilities in the Zano blockchain codebase:
+This audit successfully identified and fixed **2 critical security vulnerabilities** in the Zano blockchain codebase:
 - 1 consensus-level vulnerability (integer overflow)
-- 2 cryptographic timing attacks
-- 1 memory safety issue
+- 1 memory safety issue (sensitive data on stack)
+
+Additionally, **5 security concerns were documented** for future consideration, including timing attack vulnerabilities that require more extensive refactoring to properly address.
 
 All fixes maintain backward compatibility and minimal code changes. The codebase demonstrates good security practices overall, with room for additional hardening in future iterations.
 
-**Recommendation:** Deploy these fixes immediately as they address critical consensus and cryptographic vulnerabilities.
+**Recommendation:** Deploy these fixes immediately as they address critical consensus and memory safety vulnerabilities. Address timing attack vulnerabilities in a future security-focused release.
 
 ---
 
 ## Appendix: Files Modified
 
 1. `src/currency_core/blockchain_storage.cpp` - Added overflow check in validate_miner_transaction()
-2. `src/crypto/crypto.cpp` - Fixed timing attacks and added memory clearing (3 fixes)
+2. `src/crypto/crypto.cpp` - Added memory clearing in random_scalar_no_lock()
 
-Total lines changed: ~40 lines
+Total lines changed: ~10 lines (minimal, surgical changes)
