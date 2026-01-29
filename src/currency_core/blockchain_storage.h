@@ -246,7 +246,7 @@ namespace currency
     bool get_block_by_hash(const crypto::hash &h, block &blk) const;
     bool get_block_reward_by_main_chain_height(const uint64_t height, uint64_t& reward_with_fee) const; // only for main chain blocks
     bool get_block_reward_by_hash(const crypto::hash &h, uint64_t& reward_with_fee) const; // works for main chain and alt chain blocks
-    bool get_block_extended_info_by_height(uint64_t h, std::shared_ptr<const block_extended_info>& blk) const;
+    bool get_block_extended_info_by_height(uint64_t h, block_extended_info &blk) const;
     bool get_block_extended_info_by_hash(const crypto::hash &h, block_extended_info &blk) const;
     bool get_block_by_height(uint64_t h, block &blk) const;
     bool is_tx_related_to_altblock(crypto::hash tx_id) const;

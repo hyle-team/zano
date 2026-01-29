@@ -347,7 +347,6 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
       uint64_t cache_size = command_line::get_arg(vm, arg_db_cache_l2);
       set_db_l2_cache_size(cache_size);
     }
-    set_db_l2_cache_size(2);
 
     LOG_PRINT_L0("Opened DB ver " << m_db_storage_major_compatibility_version << "." << m_db_storage_minor_compatibility_version);
 
@@ -1225,13 +1224,7 @@ bool blockchain_storage::get_block_extended_info_by_hash(const crypto::hash &h, 
   auto vptr = m_db_blocks_index.find(h);
   if (vptr)
   {
-    std::shared_ptr<const block_extended_info> bei_ptr;
-    if (get_block_extended_info_by_height(*vptr, bei_ptr) && bei_ptr)
-    {
-      blk = *bei_ptr;
-      return true;
-    }
-    return false;
+    return get_block_extended_info_by_height(*vptr, blk);
   }
 
   // try to find block in alternative chain
@@ -1246,14 +1239,14 @@ bool blockchain_storage::get_block_extended_info_by_hash(const crypto::hash &h, 
   return false;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::get_block_extended_info_by_height(uint64_t h, std::shared_ptr<const block_extended_info>& blk) const
+bool blockchain_storage::get_block_extended_info_by_height(uint64_t h, block_extended_info &blk) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
   if (h >= m_db_blocks.size())
     return false;
   
-  blk = m_db_blocks[h];
+  blk = *m_db_blocks[h];
   return true;
 }
 //------------------------------------------------------------------
@@ -1401,14 +1394,6 @@ bool blockchain_storage::switch_to_alternative_blockchain(alt_chain_type& alt_ch
     block_verification_context bvc = boost::value_initialized<block_verification_context>();
     bvc.m_onboard_transactions.swap(old_ch_ent.onboard_transactions);
     bool r = handle_alternative_block(old_ch_ent.b, get_block_hash(old_ch_ent.b), bvc);
-    LOG_PRINT_L0("BVC after handle_alternative_block for old block " << get_block_hash(old_ch_ent.b) << ":" << std::endl <<
-      "  m_added_to_main_chain: " << bvc.m_added_to_main_chain << std::endl <<
-      "  m_verification_failed: " << bvc.m_verification_failed << std::endl <<
-      "  m_marked_as_orphaned: " << bvc.m_marked_as_orphaned << std::endl <<
-      "  m_added_to_altchain: " << bvc.m_added_to_altchain << std::endl <<
-      "  m_already_exists: " << bvc.m_already_exists << std::endl <<
-      "  m_height_difference: " << bvc.m_height_difference << std::endl <<
-      "  m_onboard_transactions count: " << bvc.m_onboard_transactions.size());
     if(!r)
     {
       LOG_ERROR("Failed to push ex-main chain blocks to alternative chain ");

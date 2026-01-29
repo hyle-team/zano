@@ -1300,10 +1300,10 @@ namespace currency
       res = m_db_solo_options.init(TRANSACTION_POOL_CONTAINER_SOLO_OPTIONS);
       CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
 
-      m_db_transactions.set_cache_size(2);
-      m_db_alias_names.set_cache_size(2);
-      m_db_alias_addresses.set_cache_size(2);
-      m_db_black_tx_list.set_cache_size(2);
+      m_db_transactions.set_cache_size(1000);
+      m_db_alias_names.set_cache_size(10000);
+      m_db_alias_addresses.set_cache_size(10000);
+      m_db_black_tx_list.set_cache_size(1000);
 
       bool need_reinit = false;
       if (m_db_storage_major_compatibility_version > 0 && m_db_storage_major_compatibility_version != TRANSACTION_POOL_MAJOR_COMPATIBILITY_VERSION)

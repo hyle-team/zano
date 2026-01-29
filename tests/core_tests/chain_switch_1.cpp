@@ -1017,9 +1017,10 @@ bool alt_chain_and_block_tx_fee_median::check_after_hf4(
                                               height_block),
     true);
 
-  std::shared_ptr<const block_extended_info> bei_ptr;
-  c.get_blockchain_storage().get_block_extended_info_by_height(height_block, bei_ptr);
-  CHECK_AND_ASSERT_EQ(bei_ptr->this_block_tx_fee_median, m_fee_tx_1_blk_2a);
+
+  c.get_blockchain_storage().get_block_extended_info_by_height(height_block,
+                                                               bei);
+  CHECK_AND_ASSERT_EQ(bei.this_block_tx_fee_median, m_fee_tx_1_blk_2a);
 
   return true;
 }
@@ -1037,9 +1038,9 @@ bool alt_chain_and_block_tx_fee_median::check_before_hf4(
                                               height_block),
     false);
 
-  std::shared_ptr<const block_extended_info> bei_ptr;
-  c.get_blockchain_storage().get_block_extended_info_by_height(height_block, bei_ptr);
-  CHECK_AND_ASSERT_EQ(bei_ptr->this_block_tx_fee_median, m_fee_tx_0_blk_2);
+  c.get_blockchain_storage().get_block_extended_info_by_height(height_block,
+                                                               bei);
+  CHECK_AND_ASSERT_EQ(bei.this_block_tx_fee_median, m_fee_tx_0_blk_2);
 
   return true;
 }
