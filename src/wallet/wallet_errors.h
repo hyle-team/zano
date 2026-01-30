@@ -635,6 +635,20 @@ namespace tools
       std::string m_message;
     };
     //----------------------------------------------------------------------------------------------------
+    struct tx_has_too_many_inputs : public transfer_error
+    {
+      explicit tx_has_too_many_inputs(std::string&& loc, const std::string& message)
+        : transfer_error(std::move(loc), API_RETURN_CODE_TX_HAS_TOO_MANY_INPUTS)
+        , m_message(message)
+      {
+      }
+ 
+      const std::string get_message() const { return m_message; }
+ 
+    private:
+      std::string m_message;
+    };
+    //----------------------------------------------------------------------------------------------------
     struct zero_destination : public transfer_error
     {
       explicit zero_destination(std::string&& loc)
