@@ -194,3 +194,10 @@ struct tx_input_mixins: public test_chain_unit_enchanced
   bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool generate(std::vector<test_event_entry>& events) const;
 };
+
+struct tx_expiration_height_and_pool_purge : public test_chain_unit_enchanced
+{
+  tx_expiration_height_and_pool_purge();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
