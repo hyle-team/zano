@@ -4552,6 +4552,13 @@ namespace currency
     return payment_id.size() <= BC_PAYMENT_ID_SERVICE_SIZE_MAX;
   }
   //-----------------------------------------------------------------------
+  bool is_address_like_wrapped(const std::string& addr)
+  {
+    if (addr.length() == 42 && addr.substr(0, 2) == "0x")
+      return true;
+    else return false;
+  }
+  //-----------------------------------------------------------------------
   std::string get_account_address_as_str(const account_public_address& addr)
   {
     if (addr.flags == 0)
@@ -4561,13 +4568,6 @@ namespace currency
       return tools::base58::encode_addr(CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr)); // new format Zano address (auditable)
     
     return tools::base58::encode_addr(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr)); // new format Zano address (normal)
-  }
-  //-----------------------------------------------------------------------
-  bool is_address_like_wrapped(const std::string& addr)
-  {
-    if (addr.length() == 42 && addr.substr(0, 2) == "0x")
-      return true;
-    else return false;
   }
   //-----------------------------------------------------------------------
   std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const payment_id_t& payment_id)
@@ -4581,29 +4581,43 @@ namespace currency
     return tools::base58::encode_addr(CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX, t_serializable_object_to_blob(addr) + payment_id); // new format integrated Zano address (normal)
   }
   //-----------------------------------------------------------------------
-  std::string get_account_address_as_str(const gateway_address_id_type& addr, const payment_id_t& payment_id)
+  std::string get_account_address_as_str(const gateway_address_id_type& addr)
   {
-    gateway_address_serialized_to_str gwserialized = AUTO_VAL_INIT(gwserialized);
+    return get_account_address_and_payment_id_as_str(addr, payment_id_t{});
+  }
+  //-----------------------------------------------------------------------
+  std::string get_account_address_and_payment_id_as_str(const gateway_address_id_type& addr, const payment_id_t& payment_id)
+  {
+    gateway_address_serialized_to_str gwserialized{};
 
     gwserialized.gateway_addr = addr;
     if (payment_id.size())
     {
-      CHECK_AND_ASSERT_THROW_MES(payment_id.size() == sizeof(uint64_t), "Unexpected payment id size");
       uint64_t val = 0;
-      std::memcpy(&val, payment_id.data(), sizeof(val));
+      CHECK_AND_ASSERT_MES(convert_payment_id(payment_id, val), false, "invalid payment id / incorrect payment id size");
       gwserialized.o_payment_id = val;
     }
 
-
     uint64_t tag = payment_id.size() ? CURRENCY_PUBLIC_INTEG_GATEWAY_BASE58_PREFIX : CURRENCY_PUBLIC_GATEWAY_BASE58_PREFIX;
     return tools::base58::encode_addr(tag, t_serializable_object_to_blob(gwserialized));
-
   }
   //-----------------------------------------------------------------------
-  std::string get_account_address_as_str(const address_v& v_addr, const payment_id_t& payment_id)
+  std::string get_account_address_as_str(const address_v& v_addr)
   {
     if (v_addr.type() == typeid(gateway_address_id_type))
-      return get_account_address_as_str(boost::get<gateway_address_id_type>(v_addr), payment_id);
+      return get_account_address_as_str(boost::get<gateway_address_id_type>(v_addr));
+    else if (v_addr.type() == typeid(account_public_address))
+      return get_account_address_as_str(boost::get<account_public_address>(v_addr));
+    else
+    {
+      throw std::runtime_error("Unknown type of address in get_account_address_as_str");
+    }
+  }
+  //-----------------------------------------------------------------------
+  std::string get_account_address_and_payment_id_as_str(const address_v& v_addr, const payment_id_t& payment_id)
+  {
+    if (v_addr.type() == typeid(gateway_address_id_type))
+      return get_account_address_and_payment_id_as_str(boost::get<gateway_address_id_type>(v_addr), payment_id);
     else if (v_addr.type() == typeid(account_public_address))
       return get_account_address_and_payment_id_as_str(boost::get<account_public_address>(v_addr), payment_id);
     else

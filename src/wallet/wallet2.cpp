@@ -7293,7 +7293,7 @@ void wallet2::add_sent_tx_detailed_info(const transaction& tx, const std::vector
 
       if (need_to_add_address)
       {
-        recipients.push_back(payment_id.empty() ? get_account_address_as_str(addr) : get_account_address_as_str(addr, payment_id));
+        recipients.push_back(payment_id.empty() ? get_account_address_as_str(addr) : get_account_address_and_payment_id_as_str(addr, payment_id));
       }
     }
   }
