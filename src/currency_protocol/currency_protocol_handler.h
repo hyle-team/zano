@@ -40,6 +40,8 @@ namespace currency
     t_currency_protocol_handler(t_core& rcore, nodetool::i_p2p_endpoint<connection_context>* p_net_layout);
     ~t_currency_protocol_handler();
 
+    inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{ 10000, 10000, 10000 };
+
     BEGIN_INVOKE_MAP2(currency_protocol_handler)
       HANDLE_NOTIFY_T2(NOTIFY_NEW_BLOCK, &currency_protocol_handler::handle_notify_new_block)
       HANDLE_NOTIFY_T2(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS, &currency_protocol_handler::handle_notify_new_transactions)

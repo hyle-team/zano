@@ -9,18 +9,42 @@
 #include "view_iface.h"
 
 
+#ifdef MOBILE_WALLET_BUILD
+  #define DAEMON_IDLE_UPDATE_TIME_MS        10000
+  #define TX_POOL_SCAN_INTERVAL             5
+#else
+  #define DAEMON_IDLE_UPDATE_TIME_MS        2000
+  #define TX_POOL_SCAN_INTERVAL             1
+#endif
+
 namespace tools
 {
-  inline bool get_wallet_info(wallet2& w, view::wallet_info& wi)
+  inline bool get_wallet_info_unlocked(wallet2& w, view::wallet_info& wi)
   {
     wi = AUTO_VAL_INIT_T(view::wallet_info);
     wi.address = w.get_account().get_public_address_str();
     wi.view_sec_key = epee::string_tools::pod_to_hex(w.get_account().get_keys().view_secret_key);
-    w.balance(wi.balances, wi.mined_total);
     wi.path = epee::string_encoding::wstring_to_utf8(w.get_wallet_path());
     wi.is_auditable = w.is_auditable();
     wi.is_watch_only = w.is_watch_only();
+    return true;
+  }
+
+  inline bool get_wallet_info(wallet2& w, view::wallet_info& wi)
+  {
+    wi = AUTO_VAL_INIT_T(view::wallet_info);
+    get_wallet_info_unlocked(w, wi);
+    w.balance(wi.balances, wi.mined_total);
     wi.has_bare_unspent_outputs = w.has_bare_unspent_outputs();
+    return true;
+  }
+
+  inline bool get_is_remote_daemon_connected_from_diag_info(std::shared_ptr<const tools::proxy_diagnostic_info> diag_info)
+  {
+    if (diag_info->is_busy)
+      return false;
+    if (time(nullptr) - diag_info->last_success_interract_time > DAEMON_IDLE_UPDATE_TIME_MS * 2)
+      return false;
     return true;
   }
 
