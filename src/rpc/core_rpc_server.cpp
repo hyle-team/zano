@@ -157,8 +157,9 @@ namespace currency
       else
         res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_synchronizing;
     }
-    res.synchronization_start_height = m_p2p.get_payload_object().get_core_inital_height();
-    res.max_net_seen_height = m_p2p.get_payload_object().get_max_seen_height();
+    res.max_net_seen_height = std::max(m_p2p.get_payload_object().get_max_seen_height(), res.height);
+    res.synchronization_start_height = std::min(m_p2p.get_payload_object().get_core_inital_height(), res.max_net_seen_height);
+
     m_p2p.get_maintainers_info(res.mi);
     res.pos_allowed = m_core.get_blockchain_storage().is_pos_allowed();
     wide_difficulty_type pos_diff = m_core.get_blockchain_storage().get_cached_next_difficulty(true);
