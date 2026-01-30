@@ -2846,11 +2846,12 @@ namespace currency
           zc_in.k_image = img;
           zc_in.key_offsets = std::move(key_offsets);
           tx.vin.push_back(zc_in);
-        }else if (src_entr.gateway_origin != currency::null_pkey)
+        }
+        else if (src_entr.is_gw())
         {
           txin_gateway input_gateway = {};
           input_gateway.amount = src_entr.amount;
-          input_gateway.asset_id = src_entr.asset_id;
+          input_gateway.asset_id = (crypto::c_scalar_1div8 * crypto::point_t(src_entr.asset_id)).to_public_key();
           input_gateway.gateway_addr = src_entr.gateway_origin;
           tx.vin.push_back(input_gateway);
         }
@@ -2879,6 +2880,12 @@ namespace currency
             break;
           }
         }
+      }
+      else if (src_entr.is_gw())
+      {
+        // if at least one gw input has non-native asset id, then we can't say that all inputs are obviously native coins
+        if (src_entr.asset_id != currency::native_coin_asset_id)
+          all_inputs_are_obviously_native_coins = false;
       }
     }
 

@@ -1263,23 +1263,12 @@ bool test_generator::construct_pow_block_with_alias_info_in_coinbase(const accou
       de.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id;
       r = construct_tx_out(de, output_index, miner_tx, deriv_cache, tx_gen_context);
       CHECK_AND_ASSERT_MES(r, false, "construct_tx_out failed for output " << output_index);
-      tx_gen_context.amounts[output_index] = de.amount;
-      tx_gen_context.asset_ids[output_index] = crypto::point_t(de.asset_id);
-      tx_gen_context.asset_id_blinding_mask_x_amount_sum += tx_gen_context.asset_id_blinding_masks[output_index] * de.amount;
-      tx_gen_context.amount_blinding_masks_sum += tx_gen_context.amount_blinding_masks[output_index];
-      tx_gen_context.amount_commitments_sum += tx_gen_context.amount_commitments[output_index];
 
       ++output_index;
       de = tx_destination_entry{new_block_reward - new_block_reward / 2, acc.get_public_address()};
       de.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id;
       r = construct_tx_out(de, output_index, miner_tx, deriv_cache, tx_gen_context);
       CHECK_AND_ASSERT_MES(r, false, "construct_tx_out failed for output " << output_index);
-      tx_gen_context.amounts[output_index] = de.amount;
-      tx_gen_context.asset_ids[output_index] = crypto::point_t(de.asset_id);
-      tx_gen_context.asset_id_blinding_mask_x_amount_sum += tx_gen_context.asset_id_blinding_masks[output_index] * de.amount;
-      tx_gen_context.amount_blinding_masks_sum += tx_gen_context.amount_blinding_masks[output_index];
-      tx_gen_context.amount_commitments_sum += tx_gen_context.amount_commitments[output_index];
-
       if (alias_cost != 0)
       {
         // output 2: alias reward
@@ -1288,11 +1277,6 @@ bool test_generator::construct_pow_block_with_alias_info_in_coinbase(const accou
         de.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask;
         r = construct_tx_out(de, output_index, miner_tx, deriv_cache, tx_gen_context);
         CHECK_AND_ASSERT_MES(r, false, "construct_tx_out failed for output " << output_index);
-        tx_gen_context.amounts[output_index] = de.amount;
-        tx_gen_context.asset_ids[output_index] = crypto::point_t(de.asset_id);
-        tx_gen_context.asset_id_blinding_mask_x_amount_sum += tx_gen_context.asset_id_blinding_masks[output_index] * de.amount;
-        tx_gen_context.amount_blinding_masks_sum += tx_gen_context.amount_blinding_masks[output_index];
-        tx_gen_context.amount_commitments_sum += tx_gen_context.amount_commitments[output_index];
       }
 
       // reconstruct all proofs
