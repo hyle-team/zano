@@ -267,7 +267,7 @@ namespace currency
   };
 
   bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs);
-  bool generate_asset_surjection_proof(uint64_t tx_version, const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, zc_asset_surjection_proof& result);
+  bool generate_asset_surjection_proof(const transaction& tx, const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, zc_asset_surjection_proof& result);
   bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id);
   bool generate_tx_balance_proof(const transaction &tx, const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, zc_balance_proof& proof);
   bool generate_zc_outs_range_proof(const crypto::hash& context_hash, const tx_generation_context& outs_gen_context,

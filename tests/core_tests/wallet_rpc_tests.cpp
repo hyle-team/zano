@@ -460,7 +460,7 @@ std::string transfer_(std::shared_ptr<tools::wallet2> wlt, const std::string& ad
   tr_req.destinations.resize(1);
   tr_req.destinations.back().address = address;
   tr_req.destinations.back().amount = amount;
-  tr_req.fee = TX_DEFAULT_FEE;
+  tr_req.fee = TESTS_DEFAULT_FEE;
   pre_hf4_api::COMMAND_RPC_TRANSFER::response tr_resp = AUTO_VAL_INIT(tr_resp);
   bool r = invoke_text_json_for_rpc(custody_wlt_rpc, "transfer", tr_req, tr_resp);
   CHECK_AND_ASSERT_MES(r, "", "failed to call");
@@ -476,7 +476,7 @@ std::string transfer_new(std::shared_ptr<tools::wallet2> wlt, const std::string&
   tr_req.destinations.resize(1);
   tr_req.destinations.back().address = address;
   tr_req.destinations.back().amount = amount;
-  tr_req.fee = TX_DEFAULT_FEE;
+  tr_req.fee = TESTS_DEFAULT_FEE;
   tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_resp = AUTO_VAL_INIT(tr_resp);
   bool r = invoke_text_json_for_rpc(custody_wlt_rpc, "transfer", tr_req, tr_resp);
   CHECK_AND_ASSERT_MES(r, "", "failed to call");
@@ -1760,12 +1760,16 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   r = mine_next_pow_blocks_in_playtime(alice_wlt->get_account().get_public_address(), c, 3);
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
+  uint64_t alice_expected_balance = 3 * COIN; // mined
+
   alice_wlt->refresh(); 
 
 
-  //uncomment this when it works
-  //transfer_(alice_wlt, miner_wlt->get_account().get_public_address_str(), COIN);
-  //r = mine_next_pow_blocks_in_playtime(alice_wlt->get_account().get_public_address(), c, 3);
+  std::string rs = transfer_(alice_wlt, miner_wlt->get_account().get_public_address_str(), MK_TEST_COINS(10));
+  CHECK_AND_ASSERT_NEQ(rs, "");
+  alice_expected_balance -= MK_TEST_COINS(10) + TESTS_DEFAULT_FEE;
+  r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_TRUE(r);
 
 
   // wallet RPC server
@@ -1773,7 +1777,7 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
 
   std::string alice_payment_id = gen_payment_id(alice_wlt_rpc);
 
-  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, 3 * COIN), false, "");
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, alice_expected_balance), false, "");
 
   crypto::public_key gw_addr_public_key{};
   crypto::secret_key gw_addr_secret_key{};

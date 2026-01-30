@@ -260,37 +260,85 @@ namespace currency
   // -----------+-------------
   // ZC native      ???       <-- asset_id on input is obvious (native coins)
   //
-  bool generate_asset_surjection_proof_hf6(const crypto::hash& context_hash, bool has_native_coin_bare_inputs, tx_generation_context& ogc, zc_asset_surjection_proof& result)
+  bool generate_asset_surjection_proof_hf6(const transaction& tx, const crypto::hash& context_hash, bool has_native_coin_bare_inputs_, tx_generation_context& ogc, zc_asset_surjection_proof& result)
   {
     bool r = false;
 
     // ring:
     // bgw asset
-    // (cgw)
     // H (if has native coin bare inputs)
-    // ZC inputs
+    // cgw, ZC
     // asset emission
+
+    std::vector<crypto::point_t> bgw_cgw_native_ring_members;
+
+    bool has_only_native_coin_bare_inputs = true; // txin_to_key, bgw native
+    bool has_native_coin_bare_inputs = false;
+    size_t confidential_inputs_count = 0;
+    for(const auto& in_v : tx.vin)
+    {
+      VARIANT_SWITCH_BEGIN(in_v)
+        VARIANT_CASE_CONST(txin_gen, in_g)
+          has_native_coin_bare_inputs = true;
+        VARIANT_CASE_CONST(txin_to_key, in_tk)
+          has_native_coin_bare_inputs = true;
+        VARIANT_CASE_CONST(txin_zc_input, in_zc)
+          has_only_native_coin_bare_inputs = false;
+          ++confidential_inputs_count;
+        VARIANT_CASE_CONST(txin_gateway, in_gw)
+          if (in_gw.asset_id == native_coin_asset_id_1div8)
+            has_native_coin_bare_inputs = true;
+          else
+          {
+            has_only_native_coin_bare_inputs = false;
+            bgw_cgw_native_ring_members.emplace_back(crypto::point_t(in_gw.asset_id).modify_mul8());
+          }
+    //  VARIANT_CASE_CONST(txin_confidential_gateway, in_cgw)
+    //    has_only_native_coin_bare_inputs = false;
+    //    bgw_cgw_native_ring_members.emplace_back(crypto::point_t(...).modify_mul8());
+    //    ++confidential_inputs_count;
+        VARIANT_CASE_OTHER()
+          CHECK_AND_ASSERT_MES(false, false, "unexpected input type: " << in_v.type().name());
+      VARIANT_SWITCH_END()
+    }
+
+    size_t confidential_outs_count = 0;
+    for(size_t j = 0; j < tx.vout.size(); ++j)
+    {
+      const auto& out_v = tx.vout[j];
+      VARIANT_SWITCH_BEGIN(out_v)
+        VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
+          ++confidential_outs_count;
+          if (has_only_native_coin_bare_inputs)
+          {
+            CHECK_AND_ASSERT_MES(out_zc.blinded_asset_id == native_coin_asset_id_1div8, false, "output #" << j << " has a non explicitly native asset id");
+            CHECK_AND_ASSERT_MES(ogc.blinded_asset_ids[j] == currency::native_coin_asset_id_pt, false, "no ZC ins: out #" << j << " has a non-explicit asset id");
+            CHECK_AND_ASSERT_MES(ogc.asset_id_blinding_masks[j] == 0, false, "no ZC ins: out #" << j << " has non-zero asset id blinding mask");
+          }
+    //  VARIANT_CASE_CONST(tx_out_confidential_gateway, out_cgw)
+    //    ++confidential_outs_count;
+    //    CHECK_AND_ASSERT_MES(!has_only_native_coin_bare_inputs || out_cgw.blinded_asset_id == native_coin_asset_id_1div8, false, "output #" << j << " has a non explicitly native asset id");
+        VARIANT_CASE_OTHER()
+          // nothing
+      VARIANT_SWITCH_END()
+    }
+
+    if (confidential_outs_count == 0)
+      return true;
+
+    if (has_only_native_coin_bare_inputs)
+      return true; // explicit native coin asset id in outs has already been checked
+
+    if (has_native_coin_bare_inputs) // txin_gen, txin_to_key, txin_gateway(native)
+      bgw_cgw_native_ring_members.emplace_back(currency::native_coin_asset_id_pt); // additional ring member for native coin inputs
+
+    CHECK_AND_ASSERT_MES(confidential_inputs_count == ogc.pseudo_outs_blinded_asset_ids.size(), false, "confidential_inputs_count != pseudo_outs_blinded_asset_ids");
+    CHECK_AND_ASSERT_MES(confidential_inputs_count == ogc.pseudo_outs_plus_real_out_blinding_masks.size(), false, "confidential_inputs_count != pseudo_outs_plus_real_out_blinding_masks");
+    CHECK_AND_ASSERT_MES(confidential_inputs_count == ogc.real_zc_ins_asset_ids.size(), false, "confidential_inputs_count != real_zc_ins_asset_ids");
 
     size_t outs_count = ogc.blinded_asset_ids.size();
     CHECK_AND_ASSERT_MES(outs_count > 0, false, "blinded_asset_ids shouldn't be empty");
     CHECK_AND_ASSERT_MES(outs_count == ogc.asset_id_blinding_masks.size(), false, "asset_id_blinding_masks != outs_count");
-
-    size_t zc_ins_count = ogc.pseudo_outs_blinded_asset_ids.size();
-    if (zc_ins_count == 0)
-    {
-      // if there's no ZC inputs all the outputs must be native coins with explicit asset ids
-      for(size_t j = 0; j < ogc.blinded_asset_ids.size(); ++j)
-      {
-        CHECK_AND_ASSERT_MES(ogc.blinded_asset_ids[j] == currency::native_coin_asset_id_pt, false, "no ZC ins: out #" << j << " has a non-explicit asset id");
-        CHECK_AND_ASSERT_MES(ogc.asset_id_blinding_masks[j] == 0, false, "no ZC ins: out #" << j << " has non-zero asset id blinding mask");
-      }
-      return true;
-    }
-    
-    // okay, have some ZC inputs
-
-    CHECK_AND_ASSERT_MES(zc_ins_count == ogc.pseudo_outs_plus_real_out_blinding_masks.size(), false, "zc_ins_count != pseudo_outs_plus_real_out_blinding_masks");
-    CHECK_AND_ASSERT_MES(zc_ins_count == ogc.real_zc_ins_asset_ids.size(), false, "zc_ins_count != real_zc_ins_asset_ids");
 
     // ins
     //ogc.pseudo_outs_blinded_asset_ids;             // T^p_i = T_real + r'_i * X
@@ -306,12 +354,20 @@ namespace currency
       const crypto::point_t& T = ogc.blinded_asset_ids[j];
       
       std::vector<crypto::point_t> ring;
-      ring.reserve(zc_ins_count);
+      ring.reserve(confidential_inputs_count);
       size_t secret_index = SIZE_MAX;
       crypto::scalar_t secret = -ogc.asset_id_blinding_masks[j];
 
-      // ring members for ZC inputs
-      for(size_t i = 0; i < zc_ins_count; ++i)
+      // ring members for non-confidential and native inputs
+      for(size_t i = 0; i < bgw_cgw_native_ring_members.size(); ++i)
+      {
+        ring.emplace_back(bgw_cgw_native_ring_members[i] - T);
+        if (secret_index == SIZE_MAX && bgw_cgw_native_ring_members[i] == H)
+          secret_index = i;
+      }
+
+      // ring members for confidential inputs
+      for(size_t i = 0; i < confidential_inputs_count; ++i)
       {
         ring.emplace_back(ogc.pseudo_outs_blinded_asset_ids[i] - T);
         if (secret_index == SIZE_MAX && ogc.real_zc_ins_asset_ids[i] == H)
@@ -319,14 +375,6 @@ namespace currency
           secret_index = i;
           secret += ogc.pseudo_outs_plus_real_out_blinding_masks[secret_index];
         }
-      }
-
-      // additional ring member for native coins
-      if (has_native_coin_bare_inputs)
-      {
-        ring.emplace_back(currency::native_coin_asset_id_pt - T);
-        if (secret_index == SIZE_MAX && H == native_coin_asset_id)
-          secret_index = ring.size() - 1;
       }
 
       // additional ring member for asset emitting operation (which has asset operation commitment in the inputs part)
@@ -338,6 +386,9 @@ namespace currency
       }
 
       CHECK_AND_ASSERT_MES(secret_index != SIZE_MAX, false, "out #" << j << ": cannot find a corresponding asset id in inputs or asset operations; asset id: " << H);
+
+      if (secret.is_zero())
+        LOG_PRINT_YELLOW("WARNING, TODO: secret == 0, consider removing ASP in such cases! -- sowle", LOG_LEVEL_0);
 
       result.bge_proofs.emplace_back(crypto::BGE_proof_s{});
       uint8_t err = 0;
@@ -375,7 +426,6 @@ namespace currency
           }
     //  VARIANT_CASE_CONST(txin_confidential_gateway, in_cgw)
     //    has_only_native_coin_bare_inputs = false;
-    //    pseudo_outs_blinded_asset_ids.emplace_back(crypto::point_t(...).modify_mul8());
         VARIANT_CASE_OTHER()
           CHECK_AND_ASSERT_MES(false, false, "unexpected input type: " << in_v.type().name());
       VARIANT_SWITCH_END()
@@ -406,11 +456,13 @@ namespace currency
     if (has_native_coin_bare_inputs) // txin_gen, txin_to_key, txin_gateway(native)
       pseudo_outs_blinded_asset_ids.emplace_back(currency::native_coin_asset_id_pt); // additional ring member for native coin inputs
 
-    // add ring members for ZC inputs
+    // add ring members for confidential inputs
     for(const auto& sig : tx.signatures)
     {
       if (sig.type() == typeid(ZC_sig))
         pseudo_outs_blinded_asset_ids.emplace_back(crypto::point_t(boost::get<ZC_sig>(sig).pseudo_out_blinded_asset_id).modify_mul8());
+  //  if (... confidential gateway ...)
+  //    pseudo_outs_blinded_asset_ids.emplace_back(...);
     }
 
     // add ring member for asset emission
@@ -456,10 +508,10 @@ namespace currency
     return true;
   }
   //--------------------------------------------------------------------------------
-  bool generate_asset_surjection_proof(uint64_t tx_version, const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, zc_asset_surjection_proof& result)
+  bool generate_asset_surjection_proof(const transaction& tx, const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, zc_asset_surjection_proof& result)
   {
-    if (tx_version >= TRANSACTION_VERSION_POST_HF6)
-      return generate_asset_surjection_proof_hf6(context_hash, has_non_zc_inputs, ogc, result);
+    if (tx.version >= TRANSACTION_VERSION_POST_HF6)
+      return generate_asset_surjection_proof_hf6(tx, context_hash, has_non_zc_inputs, ogc, result);
 
     return generate_asset_surjection_proof_hf4(context_hash, has_non_zc_inputs, ogc, result);
   }
@@ -765,7 +817,7 @@ namespace currency
 
       // asset surjection proof
       currency::zc_asset_surjection_proof asp{};
-      bool r = generate_asset_surjection_proof(tx.version, tx_id, true, tx_gen_context, asp);
+      bool r = generate_asset_surjection_proof(tx, tx_id, true, tx_gen_context, asp);
       CHECK_AND_ASSERT_MES(r, false, "generete_asset_surjection_proof failed");
       tx.proofs.emplace_back(std::move(asp));
 
@@ -1386,8 +1438,8 @@ namespace currency
     }
     tx.vout.push_back(out);
 
-    tgc.amounts[output_index]   = de.amount;
-    tgc.asset_ids[output_index] = currency::native_coin_asset_id_pt;
+    //tgc.amounts[output_index]   = de.amount;
+    //tgc.asset_ids[output_index] = currency::native_coin_asset_id_pt;
 
     return true;
   }
@@ -1487,13 +1539,22 @@ namespace currency
 
     const gateway_address_id_type& gwa = boost::get<gateway_address_id_type>(de.addr.front());
 
-    tx_out_gateway gw_out = AUTO_VAL_INIT(gw_out);
-    gw_out.gateway_addr = gwa;
-    gw_out.amount = de.amount;
-    gw_out.asset_id = de.asset_id;
-    gw_out.payment_id = de.payment_id; //@#@ payment id is open for now, need to figure out how to encrypt it
+    crypto::public_key derivation = (crypto::scalar_t(tgc.tx_key.sec) * crypto::point_t(gwa)).modify_mul8().to_public_key(); // d = 8 * r * V_gw
+    crypto::scalar_t h = 0;
+    crypto::derivation_to_scalar((const crypto::key_derivation&)derivation, output_index, h.as_secret_key()); // h = Hs(8 * r * V_gw, i)
+    crypto::scalar_t amount_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_GW_OUT_AMOUNT_MASK, h);
+    crypto::point_t asset_id_pt = crypto::point_t(de.asset_id);
 
-    tx.vout.push_back(gw_out);
+    tx_out_gateway gw_out{};
+    gw_out.gateway_addr = gwa;
+    gw_out.amount       = de.amount;
+    gw_out.asset_id     = (crypto::c_scalar_1div8 * asset_id_pt).to_public_key();
+    gw_out.payment_id   = de.payment_id ^ amount_mask.m_u64[1];
+
+    tx.vout.push_back(std::move(gw_out));
+
+    tgc.amounts[output_index]               = de.amount;
+    tgc.asset_ids[output_index]             = asset_id_pt;
     return true;
   }
   //---------------------------------------------------------------
@@ -3109,7 +3170,7 @@ namespace currency
     {
       // asset surjection proof
       currency::zc_asset_surjection_proof asp{};
-      bool r = generate_asset_surjection_proof(tx.version, tx_prefix_hash, has_non_zc_inputs, gen_context, asp);
+      bool r = generate_asset_surjection_proof(tx, tx_prefix_hash, has_non_zc_inputs, gen_context, asp);
       CHECK_AND_ASSERT_MES(r, false, "generete_asset_surjection_proof failed");
       tx.proofs.emplace_back(std::move(asp));
 

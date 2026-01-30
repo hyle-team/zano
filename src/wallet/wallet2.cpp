@@ -5082,7 +5082,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
 
   // asset surjection proof
   currency::zc_asset_surjection_proof asp{};
-  r = generate_asset_surjection_proof(b.miner_tx.version, miner_tx_id, false, miner_tx_tgc, asp);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs 
+  r = generate_asset_surjection_proof(b.miner_tx, miner_tx_id, false, miner_tx_tgc, asp);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs 
   WLT_CHECK_AND_ASSERT_MES(r, false, "generete_asset_surjection_proof failed");
   b.miner_tx.proofs.emplace_back(std::move(asp));
 

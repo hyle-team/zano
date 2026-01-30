@@ -268,7 +268,7 @@ namespace currency
     crypto::scalar_vec_t amounts;                                                     // generate_zc_outs_range_proof
     crypto::scalar_vec_t amount_blinding_masks;                                       // generate_zc_outs_range_proof
 
-    // per zc input data
+    // per confidential (zc) input data
     std::vector<crypto::point_t> pseudo_outs_blinded_asset_ids;                       // generate_asset_surjection_proof
     crypto::scalar_vec_t pseudo_outs_plus_real_out_blinding_masks; // r_pi + r'_j     // generate_asset_surjection_proof
     std::vector<crypto::point_t> real_zc_ins_asset_ids;            // H_i             // generate_asset_surjection_proof

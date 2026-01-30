@@ -159,6 +159,7 @@ namespace currency
   bool verify_balance_proof_hf4(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx /* = 0 */)
   {
     CHECK_AND_ASSERT_MES(tx.version >= TRANSACTION_VERSION_POST_HF4, false, "unexpected tx version: " << tx.version);
+
     zc_balance_proof balance_proof = AUTO_VAL_INIT(balance_proof);
     bool r = get_type_in_variant_container<zc_balance_proof>(tx.proofs, balance_proof);
     CHECK_AND_ASSERT_MES(r, false, "zc_balance_proof is missing in tx proofs");
