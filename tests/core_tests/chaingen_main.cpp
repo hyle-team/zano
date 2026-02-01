@@ -1430,8 +1430,6 @@ int main(int argc, char* argv[])
   if (!r)
     return 1;
 
-  g_runner = std::make_unique<parallel_test_runner>(g_vm);
-
   if (command_line::get_arg(g_vm, command_line::arg_help))
   {
     std::cout << desc_options << std::endl;
@@ -1456,7 +1454,16 @@ int main(int argc, char* argv[])
   const int32_t worker_id = command_line::get_arg(g_vm, arg_worker_id);
   const bool is_worker = (worker_id >= 0);
 
-  if (is_worker)
+  const uint32_t processes = command_line::get_arg(g_vm, arg_processes);
+  const bool multiprocess_enabled =
+    is_worker || (command_line::has_arg(g_vm, arg_processes) && processes > 1);
+
+  if (multiprocess_enabled)
+    g_runner = std::make_unique<parallel_test_runner>(g_vm);
+  else
+    g_runner.reset();
+
+  if (is_worker && multiprocess_enabled)
     init_shared_fail_report_if_needed();
 
   bool skip_all_till_the_end = false;
@@ -1539,9 +1546,12 @@ int main(int argc, char* argv[])
       is_test_eligible_to_run,
       is_hf_test_eligible_to_run);
 
-    const int parent_rc = g_runner->run_parent_if_needed(argc, argv, g_test_jobs);
-    if (parent_rc != parallel_test_runner::k_not_parent)
-      return parent_rc;
+    if (multiprocess_enabled)
+    {
+      const int parent_rc = g_runner->run_parent_if_needed(argc, argv, g_test_jobs);
+      if (parent_rc != parallel_test_runner::k_not_parent)
+        return parent_rc;
+    }
 
     // run
     run_registered_tests(
@@ -1604,7 +1614,8 @@ int main(int argc, char* argv[])
       rep.skip_all_till_the_end = skip_all_till_the_end;
       rep.exit_code = (serious_failures_count == 0 ? 0 : 1);
 
-      (void)g_runner->write_worker_report(rep);
+      if (g_runner)
+        (void)g_runner->write_worker_report(rep);
     }
 
     if (!is_worker)
