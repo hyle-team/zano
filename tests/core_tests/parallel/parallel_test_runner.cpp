@@ -5,6 +5,8 @@
 #include <mutex>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/process.hpp>
+#include <unordered_set>
+#include <algorithm>
 
 #include "parallel_test_runner.h"
 #include "../chaingen_args.h"
@@ -99,7 +101,7 @@ std::vector<std::string> parallel_test_runner::build_base_args_without_worker_sp
 
 void fill_postponed_tests_set(std::set<std::string>& postponed_tests);
 
-int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t processes, uint64_t wall_time_ms, const coretests_shm::shared_state* shm_state) const
+int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t processes, uint64_t wall_time_ms, const coretests_shm::shared_state* shm_state, const std::vector<test_job>& jobs) const
 {
   std::vector<worker_report> reps;
   reps.reserve(processes);
@@ -122,7 +124,7 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
   size_t total_unique_tests_count = 0;
 
   std::set<std::string> failed_tests_union;
-
+  std::unordered_set<std::string> executed_tests_union;
   for (const auto& r : reps)
   {
     if (r.exit_code != 0)
@@ -131,6 +133,8 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
     total_tests_count += r.tests_count;
     total_unique_tests_count += r.unique_tests_count;
     failed_tests_union.insert(r.failed_tests.begin(), r.failed_tests.end());
+    for (const auto& it : r.tests_running_time)
+      executed_tests_union.insert(it.first);
   }
 
   std::set<std::string> postponed_tests;
@@ -147,7 +151,35 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
       const coretests_shm::fail_entry& e = shm_state->entries[j];
       if (e.test_name[0] != '\0')
         failed_tests_union.insert(std::string(e.test_name));
+      if (e.test_name[0] != '\0')
+        executed_tests_union.insert(std::string(e.test_name));
     }
+  }
+
+  if (!jobs.empty())
+  {
+    for (const auto& j : jobs)
+    {
+      const bool failed = failed_tests_union.count(j.name) != 0;
+      const bool executed = executed_tests_union.count(j.name) != 0;
+
+      if (failed)
+        std::cout << concolor::magenta << j.name << concolor::normal << std::endl;
+      else if (executed)
+        std::cout << concolor::green << j.name << concolor::normal << std::endl;
+      else
+        std::cout << concolor::yellow << j.name << concolor::normal << std::endl;
+    }
+    std::cout << std::endl;
+  }
+
+  // 2) Postponed tests list
+  if (!postponed_tests.empty())
+  {
+    std::cout << concolor::yellow << postponed_tests.size() << " POSTPONED TESTS:" << std::endl;
+    for (const auto& el : postponed_tests)
+      std::cout << "  " << el << std::endl;
+    std::cout << concolor::normal << std::endl;
   }
 
   size_t failed_postponed_tests_count = 0;
@@ -158,18 +190,13 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
   const size_t serious_failures_count = failed_tests_union.size() >= failed_postponed_tests_count ? (failed_tests_union.size() - failed_postponed_tests_count) : 0;
   const bool ok = (!any_missing && failed_workers == 0 && serious_failures_count == 0);
 
-  std::cout << (ok ? concolor::green : concolor::magenta);
-  std::cout << "\nREPORT (aggregated):\n";
-  std::cout << "  Workers:          " << processes << "\n";
-  if (any_missing)
-    std::cout << "  Warning:          some worker reports are missing\n";
-  std::cout << "  Worker failures:  " << failed_workers << "\n";
-
-  std::cout << "  Unique tests run: " << total_unique_tests_count << "\n";
-  std::cout << "  Total tests run:  " << total_tests_count << "\n";
-  std::cout << "  Failures:         " << serious_failures_count << " (postponed failures: " << failed_postponed_tests_count << ")\n";
-  std::cout << "  Postponed:        " << postponed_tests.size() << "\n";
-  std::cout << "  Total time:       " << (wall_time_ms / MS_PER_SECOND) << " s. (" << (total_tests_count > 0 ? (wall_time_ms / total_tests_count) : 0) << " ms per test in average)\n";
+  std::cout << (serious_failures_count == 0 ? concolor::green : concolor::magenta);
+  std::cout << "\nREPORT:\n";
+  std::cout << "  Unique tests run: " << total_unique_tests_count << std::endl;
+  std::cout << "  Total tests run:  " << total_tests_count << std::endl;
+  std::cout << "  Failures:         " << serious_failures_count << " (postponed failures: " << failed_postponed_tests_count << ")" << std::endl;
+  std::cout << "  Postponed:        " << postponed_tests.size() << std::endl;
+  std::cout << "  Total time:       " << (wall_time_ms / MS_PER_SECOND) << " s. (" << (total_tests_count > 0 ? (wall_time_ms / total_tests_count) : 0) << " ms per test in average)" << std::endl;
 
   if (!failed_tests_union.empty())
   {
@@ -447,7 +474,7 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std
     const auto wall_end = std::chrono::steady_clock::now();
     const uint64_t wall_time_ms = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(wall_end - wall_start).count());
 
-    rc = print_aggregated_report_and_return_rc(processes, wall_time_ms, st);
+    rc = print_aggregated_report_and_return_rc(processes, wall_time_ms, st, g_test_jobs);
 
     if (failed_workers != 0 && rc == 0)
       rc = 1;
