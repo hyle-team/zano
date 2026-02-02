@@ -5221,7 +5221,7 @@ bool blockchain_storage::change_gateway_balance(const crypto::hash& tx_id, const
 
   if (increase)
   {
-    CHECK_AND_ASSERT_MES(balance_entry.amount > std::numeric_limits<uint64_t>::max() - amount, false, "Uint64 overflow, gateway address " << gw_addr << ", tx: " << tx_id << ", asset_id: " << asset_id);
+    CHECK_AND_ASSERT_MES(balance_entry.amount <= std::numeric_limits<uint64_t>::max() - amount, false, "Uint64 overflow, gateway address " << gw_addr << ", tx: " << tx_id << ", asset_id: " << asset_id);
     balance_entry.amount += amount;
   }
   else
@@ -5244,11 +5244,10 @@ bool blockchain_storage::process_gateway_input(const crypto::hash& tx_id, const 
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
-  crypto::point_t asset_id_pt = crypto::c_point_0;
-  CHECK_AND_ASSERT_MES(asset_id_pt.from_public_key(in_gw.asset_id), false, "invalid in_gw.asset_id, tx: " << tx_id);
-  asset_id_pt.modify_mul8();
+  crypto::public_key asset_id{};
+  CHECK_AND_ASSERT_MES(crypto::pub_key_mul8(in_gw.asset_id, asset_id), false, "invalid in_gw.asset_id, tx: " << tx_id);
 
-  bool r = change_gateway_balance(tx_id, in_gw.gateway_addr, asset_id_pt.to_public_key(), in_gw.amount, false /* false = decrease */);
+  bool r = change_gateway_balance(tx_id, in_gw.gateway_addr, asset_id, in_gw.amount, false /* false = decrease */);
   return r;
 }
 //------------------------------------------------------------------
@@ -5256,11 +5255,10 @@ bool blockchain_storage::unprocess_gateway_input(const txin_gateway& in_gw)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
-  crypto::point_t asset_id_pt = crypto::c_point_0;
-  CHECK_AND_ASSERT_MES(asset_id_pt.from_public_key(in_gw.asset_id), false, "invalid in_gw.asset_id, tx: " /* TODO << tx_id */);
-  asset_id_pt.modify_mul8();
+  crypto::public_key asset_id{};
+  CHECK_AND_ASSERT_MES(crypto::pub_key_mul8(in_gw.asset_id, asset_id), false, "invalid in_gw.asset_id, tx: " /* TODO << tx_id */);
 
-  bool r = change_gateway_balance(crypto::hash{}, in_gw.gateway_addr, asset_id_pt.to_public_key(), in_gw.amount, true /* true = increase */);
+  bool r = change_gateway_balance(crypto::hash{}, in_gw.gateway_addr, asset_id, in_gw.amount, true /* true = increase */);
   return r;
 }
 //------------------------------------------------------------------
@@ -5268,11 +5266,10 @@ bool blockchain_storage::process_gateway_ouput(const crypto::hash& tx_id, const 
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
-  crypto::point_t asset_id_pt = crypto::c_point_0;
-  CHECK_AND_ASSERT_MES(asset_id_pt.from_public_key(out_gw.asset_id), false, "invalid out_gw.asset_id, tx: " << tx_id);
-  asset_id_pt.modify_mul8();
+  crypto::public_key asset_id{};
+  CHECK_AND_ASSERT_MES(crypto::pub_key_mul8(out_gw.asset_id, asset_id), false, "invalid out_gw.asset_id, tx: " << tx_id);
 
-  bool r = change_gateway_balance(tx_id, out_gw.gateway_addr, asset_id_pt.to_public_key(), out_gw.amount, true /* true = increase */);
+  bool r = change_gateway_balance(tx_id, out_gw.gateway_addr, asset_id, out_gw.amount, true /* true = increase */);
   return r;
 }
 //------------------------------------------------------------------
@@ -5280,11 +5277,10 @@ bool blockchain_storage::unprocess_gateway_output(const tx_out_gateway& out_gw)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
-  crypto::point_t asset_id_pt = crypto::c_point_0;
-  CHECK_AND_ASSERT_MES(asset_id_pt.from_public_key(out_gw.asset_id), false, "invalid out_gw.asset_id, tx: " /* TODO << tx_id */);
-  asset_id_pt.modify_mul8();
+  crypto::public_key asset_id{};
+  CHECK_AND_ASSERT_MES(crypto::pub_key_mul8(out_gw.asset_id, asset_id), false, "invalid out_gw.asset_id, tx: " /* TODO << tx_id */);
 
-  bool r = change_gateway_balance(crypto::hash{}, out_gw.gateway_addr, asset_id_pt.to_public_key(), out_gw.amount, false /* false = decrease */);
+  bool r = change_gateway_balance(crypto::hash{}, out_gw.gateway_addr, asset_id, out_gw.amount, false /* false = decrease */);
   return r;
 }
 
