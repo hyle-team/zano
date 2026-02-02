@@ -4127,7 +4127,7 @@ bool blockchain_storage::push_transaction_to_global_outs_index(const transaction
       global_indexes.push_back(m_db_outputs.get_item_size(0) - 1);
     VARIANT_CASE_CONST(tx_out_gateway, togw)
       bool r = process_gateway_ouput(togw);
-    CHECK_AND_ASSERT_MES(r, false, "Failed to process gateway output");
+      CHECK_AND_ASSERT_MES(r, false, "Failed to process gateway output");
     VARIANT_CASE_THROW_ON_OTHER();
     VARIANT_SWITCH_END();
     ++output_index;
