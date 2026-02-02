@@ -4126,7 +4126,8 @@ bool blockchain_storage::push_transaction_to_global_outs_index(const transaction
       m_db_outputs.push_back_item(0, global_output_entry::construct(tx_id, output_index));
       global_indexes.push_back(m_db_outputs.get_item_size(0) - 1);
     VARIANT_CASE_CONST(tx_out_gateway, togw)
-      // do nothing (gw outs don't affect global indexes)
+      bool r = process_gateway_ouput(togw);
+    CHECK_AND_ASSERT_MES(r, false, "Failed to process gateway output");
     VARIANT_CASE_THROW_ON_OTHER();
     VARIANT_SWITCH_END();
     ++output_index;
@@ -4205,6 +4206,9 @@ bool blockchain_storage::pop_transaction_from_global_index(const transaction& tx
     VARIANT_CASE_CONST(tx_out_zarcanum, toz)
       if (!do_pop_output(i, 0))
         return false;
+    VARIANT_CASE_CONST(tx_out_gateway, togw)
+      bool r = unprocess_gateway_output(togw);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to unprocess gateway output");
     VARIANT_CASE_THROW_ON_OTHER();
     VARIANT_SWITCH_END();
     --i;
