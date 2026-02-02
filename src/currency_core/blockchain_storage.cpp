@@ -4100,7 +4100,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, block_verif
   return handle_block_to_main_chain(bl, id, bvc);
 }
 //------------------------------------------------------------------
-bool blockchain_storage::push_transaction_to_global_outs_index(const transaction& tx, const crypto::hash& tx_id, std::vector<uint64_t>& global_indexes)
+bool blockchain_storage::push_transaction_to_global_outs_index(const transaction& tx, const crypto::hash& tx_id, std::vector<uint64_t>& global_indexes, const crypto::hash& bl_id, const uint64_t bl_height)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   size_t output_index = 0;
@@ -4126,7 +4126,7 @@ bool blockchain_storage::push_transaction_to_global_outs_index(const transaction
       m_db_outputs.push_back_item(0, global_output_entry::construct(tx_id, output_index));
       global_indexes.push_back(m_db_outputs.get_item_size(0) - 1);
     VARIANT_CASE_CONST(tx_out_gateway, togw)
-      bool r = process_gateway_ouput(togw);
+      bool r = process_gateway_ouput(tx_id, bl_id, bl_height, togw);
       CHECK_AND_ASSERT_MES(r, false, "Failed to process gateway output");
     VARIANT_CASE_THROW_ON_OTHER();
     VARIANT_SWITCH_END();
@@ -5428,7 +5428,7 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   ch_e.m_keeper_block_height = bl_height;
   ch_e.m_spent_flags.resize(tx.vout.size(), false);
   ch_e.tx = tx;
-  r = push_transaction_to_global_outs_index(tx, tx_id, ch_e.m_global_output_indexes);
+  r = push_transaction_to_global_outs_index(tx, tx_id, ch_e.m_global_output_indexes, bl_id, bl_height);
   CHECK_AND_ASSERT_MES(r, false, "failed to return push_transaction_to_global_outs_index tx id " << tx_id);
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_push_global_index);
   
