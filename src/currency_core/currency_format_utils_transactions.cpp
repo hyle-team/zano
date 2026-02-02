@@ -84,78 +84,6 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------
-  bool generate_tx_balance_proof_hf6(const transaction &tx, const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, currency::zc_balance_proof& proof)
-  {
-    CHECK_AND_ASSERT_MES(tx.version >= TRANSACTION_VERSION_POST_HF6, false, "unsupported tx.version: " << tx.version);
-    CHECK_AND_ASSERT_MES(count_type_in_variant_container<zc_balance_proof>(tx.proofs) == 0, false, "zc_balance_proof is already present");
-    bool r = false;
-
-    uint64_t bare_inputs_sum = block_reward_for_miner_tx;
-    size_t zc_inputs_count = 0;
-    for(auto& vin : tx.vin)
-    {
-      VARIANT_SWITCH_BEGIN(vin);
-      VARIANT_CASE_CONST(txin_to_key, tk)
-        bare_inputs_sum += tk.amount;
-      VARIANT_CASE_CONST(txin_multisig, ms);
-        //bare_inputs_sum += ms.amount;
-        CHECK_AND_ASSERT_MES(false, false, "unexpected txin_multisig input"); // TODO @#@# check support for multisig inputs
-      VARIANT_CASE_CONST(txin_zc_input, foo);
-        ++zc_inputs_count;
-      VARIANT_SWITCH_END();
-    }
-
-    uint64_t fee = 0;
-    CHECK_AND_ASSERT_MES(get_tx_fee(tx, fee), false, "unable to get tx fee");
-
-    if (zc_inputs_count == 0)
-    {
-      // no ZC inputs => all inputs are bare inputs; all outputs have explicit asset_id = native_coin_asset_id; in main balance equation we only need to cancel out G-component
-      CHECK_AND_ASSERT_MES(count_type_in_variant_container<ZC_sig>(tx.signatures) == 0, false, "ZC_sig is unexpected");
-      CHECK_AND_ASSERT_MES(ogc.asset_id_blinding_mask_x_amount_sum.is_zero(), false, "it's expected that all asset ids for this tx are obvious and thus explicit"); // because this tx has no ZC inputs => all outs clearly have native asset id
-      CHECK_AND_ASSERT_MES(ogc.ao_amount_blinding_mask.is_zero(), false, "asset emmission is not allowed for txs without ZC inputs");
-
-      // (sum(bare inputs' amounts) - fee) * H - sum(outputs' commitments) = lin(G)
-
-      crypto::point_t commitment_to_zero = (crypto::scalar_t(bare_inputs_sum) - crypto::scalar_t(fee)) * currency::native_coin_asset_id_pt - ogc.amount_commitments_sum;
-      crypto::scalar_t secret_x = -ogc.amount_blinding_masks_sum;
-#ifndef NDEBUG
-      CHECK_AND_ASSERT_MES(commitment_to_zero == secret_x * crypto::c_point_G, false, "internal error: commitment_to_zero is malformed (G)");
-#endif
-      r = crypto::generate_double_schnorr_sig<crypto::gt_G, crypto::gt_G>(tx_id, commitment_to_zero, secret_x, ogc.tx_pub_key_p, ogc.tx_key.sec, proof.dss);
-      CHECK_AND_ASSERT_MES(r, false, "generate_double_schnorr_sig (G, G) failed");
-    }
-    else // i.e. zc_inputs_count != 0
-    {
-      // there're ZC inputs => in main balance equation we only need to cancel out X-component, because G-component cancelled out by choosing blinding mask for the last pseudo out amount commitment
-
-      // (sum(bare inputs' amounts) - fee) * H + sum(pseudo out amount commitments) + asset_op_commitment - sum(outputs' commitments) = lin(X)
-
-      crypto::point_t commitment_to_zero = (crypto::scalar_t(bare_inputs_sum) - crypto::scalar_t(fee)) * currency::native_coin_asset_id_pt + ogc.pseudo_out_amount_commitments_sum + (ogc.ao_commitment_in_outputs ? -ogc.ao_amount_commitment : ogc.ao_amount_commitment) - ogc.amount_commitments_sum;
-      crypto::scalar_t secret_x = ogc.real_in_asset_id_blinding_mask_x_amount_sum - ogc.asset_id_blinding_mask_x_amount_sum;
-
-      DBG_VAL_PRINT(bare_inputs_sum);
-      DBG_VAL_PRINT(fee);
-      DBG_VAL_PRINT(ogc.pseudo_out_amount_commitments_sum);
-      DBG_VAL_PRINT((int)ogc.ao_commitment_in_outputs);
-      DBG_VAL_PRINT(ogc.ao_amount_commitment);
-      DBG_VAL_PRINT(ogc.amount_commitments_sum);
-      DBG_VAL_PRINT(ogc.real_in_asset_id_blinding_mask_x_amount_sum);
-      DBG_VAL_PRINT(ogc.asset_id_blinding_mask_x_amount_sum);
-      DBG_VAL_PRINT(commitment_to_zero);
-      DBG_VAL_PRINT(secret_x);
-
-#ifndef NDEBUG
-      bool commitment_to_zero_is_sane = commitment_to_zero == secret_x * crypto::c_point_X;
-      CHECK_AND_ASSERT_MES(commitment_to_zero_is_sane, false, "internal error: commitment_to_zero is malformed (X)");
-#endif
-      r = crypto::generate_double_schnorr_sig<crypto::gt_X, crypto::gt_G>(tx_id, commitment_to_zero, secret_x, ogc.tx_pub_key_p, ogc.tx_key.sec, proof.dss);
-      CHECK_AND_ASSERT_MES(r, false, "generate_double_schnorr_sig (X, G) failed");
-    }
-
-    return true;
-  }
-  //------------------------------------------------------------------
   bool verify_balance_proof_hf4(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx /* = 0 */)
   {
     CHECK_AND_ASSERT_MES(tx.version >= TRANSACTION_VERSION_POST_HF4, false, "unexpected tx version: " << tx.version);
@@ -252,6 +180,123 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------
+  bool generate_tx_balance_proof_hf6(const transaction &tx, const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, currency::zc_balance_proof& proof)
+  {
+    CHECK_AND_ASSERT_MES(tx.version >= TRANSACTION_VERSION_POST_HF6, false, "unsupported tx.version: " << tx.version);
+    CHECK_AND_ASSERT_MES(count_type_in_variant_container<zc_balance_proof>(tx.proofs) == 0, false, "zc_balance_proof is already present");
+    bool r = false;
+
+    // inputs
+    uint64_t bare_inputs_native_amounts_sum = block_reward_for_miner_tx;
+    crypto::point_t bare_inputs_commitments_sum = crypto::c_point_0;
+    bool has_only_native_coin_bare_inputs = true; // txin_to_key, bgw native
+    bool has_native_coin_bare_inputs = false;
+    size_t confidential_inputs_count = 0;
+    for(const auto& in_v : tx.vin)
+    {
+      VARIANT_SWITCH_BEGIN(in_v)
+        VARIANT_CASE_CONST(txin_gen, in_g)
+          has_native_coin_bare_inputs = true;
+        VARIANT_CASE_CONST(txin_to_key, in_tk)
+          bare_inputs_native_amounts_sum += in_tk.amount;
+          has_native_coin_bare_inputs = true;
+        VARIANT_CASE_CONST(txin_zc_input, in_zc)
+          has_only_native_coin_bare_inputs = false;
+          ++confidential_inputs_count;
+        VARIANT_CASE_CONST(txin_gateway, in_gw)
+          if (in_gw.asset_id == native_coin_asset_id_1div8)
+          {
+            has_native_coin_bare_inputs = true;
+            bare_inputs_native_amounts_sum += in_gw.amount;
+          }
+          else
+          {
+            has_only_native_coin_bare_inputs = false;
+            bare_inputs_commitments_sum += in_gw.amount * crypto::point_t(in_gw.asset_id).modify_mul8();
+          }
+    //  VARIANT_CASE_CONST(txin_confidential_gateway, in_cgw)
+    //    has_only_native_coin_bare_inputs = false;
+    //    ++confidential_inputs_count;
+        VARIANT_CASE_OTHER()
+          CHECK_AND_ASSERT_MES(false, false, "unexpected input type: " << in_v.type().name());
+      VARIANT_SWITCH_END()
+    }
+
+    // outputs
+    
+    uint64_t bare_outs_native_amounts_sum = 0;
+    crypto::point_t bare_outs_commitments_sum = crypto::c_point_0;
+    size_t confidential_outs_count = 0;
+    for(size_t j = 0; j < tx.vout.size(); ++j)
+    {
+      const auto& out_v = tx.vout[j];
+      VARIANT_SWITCH_BEGIN(out_v)
+        VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
+          ++confidential_outs_count;
+        VARIANT_CASE_CONST(tx_out_gateway, out_gw)
+          if (out_gw.asset_id == native_coin_asset_id_1div8)
+            bare_outs_native_amounts_sum += out_gw.amount;
+          else
+            bare_outs_commitments_sum += out_gw.amount * crypto::point_t(out_gw.asset_id).modify_mul8(); // consider moving to construct_tx_out_gateway()
+    //  VARIANT_CASE_CONST(tx_out_confidential_gateway, out_cgw)
+    //    ++confidential_outs_count;
+        VARIANT_CASE_OTHER()
+          // nothing
+      VARIANT_SWITCH_END()
+    }
+
+    uint64_t fee = 0;
+    CHECK_AND_ASSERT_MES(get_tx_fee(tx, fee), false, "unable to get tx fee");
+
+    if (confidential_inputs_count == 0)
+    {
+      // no confidential inputs => all inputs are bare inputs; all outputs have explicit asset_id = native_coin_asset_id; in main balance equation we only need to cancel out G-component
+      CHECK_AND_ASSERT_MES(count_type_in_variant_container<ZC_sig>(tx.signatures) == 0, false, "ZC_sig is unexpected");
+      CHECK_AND_ASSERT_MES(ogc.asset_id_blinding_mask_x_amount_sum.is_zero(), false, "it's expected that all asset ids for this tx are obvious and thus explicit"); // because this tx has no ZC inputs => all outs clearly have native asset id
+      CHECK_AND_ASSERT_MES(ogc.ao_amount_blinding_mask.is_zero(), false, "asset emmission is not allowed for txs without ZC inputs");
+
+      // (sum(bare inputs' amounts) - fee) * H - sum(outputs' commitments) = lin(G)
+
+      crypto::point_t commitment_to_zero = (crypto::scalar_t(bare_inputs_native_amounts_sum) - crypto::scalar_t(fee)) * currency::native_coin_asset_id_pt - ogc.amount_commitments_sum;
+      crypto::scalar_t secret_x = -ogc.amount_blinding_masks_sum;
+#ifndef NDEBUG
+      CHECK_AND_ASSERT_MES(commitment_to_zero == secret_x * crypto::c_point_G, false, "internal error: commitment_to_zero is malformed (G)");
+#endif
+      r = crypto::generate_double_schnorr_sig<crypto::gt_G, crypto::gt_G>(tx_id, commitment_to_zero, secret_x, ogc.tx_pub_key_p, ogc.tx_key.sec, proof.dss);
+      CHECK_AND_ASSERT_MES(r, false, "generate_double_schnorr_sig (G, G) failed");
+    }
+    else // i.e. confidential_inputs_count != 0
+    {
+      // there're confidential inputs => in main balance equation we only need to cancel out X-component, because G-component cancelled out by choosing blinding mask for the last pseudo out amount commitment
+
+      // sum(bare non-native inputs' commitments) + (sum(bare inputs' amounts) - fee - sum(bare outs' amount)) * H + sum(pseudo out amount commitments) + asset_op_commitment - sum(outputs' commitments) - sum(bare non-native outs' commitments) = lin(X)
+
+      crypto::point_t commitment_to_zero = (crypto::scalar_t(bare_inputs_native_amounts_sum) - crypto::scalar_t(fee) - crypto::scalar_t(bare_outs_native_amounts_sum)) * currency::native_coin_asset_id_pt
+        + ogc.pseudo_out_amount_commitments_sum + (ogc.ao_commitment_in_outputs ? -ogc.ao_amount_commitment : ogc.ao_amount_commitment) - ogc.amount_commitments_sum - bare_outs_commitments_sum;
+      crypto::scalar_t secret_x = ogc.real_in_asset_id_blinding_mask_x_amount_sum - ogc.asset_id_blinding_mask_x_amount_sum;
+
+      DBG_VAL_PRINT(bare_inputs_native_amounts_sum);
+      DBG_VAL_PRINT(fee);
+      DBG_VAL_PRINT(ogc.pseudo_out_amount_commitments_sum);
+      DBG_VAL_PRINT((int)ogc.ao_commitment_in_outputs);
+      DBG_VAL_PRINT(ogc.ao_amount_commitment);
+      DBG_VAL_PRINT(ogc.amount_commitments_sum);
+      DBG_VAL_PRINT(ogc.real_in_asset_id_blinding_mask_x_amount_sum);
+      DBG_VAL_PRINT(ogc.asset_id_blinding_mask_x_amount_sum);
+      DBG_VAL_PRINT(commitment_to_zero);
+      DBG_VAL_PRINT(secret_x);
+
+#ifndef NDEBUG
+      bool commitment_to_zero_is_sane = commitment_to_zero == secret_x * crypto::c_point_X;
+      CHECK_AND_ASSERT_MES(commitment_to_zero_is_sane, false, "internal error: commitment_to_zero is malformed (X)");
+#endif
+      r = crypto::generate_double_schnorr_sig<crypto::gt_X, crypto::gt_G>(tx_id, commitment_to_zero, secret_x, ogc.tx_pub_key_p, ogc.tx_key.sec, proof.dss);
+      CHECK_AND_ASSERT_MES(r, false, "generate_double_schnorr_sig (X, G) failed");
+    }
+
+    return true;
+  }
+  //------------------------------------------------------------------
   bool verify_balance_proof_hf6(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx /* = 0 */)
   {
     CHECK_AND_ASSERT_MES(tx.version >= TRANSACTION_VERSION_POST_HF6, false, "unexpected tx version: " << tx.version);
@@ -262,25 +307,49 @@ namespace currency
     crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(tx);
 
     size_t zc_inputs_count = 0;
-    uint64_t bare_inputs_sum = additional_inputs_amount_and_fees_for_mining_tx;
-    for(auto& vin : tx.vin)
+    size_t confidential_inputs_count = 0;
+    uint64_t bare_inputs_native_amounts_sum = additional_inputs_amount_and_fees_for_mining_tx;
+    crypto::point_t inputs_commitments_sum = crypto::c_point_0;
+    for(const auto& in_v : tx.vin)
     {
-      VARIANT_SWITCH_BEGIN(vin);
-      VARIANT_CASE_CONST(txin_to_key, tk)
-        bare_inputs_sum += tk.amount;
-      VARIANT_CASE_CONST(txin_multisig, ms);
-        bare_inputs_sum += ms.amount;
-      VARIANT_CASE_CONST(txin_zc_input, foo);
-        ++zc_inputs_count;
-      VARIANT_SWITCH_END();
+      VARIANT_SWITCH_BEGIN(in_v)
+        VARIANT_CASE_CONST(txin_gen, in_g)
+        VARIANT_CASE_CONST(txin_to_key, in_tk)
+          bare_inputs_native_amounts_sum += in_tk.amount;
+        VARIANT_CASE_CONST(txin_zc_input, in_zc)
+          ++zc_inputs_count;
+          ++confidential_inputs_count;
+        VARIANT_CASE_CONST(txin_gateway, in_gw)
+          if (in_gw.asset_id == native_coin_asset_id_1div8)
+            bare_inputs_native_amounts_sum += in_gw.amount;
+          else
+            inputs_commitments_sum += in_gw.amount * crypto::point_t(in_gw.asset_id); // *1/8
+    //  VARIANT_CASE_CONST(txin_confidential_gateway, in_cgw)
+    //    ++confidential_inputs_count;
+    //    inputs_commitments_sum += crypto::point_t(in_cgw.amount_commitment); // *1/8
+        VARIANT_CASE_OTHER()
+          CHECK_AND_ASSERT_MES(false, false, "unexpected input type: " << in_v.type().name());
+      VARIANT_SWITCH_END()
     }
 
-    crypto::point_t outs_commitments_sum = crypto::c_point_0; // TODO: consider adding additional commitments / spends / burns here
-    for(auto& vout : tx.vout)
+    uint64_t bare_outs_native_amounts_sum = 0;
+    crypto::point_t outs_commitments_sum = crypto::c_point_0; // *1/8
+    for(size_t j = 0; j < tx.vout.size(); ++j)
     {
-      CHECK_AND_ASSERT_MES(vout.type() == typeid(tx_out_zarcanum), false, "unexpected type in outs: " << vout.type().name());
-      const tx_out_zarcanum& ozc = boost::get<tx_out_zarcanum>(vout);
-      outs_commitments_sum += crypto::point_t(ozc.amount_commitment); // amount_commitment premultiplied by 1/8
+      const auto& out_v = tx.vout[j];
+      VARIANT_SWITCH_BEGIN(out_v)
+        VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
+          outs_commitments_sum += crypto::point_t(out_zc.amount_commitment); // amount_commitment premultiplied by 1/8
+        VARIANT_CASE_CONST(tx_out_gateway, out_gw)
+          if (out_gw.asset_id == native_coin_asset_id_1div8)
+            bare_outs_native_amounts_sum += out_gw.amount;
+          else
+            outs_commitments_sum += out_gw.amount * crypto::point_t(out_gw.asset_id); // *1/8
+    //  VARIANT_CASE_CONST(tx_out_confidential_gateway, out_cgw)
+    //    outs_commitments_sum += crypto::point_t(out_cgw.amount_commitment);
+        VARIANT_CASE_OTHER()
+          // nothing
+      VARIANT_SWITCH_END()
     }
 
     uint64_t fee = 0;
@@ -289,7 +358,6 @@ namespace currency
     CHECK_AND_ASSERT_MES(additional_inputs_amount_and_fees_for_mining_tx == 0 || fee == 0, false, "invalid tx: fee = " << print_money_brief(fee) <<
       ", additional inputs + fees = " << print_money_brief(additional_inputs_amount_and_fees_for_mining_tx));
 
-    crypto::point_t sum_of_pseudo_out_amount_commitments = crypto::c_point_0;
     // take into account generated/burnt assets
     asset_descriptor_operation ado = AUTO_VAL_INIT(ado);
     if (get_type_in_variant_container(tx.extra, ado))
@@ -298,7 +366,7 @@ namespace currency
       {
         CHECK_AND_ASSERT_MES(ado.opt_amount_commitment.has_value(), false, "opt_amount_commitment is missing");
         // amount_commitment supposed to be validated earlier in validate_asset_operation_amount_commitment()
-        sum_of_pseudo_out_amount_commitments += crypto::point_t(ado.opt_amount_commitment.get()); // *1/8
+        inputs_commitments_sum += crypto::point_t(ado.opt_amount_commitment.get()); // *1/8
       }
       else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
       {
@@ -311,19 +379,21 @@ namespace currency
     {
       VARIANT_SWITCH_BEGIN(sig_v);
       VARIANT_CASE_CONST(ZC_sig, zc_sig);
-        sum_of_pseudo_out_amount_commitments += crypto::point_t(zc_sig.pseudo_out_amount_commitment); // *1/8
+        inputs_commitments_sum += crypto::point_t(zc_sig.pseudo_out_amount_commitment); // *1/8
         ++zc_sigs_count;
       VARIANT_CASE_CONST(zarcanum_sig, sig);
-        sum_of_pseudo_out_amount_commitments += crypto::point_t(sig.pseudo_out_amount_commitment); // *1/8
+        inputs_commitments_sum += crypto::point_t(sig.pseudo_out_amount_commitment); // *1/8
         ++zc_sigs_count;
       VARIANT_SWITCH_END();
     }
+    CHECK_AND_ASSERT_MES(zc_inputs_count == zc_sigs_count, false, "zc inputs count (" << zc_inputs_count << ") and zc sigs count (" << zc_sigs_count << ") missmatch");
 
     outs_commitments_sum.modify_mul8();
-    sum_of_pseudo_out_amount_commitments.modify_mul8();
+    inputs_commitments_sum.modify_mul8();
 
-    // (sum(bare inputs' amounts) - fee) * H + sum(pseudo outs commitments for ZC inputs) - sum(outputs' commitments) = lin(X)  OR  = lin(G)
-    crypto::point_t commitment_to_zero = (crypto::scalar_t(bare_inputs_sum) - crypto::scalar_t(fee)) * currency::native_coin_asset_id_pt + sum_of_pseudo_out_amount_commitments - outs_commitments_sum;
+    // (sum(bare inputs' amounts) - fee - sum(bare outs' amounts)) * H + sum(pseudo outs commitments for ZC inputs) - sum(outputs' commitments) = lin(X)  OR  = lin(G)
+    crypto::point_t commitment_to_zero = (crypto::scalar_t(bare_inputs_native_amounts_sum) - crypto::scalar_t(fee) - crypto::scalar_t(bare_outs_native_amounts_sum)) * currency::native_coin_asset_id_pt
+      + inputs_commitments_sum - outs_commitments_sum;
 
     DBG_VAL_PRINT(tx_id);
     DBG_VAL_PRINT(tx_pub_key);
@@ -333,14 +403,15 @@ namespace currency
     DBG_VAL_PRINT(outs_commitments_sum);
     DBG_VAL_PRINT(commitment_to_zero);
 
-    CHECK_AND_ASSERT_MES(zc_inputs_count == zc_sigs_count, false, "zc inputs count (" << zc_inputs_count << ") and zc sigs count (" << zc_sigs_count << ") missmatch");
-    if (zc_inputs_count > 0)
+    if (confidential_inputs_count > 0)
     {
       r = crypto::verify_double_schnorr_sig<crypto::gt_X, crypto::gt_G>(tx_id, commitment_to_zero, tx_pub_key, balance_proof.dss);
       CHECK_AND_ASSERT_MES(r, false, "verify_double_schnorr_sig (X, G) is invalid");
     }
     else
     {
+      // TODO : or triple GXG proof
+
       r = crypto::verify_double_schnorr_sig<crypto::gt_G, crypto::gt_G>(tx_id, commitment_to_zero, tx_pub_key, balance_proof.dss);
       CHECK_AND_ASSERT_MES(r, false, "verify_double_schnorr_sig (G, G) is invalid");
     }
@@ -405,7 +476,9 @@ namespace currency
             res += o.amount;
         }
       VARIANT_CASE_CONST(tx_out_zarcanum, o)
-        //@#@# TODO obtain info about public burn of native coins in ZC outputs
+        // impossible to obtain amount from confidential output
+      VARIANT_CASE_CONST(tx_out_gateway, out_gw)
+        // TODO @#@# reconsider this -- sowle
       VARIANT_CASE_THROW_ON_OTHER();        
       VARIANT_SWITCH_END();
     }

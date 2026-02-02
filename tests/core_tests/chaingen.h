@@ -982,7 +982,7 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
   tx_generation_context tgc{};
   tgc.set_tx_key(txkey);
   tgc.tx_outs_attr = tx_outs_attr;
-  tgc.resize(0, shuffled_dsts.size());
+  //tgc.resize(0, shuffled_dsts.size());
   BOOST_FOREACH(const currency::tx_destination_entry& dst_entr, shuffled_dsts)
   {
     CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount);

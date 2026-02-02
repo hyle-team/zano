@@ -529,7 +529,7 @@ namespace currency
   {
     size_t outs_count = outs_gen_context.amounts.size();
     // TODO @#@# reconsider this check CHECK_AND_ASSERT_MES(gen_context.check_sizes(outs_count), false, "");
-    CHECK_AND_ASSERT_MES(outs_count == vouts.size(), false, "");
+    //CHECK_AND_ASSERT_MES(outs_count == vouts.size(), false, "");
 
     // prepare data for aggregation proof
     std::vector<crypto::point_t> amount_commitments_for_rp_aggregation; // E' = amount * U + y' * G
@@ -784,7 +784,7 @@ namespace currency
     }
 
     // fill outputs
-    tx_gen_context.resize(zc_ins_count, destinations.size()); // auxiliary data for each output
+    //tx_gen_context.resize(zc_ins_count, destinations.size()); // auxiliary data for each output
     uint64_t output_index = 0;
     std::set<uint16_t> derivation_hints;
     for (auto& d : destinations)
@@ -1448,10 +1448,10 @@ namespace currency
   {
     tx_out_zarcanum out{};
 
-    crypto::scalar_t &asset_blinding_mask   = tgc.asset_id_blinding_masks[output_index];
-    crypto::scalar_t &amount_blinding_mask  = tgc.amount_blinding_masks[output_index];
-    crypto::point_t &blinded_asset_id       = tgc.blinded_asset_ids[output_index];
-    crypto::point_t &amount_commitment      = tgc.amount_commitments[output_index];
+    crypto::scalar_t &asset_blinding_mask   = tgc.asset_id_blinding_masks.emplace_back();
+    crypto::scalar_t &amount_blinding_mask  = tgc.amount_blinding_masks.emplace_back();
+    crypto::point_t &blinded_asset_id       = tgc.blinded_asset_ids.emplace_back();
+    crypto::point_t &amount_commitment      = tgc.amount_commitments.emplace_back();
 
     const account_public_address& apa = boost::get<account_public_address>(de.addr.front());
     if (apa.spend_public_key == null_pkey && apa.view_public_key == null_pkey)
@@ -1524,8 +1524,8 @@ namespace currency
 
     tx.vout.push_back(out);
 
-    tgc.amounts[output_index]               = de.amount;
-    tgc.asset_ids[output_index]             = crypto::point_t(de.asset_id);
+    tgc.amounts.push_back(de.amount);
+    tgc.asset_ids.push_back(crypto::point_t(de.asset_id));
     tgc.asset_id_blinding_mask_x_amount_sum += asset_blinding_mask * de.amount;
     tgc.amount_blinding_masks_sum           += amount_blinding_mask;
     tgc.amount_commitments_sum              += amount_commitment;
@@ -1553,8 +1553,12 @@ namespace currency
 
     tx.vout.push_back(std::move(gw_out));
 
-    tgc.amounts[output_index]               = de.amount;
-    tgc.asset_ids[output_index]             = asset_id_pt;
+    //tgc.amounts[output_index]               = de.amount;
+    //tgc.asset_ids[output_index]             = asset_id_pt;
+    //tgc.blinded_asset_ids[output_index]     = asset_id_pt;
+
+    // tgc.amount_commitments_sum              += de.amount * crypto::point_t(de.asset_id); -- maybe this? -- sowle
+
     return true;
   }
   //---------------------------------------------------------------
@@ -3015,7 +3019,7 @@ namespace currency
     // OUTs
     //
     std::vector<tx_destination_entry> shuffled_dsts(destinations);
-    gen_context.resize(zc_inputs_count, tx.vout.size() + shuffled_dsts.size());
+    //gen_context.resize(zc_inputs_count, tx.vout.size() + shuffled_dsts.size());
 
     // ASSET oprations handling
     if (tx.version > TRANSACTION_VERSION_PRE_HF4)
@@ -3131,7 +3135,6 @@ namespace currency
     // ring signatures (per-input proofs)
     r = false;
     bool separately_signed_tx_complete = !sources.empty() ? sources.back().separately_signed_tx_complete : false;
-    size_t zc_input_index = 0;
     for (size_t i_ = 0; i_ != sources.size(); i_++)
     {
       size_t i_mapped = inputs_mapping[i_];
@@ -3145,8 +3148,7 @@ namespace currency
         // ZC
         r = generate_ZC_sig(tx_hash_for_signature, i_ + input_starter_index, source_entry, in_contexts[i_mapped], sender_account_keys, flags, gen_context, tx, i_ + 1 == sources.size(), separately_signed_tx_complete);
         CHECK_AND_ASSERT_MES(r, false, "generate_ZC_sigs failed");
-        gen_context.zc_input_amounts[zc_input_index] = source_entry.amount;
-        zc_input_index++;
+        gen_context.zc_input_amounts.push_back(source_entry.amount);
       }else if (source_entry.gateway_origin != currency::null_pkey)
       {
         //TODO: Do nothing here as it will be signed after? @sowle

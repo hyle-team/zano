@@ -230,16 +230,16 @@ namespace currency
   {
     tx_generation_context() = default;
 
-    void resize(size_t zc_ins_count, size_t outs_count)
-    {
-      asset_ids.resize(outs_count);
-      blinded_asset_ids.resize(outs_count);
-      amount_commitments.resize(outs_count);
-      asset_id_blinding_masks.resize(outs_count);
-      amounts.resize(outs_count);
-      amount_blinding_masks.resize(outs_count);
-      zc_input_amounts.resize(zc_ins_count);
-    }
+    //void resize(size_t zc_ins_count, size_t outs_count)
+    //{
+    //  asset_ids.resize(outs_count);
+    //  blinded_asset_ids.resize(outs_count);
+    //  amount_commitments.resize(outs_count);
+    //  asset_id_blinding_masks.resize(outs_count);
+    //  amounts.resize(outs_count);
+    //  amount_blinding_masks.resize(outs_count);
+    //  zc_input_amounts.resize(zc_ins_count);
+    //}
 
     // TODO @#@# reconsider this check -- sowle
     bool check_sizes(size_t zc_ins_count, size_t outs_count) const
@@ -260,7 +260,7 @@ namespace currency
       tx_pub_key_p = crypto::point_t(tx_key.pub);
     }
 
-    // per output data
+    // per confidential output data
     std::vector<crypto::point_t> asset_ids;
     std::vector<crypto::point_t> blinded_asset_ids;                                   // generate_zc_outs_range_proof
     std::vector<crypto::point_t> amount_commitments;                                  // generate_zc_outs_range_proof   construct_tx_out

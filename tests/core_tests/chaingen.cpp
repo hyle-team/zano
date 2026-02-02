@@ -1254,7 +1254,7 @@ bool test_generator::construct_pow_block_with_alias_info_in_coinbase(const accou
 
       tx_generation_context tx_gen_context{};
       tx_gen_context.set_tx_key(tx_key);
-      tx_gen_context.resize(/* ZC ins: */ 0, /* OUTS: */ alias_cost != 0 ? 3 : 2);
+      //tx_gen_context.resize(/* ZC ins: */ 0, /* OUTS: */ alias_cost != 0 ? 3 : 2);
       std::set<unsigned short> deriv_cache;
       size_t output_index = 0;
 
