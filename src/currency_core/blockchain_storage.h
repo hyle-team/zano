@@ -745,8 +745,11 @@ namespace currency
     bool update_spent_tx_flags_for_input(const crypto::hash& multisig_id, uint64_t spent_height);
     bool update_spent_tx_flags_for_input(const crypto::hash& tx_id, size_t n, bool spent);
 
+    bool change_gateway_balance(const crypto::hash& tx_id, const gateway_address_id_type& gw_addr, const crypto::public_key& asset_id, const uint64_t amount, bool increase);
     bool process_gateway_input(const crypto::hash& tx_id, const crypto::hash& bl_id, const uint64_t bl_height, const txin_gateway& in_gw);
     bool unprocess_gateway_input(const txin_gateway& in_gw);
+    bool process_gateway_ouput(const crypto::hash& tx_id, const crypto::hash& bl_id, const uint64_t bl_height, const tx_out_gateway& out_gw);
+    bool unprocess_gateway_output(const tx_out_gateway& out_gw);
 
     void push_block_to_per_block_increments(uint64_t height_, std::unordered_map<uint64_t, uint32_t>& gindices);
     void pop_block_from_per_block_increments(uint64_t height_);

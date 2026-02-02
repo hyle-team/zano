@@ -4125,6 +4125,8 @@ bool blockchain_storage::push_transaction_to_global_outs_index(const transaction
       // TODO: CZ, consider using separate table for hidden amounts
       m_db_outputs.push_back_item(0, global_output_entry::construct(tx_id, output_index));
       global_indexes.push_back(m_db_outputs.get_item_size(0) - 1);
+    VARIANT_CASE_CONST(tx_out_gateway, togw)
+      // do nothing (gw outs don't affect global indexes)
     VARIANT_CASE_THROW_ON_OTHER();
     VARIANT_SWITCH_END();
     ++output_index;
@@ -5205,46 +5207,85 @@ bool blockchain_storage::validate_tx_service_attachmens_in_services(const tx_ser
   return m_services_mgr.validate_entry(a, i, tx);
 }
 //------------------------------------------------------------------
+bool blockchain_storage::change_gateway_balance(const crypto::hash& tx_id, const gateway_address_id_type& gw_addr, const crypto::public_key& asset_id, const uint64_t amount, bool increase)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  auto gw_addr_entry_ptr = m_db_gateway_addresses[gw_addr];
+  CHECK_AND_ASSERT_MES(gw_addr_entry_ptr, false, "gw balance: couldn't find gateway address " << gw_addr << ", tx: " << tx_id);
+
+  gateway_addresses_container::t_value_type gw_addr_entry = *gw_addr_entry_ptr;
+
+  auto& balance_entry = gw_addr_entry.balances[asset_id];
+  uint64_t balance_before = balance_entry.amount;
+
+  if (increase)
+  {
+    CHECK_AND_ASSERT_MES(balance_entry.amount > std::numeric_limits<uint64_t>::max() - amount, false, "Uint64 overflow, gateway address " << gw_addr << ", tx: " << tx_id << ", asset_id: " << asset_id);
+    balance_entry.amount += amount;
+  }
+  else
+  {
+    // decrease
+    CHECK_AND_ASSERT_MES(balance_entry.amount >= amount, false, "Balance underflow, gateway address " << gw_addr << ", tx: " << tx_id << ", asset_id: " << asset_id);
+    balance_entry.amount -= amount;
+  }
+
+  //update db
+  m_db_gateway_addresses.set(gw_addr, gw_addr_entry);
+
+  // for debugging
+  LOG_PRINT_L0("gateway address " << gw_addr << ", balance changed: " << balance_before << " -> " << balance_entry.amount << " (" << (increase ? "+" : "-") << amount << "), asset_id: " << asset_id);
+  return true;
+}
+
+//------------------------------------------------------------------
 bool blockchain_storage::process_gateway_input(const crypto::hash& tx_id, const crypto::hash& bl_id, const uint64_t bl_height, const txin_gateway& in_gw)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  //check if getaway exists
-  auto gw_adr_entry_ptr = m_db_gateway_addresses[in_gw.gateway_addr];
-  CHECK_AND_ASSERT_MES(gw_adr_entry_ptr, false, "Failed to find gateway addr " << in_gw.gateway_addr << " in input of tx: " << tx_id );
 
-  //check the balance
-  gateway_addresses_container::t_value_type gw_address_entry = *gw_adr_entry_ptr;
+  crypto::point_t asset_id_pt = crypto::c_point_0;
+  CHECK_AND_ASSERT_MES(asset_id_pt.from_public_key(in_gw.asset_id), false, "invalid in_gw.asset_id, tx: " << tx_id);
+  asset_id_pt.modify_mul8();
 
-  auto& balance_entry = gw_address_entry.balances[in_gw.asset_id];
-
-  CHECK_AND_ASSERT_MES(balance_entry.amount >= in_gw.amount, false, "Balance is not enought on the gateway address");
-
-  //update balance
-  balance_entry.amount -= in_gw.amount;
-  //update db
-  m_db_gateway_addresses.set(in_gw.gateway_addr, gw_address_entry);
-  return true;
+  bool r = change_gateway_balance(tx_id, in_gw.gateway_addr, asset_id_pt.to_public_key(), in_gw.amount, false /* false = decrease */);
+  return r;
 }
 //------------------------------------------------------------------
 bool blockchain_storage::unprocess_gateway_input(const txin_gateway& in_gw)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  //check if getaway exists
-  auto gw_adr_entry_ptr = m_db_gateway_addresses[in_gw.gateway_addr];
-  CHECK_AND_ASSERT_THROW_MES(gw_adr_entry_ptr, "Failed to find gateway addr " << in_gw.gateway_addr);
 
-  gateway_addresses_container::t_value_type gw_address_entry = *gw_adr_entry_ptr;
+  crypto::point_t asset_id_pt = crypto::c_point_0;
+  CHECK_AND_ASSERT_MES(asset_id_pt.from_public_key(in_gw.asset_id), false, "invalid in_gw.asset_id, tx: " /* TODO << tx_id */);
+  asset_id_pt.modify_mul8();
 
-  //check the balance
-  auto& balance_entry = gw_address_entry.balances[in_gw.asset_id];
+  bool r = change_gateway_balance(crypto::hash{}, in_gw.gateway_addr, asset_id_pt.to_public_key(), in_gw.amount, true /* true = increase */);
+  return r;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::process_gateway_ouput(const crypto::hash& tx_id, const crypto::hash& bl_id, const uint64_t bl_height, const tx_out_gateway& out_gw)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
 
-  CHECK_AND_ASSERT_THROW_MES(balance_entry.amount > std::numeric_limits<uint64_t>::max() - in_gw.amount, "Uint64 overflow in gateway addresses");
-  
-  //update balance
-  balance_entry.amount += in_gw.amount;
-  //update db
-  m_db_gateway_addresses.set(in_gw.gateway_addr, gw_address_entry);
-  return true;
+  crypto::point_t asset_id_pt = crypto::c_point_0;
+  CHECK_AND_ASSERT_MES(asset_id_pt.from_public_key(out_gw.asset_id), false, "invalid out_gw.asset_id, tx: " << tx_id);
+  asset_id_pt.modify_mul8();
+
+  bool r = change_gateway_balance(tx_id, out_gw.gateway_addr, asset_id_pt.to_public_key(), out_gw.amount, true /* true = increase */);
+  return r;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::unprocess_gateway_output(const tx_out_gateway& out_gw)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  crypto::point_t asset_id_pt = crypto::c_point_0;
+  CHECK_AND_ASSERT_MES(asset_id_pt.from_public_key(out_gw.asset_id), false, "invalid out_gw.asset_id, tx: " /* TODO << tx_id */);
+  asset_id_pt.modify_mul8();
+
+  bool r = change_gateway_balance(crypto::hash{}, out_gw.gateway_addr, asset_id_pt.to_public_key(), out_gw.amount, false /* false = decrease */);
+  return r;
 }
 
 //------------------------------------------------------------------
@@ -5661,25 +5702,36 @@ bool check_tx_explicit_asset_id_rules(const transaction& tx, bool all_tx_ins_hav
   if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
     return true;
 
-  // ( assuming that post-HF4 txs can only have tx_out_zarcanum outs )
-
   bool r = false;
-  // if all tx inputs have explicit native asset id AND it does not emit a new asset THEN all outputs must have explicit asset id (native coin)
+  // if all tx inputs have explicit native asset id AND it does not emit a new asset THEN all confidential outputs must have explicit asset id (native coin)
   if (all_tx_ins_have_explicit_native_asset_ids && !is_asset_emitting_transaction(tx))
   {
     for(size_t j = 0, k = tx.vout.size(); j < k; ++j)
     {
-      r = crypto::point_t(boost::get<tx_out_zarcanum>(tx.vout[j]).blinded_asset_id).modify_mul8().to_public_key() == native_coin_asset_id;
-      CHECK_AND_ASSERT_MES(r, false, "output #" << j << " has a non-explicit asset id in a tx where all inputs have an explicit native asset id");
+      VARIANT_SWITCH_BEGIN(tx.vout[j])
+        VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
+          r = out_zc.blinded_asset_id == native_coin_asset_id_1div8;
+          CHECK_AND_ASSERT_MES(r, false, "output #" << j << " has a non-explicit asset id in a tx where all inputs have an explicit native asset id");
+        VARIANT_CASE_CONST(tx_out_gateway, out_gw)
+          // nothing
+        VARIANT_CASE_OTHER()
+          CHECK_AND_ASSERT_MES(false, false, "output #" << j << " has unexpected type");
+      VARIANT_SWITCH_END()
     }
   }
-  else // otherwise all outputs must have hidden asset id (unless they burn money by sending them to null pubkey) 
+  else // otherwise all confidential outputs must have hidden asset id (unless they burn money by sending them to null pubkey) 
   {
     for(size_t j = 0, k = tx.vout.size(); j < k; ++j)
     {
-      const tx_out_zarcanum& zo = boost::get<tx_out_zarcanum>(tx.vout[j]);
-      r = zo.stealth_address == null_pkey || crypto::point_t(zo.blinded_asset_id).modify_mul8().to_public_key() != native_coin_asset_id;
-      CHECK_AND_ASSERT_MES(r, false, "output #" << j << " has an explicit asset id in a tx where not all inputs have an explicit native asset id");
+      VARIANT_SWITCH_BEGIN(tx.vout[j])
+        VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
+          r = out_zc.stealth_address == null_pkey || out_zc.blinded_asset_id != native_coin_asset_id_1div8;
+          CHECK_AND_ASSERT_MES(r, false, "output #" << j << " has an explicit asset id in a tx where not all inputs have an explicit native asset id");
+        VARIANT_CASE_CONST(tx_out_gateway, out_gw)
+          // nothing
+        VARIANT_CASE_OTHER()
+          CHECK_AND_ASSERT_MES(false, false, "output #" << j << " has unexpected type");
+      VARIANT_SWITCH_END()
     }
   }
   return true;
@@ -7472,6 +7524,23 @@ bool blockchain_storage::collect_rangeproofs_data_from_tx(const transaction& tx,
   if (tx.version <= TRANSACTION_VERSION_PRE_HF4)
     return true;
 
+  size_t confidential_outs_count = 0;
+  for(auto& out_v : tx.vout)
+  {
+    VARIANT_SWITCH_BEGIN(out_v)
+      VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
+        ++confidential_outs_count;
+    //  VARIANT_CASE_CONST(tx_out_confidential_gateway, out_cgw)
+    //  ++confidential_outs_count;
+      VARIANT_CASE_CONST(tx_out_gateway, out_gw)
+        // nothing
+      VARIANT_CASE_OTHER()
+        LOG_ERROR("unexpected output type: " << out_v.type().name());
+        return false;
+    VARIANT_SWITCH_END()
+  }
+
+
   size_t range_proofs_count = 0;
   size_t out_index_offset = 0; //Consolidated Transactions have multiple zc_outs_range_proof entries
   for (const auto& a : tx.proofs)
@@ -7480,13 +7549,15 @@ bool blockchain_storage::collect_rangeproofs_data_from_tx(const transaction& tx,
     {
       const zc_outs_range_proof& zcrp = boost::get<zc_outs_range_proof>(a);
 
-      // validate aggregation proof
+      // validate aggregation proof, collect commitments from confidential outputs
       std::vector<const crypto::public_key*> amount_commitment_ptrs_1div8, blinded_asset_id_ptrs_1div8;
       for(size_t j = out_index_offset; j < tx.vout.size(); ++j)
       {
-        CHECKED_GET_SPECIFIC_VARIANT(tx.vout[j], const tx_out_zarcanum, zcout, false);
-        amount_commitment_ptrs_1div8.push_back(&zcout.amount_commitment);
-        blinded_asset_id_ptrs_1div8.push_back(&zcout.blinded_asset_id);
+        VARIANT_SWITCH_BEGIN(tx.vout[j])
+          VARIANT_CASE_CONST(tx_out_zarcanum, out_zc) // other types are checked at the beggining
+            amount_commitment_ptrs_1div8.push_back(&out_zc.amount_commitment);
+            blinded_asset_id_ptrs_1div8.push_back(&out_zc.blinded_asset_id);
+        VARIANT_SWITCH_END()
       }
       uint8_t err = 0;
       bool r = crypto::verify_vector_UG_aggregation_proof(tx_id, amount_commitment_ptrs_1div8, blinded_asset_id_ptrs_1div8, zcrp.aggregation_proof, &err);
@@ -7504,7 +7575,7 @@ bool blockchain_storage::collect_rangeproofs_data_from_tx(const transaction& tx,
       range_proofs_count++;
     }
   }
-  CHECK_AND_ASSERT_MES(out_index_offset == tx.vout.size(), false, "range proof elements count doesn't match with outputs count: " << out_index_offset << " != " << tx.vout.size());
+  CHECK_AND_ASSERT_MES(out_index_offset == confidential_outs_count, false, "range proof elements count doesn't match with confidential outputs count: " << out_index_offset << " != " << confidential_outs_count);
   CHECK_AND_ASSERT_MES(range_proofs_count > 0, false, "transaction " << get_transaction_hash(tx) << " doesn't have range proofs");
   CHECK_AND_ASSERT_MES(range_proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << get_transaction_hash(tx) 
     << " doesn't have TX_FLAG_SIGNATURE_MODE_SEPARATE but has range_proofs_count = " << range_proofs_count);
