@@ -20,7 +20,6 @@ namespace
 {
   constexpr const int UNKNOWN_ERROR_EXIT_CODE = -999;
   constexpr const int MS_PER_SECOND = 1000;
-  constexpr const int WORKER_STDOUT_BUFFER_SIZE = 64 * 1024;
   constexpr const int RESERVE_UNIQUE_TESTS_HINT = 8192;
 }
 
@@ -164,22 +163,22 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
       const bool executed = executed_tests_union.count(j.name) != 0;
 
       if (failed)
-        std::cout << concolor::magenta << j.name << concolor::normal << std::endl;
+        std::cout << concolor::magenta << j.name << concolor::normal << '\n';
       else if (executed)
-        std::cout << concolor::green << j.name << concolor::normal << std::endl;
+        std::cout << concolor::green << j.name << concolor::normal << '\n';
       else
-        std::cout << concolor::yellow << j.name << concolor::normal << std::endl;
+        std::cout << concolor::yellow << j.name << concolor::normal << '\n';
     }
-    std::cout << std::endl;
+    std::cout << '\n';
   }
 
   // 2) Postponed tests list
   if (!postponed_tests.empty())
   {
-    std::cout << concolor::yellow << postponed_tests.size() << " POSTPONED TESTS:" << std::endl;
+    std::cout << concolor::yellow << postponed_tests.size() << " POSTPONED TESTS:\n";
     for (const auto& el : postponed_tests)
-      std::cout << "  " << el << std::endl;
-    std::cout << concolor::normal << std::endl;
+      std::cout << "  " << el << '\n';
+    std::cout << concolor::normal << '\n';
   }
 
   size_t failed_postponed_tests_count = 0;
@@ -192,11 +191,11 @@ int parallel_test_runner::print_aggregated_report_and_return_rc(uint32_t process
 
   std::cout << (serious_failures_count == 0 ? concolor::green : concolor::magenta);
   std::cout << "\nREPORT:\n";
-  std::cout << "  Unique tests run: " << total_unique_tests_count << std::endl;
-  std::cout << "  Total tests run:  " << total_tests_count << std::endl;
-  std::cout << "  Failures:         " << serious_failures_count << " (postponed failures: " << failed_postponed_tests_count << ")" << std::endl;
-  std::cout << "  Postponed:        " << postponed_tests.size() << std::endl;
-  std::cout << "  Total time:       " << (wall_time_ms / MS_PER_SECOND) << " s. (" << (total_tests_count > 0 ? (wall_time_ms / total_tests_count) : 0) << " ms per test in average)" << std::endl;
+  std::cout << "  Unique tests run: " << total_unique_tests_count << '\n';
+  std::cout << "  Total tests run:  " << total_tests_count << '\n';
+  std::cout << "  Failures:         " << serious_failures_count << " (postponed failures: " << failed_postponed_tests_count << ")" << '\n';
+  std::cout << "  Postponed:        " << postponed_tests.size() << '\n';
+  std::cout << "  Total time:       " << (wall_time_ms / MS_PER_SECOND) << " s. (" << (total_tests_count > 0 ? (wall_time_ms / total_tests_count) : 0) << " ms per test in average)" << '\n';
 
   if (!failed_tests_union.empty())
   {
@@ -410,34 +409,14 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std
         wp.reader = std::thread([&, out = wp.out.get(), f = wp.file.get()]()
         {
           std::string line;
-          std::string buffer;
-          buffer.reserve(WORKER_STDOUT_BUFFER_SIZE);
-
-          std::function<void()> flush = [&]()
-          {
-            if (!buffer.empty())
+           while (std::getline(*out, line))
+           {
+            (*f) << line << '\n';
             {
-              (*f) << buffer;
-
-              {
-                std::lock_guard<std::mutex> lk(cout_mutex);
-                std::cout << buffer;
-              }
-
-              buffer.clear();
+              std::lock_guard<std::mutex> lk(cout_mutex);
+              std::cout << line << '\n';
             }
-          };
-
-          while (std::getline(*out, line))
-          {
-            buffer.append(line);
-            buffer.push_back('\n');
-
-            if (buffer.size() >= WORKER_STDOUT_BUFFER_SIZE)
-              flush();
-          }
-
-          flush();
+           }
         });
 
         kids.emplace_back(std::move(wp));
