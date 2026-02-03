@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Zano Address Validator (WASM)</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 16px; }
+      .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+      input { width: min(900px, 100%); padding: 10px 12px; font-size: 14px; }
+      button { padding: 10px 14px; font-size: 14px; cursor: pointer; }
+      pre { background: #f6f8fa; padding: 12px; border-radius: 8px; overflow: auto; }
+      .muted { opacity: 0.7; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <h2>Zano Address Validator (WASM)</h2>
+
+    <div class="row">
+      <input id="addr" placeholder="Paste Zano address here..." />
+      <button id="btnCheck" type="button">Check</button>
+      <button id="btnClear" type="button">Clear</button>
+    </div>
+
+    <p class="muted">
+      Result codes: 0=ok, 1=invalid, 2=bad_args, 3=zano_integrated_ok, 4=wrapped_like_ok
+    </p>
+
+    <pre id="out">Loading…</pre>
+
+    <!-- Important: load wasm glue BEFORE main.js -->
+    <script src="address_validator_wasm.js"></script>
+    <script src="main.js"></script>
+  </body>
+</html>
