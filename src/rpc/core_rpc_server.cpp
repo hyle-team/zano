@@ -754,8 +754,27 @@ namespace currency
       ftp.sources.push_back(source);
     }
 
-    // TODO: handle not enough money -- sowle
+    //check the balance
+    auto addr_data_ptr = m_core.get_blockchain_storage().get_gateway_address_info(req.origin_gateway_id);
 
+    if (!addr_data_ptr)
+    {
+      er.code = CORE_RPC_ERROR_CODE_NOT_FOUND;
+      er.message = std::string("Gateway address") + epee::string_tools::pod_to_hex(req.origin_gateway_id) + " not found";
+      return false;
+    }
+    for ( const auto& [asset_id, amount] : total_coins_needed)
+    {
+      auto it = addr_data_ptr->balances.find(asset_id);
+      if (it == addr_data_ptr->balances.end() || it->second.amount < amount)
+      {
+        er.code = CORE_RPC_ERROR_CODE_INSUFFICIENT_FUNDS;
+        er.message = std::string("Insufficient funds for asset_id ") + epee::string_tools::pod_to_hex(asset_id);
+        return false;
+      }
+    }
+
+    //fill destinations
     std::string legacy_tx_wide_payment_id;
     bool r = rpc_fill_destinations_helper(req.destinations, ftp.prepared_destinations, ftp.extra, true, er, legacy_tx_wide_payment_id, false, [&](const std::string& address, currency::address_v& addr_v, std::string& embedded_payment_id) {
       tools::core_fast_rpc_proxy tmp_proxy(*this);
