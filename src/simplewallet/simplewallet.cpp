@@ -2130,7 +2130,7 @@ bool simple_wallet::integrated_address(const std::vector<std::string> &args)
     success_msg_writer(false) << "this wallet standard address: " << m_wallet->get_account().get_public_address_str();
     success_msg_writer(false) << "payment id (" << std::setw(3) << payment_id.size() << " bytes) :      " << epee::string_tools::mask_non_ascii_chars(payment_id);
     success_msg_writer(false) << "payment id (hex-encoded) :    " << epee::string_tools::buff_to_hex_nodelimer(payment_id);
-    success_msg_writer(true ) << "integrated address:           " << get_account_address_and_payment_id_as_str(m_wallet->get_account().get_public_address(), payment_id);
+    success_msg_writer(true ) << "integrated address:           " << get_account_address_as_str(m_wallet->get_account().get_public_address(), payment_id);
     return true;
   }
 
@@ -2140,7 +2140,7 @@ bool simple_wallet::integrated_address(const std::vector<std::string> &args)
   std::string payment_id_hex = epee::string_tools::buff_to_hex_nodelimer(payment_id);
   success_msg_writer(false) << "this wallet standard address:       " << m_wallet->get_account().get_public_address_str();
   success_msg_writer(false) << "generated payment id (hex-encoded): " << payment_id_hex;
-  success_msg_writer(true ) << "integrated address:                 " << get_account_address_and_payment_id_as_str(m_wallet->get_account().get_public_address(), payment_id);
+  success_msg_writer(true ) << "integrated address:                 " << get_account_address_as_str(m_wallet->get_account().get_public_address(), payment_id);
 
   return true;
 }

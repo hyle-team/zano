@@ -535,12 +535,9 @@ namespace currency
   bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t &reward, uint64_t height);
   uint64_t get_base_block_reward(uint64_t height);
   bool is_payment_id_size_ok(const payment_id_t& payment_id, bool allow_legacy_payment_id_size = true);
-  std::string get_account_address_as_str(const account_public_address& addr);
-  std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const payment_id_t& payment_id);
-  std::string get_account_address_as_str(const gateway_address_id_type& addr);
-  std::string get_account_address_and_payment_id_as_str(const gateway_address_id_type& addr, const payment_id_t& payment_id);
-  std::string get_account_address_as_str(const address_v& addr);
-  std::string get_account_address_and_payment_id_as_str(const address_v& addr, const payment_id_t& payment_id);
+  std::string get_account_address_as_str(const account_public_address& addr, const payment_id_t& payment_id = payment_id_t{});
+  std::string get_account_address_as_str(const gateway_address_id_type& addr, const payment_id_t& payment_id = payment_id_t{});
+  std::string get_account_address_as_str(const address_v& addr, const payment_id_t& payment_id = payment_id_t{});
   bool get_account_address_from_str(account_public_address& addr, const std::string& str);
   bool get_account_address_and_payment_id_from_str(account_public_address& addr, payment_id_t& payment_id, const std::string& str);
   bool get_account_address_and_payment_id_from_str(address_v& v_addr, payment_id_t& payment_id, const std::string& str);

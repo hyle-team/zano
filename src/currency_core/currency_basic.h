@@ -1071,8 +1071,8 @@ namespace currency
 
   struct gateway_address_descriptor_operation_register
   {
-    uint8_t     version = 0;
-    crypto::public_key              view_pub_key = null_pkey;
+    uint8_t                         version = 0;
+    crypto::public_key              view_pub_key = null_pkey; // NOT premultiplied by 1/8, checked for the main subgroup
     gateway_address_descriptor_base descriptor;
 
     BEGIN_VERSIONED_SERIALIZE(0, version)
@@ -1083,7 +1083,7 @@ namespace currency
 
   struct gateway_address_descriptor_operation_update
   {
-    uint8_t     version = 0;
+    uint8_t                         version = 0;
     gateway_address_id_type         address_id = null_pkey;
     gateway_address_descriptor_base descriptor;
 
@@ -1102,7 +1102,7 @@ namespace currency
 
     BEGIN_VERSIONED_SERIALIZE(0, version)
       FIELD(operation)
-      END_SERIALIZE()
+    END_SERIALIZE()
   };
 
 

@@ -2876,6 +2876,15 @@ namespace currency
         tx.vin.push_back(input_multisig);
         has_non_zc_inputs = true;
       }
+      else if (src_entr.is_gw())
+      {
+        txin_gateway input_gateway = {};
+        input_gateway.amount = src_entr.amount;
+        input_gateway.asset_id = (crypto::c_scalar_1div8 * crypto::point_t(src_entr.asset_id)).to_public_key();
+        input_gateway.gateway_addr = src_entr.gateway_origin;
+        tx.vin.push_back(input_gateway);
+        has_non_zc_inputs = true;
+      }
       else
       {
         // txin_to_key or txin_zc_input
@@ -2911,14 +2920,6 @@ namespace currency
           zc_in.k_image = img;
           zc_in.key_offsets = std::move(key_offsets);
           tx.vin.push_back(zc_in);
-        }
-        else if (src_entr.is_gw())
-        {
-          txin_gateway input_gateway = {};
-          input_gateway.amount = src_entr.amount;
-          input_gateway.asset_id = (crypto::c_scalar_1div8 * crypto::point_t(src_entr.asset_id)).to_public_key();
-          input_gateway.gateway_addr = src_entr.gateway_origin;
-          tx.vin.push_back(input_gateway);
         }
         else
         {
@@ -4629,19 +4630,20 @@ namespace currency
     else return false;
   }
   //-----------------------------------------------------------------------
-  std::string get_account_address_as_str(const account_public_address& addr)
+  std::string get_account_address_as_str(const account_public_address& addr, const payment_id_t& payment_id /* = payment_id_t{} */)
   {
-    if (addr.flags == 0)
-      return tools::base58::encode_addr(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr.to_old())); // classic Zano address
+    if (payment_id.empty())
+    {
+      if (addr.flags == 0)
+        return tools::base58::encode_addr(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr.to_old())); // classic Zano address
 
-    if (addr.flags & ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE)
-      return tools::base58::encode_addr(CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr)); // new format Zano address (auditable)
+      if (addr.flags & ACCOUNT_PUBLIC_ADDRESS_FLAG_AUDITABLE)
+        return tools::base58::encode_addr(CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr)); // new format Zano address (auditable)
     
-    return tools::base58::encode_addr(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr)); // new format Zano address (normal)
-  }
-  //-----------------------------------------------------------------------
-  std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const payment_id_t& payment_id)
-  {
+      return tools::base58::encode_addr(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr)); // new format Zano address (normal)
+    }
+
+    // integrated address (with payment id)
     if (addr.flags == 0)
       return tools::base58::encode_addr(CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX, t_serializable_object_to_blob(addr.to_old()) + payment_id); // classic integrated Zano address
 
@@ -4651,12 +4653,7 @@ namespace currency
     return tools::base58::encode_addr(CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX, t_serializable_object_to_blob(addr) + payment_id); // new format integrated Zano address (normal)
   }
   //-----------------------------------------------------------------------
-  std::string get_account_address_as_str(const gateway_address_id_type& addr)
-  {
-    return get_account_address_and_payment_id_as_str(addr, payment_id_t{});
-  }
-  //-----------------------------------------------------------------------
-  std::string get_account_address_and_payment_id_as_str(const gateway_address_id_type& addr, const payment_id_t& payment_id)
+  std::string get_account_address_as_str(const gateway_address_id_type& addr, const payment_id_t& payment_id /* = payment_id_t{} */)
   {
     gateway_address_serialized_to_str gwserialized{};
 
@@ -4672,28 +4669,15 @@ namespace currency
     return tools::base58::encode_addr(tag, t_serializable_object_to_blob(gwserialized));
   }
   //-----------------------------------------------------------------------
-  std::string get_account_address_as_str(const address_v& v_addr)
+  std::string get_account_address_as_str(const address_v& v_addr, const payment_id_t& payment_id /* = payment_id_t{} */)
   {
-    if (v_addr.type() == typeid(gateway_address_id_type))
-      return get_account_address_as_str(boost::get<gateway_address_id_type>(v_addr));
-    else if (v_addr.type() == typeid(account_public_address))
-      return get_account_address_as_str(boost::get<account_public_address>(v_addr));
-    else
-    {
-      throw std::runtime_error("Unknown type of address in get_account_address_as_str");
-    }
-  }
-  //-----------------------------------------------------------------------
-  std::string get_account_address_and_payment_id_as_str(const address_v& v_addr, const payment_id_t& payment_id)
-  {
-    if (v_addr.type() == typeid(gateway_address_id_type))
-      return get_account_address_and_payment_id_as_str(boost::get<gateway_address_id_type>(v_addr), payment_id);
-    else if (v_addr.type() == typeid(account_public_address))
-      return get_account_address_and_payment_id_as_str(boost::get<account_public_address>(v_addr), payment_id);
-    else
-    {
-      throw std::runtime_error("Unknown type of address in get_account_address_as_str");
-    }
+    VARIANT_SWITCH_BEGIN(v_addr)
+      VARIANT_CASE_CONST(account_public_address, addr)
+        return get_account_address_as_str(addr, payment_id);
+      VARIANT_CASE_CONST(gateway_address_id_type, gw_addr)
+        return get_account_address_as_str(gw_addr, payment_id);
+      VARIANT_CASE_THROW_ON_OTHER_MSG("Unknown type of address in get_account_address_as_str")
+    VARIANT_SWITCH_END()
   }
   //-----------------------------------------------------------------------
   bool get_account_address_and_payment_id_from_str(address_v& v_addr, payment_id_t& payment_id, const std::string& str)

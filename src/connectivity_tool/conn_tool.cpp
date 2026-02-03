@@ -992,7 +992,7 @@ bool handle_generate_integrated_address(po::variables_map& vm)
     return false;
   }
 
-  std::string integrated_addr = currency::get_account_address_and_payment_id_as_str(acc_addr, payment_id_bin);
+  std::string integrated_addr = currency::get_account_address_as_str(acc_addr, payment_id_bin);
 
 
   std::cout << "Integrated address: " << integrated_addr << ENDL;

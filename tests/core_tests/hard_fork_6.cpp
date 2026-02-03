@@ -454,9 +454,9 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   // checks with no any CLI options for wallet RPC server
   //
   std::string bob_addr = m_accounts[BOB_ACC_IDX].get_public_address_str();
-  std::string bob_addr_with_too_long_pid = get_account_address_and_payment_id_as_str(m_accounts[BOB_ACC_IDX].get_public_address(), long_legacy_payment_id);
-  std::string bob_addr_with_short_pid = get_account_address_and_payment_id_as_str(m_accounts[BOB_ACC_IDX].get_public_address(), short_payment_id);
-  std::string bob_addr_with_short_pid2 = get_account_address_and_payment_id_as_str(m_accounts[BOB_ACC_IDX].get_public_address(), short_payment_id2);
+  std::string bob_addr_with_too_long_pid = get_account_address_as_str(m_accounts[BOB_ACC_IDX].get_public_address(), long_legacy_payment_id);
+  std::string bob_addr_with_short_pid = get_account_address_as_str(m_accounts[BOB_ACC_IDX].get_public_address(), short_payment_id);
+  std::string bob_addr_with_short_pid2 = get_account_address_as_str(m_accounts[BOB_ACC_IDX].get_public_address(), short_payment_id2);
   std::string carol_addr = m_accounts[CAROL_ACC_IDX].get_public_address_str();
 
   tr_req.destinations.clear();

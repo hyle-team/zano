@@ -967,10 +967,7 @@ void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_i
     {
       handle_2_alternative_types_in_variant_container<tx_receiver, tx_receiver_old>(decrypted_att, [&](const tx_receiver& p) {
         std::string addr_str;
-        if (wti.tx_wide_payment_id.empty())
-          addr_str = currency::get_account_address_as_str(p.acc_addr);
-        else
-          addr_str = currency::get_account_address_and_payment_id_as_str(p.acc_addr, wti.tx_wide_payment_id); // show integrated address if there's a payment id provided
+        addr_str = currency::get_account_address_as_str(p.acc_addr, wti.tx_wide_payment_id); // it will be an integrated address if there's a payment id provided
         wti.remote_addresses.push_back(addr_str);
         LOG_PRINT_YELLOW("prepare_wti_decrypted_attachments, income=false, rem. addr = " << addr_str, LOG_LEVEL_0);
         return true; // continue iterating through the container
@@ -7293,14 +7290,14 @@ void wallet2::add_sent_tx_detailed_info(const transaction& tx, const std::vector
 
       if (need_to_add_address)
       {
-        recipients.push_back(payment_id.empty() ? get_account_address_as_str(addr) : get_account_address_and_payment_id_as_str(addr, payment_id));
+        recipients.push_back(get_account_address_as_str(addr, payment_id));
       }
     }
   }
   if (!recipients.size())
   {
     //transaction send to ourself
-    recipients.push_back(payment_id.empty() ? get_account_address_as_str(m_account.get_public_address()) : get_account_address_and_payment_id_as_str(m_account.get_public_address(), payment_id));
+    recipients.push_back(get_account_address_as_str(m_account.get_public_address(), payment_id));
   }
 
   add_sent_unconfirmed_tx(tx, recipients, selected_transfers, destinations);

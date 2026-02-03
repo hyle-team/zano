@@ -3541,7 +3541,7 @@ bool wallet_sending_to_integrated_address::c1(currency::core& c, size_t ev_index
   miner_wlt->refresh();
 
   std::string payment_id = "super-payment-id-1948503537205028248";
-  std::string alice_integrated_address = get_account_address_and_payment_id_as_str(m_accounts[ALICE_ACC_IDX].get_public_address(), payment_id);
+  std::string alice_integrated_address = get_account_address_as_str(m_accounts[ALICE_ACC_IDX].get_public_address(), payment_id);
 
   bool callback_succeded = false;
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(

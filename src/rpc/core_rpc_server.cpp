@@ -754,6 +754,8 @@ namespace currency
       ftp.sources.push_back(source);
     }
 
+    // TODO: handle not enough money -- sowle
+
     std::string legacy_tx_wide_payment_id;
     bool r = rpc_fill_destinations_helper(req.destinations, ftp.prepared_destinations, ftp.extra, true, er, legacy_tx_wide_payment_id, false, [&](const std::string& address, currency::address_v& addr_v, std::string& embedded_payment_id) {
       tools::core_fast_rpc_proxy tmp_proxy(*this);
@@ -791,7 +793,8 @@ namespace currency
     VARIANT_CASE_THROW_ON_OTHER();
     VARIANT_SWITCH_END();
 
-    ftp.tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED;
+    ftp.tx_outs_attr  = CURRENCY_TO_KEY_OUT_RELAXED;
+    ftp.tx_version    = TRANSACTION_VERSION_POST_HF6;
     ftp.spend_pub_key = req.origin_gateway_id;
 
     r = currency::construct_tx(dummy_keys, ftp, ftx);
@@ -852,11 +855,11 @@ namespace currency
       return true;
     }
     
-    for(const auto& sig : tx.signatures)
+    for(auto& sig : tx.signatures)
     {
       if (sig.type() == typeid(gateway_sig))
       {
-        gateway_sig& gw_sig_in_tx = boost::get<gateway_sig&>(sig);
+        gateway_sig& gw_sig_in_tx = boost::get<gateway_sig>(sig);
         gw_sig_in_tx.s = gw_sig;
       }
       else
@@ -1244,7 +1247,7 @@ namespace currency
 			std::string tx_blob;
 			if (!string_tools::parse_hexstr_to_binbuff(t, tx_blob))
 			{
-				LOG_PRINT_L0("[on_send_raw_tx]: Failed to parse tx from hexbuff: " << t);
+				LOG_PRINT_L0("[on_force_relaey_raw_txs]: Failed to parse tx from hexbuff: " << t);
 				res.status = "Failed";
 				return true;
 			}
@@ -1894,7 +1897,7 @@ namespace currency
       return false;
     }
 
-    res.integrated_address = currency::get_account_address_and_payment_id_as_str(addr, payment_id);
+    res.integrated_address = currency::get_account_address_as_str(addr, payment_id);
     res.payment_id = epee::string_tools::buff_to_hex_nodelimer(payment_id);
     return true;
   }

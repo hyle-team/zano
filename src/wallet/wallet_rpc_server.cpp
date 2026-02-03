@@ -731,7 +731,7 @@ namespace tools
       crypto::generate_random_bytes(payment_id.size(), &payment_id.front());
     }
 
-    res.integrated_address = currency::get_account_address_and_payment_id_as_str(w.get_wallet()->get_account().get_public_address(), payment_id);
+    res.integrated_address = currency::get_account_address_as_str(w.get_wallet()->get_account().get_public_address(), payment_id);
     res.payment_id = epee::string_tools::buff_to_hex_nodelimer(payment_id);
     return !res.integrated_address.empty();
     WALLET_RPC_CATCH_TRY_ENTRY();

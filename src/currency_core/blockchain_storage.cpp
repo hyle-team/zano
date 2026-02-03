@@ -4235,8 +4235,9 @@ bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx, co
 
   if (ei.m_opt_gateway_address_operation)
   {
-    r = pop_gw_address_operation(*ei.m_opt_gateway_address_operation, height, tx_id);
-    CHECK_AND_ASSERT_MES(r, false, "failed to pop_gw_address_operation");
+    CHECK_AND_ASSERT_MES(ei.m_opt_gateway_address_operation.has_value(), false, "m_opt_gateway_address_operation has no value");
+    r = pop_gw_address_operation(ei.m_opt_gateway_address_operation.value(), height, tx_id);
+    CHECK_AND_ASSERT_MES(r, false, "pop_gw_address_operation failed, op: " << ei.m_opt_gateway_address_operation.value().operation.type().name());
   }
 
   return true;
@@ -4994,8 +4995,9 @@ bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx, cons
 
   if (ei.m_opt_gateway_address_operation)
   {
+    CHECK_AND_ASSERT_MES(ei.m_opt_gateway_address_operation.has_value(), false, "m_opt_gateway_address_operation has no value");
     r = put_gw_address_operation(tx, tx_id, ei.m_opt_gateway_address_operation.value(), height);
-    CHECK_AND_ASSERT_MES(r, false, "failed to put_gateway_address_operation");
+    CHECK_AND_ASSERT_MES(r, false, "put_gw_address_operation failed, op: " << ei.m_opt_gateway_address_operation.value().operation.type().name());
   } 
 
   return true;
@@ -5003,6 +5005,8 @@ bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx, cons
 //------------------------------------------------------------------
 bool blockchain_storage::put_gw_address_operation_register(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation_register& gao, const uint64_t height)
 {
+  CHECK_AND_ASSERT_MES(crypto::point_t(gao.view_pub_key).is_in_main_subgroup(), false, "gateway_address_descriptor_operation_register: view pub key isn't in main subgroup");
+  
   auto add_entry_ptr = m_db_gateway_addresses.find(gao.view_pub_key);
   CHECK_AND_ASSERT_MES(!add_entry_ptr, false, "gateway_address_descriptor_operation_register for tx " << tx_id << " trying to register address " << gao.view_pub_key << " which is already registered");
 
@@ -5061,14 +5065,14 @@ bool blockchain_storage::validate_gw_address_ownership(const transaction& tx, co
 bool blockchain_storage::put_gw_address_operation(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation& gao, const uint64_t height)
 {
   VARIANT_SWITCH_BEGIN(gao.operation);
-  VARIANT_CASE_CONST(gateway_address_descriptor_operation_register, o)
-  {
-    return put_gw_address_operation_register(tx, tx_id, o, height);
-  }
-  VARIANT_CASE_CONST(gateway_address_descriptor_operation_update, u)
-  {
-    return put_gw_address_operation_update(tx, tx_id, u, height);
-  }
+    VARIANT_CASE_CONST(gateway_address_descriptor_operation_register, o)
+    {
+      return put_gw_address_operation_register(tx, tx_id, o, height);
+    }
+    VARIANT_CASE_CONST(gateway_address_descriptor_operation_update, u)
+    {
+      return put_gw_address_operation_update(tx, tx_id, u, height);
+    }
   VARIANT_SWITCH_END();
   return false;
 }
@@ -5077,14 +5081,14 @@ bool blockchain_storage::pop_gw_address_operation(const gateway_address_descript
 {
   gateway_address_id_type address_id = null_pkey;
   VARIANT_SWITCH_BEGIN(gao.operation);
-  VARIANT_CASE_CONST(gateway_address_descriptor_operation_register, o)
-  {
-    address_id = o.view_pub_key;
-  }
-  VARIANT_CASE_CONST(gateway_address_descriptor_operation_update, u)
-  {
-    address_id = u.address_id;
-  }
+    VARIANT_CASE_CONST(gateway_address_descriptor_operation_register, o)
+    {
+      address_id = o.view_pub_key;
+    }
+    VARIANT_CASE_CONST(gateway_address_descriptor_operation_update, u)
+    {
+      address_id = u.address_id;
+    }
   VARIANT_SWITCH_END();
 
 
