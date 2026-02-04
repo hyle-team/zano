@@ -449,6 +449,14 @@ bool invoke_text_json_for_rpc(t_rpc_server& srv, const std::string& method_name,
   return r;
 }
 
+template<typename request_t, typename response_t, typename t_rpc_server>
+bool invoke_text_json_for_rpc_and_check_status(t_rpc_server& srv, const std::string& method_name, const request_t& req, response_t& resp)
+{
+  bool r = invoke_text_json_for_rpc(srv, method_name, req, resp);
+  CHECK_AND_ASSERT_MES(resp.status == API_RETURN_CODE_OK, false, "RPC '" << method_name << "' finished with status '" << resp.status << "'");
+  return r;
+}
+
 template<typename request_t, typename response_t>
 bool invoke_text_json_for_wallet(std::shared_ptr<tools::wallet2> wlt, const std::string& method_name, const request_t& req, response_t& resp)
 {

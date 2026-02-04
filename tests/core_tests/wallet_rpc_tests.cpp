@@ -1830,7 +1830,7 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
 
   // register gw address using invalid view key (with a nonzero torsion component)
   gw_reg_req.view_pub_key = (crypto::point_t(gw_addr_public_key) + crypto::point_t(crypto::parse_tpod_from_hex_string<crypto::public_key>("ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f"))).to_public_key();
-  r = invoke_text_json_for_rpc(alice_wlt_rpc, "register_gateway_address", gw_reg_req, gw_reg_resp);
+  r = invoke_text_json_for_rpc_and_check_status(alice_wlt_rpc, "register_gateway_address", gw_reg_req, gw_reg_resp);
   CHECK_AND_ASSERT_MES(r, false, "register_gateway_address failed");
   // tx is created but cannot be confirmed in a block
   CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
@@ -1842,7 +1842,7 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   // register gw address using good view key
   gw_reg_resp = {};
   gw_reg_req.view_pub_key = gw_addr_public_key;
-  r = invoke_text_json_for_rpc(alice_wlt_rpc, "register_gateway_address", gw_reg_req, gw_reg_resp);
+  r = invoke_text_json_for_rpc_and_check_status(alice_wlt_rpc, "register_gateway_address", gw_reg_req, gw_reg_resp);
   CHECK_AND_ASSERT_MES(r, false, "register_gateway_address failed");
 
   LOG_PRINT_GREEN_L0("Registered gw address: " << gw_reg_resp.address << ", view pub key: " << gw_reg_resp.address_id);
@@ -1855,7 +1855,7 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response gw_get_info_resp = {};
 
   gw_get_info_req.gateway_address = gw_reg_resp.address;
-  r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_get_address_info", gw_get_info_req, gw_get_info_resp);
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", gw_get_info_req, gw_get_info_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_get_address_info failed");
 
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.balances.size(), 0);
@@ -1872,7 +1872,7 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   tools::wallet_public::COMMAND_RPC_TRANSFER::request tr_to_gw_req{};
   tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_to_gw_res{};
   tr_to_gw_req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(9), m_accounts[BOB_ACC_IDX].get_public_address_str()});                    // ZC, native
-  tr_to_gw_req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(1), gw_reg_resp.address});                                                 // GW, native
+  tr_to_gw_req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(2), gw_reg_resp.address});                                                 // GW, native
   tr_to_gw_req.destinations.emplace_back(tools::wallet_public::transfer_destination{40,               m_accounts[BOB_ACC_IDX].get_public_address_str(), deployed_asset_id}); // ZC, asset
   tr_to_gw_req.destinations.emplace_back(tools::wallet_public::transfer_destination{10,               gw_reg_resp.address, deployed_asset_id});                              // GW, asset
   tr_to_gw_req.fee = TESTS_DEFAULT_FEE;
@@ -1894,11 +1894,11 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
 
   // request gw address info to check updated balances
   gw_get_info_resp = {};
-  r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_get_address_info", gw_get_info_req, gw_get_info_resp);
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", gw_get_info_req, gw_get_info_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_get_address_info failed");
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.balances.size(), 2);
   update_gw_balances(gw_get_info_resp.balances);
-  CHECK_AND_ASSERT_EQ(gw_balances[native_coin_asset_id],  MK_TEST_COINS(1));
+  CHECK_AND_ASSERT_EQ(gw_balances[native_coin_asset_id],  MK_TEST_COINS(2));
   CHECK_AND_ASSERT_EQ(gw_balances[deployed_asset_id],     10);
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.gateway_view_pub_key, gw_addr_public_key);
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.descriptor_info.meta_info, gw_reg_req.descriptor_info.meta_info);
@@ -1906,14 +1906,17 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.descriptor_info.opt_owner_custom_schnorr_pub_key.value(), gw_reg_req.descriptor_info.opt_owner_custom_schnorr_pub_key.value());
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.payment_id, "");
 
-
+  //
+  // GW -> ZC
+  //
   currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request gw_create_transfer_req = {};
   currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response gw_create_transfer_resp = {};
-  gw_create_transfer_req.destinations.push_back({ TRANSFER_AMOUNT, miner_wlt->get_account().get_public_address_str()});
+  gw_create_transfer_req.destinations.push_back({ MK_TEST_COINS(1), miner_wlt->get_account().get_public_address_str() });
+  gw_create_transfer_req.destinations.push_back({ 8,                miner_wlt->get_account().get_public_address_str(), deployed_asset_id });
   gw_create_transfer_req.fee = TESTS_DEFAULT_FEE;
-  gw_create_transfer_req.comment = "sdsdsd";
+  gw_create_transfer_req.comment = "this is a transfer from a gw address to a normal address";
   gw_create_transfer_req.origin_gateway_id = gw_addr_public_key;
-  r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_create_transfer", gw_create_transfer_req, gw_create_transfer_resp);
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", gw_create_transfer_req, gw_create_transfer_resp);
   CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer failed");
 
   currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request gw_sign_transfer_req = {};
@@ -1926,16 +1929,34 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   gw_sign_transfer_req.opt_custom_schnorr_signature = sig;
   gw_sign_transfer_req.tx_blob = gw_create_transfer_resp.tx_blob;
   gw_sign_transfer_req.tx_hash_to_sign = gw_create_transfer_resp.tx_hash_to_sign;
-  r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_sign_transfer", gw_sign_transfer_req, gw_sign_transfer_resp);
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", gw_sign_transfer_req, gw_sign_transfer_resp);
   CHECK_AND_ASSERT_MES(r, false, "failed to call");
 
   currency::COMMAND_RPC_SEND_RAW_TX::request send_raw_tx_req = {};
   currency::COMMAND_RPC_SEND_RAW_TX::response send_raw_tx_resp = {};
   send_raw_tx_req.tx_as_hex = epee::string_tools::buff_to_hex_nodelimer(gw_sign_transfer_resp.signed_tx_blob);
-  r = invoke_text_json_for_rpc(core_rpc_wrapper, "sendrawtransaction", send_raw_tx_req, send_raw_tx_resp);
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "sendrawtransaction", send_raw_tx_req, send_raw_tx_resp);
   CHECK_AND_ASSERT_MES(r, false, "failed to call");
 
+
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
   r = mine_next_pow_blocks_in_playtime(alice_wlt->get_account().get_public_address(), c, 3);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+   // request gw address info to check updated balances
+  gw_get_info_resp = {};
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", gw_get_info_req, gw_get_info_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_get_address_info failed");
+  CHECK_AND_ASSERT_EQ(gw_get_info_resp.balances.size(), 2);
+  update_gw_balances(gw_get_info_resp.balances);
+  CHECK_AND_ASSERT_EQ(gw_balances[native_coin_asset_id],  0);
+  CHECK_AND_ASSERT_EQ(gw_balances[deployed_asset_id],     2);
+  CHECK_AND_ASSERT_EQ(gw_get_info_resp.gateway_view_pub_key, gw_addr_public_key);
+  CHECK_AND_ASSERT_EQ(gw_get_info_resp.descriptor_info.meta_info, gw_reg_req.descriptor_info.meta_info);
+  CHECK_AND_ASSERT_EQ(gw_get_info_resp.descriptor_info.opt_owner_custom_schnorr_pub_key.has_value(), true);
+  CHECK_AND_ASSERT_EQ(gw_get_info_resp.descriptor_info.opt_owner_custom_schnorr_pub_key.value(), gw_reg_req.descriptor_info.opt_owner_custom_schnorr_pub_key.value());
+  CHECK_AND_ASSERT_EQ(gw_get_info_resp.payment_id, "");
 
   return true;
 }

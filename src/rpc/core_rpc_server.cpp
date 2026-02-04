@@ -889,8 +889,9 @@ namespace currency
         return true;
       }
     }
+    
     res.signed_tx_blob = t_serializable_object_to_blob(tx);
-
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
