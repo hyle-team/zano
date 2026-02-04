@@ -5090,10 +5090,8 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
   b.miner_tx.proofs.emplace_back(std::move(range_proofs));
 
   // balance proof
-  currency::zc_balance_proof balance_proof{};
-  r = generate_tx_balance_proof(b.miner_tx, miner_tx_id, miner_tx_tgc, full_block_reward, balance_proof);
+  r = generate_tx_balance_proof(miner_tx_id, miner_tx_tgc, full_block_reward, b.miner_tx);
   WLT_CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
-  b.miner_tx.proofs.emplace_back(std::move(balance_proof));
 
   // the following line are for debugging when necessary -- sowle
   //err = 0;

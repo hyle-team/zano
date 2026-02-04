@@ -528,7 +528,7 @@ namespace currency
     crypto::generic_linear_composition_and_schnorr_sig_s lcss;
 
     BEGIN_SERIALIZE_OBJECT()
-      FIELD(dss)
+      FIELD(lcss)
     END_SERIALIZE()
   };
 
@@ -1173,7 +1173,7 @@ namespace currency
 
   typedef boost::variant<NLSAG_sig, void_sig, ZC_sig, zarcanum_sig, gateway_sig> signature_v;
 
-  typedef boost::variant<zc_asset_surjection_proof, zc_outs_range_proof, zc_balance_proof, asset_operation_proof, asset_operation_ownership_proof, asset_operation_ownership_proof_eth, gateway_address_ownership_proof> proof_v;
+  typedef boost::variant<zc_asset_surjection_proof, zc_outs_range_proof, zc_balance_proof, asset_operation_proof, asset_operation_ownership_proof, asset_operation_ownership_proof_eth, gateway_address_ownership_proof, zc_gw_balance_proof> proof_v;
 
 
   //include backward compatibility defintions
@@ -1471,6 +1471,7 @@ SET_VARIANT_TAGS(currency::gateway_address_descriptor_operation_update, 75, "gat
 
 SET_VARIANT_TAGS(currency::gateway_address_ownership_proof, 76, "gateway_address_ownership_proof");
 SET_VARIANT_TAGS(crypto::generic_schnorr_sig_s, 70, "generic_schnorr_sig_s");
+SET_VARIANT_TAGS(currency::zc_gw_balance_proof, 77, "zc_gw_balance_proof");
 
 
 

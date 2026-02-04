@@ -6828,6 +6828,7 @@ struct visitor_proxy : public boost::static_visitor<const x_type*>
   DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   proofs,            zc_asset_surjection_proof          );
   DEFINE_TERMS(   no,   no,   no,   no,   many, many, many, many,   proofs,            zc_outs_range_proof                );
   DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    proofs,            zc_balance_proof                   );
+  DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  one,    proofs,            zc_gw_balance_proof                );
   DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    proofs,            asset_operation_proof              );
   DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    proofs,            asset_operation_ownership_proof    );
   DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    proofs,            asset_operation_ownership_proof_eth);

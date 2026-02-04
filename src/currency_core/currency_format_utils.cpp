@@ -616,12 +616,16 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
-  bool generate_tx_balance_proof(const transaction &tx, const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, currency::zc_balance_proof& proof)
+  bool generate_tx_balance_proof(const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, transaction& tx_to_add_proof_to)
   {
-    if (tx.version >= TRANSACTION_VERSION_POST_HF6)
-      return generate_tx_balance_proof_hf6(tx, tx_id, ogc, block_reward_for_miner_tx, proof);
+    if (tx_to_add_proof_to.version >= TRANSACTION_VERSION_POST_HF6)
+      return generate_tx_balance_proof_hf6(tx_id, ogc, block_reward_for_miner_tx, tx_to_add_proof_to);
 
-    return generate_tx_balance_proof_hf4(tx, tx_id, ogc, block_reward_for_miner_tx, proof);
+    zc_balance_proof balance_proof{};
+    if (!generate_tx_balance_proof_hf4(tx_to_add_proof_to, tx_id, ogc, block_reward_for_miner_tx, balance_proof))
+      return false;
+    tx_to_add_proof_to.proofs.push_back(std::move(balance_proof));
+    return true;
   }
   //------------------------------------------------------------------
   bool apply_unlock_time(const std::vector<tx_destination_entry>& destinations, transaction& tx)
@@ -828,10 +832,8 @@ namespace currency
       tx.proofs.emplace_back(std::move(range_proofs));
 
       // balance proof
-      currency::zc_balance_proof balance_proof{};
-      r = generate_tx_balance_proof(tx, tx_id, tx_gen_context, block_reward, balance_proof);
+      r = generate_tx_balance_proof(tx_id, tx_gen_context, block_reward, tx);
       CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
-      tx.proofs.emplace_back(std::move(balance_proof));
     }
 
 
@@ -3184,10 +3186,8 @@ namespace currency
       tx.proofs.emplace_back(std::move(range_proofs));
 
       // balance proof
-      currency::zc_balance_proof balance_proof{};
-      r = generate_tx_balance_proof(tx, tx_prefix_hash, gen_context, 0, balance_proof);
+      r = generate_tx_balance_proof(tx_prefix_hash, gen_context, 0, tx);
       CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
-      tx.proofs.emplace_back(std::move(balance_proof));
 
       // optional asset operation proofs: amount commitment proof (required for register, emit, public burn)
       if (gen_context.ao_asset_id != currency::null_pkey)

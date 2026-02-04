@@ -1290,10 +1290,8 @@ bool test_generator::construct_pow_block_with_alias_info_in_coinbase(const accou
       CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
       miner_tx.proofs.emplace_back(std::move(range_proofs));
       // balance proof
-      currency::zc_balance_proof balance_proof{};
-      r = generate_tx_balance_proof(miner_tx, tx_id, tx_gen_context, block_reward, balance_proof);
+      r = generate_tx_balance_proof(tx_id, tx_gen_context, block_reward, miner_tx);
       CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
-      miner_tx.proofs.emplace_back(std::move(balance_proof));
     }
     else
     {

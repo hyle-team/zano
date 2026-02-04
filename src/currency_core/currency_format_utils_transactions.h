@@ -365,7 +365,7 @@ namespace currency
   bool validate_tx_details_against_tx_generation_context(const transaction& tx, const tx_generation_context& gen_context);
 
   bool generate_tx_balance_proof_hf4(const transaction &tx, const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, currency::zc_balance_proof& proof);
-  bool generate_tx_balance_proof_hf6(const transaction &tx, const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, currency::zc_balance_proof& proof);
+  bool generate_tx_balance_proof_hf6(const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, transaction &tx);
   bool verify_balance_proof_hf4(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
   bool verify_balance_proof_hf6(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
 
