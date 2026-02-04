@@ -8745,8 +8745,7 @@ bool blockchain_storage::collect_all_outs_in_block(uint64_t height, std::vector<
     return false;
   }
 
-  const block_extended_info& bei = *m_db_blocks[height];
-  const block& bl = bei.bl;
+  auto bei_ptr = m_db_blocks[height];
   const uint64_t mix_count = this->get_core_runtime_config().hf4_minimum_mixins;
 
   auto process_tx = [&](const crypto::hash& txid, const transaction& tx) -> bool
@@ -8779,16 +8778,15 @@ bool blockchain_storage::collect_all_outs_in_block(uint64_t height, std::vector<
     }
     return true;
   };
-
   // miner tx
   {
-    const crypto::hash miner_txid = get_transaction_hash(bl.miner_tx);
-    if (!process_tx(miner_txid, bl.miner_tx))
+    const crypto::hash miner_txid = get_transaction_hash(bei_ptr->bl.miner_tx);
+    if (!process_tx(miner_txid, bei_ptr->bl.miner_tx))
       return false;
   }
 
   // regular txs
-  for (const crypto::hash& txid : bl.tx_hashes)
+  for (const crypto::hash& txid : bei_ptr->bl.tx_hashes)
   {
     auto tx_ptr = m_db_transactions.find(txid);
     if (!tx_ptr)
