@@ -309,7 +309,7 @@ namespace crypto
     scalar_t r1 = scalar_t::random();
     scalar_t r2 = scalar_t::random();
     point_t R0 = r0 * c_point_G + r1 * c_point_X; // = (y0 + c * a0) * G + (y1 + c * a1) * X = y0 * G + y1 * X + c * A
-    point_t R2 = r2 * c_point_X;
+    point_t R2 = r2 * c_point_G;
     hash_helper_t::hs_t hsc(5);
     hsc.add_hash(m);
     hsc.add_point(A);
@@ -338,7 +338,7 @@ namespace crypto
       hsc.add_point(A);
       hsc.add_pub_key(B);
       hsc.add_point(A.mul_plus_G(sig.c, sig.y0) + sig.y1 * c_point_X);  // sig.y0 * G + sig.y1 * X + sig.c * A
-      hsc.add_point(sig.y2 * c_point_X + sig.c * point_t(B));           // sig.y2 * X + sig.c * B
+      hsc.add_point(sig.y2 * c_point_G + sig.c * point_t(B));           // sig.y2 * X + sig.c * B
       return sig.c == hsc.calc_hash();
     }
     catch(...)
