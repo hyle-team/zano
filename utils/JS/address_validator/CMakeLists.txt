@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Root of Zano repository
-set(ZANO_ROOT "${CMAKE_CURRENT_LIST_DIR}/../..")
+set(ZANO_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../..")
 
 # Detect Emscripten reliably
 set(IS_EMSCRIPTEN OFF)
