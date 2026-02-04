@@ -3542,6 +3542,10 @@ namespace currency
         if (!check_key(o.blinded_asset_id))
           return false;
       }
+      VARIANT_CASE_CONST(tx_out_gateway, o)
+      {
+        //TODO: @Val do we need to check anything here?
+      }
       VARIANT_SWITCH_END();
     }
     return true;
@@ -3571,6 +3575,10 @@ namespace currency
       else if (in.type() == typeid(txin_zc_input))
       {
         // ignore inputs with hidden amounts
+      }
+      else if (in.type() == typeid(txin_gateway))
+      {
+        //TODO: @Val do we need to check anything here?
       }
       else
       {

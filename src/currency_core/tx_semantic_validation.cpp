@@ -6,6 +6,7 @@
 #include "currency_format_utils_transactions.h"
 #include "misc_log_ex.h"
 #include "currency_config.h"
+#include "hardfork_specific_terms.h"
 
 namespace currency
 {
@@ -45,7 +46,7 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------------------------------------
-  bool validate_tx_semantic(const transaction& tx, size_t tx_blob_size)
+  bool validate_tx_semantic(const transaction& tx, size_t tx_blob_size, const crypto::hash& tx_id)
   {
     if (tx_blob_size >= CURRENCY_MAX_TRANSACTION_BLOB_SIZE)
     {
@@ -59,12 +60,23 @@ namespace currency
       return false;
     }
 
-    if (!check_inputs_types_supported(tx))
+    if (tx.hardfork_id >= ZANO_HARDFORK_06)
     {
-      LOG_PRINT_RED_L0("unsupported input types for tx id= " << get_transaction_hash(tx));
-      return false;
+      if (!currency::validate_tx_for_hardfork_specific_terms_types_new(tx, tx_id, tx.hardfork_id))
+      { 
+        LOG_PRINT_RED_L0("tx failed hardfork specific terms check for tx id= " << get_transaction_hash(tx));
+        return false;
+      }
     }
-
+    else
+    {
+      if (!check_inputs_types_supported(tx))
+      {
+        LOG_PRINT_RED_L0("unsupported input types for tx id= " << get_transaction_hash(tx));
+        return false;
+      }
+    }
+    
     if (!check_outs_valid(tx))
     {
       LOG_PRINT_RED_L0("tx has invalid outputs, rejected for tx id= " << get_transaction_hash(tx));

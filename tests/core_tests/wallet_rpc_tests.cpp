@@ -1835,8 +1835,12 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   CHECK_AND_ASSERT_MES(r, false, "register_gateway_address failed");
   // tx is created but cannot be confirmed in a block
   CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+
+  bool assert_enabled = epee::debug::get_set_enable_assert(false, false);
+  epee::debug::get_set_enable_assert(true, false);
   r = mine_next_pow_block_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c);
   CHECK_AND_ASSERT_FALSE(r); // <- should fail
+  epee::debug::get_set_enable_assert(true, assert_enabled);
   c.get_tx_pool().clear();
   CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
 

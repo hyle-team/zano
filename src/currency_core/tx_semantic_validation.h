@@ -10,6 +10,6 @@
 namespace currency
 {
   //check correct values, ins and outs types, amounts and all lightweight checks not related to the database
-  bool validate_tx_semantic(const transaction& tx, size_t tx_block_size);
+  bool validate_tx_semantic(const transaction& tx, size_t tx_block_size, const crypto::hash& tx_id);
   bool check_inputs_and_outputs_size(const transaction& tx);
 }

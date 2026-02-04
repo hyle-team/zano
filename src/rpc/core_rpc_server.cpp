@@ -736,6 +736,16 @@ namespace currency
     currency::finalize_tx_param ftp = {};
     currency::finalized_tx ftx = {};
 
+    if (m_core.get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active())
+    {
+      er.code = CORE_RPC_ERROR_CODE_CORE_BUSY;
+      er.message = "Pre hardfork freeze period is in effect, sending transactions is not allowed till the next hardfork. Please, try again after the hardfork activation.";
+      LOG_PRINT_L0("[on_gateway_create_transfer]: pre hardfork freeze period is in effect, sending transactions is not allowed till the next hardfork. Please, try again after the hardfork activation.");
+      return false;
+    }
+
+
+
     std::unordered_map<crypto::public_key, uint64_t> total_coins_needed; //asset_id -> amount
     for(const auto& dest : req.destinations)
     {
@@ -815,6 +825,15 @@ namespace currency
     ftp.tx_outs_attr  = CURRENCY_TO_KEY_OUT_RELAXED;
     ftp.tx_version    = TRANSACTION_VERSION_POST_HF6;
     ftp.spend_pub_key = req.origin_gateway_id;
+    ftp.tx_hardfork_id = m_core.get_blockchain_storage().get_current_hardfork_id();
+
+    if (!ftp.prepared_destinations.size() || ftp.prepared_destinations.begin()->addr.size() != 1)
+    {
+      er.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
+      er.message = "No valid destinations were found after processing";
+      return false;
+    }
+
 
     r = currency::construct_tx(dummy_keys, ftp, ftx);
     if(!r)

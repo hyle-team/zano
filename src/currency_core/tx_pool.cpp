@@ -187,7 +187,7 @@ namespace currency
         return false;
       }
 
-      if(!validate_tx_semantic(tx, blob_size))
+      if(!validate_tx_semantic(tx, blob_size, id))
       {          
         // tx semantics check failed
         LOG_PRINT_RED_L0("Transaction " << id << " semantics check failed ");
