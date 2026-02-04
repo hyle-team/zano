@@ -539,6 +539,7 @@ namespace currency
   std::string get_account_address_as_str(const gateway_address_id_type& addr, const payment_id_t& payment_id = payment_id_t{});
   std::string get_account_address_as_str(const address_v& addr, const payment_id_t& payment_id = payment_id_t{});
   bool get_account_address_from_str(account_public_address& addr, const std::string& str);
+  bool get_account_address_from_str(address_v& addr, const std::string& str);
   bool get_account_address_and_payment_id_from_str(account_public_address& addr, payment_id_t& payment_id, const std::string& str);
   bool get_account_address_and_payment_id_from_str(address_v& v_addr, payment_id_t& payment_id, const std::string& str);
   bool parse_payment_id_from_hex_str(const std::string& payment_id_str, payment_id_t& payment_id);

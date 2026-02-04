@@ -1924,12 +1924,20 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_aliases_by_address(const COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& req, COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
-    account_public_address addr = AUTO_VAL_INIT(addr);
-    if (!get_account_address_from_str(addr, req))
+    address_v addr_v = {};
+    if (!get_account_address_from_str(addr_v, req))
     {
       res.status = API_RETURN_CODE_FAIL;
       return true;
     }
+
+    if (addr_v.type() == typeid(gateway_address_id_type))
+    {
+      res.status = API_RETURN_CODE_NOT_FOUND;
+      return true;
+    }
+    
+    const account_public_address& addr = boost::get<account_public_address>(addr_v);
     //res.alias = m_core.get_blockchain_storage().get_alias_by_address(addr);
     COMMAND_RPC_GET_ALIAS_DETAILS::request req2 = AUTO_VAL_INIT(req2);
     COMMAND_RPC_GET_ALIAS_DETAILS::response res2 = AUTO_VAL_INIT(res2);
