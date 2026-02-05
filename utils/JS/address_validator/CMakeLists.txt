@@ -6,30 +6,21 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# Root of Zano repository
 set(ZANO_ROOT "${CMAKE_CURRENT_LIST_DIR}/../../..")
 
-# Detect Emscripten reliably
 set(IS_EMSCRIPTEN OFF)
 if(CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   set(IS_EMSCRIPTEN ON)
 endif()
 
-# Boost headers path is required
 set(Boost_INCLUDE_DIR "" CACHE PATH "Path to Boost headers (e.g. /home/user/boost_1_84_0)")
 if(Boost_INCLUDE_DIR STREQUAL "")
   message(FATAL_ERROR "Boost_INCLUDE_DIR is required (path to Boost headers).")
 endif()
 
-# ----------------------------
-# Threads (Boost.Thread is pulled by Zano headers)
-# ----------------------------
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
-# ----------------------------
-# zlib from contrib (disable its example binaries)
-# ----------------------------
 set(SKIP_INSTALL_ALL ON CACHE BOOL "" FORCE)
 set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(ZLIB_BUILD_MINIZIP OFF CACHE BOOL "" FORCE)
@@ -49,9 +40,6 @@ else()
   message(FATAL_ERROR "zlib target not found after add_subdirectory(contrib/zlib)")
 endif()
 
-# ----------------------------
-# version.h (use repo version.h if exists, else stub)
-# ----------------------------
 set(ZANO_GENERATED_DIR "${CMAKE_BINARY_DIR}/generated")
 file(MAKE_DIRECTORY "${ZANO_GENERATED_DIR}")
 
@@ -70,17 +58,11 @@ else()
   set(ZANO_VERSION_HEADER_DIR "${ZANO_GENERATED_DIR}")
 endif()
 
-# ----------------------------
-# EOS portable archive include root
-# ----------------------------
 set(ZANO_EOS_INCLUDE_DIR "${ZANO_ROOT}/contrib/eos_portable_archive")
 if(NOT EXISTS "${ZANO_EOS_INCLUDE_DIR}/eos/portable_archive.hpp")
   message(FATAL_ERROR "Expected ${ZANO_EOS_INCLUDE_DIR}/eos/portable_archive.hpp not found")
 endif()
 
-# ----------------------------
-# Common include dirs as an INTERFACE target
-# ----------------------------
 add_library(zano_includes INTERFACE)
 
 target_include_directories(zano_includes INTERFACE
@@ -94,15 +76,11 @@ target_include_directories(zano_includes INTERFACE
   "${ZANO_EOS_INCLUDE_DIR}"
 )
 
-# Make sure -pthread is used across all targets on Emscripten
 if(IS_EMSCRIPTEN)
   target_compile_options(zano_includes INTERFACE -pthread)
   target_link_options(zano_includes INTERFACE -pthread)
 endif()
 
-# ----------------------------
-# Sources
-# ----------------------------
 file(GLOB_RECURSE COMMON_SRC CONFIGURE_DEPENDS
   "${ZANO_ROOT}/src/common/*.c"
   "${ZANO_ROOT}/src/common/*.cpp"
@@ -141,9 +119,7 @@ list(FILTER CURRENCY_CORE_SRC EXCLUDE REGEX ".*/rpc_.*\\.cpp$")
 list(FILTER CURRENCY_CORE_SRC EXCLUDE REGEX ".*/wallet_.*\\.cpp$")
 list(FILTER CURRENCY_CORE_SRC EXCLUDE REGEX ".*/net_.*\\.cpp$")
 
-# ----------------------------
-# Emscripten/libc++ workaround (no repo source edits)
-# ----------------------------
+# emscripten/libc++ workaround (no repo source edits)
 if(IS_EMSCRIPTEN)
   set(WASM_PREINCLUDE "${CMAKE_BINARY_DIR}/wasm_preinclude.hpp")
   file(WRITE "${WASM_PREINCLUDE}"
@@ -157,9 +133,6 @@ if(IS_EMSCRIPTEN)
   )
 endif()
 
-# ----------------------------
-# Libraries
-# ----------------------------
 add_library(common STATIC ${COMMON_SRC})
 target_link_libraries(common PUBLIC zano_includes ${ZANO_ZLIB_TARGET} Threads::Threads)
 
@@ -169,7 +142,7 @@ target_link_libraries(crypto PUBLIC zano_includes ${ZANO_ZLIB_TARGET} Threads::T
 add_library(currency_core_min STATIC ${CURRENCY_CORE_SRC})
 target_link_libraries(currency_core_min PUBLIC zano_includes crypto common ${ZANO_ZLIB_TARGET} Threads::Threads)
 
-# Apply forced preinclude and warning suppressions for Emscripten
+# apply forced preinclude and warning suppressions for emscripten
 if(IS_EMSCRIPTEN)
   foreach(t common crypto currency_core_min)
     target_compile_options(${t} PRIVATE
@@ -180,9 +153,6 @@ if(IS_EMSCRIPTEN)
   endforeach()
 endif()
 
-# ----------------------------
-# WASM target
-# ----------------------------
 add_executable(address_validator_wasm
   "${CMAKE_CURRENT_LIST_DIR}/wasm_api.cpp"
 )
