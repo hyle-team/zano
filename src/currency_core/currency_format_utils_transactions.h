@@ -125,7 +125,10 @@ namespace currency
     tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad) {}
     tx_destination_entry(uint64_t a, const account_public_address& ad, const crypto::public_key& aid) : amount(a), addr(1, ad), asset_id(aid) {}
     tx_destination_entry(uint64_t a, const account_public_address& ad, uint64_t ut) : amount(a), addr(1, ad), unlock_time(ut) {}
-    tx_destination_entry(uint64_t a, const std::list<address_v>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()){}
+    tx_destination_entry(uint64_t a, const address_v& addr) : amount(a), addr(1, addr) {}
+    tx_destination_entry(uint64_t a, const address_v& addr, const crypto::public_key& aid) : amount(a), addr(1, addr), asset_id(aid) {}
+
+    tx_destination_entry(uint64_t a, const std::list<address_v>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()) {}
     tx_destination_entry(uint64_t a, const std::list<address_v>& addr, const crypto::public_key& aid) : amount(a), addr(addr), minimum_sigs(addr.size()), asset_id(aid) {}
 
     tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr);// : amount(a), addr(addr), minimum_sigs(addr.size()){}

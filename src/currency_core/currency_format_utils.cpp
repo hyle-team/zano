@@ -1577,6 +1577,7 @@ namespace currency
       if (de.addr.front().type() == typeid(gateway_address_id_type) && tx.version >= TRANSACTION_VERSION_POST_HF6)
         return construct_tx_out_gateway(de,  output_index, tx, deriv_cache, tgc);
 
+      LOG_ERROR("construct_tx_out: unexpected output type: " << de.addr.front().type().name());
       return false; // unknown output type
     }
 
@@ -3149,10 +3150,13 @@ namespace currency
       if (source_entry.is_zc())
       {
         // ZC
-        r = generate_ZC_sig(tx_hash_for_signature, i_ + input_starter_index, source_entry, in_contexts[i_mapped], sender_account_keys, flags, gen_context, tx, i_ + 1 == sources.size(), separately_signed_tx_complete);
+        bool last_confidential_output = (gen_context.zc_input_amounts.size() + 1 == zc_inputs_count);
+        r = generate_ZC_sig(tx_hash_for_signature, i_ + input_starter_index, source_entry, in_contexts[i_mapped], sender_account_keys, flags, gen_context, tx, last_confidential_output, separately_signed_tx_complete);
         CHECK_AND_ASSERT_MES(r, false, "generate_ZC_sigs failed");
         gen_context.zc_input_amounts.push_back(source_entry.amount);
-      }else if (source_entry.gateway_origin != currency::null_pkey)
+        CHECK_AND_ASSERT_MES(gen_context.zc_input_amounts.size() <= zc_inputs_count, false, "zc_inputs_count invariant fail");
+      }
+      else if (source_entry.gateway_origin != currency::null_pkey)
       {
         //TODO: Do nothing here as it will be signed after? @sowle
         generate_gateway_sig_dummy(tx_hash_for_signature, tx_prefix_hash, i_ + input_starter_index, source_entry, sender_account_keys, in_contexts[i_mapped], gen_context.tx_key, flags, tx, &ss_ring_s);
