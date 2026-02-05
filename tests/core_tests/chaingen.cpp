@@ -1717,8 +1717,12 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
         continue;
       }
 
-      if (amounts.count(oi.asset_id) == 0)
+      auto it_amounts = amounts.find(oi.asset_id);
+      if (it_amounts == amounts.end())
         continue; // skip assets that are not required
+
+      if ((*p_sources_amounts)[oi.asset_id] >= it_amounts->second)
+        continue; // skip, because have found enough already
 
       currency::tx_source_entry ts{};
       ts.asset_id = oi.asset_id;
@@ -1773,7 +1777,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
     ss << "fill_tx_sources failed (not enough money), found sources (amount, asset_id):" << ENDL;
     for(auto& el : sources)
     {
-      ss << "  " << std::setw(20) << std::right << el.amount << " ";
+      ss << "  " << std::setw(20) << std::right << el.amount << "  ";
       if (!el.is_native_coin())
         ss << el.asset_id;
       ss << ENDL;
