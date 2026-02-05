@@ -6,7 +6,6 @@
 
 #include "chaingen.h"
 #include "chaingen_tests_list.h"
-#include "common/command_line.h"
 #include "transaction_tests.h"
 #include "../../src/wallet/core_fast_rpc_proxy.h"
 #include "test_core_proxy.h"
@@ -14,25 +13,25 @@
 #include "random_helper.h"
 #include "core_state_helper.h"
 #include "common/db_backend_selector.h"
+#include "parallel/parallel_test_runner.h"
+#include "chaingen_args.h"
+#include <boost/property_tree/json_parser.hpp>
 #include "common/callstack_helper.h"
 
 #define TX_BLOBSIZE_CHECKER_LOG_FILENAME "get_object_blobsize(tx).log"
 
+using namespace chaingen_args;
+
 namespace po = boost::program_options;
+namespace pt = boost::property_tree;
 
 namespace
 {
-  const command_line::arg_descriptor<std::string> arg_test_data_path               ("test-data-path", "", "");
-  const command_line::arg_descriptor<bool>        arg_generate_test_data           ("generate-test-data", "");
-  const command_line::arg_descriptor<bool>        arg_play_test_data               ("play-test-data", "");
-  const command_line::arg_descriptor<bool>        arg_generate_and_play_test_data  ("generate-and-play-test-data", "");
-  const command_line::arg_descriptor<bool>        arg_test_transactions            ("test-transactions", "");
-  const command_line::arg_descriptor<std::string> arg_run_single_test              ("run-single-test", "<TEST_NAME[@HF]> TEST_NAME -- name of a single test to run, HF -- specific hardfork id to run the test for" );
-  const command_line::arg_descriptor<std::string> arg_run_multiple_tests           ("run-multiple-tests", "comma-separated list of tests to run, OR text file <@filename> containing list of tests");
-  const command_line::arg_descriptor<bool>        arg_enable_debug_asserts         ("enable-debug-asserts", "" );
-  const command_line::arg_descriptor<bool>        arg_stop_on_fail                 ("stop-on-fail", "");
-
   boost::program_options::variables_map g_vm;
+  std::unique_ptr<parallel_test_runner> g_runner;
+  std::vector<test_job> g_test_jobs;
+  coretests_shm::shared_state* g_shm_state = nullptr;
+  std::unique_ptr<boost::interprocess::mapped_region> g_shm_region;
 }
 
 #define GENERATE(filename, genclass) \
@@ -56,7 +55,6 @@ namespace
     std::cout << concolor::magenta << "Failed to pass test : " << #genclass << concolor::normal << std::endl; \
     return 1; \
   }
-
 
 std::vector<size_t> parse_hardfork_str_mask(std::string s /* intentionally passing by value */)
 {
@@ -387,72 +385,81 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
   return r;
 }
 
-
 #define GENERATE_AND_PLAY(genclass)                                                                        \
-  if (is_test_eligible_to_run(#genclass))                                                                  \
-  {                                                                                                        \
-    TIME_MEASURE_START_MS(t);                                                                              \
-    ++tests_count;                                                                                         \
-    ++unique_tests_count;                                                                                  \
-    if (!generate_and_play<genclass>(#genclass))                                                           \
-    {                                                                                                      \
-      failed_tests.insert(#genclass);                                                                      \
-      LOCAL_ASSERT(false);                                                                                 \
-      if (stop_on_first_fail)                                                                              \
-        skip_all_till_the_end = true;                                                                      \
-    }                                                                                                      \
-    TIME_MEASURE_FINISH_MS(t);                                                                             \
-    tests_running_time.push_back(std::make_pair(#genclass, t));                                            \
-  }
+  do {                                                                                                     \
+    const std::string __test_name = #genclass;                                                             \
+    auto __is_test_eligible_to_run = is_test_eligible_to_run;                                              \
+    g_test_jobs.push_back(test_job{                                                                        \
+      __test_name,                                                                                         \
+      [&, __test_name, __is_test_eligible_to_run]() -> bool {                                              \
+        if (!__is_test_eligible_to_run(__test_name))                                                       \
+          return true;                                                                                     \
+        return run_one_test_job(                                                                           \
+          __test_name,                                                                                     \
+          [&]() -> bool { return generate_and_play<genclass>(__test_name.c_str()); },                      \
+          stop_on_first_fail,                                                                              \
+          skip_all_till_the_end,                                                                           \
+          tests_count,                                                                                     \
+          unique_tests_count,                                                                              \
+          failed_tests,                                                                                    \
+          tests_running_time);                                                                             \
+      }                                                                                                    \
+    });                                                                                                    \
+  } while (0)
 
 #define GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(genclass)                                     \
-  if (is_test_eligible_to_run(#genclass))                                                                  \
-  {                                                                                                        \
-    const char* testname = #genclass " (BC saveload)";                                                     \
-    TIME_MEASURE_START_MS(t);                                                                              \
-    ++tests_count;                                                                                         \
-    ++unique_tests_count;                                                                                  \
-    if (!gen_and_play_intermitted_by_blockchain_saveload<genclass>(testname))                              \
-    {                                                                                                      \
-      failed_tests.insert(testname);                                                                       \
-      LOCAL_ASSERT(false);                                                                                 \
-      if (stop_on_first_fail)                                                                              \
-        skip_all_till_the_end = true;                                                                      \
-    }                                                                                                      \
-    TIME_MEASURE_FINISH_MS(t);                                                                             \
-    tests_running_time.push_back(std::make_pair(testname, t));                                             \
-  }
+  do {                                                                                                     \
+    const std::string __test_name = std::string(#genclass) + " (BC saveload)";                             \
+    auto __is_test_eligible_to_run = is_test_eligible_to_run;                                              \
+    g_test_jobs.push_back(test_job{                                                                        \
+      __test_name,                                                                                         \
+      [&, __test_name, __is_test_eligible_to_run]() -> bool {                                              \
+        if (!__is_test_eligible_to_run(#genclass))                                                         \
+          return true;                                                                                     \
+        return run_one_test_job(                                                                           \
+          __test_name,                                                                                     \
+          [&]() -> bool { return gen_and_play_intermitted_by_blockchain_saveload<genclass>(__test_name.c_str()); }, \
+          stop_on_first_fail,                                                                              \
+          skip_all_till_the_end,                                                                           \
+          tests_count,                                                                                     \
+          unique_tests_count,                                                                              \
+          failed_tests,                                                                                    \
+          tests_running_time);                                                                             \
+      }                                                                                                    \
+    });                                                                                                    \
+  } while (0)
 
 #define GENERATE_AND_PLAY_HF(genclass, hardfork_str_mask)                                                  \
-  if (!skip_all_till_the_end)                                                                              \
-  {                                                                                                        \
-    std::vector<size_t> hardforks = parse_hardfork_str_mask(hardfork_str_mask);                            \
-    CHECK_AND_ASSERT_MES(!hardforks.empty(), false, "invalid hardforks mask: " << hardfork_str_mask);      \
-    for(size_t i = 0; i < hardforks.size() && !skip_all_till_the_end; ++i)                                 \
+  do {                                                                                                     \
+    const std::string __gen_name = #genclass;                                                              \
+    std::vector<size_t> __hardforks = parse_hardfork_str_mask(hardfork_str_mask);                          \
+    CHECK_AND_ASSERT_MES_CUSTOM(!__hardforks.empty(), /*fail_ret_val=*/,                                   \
+      /*custom_code=*/skip_all_till_the_end = true, "invalid hardforks mask: " << hardfork_str_mask << " for test " << __gen_name); \
+    auto __hf_filter = is_hf_test_eligible_to_run;                                                         \
+    for (size_t __i = 0; __i < __hardforks.size(); ++__i)                                                  \
     {                                                                                                      \
-      if (!is_hf_test_eligible_to_run(#genclass, hardforks[i]))                                            \
-        continue;                                                                                          \
-      std::string tns = std::string(#genclass) + " @ HF " + epee::string_tools::num_to_string_fast(hardforks[i]);  \
-      const char* testname = tns.c_str();                                                                  \
-      TIME_MEASURE_START_MS(t);                                                                            \
-      ++tests_count;                                                                                       \
-      if (!generate_and_play<genclass>(testname, hardforks[i]))                                            \
-      {                                                                                                    \
-        failed_tests.insert(testname);                                                                     \
-        LOCAL_ASSERT(false);                                                                               \
-        if (stop_on_first_fail)                                                                            \
-          skip_all_till_the_end = true;                                                                    \
-      }                                                                                                    \
-      TIME_MEASURE_FINISH_MS(t);                                                                           \
-      tests_running_time.push_back(std::make_pair(testname, t));                                           \
+      const size_t __hf_id = __hardforks[__i];                                                             \
+      const std::string __test_name = __gen_name + " @ HF " + epee::string_tools::num_to_string_fast(__hf_id);  \
+      g_test_jobs.push_back(test_job{                                                                      \
+        __test_name,                                                                                       \
+        [&, __test_name, __gen_name, __hf_id, __hf_filter]() -> bool {                                     \
+          if (!__hf_filter(__gen_name, __hf_id))                                                           \
+            return true;                                                                                   \
+          return run_one_test_job(                                                                         \
+            __test_name,                                                                                   \
+            [&]() -> bool { return generate_and_play<genclass>(__test_name.c_str(), __hf_id); },           \
+            stop_on_first_fail,                                                                            \
+            skip_all_till_the_end,                                                                         \
+            tests_count,                                                                                   \
+            unique_tests_count,                                                                            \
+            failed_tests,                                                                                  \
+            tests_running_time);                                                                           \
+        }                                                                                                  \
+      });                                                                                                  \
     }                                                                                                      \
-    ++unique_tests_count;                                                                                  \
-  }
-
-
+  } while (0)
 
 //#define GENERATE_AND_PLAY(genclass) GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(genclass)
-
 
 #define CALL_TEST(test_name, function)                                                                     \
   {                                                                                                        \
@@ -730,25 +737,6 @@ inline bool replay_events_through_core(currency::core& cr, const std::vector<tes
   CATCH_ENTRY_L0("replay_events_through_core", false);
 }
 //--------------------------------------------------------------------------
-std::shared_ptr<boost::program_options::variables_map> prepare_variables_map()
-{
-  boost::program_options::options_description desc("Allowed options");
-  currency::core::init_options(desc);
-  command_line::add_arg(desc, command_line::arg_data_dir);
-  std::shared_ptr<boost::program_options::variables_map> vm(new boost::program_options::variables_map);
-  bool r = command_line::handle_error_helper(desc, [&]()
-  {
-    boost::program_options::store(boost::program_options::basic_parsed_options<char>(&desc), *vm.get());
-    boost::program_options::notify(*vm.get());
-    return true;
-  });
-
-  if (!r)
-    return nullptr;
-
-  return vm;
-}
-//--------------------------------------------------------------------------
 template<class t_test_class>
 inline bool do_replay_events(const std::vector<test_event_entry>& events, t_test_class& validator,
   size_t event_index_from = 0, size_t event_index_to = SIZE_MAX, bool deinit_core = true)
@@ -900,6 +888,493 @@ bool parse_cmd_specific_tests_to_run(std::unordered_multimap<std::string, size_t
   return true;
 }
 //--------------------------------------------------------------------------
+static bool run_one_test_job(const std::string& test_name, const std::function<bool()>& fn, bool& stop_on_first_fail, bool& skip_all_till_the_end,
+  size_t& tests_count, size_t& unique_tests_count, std::set<std::string>& failed_tests, std::vector<std::pair<std::string, uint64_t>>& tests_running_time)
+{
+  if (skip_all_till_the_end)
+    return true;
+
+  TIME_MEASURE_START_MS(t);
+
+  ++tests_count;
+  ++unique_tests_count;
+
+  if (g_runner)
+    g_runner->log_test_taken_by_this_process(test_name);
+
+  bool ok = fn();
+  if (!ok)
+  {
+    failed_tests.insert(test_name);
+    LOCAL_ASSERT(false);
+
+    const int32_t wid = command_line::get_arg(g_vm, chaingen_args::arg_worker_id);
+    const uint32_t procs = command_line::get_arg(g_vm, chaingen_args::arg_processes);
+    if (procs > 1 && wid >= 0 && g_shm_state)
+      g_shm_state->record_fail(static_cast<uint32_t>(wid), test_name.c_str());
+
+    if (stop_on_first_fail)
+      skip_all_till_the_end = true;
+  }
+
+  TIME_MEASURE_FINISH_MS(t);
+  tests_running_time.push_back(std::make_pair(test_name, t));
+
+  return ok;
+}
+
+static bool run_registered_tests(bool& stop_on_first_fail, bool& skip_all_till_the_end, size_t& tests_count, size_t& unique_tests_count, std::set<std::string>& failed_tests,
+  std::vector<std::pair<std::string, uint64_t>>& tests_running_time, const std::function<bool(const std::string&)>& /*is_test_eligible_to_run*/,const std::function<bool(const std::string&, size_t)>& /*is_hf_test_eligible_to_run*/)
+{
+  bool all_ok = true;
+
+  const int32_t worker_id = command_line::get_arg(g_vm, arg_worker_id);
+  const bool is_worker = (worker_id >= 0);
+
+  if (!is_worker)
+  {
+    for (size_t i = 0; i < g_test_jobs.size() && !skip_all_till_the_end; ++i)
+    {
+      const bool ok = g_test_jobs[i].run();
+      all_ok = all_ok && ok;
+    }
+    return all_ok;
+  }
+
+  if (!g_shm_state)
+    return all_ok;
+
+  while (!skip_all_till_the_end)
+  {
+    if (g_shm_state->stop_all.load(std::memory_order_acquire))
+      break;
+
+    uint32_t job_idx = 0;
+    if (!g_shm_state->try_take_next(job_idx))
+      break;
+
+    if (job_idx >= g_test_jobs.size())
+      continue;
+
+    const bool ok = g_test_jobs[job_idx].run();
+    if (ok)
+      continue;
+
+    all_ok = false;
+
+    if (stop_on_first_fail)
+    {
+      skip_all_till_the_end = true;
+      g_shm_state->stop_all.store(true, std::memory_order_release);
+      break;
+    }
+  }
+
+  return all_ok;
+}
+//--------------------------------------------------------------------------
+// parameters are used inside macros
+static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the_end, size_t& tests_count, size_t& unique_tests_count,
+  std::set<std::string>& failed_tests, std::vector<std::pair<std::string, uint64_t>>& tests_running_time,
+  std::function<bool(const std::string&)> is_test_eligible_to_run, std::function<bool(const std::string&, size_t)> is_hf_test_eligible_to_run)
+{
+  g_test_jobs.clear();
+
+  // TODO // GENERATE_AND_PLAY(wallet_spend_form_auditable_and_track);
+  GENERATE_AND_PLAY(gen_block_big_major_version);
+
+  GENERATE_AND_PLAY(pos_minting_tx_packing);
+
+  GENERATE_AND_PLAY(multisig_wallet_test);
+  GENERATE_AND_PLAY(multisig_wallet_test_many_dst);
+  GENERATE_AND_PLAY(multisig_wallet_heterogenous_dst);
+  GENERATE_AND_PLAY(multisig_wallet_same_dst_addr);
+  GENERATE_AND_PLAY(multisig_wallet_ms_to_ms);
+  GENERATE_AND_PLAY(multisig_minimum_sigs);
+  GENERATE_AND_PLAY(multisig_and_fake_outputs);
+  GENERATE_AND_PLAY(multisig_and_unlock_time);
+  GENERATE_AND_PLAY(multisig_and_coinbase);
+  GENERATE_AND_PLAY(multisig_with_same_id_in_pool);
+  GENERATE_AND_PLAY_HF(multisig_and_checkpoints, "0"); // TODO: fix for HF 1-3 (checkpoint hash check)
+  GENERATE_AND_PLAY(multisig_and_checkpoints_bad_txs);
+  GENERATE_AND_PLAY(multisig_and_altchains);
+  GENERATE_AND_PLAY(multisig_out_make_and_spent_in_altchain);
+  GENERATE_AND_PLAY(multisig_unconfirmed_transfer_and_multiple_scan_pool_calls);
+  GENERATE_AND_PLAY(multisig_out_spent_in_altchain_case_b4);
+  GENERATE_AND_PLAY(multisig_n_participants_seq_signing);
+
+  GENERATE_AND_PLAY(ref_by_id_basics);
+  GENERATE_AND_PLAY(ref_by_id_mixed_inputs_types);
+
+  GENERATE_AND_PLAY(escrow_wallet_test);
+  GENERATE_AND_PLAY(escrow_w_and_fake_outputs);
+  GENERATE_AND_PLAY(escrow_incorrect_proposal);
+  GENERATE_AND_PLAY(escrow_proposal_expiration);
+  GENERATE_AND_PLAY(escrow_proposal_and_accept_expiration);
+  GENERATE_AND_PLAY(escrow_incorrect_proposal_acceptance);
+  GENERATE_AND_PLAY(escrow_custom_test);
+  GENERATE_AND_PLAY(escrow_incorrect_cancel_proposal);
+  GENERATE_AND_PLAY(escrow_proposal_not_enough_money);
+  GENERATE_AND_PLAY(escrow_cancellation_and_tx_order);
+  GENERATE_AND_PLAY(escrow_cancellation_proposal_expiration);
+  GENERATE_AND_PLAY(escrow_cancellation_acceptance_expiration);
+  // GENERATE_AND_PLAY(escrow_proposal_acceptance_in_alt_chain); -- work in progress
+  GENERATE_AND_PLAY(escrow_zero_amounts);
+  GENERATE_AND_PLAY(escrow_balance);
+
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<0>);
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<1>);
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<2>);
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<3>);
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<4>);
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<5>);
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<6>);
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<7>);
+  GENERATE_AND_PLAY(escrow_altchain_meta_test<8>);
+  static_assert(escrow_altchain_meta_test_data<9>::empty_marker, ""); // make sure there are no sub-tests left
+
+  GENERATE_AND_PLAY(offers_expiration_test);
+  GENERATE_AND_PLAY(offers_tests);
+  GENERATE_AND_PLAY(offers_filtering_1);
+  //GENERATE_AND_PLAY(offers_handling_on_chain_switching);
+  GENERATE_AND_PLAY(offer_removing_and_selected_output);
+  GENERATE_AND_PLAY(offers_multiple_update);
+  GENERATE_AND_PLAY(offer_sig_validity_in_update_and_cancel);
+  GENERATE_AND_PLAY(offer_lifecycle_via_tx_pool);
+  GENERATE_AND_PLAY(offers_updating_hack);
+  GENERATE_AND_PLAY(offer_cancellation_with_zero_fee);
+
+  GENERATE_AND_PLAY(gen_crypted_attachments);
+  GENERATE_AND_PLAY(gen_checkpoints_attachments_basic);
+  GENERATE_AND_PLAY(gen_checkpoints_invalid_keyimage);
+  GENERATE_AND_PLAY(gen_checkpoints_altblock_before_and_after_cp);
+  GENERATE_AND_PLAY(gen_checkpoints_block_in_future);
+  GENERATE_AND_PLAY(gen_checkpoints_altchain_far_before_cp);
+  GENERATE_AND_PLAY(gen_checkpoints_block_in_future_after_cp);
+  GENERATE_AND_PLAY(gen_checkpoints_prun_txs_after_blockchain_load);
+  GENERATE_AND_PLAY(gen_checkpoints_reorganize);
+  GENERATE_AND_PLAY(gen_checkpoints_pos_validation_on_altchain);
+  GENERATE_AND_PLAY(gen_checkpoints_and_invalid_tx_to_pool);
+  GENERATE_AND_PLAY(gen_checkpoints_set_after_switching_to_altchain);
+  GENERATE_AND_PLAY_HF(gen_no_attchments_in_coinbase, "3");
+  GENERATE_AND_PLAY(gen_no_attchments_in_coinbase_gentime);
+
+  GENERATE_AND_PLAY_HF(gen_alias_tests, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_strange_data, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_concurrency_with_switch, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_same_alias_in_tx_pool, "3-*");   
+  GENERATE_AND_PLAY_HF(gen_alias_switch_and_tx_pool, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_update_after_addr_changed, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_blocking_reg_by_invalid_tx, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_blocking_update_by_invalid_tx, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_reg_with_locked_money, "*");
+  GENERATE_AND_PLAY_HF(gen_alias_too_small_reward, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_too_much_reward, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_tx_no_outs, "*");
+  GENERATE_AND_PLAY_HF(gen_alias_switch_and_check_block_template, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_too_many_regs_in_block_template, "3"); // disabled in HF4 due to tx outputs count limitation
+  GENERATE_AND_PLAY_HF(gen_alias_update_for_free, "3-*");
+  GENERATE_AND_PLAY_HF(gen_alias_in_coinbase, "3-*");
+
+  GENERATE_AND_PLAY(gen_wallet_basic_transfer);
+  GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch);
+  GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch_2);
+  GENERATE_AND_PLAY(gen_wallet_unconfirmed_tx_from_tx_pool);
+  GENERATE_AND_PLAY_HF(gen_wallet_save_load_and_balance, "*");
+  GENERATE_AND_PLAY_HF(gen_wallet_mine_pos_block, "3-*");
+  GENERATE_AND_PLAY(gen_wallet_unconfirmed_outdated_tx);
+  GENERATE_AND_PLAY(gen_wallet_unlock_by_block_and_by_time);
+  GENERATE_AND_PLAY(gen_wallet_payment_id);
+  GENERATE_AND_PLAY(gen_wallet_oversized_payment_id);
+  GENERATE_AND_PLAY(gen_wallet_transfers_and_outdated_unconfirmed_txs);
+  GENERATE_AND_PLAY(gen_wallet_transfers_and_chain_switch);
+  GENERATE_AND_PLAY(gen_wallet_decrypted_payload_items);
+  GENERATE_AND_PLAY_HF(gen_wallet_alias_and_unconfirmed_txs, "3-*");
+  GENERATE_AND_PLAY_HF(gen_wallet_alias_via_special_wallet_funcs, "3-*");
+  GENERATE_AND_PLAY(gen_wallet_fake_outputs_randomness);
+  GENERATE_AND_PLAY(gen_wallet_fake_outputs_not_enough);
+  GENERATE_AND_PLAY(gen_wallet_offers_basic);
+  GENERATE_AND_PLAY(gen_wallet_offers_size_limit);
+  GENERATE_AND_PLAY(gen_wallet_dust_to_account);
+  GENERATE_AND_PLAY(gen_wallet_selecting_pos_entries);
+  GENERATE_AND_PLAY(gen_wallet_spending_coinstake_after_minting);
+  GENERATE_AND_PLAY(gen_wallet_fake_outs_while_having_too_little_own_outs);
+  // GENERATE_AND_PLAY(premine_wallet_test);  // tests premine wallets; wallet files nedded; by demand only
+  GENERATE_AND_PLAY(mined_balance_wallet_test);
+  GENERATE_AND_PLAY(wallet_outputs_with_same_key_image);
+  GENERATE_AND_PLAY(wallet_unconfirmed_tx_expiration);
+  GENERATE_AND_PLAY(wallet_unconfimed_tx_balance);
+  GENERATE_AND_PLAY_HF(packing_outputs_on_pos_minting_wallet, "3");
+  GENERATE_AND_PLAY_HF(wallet_watch_only_and_chain_switch, "3");
+  GENERATE_AND_PLAY_HF(wallet_and_sweep_below, "3-*");
+
+  GENERATE_AND_PLAY(wallet_rpc_integrated_address);
+  GENERATE_AND_PLAY(wallet_rpc_integrated_address_transfer);
+  GENERATE_AND_PLAY(wallet_rpc_transfer);
+  GENERATE_AND_PLAY(wallet_rpc_alias_tests);
+  GENERATE_AND_PLAY_HF(wallet_rpc_exchange_suite, "3,4");
+  GENERATE_AND_PLAY_HF(wallet_true_rpc_pos_mining, "4-*");
+  GENERATE_AND_PLAY_HF(wallet_rpc_cold_signing, "3,5-*");
+  // GENERATE_AND_PLAY_HF(wallet_rpc_multiple_receivers, "5-*"); work in progress -- sowle
+  GENERATE_AND_PLAY_HF(wallet_chain_switch_with_spending_the_same_ki, "3");
+  GENERATE_AND_PLAY(wallet_sending_to_integrated_address);
+  GENERATE_AND_PLAY_HF(block_template_blacklist_test, "4-*");
+  GENERATE_AND_PLAY_HF(wallet_rpc_hardfork_verification, "5");
+
+  // GENERATE_AND_PLAY(emission_test); // simulate 1 year of blockchain, too long run (1 y ~= 1 hr), by demand only
+  // LOG_ERROR2("print_reward_change_first_blocks.log", currency::print_reward_change_first_blocks(525601).str()); // outputs first 1 year of blocks' rewards (simplier)
+
+  // pos tests
+  GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(gen_pos_basic_tests);
+  // GENERATE_AND_PLAY(gen_pos_basic_tests); -- commented as this test is run intermittedly by previous line; uncomment if necessary (ex. for debugging)
+  GENERATE_AND_PLAY(gen_pos_coinstake_already_spent);
+  GENERATE_AND_PLAY(gen_pos_incorrect_timestamp);
+  GENERATE_AND_PLAY(gen_pos_too_early_pos_block);
+  GENERATE_AND_PLAY_HF(gen_pos_extra_nonce, "3-*");
+  GENERATE_AND_PLAY(gen_pos_min_allowed_height);
+  GENERATE_AND_PLAY(gen_pos_invalid_coinbase);
+  // GENERATE_AND_PLAY(pos_wallet_minting_same_amount_diff_outs); // Long test! Takes ~10 hours to simulate 6000 blocks on 2015 middle-end computer
+  //GENERATE_AND_PLAY(pos_emission_test); // Long test! by demand only
+  GENERATE_AND_PLAY(pos_wallet_big_block_test);
+  //GENERATE_AND_PLAY(block_template_against_txs_size); // Long test! by demand only
+  GENERATE_AND_PLAY_HF(pos_altblocks_validation, "3-*");
+  GENERATE_AND_PLAY_HF(pos_mining_with_decoys, "3");
+  GENERATE_AND_PLAY_HF(pos_and_no_pow_blocks_between_output_and_stake, "4-*");
+
+  // alternative blocks and generic chain-switching tests
+  GENERATE_AND_PLAY(gen_chain_switch_pow_pos);
+  GENERATE_AND_PLAY(pow_pos_reorganize_specific_case);
+  GENERATE_AND_PLAY(gen_chain_switch_1);
+  GENERATE_AND_PLAY(bad_chain_switching_with_rollback);
+  GENERATE_AND_PLAY(chain_switching_and_tx_with_attachment_blobsize);
+  GENERATE_AND_PLAY_HF(chain_switching_when_gindex_spent_in_both_chains, "3-*");
+  GENERATE_AND_PLAY(alt_chain_coins_pow_mined_then_spent);
+  GENERATE_AND_PLAY(gen_simple_chain_split_1);
+  GENERATE_AND_PLAY_HF(alt_blocks_validation_and_same_new_amount_in_two_txs, "3-*");
+  GENERATE_AND_PLAY_HF(alt_blocks_with_the_same_txs, "3-*");
+  GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_mixin, "3-*");
+  GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_ref_id, "3-*");
+  GENERATE_AND_PLAY_HF(alt_chain_and_block_tx_fee_median, "3-*");
+
+  // miscellaneous tests
+  GENERATE_AND_PLAY(test_blockchain_vs_spent_keyimges);
+  GENERATE_AND_PLAY(test_blockchain_vs_spent_multisig_outs);
+  GENERATE_AND_PLAY(block_template_vs_invalid_txs_from_pool);
+  GENERATE_AND_PLAY(cumulative_difficulty_adjustment_test);
+  GENERATE_AND_PLAY(cumulative_difficulty_adjustment_test_alt);
+  GENERATE_AND_PLAY(prun_ring_signatures);
+  GENERATE_AND_PLAY(gen_simple_chain_001);
+  GENERATE_AND_PLAY(one_block);
+  GENERATE_AND_PLAY(gen_ring_signature_1);
+  GENERATE_AND_PLAY(gen_ring_signature_2);
+  GENERATE_AND_PLAY(fill_tx_rpc_inputs);
+  //GENERATE_AND_PLAY(gen_ring_signature_big); // Takes up to XXX hours (if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10)
+
+  // tests for outputs mixing in
+  GENERATE_AND_PLAY(get_random_outs_test);
+  GENERATE_AND_PLAY(mix_attr_tests);
+  GENERATE_AND_PLAY(mix_in_spent_outs);
+  GENERATE_AND_PLAY(random_outs_and_burnt_coins);
+
+  // Block verification tests
+  GENERATE_AND_PLAY_HF(gen_block_big_major_version, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_big_minor_version, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_ts_not_checked, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_ts_in_past, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_ts_in_future, "0,3");
+  //GENERATE_AND_PLAY(gen_block_invalid_prev_id); disabled because impossible to generate text chain with wrong prev_id - pow hash not works without chaining
+  GENERATE_AND_PLAY_HF(gen_block_invalid_nonce, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_no_miner_tx, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_low, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_high, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_timestamp_in_past, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_timestamp_in_future, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_height_is_low, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_height_is_high, "0,3");
+  GENERATE_AND_PLAY_HF(block_with_correct_prev_id_on_wrong_height, "3-*");
+  GENERATE_AND_PLAY_HF(block_reward_in_main_chain_basic, "3-*");
+  GENERATE_AND_PLAY_HF(block_reward_in_alt_chain_basic, "3-*");
+  GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_tx_gen_in, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_in, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_miner_tx_with_txin_to_key, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_miner_tx_out_is_small, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_miner_tx_out_is_big, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_no_out, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_out_to_initiator, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_has_invalid_tx, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_is_too_big, "0,3");
+  GENERATE_AND_PLAY_HF(gen_block_wrong_version_agains_hardfork, "0,3");
+  GENERATE_AND_PLAY_HF(block_choice_rule_bigger_fee, "4-*"); 
+  //GENERATE_AND_PLAY(gen_block_invalid_binary_format); // Takes up to 3 hours, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 500, up to 30 minutes, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10
+  
+  // Transaction verification tests
+  GENERATE_AND_PLAY(gen_broken_attachments);
+  GENERATE_AND_PLAY(gen_tx_big_version);
+  GENERATE_AND_PLAY(gen_tx_unlock_time);
+  GENERATE_AND_PLAY(gen_tx_input_is_not_txin_to_key);
+  GENERATE_AND_PLAY(gen_tx_no_inputs_no_outputs);
+  GENERATE_AND_PLAY(gen_tx_no_inputs_has_outputs);
+  GENERATE_AND_PLAY(gen_tx_has_inputs_no_outputs);
+  GENERATE_AND_PLAY(gen_tx_invalid_input_amount);
+  GENERATE_AND_PLAY(gen_tx_input_wo_key_offsets);
+  GENERATE_AND_PLAY(gen_tx_sender_key_offest_not_exist);
+  GENERATE_AND_PLAY(gen_tx_key_offest_points_to_foreign_key);
+  GENERATE_AND_PLAY(gen_tx_mixed_key_offest_not_exist);
+  GENERATE_AND_PLAY(gen_tx_key_image_not_derive_from_tx_key);
+  GENERATE_AND_PLAY(gen_tx_key_image_is_invalid);
+  GENERATE_AND_PLAY(gen_tx_check_input_unlock_time);
+  GENERATE_AND_PLAY(gen_tx_txout_to_key_has_invalid_key);
+  GENERATE_AND_PLAY(gen_tx_output_with_zero_amount);
+  GENERATE_AND_PLAY(gen_tx_output_is_not_txout_to_key);
+  GENERATE_AND_PLAY(gen_tx_signatures_are_invalid);
+  GENERATE_AND_PLAY(gen_tx_extra_double_entry);
+  GENERATE_AND_PLAY(gen_tx_double_key_image);
+  GENERATE_AND_PLAY(tx_expiration_time);
+  GENERATE_AND_PLAY(tx_expiration_time_and_block_template);
+  GENERATE_AND_PLAY(tx_expiration_time_and_chain_switching);
+  GENERATE_AND_PLAY(tx_key_image_pool_conflict);
+  //GENERATE_AND_PLAY_HF(tx_version_against_hardfork, "4-*");
+  /* To execute the check of bare balance (function "check_tx_bare_balance") we need to run the test "tx_pool_semantic_validation" on the HF 3. By default behaviour bare outputs are disallowed on
+  the heights >= 10. */
+  GENERATE_AND_PLAY_HF(tx_pool_semantic_validation, "3");
+  GENERATE_AND_PLAY(input_refers_to_incompatible_by_type_output);
+  GENERATE_AND_PLAY_HF(tx_pool_validation_and_chain_switch, "4-5");
+  GENERATE_AND_PLAY_HF(tx_coinbase_separate_sig_flag, "4-*");
+  GENERATE_AND_PLAY(tx_input_mixins);
+
+  // Double spend
+  GENERATE_AND_PLAY(gen_double_spend_in_tx<false>);
+  GENERATE_AND_PLAY(gen_double_spend_in_tx<true>);
+  GENERATE_AND_PLAY(gen_double_spend_in_the_same_block<false>);
+  GENERATE_AND_PLAY(gen_double_spend_in_the_same_block<true>);
+  GENERATE_AND_PLAY(gen_double_spend_in_different_blocks<false>);
+  GENERATE_AND_PLAY(gen_double_spend_in_different_blocks<true>);
+  GENERATE_AND_PLAY(gen_double_spend_in_different_chains);
+  GENERATE_AND_PLAY(gen_double_spend_in_alt_chain_in_the_same_block<false>);
+  GENERATE_AND_PLAY(gen_double_spend_in_alt_chain_in_the_same_block<true>);
+  GENERATE_AND_PLAY(gen_double_spend_in_alt_chain_in_different_blocks<false>);
+  GENERATE_AND_PLAY(gen_double_spend_in_alt_chain_in_different_blocks<true>);
+
+  GENERATE_AND_PLAY(gen_uint_overflow_1);
+  GENERATE_AND_PLAY(gen_uint_overflow_2);
+
+  // Hardfok 1 tests
+  GENERATE_AND_PLAY(before_hard_fork_1_cumulative_difficulty);
+  GENERATE_AND_PLAY(inthe_middle_hard_fork_1_cumulative_difficulty);
+  GENERATE_AND_PLAY(after_hard_fork_1_cumulative_difficulty);
+  GENERATE_AND_PLAY(hard_fork_1_locked_mining_test);
+  GENERATE_AND_PLAY(hard_fork_1_bad_pos_source);
+  GENERATE_AND_PLAY(hard_fork_1_unlock_time_2_in_normal_tx);
+  GENERATE_AND_PLAY(hard_fork_1_unlock_time_2_in_coinbase);
+  GENERATE_AND_PLAY(hard_fork_1_chain_switch_pow_only);
+  GENERATE_AND_PLAY(hard_fork_1_checkpoint_basic_test);
+  GENERATE_AND_PLAY(hard_fork_1_pos_locked_height_vs_time);
+  GENERATE_AND_PLAY(hard_fork_1_pos_and_locked_coins);
+
+  // Hardfork 2 tests
+  //GENERATE_AND_PLAY(hard_fork_2_tx_payer_in_wallet);
+  //GENERATE_AND_PLAY(hard_fork_2_tx_receiver_in_wallet);
+  GENERATE_AND_PLAY(hard_fork_2_tx_extra_alias_entry_in_wallet);
+  GENERATE_AND_PLAY_HF(hard_fork_2_auditable_addresses_basics, "2-*");
+  GENERATE_AND_PLAY(hard_fork_2_no_new_structures_before_hf);
+  GENERATE_AND_PLAY(hard_fork_2_awo_wallets_basic_test<true>);
+  GENERATE_AND_PLAY(hard_fork_2_awo_wallets_basic_test<false>);
+  GENERATE_AND_PLAY(hard_fork_2_alias_update_using_old_tx<true>);
+  GENERATE_AND_PLAY(hard_fork_2_alias_update_using_old_tx<false>);
+  GENERATE_AND_PLAY(hard_fork_2_incorrect_alias_update<true>);
+  GENERATE_AND_PLAY(hard_fork_2_incorrect_alias_update<false>);
+
+  // HF4
+  GENERATE_AND_PLAY_HF(hard_fork_4_consolidated_txs, "3-*");
+  GENERATE_AND_PLAY_HF(hardfork_4_wallet_transfer_with_mandatory_mixins, "3-*");
+  GENERATE_AND_PLAY(hardfork_4_wallet_sweep_bare_outs);
+  GENERATE_AND_PLAY_HF(hardfork_4_pop_tx_from_global_index, "4-*");
+
+  // HF5
+  GENERATE_AND_PLAY_HF(hard_fork_5_tx_version, "5-*");
+
+  // HF6
+  GENERATE_AND_PLAY(hard_fork_6_intrinsic_payment_id_basic_test);
+  GENERATE_AND_PLAY(hard_fork_6_intrinsic_payment_id_rpc_test);
+
+  GENERATE_AND_PLAY_HF(isolate_auditable_and_proof, "2-*");
+  
+  GENERATE_AND_PLAY(zarcanum_basic_test);
+
+  GENERATE_AND_PLAY_HF(multiassets_basic_test, "4-*");
+  GENERATE_AND_PLAY_HF(ionic_swap_basic_test, "4-*");
+  GENERATE_AND_PLAY_HF(ionic_swap_exact_amounts_test, "4-*");
+  GENERATE_AND_PLAY(zarcanum_test_n_inputs_validation);
+  GENERATE_AND_PLAY(zarcanum_gen_time_balance);
+  GENERATE_AND_PLAY(zarcanum_txs_with_big_shuffled_decoy_set_shuffled);
+  GENERATE_AND_PLAY(zarcanum_pos_block_math);
+  GENERATE_AND_PLAY(zarcanum_in_alt_chain);
+  GENERATE_AND_PLAY_HF(zarcanum_in_alt_chain_2, "4-*");
+  GENERATE_AND_PLAY(assets_and_explicit_native_coins_in_outs);
+  GENERATE_AND_PLAY(zarcanum_block_with_txs);
+  GENERATE_AND_PLAY(asset_depoyment_and_few_zc_utxos);
+  GENERATE_AND_PLAY_HF(assets_and_pos_mining, "4-*");
+  GENERATE_AND_PLAY_HF(asset_emission_and_unconfirmed_balance, "4-*");
+  GENERATE_AND_PLAY_HF(asset_operation_in_consolidated_tx, "4-*");
+  GENERATE_AND_PLAY_HF(asset_operation_and_hardfork_checks, "4-*");
+  GENERATE_AND_PLAY_HF(eth_signed_asset_basics, "5-*");  // TODO: make HF4 version
+  GENERATE_AND_PLAY_HF(eth_signed_asset_via_rpc, "5-*"); // TODO: make HF4 version
+  //GENERATE_AND_PLAY_HF(asset_current_and_total_supplies_comparative_constraints, "4-*"); <-- temporary disabled, waiting for Stepan's fix -- sowle
+  GENERATE_AND_PLAY_HF(several_asset_emit_burn_txs_in_pool, "5-*");
+  GENERATE_AND_PLAY_HF(assets_transfer_with_smallest_amount, "4-*");
+  GENERATE_AND_PLAY_HF(asset_operations_and_chain_switching, "4-*");
+
+  GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
+  GENERATE_AND_PLAY_HF(wallet_reorganize_and_trim_test, "4-*");
+  GENERATE_AND_PLAY_HF(wallet_rpc_thirdparty_custody, "5-*");    
+
+  GENERATE_AND_PLAY_HF(attachment_isolation_test, "4-*");
+
+  // GENERATE_AND_PLAY(gen_block_reward);
+  // END OF TESTS  */
+}
+
+void fill_postponed_tests_set(std::set<std::string>& postponed_tests)
+{
+  postponed_tests.clear();
+
+#define MARK_TEST_AS_POSTPONED(genclass) postponed_tests.insert(#genclass)
+  MARK_TEST_AS_POSTPONED(gen_checkpoints_reorganize);
+  MARK_TEST_AS_POSTPONED(gen_alias_update_after_addr_changed);
+  MARK_TEST_AS_POSTPONED(gen_alias_blocking_reg_by_invalid_tx);
+  MARK_TEST_AS_POSTPONED(gen_alias_blocking_update_by_invalid_tx);
+  MARK_TEST_AS_POSTPONED(gen_wallet_fake_outputs_randomness);
+  MARK_TEST_AS_POSTPONED(gen_wallet_fake_outputs_not_enough);
+  MARK_TEST_AS_POSTPONED(gen_wallet_spending_coinstake_after_minting);
+  MARK_TEST_AS_POSTPONED(gen_wallet_fake_outs_while_having_too_little_own_outs);
+  MARK_TEST_AS_POSTPONED(gen_uint_overflow_1);
+
+  MARK_TEST_AS_POSTPONED(after_hard_fork_1_cumulative_difficulty);
+  MARK_TEST_AS_POSTPONED(before_hard_fork_1_cumulative_difficulty);
+  MARK_TEST_AS_POSTPONED(inthe_middle_hard_fork_1_cumulative_difficulty);
+#undef MARK_TEST_AS_POSTPONED
+}
+//--------------------------------------------------------------------------
+static void init_shared_fail_report_if_needed()
+{
+  const std::string shm_name = command_line::get_arg(g_vm, chaingen_args::arg_shm_name);
+  if (shm_name.empty())
+    return;
+
+  namespace bip = boost::interprocess;
+  try
+  {
+    bip::shared_memory_object shm(bip::open_only, shm_name.c_str(), bip::read_write);
+    g_shm_region.reset(new bip::mapped_region(shm, bip::read_write));
+    g_shm_state = static_cast<coretests_shm::shared_state*>(g_shm_region->get_address());
+  }
+  catch (...)
+  {
+    g_shm_state = nullptr;
+    g_shm_region.reset();
+  }
+}
+//--------------------------------------------------------------------------
 int main(int argc, char* argv[])
 {
   TRY_ENTRY();
@@ -938,6 +1413,10 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_options, command_line::arg_data_dir, std::string("."));
   command_line::add_arg(desc_options, command_line::arg_stop_after_height);
   command_line::add_arg(desc_options, command_line::arg_disable_ntp);
+  command_line::add_arg(desc_options, arg_processes);
+  command_line::add_arg(desc_options, arg_worker_id);
+  command_line::add_arg(desc_options, arg_run_root);
+  command_line::add_arg(desc_options, arg_shm_name);
 
   currency::core::init_options(desc_options);
   tools::db::db_backend_selector::init_options(desc_options);
@@ -972,13 +1451,27 @@ int main(int argc, char* argv[])
     stop_on_first_fail = command_line::get_arg(g_vm, arg_stop_on_fail);
   }
 
-  
+  const int32_t worker_id = command_line::get_arg(g_vm, arg_worker_id);
+  const bool is_worker = (worker_id >= 0);
+
+  const uint32_t processes = command_line::get_arg(g_vm, arg_processes);
+  const bool multiprocess_enabled =
+    is_worker || (command_line::has_arg(g_vm, arg_processes) && processes > 1);
+
+  if (multiprocess_enabled)
+    g_runner = std::make_unique<parallel_test_runner>(g_vm);
+  else
+    g_runner.reset();
+
+  if (is_worker && multiprocess_enabled)
+    init_shared_fail_report_if_needed();
+
   bool skip_all_till_the_end = false;
   size_t tests_count = 0;
   size_t unique_tests_count = 0;
   size_t serious_failures_count = 0;
   std::set<std::string> failed_tests;
-  std::string tests_folder = command_line::get_arg(g_vm, arg_test_data_path);
+
   typedef std::vector<std::pair<std::string, uint64_t>> tests_running_time_t;
   tests_running_time_t tests_running_time;
   if (command_line::get_arg(g_vm, arg_generate_test_data))
@@ -1040,385 +1533,36 @@ int main(int argc, char* argv[])
       CALL_TEST("test_parse_hardfork_str_mask", test_parse_hardfork_str_mask);
     }
 
-    //CALL_TEST("check_hash_and_difficulty_monte_carlo_test", check_hash_and_difficulty_monte_carlo_test); // it's rather an experiment with unclean results than a solid test, for further research...
+    // Postponed tests list.
+    fill_postponed_tests_set(postponed_tests);
 
-    // Postponed tests - tests that may fail for the time being (believed that it's a serious issue and should be fixed later for some reason).
-    // In a perfect world this list is empty.
-#define MARK_TEST_AS_POSTPONED(genclass) postponed_tests.insert(#genclass)
-    MARK_TEST_AS_POSTPONED(gen_checkpoints_reorganize);
-    MARK_TEST_AS_POSTPONED(gen_alias_update_after_addr_changed);
-    MARK_TEST_AS_POSTPONED(gen_alias_blocking_reg_by_invalid_tx);
-    MARK_TEST_AS_POSTPONED(gen_alias_blocking_update_by_invalid_tx);
-    MARK_TEST_AS_POSTPONED(gen_wallet_fake_outputs_randomness);
-    MARK_TEST_AS_POSTPONED(gen_wallet_fake_outputs_not_enough);
-    MARK_TEST_AS_POSTPONED(gen_wallet_spending_coinstake_after_minting);
-    MARK_TEST_AS_POSTPONED(gen_wallet_fake_outs_while_having_too_little_own_outs);
-    MARK_TEST_AS_POSTPONED(gen_uint_overflow_1);
+    register_all_tests(
+      stop_on_first_fail,
+      skip_all_till_the_end,
+      tests_count,
+      unique_tests_count,
+      failed_tests,
+      tests_running_time,
+      is_test_eligible_to_run,
+      is_hf_test_eligible_to_run);
 
-    MARK_TEST_AS_POSTPONED(after_hard_fork_1_cumulative_difficulty); // reason: set_pos_to_low_timestamp is not supported anymore
-    MARK_TEST_AS_POSTPONED(before_hard_fork_1_cumulative_difficulty);
-    MARK_TEST_AS_POSTPONED(inthe_middle_hard_fork_1_cumulative_difficulty);
+    if (multiprocess_enabled)
+    {
+      const int parent_rc = g_runner->run_parent_if_needed(argc, argv, g_test_jobs);
+      if (parent_rc != parallel_test_runner::k_not_parent)
+        return parent_rc;
+    }
 
-#undef MARK_TEST_AS_POSTPONED
-
-
-    // TODO // GENERATE_AND_PLAY(wallet_spend_form_auditable_and_track);
-    GENERATE_AND_PLAY(gen_block_big_major_version);
-
-    GENERATE_AND_PLAY(pos_minting_tx_packing);
-
-    GENERATE_AND_PLAY(multisig_wallet_test);
-    GENERATE_AND_PLAY(multisig_wallet_test_many_dst);
-    GENERATE_AND_PLAY(multisig_wallet_heterogenous_dst);
-    GENERATE_AND_PLAY(multisig_wallet_same_dst_addr);
-    GENERATE_AND_PLAY(multisig_wallet_ms_to_ms);
-    GENERATE_AND_PLAY(multisig_minimum_sigs);
-    GENERATE_AND_PLAY(multisig_and_fake_outputs);
-    GENERATE_AND_PLAY(multisig_and_unlock_time);
-    GENERATE_AND_PLAY(multisig_and_coinbase);
-    GENERATE_AND_PLAY(multisig_with_same_id_in_pool);
-    GENERATE_AND_PLAY_HF(multisig_and_checkpoints, "0"); // TODO: fix for HF 1-3 (checkpoint hash check)
-    GENERATE_AND_PLAY(multisig_and_checkpoints_bad_txs);
-    GENERATE_AND_PLAY(multisig_and_altchains);
-    GENERATE_AND_PLAY(multisig_out_make_and_spent_in_altchain);
-    GENERATE_AND_PLAY(multisig_unconfirmed_transfer_and_multiple_scan_pool_calls);
-    GENERATE_AND_PLAY(multisig_out_spent_in_altchain_case_b4);
-    GENERATE_AND_PLAY(multisig_n_participants_seq_signing);
-
-    GENERATE_AND_PLAY(ref_by_id_basics);
-    GENERATE_AND_PLAY(ref_by_id_mixed_inputs_types);
-
-    GENERATE_AND_PLAY(escrow_wallet_test);
-    GENERATE_AND_PLAY(escrow_w_and_fake_outputs);
-    GENERATE_AND_PLAY(escrow_incorrect_proposal);
-    GENERATE_AND_PLAY(escrow_proposal_expiration);
-    GENERATE_AND_PLAY(escrow_proposal_and_accept_expiration);
-    GENERATE_AND_PLAY(escrow_incorrect_proposal_acceptance);
-    GENERATE_AND_PLAY(escrow_custom_test);
-    GENERATE_AND_PLAY(escrow_incorrect_cancel_proposal);
-    GENERATE_AND_PLAY(escrow_proposal_not_enough_money);
-    GENERATE_AND_PLAY(escrow_cancellation_and_tx_order);
-    GENERATE_AND_PLAY(escrow_cancellation_proposal_expiration);
-    GENERATE_AND_PLAY(escrow_cancellation_acceptance_expiration);
-    // GENERATE_AND_PLAY(escrow_proposal_acceptance_in_alt_chain); -- work in progress
-    GENERATE_AND_PLAY(escrow_zero_amounts);
-    GENERATE_AND_PLAY(escrow_balance);
-
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<0>);
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<1>);
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<2>);
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<3>);
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<4>);
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<5>);
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<6>);
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<7>);
-    GENERATE_AND_PLAY(escrow_altchain_meta_test<8>);
-    static_assert(escrow_altchain_meta_test_data<9>::empty_marker, ""); // make sure there are no sub-tests left
-
-    GENERATE_AND_PLAY(offers_expiration_test);
-    GENERATE_AND_PLAY(offers_tests);
-    GENERATE_AND_PLAY(offers_filtering_1);
-    //GENERATE_AND_PLAY(offers_handling_on_chain_switching);
-    GENERATE_AND_PLAY(offer_removing_and_selected_output);
-    GENERATE_AND_PLAY(offers_multiple_update);
-    GENERATE_AND_PLAY(offer_sig_validity_in_update_and_cancel);
-    GENERATE_AND_PLAY(offer_lifecycle_via_tx_pool);
-    GENERATE_AND_PLAY(offers_updating_hack);
-    GENERATE_AND_PLAY(offer_cancellation_with_zero_fee);
-
-    GENERATE_AND_PLAY(gen_crypted_attachments);
-    GENERATE_AND_PLAY(gen_checkpoints_attachments_basic);
-    GENERATE_AND_PLAY(gen_checkpoints_invalid_keyimage);
-    GENERATE_AND_PLAY(gen_checkpoints_altblock_before_and_after_cp);
-    GENERATE_AND_PLAY(gen_checkpoints_block_in_future);
-    GENERATE_AND_PLAY(gen_checkpoints_altchain_far_before_cp);
-    GENERATE_AND_PLAY(gen_checkpoints_block_in_future_after_cp);
-    GENERATE_AND_PLAY(gen_checkpoints_prun_txs_after_blockchain_load);
-    GENERATE_AND_PLAY(gen_checkpoints_reorganize);
-    GENERATE_AND_PLAY(gen_checkpoints_pos_validation_on_altchain);
-    GENERATE_AND_PLAY(gen_checkpoints_and_invalid_tx_to_pool);
-    GENERATE_AND_PLAY(gen_checkpoints_set_after_switching_to_altchain);
-    GENERATE_AND_PLAY_HF(gen_no_attchments_in_coinbase, "3");
-    GENERATE_AND_PLAY(gen_no_attchments_in_coinbase_gentime);
-
-    GENERATE_AND_PLAY_HF(gen_alias_tests, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_strange_data, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_concurrency_with_switch, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_same_alias_in_tx_pool, "3-*");   
-    GENERATE_AND_PLAY_HF(gen_alias_switch_and_tx_pool, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_update_after_addr_changed, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_blocking_reg_by_invalid_tx, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_blocking_update_by_invalid_tx, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_reg_with_locked_money, "*");
-    GENERATE_AND_PLAY_HF(gen_alias_too_small_reward, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_too_much_reward, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_tx_no_outs, "*");
-    GENERATE_AND_PLAY_HF(gen_alias_switch_and_check_block_template, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_too_many_regs_in_block_template, "3"); // disabled in HF4 due to tx outputs count limitation
-    GENERATE_AND_PLAY_HF(gen_alias_update_for_free, "3-*");
-    GENERATE_AND_PLAY_HF(gen_alias_in_coinbase, "3-*");
-
-    GENERATE_AND_PLAY(gen_wallet_basic_transfer);
-    GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch);
-    GENERATE_AND_PLAY(gen_wallet_refreshing_on_chain_switch_2);
-    GENERATE_AND_PLAY(gen_wallet_unconfirmed_tx_from_tx_pool);
-    GENERATE_AND_PLAY_HF(gen_wallet_save_load_and_balance, "*");
-    GENERATE_AND_PLAY_HF(gen_wallet_mine_pos_block, "3-*");
-    GENERATE_AND_PLAY(gen_wallet_unconfirmed_outdated_tx);
-    GENERATE_AND_PLAY(gen_wallet_unlock_by_block_and_by_time);
-    GENERATE_AND_PLAY(gen_wallet_payment_id);
-    GENERATE_AND_PLAY(gen_wallet_oversized_payment_id);
-    GENERATE_AND_PLAY(gen_wallet_transfers_and_outdated_unconfirmed_txs);
-    GENERATE_AND_PLAY(gen_wallet_transfers_and_chain_switch);
-    GENERATE_AND_PLAY(gen_wallet_decrypted_payload_items);
-    GENERATE_AND_PLAY_HF(gen_wallet_alias_and_unconfirmed_txs, "3-*");
-    GENERATE_AND_PLAY_HF(gen_wallet_alias_via_special_wallet_funcs, "3-*");
-    GENERATE_AND_PLAY(gen_wallet_fake_outputs_randomness);
-    GENERATE_AND_PLAY(gen_wallet_fake_outputs_not_enough);
-    GENERATE_AND_PLAY(gen_wallet_offers_basic);
-    GENERATE_AND_PLAY(gen_wallet_offers_size_limit);
-    GENERATE_AND_PLAY(gen_wallet_dust_to_account);
-    GENERATE_AND_PLAY(gen_wallet_selecting_pos_entries);
-    GENERATE_AND_PLAY(gen_wallet_spending_coinstake_after_minting);
-    GENERATE_AND_PLAY(gen_wallet_fake_outs_while_having_too_little_own_outs);
-    // GENERATE_AND_PLAY(premine_wallet_test);  // tests premine wallets; wallet files nedded; by demand only
-    GENERATE_AND_PLAY(mined_balance_wallet_test);
-    GENERATE_AND_PLAY(wallet_outputs_with_same_key_image);
-    GENERATE_AND_PLAY(wallet_unconfirmed_tx_expiration);
-    GENERATE_AND_PLAY(wallet_unconfimed_tx_balance);
-    GENERATE_AND_PLAY_HF(packing_outputs_on_pos_minting_wallet, "3");
-    GENERATE_AND_PLAY_HF(wallet_watch_only_and_chain_switch, "3");
-    GENERATE_AND_PLAY_HF(wallet_and_sweep_below, "3-*");
-
-    GENERATE_AND_PLAY(wallet_rpc_integrated_address);
-    GENERATE_AND_PLAY(wallet_rpc_integrated_address_transfer);
-    GENERATE_AND_PLAY(wallet_rpc_transfer);
-    GENERATE_AND_PLAY(wallet_rpc_alias_tests);
-    GENERATE_AND_PLAY_HF(wallet_rpc_exchange_suite, "3,4");
-    GENERATE_AND_PLAY_HF(wallet_true_rpc_pos_mining, "4-*");
-    GENERATE_AND_PLAY_HF(wallet_rpc_cold_signing, "3,5-*");
-    // GENERATE_AND_PLAY_HF(wallet_rpc_multiple_receivers, "5-*"); work in progress -- sowle
-    GENERATE_AND_PLAY_HF(wallet_chain_switch_with_spending_the_same_ki, "3");
-    GENERATE_AND_PLAY(wallet_sending_to_integrated_address);
-    GENERATE_AND_PLAY_HF(block_template_blacklist_test, "4-*");
-    GENERATE_AND_PLAY_HF(wallet_rpc_hardfork_verification, "5");
-    
-
-    // GENERATE_AND_PLAY(emission_test); // simulate 1 year of blockchain, too long run (1 y ~= 1 hr), by demand only
-    // LOG_ERROR2("print_reward_change_first_blocks.log", currency::print_reward_change_first_blocks(525601).str()); // outputs first 1 year of blocks' rewards (simplier)
-
-    // pos tests
-    GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(gen_pos_basic_tests);
-    // GENERATE_AND_PLAY(gen_pos_basic_tests); -- commented as this test is run intermittedly by previous line; uncomment if necessary (ex. for debugging)
-    GENERATE_AND_PLAY(gen_pos_coinstake_already_spent);
-    GENERATE_AND_PLAY(gen_pos_incorrect_timestamp);
-    GENERATE_AND_PLAY(gen_pos_too_early_pos_block);
-    GENERATE_AND_PLAY_HF(gen_pos_extra_nonce, "3-*");
-    GENERATE_AND_PLAY(gen_pos_min_allowed_height);
-    GENERATE_AND_PLAY(gen_pos_invalid_coinbase);
-    // GENERATE_AND_PLAY(pos_wallet_minting_same_amount_diff_outs); // Long test! Takes ~10 hours to simulate 6000 blocks on 2015 middle-end computer
-    //GENERATE_AND_PLAY(pos_emission_test); // Long test! by demand only
-    GENERATE_AND_PLAY(pos_wallet_big_block_test);
-    //GENERATE_AND_PLAY(block_template_against_txs_size); // Long test! by demand only
-    GENERATE_AND_PLAY_HF(pos_altblocks_validation, "3-*");
-    GENERATE_AND_PLAY_HF(pos_mining_with_decoys, "3");
-    GENERATE_AND_PLAY_HF(pos_and_no_pow_blocks_between_output_and_stake, "4-*");
-
-    // alternative blocks and generic chain-switching tests
-    GENERATE_AND_PLAY(gen_chain_switch_pow_pos);
-    GENERATE_AND_PLAY(pow_pos_reorganize_specific_case);
-    GENERATE_AND_PLAY(gen_chain_switch_1);
-    GENERATE_AND_PLAY(bad_chain_switching_with_rollback);
-    GENERATE_AND_PLAY(chain_switching_and_tx_with_attachment_blobsize);
-    GENERATE_AND_PLAY_HF(chain_switching_when_gindex_spent_in_both_chains, "3-*");
-    GENERATE_AND_PLAY(alt_chain_coins_pow_mined_then_spent);
-    GENERATE_AND_PLAY(gen_simple_chain_split_1);
-    GENERATE_AND_PLAY_HF(alt_blocks_validation_and_same_new_amount_in_two_txs, "3-*");
-    GENERATE_AND_PLAY_HF(alt_blocks_with_the_same_txs, "3-*");
-    GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_mixin, "3-*");
-    GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_ref_id, "3-*");
-    GENERATE_AND_PLAY_HF(alt_chain_and_block_tx_fee_median, "3-*");
-
-    // miscellaneous tests
-    GENERATE_AND_PLAY(test_blockchain_vs_spent_keyimges);
-    GENERATE_AND_PLAY(test_blockchain_vs_spent_multisig_outs);
-    GENERATE_AND_PLAY(block_template_vs_invalid_txs_from_pool);
-    GENERATE_AND_PLAY(cumulative_difficulty_adjustment_test);
-    GENERATE_AND_PLAY(cumulative_difficulty_adjustment_test);
-    GENERATE_AND_PLAY(cumulative_difficulty_adjustment_test_alt);
-    GENERATE_AND_PLAY(prun_ring_signatures);
-    GENERATE_AND_PLAY(gen_simple_chain_001);
-    GENERATE_AND_PLAY(one_block);
-    GENERATE_AND_PLAY(gen_ring_signature_1);
-    GENERATE_AND_PLAY(gen_ring_signature_2);
-    GENERATE_AND_PLAY(fill_tx_rpc_inputs);
-    //GENERATE_AND_PLAY(gen_ring_signature_big); // Takes up to XXX hours (if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10)
-
-    // tests for outputs mixing in
-    GENERATE_AND_PLAY(get_random_outs_test);
-    GENERATE_AND_PLAY(mix_attr_tests);
-    GENERATE_AND_PLAY(mix_in_spent_outs);
-    GENERATE_AND_PLAY(random_outs_and_burnt_coins);
-
-    // Block verification tests
-    GENERATE_AND_PLAY_HF(gen_block_big_major_version, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_big_minor_version, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_ts_not_checked, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_ts_in_past, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_ts_in_future, "0,3");
-    //GENERATE_AND_PLAY(gen_block_invalid_prev_id); disabled because impossible to generate text chain with wrong prev_id - pow hash not works without chaining
-    GENERATE_AND_PLAY_HF(gen_block_invalid_nonce, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_no_miner_tx, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_low, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_high, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_timestamp_in_past, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_unlock_time_is_timestamp_in_future, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_height_is_low, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_height_is_high, "0,3");
-    GENERATE_AND_PLAY_HF(block_with_correct_prev_id_on_wrong_height, "3-*");
-    GENERATE_AND_PLAY_HF(block_reward_in_main_chain_basic, "3-*");
-    GENERATE_AND_PLAY_HF(block_reward_in_alt_chain_basic, "3-*");
-    GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_tx_gen_in, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_2_in, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_miner_tx_with_txin_to_key, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_miner_tx_out_is_small, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_miner_tx_out_is_big, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_no_out, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_miner_tx_has_out_to_initiator, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_has_invalid_tx, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_is_too_big, "0,3");
-    GENERATE_AND_PLAY_HF(gen_block_wrong_version_agains_hardfork, "0,3");
-    GENERATE_AND_PLAY_HF(block_choice_rule_bigger_fee, "4-*"); 
-    //GENERATE_AND_PLAY(gen_block_invalid_binary_format); // Takes up to 3 hours, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 500, up to 30 minutes, if CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10
-
-
-    
-    // Transaction verification tests
-    GENERATE_AND_PLAY(gen_broken_attachments);
-    GENERATE_AND_PLAY(gen_tx_big_version);
-    GENERATE_AND_PLAY(gen_tx_unlock_time);
-    GENERATE_AND_PLAY(gen_tx_input_is_not_txin_to_key);
-    GENERATE_AND_PLAY(gen_tx_no_inputs_no_outputs);
-    GENERATE_AND_PLAY(gen_tx_no_inputs_has_outputs);
-    GENERATE_AND_PLAY(gen_tx_has_inputs_no_outputs);
-    GENERATE_AND_PLAY(gen_tx_invalid_input_amount);
-    GENERATE_AND_PLAY(gen_tx_input_wo_key_offsets);
-    GENERATE_AND_PLAY(gen_tx_sender_key_offest_not_exist);
-    GENERATE_AND_PLAY(gen_tx_key_offest_points_to_foreign_key);
-    GENERATE_AND_PLAY(gen_tx_mixed_key_offest_not_exist);
-    GENERATE_AND_PLAY(gen_tx_key_image_not_derive_from_tx_key);
-    GENERATE_AND_PLAY(gen_tx_key_image_is_invalid);
-    GENERATE_AND_PLAY(gen_tx_check_input_unlock_time);
-    GENERATE_AND_PLAY(gen_tx_txout_to_key_has_invalid_key);
-    GENERATE_AND_PLAY(gen_tx_output_with_zero_amount);
-    GENERATE_AND_PLAY(gen_tx_output_is_not_txout_to_key);
-    GENERATE_AND_PLAY(gen_tx_signatures_are_invalid);
-    GENERATE_AND_PLAY(gen_tx_extra_double_entry);
-    GENERATE_AND_PLAY(gen_tx_double_key_image);
-    GENERATE_AND_PLAY(tx_expiration_time);
-    GENERATE_AND_PLAY(tx_expiration_time_and_block_template);
-    GENERATE_AND_PLAY(tx_expiration_time_and_chain_switching);
-    GENERATE_AND_PLAY(tx_key_image_pool_conflict);
-    //GENERATE_AND_PLAY_HF(tx_version_against_hardfork, "4-*");
-    /* To execute the check of bare balance (function "check_tx_bare_balance") we need to run the test "tx_pool_semantic_validation" on the HF 3. By default behaviour bare outputs are disallowed on
-    the heights >= 10. */
-    GENERATE_AND_PLAY_HF(tx_pool_semantic_validation, "3");
-    GENERATE_AND_PLAY(input_refers_to_incompatible_by_type_output);
-    GENERATE_AND_PLAY_HF(tx_pool_validation_and_chain_switch, "4-5");
-    GENERATE_AND_PLAY_HF(tx_coinbase_separate_sig_flag, "4-*");
-    GENERATE_AND_PLAY(tx_input_mixins);
-
-    // Double spend
-    GENERATE_AND_PLAY(gen_double_spend_in_tx<false>);
-    GENERATE_AND_PLAY(gen_double_spend_in_tx<true>);
-    GENERATE_AND_PLAY(gen_double_spend_in_the_same_block<false>);
-    GENERATE_AND_PLAY(gen_double_spend_in_the_same_block<true>);
-    GENERATE_AND_PLAY(gen_double_spend_in_different_blocks<false>);
-    GENERATE_AND_PLAY(gen_double_spend_in_different_blocks<true>);
-    GENERATE_AND_PLAY(gen_double_spend_in_different_chains);
-    GENERATE_AND_PLAY(gen_double_spend_in_alt_chain_in_the_same_block<false>);
-    GENERATE_AND_PLAY(gen_double_spend_in_alt_chain_in_the_same_block<true>);
-    GENERATE_AND_PLAY(gen_double_spend_in_alt_chain_in_different_blocks<false>);
-    GENERATE_AND_PLAY(gen_double_spend_in_alt_chain_in_different_blocks<true>);
-
-    GENERATE_AND_PLAY(gen_uint_overflow_1);
-    GENERATE_AND_PLAY(gen_uint_overflow_2);
-
-
-    // Hardfok 1 tests
-    GENERATE_AND_PLAY(before_hard_fork_1_cumulative_difficulty);
-    GENERATE_AND_PLAY(inthe_middle_hard_fork_1_cumulative_difficulty);
-    GENERATE_AND_PLAY(after_hard_fork_1_cumulative_difficulty);
-    GENERATE_AND_PLAY(hard_fork_1_locked_mining_test);
-    GENERATE_AND_PLAY(hard_fork_1_bad_pos_source);
-    GENERATE_AND_PLAY(hard_fork_1_unlock_time_2_in_normal_tx);
-    GENERATE_AND_PLAY(hard_fork_1_unlock_time_2_in_coinbase);
-    GENERATE_AND_PLAY(hard_fork_1_chain_switch_pow_only);
-    GENERATE_AND_PLAY(hard_fork_1_checkpoint_basic_test);
-    GENERATE_AND_PLAY(hard_fork_1_pos_locked_height_vs_time);
-    GENERATE_AND_PLAY(hard_fork_1_pos_and_locked_coins);
-
-    // Hardfork 2 tests
-    //GENERATE_AND_PLAY(hard_fork_2_tx_payer_in_wallet);
-    //GENERATE_AND_PLAY(hard_fork_2_tx_receiver_in_wallet);
-    GENERATE_AND_PLAY(hard_fork_2_tx_extra_alias_entry_in_wallet);
-    GENERATE_AND_PLAY_HF(hard_fork_2_auditable_addresses_basics, "2-*");
-    GENERATE_AND_PLAY(hard_fork_2_no_new_structures_before_hf);
-    GENERATE_AND_PLAY(hard_fork_2_awo_wallets_basic_test<true>);
-    GENERATE_AND_PLAY(hard_fork_2_awo_wallets_basic_test<false>);
-    GENERATE_AND_PLAY(hard_fork_2_alias_update_using_old_tx<true>);
-    GENERATE_AND_PLAY(hard_fork_2_alias_update_using_old_tx<false>);
-    GENERATE_AND_PLAY(hard_fork_2_incorrect_alias_update<true>);
-    GENERATE_AND_PLAY(hard_fork_2_incorrect_alias_update<false>);
-
-    // HF4
-    GENERATE_AND_PLAY_HF(hard_fork_4_consolidated_txs, "3-*");
-    GENERATE_AND_PLAY_HF(hardfork_4_wallet_transfer_with_mandatory_mixins, "3-*");
-    GENERATE_AND_PLAY(hardfork_4_wallet_sweep_bare_outs);
-    GENERATE_AND_PLAY_HF(hardfork_4_pop_tx_from_global_index, "4-*");
-
-    // HF5
-    GENERATE_AND_PLAY_HF(hard_fork_5_tx_version, "5-*");
-
-    // HF6
-    GENERATE_AND_PLAY(hard_fork_6_intrinsic_payment_id_basic_test);
-    GENERATE_AND_PLAY(hard_fork_6_intrinsic_payment_id_rpc_test);
-
-    GENERATE_AND_PLAY_HF(isolate_auditable_and_proof, "2-*");
-    
-    GENERATE_AND_PLAY(zarcanum_basic_test);
-
-    GENERATE_AND_PLAY_HF(multiassets_basic_test, "4-*");
-    GENERATE_AND_PLAY_HF(ionic_swap_basic_test, "4-*");
-    GENERATE_AND_PLAY_HF(ionic_swap_exact_amounts_test, "4-*");
-    GENERATE_AND_PLAY(zarcanum_test_n_inputs_validation);
-    GENERATE_AND_PLAY(zarcanum_gen_time_balance);
-    GENERATE_AND_PLAY(zarcanum_txs_with_big_shuffled_decoy_set_shuffled);
-    GENERATE_AND_PLAY(zarcanum_pos_block_math);
-    GENERATE_AND_PLAY(zarcanum_in_alt_chain);
-    GENERATE_AND_PLAY_HF(zarcanum_in_alt_chain_2, "4-*");
-    GENERATE_AND_PLAY(assets_and_explicit_native_coins_in_outs);
-    GENERATE_AND_PLAY(zarcanum_block_with_txs);
-    GENERATE_AND_PLAY(asset_depoyment_and_few_zc_utxos);
-    GENERATE_AND_PLAY_HF(assets_and_pos_mining, "4-*");
-    GENERATE_AND_PLAY_HF(asset_emission_and_unconfirmed_balance, "4-*");
-    GENERATE_AND_PLAY_HF(asset_operation_in_consolidated_tx, "4-*");
-    GENERATE_AND_PLAY_HF(asset_operation_and_hardfork_checks, "4-*");
-    GENERATE_AND_PLAY_HF(eth_signed_asset_basics, "5-*");  // TODO: make HF4 version
-    GENERATE_AND_PLAY_HF(eth_signed_asset_via_rpc, "5-*"); // TODO: make HF4 version
-    //GENERATE_AND_PLAY_HF(asset_current_and_total_supplies_comparative_constraints, "4-*"); <-- temporary disabled, waiting for Stepan's fix -- sowle
-    GENERATE_AND_PLAY_HF(several_asset_emit_burn_txs_in_pool, "5-*");
-    GENERATE_AND_PLAY_HF(assets_transfer_with_smallest_amount, "4-*");
-    GENERATE_AND_PLAY_HF(asset_operations_and_chain_switching, "4-*");
-
-    GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
-    GENERATE_AND_PLAY_HF(wallet_reorganize_and_trim_test, "4-*");
-    GENERATE_AND_PLAY_HF(wallet_rpc_thirdparty_custody, "5-*");    
-
-    GENERATE_AND_PLAY_HF(attachment_isolation_test, "4-*");
-
-    // GENERATE_AND_PLAY(gen_block_reward);
-    // END OF TESTS  */
+    // run
+    run_registered_tests(
+      stop_on_first_fail,
+      skip_all_till_the_end,
+      tests_count,
+      unique_tests_count,
+      failed_tests,
+      tests_running_time,
+      is_test_eligible_to_run,
+      is_hf_test_eligible_to_run);
 
     size_t failed_postponed_tests_count = 0;
     uint64_t total_time = 0;
@@ -1427,48 +1571,83 @@ int main(int argc, char* argv[])
       uint64_t max_time = std::max_element(tests_running_time.begin(), tests_running_time.end(), [](tests_running_time_t::value_type& lhs, tests_running_time_t::value_type& rhs)->bool { return lhs.second < rhs.second; })->second;
       uint64_t max_test_name_len = std::max_element(tests_running_time.begin(), tests_running_time.end(), [](tests_running_time_t::value_type& lhs, tests_running_time_t::value_type& rhs)->bool { return lhs.first.size() < rhs.first.size(); })->first.size();
       size_t bar_width = 70;
-      for (auto i : tests_running_time)
+
+      if (!is_worker)
       {
-        bool failed = failed_tests.count(i.first) != 0;
-        bool postponed = postponed_tests.count(i.first) != 0;
-        if (failed && postponed)
-          ++failed_postponed_tests_count;
-        std::string bar(bar_width * i.second / max_time, '#');
-        std::cout << (failed ? (postponed ? concolor::yellow : concolor::magenta) : concolor::green) << std::left << std::setw(max_test_name_len + 1) << i.first << "\t" << std::setw(10) << i.second << " ms \t" << bar << std::endl;
-        total_time += i.second;
+        for (auto& i : tests_running_time)
+        {
+          bool failed = failed_tests.count(i.first) != 0;
+          bool postponed = postponed_tests.count(i.first) != 0;
+          if (failed && postponed)
+            ++failed_postponed_tests_count;
+          std::string bar(bar_width * i.second / max_time, '#');
+          std::cout << (failed ? (postponed ? concolor::yellow : concolor::magenta) : concolor::green) << std::left << std::setw(max_test_name_len + 1) << i.first << "\t" << std::setw(10) << i.second << " ms \t" << bar << std::endl;
+          total_time += i.second;
+        }
+      }
+      else
+      {
+        for (const auto& i : tests_running_time)
+          total_time += i.second;
+
+        for (const auto& name : failed_tests)
+          if (postponed_tests.count(name) != 0)
+            ++failed_postponed_tests_count;
       }
     }
 
-    if (skip_all_till_the_end)
+    if (skip_all_till_the_end && !is_worker)
       std::cout << ENDL << concolor::yellow << "(execution interrupted at the first failure; not all tests were run)" << ENDL; 
 
     serious_failures_count = failed_tests.size() - failed_postponed_tests_count;
 
-    if (!postponed_tests.empty())
+    if (is_worker)
     {
-      std::cout << concolor::yellow << std::endl << postponed_tests.size() << " POSTPONED TESTS:" << std::endl;
-      for(auto& el : postponed_tests)
-        std::cout << "  " << el << std::endl;
+      parallel_test_runner::worker_report rep;
+      rep.worker_id = static_cast<uint32_t>(worker_id);
+      rep.processes = command_line::get_arg(g_vm, chaingen_args::arg_processes);
+      rep.tests_count = tests_count;
+      rep.unique_tests_count = unique_tests_count;
+      rep.total_time_ms = total_time;
+      rep.tests_running_time = tests_running_time;
+      rep.failed_tests = failed_tests;
+      rep.skip_all_till_the_end = skip_all_till_the_end;
+      rep.exit_code = (serious_failures_count == 0 ? 0 : 1);
+
+      if (g_runner)
+        (void)g_runner->write_worker_report(rep);
     }
-    
-    std::cout << (serious_failures_count == 0 ? concolor::green : concolor::magenta);
-    std::cout << "\nREPORT:\n";
-    std::cout << "  Unique tests run: " << unique_tests_count << std::endl;
-    std::cout << "  Total tests run:  " << tests_count << std::endl;
-    
-    std::cout << "  Failures:         " << serious_failures_count << " (postponed failures: " << failed_postponed_tests_count << ")" << std::endl;
-    std::cout << "  Postponed:        " << postponed_tests.size() << std::endl;
-    std::cout << "  Total time:       " << total_time / 1000 << " s. (" << (tests_count > 0 ? total_time / tests_count : 0) << " ms per test in average)" << std::endl;
-    if (!failed_tests.empty())
+
+    if (!is_worker)
     {
-      std::cout << "FAILED/POSTPONED TESTS:\n";
-      for (auto test_name : failed_tests)
+      if (!postponed_tests.empty())
       {
-        bool postponed = postponed_tests.count(test_name);
-        std::cout << "  " << (postponed ? "POSTPONED: " : "FAILED:    ") << test_name << '\n';
+        std::cout << concolor::yellow << std::endl << postponed_tests.size() << " POSTPONED TESTS:" << std::endl;
+        for (const auto& el : postponed_tests)
+          std::cout << "  " << el << std::endl;
       }
+
+      std::cout << (serious_failures_count == 0 ? concolor::green : concolor::magenta);
+      std::cout << "\nREPORT:\n";
+      std::cout << "  Unique tests run: " << unique_tests_count << std::endl;
+      std::cout << "  Total tests run:  " << tests_count << std::endl;
+
+      std::cout << "  Failures:         " << serious_failures_count << " (postponed failures: " << failed_postponed_tests_count << ")" << std::endl;
+      std::cout << "  Postponed:        " << postponed_tests.size() << std::endl;
+      std::cout << "  Total time:       " << total_time / 1000 << " s. (" << (tests_count > 0 ? total_time / tests_count : 0) << " ms per test in average)" << std::endl;
+
+      if (!failed_tests.empty())
+      {
+        std::cout << "FAILED/POSTPONED TESTS:\n";
+        for (auto& test_name : failed_tests)
+        {
+          bool postponed = postponed_tests.count(test_name) != 0;
+          std::cout << "  " << (postponed ? "POSTPONED: " : "FAILED:    ") << test_name << '\n';
+        }
+      }
+
+      std::cout << concolor::normal << std::endl;
     }
-    std::cout << concolor::normal << std::endl;
   }
 
   /*{
