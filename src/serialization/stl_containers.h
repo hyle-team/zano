@@ -1,5 +1,6 @@
 // Copyright (c) 2014-2017 The The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
+// Copyright (c) 2014-2026 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -216,7 +217,7 @@ bool do_serialize(Archive<false>& ar, std::unordered_map<K, T>& v)
     if (i > 0)
       ar.delimit_array();
     
-    std::unordered_map<K, T>::value_type vt = AUTO_VAL_INIT(vt);
+    typename std::unordered_map<K, T>::value_type vt{};
     
     const K& k = vt.first;
     T& t = vt.second;

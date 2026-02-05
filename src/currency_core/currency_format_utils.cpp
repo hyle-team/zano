@@ -4673,7 +4673,7 @@ namespace currency
     if (payment_id.size())
     {
       uint64_t val = 0;
-      CHECK_AND_ASSERT_MES(convert_payment_id(payment_id, val), false, "invalid payment id / incorrect payment id size");
+      CHECK_AND_ASSERT_MES(convert_payment_id(payment_id, val), "", "invalid payment id / incorrect payment id size");
       gwserialized.o_payment_id = val;
     }
 
