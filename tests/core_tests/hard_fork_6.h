@@ -36,3 +36,19 @@ protected:
   mutable crypto::hash m_tx_2_id;
   mutable crypto::hash m_tx_3_id;
 };
+
+struct hard_fork_6_full_gw_tx_test : public wallet_test
+{
+  hard_fork_6_full_gw_tx_test();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry> &events);
+
+protected:
+  mutable crypto::public_key m_asset1_id{};
+  mutable crypto::public_key m_asset2_id{};
+
+  mutable currency::keypair m_gw_addr1_view{};
+  mutable currency::keypair m_gw_addr1_spend{};
+  mutable currency::keypair m_gw_addr2_view{};
+  mutable currency::keypair m_gw_addr2_spend{};
+};
