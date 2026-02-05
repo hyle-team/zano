@@ -3133,6 +3133,7 @@ test_chain_unit_enchanced::test_chain_unit_enchanced()
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_offers_count);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_hardfork_active);
   REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_hardfork_inactive);
+  REGISTER_CALLBACK_METHOD(test_chain_unit_enchanced, check_gw_balance);
 }
 
 bool test_chain_unit_enchanced::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
@@ -3318,3 +3319,22 @@ bool test_chain_unit_enchanced::check_hardfork_inactive(currency::core& c, size_
   return ce.callback_name == "mark_invalid_tx";
 }
 
+bool test_chain_unit_enchanced::check_gw_balance(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  gw_address_balance_check_param params{};
+  bool r = t_unserializable_object_from_blob(params, boost::get<callback_entry>(events[ev_index]).callback_params);
+  CHECK_AND_ASSERT_MES(r, false, "check_gw_balance: couldn't deserialize params");
+
+  const blockchain_storage& bcs = c.get_blockchain_storage();
+  
+  std::shared_ptr<const currency::gateway_address_data> pd = bcs.get_gateway_address_info(params.gw_addr);
+  CHECK_AND_ASSERT_MES(pd, false, "check_gw_balance: gw address could not be found: " << params.gw_addr);
+
+  auto it = pd->balances.find(params.asset_id);
+  if (it == pd->balances.end())
+    CHECK_AND_ASSERT_MES(params.amount == 0, false, "check_gw_balance: gw address " << params.gw_addr << " has no balance entry for asset id " << params.asset_id);
+  else
+    CHECK_AND_ASSERT_MES(it->second.amount == params.amount, false, "check_gw_balance: gw address " << params.gw_addr << " has amount " << it->second.amount << ", while expected: " << params.amount << ", asset id: " << params.asset_id);
+
+  return true;
+}

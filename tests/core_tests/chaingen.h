@@ -285,6 +285,19 @@ struct offers_count_param
   size_t offers_count_raw;
 };
 
+struct gw_address_balance_check_param
+{
+  currency::gateway_address_id_type gw_addr;
+  uint64_t amount;
+  crypto::public_key asset_id = currency::native_coin_asset_id;
+  
+  BEGIN_SERIALIZE()
+    FIELD(gw_addr)
+    FIELD(amount)
+    FIELD(asset_id)
+  END_SERIALIZE()
+};
+
 class test_chain_unit_enchanced : virtual public test_chain_unit_base
 {
 public:
@@ -361,6 +374,7 @@ public:
   bool check_offers_count(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_hardfork_active(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_hardfork_inactive(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_gw_balance(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
   static bool is_event_mark_invalid_block(const test_event_entry& ev, bool use_global_gentime_settings = true);
   static bool is_event_mark_invalid_tx(const test_event_entry& ev, bool use_global_gentime_settings = true);
