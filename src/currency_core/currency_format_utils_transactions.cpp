@@ -191,23 +191,19 @@ namespace currency
     uint64_t bare_inputs_native_amounts_sum = block_reward_for_miner_tx;
     crypto::point_t bare_inputs_commitments_sum = crypto::c_point_0;
     bool has_only_native_coin_bare_inputs = true; // txin_to_key, bgw native
-    bool has_native_coin_bare_inputs = false;
     size_t confidential_inputs_count = 0;
     for(const auto& in_v : tx.vin)
     {
       VARIANT_SWITCH_BEGIN(in_v)
         VARIANT_CASE_CONST(txin_gen, in_g)
-          has_native_coin_bare_inputs = true;
         VARIANT_CASE_CONST(txin_to_key, in_tk)
           bare_inputs_native_amounts_sum += in_tk.amount;
-          has_native_coin_bare_inputs = true;
         VARIANT_CASE_CONST(txin_zc_input, in_zc)
           has_only_native_coin_bare_inputs = false;
           ++confidential_inputs_count;
         VARIANT_CASE_CONST(txin_gateway, in_gw)
           if (in_gw.asset_id == native_coin_asset_id_1div8)
           {
-            has_native_coin_bare_inputs = true;
             bare_inputs_native_amounts_sum += in_gw.amount;
           }
           else
@@ -1042,12 +1038,17 @@ namespace currency
   }
 
 
-  tx_destination_entry::tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr_) : amount(a), minimum_sigs(addr.size()) 
+  tx_destination_entry::tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr_)
+    : amount(a)
+    , minimum_sigs(addr_.size()) 
   {
     for(const auto& ad: addr_)
       addr.push_back(ad);
   }
-  tx_destination_entry::tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr_, const crypto::public_key& aid) : amount(a), minimum_sigs(addr.size()), asset_id(aid) 
+  tx_destination_entry::tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr_, const crypto::public_key& aid)
+    : amount(a)
+    , minimum_sigs(addr_.size())
+    , asset_id(aid) 
   {
     for (const auto& ad : addr_)
       addr.push_back(ad);

@@ -2441,14 +2441,13 @@ namespace currency
   // prepare inputs
   struct input_generation_context_data
   {
-    keypair in_ephemeral          {};                     // ephemeral output key (stealth_address and secret_x)
-    size_t real_out_index         = SIZE_MAX;             // index of real output in local outputs vector
+    keypair in_ephemeral    {};                           // ephemeral output key (stealth_address and secret_x)
+    size_t real_out_index   = SIZE_MAX;                   // index of real output in local outputs vector
     std::vector<tx_source_entry::output_entry> outputs{}; // sorted by gindex
-    bool last_confidential_input  {};                     // true for the last confidential input
   };
   //--------------------------------------------------------------------------------
   bool generate_ZC_sig(const crypto::hash& tx_hash_for_signature, size_t input_index, const tx_source_entry& se, const input_generation_context_data& in_context,
-    const account_keys& sender_account_keys, const uint64_t tx_flags, tx_generation_context& ogc, transaction& tx, bool separately_signed_tx_complete)
+    const account_keys& sender_account_keys, const uint64_t tx_flags, tx_generation_context& ogc, transaction& tx, bool last_output, bool separately_signed_tx_complete)
   {
     bool watch_only_mode = sender_account_keys.spend_secret_key == null_skey;
     CHECK_AND_ASSERT_MES(se.is_zc(), false, "sources contains a non-zc input");
@@ -2476,7 +2475,7 @@ namespace currency
 
     crypto::scalar_t pseudo_out_amount_blinding_mask = 0;
     crypto::scalar_t pseudo_out_asset_id_blinding_mask = crypto::scalar_t::random();
-    if (in_context.last_confidential_input && ((tx_flags & TX_FLAG_SIGNATURE_MODE_SEPARATE) == 0 || separately_signed_tx_complete))
+    if (last_output && ((tx_flags & TX_FLAG_SIGNATURE_MODE_SEPARATE) == 0 || separately_signed_tx_complete))
     {
       // either normal tx or the last signature of consolidated tx -- in both cases we need to calculate non-random blinding mask for pseudo output commitment
       pseudo_out_amount_blinding_mask = ogc.amount_blinding_masks_sum - ogc.pseudo_out_amount_blinding_masks_sum + (ogc.ao_commitment_in_outputs ? ogc.ao_amount_blinding_mask : -ogc.ao_amount_blinding_mask);      // A_1 - A^p_0 = (f_1 - f'_1) * G   =>  f'_{i-1} = sum{y_j} - sum{f'_i}
@@ -2858,9 +2857,9 @@ namespace currency
     std::vector<input_generation_context_data> in_contexts;
     std::vector<size_t> inputs_mapping;
     size_t current_index = 0;
-    size_t last_confidential_input_index = SIZE_MAX;
     inputs_mapping.resize(sources.size());
     size_t input_starter_index = tx.vin.size();
+    size_t zc_sources_count = 0;
     bool all_inputs_are_obviously_native_coins = true;
     for (const tx_source_entry& src_entr : sources)
     {
@@ -2919,11 +2918,11 @@ namespace currency
         if (src_entr.is_zc())
         {
           ++zc_inputs_count;
+          ++zc_sources_count;
           txin_zc_input zc_in = AUTO_VAL_INIT(zc_in);
           zc_in.k_image = img;
           zc_in.key_offsets = std::move(key_offsets);
           tx.vin.push_back(zc_in);
-          last_confidential_input_index = current_index - 1;
         }
         else
         {
@@ -2959,8 +2958,6 @@ namespace currency
       }
     }
 
-    if (last_confidential_input_index != SIZE_MAX)
-      in_contexts[last_confidential_input_index].last_confidential_input = true;
 
     tx_generation_context& gen_context = result.ftp.gen_context;
     gen_context.tx_outs_attr = tx_outs_attr; // reconsder this -- sowle
@@ -3139,6 +3136,7 @@ namespace currency
 
     // ring signatures (per-input proofs)
     r = false;
+    size_t zc_new_signatures_count = 0;
     bool separately_signed_tx_complete = !sources.empty() ? sources.back().separately_signed_tx_complete : false;
     for (size_t i_ = 0; i_ != sources.size(); i_++)
     {
@@ -3151,9 +3149,12 @@ namespace currency
       if (source_entry.is_zc())
       {
         // ZC
-        r = generate_ZC_sig(tx_hash_for_signature, i_ + input_starter_index, source_entry, in_contexts[i_mapped], sender_account_keys, flags, gen_context, tx, separately_signed_tx_complete);
+        bool last_confidential_output = (zc_new_signatures_count + 1 == zc_sources_count);
+        r = generate_ZC_sig(tx_hash_for_signature, i_ + input_starter_index, source_entry, in_contexts[i_mapped], sender_account_keys, flags, gen_context, tx, last_confidential_output, separately_signed_tx_complete);
         CHECK_AND_ASSERT_MES(r, false, "generate_ZC_sigs failed");
         gen_context.zc_input_amounts.push_back(source_entry.amount);
+        CHECK_AND_ASSERT_MES(zc_new_signatures_count <= zc_inputs_count, false, "zc_inputs_count invariant fail: " << zc_new_signatures_count << ", " << zc_inputs_count);
+        ++zc_new_signatures_count;
       }
       else if (source_entry.gateway_origin != currency::null_pkey)
       {
