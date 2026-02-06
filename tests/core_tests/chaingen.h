@@ -993,7 +993,7 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
   //fill outputs
   size_t output_index = 0;
   std::set<uint16_t> der_hints;
-  tx_generation_context tgc{};
+  currency::tx_generation_context tgc{};
   tgc.set_tx_key(txkey);
   tgc.tx_outs_attr = tx_outs_attr;
   //tgc.resize(0, shuffled_dsts.size());
