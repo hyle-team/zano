@@ -363,7 +363,7 @@ namespace currency
       {
         ring.emplace_back(bgw_cgw_native_ring_members[i] - T);
         if (secret_index == SIZE_MAX && bgw_cgw_native_ring_members[i] == H)
-          secret_index = i;
+          secret_index = ring.size() - 1;
       }
 
       // ring members for confidential inputs
@@ -372,8 +372,8 @@ namespace currency
         ring.emplace_back(ogc.pseudo_outs_blinded_asset_ids[i] - T);
         if (secret_index == SIZE_MAX && ogc.real_zc_ins_asset_ids[i] == H)
         {
-          secret_index = i;
-          secret += ogc.pseudo_outs_plus_real_out_blinding_masks[secret_index];
+          secret_index = ring.size() - 1;;
+          secret += ogc.pseudo_outs_plus_real_out_blinding_masks[i];
         }
       }
 
