@@ -44,9 +44,9 @@ namespace nodetool
     bool deinit();
     size_t get_white_peers_count(){CRITICAL_REGION_LOCAL(m_peerlist_lock); return m_peers_white.size();}
     size_t get_gray_peers_count(){CRITICAL_REGION_LOCAL(m_peerlist_lock); return m_peers_gray.size();}
-    bool merge_peerlist(const std::list<peerlist_entry>& outer_bs);
-    bool get_peerlist_head(std::list<peerlist_entry>& bs_head, uint32_t depth = P2P_DEFAULT_PEERS_IN_HANDSHAKE);
-    bool get_peerlist_full(std::list<peerlist_entry>& pl_gray, std::list<peerlist_entry>& pl_white);
+    bool merge_peerlist(const std::vector<peerlist_entry>& outer_bs);
+    bool get_peerlist_head(std::vector<peerlist_entry>& bs_head, bool anonymize, uint32_t depth = P2P_DEFAULT_PEERS_IN_HANDSHAKE);
+    bool get_peerlist_full(std::vector<peerlist_entry>& pl_gray, std::vector<peerlist_entry>& pl_white);
     bool get_white_peer_by_index(peerlist_entry& p, size_t i);
     bool get_gray_peer_by_index(peerlist_entry& p, size_t i);
     bool append_with_peer_white(const peerlist_entry& pr);
@@ -194,7 +194,7 @@ namespace nodetool
   }
   //--------------------------------------------------------------------------------------------------
   inline 
-  bool peerlist_manager::merge_peerlist(const std::list<peerlist_entry>& outer_bs)
+  bool peerlist_manager::merge_peerlist(const std::vector<peerlist_entry>& outer_bs)
   {
     CRITICAL_REGION_LOCAL(m_peerlist_lock);
     BOOST_FOREACH(const peerlist_entry& be,  outer_bs)
@@ -244,25 +244,43 @@ namespace nodetool
   }
   //--------------------------------------------------------------------------------------------------
   inline 
-  bool peerlist_manager::get_peerlist_head(std::list<peerlist_entry>& bs_head, uint32_t depth)
+  bool peerlist_manager::get_peerlist_head(std::vector<peerlist_entry>& bs_head, bool anonymize, uint32_t depth)
   {
     
     CRITICAL_REGION_LOCAL(m_peerlist_lock);
     peers_indexed::index<by_time>::type& by_time_index=m_peers_white.get<by_time>();
     uint32_t cnt = 0;
+
+    // The fix was made using Monero -> 28a7d31
+    // picks a random set of peers within the first 120%, rather than a set of the first 100%.
+    // The intent is that if someone asks twice, they can't easily tell:
+    // - this address was not in the first list, but is in the second, so the only way this can be
+    // is if its last_seen was recently reset, so this means the target node recently had a new
+    // connection to that address
+    // - this address was in the first list, and not in the second, which means either the address
+    // was moved to the gray list (if it's not accessibe, which the attacker can check if
+    // the address accepts incoming connections) or it was the oldest to still fit in the 250 items,
+    // so its last_seen is old.
+    const uint32_t pick_depth = anonymize ? depth + depth / 5 : depth;
     BOOST_REVERSE_FOREACH(const peers_indexed::value_type& vl, by_time_index)
     {
-      if(!vl.last_seen)
-        continue;
-      bs_head.push_back(vl);      
-      if(cnt++ > depth)
+      if(cnt++ >= pick_depth)
         break;
+      bs_head.push_back(vl);
+    }
+    if (anonymize)
+    {
+      std::shuffle(bs_head.begin(), bs_head.end(), crypto::uniform_random_bit_generator());
+      if (bs_head.size() > depth)
+        bs_head.resize(depth);
+      for (auto &e: bs_head)
+        e.last_seen = 0;
     }
     return true;
   }
   //--------------------------------------------------------------------------------------------------
   inline
-  bool peerlist_manager::get_peerlist_full(std::list<peerlist_entry>& pl_gray, std::list<peerlist_entry>& pl_white)
+  bool peerlist_manager::get_peerlist_full(std::vector<peerlist_entry>& pl_gray, std::vector<peerlist_entry>& pl_white)
   {    
     CRITICAL_REGION_LOCAL(m_peerlist_lock);
     peers_indexed::index<by_time>::type& by_time_index_gr=m_peers_gray.get<by_time>();

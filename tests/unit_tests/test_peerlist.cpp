@@ -31,8 +31,8 @@ TEST(peer_list, peer_list_general)
   size_t gray_list_size = plm.get_gray_peers_count();
   ASSERT_EQ(gray_list_size, 1);
 
-  std::list<nodetool::peerlist_entry> bs_head;
-  bool r = plm.get_peerlist_head(bs_head, 100);
+  std::vector<nodetool::peerlist_entry> bs_head;
+  bool r = plm.get_peerlist_head(bs_head, false, 100);
   std::cout << bs_head.size() << std::endl;
   ASSERT_TRUE(r);
 

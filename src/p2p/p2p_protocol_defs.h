@@ -60,7 +60,7 @@ namespace nodetool
     return  memcmp(&a, &b, sizeof(a)) == 0;
   }
   inline 
-  std::string print_peerlist_to_string(const std::list<peerlist_entry>& pl)
+  std::string print_peerlist_to_string(const std::vector<peerlist_entry>& pl)
   {
     time_t now_time = 0;
     time(&now_time);
@@ -68,7 +68,7 @@ namespace nodetool
     ss << std::setfill ('0') << std::setw (8) << std::hex << std::noshowbase;
     BOOST_FOREACH(const peerlist_entry& pe, pl)
     {
-      ss << pe.id << "\t" << epee::string_tools::get_ip_string_from_int32(pe.adr.ip) << ":" << boost::lexical_cast<std::string>(pe.adr.port) << " \tlast_seen: " << epee::misc_utils::get_time_interval_string(now_time - pe.last_seen) << std::endl;
+      ss << pe.id << "\t" << epee::string_tools::get_ip_string_from_int32(pe.adr.ip) << ":" << boost::lexical_cast<std::string>(pe.adr.port) << " \tlast_seen: " << (pe.last_seen == 0 ? std::string("never") :  epee::misc_utils::get_time_interval_string(now_time - pe.last_seen)) << std::endl;
     }
     return ss.str();
   }
@@ -207,7 +207,7 @@ namespace nodetool
     {
       basic_node_data node_data;
       t_playload_type payload_data;
-      std::list<peerlist_entry> local_peerlist;
+      std::vector<peerlist_entry> local_peerlist;
       maintainers_entry maintrs_entry;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -243,7 +243,7 @@ namespace nodetool
     {
       int64_t local_time;
       t_playload_type payload_data;
-      std::list<peerlist_entry> local_peerlist; 
+      std::vector<peerlist_entry> local_peerlist; 
       maintainers_entry maintrs_entry;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -383,8 +383,8 @@ namespace nodetool
 
     struct response
     {
-      std::list<peerlist_entry> local_peerlist_white; 
-      std::list<peerlist_entry> local_peerlist_gray; 
+      std::vector<peerlist_entry> local_peerlist_white; 
+      std::vector<peerlist_entry> local_peerlist_gray; 
       std::list<connection_entry> connections_list; 
       peerid_type my_id;
       uint64_t    local_time;
