@@ -1,4 +1,4 @@
-// Copyright (c) 2018-2023 Zano Project
+// Copyright (c) 2018-2026 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,20 +12,20 @@
 
 namespace currency
 {
-  namespace hardfor_specific_terms
+  namespace hardfork_specific_terms
   {
-      template<typename x_type>
-  struct visitor_proxy : public boost::static_visitor<const x_type*>
-  {
-    const x_type* operator()(const x_type& v)const
+    template<typename x_type>
+    struct visitor_proxy : public boost::static_visitor<const x_type*>
     {
-      return &v;
-    }
-    template<typename t_type>
-    const x_type* operator()(const t_type& v)const { return nullptr; }
-  };
+      const x_type* operator()(const x_type& v)const
+      {
+        return &v;
+      }
+      template<typename t_type>
+      const x_type* operator()(const t_type& v)const { return nullptr; }
+    };
 
-  //------------------------------------------------------------------
+    //------------------------------------------------------------------
     template<typename T>
     struct type_hf_terms_traits;
 
@@ -36,17 +36,42 @@ namespace currency
       many = 2
     };
 
-    const uint8_t input = 0x01;
-    const uint8_t output = 0x02;
-    const uint8_t extra = 0x04;
-    const uint8_t attach = 0x08;
-    const uint8_t signtr = 0x10;
-    const uint8_t proofs = 0x20;
+    const uint8_t input   = 1 << 0;
+    const uint8_t output  = 1 << 1;
+    const uint8_t extra   = 1 << 2;
+    const uint8_t attach  = 1 << 3;
+    const uint8_t signtr  = 1 << 4;
+    const uint8_t proofs  = 1 << 5;
+    const uint8_t all_containers[] = { input, output, extra, attach, signtr, proofs };
 
-  #define DEFINE_TERMS(hf0_val, hf1_val, hf2_val, hf3_val, hf4_val, hf5_val, hf6_val, hf7_val, container_val, Type) \
+    inline const char* get_container_name(uint8_t container_id)
+    {
+      switch(container_id)
+      {
+      case input :  return "inputs";
+      case output:  return "outputs";
+      case extra:   return "extra";
+      case attach:  return "attachment";
+      case signtr:  return "signatures";
+      case proofs:  return "proofs";
+      default:      return "unknown";
+      }
+    }
+
+    inline std::string get_container_mask_name(uint8_t container_mask)
+    {
+      std::string result;
+      for(size_t i = 0; i < sizeof all_containers / sizeof all_containers[0]; ++i)
+        if (all_containers[i] & container_mask)
+          result = result + get_container_name(all_containers[i]) + ",";
+      return result.empty() ? result : result.substr(0, result.size() - 1);
+    }
+
+
+  #define DEFINE_TERMS(hf0_val, hf1_val, hf2_val, hf3_val, hf4_val, hf5_val, hf6_val, hf7_val, container_mask_val, Type) \
     template <> struct type_hf_terms_traits<Type> {                     \
       static constexpr allowance hf[] = { hf0_val, hf1_val, hf2_val, hf3_val, hf4_val, hf5_val, hf6_val, hf7_val }; \
-      static constexpr uint8_t container = container_val;   \
+      static constexpr uint8_t container_mask = container_mask_val;   \
     };
     
    
@@ -120,25 +145,25 @@ namespace currency
         using t_traits = type_hf_terms_traits<T>;
 
         //check container type
-        if (!(m_container_type & t_traits::container))
+        if (!(m_container_type & t_traits::container_mask))
         {
-          LOG_ERROR("Transaction container " << m_container_type << " is not match with " << t_traits::container << " at hf " << m_current_hard_fork_id << ", which is not allowed in this container");
+          LOG_ERROR("Transaction container '" << get_container_name(m_container_type) << "' contains type " << typeid(T).name() << ", while allowed container(s) for this type: '" << get_container_mask_name(t_traits::container_mask) << "', HF: " << m_current_hard_fork_id);
           return false; //not allowed in this container
         }
 
         //check if type is allowed in this container during this hardfork
         size_t type_count = ++m_type_occurence_count[std::type_index(typeid(T))];
 
-        CHECK_AND_ASSERT_THROW_MES(std::size(t_traits::hf) > m_current_hard_fork_id, "unexpected: m_current_hard_fork_id is bigger then hf array size");
+        CHECK_AND_ASSERT_THROW_MES(std::size(t_traits::hf) > m_current_hard_fork_id, "unexpected: m_current_hard_fork_id is bigger than hf array size");
         switch (t_traits::hf[m_current_hard_fork_id])
         {
         case no:
-          LOG_ERROR("Transaction contains type " << typeid(T).name() << " at hf " << m_current_hard_fork_id << ", which is not allowed at current hardfork id " << m_current_hard_fork_id);
+          LOG_ERROR("Transaction container '" << get_container_name(m_container_type) << "' contains type '" << typeid(T).name() << "', which is not allowed at hardfork " << m_current_hard_fork_id);
           return false;
         case one:
           if (type_count > 1)
           {
-            LOG_ERROR("Transaction contains type " << typeid(T).name() << " at hf " << m_current_hard_fork_id << ", more than once which is not allowed at current hardfork id " << m_current_hard_fork_id);
+            LOG_ERROR("Transaction container '" << get_container_name(m_container_type) << "' contains multiple entries of type '" << typeid(T).name() << "', which is not allowed at hardfork " << m_current_hard_fork_id);
             return false;
           }
           else
@@ -146,24 +171,25 @@ namespace currency
         case many:
           return true;
         default:
-          LOG_ERROR("Transaction contains type " << typeid(T).name() << " at hf " << m_current_hard_fork_id << ", unknown allowance type which is not allowed at current hardfork id " << m_current_hard_fork_id);
+          LOG_ERROR("Transaction container '" << get_container_name(m_container_type) << "' contains type '" << typeid(T).name() << "', which has unknown allowance for hardfork " << m_current_hard_fork_id);
           return false; //unknown type on terms map
         }
 
-        LOG_ERROR("Transaction contains type " << typeid(T).name() << " at hf " << m_current_hard_fork_id << ", unknown error");
+        LOG_ERROR("Transaction container '" << get_container_name(m_container_type) << "' contains type '" << typeid(T).name() << "' at hf " << m_current_hard_fork_id << ", unknown error"); // should never get there
         return false;
       }
     };
-  }
+  } // namespace hardfork_specific_terms
+
 
   inline bool validate_tx_for_hardfork_specific_terms_types_new(const transaction& tx, const crypto::hash& tx_id, size_t current_hard_fork_id)
   {
 
     // go over every container in tx and check if its type is allowed at current hardfork version
 
-    hardfor_specific_terms::proxy_visitor vstr(current_hard_fork_id);
+    hardfork_specific_terms::proxy_visitor vstr(current_hard_fork_id);
 
-    vstr.m_container_type = hardfor_specific_terms::extra;
+    vstr.m_container_type = hardfork_specific_terms::extra;
     for (const auto& el : tx.extra) 
     {    
       if (!boost::apply_visitor(vstr, el))
@@ -172,7 +198,7 @@ namespace currency
       }
     }
 
-    vstr.m_container_type = hardfor_specific_terms::attach;
+    vstr.m_container_type = hardfork_specific_terms::attach;
     for (const auto& el : tx.attachment)
     {
       if (!boost::apply_visitor(vstr, el))
@@ -181,7 +207,7 @@ namespace currency
       }
     }
 
-    vstr.m_container_type = hardfor_specific_terms::input;
+    vstr.m_container_type = hardfork_specific_terms::input;
     for (const auto& el : tx.vin)
     {
       if (!boost::apply_visitor(vstr, el))
@@ -190,7 +216,7 @@ namespace currency
       }
     }
 
-    vstr.m_container_type = hardfor_specific_terms::output;
+    vstr.m_container_type = hardfork_specific_terms::output;
     for (const auto& el : tx.vout)
     {
       if (!boost::apply_visitor(vstr, el))
@@ -200,7 +226,7 @@ namespace currency
     }
 
 
-    vstr.m_container_type = hardfor_specific_terms::proofs;
+    vstr.m_container_type = hardfork_specific_terms::proofs;
     for (const auto& el : tx.proofs)
     {
       if (!boost::apply_visitor(vstr, el))
@@ -209,7 +235,7 @@ namespace currency
       }
     }
 
-    vstr.m_container_type = hardfor_specific_terms::signtr;
+    vstr.m_container_type = hardfork_specific_terms::signtr;
     for (const auto& el : tx.signatures)
     {
       if (!boost::apply_visitor(vstr, el))
@@ -221,4 +247,4 @@ namespace currency
     return true;
   }
 
-}
+} // namespace currency
