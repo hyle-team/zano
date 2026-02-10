@@ -203,6 +203,7 @@ namespace currency
   // ASP prevents: ZC out's blinded_asset_id misuse (e.g. sum of 2 asset ids)
   // no ZC outs => no problem => no need for ASP
   // one ZC out (impossible in HF4) => simple Schnorr proff is sufficient
+  // all ZC outs have explicit asset id => no need for ASP
   // many ZC outs => blinded asset id of each must equals to blinded asset id of one of inputs
   
   // ASP generic case:
@@ -302,6 +303,15 @@ namespace currency
       VARIANT_SWITCH_END()
     }
 
+    if (is_pos_miner_tx(tx))
+    {
+      // TODO: reconsider
+      // special case for PoS miner tx after HF4 (PoS mining only allowed for native ZC inputs)
+      CHECK_AND_ASSERT_MES(has_native_coin_bare_inputs, false, "inv1");   // found, true
+      CHECK_AND_ASSERT_MES(!has_native_coin_bare_inputs_, false, "inv2"); // passed, false
+      has_native_coin_bare_inputs = false; // reset to mimic HF4 behaviour
+    }
+
     size_t confidential_outs_count = 0;
     for(size_t j = 0; j < tx.vout.size(); ++j)
     {
@@ -394,6 +404,16 @@ namespace currency
       uint8_t err = 0;
       r = crypto::generate_BGE_proof(context_hash, ring, secret, secret_index, result.bge_proofs.back(), &err);
       CHECK_AND_ASSERT_MES(r, false, "out #" << j << ": generate_BGE_proof failed with err=" << (int)err);
+
+      //std::vector<crypto::public_key> ring_pk(ring.size(), null_pkey);
+      //std::vector<const crypto::public_key*> ring_pk_ptr(ring.size(), nullptr);
+      //for(size_t i = 0; i < ring.size(); ++i)
+      //{
+      //  ring_pk[i] = (crypto::c_scalar_1div8 * ring[i]).to_public_key();
+      //  ring_pk_ptr[i] = &ring_pk[i];
+      //}
+      //r = crypto::verify_BGE_proof(context_hash, ring_pk_ptr, result.bge_proofs.back(), &err);
+      //CHECK_AND_ASSERT_MES(r, false, "verify_BGE_proof FAILED!");
     }
 
     return true;
