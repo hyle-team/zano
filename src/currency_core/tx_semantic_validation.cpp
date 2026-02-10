@@ -50,13 +50,13 @@ namespace currency
   {
     if (tx_blob_size >= CURRENCY_MAX_TRANSACTION_BLOB_SIZE)
     {
-      LOG_PRINT_RED_L0("tx blob size is " << tx_blob_size << ", it is greater than or equal to allowed maximum of " << CURRENCY_MAX_TRANSACTION_BLOB_SIZE);
+      LOG_PRINT_RED_L0("tx blob size is " << tx_blob_size << ", which is greater than or equal to allowed maximum of " << CURRENCY_MAX_TRANSACTION_BLOB_SIZE);
       return false;
     }
 
     if (!check_inputs_and_outputs_size(tx))
     {
-      LOG_PRINT_RED_L0("invalid inputs/outputs size for tx id= " << get_transaction_hash(tx));
+      LOG_PRINT_RED_L0("tx has invalid inputs/outputs size");
       return false;
     }
 
@@ -64,7 +64,7 @@ namespace currency
     {
       if (!currency::validate_tx_for_hardfork_specific_terms_types_new(tx, tx_id, tx.hardfork_id))
       { 
-        LOG_PRINT_RED_L0("tx failed hardfork specific terms check for tx id= " << get_transaction_hash(tx));
+        LOG_PRINT_RED_L0("tx failed hardfork specific terms validation");
         return false;
       }
     }
@@ -72,20 +72,20 @@ namespace currency
     {
       if (!check_inputs_types_supported(tx))
       {
-        LOG_PRINT_RED_L0("unsupported input types for tx id= " << get_transaction_hash(tx));
+        LOG_PRINT_RED_L0("tx has unsupported input types");
         return false;
       }
     }
     
     if (!check_outs_valid(tx))
     {
-      LOG_PRINT_RED_L0("tx has invalid outputs, rejected for tx id= " << get_transaction_hash(tx));
+      LOG_PRINT_RED_L0("tx has invalid outputs, rejected");
       return false;
     }
 
     if (!check_bare_money_overflow(tx))
     {
-      LOG_PRINT_RED_L0("tx has money overflow, rejected for tx id= " << get_transaction_hash(tx));
+      LOG_PRINT_RED_L0("tx has money overflow, rejected");
       return false;
     }
 
@@ -108,7 +108,7 @@ namespace currency
     {
       if (!check_tx_bare_balance(tx))
       {
-        LOG_PRINT_RED_L0("balance check failed for tx " << get_transaction_hash(tx));
+        LOG_PRINT_RED_L0("tx bare balance check failed");
         return false;
       }
     }
