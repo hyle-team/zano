@@ -29,7 +29,7 @@ struct socks5_proxy_settings
   std::optional<socks5_endpoint_config> blocks;
 };
 
-template<class base_transport>
+template<bool is_ssl, class base_transport = epee::net_utils::blocked_mode_client_t<is_ssl>>
 class socks5_proxy_transport : public base_transport
 {
 public:
@@ -46,18 +46,24 @@ public:
   bool connect(const std::string& dest_host, const std::string& dest_port, unsigned int connect_timeout_ms, unsigned int recv_timeout_ms,
     const std::string& bind_ip = "0.0.0.0")
   {
+    // https over socks5
+    if constexpr (is_ssl)
+    {
+      this->set_delay_handshake(true);
+    }
+
     // 1) TCP connect to SOCKS5 proxy through BASE transport
-    if (!this->base_transport::connect(m_proxy_host, std::to_string(m_proxy_port), connect_timeout_ms, recv_timeout_ms, bind_ip))
+    if (!base_transport::connect(m_proxy_host, std::to_string(m_proxy_port), connect_timeout_ms, recv_timeout_ms, bind_ip))
       return false;
 
     // 2) SOCKS5 greeting: [0x05, 0x01, 0x00] -> [0x05, 0x00]
     {
       const unsigned char greet[] = {0x05, 0x01, 0x00};
-      if (!this->base_transport::send(greet, sizeof(greet)))
+      if (!base_transport::send(greet, sizeof(greet)))
         return false;
 
       std::string resp;
-      if (!this->base_transport::recv_n(resp, 2))
+      if (!base_transport::recv_n(resp, 2))
         return false;
       if (resp.size() != 2)
         return false;
@@ -79,10 +85,8 @@ public:
 
       // ATYP + DST.ADDR
       boost::system::error_code ec;
-      boost::asio::ip::address ip_parsed;
-      const bool addr_is_ip =
-        !m_use_remote_dns &&
-        !((ip_parsed = boost::asio::ip::make_address(dest_host, ec)).is_unspecified());
+      auto ip_parsed = boost::asio::ip::make_address(dest_host, ec);
+      const bool addr_is_ip = (!m_use_remote_dns && !ec);
 
       if (addr_is_ip && ip_parsed.is_v4())
       {
@@ -114,12 +118,12 @@ public:
       req.push_back(static_cast<unsigned char>((p >> 8) & 0xFF));
       req.push_back(static_cast<unsigned char>( p       & 0xFF));
 
-      if (!this->base_transport::send(req.data(), req.size()))
+      if (!base_transport::send(req.data(), req.size()))
         return false;
 
       // resp: VER REP RSV ATYP [BND.ADDR] [BND.PORT]
       std::string head;
-      if (!this->base_transport::recv_n(head, 4))
+      if (!base_transport::recv_n(head, 4))
         return false;
       if (head.size() != 4)
         return false;
@@ -141,7 +145,7 @@ public:
       else if (r_atyp == 0x03)
       {
         std::string len_buf;
-        if (!this->base_transport::recv_n(len_buf, 1))
+        if (!base_transport::recv_n(len_buf, 1))
           return false;
         if (len_buf.size() != 1)
           return false;
@@ -154,16 +158,18 @@ public:
 
       // continue read BND.ADDR + BND.PORT (2 bytes)
       std::string drain;
-      if (!this->base_transport::recv_n(drain, static_cast<int64_t>(addr_len + 2)))
+      if (!base_transport::recv_n(drain, static_cast<int64_t>(addr_len + 2)))
         return false;
       if (drain.size() != addr_len + 2)
         return false;
     }
 
-    // on this step, we have established a TUNNEL to dest_host:dest_port
-    // TODO_SSL_HANDSHAKE: if HTTPS through SOCKS5 is ever needed,
-    // the base transport should be able to perform SSL handshake AFTER CONNECT,
-    // not immediately after TCP-connect to the proxy (see on_after_connect() in blocked_mode_client_t). :contentReference[oaicite:3]{index=3}
+    // here we have established a tunnel to dest_host:dest_port
+    if constexpr (is_ssl)
+    {
+      this->set_domain(dest_host);
+      this->do_handshake();
+    }
     return true;
   }
 
