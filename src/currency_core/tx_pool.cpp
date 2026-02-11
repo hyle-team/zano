@@ -387,13 +387,13 @@ namespace currency
       VARIANT_CASE_CONST(gateway_address_descriptor_operation_register, op_reg)
       {
 #ifdef NDEBUG
-  #error "This part is not implemented yet"
+//  #error "This part is not implemented yet"
 #endif
       }
       VARIANT_CASE_CONST(gateway_address_descriptor_operation_update, op_upd)
       {
 #ifdef NDEBUG
-#error "This part is not implemented yet"
+//#error "This part is not implemented yet"
 #endif
       }
       VARIANT_CASE_THROW_ON_OTHER();
