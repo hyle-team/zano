@@ -122,6 +122,11 @@ bool wallets_manager::do_exception_safe_call(guarded_code_t guarded_code, error_
     LOG_ERROR(error_prefix_maker() << "transaction is too big: " << e.what());
     api_return_code_result = API_RETURN_CODE_TX_IS_TOO_BIG;
   }
+  catch (const tools::error::tx_has_too_many_inputs& e)
+  {
+    LOG_ERROR(error_prefix_maker() << "transaction has too many inputs: " << e.what());
+    api_return_code_result = API_RETURN_CODE_TX_HAS_TOO_MANY_INPUTS;
+  }
   catch (const tools::error::tx_rejected& e)
   {
     LOG_ERROR(error_prefix_maker() << "transaction " << get_transaction_hash(e.tx()) << " was rejected by daemon with status " << e.status());
@@ -136,6 +141,11 @@ bool wallets_manager::do_exception_safe_call(guarded_code_t guarded_code, error_
   {
     LOG_ERROR(error_prefix_maker() << "no connection to daemon: " << e.what());
     api_return_code_result = API_RETURN_CODE_DISCONNECTED;
+  }
+  catch (const tools::error::tx_has_too_many_outs& e)
+  {
+    LOG_ERROR(error_prefix_maker() << "tx has to many outs: " << e.what());
+    api_return_code_result = API_RETURN_CODE_TX_HAS_TOO_MANY_OUTPUTS;
   }
   catch (const std::exception& e)
   {

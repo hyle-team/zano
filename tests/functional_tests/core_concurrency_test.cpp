@@ -103,7 +103,7 @@ bool generate_events(currency::core& c, cct_events_t& events, const cct_wallets_
   size_t last_altchain_block_height = 0;
   bool alt_chains_enabled = false;
   block_extended_info prev_block = AUTO_VAL_INIT(prev_block), current_block = AUTO_VAL_INIT(current_block);
-  r = bcs.get_block_extended_info_by_height(0, prev_block);
+  bcs.get_block_extended_info_by_height(bcs.get_top_block_height(), prev_block); // return back to main chain
   CHECK_AND_ASSERT_MES(r, false, "get_block_extended_info_by_height failed");
 
   for (size_t block_index = 1; block_index < blocks_count; ++block_index)

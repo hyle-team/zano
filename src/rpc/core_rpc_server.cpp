@@ -159,8 +159,9 @@ namespace currency
       else
         res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_synchronizing;
     }
-    res.synchronization_start_height = m_p2p.get_payload_object().get_core_inital_height();
-    res.max_net_seen_height = m_p2p.get_payload_object().get_max_seen_height();
+    res.max_net_seen_height = std::max(m_p2p.get_payload_object().get_max_seen_height(), res.height);
+    res.synchronization_start_height = std::min(m_p2p.get_payload_object().get_core_inital_height(), res.max_net_seen_height);
+
     m_p2p.get_maintainers_info(res.mi);
     res.pos_allowed = m_core.get_blockchain_storage().is_pos_allowed();
     wide_difficulty_type pos_diff = m_core.get_blockchain_storage().get_cached_next_difficulty(true);
@@ -502,7 +503,12 @@ namespace currency
   bool core_rpc_server::on_get_random_outs4(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
-    CHECK_RPC_LIMITS(req.heights.size(), RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS);
+    size_t total_heights = 0;
+    for(size_t i = 0; i < req.batches.size(); ++i)
+    {
+      total_heights += req.batches[i].heights.size();
+      CHECK_RPC_LIMITS(total_heights, RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS);
+    }
     res.status = API_RETURN_CODE_FAIL;
     if (!m_core.get_blockchain_storage().get_random_outs_for_amounts4(req, res))
     {

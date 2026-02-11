@@ -1,4 +1,4 @@
-  // Copyright (c) 2019, anonimal, <anonimal@zano.org>
+﻿  // Copyright (c) 2019, anonimal, <anonimal@zano.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
@@ -37,6 +37,7 @@
 #include <istream>
 #include <ostream>
 #include <string>
+#include <utility>
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
 #include <boost/preprocessor/selection/min.hpp>
@@ -169,26 +170,73 @@ namespace epee
         SSL_set_tlsext_host_name(m_socket.native_handle(), domain_name.c_str());
       }
 
+      void set_delay_handshake(bool delay)
+      {
+        m_delay_handshake = delay;
+        if (delay)
+          m_tls_io_active = false;
+      }
+
+      void do_handshake()
+      {
+        LOG_PRINT_L2("SSL Handshake....");
+        m_socket.handshake(boost::asio::ssl::stream_base::client);
+        LOG_PRINT_L2("SSL Handshake OK");
+        m_tls_io_active = true;
+      }
+
       boost::asio::ip::tcp::socket& get_socket()
       {
         return m_socket.next_layer();
       }
 
-      auto& get_stream()
-      {
-        return m_socket;
-      }
-
       void on_after_connect()
       {
-        LOG_PRINT_L2("SSL Handshake....");
-        m_socket.handshake(boost::asio::ssl::stream_base::client);
-        LOG_PRINT_L2("SSL Handshake OK");
+        if (!m_delay_handshake)
+          do_handshake();
+      }
+      
+      template<class const_buff_seq, class handler>
+      void async_write(const const_buff_seq& b, handler&& h)
+      {
+        if (!m_tls_io_active)
+          boost::asio::async_write(m_socket.next_layer(), b, std::forward<handler>(h));
+        else
+          boost::asio::async_write(m_socket, b, std::forward<handler>(h));
+      }
+
+      template<class mutable_buff_seq, class completion_condition, class handler>
+      void async_read(const mutable_buff_seq& b, completion_condition&& cc, handler&& h)
+      {
+        if (!m_tls_io_active)
+          boost::asio::async_read(m_socket.next_layer(), b, std::forward<completion_condition>(cc), std::forward<handler>(h));
+        else
+          boost::asio::async_read(m_socket, b, std::forward<completion_condition>(cc), std::forward<handler>(h));
+      }
+
+      template<class const_buff_seq>
+      std::size_t write_some(const const_buff_seq& b, boost::system::error_code& ec)
+      {
+        if (!m_tls_io_active)
+          return m_socket.next_layer().write_some(b, ec);
+        else
+          return m_socket.write_some(b, ec);
+      }
+
+      template<class mutable_buff_seq>
+      std::size_t read_some(const mutable_buff_seq& b, boost::system::error_code& ec)
+      {
+        if (!m_tls_io_active)
+          return m_socket.next_layer().read_some(b, ec);
+        else
+          return m_socket.read_some(b, ec);
       }
 
     private: 
       boost::asio::ssl::context m_ssl_context;
       boost::asio::ssl::stream<boost::asio::ip::tcp::socket> m_socket;
+      bool m_delay_handshake = false;
+      bool m_tls_io_active = true;
     };
 
     template<>
@@ -207,9 +255,14 @@ namespace epee
         
       }
 
-      boost::asio::ip::tcp::socket& get_stream()
+      void set_delay_handshake(bool delay)
       {
-        return m_socket;
+
+      }
+
+      void do_handshake()
+      {
+
       }
 
       void on_after_connect()
@@ -221,6 +274,31 @@ namespace epee
       {
 
       }
+
+      template<class const_buff_seq, class handler>
+      void async_write(const const_buff_seq& b, handler&& h)
+      {
+        boost::asio::async_write(m_socket, b, std::forward<handler>(h));
+      }
+
+      template<class mutable_buff_seq, class completion_condition, class handler>
+      void async_read(const mutable_buff_seq& b, completion_condition&& cc, handler&& h)
+      {
+        boost::asio::async_read(m_socket, b, std::forward<completion_condition>(cc), std::forward<handler>(h));
+      }
+
+      template<class const_buff_seq>
+      std::size_t write_some(const const_buff_seq& b, boost::system::error_code& ec)
+      {
+        return m_socket.write_some(b, ec);
+      }
+
+      template<class mutable_buff_seq>
+      std::size_t read_some(const mutable_buff_seq& b, boost::system::error_code& ec)
+      {
+        return m_socket.read_some(b, ec);
+      }
+
     private:
       boost::asio::ip::tcp::socket m_socket;
     };
@@ -242,9 +320,14 @@ namespace epee
         return m_pbackend->set_domain(domain_name);
       }
 
-      auto& get_stream()
+      void set_delay_handshake(bool delay)
       {
-        return m_pbackend->get_stream();
+        return m_pbackend->set_delay_handshake(delay);
+      }
+
+      void do_handshake()
+      {
+        return m_pbackend->do_handshake();
       }
 
       void on_after_connect()
@@ -257,6 +340,29 @@ namespace epee
         m_pbackend = std::make_shared<socket_backend<is_ssl>>(mr_io_service);
       }
 
+      template<class const_buff_seq, class handler>
+      void async_write(const const_buff_seq& b, handler&& h)
+      {
+        m_pbackend->async_write(b, std::forward<handler>(h));
+      }
+
+      template<class mutable_buff_seq, class completion_condition, class handler>
+      void async_read(const mutable_buff_seq& b, completion_condition&& cc, handler&& h)
+      {
+        m_pbackend->async_read(b, std::forward<completion_condition>(cc), std::forward<handler>(h));
+      }
+
+      template<class const_buff_seq>
+      std::size_t write_some(const const_buff_seq& b, boost::system::error_code& ec)
+      {
+        return m_pbackend->write_some(b, ec);
+      }
+
+      template<class mutable_buff_seq>
+      std::size_t read_some(const mutable_buff_seq& b, boost::system::error_code& ec)
+      {
+        return m_pbackend->read_some(b, ec);
+      }
     private: 
       boost::asio::io_service& mr_io_service;
       std::shared_ptr<socket_backend<is_ssl>> m_pbackend;
@@ -355,6 +461,7 @@ namespace epee
           // Get a list of endpoints corresponding to the server name.
 
           m_sct_back.reset();
+          m_sct_back.set_delay_handshake(m_delay_handshake_cfg);
           //////////////////////////////////////////////////////////////////////////
 
           boost::asio::ip::tcp::resolver resolver(m_io_service);
@@ -470,7 +577,7 @@ namespace epee
           // object is used as a callback and will update the ec variable when the
           // operation completes. The blocking_udp_client.cpp example shows how you
           // can use boost::bind rather than boost::lambda.
-          boost::asio::async_write(m_sct_back.get_stream(), boost::asio::buffer(buff), boost::lambda::var(ec) = boost::lambda::_1);
+          m_sct_back.async_write(boost::asio::buffer(buff), boost::lambda::var(ec) = boost::lambda::_1);
 
           // Block until the asynchronous operation has completed.
           while (ec == boost::asio::error::would_block)
@@ -533,9 +640,7 @@ namespace epee
           */
           boost::system::error_code ec;
 
-          size_t writen = m_sct_back.get_stream().write_some(boost::asio::buffer(data, sz), ec);
-
-
+          const std::size_t writen = m_sct_back.write_some(boost::asio::buffer(data, sz), ec);
 
           if (!writen || ec)
           {
@@ -602,7 +707,7 @@ namespace epee
 
           char local_buff[10000] = { 0 };
           //m_socket.async_read_some(boost::asio::buffer(local_buff, sizeof(local_buff)), hndlr);
-          boost::asio::async_read(m_sct_back.get_stream(), boost::asio::buffer(local_buff, sizeof(local_buff)), boost::asio::transfer_at_least(1), hndlr);
+          m_sct_back.async_read(boost::asio::buffer(local_buff, sizeof(local_buff)), boost::asio::transfer_at_least(1), hndlr);
 
           // Block until the asynchronous operation has completed.
           while (ec == boost::asio::error::would_block && !boost::interprocess::ipcdetail::atomic_read32(&m_shutdowned))
@@ -686,7 +791,7 @@ namespace epee
           handler_obj hndlr(ec, bytes_transfered, m_download_speed_meter);
 
           //char local_buff[10000] = {0};
-          boost::asio::async_read(m_sct_back.get_stream(), boost::asio::buffer((char*)buff.data(), buff.size()), boost::asio::transfer_at_least(buff.size()), hndlr);
+          m_sct_back.async_read(boost::asio::buffer((char*)buff.data(), buff.size()), boost::asio::transfer_at_least(buff.size()), hndlr);
 
           // Block until the asynchronous operation has completed.
           while (ec == boost::asio::error::would_block && !boost::interprocess::ipcdetail::atomic_read32(&m_shutdowned))
@@ -757,6 +862,22 @@ namespace epee
         return m_sct_back.get_socket();
       }
 
+      void set_delay_handshake(bool delay)
+      {
+        m_delay_handshake_cfg = delay;
+        m_sct_back.set_delay_handshake(delay);
+      }
+
+      void set_domain(const std::string& domain_name)
+      {
+        m_sct_back.set_domain(domain_name);
+      }
+
+      void do_handshake()
+      {
+        m_sct_back.do_handshake();
+      }
+
     private:
 
       void check_deadline()
@@ -793,6 +914,7 @@ namespace epee
       bool m_connected;
       boost::asio::deadline_timer m_deadline;
       volatile uint32_t m_shutdowned;
+      bool m_delay_handshake_cfg = false;   // delay the TLS handshake on the next connect()
 
       mutable speed_meter m_download_speed_meter;
       mutable speed_meter m_upload_speed_meter;
@@ -858,7 +980,7 @@ namespace epee
 
           boost::system::error_code ec;
 
-          size_t writen = blocked_mode_client_t<is_ssl>::m_sct_back.get_socket().write_some(boost::asio::buffer(data, sz), ec);
+          size_t writen = blocked_mode_client_t<is_ssl>::m_sct_back.write_some(boost::asio::buffer(data, sz), ec);
 
           if (!writen || ec)
           {
@@ -915,5 +1037,7 @@ namespace epee
 
     typedef blocked_mode_client_t<false> blocked_mode_client;
     typedef async_blocked_mode_client_t<false> async_blocked_mode_client;
+    typedef blocked_mode_client_t<true> blocked_mode_ssl_client;
+    typedef async_blocked_mode_client_t<true> async_blocked_mode_ssl_client;
   }
 }
