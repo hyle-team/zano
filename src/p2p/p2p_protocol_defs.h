@@ -432,10 +432,7 @@ namespace nodetool
 
     struct request
     {
-      proof_of_trust  tr;
-
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(tr)
       END_KV_SERIALIZE_MAP()
     };
 

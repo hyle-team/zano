@@ -1334,12 +1334,6 @@ namespace nodetool
   template<class t_payload_net_handler>
   int node_server<t_payload_net_handler>::handle_request_anonymized_peers(int command, COMMAND_REQUEST_ANONYMIZED_PEERS::request& req, COMMAND_REQUEST_ANONYMIZED_PEERS::response& rsp, p2p_connection_context& context)
   {
-    if (!check_trust(req.tr))
-    {
-      drop_connection(context);
-      return 1;
-    }
-
     m_net_server.get_config_object().foreach_connection([&](const p2p_connection_context& cn_context)
       {
         auto& el = rsp.peers.emplace_back();

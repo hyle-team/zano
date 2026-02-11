@@ -925,20 +925,18 @@ bool invoke_debug_command(po::variables_map& vm, const crypto::secret_key& sk, n
 //---------------------------------------------------------------------------------------------------------------
 bool handle_get_anonymized_peers(po::variables_map& vm)
 {
-  crypto::secret_key sk{};
-  if (!get_private_key(sk, vm))
-  {
-    std::cout << "ERROR: secret key error" << ENDL;
-    return false;
-  }
-
   net_utils::levin_client2 transport;
   peerid_type peer_id = 0;
 
+  if (!transport.connect(command_line::get_arg(vm, arg_ip), static_cast<int>(command_line::get_arg(vm, arg_port)), static_cast<int>(command_line::get_arg(vm, arg_timeout))))
+  {
+    std::cout << "{" << ENDL << "  \"status\": \"ERROR: " << "Failed to connect to " << command_line::get_arg(vm, arg_ip) << ":" << command_line::get_arg(vm, arg_port) << "\"" << ENDL << "}" << ENDL;
+    return false;
+  }
+
   COMMAND_REQUEST_ANONYMIZED_PEERS::request req{};
-  
   COMMAND_REQUEST_ANONYMIZED_PEERS::response rsp{};
-  if (!invoke_debug_command<COMMAND_REQUEST_ANONYMIZED_PEERS>(vm, sk, transport, peer_id, req, rsp))
+  if (!net_utils::invoke_remote_command2(COMMAND_REQUEST_ANONYMIZED_PEERS::ID, req, rsp, transport))
   {
     std::cout << "ERROR: invoking COMMAND_REQUEST_ANONYMIZED_PEERS failed" << ENDL;
     return false;
