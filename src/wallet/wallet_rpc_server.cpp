@@ -23,6 +23,7 @@ DISABLE_VS_WARNINGS(4244)
 POP_VS_WARNINGS
 #include "crypto/bitcoin/sha256_helper.h"
 #include "wallet_errors.h"
+#include "fill_destination_helper.h"
 
 #define JWT_TOKEN_EXPIRATION_MAXIMUM          (60 * 60 * 1000)
 #define JWT_TOKEN_CLAIM_NAME_BODY_HASH        "body_hash"
@@ -524,132 +525,23 @@ namespace tools
       //put it to attachments
       ctp.attachments.insert(ctp.attachments.end(), req.service_entries.begin(), req.service_entries.end());
     }
-    bool wrap = false;
-    std::vector<currency::tx_destination_entry>& dsts = ctp.dsts;
-    
-    for (auto it = req.destinations.begin(); it != req.destinations.end(); it++)
-    {
-      currency::tx_destination_entry de{};
-      de.addr.resize(1);
-      std::string embedded_payment_id;
-      //check if address looks like wrapped address
-      if (currency::is_address_like_wrapped(it->address))
-      {
-        if (wrap)
-        {
-          LOG_ERROR("More then one entries in transactions");
-          er.code = WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT;
-          er.message = "Second wrap entry not supported in transactions";
-          return false;
 
-        }
-        LOG_PRINT_L0("Address " << it->address << " recognized as wrapped address, creating wrapping transaction...");
-        //put into service attachment specially encrypted entry which will contain wrap address and network
-        currency::tx_service_attachment sa = AUTO_VAL_INIT(sa);
-        sa.service_id = BC_WRAP_SERVICE_ID;
-        sa.instruction = BC_WRAP_SERVICE_INSTRUCTION_ERC20;
-        sa.flags = TX_SERVICE_ATTACHMENT_ENCRYPT_BODY | TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE;
-        sa.body = it->address;
-        ctp.extra.push_back(sa);
-
-        currency::account_public_address acc = AUTO_VAL_INIT(acc);
-        currency::get_account_address_from_str(acc, BC_WRAP_SERVICE_CUSTODY_WALLET);
-        de.addr.front() = acc;
-        wrap = true;
-        //encrypt body with a special way
-      }
-      else if (!w.get_wallet()->get_transfer_address(it->address, de.addr.back(), embedded_payment_id))
+    bool r = currency::rpc_fill_destinations_helper(req.destinations, ctp.dsts, ctp.extra, hf6_active, er, legacy_tx_wide_payment_id, m_allow_legacy_payment_id_size, [&](const std::string& address, currency::address_v& addr_v, std::string& embedded_payment_id) {
+      if (!w.get_wallet()->get_transfer_address(address, addr_v, embedded_payment_id))
       {
         er.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
-        er.message = std::string("WALLET_RPC_ERROR_CODE_WRONG_ADDRESS: ") + it->address;
+        er.message = std::string("WALLET_RPC_ERROR_CODE_WRONG_ADDRESS: ") + address;
         return false;
       }
+      return true;
+    });
 
-      if (hf6_active)
-      {
-        if (embedded_payment_id.size() != 0)
-        {
-          uint64_t intrinsic_embeded_payment_id = 0;
-          if (currency::convert_payment_id(embedded_payment_id, intrinsic_embeded_payment_id))
-          {
-            if (it->payment_id != 0)
-            {
-              er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
-              er.message = std::string("embedded payment id: ") + epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) + " conflicts with destination intrinsic payment id: " + epee::string_tools::pod_to_hex(it->payment_id);
-              return false;
-            }
-            de.payment_id = intrinsic_embeded_payment_id;
-          }
-          else
-          {
-            // it means embedded_payment_id.size() > CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE
-            if (!m_allow_legacy_payment_id_size)
-            {
-              er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
-              er.message = std::string("payment_id embeded into integrated address ") + it->address + " is too long, maximum is " + epee::string_tools::num_to_string_fast(CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE) + " bytes";
-              return false; ///
-            }
-            if (!legacy_tx_wide_payment_id.empty())
-            {
-              er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
-              er.message = std::string("payment_id embeded into integrated address ") + it->address + " conflicts with previously set tx-wide payment id";
-              return false;
-            }
-            legacy_tx_wide_payment_id = embedded_payment_id;
-          }
-        }
-
-        if (it->payment_id != 0)
-        {
-          if (!legacy_tx_wide_payment_id.empty())
-          {
-            er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
-            er.message = std::string("destination intrinsic payment id: ") + epee::string_tools::pod_to_hex(it->payment_id) + " conflicts with previously set tx-wide payment id";
-            return false; ///
-          }
-          de.payment_id = it->payment_id;
-        }
-      }
-      else
-      {
-        // before HF6
-        if (it->payment_id != 0)
-        {
-          er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
-          er.message = std::string("intrinsic payment id cannot be used before HF6");
-          return false; ///
-        }
-
-        if (embedded_payment_id.size() != 0)
-        {
-          if (!m_allow_legacy_payment_id_size && embedded_payment_id.size() > CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE)
-          {
-            er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
-            er.message = std::string("payment_id embeded into integrated address ") + it->address + " is too long, maximum is " + epee::string_tools::num_to_string_fast(CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE) + " bytes";
-            return false; ///
-          }
-
-          if (!legacy_tx_wide_payment_id.empty())
-          {
-            er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
-            er.message = std::string("embedded payment id: ") + epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) + " conflicts with previously set payment id: " + epee::string_tools::buff_to_hex_nodelimer(legacy_tx_wide_payment_id);
-            return false; ///
-          }
-          if (it != req.destinations.begin())
-          {
-            er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
-            er.message = std::string("embedded payment id: ") + epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) + " currently can only be set for the first destination (and so you can use integrated address only for the fist destination)";
-            return false; //
-          }
-          legacy_tx_wide_payment_id = embedded_payment_id;
-        }
-      }
-      
-      de.amount = it->amount;
-      de.asset_id = (it->asset_id == currency::null_pkey ? currency::native_coin_asset_id : it->asset_id);
-      dsts.push_back(de);
+    if (!r)
+    {
+      // er is already filled inside rpc_fill_destinations_helper
+      return false;
     }
-
+    std::vector<currency::tx_destination_entry>& dsts = ctp.dsts;
     std::vector<currency::attachment_v>& attachments = ctp.attachments;
     std::vector<currency::extra_v>& extra = ctp.extra;
     if (!legacy_tx_wide_payment_id.empty())
@@ -839,7 +731,7 @@ namespace tools
       crypto::generate_random_bytes(payment_id.size(), &payment_id.front());
     }
 
-    res.integrated_address = currency::get_account_address_and_payment_id_as_str(w.get_wallet()->get_account().get_public_address(), payment_id);
+    res.integrated_address = currency::get_account_address_as_str(w.get_wallet()->get_account().get_public_address(), payment_id);
     res.payment_id = epee::string_tools::buff_to_hex_nodelimer(payment_id);
     return !res.integrated_address.empty();
     WALLET_RPC_CATCH_TRY_ENTRY();
@@ -1661,6 +1553,31 @@ namespace tools
     }
 
     return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_register_gateway_address(const wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request& req, wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+
+    try
+    {
+      currency::finalized_tx ft{};
+      w.get_wallet()->register_gateway_address(req, res, ft);  
+      res.status = API_RETURN_CODE_OK;
+      return true;
+    }
+    catch (std::exception& e)
+    {
+      // doing this to be able to return 'transfers_were_unlocked' to the caller even in the case of exception
+      res.status = e.what();
+      return true;
+    }
+
+    return true;
+
+
+
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
   //------------------------------------------------------------------------------------------------------------------------------

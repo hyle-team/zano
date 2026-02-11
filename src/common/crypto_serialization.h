@@ -22,6 +22,7 @@
 #include "crypto/zarcanum.h"
 #include "crypto/one_out_of_many_proofs.h"
 #include "crypto/eth_signature.h"
+#include "crypto/eddsa_signature.h"
 #include "boost_serialization_maps.h"
 #include "serialization/keyvalue_enable_POD_serialize_as_string.h"
 //
@@ -184,6 +185,7 @@ namespace crypto
     END_BOOST_SERIALIZATION()
 
     bool is_zero() const { return c.is_zero() && y.is_zero(); }
+    bool operator== (const generic_schnorr_sig_s& rhs) const { return c == rhs.c && y == rhs.y; }
   };
 
   struct generic_double_schnorr_sig_s : public generic_double_schnorr_sig
@@ -198,6 +200,23 @@ namespace crypto
       BOOST_SERIALIZE(c)
       BOOST_SERIALIZE(y0)
       BOOST_SERIALIZE(y1)
+    END_BOOST_SERIALIZATION()
+  };
+
+  struct generic_linear_composition_and_schnorr_sig_s : public generic_linear_composition_and_schnorr_sig
+  {
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(c)
+      FIELD(y0)
+      FIELD(y1)
+      FIELD(y2)
+    END_SERIALIZE()
+
+    BEGIN_BOOST_SERIALIZATION()
+      BOOST_SERIALIZE(c)
+      BOOST_SERIALIZE(y0)
+      BOOST_SERIALIZE(y1)
+      BOOST_SERIALIZE(y2)
     END_BOOST_SERIALIZATION()
   };
 
@@ -254,6 +273,8 @@ BLOB_SERIALIZER(crypto::scalar_t);
 BLOB_SERIALIZER(crypto::point_t);
 BLOB_SERIALIZER(crypto::eth_public_key);
 BLOB_SERIALIZER(crypto::eth_signature);
+BLOB_SERIALIZER(crypto::eddsa_public_key);
+BLOB_SERIALIZER(crypto::eddsa_signature);
 
 VARIANT_TAG(debug_archive, crypto::hash, "hash");
 VARIANT_TAG(debug_archive, crypto::public_key, "public_key");

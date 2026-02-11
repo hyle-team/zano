@@ -57,7 +57,7 @@ struct tx_builder
       {
         // one destination address - create txout_to_key
         crypto::public_key out_eph_public_key = currency::null_pkey; // null_pkey means "burn" money
-        currency::account_public_address addr = dst_entr.addr.front();
+        currency::account_public_address addr = boost::get<currency::account_public_address>(dst_entr.addr.front());
         if (addr.view_public_key != currency::null_pkey && addr.spend_public_key != currency::null_pkey)
         {
           crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
@@ -77,10 +77,10 @@ struct tx_builder
         for (auto& addr : dst_entr.addr)
         {
           crypto::key_derivation derivation = AUTO_VAL_INIT(derivation);
-          bool r = crypto::generate_key_derivation(addr.view_public_key, m_tx_key.sec, derivation);
+          bool r = crypto::generate_key_derivation( boost::get<currency::account_public_address>(addr).view_public_key, m_tx_key.sec, derivation);
           CHECK_AND_ASSERT_MES(r, void(0), "generate_key_derivation failed for ms output #" << output_index);
           crypto::public_key out_eph_public_key = AUTO_VAL_INIT(out_eph_public_key);
-          r = crypto::derive_public_key(derivation, output_index, addr.spend_public_key, out_eph_public_key);
+          r = crypto::derive_public_key(derivation, output_index, boost::get<currency::account_public_address>(addr).spend_public_key, out_eph_public_key);
           CHECK_AND_ASSERT_MES(r, void(0), "derive_public_key failed for ms output #" << output_index);
           ms.keys.push_back(out_eph_public_key);
         }

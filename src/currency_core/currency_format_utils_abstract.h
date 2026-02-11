@@ -302,10 +302,9 @@ namespace currency
     return false;
   }
   //---------------------------------------------------------------
-  // TODO@#@# replace with gateway -- sowle
-  inline bool compare_variant_by_types(const txin_dummy& left, const txin_dummy& right)
+  inline bool compare_variant_by_types(const txin_gateway& left, const txin_gateway& right)
   {
-    return false;
+    return (left.gateway_addr < right.gateway_addr);
   }
   //---------------------------------------------------------------
   inline bool compare_variant_by_types(const txin_multisig& left, const txin_multisig& right)
@@ -315,7 +314,7 @@ namespace currency
   //---------------------------------------------------------------
   inline bool compare_variant_by_types(const txin_gen& left, const txin_gen& right)
   {
-    //actually this should never happen, should we leave it in case it happen in unit tests? @sowle 
+    //actually this should never happen, should we` leave it in case it happen in unit tests? @sowle 
     return (left.height < right.height);
   }
   //---------------------------------------------------------------

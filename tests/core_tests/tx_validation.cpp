@@ -1710,19 +1710,19 @@ bool tx_version_against_hardfork::generate(std::vector<test_event_entry>& events
 bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events) const
 {
   // Test idea: ensure that the checks contained in the function "validate_tx_semantic" body are performed.
-
+  crypto::hash dummy_hash = currency::null_hash;
   GENERATE_ACCOUNT(miner);
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner, test_core_time::get_time());
   DO_CALLBACK(events, "configure_core");
-  CHECK_AND_ASSERT_EQ(validate_tx_semantic(transaction{}, CURRENCY_MAX_TRANSACTION_BLOB_SIZE), false);
+  CHECK_AND_ASSERT_EQ(validate_tx_semantic(transaction{}, CURRENCY_MAX_TRANSACTION_BLOB_SIZE, dummy_hash ), false);
 
   // No inputs.
   {
     transaction tx{};
 
     tx.vin = {};
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), false);
     DO_CALLBACK(events, "mark_invalid_tx");
     ADD_CUSTOM_EVENT(events, tx);
   }
@@ -1732,7 +1732,7 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
     transaction tx{};
 
     tx.vin.emplace_back(txin_gen{});
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), false);
     DO_CALLBACK(events, "mark_invalid_tx");
     ADD_CUSTOM_EVENT(events, tx);
   }
@@ -1743,7 +1743,7 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
 
     tx.vin.push_back(txin_to_key{});
     tx.vout.emplace_back();
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), false);
     DO_CALLBACK(events, "mark_invalid_tx");
     ADD_CUSTOM_EVENT(events, tx);
   }
@@ -1767,7 +1767,7 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
 
     CHECK_AND_ASSERT_GREATER(inputs.at(0).amount, inputs.at(0).amount + inputs.at(1).amount);
     CHECK_AND_ASSERT_GREATER(inputs.at(1).amount, inputs.at(0).amount + inputs.at(1).amount);
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), false);
     DO_CALLBACK(events, "mark_invalid_tx");
     ADD_CUSTOM_EVENT(events, tx);
   }
@@ -1794,7 +1794,7 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
 
     CHECK_AND_ASSERT_GREATER(outputs.at(0).amount, outputs.at(0).amount + outputs.at(1).amount);
     CHECK_AND_ASSERT_GREATER(outputs.at(1).amount, outputs.at(0).amount + outputs.at(1).amount);
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), false);
     DO_CALLBACK(events, "mark_invalid_tx");
     ADD_CUSTOM_EVENT(events, tx);
   }
@@ -1827,13 +1827,13 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
     for (int8_t step{}; step < 3; ++step)
     {
       tx.vin.push_back(tx.vin.front());
-      CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+      CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), false);
       DO_CALLBACK(events, "mark_invalid_tx");
       ADD_CUSTOM_EVENT(events, tx);
       tx.vin.erase(tx.vin.begin(), tx.vin.begin() + 1);
     }
 
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), true);
 
   }
 
@@ -1857,7 +1857,7 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
 
     CHECK_AND_ASSERT_EQ(tx.extra.size(), 2);
     CHECK_AND_ASSERT_EQ(typeid(tx.extra.front()), typeid(tx.extra.back()));
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), false);
     DO_CALLBACK(events, "mark_invalid_tx");
     ADD_CUSTOM_EVENT(events, tx);
   }
@@ -1888,7 +1888,7 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
 
     CHECK_AND_ASSERT_LESS(sum_inputs, output.amount);
     CHECK_AND_ASSERT_EQ(output.amount - sum_inputs, 1);
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), false);
     DO_CALLBACK(events, "mark_invalid_tx");
     ADD_CUSTOM_EVENT(events, tx);
   }
@@ -1914,7 +1914,7 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
       tx.vin.push_back(input);
     }
 
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), true);
     DO_CALLBACK(events, "mark_invalid_tx");
     ADD_CUSTOM_EVENT(events, tx);
   }
@@ -1927,9 +1927,9 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
   {
     MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
 
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), true);
     tx.vin = {};
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), false);
     DO_CALLBACK(events, "mark_invalid_tx");
     ADD_CUSTOM_EVENT(events, tx);
   }
@@ -1938,9 +1938,9 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
   {
     MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
 
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), true);
     tx.vin.emplace_back(txin_gen{});
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), false);
     DO_CALLBACK(events, "mark_invalid_tx");
     ADD_CUSTOM_EVENT(events, tx);
   }
@@ -1949,9 +1949,9 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
   {
     MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
 
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), true);
     tx.vout.emplace_back();
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), false);
     DO_CALLBACK(events, "mark_invalid_tx");
     ADD_CUSTOM_EVENT(events, tx);
   }
@@ -1963,7 +1963,7 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
     std::array<txin_to_key, 2> inputs{};
     MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
 
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), true);
     CHECK_AND_ASSERT_EQ(point_public_key.from_string("499790c3302b9f0514e2db09b390679283d43d971383d33dc24c7991ea4cf6d7"), true);
     target.key = point_public_key.to_public_key();
     inputs.at(0).amount = 1;
@@ -1976,7 +1976,7 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
 
     CHECK_AND_ASSERT_GREATER(inputs.at(0).amount, inputs.at(0).amount + inputs.at(1).amount);
     CHECK_AND_ASSERT_GREATER(inputs.at(1).amount, inputs.at(0).amount + inputs.at(1).amount);
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), false);
     DO_CALLBACK(events, "mark_invalid_tx");
     ADD_CUSTOM_EVENT(events, tx);
   }
@@ -1988,7 +1988,7 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
     std::array<tx_out_bare, 2> outputs{};
     MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
 
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), true);
     CHECK_AND_ASSERT_EQ(point_public_key.from_string("78ef3d9af7b5e3d09556d57820cf68c2b3553a9d8205c01fe40fc70aae86bb4f"), true);
     target.key = point_public_key.to_public_key();
     outputs.at(0).amount = 1;
@@ -2004,7 +2004,7 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
 
     CHECK_AND_ASSERT_GREATER(outputs.at(0).amount, outputs.at(0).amount + outputs.at(1).amount);
     CHECK_AND_ASSERT_GREATER(outputs.at(1).amount, outputs.at(0).amount + outputs.at(1).amount);
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), false);
     DO_CALLBACK(events, "mark_invalid_tx");
     ADD_CUSTOM_EVENT(events, tx);
   }
@@ -2030,26 +2030,26 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
     for (int8_t step{}; step < 3; ++step)
     {
       tx.vin.push_back(tx.vin.front());
-      CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+      CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), false);
       DO_CALLBACK(events, "mark_invalid_tx");
       ADD_CUSTOM_EVENT(events, tx);
       tx.vin.erase(tx.vin.begin(), tx.vin.begin() + 1);
     }
 
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), true);
   }
 
   // Two entries of the same type in extra.
   {
     MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(2), TESTS_DEFAULT_FEE, blk_0r);
 
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), true);
     tx.extra.push_back(null_pkey);
     tx.extra.push_back(null_pkey);
 
     CHECK_AND_ASSERT_GREATER(tx.extra.size(), 2);
     CHECK_AND_ASSERT_EQ(typeid(tx.extra.back()), typeid(tx.extra.at(tx.extra.size() - 2)));
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), false);
     DO_CALLBACK(events, "mark_invalid_tx");
     ADD_CUSTOM_EVENT(events, tx);
   }
@@ -2061,7 +2061,7 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
     std::array<txin_to_key, 2> inputs{};
     MAKE_TX_FEE(events, tx, miner, miner, MK_TEST_COINS(1), TESTS_DEFAULT_FEE, blk_0r);
 
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), true);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), true);
     output.amount = 10'000'000'003;
     tx.vout.push_back(output);
     tx.version = 0;
@@ -2113,7 +2113,7 @@ bool tx_pool_semantic_validation::generate(std::vector<test_event_entry>& events
     CHECK_AND_ASSERT_EQ(get_block_height(blk_0r), 10);
     CHECK_AND_ASSERT_EQ(m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_03, 10), true);
     CHECK_AND_ASSERT_EQ(m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, 10), false);
-    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1), false);
+    CHECK_AND_ASSERT_EQ(validate_tx_semantic(tx, CURRENCY_MAX_TRANSACTION_BLOB_SIZE - 1, dummy_hash), false);
     DO_CALLBACK(events, "mark_invalid_tx");
     ADD_CUSTOM_EVENT(events, tx);
   }

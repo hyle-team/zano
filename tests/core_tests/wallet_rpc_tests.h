@@ -89,3 +89,10 @@ struct wallet_rpc_hardfork_verification : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct wallet_rpc_gateway_address : public wallet_test
+{
+  wallet_rpc_gateway_address();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};

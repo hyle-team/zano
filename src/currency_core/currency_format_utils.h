@@ -65,6 +65,7 @@ namespace currency
     std::string m_user_data_blob;
     extra_attachment_info m_attachment_info;
     asset_descriptor_operation m_asset_operation;
+    std::optional<gateway_address_descriptor_operation> m_opt_gateway_address_operation;
   };
 
   //---------------------------------------------------------------------------------------------------------------
@@ -266,9 +267,9 @@ namespace currency
   };
 
   bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs);
-  bool generate_asset_surjection_proof(const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, zc_asset_surjection_proof& result);
+  bool generate_asset_surjection_proof(const transaction& tx, const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, zc_asset_surjection_proof& result);
   bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id);
-  bool generate_tx_balance_proof(const transaction &tx, const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, zc_balance_proof& proof);
+  bool generate_tx_balance_proof(const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, transaction& tx_to_add_proof_to);
   bool generate_zc_outs_range_proof(const crypto::hash& context_hash, const tx_generation_context& outs_gen_context,
     const std::vector<tx_out_v>& vouts, zc_outs_range_proof& result);
   bool check_tx_bare_balance(const transaction& tx, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
@@ -302,8 +303,8 @@ namespace currency
                                                         );
   //---------------------------------------------------------------
   uint64_t get_string_uint64_hash(const std::string& str);
-  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, crypto::scalar_t& asset_blinding_mask, crypto::scalar_t& amount_blinding_mask, crypto::point_t& blinded_asset_id, crypto::point_t& amount_commitment, finalized_tx& result, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
-  bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, const account_keys& self, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
+  bool construct_tx_out(const tx_destination_entry& de, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, tx_generation_context& tgc);
+  //bool construct_tx_out(const tx_destination_entry& de, const crypto::secret_key& tx_sec_key, size_t output_index, transaction& tx, std::set<uint16_t>& deriv_cache, uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED);
 
   bool validate_alias_name(const std::string& al);
   bool validate_password(const std::string& password);
@@ -534,10 +535,13 @@ namespace currency
   bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t &reward, uint64_t height);
   uint64_t get_base_block_reward(uint64_t height);
   bool is_payment_id_size_ok(const payment_id_t& payment_id, bool allow_legacy_payment_id_size = true);
-  std::string get_account_address_as_str(const account_public_address& addr);
-  std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const payment_id_t& payment_id);
+  std::string get_account_address_as_str(const account_public_address& addr, const payment_id_t& payment_id = payment_id_t{});
+  std::string get_account_address_as_str(const gateway_address_id_type& addr, const payment_id_t& payment_id = payment_id_t{});
+  std::string get_account_address_as_str(const address_v& addr, const payment_id_t& payment_id = payment_id_t{});
   bool get_account_address_from_str(account_public_address& addr, const std::string& str);
+  bool get_account_address_from_str(address_v& addr, const std::string& str);
   bool get_account_address_and_payment_id_from_str(account_public_address& addr, payment_id_t& payment_id, const std::string& str);
+  bool get_account_address_and_payment_id_from_str(address_v& v_addr, payment_id_t& payment_id, const std::string& str);
   bool parse_payment_id_from_hex_str(const std::string& payment_id_str, payment_id_t& payment_id);
   bool is_coinbase(const transaction& tx);
   bool is_coinbase(const transaction& tx, bool& pos_coinbase);
@@ -862,7 +866,7 @@ namespace currency
       size_t operator()(const txin_to_key& txin) const    { return tools::get_varint_packed_size(txin.key_offsets.size() + a) + sizeof(crypto::signature) * (txin.key_offsets.size() + a); }
       size_t operator()(const txin_multisig& txin) const  { return tools::get_varint_packed_size(txin.sigs_count + a) + sizeof(crypto::signature) * (txin.sigs_count + a); }
       size_t operator()(const txin_zc_input& txin) const  { return 97 + tools::get_varint_packed_size(txin.key_offsets.size()) + txin.key_offsets.size() * 32; }
-      size_t operator()(const txin_dummy&) const          { return 0; } // TODO@#@# replace with gateway -- sowle
+      size_t operator()(const txin_gateway& txin) const   { throw(std::runtime_error("Not implemented yet")); }
     };
 
     return boost::apply_visitor(txin_signature_size_visitor(last_input_in_separately_signed_tx ? 1 : 0), tx_in);

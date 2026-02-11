@@ -165,6 +165,9 @@ namespace tools
         MAP_JON_RPC_WE("attach_asset_descriptor",             on_attach_asset_descriptor,       wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR)
         MAP_JON_RPC_WE("transfer_asset_ownership",            on_transfer_asset_ownership,      wallet_public::COMMAND_TRANSFER_ASSET_OWNERSHIP)
 
+        //Gateway API
+        MAP_JON_RPC_WE("register_gateway_address",            on_register_gateway_address,      wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS)
+
         //MULTIWALLET APIs
         MAP_JON_RPC_WE("mw_get_wallets",                      on_mw_get_wallets,                wallet_public::COMMAND_MW_GET_WALLETS)
         MAP_JON_RPC_WE("mw_select_wallet",                    on_mw_select_wallet,              wallet_public::COMMAND_MW_SELECT_WALLET)
@@ -235,7 +238,9 @@ namespace tools
     bool on_asset_send_ext_signed_tx(const wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::request& req, wallet_public::COMMAND_ASSET_SEND_EXT_SIGNED_TX::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_attach_asset_descriptor(const wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::request& req, wallet_public::COMMAND_ATTACH_ASSET_DESCRIPTOR::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_transfer_asset_ownership(const wallet_public::COMMAND_TRANSFER_ASSET_OWNERSHIP::request& req, wallet_public::COMMAND_TRANSFER_ASSET_OWNERSHIP::response& res, epee::json_rpc::error& er, connection_context& cntx);
-    
+
+    bool on_register_gateway_address(const wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request& req, wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response& res, epee::json_rpc::error& er, connection_context& cntx);
+
 
     bool on_mw_get_wallets(const wallet_public::COMMAND_MW_GET_WALLETS::request& req, wallet_public::COMMAND_MW_GET_WALLETS::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_mw_select_wallet(const wallet_public::COMMAND_MW_SELECT_WALLET::request& req, wallet_public::COMMAND_MW_SELECT_WALLET::response& res, epee::json_rpc::error& er, connection_context& cntx);

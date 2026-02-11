@@ -364,6 +364,7 @@ const crypto::public_key& wallet2::out_get_pub_key(const currency::tx_out_v& out
       return boost::get<currency::txout_to_key>(out.target).key;
     }
     THROW_IF_FALSE_WALLET_INT_ERR_EX(false, "Unexpected out type in target wallet: " << out.target.type().name());
+    return null_pkey; //this line just to avoid warning C4715: not all control paths return a value
   }
   else
   {
@@ -970,10 +971,7 @@ void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_i
     {
       handle_2_alternative_types_in_variant_container<tx_receiver, tx_receiver_old>(decrypted_att, [&](const tx_receiver& p) {
         std::string addr_str;
-        if (wti.tx_wide_payment_id.empty())
-          addr_str = currency::get_account_address_as_str(p.acc_addr);
-        else
-          addr_str = currency::get_account_address_and_payment_id_as_str(p.acc_addr, wti.tx_wide_payment_id); // show integrated address if there's a payment id provided
+        addr_str = currency::get_account_address_as_str(p.acc_addr, wti.tx_wide_payment_id); // it will be an integrated address if there's a payment id provided
         wti.remote_addresses.push_back(addr_str);
         LOG_PRINT_YELLOW("prepare_wti_decrypted_attachments, income=false, rem. addr = " << addr_str, LOG_LEVEL_0);
         return true; // continue iterating through the container
@@ -4654,6 +4652,10 @@ bool wallet2::get_transfer_address(const std::string& adr_str, currency::account
 {
   return m_core_proxy->get_transfer_address(adr_str, addr, payment_id);
 }
+bool wallet2::get_transfer_address(const std::string& adr_str, currency::address_v& addr, std::string& payment_id)
+{
+  return m_core_proxy->get_transfer_address(adr_str, addr, payment_id);
+}
 //----------------------------------------------------------------------------------------------------
 bool wallet2::is_transfer_okay_for_pos(const transfer_details& tr, bool is_zarcanum_hf, uint64_t& stake_unlock_time) const
 {
@@ -5310,7 +5312,7 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
 
   // asset surjection proof
   currency::zc_asset_surjection_proof asp{};
-  r = generate_asset_surjection_proof(miner_tx_id, false, miner_tx_tgc, asp);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs 
+  r = generate_asset_surjection_proof(b.miner_tx, miner_tx_id, false, miner_tx_tgc, asp);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs 
   WLT_CHECK_AND_ASSERT_MES(r, false, "generete_asset_surjection_proof failed");
   b.miner_tx.proofs.emplace_back(std::move(asp));
 
@@ -5321,10 +5323,8 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
   b.miner_tx.proofs.emplace_back(std::move(range_proofs));
 
   // balance proof
-  currency::zc_balance_proof balance_proof{};
-  r = generate_tx_balance_proof(b.miner_tx, miner_tx_id, miner_tx_tgc, full_block_reward, balance_proof);
+  r = generate_tx_balance_proof(miner_tx_id, miner_tx_tgc, full_block_reward, b.miner_tx);
   WLT_CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
-  b.miner_tx.proofs.emplace_back(std::move(balance_proof));
 
   // the following line are for debugging when necessary -- sowle
   //err = 0;
@@ -5810,9 +5810,11 @@ void wallet2::request_alias_registration(currency::extra_alias_entry& ai, curren
 
   push_alias_info_to_extra_according_to_hf_status(ai, extra);
 
+  account_public_address dst_acc;
+  get_aliases_reward_account(dst_acc);
   currency::tx_destination_entry tx_dest_alias_reward;
-  tx_dest_alias_reward.addr.resize(1);
-  get_aliases_reward_account(tx_dest_alias_reward.addr.back());
+  tx_dest_alias_reward.addr.push_back(dst_acc);
+
   tx_dest_alias_reward.amount = reward;
   tx_dest_alias_reward.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask;
   destinations.push_back(tx_dest_alias_reward);
@@ -5842,6 +5844,57 @@ void wallet2::fill_adb_version_based_onhardfork(currency::asset_descriptor_base&
   {
     asset_base.version = ASSET_DESCRIPTOR_BASE_LAST_VER;
   }
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::register_gateway_address(const wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request& req, wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response& res, currency::finalized_tx& ft)
+{
+  gateway_address_descriptor_operation_register operation_register = {};
+  gateway_address_descriptor_operation gateway_operation = {};
+
+  size_t count_keys = 0;
+  if(req.descriptor_info.opt_owner_custom_schnorr_pub_key)
+    count_keys++;
+  if(req.descriptor_info.opt_owner_eddsa_pub_key)
+    count_keys++;
+  if(req.descriptor_info.opt_owner_eth_pub_key)
+    count_keys++;
+
+  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(count_keys == 1, "Exactly one owner public key must be provided");
+
+  if(req.descriptor_info.opt_owner_custom_schnorr_pub_key)
+  {
+    operation_register.descriptor.owner_key = req.descriptor_info.opt_owner_custom_schnorr_pub_key.value();
+  }
+  else if(req.descriptor_info.opt_owner_eddsa_pub_key)
+  {
+    operation_register.descriptor.owner_key = req.descriptor_info.opt_owner_eddsa_pub_key.value();
+  }
+  else if(req.descriptor_info.opt_owner_eth_pub_key)
+  {
+    operation_register.descriptor.owner_key = req.descriptor_info.opt_owner_eth_pub_key.value();
+  }
+
+  operation_register.descriptor.meta_info = req.descriptor_info.meta_info;
+  operation_register.view_pub_key = req.view_pub_key;
+  gateway_operation.operation = operation_register;
+
+  construct_tx_param ctp = get_default_construct_tx_param();
+
+
+  tx_destination_entry td = AUTO_VAL_INIT(td);
+  td.addr.push_back(this->get_account().get_public_address());
+  td.amount = COIN / 100; // 0.01 ZANO to make tx valid
+  td.asset_id = currency::native_coin_asset_id;
+  ctp.dsts.push_back(td);
+
+  ctp.extra.push_back(gateway_operation);
+  ctp.need_at_least_1_zc = true;
+  ctp.tx_meaning_for_logs = "gateway registration";
+
+  this->transfer(ctp, ft, true, nullptr);
+  res.address_id = operation_register.view_pub_key;
+  res.address = get_account_address_as_str(res.address_id);
+  res.tx_id = ft.tx_id;
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::deploy_new_asset(const currency::asset_descriptor_base& asset_info, const std::vector<currency::tx_destination_entry>& destinations, currency::finalized_tx& ft, crypto::public_key& new_asset_id)
@@ -7293,18 +7346,41 @@ void wallet2::add_sent_tx_detailed_info(const transaction& tx, const std::vector
 
   std::vector<std::string> recipients;
   std::unordered_set<account_public_address> used_addresses;
+  std::unordered_set<gateway_address_id_type> used_gw_addresses;
   for (const auto& d : destinations)
   {
+
     for (const auto& addr : d.addr)
     {
-      if (used_addresses.insert(addr).second && addr != m_account.get_public_address())
-        recipients.push_back(payment_id.empty() ? get_account_address_as_str(addr) : get_account_address_and_payment_id_as_str(addr, payment_id));
+      bool need_to_add_address = false;
+      if (addr.type() == typeid(account_public_address))
+      {
+        account_public_address a = boost::get<account_public_address>(addr);
+        if(used_addresses.insert(a).second && a != m_account.get_public_address())
+        {
+          need_to_add_address = true;
+        }
+      }
+      else if (addr.type() == typeid(gateway_address_id_type))
+      {
+        gateway_address_id_type ga = boost::get<gateway_address_id_type>(addr);
+        need_to_add_address = used_gw_addresses.insert(ga).second;
+      }
+      else
+      {
+        WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(false, "unknown address type in tx_destination_entry");
+      }
+
+      if (need_to_add_address)
+      {
+        recipients.push_back(get_account_address_as_str(addr, payment_id));
+      }
     }
   }
   if (!recipients.size())
   {
     //transaction send to ourself
-    recipients.push_back(payment_id.empty() ? get_account_address_as_str(m_account.get_public_address()) : get_account_address_and_payment_id_as_str(m_account.get_public_address(), payment_id));
+    recipients.push_back(get_account_address_as_str(m_account.get_public_address(), payment_id));
   }
 
   add_sent_unconfirmed_tx(tx, recipients, selected_transfers, destinations);
@@ -8314,7 +8390,8 @@ void wallet2::check_and_throw_if_self_directed_tx_with_payment_id_requested(cons
   {
     for (auto& addr : d.addr)
     {
-      if (addr != m_account.get_public_address())
+      if(addr.type() == typeid(account_public_address))
+      if ( boost::get<account_public_address>(addr) != m_account.get_public_address())
         return; // at least one destination address is not our address -- it's not self-directed tx
     }
   }

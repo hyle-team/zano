@@ -33,7 +33,7 @@
 #include "storages/portable_storage_template_helper.h"
 #include "crypto/chacha.h"
 #include "crypto/hash.h"
-#include "core_rpc_proxy.h"
+#include "i_core_rpc_proxy.h"
 #include "core_default_rpc_proxy.h"
 #include "wallet_errors.h"
 #include "eos/portable_archive.hpp"
@@ -443,6 +443,8 @@ namespace tools
     void update_asset(const crypto::public_key& asset_id, const currency::asset_descriptor_base& new_descriptor, currency::finalized_tx& ft);
     void burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::finalized_tx& ft, const std::vector<currency::tx_service_attachment>& service_entries = std::vector<currency::tx_service_attachment>(), const std::string& address_to_point = std::string(), uint64_t native_amount_to_point = 0);
     void transfer_asset_ownership(const crypto::public_key& asset_id, const currency::asset_owner_pub_key_v& new_owner_v, currency::finalized_tx& ft);
+    
+    void register_gateway_address(const wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request& req, wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response& res, currency::finalized_tx& ft);
 
     bool daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb) const;
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
@@ -637,6 +639,7 @@ namespace tools
       uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
 
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
+    bool get_transfer_address(const std::string& adr_str, currency::address_v& addr, std::string& payment_id);
     inline uint64_t get_blockchain_current_size() const {
       return m_chain.get_blockchain_current_size();
     }

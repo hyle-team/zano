@@ -314,7 +314,7 @@ inline bool put_alias_via_tx_to_list(const currency::hard_forks_descriptor& hf, 
 
   for(auto& el : destinations)
   {
-    if (el.addr.front() == reward_acc.get_public_address())
+    if (boost::get<currency::account_public_address>(el.addr.front()) == reward_acc.get_public_address())
       el.flags |= currency::tx_destination_entry_flags::tdef_explicit_native_asset_id | currency::tx_destination_entry_flags::tdef_zero_amount_blinding_mask; // all alias-burn outputs must have explicit native asset id and zero amount mask
   }
 
@@ -446,6 +446,14 @@ bool invoke_text_json_for_rpc(t_rpc_server& srv, const std::string& method_name,
   tests_rpc_transport<t_rpc_server> tr(srv);
 
   bool r = epee::net_utils::invoke_http_json_rpc("/json_rpc", method_name, req, resp, tr);
+  return r;
+}
+
+template<typename request_t, typename response_t, typename t_rpc_server>
+bool invoke_text_json_for_rpc_and_check_status(t_rpc_server& srv, const std::string& method_name, const request_t& req, response_t& resp)
+{
+  bool r = invoke_text_json_for_rpc(srv, method_name, req, resp);
+  CHECK_AND_ASSERT_MES(resp.status == API_RETURN_CODE_OK, false, "RPC '" << method_name << "' finished with status '" << resp.status << "'");
   return r;
 }
 

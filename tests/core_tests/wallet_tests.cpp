@@ -53,8 +53,9 @@ bool determine_tx_real_inputs(currency::core& c, const currency::transaction& tx
       , m_found(false)
     {}
 
-    bool handle_output(const transaction& source_tx, const transaction& validated_tx, const tx_out_v& out_v, uint64_t source_tx_output_index)
+    bool handle_output(std::shared_ptr<const transaction_chain_entry> source_tx_ptr, const transaction& validated_tx, const tx_out_v& out_v, uint64_t source_tx_output_index)
     {
+      const transaction& source_tx = source_tx_ptr->tx;
       CHECK_AND_ASSERT_MES(!m_found, false, "Internal error: m_found is true but the visitor is still being applied");
       /*
       auto is_even = [&](const tx_out_v& v) { return boost::get<tx_out_bare>(v) == out; };
@@ -1661,7 +1662,7 @@ bool gen_wallet_alias_and_unconfirmed_txs::generate(std::vector<test_event_entry
   bool r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc, null_account, get_alias_coast_from_fee(ai.m_alias, ALIAS_VERY_INITAL_COAST), TESTS_DEFAULT_FEE, 0, sources, destinations);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   for(auto& d : destinations)
-    if (d.addr.back() == null_pub_addr)
+    if (boost::get<currency::account_public_address>(d.addr.back()) == null_pub_addr)
       d.flags |= tx_destination_entry_flags::tdef_explicit_native_asset_id | tx_destination_entry_flags::tdef_zero_amount_blinding_mask;
   transaction tx_alice_alias{};
   crypto::secret_key sk{};
@@ -3540,7 +3541,7 @@ bool wallet_sending_to_integrated_address::c1(currency::core& c, size_t ev_index
   miner_wlt->refresh();
 
   std::string payment_id = "super-payment-id-1948503537205028248";
-  std::string alice_integrated_address = get_account_address_and_payment_id_as_str(m_accounts[ALICE_ACC_IDX].get_public_address(), payment_id);
+  std::string alice_integrated_address = get_account_address_as_str(m_accounts[ALICE_ACC_IDX].get_public_address(), payment_id);
 
   bool callback_succeded = false;
   std::shared_ptr<wlt_lambda_on_transfer2_wrapper> l(new wlt_lambda_on_transfer2_wrapper(

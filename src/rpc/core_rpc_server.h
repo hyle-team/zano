@@ -102,9 +102,12 @@ namespace currency
     bool on_find_outs_in_recent_blocks(const COMMAND_RPC_FIND_OUTS_IN_RECENT_BLOCKS::request& req, COMMAND_RPC_FIND_OUTS_IN_RECENT_BLOCKS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);
     bool on_get_integrated_address(const COMMAND_RPC_GET_INTEGRATED_ADDRESS::request& req, COMMAND_RPC_GET_INTEGRATED_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);    
     bool on_validate_signature(const COMMAND_VALIDATE_SIGNATURE::request& req, COMMAND_VALIDATE_SIGNATURE::response& res, epee::json_rpc::error& er, connection_context& cntx);
-    
-    
-    
+
+    bool on_gateway_get_address_info(const COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_gateway_create_transfer(const COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request& req, COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_gateway_sign_transfer(const COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request& req, COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx);
+
+
     CHAIN_HTTP_TO_MAP2(connection_context); //forward http requests to uri map
 
     BEGIN_URI_MAP2()
@@ -183,6 +186,12 @@ namespace currency
         //
         MAP_JON_RPC_WE("marketplace_global_get_offers_ex", on_get_offers_ex,          COMMAND_RPC_GET_OFFERS_EX)        
         MAP_JON_RPC_WE("validate_signature",          on_validate_signature,          COMMAND_VALIDATE_SIGNATURE)
+        
+        //gateway addresses api
+        MAP_JON_RPC_WE("gateway_get_address_info",    on_gateway_get_address_info,    COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO)
+        MAP_JON_RPC_WE("gateway_create_transfer",     on_gateway_create_transfer,     COMMAND_RPC_GATEWAY_CREATE_TRANSFER)
+        MAP_JON_RPC_WE("gateway_sign_transfer",       on_gateway_sign_transfer,       COMMAND_RPC_GATEWAY_SIGN_TRANSFER)
+
         CHAIN_TO_PHANDLER(m_prpc_chain_handler)
       END_JSON_RPC_MAP()
       CHAIN_TO_PHANDLER(m_prpc_chain_handler)
