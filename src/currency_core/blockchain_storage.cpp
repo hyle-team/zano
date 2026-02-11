@@ -5764,6 +5764,10 @@ bool blockchain_storage::have_tx_keyimges_as_spent(const transaction &tx) const
     {
       // skip txin_gen
     }
+    else if (in.type() == typeid(txin_gateway))
+    {
+      // skip txin_gateway
+    }
     else
     {
       LOG_ERROR("Unexpected input type: " << in.type().name());
@@ -6340,30 +6344,36 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
 
   const gateway_owner_key_v& gw_owner_key = gw_entry_ptr->info_history.back().owner_key;
   VARIANT_SWITCH_BEGIN(gw_owner_key);
-  VARIANT_CASE_CONST(crypto::public_key, pkey)
-  {
-    CHECK_AND_ASSERT_THROW_MES(sig.s.type() == typeid(crypto::generic_schnorr_sig_s), "Unexpected signature type("<< sig.s.type().name() <<
-      ") for gw_in.gateway_addr" << gw_in.gateway_addr << "(expected crypto::signature) in tx: " << tx_prefix_hash);
-    const crypto::generic_schnorr_sig_s& signature = boost::get<crypto::generic_schnorr_sig_s>(sig.s);
-    bool r = crypto::verify_schnorr_sig(tx_hash_for_signature, pkey, signature);
-  }
-  VARIANT_CASE_CONST(crypto::eth_public_key, pkey)
-  {
-    CHECK_AND_ASSERT_THROW_MES(sig.s.type() == typeid(crypto::eth_signature), "Unexpected signature type(" << sig.s.type().name() <<
-      ") for gw_in.gateway_addr" << gw_in.gateway_addr << "(expected crypto::eth_signature) in tx: " << tx_prefix_hash);
-    const crypto::eth_signature& signature = boost::get<crypto::eth_signature>(sig.s);
-    bool r = crypto::verify_eth_signature(tx_hash_for_signature, pkey, signature);
-  }
-  VARIANT_CASE_CONST(crypto::eddsa_public_key, pkey)
-  {
-    CHECK_AND_ASSERT_THROW_MES(sig.s.type() == typeid(crypto::eddsa_signature), "Unexpected signature type(" << sig.s.type().name() <<
-      ") for gw_in.gateway_addr" << gw_in.gateway_addr << "(expected crypto::eddsa_signature) in tx: " << tx_prefix_hash);
-    const crypto::eddsa_signature& signature = boost::get<crypto::eddsa_signature>(sig.s);
-    bool r = crypto::verify_eddsa_signature(tx_hash_for_signature, pkey, signature);
-  }
-  VARIANT_CASE_THROW_ON_OTHER();
+    VARIANT_CASE_CONST(crypto::public_key, pkey)
+    {
+      CHECK_AND_ASSERT_MES(sig.s.type() == typeid(crypto::generic_schnorr_sig_s), false, "Unexpected signature type ("<< sig.s.type().name() <<
+        ") for gw_in.gateway_addr " << gw_in.gateway_addr << ", expected: generic_schnorr_sig_s, tx: " << tx_prefix_hash);
+      const crypto::generic_schnorr_sig_s& signature = boost::get<crypto::generic_schnorr_sig_s>(sig.s);
+      bool r = crypto::verify_schnorr_sig(tx_hash_for_signature, pkey, signature);
+      CHECK_AND_ASSERT_MES(r, false, "verify_schnorr_sig failed");
+    }
+    VARIANT_CASE_CONST(crypto::eth_public_key, pkey)
+    {
+      CHECK_AND_ASSERT_MES(sig.s.type() == typeid(crypto::eth_signature), false, "Unexpected signature type (" << sig.s.type().name() <<
+        ") for gw_in.gateway_addr " << gw_in.gateway_addr << ", eth_signature, tx: " << tx_prefix_hash);
+      const crypto::eth_signature& signature = boost::get<crypto::eth_signature>(sig.s);
+      bool r = crypto::verify_eth_signature(tx_hash_for_signature, pkey, signature);
+      CHECK_AND_ASSERT_MES(r, false, "verify_eth_signature failed");
+    }
+    VARIANT_CASE_CONST(crypto::eddsa_public_key, pkey)
+    {
+      CHECK_AND_ASSERT_MES(sig.s.type() == typeid(crypto::eddsa_signature), false, "Unexpected signature type (" << sig.s.type().name() <<
+        ") for gw_in.gateway_addr " << gw_in.gateway_addr << ", expected: eddsa_signature, tx: " << tx_prefix_hash);
+      const crypto::eddsa_signature& signature = boost::get<crypto::eddsa_signature>(sig.s);
+      bool r = crypto::verify_eddsa_signature(tx_hash_for_signature, pkey, signature);
+      CHECK_AND_ASSERT_MES(r, false, "verify_eddsa_signature failed");
+    }
+    VARIANT_CASE_THROW_ON_OTHER();
   VARIANT_SWITCH_END();
 
+
+  if (ctic.all_tx_ins_have_explicit_native_asset_ids && gw_in.asset_id != native_coin_asset_id_1div8)
+    ctic.all_tx_ins_have_explicit_native_asset_ids = false;
 
   return true;
 }

@@ -3469,7 +3469,8 @@ namespace currency
       CHECK_AND_ASSERT_MES(
         in.type() == typeid(txin_to_key) ||
         in.type() == typeid(txin_multisig) ||
-        in.type() == typeid(txin_zc_input), 
+        in.type() == typeid(txin_zc_input) ||
+        in.type() == typeid(txin_gateway), 
         false, "wrong input type: " << in.type().name() << ", in transaction " << get_transaction_hash(tx));
     }
     return true;
