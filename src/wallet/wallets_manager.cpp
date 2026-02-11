@@ -142,6 +142,11 @@ bool wallets_manager::do_exception_safe_call(guarded_code_t guarded_code, error_
     LOG_ERROR(error_prefix_maker() << "no connection to daemon: " << e.what());
     api_return_code_result = API_RETURN_CODE_DISCONNECTED;
   }
+  catch (const tools::error::tx_has_too_many_outs& e)
+  {
+    LOG_ERROR(error_prefix_maker() << "tx has to many outs: " << e.what());
+    api_return_code_result = API_RETURN_CODE_TX_HAS_TOO_MANY_OUTPUTS;
+  }
   catch (const std::exception& e)
   {
     LOG_ERROR(error_prefix_maker() << "internal error: " << e.what());
