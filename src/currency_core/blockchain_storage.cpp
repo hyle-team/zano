@@ -5052,22 +5052,22 @@ bool blockchain_storage::validate_gw_address_ownership(const transaction& tx, co
   VARIANT_SWITCH_BEGIN(address_desciptor.owner_key)
   VARIANT_CASE_CONST(crypto::public_key, o)
   {
-    CHECK_AND_ASSERT_MES(gaoop.sign.type() == typeid(crypto::generic_schnorr_sig_s), false, "Ownership validation failed: invalid signature type for gw address " << gao.address_id << " in tx " << tx_id);
+    CHECK_AND_ASSERT_MES(gaoop.sign.type() == typeid(crypto::generic_schnorr_sig_s), false, "Ownership validation failed: invalid signature type for gw address " << gao.address_id << ", expected: generic_schnorr_sig_s, tx: " << tx_id);
     r = crypto::verify_schnorr_sig(tx_id, o, boost::get<crypto::generic_schnorr_sig_s>(gaoop.sign));
   }
   VARIANT_CASE_CONST(crypto::eth_public_key, u)
   {
-    CHECK_AND_ASSERT_MES(gaoop.sign.type() == typeid(crypto::eth_signature), false, "Ownership validation failed: invalid signature type for gw address " << gao.address_id << " in tx " << tx_id);
+    CHECK_AND_ASSERT_MES(gaoop.sign.type() == typeid(crypto::eth_signature), false, "Ownership validation failed: invalid signature type for gw address " << gao.address_id << ", expected: eth_signature, tx: " << tx_id);
     r = crypto::verify_eth_signature(tx_id, u, boost::get<crypto::eth_signature>(gaoop.sign));
   }
   VARIANT_CASE_CONST(crypto::eddsa_public_key, u)
   {
-    CHECK_AND_ASSERT_MES(gaoop.sign.type() == typeid(crypto::eddsa_signature), false, "Ownership validation failed: invalid signature type for gw address " << gao.address_id << " in tx " << tx_id);
+    CHECK_AND_ASSERT_MES(gaoop.sign.type() == typeid(crypto::eddsa_signature), false, "Ownership validation failed: invalid signature type for gw address " << gao.address_id << ", expected: eddsa_signature, tx: " << tx_id);
     r = crypto::verify_eddsa_signature(tx_id, u, boost::get<crypto::eddsa_signature>(gaoop.sign));
   }
   VARIANT_SWITCH_END();
 
-  CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed: signature verification failed for gw address " << gao.address_id << " in tx " << tx_id);
+  CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed: signature verification failed for gw address " << gao.address_id << " in tx " << tx_id << ", owner key type: " << address_desciptor.owner_key.type().name());
   return r;
 }
 //------------------------------------------------------------------

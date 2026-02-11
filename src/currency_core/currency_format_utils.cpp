@@ -197,70 +197,6 @@ namespace currency
     return true;
   }
   //--------------------------------------------------------------------------------
-  // HF6 updated:
-  // obvious asset id in INPUTS => ALL OUTS have explicit native coin asset id
-
-  // ASP prevents: ZC out's blinded_asset_id misuse (e.g. sum of 2 asset ids)
-  // no ZC outs => no problem => no need for ASP
-  // one ZC out (impossible in HF4) => simple Schnorr proff is sufficient
-  // all ZC outs have explicit asset id => no need for ASP
-  // many ZC outs => blinded asset id of each must equals to blinded asset id of one of inputs
-  
-  // ASP generic case:
-  //     INs         OUTs
-  // -----------+-------------
-  // ZC any        gw anything
-  // gw any        ZC any
-  // bare          ZC any
-  //               asset emission
-
-  // bgw = bare gateway input/output
-  // cgw = confidential gateway input/output
-
-  // 1. service withdrawal with bare gateway
-  //
-  //     INs         OUTs
-  // -----------+-------------
-  // bgw native   ZC native     (explicit native asset id)
-  // 
-  // 
-  //     INs         OUTs
-  // -----------+-------------
-  // bgw native   ZC asset      (obvious asset id)
-  // bgw asset
-  //              
-  // 2. service withdrawal with confidential gateway
-  // 
-  //     INs         OUTs
-  // -----------+-------------
-  // cgw native   ZC native     (explicit native asset id)
-  // 
-  // 
-  //     INs         OUTs
-  // -----------+-------------
-  // cgw native   ZC asset      (unknown asset id, linkable with others prior to FCMP)
-  // cgw asset
-  //
-  // an attacker can withdraw test asset to his wallet to see what cgw is used and determine which asset id is stored in cgw (in one-asset-per-gw model)
-
-
-  // special:
-
-  //     INs         OUTs
-  // -----------+-------------
-  // gw native      gw native/asset
-  // gw asset       ZC asset/native  <-- asset_id is obvious (asset)
-
-  //     INs         OUTs
-  // -----------+-------------
-  // gw native      gw native
-  // gw asset       ZC asset  <-- obviousness depends on change amount
-  //                ZC asset  <-- obviousness depends on change amount
-
-  //     INs         OUTs
-  // -----------+-------------
-  // ZC native      ???       <-- asset_id on input is obvious (native coins)
-  //
   bool generate_asset_surjection_proof_hf6(const transaction& tx, const crypto::hash& context_hash, bool has_native_coin_bare_inputs_, tx_generation_context& ogc, zc_asset_surjection_proof& result)
   {
     bool r = false;
@@ -405,6 +341,7 @@ namespace currency
       r = crypto::generate_BGE_proof(context_hash, ring, secret, secret_index, result.bge_proofs.back(), &err);
       CHECK_AND_ASSERT_MES(r, false, "out #" << j << ": generate_BGE_proof failed with err=" << (int)err);
 
+      // kept for debugging
       //std::vector<crypto::public_key> ring_pk(ring.size(), null_pkey);
       //std::vector<const crypto::public_key*> ring_pk_ptr(ring.size(), nullptr);
       //for(size_t i = 0; i < ring.size(); ++i)
