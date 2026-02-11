@@ -980,6 +980,7 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
   m_accounts.resize(TOTAL_ACCS_COUNT);
   account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
 
@@ -1090,13 +1091,13 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
   // setup is complete
 
   //
-  // INs             | Extra      | OUTs
-  // ----------------+------------+----------------
-  // ZC native   >20   AO emit2     ZC  asset2  7
-  // GW1 native  13                 GW1 asset1  50
-  // ZC asset1   50                 ZC  native  9 + change
-  // GW2 asset2  7                  GW2 native  23
-  // bare native?
+  // INs             | Extra        | OUTs
+  // ----------------+--------------+----------------
+  // ZC native   >20   AO emit2 17    ZC  asset2  7
+  // GW1 native  13                   GW1 asset1  50
+  // ZC asset1   50                   ZC  native  9 + change
+  // GW2 asset2  7                    GW2 native  23
+  // bare native?                     ZC  asset2  17
 
   // get ZC sources
   std::unordered_map<crypto::public_key, uint64_t> amounts;
@@ -1128,27 +1129,68 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
   destinations.clear();
   destinations.emplace_back(7,                                m_accounts[BOB_ACC_IDX].get_public_address(), m_asset2_id);
   destinations.emplace_back(50,                               m_gw_addr1_view.pub,                          m_asset1_id);
-  destinations.emplace_back(MK_TEST_COINS(9) + change_native, m_accounts[BOB_ACC_IDX].get_public_address());
+  destinations.emplace_back(MK_TEST_COINS(9),                 m_accounts[BOB_ACC_IDX].get_public_address());
+  destinations.emplace_back(change_native,                    m_accounts[ALICE_ACC_IDX].get_public_address());
   destinations.emplace_back(MK_TEST_COINS(23),                m_gw_addr2_view.pub);
 
+  // AO
+  asset_descriptor_operation ado{};
+  fill_ado_version_based_onhardfork(ado, current_hardfork_id);
+  //ado.opt_descriptor = adb_0;  // required only for HF4 (since HF5 descriptor must not be provided)
+  ado.operation_type = ASSET_DESCRIPTOR_OPERATION_EMIT;
+  ado.opt_asset_id = m_asset2_id;
+  destinations.emplace_back(17,                               m_accounts[BOB_ACC_IDX].get_public_address(), null_pkey);
+  
+  // simple balance check
   std::unordered_map<crypto::public_key, int64_t> balance_check;
   for(auto el : sources)
     balance_check[el.asset_id] += el.amount;
   for(auto el : destinations)
     balance_check[el.asset_id] -= el.amount;
-  CHECK_AND_ASSERT_EQ(balance_check[m_asset1_id], 0);
-  CHECK_AND_ASSERT_EQ(balance_check[m_asset2_id], 0);
-  CHECK_AND_ASSERT_EQ(balance_check[native_coin_asset_id], TESTS_DEFAULT_FEE);
-  
+  CHECK_AND_ASSERT_EQ(balance_check[m_asset1_id],           0);
+  CHECK_AND_ASSERT_EQ(balance_check[m_asset2_id],           0);
+  CHECK_AND_ASSERT_EQ(balance_check[null_pkey],             -17); // emission
+  CHECK_AND_ASSERT_EQ(balance_check[native_coin_asset_id],  TESTS_DEFAULT_FEE);
+
+  // construct tx_7 (all ZC inputs will be signed, all GW -- not)
   size_t tx_hardfork_id{};
   uint64_t tx_version = get_tx_version_and_hardfork_id(get_block_height(blk_5) + 1, m_hardforks, tx_hardfork_id);
   transaction tx_7{};
-  r = construct_tx(alice_acc.get_keys(), sources, destinations, empty_attachment, tx_7, tx_version, tx_hardfork_id, 0);
+  crypto::secret_key tx_key{};
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, std::vector<extra_v>({ ado }), empty_attachment, tx_7, tx_version, tx_hardfork_id, tx_key, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+
+  // sign gw inputs
+  crypto::hash tx_hash_for_signing = get_transaction_hash(tx_7);
+  for(size_t i = 0; i < tx_7.signatures.size(); ++i)
+  {
+    auto& sig = tx_7.signatures[i];
+    if (sig.type() != typeid(gateway_sig))
+      continue;
+    const auto& in_v = tx_7.vin[i];
+    CHECKED_GET_SPECIFIC_VARIANT(in_v, const txin_gateway, in_gw, false);
+    gateway_sig& gws = boost::get<gateway_sig>(sig);
+    CHECKED_GET_SPECIFIC_VARIANT(gws.s, crypto::generic_schnorr_sig_s, gsss, false);
+    crypto::generic_schnorr_sig& gss = static_cast<crypto::generic_schnorr_sig&>(gsss);
+    if (in_gw.gateway_addr == m_gw_addr1_view.pub)
+      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(tx_hash_for_signing, crypto::point_t(m_gw_addr1_spend.pub), crypto::scalar_t(m_gw_addr1_spend.sec), gss));
+    else
+      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(tx_hash_for_signing, crypto::point_t(m_gw_addr2_spend.pub), crypto::scalar_t(m_gw_addr2_spend.sec), gss));
+  }
+
   ADD_CUSTOM_EVENT(events, tx_7);
+  MAKE_NEXT_BLOCK_TX1(events, blk_6, blk_5, miner_acc, tx_7);
 
 
-  
+  // check gw addresses' balances
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr1_view.pub, 0 }));
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr1_view.pub, 50, m_asset1_id }));
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr2_view.pub, MK_TEST_COINS(23) }));
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr2_view.pub, 0, m_asset2_id }));
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_6r, blk_6, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK(events, "c1");
 
 
 
@@ -1174,8 +1216,15 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
 
 bool hard_fork_6_full_gw_tx_test::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry> &events)
 {
-  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
-  miner_wlt->refresh();
+  //std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  //miner_wlt->refresh();
+
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  bob_wlt->refresh();
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", MK_TEST_COINS(9), 0, MK_TEST_COINS(9), 0, 0), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", 0, 0, 0, 0, 0, m_asset1_id, 0), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", 7 + 17, 0, 7 + 17, 0, 0, m_asset2_id, 0), false, "");
 
   return true;
 }
