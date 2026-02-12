@@ -1110,6 +1110,7 @@ namespace currency
       bc_performance_data performance_data;
       pool_performance_data tx_pool_performance_data;
       bool pos_allowed;
+      bool pre_hf_tx_freeze_period_active;
       uint64_t last_block_size;
       uint64_t current_max_allowed_block_size;
       uint64_t tx_count_in_last_block;
@@ -1126,6 +1127,7 @@ namespace currency
         // Always calculated and provided fields
         KV_SERIALIZE(height)                     DOC_DSCR("The current size of the blockchain, equal to the height of the top block plus one.") DOC_EXMP(2555000) DOC_END
         KV_SERIALIZE(pos_allowed)                DOC_DSCR("Boolean value indicating whether PoS mining is currently allowed based on network rules and state.") DOC_EXMP(true) DOC_END
+        KV_SERIALIZE(pre_hf_tx_freeze_period_active) DOC_DSCR("Boolean value indicating whether tx sending is temporarly stopped because a hardfork is coming.") DOC_EXMP(false) DOC_END
         KV_SERIALIZE(pos_difficulty)             DOC_DSCR("Current difficulty for Proof of Stake mining.") DOC_EXMP("1848455949616658404658") DOC_END
         KV_SERIALIZE(pow_difficulty)             DOC_DSCR("Current difficulty for Proof of Work mining.") DOC_EXMP(12777323347117) DOC_END
         KV_SERIALIZE(tx_count)                   DOC_DSCR("Total number of transactions in the blockchain.") DOC_EXMP(767742) DOC_END
