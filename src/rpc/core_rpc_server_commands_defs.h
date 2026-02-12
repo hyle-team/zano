@@ -1702,7 +1702,7 @@ namespace currency
   {
     uint64_t amount;
     uint64_t multisig_count;
-   std::string kimage_or_ms_id;
+    std::string kimage_or_ms_id;
     std::string gw_addr;
     std::string asset_id;
     std::vector<uint64_t> global_indexes;
