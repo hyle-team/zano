@@ -8,7 +8,7 @@
 namespace currency
 {
   template<typename callback_t>
-  bool rpc_fill_destinations_helper(const std::list<tools::wallet_public::transfer_destination>& destinations_in_api,                                     
+  bool rpc_fill_destinations_helper(const std::list<currency::transfer_destination>& destinations_in_api,                                     
                                     std::vector<currency::tx_destination_entry>& dsts, std::vector<currency::extra_v>& extra, bool hf6_active, epee::json_rpc::error& er, std::string& legacy_tx_wide_payment_id,
                                     const bool allow_legacy_payment_id_size,
                                     callback_t cb_get_address)
