@@ -429,7 +429,7 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   tr_req.comment = "stars continue to operate normally";
   tr_req.payment_id = "1836";
   tr_req.fee = TX_DEFAULT_FEE;
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(1), m_accounts[BOB_ACC_IDX].get_public_address_str()});
+  tr_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(1), m_accounts[BOB_ACC_IDX].get_public_address_str()});
   tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_resp{};
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   // without payment_id it should work
@@ -438,10 +438,10 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   successfull_txs.push_back(crypto::parse_tpod_from_hex_string<crypto::hash>(tr_resp.tx_hash)); // 0
 
   // check any destination cannot has an intrinsic payment id
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(2), m_accounts[BOB_ACC_IDX].get_public_address_str()});
+  tr_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(2), m_accounts[BOB_ACC_IDX].get_public_address_str()});
   tr_req.destinations.front().payment_id = 137;
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(2), m_accounts[BOB_ACC_IDX].get_public_address_str()});
+  tr_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(2), m_accounts[BOB_ACC_IDX].get_public_address_str()});
   tr_req.destinations.front().payment_id = 0;
   tr_req.destinations.back().payment_id = 1836;
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
@@ -460,27 +460,27 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   std::string carol_addr = m_accounts[CAROL_ACC_IDX].get_public_address_str();
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr_with_too_long_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr_with_too_long_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr, m_asset_id});
   CHECK_AND_ASSERT_SUCCESS(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   successfull_txs.push_back(crypto::parse_tpod_from_hex_string<crypto::hash>(tr_resp.tx_hash)); // 2
 
@@ -492,28 +492,28 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_SUCCESS(alice_wlt_rpc.init(vm_allow_legacy_pid_size_wallet));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr_with_too_long_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr_with_too_long_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr_with_too_long_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr, m_asset_id});
   CHECK_AND_ASSERT_SUCCESS(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   successfull_txs.push_back(crypto::parse_tpod_from_hex_string<crypto::hash>(tr_resp.tx_hash)); // 3
 
@@ -540,7 +540,7 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   tr_req.comment = "stars continue to operate normally";
   tr_req.payment_id = "1836";
   tr_req.fee = TX_DEFAULT_FEE;
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(5), m_accounts[BOB_ACC_IDX].get_public_address_str()});
+  tr_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(5), m_accounts[BOB_ACC_IDX].get_public_address_str()});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   // without payment_id it should work, as before
   tr_req.payment_id.clear();
@@ -550,29 +550,29 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
 
   // checks without any CLI options specified for wallet RPC
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{6, bob_addr_with_too_long_pid, m_asset_id}); // long pid needs CLI option
+  tr_req.destinations.emplace_back(currency::transfer_destination{6, bob_addr_with_too_long_pid, m_asset_id}); // long pid needs CLI option
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{6, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{6, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{6, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{6, bob_addr_with_too_long_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{6, bob_addr, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{6, bob_addr_with_short_pid, m_asset_id});  // integrated address in the second destination
+  tr_req.destinations.emplace_back(currency::transfer_destination{6, bob_addr, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{6, bob_addr_with_short_pid, m_asset_id});   // integrated address in the second destination
   CHECK_AND_ASSERT_SUCCESS(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   successfull_txs.push_back(crypto::parse_tpod_from_hex_string<crypto::hash>(tr_resp.tx_hash)); // 5
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{7, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{7, bob_addr, m_asset_id, 18361836});       // with intrinsic pid specified separately
+  tr_req.destinations.emplace_back(currency::transfer_destination{7, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{7, bob_addr, m_asset_id, 18361836});        // with intrinsic pid specified separately
   CHECK_AND_ASSERT_SUCCESS(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   successfull_txs.push_back(crypto::parse_tpod_from_hex_string<crypto::hash>(tr_resp.tx_hash)); // 6
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_short_pid2, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_short_pid2, m_asset_id});
   CHECK_AND_ASSERT_SUCCESS(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   successfull_txs.push_back(crypto::parse_tpod_from_hex_string<crypto::hash>(tr_resp.tx_hash)); // 7
   
@@ -585,40 +585,40 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_SUCCESS(alice_wlt_rpc.init(vm_allow_legacy_pid_size_wallet));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id, 111111}); // long pid is incompatible with intrinsic pid
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id, 111111}); // long pid is incompatible with intrinsic pid
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr, m_asset_id, 18361836});       // long pid is incompatible with intrinsic pid specified separately
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr, m_asset_id, 18361836});          // long pid is incompatible with intrinsic pid specified separately
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_short_pid, m_asset_id});  // long pid is incompatible with intrinsic pid from integrated address
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_short_pid, m_asset_id});     // long pid is incompatible with intrinsic pid from integrated address
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_short_pid, m_asset_id});  // long pid is incompatible with intrinsic pid from integrated address
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_short_pid, m_asset_id});     // long pid is incompatible with intrinsic pid from integrated address
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});  // long pid is incompatible with intrinsic pid from the first destination
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});  // long pid is incompatible with intrinsic pid from the first destination
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});  // this
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr, m_asset_id});                    // and this will be received by Bob with the long legacy payment id, because it's one per tx
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, carol_addr, m_asset_id});                  // carol should got receive the same payment id
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});  // this
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr, m_asset_id});                    // and this will be received by Bob with the long legacy payment id, because it's one per tx
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, carol_addr, m_asset_id});                  // carol should got receive the same payment id
   CHECK_AND_ASSERT_SUCCESS(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   successfull_txs.push_back(crypto::parse_tpod_from_hex_string<crypto::hash>(tr_resp.tx_hash)); // 8
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{9, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{9, bob_addr_with_short_pid2, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{9, bob_addr, m_asset_id, 18361836});
+  tr_req.destinations.emplace_back(currency::transfer_destination{9, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{9, bob_addr_with_short_pid2, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{9, bob_addr, m_asset_id, 18361836});
   CHECK_AND_ASSERT_SUCCESS(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   successfull_txs.push_back(crypto::parse_tpod_from_hex_string<crypto::hash>(tr_resp.tx_hash)); // 9
 

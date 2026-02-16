@@ -131,7 +131,7 @@ bool wallet_rpc_integrated_address_transfer::c1(currency::core& c, size_t ev_ind
   tools::wallet_public::COMMAND_RPC_TRANSFER::request  req = AUTO_VAL_INIT(req);
   req.fee = TESTS_DEFAULT_FEE;
   req.mixin = 0;
-  tools::wallet_public::transfer_destination tds = AUTO_VAL_INIT(tds);
+  currency::transfer_destination tds = AUTO_VAL_INIT(tds);
   tds.address = alice_integrated_address;
   tds.amount = MK_TEST_COINS(3);
   req.destinations.push_back(tds);
@@ -167,7 +167,7 @@ bool wallet_rpc_integrated_address_transfer::c1(currency::core& c, size_t ev_ind
 
   // 3. standard address + invalid external payment id => fail
   req.destinations.clear();
-  tools::wallet_public::transfer_destination tds2 = AUTO_VAL_INIT(tds2);
+  currency::transfer_destination tds2 = AUTO_VAL_INIT(tds2);
   tds2.address = m_accounts[ALICE_ACC_IDX].get_public_address_str();
   tds2.amount = MK_TEST_COINS(7);
   req.destinations.push_back(tds2);
@@ -248,7 +248,7 @@ bool wallet_rpc_transfer::c1(currency::core& c, size_t ev_index, const std::vect
   tools::wallet_public::COMMAND_RPC_TRANSFER::request  req = AUTO_VAL_INIT(req);
   req.fee = TESTS_DEFAULT_FEE;
   req.mixin = 2;
-  tools::wallet_public::transfer_destination tds = AUTO_VAL_INIT(tds);
+  currency::transfer_destination tds = AUTO_VAL_INIT(tds);
   tds.address = m_accounts[ALICE_ACC_IDX].get_public_address_str();
   tds.amount = MK_TEST_COINS(3);
   req.destinations.push_back(tds);
@@ -1065,7 +1065,7 @@ bool wallet_rpc_thirdparty_custody::c1(currency::core& c, size_t ev_index, const
 #define COINS_TO_TRANSFER 10
 
   emm_req.asset_id = resp.new_asset_id;
-  emm_req.destinations.push_back(tools::wallet_public::transfer_destination{ COINS_TO_TRANSFER, bob_wlt->get_account().get_public_address_str(), emm_req.asset_id });
+  emm_req.destinations.push_back(currency::transfer_destination{ COINS_TO_TRANSFER, bob_wlt->get_account().get_public_address_str(), emm_req.asset_id });
   r = invoke_text_json_for_rpc(alice_wlt_rpc, "emit_asset", emm_req, emm_resp);
   CHECK_AND_ASSERT_MES(r, false, "failed to call");
   if (!emm_resp.data_for_external_signing)
@@ -1331,7 +1331,7 @@ bool wallet_rpc_cold_signing::c1(currency::core& c, size_t ev_index, const std::
     req_deploy.asset_descriptor.full_name = "50 pounds per person";
     req_deploy.asset_descriptor.ticker = "50PPP";
     req_deploy.asset_descriptor.total_max_supply = 200; // for a family of four
-    req_deploy.destinations.emplace_back(tools::wallet_public::transfer_destination{50, m_accounts[ALICE_ACC_IDX].get_public_address_str(), null_pkey});
+    req_deploy.destinations.emplace_back(currency::transfer_destination{50, m_accounts[ALICE_ACC_IDX].get_public_address_str(), null_pkey});
     req_deploy.do_not_split_destinations = true;
     tools::wallet_public::COMMAND_ASSETS_DEPLOY::response res_deploy{};
     r = invoke_text_json_for_rpc(miner_rpc, "deploy_asset", req_deploy, res_deploy);
@@ -1371,9 +1371,9 @@ bool wallet_rpc_cold_signing::c1(currency::core& c, size_t ev_index, const std::
 
   // send a cold-signed transaction: Alice -> Bob; 50 test coins + 50 of the asset
   tools::wallet_public::COMMAND_RPC_TRANSFER::request req{};
-  req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(50), m_accounts[BOB_ACC_IDX].get_public_address_str(), native_coin_asset_id});
+  req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(50), m_accounts[BOB_ACC_IDX].get_public_address_str(), native_coin_asset_id});
   if (use_assets)
-    req.destinations.emplace_back(tools::wallet_public::transfer_destination{50, m_accounts[BOB_ACC_IDX].get_public_address_str(), deployed_asset_id});
+    req.destinations.emplace_back(currency::transfer_destination{50, m_accounts[BOB_ACC_IDX].get_public_address_str(), deployed_asset_id});
   req.fee = TESTS_DEFAULT_FEE;
   req.mixin = 10;
   r = make_cold_signing_transaction(*alice_rpc_wo_ptr, alice_rpc, req);
@@ -1593,7 +1593,7 @@ bool wallet_rpc_multiple_receivers::c1(currency::core& c, size_t ev_index, const
   req_deploy.asset_descriptor.full_name = "50 pounds per person";
   req_deploy.asset_descriptor.ticker = "50PPP";
   req_deploy.asset_descriptor.total_max_supply = 200; // for a family of four
-  req_deploy.destinations.emplace_back(tools::wallet_public::transfer_destination{50, m_accounts[ALICE_ACC_IDX].get_public_address_str(), null_pkey});
+  req_deploy.destinations.emplace_back(currency::transfer_destination{50, m_accounts[ALICE_ACC_IDX].get_public_address_str(), null_pkey});
   req_deploy.do_not_split_destinations = true;
   tools::wallet_public::COMMAND_ASSETS_DEPLOY::response res_deploy{};
   r = invoke_text_json_for_rpc(miner_rpc, "deploy_asset", req_deploy, res_deploy);
@@ -1604,8 +1604,8 @@ bool wallet_rpc_multiple_receivers::c1(currency::core& c, size_t ev_index, const
   // 
   tools::wallet_public::COMMAND_RPC_TRANSFER::request tr_req{};
   tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_res{};
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(80), m_accounts[ALICE_ACC_IDX].get_public_address_str()});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(90), m_accounts[BOB_ACC_IDX].get_public_address_str()});
+  tr_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(80), m_accounts[ALICE_ACC_IDX].get_public_address_str()});
+  tr_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(90), m_accounts[BOB_ACC_IDX].get_public_address_str()});
   tr_req.fee = TESTS_DEFAULT_FEE;
   tr_req.mixin = 0;
   tr_req.hide_receiver = false;
@@ -1782,7 +1782,7 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   req_deploy.asset_descriptor.full_name = "To the moon!";
   req_deploy.asset_descriptor.ticker = "ArtemisII";
   req_deploy.asset_descriptor.total_max_supply = 1000;
-  req_deploy.destinations.emplace_back(tools::wallet_public::transfer_destination{50, m_accounts[ALICE_ACC_IDX].get_public_address_str(), null_pkey});
+  req_deploy.destinations.emplace_back(currency::transfer_destination{50, m_accounts[ALICE_ACC_IDX].get_public_address_str(), null_pkey});
   req_deploy.do_not_split_destinations = true;
   tools::wallet_public::COMMAND_ASSETS_DEPLOY::response res_deploy{};
   r = invoke_text_json_for_rpc(miner_wlt_rpc, "deploy_asset", req_deploy, res_deploy);
@@ -1876,10 +1876,10 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   //
   tools::wallet_public::COMMAND_RPC_TRANSFER::request tr_to_gw_req{};
   tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_to_gw_res{};
-  tr_to_gw_req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(9), m_accounts[BOB_ACC_IDX].get_public_address_str()});                    // ZC, native
-  tr_to_gw_req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(2), gw_reg_resp.address});                                                 // GW, native
-  tr_to_gw_req.destinations.emplace_back(tools::wallet_public::transfer_destination{40,               m_accounts[BOB_ACC_IDX].get_public_address_str(), deployed_asset_id}); // ZC, asset
-  tr_to_gw_req.destinations.emplace_back(tools::wallet_public::transfer_destination{10,               gw_reg_resp.address, deployed_asset_id});                              // GW, asset
+  tr_to_gw_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(9), m_accounts[BOB_ACC_IDX].get_public_address_str()});                    // ZC, native
+  tr_to_gw_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(2), gw_reg_resp.address});                                                 // GW, native
+  tr_to_gw_req.destinations.emplace_back(currency::transfer_destination{40,               m_accounts[BOB_ACC_IDX].get_public_address_str(), deployed_asset_id}); // ZC, asset
+  tr_to_gw_req.destinations.emplace_back(currency::transfer_destination{10,               gw_reg_resp.address, deployed_asset_id});                              // GW, asset
   tr_to_gw_req.fee = TESTS_DEFAULT_FEE;
   r = invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_to_gw_req, tr_to_gw_res);
   CHECK_AND_ASSERT_MES(r, false, "RPC 'transfer' failed");
