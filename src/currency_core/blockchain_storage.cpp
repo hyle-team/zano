@@ -5237,8 +5237,10 @@ bool blockchain_storage::change_gateway_balance(const crypto::hash& tx_id, const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
+  std::string gw_addr_str = get_account_address_as_str(gw_addr);
+
   auto gw_addr_entry_ptr = m_db_gateway_addresses[gw_addr];
-  CHECK_AND_ASSERT_MES(gw_addr_entry_ptr, false, "gw balance: couldn't find gateway address " << gw_addr << ", tx: " << tx_id);
+  CHECK_AND_ASSERT_MES(gw_addr_entry_ptr, false, "gw balance: couldn't find gateway address " << gw_addr_str << ", tx: " << tx_id);
 
   gateway_addresses_container::t_value_type gw_addr_entry = *gw_addr_entry_ptr;
 
@@ -5247,13 +5249,13 @@ bool blockchain_storage::change_gateway_balance(const crypto::hash& tx_id, const
 
   if (increase)
   {
-    CHECK_AND_ASSERT_MES(balance_entry.amount <= std::numeric_limits<uint64_t>::max() - amount, false, "Uint64 overflow, gateway address " << gw_addr << ", tx: " << tx_id << ", asset_id: " << asset_id);
+    CHECK_AND_ASSERT_MES(balance_entry.amount <= std::numeric_limits<uint64_t>::max() - amount, false, "Uint64 overflow, gateway address " << gw_addr_str << ", tx: " << tx_id << ", asset_id: " << asset_id);
     balance_entry.amount += amount;
   }
   else
   {
     // decrease
-    CHECK_AND_ASSERT_MES(balance_entry.amount >= amount, false, "Balance underflow, gateway address " << gw_addr << ", tx: " << tx_id << ", asset_id: " << asset_id);
+    CHECK_AND_ASSERT_MES(balance_entry.amount >= amount, false, "Balance underflow, gateway address " << gw_addr_str << ", tx: " << tx_id << ", asset_id: " << asset_id);
     balance_entry.amount -= amount;
   }
 
@@ -5261,7 +5263,7 @@ bool blockchain_storage::change_gateway_balance(const crypto::hash& tx_id, const
   m_db_gateway_addresses.set(gw_addr, gw_addr_entry);
 
   // for debugging
-  LOG_PRINT_L0("gateway address " << gw_addr << ", balance changed: " << balance_before << " -> " << balance_entry.amount << " (" << (increase ? "+" : "-") << amount << "), asset_id: " << asset_id);
+  LOG_PRINT_L0("gateway address " << gw_addr_str << ", balance changed: " << balance_before << " -> " << balance_entry.amount << " (" << (increase ? "+" : "-") << amount << "), asset_id: " << asset_id);
   return true;
 }
 

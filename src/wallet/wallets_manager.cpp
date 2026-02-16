@@ -1674,7 +1674,7 @@ std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_p
   tr_req.comment = tp.comment;
   for(auto& d : tp.destinations)
   {
-    tools::wallet_public::transfer_destination& result_dst = tr_req.destinations.emplace_back();
+    currency::transfer_destination& result_dst = tr_req.destinations.emplace_back();
     result_dst.address = d.address;
     result_dst.asset_id = d.asset_id;
 

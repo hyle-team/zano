@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2026 Zano Project
+﻿// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -1110,6 +1110,7 @@ namespace currency
       bc_performance_data performance_data;
       pool_performance_data tx_pool_performance_data;
       bool pos_allowed;
+      bool pre_hf_tx_freeze_period_active;
       uint64_t last_block_size;
       uint64_t current_max_allowed_block_size;
       uint64_t tx_count_in_last_block;
@@ -1126,6 +1127,7 @@ namespace currency
         // Always calculated and provided fields
         KV_SERIALIZE(height)                     DOC_DSCR("The current size of the blockchain, equal to the height of the top block plus one.") DOC_EXMP(2555000) DOC_END
         KV_SERIALIZE(pos_allowed)                DOC_DSCR("Boolean value indicating whether PoS mining is currently allowed based on network rules and state.") DOC_EXMP(true) DOC_END
+        KV_SERIALIZE(pre_hf_tx_freeze_period_active) DOC_DSCR("Boolean value indicating whether tx sending is temporarly stopped because a hardfork is coming.") DOC_EXMP(false) DOC_END
         KV_SERIALIZE(pos_difficulty)             DOC_DSCR("Current difficulty for Proof of Stake mining.") DOC_EXMP("1848455949616658404658") DOC_END
         KV_SERIALIZE(pow_difficulty)             DOC_DSCR("Current difficulty for Proof of Work mining.") DOC_EXMP(12777323347117) DOC_END
         KV_SERIALIZE(tx_count)                   DOC_DSCR("Total number of transactions in the blockchain.") DOC_EXMP(767742) DOC_END
@@ -1678,15 +1680,21 @@ namespace currency
   {
     uint64_t amount;
     std::list<std::string> pub_keys;
+    std::string gw_addr;
+    std::string asset_id;
     uint64_t minimum_sigs;
     bool is_spent;
     uint64_t global_index;
+    uint64_t payment_id;
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(amount)                       DOC_DSCR("The output's amount, 0 for ZC outputs.") DOC_EXMP(9000000000) DOC_END
       KV_SERIALIZE(pub_keys)                     DOC_DSCR("List of public keys associated with the output.") DOC_EXMP_AGGR("7d0c755e7e24a241847176c9a3cf4c970bcd6377018068abe6fe4535b23f5323") DOC_END
+      KV_SERIALIZE(gw_addr)                      DOC_DSCR("[optional] Gateway destination address (for tx_out_gateway only)") DOC_EXMP_AGGR("gwZ5sqZkre33rxhoo9ht5xcmzy5khvr2hFSfvk7TeXeMXxby7acC3fs1D") DOC_END
+      KV_SERIALIZE(asset_id)                     DOC_DSCR("[optional] Asset ID (for tx_out_gateway only)") DOC_EXMP_AGGR("7d0c755e7e24a241847176c9a3cf4c970bcd6377018068abe6fe4535b23f5323") DOC_END
       KV_SERIALIZE(minimum_sigs)                 DOC_DSCR("Minimum number of signatures required to spend the output, for multisig outputs only.") DOC_EXMP(0) DOC_END
       KV_SERIALIZE(is_spent)                     DOC_DSCR("Indicates whether the output has been spent.") DOC_EXMP(false) DOC_END
       KV_SERIALIZE(global_index)                 DOC_DSCR("Global index of the output for this specific amount.") DOC_EXMP(0) DOC_END
+      KV_SERIALIZE(payment_id)                   DOC_DSCR("[optional] Intrinsic per-output 8 byte long payment id") DOC_EXMP(0) DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
@@ -1694,13 +1702,17 @@ namespace currency
   {
     uint64_t amount;
     uint64_t multisig_count;
-   std::string kimage_or_ms_id;
+    std::string kimage_or_ms_id;
+    std::string gw_addr;
+    std::string asset_id;
     std::vector<uint64_t> global_indexes;
     std::vector<std::string> etc_options;
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(amount)                       DOC_DSCR("The amount of coins being transacted.") DOC_EXMP(1000000000000) DOC_END
-      KV_SERIALIZE(kimage_or_ms_id)              DOC_DSCR("Contains either the key image for the input or the multisig output ID, depending on the input type.") DOC_EXMP("2540e0544b1fed3b104976f803dbd83681335c427f9d601d9d5aecf86ef276d2") DOC_END
-      KV_SERIALIZE(global_indexes)               DOC_DSCR("List of global indexes indicating the outputs referenced by this input, where only one is actually being spent.") DOC_EXMP_AGGR(0,2,12,27) DOC_END
+      KV_SERIALIZE(kimage_or_ms_id)              DOC_DSCR("Contains either the key image for the input or the multisig output ID, or gateway address, depending on the input type.") DOC_EXMP("2540e0544b1fed3b104976f803dbd83681335c427f9d601d9d5aecf86ef276d2") DOC_END
+      KV_SERIALIZE(gw_addr)                      DOC_DSCR("[optional] Gateway source address (for txin_gateway only)") DOC_EXMP_AGGR("gwZ5sqZkre33rxhoo9ht5xcmzy5khvr2hFSfvk7TeXeMXxby7acC3fs1D") DOC_END
+      KV_SERIALIZE(asset_id)                     DOC_DSCR("[optional] Asset ID (for txin_gateway only)") DOC_EXMP_AGGR("7d0c755e7e24a241847176c9a3cf4c970bcd6377018068abe6fe4535b23f5323") DOC_END
+      KV_SERIALIZE(global_indexes)               DOC_DSCR("List of global indexes indicating the outputs referenced by this input, where only one is actually being spent (only for txin_zc_input).") DOC_EXMP_AGGR(0,2,12,27) DOC_END
       KV_SERIALIZE(multisig_count)               DOC_DSCR("Number of multisig signatures used, relevant only for multisig outputs.") DOC_EXMP(0) DOC_END
       KV_SERIALIZE(etc_options)                  DOC_DSCR("Auxiliary options associated with the input, containing additional configuration or data.") DOC_END
     END_KV_SERIALIZE_MAP()

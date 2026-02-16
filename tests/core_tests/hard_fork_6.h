@@ -52,3 +52,11 @@ protected:
   mutable currency::keypair m_gw_addr2_view{};
   mutable currency::keypair m_gw_addr2_spend{};
 };
+
+struct hard_fork_6_and_alt_chain : public wallet_test
+{
+  hard_fork_6_and_alt_chain();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry> &events);
+
+};

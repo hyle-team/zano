@@ -4347,31 +4347,43 @@ namespace currency
       tei.outs.back().is_spent = ptce ? ptce->m_spent_flags[i] : false;
       tei.outs.back().global_index = ptce ? ptce->m_global_output_indexes[i] : 0;
       VARIANT_SWITCH_BEGIN(out);
-      VARIANT_CASE_CONST(tx_out_bare, out)
-      {
-        tei.outs.back().amount = out.amount;
+        VARIANT_CASE_CONST(tx_out_bare, out)
+        {
+          tei.outs.back().amount = out.amount;
 
-        VARIANT_SWITCH_BEGIN(out.target);
-        VARIANT_CASE_CONST(txout_to_key, otk)
-          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.key));
-          if (otk.mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
-            tei.outs.back().pub_keys.back() += "(FORCED_NO_MIX)";
-          if (otk.mix_attr >= CURRENCY_TO_KEY_OUT_FORCED_MIX_LOWER_BOUND)
-            tei.outs.back().pub_keys.back() += std::string("(FORCED_MIX_LOWER_BOUND: ") + std::to_string(otk.mix_attr) + ")";
-        VARIANT_CASE_CONST(txout_multisig, otm)
-          for (auto& k : otm.keys)
-          {
-            tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(k));
-          }
-          tei.outs.back().minimum_sigs = otm.minimum_sigs;
-        VARIANT_SWITCH_END();
-      }
-      VARIANT_CASE_CONST(tx_out_zarcanum, o)
-        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.stealth_address));
-        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.concealing_point));
-        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.amount_commitment));
-        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.blinded_asset_id));
-        tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.encrypted_amount));
+          VARIANT_SWITCH_BEGIN(out.target);
+          VARIANT_CASE_CONST(txout_to_key, otk)
+            tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(otk.key));
+            if (otk.mix_attr == CURRENCY_TO_KEY_OUT_FORCED_NO_MIX)
+              tei.outs.back().pub_keys.back() += "(FORCED_NO_MIX)";
+            if (otk.mix_attr >= CURRENCY_TO_KEY_OUT_FORCED_MIX_LOWER_BOUND)
+              tei.outs.back().pub_keys.back() += std::string("(FORCED_MIX_LOWER_BOUND: ") + std::to_string(otk.mix_attr) + ")";
+          VARIANT_CASE_CONST(txout_multisig, otm)
+            for (auto& k : otm.keys)
+            {
+              tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(k));
+            }
+            tei.outs.back().minimum_sigs = otm.minimum_sigs;
+          VARIANT_SWITCH_END();
+        }
+        VARIANT_CASE_CONST(tx_out_zarcanum, o)
+        {
+          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.stealth_address));
+          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.concealing_point));
+          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.amount_commitment));
+          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.blinded_asset_id));
+          tei.outs.back().pub_keys.push_back(epee::string_tools::pod_to_hex(o.encrypted_amount));
+        }
+        VARIANT_CASE_CONST(tx_out_gateway, gw_out)
+        {
+          tei.outs.back().gw_addr = get_account_address_as_str(gw_out.gateway_addr);
+          tei.outs.back().amount = gw_out.amount;
+          tei.outs.back().asset_id = crypto::point_t(gw_out.asset_id).modify_mul8().to_string();
+          tei.outs.back().is_spent = true;
+          tei.outs.back().payment_id = gw_out.payment_id;
+          tei.outs.back().pub_keys.push_back(get_account_address_as_str(gw_out.gateway_addr)); // temporary, remove once gw_addr supported -- sowle
+          tei.outs.back().pub_keys.push_back(crypto::point_t(gw_out.asset_id).modify_mul8().to_string()); // reconsider this -- sowle
+        }
       VARIANT_SWITCH_END();
       ++i;
     }
@@ -4380,48 +4392,56 @@ namespace currency
   //------------------------------------------------------------------
   bool fill_tx_rpc_inputs(tx_rpc_extended_info& tei, const transaction& tx)
   {
+    auto handle_intokey_and_zc = [](const txin_v& in, tx_in_rpc_entry& entry_to_fill)
+    {
+      entry_to_fill.amount = get_amount_from_variant(in);
+      entry_to_fill.kimage_or_ms_id = epee::string_tools::pod_to_hex(get_key_image_from_txin_v(in));
+      const std::vector<txout_ref_v>& key_offsets = get_key_offsets_from_txin_v(in);
+      std::vector<txout_ref_v> absolute_offsets = relative_output_offsets_to_absolute(key_offsets);
+      for (auto& ao : absolute_offsets)
+      {
+        entry_to_fill.global_indexes.push_back(0);
+        if (ao.type() == typeid(uint64_t))
+        {
+          entry_to_fill.global_indexes.back() = boost::get<uint64_t>(ao);
+        }
+        else// if (ao.type() == typeid(ref_by_id))
+        {
+          //disable for the reset at the moment 
+          entry_to_fill.global_indexes.back() = std::numeric_limits<uint64_t>::max();
+        }
+      }
+      //tk.etc_details -> visualize it may be later
+    };
+
     //handle inputs
     for (auto in : tx.vin)
     {
       tei.ins.push_back(tx_in_rpc_entry());
       tx_in_rpc_entry& entry_to_fill = tei.ins.back();
-      if (in.type() == typeid(txin_gen))
-      {
-        entry_to_fill.amount = 0;
-      }
-      else if (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_zc_input))
-      {
-        entry_to_fill.amount = get_amount_from_variant(in);
-        entry_to_fill.kimage_or_ms_id = epee::string_tools::pod_to_hex(get_key_image_from_txin_v(in));
-        const std::vector<txout_ref_v>& key_offsets = get_key_offsets_from_txin_v(in);
-        std::vector<txout_ref_v> absolute_offsets = relative_output_offsets_to_absolute(key_offsets);
-        for (auto& ao : absolute_offsets)
-        {
-          entry_to_fill.global_indexes.push_back(0);
-          if (ao.type() == typeid(uint64_t))
+      VARIANT_SWITCH_BEGIN(in)
+        VARIANT_CASE_CONST(txin_gen, in_gen)
+          entry_to_fill.amount = 0;
+        VARIANT_CASE_CONST(txin_to_key, in_tk)
+          handle_intokey_and_zc(in, entry_to_fill);
+        VARIANT_CASE_CONST(txin_zc_input, in_zc)
+          handle_intokey_and_zc(in, entry_to_fill);
+        VARIANT_CASE_CONST(txin_multisig, tms)
+          entry_to_fill.amount = tms.amount;
+          entry_to_fill.kimage_or_ms_id = epee::string_tools::pod_to_hex(tms.multisig_out_id);
+          if (tx.signatures.size() >= tei.ins.size() &&
+            tx.signatures[tei.ins.size() - 1].type() == typeid(NLSAG_sig))
           {
-            entry_to_fill.global_indexes.back() = boost::get<uint64_t>(ao);
+            entry_to_fill.multisig_count = boost::get<NLSAG_sig>(tx.signatures[tei.ins.size() - 1]).s.size();
           }
-          else// if (ao.type() == typeid(ref_by_id))
-          {
-            //disable for the reset at the moment 
-            entry_to_fill.global_indexes.back() = std::numeric_limits<uint64_t>::max();
-          }
-        }
-        //tk.etc_details -> visualize it may be later
-      }
-      else if (in.type() == typeid(txin_multisig))
-      {
-        txin_multisig& tms = boost::get<txin_multisig>(in);
-        entry_to_fill.amount = tms.amount;
-        entry_to_fill.kimage_or_ms_id = epee::string_tools::pod_to_hex(tms.multisig_out_id);
-        if (tx.signatures.size() >= tei.ins.size() &&
-          tx.signatures[tei.ins.size() - 1].type() == typeid(NLSAG_sig))
-        {
-          entry_to_fill.multisig_count = boost::get<NLSAG_sig>(tx.signatures[tei.ins.size() - 1]).s.size();
-        }
-          
-      }
+        VARIANT_CASE_CONST(txin_gateway, in_gw)
+          entry_to_fill.amount    = in_gw.amount;
+          entry_to_fill.gw_addr   = get_account_address_as_str(in_gw.gateway_addr);
+          entry_to_fill.asset_id  = crypto::point_t(in_gw.asset_id).modify_mul8().to_string();
+          entry_to_fill.kimage_or_ms_id = entry_to_fill.gw_addr + "," + entry_to_fill.asset_id; // temporary, remove later
+        VARIANT_CASE_OTHER()
+          entry_to_fill.kimage_or_ms_id = "unknown input type";
+      VARIANT_SWITCH_END()
     }
     return true;
   }

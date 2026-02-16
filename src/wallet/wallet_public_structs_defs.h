@@ -789,7 +789,7 @@ namespace tools::wallet_public
   };
 
   
-  typedef currency::transfer_destination transfer_destination; // probably better to rename it later to currency::transfer_destination everywhere instead of typedef
+  //typedef currency::transfer_destination transfer_destination; // probably better to rename it later to currency::transfer_destination everywhere instead of typedef
 
 
   struct COMMAND_RPC_TRANSFER
@@ -798,7 +798,7 @@ namespace tools::wallet_public
 
     struct request
     {
-      std::list<transfer_destination> destinations;
+      std::list<currency::transfer_destination> destinations;
       uint64_t fee;
       uint64_t mixin;
       //uint64_t unlock_time;
@@ -1923,7 +1923,7 @@ namespace tools::wallet_public
 
     struct request
     {
-      std::list<transfer_destination> destinations;
+      std::list<currency::transfer_destination> destinations;
       currency::asset_descriptor_base asset_descriptor;
       bool do_not_split_destinations = false;
 
@@ -1970,7 +1970,7 @@ namespace tools::wallet_public
     struct request
     {
       crypto::public_key asset_id;
-      std::list<transfer_destination> destinations;
+      std::list<currency::transfer_destination> destinations;
       bool do_not_split_destinations = false;
 
       BEGIN_KV_SERIALIZE_MAP()

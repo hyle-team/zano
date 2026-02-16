@@ -1308,13 +1308,13 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   #define DESTINATIONS_COUNT_FOR_DEPLOY_OR_EMIT 10
   static_assert(DESTINATIONS_COUNT_FOR_DEPLOY_OR_EMIT >= CURRENCY_TX_MIN_ALLOWED_OUTS, "DESTINATIONS_COUNT_FOR_DEPLOY_OR_EMIT must be >= min allowed tx outs");
-  void wallet_rpc_server::rpc_destinations_to_currency_destinations(const std::list<wallet_public::transfer_destination>& rpc_destinations, bool nullify_asset_id, bool try_to_split, std::vector<currency::tx_destination_entry>& result_destinations)
+  void wallet_rpc_server::rpc_destinations_to_currency_destinations(const std::list<currency::transfer_destination>& rpc_destinations, bool nullify_asset_id, bool try_to_split, std::vector<currency::tx_destination_entry>& result_destinations)
   {
     GET_WALLET();
 
     WLT_THROW_IF_FALSE_WITH_CODE(!rpc_destinations.empty(), "WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT", "WALLET_RPC_ERROR_CODE_WRONG_ARGUMENT");
 
-    std::list<wallet_public::transfer_destination> local_destinations;
+    std::list<currency::transfer_destination> local_destinations;
     if (nullify_asset_id && try_to_split)
     {
       bool do_split = true;
@@ -1332,7 +1332,7 @@ namespace tools
       if (do_split)
       {
         const uint64_t el_amount = total_amount / DESTINATIONS_COUNT_FOR_DEPLOY_OR_EMIT; // approximation, see below
-        wallet_public::transfer_destination td{};
+        currency::transfer_destination td{};
         td.address = first_address;
         td.amount = el_amount;
         for(size_t i = 0; i < DESTINATIONS_COUNT_FOR_DEPLOY_OR_EMIT - 1; ++i)
@@ -1341,7 +1341,7 @@ namespace tools
         local_destinations.push_back(td);
       }
     }
-    const std::list<wallet_public::transfer_destination>& destinations = local_destinations.size() != 0 ? local_destinations : rpc_destinations;
+    const std::list<currency::transfer_destination>& destinations = local_destinations.size() != 0 ? local_destinations : rpc_destinations;
 
     for (auto it = destinations.begin(); it != destinations.end(); ++it)
     {
@@ -1373,7 +1373,7 @@ namespace tools
 
     if (req.destinations.empty() && req.asset_descriptor.current_supply != 0)
     {
-      req.destinations.push_back(tools::wallet_public::transfer_destination{ req.asset_descriptor.current_supply , w.get_wallet()->get_account().get_public_address_str(), currency::null_pkey });
+      req.destinations.push_back(currency::transfer_destination{ req.asset_descriptor.current_supply , w.get_wallet()->get_account().get_public_address_str(), currency::null_pkey });
     }
 
     std::vector<currency::tx_destination_entry> currency_destinations;

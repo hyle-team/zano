@@ -132,7 +132,9 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_info(const COMMAND_RPC_GET_INFO::request& req, COMMAND_RPC_GET_INFO::response& res, connection_context& cntx)
   {
-    //unconditional values 
+    //
+    // unconditional values 
+    //
     res.height = m_core.get_current_blockchain_size();
     res.tx_count = m_core.get_blockchain_storage().get_total_transactions() - res.height; //without coinbase
     res.tx_pool_size = m_core.get_pool_transactions_count();
@@ -176,7 +178,11 @@ namespace currency
       res.is_hardfok_active.push_back(m_core.get_blockchain_storage().is_hardfork_active(i));
     }
 
-    //conditional values 
+    res.pre_hf_tx_freeze_period_active = m_core.get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active();
+
+    //
+    // conditional values 
+    //
     if (req.flags&COMMAND_RPC_GET_INFO_FLAG_NET_TIME_DELTA_MEDIAN)
     {
       int64_t last_median2local_time_diff, last_ntp2local_time_diff;
