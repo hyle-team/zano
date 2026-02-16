@@ -556,6 +556,7 @@ namespace currency
 
     // Gateway addresses
     typedef tools::db::cached_key_value_accessor<gateway_address_id_type, gateway_address_data, true, false> gateway_addresses_container;
+    typedef tools::db::cached_key_value_accessor<gateway_address_id_type, crypto::hash, false, false> gateway_address_transactions_container;
 
 
     //-----------------------------------------
@@ -603,6 +604,7 @@ namespace currency
     
     assets_container m_db_assets;
     gateway_addresses_container m_db_gateway_addresses;
+    gateway_address_transactions_container m_db_gateway_transactions;
 
 
 

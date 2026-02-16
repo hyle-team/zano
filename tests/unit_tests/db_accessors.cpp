@@ -486,3 +486,145 @@ TEST(db_accessor_tests, dtor_without_init)
   }
 
 }
+
+
+TEST(db_accessor_tests, db_chunked_container_test)
+{
+  epee::shared_recursive_mutex m_rw_lock;
+  tools::db::basic_db_accessor m_db(std::shared_ptr<tools::db::i_db_backend>(new tools::db::lmdb_db_backend), m_rw_lock);
+  tools::db::chunked_key_to_array_accessor<crypto::public_key, crypto::hash, false, 10> m_container(m_db);
+
+  const std::string folder_name = "./TEST_db_chunked_container";
+  tools::create_directories_if_necessary(folder_name);
+  uint64_t cache_size = CACHE_SIZE;
+  ASSERT_TRUE(m_db.open(folder_name, cache_size));
+  ASSERT_TRUE(m_container.init("zzzz"));
+
+  auto db_tx_ptr = m_db.begin_transaction_obj();
+  ASSERT_TRUE(db_tx_ptr.get());
+
+  auto make_public_key = [](uint8_t seed)
+  {
+    crypto::public_key key = AUTO_VAL_INIT(key);
+    for (size_t i = 0; i < sizeof(key.data); ++i)
+      key.data[i] = static_cast<char>(seed + i);
+    return key;
+  };
+
+  auto make_hash = [](uint8_t seed)
+  {
+    crypto::hash h = AUTO_VAL_INIT(h);
+    for (size_t i = 0; i < sizeof(h.data); ++i)
+      h.data[i] = static_cast<char>(seed + i);
+    return h;
+  };
+
+  const auto key_a = make_public_key(1);
+  const auto key_b = make_public_key(2);
+
+  ASSERT_EQ(m_container.get_item_size(key_a), 0u);
+  ASSERT_THROW(m_container.get_subitem(key_a, 0), std::out_of_range);
+
+  std::vector<crypto::hash> values;
+  for (uint8_t i = 0; i < 25; ++i)
+  {
+    auto value = make_hash(static_cast<uint8_t>(i + 1));
+    values.push_back(value);
+    m_container.push_back_item(key_a, value);
+  }
+
+  std::vector<crypto::hash> key_b_values;
+  for (uint8_t i = 0; i < 3; ++i)
+  {
+    auto value = make_hash(static_cast<uint8_t>(100 + i));
+    key_b_values.push_back(value);
+    m_container.push_back_item(key_b, value);
+  }
+
+  ASSERT_EQ(m_container.get_item_size(key_a), static_cast<uint64_t>(values.size()));
+  ASSERT_EQ(m_container.get_item_size(key_b), static_cast<uint64_t>(key_b_values.size()));
+
+  auto first_ptr = m_container.get_subitem(key_a, 0);
+  ASSERT_TRUE(first_ptr.get());
+  EXPECT_EQ(*first_ptr, values[0]);
+
+  auto last_in_first_chunk_ptr = m_container.get_subitem(key_a, 9);
+  ASSERT_TRUE(last_in_first_chunk_ptr.get());
+  EXPECT_EQ(*last_in_first_chunk_ptr, values[9]);
+
+  auto first_in_second_chunk_ptr = m_container.get_subitem(key_a, 10);
+  ASSERT_TRUE(first_in_second_chunk_ptr.get());
+  EXPECT_EQ(*first_in_second_chunk_ptr, values[10]);
+
+  auto last_ptr = m_container.get_subitem(key_a, static_cast<uint64_t>(values.size() - 1));
+  ASSERT_TRUE(last_ptr.get());
+  EXPECT_EQ(*last_ptr, values.back());
+
+  std::vector<crypto::hash> subitems;
+  ASSERT_TRUE(m_container.get_subitems(key_a, 8, 5, subitems));
+  ASSERT_EQ(subitems.size(), 5u);
+  for (size_t i = 0; i < subitems.size(); ++i)
+    EXPECT_EQ(subitems[i], values[8 + i]);
+
+  subitems.clear();
+  ASSERT_TRUE(m_container.get_subitems(key_a, 0, 0, subitems));
+  ASSERT_TRUE(subitems.empty());
+
+  ASSERT_THROW(m_container.get_subitems(key_a, static_cast<uint64_t>(values.size() - 1), 2, subitems), std::out_of_range);
+  ASSERT_THROW(m_container.get_subitems(key_a, static_cast<uint64_t>(values.size()), 1, subitems), std::out_of_range);
+
+  auto chunk0 = m_container.get_chunk(key_a, 0);
+  ASSERT_TRUE(chunk0);
+  ASSERT_EQ(chunk0->size(), 10u);
+  EXPECT_EQ(chunk0->at(0), values[0]);
+  EXPECT_EQ(chunk0->at(9), values[9]);
+
+  auto chunk2 = *m_container.get_chunk(key_a, 2);
+  ASSERT_EQ(chunk2.size(), 5u);
+  crypto::hash replacement = make_hash(200);
+  chunk2[2] = replacement;
+  m_container.set_chunk(key_a, 2, chunk2);
+  values[22] = replacement;
+
+  auto replaced_ptr = m_container.get_subitem(key_a, 22);
+  ASSERT_TRUE(replaced_ptr.get());
+  EXPECT_EQ(*replaced_ptr, replacement);
+
+  std::vector<crypto::hash> enumerated;
+  m_container.enumerate_subitems([&](uint64_t /*i*/, const crypto::public_key& key, uint64_t /*chunk_index*/, const crypto::hash& value)
+  {
+    if (key == key_a)
+      enumerated.push_back(value);
+    return true;
+  });
+
+  ASSERT_EQ(enumerated.size(), values.size());
+  auto sorted_expected = values;
+  std::sort(enumerated.begin(), enumerated.end());
+  std::sort(sorted_expected.begin(), sorted_expected.end());
+  EXPECT_EQ(enumerated, sorted_expected);
+
+  for (size_t i = 0; i < 5; ++i)
+  {
+    m_container.pop_back_item(key_a);
+    values.pop_back();
+  }
+
+  ASSERT_EQ(m_container.get_item_size(key_a), static_cast<uint64_t>(values.size()));
+  auto new_last_ptr = m_container.get_subitem(key_a, static_cast<uint64_t>(values.size() - 1));
+  ASSERT_TRUE(new_last_ptr.get());
+  EXPECT_EQ(*new_last_ptr, values.back());
+  ASSERT_THROW(m_container.get_chunk(key_a, 2), std::out_of_range);
+
+  m_container.erase_items(key_a);
+  ASSERT_EQ(m_container.get_item_size(key_a), 0u);
+  ASSERT_THROW(m_container.get_subitem(key_a, 0), std::out_of_range);
+
+  auto key_b_ptr = m_container.get_subitem(key_b, 0);
+  ASSERT_TRUE(key_b_ptr.get());
+  EXPECT_EQ(*key_b_ptr, key_b_values[0]);
+  ASSERT_EQ(m_container.get_item_size(key_b), static_cast<uint64_t>(key_b_values.size()));
+
+  db_tx_ptr->commit_transaction();
+}
+

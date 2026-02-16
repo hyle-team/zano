@@ -964,6 +964,19 @@ namespace tools
 //     {};
 #pragma pack(pop)
 
+    template<class t_key_a, class t_key_b>
+    inline bool operator==(const composite_key<t_key_a, t_key_b>& lhs, const composite_key<t_key_a, t_key_b>& rhs)
+    {
+      return lhs.container_id == rhs.container_id && lhs.sufix == rhs.sufix;
+    }
+
+    template<class t_key_a, class t_key_b>
+    inline bool operator!=(const composite_key<t_key_a, t_key_b>& lhs, const composite_key<t_key_a, t_key_b>& rhs)
+    {
+      return !(lhs == rhs);
+    }
+
+
     /************************************************************************/
     /*                                                                      */
     /************************************************************************/
@@ -1045,14 +1058,14 @@ namespace tools
       }
 
       void pop_back_item(const t_key& k)
-      { 
+      {
         auto counter = get_counter_accessor(k);
         uint64_t sz = static_cast<uint64_t>(counter);
 
         CHECK_AND_ASSERT_MES(sz != 0, void(), "pop_back_item called on empty subitem");
-        
+
         composite_key<t_key, uint64_t> ck{ k, sz - 1 };
-        this->erase(ck);
+          this->erase(ck);
         counter = --sz;
       }
 
@@ -1067,6 +1080,255 @@ namespace tools
           composite_key<t_key, uint64_t> ck{ k, sz - 1 };
           this->erase(ck);
           --sz;
+        }
+
+        counter = 0;
+      }
+
+      template<typename callback_t>
+      void enumerate_subitems(callback_t callback) const
+      {
+        subitems_visitor<callback_t> visitor(callback);
+        basic_accessor_type::bdb.get_backend()->enumerate(basic_accessor_type::m_h, &visitor);
+      }
+
+    };
+
+
+    /************************************************************************
+
+      This class is meant to provide trade-off solution for cases when we need to keep arrays of items by key, but don't
+      want to have overhead of space when using keys like hash+index for each item. It uses solo_db_value with guid_key 
+      suffix to keep items count and composite_key of key+index as key for each "chunk"
+
+    ************************************************************************/
+
+    template<class t_key, class t_value, bool is_t_access_strategy, size_t chunk_size>
+    class chunked_key_to_array_accessor : public cached_key_value_accessor<composite_key<t_key, uint64_t>, std::vector<t_value>, is_t_access_strategy, false>
+    {
+      typedef cached_key_value_accessor<composite_key<t_key, uint64_t>, std::vector<t_value>, is_t_access_strategy, false> basic_accessor_type;
+
+
+      solo_db_value<composite_key<t_key, guid_key>, uint64_t, basic_accessor_type>
+        get_counter_accessor(const t_key& container_id)
+      {
+        static_assert(std::is_pod<t_key>::value, "t_pod_key must be a POD type.");
+        composite_key<t_key, guid_key> cc = { container_id, const_counter_suffix };
+
+        return solo_db_value<composite_key<t_key, guid_key>, uint64_t, basic_accessor_type >(cc, *this);
+      }
+
+      const solo_db_value<composite_key<t_key, guid_key>, uint64_t, basic_accessor_type >
+        get_counter_accessor(const t_key& container_id) const
+      {
+        static_assert(std::is_pod<t_key>::value, "t_pod_key must be a POD type.");
+        composite_key<t_key, guid_key> cc = { container_id, const_counter_suffix };
+
+        return solo_db_value<composite_key<t_key, guid_key>, uint64_t, basic_accessor_type >(cc, const_cast<basic_accessor_type&>(static_cast<const basic_accessor_type&>(*this)));
+      }
+
+      template<typename callback_t>
+      struct subitems_visitor : public i_db_callback
+      {
+        subitems_visitor(callback_t cb)
+          : m_callback(cb)
+        {
+        }
+
+        virtual bool on_enum_item(uint64_t i, const void* key_data, uint64_t key_size, const void* value_data, uint64_t value_size) override
+        {
+          if (key_size != sizeof(composite_key<t_key, uint64_t>))
+            return true; // skip solo values containing items size
+
+          composite_key<t_key, uint64_t> key = AUTO_VAL_INIT(key);
+          key_from_ptr(key, key_data, key_size);
+
+          std::vector<t_value> vec_of_values = AUTO_VAL_INIT(vec_of_values);
+          access_strategy_selector<is_t_access_strategy>::from_buff_to_obj(value_data, value_size, vec_of_values);
+
+          size_t offset = i * chunk_size;
+          size_t index = 0;
+          for (const auto& value : vec_of_values)
+          {
+            if (!m_callback(offset + index++, key.container_id, key.sufix, value))
+              return false;
+          }
+
+          return true;
+        }
+
+        callback_t m_callback;
+      };
+
+
+      uint64_t get_chunk_index(uint64_t index, uint64_t& index_in_chunk) const
+      {
+        index_in_chunk = index % chunk_size;
+        return index / chunk_size;
+      }
+
+    public:
+      chunked_key_to_array_accessor(basic_db_accessor& db) : basic_accessor_type(db)
+      {
+      }
+
+      uint64_t get_item_size(const t_key& k) const
+      {
+        return get_counter_accessor(k);
+      }
+
+      std::shared_ptr<const std::vector<t_value>> get_chunk(const t_key& k, uint64_t chunk_index) const
+      {
+        composite_key<t_key, uint64_t> ck{ k, chunk_index };
+        auto chunk_ptr = this->get(ck);
+        if (!chunk_ptr)
+        {
+          LOG_ERROR("Out of bound access: chunk_index = " << chunk_index);
+          throw std::out_of_range("In basic_key_to_array_accessor");
+        }
+        return chunk_ptr;
+      }
+
+      void set_chunk(const t_key& k, uint64_t chunk_index, const std::vector<t_value>& new_chunk)
+      {
+        composite_key<t_key, uint64_t> ck{ k, chunk_index };
+        this->set(ck, new_chunk);
+      }
+
+      std::shared_ptr<const t_value> get_subitem(const t_key& k, uint64_t i) const
+      {
+        if (i >= get_item_size(k))
+        {
+          LOG_ERROR("Out of bound access: itmes_count = " << get_item_size(k) << ", i = " << i);
+          throw std::out_of_range("In basic_key_to_array_accessor");
+        }
+
+        uint64_t index_inside_chunk = 0;
+        uint64_t chunk_index = get_chunk_index(i, index_inside_chunk);
+
+        auto chunk_ptr = get_chunk(k, chunk_index);
+
+        //now we have chunk, need to get item inside chunk
+        if (index_inside_chunk >= chunk_ptr->size())
+        {
+          LOG_ERROR("Out of bound access: index_inside_chunk = " << index_inside_chunk << ", chunk_size = " << chunk_ptr->size());
+          throw std::out_of_range("In basic_key_to_array_accessor");
+        }
+
+        return std::shared_ptr<const t_value>(new t_value((*chunk_ptr)[index_inside_chunk]));
+      }
+
+      bool get_subitems(const t_key& k, uint64_t offset, uint64_t count, std::vector<t_value>& res) const
+      {
+        res.clear();
+        res.reserve(count);
+
+        if (count == 0)
+          return true;
+
+        if (offset + count > get_item_size(k))
+        {
+          LOG_ERROR("Out of bound access: itmes_count = " << get_item_size(k) << ", offset = " << offset);
+          throw std::out_of_range("In basic_key_to_array_accessor");
+        }
+
+        std::shared_ptr<const std::vector<t_value>> current_chunk_ptr;
+        size_t current_chunk_ptr_index = 0;
+
+        size_t local_count = 0;
+        while (local_count < count)
+        {
+          uint64_t index_inside_chunk = 0;
+          uint64_t chunk_index = get_chunk_index(offset + local_count, index_inside_chunk);
+          if (!current_chunk_ptr || current_chunk_ptr_index != chunk_index)
+          {
+            current_chunk_ptr = get_chunk(k, chunk_index);
+            current_chunk_ptr_index = chunk_index;
+          }
+          res.push_back(current_chunk_ptr->at(index_inside_chunk));
+          local_count++;
+        }
+
+        return true;
+      }
+
+      void push_back_item(const t_key& k, const t_value& v)
+      {
+        auto counter = get_counter_accessor(k);
+        uint64_t new_index = counter;
+
+        uint64_t index_inside_chunk = 0;
+        uint64_t chunk_index = get_chunk_index(new_index, index_inside_chunk);
+
+        if (index_inside_chunk == 0)
+        {
+          //this is new chunk
+          std::vector<t_value> tmp;
+          tmp.push_back(v);
+          set_chunk(k, chunk_index, tmp);
+        }
+        else
+        {
+          //existing chunk
+          auto chunk_ptr = get_chunk(k, chunk_index);
+          std::vector<t_value> new_chunk = *chunk_ptr;
+          new_chunk.push_back(v);
+          if (index_inside_chunk != new_chunk.size() - 1)
+          {
+            LOG_ERROR("Intenral error: itmes_count = " << index_inside_chunk << " != chunk_ptr->size() - 1" << new_chunk.size() - 1);
+            throw std::out_of_range("Internal error");
+          }
+          set_chunk(k, chunk_index, new_chunk);
+        }
+        counter = new_index + 1;
+      }
+
+      void pop_back_item(const t_key& k)
+      {
+        auto counter = get_counter_accessor(k);
+        uint64_t sz = static_cast<uint64_t>(counter);
+
+        CHECK_AND_ASSERT_MES(sz != 0, void(), "pop_back_item called on empty subitem");
+
+        uint64_t last_index = sz - 1;
+        uint64_t index_inside_chunk = 0;
+        uint64_t chunk_index = get_chunk_index(last_index, index_inside_chunk);
+
+        if (index_inside_chunk == 0)
+        {
+          // last item is the first element in the chunk, so drop the whole chunk
+          composite_key<t_key, uint64_t> ck{ k, chunk_index };
+          this->erase(ck);
+        }
+        else
+        {
+          auto chunk_ptr = get_chunk(k, chunk_index);
+          CHECK_AND_ASSERT_MES(chunk_ptr && index_inside_chunk < chunk_ptr->size(), void(), "pop_back_item: index inside chunk is out of range");
+          std::vector<t_value> new_chunk = *chunk_ptr;
+          new_chunk.pop_back();
+          set_chunk(k, chunk_index, new_chunk);
+        }
+
+        counter = last_index;
+      }
+
+      // removes all items by key k
+      void erase_items(const t_key& k)
+      {
+        auto counter = get_counter_accessor(k);
+        uint64_t sz = static_cast<uint64_t>(counter);
+
+        if (sz == 0)
+          return;
+
+        uint64_t last_index = sz - 1;
+        uint64_t index_inside_chunk = 0;
+        uint64_t last_chunk_index = get_chunk_index(last_index, index_inside_chunk);
+
+        for (uint64_t chunk_index = 0; chunk_index <= last_chunk_index; ++chunk_index)
+        {
+          composite_key<t_key, uint64_t> ck{ k, chunk_index };
+          this->erase(ck);
         }
 
         counter = 0;
@@ -1154,6 +1416,23 @@ namespace tools
 
   }
 }
+
+namespace std
+{
+  template<class t_key_a, class t_key_b>
+  struct hash<tools::db::composite_key<t_key_a, t_key_b>>
+  {
+    size_t operator()(const tools::db::composite_key<t_key_a, t_key_b>& v) const
+      noexcept(noexcept(hash<t_key_a>{}(v.container_id)) && noexcept(hash<t_key_b>{}(v.sufix)))
+    {
+      const size_t h1 = hash<t_key_a>{}(v.container_id);
+      const size_t h2 = hash<t_key_b>{}(v.sufix);
+      return h1 ^ (h2 + static_cast<size_t>(0x9e3779b97f4a7c15ULL) + (h1 << 6) + (h1 >> 2));
+    }
+  };
+}
+
+
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL NULL

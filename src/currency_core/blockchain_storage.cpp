@@ -51,20 +51,21 @@ using namespace std;
 using namespace epee;
 using namespace currency;
 
-#define BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS            "blocks"
-#define BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS_INDEX      "blocks_index"
-#define BLOCKCHAIN_STORAGE_CONTAINER_TRANSACTIONS      "transactions"
-#define BLOCKCHAIN_STORAGE_CONTAINER_SPENT_KEYS        "spent_keys"
-#define BLOCKCHAIN_STORAGE_CONTAINER_OUTPUTS           "outputs"
-#define BLOCKCHAIN_STORAGE_CONTAINER_MULTISIG_OUTS     "multisig_outs"
-#define BLOCKCHAIN_STORAGE_CONTAINER_INVALID_BLOCKS    "invalid_blocks"
-#define BLOCKCHAIN_STORAGE_CONTAINER_SOLO_OPTIONS      "solo"
-#define BLOCKCHAIN_STORAGE_CONTAINER_ALIASES           "aliases"
-#define BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS     "addr_to_alias"
-#define BLOCKCHAIN_STORAGE_CONTAINER_TX_FEE_MEDIAN     "median_fee2"
-#define BLOCKCHAIN_STORAGE_CONTAINER_GINDEX_INCS       "gindex_increments"
-#define BLOCKCHAIN_STORAGE_CONTAINER_ASSETS            "assets"
-#define BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_ADDRESSES "gateway_addresses"
+#define BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS                 "blocks"
+#define BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS_INDEX            "blocks_index"
+#define BLOCKCHAIN_STORAGE_CONTAINER_TRANSACTIONS            "transactions"
+#define BLOCKCHAIN_STORAGE_CONTAINER_SPENT_KEYS              "spent_keys"
+#define BLOCKCHAIN_STORAGE_CONTAINER_OUTPUTS                 "outputs"
+#define BLOCKCHAIN_STORAGE_CONTAINER_MULTISIG_OUTS           "multisig_outs"
+#define BLOCKCHAIN_STORAGE_CONTAINER_INVALID_BLOCKS          "invalid_blocks"
+#define BLOCKCHAIN_STORAGE_CONTAINER_SOLO_OPTIONS            "solo"
+#define BLOCKCHAIN_STORAGE_CONTAINER_ALIASES                 "aliases"
+#define BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS           "addr_to_alias"
+#define BLOCKCHAIN_STORAGE_CONTAINER_TX_FEE_MEDIAN           "median_fee2"
+#define BLOCKCHAIN_STORAGE_CONTAINER_GINDEX_INCS             "gindex_increments"
+#define BLOCKCHAIN_STORAGE_CONTAINER_ASSETS                  "assets"
+#define BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_ADDRESSES       "gateway_addresses"
+#define BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_TRANSACTIONS    "gateway_transactions"
 
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_BLOCK_CUMUL_SZ_LIMIT          0
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_PRUNED_RS_HEIGHT              1
@@ -96,6 +97,7 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
                                                                  m_db_assets(m_db),
                                                                  m_db_addr_to_alias(m_db),
                                                                  m_db_gateway_addresses(m_db),
+                                                                 m_db_gateway_transactions(m_db), 
                                                                  m_read_lock(m_rw_lock),
                                                                  m_db_current_block_cumul_sz_limit(BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_BLOCK_CUMUL_SZ_LIMIT, m_db_solo_options),
                                                                  m_db_current_pruned_rs_height(BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_PRUNED_RS_HEIGHT, m_db_solo_options),
@@ -227,6 +229,7 @@ void blockchain_storage::set_db_l2_cache_size(uint64_t ceched_elements) const
   m_db_aliases.set_cache_size(ceched_elements);
   m_db_assets.set_cache_size(ceched_elements);
   m_db_gateway_addresses.set_cache_size(ceched_elements);
+  m_db_gateway_transactions.set_cache_size(ceched_elements);
   m_db_addr_to_alias.set_cache_size(ceched_elements);
 }
 //------------------------------------------------------------------
@@ -244,6 +247,7 @@ std::string blockchain_storage::get_db_l2_cache_state_str() const
   PRINT_CACHE_STATE(m_db_aliases);
   PRINT_CACHE_STATE(m_db_assets);
   PRINT_CACHE_STATE(m_db_gateway_addresses);
+  PRINT_CACHE_STATE(m_db_gateway_transactions);
   PRINT_CACHE_STATE(m_db_addr_to_alias);
   return ss.str();
 }
@@ -350,6 +354,8 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     res = m_db_per_block_gindex_incs.init(BLOCKCHAIN_STORAGE_CONTAINER_GINDEX_INCS);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
     res = m_db_gateway_addresses.init(BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_ADDRESSES);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    res = m_db_gateway_transactions.init(BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_TRANSACTIONS);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
 
     if (command_line::has_arg(vm, arg_db_cache_l2))
@@ -586,6 +592,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
       m_db_addr_to_alias.deinit();
       m_db_per_block_gindex_incs.deinit();
       m_db_gateway_addresses.deinit();
+      m_db_gateway_transactions.deinit();
       m_db.close();
       size_t files_removed = boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(db_folder_path));
       LOG_PRINT_L1(files_removed << " files at " << db_folder_path << " removed");
@@ -894,7 +901,7 @@ bool blockchain_storage::clear()
     m_pos_targetdata_cache.clear();
     m_pow_targetdata_cache.clear();
     m_db_gateway_addresses.clear();
-
+    m_db_gateway_transactions.clear();
     db_tx_ptr->commit_transaction();
   }
   
@@ -1910,6 +1917,7 @@ void blockchain_storage::reset_db_cache() const
   m_db_aliases.clear_cache();
   m_db_assets.clear_cache();
   m_db_gateway_addresses.clear_cache();
+  m_db_gateway_transactions.clear_cache();
   m_db_addr_to_alias.clear_cache();
 
 }
@@ -3671,6 +3679,7 @@ void blockchain_storage::print_db_cache_perfeormance_data() const
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_aliases) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_assets) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_gateway_addresses) << ENDL
+    DB_CONTAINER_PERF_DATA_ENTRY(m_db_gateway_transactions) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_addr_to_alias) << ENDL
     //DB_CONTAINER_PERF_DATA_ENTRY(m_db_per_block_gindex_incs) << ENDL
     //DB_CONTAINER_PERF_DATA_ENTRY(m_tx_fee_median) << ENDL
