@@ -1228,3 +1228,53 @@ bool hard_fork_6_full_gw_tx_test::c1(currency::core& c, size_t ev_index, const s
 
   return true;
 }
+
+
+
+//------------------------------------------------------------------------------
+
+hard_fork_6_and_alt_chain::hard_fork_6_and_alt_chain()
+{
+  REGISTER_CALLBACK_METHOD(hard_fork_6_and_alt_chain, c1);
+}
+
+bool hard_fork_6_and_alt_chain::generate(std::vector<test_event_entry>& events) const
+{
+  bool r = false;
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  //account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  //account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+  //account_base& carol_acc = m_accounts[CAROL_ACC_IDX]; carol_acc.generate(); carol_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2);
+
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_06));
+
+  std::list<currency::account_base> miner_stake_sources( {miner_acc} );
+  MAKE_NEXT_POS_BLOCK(events, blk_1, blk_0r, miner_acc, miner_stake_sources);
+
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
+
+  MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_3a, blk_2, miner_acc);
+
+  MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_4a, blk_3a, miner_acc);
+
+  MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_5a, blk_4a, miner_acc);
+
+  MAKE_NEXT_BLOCK(events, blk_6a, blk_5a, miner_acc);
+
+  return true;
+}
+
+bool hard_fork_6_and_alt_chain::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry> &events)
+{
+  return true;
+}
