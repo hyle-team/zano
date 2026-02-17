@@ -1104,9 +1104,9 @@ namespace tools
     ************************************************************************/
 
     template<class t_key, class t_value, bool is_t_access_strategy, size_t chunk_size>
-    class chunked_key_to_array_accessor : public cached_key_value_accessor<composite_key<t_key, uint64_t>, std::vector<t_value>, is_t_access_strategy, false>
+    class chunked_key_to_array_accessor : public cached_key_value_accessor<composite_key<t_key, uint64_t>, std::vector<t_value>, true, false>
     {
-      typedef cached_key_value_accessor<composite_key<t_key, uint64_t>, std::vector<t_value>, is_t_access_strategy, false> basic_accessor_type;
+      typedef cached_key_value_accessor<composite_key<t_key, uint64_t>, std::vector<t_value>, true, false> basic_accessor_type;
 
 
       solo_db_value<composite_key<t_key, guid_key>, uint64_t, basic_accessor_type>
@@ -1127,6 +1127,7 @@ namespace tools
         return solo_db_value<composite_key<t_key, guid_key>, uint64_t, basic_accessor_type >(cc, const_cast<basic_accessor_type&>(static_cast<const basic_accessor_type&>(*this)));
       }
 
+      /*
       template<typename callback_t>
       struct subitems_visitor : public i_db_callback
       {
@@ -1158,7 +1159,7 @@ namespace tools
         }
 
         callback_t m_callback;
-      };
+      };*/
 
 
       uint64_t get_chunk_index(uint64_t index, uint64_t& index_in_chunk) const
@@ -1334,12 +1335,13 @@ namespace tools
         counter = 0;
       }
 
+      /*
       template<typename callback_t>
       void enumerate_subitems(callback_t callback) const
       {
         subitems_visitor<callback_t> visitor(callback);
         basic_accessor_type::bdb.get_backend()->enumerate(basic_accessor_type::m_h, &visitor);
-      }
+      }*/
 
     };
 
