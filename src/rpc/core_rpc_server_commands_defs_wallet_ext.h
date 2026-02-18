@@ -23,6 +23,7 @@ namespace currency
         KV_SERIALIZE(gateway_address)               DOC_DSCR("The gateway address for which transaction history is being requested.") DOC_EXMP("gateway1qxyz...") DOC_END
         KV_SERIALIZE(offset)                        DOC_DSCR("The offset in the transaction history from which to start retrieval.") DOC_EXMP(0) DOC_END
         KV_SERIALIZE(count)                         DOC_DSCR("The number of transactions to retrieve from the specified offset.") DOC_EXMP(10) DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(gateway_view_secret_key) DOC_DSCR("View secret key to decrypt attachments and payment id") DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
       END_KV_SERIALIZE_MAP()
     };
 

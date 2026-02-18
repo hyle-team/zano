@@ -5344,6 +5344,7 @@ namespace currency
         total_balance_change_per_payment_id[payment_ids[out_index]][tg.asset_id] += tg.amount;
         total_balance_change_per_asset_id[tg.asset_id][payment_ids[out_index]] += tg.amount;
       }
+      out_index++;
     }
 
     for (const auto& in : wti.tx.vin)

@@ -4191,9 +4191,10 @@ bool blockchain_storage::push_transaction_to_global_outs_index(const transaction
       // TODO: CZ, consider using separate table for hidden amounts
       m_db_outputs.push_back_item(0, global_output_entry::construct(tx_id, output_index));
       global_indexes.push_back(m_db_outputs.get_item_size(0) - 1);
-    VARIANT_CASE_CONST(tx_out_gateway, togw)
+    VARIANT_CASE_CONST(tx_out_gateway, togw)      
       bool r = process_gateway_ouput(tx_id, bl_id, bl_height, togw);
       CHECK_AND_ASSERT_MES(r, false, "Failed to process gateway output");
+      global_indexes.push_back(0); // just stub to make other code easier
     VARIANT_CASE_THROW_ON_OTHER();
     VARIANT_SWITCH_END();
     ++output_index;

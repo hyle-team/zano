@@ -1878,7 +1878,7 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_to_gw_res{};
   tr_to_gw_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(9), m_accounts[BOB_ACC_IDX].get_public_address_str()});                    // ZC, native
   tr_to_gw_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(2), gw_reg_resp.address});                                                 // GW, native
-  tr_to_gw_req.destinations.emplace_back(currency::transfer_destination{40,               m_accounts[BOB_ACC_IDX].get_public_address_str(), deployed_asset_id}); // ZC, asset
+  tr_to_gw_req.destinations.emplace_back(currency::transfer_destination{10,               m_accounts[BOB_ACC_IDX].get_public_address_str(), deployed_asset_id}); // ZC, asset
   tr_to_gw_req.destinations.emplace_back(currency::transfer_destination{10,               gw_reg_resp.address, deployed_asset_id});                              // GW, asset
   tr_to_gw_req.fee = TESTS_DEFAULT_FEE;
   r = invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_to_gw_req, tr_to_gw_res);
@@ -1962,6 +1962,56 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.descriptor_info.opt_owner_custom_schnorr_pub_key.has_value(), true);
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.descriptor_info.opt_owner_custom_schnorr_pub_key.value(), gw_reg_req.descriptor_info.opt_owner_custom_schnorr_pub_key.value());
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.payment_id, "");
+
+  //payment_id tests + history 
+
+    //
+  // ZC -> GW
+  //
+  alice_wlt->refresh();
+  std::unordered_map<crypto::public_key, tools::wallet_public::asset_balance_entry_base> balances;
+  uint64_t mined = 0;
+  alice_wlt->balance(balances, mined);
+
+  currency::COMMAND_RPC_GET_INTEGRATED_ADDRESS::request get_integrated_addr_req{};
+  currency::COMMAND_RPC_GET_INTEGRATED_ADDRESS::response get_integrated_addr_resp{};
+  get_integrated_addr_req.regular_address = gw_reg_resp.address;
+  get_integrated_addr_req.payment_id = "1dfe5a88ff9effb3";
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "get_integrated_address", get_integrated_addr_req, get_integrated_addr_resp);
+  CHECK_AND_ASSERT_MES(r, false, "get_integrated_address failed");
+
+  std::string integrated_address_a = get_integrated_addr_resp.integrated_address;
+
+  get_integrated_addr_req.payment_id = "1dfe5a88ff9effb4";
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "get_integrated_address", get_integrated_addr_req, get_integrated_addr_resp);
+  CHECK_AND_ASSERT_MES(r, false, "get_integrated_address failed");
+  std::string integrated_address_b = get_integrated_addr_resp.integrated_address;
+
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request tr_to_gw_req2{};
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_to_gw_res2{};
+  tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ MK_TEST_COINS(1), integrated_address_a });                    // GW, native asset, payment_id a
+  tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ MK_TEST_COINS(1), integrated_address_b });                    // GW, native asset, payment_id b
+  tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ 1,               integrated_address_a, deployed_asset_id }); // GW, asset, payment_id a
+  tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ 1,               integrated_address_b, deployed_asset_id }); // GW, asset, payment_id b
+  tr_to_gw_req2.fee = TESTS_DEFAULT_FEE;
+  r = invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_to_gw_req2, tr_to_gw_res);
+  CHECK_AND_ASSERT_MES(r, false, "RPC 'transfer' failed");
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+
+  // request address history and check that payment ids are correct
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request get_history_req = {};
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response get_history_resp = {};
+  get_history_req.gateway_address = gw_reg_resp.address;
+  get_history_req.gateway_view_secret_key = gw_addr_secret_key;
+  get_history_req.count = 10;
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_history", get_history_req, get_history_resp);
+
+
 
   return true;
 }

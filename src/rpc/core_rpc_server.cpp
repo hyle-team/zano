@@ -1966,6 +1966,7 @@ namespace currency
     std::string payment_id;
     if (!epee::string_tools::parse_hexstr_to_binbuff(req.payment_id, payment_id))
     {
+      res.status = API_RETURN_CODE_BAD_ARG;
       error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
       error_resp.message = std::string("invalid payment id given: \'") + req.payment_id + "\', hex-encoded string was expected";
       return false;
@@ -1973,6 +1974,7 @@ namespace currency
 
     if (!currency::is_payment_id_size_ok(payment_id, m_allow_legacy_payment_id_size))
     {
+      res.status = API_RETURN_CODE_BAD_ARG;
       error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
       error_resp.message = std::string("given payment id is too long: \'") + req.payment_id + "\'";
       return false;
@@ -1986,22 +1988,25 @@ namespace currency
 
 
     std::string payment_id_from_provided_addr; // won't be used
-    account_public_address addr = AUTO_VAL_INIT(addr);
-    if (!get_account_address_and_payment_id_from_str(addr, payment_id_from_provided_addr, req.regular_address))
+    address_v v_adddr = {};
+    if (!get_account_address_and_payment_id_from_str(v_adddr, payment_id_from_provided_addr, req.regular_address))
     {
+      res.status = API_RETURN_CODE_BAD_ARG;
       error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
       error_resp.message = std::string("invalid address provided: \'") + req.regular_address + "\', Zano address expected";
       return false;
     }
     if (payment_id_from_provided_addr.size())
     {
+      res.status = API_RETURN_CODE_BAD_ARG;
       error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
       error_resp.message = std::string("invalid address provided: \'") + req.regular_address + "\', Zano address expected be regular and NOT integrated address";
       return false;
     }
 
-    res.integrated_address = currency::get_account_address_as_str(addr, payment_id);
+    res.integrated_address = currency::get_account_address_as_str(v_adddr, payment_id);
     res.payment_id = epee::string_tools::buff_to_hex_nodelimer(payment_id);
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
