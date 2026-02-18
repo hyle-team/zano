@@ -11,6 +11,7 @@
 
 #include "net/http_server_impl_base.h"
 #include "core_rpc_server_commands_defs.h"
+#include "core_rpc_server_commands_defs_wallet_ext.h"
 #include "currency_core/currency_core.h"
 #include "p2p/net_node.h"
 #include "currency_protocol/currency_protocol_handler.h"
@@ -106,6 +107,7 @@ namespace currency
     bool on_gateway_get_address_info(const COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_gateway_create_transfer(const COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request& req, COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_gateway_sign_transfer(const COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request& req, COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_gateway_get_address_history(const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
 
     CHAIN_HTTP_TO_MAP2(connection_context); //forward http requests to uri map
@@ -191,6 +193,7 @@ namespace currency
         MAP_JON_RPC_WE("gateway_get_address_info",    on_gateway_get_address_info,    COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO)
         MAP_JON_RPC_WE("gateway_create_transfer",     on_gateway_create_transfer,     COMMAND_RPC_GATEWAY_CREATE_TRANSFER)
         MAP_JON_RPC_WE("gateway_sign_transfer",       on_gateway_sign_transfer,       COMMAND_RPC_GATEWAY_SIGN_TRANSFER)
+        MAP_JON_RPC_WE("gateway_get_address_history", on_gateway_get_address_history, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY)
 
         CHAIN_TO_PHANDLER(m_prpc_chain_handler)
       END_JSON_RPC_MAP()

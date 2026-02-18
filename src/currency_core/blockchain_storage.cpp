@@ -1002,6 +1002,52 @@ bool blockchain_storage::purge_transaction_keyimages_from_blockchain(const trans
   return true;
 }
 //------------------------------------------------------------------
+void get_gateway_addresses_involved_in_tx(std::set<currency::gateway_address_id_type>& gw, const currency::transaction& tx)
+{
+  for(const auto& in : tx.vin)
+  {
+    if (in.type() == typeid(txin_gateway))
+    {
+      gw.insert(boost::get<txin_gateway>(in).gateway_addr);
+    }
+  }
+  for (const auto& out : tx.vout)
+  {
+    if(out.type() == typeid(tx_out_gateway))
+    {
+      gw.insert(boost::get<tx_out_gateway>(out).gateway_addr);
+    }
+  }
+}
+//------------------------------------------------------------------
+bool blockchain_storage::process_tx_gateway_history(const crypto::hash& tx_id, const transaction& tx_)
+{
+  //associate transaction id with every gateway address mentioned in this tx to maintain the history of transactions related to gateway addresses
+  std::set<currency::gateway_address_id_type> gw;
+  get_gateway_addresses_involved_in_tx(gw, tx_);
+  for(const auto& gw_addr : gw)
+  {
+    m_db_gateway_transactions.push_back_item(gw_addr, tx_id);
+  }
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::unprocess_tx_gateway_history(const crypto::hash& tx_id, const transaction& tx_)
+{
+  //remove association of transaction id with every gateway address mentioned in this tx
+  std::set<currency::gateway_address_id_type> gw;
+  get_gateway_addresses_involved_in_tx(gw, tx_);
+  for (const auto& gw_addr : gw)
+  {
+    auto ptr = m_db_gateway_transactions.get_subitem(gw_addr, m_db_gateway_transactions.get_item_size(gw_addr) - 1);
+    if (ptr && *ptr == tx_id)
+    {
+      m_db_gateway_transactions.pop_back_item(gw_addr);
+    }
+  }
+  return true;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& tx_id, uint64_t& fee, transaction& tx_)
 {
   fee = 0;
@@ -1019,6 +1065,8 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
   CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra for tx " << tx_id);
  
   r = unprocess_blockchain_tx_attachments(tx, get_current_blockchain_size(), 0/*TODO: add valid timestamp here in future if need*/);
+
+  unprocess_tx_gateway_history(tx_id, tx_);
 
   bool added_to_the_pool = false;
   if(!is_coinbase(tx))
@@ -5385,6 +5433,43 @@ namespace currency
   };
 }
 
+bool blockchain_storage::gateway_get_address_history(const currency::gateway_address_id_type& addr_id, const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  res.total_transactions = m_db_gateway_transactions.get_item_size(addr_id);
+  if (req.offset >= res.total_transactions)
+  {
+    res.status = API_RETURN_CODE_BAD_ARG;
+    return true;
+  }
+  //adjust count if needed
+  size_t count = req.count;
+  if (req.offset + count > res.total_transactions)
+  {
+    count = res.total_transactions - req.offset;
+  }
+
+
+  std::vector<crypto::hash> tx_ids;
+  m_db_gateway_transactions.get_subitems(addr_id, req.offset, count, tx_ids);
+  crypto::secret_key decrypt_key = {};
+  if (req.gateway_view_secret_key)
+    decrypt_key = *req.gateway_view_secret_key;
+
+
+  for (const auto& tx_id : tx_ids)
+  {
+    tools::wallet_public::wallet_transfer_info wti = {};
+    auto tx_ptr = m_db_transactions.get(tx_id);
+    CHECK_AND_ASSERT_MES(tx_ptr, false, "gateway_get_address_history: internal error, tx id " << tx_id << " not found in m_db_transactions");
+    bool r = gateway_prepare_wti(addr_id, tx_id, decrypt_key, wti, *tx_ptr);
+    if(r)
+      res.transactions.push_back(wti);
+  }
+  
+  return true;
+}
 
 bool blockchain_storage::add_transaction_from_block(const transaction& tx, const crypto::hash& tx_id, const crypto::hash& bl_id, uint64_t bl_height, uint64_t timestamp)
 {
@@ -5403,6 +5488,9 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   bool r = process_blockchain_tx_extra(tx, tx_id, bl_height);
   CHECK_AND_ASSERT_MES(r, false, "failed to process_blockchain_tx_extra");
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_process_extra);
+
+  r = process_tx_gateway_history(tx_id, tx);
+  CHECK_AND_ASSERT_MES(r, false, "failed to process_tx_gateway_history");
 
   TIME_MEASURE_START_PD(tx_process_attachment);
   process_blockchain_tx_attachments(tx, bl_height, bl_id, timestamp);

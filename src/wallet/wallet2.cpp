@@ -944,45 +944,7 @@ void wallet2::process_transaction_context::handle_incoming_tx_output(const curre
   total_balance_change_per_payment_id[woi.payment_id][woi.asset_id] += woi.amount;
   employed_entries.receive.push_back(wallet_public::employed_tx_entry{ woi.index, woi.amount, woi.asset_id, woi.payment_id });
 }
-//----------------------------------------------------------------------------------------------------
-void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_att)
-{
-  PROFILE_FUNC("wallet2::prepare_wti_decrypted_attachments");
 
-  for (const auto& item : decrypted_att)
-  {
-    if (item.type() == typeid(currency::tx_service_attachment))
-    {
-      wti.service_entries.push_back(boost::get<currency::tx_service_attachment>(item));
-    }
-  }
-
-  if (wti.is_income_mode_encryption())
-  {
-    account_public_address sender_address = AUTO_VAL_INIT(sender_address);
-    wti.show_sender = handle_2_alternative_types_in_variant_container<tx_payer, tx_payer_old>(decrypted_att, [&](const tx_payer& p) { sender_address = p.acc_addr; return false; /* <- continue? */ });
-    if (wti.show_sender)
-      if (!wti.remote_addresses.size())
-        wti.remote_addresses.push_back(currency::get_account_address_as_str(sender_address));
-  }
-  else
-  {
-    if (wti.remote_addresses.empty())
-    {
-      handle_2_alternative_types_in_variant_container<tx_receiver, tx_receiver_old>(decrypted_att, [&](const tx_receiver& p) {
-        std::string addr_str;
-        addr_str = currency::get_account_address_as_str(p.acc_addr, wti.tx_wide_payment_id); // it will be an integrated address if there's a payment id provided
-        wti.remote_addresses.push_back(addr_str);
-        LOG_PRINT_YELLOW("prepare_wti_decrypted_attachments, income=false, rem. addr = " << addr_str, LOG_LEVEL_0);
-        return true; // continue iterating through the container
-        });
-    }
-  }
-
-  currency::tx_comment cm;
-  if (currency::get_type_in_variant_container(decrypted_att, cm))
-    wti.comment = cm.comment;
-}
 //----------------------------------------------------------------------------------------------------
 void wallet2::resend_unconfirmed()
 {
@@ -1559,7 +1521,7 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, const proces
     remove_field_of_type_from_extra<tx_comment>(decrypted_att);
   }
   process_payment_id_for_wti_and_populate_subtransfers(wti, tx_process_context, decrypted_att);
-  prepare_wti_decrypted_attachments(wti, decrypted_att); // should be called after wti subtransfer are populated
+  currency::prepare_wti_decrypted_attachments(wti, decrypted_att); // should be called after wti subtransfer are populated
   process_contract_info(wti, decrypted_att); // should be called after attachments are decrypted
 
 }
@@ -1661,6 +1623,7 @@ bool wallet2::process_payment_id_for_wti_and_populate_subtransfers(wallet_public
 
   return true;
 }
+//----------------------------------------------------------------------------------------------------
 void wallet2::rise_on_transfer2(const wallet_public::wallet_transfer_info& wti)
 {
   PROFILE_FUNC("wallet2::rise_on_transfer2");

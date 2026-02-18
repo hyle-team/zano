@@ -2102,11 +2102,11 @@ namespace currency
       ttc.push_back(att);
     }
   };
-
-  bool decrypt_payload_items(bool is_income, const transaction& tx, const account_keys& acc_keys, std::vector<payload_items_v>& decrypted_items)
+  //---------------------------------------------------------------
+  bool decrypt_payload_items(bool is_income, const transaction& tx, const account_keys& acc_keys, std::vector<payload_items_v>& decrypted_items, crypto::key_derivation& derivation)
   {
     PROFILE_FUNC("currency::decrypt_payload_items");
-    crypto::key_derivation derivation = get_encryption_key_derivation(is_income, tx, acc_keys);
+    derivation = get_encryption_key_derivation(is_income, tx, acc_keys);
     if (derivation == null_derivation)
     {
       back_inserter<std::vector<payload_items_v> > v(decrypted_items);
@@ -2141,7 +2141,12 @@ namespace currency
     }
     return true;
   }
-
+  //---------------------------------------------------------------
+  bool decrypt_payload_items(bool is_income, const transaction& tx, const account_keys& acc_keys, std::vector<payload_items_v>& decrypted_items)
+  {
+    crypto::key_derivation derivation = {};
+    return decrypt_payload_items(is_income, tx, acc_keys, decrypted_items, derivation);
+  }
   //---------------------------------------------------------------
   void encrypt_payload_items(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key, crypto::key_derivation& derivation)
   {
@@ -3674,6 +3679,42 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
+  bool decode_output_data(const tx_out_gateway& gwo, const crypto::key_derivation& derivation, const size_t output_index, uint64_t& decoded_amount, crypto::public_key& decoded_asset_id,
+    crypto::scalar_t& amount_blinding_mask, /* crypto::scalar_t& asset_id_blinding_mask, */ uint64_t & decoded_payment_id, crypto::scalar_t* derived_h_ptr /* = nullptr */)
+  {
+    crypto::scalar_t local_h{};
+    if (derived_h_ptr == nullptr)
+      derived_h_ptr = &local_h;
+    crypto::scalar_t& h = *derived_h_ptr;
+
+    crypto::derivation_to_scalar(derivation, output_index, h.as_secret_key()); // h = Hs(8 * r * V, i)
+
+    crypto::scalar_t amount_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
+    decoded_amount = gwo.amount;//zo.encrypted_amount ^ amount_mask.m_u64[0];
+    decoded_payment_id = gwo.payment_id != 0 ? gwo.payment_id ^ amount_mask.m_u64[1] : 0;
+
+    amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_BLINDING_MASK, h); // f = Hs(domain_sep, h)
+
+    //crypto::point_t blinded_asset_id = crypto::point_t(zo.blinded_asset_id).modify_mul8();
+    //crypto::point_t A_prime = decoded_amount * blinded_asset_id + amount_blinding_mask * crypto::c_point_G; // A' * 8 =? a * T + f * G
+    //if (A_prime != crypto::point_t(zo.amount_commitment).modify_mul8())
+    //  return false;
+
+//     if (blinded_asset_id == currency::native_coin_asset_id_pt)
+//     {
+//       asset_id_blinding_mask = 0;
+//       decoded_asset_id = currency::native_coin_asset_id;
+//     }
+//     else
+//     {
+//       asset_id_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
+//       crypto::point_t asset_id = blinded_asset_id - asset_id_blinding_mask * crypto::c_point_X; // H = T - s * X
+//       decoded_asset_id = asset_id.to_public_key();
+//     }
+
+    return true;
+  }
+  //---------------------------------------------------------------
   bool decode_output_amount_and_asset_id(const tx_out_zarcanum& zo, const crypto::key_derivation& derivation, const size_t output_index, uint64_t& decoded_amount, crypto::public_key& decoded_asset_id,
     crypto::scalar_t& amount_blinding_mask, crypto::scalar_t& asset_id_blinding_mask, crypto::scalar_t* derived_h_ptr /* = nullptr */)
   {
@@ -5181,7 +5222,194 @@ namespace currency
     return res;
     CATCH_ENTRY_WITH_FORWARDING_EXCEPTION();
   }
+  //-----------------------------------------------------------------------------------------------------
+  void convert_balance_change_to_subtrasfers(tools::wallet_public::wallet_transfer_info& wti, const std::map<uint64_t, std::unordered_map<crypto::public_key, boost::multiprecision::int128_t>>& total_balance_change_per_payment_id)
+  {
+    // no legacy tx-wide payment id specified -- handle intrinsic payment ids
+    for (const auto& [intrinsic_payment_id, aid_to_balance_change] : total_balance_change_per_payment_id)
+    {
+      bool has_balance_increase = false;
+      tools::wallet_public::wallet_sub_transfer_info wsti{};
+      for (const auto& [asset_id, balance_change] : aid_to_balance_change)
+      {
+        if (balance_change > 0)
+        {
+          has_balance_increase = true;
+          wsti.is_income = true;
+          wsti.amount = static_cast<uint64_t>(balance_change);
+        }
+        else if (balance_change < 0)
+        {
+          wsti.is_income = false;
+          wsti.amount = static_cast<uint64_t>(-balance_change);
+        }
 
+        if (wsti.amount != 0)
+        {
+          wsti.asset_id = asset_id;
+          tools::wallet_public::wallet_sub_transfers_by_pid_info& wstbp = wti.get_or_add_subtransfers_by_pid(convert_payment_id(intrinsic_payment_id));
+          wstbp.subtransfers.push_back(wsti);
+        }
+      }
+    }
+  }
+  //-----------------------------------------------------------------------------------------------------
+  bool gateway_prepare_wti(const currency::gateway_address_id_type& gw_id, const crypto::hash& tx_id, const crypto::secret_key& decrypt_key, tools::wallet_public::wallet_transfer_info& wti, const transaction_chain_entry& tx_chain_entry)
+  {
+    PROFILE_FUNC("wallet2::prepare_wti");
+    wti.tx = tx_chain_entry.tx;
+
+    wti.height = tx_chain_entry.m_keeper_block_height;
+    //wti.employed_entries = tx_process_context.employed_entries;
+    //wti.timestamp = tx_chain_entry.
+    //wti.tx_blob_size = static_cast<uint32_t>(currency::get_object_blobsize(wti.tx));
+    wti.tx_hash = tx_id;
+    load_wallet_transfer_info_flags(wti);
+
+    // escrow transactions, which are built with TX_FLAG_SIGNATURE_MODE_SEPARATE flag actually encrypt attachments 
+    // with buyer as a sender, and seller as receiver, despite the fact that for both sides transaction seen as outgoing.
+    // so here to decrypt tx properly we need to figure out, if this transaction is actually escrow acceptance. 
+    //we check if spent_indices have zero then input do not belong to this account, which means that we are seller for this 
+    //escrow, and decryption should be processed as income flag
+
+    bool is_income = false;
+    bool is_outcome = false;
+    bool is_outcome_native_coins = false;
+    bool found = false;
+    for (const auto& in : wti.tx.vin)
+    {
+      if(in.type() == typeid(txin_gateway) && boost::get<txin_gateway>(in).gateway_addr == gw_id)
+      {
+        is_outcome = true;
+        found = true;
+        if (boost::get<txin_gateway>(in).asset_id == currency::native_coin_asset_id)
+        {
+          is_outcome_native_coins = true;
+        }
+      }
+    }
+
+    for(const auto& out: wti.tx.vout)
+    {
+      if (out.type() == typeid(tx_out_gateway) && boost::get<tx_out_gateway>(out).gateway_addr == gw_id)
+      {
+        is_income = true;
+        found = true;
+      }
+    }
+
+    if (!found)
+    {
+      LOG_ERROR("Detected transaction that don't have expected gatewate inputs/outputs, tx_id: " << tx_id << ", gw_id: " << gw_id);
+      return true;
+    }
+
+    //let's assume that the one who pays for tx fee is sender of tx
+    bool decrypt_attachment_as_income = !(is_outcome_native_coins);
+
+    currency::account_keys keys = {};
+    keys.spend_secret_key = decrypt_key;
+    keys.view_secret_key = decrypt_key; // for gateway transactions we use the same key for view and spend, so it doesn't matter which one we use for decryption
+
+    std::vector<currency::payload_items_v> decrypted_att;
+    crypto::key_derivation derivation = {};
+    decrypt_payload_items(decrypt_attachment_as_income, wti.tx, keys, decrypted_att, derivation);
+
+    std::vector<uint64_t> payment_ids(wti.tx.vout.size());
+    size_t out_index = 0;
+    for (const auto& out : wti.tx.vout)
+    {
+      if (out.type() == typeid(tx_out_gateway) && boost::get<tx_out_gateway>(out).gateway_addr == gw_id)
+      {
+        uint64_t decoded_amount_unused = 0;
+        crypto::public_key decoded_asset_id_unused = {};
+        crypto::scalar_t amount_blinding_mask_unused = {};
+        uint64_t decoded_payment_id = 0; //this one we actually need
+        bool r = decode_output_data(boost::get<tx_out_gateway>(out), derivation, out_index, decoded_amount_unused, decoded_asset_id_unused, amount_blinding_mask_unused, decoded_payment_id);
+        CHECK_AND_ASSERT_MES(r, false, "Failed to decode output data for gateway output, tx_id: " << tx_id << ", out_index: " << out_index);
+        payment_ids[out_index] = decoded_payment_id;
+      }
+      out_index++;
+    }
+
+    out_index = 0;
+    std::map<uint64_t, std::unordered_map<crypto::public_key, boost::multiprecision::int128_t>> total_balance_change_per_payment_id; // { intrinsic_payment_id -> { asset_id -> balance_change } }    
+    std::unordered_map<crypto::public_key, std::map<uint64_t, boost::multiprecision::int128_t>> total_balance_change_per_asset_id; // { asset_id -> { intrinsic_payment_id -> balance_change } }
+
+    for (const auto& out : wti.tx.vout)
+    {
+      if (out.type() == typeid(tx_out_gateway) && boost::get<tx_out_gateway>(out).gateway_addr == gw_id)
+      {
+        const tx_out_gateway& tg = boost::get<tx_out_gateway>(out);
+        total_balance_change_per_payment_id[payment_ids[out_index]][tg.asset_id] += tg.amount;
+        total_balance_change_per_asset_id[tg.asset_id][payment_ids[out_index]] += tg.amount;
+      }
+    }
+
+    for (const auto& in : wti.tx.vin)
+    {
+      if (in.type() == typeid(txin_gateway) && boost::get<txin_gateway>(in).gateway_addr == gw_id)
+      {
+        const txin_gateway& tg = boost::get<txin_gateway>(in);
+        //check if asset of this type exist in inputs with non-zero payment id, in that case we assume this tx as invalid and ignore it from history
+        auto it = total_balance_change_per_asset_id.find(tg.asset_id);
+        if (it != total_balance_change_per_asset_id.end())
+        {
+          if(it->second.size() > 1 || (it->second.size() == 1 && it->second.begin()->first != 0))
+          {
+            LOG_ERROR("Detected invalid transaction with non-zero payment id in inputs of assed_id = " << tg.asset_id << ", tx_id: " << tx_id);
+            return false;
+          }
+        }
+        total_balance_change_per_payment_id[0][tg.asset_id] -= tg.amount;
+      }
+    }
+
+    convert_balance_change_to_subtrasfers(wti, total_balance_change_per_payment_id);
+    prepare_wti_decrypted_attachments(wti, decrypted_att); // should be called after wti subtransfer are populated
+
+    return true;
+  }
+
+
+  void prepare_wti_decrypted_attachments(tools::wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_att)
+  {
+    PROFILE_FUNC("wallet2::prepare_wti_decrypted_attachments");
+
+    for (const auto& item : decrypted_att)
+    {
+      if (item.type() == typeid(currency::tx_service_attachment))
+      {
+        wti.service_entries.push_back(boost::get<currency::tx_service_attachment>(item));
+      }
+    }
+
+    if (wti.is_income_mode_encryption())
+    {
+      account_public_address sender_address = AUTO_VAL_INIT(sender_address);
+      wti.show_sender = handle_2_alternative_types_in_variant_container<tx_payer, tx_payer_old>(decrypted_att, [&](const tx_payer& p) { sender_address = p.acc_addr; return false; /* <- continue? */ });
+      if (wti.show_sender)
+        if (!wti.remote_addresses.size())
+          wti.remote_addresses.push_back(currency::get_account_address_as_str(sender_address));
+    }
+    else
+    {
+      if (wti.remote_addresses.empty())
+      {
+        handle_2_alternative_types_in_variant_container<tx_receiver, tx_receiver_old>(decrypted_att, [&](const tx_receiver& p) {
+          std::string addr_str;
+          addr_str = currency::get_account_address_as_str(p.acc_addr, wti.tx_wide_payment_id); // it will be an integrated address if there's a payment id provided
+          wti.remote_addresses.push_back(addr_str);
+          LOG_PRINT_YELLOW("prepare_wti_decrypted_attachments, income=false, rem. addr = " << addr_str, LOG_LEVEL_0);
+          return true; // continue iterating through the container
+          });
+      }
+    }
+
+    currency::tx_comment cm;
+    if (currency::get_type_in_variant_container(decrypted_att, cm))
+      wti.comment = cm.comment;
+  }
 
 
 } // namespace currency

@@ -2307,6 +2307,5 @@ namespace currency
       END_KV_SERIALIZE_MAP()
     };
   };
-
 }
 

@@ -30,6 +30,7 @@
 #include "common/db_abstract_accessor.h"
 #include "currency_protocol/currency_protocol_defs.h"
 #include "rpc/core_rpc_server_commands_defs.h"
+#include "rpc/core_rpc_server_commands_defs_wallet_ext.h"
 #include "difficulty.h"
 #include "common/difficulty_boost_serialization.h"
 #include "currency_core/currency_format_utils.h"
@@ -508,6 +509,7 @@ namespace currency
     bool get_est_height_from_date(uint64_t date, uint64_t& res_h)const;
 
     bool get_pos_votes(uint64_t start_h, uint64_t end_h, vote_results& r);
+    bool gateway_get_address_history(const currency::gateway_address_id_type& addr_id, const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res);
 
     //debug functions
     bool validate_blockchain_prev_links(size_t last_n_blocks_to_check = 10) const;
@@ -556,7 +558,7 @@ namespace currency
 
     // Gateway addresses
     typedef tools::db::cached_key_value_accessor<gateway_address_id_type, gateway_address_data, true, false> gateway_addresses_container;
-    typedef tools::db::cached_key_value_accessor<gateway_address_id_type, crypto::hash, false, false> gateway_address_transactions_container;
+    typedef tools::db::chunked_key_to_array_accessor<gateway_address_id_type, crypto::hash, false, 100> gateway_address_transactions_container;
 
 
     //-----------------------------------------
@@ -765,6 +767,8 @@ namespace currency
     bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v) const;
     bool is_output_allowed_for_input(const tx_out_zarcanum& out, const txin_v& in_v) const;
     void remove_old_dbs();
+    bool process_tx_gateway_history(const crypto::hash& tx_id, const transaction& tx_);
+    bool unprocess_tx_gateway_history(const crypto::hash& tx_id, const transaction& tx_);
 
 
     //POS
