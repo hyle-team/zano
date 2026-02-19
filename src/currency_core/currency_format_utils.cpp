@@ -3679,38 +3679,17 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
-  bool decode_output_data(const tx_out_gateway& gwo, const crypto::key_derivation& derivation, const size_t output_index, uint64_t& decoded_amount, crypto::public_key& decoded_asset_id,
-    crypto::scalar_t& amount_blinding_mask, /* crypto::scalar_t& asset_id_blinding_mask, */ uint64_t & decoded_payment_id, crypto::scalar_t* derived_h_ptr /* = nullptr */)
+  bool decode_output_data(const tx_out_gateway& gwo, const crypto::key_derivation& derivation, const size_t output_index, uint64_t& decoded_payment_id, crypto::scalar_t* derived_h_ptr /* = nullptr */)
   {
     crypto::scalar_t local_h{};
     if (derived_h_ptr == nullptr)
       derived_h_ptr = &local_h;
     crypto::scalar_t& h = *derived_h_ptr;
 
-    crypto::derivation_to_scalar(derivation, output_index, h.as_secret_key()); // h = Hs(8 * r * V, i)
+    crypto::derivation_to_scalar(derivation, output_index, h.as_secret_key()); // h = Hs(8 * r * V_gw, i)
 
-    crypto::scalar_t amount_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_MASK, h);
-    decoded_amount = gwo.amount;//zo.encrypted_amount ^ amount_mask.m_u64[0];
+    crypto::scalar_t amount_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_GW_OUT_AMOUNT_MASK, h);
     decoded_payment_id = gwo.payment_id != 0 ? gwo.payment_id ^ amount_mask.m_u64[1] : 0;
-
-    amount_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_AMOUNT_BLINDING_MASK, h); // f = Hs(domain_sep, h)
-
-    //crypto::point_t blinded_asset_id = crypto::point_t(zo.blinded_asset_id).modify_mul8();
-    //crypto::point_t A_prime = decoded_amount * blinded_asset_id + amount_blinding_mask * crypto::c_point_G; // A' * 8 =? a * T + f * G
-    //if (A_prime != crypto::point_t(zo.amount_commitment).modify_mul8())
-    //  return false;
-
-//     if (blinded_asset_id == currency::native_coin_asset_id_pt)
-//     {
-//       asset_id_blinding_mask = 0;
-//       decoded_asset_id = currency::native_coin_asset_id;
-//     }
-//     else
-//     {
-//       asset_id_blinding_mask = crypto::hash_helper_t::hs(CRYPTO_HDS_OUT_ASSET_BLINDING_MASK, h); // f = Hs(domain_sep, d, i)
-//       crypto::point_t asset_id = blinded_asset_id - asset_id_blinding_mask * crypto::c_point_X; // H = T - s * X
-//       decoded_asset_id = asset_id.to_public_key();
-//     }
 
     return true;
   }
@@ -5321,11 +5300,8 @@ namespace currency
     {
       if (out.type() == typeid(tx_out_gateway) && boost::get<tx_out_gateway>(out).gateway_addr == gw_id)
       {
-        uint64_t decoded_amount_unused = 0;
-        crypto::public_key decoded_asset_id_unused = {};
-        crypto::scalar_t amount_blinding_mask_unused = {};
-        uint64_t decoded_payment_id = 0; //this one we actually need
-        bool r = decode_output_data(boost::get<tx_out_gateway>(out), derivation, out_index, decoded_amount_unused, decoded_asset_id_unused, amount_blinding_mask_unused, decoded_payment_id);
+        uint64_t decoded_payment_id = 0;
+        bool r = decode_output_data(boost::get<tx_out_gateway>(out), derivation, out_index, decoded_payment_id);
         CHECK_AND_ASSERT_MES(r, false, "Failed to decode output data for gateway output, tx_id: " << tx_id << ", out_index: " << out_index);
         payment_ids[out_index] = decoded_payment_id;
       }
