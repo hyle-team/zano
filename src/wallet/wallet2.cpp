@@ -7222,7 +7222,7 @@ assets_selection_context wallet2::get_needed_money(uint64_t fee, const std::vect
   return amounts_map;
 }
 //----------------------------------------------------------------------------------------------------------------
-void wallet2::set_disable_tor_relay(bool disable)
+void wallet2::set_disable_relay(bool disable)
 {
   if (disable)
   {
@@ -7234,7 +7234,7 @@ void wallet2::set_disable_tor_relay(bool disable)
 void wallet2::notify_state_change(const std::string& state_code, const std::string& details)
 {
   if (auto wcb = m_wcallback.lock())
-    wcb->on_tor_status_change(state_code);
+    wcb->on_wallet_status_change(state_code);
 }
 //----------------------------------------------------------------------------------------------------------------
 void wallet2::send_transaction_to_network(const transaction& tx)

@@ -136,7 +136,7 @@ namespace
   const command_line::arg_descriptor<bool>          arg_offline_mode  ( "offline-mode", "Don't connect to daemon, work offline (for cold-signing process)");
   const command_line::arg_descriptor<std::string>   arg_scan_for_wallet  ( "scan-for-wallet", "");
   const command_line::arg_descriptor<std::string>   arg_addr_to_compare  ( "addr-to-compare", "");
-  const command_line::arg_descriptor<bool>          arg_disable_tor_relay  ( "disable-tor-relay", "Disable TOR relay", false);
+  const command_line::arg_descriptor<bool>          arg_disable_relay  ( "disable-relay", "Disable relay", false);
   const command_line::arg_descriptor<unsigned int>  arg_set_timeout("set-timeout", "Set timeout for the wallet");
   const command_line::arg_descriptor<std::string>   arg_voting_config_file("voting-config-file", "Set voting config instead of getting if from daemon", "");
   const command_line::arg_descriptor<bool>          arg_no_password_confirmations("no-password-confirmation", "Enable/Disable password confirmation for transactions", false);
@@ -341,8 +341,8 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("sign_transfer", boost::bind(&simple_wallet::sign_transfer, this,ph::_1), "sign_transfer <unsgined_tx_file> <signed_tx_file> - sign unsigned tx from a watch-only wallet");
   m_cmd_binder.set_handler("submit_transfer", boost::bind(&simple_wallet::submit_transfer, this,ph::_1), "submit_transfer <signed_tx_file> - broadcast signed tx");
   m_cmd_binder.set_handler("export_history", boost::bind(&simple_wallet::submit_transfer, this,ph::_1), "Export transaction history in CSV file");
-  m_cmd_binder.set_handler("tor_enable", boost::bind(&simple_wallet::tor_enable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
-  m_cmd_binder.set_handler("tor_disable", boost::bind(&simple_wallet::tor_disable, this, ph::_1), "Enable relaying transactions over TOR network(enabled by default)");
+  m_cmd_binder.set_handler("relay_enable", boost::bind(&simple_wallet::relay_enable, this, ph::_1), "Enable relaying transactions via configured relay (SOCKS5)");
+  m_cmd_binder.set_handler("relay_disable", boost::bind(&simple_wallet::relay_disable, this, ph::_1), "Disable relaying transactions via configured relay (SOCKS5)");
   m_cmd_binder.set_handler("deploy_new_asset", boost::bind(&simple_wallet::deploy_new_asset, this, ph::_1), "deploy_new_asset <json_filename> - Deploys new asset in the network, with current wallet as a maintainer");
   m_cmd_binder.set_handler("emit_asset", boost::bind(&simple_wallet::emit_asset, this, ph::_1), "emit_asset <asset_id> <amount> - Emmit more coins for the asset, possible only if current wallet is a maintainer for the asset");
   m_cmd_binder.set_handler("burn_asset", boost::bind(&simple_wallet::burn_asset, this, ph::_1), "burn_asset <asset_id> <amount> - Burn coins for the asset, possible only if current wallet is a maintainer for the asset AND possess given amount of coins to burn");
@@ -397,17 +397,17 @@ bool simple_wallet::set_log(const std::vector<std::string> &args)
 //----------------------------------------------------------------------------------------------------
 void process_wallet_command_line_params(const po::variables_map& vm, tools::wallet2& wal, bool is_server_mode = true)
 {
-  if (command_line::has_arg(vm, arg_disable_tor_relay))
+  if (command_line::has_arg(vm, arg_disable_relay))
   {
-    wal.set_disable_tor_relay(command_line::get_arg(vm, arg_disable_tor_relay));
-    message_writer(epee::log_space::console_color_default, true, std::string(), LOG_LEVEL_0) << "Notice: Relaying transactions over TOR disabled with command line parameter";
+    wal.set_disable_relay(command_line::get_arg(vm, arg_disable_relay));
+    message_writer(epee::log_space::console_color_default, true, std::string(), LOG_LEVEL_0) << "Notice: Transaction relaying disabled with command line parameter";
   }
   else
   {
     if (is_server_mode)
     {
       //disable TOR by default for server-mode, to avoid potential sporadic errors due to TOR connectivity fails
-      wal.set_disable_tor_relay(true);
+      wal.set_disable_relay(true);
     }
   }
   
@@ -652,7 +652,7 @@ void simple_wallet::handle_command_line(const boost::program_options::variables_
   m_do_not_set_date = command_line::get_arg(vm, arg_dont_set_date);
   m_do_pos_mining   = command_line::get_arg(vm, arg_do_pos_mining);
   m_restore_wallet  = command_line::get_arg(vm, arg_restore_wallet);
-  m_disable_tor     = command_line::get_arg(vm, arg_disable_tor_relay);
+  m_disable_tor     = command_line::get_arg(vm, arg_disable_relay);
   m_voting_config_file = command_line::get_arg(vm, arg_voting_config_file);
   m_no_password_confirmations = command_line::get_arg(vm, arg_no_password_confirmations);  
   m_no_whitelist = command_line::get_arg(vm, arg_no_whitelist);
@@ -1072,24 +1072,10 @@ void simple_wallet::on_message(i_wallet2_callback::message_severity severity, co
   message_writer(color, true, std::string()) << m;
 }
 //----------------------------------------------------------------------------------------------------
-void simple_wallet::on_tor_status_change(const std::string& state)
+void simple_wallet::on_wallet_status_change(const std::string& state)
 {
   std::string human_message;
-  if (state == TOR_LIB_STATE_INITIALIZING)
-    human_message = "Initializing...";
-  else if (state == TOR_LIB_STATE_DOWNLOADING_CONSENSUS)
-    human_message = "Downloading consensus...";
-  else if (state == TOR_LIB_STATE_MAKING_TUNNEL_A)
-    human_message = "Building tunnel to A...";
-  else if (state == TOR_LIB_STATE_MAKING_TUNNEL_B)
-    human_message = "Building tunnel to B...";
-  else if (state == TOR_LIB_STATE_CREATING_STREAM)
-    human_message = "Creating stream...";
-  else if (state == TOR_LIB_STATE_SUCCESS)
-    human_message = "Successfully created stream";
-  else if (state == TOR_LIB_STATE_FAILED)
-    human_message = "Failed created stream";
-  else if (state == WALLET_LIB_STATE_SENDING)
+  if (state == WALLET_LIB_STATE_SENDING)
     human_message = "Sending transaction...";
   else if (state == WALLET_LIB_SENT_SUCCESS)
     human_message = "Successfully sent!";
@@ -1097,7 +1083,7 @@ void simple_wallet::on_tor_status_change(const std::string& state)
     human_message = "Sending failed";
 
 
-  message_writer(epee::log_space::console_color_yellow, true, std::string("[TOR]: ")) << human_message;
+  message_writer(epee::log_space::console_color_yellow, true, std::string("[WALLET]: ")) << human_message;
 }
 //----------------------------------------------------------------------------------------------------
 void simple_wallet::on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets)
@@ -2399,17 +2385,17 @@ bool simple_wallet::submit_transfer(const std::vector<std::string> &args)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::tor_enable(const std::vector<std::string> &args)
+bool simple_wallet::relay_enable(const std::vector<std::string> &args)
 {
-  success_msg_writer(true) << "TOR relaying enabled";
-  m_wallet->set_disable_tor_relay(false);
+  success_msg_writer(true) << "Relay enabled";
+  m_wallet->set_disable_relay(false);
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::tor_disable(const std::vector<std::string> &args)
+bool simple_wallet::relay_disable(const std::vector<std::string> &args)
 {
-  m_wallet->set_disable_tor_relay(true);
-  success_msg_writer(true) << "TOR relaying disabled";
+  m_wallet->set_disable_relay(true);
+  success_msg_writer(true) << "Relay disabled";
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -3584,7 +3570,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, command_line::arg_log_level);
   command_line::add_arg(desc_params, arg_scan_for_wallet);
   command_line::add_arg(desc_params, arg_addr_to_compare);
-  command_line::add_arg(desc_params, arg_disable_tor_relay);
+  command_line::add_arg(desc_params, arg_disable_relay);
   command_line::add_arg(desc_params, arg_set_timeout);
   command_line::add_arg(desc_params, arg_voting_config_file);
   command_line::add_arg(desc_params, arg_no_password_confirmations);

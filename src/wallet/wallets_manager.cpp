@@ -2144,13 +2144,13 @@ void wallets_manager::on_pos_block_found(size_t wallet_id, const currency::block
 {
   m_pview->pos_block_found(b);
 }
-bool wallets_manager::set_use_tor(bool use_tor)
+bool wallets_manager::set_use_relay(bool use_tor)
 {
   m_use_tor = use_tor;
   SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
   for (auto& w : m_wallets)
   {
-    w.second.w->get()->set_disable_tor_relay(!m_use_tor);
+    w.second.w->get()->set_disable_relay(!m_use_tor);
   }
   return true;
 }
@@ -2191,7 +2191,7 @@ void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet
   m_pview->money_transfer_cancel(tei);
 }
 
-void wallets_manager::on_tor_status_change(size_t wallet_id, const std::string& state)
+void wallets_manager::on_wallet_status_change(size_t wallet_id, const std::string& state)
 {
   view::current_action_status tsu = { wallet_id , state };
   m_pview->update_tor_status(tsu);

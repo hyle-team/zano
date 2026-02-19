@@ -93,8 +93,8 @@ namespace currency
     bool submit_transfer(const std::vector<std::string> &args);
     bool sweep_below(const std::vector<std::string> &args);
     bool sweep_bare_outs(const std::vector<std::string> &args);
-    bool tor_enable(const std::vector<std::string> &args);
-    bool tor_disable(const std::vector<std::string> &args);
+    bool relay_enable(const std::vector<std::string> &args);
+    bool relay_disable(const std::vector<std::string> &args);
     bool deploy_new_asset(const std::vector<std::string> &args);
     bool call_rpc(const std::vector<std::string>& args);
     bool add_custom_asset_id(const std::vector<std::string> &args);
@@ -127,7 +127,7 @@ namespace currency
     virtual void on_new_block(uint64_t height, const currency::block& block) override;
     virtual void on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined) override;
     virtual void on_message(i_wallet2_callback::message_severity severity, const std::string& m) override;
-    virtual void on_tor_status_change(const std::string& state) override;
+    virtual void on_wallet_status_change(const std::string& state) override;
 
     virtual void on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets) override;
     virtual bool on_mw_select_wallet(uint64_t wallet_id) override;

@@ -42,7 +42,6 @@
 #include "currency_core/bc_escrow_service.h"
 #include "common/pod_array_file_container.h"
 #include "currency_core/block_chain_shortener.h"
-#include "tor-connect/torlib/tor_lib_iface.h"
 #include "currency_core/pos_mining.h"
 #include "view_iface.h"
 #include "wallet2_base.h"
@@ -111,7 +110,7 @@ namespace tools
     virtual void on_sync_progress(const uint64_t& /*percents*/) {}
     virtual void on_transfer_canceled(const wallet_public::wallet_transfer_info& wti) {}
     virtual void on_message(message_severity /*severity*/, const std::string& /*m*/) {}
-    virtual void on_tor_status_change(const std::string& state) {}
+    virtual void on_wallet_status_change(const std::string& state) {}
 
     //mw api
     virtual void on_mw_get_wallets(std::vector<wallet_public::wallet_entry_info>& wallets) {}
@@ -231,7 +230,7 @@ namespace tools
   };
   
 
-  class wallet2: public tools::tor::t_transport_state_notifier, public boost::static_visitor<void>, public wallet2_base_state
+  class wallet2: public boost::static_visitor<void>, public wallet2_base_state
   {
     wallet2(const wallet2&) = delete;
   public:
@@ -739,7 +738,7 @@ namespace tools
     void set_do_not_unlock_reserved_on_idle(bool val) {m_do_not_unlock_reserved_on_idle = val;}
     void set_use_assets_whitelisting(bool use);
     construct_tx_param get_default_construct_tx_param_inital();
-    void set_disable_tor_relay(bool disable);
+    void set_disable_relay(bool disable);
     uint64_t get_default_fee() {return TX_DEFAULT_FEE;}
     uint64_t get_current_minimum_network_fee() { return TX_DEFAULT_FEE; }
     void export_transaction_history(std::ostream& ss, const std::string& format, bool include_pos_transactions = true);
