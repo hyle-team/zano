@@ -1995,6 +1995,7 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ MK_TEST_COINS(1), integrated_address_b });                   // GW, native asset, payment_id b
   tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ 1,               integrated_address_a, deployed_asset_id }); // GW, asset, payment_id a
   tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ 2,               integrated_address_b, deployed_asset_id }); // GW, asset, payment_id b
+  tr_to_gw_req2.comment = "aaaaabbbbb";
   tr_to_gw_req2.fee = TESTS_DEFAULT_FEE;
   r = invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_to_gw_req2, tr_to_gw_res);
   CHECK_AND_ASSERT_MES(r, false, "RPC 'transfer' failed");
@@ -2034,7 +2035,7 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   CHECK_AND_ASSERT_EQ(payment_id_to_asset_id_to_amout[payment_id_a][deployed_asset_id], 1);
   CHECK_AND_ASSERT_EQ(payment_id_to_asset_id_to_amout[payment_id_b][deployed_asset_id], 2);
 
-
+  CHECK_AND_ASSERT_EQ(get_history_resp.transactions.back().comment, tr_to_gw_req2.comment);
 
   return true;
 }
