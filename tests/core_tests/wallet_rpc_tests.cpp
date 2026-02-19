@@ -2037,5 +2037,15 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
 
   CHECK_AND_ASSERT_EQ(get_history_resp.transactions.back().comment, tr_to_gw_req2.comment);
 
+  /*
+  TODO:
+    1. Test against ECDSA, EDDSA signatures
+    2. Test against registration of illigal asset_id (random, not public key)
+    3. Test for spending from GW address more coins that it has. 
+    4. Test for encrypted tx service attachments for GW-outgoing transactions
+    5. Reorganizae tests
+       5.1. Tx that spend GW address on reorganize should properly undo balance
+       5.2. Tx that send to GW address should properly undo balance
+ */
   return true;
 }
