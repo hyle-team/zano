@@ -5261,7 +5261,7 @@ namespace currency
       {
         is_outcome = true;
         found = true;
-        if (boost::get<txin_gateway>(in).asset_id == currency::native_coin_asset_id)
+        if (boost::get<txin_gateway>(in).asset_id == currency::native_coin_asset_id_1div8)
         {
           is_outcome_native_coins = true;
         }
@@ -5317,8 +5317,11 @@ namespace currency
       if (out.type() == typeid(tx_out_gateway) && boost::get<tx_out_gateway>(out).gateway_addr == gw_id)
       {
         const tx_out_gateway& tg = boost::get<tx_out_gateway>(out);
-        total_balance_change_per_payment_id[payment_ids[out_index]][tg.asset_id] += tg.amount;
-        total_balance_change_per_asset_id[tg.asset_id][payment_ids[out_index]] += tg.amount;
+        crypto::public_key asset_id = {};
+        CHECK_AND_ASSERT_MES(crypto::pub_key_mul8(tg.asset_id, asset_id), false, "invalid tx_out_gateway.asset_id, tx: " << tx_id);
+
+        total_balance_change_per_payment_id[payment_ids[out_index]][asset_id] += tg.amount;
+        total_balance_change_per_asset_id[asset_id][payment_ids[out_index]] += tg.amount;
       }
       out_index++;
     }
@@ -5328,8 +5331,11 @@ namespace currency
       if (in.type() == typeid(txin_gateway) && boost::get<txin_gateway>(in).gateway_addr == gw_id)
       {
         const txin_gateway& tg = boost::get<txin_gateway>(in);
+        crypto::public_key asset_id = {};
+        CHECK_AND_ASSERT_MES(crypto::pub_key_mul8(tg.asset_id, asset_id), false, "invalid txin_gateway.asset_id, tx: " << tx_id);
+
         //check if asset of this type exist in inputs with non-zero payment id, in that case we assume this tx as invalid and ignore it from history
-        auto it = total_balance_change_per_asset_id.find(tg.asset_id);
+        auto it = total_balance_change_per_asset_id.find(asset_id);
         if (it != total_balance_change_per_asset_id.end())
         {
           if(it->second.size() > 1 || (it->second.size() == 1 && it->second.begin()->first != 0))
@@ -5338,7 +5344,7 @@ namespace currency
             return false;
           }
         }
-        total_balance_change_per_payment_id[0][tg.asset_id] -= tg.amount;
+        total_balance_change_per_payment_id[0][asset_id] -= tg.amount;
       }
     }
 

@@ -1973,26 +1973,28 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   uint64_t mined = 0;
   alice_wlt->balance(balances, mined);
 
+  std::string payment_id_a = "1dfe5a88ff9effb3";
+  std::string payment_id_b = "1dfe5a88ff9effb4";
   currency::COMMAND_RPC_GET_INTEGRATED_ADDRESS::request get_integrated_addr_req{};
   currency::COMMAND_RPC_GET_INTEGRATED_ADDRESS::response get_integrated_addr_resp{};
   get_integrated_addr_req.regular_address = gw_reg_resp.address;
-  get_integrated_addr_req.payment_id = "1dfe5a88ff9effb3";
+  get_integrated_addr_req.payment_id = payment_id_a;
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "get_integrated_address", get_integrated_addr_req, get_integrated_addr_resp);
   CHECK_AND_ASSERT_MES(r, false, "get_integrated_address failed");
 
   std::string integrated_address_a = get_integrated_addr_resp.integrated_address;
 
-  get_integrated_addr_req.payment_id = "1dfe5a88ff9effb4";
+  get_integrated_addr_req.payment_id = payment_id_b;
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "get_integrated_address", get_integrated_addr_req, get_integrated_addr_resp);
   CHECK_AND_ASSERT_MES(r, false, "get_integrated_address failed");
   std::string integrated_address_b = get_integrated_addr_resp.integrated_address;
 
   tools::wallet_public::COMMAND_RPC_TRANSFER::request tr_to_gw_req2{};
   tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_to_gw_res2{};
-  tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ MK_TEST_COINS(1), integrated_address_a });                    // GW, native asset, payment_id a
-  tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ MK_TEST_COINS(1), integrated_address_b });                    // GW, native asset, payment_id b
+  tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ MK_TEST_COINS(1), integrated_address_a });                   // GW, native asset, payment_id a
+  tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ MK_TEST_COINS(1), integrated_address_b });                   // GW, native asset, payment_id b
   tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ 1,               integrated_address_a, deployed_asset_id }); // GW, asset, payment_id a
-  tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ 1,               integrated_address_b, deployed_asset_id }); // GW, asset, payment_id b
+  tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ 2,               integrated_address_b, deployed_asset_id }); // GW, asset, payment_id b
   tr_to_gw_req2.fee = TESTS_DEFAULT_FEE;
   r = invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_to_gw_req2, tr_to_gw_res);
   CHECK_AND_ASSERT_MES(r, false, "RPC 'transfer' failed");
@@ -2010,6 +2012,27 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   get_history_req.gateway_view_secret_key = gw_addr_secret_key;
   get_history_req.count = 10;
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_history", get_history_req, get_history_resp);
+
+  CHECK_AND_ASSERT_EQ(get_history_resp.total_transactions, 3);
+  CHECK_AND_ASSERT_EQ(get_history_resp.transactions.size(), 3);
+
+
+  std::map<std::string, std::unordered_map<crypto::public_key, uint64_t > >  payment_id_to_asset_id_to_amout;
+  CHECK_AND_ASSERT_EQ(get_history_resp.transactions.back().subtransfers_by_pid.size(), 2);
+
+  for (const auto& sub_payment_id : get_history_resp.transactions.back().subtransfers_by_pid)
+  {
+    for (const auto& subtransfer : sub_payment_id.subtransfers)
+    {
+      payment_id_to_asset_id_to_amout[epee::string_tools::buff_to_hex_nodelimer(sub_payment_id.payment_id)][subtransfer.asset_id] = subtransfer.amount;
+    }
+  }
+
+  CHECK_AND_ASSERT_EQ(payment_id_to_asset_id_to_amout[payment_id_a][currency::native_coin_asset_id], MK_TEST_COINS(1));
+  CHECK_AND_ASSERT_EQ(payment_id_to_asset_id_to_amout[payment_id_b][currency::native_coin_asset_id], MK_TEST_COINS(1));
+  
+  CHECK_AND_ASSERT_EQ(payment_id_to_asset_id_to_amout[payment_id_a][deployed_asset_id], 1);
+  CHECK_AND_ASSERT_EQ(payment_id_to_asset_id_to_amout[payment_id_b][deployed_asset_id], 2);
 
 
 
