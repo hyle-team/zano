@@ -5160,8 +5160,30 @@ namespace currency
     const wide_difficulty_type& a_pow_cumulative_difficulty = a_diff.pow_diff > 0 ? a_diff.pow_diff : difficulty_pow_starter;
     const wide_difficulty_type& b_pow_cumulative_difficulty = b_diff.pow_diff > 0 ? b_diff.pow_diff : difficulty_pow_starter;
 
-    boost::multiprecision::uint1024_t basic_sum_ = boost::multiprecision::uint1024_t(a_pow_cumulative_difficulty) + (boost::multiprecision::uint1024_t(a_pos_cumulative_difficulty)*difficulty_pow_at_split_point) / difficulty_pos_at_split_point;
-    boost::multiprecision::uint1024_t basic_sum_pow_minus2 = adjusting_multiplier /(basic_sum_ * basic_sum_);
+  // Fix for recursive reorg caused by integer division precision loss
+  // Root cause: when a chain has no PoS blocks, pos_diff falls back to DIFFICULTY_POS_STARTER (= 1), in the original formula:
+  //   basic_sum = a_pow + (a_pos * d_pow) / d_pos
+  // with a_pos = 1 and d_pos >> d_pow the division (1 * d_pow) / d_pos truncates to 0. This erases
+  // the PoS component, making basic_sum = a_pow alone
+
+  // Consequence: score becomes purely a function of a_pow, and due to
+  // the structure of the formula, shorter chains systematically score higher than longer ones
+  // This triggers a reorg to the shorter chain, after which the old main (longer)
+  // becomes the alt - but it still loses for the same reason, creating
+  // an infinite recursive reorg loop
+  //
+  // Fix: multiply through by d_pos to eliminate the truncating division:
+  //   basic_sum_scaled = a_pow * d_pos + a_pos * d_pow
+  // Now with a_pos = 1: basic_sum_scaled = a_pow * d_pos + d_pow,
+  // which correctly preserves the PoS contribution even when a_pos = 1.
+  //
+  // Since basic_sum_scaled = basic_sum * d_pos, we compensate the squared term by multiplying the numerator by d_pos^2:
+  //   score_component = (M * d_pos^2) / (basic_sum_scaled^2)
+  // d_pos^2 is identical for both sides of the comparison, so it does not affect the fork choice result
+    boost::multiprecision::uint1024_t basic_sum_scaled = boost::multiprecision::uint1024_t(a_pow_cumulative_difficulty) * difficulty_pos_at_split_point + boost::multiprecision::uint1024_t(a_pos_cumulative_difficulty) * difficulty_pow_at_split_point;
+    boost::multiprecision::uint1024_t d_pos_sq = boost::multiprecision::uint1024_t(difficulty_pos_at_split_point) * boost::multiprecision::uint1024_t(difficulty_pos_at_split_point);
+    boost::multiprecision::uint1024_t basic_sum_pow_minus2 = (adjusting_multiplier * d_pos_sq) / (basic_sum_scaled * basic_sum_scaled);
+
     boost::multiprecision::uint1024_t res =
       (basic_sum_pow_minus2 * a_pow_cumulative_difficulty * a_pos_cumulative_difficulty) / (boost::multiprecision::uint1024_t(b_pow_cumulative_difficulty)*b_pos_cumulative_difficulty);
 
