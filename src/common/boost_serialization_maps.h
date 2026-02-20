@@ -28,6 +28,18 @@ template<size_t A, size_t B> struct TAssertEquality {
 
 #define END_BOOST_SERIALIZATION()       }
 
+#define BOOST_SERIALIZATION_DO_ON_LOADING(custom_code)  \
+  if (typename t_archive::is_loading())                 \
+  {                                                     \
+    custom_code;                                        \
+  }
+
+#define BOOST_SERIALIZATION_DO_ON_SAVING(custom_code)   \
+  if (typename t_archive::is_saving())                  \
+  {                                                     \
+    custom_code;                                        \
+  }
+
 
 
 /**********************************************************************************************************************************

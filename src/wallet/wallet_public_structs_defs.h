@@ -212,7 +212,13 @@ namespace wallet_public
       BOOST_SERIALIZE(unlock_time)
       BOOST_SERIALIZE(service_entries)
       BOOST_SERIALIZE(subtransfers)
+      BOOST_SERIALIZATION_DO_ON_LOADING(restore_fee_from_tx()) // TODO: remove this after HF6 migration -- sowle
     END_BOOST_SERIALIZATION()
+
+    void restore_fee_from_tx()
+    {
+      fee = currency::is_coinbase(tx) ? 0 : currency::get_tx_fee(tx);
+    }
 
     bool is_income_mode_encryption() const 
     {
