@@ -507,7 +507,7 @@ void wallet2::add_rollback_event(uint64_t h, const wallet_event_t& ev)
   m_rollback_events.emplace_back(h, ev);
 }
 //----------------------------------------------------------------------------------------------------
-#define M_LAST_ZC_GLOBAL_INDEXS_MAX_SIZE                    30
+/*#define M_LAST_ZC_GLOBAL_INDEXS_MAX_SIZE                    30
 void wallet2::add_to_last_zc_global_indexs(uint64_t h, uint64_t last_zc_output_index)
 {
   if (m_last_zc_global_indexs.size())
@@ -549,7 +549,7 @@ void wallet2::add_to_last_zc_global_indexs(uint64_t h, uint64_t last_zc_output_i
 
   if (m_last_zc_global_indexs.size() > M_LAST_ZC_GLOBAL_INDEXS_MAX_SIZE)
     m_last_zc_global_indexs.pop_back();
-}
+}*/
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::get_actual_zc_global_index()
 {
@@ -578,14 +578,14 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
   ptc.is_derived_from_coinbase = !ptc.is_pos_coinbase;
   ptc.height = height;
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(pglobal_indexes, "pglobal_indexes not set");
-  if (this->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
-  {
-    if (pglobal_indexes->size())
-    {
-      WLT_LOG_L3("add_to_last_zc_global_indexs: h: " << height << ", b: " << currency::get_block_hash(b) << " , tx: " << currency::get_transaction_hash(tx) << ", last_zc_output_index: " << pglobal_indexes->back());
-      add_to_last_zc_global_indexs(ptc.height, pglobal_indexes->back());
-    }
-  }
+//   if (this->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
+//   {
+//     if (pglobal_indexes->size())
+//     {
+//       WLT_LOG_L3("add_to_last_zc_global_indexs: h: " << height << ", b: " << currency::get_block_hash(b) << " , tx: " << currency::get_transaction_hash(tx) << ", last_zc_output_index: " << pglobal_indexes->back());
+//       add_to_last_zc_global_indexs(ptc.height, pglobal_indexes->back());
+//     }
+//   }
 
   for (auto& in : tx.vin)
   {
