@@ -2477,7 +2477,7 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
       << "alt_cumul_diff.pos_diff:" << alt_cumul_diff.pos_diff << ENDL
       << "main_cumul_diff.pow_diff:" << main_cumul_diff.pow_diff << ENDL
       << "main_cumul_diff.pos_diff:" << main_cumul_diff.pos_diff << ENDL
-      << "alt:" << alt << ENDL
+      << "alt: " << alt << ENDL
       << "main:" << main << ENDL
     );
     if (main < alt)

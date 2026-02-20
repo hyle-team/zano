@@ -709,10 +709,61 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
   //CHECK_RESPONSE_EQUAL(st_resp.in.begin()->comment == TRANSFER_COMMENT);
   CHECK_AND_ASSERT_EQ(st_resp.in.begin()->amount, TRANSFER_AMOUNT);
   CHECK_AND_ASSERT_EQ(st_resp.in.begin()->is_income, true);
+  CHECK_AND_ASSERT_EQ(st_resp.in.begin()->fee, TESTS_DEFAULT_FEE);
   CHECK_AND_ASSERT_EQ(epee::string_tools::buff_to_hex_nodelimer(st_resp.in.begin()->payment_id), bob_payment_id);
   CHECK_AND_ASSERT_EQ(boost::lexical_cast<std::string>(st_resp.in.begin()->tx_hash), bob_tx2);
 
   
+  // refresh Alice's wallet so it gets all new txs before load cycle to test serialization
+  alice_wlt->refresh();
+
+  // perform a load cycle for Alice's wallet to check more potential issues
+  alice_wlt->reset_password(m_alice_wallet_password);
+  alice_wlt->store(m_alice_wallet_filename);
+  alice_wlt.reset(new tools::wallet2);
+  alice_wlt->load(m_alice_wallet_filename, m_alice_wallet_password);
+  alice_wlt->set_core_proxy(m_core_proxy);
+  alice_wlt->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
+  set_playtime_test_wallet_options(alice_wlt, false);
+  tools::wallet_rpc_server alice_rpc(alice_wlt);
+
+  // search_for_transactions (outgoing)
+  st_req = {};
+  st_req.filter_by_height = false;
+  st_req.in = false;
+  st_req.out = true;
+  st_req.pool = true;
+  st_resp = {};
+  r = invoke_text_json_for_rpc(alice_rpc, "search_for_transactions", st_req, st_resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+
+  CHECK_AND_ASSERT_EQ(st_resp.out.size(), 1);
+  CHECK_AND_ASSERT_EQ(st_resp.out.front().amount, TRANSFER_AMOUNT + TESTS_DEFAULT_FEE); // outgoing wti includes fee into amount/subtransfers
+  CHECK_AND_ASSERT_EQ(st_resp.out.front().is_income, false);
+  CHECK_AND_ASSERT_EQ(st_resp.out.front().fee, TESTS_DEFAULT_FEE);
+  CHECK_AND_ASSERT_EQ(epee::string_tools::buff_to_hex_nodelimer(st_resp.out.front().payment_id), alice_payment_id);
+  CHECK_AND_ASSERT_EQ(boost::lexical_cast<std::string>(st_resp.out.front().tx_hash), alice_tx1);
+
+  // search_for_transactions2 (outgoing)
+  tools::wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::request st2_req{};
+  st2_req.filter_by_height = false;
+  st2_req.in = false;
+  st2_req.out = true;
+  st2_req.pool = true;
+  tools::wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::response st2_resp{};
+  r = invoke_text_json_for_rpc(alice_rpc, "search_for_transactions2", st2_req, st2_resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+
+  CHECK_AND_ASSERT_EQ(st2_resp.out.size(), 1);
+  CHECK_AND_ASSERT_EQ(st2_resp.out.front().fee, TESTS_DEFAULT_FEE);
+  CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.size(), 1);
+  CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.front().payment_id, alice_payment_id);
+  CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.front().subtransfers.size(), 1);
+  CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.front().subtransfers.front().amount, TRANSFER_AMOUNT + TESTS_DEFAULT_FEE);
+  CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.front().subtransfers.front().is_income, false);
+  CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.front().subtransfers.front().asset_id, native_coin_asset_id);
+
+
   //get_payments
   pre_hf4_api::COMMAND_RPC_GET_PAYMENTS::request gps_req = AUTO_VAL_INIT(gps_req);
   gps_req.payment_id = carol_payment_id;

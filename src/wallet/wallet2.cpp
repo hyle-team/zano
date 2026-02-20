@@ -93,6 +93,11 @@ namespace tools
     // do nothing
   }
   //---------------------------------------------------------------
+  void wallet_public::wallet_transfer_info::restore_fee_from_tx()
+  {
+    fee = currency::is_coinbase(tx) ? 0 : currency::get_tx_fee(tx);
+  }
+  //---------------------------------------------------------------
   uint64_t wallet2::get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const wallet_public::employed_tx_entries& td)
   {
     uint64_t max_unlock_time = 0;
