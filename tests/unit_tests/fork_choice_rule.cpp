@@ -1909,7 +1909,7 @@ TEST(fork_choice_rule_test, fork_choice_rule_test_hf4)
 
 // test demonstrates the HF6 formula integer division asymmetry:
 // score_hf6(A,B) != score_hf6(B,A) due to double floor in integer division
-// ыhorter chains get higher scores, which caused the recursive reorganize
+// shorter chains get higher scores, which caused the recursive reorganize
 TEST(fork_choice_rule_test, hf6_formula_asymmetry)
 {
   using namespace currency;
@@ -1923,7 +1923,6 @@ TEST(fork_choice_rule_test, hf6_formula_asymmetry)
   {
     wide_difficulty_type d_pos_split = 2;
     wide_difficulty_type d_pow_split = 1;
-
     // Chain A = 4 PoW blocks (shorter
     difficulties chain_4;
     chain_4.pow_diff = 4;
@@ -1944,12 +1943,14 @@ TEST(fork_choice_rule_test, hf6_formula_asymmetry)
     LOG_PRINT_L0("score(10-block, 4-block) = " << score_10_vs_4);
     LOG_PRINT_L0("diff = " << (score_4_vs_10 - score_10_vs_4));
 
-    // shorter chain (4 blocks) scores HIGHER than longer chain (10 blocks)
-    ASSERT_GT(score_4_vs_10, score_10_vs_4) << "4-block chain should beat 10-block chain due to asymmetry";
+    // fixed: longer chain (10 blocks) now wins correctly
+    // before fix this was shorter chain won
+    ASSERT_LT(score_4_vs_10, score_10_vs_4) << "After fix: longer chain should win";
   }
 
   // Case 2 recursive reorg trigger (1 block vs 4 blocks) after the first reorg, ex-main blocks are pushed as alt one by one
   //first ex-main block = 1-block alt chain vs 4-block new main
+  //before fix: 1 block beat 4 blocks -> triggered infinite recursive reorganize - after fix: 4-block chain wins (no recursive reorg)
   {
     wide_difficulty_type d_pos_split = 2;
     wide_difficulty_type d_pow_split = 1;
@@ -1968,13 +1969,14 @@ TEST(fork_choice_rule_test, hf6_formula_asymmetry)
     LOG_PRINT_L0("Case 2: d_pos=2, d_pow=1, chains 1 vs 4 (recursive reorg)");
     LOG_PRINT_L0("score(1-block, 4-block) = " << score_1_vs_4);
     LOG_PRINT_L0("score(4-block, 1-block) = " << score_4_vs_1);
-    LOG_PRINT_L0("difference = " << (score_1_vs_4 - score_4_vs_1));
 
-    // 1 block beats 4 blocks -> this triggers recursive reorganize
-    ASSERT_GT(score_1_vs_4, score_4_vs_1) << "1-block chain should beat 4-block chain due to asymmetry";
+    // fixed: 4-block chain wins, no recursive reorg
+    // before fix this was 1-block chain won
+    ASSERT_LT(score_1_vs_4, score_4_vs_1) << "after fix: longer chain should win";
   }
 
-  // Case 3 production values
+  // Case 3 production values (from log file)
+  // before fix: shorter chain won with real production numbers too, after fix: longer chain wins correctly
   {
     wide_difficulty_type d_pos_split;
     d_pos_split.assign("4471087092590408652"); // from log file
@@ -1991,15 +1993,16 @@ TEST(fork_choice_rule_test, hf6_formula_asymmetry)
     boost::multiprecision::uint1024_t score_4_vs_10 = get_a_to_b_relative_cumulative_difficulty_hf6(d_pos_split, d_pow_split, chain_4, chain_10);
     boost::multiprecision::uint1024_t score_10_vs_4 = get_a_to_b_relative_cumulative_difficulty_hf6(d_pos_split, d_pow_split, chain_10, chain_4);
 
-    LOG_PRINT_L0("score(4-block, 10-block) = " << score_4_vs_10);
     LOG_PRINT_L0("Case 3 production value");
+    LOG_PRINT_L0("score(4-block, 10-block) = " << score_4_vs_10);
     LOG_PRINT_L0("score(10-block, 4-block) = " << score_10_vs_4);
 
-    // Same asymmetry with real production numbers
-    ASSERT_GT(score_4_vs_10, score_10_vs_4) << "Shorter chain wins with production values too";
+    // fixed: longer chain wins production values
+    // before fix this was shorter chain won
+    ASSERT_LT(score_4_vs_10, score_10_vs_4) << "after fix: longer chain should win at production scale";
   }
 
-  //Case 4: old formula does NOT have this asymmetry
+  // Case 4: old formula (pre-HF6 does NOT have this asymmetry
   {
     wide_difficulty_type d_pos_split = 2;
     wide_difficulty_type d_pow_split = 1;
@@ -2019,7 +2022,7 @@ TEST(fork_choice_rule_test, hf6_formula_asymmetry)
     LOG_PRINT_L0("score_old(4-block, 10-block) = " << score_4_vs_10_old);
     LOG_PRINT_L0("score_old(10-block, 4-block) = " << score_10_vs_4_old);
 
-    // Old formula: longer chain wins (correct)
+    // Old formula: longer chain wins (always correct)
     ASSERT_LT(score_4_vs_10_old, score_10_vs_4_old) << "Old formula: longer chain should win";
   }
 
@@ -2043,7 +2046,7 @@ TEST(fork_choice_rule_test, hf6_formula_asymmetry)
     LOG_PRINT_L0("score_hf6(4-block, 10-block) = " << score_4_vs_10);
     LOG_PRINT_L0("score_hf6(10-block, 4-block) = " << score_10_vs_4);
 
-    // When d_pos == d_pow, basic_sum = a_pow + a_pos (not just a_pow), and the longer chain should win correctly
+    // When d_pos == d_pow, longer chain should win correctly
     ASSERT_LT(score_4_vs_10, score_10_vs_4) << "When d_pos == d_pow, longer chain should win";
   }
 }
