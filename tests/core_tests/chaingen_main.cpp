@@ -1194,7 +1194,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(wallet_rpc_integrated_address_transfer);
     GENERATE_AND_PLAY(wallet_rpc_transfer);
     GENERATE_AND_PLAY(wallet_rpc_alias_tests);
-    GENERATE_AND_PLAY_HF(wallet_rpc_exchange_suite, "3,4");
+    GENERATE_AND_PLAY_HF(wallet_rpc_exchange_suite, "3-*");
     GENERATE_AND_PLAY_HF(wallet_true_rpc_pos_mining, "4-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_cold_signing, "3,5-*");
     // GENERATE_AND_PLAY_HF(wallet_rpc_multiple_receivers, "5-*"); work in progress -- sowle

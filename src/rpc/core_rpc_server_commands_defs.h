@@ -467,10 +467,12 @@ namespace currency
     {
       std::string integrated_address;
       std::string payment_id; // hex-encoded
+      std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(integrated_address) DOC_DSCR("Integrated address combining a standard address and payment ID, if applicable.")  DOC_EXMP("iZ2EMyPD7g28hgBfboZeCENaYrHBYZ1bLFi5cgWvn4WJLaxfgs4kqG6cJi9ai2zrXWSCpsvRXit14gKjeijx6YPCLJEv6Fx4rVm1hdAGQFis") DOC_END
         KV_SERIALIZE(payment_id)         DOC_DSCR("Payment ID associated with the this address.") DOC_EXMP("1dfe5a88ff9effb3")  DOC_END
+        KV_SERIALIZE(status)             DOC_DSCR("Status") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -2307,6 +2309,5 @@ namespace currency
       END_KV_SERIALIZE_MAP()
     };
   };
-
 }
 

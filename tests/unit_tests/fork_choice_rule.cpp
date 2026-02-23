@@ -131,6 +131,99 @@ currency::wide_difficulty_type find_break_point(const currency::wide_difficulty_
   }*/
 }
 
+TEST(fork_choice_rule_test, fork_choice_rule_test_hf6_gaps)
+{
+  //This test validate that there are no gaps in the fork choice rule, i.e. that if A is stronger than B, then B is not stronger than A. 
+  //It does not validate that the fork choice rule is correct, just that it is consistent and does not have gaps.
+  //tests only a small range of difficulties due to calculation time
+
+
+  currency::wide_difficulty_type pos_start, pos_end, pos_step, pos_diveder;
+
+  currency::wide_difficulty_type difficulty_pos_at_split_point = 2;
+  currency::wide_difficulty_type difficulty_pow_at_split_point = 1;
+  currency::difficulties a_diff;
+  currency::difficulties b_diff;
+  for (currency::wide_difficulty_type i_0 = 1; i_0 != 100; i_0++)
+  {
+    for (currency::wide_difficulty_type i_1 = 1; i_1 != 100; i_1++)
+    {
+      for (currency::wide_difficulty_type i_2 = 1; i_2 != 100; i_2++)
+      {
+        for (currency::wide_difficulty_type i_3 = 1; i_3 != 100; i_3++)
+        {
+          a_diff.pos_diff = i_0;
+          a_diff.pow_diff = i_1;  
+          b_diff.pos_diff = i_2;
+          b_diff.pow_diff = i_3;
+          boost::multiprecision::uint1024_t alt_0 = get_a_to_b_relative_cumulative_difficulty_hf6(difficulty_pos_at_split_point, difficulty_pow_at_split_point, a_diff, b_diff);
+          boost::multiprecision::uint1024_t main_0 = get_a_to_b_relative_cumulative_difficulty_hf6(difficulty_pos_at_split_point, difficulty_pow_at_split_point, b_diff, a_diff);
+
+          boost::multiprecision::uint1024_t alt_1 = get_a_to_b_relative_cumulative_difficulty_hf6(difficulty_pos_at_split_point, difficulty_pow_at_split_point, b_diff, a_diff);
+          boost::multiprecision::uint1024_t main_1 = get_a_to_b_relative_cumulative_difficulty_hf6(difficulty_pos_at_split_point, difficulty_pow_at_split_point, a_diff, b_diff);
+
+          if ((main_0 < alt_0) != (main_1 > alt_1))
+          {
+            LOG_ERROR("Assymetry detected: " << i_0 << ", " << i_1 << ", " << i_2 << ", " << i_3 << ENDL << main_0 << alt_0 << ENDL << main_1 << alt_1 << ENDL);
+            ASSERT_TRUE(false);
+          }
+
+        }
+      }
+    }
+  }
+  
+
+
+
+}
+
+
+TEST(fork_choice_rule_test, fork_choice_rule_test_hf6_reiterations)
+{
+  //This test make sure that no possible combination of difficulties can cause recursive reorganizing, i.e. that if A is stronger than B, then there is no subchains in B that can be stronger than A.
+
+
+  currency::wide_difficulty_type pos_start, pos_end, pos_step, pos_diveder;
+
+  currency::wide_difficulty_type difficulty_pos_at_split_point = 2;
+  currency::wide_difficulty_type difficulty_pow_at_split_point = 1;
+  currency::difficulties a_diff;
+  currency::difficulties b_diff;
+  for (currency::wide_difficulty_type i_pos_main = 1; i_pos_main != 100; i_pos_main++)
+  {
+    for (currency::wide_difficulty_type i_pow_main = 1; i_pow_main != 100; i_pow_main++)
+    {
+      for (currency::wide_difficulty_type i_pos_sub = i_pos_main; i_pos_sub != 0; i_pos_sub--)
+      {
+        for (currency::wide_difficulty_type i_pow_sub = i_pow_main; i_pow_sub != 0; i_pow_sub--)
+        {
+          a_diff.pos_diff = i_pos_main;
+          a_diff.pow_diff = i_pow_main;
+
+          b_diff.pos_diff = i_pos_sub;
+          b_diff.pow_diff = i_pow_sub;
+          boost::multiprecision::uint1024_t main_0 = get_a_to_b_relative_cumulative_difficulty_hf6(difficulty_pos_at_split_point, difficulty_pow_at_split_point, a_diff, b_diff);
+          boost::multiprecision::uint1024_t alt_0 = get_a_to_b_relative_cumulative_difficulty_hf6(difficulty_pos_at_split_point, difficulty_pow_at_split_point, b_diff, a_diff);
+          
+          if ((main_0 < alt_0))
+          {
+            LOG_PRINT_RED_L0("Reiteration detected: " << i_pos_main << ", " << i_pow_main << ", " << i_pos_sub << ", " << i_pow_sub << ", " << ENDL << main_0 << ENDL << alt_0 << ENDL);
+            //ASSERT_TRUE(false);
+          }
+
+        }
+      }
+    }
+  }
+
+
+
+
+}
+
+
+
 /*
 TEST(fork_choice_rule_test, fork_choice_rule_test_hf4)
 {

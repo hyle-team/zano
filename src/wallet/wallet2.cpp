@@ -93,6 +93,11 @@ namespace tools
     // do nothing
   }
   //---------------------------------------------------------------
+  void wallet_public::wallet_transfer_info::restore_fee_from_tx()
+  {
+    fee = currency::is_coinbase(tx) ? 0 : currency::get_tx_fee(tx);
+  }
+  //---------------------------------------------------------------
   uint64_t wallet2::get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const wallet_public::employed_tx_entries& td)
   {
     uint64_t max_unlock_time = 0;
@@ -507,7 +512,7 @@ void wallet2::add_rollback_event(uint64_t h, const wallet_event_t& ev)
   m_rollback_events.emplace_back(h, ev);
 }
 //----------------------------------------------------------------------------------------------------
-#define M_LAST_ZC_GLOBAL_INDEXS_MAX_SIZE                    30
+/*#define M_LAST_ZC_GLOBAL_INDEXS_MAX_SIZE                    30
 void wallet2::add_to_last_zc_global_indexs(uint64_t h, uint64_t last_zc_output_index)
 {
   if (m_last_zc_global_indexs.size())
@@ -549,7 +554,7 @@ void wallet2::add_to_last_zc_global_indexs(uint64_t h, uint64_t last_zc_output_i
 
   if (m_last_zc_global_indexs.size() > M_LAST_ZC_GLOBAL_INDEXS_MAX_SIZE)
     m_last_zc_global_indexs.pop_back();
-}
+}*/
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::get_actual_zc_global_index()
 {
@@ -578,14 +583,14 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
   ptc.is_derived_from_coinbase = !ptc.is_pos_coinbase;
   ptc.height = height;
   WLT_THROW_IF_FALSE_WALLET_INT_ERR_EX(pglobal_indexes, "pglobal_indexes not set");
-  if (this->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
-  {
-    if (pglobal_indexes->size())
-    {
-      WLT_LOG_L3("add_to_last_zc_global_indexs: h: " << height << ", b: " << currency::get_block_hash(b) << " , tx: " << currency::get_transaction_hash(tx) << ", last_zc_output_index: " << pglobal_indexes->back());
-      add_to_last_zc_global_indexs(ptc.height, pglobal_indexes->back());
-    }
-  }
+//   if (this->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
+//   {
+//     if (pglobal_indexes->size())
+//     {
+//       WLT_LOG_L3("add_to_last_zc_global_indexs: h: " << height << ", b: " << currency::get_block_hash(b) << " , tx: " << currency::get_transaction_hash(tx) << ", last_zc_output_index: " << pglobal_indexes->back());
+//       add_to_last_zc_global_indexs(ptc.height, pglobal_indexes->back());
+//     }
+//   }
 
   for (auto& in : tx.vin)
   {
@@ -944,45 +949,7 @@ void wallet2::process_transaction_context::handle_incoming_tx_output(const curre
   total_balance_change_per_payment_id[woi.payment_id][woi.asset_id] += woi.amount;
   employed_entries.receive.push_back(wallet_public::employed_tx_entry{ woi.index, woi.amount, woi.asset_id, woi.payment_id });
 }
-//----------------------------------------------------------------------------------------------------
-void wallet2::prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_att)
-{
-  PROFILE_FUNC("wallet2::prepare_wti_decrypted_attachments");
 
-  for (const auto& item : decrypted_att)
-  {
-    if (item.type() == typeid(currency::tx_service_attachment))
-    {
-      wti.service_entries.push_back(boost::get<currency::tx_service_attachment>(item));
-    }
-  }
-
-  if (wti.is_income_mode_encryption())
-  {
-    account_public_address sender_address = AUTO_VAL_INIT(sender_address);
-    wti.show_sender = handle_2_alternative_types_in_variant_container<tx_payer, tx_payer_old>(decrypted_att, [&](const tx_payer& p) { sender_address = p.acc_addr; return false; /* <- continue? */ });
-    if (wti.show_sender)
-      if (!wti.remote_addresses.size())
-        wti.remote_addresses.push_back(currency::get_account_address_as_str(sender_address));
-  }
-  else
-  {
-    if (wti.remote_addresses.empty())
-    {
-      handle_2_alternative_types_in_variant_container<tx_receiver, tx_receiver_old>(decrypted_att, [&](const tx_receiver& p) {
-        std::string addr_str;
-        addr_str = currency::get_account_address_as_str(p.acc_addr, wti.tx_wide_payment_id); // it will be an integrated address if there's a payment id provided
-        wti.remote_addresses.push_back(addr_str);
-        LOG_PRINT_YELLOW("prepare_wti_decrypted_attachments, income=false, rem. addr = " << addr_str, LOG_LEVEL_0);
-        return true; // continue iterating through the container
-        });
-    }
-  }
-
-  currency::tx_comment cm;
-  if (currency::get_type_in_variant_container(decrypted_att, cm))
-    wti.comment = cm.comment;
-}
 //----------------------------------------------------------------------------------------------------
 void wallet2::resend_unconfirmed()
 {
@@ -1559,7 +1526,7 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, const proces
     remove_field_of_type_from_extra<tx_comment>(decrypted_att);
   }
   process_payment_id_for_wti_and_populate_subtransfers(wti, tx_process_context, decrypted_att);
-  prepare_wti_decrypted_attachments(wti, decrypted_att); // should be called after wti subtransfer are populated
+  currency::prepare_wti_decrypted_attachments(wti, decrypted_att); // should be called after wti subtransfer are populated
   process_contract_info(wti, decrypted_att); // should be called after attachments are decrypted
 
 }
@@ -1661,6 +1628,7 @@ bool wallet2::process_payment_id_for_wti_and_populate_subtransfers(wallet_public
 
   return true;
 }
+//----------------------------------------------------------------------------------------------------
 void wallet2::rise_on_transfer2(const wallet_public::wallet_transfer_info& wti)
 {
   PROFILE_FUNC("wallet2::rise_on_transfer2");

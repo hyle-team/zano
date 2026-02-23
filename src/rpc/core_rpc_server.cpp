@@ -35,6 +35,7 @@ using namespace epee;
 #define RPC_LIMIT_COMMAND_RPC_GET_ALT_BLOCKS_DETAILS_COUNT                                      100
 #define RPC_LIMIT_COMMAND_RPC_FORCE_RELAY_RAW_TXS                                               100
 #define RPC_LIMIT_COMMAND_RPC_GET_ALIASES_COUNT                                                 200
+#define RPC_LIMIT_COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY                                       200
 
 
 
@@ -922,6 +923,57 @@ namespace currency
     }
     
     res.signed_tx_blob = t_serializable_object_to_blob(tx);
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_get_address_history(const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY);
+    currency::gateway_address_id_type addr_id = {};
+    address_v v_addr = {};
+    payment_id_t dummy_payment_id = {};
+
+    bool r = currency::get_account_address_and_payment_id_from_str(v_addr, dummy_payment_id, req.gateway_address);
+    if (!r)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS;
+      return true;
+    }
+    if (v_addr.type() == typeid(currency::gateway_address_id_type))
+    {
+      addr_id = boost::get<currency::gateway_address_id_type>(v_addr);
+    }
+    else
+    {
+      res.status = API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS_TYPE;
+      return true;
+    }
+
+    //read balances
+    auto addr_data_ptr = m_core.get_blockchain_storage().get_gateway_address_info(addr_id);
+
+    if (!addr_data_ptr)
+    {
+      res.status = API_RETURN_CODE_NOT_FOUND;
+      return true;
+    }
+
+    for (const auto& [asset_id, balance_entry] : addr_data_ptr->balances)
+    {
+      gateway_balance_entry be = {};
+      be.asset_id = asset_id;
+      be.amount = balance_entry.amount;
+      res.balances.push_back(be);
+    }
+
+    //read history
+    r = m_core.get_blockchain_storage().gateway_get_address_history(addr_id, req, res);
+    if(!r)
+    {
+      res.status = API_RETURN_CODE_FAIL;
+      return true;
+    }
     res.status = API_RETURN_CODE_OK;
     return true;
   }
@@ -1914,6 +1966,7 @@ namespace currency
     std::string payment_id;
     if (!epee::string_tools::parse_hexstr_to_binbuff(req.payment_id, payment_id))
     {
+      res.status = API_RETURN_CODE_BAD_ARG;
       error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
       error_resp.message = std::string("invalid payment id given: \'") + req.payment_id + "\', hex-encoded string was expected";
       return false;
@@ -1921,6 +1974,7 @@ namespace currency
 
     if (!currency::is_payment_id_size_ok(payment_id, m_allow_legacy_payment_id_size))
     {
+      res.status = API_RETURN_CODE_BAD_ARG;
       error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
       error_resp.message = std::string("given payment id is too long: \'") + req.payment_id + "\'";
       return false;
@@ -1934,22 +1988,25 @@ namespace currency
 
 
     std::string payment_id_from_provided_addr; // won't be used
-    account_public_address addr = AUTO_VAL_INIT(addr);
-    if (!get_account_address_and_payment_id_from_str(addr, payment_id_from_provided_addr, req.regular_address))
+    address_v v_adddr = {};
+    if (!get_account_address_and_payment_id_from_str(v_adddr, payment_id_from_provided_addr, req.regular_address))
     {
+      res.status = API_RETURN_CODE_BAD_ARG;
       error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
       error_resp.message = std::string("invalid address provided: \'") + req.regular_address + "\', Zano address expected";
       return false;
     }
     if (payment_id_from_provided_addr.size())
     {
+      res.status = API_RETURN_CODE_BAD_ARG;
       error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
       error_resp.message = std::string("invalid address provided: \'") + req.regular_address + "\', Zano address expected be regular and NOT integrated address";
       return false;
     }
 
-    res.integrated_address = currency::get_account_address_as_str(addr, payment_id);
+    res.integrated_address = currency::get_account_address_as_str(v_adddr, payment_id);
     res.payment_id = epee::string_tools::buff_to_hex_nodelimer(payment_id);
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------

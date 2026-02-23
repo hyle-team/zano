@@ -234,6 +234,7 @@ namespace tools::wallet_public
       BOOST_SERIALIZE(unlock_time)
       BOOST_SERIALIZE(service_entries)
       BOOST_SERIALIZE(subtransfers_by_pid)
+      BOOST_SERIALIZATION_DO_ON_LOADING(restore_fee_from_tx()) // TODO: remove this after HF6 migration -- sowle
     END_BOOST_SERIALIZATION_TOTAL_FIELDS(24)
 
     wallet_sub_transfers_by_pid_info& get_or_add_subtransfers_by_pid(const currency::payment_id_t& pid)
@@ -252,6 +253,8 @@ namespace tools::wallet_public
     {
       return get_or_add_subtransfers_by_pid("").subtransfers;
     }
+
+    void restore_fee_from_tx();
 
     bool is_income_mode_encryption() const 
     {

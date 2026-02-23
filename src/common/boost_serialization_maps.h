@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2022 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -27,6 +27,18 @@ template<size_t A, size_t B> struct TAssertEquality {
   if(ver < x ) {return;}
 
 #define END_BOOST_SERIALIZATION()       }
+
+#define BOOST_SERIALIZATION_DO_ON_LOADING(custom_code)  \
+  if (typename t_archive::is_loading())                 \
+  {                                                     \
+    custom_code;                                        \
+  }
+
+#define BOOST_SERIALIZATION_DO_ON_SAVING(custom_code)   \
+  if (typename t_archive::is_saving())                  \
+  {                                                     \
+    custom_code;                                        \
+  }
 
 
 
@@ -105,9 +117,10 @@ struct boost_transition_t<false, destination_t>
     BEGIN_BOOST_SERIALIZATION()
       BOOST_SERIALIZE(m_tx_pub_key)
       BOOST_SERIALIZE(m_alias)
-      if(ver < xxx) return;
+      BOOST_END_VERSION_UNDER(2)
       BOOST_SERIALIZE(m_user_data_blob)
       BOOST_SERIALIZE(m_attachment_info)
+      BOOST_SERIALIZATION_DO_ON_LOADING(fee = currency::is_coinbase(tx) ? 0 : currency::get_tx_fee(tx))
     END_BOOST_SERIALIZATION_TOTAL_FIELDS(0)
   };
 */

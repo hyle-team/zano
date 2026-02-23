@@ -51,20 +51,21 @@ using namespace std;
 using namespace epee;
 using namespace currency;
 
-#define BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS            "blocks"
-#define BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS_INDEX      "blocks_index"
-#define BLOCKCHAIN_STORAGE_CONTAINER_TRANSACTIONS      "transactions"
-#define BLOCKCHAIN_STORAGE_CONTAINER_SPENT_KEYS        "spent_keys"
-#define BLOCKCHAIN_STORAGE_CONTAINER_OUTPUTS           "outputs"
-#define BLOCKCHAIN_STORAGE_CONTAINER_MULTISIG_OUTS     "multisig_outs"
-#define BLOCKCHAIN_STORAGE_CONTAINER_INVALID_BLOCKS    "invalid_blocks"
-#define BLOCKCHAIN_STORAGE_CONTAINER_SOLO_OPTIONS      "solo"
-#define BLOCKCHAIN_STORAGE_CONTAINER_ALIASES           "aliases"
-#define BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS     "addr_to_alias"
-#define BLOCKCHAIN_STORAGE_CONTAINER_TX_FEE_MEDIAN     "median_fee2"
-#define BLOCKCHAIN_STORAGE_CONTAINER_GINDEX_INCS       "gindex_increments"
-#define BLOCKCHAIN_STORAGE_CONTAINER_ASSETS            "assets"
-#define BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_ADDRESSES "gateway_addresses"
+#define BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS                 "blocks"
+#define BLOCKCHAIN_STORAGE_CONTAINER_BLOCKS_INDEX            "blocks_index"
+#define BLOCKCHAIN_STORAGE_CONTAINER_TRANSACTIONS            "transactions"
+#define BLOCKCHAIN_STORAGE_CONTAINER_SPENT_KEYS              "spent_keys"
+#define BLOCKCHAIN_STORAGE_CONTAINER_OUTPUTS                 "outputs"
+#define BLOCKCHAIN_STORAGE_CONTAINER_MULTISIG_OUTS           "multisig_outs"
+#define BLOCKCHAIN_STORAGE_CONTAINER_INVALID_BLOCKS          "invalid_blocks"
+#define BLOCKCHAIN_STORAGE_CONTAINER_SOLO_OPTIONS            "solo"
+#define BLOCKCHAIN_STORAGE_CONTAINER_ALIASES                 "aliases"
+#define BLOCKCHAIN_STORAGE_CONTAINER_ADDR_TO_ALIAS           "addr_to_alias"
+#define BLOCKCHAIN_STORAGE_CONTAINER_TX_FEE_MEDIAN           "median_fee2"
+#define BLOCKCHAIN_STORAGE_CONTAINER_GINDEX_INCS             "gindex_increments"
+#define BLOCKCHAIN_STORAGE_CONTAINER_ASSETS                  "assets"
+#define BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_ADDRESSES       "gateway_addresses"
+#define BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_TRANSACTIONS    "gateway_transactions"
 
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_BLOCK_CUMUL_SZ_LIMIT          0
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_PRUNED_RS_HEIGHT              1
@@ -96,6 +97,7 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
                                                                  m_db_assets(m_db),
                                                                  m_db_addr_to_alias(m_db),
                                                                  m_db_gateway_addresses(m_db),
+                                                                 m_db_gateway_transactions(m_db), 
                                                                  m_read_lock(m_rw_lock),
                                                                  m_db_current_block_cumul_sz_limit(BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_BLOCK_CUMUL_SZ_LIMIT, m_db_solo_options),
                                                                  m_db_current_pruned_rs_height(BLOCKCHAIN_STORAGE_OPTIONS_ID_CURRENT_PRUNED_RS_HEIGHT, m_db_solo_options),
@@ -227,6 +229,7 @@ void blockchain_storage::set_db_l2_cache_size(uint64_t ceched_elements) const
   m_db_aliases.set_cache_size(ceched_elements);
   m_db_assets.set_cache_size(ceched_elements);
   m_db_gateway_addresses.set_cache_size(ceched_elements);
+  m_db_gateway_transactions.set_cache_size(ceched_elements);
   m_db_addr_to_alias.set_cache_size(ceched_elements);
 }
 //------------------------------------------------------------------
@@ -244,6 +247,7 @@ std::string blockchain_storage::get_db_l2_cache_state_str() const
   PRINT_CACHE_STATE(m_db_aliases);
   PRINT_CACHE_STATE(m_db_assets);
   PRINT_CACHE_STATE(m_db_gateway_addresses);
+  PRINT_CACHE_STATE(m_db_gateway_transactions);
   PRINT_CACHE_STATE(m_db_addr_to_alias);
   return ss.str();
 }
@@ -350,6 +354,8 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     res = m_db_per_block_gindex_incs.init(BLOCKCHAIN_STORAGE_CONTAINER_GINDEX_INCS);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
     res = m_db_gateway_addresses.init(BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_ADDRESSES);
+    CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
+    res = m_db_gateway_transactions.init(BLOCKCHAIN_STORAGE_CONTAINER_GATEWAY_TRANSACTIONS);
     CHECK_AND_ASSERT_MES(res, false, "Unable to init db container");
 
     if (command_line::has_arg(vm, arg_db_cache_l2))
@@ -586,6 +592,7 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
       m_db_addr_to_alias.deinit();
       m_db_per_block_gindex_incs.deinit();
       m_db_gateway_addresses.deinit();
+      m_db_gateway_transactions.deinit();
       m_db.close();
       size_t files_removed = boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(db_folder_path));
       LOG_PRINT_L1(files_removed << " files at " << db_folder_path << " removed");
@@ -894,7 +901,7 @@ bool blockchain_storage::clear()
     m_pos_targetdata_cache.clear();
     m_pow_targetdata_cache.clear();
     m_db_gateway_addresses.clear();
-
+    m_db_gateway_transactions.clear();
     db_tx_ptr->commit_transaction();
   }
   
@@ -995,6 +1002,52 @@ bool blockchain_storage::purge_transaction_keyimages_from_blockchain(const trans
   return true;
 }
 //------------------------------------------------------------------
+void get_gateway_addresses_involved_in_tx(std::set<currency::gateway_address_id_type>& gw, const currency::transaction& tx)
+{
+  for(const auto& in : tx.vin)
+  {
+    if (in.type() == typeid(txin_gateway))
+    {
+      gw.insert(boost::get<txin_gateway>(in).gateway_addr);
+    }
+  }
+  for (const auto& out : tx.vout)
+  {
+    if(out.type() == typeid(tx_out_gateway))
+    {
+      gw.insert(boost::get<tx_out_gateway>(out).gateway_addr);
+    }
+  }
+}
+//------------------------------------------------------------------
+bool blockchain_storage::process_tx_gateway_history(const crypto::hash& tx_id, const transaction& tx_)
+{
+  //associate transaction id with every gateway address mentioned in this tx to maintain the history of transactions related to gateway addresses
+  std::set<currency::gateway_address_id_type> gw;
+  get_gateway_addresses_involved_in_tx(gw, tx_);
+  for(const auto& gw_addr : gw)
+  {
+    m_db_gateway_transactions.push_back_item(gw_addr, tx_id);
+  }
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::unprocess_tx_gateway_history(const crypto::hash& tx_id, const transaction& tx_)
+{
+  //remove association of transaction id with every gateway address mentioned in this tx
+  std::set<currency::gateway_address_id_type> gw;
+  get_gateway_addresses_involved_in_tx(gw, tx_);
+  for (const auto& gw_addr : gw)
+  {
+    auto ptr = m_db_gateway_transactions.get_subitem(gw_addr, m_db_gateway_transactions.get_item_size(gw_addr) - 1);
+    if (ptr && *ptr == tx_id)
+    {
+      m_db_gateway_transactions.pop_back_item(gw_addr);
+    }
+  }
+  return true;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& tx_id, uint64_t& fee, transaction& tx_)
 {
   fee = 0;
@@ -1012,6 +1065,8 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
   CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra for tx " << tx_id);
  
   r = unprocess_blockchain_tx_attachments(tx, get_current_blockchain_size(), 0/*TODO: add valid timestamp here in future if need*/);
+
+  unprocess_tx_gateway_history(tx_id, tx_);
 
   bool added_to_the_pool = false;
   if(!is_coinbase(tx))
@@ -1910,6 +1965,7 @@ void blockchain_storage::reset_db_cache() const
   m_db_aliases.clear_cache();
   m_db_assets.clear_cache();
   m_db_gateway_addresses.clear_cache();
+  m_db_gateway_transactions.clear_cache();
   m_db_addr_to_alias.clear_cache();
 
 }
@@ -2421,7 +2477,7 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
       << "alt_cumul_diff.pos_diff:" << alt_cumul_diff.pos_diff << ENDL
       << "main_cumul_diff.pow_diff:" << main_cumul_diff.pow_diff << ENDL
       << "main_cumul_diff.pos_diff:" << main_cumul_diff.pos_diff << ENDL
-      << "alt:" << alt << ENDL
+      << "alt: " << alt << ENDL
       << "main:" << main << ENDL
     );
     if (main < alt)
@@ -3671,6 +3727,7 @@ void blockchain_storage::print_db_cache_perfeormance_data() const
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_aliases) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_assets) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_gateway_addresses) << ENDL
+    DB_CONTAINER_PERF_DATA_ENTRY(m_db_gateway_transactions) << ENDL
     DB_CONTAINER_PERF_DATA_ENTRY(m_db_addr_to_alias) << ENDL
     //DB_CONTAINER_PERF_DATA_ENTRY(m_db_per_block_gindex_incs) << ENDL
     //DB_CONTAINER_PERF_DATA_ENTRY(m_tx_fee_median) << ENDL
@@ -4134,9 +4191,10 @@ bool blockchain_storage::push_transaction_to_global_outs_index(const transaction
       // TODO: CZ, consider using separate table for hidden amounts
       m_db_outputs.push_back_item(0, global_output_entry::construct(tx_id, output_index));
       global_indexes.push_back(m_db_outputs.get_item_size(0) - 1);
-    VARIANT_CASE_CONST(tx_out_gateway, togw)
+    VARIANT_CASE_CONST(tx_out_gateway, togw)      
       bool r = process_gateway_ouput(tx_id, bl_id, bl_height, togw);
       CHECK_AND_ASSERT_MES(r, false, "Failed to process gateway output");
+      global_indexes.push_back(0); // just stub to make other code easier
     VARIANT_CASE_THROW_ON_OTHER();
     VARIANT_SWITCH_END();
     ++output_index;
@@ -5376,6 +5434,43 @@ namespace currency
   };
 }
 
+bool blockchain_storage::gateway_get_address_history(const currency::gateway_address_id_type& addr_id, const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res)
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
+  res.total_transactions = m_db_gateway_transactions.get_item_size(addr_id);
+  if (req.offset >= res.total_transactions)
+  {
+    res.status = API_RETURN_CODE_BAD_ARG;
+    return true;
+  }
+  //adjust count if needed
+  size_t count = req.count;
+  if (req.offset + count > res.total_transactions)
+  {
+    count = res.total_transactions - req.offset;
+  }
+
+
+  std::vector<crypto::hash> tx_ids;
+  m_db_gateway_transactions.get_subitems(addr_id, req.offset, count, tx_ids);
+  crypto::secret_key decrypt_key = {};
+  if (req.gateway_view_secret_key)
+    decrypt_key = *req.gateway_view_secret_key;
+
+
+  for (const auto& tx_id : tx_ids)
+  {
+    tools::wallet_public::wallet_transfer_info wti = {};
+    auto tx_ptr = m_db_transactions.get(tx_id);
+    CHECK_AND_ASSERT_MES(tx_ptr, false, "gateway_get_address_history: internal error, tx id " << tx_id << " not found in m_db_transactions");
+    bool r = gateway_prepare_wti(addr_id, tx_id, decrypt_key, wti, *tx_ptr);
+    if(r)
+      res.transactions.push_back(wti);
+  }
+  
+  return true;
+}
 
 bool blockchain_storage::add_transaction_from_block(const transaction& tx, const crypto::hash& tx_id, const crypto::hash& bl_id, uint64_t bl_height, uint64_t timestamp)
 {
@@ -5394,6 +5489,9 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   bool r = process_blockchain_tx_extra(tx, tx_id, bl_height);
   CHECK_AND_ASSERT_MES(r, false, "failed to process_blockchain_tx_extra");
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_process_extra);
+
+  r = process_tx_gateway_history(tx_id, tx);
+  CHECK_AND_ASSERT_MES(r, false, "failed to process_tx_gateway_history");
 
   TIME_MEASURE_START_PD(tx_process_attachment);
   process_blockchain_tx_attachments(tx, bl_height, bl_id, timestamp);

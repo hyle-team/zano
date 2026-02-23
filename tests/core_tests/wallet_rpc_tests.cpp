@@ -709,10 +709,61 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
   //CHECK_RESPONSE_EQUAL(st_resp.in.begin()->comment == TRANSFER_COMMENT);
   CHECK_AND_ASSERT_EQ(st_resp.in.begin()->amount, TRANSFER_AMOUNT);
   CHECK_AND_ASSERT_EQ(st_resp.in.begin()->is_income, true);
+  CHECK_AND_ASSERT_EQ(st_resp.in.begin()->fee, TESTS_DEFAULT_FEE);
   CHECK_AND_ASSERT_EQ(epee::string_tools::buff_to_hex_nodelimer(st_resp.in.begin()->payment_id), bob_payment_id);
   CHECK_AND_ASSERT_EQ(boost::lexical_cast<std::string>(st_resp.in.begin()->tx_hash), bob_tx2);
 
   
+  // refresh Alice's wallet so it gets all new txs before load cycle to test serialization
+  alice_wlt->refresh();
+
+  // perform a load cycle for Alice's wallet to check more potential issues
+  alice_wlt->reset_password(m_alice_wallet_password);
+  alice_wlt->store(m_alice_wallet_filename);
+  alice_wlt.reset(new tools::wallet2);
+  alice_wlt->load(m_alice_wallet_filename, m_alice_wallet_password);
+  alice_wlt->set_core_proxy(m_core_proxy);
+  alice_wlt->set_core_runtime_config(c.get_blockchain_storage().get_core_runtime_config());
+  set_playtime_test_wallet_options(alice_wlt, false);
+  tools::wallet_rpc_server alice_rpc(alice_wlt);
+
+  // search_for_transactions (outgoing)
+  st_req = {};
+  st_req.filter_by_height = false;
+  st_req.in = false;
+  st_req.out = true;
+  st_req.pool = true;
+  st_resp = {};
+  r = invoke_text_json_for_rpc(alice_rpc, "search_for_transactions", st_req, st_resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+
+  CHECK_AND_ASSERT_EQ(st_resp.out.size(), 1);
+  CHECK_AND_ASSERT_EQ(st_resp.out.front().amount, TRANSFER_AMOUNT + TESTS_DEFAULT_FEE); // outgoing wti includes fee into amount/subtransfers
+  CHECK_AND_ASSERT_EQ(st_resp.out.front().is_income, false);
+  CHECK_AND_ASSERT_EQ(st_resp.out.front().fee, TESTS_DEFAULT_FEE);
+  CHECK_AND_ASSERT_EQ(epee::string_tools::buff_to_hex_nodelimer(st_resp.out.front().payment_id), alice_payment_id);
+  CHECK_AND_ASSERT_EQ(boost::lexical_cast<std::string>(st_resp.out.front().tx_hash), alice_tx1);
+
+  // search_for_transactions2 (outgoing)
+  tools::wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::request st2_req{};
+  st2_req.filter_by_height = false;
+  st2_req.in = false;
+  st2_req.out = true;
+  st2_req.pool = true;
+  tools::wallet_public::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::response st2_resp{};
+  r = invoke_text_json_for_rpc(alice_rpc, "search_for_transactions2", st2_req, st2_resp);
+  CHECK_AND_ASSERT_MES(r, false, "failed to call");
+
+  CHECK_AND_ASSERT_EQ(st2_resp.out.size(), 1);
+  CHECK_AND_ASSERT_EQ(st2_resp.out.front().fee, TESTS_DEFAULT_FEE);
+  CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.size(), 1);
+  CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.front().payment_id, alice_payment_id);
+  CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.front().subtransfers.size(), 1);
+  CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.front().subtransfers.front().amount, TRANSFER_AMOUNT + TESTS_DEFAULT_FEE);
+  CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.front().subtransfers.front().is_income, false);
+  CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.front().subtransfers.front().asset_id, native_coin_asset_id);
+
+
   //get_payments
   pre_hf4_api::COMMAND_RPC_GET_PAYMENTS::request gps_req = AUTO_VAL_INIT(gps_req);
   gps_req.payment_id = carol_payment_id;
@@ -1878,7 +1929,7 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_to_gw_res{};
   tr_to_gw_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(9), m_accounts[BOB_ACC_IDX].get_public_address_str()});                    // ZC, native
   tr_to_gw_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(2), gw_reg_resp.address});                                                 // GW, native
-  tr_to_gw_req.destinations.emplace_back(currency::transfer_destination{40,               m_accounts[BOB_ACC_IDX].get_public_address_str(), deployed_asset_id}); // ZC, asset
+  tr_to_gw_req.destinations.emplace_back(currency::transfer_destination{10,               m_accounts[BOB_ACC_IDX].get_public_address_str(), deployed_asset_id}); // ZC, asset
   tr_to_gw_req.destinations.emplace_back(currency::transfer_destination{10,               gw_reg_resp.address, deployed_asset_id});                              // GW, asset
   tr_to_gw_req.fee = TESTS_DEFAULT_FEE;
   r = invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_to_gw_req, tr_to_gw_res);
@@ -1963,5 +2014,89 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.descriptor_info.opt_owner_custom_schnorr_pub_key.value(), gw_reg_req.descriptor_info.opt_owner_custom_schnorr_pub_key.value());
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.payment_id, "");
 
+  //payment_id tests + history 
+
+    //
+  // ZC -> GW
+  //
+  alice_wlt->refresh();
+  std::unordered_map<crypto::public_key, tools::wallet_public::asset_balance_entry_base> balances;
+  uint64_t mined = 0;
+  alice_wlt->balance(balances, mined);
+
+  std::string payment_id_a = "1dfe5a88ff9effb3";
+  std::string payment_id_b = "1dfe5a88ff9effb4";
+  currency::COMMAND_RPC_GET_INTEGRATED_ADDRESS::request get_integrated_addr_req{};
+  currency::COMMAND_RPC_GET_INTEGRATED_ADDRESS::response get_integrated_addr_resp{};
+  get_integrated_addr_req.regular_address = gw_reg_resp.address;
+  get_integrated_addr_req.payment_id = payment_id_a;
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "get_integrated_address", get_integrated_addr_req, get_integrated_addr_resp);
+  CHECK_AND_ASSERT_MES(r, false, "get_integrated_address failed");
+
+  std::string integrated_address_a = get_integrated_addr_resp.integrated_address;
+
+  get_integrated_addr_req.payment_id = payment_id_b;
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "get_integrated_address", get_integrated_addr_req, get_integrated_addr_resp);
+  CHECK_AND_ASSERT_MES(r, false, "get_integrated_address failed");
+  std::string integrated_address_b = get_integrated_addr_resp.integrated_address;
+
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request tr_to_gw_req2{};
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_to_gw_res2{};
+  tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ MK_TEST_COINS(1), integrated_address_a });                   // GW, native asset, payment_id a
+  tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ MK_TEST_COINS(1), integrated_address_b });                   // GW, native asset, payment_id b
+  tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ 1,               integrated_address_a, deployed_asset_id }); // GW, asset, payment_id a
+  tr_to_gw_req2.destinations.emplace_back(currency::transfer_destination{ 2,               integrated_address_b, deployed_asset_id }); // GW, asset, payment_id b
+  tr_to_gw_req2.comment = "aaaaabbbbb";
+  tr_to_gw_req2.fee = TESTS_DEFAULT_FEE;
+  r = invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_to_gw_req2, tr_to_gw_res);
+  CHECK_AND_ASSERT_MES(r, false, "RPC 'transfer' failed");
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine_next_pow_block_in_playtime failed");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+
+  // request address history and check that payment ids are correct
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request get_history_req = {};
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response get_history_resp = {};
+  get_history_req.gateway_address = gw_reg_resp.address;
+  get_history_req.gateway_view_secret_key = gw_addr_secret_key;
+  get_history_req.count = 10;
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_history", get_history_req, get_history_resp);
+
+  CHECK_AND_ASSERT_EQ(get_history_resp.total_transactions, 3);
+  CHECK_AND_ASSERT_EQ(get_history_resp.transactions.size(), 3);
+
+
+  std::map<std::string, std::unordered_map<crypto::public_key, uint64_t > >  payment_id_to_asset_id_to_amout;
+  CHECK_AND_ASSERT_EQ(get_history_resp.transactions.back().subtransfers_by_pid.size(), 2);
+
+  for (const auto& sub_payment_id : get_history_resp.transactions.back().subtransfers_by_pid)
+  {
+    for (const auto& subtransfer : sub_payment_id.subtransfers)
+    {
+      payment_id_to_asset_id_to_amout[epee::string_tools::buff_to_hex_nodelimer(sub_payment_id.payment_id)][subtransfer.asset_id] = subtransfer.amount;
+    }
+  }
+
+  CHECK_AND_ASSERT_EQ(payment_id_to_asset_id_to_amout[payment_id_a][currency::native_coin_asset_id], MK_TEST_COINS(1));
+  CHECK_AND_ASSERT_EQ(payment_id_to_asset_id_to_amout[payment_id_b][currency::native_coin_asset_id], MK_TEST_COINS(1));
+  
+  CHECK_AND_ASSERT_EQ(payment_id_to_asset_id_to_amout[payment_id_a][deployed_asset_id], 1);
+  CHECK_AND_ASSERT_EQ(payment_id_to_asset_id_to_amout[payment_id_b][deployed_asset_id], 2);
+
+  CHECK_AND_ASSERT_EQ(get_history_resp.transactions.back().comment, tr_to_gw_req2.comment);
+
+  /*
+  TODO:
+    1. Test against ECDSA, EDDSA signatures
+    2. Test against registration of illigal asset_id (random, not public key)
+    3. Test for spending from GW address more coins that it has. 
+    4. Test for encrypted tx service attachments for GW-outgoing transactions
+    5. Reorganizae tests
+       5.1. Tx that spend GW address on reorganize should properly undo balance
+       5.2. Tx that send to GW address should properly undo balance
+ */
   return true;
 }

@@ -47,6 +47,9 @@ struct wallet_rpc_exchange_suite : public wallet_test
   wallet_rpc_exchange_suite();
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+protected:
+  const std::wstring m_alice_wallet_filename = L"alice-wlt";
+  const std::string m_alice_wallet_password = "deterrence";
 };
 
 struct wallet_true_rpc_pos_mining : public wallet_test
