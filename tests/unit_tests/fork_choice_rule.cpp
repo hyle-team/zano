@@ -131,6 +131,7 @@ currency::wide_difficulty_type find_break_point(const currency::wide_difficulty_
   }*/
 }
 
+/*
 TEST(fork_choice_rule_test, fork_choice_rule_test_hf4)
 {
   std::stringstream ss;
@@ -171,7 +172,7 @@ TEST(fork_choice_rule_test, fork_choice_rule_test_hf4)
     
   ************************************************************************/
 
-  /*
+/*
   std::vector<std::pair<uint64_t, uint64_t>> break_points_init = {
     {8100, 173895},
     {8150, 102145},
@@ -511,8 +512,8 @@ TEST(fork_choice_rule_test, fork_choice_rule_test_hf4)
 {24850, 2225},
 {24900, 2225},
 {24950, 2225}
-  };*/
-  /*
+  };
+
   //std::stringstream ss;
   for (auto bp : break_points_init)
   {
@@ -548,7 +549,7 @@ TEST(fork_choice_rule_test, fork_choice_rule_test_hf4)
     }
   }
   bool r = epee::file_io_utils::save_string_to_file("script.txt", ss.str());
-  */
+
   bool res = false;
   res = if_alt_chain_stronger_hf4(currency::wide_difficulty_type("810000000000000000000000000"), currency::wide_difficulty_type("173893610095151033482"));
   ASSERT_TRUE(res);
@@ -1904,7 +1905,49 @@ TEST(fork_choice_rule_test, fork_choice_rule_test_hf4)
   ASSERT_FALSE(res);
 
 }
+*/
 
+TEST(fork_choice_rule_test, fork_choice_rule_test_hf4)
+{
+  currency::wide_difficulty_type pos_start, pos_end, pos_step;
+  pos_start.assign("810000000000000000000000000");
+  pos_end.assign("2500000000000000000000000000");
+  pos_step.assign("5000000000000000000000000");
+
+  //upper bound for binary search 3x the main chains PoW cumulative diff
+  currency::wide_difficulty_type pow_upper_bound;
+  pow_upper_bound.assign("9033793662008534943"); // 3011264554002844981 * 3
+
+  size_t points_checked = 0;
+  for (currency::wide_difficulty_type pos = pos_start; pos < pos_end; pos += pos_step)
+  {
+    // bin search breakpoint PoW
+    currency::wide_difficulty_type low = 0;
+    currency::wide_difficulty_type high = pow_upper_bound;
+
+    while (low < high)
+    {
+      currency::wide_difficulty_type mid = low + (high - low) / 2;
+      if (!if_alt_chain_stronger_hf4(pos, mid))
+        low = mid + 1;
+      else
+        high = mid;
+    }
+
+    if (low > 0 && low < pow_upper_bound)
+    {
+      bool at_breakpoint = if_alt_chain_stronger_hf4(pos, low);
+      ASSERT_TRUE(at_breakpoint) << "at breakpoint PoW=" << low << " pos=" << pos << " alt should win";
+
+      bool below_breakpoint = if_alt_chain_stronger_hf4(pos, low - 1);
+      ASSERT_FALSE(below_breakpoint) << "below breakpoint PoW=" << (low - 1) << " pos=" << pos << " alt should lose";
+
+      points_checked++;
+    }
+  }
+  LOG_PRINT_L0("fork_choice_rule_test_hf4: verified " << points_checked << " boundary points");
+  ASSERT_GT(points_checked, 300u) << "should verify at least 300 boundary points";
+}
 
 
 // test demonstrates the HF6 formula integer division asymmetry:
