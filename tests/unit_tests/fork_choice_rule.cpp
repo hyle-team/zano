@@ -224,6 +224,7 @@ TEST(fork_choice_rule_test, fork_choice_rule_test_hf6_reiterations)
 
 
 
+/*
 TEST(fork_choice_rule_test, fork_choice_rule_test_hf4)
 {
   std::stringstream ss;
@@ -264,7 +265,7 @@ TEST(fork_choice_rule_test, fork_choice_rule_test_hf4)
     
   ************************************************************************/
 
-  /*
+/*
   std::vector<std::pair<uint64_t, uint64_t>> break_points_init = {
     {8100, 173895},
     {8150, 102145},
@@ -604,8 +605,8 @@ TEST(fork_choice_rule_test, fork_choice_rule_test_hf4)
 {24850, 2225},
 {24900, 2225},
 {24950, 2225}
-  };*/
-  /*
+  };
+
   //std::stringstream ss;
   for (auto bp : break_points_init)
   {
@@ -641,7 +642,7 @@ TEST(fork_choice_rule_test, fork_choice_rule_test_hf4)
     }
   }
   bool r = epee::file_io_utils::save_string_to_file("script.txt", ss.str());
-  */
+
   bool res = false;
   res = if_alt_chain_stronger_hf4(currency::wide_difficulty_type("810000000000000000000000000"), currency::wide_difficulty_type("173893610095151033482"));
   ASSERT_TRUE(res);
@@ -1996,4 +1997,192 @@ TEST(fork_choice_rule_test, fork_choice_rule_test_hf4)
   res = if_alt_chain_stronger_hf4(currency::wide_difficulty_type("2495000000000000000000000000"), currency::wide_difficulty_type("2220167303998455998"));
   ASSERT_FALSE(res);
 
- }
+}
+*/
+
+TEST(fork_choice_rule_test, fork_choice_rule_test_hf4)
+{
+  currency::wide_difficulty_type pos_start, pos_end, pos_step;
+  pos_start.assign("810000000000000000000000000");
+  pos_end.assign("2500000000000000000000000000");
+  pos_step.assign("5000000000000000000000000");
+
+  //upper bound for binary search 3x the main chains PoW cumulative diff
+  currency::wide_difficulty_type pow_upper_bound;
+  pow_upper_bound.assign("9033793662008534943"); // 3011264554002844981 * 3
+
+  size_t points_checked = 0;
+  for (currency::wide_difficulty_type pos = pos_start; pos < pos_end; pos += pos_step)
+  {
+    // bin search breakpoint PoW
+    currency::wide_difficulty_type low = 0;
+    currency::wide_difficulty_type high = pow_upper_bound;
+
+    while (low < high)
+    {
+      currency::wide_difficulty_type mid = low + (high - low) / 2;
+      if (!if_alt_chain_stronger_hf4(pos, mid))
+        low = mid + 1;
+      else
+        high = mid;
+    }
+
+    if (low > 0 && low < pow_upper_bound)
+    {
+      bool at_breakpoint = if_alt_chain_stronger_hf4(pos, low);
+      ASSERT_TRUE(at_breakpoint) << "at breakpoint PoW=" << low << " pos=" << pos << " alt should win";
+
+      bool below_breakpoint = if_alt_chain_stronger_hf4(pos, low - 1);
+      ASSERT_FALSE(below_breakpoint) << "below breakpoint PoW=" << (low - 1) << " pos=" << pos << " alt should lose";
+
+      points_checked++;
+    }
+  }
+  LOG_PRINT_L0("fork_choice_rule_test_hf4: verified " << points_checked << " boundary points");
+  ASSERT_GT(points_checked, 300u) << "should verify at least 300 boundary points";
+}
+
+
+// test demonstrates the HF6 formula integer division asymmetry:
+// score_hf6(A,B) != score_hf6(B,A) due to double floor in integer division
+// shorter chains get higher scores, which caused the recursive reorganize
+TEST(fork_choice_rule_test, hf6_formula_asymmetry)
+{
+  using namespace currency;
+
+  // Setup: d_pos >> d_pow like in our production logs
+  // Production values- d_pow = 2 258 156  d_pos = 4 471 087 092 590 408 652
+  // and even d_pos = 2, d_pow = 1 is enought to trigger the asymmetry
+
+  // Case 1: minimal values (d_pos=2, d_pow=1) two purePoW forks after the split point: 4 blocks vs 10 blocks
+  // pos_diff=0 for both -> defaults to DIFFICULTY_POS_STARTER=1 inside
+  {
+    wide_difficulty_type d_pos_split = 2;
+    wide_difficulty_type d_pow_split = 1;
+    // Chain A = 4 PoW blocks (shorter
+    difficulties chain_4;
+    chain_4.pow_diff = 4;
+    chain_4.pos_diff = 0;  // no PoS blocks after fork -> will use starter=1
+
+    // Chain B = 10 PoW blocks (longer)
+    difficulties chain_10;
+    chain_10.pow_diff = 10;
+    chain_10.pos_diff = 0;  // same
+
+    // score(4-block, 10-block) - 4-block against 10-block
+    boost::multiprecision::uint1024_t score_4_vs_10 = get_a_to_b_relative_cumulative_difficulty_hf6(d_pos_split, d_pow_split, chain_4, chain_10);
+    // score(10-block, 4-block) - 10-blockagainst 4-block
+    boost::multiprecision::uint1024_t score_10_vs_4 = get_a_to_b_relative_cumulative_difficulty_hf6(d_pos_split, d_pow_split, chain_10, chain_4);
+
+    LOG_PRINT_L0("Case 1: d_pos=2, d_pow=1, chains 4 vs 10");
+    LOG_PRINT_L0("score(4-block, 10-block) = " << score_4_vs_10);
+    LOG_PRINT_L0("score(10-block, 4-block) = " << score_10_vs_4);
+    LOG_PRINT_L0("diff = " << (score_4_vs_10 - score_10_vs_4));
+
+    // fixed: longer chain (10 blocks) now wins correctly
+    // before fix this was shorter chain won
+    ASSERT_LT(score_4_vs_10, score_10_vs_4) << "After fix: longer chain should win";
+  }
+
+  // Case 2 recursive reorg trigger (1 block vs 4 blocks) after the first reorg, ex-main blocks are pushed as alt one by one
+  //first ex-main block = 1-block alt chain vs 4-block new main
+  //before fix: 1 block beat 4 blocks -> triggered infinite recursive reorganize - after fix: 4-block chain wins (no recursive reorg)
+  {
+    wide_difficulty_type d_pos_split = 2;
+    wide_difficulty_type d_pow_split = 1;
+
+    difficulties chain_1;
+    chain_1.pow_diff = 1;
+    chain_1.pos_diff = 0;
+
+    difficulties chain_4;
+    chain_4.pow_diff = 4;
+    chain_4.pos_diff = 0;
+
+    boost::multiprecision::uint1024_t score_1_vs_4 = get_a_to_b_relative_cumulative_difficulty_hf6(d_pos_split, d_pow_split, chain_1, chain_4);
+    boost::multiprecision::uint1024_t score_4_vs_1 = get_a_to_b_relative_cumulative_difficulty_hf6(d_pos_split, d_pow_split, chain_4, chain_1);
+
+    LOG_PRINT_L0("Case 2: d_pos=2, d_pow=1, chains 1 vs 4 (recursive reorg)");
+    LOG_PRINT_L0("score(1-block, 4-block) = " << score_1_vs_4);
+    LOG_PRINT_L0("score(4-block, 1-block) = " << score_4_vs_1);
+
+    // fixed: 4-block chain wins, no recursive reorg
+    // before fix this was 1-block chain won
+    ASSERT_LT(score_1_vs_4, score_4_vs_1) << "after fix: longer chain should win";
+  }
+
+  // Case 3 production values (from log file)
+  // before fix: shorter chain won with real production numbers too, after fix: longer chain wins correctly
+  {
+    wide_difficulty_type d_pos_split;
+    d_pos_split.assign("4471087092590408652"); // from log file
+    wide_difficulty_type d_pow_split = 2258156;
+
+    difficulties chain_4;
+    chain_4.pow_diff = 1099233;  // ~4 blocks difficulty(from log file)
+    chain_4.pos_diff = 0;
+
+    difficulties chain_10;
+    chain_10.pow_diff = 2747042;  // ~10 blocks worth
+    chain_10.pos_diff = 0;
+
+    boost::multiprecision::uint1024_t score_4_vs_10 = get_a_to_b_relative_cumulative_difficulty_hf6(d_pos_split, d_pow_split, chain_4, chain_10);
+    boost::multiprecision::uint1024_t score_10_vs_4 = get_a_to_b_relative_cumulative_difficulty_hf6(d_pos_split, d_pow_split, chain_10, chain_4);
+
+    LOG_PRINT_L0("Case 3 production value");
+    LOG_PRINT_L0("score(4-block, 10-block) = " << score_4_vs_10);
+    LOG_PRINT_L0("score(10-block, 4-block) = " << score_10_vs_4);
+
+    // fixed: longer chain wins production values
+    // before fix this was shorter chain won
+    ASSERT_LT(score_4_vs_10, score_10_vs_4) << "after fix: longer chain should win at production scale";
+  }
+
+  // Case 4: old formula (pre-HF6 does NOT have this asymmetry
+  {
+    wide_difficulty_type d_pos_split = 2;
+    wide_difficulty_type d_pow_split = 1;
+
+    difficulties chain_4;
+    chain_4.pow_diff = 4;
+    chain_4.pos_diff = 0;
+
+    difficulties chain_10;
+    chain_10.pow_diff = 10;
+    chain_10.pos_diff = 0;
+
+    boost::multiprecision::uint1024_t score_4_vs_10_old = get_a_to_b_relative_cumulative_difficulty(d_pos_split, d_pow_split, chain_4, chain_10);
+    boost::multiprecision::uint1024_t score_10_vs_4_old = get_a_to_b_relative_cumulative_difficulty(d_pos_split, d_pow_split, chain_10, chain_4);
+
+    LOG_PRINT_L0("Case 4: OLD formula (pre-HF6), same setup");
+    LOG_PRINT_L0("score_old(4-block, 10-block) = " << score_4_vs_10_old);
+    LOG_PRINT_L0("score_old(10-block, 4-block) = " << score_10_vs_4_old);
+
+    // Old formula: longer chain wins (always correct)
+    ASSERT_LT(score_4_vs_10_old, score_10_vs_4_old) << "Old formula: longer chain should win";
+  }
+
+  // Case 5: when d_pos == d_pow, HF6 formula is fine (no asymmetry)
+  {
+    wide_difficulty_type d_pos_split = 1;
+    wide_difficulty_type d_pow_split = 1;
+
+    difficulties chain_4;
+    chain_4.pow_diff = 4;
+    chain_4.pos_diff = 0;
+
+    difficulties chain_10;
+    chain_10.pow_diff = 10;
+    chain_10.pos_diff = 0;
+
+    boost::multiprecision::uint1024_t score_4_vs_10 = get_a_to_b_relative_cumulative_difficulty_hf6(d_pos_split, d_pow_split, chain_4, chain_10);
+    boost::multiprecision::uint1024_t score_10_vs_4 = get_a_to_b_relative_cumulative_difficulty_hf6(d_pos_split, d_pow_split, chain_10, chain_4);
+
+    LOG_PRINT_L0("Case 5: d_pos == d_pow (no asymmetry expected)");
+    LOG_PRINT_L0("score_hf6(4-block, 10-block) = " << score_4_vs_10);
+    LOG_PRINT_L0("score_hf6(10-block, 4-block) = " << score_10_vs_4);
+
+    // When d_pos == d_pow, longer chain should win correctly
+    ASSERT_LT(score_4_vs_10, score_10_vs_4) << "When d_pos == d_pow, longer chain should win";
+  }
+}

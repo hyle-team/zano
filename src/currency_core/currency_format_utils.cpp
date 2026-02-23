@@ -5180,8 +5180,10 @@ namespace currency
     const wide_difficulty_type& a_pow_cumulative_difficulty = a_diff.pow_diff > 0 ? a_diff.pow_diff : difficulty_pow_starter;
     const wide_difficulty_type& b_pow_cumulative_difficulty = b_diff.pow_diff > 0 ? b_diff.pow_diff : difficulty_pow_starter;
 
-    boost::multiprecision::uint1024_t basic_sum_ = boost::multiprecision::uint1024_t(a_pow_cumulative_difficulty) + (boost::multiprecision::uint1024_t(a_pos_cumulative_difficulty)*difficulty_pow_at_split_point) / difficulty_pos_at_split_point;
-    boost::multiprecision::uint1024_t basic_sum_pow_minus2 = adjusting_multiplier /(basic_sum_ * basic_sum_);
+    boost::multiprecision::uint1024_t basic_sum_scaled = boost::multiprecision::uint1024_t(a_pow_cumulative_difficulty) * difficulty_pos_at_split_point + boost::multiprecision::uint1024_t(a_pos_cumulative_difficulty) * difficulty_pow_at_split_point;
+    boost::multiprecision::uint1024_t d_pos_sq = boost::multiprecision::uint1024_t(difficulty_pos_at_split_point) * boost::multiprecision::uint1024_t(difficulty_pos_at_split_point);
+    boost::multiprecision::uint1024_t basic_sum_pow_minus2 = (adjusting_multiplier * d_pos_sq) / (basic_sum_scaled * basic_sum_scaled);
+
     boost::multiprecision::uint1024_t res =
       (basic_sum_pow_minus2 * a_pow_cumulative_difficulty * a_pos_cumulative_difficulty) / (boost::multiprecision::uint1024_t(b_pow_cumulative_difficulty)*b_pos_cumulative_difficulty);
 
