@@ -177,7 +177,7 @@ public:
   bool is_qt_logs_enabled() const { return m_qt_logs_enbaled; }
   std::string get_qt_dev_tools_option() const { return m_qt_dev_tools; }
   void set_use_deffered_global_outputs(bool use) { m_use_deffered_global_outputs = use; }
-  bool set_use_relay(bool use_tor);
+  bool set_use_tor(bool use_tor);
   std::string add_custom_asset_id(uint64_t wallet_id, const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_descriptor);
   std::string delete_custom_asset_id(uint64_t wallet_id, const crypto::public_key& asset_id);
   bool is_core_initialized() { return m_core_initialized;}
@@ -207,7 +207,7 @@ private:
   virtual void on_pos_block_found(size_t wallet_id, const currency::block& /*block*/) override;
   virtual void on_sync_progress(size_t wallet_id, const uint64_t& /*percents*/) override;
   virtual void on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti) override;
-  virtual void on_wallet_status_change(size_t wallet_id, const std::string& state) override;
+  virtual void on_tor_status_change(size_t wallet_id, const std::string& state) override;
 
   virtual void on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets) override;
   virtual bool on_mw_select_wallet(uint64_t wallet_id) override;

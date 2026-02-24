@@ -1878,15 +1878,15 @@ QString MainWindow::get_log_level(const QString& param)
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString MainWindow::set_enable_relay(const QString& param)
+QString MainWindow::set_enable_tor(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
-  PREPARE_ARG_FROM_JSON(currency::struct_with_one_t_type<bool>, enable_relay);
-  m_backend.set_use_relay(enable_relay.v);
+  PREPARE_ARG_FROM_JSON(currency::struct_with_one_t_type<bool>, enabl_tor);
+  m_backend.set_use_tor(enabl_tor.v);
   //epee::log_space::get_set_log_detalisation_level(true, enabl_tor.v);
   default_ar.error_code = API_RETURN_CODE_OK;
-  LOG_PRINT("[RELAY]: Enable relay set to " << enable_relay.v, LOG_LEVEL_MIN);
+  LOG_PRINT("[TOR]: Enable TOR set to " << enabl_tor.v, LOG_LEVEL_MIN);
 
   return MAKE_RESPONSE(default_ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
