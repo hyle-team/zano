@@ -1083,7 +1083,7 @@ void simple_wallet::on_tor_status_change(const std::string& state)
     human_message = "Sending failed";
 
 
-  message_writer(epee::log_space::console_color_yellow, true, std::string("[WALLET]: ")) << human_message;
+  message_writer(epee::log_space::console_color_yellow, true, std::string("[TOR]: ")) << human_message;
 }
 //----------------------------------------------------------------------------------------------------
 void simple_wallet::on_mw_get_wallets(std::vector<tools::wallet_public::wallet_entry_info>& wallets)
