@@ -5847,7 +5847,7 @@ void wallet2::register_gateway_address(const wallet_public::COMMAND_GATEWAY_REGI
   gateway_operation.operation = operation_register;
 
   construct_tx_param ctp = get_default_construct_tx_param();
-
+  ctp.fee = CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE;
 
   tx_destination_entry td = AUTO_VAL_INIT(td);
   td.addr.push_back(this->get_account().get_public_address());

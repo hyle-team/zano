@@ -1824,6 +1824,9 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   tools::wallet_rpc_server bob_wlt_rpc(bob_wlt);
 
   miner_wlt->refresh();
+  miner_wlt->transfer(CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE, alice_wlt->get_account().get_public_address());
+
+
 
   // miner deploys new asset and sends 50 coins of it to Alice
   uint8_t deployed_asset_decimal_point = 0;
@@ -1843,12 +1846,12 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   LOG_PRINT_GREEN_L0("Deployed asset: " << deployed_asset_id);
 
   // Alice and miner mine some blocks, confirming asset registering tx
-  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 2);
   CHECK_AND_ASSERT_TRUE(mine_next_pow_blocks_in_playtime(alice_wlt->get_account().get_public_address(), c, 3));
   CHECK_AND_ASSERT_TRUE(mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW));
   CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
 
-  uint64_t alice_expected_balance_native = 3 * COIN; // mined
+  uint64_t alice_expected_balance_native = 3 * COIN + CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE; // mined
   uint64_t alice_expected_balance_asset = req_deploy.asset_descriptor.current_supply;
 
   CHECK_AND_ASSERT_TRUE(refresh_wallet_and_check_balance("got asset and mined 3 blocks", "Alice", alice_wlt, alice_expected_balance_native));
@@ -1895,6 +1898,8 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   c.get_tx_pool().clear();
   CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
 
+  alice_wlt->reset_history();
+  alice_wlt->refresh();
   // register gw address using good view key
   gw_reg_resp = {};
   gw_reg_req.view_pub_key = gw_addr_public_key;
