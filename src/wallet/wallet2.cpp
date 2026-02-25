@@ -47,6 +47,7 @@ using namespace epee;
 #include "crypto/zarcanum.h"
 #include "wallet_debug_events_definitions.h"
 #include "decoy_selection.h"
+#include "wallet_helpers.h"
 
 using namespace currency;
 
@@ -95,6 +96,11 @@ namespace tools
   wallet2::~wallet2()
   {
     // do nothing
+  }
+  //---------------------------------------------------------------
+  void wallet_public::wallet_transfer_info::restore_fee_from_tx()
+  {
+    fee = currency::is_coinbase(tx) ? 0 : currency::get_tx_fee(tx);
   }
   //---------------------------------------------------------------
   uint64_t wallet2::get_max_unlock_time_from_receive_indices(const currency::transaction& tx, const wallet_public::employed_tx_entries& td)
@@ -176,6 +182,11 @@ void wallet2::init(const std::string& daemon_address)
     }
     WLT_LOG_L0(ss.str());
   }
+}
+//----------------------------------------------------------------------------------------------------
+void wallet2::reset_connection_addr(const std::string& daemon_address)
+{
+  m_core_proxy->set_connection_addr(daemon_address);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy)
@@ -2101,6 +2112,17 @@ uint64_t wallet2::get_sync_progress()
   return m_last_sync_percent;
 }
 //----------------------------------------------------------------------------------------------------
+bool wallet2::get_is_remote_daemon_connected()
+{
+  std::shared_ptr<const proxy_diagnostic_info> diag_info = m_core_proxy->get_proxy_diagnostic_info();
+  return tools::get_is_remote_daemon_connected_from_diag_info(diag_info);
+}
+//----------------------------------------------------------------------------------------------------
+uint64_t wallet2::get_sync_speed() const
+{
+  return m_core_proxy->get_download_speed();
+}
+//----------------------------------------------------------------------------------------------------
 void wallet2::refresh()
 {
   size_t blocks_fetched = 0;
@@ -3593,6 +3615,7 @@ void wallet2::store_watch_only(const std::wstring& path_to_save, const std::stri
 
   wo.m_watch_only = true;
   wo.m_account = m_account;
+  wo.m_password = password;
   wo.m_account.make_account_watch_only();
   wo.prepare_file_names(path_to_save);
 

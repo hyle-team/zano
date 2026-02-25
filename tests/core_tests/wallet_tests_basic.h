@@ -12,10 +12,10 @@
 #include "rpc/core_rpc_server.h"
 
 template<typename wallet_t>
-void set_playtime_test_wallet_options(std::shared_ptr<wallet_t> w)
+void set_playtime_test_wallet_options(std::shared_ptr<wallet_t> w, bool concise_mode = true)
 {
   w->set_disable_tor_relay(true);
-  w->set_concise_mode(true);
+  w->set_concise_mode(concise_mode);
   w->set_concise_mode_reorg_max_reorg_blocks(TESTS_CONCISE_MODE_REORG_MAX_REORG_BLOCK);
   w->set_use_assets_whitelisting(false);
 }

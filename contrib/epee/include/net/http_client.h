@@ -214,7 +214,8 @@ namespace epee
         virtual bool is_connected() = 0;
         virtual bool invoke_get(const std::string& uri, const std::string& body = std::string(), const http_response_info** ppresponse_info = NULL, const fields_list& additional_params = fields_list()) = 0;
         virtual bool invoke(const std::string& uri, const std::string& method, const std::string& body, const http_response_info** ppresponse_info = NULL, const fields_list& additional_params = fields_list()) = 0;
-        virtual bool invoke_post(const std::string& uri, const std::string& body, const http_response_info** ppresponse_info = NULL, const fields_list& additional_params = fields_list()) = 0;
+        virtual bool invoke_post(const std::string& uri, const std::string& body, const http_response_info** ppresponse_info = NULL, const fields_list& additional_params = fields_list()) = 0; 
+        virtual uint64_t get_download_speed() const = 0;
       };
 
       template<bool is_ssl>
@@ -275,7 +276,10 @@ namespace epee
         {
           return m_net_client.get_socket();
         }
-
+        uint64_t get_download_speed() const
+        {
+          return m_net_client.get_download_speed();
+        }
 
         bool connect(const std::string& host, int port, unsigned int timeout)
         {
@@ -935,7 +939,7 @@ namespace epee
         bool invoke_get(const std::string& uri, const std::string& body = std::string(), const http_response_info** ppresponse_info = nullptr, const fields_list& additional_params = fields_list()) override { return m_pclient->invoke_get(uri, body, ppresponse_info, additional_params); }
         bool invoke(const std::string& uri, const std::string& method, const std::string& body, const http_response_info** ppresponse_info = nullptr, const fields_list& additional_params = fields_list()) override { return m_pclient->invoke(uri, method, body, ppresponse_info, additional_params); }
         bool invoke_post(const std::string& uri, const std::string& body, const http_response_info** ppresponse_info = nullptr, const fields_list& additional_params = fields_list()) override { return m_pclient->invoke_post(uri, body, ppresponse_info, additional_params); }
-
+        uint64_t get_download_speed() const { return m_pclient->get_download_speed(); }
         void set_is_ssl(bool is_ssl)
         {
           if (m_is_ssl != is_ssl)

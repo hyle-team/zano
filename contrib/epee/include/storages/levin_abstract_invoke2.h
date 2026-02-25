@@ -233,8 +233,18 @@ namespace epee
     template<class t_owner, class t_in_type, class t_context, class callback_t>
     int buff_to_t_adapter(t_owner* powner, int command, const std::string& in_buff, callback_t cb, t_context& context)
     {
+
+      //get portable storage limits
+      const epee::serialization::portable_storage_limits& limits =
+        []() -> const epee::serialization::portable_storage_limits& {
+        if constexpr (has_static_portable_storage_limits<t_owner>::value)
+          return t_owner::local_portable_storage_limits;
+        else
+          return epee::serialization::gdefault_portable_storage_limits;
+        }();
+
       serialization::portable_storage strg;
-      if(!strg.load_from_binary(in_buff))
+      if(!strg.load_from_binary(in_buff, limits))
       {
         LOG_ERROR("Failed to load_from_binary in notify " << command);
         return LEVIN_ERROR_FORMAT;
