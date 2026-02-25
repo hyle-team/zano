@@ -366,9 +366,12 @@ namespace tools::legacy
       BOOST_SERIALIZE(unlock_time)
       BOOST_SERIALIZE(service_entries)
       BOOST_SERIALIZE(subtransfers)
+      BOOST_SERIALIZATION_DO_ON_LOADING(restore_fee_from_tx()) // fee wasn't serialized, so we need to restore it after wallet's loading -- sowle
     END_BOOST_SERIALIZATION()
 
     // ( additional member functions removed )
+
+    void restore_fee_from_tx();
   };
 
 

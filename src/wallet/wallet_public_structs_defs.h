@@ -170,6 +170,7 @@ namespace tools::wallet_public
     bool          is_mixing = false;
     bool          is_mining = false;
     uint64_t      tx_type = 0;
+    uint64_t      fee = 0;
     employed_tx_entries employed_entries;
     std::vector<currency::tx_service_attachment> service_entries;
     std::vector<std::string> remote_addresses;  //optional
@@ -177,7 +178,6 @@ namespace tools::wallet_public
     std::vector<wallet_sub_transfers_by_pid_info> subtransfers_by_pid;
 
     //not included in streaming serialization
-    uint64_t      fee = 0;
     bool          show_sender = false;
     std::vector<escrow_contract_details> contract;
     uint16_t      extra_flags = 0;
@@ -225,6 +225,7 @@ namespace tools::wallet_public
       BOOST_SERIALIZE(tx_wide_payment_id)
       BOOST_SERIALIZE(remote_addresses)
       BOOST_SERIALIZE(employed_entries)
+      BOOST_SERIALIZE(fee)
       BOOST_SERIALIZE(tx)
       BOOST_SERIALIZE(remote_aliases)
       BOOST_SERIALIZE(comment)
@@ -234,7 +235,6 @@ namespace tools::wallet_public
       BOOST_SERIALIZE(unlock_time)
       BOOST_SERIALIZE(service_entries)
       BOOST_SERIALIZE(subtransfers_by_pid)
-      BOOST_SERIALIZATION_DO_ON_LOADING(restore_fee_from_tx()) // TODO: remove this after HF6 migration -- sowle
     END_BOOST_SERIALIZATION_TOTAL_FIELDS(24)
 
     wallet_sub_transfers_by_pid_info& get_or_add_subtransfers_by_pid(const currency::payment_id_t& pid)
@@ -253,8 +253,6 @@ namespace tools::wallet_public
     {
       return get_or_add_subtransfers_by_pid("").subtransfers;
     }
-
-    void restore_fee_from_tx();
 
     bool is_income_mode_encryption() const 
     {

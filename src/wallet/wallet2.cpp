@@ -93,7 +93,7 @@ namespace tools
     // do nothing
   }
   //---------------------------------------------------------------
-  void wallet_public::wallet_transfer_info::restore_fee_from_tx()
+  void legacy::wallet_transfer_info_hf5::restore_fee_from_tx()
   {
     fee = currency::is_coinbase(tx) ? 0 : currency::get_tx_fee(tx);
   }
