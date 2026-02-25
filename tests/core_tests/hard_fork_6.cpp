@@ -1046,7 +1046,7 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
   gwdo_reg.descriptor.meta_info = "gw_addr1";
   gwdo_reg.descriptor.owner_key = m_gw_addr1_spend.pub;
   gwdo.operation = gwdo_reg;
-  MAKE_TX_EXTRA_ATTACH_FEE(events, tx_3, miner_acc, miner_acc, 0, TX_DEFAULT_FEE, blk_2, std::vector<extra_v>({ gwdo }), empty_attachment);
+  MAKE_TX_EXTRA_ATTACH_FEE(events, tx_3, miner_acc, miner_acc, 0, CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE, blk_2, std::vector<extra_v>({ gwdo }), empty_attachment);
   MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_3);
 
   // register 2nd gw address
@@ -1057,7 +1057,7 @@ bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events
   gwdo_reg.descriptor.meta_info = "gw_addr2";
   gwdo_reg.descriptor.owner_key = m_gw_addr2_spend.pub;
   gwdo.operation = gwdo_reg;
-  MAKE_TX_EXTRA_ATTACH_FEE(events, tx_4, miner_acc, miner_acc, 0, TX_DEFAULT_FEE, blk_3, std::vector<extra_v>({ gwdo }), empty_attachment);
+  MAKE_TX_EXTRA_ATTACH_FEE(events, tx_4, miner_acc, miner_acc, 0, CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE, blk_3, std::vector<extra_v>({ gwdo }), empty_attachment);
   MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_4);
 
   REWIND_BLOCKS_N(events, blk_4r, blk_4, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);

@@ -364,7 +364,8 @@ namespace tools::wallet_public
 
     static bool wallet_transfer_info_to_pid(const wallet_transfer_info_old& wtio, std::string& val)
     {
-      CHECK_AND_ASSERT_THROW_MES(!wtio.has_intrinsic_payment_id(), "corresponding tx uses intrinsic payment id(s), and its data cannot be retreived using legacy API");
+      bool good_to_go = !wtio.has_intrinsic_payment_id();
+      CHECK_AND_ASSERT_THROW_MES(good_to_go, "corresponding tx uses intrinsic payment id(s), and its data cannot be retreived using legacy API");
       val = epee::string_tools::buff_to_hex_nodelimer(wtio.tx_wide_payment_id);
       return true;
     }
