@@ -22,7 +22,7 @@ using namespace epee;
 
 
 #define RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS                                       4000
-#define RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS                                    500
+#define RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS                                    CURRENCY_TX_MAX_ALLOWED_INPUTS * (CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1) * 2 // 2 - over
 #define RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3                                   300
 #define RPC_LIMIT_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES_TXIDS                               100
 #define RPC_LIMIT_COMMAND_RPC_CHECK_KEYIMAGES_IMAGES                                            1000
