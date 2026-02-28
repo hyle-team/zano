@@ -5077,8 +5077,12 @@ bool blockchain_storage::put_gw_address_operation_register(const transaction& tx
   auto add_entry_ptr = m_db_gateway_addresses.find(gao.view_pub_key);
   CHECK_AND_ASSERT_MES(!add_entry_ptr, false, "gateway_address_descriptor_operation_register for tx " << tx_id << " trying to register address " << gao.view_pub_key << " which is already registered");
 
-  uint64_t fee = get_tx_fee(tx);
-  CHECK_AND_ASSERT_MES(fee >= CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE, false, "gateway_address_descriptor_operation_register for tx " << tx_id << " has insufficient fee: " << print_money_brief(fee) << ", required: " << print_money_brief(CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE));
+  static_assert(TESTNET == 1 || ZANO_HARDFORK_06_AFTER_HEIGHT == 999999999999999999);  // 1/2
+  if (height > 20445)                                                                  // 2/2 TODO: remove these 2 lines before releasing 2.2.x for mainnet -- sowle
+  {
+    uint64_t fee = get_tx_fee(tx);
+    CHECK_AND_ASSERT_MES(fee >= CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE, false, "gateway_address_descriptor_operation_register for tx " << tx_id << " has insufficient fee: " << print_money_brief(fee) << ", required: " << print_money_brief(CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE));
+  }
 
 
   gateway_address_data gad{};
