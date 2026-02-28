@@ -8346,28 +8346,53 @@ bool wallet2::store_unsigned_tx_to_file_and_reserve_transfers(const currency::fi
 //----------------------------------------------------------------------------------------------------
 void wallet2::check_and_throw_if_self_directed_tx_with_payment_id_requested(const construct_tx_param& ctp)
 {
-  // If someone sends coins to his own address, all tx outputs will be detected as own outputs.
-  // It's totally okay unless payment id is used, because it would be impossible to distinguish
-  // between change outs and transfer outs. Thus, such tx with a payment id can't be correctly
-  // obtained via RPC by the given payment id. It could be a problem for an exchange or other
-  // service when a user, identifyied by payment id sends coins to another user on the same
-  // exchange/service. Coins will be received but RPCs like get_payments won't give the transfer.
-  // To avoid such issues we prohibit such txs with a soft rule on sender side.
+  payment_id_t pid;
+  bool has_tx_wide_payment_id = get_tx_wide_payment_id_from_decrypted_container(ctp.attachments, pid) && !pid.empty();
 
-  for (auto& d : ctp.dsts)
+  if (is_in_hardfork_zone(ZANO_HARDFORK_06))
   {
-    for (auto& addr : d.addr)
+    // In HF6 we forbid any transaction that has at least one self-directed output with intrinsic payment id
+    // OR at least one self-directed output with legacy tx-wide payment id.
+    // All such txs will be rejected on tx scan.
+    for (auto& d : ctp.dsts)
     {
-      if(addr.type() == typeid(account_public_address))
-      if ( boost::get<account_public_address>(addr) != m_account.get_public_address())
-        return; // at least one destination address is not our address -- it's not self-directed tx
+      for (auto& addr : d.addr)
+      {
+        if (addr.type() == typeid(account_public_address))
+        {
+          if (boost::get<account_public_address>(addr) == m_account.get_public_address())
+          {
+            // self-directed destination, make sure there's no intrinsic pid, nor tx wide pid
+            WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(d.payment_id == 0, "sending funds to yourself with intrinsic payment id is not allowed");
+            WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!has_tx_wide_payment_id, "sending funds to yourself with tx-wide payment id is not allowed");
+          }
+        }
+      }
     }
   }
+  else if (is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
+  {
+    // If someone sends coins to his own address, all tx outputs will be detected as own outputs.
+    // It's totally okay unless payment id is used, because it would be impossible to distinguish
+    // between change outs and transfer outs. Thus, such tx with a payment id can't be correctly
+    // obtained via RPC by the given payment id. It could be a problem for an exchange or other
+    // service when a user, identifyied by payment id sends coins to another user on the same
+    // exchange/service. Coins will be received but RPCs like get_payments won't give the transfer.
+    // To avoid such issues we prohibit such txs with a soft rule on sender side.
 
-  // it's self-directed tx
-  payment_id_t pid;
-  bool has_payment_id = get_tx_wide_payment_id_from_decrypted_container(ctp.attachments, pid) && !pid.empty();
-  WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!has_payment_id, "sending funds to yourself with payment id is not allowed");
+    for (auto& d : ctp.dsts)
+    {
+      for (auto& addr : d.addr)
+      {
+        if(addr.type() == typeid(account_public_address))
+        if ( boost::get<account_public_address>(addr) != m_account.get_public_address())
+          return; // at least one destination address is not our address -- it's not self-directed tx
+      }
+    }
+
+    // it's self-directed tx
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!has_tx_wide_payment_id, "sending funds to yourself with payment id is not allowed");
+  }
 }
 //----------------------------------------------------------------------------------------------------
 void wallet2::check_and_throw_if_smth_not_good_with_comment_or_payment_id(const construct_tx_param& ctp)

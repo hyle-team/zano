@@ -2017,7 +2017,7 @@ namespace currency
   void encrypt_decrypt_key_derivation_for_sender(const crypto::public_key& tx_pub, const crypto::secret_key& spend_sec, crypto::key_derivation& in_out)
   {
     crypto::key_derivation tmp_derivation;
-    bool r = crypto::generate_key_derivation(tx_pub, spend_sec, tmp_derivation);
+    bool r = crypto::generate_key_derivation(tx_pub, spend_sec, tmp_derivation); // tmp_derivation = 8 * spend_sec * tx_pub
     CHECK_AND_ASSERT_THROW_MES(r, "generate_key_derivation failed");
     crypto::chacha_key ck{};
     crypto::chacha_iv civ{};

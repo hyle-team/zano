@@ -5177,7 +5177,7 @@ bool blockchain_storage::pop_gw_address_operation(const gateway_address_descript
   else
     m_db_gateway_addresses.erase(address_id);
 
-  return false;
+  return true;
 }
 //------------------------------------------------------------------
 bool blockchain_storage::get_outs_index_stat(outs_index_stat& outs_stat) const
