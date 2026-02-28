@@ -362,18 +362,28 @@ namespace tools::wallet_public
 
     static bool wallet_transfer_info_to_pid(const wallet_transfer_info_old& wtio, std::string& val)
     {
-      bool good_to_go = !wtio.has_intrinsic_payment_id();
-      CHECK_AND_ASSERT_THROW_MES(good_to_go, "corresponding tx uses intrinsic payment id(s), and its data cannot be retreived using legacy API");
-      val = epee::string_tools::buff_to_hex_nodelimer(wtio.tx_wide_payment_id);
-      return true;
+      if (!wtio.has_intrinsic_payment_id())
+      {
+        val = epee::string_tools::buff_to_hex_nodelimer(wtio.tx_wide_payment_id);
+        return true;
+      }
+
+      if (wtio.subtransfers_by_pid.size() == 1 && wtio.tx_wide_payment_id.empty())
+      {
+        // single subtransfer by pid -- get this pid as tx wide pid
+        val = epee::string_tools::buff_to_hex_nodelimer(wtio.subtransfers_by_pid.front().payment_id);
+        return true;
+      }
+
+      // otherwise -- legacy API cannot determine which pid to return, so we can return error in this case
+      LOG_ERROR("corresponding tx uses intrinsic payment id(s), and its data cannot be retreived using legacy API");
+      return false;
     }
   };
 
   // only for txs with legacy tx-wide payment id, should not be used for new transactions if intrinsic payment id is present
   struct wallet_transfer_info_v2 : public wallet_transfer_info
   {
-    // std::string payment_id;
-    // std::vector<wallet_sub_transfer_info> subtransfers;
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE_EPHEMERAL_N(std::string, wti2_to_payment_id, "payment_id") DOC_DSCR("HEX-encoded payment id blob, if it was present")  DOC_EXMP("00000000ff00ff00")   DOC_END
       KV_SERIALIZE_EPHEMERAL_N(std::vector<wallet_sub_transfer_info>, wti2_to_subtransfers, "subtransfers") DOC_DSCR("Essential part of transfer entry: amounts that been transfered in this transaction grouped by asset id")  DOC_EXMP_AUTO(1)   DOC_END
@@ -395,6 +405,9 @@ namespace tools::wallet_public
       return true;
     }
   };
+
+  static_assert(std::is_move_constructible<wallet_transfer_info_v2>::value, "wallet_transfer_info_v2 is not move-constructible");
+  static_assert(std::is_move_assignable<wallet_transfer_info_v2>::value, "wallet_transfer_info_v2 is not move-assignable");
 
 
 
@@ -648,7 +661,7 @@ namespace tools::wallet_public
 
   struct COMMAND_RPC_GET_RECENT_TXS_AND_INFO2
   {
-    DOC_COMMAND("Returns wallet history of transactions V2(post-zarcanum version)");
+    DOC_COMMAND("(deprecated) Returns wallet history of transactions V2 (post-Zarcanum version)");
 
     struct request
     {
@@ -684,7 +697,7 @@ namespace tools::wallet_public
     struct response
     {
       wallet_provision_info pi;
-      std::vector<wallet_transfer_info> transfers;
+      std::vector<wallet_transfer_info_v2> transfers;
       uint64_t total_transfers;
       uint64_t last_item_index;
 
@@ -699,7 +712,7 @@ namespace tools::wallet_public
 
   struct COMMAND_RPC_GET_RECENT_TXS_AND_INFO
   {
-    DOC_COMMAND("Returns wallet history of transactions");
+    DOC_COMMAND("(deprecated) Returns wallet history of transactions");
 
     typedef COMMAND_RPC_GET_RECENT_TXS_AND_INFO2::request request;
 
@@ -722,7 +735,7 @@ namespace tools::wallet_public
 
   struct COMMAND_RPC_GET_RECENT_TXS_AND_INFO3
   {
-    DOC_COMMAND("Returns wallet history of transactions V3 (post-zarcanum version with intrinsic payment IDs)");
+    DOC_COMMAND("Returns wallet history of transactions V3 (HF6-ready version with intrinsic payment IDs support)");
 
     using request = COMMAND_RPC_GET_RECENT_TXS_AND_INFO2::request;
 

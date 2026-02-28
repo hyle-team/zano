@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -463,6 +463,38 @@ namespace tools
       res.pi.curent_height = w.get_wallet()->get_top_block_height();
     }
 
+    // collect data in modern wti format, then convert to the required legacy _v2
+    std::vector<wallet_public::wallet_transfer_info> transfers;
+
+    if (req.offset == 0 && !req.exclude_unconfirmed)
+      w.get_wallet()->get_unconfirmed_transfers(transfers, req.exclude_mining_txs);
+
+    bool start_from_end = true;
+    if (req.order == ORDER_FROM_BEGIN_TO_END)
+    {
+      start_from_end = false;
+    }
+    w.get_wallet()->get_recent_transfers_history(transfers, req.offset, req.count, res.total_transfers, res.last_item_index, req.exclude_mining_txs, start_from_end);
+
+    res.transfers.reserve(transfers.size());
+    for(auto&& ur_wti : transfers)
+      res.transfers.push_back(std::move(static_cast<wallet_public::wallet_transfer_info_v2&>(ur_wti)));
+
+    return true;
+    WALLET_RPC_CATCH_TRY_ENTRY();
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool wallet_rpc_server::on_get_recent_txs_and_info3(const wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO3::request& req, wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO3::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    WALLET_RPC_BEGIN_TRY_ENTRY();
+    if (req.update_provision_info)
+    {
+      res.pi.balance                = w.get_wallet()->balance(res.pi.unlocked_balance);
+      res.pi.transfer_entries_count = w.get_wallet()->get_transfer_entries_count();
+      res.pi.transfers_count        = w.get_wallet()->get_recent_transfers_total_count();
+      res.pi.curent_height          = w.get_wallet()->get_top_block_height();
+    }
+
     if (req.offset == 0 && !req.exclude_unconfirmed)
       w.get_wallet()->get_unconfirmed_transfers(res.transfers, req.exclude_mining_txs);
 
@@ -718,7 +750,7 @@ namespace tools
       return false;
     }
 
-    if (!currency::is_payment_id_size_ok(payment_id))
+    if (!currency::is_payment_id_size_ok(payment_id, m_allow_legacy_payment_id_size))
     {
       er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
       er.message = std::string("given payment id is too long: \'") + req.payment_id + "\'";

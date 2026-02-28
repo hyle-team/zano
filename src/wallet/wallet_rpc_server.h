@@ -112,8 +112,9 @@ namespace tools
         MAP_JON_RPC_WE("getbalance",                on_getbalance,                wallet_public::COMMAND_RPC_GET_BALANCE)
         MAP_JON_RPC_WE("getaddress",                on_getaddress,                wallet_public::COMMAND_RPC_GET_ADDRESS)
         MAP_JON_RPC_WE("get_wallet_info",           on_getwallet_info,            wallet_public::COMMAND_RPC_GET_WALLET_INFO)
-        MAP_JON_RPC_WE("get_recent_txs_and_info",   on_get_recent_txs_and_info,   wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO) //LEGACY
-        MAP_JON_RPC_WE("get_recent_txs_and_info2",  on_get_recent_txs_and_info2,  wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO2)
+        MAP_JON_RPC_WE("get_recent_txs_and_info",   on_get_recent_txs_and_info,   wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO)  // very LEGACY
+        MAP_JON_RPC_WE("get_recent_txs_and_info2",  on_get_recent_txs_and_info2,  wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO2) // will fail on post-HF6 txs with intrinsic pid
+        MAP_JON_RPC_WE("get_recent_txs_and_info3",  on_get_recent_txs_and_info3,  wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO3)
         MAP_JON_RPC_WE("transfer",                  on_transfer,                  wallet_public::COMMAND_RPC_TRANSFER)
         MAP_JON_RPC_WE("store",                     on_store,                     wallet_public::COMMAND_RPC_STORE)
         MAP_JON_RPC_WE("force_rescan_tx_pool",      force_rescan_tx_pool,         wallet_public::COMMAND_RPC_FORCE_RESCAN_TX_POOL)
@@ -192,6 +193,7 @@ namespace tools
     bool on_get_seed_phrase_info(const wallet_public::COMMAND_RPC_GET_SEED_PHRASE_INFO::request& req, wallet_public::COMMAND_RPC_GET_SEED_PHRASE_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_get_recent_txs_and_info(const wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::request& req, wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_get_recent_txs_and_info2(const wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO2::request& req, wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO2::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_get_recent_txs_and_info3(const wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO3::request& req, wallet_public::COMMAND_RPC_GET_RECENT_TXS_AND_INFO3::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_transfer(const wallet_public::COMMAND_RPC_TRANSFER::request& req, wallet_public::COMMAND_RPC_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool on_store(const wallet_public::COMMAND_RPC_STORE::request& req, wallet_public::COMMAND_RPC_STORE::response& res, epee::json_rpc::error& er, connection_context& cntx);
     bool force_rescan_tx_pool(const wallet_public::COMMAND_RPC_FORCE_RESCAN_TX_POOL::request& req, wallet_public::COMMAND_RPC_FORCE_RESCAN_TX_POOL::response& res, epee::json_rpc::error& er, connection_context& cntx);
