@@ -37,6 +37,7 @@ bool wallet_rpc_integrated_address::generate(std::vector<test_event_entry>& even
 
   // wallet RPC server
   tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
+  miner_wlt_rpc.set_flag_allow_legacy_payment_id_size(true);
   epee::json_rpc::error je;
   tools::wallet_rpc_server::connection_context ctx;
 
@@ -79,6 +80,9 @@ bool wallet_rpc_integrated_address::generate(std::vector<test_event_entry>& even
 
   CHECK_AND_ASSERT_MES(sia_res.standard_address == m_accounts[MINER_ACC_IDX].get_public_address_str(), false, "address missmatch");
   CHECK_AND_ASSERT_MES(sia_res.payment_id == mia_req.payment_id, false, "payment id missmatch");
+
+
+  // TODO: add cases for miner_wlt_rpc.set_flag_allow_legacy_payment_id_size(false)
 
   return true;
 }
@@ -432,7 +436,7 @@ bool wallet_rpc_exchange_suite::generate(std::vector<test_event_entry>& events) 
 #include "wallet_rpc_tests_legacy_defs.h"
 
 
-std::string gen_payment_id(tools::wallet_rpc_server& custody_wlt_rpc)
+std::string gen_payment_id_as_hex_str(tools::wallet_rpc_server& custody_wlt_rpc)
 {
   pre_hf4_api::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::request req = AUTO_VAL_INIT(req);
   pre_hf4_api::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::response resp = AUTO_VAL_INIT(resp);
@@ -441,10 +445,10 @@ std::string gen_payment_id(tools::wallet_rpc_server& custody_wlt_rpc)
   return resp.payment_id;
 }
 
-std::string get_integr_addr(tools::wallet_rpc_server& custody_wlt_rpc, const std::string payment_id)
+std::string get_integr_addr(tools::wallet_rpc_server& custody_wlt_rpc, const std::string payment_id_hex_str)
 {
   pre_hf4_api::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::request req = AUTO_VAL_INIT(req);
-  req.payment_id = payment_id;
+  req.payment_id = payment_id_hex_str;
   pre_hf4_api::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::response resp = AUTO_VAL_INIT(resp);
   bool r = invoke_text_json_for_rpc(custody_wlt_rpc, "make_integrated_address", req, resp);
   CHECK_AND_ASSERT_MES(r, "", "failed to call");
@@ -487,7 +491,7 @@ std::string transfer_new(std::shared_ptr<tools::wallet2> wlt, const std::string&
 bool test_payment_ids_generation(tools::wallet_rpc_server& custody_wlt_rpc)
 {
   //check make_integrated_address/split_integrated_address
-//check auto generated payment_id
+  //check auto generated payment_id
   pre_hf4_api::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::request req = AUTO_VAL_INIT(req);
   pre_hf4_api::COMMAND_RPC_MAKE_INTEGRATED_ADDRESS::response resp = AUTO_VAL_INIT(resp);
   bool r = invoke_text_json_for_rpc(custody_wlt_rpc, "make_integrated_address", req, resp);
@@ -517,7 +521,6 @@ bool test_payment_ids_generation(tools::wallet_rpc_server& custody_wlt_rpc)
 
 bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
 {
-
   bool r = false;
   account_base alice_acc, bob_acc, carol_acc, custody_acc;
   alice_acc.generate();
@@ -537,6 +540,7 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
   //r = mine_next_pow_blocks_in_playtime(custody_wlt->get_account().get_public_address(), c, 3);
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
+  bool hf6_active = c.get_blockchain_storage().is_hardfork_active(ZANO_HARDFORK_06);
 
   // wallet RPC server
   tools::wallet_rpc_server custody_wlt_rpc(custody_wlt);
@@ -544,9 +548,15 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
   r = test_payment_ids_generation(custody_wlt_rpc);
   CHECK_AND_ASSERT_MES(r, false, "test_payment_ids_generation() failed ");
   //======================================================================
-  std::string alice_payment_id = gen_payment_id(custody_wlt_rpc);
-  std::string bob_payment_id = gen_payment_id(custody_wlt_rpc);
-  std::string carol_payment_id = gen_payment_id(custody_wlt_rpc);
+  std::string alice_payment_id_hex_str  = gen_payment_id_as_hex_str(custody_wlt_rpc);
+  std::string alice_payment_id;
+  CHECK_AND_ASSERT_TRUE(epee::string_tools::parse_hexstr_to_binbuff(alice_payment_id_hex_str, alice_payment_id));
+  std::string bob_payment_id_hex_str    = gen_payment_id_as_hex_str(custody_wlt_rpc);
+  std::string bob_payment_id;
+  CHECK_AND_ASSERT_TRUE(epee::string_tools::parse_hexstr_to_binbuff(bob_payment_id_hex_str, bob_payment_id));
+  std::string carol_payment_id_hex_str  = gen_payment_id_as_hex_str(custody_wlt_rpc);
+  std::string carol_payment_id;
+  CHECK_AND_ASSERT_TRUE(epee::string_tools::parse_hexstr_to_binbuff(carol_payment_id_hex_str, carol_payment_id));
 
   // generate payment id's for each wallet and deposit
   custody_wlt->refresh();
@@ -556,22 +566,22 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
 
 #define TRANSFER_AMOUNT   COIN / 10
 
-  std::string alice_tx1 = transfer_(alice_wlt, get_integr_addr(custody_wlt_rpc, alice_payment_id), TRANSFER_AMOUNT);
+  std::string alice_tx1 = transfer_(alice_wlt, get_integr_addr(custody_wlt_rpc, alice_payment_id_hex_str), TRANSFER_AMOUNT);
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
 
-  std::string bob_tx1 = transfer_(bob_wlt, get_integr_addr(custody_wlt_rpc, bob_payment_id), TRANSFER_AMOUNT);
+  std::string bob_tx1 = transfer_(bob_wlt, get_integr_addr(custody_wlt_rpc, bob_payment_id_hex_str), TRANSFER_AMOUNT);
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
 
-  std::string bob_tx2 = transfer_(bob_wlt, get_integr_addr(custody_wlt_rpc, bob_payment_id), TRANSFER_AMOUNT);
+  std::string bob_tx2 = transfer_(bob_wlt, get_integr_addr(custody_wlt_rpc, bob_payment_id_hex_str), TRANSFER_AMOUNT);
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
 
-  std::string carol_tx1 = transfer_(carol_wlt, get_integr_addr(custody_wlt_rpc, carol_payment_id), TRANSFER_AMOUNT);
+  std::string carol_tx1 = transfer_(carol_wlt, get_integr_addr(custody_wlt_rpc, carol_payment_id_hex_str), TRANSFER_AMOUNT);
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
 
-  std::string carol_tx2 = transfer_(carol_wlt, get_integr_addr(custody_wlt_rpc, carol_payment_id), TRANSFER_AMOUNT);
+  std::string carol_tx2 = transfer_(carol_wlt, get_integr_addr(custody_wlt_rpc, carol_payment_id_hex_str), TRANSFER_AMOUNT);
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
 
-  std::string carol_tx3 = transfer_(carol_wlt, get_integr_addr(custody_wlt_rpc, carol_payment_id), TRANSFER_AMOUNT);
+  std::string carol_tx3 = transfer_(carol_wlt, get_integr_addr(custody_wlt_rpc, carol_payment_id_hex_str), TRANSFER_AMOUNT);
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
 
   CHECK_AND_ASSERT_MES(alice_tx1.size()
@@ -605,37 +615,37 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
   //CHECK_RESPONSE_EQUAL(resp.transfers[0].comment == TRANSFER_COMMENT);
   CHECK_AND_ASSERT_EQ(resp.transfers[0].amount, TRANSFER_AMOUNT);
   CHECK_AND_ASSERT_EQ(resp.transfers[0].is_income, true);
-  CHECK_AND_ASSERT_EQ(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[0].payment_id), carol_payment_id);
+  CHECK_AND_ASSERT_EQ(resp.transfers[0].payment_id, carol_payment_id);
   CHECK_AND_ASSERT_EQ(boost::lexical_cast<std::string>(resp.transfers[0].tx_hash), carol_tx3);
 
   //CHECK_RESPONSE_EQUAL(resp.transfers[1].comment == TRANSFER_COMMENT);
   CHECK_AND_ASSERT_EQ(resp.transfers[1].amount, TRANSFER_AMOUNT);
   CHECK_AND_ASSERT_EQ(resp.transfers[1].is_income, true);
-  CHECK_AND_ASSERT_EQ(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[1].payment_id), carol_payment_id);
+  CHECK_AND_ASSERT_EQ(resp.transfers[1].payment_id, carol_payment_id);
   CHECK_AND_ASSERT_EQ(boost::lexical_cast<std::string>(resp.transfers[1].tx_hash), carol_tx2);
 
   //CHECK_RESPONSE_EQUAL(resp.transfers[2].comment == TRANSFER_COMMENT);
   CHECK_AND_ASSERT_EQ(resp.transfers[2].amount, TRANSFER_AMOUNT);
   CHECK_AND_ASSERT_EQ(resp.transfers[2].is_income, true);
-  CHECK_AND_ASSERT_EQ(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[2].payment_id), carol_payment_id);
+  CHECK_AND_ASSERT_EQ(resp.transfers[2].payment_id, carol_payment_id);
   CHECK_AND_ASSERT_EQ(boost::lexical_cast<std::string>(resp.transfers[2].tx_hash), carol_tx1);
 
   //CHECK_RESPONSE_EQUAL(resp.transfers[3].comment == TRANSFER_COMMENT);
   CHECK_AND_ASSERT_EQ(resp.transfers[3].amount, TRANSFER_AMOUNT);
   CHECK_AND_ASSERT_EQ(resp.transfers[3].is_income, true);
-  CHECK_AND_ASSERT_EQ(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[3].payment_id), bob_payment_id);
+  CHECK_AND_ASSERT_EQ(resp.transfers[3].payment_id, bob_payment_id);
   CHECK_AND_ASSERT_EQ(boost::lexical_cast<std::string>(resp.transfers[3].tx_hash), bob_tx2);
 
   //CHECK_RESPONSE_EQUAL(resp.transfers[4].comment == TRANSFER_COMMENT);
   CHECK_AND_ASSERT_EQ(resp.transfers[4].amount, TRANSFER_AMOUNT);
   CHECK_AND_ASSERT_EQ(resp.transfers[4].is_income, true);
-  CHECK_AND_ASSERT_EQ(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[4].payment_id), bob_payment_id);
+  CHECK_AND_ASSERT_EQ(resp.transfers[4].payment_id, bob_payment_id);
   CHECK_AND_ASSERT_EQ(boost::lexical_cast<std::string>(resp.transfers[4].tx_hash), bob_tx1);
 
   //CHECK_RESPONSE_EQUAL(resp.transfers[5].comment == TRANSFER_COMMENT);
   CHECK_AND_ASSERT_EQ(resp.transfers[5].amount, TRANSFER_AMOUNT);
   CHECK_AND_ASSERT_EQ(resp.transfers[5].is_income, true);
-  CHECK_AND_ASSERT_EQ(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[5].payment_id), alice_payment_id);
+  CHECK_AND_ASSERT_EQ(resp.transfers[5].payment_id, alice_payment_id);
   CHECK_AND_ASSERT_EQ(boost::lexical_cast<std::string>(resp.transfers[5].tx_hash), alice_tx1);
 
 
@@ -652,25 +662,25 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
   //CHECK_RESPONSE_EQUAL(resp.transfers[0].comment == TRANSFER_COMMENT);
   CHECK_AND_ASSERT_EQ(resp.transfers[0].amount, TRANSFER_AMOUNT);
   CHECK_AND_ASSERT_EQ(resp.transfers[0].is_income, true);
-  CHECK_AND_ASSERT_EQ(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[0].payment_id), carol_payment_id);
+  CHECK_AND_ASSERT_EQ(resp.transfers[0].payment_id, carol_payment_id);
   CHECK_AND_ASSERT_EQ(boost::lexical_cast<std::string>(resp.transfers[0].tx_hash), carol_tx1);
 
   //CHECK_RESPONSE_EQUAL(resp.transfers[1].comment == TRANSFER_COMMENT);
   CHECK_AND_ASSERT_EQ(resp.transfers[1].amount, TRANSFER_AMOUNT);
   CHECK_AND_ASSERT_EQ(resp.transfers[1].is_income, true);
-  CHECK_AND_ASSERT_EQ(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[1].payment_id), bob_payment_id);
+  CHECK_AND_ASSERT_EQ(resp.transfers[1].payment_id, bob_payment_id);
   CHECK_AND_ASSERT_EQ(boost::lexical_cast<std::string>(resp.transfers[1].tx_hash), bob_tx2);
 
   //CHECK_RESPONSE_EQUAL(resp.transfers[2].comment == TRANSFER_COMMENT);
   CHECK_AND_ASSERT_EQ(resp.transfers[2].amount, TRANSFER_AMOUNT);
   CHECK_AND_ASSERT_EQ(resp.transfers[2].is_income, true);
-  CHECK_AND_ASSERT_EQ(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[2].payment_id), bob_payment_id);
+  CHECK_AND_ASSERT_EQ(resp.transfers[2].payment_id, bob_payment_id);
   CHECK_AND_ASSERT_EQ(boost::lexical_cast<std::string>(resp.transfers[2].tx_hash), bob_tx1);
 
   //CHECK_RESPONSE_EQUAL(resp.transfers[3].comment == TRANSFER_COMMENT);
   CHECK_AND_ASSERT_EQ(resp.transfers[3].amount, TRANSFER_AMOUNT);
   CHECK_AND_ASSERT_EQ(resp.transfers[3].is_income, true);
-  CHECK_AND_ASSERT_EQ(epee::string_tools::buff_to_hex_nodelimer(resp.transfers[3].payment_id), alice_payment_id);
+  CHECK_AND_ASSERT_EQ(resp.transfers[3].payment_id, alice_payment_id);
   CHECK_AND_ASSERT_EQ(boost::lexical_cast<std::string>(resp.transfers[3].tx_hash), alice_tx1);
 
   //getbalance
@@ -710,7 +720,7 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
   CHECK_AND_ASSERT_EQ(st_resp.in.begin()->amount, TRANSFER_AMOUNT);
   CHECK_AND_ASSERT_EQ(st_resp.in.begin()->is_income, true);
   CHECK_AND_ASSERT_EQ(st_resp.in.begin()->fee, TESTS_DEFAULT_FEE);
-  CHECK_AND_ASSERT_EQ(epee::string_tools::buff_to_hex_nodelimer(st_resp.in.begin()->payment_id), bob_payment_id);
+  CHECK_AND_ASSERT_EQ(st_resp.in.begin()->payment_id, bob_payment_id);
   CHECK_AND_ASSERT_EQ(boost::lexical_cast<std::string>(st_resp.in.begin()->tx_hash), bob_tx2);
 
   
@@ -741,7 +751,11 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
   CHECK_AND_ASSERT_EQ(st_resp.out.front().amount, TRANSFER_AMOUNT + TESTS_DEFAULT_FEE); // outgoing wti includes fee into amount/subtransfers
   CHECK_AND_ASSERT_EQ(st_resp.out.front().is_income, false);
   CHECK_AND_ASSERT_EQ(st_resp.out.front().fee, TESTS_DEFAULT_FEE);
-  CHECK_AND_ASSERT_EQ(epee::string_tools::buff_to_hex_nodelimer(st_resp.out.front().payment_id), alice_payment_id);
+  if (!hf6_active)
+  {
+    // this check is not valid since HF6, as we decided to stop accounting pid for outgoing wti due to complications with subtransfers -- sowle
+    CHECK_AND_ASSERT_EQ(st_resp.out.front().payment_id, alice_payment_id);
+  }
   CHECK_AND_ASSERT_EQ(boost::lexical_cast<std::string>(st_resp.out.front().tx_hash), alice_tx1);
 
   // search_for_transactions2 (outgoing)
@@ -757,7 +771,11 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
   CHECK_AND_ASSERT_EQ(st2_resp.out.size(), 1);
   CHECK_AND_ASSERT_EQ(st2_resp.out.front().fee, TESTS_DEFAULT_FEE);
   CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.size(), 1);
-  CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.front().payment_id, alice_payment_id);
+  if (!hf6_active)
+  {
+    // this check is not valid since HF6, as we decided to stop accounting pid for outgoing wti due to complications with subtransfers -- sowle
+    CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.front().payment_id, alice_payment_id);
+  }
   CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.front().subtransfers.size(), 1);
   CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.front().subtransfers.front().amount, TRANSFER_AMOUNT + TESTS_DEFAULT_FEE);
   CHECK_AND_ASSERT_EQ(st2_resp.out.front().subtransfers_by_pid.front().subtransfers.front().is_income, false);
@@ -765,9 +783,9 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
 
 
   //get_payments
-  pre_hf4_api::COMMAND_RPC_GET_PAYMENTS::request gps_req = AUTO_VAL_INIT(gps_req);
-  gps_req.payment_id = carol_payment_id;
-  pre_hf4_api::COMMAND_RPC_GET_PAYMENTS::response gps_resp = AUTO_VAL_INIT(gps_resp);
+  pre_hf4_api::COMMAND_RPC_GET_PAYMENTS::request gps_req{};
+  gps_req.payment_id = carol_payment_id_hex_str;
+  pre_hf4_api::COMMAND_RPC_GET_PAYMENTS::response gps_resp{};
   r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_payments", gps_req, gps_resp);
   CHECK_AND_ASSERT_MES(r, false, "failed to call");
 
@@ -778,25 +796,25 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
     CHECK_AND_ASSERT_EQ(gps_resp.payments.size(), 3);
     auto  it = gps_resp.payments.begin();
     CHECK_AND_ASSERT_EQ(it->amount, 100000000000);
-    CHECK_AND_ASSERT_EQ(it->payment_id, carol_payment_id);
+    CHECK_AND_ASSERT_EQ(it->payment_id, carol_payment_id_hex_str);
     CHECK_AND_ASSERT_EQ(it->block_height, 23);
     it++;
     CHECK_AND_ASSERT_EQ(it->amount, 100000000000);
-    CHECK_AND_ASSERT_EQ(it->payment_id, carol_payment_id);
+    CHECK_AND_ASSERT_EQ(it->payment_id, carol_payment_id_hex_str);
     CHECK_AND_ASSERT_EQ(it->block_height, 24);
     it++;
     CHECK_AND_ASSERT_EQ(it->amount, 100000000000);
-    CHECK_AND_ASSERT_EQ(it->payment_id, carol_payment_id);
+    CHECK_AND_ASSERT_EQ(it->payment_id, carol_payment_id_hex_str);
     CHECK_AND_ASSERT_EQ(it->block_height, 25);
   }
 
 
 
   //get_bulk_payments
-  pre_hf4_api::COMMAND_RPC_GET_BULK_PAYMENTS::request gbps_req = AUTO_VAL_INIT(gbps_req);
-  gbps_req.payment_ids.push_back(bob_payment_id);
-  gbps_req.payment_ids.push_back(alice_payment_id);
-  pre_hf4_api::COMMAND_RPC_GET_BULK_PAYMENTS::response gbps_resp = AUTO_VAL_INIT(gbps_resp);
+  pre_hf4_api::COMMAND_RPC_GET_BULK_PAYMENTS::request gbps_req{};
+  gbps_req.payment_ids.push_back(bob_payment_id_hex_str);
+  gbps_req.payment_ids.push_back(alice_payment_id_hex_str);
+  pre_hf4_api::COMMAND_RPC_GET_BULK_PAYMENTS::response gbps_resp{};
   r = invoke_text_json_for_rpc(custody_wlt_rpc, "get_bulk_payments", gbps_req, gbps_resp);
   CHECK_AND_ASSERT_MES(r, false, "failed to call");
   
@@ -807,15 +825,15 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
     CHECK_AND_ASSERT_EQ(gbps_resp.payments.size(), 3);
     auto  it = gbps_resp.payments.begin();
     CHECK_AND_ASSERT_EQ(it->amount, 100000000000);
-    CHECK_AND_ASSERT_EQ(it->payment_id, alice_payment_id);
+    CHECK_AND_ASSERT_EQ(it->payment_id, alice_payment_id_hex_str);
     CHECK_AND_ASSERT_EQ(it->block_height, 20);
     it++;
     CHECK_AND_ASSERT_EQ(it->amount, 100000000000);
-    CHECK_AND_ASSERT_EQ(it->payment_id, bob_payment_id);
+    CHECK_AND_ASSERT_EQ(it->payment_id, bob_payment_id_hex_str);
     CHECK_AND_ASSERT_EQ(it->block_height, 21);
     it++;
     CHECK_AND_ASSERT_EQ(it->amount, 100000000000);
-    CHECK_AND_ASSERT_EQ(it->payment_id, bob_payment_id);
+    CHECK_AND_ASSERT_EQ(it->payment_id, bob_payment_id_hex_str);
     CHECK_AND_ASSERT_EQ(it->block_height, 22);
   }
 
@@ -1865,7 +1883,9 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   //CHECK_AND_ASSERT_TRUE(r);
 
 
-  std::string alice_payment_id = gen_payment_id(alice_wlt_rpc);
+  //std::string alice_payment_id_hex_str  = gen_payment_id_as_hex_str(alice_wlt_rpc);
+  //std::string alice_payment_id;
+  //CHECK_AND_ASSERT_TRUE(epee::string_tools::parse_hexstr_to_binbuff(alice_payment_id_hex_str, alice_payment_id));
 
   CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, alice_expected_balance_native), false, "");
 
