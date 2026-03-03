@@ -230,9 +230,12 @@ if(STATIC)
   set(Boost_USE_STATIC_LIBS ON)  
   set(Boost_USE_STATIC_RUNTIME ON)
 endif()
+# preconfigure boost for certain platforms
 if(Boost_FATLIB)
+  # use fatlib for boost on mobile platforms
   set(Boost_LIBRARIES ${Boost_FATLIB})
 else()
+  # manually specify boost libs for mobile platforms
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     if(NOT DEFINED SKIP_BOOST_FATLIB_LIB OR NOT SKIP_BOOST_FATLIB_LIB)
       message("Ios: libboost.a included as library")    
