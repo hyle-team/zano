@@ -930,7 +930,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
 void wallet2::process_transaction_context::handle_incoming_tx_input(size_t transfer_index, const transfer_details& td, size_t input_index)
 {
   total_balance_change[td.get_asset_id()] -= td.amount();
-  total_balance_change_per_payment_id[td.m_payment_id][td.get_asset_id()] -= td.amount();
+  total_balance_change_per_payment_id[0][td.get_asset_id()] -= td.amount(); // don't take td.m_payment_id into account, since td is linked to the corresponding output, referred by the input
   
   if (td.is_native_coin())
     spent_own_native_inputs = true;
