@@ -5177,7 +5177,7 @@ bool blockchain_storage::pop_gw_address_operation(const gateway_address_descript
   else
     m_db_gateway_addresses.erase(address_id);
 
-  return false;
+  return true;
 }
 //------------------------------------------------------------------
 bool blockchain_storage::get_outs_index_stat(outs_index_stat& outs_stat) const
@@ -9180,6 +9180,13 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
       {
         // genesis can't be in tx_hashes
         CHECK_AND_ASSERT_MES(false, false, "input #" << n << " has unexpected type (" << tx.vin[n].type().name() << ", genesis can't be in tx_hashes), tx " << tx_id);
+      }
+      else if (tx.vin[n].type() == typeid(txin_gateway))
+      {
+        const txin_gateway& gw_in = boost::get<txin_gateway>(tx.vin[n]);
+        check_tx_inputs_context ctic{};
+        r = check_tx_input(tx, n, gw_in, tx_id, ctic);
+        CHECK_AND_ASSERT_MES(r, false, "tx " << tx_id << ", input #" << n << " gateway validation failed");
       }
       else
       {

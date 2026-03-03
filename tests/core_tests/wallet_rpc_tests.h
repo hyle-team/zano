@@ -99,3 +99,45 @@ struct wallet_rpc_gateway_address : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct wallet_rpc_gateway_signatures : public wallet_test
+{
+  wallet_rpc_gateway_signatures();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_gateway_illegal_asset_id : public wallet_test
+{
+  wallet_rpc_gateway_illegal_asset_id();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_gateway_overspend : public wallet_test
+{
+  wallet_rpc_gateway_overspend();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_gateway_service_entries : public wallet_test
+{
+  wallet_rpc_gateway_service_entries();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_gateway_reorg_spend : public wallet_test
+{
+  wallet_rpc_gateway_reorg_spend();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_gateway_reorg_receive : public wallet_test
+{
+  wallet_rpc_gateway_reorg_receive();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};

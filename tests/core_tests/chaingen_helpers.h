@@ -117,7 +117,54 @@ inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::accou
     CHECK_AND_ASSERT_MES(b.miner_tx.vin.size() > 0, false, "invalid miner_tx.vin");
     CHECKED_GET_SPECIFIC_VARIANT(b.miner_tx.vin[0], currency::txin_gen, in, false);
     in.height = height;
-    set_tx_unlock_time(b.miner_tx, cbtr.height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+    // etc_tx_details_unlock_time forbidden for hf6+
+    bool has_etc_unlock_time = false;
+    for (const auto& ev : b.miner_tx.extra)
+    {
+      if (ev.type() == typeid(currency::etc_tx_details_unlock_time))
+      {
+        has_etc_unlock_time = true;
+        break;
+      }
+    }
+    if (has_etc_unlock_time)
+      set_tx_unlock_time(b.miner_tx, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+    //for hf6+ coinbase new unlock time regenerate proof when height changed
+    bool has_zc_range_proof = false;
+    bool has_zc_balance_proof = false;
+    for (const auto& pv : b.miner_tx.proofs)
+    {
+      if (pv.type() == typeid(currency::zc_outs_range_proof))
+        has_zc_range_proof = true;
+      if (pv.type() == typeid(currency::zc_balance_proof))
+        has_zc_balance_proof = true;
+    }
+    if (has_zc_range_proof || has_zc_balance_proof)
+    {
+      crypto::hash new_tx_id = currency::get_transaction_hash(b.miner_tx);
+      if (has_zc_range_proof)
+      {
+        b.miner_tx.proofs.erase(std::remove_if(b.miner_tx.proofs.begin(), b.miner_tx.proofs.end(), [](const auto& pv)
+          {
+            return pv.type() == typeid(currency::zc_outs_range_proof);
+          }), b.miner_tx.proofs.end());
+        currency::zc_outs_range_proof new_range_proof{};
+        bool ok = currency::generate_zc_outs_range_proof(new_tx_id, cbtr.miner_tx_tgc, b.miner_tx.vout, new_range_proof);
+        CHECK_AND_ASSERT_MES(ok, false, "generate_zc_outs_range_proof failed for alt-chain coinbase");
+        b.miner_tx.proofs.emplace_back(std::move(new_range_proof));
+      }
+      if (has_zc_balance_proof)
+      {
+        b.miner_tx.proofs.erase(std::remove_if(b.miner_tx.proofs.begin(), b.miner_tx.proofs.end(), [](const auto& pv)
+          { 
+            return pv.type() == typeid(currency::zc_balance_proof); 
+          }), b.miner_tx.proofs.end());
+        bool ok = currency::generate_tx_balance_proof_hf6(new_tx_id, cbtr.miner_tx_tgc, cbtr.block_reward, b.miner_tx);
+        CHECK_AND_ASSERT_MES(ok, false, "generate_tx_balance_proof_hf6 failed for alt-chain coinbase");
+      }
+    }
   }
   else
   {

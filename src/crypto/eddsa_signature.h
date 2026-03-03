@@ -31,7 +31,7 @@ namespace crypto
   };
 
   // generates secp256k1 keypair
-  bool generate_eddsa_key_pair(eddsa_public_key& sec_key, eddsa_public_key& pub_key) noexcept;
+  bool generate_eddsa_key_pair(eddsa_secret_key& sec_key, eddsa_public_key& pub_key) noexcept;
 
   // converts eth_secret_key to eth_public_key
   //bool _eth_secret_key_to_public_key(const eth_secret_key& sec_key, eth_public_key& pub_key) noexcept;
