@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Zano Project
+// Copyright (c) 2025-2026 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -13,6 +13,7 @@ using namespace currency;
 hard_fork_6_intrinsic_payment_id_basic_test::hard_fork_6_intrinsic_payment_id_basic_test()
 {
   REGISTER_CALLBACK_METHOD(hard_fork_6_intrinsic_payment_id_basic_test, c1);
+  REGISTER_CALLBACK_METHOD(hard_fork_6_intrinsic_payment_id_basic_test, c2);
 
   m_hardforks.clear();
   m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 1);
@@ -30,6 +31,7 @@ bool hard_fork_6_intrinsic_payment_id_basic_test::generate(std::vector<test_even
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
   account_base& carol_acc = m_accounts[CAROL_ACC_IDX]; carol_acc.generate(); carol_acc.set_createtime(ts);
+  account_base& dan_acc   = m_accounts[DAN_ACC_IDX];   dan_acc.generate();   dan_acc.set_createtime(ts);
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
 
@@ -137,6 +139,25 @@ bool hard_fork_6_intrinsic_payment_id_basic_test::generate(std::vector<test_even
 
 
   DO_CALLBACK(events, "c1");
+
+
+  //
+  // tx_4 : Carol -> Dan; spending an output with intrinsig payment id, and sending an output with intrinsic payment id as well
+  //
+  destinations.clear();
+  destinations.push_back(tx_destination_entry(5, dan_acc.get_public_address(), m_asset_id));
+  destinations.back().payment_id = 137035999;
+  transaction tx_4{};
+  r = construct_tx_to_key(m_hardforks, events, tx_4, blk_3r, carol_acc, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  ADD_CUSTOM_EVENT(events, tx_4);
+  m_tx_4_id = get_transaction_hash(tx_4);
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3r, miner_acc, tx_4);
+
+  REWIND_BLOCKS_N(events, blk_4r, blk_4, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK(events, "c2");
 
   return true;
 }
@@ -271,6 +292,94 @@ bool hard_fork_6_intrinsic_payment_id_basic_test::c1(currency::core& c, size_t e
 
   return true;
 }
+
+bool hard_fork_6_intrinsic_payment_id_basic_test::c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry> &events)
+{
+  bool r = false;
+  
+  std::shared_ptr<tools::wallet2> dan_wlt = init_playtime_test_wallet(events, c, DAN_ACC_IDX);
+  
+
+  // check Dan's balance, payments and wti's after receiving tx_4 from Carol
+  dan_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*dan_wlt.get(), "Dan", 0, UINT64_MAX, 0, 0, 0), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*dan_wlt.get(), "Dan", 5, UINT64_MAX, 5, 0, 0, m_asset_id, 0), false, "");
+
+  std::list<tools::payment_details> payments;
+  dan_wlt->get_payments(convert_payment_id(137035999), payments);
+  CHECK_AND_ASSERT_EQ(payments.size(), 1);
+  CHECK_AND_ASSERT_EQ(payments.back().m_amount,             0);
+  CHECK_AND_ASSERT_EQ(payments.back().m_block_height,       45);
+  CHECK_AND_ASSERT_EQ(payments.back().m_tx_hash,            m_tx_4_id);
+  CHECK_AND_ASSERT_EQ(payments.back().m_unlock_time,        0);
+  CHECK_AND_ASSERT_EQ(payments.back().subtransfers.size(),  1);
+  CHECK_AND_ASSERT_EQ(payments.back().subtransfers.back().amount,  5);
+  CHECK_AND_ASSERT_EQ(payments.back().subtransfers.back().asset_id, m_asset_id);
+
+  std::vector<tools::wallet_public::wallet_transfer_info> wtis;
+  uint64_t total = 0, last_item_index = 0;
+  dan_wlt->get_recent_transfers_history(wtis, 0, 100, total, last_item_index, false /*exclude_mining_txs*/, false /*start_form_end*/);
+  CHECK_AND_ASSERT_EQ(wtis.size(),                          1);
+  CHECK_AND_ASSERT_EQ(wtis.back().height,                   45);
+  CHECK_AND_ASSERT_EQ(wtis.back().comment,                  "");
+  CHECK_AND_ASSERT_EQ(wtis.back().tx_hash,                  m_tx_4_id);
+  CHECK_AND_ASSERT_EQ(wtis.back().fee,                      TX_DEFAULT_FEE);
+  CHECK_AND_ASSERT_EQ(wtis.back().is_mining,                false);
+  CHECK_AND_ASSERT_EQ(wtis.back().is_mixing,                false);
+  CHECK_AND_ASSERT_EQ(wtis.back().is_service,               false);
+  CHECK_AND_ASSERT_EQ(wtis.back().tx_type,                  GUI_TX_TYPE_NORMAL);
+  CHECK_AND_ASSERT_EQ(wtis.back().unlock_time,              0);
+  CHECK_AND_ASSERT_EQ(wtis.back().tx_wide_payment_id,       "");
+  CHECK_AND_ASSERT_EQ(wtis.back().subtransfers_by_pid.size(), 1);
+
+  std::unordered_map<std::string, std::unordered_map<crypto::public_key, tools::wallet_public::wallet_sub_transfer_info>> substransfers_grouped_by_pid_aid;
+  auto populate_substransfers_grouped_by_pid_aid = [&](){
+    for (auto& stbp : wtis.back().subtransfers_by_pid)
+    {
+      for (auto& st : stbp.subtransfers)
+      {
+        CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid[stbp.payment_id].count(st.asset_id), 0);
+        substransfers_grouped_by_pid_aid[stbp.payment_id][st.asset_id] = st;
+      }
+    }
+  };
+  populate_substransfers_grouped_by_pid_aid();
+  CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid.size(),                                                1);
+  CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid[convert_payment_id(137035999)].size(),                 1);
+  CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid[convert_payment_id(137035999)][m_asset_id].amount,     5);
+  CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid[convert_payment_id(137035999)][m_asset_id].is_income,  true);
+
+
+  // now check Carol's tx4 transfer to Dan as well, to be sure that intrinsic payment id is correctly handled on sender's side too
+  std::shared_ptr<tools::wallet2> carol_wlt = init_playtime_test_wallet(events, c, CAROL_ACC_IDX);
+  carol_wlt->refresh();
+  wtis.clear();
+  carol_wlt->get_recent_transfers_history(wtis, 1, 100, total, last_item_index, false /*exclude_mining_txs*/, false /*start_form_end*/); // requesting 1 of 2 transfers total (we only need tx4)
+  CHECK_AND_ASSERT_EQ(wtis.size(), 1); // implicitly make sure there are 2 transfers total (note the offset 1 above)
+  CHECK_AND_ASSERT_EQ(wtis.back().height,                   45);
+  CHECK_AND_ASSERT_EQ(wtis.back().comment,                  "");
+  CHECK_AND_ASSERT_EQ(wtis.back().tx_hash,                  m_tx_4_id); // make sure it's tx4
+  CHECK_AND_ASSERT_EQ(wtis.back().fee,                      TX_DEFAULT_FEE);
+  CHECK_AND_ASSERT_EQ(wtis.back().is_mining,                false);
+  CHECK_AND_ASSERT_EQ(wtis.back().is_mixing,                false);
+  CHECK_AND_ASSERT_EQ(wtis.back().is_service,               false);
+  CHECK_AND_ASSERT_EQ(wtis.back().tx_type,                  GUI_TX_TYPE_NORMAL);
+  CHECK_AND_ASSERT_EQ(wtis.back().unlock_time,              0);
+  CHECK_AND_ASSERT_EQ(wtis.back().tx_wide_payment_id,       "");
+  CHECK_AND_ASSERT_EQ(wtis.back().subtransfers_by_pid.size(), 1);
+
+  substransfers_grouped_by_pid_aid.clear();
+  populate_substransfers_grouped_by_pid_aid();
+
+  // on sender's side all outgoing subtrasfers have empty payment id by design
+  CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid.size(),                                              1);
+  CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid[convert_payment_id(0)][native_coin_asset_id].amount, TESTS_DEFAULT_FEE);
+  CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid[convert_payment_id(0)][m_asset_id].amount,           5);
+  CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid[convert_payment_id(0)][m_asset_id].is_income,        false);
+
+  return true;
+}
+
 
 //------------------------------------------------------------------------------
 
