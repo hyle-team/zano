@@ -1276,7 +1276,8 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
   w->set_votes_config_path(m_data_dir + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME);
   owr.wallet_id = m_wallet_id_counter++;
-  w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
+  std::shared_ptr<tools::i_wallet2_callback> w_cb{new i_wallet_to_i_backend_adapter(this, owr.wallet_id)};
+  w->callback(w_cb);
   if (m_remote_node_mode)
   {
     w->init(m_daemon_address);
@@ -1316,6 +1317,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
   wo.wallet_state = view::wallet_status_info::wallet_state_ready;
+  wo.w_cb = w_cb;
   init_wallet_entry(wo, owr.wallet_id);
   get_wallet_info(wo, owr.wi);
   return API_RETURN_CODE_OK;
@@ -1391,7 +1393,8 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
   w->set_votes_config_path(m_data_dir + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME);
   owr.wallet_id = m_wallet_id_counter++;
-  w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
+  std::shared_ptr<tools::i_wallet2_callback> w_cb{new i_wallet_to_i_backend_adapter(this, owr.wallet_id)};
+  w->callback(w_cb);
   if (m_remote_node_mode)
   {
     w->init(m_daemon_address);
@@ -1438,6 +1441,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
+  wo.w_cb = w_cb;
   init_wallet_entry(wo, owr.wallet_id);
   get_wallet_info(wo, owr.wi);
   return API_RETURN_CODE_OK;
