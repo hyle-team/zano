@@ -1386,6 +1386,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(hard_fork_6_intrinsic_payment_id_rpc_test);
     GENERATE_AND_PLAY(hard_fork_6_full_gw_tx_test);
     GENERATE_AND_PLAY_HF(hard_fork_6_and_alt_chain, "6-*");
+    GENERATE_AND_PLAY_HF(hard_fork_6_and_self_directed_tx_with_payment_id, "6-*");
 
     GENERATE_AND_PLAY_HF(isolate_auditable_and_proof, "2-*");
     

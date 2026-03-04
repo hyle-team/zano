@@ -1387,3 +1387,108 @@ bool hard_fork_6_and_alt_chain::c1(currency::core& c, size_t ev_index, const std
 {
   return true;
 }
+
+//------------------------------------------------------------------------------
+
+hard_fork_6_and_self_directed_tx_with_payment_id::hard_fork_6_and_self_directed_tx_with_payment_id()
+{
+  REGISTER_CALLBACK_METHOD(hard_fork_6_and_self_directed_tx_with_payment_id, c1);
+}
+
+bool hard_fork_6_and_self_directed_tx_with_payment_id::generate(std::vector<test_event_entry>& events) const
+{
+  bool r = false;
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_06));
+
+  // tx_0 : miner -> Alice (10 x 10 test coins)
+  transaction tx_0{};
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(10) * 10, 10, TESTS_DEFAULT_FEE, tx_0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
+  ADD_CUSTOM_EVENT(events, tx_0);
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  //
+  // tx_1 : Alice -> Alice; no payment id (normal self-directed)
+  //
+  std::vector<tx_destination_entry> destinations;
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(11), alice_acc.get_public_address()));
+  destinations.back().payment_id = 0; // effectively payment id is not set
+
+  transaction tx_1{};
+  r = construct_tx_to_key(m_hardforks, events, tx_1, blk_1r, alice_acc, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  ADD_CUSTOM_EVENT(events, tx_1);
+  //m_tx_1_id = get_transaction_hash(tx_1);
+
+  //
+  // tx_2 : Alice -> Alice; intrinsic payment id only (no tx-wide payment id); should be processed but skipped by wallet
+  //
+  destinations.clear();
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(10), alice_acc.get_public_address()));
+  destinations.back().payment_id = 0; // effectively payment id is not set
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(9), alice_acc.get_public_address()));
+  destinations.back().payment_id = 1;
+
+  transaction tx_2{};
+  r = construct_tx_to_key(m_hardforks, events, tx_2, blk_1r, alice_acc, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  ADD_CUSTOM_EVENT(events, tx_2);
+  //m_tx_2_id = get_transaction_hash(tx_2);
+
+
+  //
+  // tx_3 : Alice -> Alice; legacy tx-wide payment id; should be processed but skipped by wallet
+  //
+  destinations.clear();
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(8), alice_acc.get_public_address()));
+  destinations.back().payment_id = 0; // effectively payment id is not set
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(11), alice_acc.get_public_address()));
+  destinations.back().payment_id = 0; // effectively payment id is not set
+
+  std::vector<payload_items_v> extra;
+  payment_id_t tx_wide_payment_id = "abcdefghi";
+  r = set_payment_id_to_tx(extra, tx_wide_payment_id, true);
+  CHECK_AND_ASSERT_MES(r, false, "set_payment_id_to_tx failed");
+
+  transaction tx_3{};
+  r = construct_tx_to_key(m_hardforks, events, tx_3, blk_1r, alice_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  ADD_CUSTOM_EVENT(events, tx_3);
+  //m_tx_3_id = get_transaction_hash(tx_3);
+
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1r, miner_acc, std::list({ tx_1, tx_2, tx_3 }));
+
+  REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK(events, "c1");
+}
+
+bool hard_fork_6_and_self_directed_tx_with_payment_id::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry> &events)
+{
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  alice_wlt->refresh();
+
+  std::list<tools::payment_details> payments;
+  alice_wlt->get_payments(convert_payment_id(1), payments);
+  CHECK_AND_ASSERT_EQ(payments.size(), 0);
+  alice_wlt->get_payments("abcdefghi", payments);
+  CHECK_AND_ASSERT_EQ(payments.size(), 0);
+
+  // tx_2 and tx_3 should be skipped by wallet, so their inputs are lost and only tx_1 is processed (self-directed, taking fee into account)
+  uint64_t expected_alice_balance = MK_TEST_COINS(10) * 10 - MK_TEST_COINS(20) - MK_TEST_COINS(20) - TESTS_DEFAULT_FEE;
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", expected_alice_balance, UINT64_MAX, expected_alice_balance, 0, 0), false, "");
+
+  return true;
+}
