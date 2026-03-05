@@ -840,18 +840,6 @@ namespace currency
     ftp.spend_pub_key = req.origin_gateway_id;
     ftp.tx_hardfork_id = m_core.get_blockchain_storage().get_current_hardfork_id();
 
-    if (req.service_entries_permanent)
-      ftp.extra.insert(ftp.extra.end(), req.service_entries.begin(), req.service_entries.end());
-    else
-      ftp.attachments.insert(ftp.attachments.end(), req.service_entries.begin(), req.service_entries.end());
-
-    if (!req.comment.empty())
-    {
-      currency::tx_comment tc{};
-      tc.comment = req.comment;
-      ftp.extra.push_back(tc);
-    }
-
     if (!ftp.prepared_destinations.size() || ftp.prepared_destinations.begin()->addr.size() != 1)
     {
       er.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
