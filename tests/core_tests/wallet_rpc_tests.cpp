@@ -1960,7 +1960,7 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.balances.size(), 2);
   update_gw_balances(gw_get_info_resp.balances);
   CHECK_AND_ASSERT_EQ(gw_balances[native_coin_asset_id],  MK_TEST_COINS(2));
-  CHECK_AND_ASSERT_EQ(gw_balances[deployed_asset_id], 10);
+  CHECK_AND_ASSERT_EQ(gw_balances[deployed_asset_id],     10);
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.gateway_view_pub_key, gw_addr_public_key);
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.descriptor_info.meta_info, gw_reg_req.descriptor_info.meta_info);
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.descriptor_info.opt_owner_custom_schnorr_pub_key.has_value(), true);
@@ -1973,7 +1973,7 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request gw_create_transfer_req = {};
   currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response gw_create_transfer_resp = {};
   gw_create_transfer_req.destinations.push_back({ MK_TEST_COINS(1), miner_wlt->get_account().get_public_address_str() });
-  gw_create_transfer_req.destinations.push_back({ 8, miner_wlt->get_account().get_public_address_str(), deployed_asset_id });
+  gw_create_transfer_req.destinations.push_back({ 8,                miner_wlt->get_account().get_public_address_str(), deployed_asset_id });
   gw_create_transfer_req.fee = TESTS_DEFAULT_FEE;
   gw_create_transfer_req.comment = "this is a transfer from a gw address to a normal address";
   gw_create_transfer_req.origin_gateway_id = gw_addr_public_key;
@@ -2020,6 +2020,7 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
   CHECK_AND_ASSERT_EQ(gw_get_info_resp.payment_id, "");
 
   //payment_id tests + history 
+
     //
   // ZC -> GW
   //
