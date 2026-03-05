@@ -1304,6 +1304,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_tx_has_inputs_no_outputs);
     GENERATE_AND_PLAY(gen_tx_invalid_input_amount);
     GENERATE_AND_PLAY(gen_tx_input_wo_key_offsets);
+    GENERATE_AND_PLAY(offers_decompression_test);
     GENERATE_AND_PLAY(gen_tx_sender_key_offest_not_exist);
     GENERATE_AND_PLAY(gen_tx_key_offest_points_to_foreign_key);
     GENERATE_AND_PLAY(gen_tx_mixed_key_offest_not_exist);
