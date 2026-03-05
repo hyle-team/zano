@@ -333,7 +333,7 @@ bool hard_fork_6_intrinsic_payment_id_basic_test::c2(currency::core& c, size_t e
   CHECK_AND_ASSERT_EQ(wtis.back().subtransfers_by_pid.size(), 1);
 
   std::unordered_map<std::string, std::unordered_map<crypto::public_key, tools::wallet_public::wallet_sub_transfer_info>> substransfers_grouped_by_pid_aid;
-  auto populate_substransfers_grouped_by_pid_aid = [&](){
+  auto populate_substransfers_grouped_by_pid_aid = [&]() -> bool {
     for (auto& stbp : wtis.back().subtransfers_by_pid)
     {
       for (auto& st : stbp.subtransfers)
@@ -342,8 +342,9 @@ bool hard_fork_6_intrinsic_payment_id_basic_test::c2(currency::core& c, size_t e
         substransfers_grouped_by_pid_aid[stbp.payment_id][st.asset_id] = st;
       }
     }
+    return true;
   };
-  populate_substransfers_grouped_by_pid_aid();
+  CHECK_AND_ASSERT_TRUE(populate_substransfers_grouped_by_pid_aid());
   CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid.size(),                                                1);
   CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid[convert_payment_id(137035999)].size(),                 1);
   CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid[convert_payment_id(137035999)][m_asset_id].amount,     5);
@@ -369,7 +370,7 @@ bool hard_fork_6_intrinsic_payment_id_basic_test::c2(currency::core& c, size_t e
   CHECK_AND_ASSERT_EQ(wtis.back().subtransfers_by_pid.size(), 1);
 
   substransfers_grouped_by_pid_aid.clear();
-  populate_substransfers_grouped_by_pid_aid();
+  CHECK_AND_ASSERT_TRUE(populate_substransfers_grouped_by_pid_aid());
 
   // on sender's side all outgoing subtrasfers have empty payment id by design
   CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid.size(),                                              1);
@@ -1473,6 +1474,7 @@ bool hard_fork_6_and_self_directed_tx_with_payment_id::generate(std::vector<test
   REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
   DO_CALLBACK(events, "c1");
+  return true;
 }
 
 bool hard_fork_6_and_self_directed_tx_with_payment_id::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry> &events)
