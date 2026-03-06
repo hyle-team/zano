@@ -8821,8 +8821,9 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
       CHECK_AND_ASSERT_MES(r, false, "failed to build kernel_stake");
       crypto::hash kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
       crypto::scalar_t last_pow_block_id_hashed = crypto::hash_helper_t::hs(CRYPTO_HDS_ZARCANUM_LAST_POW_HASH, sm.last_pow_id);
-      CHECK_AND_ASSERT_MES(input_tx.signatures.size() != 2, false, "input_tx.signatures has wrong size: " << input_tx.signatures.size());
-      CHECK_AND_ASSERT_MES(input_tx.signatures[0].type() == typeid(zarcanum_sig), false, "input_tx.signatures[" << input_index << "] has wrong type: " << input_tx.signatures[input_index].type().name());
+      CHECK_AND_ASSERT_MES(input_index == 1, false, "input_index = " << input_index << ", but must be 1 for Zarcanum PoS");
+      CHECK_AND_ASSERT_MES(input_tx.signatures.size() == 1, false, "input_tx.signatures.size() = " << input_tx.signatures.size());
+      CHECK_AND_ASSERT_MES(input_tx.signatures[0].type() == typeid(zarcanum_sig), false, "input_tx.signatures[0] has wrong type: " << input_tx.signatures[0].type().name());
       const zarcanum_sig& sig = boost::get<zarcanum_sig>(input_tx.signatures[0]);
       uint8_t err = 0;
       r = crypto::zarcanum_verify_proof(bl_id, kernel_hash, zarcanum_input_ring, last_pow_block_id_hashed, input_key_image, pos_difficulty, sig, &err);
@@ -8833,7 +8834,7 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
       // ZC signature (3/2-CLSAG GGX)
       crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(input_tx, input_index, input_tx_hash);
       CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "prepare_prefix_hash_for_sign failed");
-      CHECK_AND_ASSERT_MES(input_index < input_tx.signatures.size(), false, "input_tx.signatures has wrong size: " << input_tx.signatures.size());
+      CHECK_AND_ASSERT_MES(input_index < input_tx.signatures.size(), false, "input_index = " << input_index << ", isn't less than input_tx.signatures.size() = " << input_tx.signatures.size());
       CHECK_AND_ASSERT_MES(input_tx.signatures[input_index].type() == typeid(ZC_sig), false, "input_tx.signatures[" << input_index << "] has wrong type: " << input_tx.signatures[input_index].type().name());
       const ZC_sig& sig = boost::get<ZC_sig>(input_tx.signatures[input_index]);
       bool r = crypto::verify_CLSAG_GGX(tx_hash_for_signature, zc_input_ring, sig.pseudo_out_amount_commitment, sig.pseudo_out_blinded_asset_id, input_key_image, sig.clsags_ggx);
