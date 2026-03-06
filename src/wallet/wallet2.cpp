@@ -572,6 +572,8 @@ uint64_t wallet2::get_actual_zc_global_index()
 //----------------------------------------------------------------------------------------------------
 void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t height, const currency::block& b, const std::vector<uint64_t>* pglobal_indexes)
 {
+  const bool hf6_active = is_in_hardfork_zone(ZANO_HARDFORK_06);
+
   //check for transaction spends
   process_transaction_context ptc(tx);
 
@@ -640,7 +642,23 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
   if (!outs.empty())
   {
     //good news - got money! take care about it
-    //usually we have only one transfer for user in transaction
+
+    bool has_tx_wide_payment_id = currency::has_tx_wide_payment_id(tx);
+    bool has_intrinsic_payment_id = std::any_of(outs.begin(), outs.end(), [&]( const wallet_out_info& o ) { return o.payment_id != 0; });
+    bool is_self_directed_tx = (outs.size() == tx.vout.size());
+    if (hf6_active && ptc.spent_own_outs_in_inputs && ((is_self_directed_tx && has_tx_wide_payment_id) || has_intrinsic_payment_id))
+    {
+      // a self-directed tx with tx-wide payment id or with intrinsic pid in a self-directed output -- we forbid such txs since HF6 and here skip the whole transaction
+      std::stringstream ss;
+      ss << "WARNING: tx " << ptc.tx_hash() << (has_intrinsic_payment_id ? " has intrinsic payment id for a self-directed output" : " is a self-directed with tx-wide payment id") << ", such transactions are forbidden since HF6, skipping whole transaction." << ENDL
+         << "outs:" << ENDL;
+      for(auto& o : outs)
+        ss << o.amount << ", " << o.asset_id << ", " << o.payment_id << ENDL;
+      if (auto wcb = m_wcallback.lock())
+        wcb->on_message(i_wallet2_callback::ms_yellow, ss.str());
+      WLT_LOG_YELLOW(ss.str(), LOG_LEVEL_0);
+      return;
+    }
 
     //create once instance of tx for all entries
     std::shared_ptr<transaction_wallet_info> pwallet_info(new transaction_wallet_info());
@@ -934,6 +952,8 @@ void wallet2::process_transaction_context::handle_incoming_tx_input(size_t trans
   
   if (td.is_native_coin())
     spent_own_native_inputs = true;
+
+  spent_own_outs_in_inputs = true;
 
   if (coin_base_tx && td.m_flags&WALLET_TRANSFER_DETAIL_FLAG_MINED_TRANSFER)
     is_derived_from_coinbase = true;
@@ -8352,8 +8372,9 @@ void wallet2::check_and_throw_if_self_directed_tx_with_payment_id_requested(cons
   if (is_in_hardfork_zone(ZANO_HARDFORK_06))
   {
     // In HF6 we forbid any transaction that has at least one self-directed output with intrinsic payment id
-    // OR at least one self-directed output with legacy tx-wide payment id.
-    // All such txs will be rejected on tx scan.
+    // OR if all outpus are self-directed and legacy tx-wide payment id is set.
+    // Here we forbid creation, but all such txs will be rejected on tx scan as well.
+    bool self_directed_tx = true;
     for (auto& d : ctp.dsts)
     {
       for (auto& addr : d.addr)
@@ -8362,13 +8383,17 @@ void wallet2::check_and_throw_if_self_directed_tx_with_payment_id_requested(cons
         {
           if (boost::get<account_public_address>(addr) == m_account.get_public_address())
           {
-            // self-directed destination, make sure there's no intrinsic pid, nor tx wide pid
+            // self-directed destination, make sure there's no intrinsic pid
             WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(d.payment_id == 0, "sending funds to yourself with intrinsic payment id is not allowed");
-            WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!has_tx_wide_payment_id, "sending funds to yourself with tx-wide payment id is not allowed");
+          }
+          else
+          {
+            self_directed_tx = false; // at least one output is not self-directed => it's not a self-directed tx
           }
         }
       }
     }
+    WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(!self_directed_tx || !has_tx_wide_payment_id, "sending funds to yourself with tx-wide payment id is not allowed");
   }
   else if (is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM))
   {

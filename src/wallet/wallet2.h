@@ -317,6 +317,7 @@ namespace tools
       process_transaction_context(const currency::transaction& t) : tx(t) {}
       const currency::transaction& tx;
       bool spent_own_native_inputs = false; 
+      bool spent_own_outs_in_inputs = false;
       // check all outputs for spending (compare key images)
       wallet_public::employed_tx_entries employed_entries;
       bool is_pos_coinbase = false;
