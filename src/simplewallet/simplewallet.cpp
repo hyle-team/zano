@@ -330,7 +330,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("spendkey", boost::bind(&simple_wallet::spendkey, this,ph::_1), "Display secret spend key");
   m_cmd_binder.set_handler("viewkey",  boost::bind(&simple_wallet::viewkey, this,ph::_1), "Display secret view key");
   
-  m_cmd_binder.set_handler("get_tx_key", boost::bind(&simple_wallet::get_tx_key, this,ph::_1), "Get transaction one-time secret key (r) for a given <txid>");
+  m_cmd_binder.set_handler("get_tx_key", boost::bind(&simple_wallet::get_tx_key, this,ph::_1), "get_tx_key <tx_id> - Get transaction one-time secret key (r) for a given <txid>");
   m_cmd_binder.set_handler("check_all_tx_keys", boost::bind(&simple_wallet::check_all_tx_keys, this, ph::_1), "Check one-time secret key status for all sent transactions");
 
   m_cmd_binder.set_handler("tracking_seed", boost::bind(&simple_wallet::tracking_seed, this,ph::_1), "For auditable wallets: prints tracking seed for wallet's audit by a third party");
@@ -980,6 +980,8 @@ void simple_wallet::on_new_block(uint64_t height, const currency::block& block)
 std::string print_money_trailing_zeros_replaced_with_spaces(uint64_t amount, size_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT)
 {
   std::string s = print_money(amount, decimal_point);
+  if (decimal_point == 0)
+    return s;
   size_t p = s.find_last_not_of('0');
   if (p != std::string::npos)
   {
@@ -993,9 +995,9 @@ std::string print_money_trailing_zeros_replaced_with_spaces(uint64_t amount, siz
   return s;
 }
 //----------------------------------------------------------------------------------------------------
-std::string simple_wallet::get_token_info_string(const crypto::public_key& asset_id, uint64_t& decimal_points)
+std::string simple_wallet::get_asset_info_string(const crypto::public_key& asset_id, uint64_t& decimal_points)
 {
-  std::string token_info = "ZANO";
+  std::string result = "ZANO";
   decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
   if (asset_id != currency::native_coin_asset_id)
   {
@@ -1003,28 +1005,28 @@ std::string simple_wallet::get_token_info_string(const crypto::public_key& asset
     uint32_t asset_info_flags{};
     if (!m_wallet->get_asset_info(asset_id, adb, asset_info_flags))
     {
-      token_info = "!UNKNOWN!";
+      result = "!UNKNOWN!";
     }
     else
     {
       decimal_points = adb.decimal_point;
-      token_info = adb.ticker;
+      result = adb.ticker;
 
       if (asset_info_flags & tools::wallet2::aif_whitelisted)
       {
-        token_info += "[*]";
+        result += "[*]";
       }
       else if (asset_info_flags & tools::wallet2::aif_own)
       {
-        token_info += "[$]";
+        result += "[$]";
       }
       else
       {
-        token_info += std::string("[") + epee::string_tools::pod_to_hex(asset_id) + "]";
+        result += std::string("[") + epee::string_tools::pod_to_hex(asset_id) + "]";
       }
     }
   }
-  return token_info;
+  return result;
 }
 //----------------------------------------------------------------------------------------------------
 void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
@@ -1034,7 +1036,7 @@ void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_inf
   {
     epee::log_space::console_colors color = !wti.has_outgoing_entries() ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
     uint64_t decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
-    std::string token_info = get_token_info_string(wti.subtransfers[0].asset_id, decimal_points);
+    std::string token_info = get_asset_info_string(wti.subtransfers[0].asset_id, decimal_points);
     message_writer(color, false) <<
       "height " << wti.height <<
       ", tx " << wti.tx_hash <<
@@ -1050,7 +1052,7 @@ void simple_wallet::on_transfer2(const tools::wallet_public::wallet_transfer_inf
       {
         epee::log_space::console_colors color = st.is_income ? epee::log_space::console_color_green : epee::log_space::console_color_magenta;
         uint64_t decimal_points = CURRENCY_DISPLAY_DECIMAL_POINT;
-        std::string token_info = get_token_info_string(st.asset_id, decimal_points);
+        std::string token_info = get_asset_info_string(st.asset_id, decimal_points);
 
         message_writer(color, false) << "    " 
           << std::right << std::setw(24) << print_money_trailing_zeros_replaced_with_spaces(st.amount, decimal_points) << std::left << (st.is_income ? " received" : "    spent") << " " << token_info << " " << pid;
@@ -1200,7 +1202,7 @@ bool simple_wallet::print_wti(const tools::wallet_public::wallet_transfer_info& 
 
   std::string payment_id_placeholder;
   if (wti.tx_wide_payment_id.size())
-    payment_id_placeholder = std::string("(tx_wide_payment_id:") + epee::string_tools::buff_to_hex_nodelimer(wti.tx_wide_payment_id) + ")";
+    payment_id_placeholder = std::string(", tx_wide_payment_id:") + epee::string_tools::buff_to_hex_nodelimer(wti.tx_wide_payment_id);
 
   static const std::string separator = ", ";
   std::string remote_side;
@@ -1224,9 +1226,9 @@ bool simple_wallet::print_wti(const tools::wallet_public::wallet_transfer_info& 
       << " " << wti.tx_hash << payment_id_placeholder;
   }else*/
   {
-    success_msg_writer(cl) << "[" << wti.transfer_internal_index << "]" << epee::misc_utils::get_time_str_v2(wti.timestamp) << " (fee:" << print_money(wti.fee) << ")  "
+    success_msg_writer(cl) << "[" << wti.transfer_internal_index << "]" << " " << epee::misc_utils::get_time_str_v2(wti.timestamp) << " (fee:" << print_money_brief(wti.fee) << ")  "
       << remote_side
-      << " " << wti.tx_hash << payment_id_placeholder;
+      << " tx:" << wti.tx_hash << payment_id_placeholder;
 
     for(auto& stbp : wti.subtransfers_by_pid)
     {
@@ -1235,11 +1237,12 @@ bool simple_wallet::print_wti(const tools::wallet_public::wallet_transfer_info& 
       {
         epee::log_space::console_colors cl = st.is_income ? epee::log_space::console_color_green: epee::log_space::console_color_magenta;
         uint64_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT;
-        std::string token_info = get_token_info_string(st.asset_id, decimal_point);
+        std::string asset_info_str = get_asset_info_string(st.asset_id, decimal_point);
 
         success_msg_writer(cl) 
           << (st.is_income ? "Received " : "Sent    ")
-          << print_money(st.amount, decimal_point) << token_info;
+          << print_money(st.amount, decimal_point) << " " << asset_info_str << " "
+          << (stbp.payment_id.empty() ? std::string() : std::string("pid: ") + epee::string_tools::buff_to_hex_nodelimer(stbp.payment_id));
       }
     }
   
