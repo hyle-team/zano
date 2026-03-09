@@ -42,7 +42,6 @@
 #include "currency_core/bc_escrow_service.h"
 #include "common/pod_array_file_container.h"
 #include "currency_core/block_chain_shortener.h"
-#include "tor-connect/torlib/tor_lib_iface.h"
 #include "currency_core/pos_mining.h"
 #include "view_iface.h"
 #include "wallet2_base.h"
@@ -231,7 +230,7 @@ namespace tools
   };
   
 
-  class wallet2: public tools::tor::t_transport_state_notifier, public boost::static_visitor<void>, public wallet2_base_state
+  class wallet2: public boost::static_visitor<void>, public wallet2_base_state
   {
     wallet2(const wallet2&) = delete;
   public:

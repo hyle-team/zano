@@ -144,10 +144,6 @@ else()
   ENABLE_SHARED_PCH(wallet WALLET)
 endif()
 
-if(NOT DISABLE_TOR)
-  target_link_libraries(wallet tor-connect)
-endif()
-
 
 
 

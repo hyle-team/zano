@@ -73,7 +73,6 @@ if(APPLE)
 endif()
 
 set(USE_PCH FALSE CACHE BOOL "Use shared precompiled headers")
-set(DISABLE_TOR FALSE CACHE BOOL "Disable TOR library(and related tor-connect submodule)")
 set(TESTNET FALSE CACHE BOOL "Compile for testnet")
 set(BUILD_GUI FALSE CACHE BOOL "Build qt-daemon")
 set(USE_BITCOIN_SECP256K1_FOR_ECDSA FALSE CACHE BOOL "Use bitcoin-secp256k1 library for validating ECDSA(instead of OpenSSL)")

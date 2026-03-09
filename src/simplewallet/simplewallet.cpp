@@ -1077,21 +1077,7 @@ void simple_wallet::on_message(i_wallet2_callback::message_severity severity, co
 void simple_wallet::on_tor_status_change(const std::string& state)
 {
   std::string human_message;
-  if (state == TOR_LIB_STATE_INITIALIZING)
-    human_message = "Initializing...";
-  else if (state == TOR_LIB_STATE_DOWNLOADING_CONSENSUS)
-    human_message = "Downloading consensus...";
-  else if (state == TOR_LIB_STATE_MAKING_TUNNEL_A)
-    human_message = "Building tunnel to A...";
-  else if (state == TOR_LIB_STATE_MAKING_TUNNEL_B)
-    human_message = "Building tunnel to B...";
-  else if (state == TOR_LIB_STATE_CREATING_STREAM)
-    human_message = "Creating stream...";
-  else if (state == TOR_LIB_STATE_SUCCESS)
-    human_message = "Successfully created stream";
-  else if (state == TOR_LIB_STATE_FAILED)
-    human_message = "Failed created stream";
-  else if (state == WALLET_LIB_STATE_SENDING)
+  if (state == WALLET_LIB_STATE_SENDING)
     human_message = "Sending transaction...";
   else if (state == WALLET_LIB_SENT_SUCCESS)
     human_message = "Successfully sent!";
