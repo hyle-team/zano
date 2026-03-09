@@ -785,6 +785,7 @@ inline bool do_replay_events(const std::vector<test_event_entry>& events, t_test
   c.get_blockchain_storage().get_attachment_services_manager().add_service(&offers_service);
 
   c.get_blockchain_storage().set_core_runtime_config(validator.get_runtime_info_for_core());
+  c.get_blockchain_storage().override_non_pruning_mode_state_after_init(false);
 
   if (validator.need_core_proxy())
   {

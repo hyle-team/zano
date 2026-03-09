@@ -360,6 +360,7 @@ namespace currency
     boost::multiprecision::uint128_t total_coins()const;
     bool is_pos_allowed()const;
     bool is_non_pruning_mode_enabled() const { return m_non_pruning_mode_enabled; }
+    void override_non_pruning_mode_state_after_init(bool enabled) { m_non_pruning_mode_enabled = enabled; } // primarally for tests, consider moving into core runtime config in future
     uint64_t get_tx_fee_median()const;
     uint64_t get_tx_fee_window_value_median() const;
     uint64_t get_tx_expiration_median() const;
