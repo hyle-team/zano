@@ -54,10 +54,19 @@ namespace currency
         return false;
       }
 
+      //
+      // payment id processing logic (if changed, make simplewallet::transfer_impl consistent; consider code reuse -- sowle)
+      //
       if (hf6_active)
       {
         if (embedded_payment_id.size() != 0)
         {
+          if (!legacy_tx_wide_payment_id.empty())
+          {
+            er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
+            er.message = std::string("payment_id embeded into integrated address ") + it->address + " conflicts with previously set tx-wide payment id (perhaps, from another integrated address)";
+            return false;
+          }
           uint64_t intrinsic_embeded_payment_id = 0;
           if (currency::convert_payment_id(embedded_payment_id, intrinsic_embeded_payment_id))
           {
@@ -76,12 +85,12 @@ namespace currency
             {
               er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
               er.message = std::string("payment_id embeded into integrated address ") + it->address + " is too long, maximum is " + epee::string_tools::num_to_string_fast(CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE) + " bytes";
-              return false; ///
+              return false;
             }
-            if (!legacy_tx_wide_payment_id.empty())
+            if (it != destinations_in_api.begin())
             {
               er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
-              er.message = std::string("payment_id embeded into integrated address ") + it->address + " conflicts with previously set tx-wide payment id";
+              er.message = std::string("long embedded payment id: ") + epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) + " can only be set for the first destination (and so you can use integrated address with long payment id only for the fist destination)";
               return false;
             }
             legacy_tx_wide_payment_id = embedded_payment_id;
@@ -94,7 +103,7 @@ namespace currency
           {
             er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
             er.message = std::string("destination intrinsic payment id: ") + epee::string_tools::pod_to_hex(it->payment_id) + " conflicts with previously set tx-wide payment id";
-            return false; ///
+            return false;
           }
           de.payment_id = it->payment_id;
         }
@@ -106,7 +115,7 @@ namespace currency
         {
           er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
           er.message = std::string("intrinsic payment id cannot be used before HF6");
-          return false; ///
+          return false;
         }
 
         if (embedded_payment_id.size() != 0)
@@ -115,20 +124,20 @@ namespace currency
           {
             er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
             er.message = std::string("payment_id embedded into integrated address ") + it->address + " is too long, maximum is " + epee::string_tools::num_to_string_fast(CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE) + " bytes";
-            return false; ///
+            return false;
           }
 
           if (!legacy_tx_wide_payment_id.empty())
           {
             er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
             er.message = std::string("embedded payment id: ") + epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) + " conflicts with previously set payment id: " + epee::string_tools::buff_to_hex_nodelimer(legacy_tx_wide_payment_id);
-            return false; ///
+            return false;
           }
           if (it != destinations_in_api.begin())
           {
             er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
             er.message = std::string("embedded payment id: ") + epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) + " currently can only be set for the first destination (and so you can use integrated address only for the fist destination)";
-            return false; //
+            return false;
           }
           legacy_tx_wide_payment_id = embedded_payment_id;
         }

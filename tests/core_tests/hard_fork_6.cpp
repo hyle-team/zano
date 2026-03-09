@@ -669,8 +669,12 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   
   tr_req.destinations.clear();
+  tr_req.destinations.emplace_back(currency::transfer_destination{6, bob_addr_with_short_pid, m_asset_id, 137035999}); // short embedded pid + intrinsic pid, incompatible
+  CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
+  
+  tr_req.destinations.clear();
   tr_req.destinations.emplace_back(currency::transfer_destination{6, bob_addr, m_asset_id});
-  tr_req.destinations.emplace_back(currency::transfer_destination{6, bob_addr_with_short_pid, m_asset_id});   // integrated address in the second destination
+  tr_req.destinations.emplace_back(currency::transfer_destination{6, bob_addr_with_short_pid, m_asset_id});   // integrated address in the second destination -- ok
   CHECK_AND_ASSERT_SUCCESS(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   successfull_txs.push_back(crypto::parse_tpod_from_hex_string<crypto::hash>(tr_resp.tx_hash)); // 5
 
@@ -701,6 +705,11 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   tr_req.destinations.clear();
   tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});
   tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr, m_asset_id, 18361836});          // long pid is incompatible with intrinsic pid specified separately
+  CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
+
+  tr_req.destinations.clear();
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id, 137035999}); // long embedded pid + intrinsic pid, incompatible
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();

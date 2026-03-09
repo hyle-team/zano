@@ -1791,6 +1791,10 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
 {
   CONFIRM_WITH_PASSWORD();
   SIMPLE_WALLET_BEGIN_TRY_ENTRY();
+
+  const bool hf4_active = m_wallet->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM);
+  const bool hf6_active = m_wallet->is_in_hardfork_zone(ZANO_HARDFORK_06);
+
   if (!try_connect_to_daemon())
     return true;
 
@@ -1813,7 +1817,7 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
   local_args.erase(local_args.begin());
 
   
-  currency::payment_id_t payment_id;
+  currency::payment_id_t legacy_tx_wide_payment_id;
   std::vector<extra_v> extra;
   vector<currency::tx_destination_entry> dsts;
   bool wrapped_transaction = false;
@@ -1836,21 +1840,31 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
       return true;
     }
 
-    bool ok = currency::parse_amount(local_args[i + 1], de.amount, asset_info.decimal_point);
+    const std::string& arg_address = local_args[i];
+
+    if (i + 1 >= local_args.size())
+    {
+      fail_msg_writer() << "amount for the last address " << arg_address << " is not specified";
+      return true;
+    }
+
+    const std::string& arg_amount = local_args[i + 1];
+
+    bool ok = currency::parse_amount(arg_amount, de.amount, asset_info.decimal_point);
     if (!ok || 0 == de.amount)
     {
-      fail_msg_writer() << "amount is wrong: " << local_args[i] << ' ' << local_args[i + 1] <<
+      fail_msg_writer() << "amount is wrong: " << arg_address << ' ' << arg_amount <<
         ", expected number from 0 to " << print_money_brief(std::numeric_limits<uint64_t>::max(), asset_info.decimal_point) << " with maximum " << (int)asset_info.decimal_point << " digits after decimal point";
       return true;
     }
 
-    std::string integrated_payment_id;
+    currency::payment_id_t embedded_payment_id;
     
     //check if address looks like wrapped address
-    if (is_address_like_wrapped(local_args[i]))
+    if (is_address_like_wrapped(arg_address))
     {
 
-      success_msg_writer(false) << "Address " << local_args[i] << " recognized as wrapped address, creating wrapping transaction.";
+      success_msg_writer(false) << "Address " << arg_address << " recognized as wrapped address, creating wrapping transaction.";
       success_msg_writer(false) << "This transaction will create wZano (\"Wrapped Zano\") which will be sent to the specified address on the Ethereum network.";
 
       if (!validate_wrap_status(de.amount))
@@ -1862,7 +1876,7 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
       sa.service_id = BC_WRAP_SERVICE_ID;
       sa.instruction = BC_WRAP_SERVICE_INSTRUCTION_ERC20;
       sa.flags = TX_SERVICE_ATTACHMENT_ENCRYPT_BODY | TX_SERVICE_ATTACHMENT_ENCRYPT_BODY_ISOLATE_AUDITABLE;
-      sa.body = local_args[i];
+      sa.body = arg_address;
       extra.push_back(sa);
 
       currency::account_public_address acc{};
@@ -1871,28 +1885,73 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
       wrapped_transaction = true;
       //encrypt body with a special way
     }
-    else if (local_args[i] == "self")
+    else if (arg_address == "self")
     {
       de.addr.front() = m_wallet->get_account().get_public_address();
     }
-    else if(!(de.addr.size() == 1 && m_wallet->get_transfer_address(local_args[i], de.addr.front(), integrated_payment_id)))
+    else if(!(de.addr.size() == 1 && m_wallet->get_transfer_address(arg_address, de.addr.front(), embedded_payment_id)))
     {
-      fail_msg_writer() << "wrong address: " << local_args[i];
+      fail_msg_writer() << "wrong address: " << arg_address;
       return true;
     }
 
-    if (!integrated_payment_id.empty())
+    //
+    // payment id processing logic (must be consistent with rpc_fill_destinations_helper(), consider code reuse -- sowle)
+    //
+    if (hf6_active)
     {
-      if (!convert_payment_id(integrated_payment_id, de.payment_id))
+      if (embedded_payment_id.size() != 0)
       {
-
+        if (!legacy_tx_wide_payment_id.empty())
+        {
+          fail_msg_writer() << "payment_id embeded into integrated address " << arg_address << " conflicts with previously set tx-wide payment id (perhaps, from another integrated address)";
+          return true;
+        }
+        uint64_t intrinsic_embeded_payment_id = 0;
+        if (currency::convert_payment_id(embedded_payment_id, intrinsic_embeded_payment_id))
+        {
+          de.payment_id = intrinsic_embeded_payment_id;
+        }
+        else
+        {
+          // it means embedded_payment_id.size() > CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE
+          if (!m_allow_legacy_payment_id_size)
+          {
+            fail_msg_writer() << "payment_id embeded into integrated address " << arg_address << " is too long, maximum is " << epee::string_tools::num_to_string_fast(CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE) << " bytes";
+            return true;
+          }
+          if (i != 0)
+          {
+            fail_msg_writer() << "long embedded payment id: " << epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) << " can only be set for the first destination (and so you can use integrated address with long payment id only for the fist destination)";
+            return true;
+          }
+          legacy_tx_wide_payment_id = embedded_payment_id;
+        }
       }
     }
-
-    if (local_args.size() <= i + 1)
+    else
     {
-      fail_msg_writer() << "amount for the last address " << local_args[i] << " is not specified";
-      return true;
+      // before HF6
+      if (embedded_payment_id.size() != 0)
+      {
+        if (!m_allow_legacy_payment_id_size && embedded_payment_id.size() > CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE)
+        {
+          fail_msg_writer() << "payment_id embedded into integrated address " << arg_address << " is too long, maximum is " << epee::string_tools::num_to_string_fast(CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE) << " bytes";
+          return true;
+        }
+
+        if (!legacy_tx_wide_payment_id.empty())
+        {
+          fail_msg_writer() << "embedded payment id: " << epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) << " conflicts with previously set payment id: " << epee::string_tools::buff_to_hex_nodelimer(legacy_tx_wide_payment_id);
+          return true;
+        }
+        if (i != 0)
+        {
+          fail_msg_writer() << "embedded payment id: " << epee::string_tools::buff_to_hex_nodelimer(embedded_payment_id) << " currently can only be set for the first destination (and so you can use integrated address only for the fist destination)";
+          return true;
+        }
+        legacy_tx_wide_payment_id = embedded_payment_id;
+      }
     }
 
     dsts.push_back(de);
@@ -1900,13 +1959,13 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
 
 
   std::vector<currency::attachment_v> attachments;
-  if (!payment_id.empty() && !set_payment_id_to_tx(attachments, payment_id, m_wallet->is_in_hardfork_zone(ZANO_HARDFORK_04_ZARCANUM)))
+  if (!legacy_tx_wide_payment_id.empty() && !set_payment_id_to_tx(attachments, legacy_tx_wide_payment_id, hf4_active))
   {
-    fail_msg_writer() << "provided (or embedded) payment id can't be set: \"" << payment_id << "\"";
+    fail_msg_writer() << "tx-wide payment id could not be set: \"" << legacy_tx_wide_payment_id << "\"";
     return true;
   }
 
-  currency::transaction tx;
+  currency::transaction tx{};
   m_wallet->transfer(dsts, fake_outs_count, 0, fee, extra, attachments, tx);
 
   if (!m_wallet->is_watch_only())
