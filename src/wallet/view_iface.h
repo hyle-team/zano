@@ -339,7 +339,7 @@ public:
 
   struct transfer_event_info
   {
-    tools::wallet_public::wallet_transfer_info_v2 ti;
+    tools::wallet_public::wallet_transfer_info ti;
     std::list<tools::wallet_public::asset_balance_entry> balances; 
 		uint64_t total_mined;
     uint64_t wallet_id;
@@ -356,8 +356,8 @@ public:
 
   struct transfers_array
   {
-    std::vector<tools::wallet_public::wallet_transfer_info_v2> unconfirmed;
-    std::vector<tools::wallet_public::wallet_transfer_info_v2> history;
+    std::vector<tools::wallet_public::wallet_transfer_info> unconfirmed;
+    std::vector<tools::wallet_public::wallet_transfer_info> history;
     uint64_t total_history_items;
     uint64_t last_item_index;
 

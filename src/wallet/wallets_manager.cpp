@@ -1163,12 +1163,9 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       if (w->is_watch_only() && !w->is_auditable())
         return API_RETURN_CODE_WALLET_WATCH_ONLY_NOT_SUPPORTED;
 
-      // @#@#TODO: remove this conversion -- sowle
-      std::vector<tools::wallet_public::wallet_transfer_info> wti_history;
-      w->get_recent_transfers_history(wti_history, 0, txs_to_return, owr.recent_history.total_history_items, owr.recent_history.last_item_index, exclude_mining_txs);
+      w->get_recent_transfers_history(owr.recent_history.history, 0, txs_to_return, owr.recent_history.total_history_items, owr.recent_history.last_item_index, exclude_mining_txs);
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
-      w->get_unconfirmed_transfers(wti_history, exclude_mining_txs);
-      std::for_each(wti_history.begin(), wti_history.end(), [&](auto& el){ owr.recent_history.history.push_back(tools::wallet_public::wallet_transfer_info_v2{el}); });
+      w->get_unconfirmed_transfers(owr.recent_history.history, exclude_mining_txs);
       w->set_use_assets_whitelisting(true);
       owr.wallet_local_bc_size = w->get_blockchain_current_size();
 
@@ -1248,11 +1245,8 @@ std::string wallets_manager::get_recent_transfers(size_t wallet_id, uint64_t off
     return API_RETURN_CODE_CORE_BUSY;
   }
 
-  // @#@#TODO: remove this conversion -- sowle
-  std::vector<tools::wallet_public::wallet_transfer_info> wti_history;
-  w->get()->get_unconfirmed_transfers(wti_history, exclude_mining_txs);
-  w->get()->get_recent_transfers_history(wti_history, offset, count, tr_hist.total_history_items, tr_hist.last_item_index, exclude_mining_txs);
-  std::for_each(wti_history.begin(), wti_history.end(), [&](auto& el){ tr_hist.history.push_back(tools::wallet_public::wallet_transfer_info_v2{el}); });
+  w->get()->get_unconfirmed_transfers(tr_hist.history, exclude_mining_txs);
+  w->get()->get_recent_transfers_history(tr_hist.history, offset, count, tr_hist.total_history_items, tr_hist.last_item_index, exclude_mining_txs);
 
   auto fix_tx = [](tools::wallet_public::wallet_transfer_info& wti) -> void {
     wti.show_sender = currency::is_showing_sender_addres(wti.tx);
@@ -2132,7 +2126,7 @@ void wallets_manager::on_new_block(size_t wallet_id, uint64_t /*height*/, const 
 void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
 {  
   view::transfer_event_info tei{};
-  tei.ti = tools::wallet_public::wallet_transfer_info_v2{wti}; // @#@#TODO: remove this conversion -- sowle
+  tei.ti = wti;
   tei.balances = balances;
   tei.total_mined = total_mined;
   tei.wallet_id = wallet_id;
@@ -2173,7 +2167,7 @@ void wallets_manager::on_sync_progress(size_t wallet_id, const uint64_t& percent
 void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti)
 {
   view::transfer_event_info tei{};
-  tei.ti = tools::wallet_public::wallet_transfer_info_v2{wti}; // @#@#TODO: remove this conversion -- sowle
+  tei.ti = wti;
 
   SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
   auto it = m_wallets.find(wallet_id);
