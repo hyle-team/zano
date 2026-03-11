@@ -9,6 +9,7 @@
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
 #include "crypto/RIPEMD160_helper.h"
+#include "crypto/sha512.h"
 
 bool parse_hash256(const std::string str_hash, crypto::hash& hash);
 
@@ -41,4 +42,5 @@ namespace crypto
   inline std::ostream &operator <<(std::ostream &o, const crypto::signature &v)       { return print_t(o, v); }
   inline std::ostream &operator <<(std::ostream &o, const crypto::hash &v)            { return print_t(o, v); }
   inline std::ostream &operator <<(std::ostream &o, const crypto::hash160 &v)         { return print_t(o, v); }
+  inline std::ostream &operator <<(std::ostream &o, const crypto::hash64 &v)          { return print_t(o, v); }
 } // namespace crypto
