@@ -2084,6 +2084,92 @@ TEST(hash, sha512)
   return true;
 }
 
+std::string reverse_32bytes_hex(const std::string& hex)
+{
+  size_t size = hex.size();
+  CHECK_AND_ASSERT_THROW_MES(size % 2 == 0, "invalid hex");
+  std::string result(size, '0');
+  for(size_t i = 0; i < size; i += 2)
+  {
+    result[i    ] = hex[size - i - 2];
+    result[i + 1] = hex[size - i - 1];
+  }
+  return result;
+}
+
+
+TEST(crypto, eddsa)
+{
+  // form RFC8032   
+  // -----TEST 1
+  // SECRET KEY: 9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60
+  // PUBLIC KEY: d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a
+  // MESSAGE (length 0 bytes):
+  // SIGNATURE: e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b
+
+  std::string message = "";
+
+  uint8_t seed[32] = {};
+  CHECK_AND_ASSERT_TRUE(parse_tpod_from_hex_string("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60", seed));
+
+  hash64 h64{};
+  CHECK_AND_ASSERT_TRUE(sha512(seed, sizeof seed, h64));
+
+  scalar_t sk{};
+  std::string buff(32, '\0');
+  memcpy(sk.data(), h64.data, 32);    // first 32 bytes
+  memcpy(buff.data(), h64.data + 32, 32); // last 32 bytes
+  // prune the expanded key per RFC 8032 
+  sk.m_s[0] &= 248;
+  sk.m_s[31] &= 63;
+  sk.m_s[31] |= 64;
+  sk.reduce();
+
+  buff += message;
+
+  CHECK_AND_ASSERT_TRUE(sha512(buff.data(), buff.size(), h64));  // sha512(prefix | m)
+  sc_reduce(h64.data);
+  scalar_t r;
+  memcpy(r.data(), h64.data, 32);
+  CHECK_AND_ASSERT_TRUE(r.is_reduced());
+
+  point_t R = r * c_point_G;
+  std::cout << "R = " << R << ENDL;
+  public_key R_pk = R.to_public_key();
+
+  point_t p;
+  public_key pk = parse_tpod_from_hex_string<public_key>("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a");
+  CHECK_AND_ASSERT_TRUE(p.from_public_key(pk));
+  CHECK_AND_ASSERT_TRUE(p.is_in_main_subgroup());
+
+  CHECK_AND_ASSERT_EQ(sk * c_point_G, p);
+
+
+  buff.clear();
+  epst::append_pod_to_strbuff(R_pk, buff);
+  epst::append_pod_to_strbuff(pk, buff);
+  buff += message;
+
+  CHECK_AND_ASSERT_TRUE(sha512(buff.data(), buff.size(), h64));  // sha512(R_pk | pk | m)
+  sc_reduce(h64.data);
+  scalar_t h;
+  memcpy(h.data(), h64.data, 32);
+  CHECK_AND_ASSERT_TRUE(h.is_reduced());
+
+  scalar_t s = r + h * sk;
+  std::cout << "s = " << s << ENDL;
+
+
+  hash64 signature{};
+  memcpy(signature.data,      R_pk.data, 32);
+  memcpy(signature.data + 32, s.data(), 32);
+
+  hash64 expected_signature = parse_tpod_from_hex_string<hash64>("e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b");
+  
+  CHECK_AND_ASSERT_EQ(signature, expected_signature);
+
+  return true;
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////
