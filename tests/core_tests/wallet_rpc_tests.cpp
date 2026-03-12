@@ -2113,15 +2113,995 @@ bool wallet_rpc_gateway_address::c1(currency::core& c, size_t ev_index, const st
 
   CHECK_AND_ASSERT_EQ(get_history_resp.transactions.back().comment, tr_to_gw_req2.comment);
 
-  /*
-  TODO:
-    1. Test against ECDSA, EDDSA signatures
-    2. Test against registration of illigal asset_id (random, not public key)
-    3. Test for spending from GW address more coins that it has. 
-    4. Test for encrypted tx service attachments for GW-outgoing transactions
-    5. Reorganizae tests
-       5.1. Tx that spend GW address on reorganize should properly undo balance
-       5.2. Tx that send to GW address should properly undo balance
- */
+  return true;
+}
+
+wallet_rpc_gateway_signatures::wallet_rpc_gateway_signatures()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_gateway_signatures, c1);
+}
+
+bool wallet_rpc_gateway_signatures::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool wallet_rpc_gateway_signatures::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  // Tests ETH ECDSA gateway owner key: register gateway with an ETH public key, fund it, create a transfer,
+  // sign it with the ETH private key, broadcast, verify balance
+  bool r = false;
+  currency::t_currency_protocol_handler<currency::core> cprotocol(c, NULL);
+  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > dummy_p2p(cprotocol);
+  bc_services::bc_offers_service dummy_bc(nullptr);
+  currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
+  core_rpc_wrapper.set_ignore_connectivity_status(true);
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
+
+  std::unordered_map<crypto::public_key, uint64_t> gw_balances;
+  auto update_gw_balances = [&](const std::list<gateway_balance_entry>& balances)
+  {
+    gw_balances.clear();
+    for (const auto& el : balances)
+      gw_balances[el.asset_id] = el.amount;
+  };
+
+  LOG_PRINT_GREEN_L0("--- ETH ECDSA gateway");
+
+  crypto::public_key eth_gw_view_pub_key{};
+  crypto::secret_key eth_gw_view_sec_key{};
+  crypto::generate_keys(eth_gw_view_pub_key, eth_gw_view_sec_key);
+
+  crypto::eth_secret_key eth_owner_sec_key{};
+  crypto::eth_public_key eth_owner_pub_key{};
+  r = crypto::generate_eth_key_pair(eth_owner_sec_key, eth_owner_pub_key);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_key_pair failed");
+
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request eth_gw_reg_req = {};
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response eth_gw_reg_resp = {};
+  eth_gw_reg_req.view_pub_key= eth_gw_view_pub_key;
+  eth_gw_reg_req.descriptor_info.opt_owner_eth_pub_key = eth_owner_pub_key;
+  eth_gw_reg_req.descriptor_info.meta_info = "eth-gw-test";
+  r = invoke_text_json_for_rpc_and_check_status(miner_wlt_rpc, "register_gateway_address", eth_gw_reg_req, eth_gw_reg_resp);
+  CHECK_AND_ASSERT_MES(r, false, "register_gateway_address (ETH) failed");
+  LOG_PRINT_GREEN_L0("Registered ETH gw address: " << eth_gw_reg_resp.address);
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
+  CHECK_AND_ASSERT_TRUE(r);
+
+  // verify ETH gateway,descriptor must contain only opt_owner_eth_pub_key
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request eth_gw_info_req = {};
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response eth_gw_info_resp = {};
+  eth_gw_info_req.gateway_address = eth_gw_reg_resp.address;
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", eth_gw_info_req, eth_gw_info_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_get_address_info (ETH) failed");
+  CHECK_AND_ASSERT_EQ(eth_gw_info_resp.balances.size(), 0);
+  CHECK_AND_ASSERT_EQ(eth_gw_info_resp.gateway_view_pub_key, eth_gw_view_pub_key);
+  CHECK_AND_ASSERT_EQ(eth_gw_info_resp.descriptor_info.opt_owner_eth_pub_key.has_value(), true);
+  CHECK_AND_ASSERT_EQ(eth_gw_info_resp.descriptor_info.opt_owner_eth_pub_key.value(), eth_owner_pub_key);
+  CHECK_AND_ASSERT_EQ(eth_gw_info_resp.descriptor_info.opt_owner_custom_schnorr_pub_key.has_value(), false);
+  CHECK_AND_ASSERT_EQ(eth_gw_info_resp.descriptor_info.opt_owner_eddsa_pub_key.has_value(), false);
+
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request  tr_to_eth_gw_req = {};
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_to_eth_gw_resp = {};
+  tr_to_eth_gw_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(4), eth_gw_reg_resp.address});
+  tr_to_eth_gw_req.fee = TESTS_DEFAULT_FEE;
+  r = invoke_text_json_for_rpc(miner_wlt_rpc, "transfer", tr_to_eth_gw_req, tr_to_eth_gw_resp);
+  CHECK_AND_ASSERT_MES(r, false, "RPC transfer to ETH gateway failed");
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine failed after funding ETH gw");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  eth_gw_info_resp = {};
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", eth_gw_info_req, eth_gw_info_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_get_address_info (ETH, after funding) failed");
+  update_gw_balances(eth_gw_info_resp.balances);
+  CHECK_AND_ASSERT_EQ(gw_balances[native_coin_asset_id], MK_TEST_COINS(4));
+
+  // create transfer ETH gateway -> miner + bob (2 outputs required by hf4)
+  // sends 1 to miner + 1 to bob + TESTS_DEFAULT_FEE = 1 left
+  currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request eth_gw_create_req = {};
+  currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response eth_gw_create_resp = {};
+  eth_gw_create_req.origin_gateway_id = eth_gw_view_pub_key;
+  eth_gw_create_req.destinations.push_back({MK_TEST_COINS(1), miner_wlt->get_account().get_public_address_str()});
+  eth_gw_create_req.destinations.push_back({MK_TEST_COINS(1), bob_wlt->get_account().get_public_address_str()});
+  eth_gw_create_req.fee = TESTS_DEFAULT_FEE;
+  eth_gw_create_req.comment = "eth gateway transfer test";
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", eth_gw_create_req, eth_gw_create_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer (ETH) failed");
+
+  crypto::eth_signature eth_sig{};
+  r = crypto::generate_eth_signature(eth_gw_create_resp.tx_hash_to_sign, eth_owner_sec_key, eth_sig);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_signature failed");
+
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request eth_sign_req = {};
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response eth_sign_resp = {};
+  eth_sign_req.opt_eth_signature = eth_sig;
+  eth_sign_req.tx_blob = eth_gw_create_resp.tx_blob;
+  eth_sign_req.tx_hash_to_sign = eth_gw_create_resp.tx_hash_to_sign;
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", eth_sign_req, eth_sign_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_sign_transfer (ETH) failed");
+
+  currency::COMMAND_RPC_SEND_RAW_TX::request send_eth_gw_req = {};
+  currency::COMMAND_RPC_SEND_RAW_TX::response send_eth_gw_resp = {};
+  send_eth_gw_req.tx_as_hex = epee::string_tools::buff_to_hex_nodelimer(eth_sign_resp.signed_tx_blob);
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "sendrawtransaction", send_eth_gw_req, send_eth_gw_resp);
+  CHECK_AND_ASSERT_MES(r, false, "sendrawtransaction (ETH) failed");
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  // ETH gateway balance must decrease: 4 - 1 (to miner) - 1 (to bob) - 1 (fee) = 1
+  eth_gw_info_resp = {};
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", eth_gw_info_req, eth_gw_info_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_get_address_info (ETH, after transfer) failed");
+  update_gw_balances(eth_gw_info_resp.balances);
+  CHECK_AND_ASSERT_EQ(gw_balances[native_coin_asset_id], MK_TEST_COINS(1));
+
+  LOG_PRINT_GREEN_L0("wallet_rpc_gateway_signatures passed");
+  return true;
+}
+
+/* TODO: EdDSA Ed25519 gateway owner key uncomment when generate_eddsa_key_pair / generate_eddsa_signature / verify_eddsa_signature are implemented
+
+  crypto::public_key eddsa_gw_view_pub_key{};
+  crypto::secret_key eddsa_gw_view_sec_key{};
+  crypto::generate_keys(eddsa_gw_view_pub_key, eddsa_gw_view_sec_key);
+
+  crypto::eddsa_secret_key eddsa_owner_sec_key{};
+  crypto::eddsa_public_key eddsa_owner_pub_key{};
+  r = crypto::generate_eddsa_key_pair(eddsa_owner_sec_key, eddsa_owner_pub_key);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eddsa_key_pair failed");
+
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request eddsa_gw_reg_req = {};
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response eddsa_gw_reg_resp = {};
+  eddsa_gw_reg_req.view_pub_key = eddsa_gw_view_pub_key;
+  eddsa_gw_reg_req.descriptor_info.opt_owner_eddsa_pub_key = eddsa_owner_pub_key;
+  eddsa_gw_reg_req.descriptor_info.meta_info = "eddsa-gw-test";
+  r = invoke_text_json_for_rpc_and_check_status(miner_wlt_rpc, "register_gateway_address", eddsa_gw_reg_req, eddsa_gw_reg_resp);
+  CHECK_AND_ASSERT_MES(r, false, "register_gateway_address (EdDSA) failed");
+  LOG_PRINT_GREEN_L0("Registered EdDSA gw address: " << eddsa_gw_reg_resp.address);
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
+  CHECK_AND_ASSERT_TRUE(r);
+
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request eddsa_gw_info_req = {};
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response eddsa_gw_info_resp = {};
+  eddsa_gw_info_req.gateway_address = eddsa_gw_reg_resp.address;
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", eddsa_gw_info_req, eddsa_gw_info_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_get_address_info (EdDSA) failed");
+  CHECK_AND_ASSERT_EQ(eddsa_gw_info_resp.balances.size(), 0);
+  CHECK_AND_ASSERT_EQ(eddsa_gw_info_resp.gateway_view_pub_key, eddsa_gw_view_pub_key);
+  CHECK_AND_ASSERT_EQ(eddsa_gw_info_resp.descriptor_info.opt_owner_eddsa_pub_key.has_value(), true);
+  CHECK_AND_ASSERT_EQ(eddsa_gw_info_resp.descriptor_info.opt_owner_eddsa_pub_key.value(), eddsa_owner_pub_key);
+  CHECK_AND_ASSERT_EQ(eddsa_gw_info_resp.descriptor_info.opt_owner_custom_schnorr_pub_key.has_value(), false);
+  CHECK_AND_ASSERT_EQ(eddsa_gw_info_resp.descriptor_info.opt_owner_eth_pub_key.has_value(), false);
+
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request  tr_to_eddsa_gw_req  = {};
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_to_eddsa_gw_resp = {};
+  tr_to_eddsa_gw_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(4), eddsa_gw_reg_resp.address});
+  tr_to_eddsa_gw_req.fee = TESTS_DEFAULT_FEE;
+  r = invoke_text_json_for_rpc(miner_wlt_rpc, "transfer", tr_to_eddsa_gw_req, tr_to_eddsa_gw_resp);
+  CHECK_AND_ASSERT_MES(r, false, "RPC 'transfer' to EdDSA gateway failed");
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine failed after funding EdDSA gw");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  eddsa_gw_info_resp = {};
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", eddsa_gw_info_req, eddsa_gw_info_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_get_address_info (EdDSA, after funding) failed");
+  update_gw_balances(eddsa_gw_info_resp.balances);
+  CHECK_AND_ASSERT_EQ(gw_balances[native_coin_asset_id], MK_TEST_COINS(4));
+
+  currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request  eddsa_gw_create_req = {};
+  currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response eddsa_gw_create_resp = {};
+  eddsa_gw_create_req.origin_gateway_id = eddsa_gw_view_pub_key;
+  eddsa_gw_create_req.destinations.push_back({MK_TEST_COINS(1), miner_wlt->get_account().get_public_address_str()});
+  eddsa_gw_create_req.destinations.push_back({MK_TEST_COINS(1), bob_wlt->get_account().get_public_address_str()});
+  eddsa_gw_create_req.fee = TESTS_DEFAULT_FEE;
+  eddsa_gw_create_req.comment = "eddsa gateway transfer test";
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", eddsa_gw_create_req, eddsa_gw_create_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer (EdDSA) failed");
+
+  crypto::eddsa_signature eddsa_sig{};
+  r = crypto::generate_eddsa_signature(eddsa_gw_create_resp.tx_hash_to_sign, eddsa_owner_sec_key, eddsa_sig);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eddsa_signature failed");
+
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request eddsa_sign_req = {};
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response eddsa_sign_resp = {};
+  eddsa_sign_req.opt_eddsa_signature = eddsa_sig;
+  eddsa_sign_req.tx_blob = eddsa_gw_create_resp.tx_blob;
+  eddsa_sign_req.tx_hash_to_sign = eddsa_gw_create_resp.tx_hash_to_sign;
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", eddsa_sign_req, eddsa_sign_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_sign_transfer (EdDSA) failed");
+
+  currency::COMMAND_RPC_SEND_RAW_TX::request send_eddsa_gw_req = {};
+  currency::COMMAND_RPC_SEND_RAW_TX::response send_eddsa_gw_resp = {};
+  send_eddsa_gw_req.tx_as_hex = epee::string_tools::buff_to_hex_nodelimer(eddsa_sign_resp.signed_tx_blob);
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "sendrawtransaction", send_eddsa_gw_req, send_eddsa_gw_resp);
+  CHECK_AND_ASSERT_MES(r, false, "sendrawtransaction (EdDSA) failed");
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  eddsa_gw_info_resp = {};
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", eddsa_gw_info_req, eddsa_gw_info_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_get_address_info (EdDSA, after transfer) failed");
+  update_gw_balances(eddsa_gw_info_resp.balances);
+  CHECK_AND_ASSERT_EQ(gw_balances[native_coin_asset_id], MK_TEST_COINS(1));
+*/
+
+
+wallet_rpc_gateway_illegal_asset_id::wallet_rpc_gateway_illegal_asset_id()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_gateway_illegal_asset_id, c1);
+}
+
+bool wallet_rpc_gateway_illegal_asset_id::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool wallet_rpc_gateway_illegal_asset_id::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  // test idea that ZC->GW transfer specifying syntactically invalid asset_id (bytes that are not valid Ed25519 curve point)
+  // is rejected by the wallet, while transfer of legitimately deployed asset is accepted
+  bool r = false;
+
+  currency::t_currency_protocol_handler<currency::core> cprotocol(c, NULL);
+  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > dummy_p2p(cprotocol);
+  bc_services::bc_offers_service dummy_bc(nullptr);
+  currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
+  core_rpc_wrapper.set_ignore_connectivity_status(true);
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
+
+  miner_wlt->refresh();
+  crypto::public_key eth_gw_view_pub_key{};
+  crypto::secret_key eth_gw_view_sec_key{};
+  crypto::generate_keys(eth_gw_view_pub_key, eth_gw_view_sec_key);
+
+  crypto::eth_secret_key eth_owner_sec_key{};
+  crypto::eth_public_key eth_owner_pub_key{};
+  r = crypto::generate_eth_key_pair(eth_owner_sec_key, eth_owner_pub_key);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_key_pair failed");
+
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request eth_gw_reg_req = {};
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response eth_gw_reg_resp = {};
+  eth_gw_reg_req.view_pub_key = eth_gw_view_pub_key;
+  eth_gw_reg_req.descriptor_info.opt_owner_eth_pub_key = eth_owner_pub_key;
+  eth_gw_reg_req.descriptor_info.meta_info = "illegal-asset-id-test";
+  r = invoke_text_json_for_rpc_and_check_status(miner_wlt_rpc, "register_gateway_address", eth_gw_reg_req, eth_gw_reg_resp);
+  CHECK_AND_ASSERT_MES(r, false, "register_gateway_address ETH failed");
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
+  CHECK_AND_ASSERT_MES(r, false, "mine failed after ETH gw registration");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request eth_gw_info_req = {};
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response eth_gw_info_resp = {};
+  eth_gw_info_req.gateway_address = eth_gw_reg_resp.address;
+
+  std::unordered_map<crypto::public_key, uint64_t> gw_balances;
+  auto update_gw_balances = [&](const std::list<gateway_balance_entry>& balances)
+  {
+    gw_balances.clear();
+    for (const auto& el : balances)
+      gw_balances[el.asset_id] = el.amount;
+  };
+
+  // illegal asset_id (bytes that are not a valid Ed25519 curve point)
+  // first, deploy fresh asset and mint 20 coins to the miner so that the miner holds real utxos for a valid but diff asset
+  //
+  //  A: rejection attempt to transfer to the ETH gateway specifying invalid_asset_id (bytes that dont decode to any Ed25519 point)
+  //    wallet fails at UTXO selection (error::not_enough_money - no UTXOs exist for that asset_id) and no tx enters the mempool
+  //    second line of defence process_gateway_ouput calls pub_key_mul8() / ge_frombytes_vartime() and would reject the bytes at the blockchain level
+  //
+  //  B: happy path transfer the same newly deployed asset (valid asset_id, real balance) to the ETH gateway - must succeed and update the gateway balance.
+  //
+  // test vector for the invalid point: y = 2^255 - 1 > p (field prime 2^255 - 19)
+
+  // deploy asset+ mint 20 coins to miner
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_ASSETS_DEPLOY::request st2_deploy_req = {};
+  tools::wallet_public::COMMAND_ASSETS_DEPLOY::response st2_deploy_resp = {};
+  st2_deploy_req.asset_descriptor.current_supply = 20;
+  st2_deploy_req.asset_descriptor.decimal_point = 0;
+  st2_deploy_req.asset_descriptor.full_name = "XDDDGatewayTestAssetXDDD";
+  st2_deploy_req.asset_descriptor.ticker = "GTA6";
+  st2_deploy_req.asset_descriptor.total_max_supply = 100;
+  st2_deploy_req.destinations.emplace_back(currency::transfer_destination{20, miner_wlt->get_account().get_public_address_str(), null_pkey});
+  st2_deploy_req.do_not_split_destinations = true;
+  r = invoke_text_json_for_rpc(miner_wlt_rpc, "deploy_asset", st2_deploy_req, st2_deploy_resp);
+  CHECK_AND_ASSERT_MES(r, false, "deploy_asset failed");
+  crypto::public_key st2_asset_id = st2_deploy_resp.new_asset_id;
+  LOG_PRINT_GREEN_L0("asset deployed: " << st2_asset_id);
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine failed after deploy");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  // A: rejection - transfer to ETH gateway specifying invalid_asset_id
+  // miner has real UTXOs (st2_asset_id) but none for invalid_asset_id, so select_indices_for_transfer throws error::not_enough_money before building the tx
+  LOG_PRINT_GREEN_L0("--- A: illegal asset_id is rejected by the wallet");
+
+  crypto::public_key invalid_asset_id = crypto::parse_tpod_from_hex_string<crypto::public_key>("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f");
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request tr_invalid_asset_req = {};
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_invalid_asset_resp = {};
+  tr_invalid_asset_req.destinations.emplace_back(currency::transfer_destination{10, eth_gw_reg_resp.address, invalid_asset_id});
+  tr_invalid_asset_req.fee = TESTS_DEFAULT_FEE;
+  r = invoke_text_json_for_rpc(miner_wlt_rpc, "transfer", tr_invalid_asset_req, tr_invalid_asset_resp);
+  CHECK_AND_ASSERT_FALSE(r);  // must fail: wallet has no utxo for invalid_asset_id
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  // B: happy path send the valid new asset st2_asset_id to the ETH gateway
+  // miner has 20 coins of st2_asset_id send 10 to the gateway
+  LOG_PRINT_GREEN_L0("--- B: valid different asset accepted by ETH gateway");
+
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request tr_st2_asset_req = {};
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_st2_asset_resp = {};
+  tr_st2_asset_req.destinations.emplace_back(currency::transfer_destination{10, eth_gw_reg_resp.address, st2_asset_id});
+  tr_st2_asset_req.fee = TESTS_DEFAULT_FEE;
+  r = invoke_text_json_for_rpc(miner_wlt_rpc, "transfer", tr_st2_asset_req, tr_st2_asset_resp);
+  CHECK_AND_ASSERT_MES(r, false, "transfer valid new asset to ETH gateway failed");
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
+  CHECK_AND_ASSERT_MES(r, false, "mine failed after B transfer");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  // verify ETH gateway now holds 10 coins of st2_asset_id
+  eth_gw_info_resp = {};
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", eth_gw_info_req, eth_gw_info_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_get_address_info B failed");
+  update_gw_balances(eth_gw_info_resp.balances);
+  CHECK_AND_ASSERT_EQ(gw_balances[st2_asset_id], 10);
+
+  LOG_PRINT_GREEN_L0("wallet_rpc_gateway_illegal_asset_id passed");
+  return true;
+}
+
+wallet_rpc_gateway_overspend::wallet_rpc_gateway_overspend()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_gateway_overspend, c1);
+}
+
+bool wallet_rpc_gateway_overspend::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc = m_accounts[BOB_ACC_IDX]; bob_acc.generate(); bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool wallet_rpc_gateway_overspend::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  // Test idea: that gateway_create_transfer rejects transfers that exceed the gateways on-chain balance (both large overdrafts and off-by-one boundary cases)
+  bool r = false;
+
+  currency::t_currency_protocol_handler<currency::core> cprotocol(c, NULL);
+  nodetool::node_server<currency::t_currency_protocol_handler<currency::core>> dummy_p2p(cprotocol);
+  bc_services::bc_offers_service dummy_bc(nullptr);
+  currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
+  core_rpc_wrapper.set_ignore_connectivity_status(true);
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
+
+  std::unordered_map<crypto::public_key, uint64_t> gw_balances;
+  auto update_gw_balances = [&](const std::list<gateway_balance_entry>& balances)
+  {
+    gw_balances.clear();
+    for (const auto& el : balances)
+      gw_balances[el.asset_id] = el.amount;
+  };
+
+  miner_wlt->refresh();
+  crypto::public_key eth_gw_view_pub_key{};
+  crypto::secret_key eth_gw_view_sec_key{};
+  crypto::generate_keys(eth_gw_view_pub_key, eth_gw_view_sec_key);
+
+  crypto::eth_secret_key eth_owner_sec_key{};
+  crypto::eth_public_key eth_owner_pub_key{};
+  r = crypto::generate_eth_key_pair(eth_owner_sec_key, eth_owner_pub_key);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_key_pair failed");
+
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request eth_gw_reg_req = {};
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response eth_gw_reg_resp = {};
+  eth_gw_reg_req.view_pub_key = eth_gw_view_pub_key;
+  eth_gw_reg_req.descriptor_info.opt_owner_eth_pub_key = eth_owner_pub_key;
+  eth_gw_reg_req.descriptor_info.meta_info = "overspend-test";
+  r = invoke_text_json_for_rpc_and_check_status(miner_wlt_rpc, "register_gateway_address", eth_gw_reg_req, eth_gw_reg_resp);
+  CHECK_AND_ASSERT_MES(r, false, "register_gateway_address ETH failed");
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
+  CHECK_AND_ASSERT_MES(r, false, "mine failed after ETH gw registration");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request eth_gw_info_req = {};
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response eth_gw_info_resp = {};
+  eth_gw_info_req.gateway_address = eth_gw_reg_resp.address;
+
+  // fund ETH gateway with exactly 1 = TESTS_DEFAULT_FEE native coins this means the entire 
+  // native balance will be consumed by the fee in any outgoing tx so any native destination > 0 is an overdraft
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request fund_req = {};
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response fund_resp = {};
+  fund_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(1), eth_gw_reg_resp.address});
+  fund_req.fee = TESTS_DEFAULT_FEE;
+  r = invoke_text_json_for_rpc(miner_wlt_rpc, "transfer", fund_req, fund_resp);
+  CHECK_AND_ASSERT_MES(r, false, "transfer native to ETH gateway failed");
+
+  // deploy asset and mint 20 coins to miner, then send 10 to the ETH gateway keeping 10 as change to the miner
+  tools::wallet_public::COMMAND_ASSETS_DEPLOY::request os_deploy_req = {};
+  tools::wallet_public::COMMAND_ASSETS_DEPLOY::response os_deploy_resp = {};
+  os_deploy_req.asset_descriptor.current_supply = 20;
+  os_deploy_req.asset_descriptor.decimal_point = 0;
+  os_deploy_req.asset_descriptor.full_name = "LLLOverspendTestAssetLLL";
+  os_deploy_req.asset_descriptor.ticker = "OTA";
+  os_deploy_req.asset_descriptor.total_max_supply = 100;
+  os_deploy_req.destinations.emplace_back(currency::transfer_destination{20, miner_wlt->get_account().get_public_address_str(), null_pkey});
+  os_deploy_req.do_not_split_destinations = true;
+  r = invoke_text_json_for_rpc(miner_wlt_rpc, "deploy_asset", os_deploy_req, os_deploy_resp);
+  CHECK_AND_ASSERT_MES(r, false, "deploy_asset overspend failed");
+  crypto::public_key os_asset_id = os_deploy_resp.new_asset_id;
+
+  // mine enough blocks to unlock the newly deployed asset UTXOs
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 2);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_MES(r, false, "mine failed after funding + deploy");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  // refresh and transfer all 10 os_asset_id coins to the ETH gateway 10 remain as change
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request asset_fund_req = {};
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response asset_fund_resp = {};
+  asset_fund_req.destinations.emplace_back(currency::transfer_destination{10, eth_gw_reg_resp.address, os_asset_id});
+  asset_fund_req.fee = TESTS_DEFAULT_FEE;
+  r = invoke_text_json_for_rpc(miner_wlt_rpc, "transfer", asset_fund_req, asset_fund_resp);
+  CHECK_AND_ASSERT_MES(r, false, "transfer asset to ETH gateway failed");
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
+  CHECK_AND_ASSERT_MES(r, false, "mine failed after asset transfer to gw");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  // verify starting balances native = 1, os_asset_id = 10
+  eth_gw_info_resp = {};
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", eth_gw_info_req, eth_gw_info_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_get_address_info (initial) failed");
+  update_gw_balances(eth_gw_info_resp.balances);
+  CHECK_AND_ASSERT_EQ(gw_balances[native_coin_asset_id], MK_TEST_COINS(1));
+  CHECK_AND_ASSERT_EQ(gw_balances[os_asset_id], 10);
+
+  LOG_PRINT_GREEN_L0("--- overdraft - gateway_create_transfer must reject");
+
+  // A: native-coin overdraft
+  // attempt to send 2 + 1 = 3 plus TESTS_DEFAULT_FEE, while the gateway only holds 1
+  LOG_PRINT_GREEN_L0("--- A: native coin overdraft");
+  {
+    currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request req = {};
+    currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response resp = {};
+    req.origin_gateway_id = eth_gw_view_pub_key;
+    req.destinations.push_back({MK_TEST_COINS(2), miner_wlt->get_account().get_public_address_str()});
+    req.destinations.push_back({MK_TEST_COINS(1), bob_wlt->get_account().get_public_address_str()});
+    req.fee = TESTS_DEFAULT_FEE;
+    r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_create_transfer", req, resp);
+    CHECK_AND_ASSERT_FALSE(r);   // must fail: gateway holds only 1
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+  }
+
+  // B: asset overdraft
+  // attempt to send 15 + 10 = 25 units of os_asset_id, while the gateway only holds 10
+  LOG_PRINT_GREEN_L0("--- B: asset overdraft");
+  {
+    currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request req = {};
+    currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response resp = {};
+    req.origin_gateway_id = eth_gw_view_pub_key;
+    req.destinations.push_back({15, miner_wlt->get_account().get_public_address_str(), os_asset_id});
+    req.destinations.push_back({10, bob_wlt->get_account().get_public_address_str(),   os_asset_id});
+    req.fee = TESTS_DEFAULT_FEE;
+    r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_create_transfer", req, resp);
+    CHECK_AND_ASSERT_FALSE(r); // must fail: gateway holds only 10 of os_asset_id
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+  }
+
+  // boundary test
+  // gateway balances at this point:
+  //   native coin = 1 = TESTS_DEFAULT_FEE all consumed by fee in any tx
+  //   os_asset_id = 10
+
+  // С: native coin, over by exactly 1 unit, total_native_needed = 1 (dest) + TESTS_DEFAULT_FEE (fee) = TESTS_DEFAULT_FEE + 1
+  // balance = TESTS_DEFAULT_FEE -> exceeds by 1 -> must reject
+  LOG_PRINT_GREEN_L0("--- C: native coin over by 1 unit");
+  {
+    currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request req = {};
+    currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response resp = {};
+    req.origin_gateway_id = eth_gw_view_pub_key;
+    req.destinations.push_back({1, miner_wlt->get_account().get_public_address_str()});  // 1 unit native
+    req.fee = TESTS_DEFAULT_FEE;
+    r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_create_transfer", req, resp);
+    CHECK_AND_ASSERT_FALSE(r);   // total_native = TESTS_DEFAULT_FEE + 1 > balance
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+  }
+
+  // D: asset, over by exactly 1
+  // total_asset_needed = 11 > balance(10) -> must reject
+  LOG_PRINT_GREEN_L0("--- D: asset over by 1");
+  {
+    currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request req = {};
+    currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response resp = {};
+    req.origin_gateway_id = eth_gw_view_pub_key;
+    req.destinations.push_back({11, miner_wlt->get_account().get_public_address_str(), os_asset_id});
+    req.fee = TESTS_DEFAULT_FEE;
+    r = invoke_text_json_for_rpc(core_rpc_wrapper, "gateway_create_transfer", req, resp);
+    CHECK_AND_ASSERT_FALSE(r); // total_asset = 11 > balance(10)
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+  }
+
+  // E: asset exactly at balance - the call must success
+  LOG_PRINT_GREEN_L0("--- E: asset exactly at balance");
+  {
+    currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request req = {};
+    currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response resp = {};
+    req.origin_gateway_id = eth_gw_view_pub_key;
+    req.destinations.push_back({10, miner_wlt->get_account().get_public_address_str(), os_asset_id});
+    req.fee = TESTS_DEFAULT_FEE;
+    r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", req, resp);
+    CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer (3e: exactly at balance) must succeed");
+    CHECK_AND_ASSERT_FALSE(resp.tx_blob.empty());
+    CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+  }
+
+  // verify that all failed and unsigned attempts left the gateway balances untouched.
+  eth_gw_info_resp = {};
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", eth_gw_info_req, eth_gw_info_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_get_address_info E failed");
+  update_gw_balances(eth_gw_info_resp.balances);
+  CHECK_AND_ASSERT_EQ(gw_balances[native_coin_asset_id], MK_TEST_COINS(1));
+  CHECK_AND_ASSERT_EQ(gw_balances[os_asset_id], 10);
+
+  LOG_PRINT_GREEN_L0("wallet_rpc_gateway_overspend passed: overdraft correctly rejected, balances unchanged");
+
+  return true;
+}
+
+wallet_rpc_gateway_service_entries::wallet_rpc_gateway_service_entries()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_gateway_service_entries, c1);
+}
+
+bool wallet_rpc_gateway_service_entries::generate(std::vector<test_event_entry>& events) const
+{
+  // Test idea: verifies that service entries in gateway_create_transfer are included in the constructed tx and are accessible via gateway_get_address_history
+  // plaintext entries flags=0 appear verbatim; encrypted entries TX_SERVICE_ATTACHMENT_ENCRYPT_BODY
+  // have their flags preserved but body garbled, since the gateway view key differs from the recipients key
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc = m_accounts[BOB_ACC_IDX]; bob_acc.generate(); bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool wallet_rpc_gateway_service_entries::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  currency::t_currency_protocol_handler<currency::core> cprotocol(c, NULL);
+  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > dummy_p2p(cprotocol);
+  bc_services::bc_offers_service dummy_bc(nullptr);
+  currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
+  core_rpc_wrapper.set_ignore_connectivity_status(true);
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
+
+  // reg ETH gateway
+  crypto::public_key gw_view_pub_key{};
+  crypto::secret_key gw_view_sec_key{};
+  crypto::generate_keys(gw_view_pub_key, gw_view_sec_key);
+
+  crypto::eth_secret_key eth_owner_sec_key{};
+  crypto::eth_public_key eth_owner_pub_key{};
+  r = crypto::generate_eth_key_pair(eth_owner_sec_key, eth_owner_pub_key);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_key_pair failed");
+
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request gw_reg_req = {};
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response gw_reg_resp = {};
+  gw_reg_req.view_pub_key= gw_view_pub_key;
+  gw_reg_req.descriptor_info.opt_owner_eth_pub_key = eth_owner_pub_key;
+  gw_reg_req.descriptor_info.meta_info = "omg im meta info, show me!";
+  r = invoke_text_json_for_rpc_and_check_status(miner_wlt_rpc, "register_gateway_address", gw_reg_req, gw_reg_resp);
+  CHECK_AND_ASSERT_MES(r, false, "register_gateway_address failed");
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
+  CHECK_AND_ASSERT_TRUE(r);
+
+  // fund the gateway with 4 native
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request  fund_req = {};
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response fund_resp = {};
+  fund_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(4), gw_reg_resp.address});
+  fund_req.fee = TESTS_DEFAULT_FEE;
+  r = invoke_text_json_for_rpc(miner_wlt_rpc, "transfer", fund_req, fund_resp);
+  CHECK_AND_ASSERT_MES(r, false, "RPC 'transfer' to gateway failed");
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_TRUE(r);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  // prepare two service entries - one plaintext one body encrypted
+  const std::string plain_body = "hello plaintext";
+  const std::string enc_body = "hello encrypted";
+
+  currency::tx_service_attachment sa_plain = AUTO_VAL_INIT(sa_plain);
+  sa_plain.service_id = "TEST";
+  sa_plain.body = plain_body;
+  sa_plain.flags = 0;
+
+  currency::tx_service_attachment sa_enc = AUTO_VAL_INIT(sa_enc);
+  sa_enc.service_id = "TEST";
+  sa_enc.body = enc_body;
+  sa_enc.flags = TX_SERVICE_ATTACHMENT_ENCRYPT_BODY;
+
+  // create gateway transfer: 2 outputs required by the hardfork minimum (miner + bob)
+  currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request ct_req = {};
+  currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response ct_resp = {};
+  ct_req.origin_gateway_id = gw_view_pub_key;
+  ct_req.destinations.push_back({MK_TEST_COINS(1), miner_wlt->get_account().get_public_address_str()});
+  ct_req.destinations.push_back({MK_TEST_COINS(1), bob_wlt->get_account().get_public_address_str()});
+  ct_req.fee = TESTS_DEFAULT_FEE;
+  ct_req.service_entries.push_back(sa_plain);
+  ct_req.service_entries.push_back(sa_enc);
+  ct_req.service_entries_permanent = false;  // attachments, not extra
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", ct_req, ct_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer with service entries failed");
+  CHECK_AND_ASSERT_FALSE(ct_resp.tx_blob.empty());
+
+  crypto::eth_signature eth_sig{};
+  r = crypto::generate_eth_signature(ct_resp.tx_hash_to_sign, eth_owner_sec_key, eth_sig);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_signature failed");
+
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request sign_req = {};
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response sign_resp = {};
+  sign_req.opt_eth_signature = eth_sig;
+  sign_req.tx_blob = ct_resp.tx_blob;
+  sign_req.tx_hash_to_sign = ct_resp.tx_hash_to_sign;
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", sign_req, sign_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_sign_transfer failed");
+
+  currency::COMMAND_RPC_SEND_RAW_TX::request  send_req = {};
+  currency::COMMAND_RPC_SEND_RAW_TX::response send_resp = {};
+  send_req.tx_as_hex = epee::string_tools::buff_to_hex_nodelimer(sign_resp.signed_tx_blob);
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "sendrawtransaction", send_req, send_resp);
+  CHECK_AND_ASSERT_MES(r, false, "sendrawtransaction failed");
+
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
+  CHECK_AND_ASSERT_TRUE(r);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  // get history + find the outgoing tx with entries
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request hist_req = {};
+  currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response hist_resp = {};
+  hist_req.gateway_address = gw_reg_resp.address;
+  hist_req.gateway_view_secret_key = gw_view_sec_key;
+  hist_req.count = 10;
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_history", hist_req, hist_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_get_address_history failed");
+  CHECK_AND_ASSERT_MES(hist_resp.transactions.size() >= 1, false, "history must contain at least one entry");
+
+  bool found_se_tx = false;
+  for (const auto& wti : hist_resp.transactions)
+  {
+    if (wti.service_entries.size() < 2)
+      continue;
+
+    found_se_tx = true;
+
+    const auto& se0 = wti.service_entries[0];
+    CHECK_AND_ASSERT_MES(se0.flags == 0, false, "plaintext service entry must have flags==0 got " << (int)se0.flags);
+    CHECK_AND_ASSERT_MES(se0.body == plain_body, false, "plaintext service entry body mismatch: '" << se0.body << "' != '" << plain_body << "'");
+
+    // gateway key != recipient key
+    const auto& se1 = wti.service_entries[1];
+    CHECK_AND_ASSERT_MES((se1.flags & TX_SERVICE_ATTACHMENT_ENCRYPT_BODY) != 0, false, "encrypted service entry must have TX_SERVICE_ATTACHMENT_ENCRYPT_BODY set");
+    CHECK_AND_ASSERT_MES(se1.body != enc_body, false, "encrypted service entry body must not equal plaintext after decryption with wrong key");
+
+    break;
+  }
+  CHECK_AND_ASSERT_MES(found_se_tx, false, "no history entry with 2 service entries found");
+
+  return true;
+}
+
+wallet_rpc_gateway_reorg_spend::wallet_rpc_gateway_reorg_spend()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_gateway_reorg_spend, c1);
+}
+
+bool wallet_rpc_gateway_reorg_spend::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc = m_accounts[BOB_ACC_IDX]; bob_acc.generate(); bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool wallet_rpc_gateway_reorg_spend::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  // Test idea: gateway spend tx that gets rolled back by a blockchain reorg must restore the gateway balance
+  // fund gateway -> record fork_point -> mine 1 block containing the spend tx -> mine 2 alt blocks from fork_point (triggers reorg) -> verify balance restored
+  bool r = false;
+
+  currency::t_currency_protocol_handler<currency::core> cprotocol(c, NULL);
+  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > dummy_p2p(cprotocol);
+  bc_services::bc_offers_service dummy_bc(nullptr);
+  currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
+  core_rpc_wrapper.set_ignore_connectivity_status(true);
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  std::shared_ptr<tools::wallet2> bob_wlt= init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
+
+  crypto::public_key gw_view_pub_key{};
+  crypto::secret_key gw_view_sec_key{};
+  crypto::generate_keys(gw_view_pub_key, gw_view_sec_key);
+
+  crypto::eth_secret_key eth_owner_sec_key{};
+  crypto::eth_public_key eth_owner_pub_key{};
+  r = crypto::generate_eth_key_pair(eth_owner_sec_key, eth_owner_pub_key);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_key_pair failed");
+
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request gw_reg_req = {};
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response gw_reg_resp = {};
+  gw_reg_req.view_pub_key = gw_view_pub_key;
+  gw_reg_req.descriptor_info.opt_owner_eth_pub_key = eth_owner_pub_key;
+  r = invoke_text_json_for_rpc_and_check_status(miner_wlt_rpc, "register_gateway_address", gw_reg_req, gw_reg_resp);
+  CHECK_AND_ASSERT_MES(r, false, "register_gateway_address failed");
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
+  CHECK_AND_ASSERT_TRUE(r);
+
+  // Fund the gateway with 4
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request fund_req = {};
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response fund_resp = {};
+  fund_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(4), gw_reg_resp.address});
+  fund_req.fee = TESTS_DEFAULT_FEE;
+  r = invoke_text_json_for_rpc(miner_wlt_rpc, "transfer", fund_req, fund_resp);
+  CHECK_AND_ASSERT_MES(r, false, "RPC 'transfer' to gateway failed");
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_TRUE(r);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  // helper to read the gateways native balance
+  auto check_gw_native_balance = [&](uint64_t expected) -> bool
+  {
+    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request info_req = {};
+    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response info_resp = {};
+    info_req.gateway_address = gw_reg_resp.address;
+    bool ok = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", info_req, info_resp);
+    CHECK_AND_ASSERT_MES(ok, false, "gateway_get_address_info failed");
+    uint64_t actual = 0;
+    for (const auto& b : info_resp.balances)
+      if (b.asset_id == currency::native_coin_asset_id)
+        actual = b.amount;
+    CHECK_AND_ASSERT_MES(actual == expected, false, "gateway native balance: expected " << expected << ", got " << actual);
+    return true;
+  };
+
+  CHECK_AND_ASSERT_MES(check_gw_native_balance(MK_TEST_COINS(4)), false, "pre-fork balance check");
+
+  // record the fork point - all blocks after this will be rolled back by the reorg
+  crypto::hash fork_point = c.get_tail_id();
+
+  // create and broadcast the gateway spend tx:
+  //  dest1 = 1 to miner, dest2 = 1 to bob, fee = TESTS_DEFAULT_FEE
+  //  total debited = 3*FEE -> post spend balance = 4 - 3*FEE = 1
+  currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request ct_req = {};
+  currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response ct_resp = {};
+  ct_req.origin_gateway_id = gw_view_pub_key;
+  ct_req.destinations.push_back({MK_TEST_COINS(1), miner_wlt->get_account().get_public_address_str()});
+  ct_req.destinations.push_back({MK_TEST_COINS(1), bob_wlt->get_account().get_public_address_str()});
+  ct_req.fee = TESTS_DEFAULT_FEE;
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", ct_req, ct_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer failed");
+
+  crypto::eth_signature eth_sig{};
+  r = crypto::generate_eth_signature(ct_resp.tx_hash_to_sign, eth_owner_sec_key, eth_sig);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_signature failed");
+
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request sign_req = {};
+  currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response sign_resp = {};
+  sign_req.opt_eth_signature = eth_sig;
+  sign_req.tx_blob = ct_resp.tx_blob;
+  sign_req.tx_hash_to_sign = ct_resp.tx_hash_to_sign;
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", sign_req, sign_resp);
+  CHECK_AND_ASSERT_MES(r, false, "gateway_sign_transfer failed");
+
+  currency::COMMAND_RPC_SEND_RAW_TX::request send_req = {};
+  currency::COMMAND_RPC_SEND_RAW_TX::response send_resp = {};
+  send_req.tx_as_hex = epee::string_tools::buff_to_hex_nodelimer(sign_resp.signed_tx_blob);
+  r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "sendrawtransaction", send_req, send_resp);
+  CHECK_AND_ASSERT_MES(r, false, "sendrawtransaction failed");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+
+  // mine 1 block - spend tx is now confirmed on the main chain
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 1);
+  CHECK_AND_ASSERT_TRUE(r);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+  CHECK_AND_ASSERT_MES(check_gw_native_balance(MK_TEST_COINS(1)), false, "post-spend balance check");
+
+  // alt chain (2 blocks) > main chain (1 block) -> reorg triggers
+  r = mine_next_pow_blocks_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), {}, c, 2, fork_point);
+  CHECK_AND_ASSERT_MES(r, false, "failed to mine alt chain for reorg");
+
+  // after the reorg the spend tx is undone gateway balance must be restored
+  CHECK_AND_ASSERT_MES(check_gw_native_balance(MK_TEST_COINS(4)), false, "post-reorg balance check");
+
+  LOG_PRINT_GREEN_L0("wallet_rpc_gateway_reorg_spend passed: spend tx rolled back, balance restored");
+  return true;
+}
+
+wallet_rpc_gateway_reorg_receive::wallet_rpc_gateway_reorg_receive()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_gateway_reorg_receive, c1);
+}
+
+bool wallet_rpc_gateway_reorg_receive::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc  = m_accounts[BOB_ACC_IDX];  bob_acc.generate(); bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool wallet_rpc_gateway_reorg_receive::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  // Test idea: tx that funds a gateway and gets rolled back by a reorg must return the gateway balance to zero
+  // i register gateway -> record fork_point -> mine 1 block containing the funding tx -> mine 2 alt blocks from fork_point (triggers reorg) -> verify balance is 0
+
+  bool r = false;
+  currency::t_currency_protocol_handler<currency::core> cprotocol(c, NULL);
+  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > dummy_p2p(cprotocol);
+  bc_services::bc_offers_service dummy_bc(nullptr);
+  currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
+  core_rpc_wrapper.set_ignore_connectivity_status(true);
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
+
+  crypto::public_key gw_view_pub_key{};
+  crypto::secret_key gw_view_sec_key{};
+  crypto::generate_keys(gw_view_pub_key, gw_view_sec_key);
+
+  crypto::eth_secret_key eth_owner_sec_key{};
+  crypto::eth_public_key eth_owner_pub_key{};
+  r = crypto::generate_eth_key_pair(eth_owner_sec_key, eth_owner_pub_key);
+  CHECK_AND_ASSERT_MES(r, false, "generate_eth_key_pair failed");
+
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request gw_reg_req = {};
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response gw_reg_resp = {};
+  gw_reg_req.view_pub_key = gw_view_pub_key;
+  gw_reg_req.descriptor_info.opt_owner_eth_pub_key = eth_owner_pub_key;
+  r = invoke_text_json_for_rpc_and_check_status(miner_wlt_rpc, "register_gateway_address", gw_reg_req, gw_reg_resp);
+  CHECK_AND_ASSERT_MES(r, false, "register_gateway_address failed");
+
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
+  CHECK_AND_ASSERT_TRUE(r);
+
+  auto check_gw_native_balance = [&](uint64_t expected) -> bool
+  {
+    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request info_req = {};
+    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response info_resp = {};
+    info_req.gateway_address = gw_reg_resp.address;
+    bool ok = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", info_req, info_resp);
+    CHECK_AND_ASSERT_MES(ok, false, "gateway_get_address_info failed");
+    uint64_t actual = 0;
+    for (const auto& b : info_resp.balances)
+      if (b.asset_id == currency::native_coin_asset_id)
+        actual = b.amount;
+    CHECK_AND_ASSERT_MES(actual == expected, false, "gateway native balance: expected " << expected << ", got " << actual);
+    return true;
+  };
+
+  CHECK_AND_ASSERT_MES(check_gw_native_balance(0), false, "initial balance must be 0");
+
+  crypto::hash fork_point = c.get_tail_id();
+
+  // miner sends 2 to the gateway
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request fund_req = {};
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response fund_resp = {};
+  fund_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(2), gw_reg_resp.address});
+  fund_req.fee = TESTS_DEFAULT_FEE;
+  r = invoke_text_json_for_rpc(miner_wlt_rpc, "transfer", fund_req, fund_resp);
+  CHECK_AND_ASSERT_MES(r, false, "RPC 'transfer' to gateway failed");
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 1);
+
+  // mine 1 block - funding tx now confirmed on the main chain
+  r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 1);
+  CHECK_AND_ASSERT_TRUE(r);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+  CHECK_AND_ASSERT_MES(check_gw_native_balance(MK_TEST_COINS(2)), false, "post-fund balance check");
+
+  // alt chain (2 blocks) > main chain (1 block) -> reorg triggers
+  r = mine_next_pow_blocks_in_playtime_with_given_txs(m_accounts[MINER_ACC_IDX].get_public_address(), {}, c, 2, fork_point);
+  CHECK_AND_ASSERT_MES(r, false, "failed to mine alt chain for reorg");
+
+  // after reorg funding tx is undone gateway balance must return to zero
+  CHECK_AND_ASSERT_MES(check_gw_native_balance(0), false, "post-reorg balance must be 0");
+  LOG_PRINT_GREEN_L0("wallet_rpc_gateway_reorg_receive passed: funding tx rolled back, balance restored to 0");
   return true;
 }
