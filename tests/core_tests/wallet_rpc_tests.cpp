@@ -2174,7 +2174,7 @@ bool wallet_rpc_gateway_signatures::c1(currency::core& c, size_t ev_index, const
   tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request eth_gw_reg_req = {};
   tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response eth_gw_reg_resp = {};
   eth_gw_reg_req.view_pub_key= eth_gw_view_pub_key;
-  eth_gw_reg_req.descriptor_info.opt_owner_eth_pub_key = eth_owner_pub_key;
+  eth_gw_reg_req.descriptor_info.opt_owner_ecdsa_pub_key = eth_owner_pub_key;
   eth_gw_reg_req.descriptor_info.meta_info = "eth-gw-test";
   r = invoke_text_json_for_rpc_and_check_status(miner_wlt_rpc, "register_gateway_address", eth_gw_reg_req, eth_gw_reg_resp);
   CHECK_AND_ASSERT_MES(r, false, "register_gateway_address (ETH) failed");
@@ -2183,7 +2183,7 @@ bool wallet_rpc_gateway_signatures::c1(currency::core& c, size_t ev_index, const
   r = mine_next_pow_blocks_in_playtime(m_accounts[MINER_ACC_IDX].get_public_address(), c, 3);
   CHECK_AND_ASSERT_TRUE(r);
 
-  // verify ETH gateway,descriptor must contain only opt_owner_eth_pub_key
+  // verify ETH gateway,descriptor must contain only opt_owner_ecdsa_pub_key
   currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request eth_gw_info_req = {};
   currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response eth_gw_info_resp = {};
   eth_gw_info_req.gateway_address = eth_gw_reg_resp.address;
@@ -2191,8 +2191,8 @@ bool wallet_rpc_gateway_signatures::c1(currency::core& c, size_t ev_index, const
   CHECK_AND_ASSERT_MES(r, false, "gateway_get_address_info (ETH) failed");
   CHECK_AND_ASSERT_EQ(eth_gw_info_resp.balances.size(), 0);
   CHECK_AND_ASSERT_EQ(eth_gw_info_resp.gateway_view_pub_key, eth_gw_view_pub_key);
-  CHECK_AND_ASSERT_EQ(eth_gw_info_resp.descriptor_info.opt_owner_eth_pub_key.has_value(), true);
-  CHECK_AND_ASSERT_EQ(eth_gw_info_resp.descriptor_info.opt_owner_eth_pub_key.value(), eth_owner_pub_key);
+  CHECK_AND_ASSERT_EQ(eth_gw_info_resp.descriptor_info.opt_owner_ecdsa_pub_key.has_value(), true);
+  CHECK_AND_ASSERT_EQ(eth_gw_info_resp.descriptor_info.opt_owner_ecdsa_pub_key.value(), eth_owner_pub_key);
   CHECK_AND_ASSERT_EQ(eth_gw_info_resp.descriptor_info.opt_owner_custom_schnorr_pub_key.has_value(), false);
   CHECK_AND_ASSERT_EQ(eth_gw_info_resp.descriptor_info.opt_owner_eddsa_pub_key.has_value(), false);
 
@@ -2233,7 +2233,7 @@ bool wallet_rpc_gateway_signatures::c1(currency::core& c, size_t ev_index, const
 
   currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request eth_sign_req = {};
   currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response eth_sign_resp = {};
-  eth_sign_req.opt_eth_signature = eth_sig;
+  eth_sign_req.opt_ecdsa_signature = eth_sig;
   eth_sign_req.tx_blob = eth_gw_create_resp.tx_blob;
   eth_sign_req.tx_hash_to_sign = eth_gw_create_resp.tx_hash_to_sign;
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", eth_sign_req, eth_sign_resp);
@@ -2294,7 +2294,7 @@ bool wallet_rpc_gateway_signatures::c1(currency::core& c, size_t ev_index, const
   CHECK_AND_ASSERT_EQ(eddsa_gw_info_resp.descriptor_info.opt_owner_eddsa_pub_key.has_value(), true);
   CHECK_AND_ASSERT_EQ(eddsa_gw_info_resp.descriptor_info.opt_owner_eddsa_pub_key.value(), eddsa_owner_pub_key);
   CHECK_AND_ASSERT_EQ(eddsa_gw_info_resp.descriptor_info.opt_owner_custom_schnorr_pub_key.has_value(), false);
-  CHECK_AND_ASSERT_EQ(eddsa_gw_info_resp.descriptor_info.opt_owner_eth_pub_key.has_value(), false);
+  CHECK_AND_ASSERT_EQ(eddsa_gw_info_resp.descriptor_info.opt_owner_ecdsa_pub_key.has_value(), false);
 
   miner_wlt->refresh();
   tools::wallet_public::COMMAND_RPC_TRANSFER::request  tr_to_eddsa_gw_req  = {};
@@ -2403,7 +2403,7 @@ bool wallet_rpc_gateway_illegal_asset_id::c1(currency::core& c, size_t ev_index,
   tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request eth_gw_reg_req = {};
   tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response eth_gw_reg_resp = {};
   eth_gw_reg_req.view_pub_key = eth_gw_view_pub_key;
-  eth_gw_reg_req.descriptor_info.opt_owner_eth_pub_key = eth_owner_pub_key;
+  eth_gw_reg_req.descriptor_info.opt_owner_ecdsa_pub_key = eth_owner_pub_key;
   eth_gw_reg_req.descriptor_info.meta_info = "illegal-asset-id-test";
   r = invoke_text_json_for_rpc_and_check_status(miner_wlt_rpc, "register_gateway_address", eth_gw_reg_req, eth_gw_reg_resp);
   CHECK_AND_ASSERT_MES(r, false, "register_gateway_address ETH failed");
@@ -2554,7 +2554,7 @@ bool wallet_rpc_gateway_overspend::c1(currency::core& c, size_t ev_index, const 
   tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request eth_gw_reg_req = {};
   tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response eth_gw_reg_resp = {};
   eth_gw_reg_req.view_pub_key = eth_gw_view_pub_key;
-  eth_gw_reg_req.descriptor_info.opt_owner_eth_pub_key = eth_owner_pub_key;
+  eth_gw_reg_req.descriptor_info.opt_owner_ecdsa_pub_key = eth_owner_pub_key;
   eth_gw_reg_req.descriptor_info.meta_info = "overspend-test";
   r = invoke_text_json_for_rpc_and_check_status(miner_wlt_rpc, "register_gateway_address", eth_gw_reg_req, eth_gw_reg_resp);
   CHECK_AND_ASSERT_MES(r, false, "register_gateway_address ETH failed");
@@ -2762,7 +2762,7 @@ bool wallet_rpc_gateway_service_entries::c1(currency::core& c, size_t ev_index, 
   tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request gw_reg_req = {};
   tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response gw_reg_resp = {};
   gw_reg_req.view_pub_key= gw_view_pub_key;
-  gw_reg_req.descriptor_info.opt_owner_eth_pub_key = eth_owner_pub_key;
+  gw_reg_req.descriptor_info.opt_owner_ecdsa_pub_key = eth_owner_pub_key;
   gw_reg_req.descriptor_info.meta_info = "omg im meta info, show me!";
   r = invoke_text_json_for_rpc_and_check_status(miner_wlt_rpc, "register_gateway_address", gw_reg_req, gw_reg_resp);
   CHECK_AND_ASSERT_MES(r, false, "register_gateway_address failed");
@@ -2817,7 +2817,7 @@ bool wallet_rpc_gateway_service_entries::c1(currency::core& c, size_t ev_index, 
 
   currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request sign_req = {};
   currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response sign_resp = {};
-  sign_req.opt_eth_signature = eth_sig;
+  sign_req.opt_ecdsa_signature = eth_sig;
   sign_req.tx_blob = ct_resp.tx_blob;
   sign_req.tx_hash_to_sign = ct_resp.tx_hash_to_sign;
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", sign_req, sign_resp);
@@ -2917,7 +2917,7 @@ bool wallet_rpc_gateway_reorg_spend::c1(currency::core& c, size_t ev_index, cons
   tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request gw_reg_req = {};
   tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response gw_reg_resp = {};
   gw_reg_req.view_pub_key = gw_view_pub_key;
-  gw_reg_req.descriptor_info.opt_owner_eth_pub_key = eth_owner_pub_key;
+  gw_reg_req.descriptor_info.opt_owner_ecdsa_pub_key = eth_owner_pub_key;
   r = invoke_text_json_for_rpc_and_check_status(miner_wlt_rpc, "register_gateway_address", gw_reg_req, gw_reg_resp);
   CHECK_AND_ASSERT_MES(r, false, "register_gateway_address failed");
 
@@ -2976,7 +2976,7 @@ bool wallet_rpc_gateway_reorg_spend::c1(currency::core& c, size_t ev_index, cons
 
   currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request sign_req = {};
   currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response sign_resp = {};
-  sign_req.opt_eth_signature = eth_sig;
+  sign_req.opt_ecdsa_signature = eth_sig;
   sign_req.tx_blob = ct_resp.tx_blob;
   sign_req.tx_hash_to_sign = ct_resp.tx_hash_to_sign;
   r = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", sign_req, sign_resp);
@@ -3054,7 +3054,7 @@ bool wallet_rpc_gateway_reorg_receive::c1(currency::core& c, size_t ev_index, co
   tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request gw_reg_req = {};
   tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response gw_reg_resp = {};
   gw_reg_req.view_pub_key = gw_view_pub_key;
-  gw_reg_req.descriptor_info.opt_owner_eth_pub_key = eth_owner_pub_key;
+  gw_reg_req.descriptor_info.opt_owner_ecdsa_pub_key = eth_owner_pub_key;
   r = invoke_text_json_for_rpc_and_check_status(miner_wlt_rpc, "register_gateway_address", gw_reg_req, gw_reg_resp);
   CHECK_AND_ASSERT_MES(r, false, "register_gateway_address failed");
 

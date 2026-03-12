@@ -5844,7 +5844,7 @@ void wallet2::register_gateway_address(const wallet_public::COMMAND_GATEWAY_REGI
     count_keys++;
   if(req.descriptor_info.opt_owner_eddsa_pub_key)
     count_keys++;
-  if(req.descriptor_info.opt_owner_eth_pub_key)
+  if(req.descriptor_info.opt_owner_ecdsa_pub_key)
     count_keys++;
 
   WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(count_keys == 1, "Exactly one owner public key must be provided");
@@ -5857,9 +5857,9 @@ void wallet2::register_gateway_address(const wallet_public::COMMAND_GATEWAY_REGI
   {
     operation_register.descriptor.owner_key = req.descriptor_info.opt_owner_eddsa_pub_key.value();
   }
-  else if(req.descriptor_info.opt_owner_eth_pub_key)
+  else if(req.descriptor_info.opt_owner_ecdsa_pub_key)
   {
-    operation_register.descriptor.owner_key = req.descriptor_info.opt_owner_eth_pub_key.value();
+    operation_register.descriptor.owner_key = req.descriptor_info.opt_owner_ecdsa_pub_key.value();
   }
 
   operation_register.descriptor.meta_info = req.descriptor_info.meta_info;

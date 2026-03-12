@@ -721,7 +721,7 @@ namespace currency
     }
     VARIANT_CASE_CONST(crypto::eth_public_key, owner_key)
     {
-      res.descriptor_info.opt_owner_eth_pub_key = owner_key;
+      res.descriptor_info.opt_owner_ecdsa_pub_key = owner_key;
     }
     VARIANT_CASE_CONST(crypto::eddsa_public_key, owner_key)
     {
@@ -895,9 +895,9 @@ namespace currency
 
     size_t gw_sig_count = 0;
     gateway_signature_v gw_sig;
-    if(req.opt_eth_signature)
+    if(req.opt_ecdsa_signature)
     {
-      gw_sig = req.opt_eth_signature.value();
+      gw_sig = req.opt_ecdsa_signature.value();
       gw_sig_count++;
     }
     if(req.opt_custom_schnorr_signature)
