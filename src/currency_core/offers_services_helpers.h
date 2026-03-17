@@ -145,15 +145,24 @@ namespace bc_services
         {
           if (sa.instruction == BC_OFFERS_SERVICE_INSTRUCTION_ADD)
           {
-             extract_type_and_add<bc_services::offer_details>(sa.body, cnt);
+            if (!extract_type_and_add<bc_services::offer_details>(sa.body, cnt))
+            {
+              LOG_PRINT_L1("Failed to extract offer_details, instruction: " << sa.instruction);
+            }
           }
           else if (sa.instruction == BC_OFFERS_SERVICE_INSTRUCTION_UPD)
           {
-             extract_type_and_add<bc_services::update_offer>(sa.body, cnt);
+            if (!extract_type_and_add<bc_services::update_offer>(sa.body, cnt))
+            {
+              LOG_PRINT_L1("Failed to extract update_offer, instruction: " << sa.instruction);
+            }
           }
           else if (sa.instruction == BC_OFFERS_SERVICE_INSTRUCTION_DEL)
           {
-            extract_type_and_add<bc_services::cancel_offer>(sa.body, cnt);
+            if (!extract_type_and_add<bc_services::cancel_offer>(sa.body, cnt))
+            {
+              LOG_PRINT_L1("Failed to extract cancel_offer, instruction: " << sa.instruction);
+            }
           }
         }
       }
