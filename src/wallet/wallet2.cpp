@@ -1564,9 +1564,9 @@ bool wallet2::process_payment_id_for_wti_and_populate_subtransfers(wallet_public
     {
       bool has_balance_increase = false;
       payment_details pd{};
-      wallet_public::wallet_sub_transfer_info wsti{};
       for(const auto& [asset_id, balance_change] : aid_to_balance_change)
       {
+        wallet_public::wallet_sub_transfer_info wsti{};
         if (balance_change > 0)
         {
           has_balance_increase = true;
@@ -1607,11 +1607,11 @@ bool wallet2::process_payment_id_for_wti_and_populate_subtransfers(wallet_public
   {
     // tx-wide payment id is specified -- use legacy approach and ignore intrinsic payment ids (they shouldn't be present, but anyway)
     payment_details payment{};
-    wallet_public::wallet_sub_transfer_info wsti{};
 
     bool has_balance_increase = false;
     for (const auto& [asset_id, balance_change] : ptc.total_balance_change)
     {
+      wallet_public::wallet_sub_transfer_info wsti{};
       if (balance_change > 0)
       {
         has_balance_increase = true;

@@ -5210,9 +5210,9 @@ namespace currency
     for (const auto& [intrinsic_payment_id, aid_to_balance_change] : total_balance_change_per_payment_id)
     {
       bool has_balance_increase = false;
-      tools::wallet_public::wallet_sub_transfer_info wsti{};
       for (const auto& [asset_id, balance_change] : aid_to_balance_change)
       {
+        tools::wallet_public::wallet_sub_transfer_info wsti{};
         if (balance_change > 0)
         {
           has_balance_increase = true;
