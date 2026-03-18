@@ -215,7 +215,7 @@ namespace tools::wallet_public
       KV_SERIALIZE_EPHEMERAL_N(currency::asset_descriptor_operation, wallet_transfer_info_get_ado, "ado")   DOC_DSCR("\"Asset Descriptor Operation\" if it was present in transaction")   DOC_END
     END_KV_SERIALIZE_MAP()
 
-    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(13)
+    BOOST_SERIALIZATION_CURRENT_ARCHIVE_VER(14)
     BEGIN_BOOST_SERIALIZATION()
       BOOST_CHAIN_TRANSITION_VER(12, tools::legacy::wallet_transfer_info_hf5)
       BOOST_SERIALIZE(timestamp)
