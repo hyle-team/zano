@@ -251,16 +251,7 @@ namespace nodetool
     peers_indexed::index<by_time>::type& by_time_index=m_peers_white.get<by_time>();
     uint32_t cnt = 0;
 
-    // The fix was made using Monero -> 28a7d31
-    // picks a random set of peers within the first 120%, rather than a set of the first 100%.
-    // The intent is that if someone asks twice, they can't easily tell:
-    // - this address was not in the first list, but is in the second, so the only way this can be
-    // is if its last_seen was recently reset, so this means the target node recently had a new
-    // connection to that address
-    // - this address was in the first list, and not in the second, which means either the address
-    // was moved to the gray list (if it's not accessibe, which the attacker can check if
-    // the address accepts incoming connections) or it was the oldest to still fit in the 250 items,
-    // so its last_seen is old.
+    // Research https://fc20.ifca.ai/preproceedings/43.pdf
     const uint32_t pick_depth = anonymize ? depth + depth / 5 : depth;
     BOOST_REVERSE_FOREACH(const peers_indexed::value_type& vl, by_time_index)
     {
