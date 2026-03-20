@@ -15,6 +15,8 @@
 
 command_line::arg_descriptor<bool>      arg_market_disable  ( "disable-market", "Start GUI with market service disabled");
 
+#define ZLIB_DEFLATE_MAX_EXPECTED_RATIO    1000
+#define ZLIB_MAX_ALLOWED_DECOMPRESSED_SIZE (1 * 1024 * 1024)  // 1 MiB
 
 namespace bc_services
 {
@@ -80,11 +82,17 @@ namespace bc_services
   {
     if (m_disabled)
       return;
+    if (a.body.size() * ZLIB_DEFLATE_MAX_EXPECTED_RATIO > ZLIB_MAX_ALLOWED_DECOMPRESSED_SIZE)
+    {
+      LOG_ERROR("tx_service_attachment body too large for decompression: " << a.body.size()
+        << " bytes (estimated decompressed: " << a.body.size() * ZLIB_DEFLATE_MAX_EXPECTED_RATIO << "), tx_id = " << currency::get_transaction_hash(tx));
+      return;
+    }
     //unpack data and pars json
     std::string json_buff;
     if (!epee::zlib_helper::unpack(a.body, json_buff))
     {
-      LOG_ERROR("Filed to unpack tx_service_attachment in bc_offers_service, tx_id = " << currency::get_transaction_hash(tx));
+      LOG_ERROR("Failed to unpack tx_service_attachment in bc_offers_service, tx_id = " << currency::get_transaction_hash(tx));
       return;
     }
 
@@ -153,11 +161,16 @@ namespace bc_services
   {
     if (m_disabled)
       return;
+    if (a.body.size() * ZLIB_DEFLATE_MAX_EXPECTED_RATIO > ZLIB_MAX_ALLOWED_DECOMPRESSED_SIZE)
+    {
+      LOG_ERROR("tx_service_attachment body too large for decompression: " << a.body.size() << " bytes, tx_id = " << get_transaction_hash(tx));
+      return;
+    }
     //unpack data and pars json
     std::string json_buff;
     if (!epee::zlib_helper::unpack(a.body, json_buff))
     {
-      LOG_ERROR("Filed to unpack tx_service_attachment in bc_offers_service, tx_id = " << get_transaction_hash(tx));
+      LOG_ERROR("Failed to unpack tx_service_attachment in bc_offers_service, tx_id = " << get_transaction_hash(tx));
       return;
     }
 
@@ -223,10 +236,16 @@ namespace bc_services
     if (a.instruction != BC_OFFERS_SERVICE_INSTRUCTION_DEL)
       return true;
 
+    if (a.body.size() * ZLIB_DEFLATE_MAX_EXPECTED_RATIO > ZLIB_MAX_ALLOWED_DECOMPRESSED_SIZE)
+    {
+      LOG_ERROR("tx_service_attachment body too large for decompression: " << a.body.size() << " bytes, tx_id = " << get_transaction_hash(tx));
+      return false;
+    }
+
     std::string json_buff;
     if (!epee::zlib_helper::unpack(a.body, json_buff))
     {
-      LOG_ERROR("Filed to unpack tx_service_attachment in bc_offers_service, tx_id = " << get_transaction_hash(tx));
+      LOG_ERROR("Failed to unpack tx_service_attachment in bc_offers_service, tx_id = " << get_transaction_hash(tx));
       return false;
     }
 
@@ -234,7 +253,7 @@ namespace bc_services
     bool r = epee::serialization::load_t_from_json(co, json_buff);
     if (!r)
     {
-      LOG_ERROR("Filed to load json from tx_service_attachment in bc_offers_service, tx_id = " << get_transaction_hash(tx) << ", body: " << json_buff);
+      LOG_ERROR("Failed to load json from tx_service_attachment in bc_offers_service, tx_id = " << get_transaction_hash(tx) << ", body: " << json_buff);
       return false;
     }
     offers_container::index<by_id>::type::iterator oit;
