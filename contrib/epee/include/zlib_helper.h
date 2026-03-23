@@ -26,11 +26,13 @@
 
 
 #pragma once
-extern "C" { 
+extern "C" {
 #include "zlib/zlib.h"
 }
 
-namespace epee 
+#define ZLIB_MAX_DECOMPRESSED_SIZE (1 * 1024 * 1024) // 1 MiB
+
+namespace epee
 {
 namespace zlib_helper
 {
@@ -71,7 +73,7 @@ namespace zlib_helper
 		return r;
 	}
 
-	inline bool unpack(const std::string& target, std::string& decode_summary_buff)
+	inline bool unpack(const std::string& target, std::string& decode_summary_buff, size_t max_output_size = 0)
 	{
 		z_stream    zstream = {0};
 		int ret = inflateInit(&zstream);//
@@ -86,7 +88,7 @@ namespace zlib_helper
 		{
 			zstream.next_out = (Bytef*)current_decode_buff.data();
 			zstream.avail_out = (uInt)ungzip_buff_size;
-			
+
 			static char dummy_head[2] =
 			{
 				0x8 + 0x7 * 0x10,
@@ -101,7 +103,7 @@ namespace zlib_helper
 				inflateEnd(&zstream);
 				return false;
 			}
-			
+
       zstream.next_in = (Bytef*)target.data() + current_offset;
       zstream.avail_in = (uInt)target.size() - current_offset;
 
@@ -113,10 +115,10 @@ namespace zlib_helper
 				return false;
 			}
 
-			
+
 			//target.erase(0, target.size()-zstream.avail_in);
       current_offset += zstream.total_in;
-			
+
 			if(ungzip_buff_size == zstream.avail_out)
 			{
 				LOG_ERROR("Can't unpack buffer");
@@ -124,26 +126,33 @@ namespace zlib_helper
 				return false;
 			}
 
-			
+
 			current_decode_buff.resize(ungzip_buff_size - zstream.avail_out);
 			if(decode_summary_buff.size())
 				decode_summary_buff += current_decode_buff;
 			else
 				current_decode_buff.swap(decode_summary_buff);
 
+			if (max_output_size > 0 && decode_summary_buff.size() > max_output_size)
+			{
+				LOG_ERROR("unpack: decompressed size " << decode_summary_buff.size() << " exceeds limit " << max_output_size);
+				inflateEnd(&zstream);
+				return false;
+			}
+
 			current_decode_buff.resize(ungzip_buff_size);
 		}
 
 		inflateEnd(&zstream );
 
-		
+
 		return true;
 	}
 
-	inline 	bool unpack(std::string& target)
+	inline 	bool unpack(std::string& target, size_t max_output_size = 0)
 	{
 		std::string decode_summary_buff;
-		bool r = unpack(target, decode_summary_buff);
+		bool r = unpack(target, decode_summary_buff, max_output_size);
 		if (r)
 			decode_summary_buff.swap(target);
 		return r;

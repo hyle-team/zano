@@ -116,7 +116,7 @@ namespace bc_services
   bool extract_type_and_add(const std::string& body, t_srv_attachments_container& srv_cnt)
   {
     std::string json_buff;
-    if (!epee::zlib_helper::unpack(body, json_buff))
+    if (!epee::zlib_helper::unpack(body, json_buff, ZLIB_MAX_DECOMPRESSED_SIZE))
     {
       LOG_ERROR("Filed to unpack tx_service_attachment in bc_offers_service, tx_id");
       return false;
