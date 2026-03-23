@@ -26,7 +26,7 @@
 
 
 #pragma once
-extern "C" {
+extern "C" { 
 #include "zlib/zlib.h"
 }
 
@@ -88,7 +88,7 @@ namespace zlib_helper
 		{
 			zstream.next_out = (Bytef*)current_decode_buff.data();
 			zstream.avail_out = (uInt)ungzip_buff_size;
-
+			
 			static char dummy_head[2] =
 			{
 				0x8 + 0x7 * 0x10,
@@ -103,7 +103,7 @@ namespace zlib_helper
 				inflateEnd(&zstream);
 				return false;
 			}
-
+			
       zstream.next_in = (Bytef*)target.data() + current_offset;
       zstream.avail_in = (uInt)target.size() - current_offset;
 
@@ -115,10 +115,10 @@ namespace zlib_helper
 				return false;
 			}
 
-
+			
 			//target.erase(0, target.size()-zstream.avail_in);
       current_offset += zstream.total_in;
-
+			
 			if(ungzip_buff_size == zstream.avail_out)
 			{
 				LOG_ERROR("Can't unpack buffer");
@@ -145,7 +145,7 @@ namespace zlib_helper
 
 		inflateEnd(&zstream );
 
-
+		
 		return true;
 	}
 
