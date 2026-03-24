@@ -43,6 +43,12 @@ POP_VS_WARNINGS
           er.message = e.rpc_error_message(); \
           return false; \
         } \
+        catch (const tools::error::tx_freeze_period& e) \
+        { \
+          er.code = WALLET_RPC_ERROR_CODE_TX_FREEZE_PERIOD; \
+          er.message = std::string("WALLET_RPC_ERROR_CODE_TX_FREEZE_PERIOD: ") + e.what(); \
+          return false; \
+        } \
         catch (const tools::error::daemon_busy& e) \
         { \
           er.code = WALLET_RPC_ERROR_CODE_DAEMON_IS_BUSY; \

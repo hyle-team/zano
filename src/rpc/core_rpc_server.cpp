@@ -1313,7 +1313,7 @@ namespace currency
     if (m_p2p.get_payload_object().get_core().get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active())
     {
       LOG_PRINT_L0("[on_send_raw_tx]: pre hardfork freeze period is in effect, sending transactions is not allowed till the next hardfork. Please, try again after the hardfork activation.");
-      res.status = API_RETURN_CODE_BUSY;
+      res.status = API_RETURN_CODE_TX_FREEZE_PERIOD;
       return true;
     }
 
