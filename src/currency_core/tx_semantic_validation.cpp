@@ -23,12 +23,19 @@ namespace currency
   bool check_tx_inputs_keyimages_diff(const transaction& tx)
   {
     std::unordered_set<crypto::key_image> key_images;
+    std::unordered_set<crypto::hash> multisig_out_ids;
     crypto::key_image ki{};
     for(const auto& in_v : tx.vin)
     {
       if (get_key_image_from_txin_v(in_v, ki))
       {
         if (!key_images.insert(ki).second)
+          return false;
+      }
+      else if (in_v.type() == typeid(txin_multisig))
+      {
+        const auto& ms_in = boost::get<txin_multisig>(in_v);
+        if (!multisig_out_ids.insert(ms_in.multisig_out_id).second)
           return false;
       }
     }
