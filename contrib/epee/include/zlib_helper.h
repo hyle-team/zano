@@ -30,7 +30,9 @@ extern "C" {
 #include "zlib/zlib.h"
 }
 
-namespace epee 
+#define ZLIB_MAX_DECOMPRESSED_SIZE (1 * 1024 * 1024) // 1 MiB
+
+namespace epee
 {
 namespace zlib_helper
 {
@@ -71,7 +73,7 @@ namespace zlib_helper
 		return r;
 	}
 
-	inline bool unpack(const std::string& target, std::string& decode_summary_buff)
+	inline bool unpack(const std::string& target, std::string& decode_summary_buff, size_t max_output_size = 0)
 	{
 		z_stream    zstream = {0};
 		int ret = inflateInit(&zstream);//
@@ -124,12 +126,19 @@ namespace zlib_helper
 				return false;
 			}
 
-			
+
 			current_decode_buff.resize(ungzip_buff_size - zstream.avail_out);
 			if(decode_summary_buff.size())
 				decode_summary_buff += current_decode_buff;
 			else
 				current_decode_buff.swap(decode_summary_buff);
+
+			if (max_output_size > 0 && decode_summary_buff.size() > max_output_size)
+			{
+				LOG_ERROR("unpack: decompressed size " << decode_summary_buff.size() << " exceeds limit " << max_output_size);
+				inflateEnd(&zstream);
+				return false;
+			}
 
 			current_decode_buff.resize(ungzip_buff_size);
 		}
@@ -140,10 +149,10 @@ namespace zlib_helper
 		return true;
 	}
 
-	inline 	bool unpack(std::string& target)
+	inline 	bool unpack(std::string& target, size_t max_output_size = 0)
 	{
 		std::string decode_summary_buff;
-		bool r = unpack(target, decode_summary_buff);
+		bool r = unpack(target, decode_summary_buff, max_output_size);
 		if (r)
 			decode_summary_buff.swap(target);
 		return r;
