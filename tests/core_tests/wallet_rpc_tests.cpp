@@ -2257,19 +2257,21 @@ bool wallet_rpc_gateway_signatures::c1(currency::core& c, size_t ev_index, const
   CHECK_AND_ASSERT_EQ(gw_balances[native_coin_asset_id], MK_TEST_COINS(1));
 
   LOG_PRINT_GREEN_L0("wallet_rpc_gateway_signatures passed");
-  return true;
-}
 
-/* TODO: EdDSA Ed25519 gateway owner key uncomment when generate_eddsa_key_pair / generate_eddsa_signature / verify_eddsa_signature are implemented
+  //
+  // EDDSA
+  //
 
   crypto::public_key eddsa_gw_view_pub_key{};
   crypto::secret_key eddsa_gw_view_sec_key{};
   crypto::generate_keys(eddsa_gw_view_pub_key, eddsa_gw_view_sec_key);
 
+  crypto::eddsa_seed eddsa_seed{};
+  CHECK_AND_ASSERT_TRUE(crypto::eddsa_generate_random_seed(eddsa_seed));
+  crypto::eddsa_sec_prefix eddsa_prefix{};
   crypto::eddsa_secret_key eddsa_owner_sec_key{};
   crypto::eddsa_public_key eddsa_owner_pub_key{};
-  r = crypto::generate_eddsa_key_pair(eddsa_owner_sec_key, eddsa_owner_pub_key);
-  CHECK_AND_ASSERT_MES(r, false, "generate_eddsa_key_pair failed");
+  CHECK_AND_ASSERT_TRUE(crypto::eddsa_seed_to_secret_key_public_key_and_prefix(eddsa_seed, eddsa_owner_sec_key, eddsa_owner_pub_key, eddsa_prefix));
 
   miner_wlt->refresh();
   tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request eddsa_gw_reg_req = {};
@@ -2326,7 +2328,7 @@ bool wallet_rpc_gateway_signatures::c1(currency::core& c, size_t ev_index, const
   CHECK_AND_ASSERT_MES(r, false, "gateway_create_transfer (EdDSA) failed");
 
   crypto::eddsa_signature eddsa_sig{};
-  r = crypto::generate_eddsa_signature(eddsa_gw_create_resp.tx_hash_to_sign, eddsa_owner_sec_key, eddsa_sig);
+  r = crypto::generate_eddsa_signature(eddsa_gw_create_resp.tx_hash_to_sign, eddsa_prefix, eddsa_owner_sec_key, eddsa_owner_pub_key, eddsa_sig);
   CHECK_AND_ASSERT_MES(r, false, "generate_eddsa_signature failed");
 
   currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request eddsa_sign_req = {};
@@ -2352,7 +2354,9 @@ bool wallet_rpc_gateway_signatures::c1(currency::core& c, size_t ev_index, const
   CHECK_AND_ASSERT_MES(r, false, "gateway_get_address_info (EdDSA, after transfer) failed");
   update_gw_balances(eddsa_gw_info_resp.balances);
   CHECK_AND_ASSERT_EQ(gw_balances[native_coin_asset_id], MK_TEST_COINS(1));
-*/
+
+  return true;
+}
 
 
 wallet_rpc_gateway_illegal_asset_id::wallet_rpc_gateway_illegal_asset_id()
