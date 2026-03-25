@@ -1,5 +1,5 @@
-// Copyright (c) 2020-2024 Zano Project
-// Copyright (c) 2020-2024 sowle (val@zano.org, crypto.sowle@gmail.com)
+// Copyright (c) 2020-2026 Zano Project
+// Copyright (c) 2020-2026 sowle (val@zano.org, crypto.sowle@gmail.com)
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -2063,21 +2063,21 @@ TEST(hash, sha512)
   // input:  ""
   // ouptut: cf83e1357eefb8bd f1542850d66d8007 d620e4050b5715dc 83f4a921d36ce9ce 47d0d13c5d85f2b0 ff8318d2877eec2f 63b931bd47417a81 a538327af927da3e
   ASSERT_TRUE(sha512("", 0, h));
-  hash64 test_result_0 = {{ '\xcf', '\x83', '\xe1', '\x35', '\x7e', '\xef', '\xb8', '\xbd', '\xf1', '\x54', '\x28', '\x50', '\xd6', '\x6d', '\x80', '\x07', '\xd6', '\x20', '\xe4', '\x05', '\x0b', '\x57', '\x15', '\xdc', '\x83', '\xf4', '\xa9', '\x21', '\xd3', '\x6c', '\xe9', '\xce', '\x47', '\xd0', '\xd1', '\x3c', '\x5d', '\x85', '\xf2', '\xb0', '\xff', '\x83', '\x18', '\xd2', '\x87', '\x7e', '\xec', '\x2f', '\x63', '\xb9', '\x31', '\xbd', '\x47', '\x41', '\x7a', '\x81', '\xa5', '\x38', '\x32', '\x7a', '\xf9', '\x27', '\xda', '\x3e' }};
+  hash64 test_result_0 = {{ 0xcf, 0x83, 0xe1, 0x35, 0x7e, 0xef, 0xb8, 0xbd, 0xf1, 0x54, 0x28, 0x50, 0xd6, 0x6d, 0x80, 0x07, 0xd6, 0x20, 0xe4, 0x05, 0x0b, 0x57, 0x15, 0xdc, 0x83, 0xf4, 0xa9, 0x21, 0xd3, 0x6c, 0xe9, 0xce, 0x47, 0xd0, 0xd1, 0x3c, 0x5d, 0x85, 0xf2, 0xb0, 0xff, 0x83, 0x18, 0xd2, 0x87, 0x7e, 0xec, 0x2f, 0x63, 0xb9, 0x31, 0xbd, 0x47, 0x41, 0x7a, 0x81, 0xa5, 0x38, 0x32, 0x7a, 0xf9, 0x27, 0xda, 0x3e }};
   ASSERT_EQ(h, test_result_0);
 
   // #1
   // input:  "abc"
   // output: ddaf35a193617aba cc417349ae204131 12e6fa4e89a97ea2 0a9eeee64b55d39a 2192992a274fc1a8 36ba3c23a3feebbd 454d4423643ce80e 2a9ac94fa54ca49f
   ASSERT_TRUE(sha512("abc", 3, h));
-  hash64 test_result_1 = {{ '\xdd', '\xaf', '\x35', '\xa1', '\x93', '\x61', '\x7a', '\xba', '\xcc', '\x41', '\x73', '\x49', '\xae', '\x20', '\x41', '\x31', '\x12', '\xe6', '\xfa', '\x4e', '\x89', '\xa9', '\x7e', '\xa2', '\x0a', '\x9e', '\xee', '\xe6', '\x4b', '\x55', '\xd3', '\x9a', '\x21', '\x92', '\x99', '\x2a', '\x27', '\x4f', '\xc1', '\xa8', '\x36', '\xba', '\x3c', '\x23', '\xa3', '\xfe', '\xeb', '\xbd', '\x45', '\x4d', '\x44', '\x23', '\x64', '\x3c', '\xe8', '\x0e', '\x2a', '\x9a', '\xc9', '\x4f', '\xa5', '\x4c', '\xa4', '\x9f' }};
+  hash64 test_result_1 = {{ 0xdd, 0xaf, 0x35, 0xa1, 0x93, 0x61, 0x7a, 0xba, 0xcc, 0x41, 0x73, 0x49, 0xae, 0x20, 0x41, 0x31, 0x12, 0xe6, 0xfa, 0x4e, 0x89, 0xa9, 0x7e, 0xa2, 0x0a, 0x9e, 0xee, 0xe6, 0x4b, 0x55, 0xd3, 0x9a, 0x21, 0x92, 0x99, 0x2a, 0x27, 0x4f, 0xc1, 0xa8, 0x36, 0xba, 0x3c, 0x23, 0xa3, 0xfe, 0xeb, 0xbd, 0x45, 0x4d, 0x44, 0x23, 0x64, 0x3c, 0xe8, 0x0e, 0x2a, 0x9a, 0xc9, 0x4f, 0xa5, 0x4c, 0xa4, 0x9f }};
   ASSERT_EQ(h, test_result_1);
 
   // #2
   // input:  "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" (length 448 bits)
   // output: 204a8fc6dda82f0a 0ced7beb8e08a416 57c16ef468b228a8 279be331a703c335 96fd15c13b1b07f9 aa1d3bea57789ca0 31ad85c7a71dd703 54ec631238ca3445
   ASSERT_TRUE(sha512("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", 56, h));
-  hash64 test_result_2 = {{ '\x20', '\x4a', '\x8f', '\xc6', '\xdd', '\xa8', '\x2f', '\x0a', '\x0c', '\xed', '\x7b', '\xeb', '\x8e', '\x08', '\xa4', '\x16', '\x57', '\xc1', '\x6e', '\xf4', '\x68', '\xb2', '\x28', '\xa8', '\x27', '\x9b', '\xe3', '\x31', '\xa7', '\x03', '\xc3', '\x35', '\x96', '\xfd', '\x15', '\xc1', '\x3b', '\x1b', '\x07', '\xf9', '\xaa', '\x1d', '\x3b', '\xea', '\x57', '\x78', '\x9c', '\xa0', '\x31', '\xad', '\x85', '\xc7', '\xa7', '\x1d', '\xd7', '\x03', '\x54', '\xec', '\x63', '\x12', '\x38', '\xca', '\x34', '\x45' }};
+  hash64 test_result_2 = {{ 0x20, 0x4a, 0x8f, 0xc6, 0xdd, 0xa8, 0x2f, 0x0a, 0x0c, 0xed, 0x7b, 0xeb, 0x8e, 0x08, 0xa4, 0x16, 0x57, 0xc1, 0x6e, 0xf4, 0x68, 0xb2, 0x28, 0xa8, 0x27, 0x9b, 0xe3, 0x31, 0xa7, 0x03, 0xc3, 0x35, 0x96, 0xfd, 0x15, 0xc1, 0x3b, 0x1b, 0x07, 0xf9, 0xaa, 0x1d, 0x3b, 0xea, 0x57, 0x78, 0x9c, 0xa0, 0x31, 0xad, 0x85, 0xc7, 0xa7, 0x1d, 0xd7, 0x03, 0x54, 0xec, 0x63, 0x12, 0x38, 0xca, 0x34, 0x45 }};
   ASSERT_EQ(h, test_result_2);
 
 
@@ -2097,78 +2097,234 @@ std::string reverse_32bytes_hex(const std::string& hex)
   return result;
 }
 
+bool test_eddsa_against_test_vector(const std::string& seed_s, const std::string& pub_key_s, const std::string& hex_encoded_message, const std::string& sig_s)
+{
+  std::string message;
+  CHECK_AND_ASSERT_TRUE(epst::parse_hexstr_to_binbuff(hex_encoded_message, message));
+
+  eddsa_public_key expected_edpk{};
+  CHECK_AND_ASSERT_TRUE(parse_tpod_from_hex_string<eddsa_public_key>(pub_key_s, expected_edpk));
+
+  eddsa_signature expected_signature{};
+  CHECK_AND_ASSERT_TRUE(parse_tpod_from_hex_string<eddsa_signature>(sig_s, expected_signature));
+
+  if (seed_s.empty())
+  {
+    // no secret keys, do verification only
+    CHECK_AND_ASSERT_TRUE(verify_eddsa_signature(message, expected_edpk, expected_signature));
+  }
+  else
+  {
+    // full keys, do all the checks
+    eddsa_seed seed = {};
+    CHECK_AND_ASSERT_TRUE(parse_tpod_from_hex_string(seed_s, seed));
+
+    eddsa_secret_key edsk{};
+    eddsa_public_key edpk{};
+    eddsa_sec_prefix prefix{};
+    CHECK_AND_ASSERT_TRUE(eddsa_seed_to_secret_key_public_key_and_prefix(seed, edsk, edpk, prefix));
+
+    CHECK_AND_ASSERT_EQ(edpk, expected_edpk);
+  
+    eddsa_signature sig{};
+    CHECK_AND_ASSERT_TRUE(generate_eddsa_signature(message, prefix, edsk, edpk, sig));
+
+    CHECK_AND_ASSERT_EQ(sig, expected_signature);
+
+    CHECK_AND_ASSERT_TRUE(verify_eddsa_signature(message, edpk, sig));
+  }
+
+  return true;
+}
 
 TEST(crypto, eddsa)
 {
-  // form RFC8032   
+  //
+  // 5 test vectors form RFC8032
+  // 
   // -----TEST 1
   // SECRET KEY: 9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60
   // PUBLIC KEY: d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a
   // MESSAGE (length 0 bytes):
   // SIGNATURE: e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b
 
-  std::string message = "";
+  CHECK_AND_ASSERT_TRUE(test_eddsa_against_test_vector(
+    "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+    "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a",
+    "",
+    "e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b"));
 
-  uint8_t seed[32] = {};
-  CHECK_AND_ASSERT_TRUE(parse_tpod_from_hex_string("9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60", seed));
+  // -----TEST 2
+  // SECRET KEY: 4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb
+  // PUBLIC KEY: 3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c
+  // MESSAGE (length 1 byte): 72
+  // SIGNATURE:  92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00
 
-  hash64 h64{};
-  CHECK_AND_ASSERT_TRUE(sha512(seed, sizeof seed, h64));
+  CHECK_AND_ASSERT_TRUE(test_eddsa_against_test_vector(
+    "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb",
+    "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c",
+    "72",
+    "92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00"));
 
-  scalar_t sk{};
-  std::string buff(32, '\0');
-  memcpy(sk.data(), h64.data, 32);    // first 32 bytes
-  memcpy(buff.data(), h64.data + 32, 32); // last 32 bytes
-  // prune the expanded key per RFC 8032 
-  sk.m_s[0] &= 248;
-  sk.m_s[31] &= 63;
-  sk.m_s[31] |= 64;
-  sk.reduce();
+  //  -----TEST 3
+  // SECRET KEY: c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7
+  // PUBLIC KEY: fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025
+  // MESSAGE (length 2 bytes): af82
+  // SIGNATURE:  6291d657deec24024827e69c3abe01a30ce548a284743a445e3680d7db5ac3ac18ff9b538d16f290ae67f760984dc6594a7c15e9716ed28dc027beceea1ec40a
 
-  buff += message;
+  CHECK_AND_ASSERT_TRUE(test_eddsa_against_test_vector(
+    "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7",
+    "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025",
+    "af82",
+    "6291d657deec24024827e69c3abe01a30ce548a284743a445e3680d7db5ac3ac18ff9b538d16f290ae67f760984dc6594a7c15e9716ed28dc027beceea1ec40a"));
 
-  CHECK_AND_ASSERT_TRUE(sha512(buff.data(), buff.size(), h64));  // sha512(prefix | m)
-  sc_reduce(h64.data);
-  scalar_t r;
-  memcpy(r.data(), h64.data, 32);
-  CHECK_AND_ASSERT_TRUE(r.is_reduced());
+  // -----TEST 1024
+  // SECRET KEY: f5e5767cf153319517630f226876b86c8160cc583bc013744c6bf255f5cc0ee5
+  // PUBLIC KEY: 278117fc144c72340f67d0f2316e8386ceffbf2b2428c9c51fef7c597f1d426e
+  // MESSAGE (length 1023 bytes): 08b8b2b733424243760fe426a4b54908632110a66c2f6591eabd3345e3e4eb98fa6e264bf09efe12ee50f8f54e9f77b1e355f6c50544e23fb1433ddf73be84d879de7c0046dc4996d9e773f4bc9efe5738829adb26c81b37c93a1b270b20329d658675fc6ea534e0810a4432826bf58c941efb65d57a338bbd2e26640f89ffbc1a858efcb8550ee3a5e1998bd177e93a7363c344fe6b199ee5d02e82d522c4feba15452f80288a821a579116ec6dad2b3b310da903401aa62100ab5d1a36553e06203b33890cc9b832f79ef80560ccb9a39ce767967ed628c6ad573cb116dbefefd75499da96bd68a8a97b928a8bbc103b6621fcde2beca1231d206be6cd9ec7aff6f6c94fcd7204ed3455c68c83f4a41da4af2b74ef5c53f1d8ac70bdcb7ed185ce81bd84359d44254d95629e9855a94a7c1958d1f8ada5d0532ed8a5aa3fb2d17ba70eb6248e594e1a2297acbbb39d502f1a8c6eb6f1ce22b3de1a1f40cc24554119a831a9aad6079cad88425de6bde1a9187ebb6092cf67bf2b13fd65f27088d78b7e883c8759d2c4f5c65adb7553878ad575f9fad878e80a0c9ba63bcbcc2732e69485bbc9c90bfbd62481d9089beccf80cfe2df16a2cf65bd92dd597b0707e0917af48bbb75fed413d238f5555a7a569d80c3414a8d0859dc65a46128bab27af87a71314f318c782b23ebfe808b82b0ce26401d2e22f04d83d1255dc51addd3b75a2b1ae0784504df543af8969be3ea7082ff7fc9888c144da2af58429ec96031dbcad3dad9af0dcbaaaf268cb8fcffead94f3c7ca495e056a9b47acdb751fb73e666c6c655ade8297297d07ad1ba5e43f1bca32301651339e22904cc8c42f58c30c04aafdb038dda0847dd988dcda6f3bfd15c4b4c4525004aa06eeff8ca61783aacec57fb3d1f92b0fe2fd1a85f6724517b65e614ad6808d6f6ee34dff7310fdc82aebfd904b01e1dc54b2927094b2db68d6f903b68401adebf5a7e08d78ff4ef5d63653a65040cf9bfd4aca7984a74d37145986780fc0b16ac451649de6188a7dbdf191f64b5fc5e2ab47b57f7f7276cd419c17a3ca8e1b939ae49e488acba6b965610b5480109c8b17b80e1b7b750dfc7598d5d5011fd2dcc5600a32ef5b52a1ecc820e308aa342721aac0943bf6686b64b2579376504ccc493d97e6aed3fb0f9cd71a43dd497f01f17c0e2cb3797aa2a2f256656168e6c496afc5fb93246f6b1116398a346f1a641f3b041e989f7914f90cc2c7fff357876e506b50d334ba77c225bc307ba537152f3f1610e4eafe595f6d9d90d11faa933a15ef1369546868a7f3a45a96768d40fd9d03412c091c6315cf4fde7cb68606937380db2eaaa707b4c4185c32eddcdd306705e4dc1ffc872eeee475a64dfac86aba41c0618983f8741c5ef68d3a101e8a3b8cac60c905c15fc910840b94c00a0b9d0
+  // SIGNATURE:  0aab4c900501b3e24d7cdf4663326a3a87df5e4843b2cbdb67cbf6e460fec350aa5371b1508f9f4528ecea23c436d94b5e8fcd4f681e30a6ac00a9704a188a03
 
-  point_t R = r * c_point_G;
-  std::cout << "R = " << R << ENDL;
-  public_key R_pk = R.to_public_key();
+  CHECK_AND_ASSERT_TRUE(test_eddsa_against_test_vector(
+    "f5e5767cf153319517630f226876b86c8160cc583bc013744c6bf255f5cc0ee5",
+    "278117fc144c72340f67d0f2316e8386ceffbf2b2428c9c51fef7c597f1d426e",
+    "08b8b2b733424243760fe426a4b54908632110a66c2f6591eabd3345e3e4eb98fa6e264bf09efe12ee50f8f54e9f77b1e355f6c50544e23fb1433ddf73be84d879de7c0046dc4996d9e773f4bc9efe5738829adb26c81b37c93a1b270b20329d658675fc6ea534e0810a4432826bf58c941efb65d57a338bbd2e26640f89ffbc1a858efcb8550ee3a5e1998bd177e93a7363c344fe6b199ee5d02e82d522c4feba15452f80288a821a579116ec6dad2b3b310da903401aa62100ab5d1a36553e06203b33890cc9b832f79ef80560ccb9a39ce767967ed628c6ad573cb116dbefefd75499da96bd68a8a97b928a8bbc103b6621fcde2beca1231d206be6cd9ec7aff6f6c94fcd7204ed3455c68c83f4a41da4af2b74ef5c53f1d8ac70bdcb7ed185ce81bd84359d44254d95629e9855a94a7c1958d1f8ada5d0532ed8a5aa3fb2d17ba70eb6248e594e1a2297acbbb39d502f1a8c6eb6f1ce22b3de1a1f40cc24554119a831a9aad6079cad88425de6bde1a9187ebb6092cf67bf2b13fd65f27088d78b7e883c8759d2c4f5c65adb7553878ad575f9fad878e80a0c9ba63bcbcc2732e69485bbc9c90bfbd62481d9089beccf80cfe2df16a2cf65bd92dd597b0707e0917af48bbb75fed413d238f5555a7a569d80c3414a8d0859dc65a46128bab27af87a71314f318c782b23ebfe808b82b0ce26401d2e22f04d83d1255dc51addd3b75a2b1ae0784504df543af8969be3ea7082ff7fc9888c144da2af58429ec96031dbcad3dad9af0dcbaaaf268cb8fcffead94f3c7ca495e056a9b47acdb751fb73e666c6c655ade8297297d07ad1ba5e43f1bca32301651339e22904cc8c42f58c30c04aafdb038dda0847dd988dcda6f3bfd15c4b4c4525004aa06eeff8ca61783aacec57fb3d1f92b0fe2fd1a85f6724517b65e614ad6808d6f6ee34dff7310fdc82aebfd904b01e1dc54b2927094b2db68d6f903b68401adebf5a7e08d78ff4ef5d63653a65040cf9bfd4aca7984a74d37145986780fc0b16ac451649de6188a7dbdf191f64b5fc5e2ab47b57f7f7276cd419c17a3ca8e1b939ae49e488acba6b965610b5480109c8b17b80e1b7b750dfc7598d5d5011fd2dcc5600a32ef5b52a1ecc820e308aa342721aac0943bf6686b64b2579376504ccc493d97e6aed3fb0f9cd71a43dd497f01f17c0e2cb3797aa2a2f256656168e6c496afc5fb93246f6b1116398a346f1a641f3b041e989f7914f90cc2c7fff357876e506b50d334ba77c225bc307ba537152f3f1610e4eafe595f6d9d90d11faa933a15ef1369546868a7f3a45a96768d40fd9d03412c091c6315cf4fde7cb68606937380db2eaaa707b4c4185c32eddcdd306705e4dc1ffc872eeee475a64dfac86aba41c0618983f8741c5ef68d3a101e8a3b8cac60c905c15fc910840b94c00a0b9d0",
+    "0aab4c900501b3e24d7cdf4663326a3a87df5e4843b2cbdb67cbf6e460fec350aa5371b1508f9f4528ecea23c436d94b5e8fcd4f681e30a6ac00a9704a188a03"));
 
-  point_t p;
-  public_key pk = parse_tpod_from_hex_string<public_key>("d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a");
-  CHECK_AND_ASSERT_TRUE(p.from_public_key(pk));
-  CHECK_AND_ASSERT_TRUE(p.is_in_main_subgroup());
+  // -----TEST SHA(abc)
+  // SECRET KEY: 833fe62409237b9d62ec77587520911e9a759cec1d19755b7da901b96dca3d42
+  // PUBLIC KEY: ec172b93ad5e563bf4932c70e1245034c35467ef2efd4d64ebf819683467e2bf
+  // MESSAGE (length 64 bytes): ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f
+  // SIGNATURE:  dc2a4459e7369633a52b1bf277839a00201009a3efbf3ecb69bea2186c26b58909351fc9ac90b3ecfdfbc7c66431e0303dca179c138ac17ad9bef1177331a704
 
-  CHECK_AND_ASSERT_EQ(sk * c_point_G, p);
-
-
-  buff.clear();
-  epst::append_pod_to_strbuff(R_pk, buff);
-  epst::append_pod_to_strbuff(pk, buff);
-  buff += message;
-
-  CHECK_AND_ASSERT_TRUE(sha512(buff.data(), buff.size(), h64));  // sha512(R_pk | pk | m)
-  sc_reduce(h64.data);
-  scalar_t h;
-  memcpy(h.data(), h64.data, 32);
-  CHECK_AND_ASSERT_TRUE(h.is_reduced());
-
-  scalar_t s = r + h * sk;
-  std::cout << "s = " << s << ENDL;
+  CHECK_AND_ASSERT_TRUE(test_eddsa_against_test_vector(
+    "833fe62409237b9d62ec77587520911e9a759cec1d19755b7da901b96dca3d42",
+    "ec172b93ad5e563bf4932c70e1245034c35467ef2efd4d64ebf819683467e2bf",
+    "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f",
+    "dc2a4459e7369633a52b1bf277839a00201009a3efbf3ecb69bea2186c26b58909351fc9ac90b3ecfdfbc7c66431e0303dca179c138ac17ad9bef1177331a704"));
 
 
-  hash64 signature{};
-  memcpy(signature.data,      R_pk.data, 32);
-  memcpy(signature.data + 32, s.data(), 32);
+  //
+  // 12 test vectors from "Taming the many EdDSAs" by Chalkias et al https://eprint.iacr.org/2020/1244.pdf
+  // (Our EdDSA implementation is intended to be close to Dalek implementation -- sowle)
+  //
 
-  hash64 expected_signature = parse_tpod_from_hex_string<hash64>("e5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b");
-  
-  CHECK_AND_ASSERT_EQ(signature, expected_signature);
+  std::array<bool, 12> iacr1244_test_results;
 
-  return true;
+  // #0, small-order A, small-order R, s = 0
+  // Dalek: accept, Zano: accept
+  iacr1244_test_results[0] = test_eddsa_against_test_vector(
+    "",
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",
+    "8c93255d71dcab10e8f379c26200f3c7bd5f09d9bc3068d3ef4edeb4853022b6",
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a0000000000000000000000000000000000000000000000000000000000000000");
+
+  // #1, small-order A
+  // Dalet: accept, Zano: reject
+  iacr1244_test_results[1] = test_eddsa_against_test_vector(
+    "",
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa",
+    "bd9f44f4dcc75bd531b56b2cd280b0bb38fc1cd6d1230e14861d861de092e79",
+    "f7badec5b8abeaf699583992219b7b223f1df3fbbea919844e3f7c554a43dd43a5bb704786be79fc476f91d3f3f89b03984d8068dcf1bb7dfc6637b45450ac04");
+
+  // #2, small-order R
+  // Dalek: accept, Zano: accept
+  iacr1244_test_results[2] = test_eddsa_against_test_vector(
+    "",
+    "f7badec5b8abeaf699583992219b7b223f1df3fbbea919844e3f7c554a43dd43",
+    "aebf3f2601a0c8c5d39cc7d8911642f740b78168218da8471772b35f9d35b9ab",
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa8c4bd45aecaca5b24fb97bc10ac27ac8751a7dfe1baff8b953ec9f5833ca260e");
+
+  // #3, normal, succeeds unless full-order is checked
+  // Dalek: accept, Zano: accept
+  iacr1244_test_results[3] = test_eddsa_against_test_vector(
+    "",
+    "cdb267ce40c5cd45306fa5d2f29731459387dbf9eb933b7bd5aed9a765b88d4d",
+    "9bd9f44f4dcc75bd531b56b2cd280b0bb38fc1cd6d1230e14861d861de092e79",
+    "9046a64750444938de19f227bb80485e92b83fdb4b6506c160484c016cc1852f87909e14428a7a1d62e9f22f3d3ad7802db02eb2e688b6c52fcd6648a98bd009");
+
+  // #4
+  // Dalek: reject, Zano: reject
+  iacr1244_test_results[4] = test_eddsa_against_test_vector(
+    "",
+    "cdb267ce40c5cd45306fa5d2f29731459387dbf9eb933b7bd5aed9a765b88d4d",
+    "e47d62c63f830dc7a6851a0b1f33ae4bb2f507fb6cffec4011eaccd55b53f56c",
+    "160a1cb0dc9c0258cd0a7d23e94d8fa878bcb1925f2c64246b2dee1796bed5125ec6bc982a269b723e0668e540911a9a6a58921d6925e434ab10aa7940551a09");
+
+  // #5
+  // Dalek: reject, Zano: reject
+  iacr1244_test_results[5] = test_eddsa_against_test_vector(
+    "",
+    "cdb267ce40c5cd45306fa5d2f29731459387dbf9eb933b7bd5aed9a765b88d4d",
+    "e47d62c63f830dc7a6851a0b1f33ae4bb2f507fb6cffec4011eaccd55b53f56c",
+    "21122a84e0b5fca4052f5b1235c80a537878b38f3142356b2c2384ebad4668b7e40bc836dac0f71076f9abe3a53f9c03c1ceeeddb658d0030494ace586687405");
+
+  // #6, s > L
+  // Dalek: reject, Zano: reject
+  iacr1244_test_results[6] = test_eddsa_against_test_vector(
+    "",
+    "442aad9f089ad9e14647b1ef9099a1ff4798d78589e66f28eca69c11f582a623",
+    "85e241a07d148b41e47d62c63f830dc7a6851a0b1f33ae4bb2f507fb6cffec40",
+    "e96f66be976d82e60150baecff9906684aebb1ef181f67a7189ac78ea23b6c0e547f7690a0e2ddcd04d87dbc3490dc19b3b3052f7ff0538cb68afb369ba3a514");
+
+
+  // #7, s >> L
+  // Dalek: reject, Zano: reject
+  iacr1244_test_results[7] = test_eddsa_against_test_vector(
+    "",
+    "442aad9f089ad9e14647b1ef9099a1ff4798d78589e66f28eca69c11f582a623",
+    "85e241a07d148b41e47d62c63f830dc7a6851a0b1f33ae4bb2f507fb6cffec40",
+    "8ce5b96c8f26d0ab6c47958c9e68b937104cd36e13c33566acd2fe8d38aa19427e71f98a473474f2f13f06f97c20d58cc3f54b8bd0d272f42b695dd7e89a8c22");
+
+
+  // #8, non-canonical R, reduced for hash
+  // Dalek: reject, Zano: reject
+  iacr1244_test_results[8] = test_eddsa_against_test_vector(
+    "",
+    "f7badec5b8abeaf699583992219b7b223f1df3fbbea919844e3f7c554a43dd43",
+    "9bedc267423725d473888631ebf45988bad3db83851ee85c85e241a07d148b41",
+    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff03be9678ac102edcd92b0210bb34d7428d12ffc5df5f37e359941266a4e35f0f");
+
+
+  // #9, non-canonical R, not reduced for hash
+  // Dalek: reject, Zano: reject
+  iacr1244_test_results[9] = test_eddsa_against_test_vector(
+    "",
+    "f7badec5b8abeaf699583992219b7b223f1df3fbbea919844e3f7c554a43dd43",
+    "9bedc267423725d473888631ebf45988bad3db83851ee85c85e241a07d148b41",
+    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffca8c5b64cd208982aa38d4936621a4775aa233aa0505711d8fdcfdaa943d4908");
+
+
+  // #10, non-canonical A, reduced for hash
+  // Dalek: reject, Zano: reject
+  iacr1244_test_results[10] = test_eddsa_against_test_vector(
+    "",
+    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "e96b7021eb39c1a163b6da4e3093dcd3f21387da4cc4572be588fafae23c155b",
+    "a9d55260f765261eb9b84e106f665e00b867287a761990d7135963ee0a7d59dca5bb704786be79fc476f91d3f3f89b03984d8068dcf1bb7dfc6637b45450ac04");
+
+
+  // #11, non-canonical A, not reduced for hash
+  // Dalek: accept, Zano: reject
+  iacr1244_test_results[11] = test_eddsa_against_test_vector(
+    "",
+    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "39a591f5321bbe07fd5a23dc2f39d025d74526615746727ceefd6e82ae65c06f",
+    "a9d55260f765261eb9b84e106f665e00b867287a761990d7135963ee0a7d59dca5bb704786be79fc476f91d3f3f89b03984d8068dcf1bb7dfc6637b45450ac04");
+
+  //                                                0     1      2     3     4      5      6      7      8      9      10     11
+  std::array<bool, 12> iacr1244_expected_results = {true, false, true, true, false, false, false, false, false, false, false, false};
+
+  std::stringstream ss;
+  ss << "results against IACR2020/1244 test vectors:" << ENDL;
+  bool success = true;
+  for(size_t i = 0; i < iacr1244_test_results.size(); ++i)
+  {
+    ss << std::setw(2) << i << "  " << (iacr1244_test_results[i] ? "pass" : "fail") << "   expected: " << (iacr1244_expected_results[i] ? "pass" : "fail" ) << ENDL;
+    success = success && (iacr1244_test_results[i] == iacr1244_expected_results[i]);
+  }
+  LOG_PRINT_L0(ss.str());
+
+  return success;
 }
 
 
