@@ -587,8 +587,11 @@ namespace currency
     // two valid options here: 1) no attachment info and empty attachements container; 2) attachment info present and the container is not empty
     CHECK_AND_ASSERT_MES(r == !attachments.empty(), false, "Invalid attachment info: extra_attachment_info is " << (r ? "present" : "not present") << " while attachments size is " << attachments.size());
 
-    CHECK_AND_ASSERT_MES(eai.cnt <= attachments.size(), false, "Incorrect attachments counter: " << eai.cnt << " while attachments size is " << attachments.size());
-
+    if (allow_no_info_for_non_empty_attachments_container)
+      CHECK_AND_ASSERT_MES(eai.cnt <= attachments.size(), false, "Incorrect attachments counter: " << eai.cnt << " while attachments size is " << attachments.size());
+    else
+      CHECK_AND_ASSERT_MES(eai.cnt == attachments.size(), false, "Incorrect attachments counter: " << eai.cnt << " while attachments size is " << attachments.size() << ". All attachments must be covered.");
+ 
     extra_attachment_info eai_local = AUTO_VAL_INIT(eai_local);
     if (eai.cnt == attachments.size())
     {
