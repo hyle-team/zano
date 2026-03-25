@@ -695,6 +695,14 @@ namespace tools
       }
     };
     //----------------------------------------------------------------------------------------------------
+    struct tx_freeze_period : public wallet_rpc_error
+    {
+      explicit tx_freeze_period(std::string&& loc, const std::string& request)
+        : wallet_rpc_error(std::move(loc), "sending transactions is temporarily not allowed because a hardfork activation is coming", request)
+      {
+      }
+    };
+    //----------------------------------------------------------------------------------------------------
     struct no_connection_to_daemon : public wallet_rpc_error
     {
       explicit no_connection_to_daemon(std::string&& loc, const std::string& request)

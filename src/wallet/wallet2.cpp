@@ -1583,7 +1583,7 @@ bool wallet2::process_payment_id_for_wti_and_populate_subtransfers(wallet_public
           wsti.is_income = false;
           wsti.amount = static_cast<uint64_t>(-balance_change);
         }
-        
+
         if (wsti.amount != 0)
         {
           wsti.asset_id = asset_id;
@@ -7277,6 +7277,7 @@ void wallet2::send_transaction_to_network(const transaction& tx)
       }
 
       this->notify_state_change(WALLET_LIB_SEND_FAILED);
+      THROW_IF_TRUE_WALLET_EX(res.status == API_RETURN_CODE_TX_FREEZE_PERIOD, error::tx_freeze_period, "sendrawtransaction");
       WLT_LOG_L1("[SOCKS5] sendrawtransaction status: " << res.status);
       return false;
     };
@@ -7318,6 +7319,7 @@ void wallet2::send_transaction_to_network(const transaction& tx)
   COMMAND_RPC_SEND_RAW_TX::response daemon_send_resp;
   const bool r = m_core_proxy->call_COMMAND_RPC_SEND_RAW_TX(req, daemon_send_resp);
   THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "sendrawtransaction");
+  THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_TX_FREEZE_PERIOD, error::tx_freeze_period, "sendrawtransaction");
   THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_BUSY, error::daemon_busy, "sendrawtransaction");
   THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status == API_RETURN_CODE_DISCONNECTED, error::no_connection_to_daemon, "Transfer attempt while daemon offline");
   THROW_IF_TRUE_WALLET_EX(daemon_send_resp.status != API_RETURN_CODE_OK, error::tx_rejected, tx, daemon_send_resp.status);
