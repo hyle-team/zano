@@ -9188,6 +9188,10 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
         // genesis can't be in tx_hashes
         CHECK_AND_ASSERT_MES(false, false, "input #" << n << " has unexpected type (" << tx.vin[n].type().name() << ", genesis can't be in tx_hashes), tx " << tx_id);
       }
+      else if(tx.vin[n].type() == typeid(txin_gateway))
+      {
+        // do nothing
+      }
       else
       {
         CHECK_AND_ASSERT_MES(false, false, "input #" << n << " has unexpected type (" << tx.vin[n].type().name() << "), tx " << tx_id);
