@@ -2290,7 +2290,7 @@ namespace currency
       std::optional<crypto::generic_schnorr_sig_s>  opt_custom_schnorr_signature;  //Zano specific generic schnorr signature public key
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(tx_blob)    DOC_DSCR("Hex representation of the transaction blob to sign.") DOC_EXMP("0100000001...") DOC_END
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)    DOC_DSCR("Hex representation of the transaction blob to sign.") DOC_EXMP("0100000001...") DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)               DOC_DSCR("Hash of the transaction to sign.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(opt_ecdsa_signature)             DOC_DSCR("Ethereum signature for signing the transaction.") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123") DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(opt_eddsa_signature)           DOC_DSCR("EdDSA signature for signing the transaction.") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01") DOC_END
