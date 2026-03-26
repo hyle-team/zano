@@ -94,7 +94,33 @@ Asset id: 3de9ad7243afa49e0ade6839e97a9f10a527c4958ece2fc9cb1b87a44032167d
 
 **End** 3512350
 
+---
 
+### ZAP8: BNBX (Wrapped BNB)
+
+**Description** This proposal asks the Zano community to vote on whether to officially add the following Confidential Asset (CAs) to the Zano asset whitelist: 
+
+BNBX (Wrapped BNB)  
+Asset id: 6ca3fa07f1b6a75b6e195d2918c32228765968b54ea691c75958affa1c4073fb
+
+
+**Start** 3621834
+
+**End** 3641994
+
+---
+
+### ZAP9: DAIX (Wrapped DAI)
+
+**Description** This proposal asks the Zano community to vote on whether to officially add the following Confidential Asset (CAs) to the Zano asset whitelist: 
+
+DAIX (Wrapped DAI)  
+Asset id: 24819c4b65786c3ac424e05d9ef4ab212de6222cc73bc5c4b012df5a3107eea4
+
+
+**Start** 3621834
+
+**End** 3641994
 
 
 
