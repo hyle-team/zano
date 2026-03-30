@@ -1236,6 +1236,12 @@ namespace nodetool
   template<class t_payload_net_handler>
   bool node_server<t_payload_net_handler>::handle_remote_peerlist(const std::vector<peerlist_entry>& peerlist, time_t local_time, const net_utils::connection_context_base& context)
   {
+    if (peerlist.size() > P2P_DEFAULT_PEERS_IN_HANDSHAKE)
+    {
+      LOG_PRINT_L0("Too many peers in peerlist received from remote node " << string_tools::get_ip_string_from_int32(context.m_remote_ip) << ":" << context.m_remote_port << ", peerlist size: " << peerlist.size() << ", dropping connection");
+      return false;
+    }
+
     int64_t delta = 0;
     std::vector<peerlist_entry> peerlist_ = peerlist;
     if(!fix_time_delta(peerlist_, local_time, delta))
