@@ -6560,6 +6560,12 @@ bool blockchain_storage::check_block_timestamp(std::vector<uint64_t> timestamps,
   if(timestamps.size() < BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW)
     return true;
 
+  if (b.timestamp > get_adjusted_time() + CURRENCY_BLOCK_FUTURE_TIME_LIMIT)
+  {
+    LOG_PRINT_L0("Timestamp of block with id: " << get_block_hash(b) << ", " << b.timestamp << ", bigger than adjusted time + " + epee::misc_utils::get_time_interval_string(CURRENCY_BLOCK_FUTURE_TIME_LIMIT));
+    return false;
+  }
+
   if (is_pos_block(b) && b.timestamp > get_adjusted_time() + CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT)
   {
     LOG_PRINT_L0("Timestamp of PoS block with id: " << get_block_hash(b) << ", " << b.timestamp << ", bigger than adjusted time + " + epee::misc_utils::get_time_interval_string(CURRENCY_POS_BLOCK_FUTURE_TIME_LIMIT) + ": " << get_adjusted_time() << " (" << b.timestamp - get_adjusted_time() << ")");
