@@ -298,7 +298,7 @@ namespace nodetool
     std::optional<uint64_t> outgoing_connections_limit;
     std::vector<std::string> ip_black_list;
     std::optional<bool> use_only_priority_peers = false;             //allow to make outgoing connections only to the peers listed in ip_priority_list
-    std::vector<std::string> priority_peers_list; 
+    std::vector<std::string> priority_peers_list;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(incoming_connections_limit)

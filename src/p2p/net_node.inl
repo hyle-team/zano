@@ -114,7 +114,22 @@ namespace nodetool
 
     if (is_incoming)
     {
-      size_t conn_count = get_incoming_connections_count();
+
+      // total limit and per-IP limit
+      size_t per_ip_count = 0;
+      size_t conn_count = 0;
+      m_net_server.get_config_object().foreach_connection([&](const p2p_connection_context& cntxt)
+        {
+          if (cntxt.m_is_income && cntxt.m_remote_ip == addr)
+            ++per_ip_count;
+
+          ++conn_count;
+          return true;
+        });
+
+      if (per_ip_count >= P2P_DEFAULT_MAX_CONNECTIONS_PER_IP) 
+        return false;
+
 
       if (m_p2p_manual_config.incoming_connections_limit)
       {
@@ -129,6 +144,7 @@ namespace nodetool
 
       if (m_use_only_priority_peers)
         return false;
+
     }
 
     bool ignore_auto_blocked_list = !m_ip_auto_blocking_enabled;

@@ -155,6 +155,7 @@
 #define P2P_DEFAULT_WHITELIST_CONNECTIONS_PERCENT       70
 #define P2P_FAILED_ADDR_FORGET_SECONDS                  (60*5)     //5 minutes
 #define P2P_DEFAULT_MAX_INCOMING_CONNECTIONS_COUNT      200
+#define P2P_DEFAULT_MAX_CONNECTIONS_PER_IP              3          //allowed count of connections from single IP, including white list
 
 #define P2P_IP_BLOCKTIME                                (60*60*24) //24 hours
 #define P2P_IP_FAILS_BEFOR_BLOCK                        10
