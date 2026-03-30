@@ -18,6 +18,7 @@ namespace currency
     bool m_verification_impossible; //the transaction is related to alternative blockchain
     bool m_added_to_pool; 
     bool m_already_existed = false;
+    std::string m_error_code;
   };
 
   struct block_verification_context

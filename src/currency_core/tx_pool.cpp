@@ -134,6 +134,17 @@ namespace currency
       return false;
     }
 
+    if (!kept_by_block && !from_core && m_db_transactions.size() > CURRENCY_MEMPOOL_MAX_TX_COUT)
+    {
+      LOG_PRINT_L0("Tx pool has reached its maximum capacity (" << m_db_transactions.size() << " txs), new transaction " << id << " rejected");
+      tvc.m_added_to_pool = false;
+      tvc.m_should_be_relayed = false;
+      tvc.m_verification_failed = false;
+      tvc.m_error_code = API_RETURN_CODE_TX_POOL_FULL;
+      return false;
+    }
+
+
     r = m_blockchain.validate_tx_for_hardfork_specific_terms(tx, id);
     CHECK_AND_ASSERT_MES(r, false, "Transaction " << id <<" doesn't fit current hardfork");
 

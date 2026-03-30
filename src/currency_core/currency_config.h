@@ -118,6 +118,7 @@
 #define CURRENCY_ALT_BLOCK_LIVETIME_COUNT               (CURRENCY_BLOCKS_PER_DAY*7)//one week
 #define CURRENCY_ALT_BLOCK_MAX_COUNT                    43200 //30 days
 #define CURRENCY_MEMPOOL_TX_LIVETIME                    345600 //seconds, 4 days
+#define CURRENCY_MEMPOOL_MAX_TX_COUT                    10000 
 
 
 #ifndef TESTNET

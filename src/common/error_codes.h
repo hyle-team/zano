@@ -51,3 +51,4 @@
 #define API_RETURN_CODE_TX_HAS_TOO_MANY_OUTPUTS                 "TX_HAS_TOO_MANY_OUTPUTS"
 #define API_RETURN_CODE_TX_HAS_TOO_MANY_INPUTS                  "TX_HAS_TOO_MANY_INPUTS"
 #define API_RETURN_CODE_TX_FREEZE_PERIOD                        "TX_FREEZE_PERIOD"
+#define API_RETURN_CODE_TX_POOL_FULL                            "TX_POOL_FULL"

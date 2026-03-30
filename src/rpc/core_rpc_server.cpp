@@ -1322,14 +1322,20 @@ namespace currency
     if(!m_core.handle_incoming_tx(tx_blob, tvc, false))
     {
       LOG_PRINT_L0("[on_send_raw_tx]: Failed to process tx");
-      res.status = "Failed";
+      if (tvc.m_error_code.size())
+        res.status = tvc.m_error_code;
+      else
+        res.status = "Failed";
       return true;
     }
 
     if(tvc.m_verification_failed)
     {
       LOG_PRINT_L0("[on_send_raw_tx]: tx verification failed");
-      res.status = "Failed";
+      if (tvc.m_error_code.size())
+        res.status = tvc.m_error_code;
+      else
+        res.status = "Failed";
       return true;
     }
 
