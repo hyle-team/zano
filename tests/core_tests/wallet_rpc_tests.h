@@ -47,6 +47,9 @@ struct wallet_rpc_exchange_suite : public wallet_test
   wallet_rpc_exchange_suite();
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+protected:
+  const std::wstring m_alice_wallet_filename = L"alice-wlt";
+  const std::string m_alice_wallet_password = "deterrence";
 };
 
 struct wallet_true_rpc_pos_mining : public wallet_test
@@ -86,6 +89,55 @@ struct wallet_rpc_multiple_receivers : public wallet_test
 struct wallet_rpc_hardfork_verification : public wallet_test
 {
   wallet_rpc_hardfork_verification();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_gateway_address : public wallet_test
+{
+  wallet_rpc_gateway_address();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_gateway_signatures : public wallet_test
+{
+  wallet_rpc_gateway_signatures();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_gateway_illegal_asset_id : public wallet_test
+{
+  wallet_rpc_gateway_illegal_asset_id();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_gateway_overspend : public wallet_test
+{
+  wallet_rpc_gateway_overspend();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_gateway_service_entries : public wallet_test
+{
+  wallet_rpc_gateway_service_entries();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_gateway_reorg_spend : public wallet_test
+{
+  wallet_rpc_gateway_reorg_spend();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_rpc_gateway_reorg_receive : public wallet_test
+{
+  wallet_rpc_gateway_reorg_receive();
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };

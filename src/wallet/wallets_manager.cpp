@@ -122,6 +122,11 @@ bool wallets_manager::do_exception_safe_call(guarded_code_t guarded_code, error_
     LOG_ERROR(error_prefix_maker() << "transaction is too big: " << e.what());
     api_return_code_result = API_RETURN_CODE_TX_IS_TOO_BIG;
   }
+  catch (const tools::error::tx_has_too_many_inputs& e)
+  {
+    LOG_ERROR(error_prefix_maker() << "transaction has too many inputs: " << e.what());
+    api_return_code_result = API_RETURN_CODE_TX_HAS_TOO_MANY_INPUTS;
+  }
   catch (const tools::error::tx_rejected& e)
   {
     LOG_ERROR(error_prefix_maker() << "transaction " << get_transaction_hash(e.tx()) << " was rejected by daemon with status " << e.status());
@@ -136,6 +141,11 @@ bool wallets_manager::do_exception_safe_call(guarded_code_t guarded_code, error_
   {
     LOG_ERROR(error_prefix_maker() << "no connection to daemon: " << e.what());
     api_return_code_result = API_RETURN_CODE_DISCONNECTED;
+  }
+  catch (const tools::error::tx_has_too_many_outs& e)
+  {
+    LOG_ERROR(error_prefix_maker() << "tx has to many outs: " << e.what());
+    api_return_code_result = API_RETURN_CODE_TX_HAS_TOO_MANY_OUTPUTS;
   }
   catch (const std::exception& e)
   {
@@ -1153,12 +1163,9 @@ std::string wallets_manager::open_wallet(const std::wstring& path, const std::st
       if (w->is_watch_only() && !w->is_auditable())
         return API_RETURN_CODE_WALLET_WATCH_ONLY_NOT_SUPPORTED;
 
-      // @#@#TODO: remove this conversion -- sowle
-      std::vector<tools::wallet_public::wallet_transfer_info> wti_history;
-      w->get_recent_transfers_history(wti_history, 0, txs_to_return, owr.recent_history.total_history_items, owr.recent_history.last_item_index, exclude_mining_txs);
+      w->get_recent_transfers_history(owr.recent_history.history, 0, txs_to_return, owr.recent_history.total_history_items, owr.recent_history.last_item_index, exclude_mining_txs);
       //w->get_unconfirmed_transfers(owr.recent_history.unconfirmed);      
-      w->get_unconfirmed_transfers(wti_history, exclude_mining_txs);
-      std::for_each(wti_history.begin(), wti_history.end(), [&](auto& el){ owr.recent_history.history.push_back(tools::wallet_public::wallet_transfer_info_v2{el}); });
+      w->get_unconfirmed_transfers(owr.recent_history.history, exclude_mining_txs);
       w->set_use_assets_whitelisting(true);
       owr.wallet_local_bc_size = w->get_blockchain_current_size();
 
@@ -1238,11 +1245,8 @@ std::string wallets_manager::get_recent_transfers(size_t wallet_id, uint64_t off
     return API_RETURN_CODE_CORE_BUSY;
   }
 
-  // @#@#TODO: remove this conversion -- sowle
-  std::vector<tools::wallet_public::wallet_transfer_info> wti_history;
-  w->get()->get_unconfirmed_transfers(wti_history, exclude_mining_txs);
-  w->get()->get_recent_transfers_history(wti_history, offset, count, tr_hist.total_history_items, tr_hist.last_item_index, exclude_mining_txs);
-  std::for_each(wti_history.begin(), wti_history.end(), [&](auto& el){ tr_hist.history.push_back(tools::wallet_public::wallet_transfer_info_v2{el}); });
+  w->get()->get_unconfirmed_transfers(tr_hist.history, exclude_mining_txs);
+  w->get()->get_recent_transfers_history(tr_hist.history, offset, count, tr_hist.total_history_items, tr_hist.last_item_index, exclude_mining_txs);
 
   auto fix_tx = [](tools::wallet_public::wallet_transfer_info& wti) -> void {
     wti.show_sender = currency::is_showing_sender_addres(wti.tx);
@@ -1266,7 +1270,8 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
   w->set_votes_config_path(m_data_dir + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME);
   owr.wallet_id = m_wallet_id_counter++;
-  w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
+  std::shared_ptr<tools::i_wallet2_callback> w_cb{new i_wallet_to_i_backend_adapter(this, owr.wallet_id)};
+  w->callback(w_cb);
   if (m_remote_node_mode)
   {
     w->init(m_daemon_address);
@@ -1306,6 +1311,7 @@ std::string wallets_manager::generate_wallet(const std::wstring& path, const std
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
   wo.wallet_state = view::wallet_status_info::wallet_state_ready;
+  wo.w_cb = w_cb;
   init_wallet_entry(wo, owr.wallet_id);
   get_wallet_info(wo, owr.wi);
   return API_RETURN_CODE_OK;
@@ -1381,7 +1387,8 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   w->set_use_deffered_global_outputs(m_use_deffered_global_outputs);
   w->set_votes_config_path(m_data_dir + "/" + CURRENCY_VOTING_CONFIG_DEFAULT_FILENAME);
   owr.wallet_id = m_wallet_id_counter++;
-  w->callback(std::shared_ptr<tools::i_wallet2_callback>(new i_wallet_to_i_backend_adapter(this, owr.wallet_id)));
+  std::shared_ptr<tools::i_wallet2_callback> w_cb{new i_wallet_to_i_backend_adapter(this, owr.wallet_id)};
+  w->callback(w_cb);
   if (m_remote_node_mode)
   {
     w->init(m_daemon_address);
@@ -1428,6 +1435,7 @@ std::string wallets_manager::restore_wallet(const std::wstring& path, const std:
   EXCLUSIVE_CRITICAL_REGION_LOCAL(m_wallets_lock);
   wallet_vs_options& wo = m_wallets[owr.wallet_id];
   **wo.w = w;
+  wo.w_cb = w_cb;
   init_wallet_entry(wo, owr.wallet_id);
   get_wallet_info(wo, owr.wi);
   return API_RETURN_CODE_OK;
@@ -1664,7 +1672,7 @@ std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_p
   tr_req.comment = tp.comment;
   for(auto& d : tp.destinations)
   {
-    tools::wallet_public::transfer_destination& result_dst = tr_req.destinations.emplace_back();
+    currency::transfer_destination& result_dst = tr_req.destinations.emplace_back();
     result_dst.address = d.address;
     result_dst.asset_id = d.asset_id;
 
@@ -2118,7 +2126,7 @@ void wallets_manager::on_new_block(size_t wallet_id, uint64_t /*height*/, const 
 void wallets_manager::on_transfer2(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti, const std::list<tools::wallet_public::asset_balance_entry>& balances, uint64_t total_mined)
 {  
   view::transfer_event_info tei{};
-  tei.ti = tools::wallet_public::wallet_transfer_info_v2{wti}; // @#@#TODO: remove this conversion -- sowle
+  tei.ti = wti;
   tei.balances = balances;
   tei.total_mined = total_mined;
   tei.wallet_id = wallet_id;
@@ -2159,7 +2167,7 @@ void wallets_manager::on_sync_progress(size_t wallet_id, const uint64_t& percent
 void wallets_manager::on_transfer_canceled(size_t wallet_id, const tools::wallet_public::wallet_transfer_info& wti)
 {
   view::transfer_event_info tei{};
-  tei.ti = tools::wallet_public::wallet_transfer_info_v2{wti}; // @#@#TODO: remove this conversion -- sowle
+  tei.ti = wti;
 
   SHARED_CRITICAL_REGION_LOCAL(m_wallets_lock);
   auto it = m_wallets.find(wallet_id);

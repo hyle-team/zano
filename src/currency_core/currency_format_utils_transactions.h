@@ -58,9 +58,13 @@ namespace currency
     bool separately_signed_tx_complete = false;               //for separately signed tx only: denotes the last source entry in complete tx to explicitly mark the final step of tx creation
     std::string htlc_origin;                                  //for htlc, specify origin
     crypto::public_key asset_id = currency::native_coin_asset_id; //asset id (not blinded, not premultiplied by 1/8) TODO @#@# consider changing to crypto::point_t
+    
+    currency::gateway_address_id_type gateway_origin = {}; // for gateway transfers, the source gateway address id
+
 
     bool is_multisig() const    { return ms_sigs_count > 0; }
     bool is_zc() const          { return !real_out_amount_blinding_mask.is_zero(); }
+    bool is_gw() const          { return gateway_origin != currency::null_pkey; }
     bool is_native_coin() const { return asset_id == currency::native_coin_asset_id; }
     uint64_t amount_for_global_output_index() const { return is_zc() ? 0 : amount; } // amount value for global outputs index, it's zero for outputs with hidden amounts
 
@@ -79,6 +83,7 @@ namespace currency
       FIELD(separately_signed_tx_complete)
       FIELD(htlc_origin)
       FIELD(asset_id)
+      FIELD(gateway_origin)
     END_SERIALIZE()
   };
 
@@ -107,7 +112,7 @@ namespace currency
   struct tx_destination_entry
   {
     uint64_t amount = 0;                                // money
-    std::list<account_public_address>   addr;           // destination address, in case of 1 address - txout_to_key, in case of more - txout_multisig
+    std::list<address_v>   addr;                        // destination address, in case of 1 address - txout_to_key, in case of more - txout_multisig
     size_t   minimum_sigs = 0;                          // if txout_multisig: minimum signatures that are required to spend this output (minimum_sigs <= addr.size())  IF txout_to_key - not used
     uint64_t amount_to_provide = 0;                     // amount money that provided by initial creator of tx, used with partially created transactions
     uint64_t unlock_time = 0;
@@ -120,8 +125,14 @@ namespace currency
     tx_destination_entry(uint64_t a, const account_public_address& ad) : amount(a), addr(1, ad) {}
     tx_destination_entry(uint64_t a, const account_public_address& ad, const crypto::public_key& aid) : amount(a), addr(1, ad), asset_id(aid) {}
     tx_destination_entry(uint64_t a, const account_public_address& ad, uint64_t ut) : amount(a), addr(1, ad), unlock_time(ut) {}
-    tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()){}
-    tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr, const crypto::public_key& aid) : amount(a), addr(addr), minimum_sigs(addr.size()), asset_id(aid) {}
+    tx_destination_entry(uint64_t a, const address_v& addr) : amount(a), addr(1, addr) {}
+    tx_destination_entry(uint64_t a, const address_v& addr, const crypto::public_key& aid) : amount(a), addr(1, addr), asset_id(aid) {}
+
+    tx_destination_entry(uint64_t a, const std::list<address_v>& addr) : amount(a), addr(addr), minimum_sigs(addr.size()) {}
+    tx_destination_entry(uint64_t a, const std::list<address_v>& addr, const crypto::public_key& aid) : amount(a), addr(addr), minimum_sigs(addr.size()), asset_id(aid) {}
+
+    tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr);// : amount(a), addr(addr), minimum_sigs(addr.size()){}
+    tx_destination_entry(uint64_t a, const std::list<account_public_address>& addr, const crypto::public_key& aid);// : amount(a), addr(addr), minimum_sigs(addr.size()), asset_id(aid) {}
 
     bool is_native_coin() const { return asset_id == currency::native_coin_asset_id; }
 
@@ -222,16 +233,16 @@ namespace currency
   {
     tx_generation_context() = default;
 
-    void resize(size_t zc_ins_count, size_t outs_count)
-    {
-      asset_ids.resize(outs_count);
-      blinded_asset_ids.resize(outs_count);
-      amount_commitments.resize(outs_count);
-      asset_id_blinding_masks.resize(outs_count);
-      amounts.resize(outs_count);
-      amount_blinding_masks.resize(outs_count);
-      zc_input_amounts.resize(zc_ins_count);
-    }
+    //void resize(size_t zc_ins_count, size_t outs_count)
+    //{
+    //  asset_ids.resize(outs_count);
+    //  blinded_asset_ids.resize(outs_count);
+    //  amount_commitments.resize(outs_count);
+    //  asset_id_blinding_masks.resize(outs_count);
+    //  amounts.resize(outs_count);
+    //  amount_blinding_masks.resize(outs_count);
+    //  zc_input_amounts.resize(zc_ins_count);
+    //}
 
     // TODO @#@# reconsider this check -- sowle
     bool check_sizes(size_t zc_ins_count, size_t outs_count) const
@@ -252,7 +263,7 @@ namespace currency
       tx_pub_key_p = crypto::point_t(tx_key.pub);
     }
 
-    // per output data
+    // per confidential output data
     std::vector<crypto::point_t> asset_ids;
     std::vector<crypto::point_t> blinded_asset_ids;                                   // generate_zc_outs_range_proof
     std::vector<crypto::point_t> amount_commitments;                                  // generate_zc_outs_range_proof   construct_tx_out
@@ -260,7 +271,7 @@ namespace currency
     crypto::scalar_vec_t amounts;                                                     // generate_zc_outs_range_proof
     crypto::scalar_vec_t amount_blinding_masks;                                       // generate_zc_outs_range_proof
 
-    // per zc input data
+    // per confidential (zc) input data
     std::vector<crypto::point_t> pseudo_outs_blinded_asset_ids;                       // generate_asset_surjection_proof
     crypto::scalar_vec_t pseudo_outs_plus_real_out_blinding_masks; // r_pi + r'_j     // generate_asset_surjection_proof
     std::vector<crypto::point_t> real_zc_ins_asset_ids;            // H_i             // generate_asset_surjection_proof
@@ -286,6 +297,7 @@ namespace currency
     // per tx data
     keypair             tx_key                              {};                       //
     crypto::point_t     tx_pub_key_p                        = crypto::c_point_0;      // == tx_key.pub
+    uint8_t             tx_outs_attr                        = CURRENCY_TO_KEY_OUT_RELAXED;
 
     // consider redesign, some data may possibly be excluded from kv serialization -- sowle
     BEGIN_KV_SERIALIZE_MAP()
@@ -312,11 +324,13 @@ namespace currency
       KV_SERIALIZE_POD_AS_HEX_STRING(ao_commitment_in_outputs)
       KV_SERIALIZE_POD_AS_HEX_STRING(tx_key)
       KV_SERIALIZE_POD_AS_HEX_STRING(tx_pub_key_p)
+      KV_SERIALIZE(tx_outs_attr)
     END_KV_SERIALIZE_MAP()
   
     // solely for consolidated txs, asset opration fields are not serialized
+#define TX_GEN_CONTEXT_VERSION 1
     BEGIN_SERIALIZE_OBJECT()
-      VERSION(0)
+      VERSION(TX_GEN_CONTEXT_VERSION)
       FIELD(asset_ids)
       FIELD(blinded_asset_ids)
       FIELD(amount_commitments)
@@ -344,10 +358,19 @@ namespace currency
       FIELD(tx_key.pub) // TODO: change to sane serialization FIELD(tx_key)
       FIELD(tx_key.sec)
       FIELD(tx_pub_key_p)
+      
+      END_VERSION_UNDER(1)
+
+      FIELD(tx_outs_attr)
     END_SERIALIZE()
   }; // struct tx_generation_context
 
   bool validate_tx_details_against_tx_generation_context(const transaction& tx, const tx_generation_context& gen_context);
+
+  bool generate_tx_balance_proof_hf4(const transaction &tx, const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, currency::zc_balance_proof& proof);
+  bool generate_tx_balance_proof_hf6(const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, transaction &tx);
+  bool verify_balance_proof_hf4(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
+  bool verify_balance_proof_hf6(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
 
   std::string transform_tx_to_str(const transaction& tx);
   transaction transform_str_to_tx(const std::string& tx_str);

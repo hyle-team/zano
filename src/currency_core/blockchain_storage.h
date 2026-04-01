@@ -30,6 +30,7 @@
 #include "common/db_abstract_accessor.h"
 #include "currency_protocol/currency_protocol_defs.h"
 #include "rpc/core_rpc_server_commands_defs.h"
+#include "rpc/core_rpc_server_commands_defs_wallet_ext.h"
 #include "difficulty.h"
 #include "common/difficulty_boost_serialization.h"
 #include "currency_core/currency_format_utils.h"
@@ -253,7 +254,9 @@ namespace currency
     //void get_all_known_block_ids(std::list<crypto::hash> &main, std::list<crypto::hash> &alt, std::list<crypto::hash> &invalid) const;
     bool is_pre_hardfork_tx_freeze_period_active() const;
     bool is_block_fit_for_strategy(uint64_t h, const std::string& strategy) const;
-    bool collect_all_outs_in_block(uint64_t height, std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& outs) const;
+    bool collect_all_outs_in_block(uint64_t input_amount, uint64_t height, std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& outs) const;
+    uint64_t get_current_hardfork_id() const;
+
 
     bc_attachment_services_manager& get_attachment_services_manager(){ return m_services_mgr; }
 
@@ -329,10 +332,13 @@ namespace currency
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_zc_input& zc_in, const crypto::hash& tx_prefix_hash, check_tx_inputs_context& ctic) const;
+    bool check_tx_input(const transaction& tx, size_t in_index, const txin_gateway& gw_in, const crypto::hash& tx_prefix_hash, check_tx_inputs_context& ctic) const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, check_tx_inputs_context& ctic)const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash) const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height, crypto::hash& max_used_block_id)const;
     bool check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const transaction& source_tx, size_t out_n) const;
+    bool validate_tx_for_hardfork_specific_terms_types_new(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
+    bool validate_tx_for_hardfork_specific_terms_types_old(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
     bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
     bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id) const;
     bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_v& verified_input, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase, scan_for_keys_context& scan_context) const;
@@ -354,6 +360,7 @@ namespace currency
     boost::multiprecision::uint128_t total_coins()const;
     bool is_pos_allowed()const;
     bool is_non_pruning_mode_enabled() const { return m_non_pruning_mode_enabled; }
+    void override_non_pruning_mode_state_after_init(bool enabled) { m_non_pruning_mode_enabled = enabled; } // primarally for tests, consider moving into core runtime config in future
     uint64_t get_tx_fee_median()const;
     uint64_t get_tx_fee_window_value_median() const;
     uint64_t get_tx_expiration_median() const;
@@ -369,6 +376,7 @@ namespace currency
     bool validate_instance(const std::string& path);
     bool is_tx_expired(const transaction& tx) const;
     std::shared_ptr<const transaction_chain_entry> find_key_image_and_related_tx(const crypto::key_image& ki, crypto::hash& id_result) const;
+    std::shared_ptr<const gateway_address_data> get_gateway_address_info(const gateway_address_id_type& address_id) const;
 
     // returns true as soon as the hardfork is active for the NEXT upcoming block (not for the top block in the blockchain storage)
     bool is_hardfork_active(size_t hardfork_id) const;
@@ -502,6 +510,7 @@ namespace currency
     bool get_est_height_from_date(uint64_t date, uint64_t& res_h)const;
 
     bool get_pos_votes(uint64_t start_h, uint64_t end_h, vote_results& r);
+    bool gateway_get_address_history(const currency::gateway_address_id_type& addr_id, const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res);
 
     //debug functions
     bool validate_blockchain_prev_links(size_t last_n_blocks_to_check = 10) const;
@@ -548,6 +557,10 @@ namespace currency
     
     typedef tools::db::cached_key_value_accessor<crypto::public_key, std::list<asset_descriptor_operation>, true, false> assets_container; // TODO @#@# consider storing tx_id as well for reference -- sowle 
 
+    // Gateway addresses
+    typedef tools::db::cached_key_value_accessor<gateway_address_id_type, gateway_address_data, true, false> gateway_addresses_container;
+    typedef tools::db::chunked_key_to_array_accessor<gateway_address_id_type, crypto::hash, false, 100> gateway_address_transactions_container;
+
 
     //-----------------------------------------
 
@@ -593,7 +606,8 @@ namespace currency
     per_block_gindex_increments_container m_db_per_block_gindex_incs;
     
     assets_container m_db_assets;
-
+    gateway_addresses_container m_db_gateway_addresses;
+    gateway_address_transactions_container m_db_gateway_transactions;
 
 
 
@@ -685,7 +699,7 @@ namespace currency
     bool prevalidate_miner_transaction(const block& b, uint64_t height, bool pos)const;
     bool rollback_blockchain_switching(std::list<block_ws_txs>& original_chain, size_t rollback_height);
     bool add_transaction_from_block(const transaction& tx, const crypto::hash& tx_id, const crypto::hash& bl_id, uint64_t bl_height, uint64_t timestamp);
-    bool push_transaction_to_global_outs_index(const transaction& tx, const crypto::hash& tx_id, std::vector<uint64_t>& global_indexes);
+    bool push_transaction_to_global_outs_index(const transaction& tx, const crypto::hash& tx_id, std::vector<uint64_t>& global_indexes, const crypto::hash& bl_id, const uint64_t bl_height);
     bool pop_transaction_from_global_index(const transaction& tx, const crypto::hash& tx_id);
     bool build_random_out_entry(uint64_t amount, size_t g_index, uint64_t mix_count, bool use_only_forced_to_mix, uint64_t height_upper_limit, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry& oen) const;
     bool add_out_to_get_random_outs(COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount& result_outs, uint64_t amount, size_t i, uint64_t mix_count, bool use_only_forced_to_mix = false, uint64_t height_upper_limit = 0) const;
@@ -712,13 +726,20 @@ namespace currency
     bool complete_timestamps_vector(uint64_t start_height, std::vector<uint64_t>& timestamps);
     bool update_next_comulative_size_limit();
     bool process_blockchain_tx_extra(const transaction& tx, const crypto::hash& tx_id, const uint64_t height);
-    bool unprocess_blockchain_tx_extra(const transaction& tx, const uint64_t height);
+    bool unprocess_blockchain_tx_extra(const transaction& tx, const uint64_t height, const crypto::hash& tx_id);
     bool process_blockchain_tx_attachments(const transaction& tx, uint64_t h, const crypto::hash& bl_id, uint64_t timestamp);
     bool unprocess_blockchain_tx_attachments(const transaction& tx, uint64_t h, uint64_t timestamp);
     bool pop_alias_info(const extra_alias_entry& ai);
     bool put_alias_info(const transaction& tx, extra_alias_entry& ai);
     bool pop_asset_info(const asset_descriptor_operation& ado, const uint64_t height);
     bool put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, const uint64_t height);
+    bool put_gw_address_operation(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation& ado, const uint64_t height);
+    bool pop_gw_address_operation(const gateway_address_descriptor_operation& ado, const uint64_t height, const crypto::hash& tx_id);
+
+    bool put_gw_address_operation_register(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation_register& gao, const uint64_t height);
+    bool put_gw_address_operation_update(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation_update& gao, const uint64_t height);
+    bool validate_gw_address_ownership(const transaction& tx, const crypto::hash& tx_id, const gateway_address_descriptor_operation_update& gao, const gateway_address_data& gad, const uint64_t height);
+
     void fill_addr_to_alias_dict();
     //bool resync_spent_tx_flags();
     bool prune_ring_signatures_and_attachments_if_need();
@@ -730,7 +751,13 @@ namespace currency
     bool update_spent_tx_flags_for_input(uint64_t amount, uint64_t global_index, bool spent);
     bool update_spent_tx_flags_for_input(const crypto::hash& multisig_id, uint64_t spent_height);
     bool update_spent_tx_flags_for_input(const crypto::hash& tx_id, size_t n, bool spent);
-    
+
+    bool change_gateway_balance(const crypto::hash& tx_id, const gateway_address_id_type& gw_addr, const crypto::public_key& asset_id, const uint64_t amount, bool increase);
+    bool process_gateway_input(const crypto::hash& tx_id, const crypto::hash& bl_id, const uint64_t bl_height, const txin_gateway& in_gw);
+    bool unprocess_gateway_input(const txin_gateway& in_gw);
+    bool process_gateway_ouput(const crypto::hash& tx_id, const crypto::hash& bl_id, const uint64_t bl_height, const tx_out_gateway& out_gw);
+    bool unprocess_gateway_output(const tx_out_gateway& out_gw);
+
     void push_block_to_per_block_increments(uint64_t height_, std::unordered_map<uint64_t, uint32_t>& gindices);
     void pop_block_from_per_block_increments(uint64_t height_);
     void calculate_local_gindex_lookup_table_for_height(uint64_t split_height, std::map<uint64_t, uint64_t>& increments) const;
@@ -741,6 +768,8 @@ namespace currency
     bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v) const;
     bool is_output_allowed_for_input(const tx_out_zarcanum& out, const txin_v& in_v) const;
     void remove_old_dbs();
+    bool process_tx_gateway_history(const crypto::hash& tx_id, const transaction& tx_);
+    bool unprocess_tx_gateway_history(const crypto::hash& tx_id, const transaction& tx_);
 
 
     //POS
@@ -865,7 +894,7 @@ namespace currency
 
         TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
 
-        if (!vis.handle_output(tx_ptr->tx, validated_tx, o, n))
+        if (!vis.handle_output(tx_ptr, validated_tx, o, n))
         {
           size_t verified_input_index = std::find(validated_tx.vin.begin(), validated_tx.vin.end(), verified_input) - validated_tx.vin.begin();
           LOG_PRINT_RED_L0("handle_output failed for output #" << n << " in " << tx_id << " referenced by input #" << verified_input_index << " in tx " << get_transaction_hash(validated_tx));
@@ -886,7 +915,7 @@ namespace currency
 
 
         TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
-        if (!vis.handle_output(tx_ptr->tx, validated_tx, out_zc, n))
+        if (!vis.handle_output(tx_ptr, validated_tx, out_zc, n))
         {
           size_t verified_input_index = std::find(validated_tx.vin.begin(), validated_tx.vin.end(), verified_input) - validated_tx.vin.begin();
           LOG_PRINT_RED_L0("handle_output failed for output #" << n << " in " << tx_id << " referenced by input #" << verified_input_index << " in tx " << get_transaction_hash(validated_tx));

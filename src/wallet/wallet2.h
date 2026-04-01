@@ -33,7 +33,7 @@
 #include "storages/portable_storage_template_helper.h"
 #include "crypto/chacha.h"
 #include "crypto/hash.h"
-#include "core_rpc_proxy.h"
+#include "i_core_rpc_proxy.h"
 #include "core_default_rpc_proxy.h"
 #include "wallet_errors.h"
 #include "eos/portable_archive.hpp"
@@ -42,7 +42,6 @@
 #include "currency_core/bc_escrow_service.h"
 #include "common/pod_array_file_container.h"
 #include "currency_core/block_chain_shortener.h"
-#include "tor-connect/torlib/tor_lib_iface.h"
 #include "currency_core/pos_mining.h"
 #include "view_iface.h"
 #include "wallet2_base.h"
@@ -231,7 +230,7 @@ namespace tools
   };
   
 
-  class wallet2: public tools::tor::t_transport_state_notifier, public boost::static_visitor<void>, public wallet2_base_state
+  class wallet2: public boost::static_visitor<void>, public wallet2_base_state
   {
     wallet2(const wallet2&) = delete;
   public:
@@ -317,6 +316,7 @@ namespace tools
       process_transaction_context(const currency::transaction& t) : tx(t) {}
       const currency::transaction& tx;
       bool spent_own_native_inputs = false; 
+      bool spent_own_outs_in_inputs = false;
       // check all outputs for spending (compare key images)
       wallet_public::employed_tx_entries employed_entries;
       bool is_pos_coinbase = false;
@@ -359,7 +359,20 @@ namespace tools
       uint64_t additional_tid_amount = 0;
     };
 
+    private:
+      struct mix_input_plan
+      {
+        size_t            selection_pos;               // position in the input list of selected_indices
+        uint64_t          transfer_index;              // key in m_transfers
+        const transfer_details* td;
+        size_t            target_decoy_count;          // how many decoys we want
+        bool              needs_decoys;                // (!auditable && target_decoy_count > 0)
+        bool              is_real_output_post_hf4;     // zone HF real output
+        uint64_t          batch_key;                   // 0 for ZC, otherwise td.amount()
+        size_t            batch_idx;                   // batch index in req4/resp4 (SIZE_MAX if not needed)
+      };
 
+    public:
 
     void assign_account(const currency::account_base& acc);
     void generate(const std::wstring& path, const std::string& password, bool auditable_wallet);
@@ -430,6 +443,8 @@ namespace tools
     void update_asset(const crypto::public_key& asset_id, const currency::asset_descriptor_base& new_descriptor, currency::finalized_tx& ft);
     void burn_asset(const crypto::public_key& asset_id, uint64_t amount_to_burn, currency::finalized_tx& ft, const std::vector<currency::tx_service_attachment>& service_entries = std::vector<currency::tx_service_attachment>(), const std::string& address_to_point = std::string(), uint64_t native_amount_to_point = 0);
     void transfer_asset_ownership(const crypto::public_key& asset_id, const currency::asset_owner_pub_key_v& new_owner_v, currency::finalized_tx& ft);
+    
+    void register_gateway_address(const wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request& req, wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response& res, currency::finalized_tx& ft);
 
     bool daemon_get_asset_info(const crypto::public_key& asset_id, currency::asset_descriptor_base& adb) const;
     bool set_core_proxy(const std::shared_ptr<i_core_proxy>& proxy);
@@ -624,6 +639,7 @@ namespace tools
       uint64_t fee, size_t& outs_total, uint64_t& amount_total, size_t& outs_swept, uint64_t& amount_swept, currency::transaction* p_result_tx = nullptr, std::string* p_filename_or_unsigned_tx_blob_str = nullptr);
 
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id);
+    bool get_transfer_address(const std::string& adr_str, currency::address_v& addr, std::string& payment_id);
     inline uint64_t get_blockchain_current_size() const {
       return m_chain.get_blockchain_current_size();
     }
@@ -654,9 +670,11 @@ namespace tools
     void set_genesis(const crypto::hash& genesis_hash);
     bool prepare_and_sign_pos_block(const mining_context& cxt, uint64_t full_block_reward, const currency::pos_entry& pe, currency::tx_generation_context& miner_tx_tgc, currency::block& b) const;
     bool prepare_pos_zc_input_and_ring(const transfer_details& td, const currency::tx_out_zarcanum& stake_out, currency::txin_zc_input& stake_input,
-      std::vector<currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& decoy_storage,
-      std::vector<crypto::CLSAG_GGXXG_input_ref_t>& ring,
-      uint64_t& secret_index) const;
+      std::vector<currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& decoy_storage, std::vector<crypto::CLSAG_GGXXG_input_ref_t>& ring, uint64_t& secret_index) const;
+    void distribute_decoys_and_build_sources(const currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& resp4, const std::vector<mix_input_plan>& plans,
+      bool use_all_decoys_if_found_less_than_required, std::vector<currency::tx_source_entry>& sources) const;
+    void plan_decoy_batches_for_sources( size_t fake_outputs_count_, const std::vector<uint64_t>& selected_indices, uint64_t hf4_height,
+      currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req4, std::vector<mix_input_plan>& plans) const;
     void process_new_blockchain_entry(const currency::block& b, 
       const currency::block_direct_data_entry& bche, 
       const crypto::hash& bl_id,
@@ -819,7 +837,7 @@ private:
     void handle_money(const currency::block& b, const process_transaction_context& tx_process_context);
     void load_wti_from_process_transaction_context(wallet_public::wallet_transfer_info& wti, const process_transaction_context& tx_process_context);
     bool process_payment_id_for_wti_and_populate_subtransfers(wallet_public::wallet_transfer_info& wti, const process_transaction_context& tx_process_context, const std::vector<currency::payload_items_v>& decrypted_items);
-    void add_to_last_zc_global_indexs(uint64_t h, uint64_t last_zc_output_index);
+    //void add_to_last_zc_global_indexs(uint64_t h, uint64_t last_zc_output_index);
     uint64_t get_actual_zc_global_index();
     void handle_pulled_blocks(size_t& blocks_added, std::atomic<bool>& stop,
       currency::COMMAND_RPC_GET_BLOCKS_DIRECT::response& blocks, bool& full_reset_needed);
@@ -927,6 +945,7 @@ private:
     void remove_transfer_from_amount_gindex_map(uint64_t tid);
     uint64_t get_alias_cost(const std::string& alias);
     detail::split_strategy_id_t get_current_split_strategy();
+    void append_heights_with_distribution(std::vector<uint64_t>& heights, size_t oversample, uint64_t max_height, decoy_selection_generator::dist_kind kind) const;
     void build_distribution_for_input(std::vector<uint64_t>& height_distrib, uint64_t own_height, decoy_selection_generator::dist_kind kind) const;
     void build_distribution_for_input(std::vector<uint64_t>& offsets, uint64_t own_index);
     void select_decoys(currency::COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::outs_for_amount & amount_entry, uint64_t own_g_index);
@@ -938,8 +957,6 @@ private:
     void wti_to_json_line(std::ostream& ss, const wallet_public::wallet_transfer_info& wti, size_t index) const;
     
     bool send_block_via_socks5(const currency::block& bl);
-
-    
 
     /*     
      

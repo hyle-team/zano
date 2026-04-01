@@ -114,8 +114,11 @@ namespace currency
     bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr);
 
     uint64_t get_daemon_blockchain_height(std::string& err);
+    bool is_freeze_period_active(std::string& err);
     bool try_connect_to_daemon();
-    std::string get_token_info_string(const crypto::public_key& asset_id, uint64_t& decimal_point);
+    bool check_whether_tx_send_possible();
+
+    std::string get_asset_info_string(const crypto::public_key& asset_id, uint64_t& decimal_point);
     bool print_wti(const tools::wallet_public::wallet_transfer_info& wti);
     bool check_password_for_operation();
     crypto::hash get_hash_from_pass_and_salt(const std::string& pass, uint64_t salt);
@@ -210,6 +213,7 @@ namespace currency
     std::string m_enable_block_socks5_relay_proxy;
     std::string m_block_relay_url;
     bool m_concise_mode = false;
+    bool m_allow_legacy_payment_id_size = false;
     
     crypto::hash m_password_hash;
     uint64_t m_password_salt;

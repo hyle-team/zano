@@ -285,6 +285,19 @@ struct offers_count_param
   size_t offers_count_raw;
 };
 
+struct gw_address_balance_check_param
+{
+  currency::gateway_address_id_type gw_addr;
+  uint64_t amount;
+  crypto::public_key asset_id = currency::native_coin_asset_id;
+  
+  BEGIN_SERIALIZE()
+    FIELD(gw_addr)
+    FIELD(amount)
+    FIELD(asset_id)
+  END_SERIALIZE()
+};
+
 class test_chain_unit_enchanced : virtual public test_chain_unit_base
 {
 public:
@@ -361,6 +374,7 @@ public:
   bool check_offers_count(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_hardfork_active(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
   bool check_hardfork_inactive(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool check_gw_balance(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 
   static bool is_event_mark_invalid_block(const test_event_entry& ev, bool use_global_gentime_settings = true);
   static bool is_event_mark_invalid_tx(const test_event_entry& ev, bool use_global_gentime_settings = true);
@@ -979,10 +993,14 @@ bool construct_broken_tx(const currency::account_keys& sender_account_keys, cons
   //fill outputs
   size_t output_index = 0;
   std::set<uint16_t> der_hints;
+  currency::tx_generation_context tgc{};
+  tgc.set_tx_key(txkey);
+  tgc.tx_outs_attr = tx_outs_attr;
+  //tgc.resize(0, shuffled_dsts.size());
   BOOST_FOREACH(const currency::tx_destination_entry& dst_entr, shuffled_dsts)
   {
     CHECK_AND_ASSERT_MES(dst_entr.amount > 0, false, "Destination with wrong amount: " << dst_entr.amount);
-    bool r = construct_tx_out(dst_entr, txkey.sec, output_index, tx, der_hints, sender_account_keys, tx_outs_attr);
+    bool r = construct_tx_out(dst_entr, output_index, tx, der_hints, tgc);
     CHECK_AND_ASSERT_MES(r, false, "Failed to construc tx out");
     output_index++;
     summary_outs_money += dst_entr.amount;

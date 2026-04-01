@@ -690,6 +690,7 @@ namespace plain_wallet
     PLAIN_WALLET_BEGIN_TRY_ENTRY();
     GET_INSTANCE_PTR(inst_ptr);
     inst_ptr->gwm.set_remote_node_url(url);
+    inst_ptr->m_common_daemon_proxy.set_connection_addr(url);
 
     LOG_PRINT_L0("[RESET URL] URL:" << url);
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2026 Zano Project
+﻿// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -467,10 +467,12 @@ namespace currency
     {
       std::string integrated_address;
       std::string payment_id; // hex-encoded
+      std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(integrated_address) DOC_DSCR("Integrated address combining a standard address and payment ID, if applicable.")  DOC_EXMP("iZ2EMyPD7g28hgBfboZeCENaYrHBYZ1bLFi5cgWvn4WJLaxfgs4kqG6cJi9ai2zrXWSCpsvRXit14gKjeijx6YPCLJEv6Fx4rVm1hdAGQFis") DOC_END
         KV_SERIALIZE(payment_id)         DOC_DSCR("Payment ID associated with the this address.") DOC_EXMP("1dfe5a88ff9effb3")  DOC_END
+        KV_SERIALIZE(status)             DOC_DSCR("Status") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -662,17 +664,26 @@ namespace currency
   struct COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4
   {
     DOC_COMMAND("Version 4 of the command to retrieve random decoy outputs for specified amounts, focusing on either pre-zarcanum or post-zarcanum zones based on the amount value.");
+    struct request_batch
+    {
+      uint64_t input_amount;
+      std::vector<uint64_t> heights;
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(input_amount)            DOC_DSCR("Amount to be processed in the batch.") DOC_EXMP_AUTO(1000000) DOC_END
+        KV_SERIALIZE(heights)                 DOC_DSCR("Array of heights to be processed in the batch.") DOC_EXMP_AUTO(1) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
 
     struct request
     {
-      std::vector<uint64_t> heights;                    // array heights derived from decoy selection algorithm, number of heights expected to be not less than minimal ring size
+      std::vector<request_batch> batches;               // multiple amounts with heights to be processed in a single call
       uint64_t              height_upper_limit;         // if nonzero, all the decoy outputs must be either older than, or the same age as this height
       std::string           look_up_strategy;           // LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(heights)                     DOC_DSCR("array heights derived from decoy selection algorithm, number of heights expected to be not less than minimal ring size") DOC_EXMP_AGGR(1, 2, 3, 4) DOC_END
-        KV_SERIALIZE(height_upper_limit)          DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_EXMP(2555000) DOC_END
-        KV_SERIALIZE(look_up_strategy)            DOC_DSCR("LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE") DOC_EXMP("LOOK_UP_STRATEGY_REGULAR_TX") DOC_END
+        KV_SERIALIZE(batches)                 DOC_DSCR("List of request batches, each containing an amount and corresponding heights to be processed.") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(height_upper_limit)      DOC_DSCR("Maximum blockchain height from which decoys can be taken. If nonzero, decoys must be at this height or older.") DOC_EXMP(2555000) DOC_END
+        KV_SERIALIZE(look_up_strategy)        DOC_DSCR("LOOK_UP_STRATEGY_REGULAR_TX or LOOK_UP_STRATEGY_POS_COINBASE") DOC_EXMP("LOOK_UP_STRATEGY_REGULAR_TX") DOC_END
 
       END_KV_SERIALIZE_MAP()
     };
@@ -689,14 +700,22 @@ namespace currency
       END_KV_SERIALIZE_MAP()
     };
 
-    struct response
+    struct blocks_batch
     {
       std::vector<outputs_in_block> blocks;
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(blocks)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::vector<blocks_batch> blocks_batches; // batches x blocks
       std::string status;
 
       BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(blocks)    DOC_DSCR("Blocks collected by node") DOC_EXMP_AUTO(1) DOC_END
-        KV_SERIALIZE(status)    DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE(blocks_batches)    DOC_DSCR("Blocks collected by node") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(status)            DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 
@@ -1093,6 +1112,7 @@ namespace currency
       bc_performance_data performance_data;
       pool_performance_data tx_pool_performance_data;
       bool pos_allowed;
+      bool pre_hf_tx_freeze_period_active;
       uint64_t last_block_size;
       uint64_t current_max_allowed_block_size;
       uint64_t tx_count_in_last_block;
@@ -1109,6 +1129,7 @@ namespace currency
         // Always calculated and provided fields
         KV_SERIALIZE(height)                     DOC_DSCR("The current size of the blockchain, equal to the height of the top block plus one.") DOC_EXMP(2555000) DOC_END
         KV_SERIALIZE(pos_allowed)                DOC_DSCR("Boolean value indicating whether PoS mining is currently allowed based on network rules and state.") DOC_EXMP(true) DOC_END
+        KV_SERIALIZE(pre_hf_tx_freeze_period_active) DOC_DSCR("Boolean value indicating whether tx sending is temporarly stopped because a hardfork is coming.") DOC_EXMP(false) DOC_END
         KV_SERIALIZE(pos_difficulty)             DOC_DSCR("Current difficulty for Proof of Stake mining.") DOC_EXMP("1848455949616658404658") DOC_END
         KV_SERIALIZE(pow_difficulty)             DOC_DSCR("Current difficulty for Proof of Work mining.") DOC_EXMP(12777323347117) DOC_END
         KV_SERIALIZE(tx_count)                   DOC_DSCR("Total number of transactions in the blockchain.") DOC_EXMP(767742) DOC_END
@@ -1661,15 +1682,21 @@ namespace currency
   {
     uint64_t amount;
     std::list<std::string> pub_keys;
+    std::string gw_addr;
+    std::string asset_id;
     uint64_t minimum_sigs;
     bool is_spent;
     uint64_t global_index;
+    uint64_t payment_id;
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(amount)                       DOC_DSCR("The output's amount, 0 for ZC outputs.") DOC_EXMP(9000000000) DOC_END
       KV_SERIALIZE(pub_keys)                     DOC_DSCR("List of public keys associated with the output.") DOC_EXMP_AGGR("7d0c755e7e24a241847176c9a3cf4c970bcd6377018068abe6fe4535b23f5323") DOC_END
+      KV_SERIALIZE(gw_addr)                      DOC_DSCR("[optional] Gateway destination address (for tx_out_gateway only)") DOC_EXMP_AGGR("gwZ5sqZkre33rxhoo9ht5xcmzy5khvr2hFSfvk7TeXeMXxby7acC3fs1D") DOC_END
+      KV_SERIALIZE(asset_id)                     DOC_DSCR("[optional] Asset ID (for tx_out_gateway only)") DOC_EXMP_AGGR("7d0c755e7e24a241847176c9a3cf4c970bcd6377018068abe6fe4535b23f5323") DOC_END
       KV_SERIALIZE(minimum_sigs)                 DOC_DSCR("Minimum number of signatures required to spend the output, for multisig outputs only.") DOC_EXMP(0) DOC_END
       KV_SERIALIZE(is_spent)                     DOC_DSCR("Indicates whether the output has been spent.") DOC_EXMP(false) DOC_END
       KV_SERIALIZE(global_index)                 DOC_DSCR("Global index of the output for this specific amount.") DOC_EXMP(0) DOC_END
+      KV_SERIALIZE(payment_id)                   DOC_DSCR("[optional] Intrinsic per-output 8 byte long payment id") DOC_EXMP(0) DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
@@ -1677,13 +1704,17 @@ namespace currency
   {
     uint64_t amount;
     uint64_t multisig_count;
-   std::string kimage_or_ms_id;
+    std::string kimage_or_ms_id;
+    std::string gw_addr;
+    std::string asset_id;
     std::vector<uint64_t> global_indexes;
     std::vector<std::string> etc_options;
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(amount)                       DOC_DSCR("The amount of coins being transacted.") DOC_EXMP(1000000000000) DOC_END
-      KV_SERIALIZE(kimage_or_ms_id)              DOC_DSCR("Contains either the key image for the input or the multisig output ID, depending on the input type.") DOC_EXMP("2540e0544b1fed3b104976f803dbd83681335c427f9d601d9d5aecf86ef276d2") DOC_END
-      KV_SERIALIZE(global_indexes)               DOC_DSCR("List of global indexes indicating the outputs referenced by this input, where only one is actually being spent.") DOC_EXMP_AGGR(0,2,12,27) DOC_END
+      KV_SERIALIZE(kimage_or_ms_id)              DOC_DSCR("Contains either the key image for the input or the multisig output ID, or gateway address, depending on the input type.") DOC_EXMP("2540e0544b1fed3b104976f803dbd83681335c427f9d601d9d5aecf86ef276d2") DOC_END
+      KV_SERIALIZE(gw_addr)                      DOC_DSCR("[optional] Gateway source address (for txin_gateway only)") DOC_EXMP_AGGR("gwZ5sqZkre33rxhoo9ht5xcmzy5khvr2hFSfvk7TeXeMXxby7acC3fs1D") DOC_END
+      KV_SERIALIZE(asset_id)                     DOC_DSCR("[optional] Asset ID (for txin_gateway only)") DOC_EXMP_AGGR("7d0c755e7e24a241847176c9a3cf4c970bcd6377018068abe6fe4535b23f5323") DOC_END
+      KV_SERIALIZE(global_indexes)               DOC_DSCR("List of global indexes indicating the outputs referenced by this input, where only one is actually being spent (only for txin_zc_input).") DOC_EXMP_AGGR(0,2,12,27) DOC_END
       KV_SERIALIZE(multisig_count)               DOC_DSCR("Number of multisig signatures used, relevant only for multisig outputs.") DOC_EXMP(0) DOC_END
       KV_SERIALIZE(etc_options)                  DOC_DSCR("Auxiliary options associated with the input, containing additional configuration or data.") DOC_END
     END_KV_SERIALIZE_MAP()
@@ -2152,5 +2183,131 @@ namespace currency
     END_KV_SERIALIZE_MAP()
   };
 
+
+  struct gateway_balance_entry
+  {
+    crypto::public_key asset_id;
+    uint64_t amount;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE_POD_AS_HEX_STRING(asset_id)  DOC_DSCR("The asset ID for the gateway balance entry.") DOC_EXMP("729811f9340537e8d5641949e6cc58261f91f109687a706f39bae9514757e819") DOC_END
+      KV_SERIALIZE(amount)                      DOC_DSCR("The amount of the specified currency in the gateway balance entry.") DOC_EXMP(100000000) DOC_END
+    END_KV_SERIALIZE_MAP()
+  };
+
+
+  struct gateway_descriptor_api_info
+  {
+    std::optional<crypto::eth_public_key>   opt_owner_ecdsa_pub_key;
+    std::optional<crypto::eddsa_public_key> opt_owner_eddsa_pub_key;
+    std::optional<crypto::public_key>       opt_owner_custom_schnorr_pub_key;  //Zano specific generic schnorr signature public key
+    std::string meta_info;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE_POD_AS_HEX_STRING(opt_owner_ecdsa_pub_key)               DOC_DSCR("owner's Ethereum public key")                  DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8e2") DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(opt_owner_eddsa_pub_key)               DOC_DSCR("owner's EdDSA public key")                     DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+      KV_SERIALIZE_POD_AS_HEX_STRING(opt_owner_custom_schnorr_pub_key)      DOC_DSCR("owner's custom Schnorr signature public key")  DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+      KV_SERIALIZE(meta_info)                                               DOC_DSCR("Additional metadata about the gateway")       DOC_EXMP("Some metadata") DOC_END
+    END_KV_SERIALIZE_MAP()
+  };
+
+  struct COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO
+  {
+    DOC_COMMAND("Retrieves information about a gateway address.");
+    struct request
+    {
+      std::string gateway_address;
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(gateway_address)            DOC_DSCR("The gateway address for which information is being requested.") DOC_EXMP("gateway1qxyz...") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      currency::gateway_descriptor_api_info descriptor_info;
+      std::list<gateway_balance_entry> balances;
+      payment_id_t payment_id;
+      crypto::public_key gateway_view_pub_key;
+      std::string status;
+
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(descriptor_info)            DOC_DSCR("Information about the specified gateway address.") DOC_END
+        KV_SERIALIZE(balances)                   DOC_DSCR("List of balances for different asset_id associated with the gateway address.") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(status)                     DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE(payment_id)                 DOC_DSCR("Payment ID associated with the gateway address.") DOC_EXMP("4cf2c7c7e16d1a2a") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(gateway_view_pub_key) DOC_DSCR("Gateway view public key associated with the gateway address.") DOC_EXMP("0feef5e2ea0e88b592c0a0e6639ce73e12ea9b3136d89464748fcb60bb6f18f5") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_RPC_GATEWAY_CREATE_TRANSFER
+  {
+    DOC_COMMAND("Initiates a transfer from gateway address. Create tx that need to be signed.");
+    struct request
+    {
+      currency::gateway_address_id_type origin_gateway_id;
+      std::list<currency::transfer_destination> destinations;
+      uint64_t fee;
+      std::string comment;
+      std::vector<currency::tx_service_attachment> service_entries;
+      bool service_entries_permanent;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(origin_gateway_id)  DOC_DSCR("Origin gateway ID for the transfer.")           DOC_EXMP("gateway1qxyz...") DOC_END
+        KV_SERIALIZE(destinations)                         DOC_DSCR("Details of the gateway transfer destinations.") DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(fee)                                  DOC_DSCR("Transaction fee for the gateway transfer.")     DOC_EXMP(100000000) DOC_END
+        KV_SERIALIZE(comment)                              DOC_DSCR("Comment for the gateway transfer.")             DOC_EXMP("Some comment") DOC_END
+        KV_SERIALIZE(service_entries)                      DOC_DSCR("Service entries for the gateway transfer.")     DOC_EXMP_AUTO(1) DOC_END
+        KV_SERIALIZE(service_entries_permanent)            DOC_DSCR("Whether the service entries are permanent.")    DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+      crypto::hash tx_hash_to_sign;
+      std::string tx_blob;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)                                          DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)               DOC_DSCR("Hash of the transaction created for the gateway transfer.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)                    DOC_DSCR("Hex representation of the transaction blob.") DOC_EXMP("0100000001...") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_RPC_GATEWAY_SIGN_TRANSFER
+  {
+    DOC_COMMAND("Signs a transfer from gateway address.");
+    struct request
+    {
+      std::string tx_blob;
+      crypto::hash tx_hash_to_sign;
+
+      std::optional<crypto::eth_signature>          opt_ecdsa_signature;
+      std::optional<crypto::eddsa_signature>        opt_eddsa_signature;
+      std::optional<crypto::generic_schnorr_sig_s>  opt_custom_schnorr_signature;  //Zano specific generic schnorr signature public key
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)    DOC_DSCR("Hex representation of the transaction blob to sign.") DOC_EXMP("0100000001...") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)               DOC_DSCR("Hash of the transaction to sign.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_ecdsa_signature)           DOC_DSCR("ECDSA (Ethereum) signature for signing the transaction (hex-encoded).") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_eddsa_signature)           DOC_DSCR("EdDSA (Solana) signature for signing the transaction (hex-encoded).") DOC_EXMP("dc2a4459e7369633a52b1bf277839a00201009a3efbf3ecb69bea2186c26b58909351fc9ac90b3ecfdfbc7c66431e0303dca179c138ac17ad9bef1177331a704") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_custom_schnorr_signature)  DOC_DSCR("Custom Schnorr signature for signing the transaction (hex-encoded).") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+      std::string signed_tx_blob;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)                                      DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(signed_tx_blob)    DOC_DSCR("Hex representation of the signed transaction blob.") DOC_EXMP("0100000001...") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
 }
 

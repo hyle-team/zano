@@ -1095,7 +1095,7 @@ bool asset_operation_and_hardfork_checks::generate(
   CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_2");
 
   DO_CALLBACK(events, "mark_invalid_tx");
-  ADD_CUSTOM_EVENT(events, tx_2);
+  ADD_CUSTOM_EVENT(events, tx_2); // event 67
 
   sources.clear();
   destinations.clear();
@@ -1135,7 +1135,9 @@ bool asset_operation_and_hardfork_checks::generate(
 
   CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_3");
 
-  ADD_CUSTOM_EVENT(events, tx_3);
+  if (hf_n >= ZANO_HARDFORK_06)
+    DO_CALLBACK(events, "mark_invalid_tx"); // tx_3 is invalid in HF6 since data items that go into payload containers are whitelisted
+  ADD_CUSTOM_EVENT(events, tx_3); // event 68
   DO_CALLBACK(events, "c2");
 
   sources.clear();
@@ -1177,9 +1179,16 @@ bool asset_operation_and_hardfork_checks::generate(
 
   CHECK_AND_ASSERT_MES(success, false, "fail to construct tx_4");
 
+  if (hf_n >= ZANO_HARDFORK_06)
+    DO_CALLBACK(events, "mark_invalid_tx"); // tx_4 is invalid in HF6 since data items that go into payload containers are whitelisted
   ADD_CUSTOM_EVENT(events, tx_4);
   DO_CALLBACK(events, "c2");
   DO_CALLBACK(events, "c1");
+
+  if (hf_n < ZANO_HARDFORK_06)
+  {
+    MAKE_NEXT_BLOCK_TX_LIST(events, blk_3, blk_2r, miner, std::list<transaction>({ tx_3, tx_4 }));
+  }
 
   return true;
 }
@@ -1663,7 +1672,7 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
 
   tools::wallet_public::COMMAND_ASSETS_DEPLOY::request deploy_req{};
   deploy_req.asset_descriptor = adb;
-  deploy_req.destinations.push_back(tools::wallet_public::transfer_destination{initial_register_amount, m_accounts[ALICE_ACC_IDX].get_public_address_str(), null_pkey});
+  deploy_req.destinations.push_back(currency::transfer_destination{initial_register_amount, m_accounts[ALICE_ACC_IDX].get_public_address_str(), null_pkey});
   deploy_req.do_not_split_destinations = false;
   tools::wallet_public::COMMAND_ASSETS_DEPLOY::response deploy_resp{};
   r = miner_wlt_rpc.on_asset_deploy(deploy_req, deploy_resp, jerr, ctx);
@@ -1697,7 +1706,7 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
 
   tools::wallet_public::COMMAND_ASSETS_EMIT::request emit_req{};
   emit_req.asset_id = asset_id;
-  emit_req.destinations.push_back(tools::wallet_public::transfer_destination{additional_emit_amount, m_accounts[ALICE_ACC_IDX].get_public_address_str(), asset_id});
+  emit_req.destinations.push_back(currency::transfer_destination{additional_emit_amount, m_accounts[ALICE_ACC_IDX].get_public_address_str(), asset_id});
   emit_req.do_not_split_destinations = false;
 
   tools::wallet_public::COMMAND_ASSETS_EMIT::response emit_resp{};
@@ -1905,7 +1914,7 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
 
   emit_req = tools::wallet_public::COMMAND_ASSETS_EMIT::request{};
   emit_req.asset_id = asset_id;
-  emit_req.destinations.push_back(tools::wallet_public::transfer_destination{additional_emit_amount, m_accounts[BOB_ACC_IDX].get_public_address_str(), asset_id});
+  emit_req.destinations.push_back(currency::transfer_destination{additional_emit_amount, m_accounts[BOB_ACC_IDX].get_public_address_str(), asset_id});
   emit_req.do_not_split_destinations = false;
 
   emit_resp = tools::wallet_public::COMMAND_ASSETS_EMIT::response{};

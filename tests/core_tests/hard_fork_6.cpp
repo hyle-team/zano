@@ -1,4 +1,4 @@
-// Copyright (c) 2025 Zano Project
+// Copyright (c) 2025-2026 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -13,6 +13,7 @@ using namespace currency;
 hard_fork_6_intrinsic_payment_id_basic_test::hard_fork_6_intrinsic_payment_id_basic_test()
 {
   REGISTER_CALLBACK_METHOD(hard_fork_6_intrinsic_payment_id_basic_test, c1);
+  REGISTER_CALLBACK_METHOD(hard_fork_6_intrinsic_payment_id_basic_test, c2);
 
   m_hardforks.clear();
   m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 1);
@@ -30,6 +31,7 @@ bool hard_fork_6_intrinsic_payment_id_basic_test::generate(std::vector<test_even
   account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
   account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
   account_base& carol_acc = m_accounts[CAROL_ACC_IDX]; carol_acc.generate(); carol_acc.set_createtime(ts);
+  account_base& dan_acc   = m_accounts[DAN_ACC_IDX];   dan_acc.generate();   dan_acc.set_createtime(ts);
 
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
 
@@ -137,6 +139,25 @@ bool hard_fork_6_intrinsic_payment_id_basic_test::generate(std::vector<test_even
 
 
   DO_CALLBACK(events, "c1");
+
+
+  //
+  // tx_4 : Carol -> Dan; spending an output with intrinsig payment id, and sending an output with intrinsic payment id as well
+  //
+  destinations.clear();
+  destinations.push_back(tx_destination_entry(5, dan_acc.get_public_address(), m_asset_id));
+  destinations.back().payment_id = 137035999;
+  transaction tx_4{};
+  r = construct_tx_to_key(m_hardforks, events, tx_4, blk_3r, carol_acc, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  ADD_CUSTOM_EVENT(events, tx_4);
+  m_tx_4_id = get_transaction_hash(tx_4);
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3r, miner_acc, tx_4);
+
+  REWIND_BLOCKS_N(events, blk_4r, blk_4, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK(events, "c2");
 
   return true;
 }
@@ -271,6 +292,95 @@ bool hard_fork_6_intrinsic_payment_id_basic_test::c1(currency::core& c, size_t e
 
   return true;
 }
+
+bool hard_fork_6_intrinsic_payment_id_basic_test::c2(currency::core& c, size_t ev_index, const std::vector<test_event_entry> &events)
+{
+  bool r = false;
+  
+  std::shared_ptr<tools::wallet2> dan_wlt = init_playtime_test_wallet(events, c, DAN_ACC_IDX);
+  
+
+  // check Dan's balance, payments and wti's after receiving tx_4 from Carol
+  dan_wlt->refresh();
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*dan_wlt.get(), "Dan", 0, UINT64_MAX, 0, 0, 0), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*dan_wlt.get(), "Dan", 5, UINT64_MAX, 5, 0, 0, m_asset_id, 0), false, "");
+
+  std::list<tools::payment_details> payments;
+  dan_wlt->get_payments(convert_payment_id(137035999), payments);
+  CHECK_AND_ASSERT_EQ(payments.size(), 1);
+  CHECK_AND_ASSERT_EQ(payments.back().m_amount,             0);
+  CHECK_AND_ASSERT_EQ(payments.back().m_block_height,       45);
+  CHECK_AND_ASSERT_EQ(payments.back().m_tx_hash,            m_tx_4_id);
+  CHECK_AND_ASSERT_EQ(payments.back().m_unlock_time,        0);
+  CHECK_AND_ASSERT_EQ(payments.back().subtransfers.size(),  1);
+  CHECK_AND_ASSERT_EQ(payments.back().subtransfers.back().amount,  5);
+  CHECK_AND_ASSERT_EQ(payments.back().subtransfers.back().asset_id, m_asset_id);
+
+  std::vector<tools::wallet_public::wallet_transfer_info> wtis;
+  uint64_t total = 0, last_item_index = 0;
+  dan_wlt->get_recent_transfers_history(wtis, 0, 100, total, last_item_index, false /*exclude_mining_txs*/, false /*start_form_end*/);
+  CHECK_AND_ASSERT_EQ(wtis.size(),                          1);
+  CHECK_AND_ASSERT_EQ(wtis.back().height,                   45);
+  CHECK_AND_ASSERT_EQ(wtis.back().comment,                  "");
+  CHECK_AND_ASSERT_EQ(wtis.back().tx_hash,                  m_tx_4_id);
+  CHECK_AND_ASSERT_EQ(wtis.back().fee,                      TX_DEFAULT_FEE);
+  CHECK_AND_ASSERT_EQ(wtis.back().is_mining,                false);
+  CHECK_AND_ASSERT_EQ(wtis.back().is_mixing,                false);
+  CHECK_AND_ASSERT_EQ(wtis.back().is_service,               false);
+  CHECK_AND_ASSERT_EQ(wtis.back().tx_type,                  GUI_TX_TYPE_NORMAL);
+  CHECK_AND_ASSERT_EQ(wtis.back().unlock_time,              0);
+  CHECK_AND_ASSERT_EQ(wtis.back().tx_wide_payment_id,       "");
+  CHECK_AND_ASSERT_EQ(wtis.back().subtransfers_by_pid.size(), 1);
+
+  std::unordered_map<std::string, std::unordered_map<crypto::public_key, tools::wallet_public::wallet_sub_transfer_info>> substransfers_grouped_by_pid_aid;
+  auto populate_substransfers_grouped_by_pid_aid = [&]() -> bool {
+    for (auto& stbp : wtis.back().subtransfers_by_pid)
+    {
+      for (auto& st : stbp.subtransfers)
+      {
+        CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid[stbp.payment_id].count(st.asset_id), 0);
+        substransfers_grouped_by_pid_aid[stbp.payment_id][st.asset_id] = st;
+      }
+    }
+    return true;
+  };
+  CHECK_AND_ASSERT_TRUE(populate_substransfers_grouped_by_pid_aid());
+  CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid.size(),                                                1);
+  CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid[convert_payment_id(137035999)].size(),                 1);
+  CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid[convert_payment_id(137035999)][m_asset_id].amount,     5);
+  CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid[convert_payment_id(137035999)][m_asset_id].is_income,  true);
+
+
+  // now check Carol's tx4 transfer to Dan as well, to be sure that intrinsic payment id is correctly handled on sender's side too
+  std::shared_ptr<tools::wallet2> carol_wlt = init_playtime_test_wallet(events, c, CAROL_ACC_IDX);
+  carol_wlt->refresh();
+  wtis.clear();
+  carol_wlt->get_recent_transfers_history(wtis, 1, 100, total, last_item_index, false /*exclude_mining_txs*/, false /*start_form_end*/); // requesting 1 of 2 transfers total (we only need tx4)
+  CHECK_AND_ASSERT_EQ(wtis.size(), 1); // implicitly make sure there are 2 transfers total (note the offset 1 above)
+  CHECK_AND_ASSERT_EQ(wtis.back().height,                   45);
+  CHECK_AND_ASSERT_EQ(wtis.back().comment,                  "");
+  CHECK_AND_ASSERT_EQ(wtis.back().tx_hash,                  m_tx_4_id); // make sure it's tx4
+  CHECK_AND_ASSERT_EQ(wtis.back().fee,                      TX_DEFAULT_FEE);
+  CHECK_AND_ASSERT_EQ(wtis.back().is_mining,                false);
+  CHECK_AND_ASSERT_EQ(wtis.back().is_mixing,                false);
+  CHECK_AND_ASSERT_EQ(wtis.back().is_service,               false);
+  CHECK_AND_ASSERT_EQ(wtis.back().tx_type,                  GUI_TX_TYPE_NORMAL);
+  CHECK_AND_ASSERT_EQ(wtis.back().unlock_time,              0);
+  CHECK_AND_ASSERT_EQ(wtis.back().tx_wide_payment_id,       "");
+  CHECK_AND_ASSERT_EQ(wtis.back().subtransfers_by_pid.size(), 1);
+
+  substransfers_grouped_by_pid_aid.clear();
+  CHECK_AND_ASSERT_TRUE(populate_substransfers_grouped_by_pid_aid());
+
+  // on sender's side all outgoing subtrasfers have empty payment id by design
+  CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid.size(),                                              1);
+  CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid[convert_payment_id(0)][native_coin_asset_id].amount, TESTS_DEFAULT_FEE);
+  CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid[convert_payment_id(0)][m_asset_id].amount,           5);
+  CHECK_AND_ASSERT_EQ(substransfers_grouped_by_pid_aid[convert_payment_id(0)][m_asset_id].is_income,        false);
+
+  return true;
+}
+
 
 //------------------------------------------------------------------------------
 
@@ -429,7 +539,7 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   tr_req.comment = "stars continue to operate normally";
   tr_req.payment_id = "1836";
   tr_req.fee = TX_DEFAULT_FEE;
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(1), m_accounts[BOB_ACC_IDX].get_public_address_str()});
+  tr_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(1), m_accounts[BOB_ACC_IDX].get_public_address_str()});
   tools::wallet_public::COMMAND_RPC_TRANSFER::response tr_resp{};
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   // without payment_id it should work
@@ -438,10 +548,10 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   successfull_txs.push_back(crypto::parse_tpod_from_hex_string<crypto::hash>(tr_resp.tx_hash)); // 0
 
   // check any destination cannot has an intrinsic payment id
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(2), m_accounts[BOB_ACC_IDX].get_public_address_str()});
+  tr_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(2), m_accounts[BOB_ACC_IDX].get_public_address_str()});
   tr_req.destinations.front().payment_id = 137;
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(2), m_accounts[BOB_ACC_IDX].get_public_address_str()});
+  tr_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(2), m_accounts[BOB_ACC_IDX].get_public_address_str()});
   tr_req.destinations.front().payment_id = 0;
   tr_req.destinations.back().payment_id = 1836;
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
@@ -454,33 +564,33 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   // checks with no any CLI options for wallet RPC server
   //
   std::string bob_addr = m_accounts[BOB_ACC_IDX].get_public_address_str();
-  std::string bob_addr_with_too_long_pid = get_account_address_and_payment_id_as_str(m_accounts[BOB_ACC_IDX].get_public_address(), long_legacy_payment_id);
-  std::string bob_addr_with_short_pid = get_account_address_and_payment_id_as_str(m_accounts[BOB_ACC_IDX].get_public_address(), short_payment_id);
-  std::string bob_addr_with_short_pid2 = get_account_address_and_payment_id_as_str(m_accounts[BOB_ACC_IDX].get_public_address(), short_payment_id2);
+  std::string bob_addr_with_too_long_pid = get_account_address_as_str(m_accounts[BOB_ACC_IDX].get_public_address(), long_legacy_payment_id);
+  std::string bob_addr_with_short_pid = get_account_address_as_str(m_accounts[BOB_ACC_IDX].get_public_address(), short_payment_id);
+  std::string bob_addr_with_short_pid2 = get_account_address_as_str(m_accounts[BOB_ACC_IDX].get_public_address(), short_payment_id2);
   std::string carol_addr = m_accounts[CAROL_ACC_IDX].get_public_address_str();
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr_with_too_long_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr_with_too_long_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{3, bob_addr, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{3, bob_addr, m_asset_id});
   CHECK_AND_ASSERT_SUCCESS(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   successfull_txs.push_back(crypto::parse_tpod_from_hex_string<crypto::hash>(tr_resp.tx_hash)); // 2
 
@@ -492,28 +602,28 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_SUCCESS(alice_wlt_rpc.init(vm_allow_legacy_pid_size_wallet));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr_with_too_long_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr_with_too_long_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr_with_short_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr_with_too_long_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{4, bob_addr, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{4, bob_addr, m_asset_id});
   CHECK_AND_ASSERT_SUCCESS(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   successfull_txs.push_back(crypto::parse_tpod_from_hex_string<crypto::hash>(tr_resp.tx_hash)); // 3
 
@@ -540,7 +650,7 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   tr_req.comment = "stars continue to operate normally";
   tr_req.payment_id = "1836";
   tr_req.fee = TX_DEFAULT_FEE;
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{MK_TEST_COINS(5), m_accounts[BOB_ACC_IDX].get_public_address_str()});
+  tr_req.destinations.emplace_back(currency::transfer_destination{MK_TEST_COINS(5), m_accounts[BOB_ACC_IDX].get_public_address_str()});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   // without payment_id it should work, as before
   tr_req.payment_id.clear();
@@ -550,29 +660,33 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
 
   // checks without any CLI options specified for wallet RPC
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{6, bob_addr_with_too_long_pid, m_asset_id}); // long pid needs CLI option
+  tr_req.destinations.emplace_back(currency::transfer_destination{6, bob_addr_with_too_long_pid, m_asset_id}); // long pid needs CLI option
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{6, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{6, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{6, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{6, bob_addr_with_too_long_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{6, bob_addr, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{6, bob_addr_with_short_pid, m_asset_id});  // integrated address in the second destination
+  tr_req.destinations.emplace_back(currency::transfer_destination{6, bob_addr_with_short_pid, m_asset_id, 137035999}); // short embedded pid + intrinsic pid, incompatible
+  CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
+  
+  tr_req.destinations.clear();
+  tr_req.destinations.emplace_back(currency::transfer_destination{6, bob_addr, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{6, bob_addr_with_short_pid, m_asset_id});   // integrated address in the second destination -- ok
   CHECK_AND_ASSERT_SUCCESS(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   successfull_txs.push_back(crypto::parse_tpod_from_hex_string<crypto::hash>(tr_resp.tx_hash)); // 5
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{7, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{7, bob_addr, m_asset_id, 18361836});       // with intrinsic pid specified separately
+  tr_req.destinations.emplace_back(currency::transfer_destination{7, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{7, bob_addr, m_asset_id, 18361836});        // with intrinsic pid specified separately
   CHECK_AND_ASSERT_SUCCESS(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   successfull_txs.push_back(crypto::parse_tpod_from_hex_string<crypto::hash>(tr_resp.tx_hash)); // 6
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_short_pid2, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_short_pid2, m_asset_id});
   CHECK_AND_ASSERT_SUCCESS(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   successfull_txs.push_back(crypto::parse_tpod_from_hex_string<crypto::hash>(tr_resp.tx_hash)); // 7
   
@@ -585,40 +699,45 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_SUCCESS(alice_wlt_rpc.init(vm_allow_legacy_pid_size_wallet));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id, 111111}); // long pid is incompatible with intrinsic pid
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id, 111111}); // long pid is incompatible with intrinsic pid
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr, m_asset_id, 18361836});       // long pid is incompatible with intrinsic pid specified separately
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr, m_asset_id, 18361836});          // long pid is incompatible with intrinsic pid specified separately
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_short_pid, m_asset_id});  // long pid is incompatible with intrinsic pid from integrated address
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id, 137035999}); // long embedded pid + intrinsic pid, incompatible
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_short_pid, m_asset_id});  // long pid is incompatible with intrinsic pid from integrated address
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_short_pid, m_asset_id});     // long pid is incompatible with intrinsic pid from integrated address
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});  // long pid is incompatible with intrinsic pid from the first destination
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_short_pid, m_asset_id});     // long pid is incompatible with intrinsic pid from integrated address
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});
   CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});  // this
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, bob_addr, m_asset_id});                    // and this will be received by Bob with the long legacy payment id, because it's one per tx
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{8, carol_addr, m_asset_id});                  // carol should got receive the same payment id
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});  // long pid is incompatible with intrinsic pid from the first destination
+  CHECK_AND_ASSERT_FAILURE(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
+
+  tr_req.destinations.clear();
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr_with_too_long_pid, m_asset_id});  // this
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, bob_addr, m_asset_id});                    // and this will be received by Bob with the long legacy payment id, because it's one per tx
+  tr_req.destinations.emplace_back(currency::transfer_destination{8, carol_addr, m_asset_id});                  // carol should got receive the same payment id
   CHECK_AND_ASSERT_SUCCESS(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   successfull_txs.push_back(crypto::parse_tpod_from_hex_string<crypto::hash>(tr_resp.tx_hash)); // 8
 
   tr_req.destinations.clear();
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{9, bob_addr_with_short_pid, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{9, bob_addr_with_short_pid2, m_asset_id});
-  tr_req.destinations.emplace_back(tools::wallet_public::transfer_destination{9, bob_addr, m_asset_id, 18361836});
+  tr_req.destinations.emplace_back(currency::transfer_destination{9, bob_addr_with_short_pid, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{9, bob_addr_with_short_pid2, m_asset_id});
+  tr_req.destinations.emplace_back(currency::transfer_destination{9, bob_addr, m_asset_id, 18361836});
   CHECK_AND_ASSERT_SUCCESS(invoke_text_json_for_rpc(alice_wlt_rpc, "transfer", tr_req, tr_resp));
   successfull_txs.push_back(crypto::parse_tpod_from_hex_string<crypto::hash>(tr_resp.tx_hash)); // 9
 
@@ -958,6 +1077,429 @@ bool hard_fork_6_intrinsic_payment_id_rpc_test::c1(currency::core& c, size_t ev_
   CHECK_AND_ASSERT_EQ(wtis[idx].subtransfers_by_pid.back().subtransfers[1-jdx].amount,                                    120);
   CHECK_AND_ASSERT_EQ(wtis[idx].subtransfers_by_pid.back().subtransfers[1-jdx].asset_id,                                  m_asset_id);
   CHECK_AND_ASSERT_EQ(wtis[idx].subtransfers_by_pid.back().subtransfers[1-jdx].is_income,                                 true);
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+hard_fork_6_full_gw_tx_test::hard_fork_6_full_gw_tx_test()
+{
+  REGISTER_CALLBACK_METHOD(hard_fork_6_full_gw_tx_test, c1);
+
+  m_hardforks.clear();
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 1);
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_06, 1);
+}
+
+bool hard_fork_6_full_gw_tx_test::generate(std::vector<test_event_entry>& events) const
+{
+  bool r = false;
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_04_ZARCANUM));
+
+  transaction tx_0{};
+  CHECK_AND_ASSERT_SUCCESS(construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(301), 10, TESTS_DEFAULT_FEE, tx_0));
+  ADD_CUSTOM_EVENT(events, tx_0);
+  //m_tx_0_id = get_transaction_hash(tx_0);
+
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_1, blk_0r, miner_acc, std::list<transaction>({tx_0}));
+
+  REWIND_BLOCKS_N(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  // register two assets (tx_1: Alice to herself, tx_2: miner to Alice)
+  size_t current_hardfork_id = m_hardforks.get_the_most_recent_hardfork_id_for_height(get_block_height(blk_1r));
+  std::vector<tx_destination_entry> destinations;
+  transaction tx_1{}, tx_2;
+  asset_descriptor_base adb{};
+  {
+    // register asset 1
+    adb.total_max_supply = 1000;
+    adb.ticker = "GLUT2";
+    adb.full_name = "mr transporter";
+    asset_descriptor_operation ado{};
+    fill_ado_version_based_onhardfork(ado, current_hardfork_id);
+    ado.opt_descriptor = adb;
+    fill_adb_version_based_onhardfork(*ado.opt_descriptor, current_hardfork_id);
+    ado.operation_type = ASSET_DESCRIPTOR_OPERATION_REGISTER;
+    for(size_t i = 0; i < 12; ++i)
+      destinations.emplace_back(10, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey);
+    destinations.emplace_back(MK_TEST_COINS(100), m_accounts[ALICE_ACC_IDX].get_public_address());
+    r = construct_tx_to_key(m_hardforks, events, tx_1, blk_1r, alice_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, std::vector<attachment_v>({ado}));
+    CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+    CHECK_AND_ASSERT_TRUE(get_type_in_variant_container(tx_1.extra, ado));
+    CHECK_AND_ASSERT_TRUE(get_or_calculate_asset_id(ado, nullptr, &m_asset1_id));
+    ADD_CUSTOM_EVENT(events, tx_1);
+
+    // register asset 2 (reusing the same structs)
+    adb.ticker = "GLUT4";
+    ado.opt_descriptor = adb;
+    destinations.clear();
+    for(size_t i = 0; i < 5; ++i)
+      destinations.emplace_back(2, m_accounts[ALICE_ACC_IDX].get_public_address(), null_pkey);
+    r = construct_tx_to_key(m_hardforks, events, tx_2, blk_1r, alice_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, std::vector<attachment_v>({ado}));
+    CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+    CHECK_AND_ASSERT_TRUE(get_type_in_variant_container(tx_2.extra, ado));
+    CHECK_AND_ASSERT_TRUE(get_or_calculate_asset_id(ado, nullptr, &m_asset2_id));
+    ADD_CUSTOM_EVENT(events, tx_2);
+  }
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1r, miner_acc, std::list<transaction>({ tx_1, tx_2 }));
+
+  // register 1st gw address
+  m_gw_addr1_view  = keypair::generate();
+  m_gw_addr1_spend = keypair::generate();
+
+  gateway_address_descriptor_operation gwdo{};
+  gateway_address_descriptor_operation_register gwdo_reg{};
+  gwdo_reg.view_pub_key = m_gw_addr1_view.pub;
+  gwdo_reg.descriptor.meta_info = "gw_addr1";
+  gwdo_reg.descriptor.owner_key = m_gw_addr1_spend.pub;
+  gwdo.operation = gwdo_reg;
+  MAKE_TX_EXTRA_ATTACH_FEE(events, tx_3, miner_acc, miner_acc, 0, CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE, blk_2, std::vector<extra_v>({ gwdo }), empty_attachment);
+  MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_3);
+
+  // register 2nd gw address
+  m_gw_addr2_view  = keypair::generate();
+  m_gw_addr2_spend = keypair::generate();
+
+  gwdo_reg.view_pub_key = m_gw_addr2_view.pub;
+  gwdo_reg.descriptor.meta_info = "gw_addr2";
+  gwdo_reg.descriptor.owner_key = m_gw_addr2_spend.pub;
+  gwdo.operation = gwdo_reg;
+  MAKE_TX_EXTRA_ATTACH_FEE(events, tx_4, miner_acc, miner_acc, 0, CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE, blk_3, std::vector<extra_v>({ gwdo }), empty_attachment);
+  MAKE_NEXT_BLOCK_TX1(events, blk_4, blk_3, miner_acc, tx_4);
+
+  REWIND_BLOCKS_N(events, blk_4r, blk_4, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr1_view.pub, 0 }));
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr2_view.pub, 0 }));
+
+  // Alice sends native coins to gw addr 1
+  destinations.clear();
+  destinations.emplace_back(MK_TEST_COINS(13), m_gw_addr1_view.pub);
+  transaction tx_5{};
+  r = construct_tx_to_key(m_hardforks, events, tx_5, blk_4r, alice_acc, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  ADD_CUSTOM_EVENT(events, tx_5);
+  
+  // Alice sends asset2 to gw addr 2
+  destinations.clear();
+  destinations.emplace_back(7, m_gw_addr2_view.pub, m_asset2_id);
+  transaction tx_6{};
+  r = construct_tx_to_key(m_hardforks, events, tx_6, blk_4r, alice_acc, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  ADD_CUSTOM_EVENT(events, tx_6);
+
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_5, blk_4r, miner_acc, std::list<transaction>({ tx_5, tx_6 }));
+
+  // check gw addresses' balances
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr1_view.pub, MK_TEST_COINS(13) }));
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr2_view.pub, 0 }));
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr2_view.pub, 7, m_asset2_id }));
+
+  // setup is complete
+
+  //
+  // INs             | Extra        | OUTs
+  // ----------------+--------------+----------------
+  // ZC native   >20   AO emit2 17    ZC  asset2  7
+  // GW1 native  13                   GW1 asset1  50
+  // ZC asset1   50                   ZC  native  9 + change
+  // GW2 asset2  7                    GW2 native  23
+  // bare native?                     ZC  asset2  17
+
+  // get ZC sources
+  std::unordered_map<crypto::public_key, uint64_t> amounts;
+  amounts[native_coin_asset_id] = MK_TEST_COINS(20);
+  amounts[m_asset1_id]          = 50;
+  std::vector<tx_source_entry> sources;
+  r = fill_tx_sources(sources, events, blk_5, alice_acc.get_keys(), amounts, 0, std::vector<tx_source_entry>(), fts_default);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
+  std::unordered_map<crypto::public_key, uint64_t> found_amounts;
+  get_sources_total_amount(sources, found_amounts);
+  CHECK_AND_ASSERT_EQ(amounts.size(), found_amounts.size());
+  CHECK_AND_ASSERT_EQ(amounts[m_asset1_id], found_amounts[m_asset1_id]); // should be exact amount found
+  uint64_t change_native = found_amounts[native_coin_asset_id] - amounts[native_coin_asset_id];
+
+  // manually add tx_source_entry for gw inputs
+  {
+    tx_source_entry& tse = sources.emplace_back();
+    tse.gateway_origin = m_gw_addr1_view.pub;
+    tse.asset_id = native_coin_asset_id;
+    tse.amount = MK_TEST_COINS(13);
+  }
+  {
+    tx_source_entry& tse = sources.emplace_back();
+    tse.gateway_origin = m_gw_addr2_view.pub;
+    tse.asset_id = m_asset2_id;
+    tse.amount = 7;
+  }
+  
+  destinations.clear();
+  destinations.emplace_back(7,                                m_accounts[BOB_ACC_IDX].get_public_address(), m_asset2_id);
+  destinations.emplace_back(50,                               m_gw_addr1_view.pub,                          m_asset1_id);
+  destinations.emplace_back(MK_TEST_COINS(9),                 m_accounts[BOB_ACC_IDX].get_public_address());
+  destinations.emplace_back(change_native,                    m_accounts[ALICE_ACC_IDX].get_public_address());
+  destinations.emplace_back(MK_TEST_COINS(23),                m_gw_addr2_view.pub);
+
+  // AO
+  asset_descriptor_operation ado{};
+  fill_ado_version_based_onhardfork(ado, current_hardfork_id);
+  //ado.opt_descriptor = adb_0;  // required only for HF4 (since HF5 descriptor must not be provided)
+  ado.operation_type = ASSET_DESCRIPTOR_OPERATION_EMIT;
+  ado.opt_asset_id = m_asset2_id;
+  destinations.emplace_back(17,                               m_accounts[BOB_ACC_IDX].get_public_address(), null_pkey);
+  
+  // simple balance check
+  std::unordered_map<crypto::public_key, int64_t> balance_check;
+  for(auto el : sources)
+    balance_check[el.asset_id] += el.amount;
+  for(auto el : destinations)
+    balance_check[el.asset_id] -= el.amount;
+  CHECK_AND_ASSERT_EQ(balance_check[m_asset1_id],           0);
+  CHECK_AND_ASSERT_EQ(balance_check[m_asset2_id],           0);
+  CHECK_AND_ASSERT_EQ(balance_check[null_pkey],             -17); // emission
+  CHECK_AND_ASSERT_EQ(balance_check[native_coin_asset_id],  TESTS_DEFAULT_FEE);
+
+  // construct tx_7 (all ZC inputs will be signed, all GW -- not)
+  size_t tx_hardfork_id{};
+  uint64_t tx_version = get_tx_version_and_hardfork_id(get_block_height(blk_5) + 1, m_hardforks, tx_hardfork_id);
+  transaction tx_7{};
+  crypto::secret_key tx_key{};
+  r = construct_tx(alice_acc.get_keys(), sources, destinations, std::vector<extra_v>({ ado }), empty_attachment, tx_7, tx_version, tx_hardfork_id, tx_key, 0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+
+  // sign gw inputs
+  crypto::hash tx_hash_for_signing = get_transaction_hash(tx_7);
+  for(size_t i = 0; i < tx_7.signatures.size(); ++i)
+  {
+    auto& sig = tx_7.signatures[i];
+    if (sig.type() != typeid(gateway_sig))
+      continue;
+    const auto& in_v = tx_7.vin[i];
+    CHECKED_GET_SPECIFIC_VARIANT(in_v, const txin_gateway, in_gw, false);
+    gateway_sig& gws = boost::get<gateway_sig>(sig);
+    CHECKED_GET_SPECIFIC_VARIANT(gws.s, crypto::generic_schnorr_sig_s, gsss, false);
+    crypto::generic_schnorr_sig& gss = static_cast<crypto::generic_schnorr_sig&>(gsss);
+    if (in_gw.gateway_addr == m_gw_addr1_view.pub)
+      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(tx_hash_for_signing, crypto::point_t(m_gw_addr1_spend.pub), crypto::scalar_t(m_gw_addr1_spend.sec), gss));
+    else
+      CHECK_AND_ASSERT_TRUE(crypto::generate_schnorr_sig<crypto::gt_G>(tx_hash_for_signing, crypto::point_t(m_gw_addr2_spend.pub), crypto::scalar_t(m_gw_addr2_spend.sec), gss));
+  }
+
+  ADD_CUSTOM_EVENT(events, tx_7);
+  MAKE_NEXT_BLOCK_TX1(events, blk_6, blk_5, miner_acc, tx_7);
+
+
+  // check gw addresses' balances
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr1_view.pub, 0 }));
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr1_view.pub, 50, m_asset1_id }));
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr2_view.pub, MK_TEST_COINS(23) }));
+  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr2_view.pub, 0, m_asset2_id }));
+
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_6r, blk_6, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK(events, "c1");
+
+
+
+
+
+  //
+  // INs          | Extra      | OUTs
+  // -------------+------------+------------
+  // GW native     [AO forbid]   GW asset
+  // GW asset                    GW native
+  // bare native
+
+
+
+
+
+
+
+
+
+  return true;
+}
+
+bool hard_fork_6_full_gw_tx_test::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry> &events)
+{
+  //std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  //miner_wlt->refresh();
+
+  std::shared_ptr<tools::wallet2> bob_wlt = init_playtime_test_wallet(events, c, BOB_ACC_IDX);
+  bob_wlt->refresh();
+
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", MK_TEST_COINS(9), 0, MK_TEST_COINS(9), 0, 0), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", 0, 0, 0, 0, 0, m_asset1_id, 0), false, "");
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*bob_wlt.get(), "Bob", 7 + 17, 0, 7 + 17, 0, 0, m_asset2_id, 0), false, "");
+
+  return true;
+}
+
+
+
+//------------------------------------------------------------------------------
+
+hard_fork_6_and_alt_chain::hard_fork_6_and_alt_chain()
+{
+  REGISTER_CALLBACK_METHOD(hard_fork_6_and_alt_chain, c1);
+}
+
+bool hard_fork_6_and_alt_chain::generate(std::vector<test_event_entry>& events) const
+{
+  bool r = false;
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  //account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  //account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+  //account_base& carol_acc = m_accounts[CAROL_ACC_IDX]; carol_acc.generate(); carol_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW * 2);
+
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_06));
+
+  std::list<currency::account_base> miner_stake_sources( {miner_acc} );
+  MAKE_NEXT_POS_BLOCK(events, blk_1, blk_0r, miner_acc, miner_stake_sources);
+
+  MAKE_NEXT_BLOCK(events, blk_2, blk_1, miner_acc);
+
+  MAKE_NEXT_BLOCK(events, blk_3, blk_2, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_3a, blk_2, miner_acc);
+
+  MAKE_NEXT_BLOCK(events, blk_4, blk_3, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_4a, blk_3a, miner_acc);
+
+  MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_5a, blk_4a, miner_acc);
+
+  MAKE_NEXT_BLOCK(events, blk_6a, blk_5a, miner_acc);
+
+  return true;
+}
+
+bool hard_fork_6_and_alt_chain::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry> &events)
+{
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+hard_fork_6_and_self_directed_tx_with_payment_id::hard_fork_6_and_self_directed_tx_with_payment_id()
+{
+  REGISTER_CALLBACK_METHOD(hard_fork_6_and_self_directed_tx_with_payment_id, c1);
+}
+
+bool hard_fork_6_and_self_directed_tx_with_payment_id::generate(std::vector<test_event_entry>& events) const
+{
+  bool r = false;
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+
+  DO_CALLBACK(events, "configure_core"); // default configure_core callback will initialize core runtime config with m_hardforks
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_06));
+
+  // tx_0 : miner -> Alice (10 x 10 test coins)
+  transaction tx_0{};
+  r = construct_tx_with_many_outputs(m_hardforks, events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(10) * 10, 10, TESTS_DEFAULT_FEE, tx_0);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_with_many_outputs failed");
+  ADD_CUSTOM_EVENT(events, tx_0);
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  //
+  // tx_1 : Alice -> Alice; no payment id (normal self-directed)
+  //
+  std::vector<tx_destination_entry> destinations;
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(11), alice_acc.get_public_address()));
+  destinations.back().payment_id = 0; // effectively payment id is not set
+
+  transaction tx_1{};
+  r = construct_tx_to_key(m_hardforks, events, tx_1, blk_1r, alice_acc, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  ADD_CUSTOM_EVENT(events, tx_1);
+  //m_tx_1_id = get_transaction_hash(tx_1);
+
+  //
+  // tx_2 : Alice -> Alice; intrinsic payment id only (no tx-wide payment id); should be processed but skipped by wallet
+  //
+  destinations.clear();
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(10), alice_acc.get_public_address()));
+  destinations.back().payment_id = 0; // effectively payment id is not set
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(9), alice_acc.get_public_address()));
+  destinations.back().payment_id = 1;
+
+  transaction tx_2{};
+  r = construct_tx_to_key(m_hardforks, events, tx_2, blk_1r, alice_acc, destinations);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  ADD_CUSTOM_EVENT(events, tx_2);
+  //m_tx_2_id = get_transaction_hash(tx_2);
+
+
+  //
+  // tx_3 : Alice -> Alice; legacy tx-wide payment id; should be processed but skipped by wallet
+  //
+  destinations.clear();
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(8), alice_acc.get_public_address()));
+  destinations.back().payment_id = 0; // effectively payment id is not set
+  destinations.push_back(tx_destination_entry(MK_TEST_COINS(11), alice_acc.get_public_address()));
+  destinations.back().payment_id = 0; // effectively payment id is not set
+
+  std::vector<payload_items_v> extra;
+  payment_id_t tx_wide_payment_id = "abcdefghi";
+  r = set_payment_id_to_tx(extra, tx_wide_payment_id, true);
+  CHECK_AND_ASSERT_MES(r, false, "set_payment_id_to_tx failed");
+
+  transaction tx_3{};
+  r = construct_tx_to_key(m_hardforks, events, tx_3, blk_1r, alice_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx_to_key failed");
+  ADD_CUSTOM_EVENT(events, tx_3);
+  //m_tx_3_id = get_transaction_hash(tx_3);
+
+  MAKE_NEXT_BLOCK_TX_LIST(events, blk_2, blk_1r, miner_acc, std::list({ tx_1, tx_2, tx_3 }));
+
+  REWIND_BLOCKS_N(events, blk_2r, blk_2, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool hard_fork_6_and_self_directed_tx_with_payment_id::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry> &events)
+{
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+  alice_wlt->refresh();
+
+  std::list<tools::payment_details> payments;
+  alice_wlt->get_payments(convert_payment_id(1), payments);
+  CHECK_AND_ASSERT_EQ(payments.size(), 0);
+  alice_wlt->get_payments("abcdefghi", payments);
+  CHECK_AND_ASSERT_EQ(payments.size(), 0);
+
+  // tx_2 and tx_3 should be skipped by wallet, so their inputs are lost and only tx_1 is processed (self-directed, taking fee into account)
+  uint64_t expected_alice_balance = MK_TEST_COINS(10) * 10 - MK_TEST_COINS(20) - MK_TEST_COINS(20) - TESTS_DEFAULT_FEE;
+  CHECK_AND_ASSERT_MES(check_balance_via_wallet(*alice_wlt.get(), "Alice", expected_alice_balance, UINT64_MAX, expected_alice_balance, 0, 0), false, "");
 
   return true;
 }

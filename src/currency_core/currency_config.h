@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2025 Zano Project
+// Copyright (c) 2014-2026 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -10,7 +10,7 @@
 #ifndef TESTNET
 #define CURRENCY_FORMATION_VERSION                      84
 #else
-#define CURRENCY_FORMATION_VERSION                      100
+#define CURRENCY_FORMATION_VERSION                      101
 #endif
 
 #define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121) //bender's nightmare
@@ -23,11 +23,16 @@
 #define CURRENCY_TX_MAX_ALLOWED_OUTS                    32            // soft rule, but matches BPP aggregation values limit; hard rule since HF6
 #define CURRENCY_TX_MAX_ALLOWED_OUTS_PRE_HF4            2000
 #define CURRENCY_TX_MIN_ALLOWED_OUTS                    2             // effective starting HF4 Zarcanum
+
 #define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           0xc5          // addresses start with 'Zx'
 #define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678        // integrated addresses start with 'iZ'
 #define CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX  0x36f8        // integrated addresses start with 'iZ' (new format)
 #define CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX 0x98c8        // auditable addresses start with 'aZx'
 #define CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX 0x8a49  // auditable integrated addresses start with 'aiZX'
+
+#define CURRENCY_PUBLIC_GATEWAY_BASE58_PREFIX           0x656e     // gateway addresses start with "gwZ"
+#define CURRENCY_PUBLIC_INTEG_GATEWAY_BASE58_PREFIX     0x14276e   // integrated gateway addresses start with "gwiZ"
+
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
 #define CURRENT_TRANSACTION_VERSION                     4
 #define TRANSACTION_VERSION_INITAL                      0
@@ -113,6 +118,7 @@
 #define CURRENCY_ALT_BLOCK_LIVETIME_COUNT               (CURRENCY_BLOCKS_PER_DAY*7)//one week
 #define CURRENCY_ALT_BLOCK_MAX_COUNT                    43200 //30 days
 #define CURRENCY_MEMPOOL_TX_LIVETIME                    345600 //seconds, 4 days
+#define CURRENCY_MEMPOOL_MAX_TX_COUT                    10000 
 
 
 #ifndef TESTNET
@@ -150,6 +156,7 @@
 #define P2P_DEFAULT_WHITELIST_CONNECTIONS_PERCENT       70
 #define P2P_FAILED_ADDR_FORGET_SECONDS                  (60*5)     //5 minutes
 #define P2P_DEFAULT_MAX_INCOMING_CONNECTIONS_COUNT      200
+#define P2P_DEFAULT_MAX_CONNECTIONS_PER_IP              3          //allowed count of connections from single IP, including white list
 
 #define P2P_IP_BLOCKTIME                                (60*60*24) //24 hours
 #define P2P_IP_FAILS_BEFOR_BLOCK                        10
@@ -194,6 +201,8 @@
 
 #define GUI_BLOCKS_DISPLAY_COUNT                        40
 #define GUI_DISPATCH_QUE_MAXSIZE                        100
+
+#define CURRENCY_GATEWAY_ADDRESS_REGISTRATION_FEE       ((uint64_t)100000000000000) // 100 Zano
 
 #define ALLOW_DEBUG_COMMANDS
 
@@ -294,14 +303,14 @@
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   0
 
-#define ZANO_HARDFORK_04_AFTER_HEIGHT                   100
-#define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1738664528ull // block 100, 2025-02-04 10:22:08 UTC
+#define ZANO_HARDFORK_04_AFTER_HEIGHT                   800
+#define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1770898868ull // block 100, 2026-02-12 12:xx:yy UTC
 
-#define ZANO_HARDFORK_05_AFTER_HEIGHT                   200
-#define ZANO_HARDFORK_05_MIN_BUILD_VER                  382
+#define ZANO_HARDFORK_05_AFTER_HEIGHT                   801
+#define ZANO_HARDFORK_05_MIN_BUILD_VER                  450
 
-#define ZANO_HARDFORK_06_AFTER_HEIGHT                   999999999999999999
-#define ZANO_HARDFORK_06_MIN_BUILD_VER                  382
+#define ZANO_HARDFORK_06_AFTER_HEIGHT                   1100
+#define ZANO_HARDFORK_06_MIN_BUILD_VER                  450
 #endif
 
 

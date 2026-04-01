@@ -82,9 +82,9 @@ namespace bc_services
       return;
     //unpack data and pars json
     std::string json_buff;
-    if (!epee::zlib_helper::unpack(a.body, json_buff))
+    if (!epee::zlib_helper::unpack(a.body, json_buff, ZLIB_MAX_DECOMPRESSED_SIZE))
     {
-      LOG_ERROR("Filed to unpack tx_service_attachment in bc_offers_service, tx_id = " << currency::get_transaction_hash(tx));
+      LOG_ERROR("Failed to unpack tx_service_attachment in bc_offers_service, tx_id = " << currency::get_transaction_hash(tx));
       return;
     }
 
@@ -155,9 +155,9 @@ namespace bc_services
       return;
     //unpack data and pars json
     std::string json_buff;
-    if (!epee::zlib_helper::unpack(a.body, json_buff))
+    if (!epee::zlib_helper::unpack(a.body, json_buff, ZLIB_MAX_DECOMPRESSED_SIZE))
     {
-      LOG_ERROR("Filed to unpack tx_service_attachment in bc_offers_service, tx_id = " << get_transaction_hash(tx));
+      LOG_ERROR("Failed to unpack tx_service_attachment in bc_offers_service, tx_id = " << get_transaction_hash(tx));
       return;
     }
 
@@ -224,9 +224,9 @@ namespace bc_services
       return true;
 
     std::string json_buff;
-    if (!epee::zlib_helper::unpack(a.body, json_buff))
+    if (!epee::zlib_helper::unpack(a.body, json_buff, ZLIB_MAX_DECOMPRESSED_SIZE))
     {
-      LOG_ERROR("Filed to unpack tx_service_attachment in bc_offers_service, tx_id = " << get_transaction_hash(tx));
+      LOG_ERROR("Failed to unpack tx_service_attachment in bc_offers_service, tx_id = " << get_transaction_hash(tx));
       return false;
     }
 
@@ -234,7 +234,7 @@ namespace bc_services
     bool r = epee::serialization::load_t_from_json(co, json_buff);
     if (!r)
     {
-      LOG_ERROR("Filed to load json from tx_service_attachment in bc_offers_service, tx_id = " << get_transaction_hash(tx) << ", body: " << json_buff);
+      LOG_ERROR("Failed to load json from tx_service_attachment in bc_offers_service, tx_id = " << get_transaction_hash(tx) << ", body: " << json_buff);
       return false;
     }
     offers_container::index<by_id>::type::iterator oit;

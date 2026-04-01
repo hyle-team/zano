@@ -32,7 +32,7 @@
 #include "storages/portable_storage_template_helper.h"
 #include "crypto/chacha.h"
 #include "crypto/hash.h"
-#include "core_rpc_proxy.h"
+#include "i_core_rpc_proxy.h"
 #include "core_default_rpc_proxy.h"
 #include "wallet_errors.h"
 #include "currency_core/core_runtime_config.h"
@@ -40,7 +40,6 @@
 #include "currency_core/bc_escrow_service.h"
 #include "common/pod_array_file_container.h"
 #include "currency_core/block_chain_shortener.h"
-#include "tor-connect/torlib/tor_lib_iface.h"
 #include "currency_core/pos_mining.h"
 #include "view_iface.h"
 

@@ -150,4 +150,90 @@ TEST(tx_signatures_packing, 1)
     ASSERT_EQ(102786, t_serializable_object_to_blob(sigs).size());
     ASSERT_EQ(102786, get_object_blobsize(sigs));
   }
+
+  //
+  // GW
+  //
+
+  {
+    // 1 gateway_sig / generic_schnorr_sig_s
+    // v(1) + 1 * (1 + v(0) + 1 + (32 + 32)) = 68
+    sigs.clear();
+    gateway_sig gws{};
+    crypto::generic_schnorr_sig_s sig{};
+    gws.s = sig;
+    sigs.push_back(gws);
+
+    ASSERT_EQ(68, t_serializable_object_to_blob(sigs).size());
+    ASSERT_EQ(68, get_object_blobsize(sigs));
+  }
+
+  {
+    // 128 gateway_sig / generic_schnorr_sig_s
+    // v(128) + 128 * (1 + v(0) + 1 + (32 + 32)) = 8578
+    sigs.clear();
+    gateway_sig gws{};
+    crypto::generic_schnorr_sig_s sig{};
+    gws.s = sig;
+    for(size_t i = 0; i < 128; ++i)
+      sigs.push_back(gws);
+
+    ASSERT_EQ(8578, t_serializable_object_to_blob(sigs).size());
+    ASSERT_EQ(8578, get_object_blobsize(sigs));
+  }
+
+  {
+    // 1 gateway_sig / eth_signature
+    // v(1) + 1 * (1 + v(0) + 1 + (32 + 32)) = 68
+    sigs.clear();
+    gateway_sig gws{};
+    crypto::eth_signature sig{};
+    gws.s = sig;
+    sigs.push_back(gws);
+
+    ASSERT_EQ(68, t_serializable_object_to_blob(sigs).size());
+    ASSERT_EQ(68, get_object_blobsize(sigs));
+  }
+
+  {
+    // 128 gateway_sig / eth_signature
+    // v(128) + 128 * (1 + v(0) + 1 + (32 + 32)) = 8578
+    sigs.clear();
+    gateway_sig gws{};
+    crypto::eth_signature sig{};
+    gws.s = sig;
+    for(size_t i = 0; i < 128; ++i)
+      sigs.push_back(gws);
+
+    ASSERT_EQ(8578, t_serializable_object_to_blob(sigs).size());
+    ASSERT_EQ(8578, get_object_blobsize(sigs));
+  }
+
+  {
+    // 1 gateway_sig / eddsa_signature
+    // v(1) + 1 * (1 + v(0) + 1 + (32 + 32)) = 68
+    sigs.clear();
+    gateway_sig gws{};
+    crypto::eddsa_signature sig{};
+    gws.s = sig;
+    sigs.push_back(gws);
+
+    ASSERT_EQ(68, t_serializable_object_to_blob(sigs).size());
+    ASSERT_EQ(68, get_object_blobsize(sigs));
+  }
+
+  {
+    // 128 gateway_sig / eddsa_signature
+    // v(128) + 128 * (1 + v(0) + 1 + (32 + 32)) = 8578
+    sigs.clear();
+    gateway_sig gws{};
+    crypto::eddsa_signature sig{};
+    gws.s = sig;
+    for(size_t i = 0; i < 128; ++i)
+      sigs.push_back(gws);
+
+    ASSERT_EQ(8578, t_serializable_object_to_blob(sigs).size());
+    ASSERT_EQ(8578, get_object_blobsize(sigs));
+  }
+
 }

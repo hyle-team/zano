@@ -73,6 +73,7 @@ int main(int argc, char* argv[])
   //  log_space::log_singletone::get_default_log_file().c_str(), 
   //  log_space::log_singletone::get_default_log_folder().c_str());
 
+  epee::debug::get_set_enable_assert(true, false);
 
   po::options_description desc_options("Allowed options");
   command_line::add_arg(desc_options, command_line::arg_help);

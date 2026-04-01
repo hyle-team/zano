@@ -263,7 +263,7 @@ namespace currency
     TIME_MEASURE_FINISH_MS(parse_tx_time);
     
     TIME_MEASURE_START_MS(check_tx_semantic_time);
-    if(!validate_tx_semantic(tx, tx_blob.size()))
+    if(!validate_tx_semantic(tx, tx_blob.size(), tx_hash))
     {
       LOG_PRINT_L0("WRONG TRANSACTION SEMANTICS, Failed to check tx " << tx_hash << " semantic, rejected");
       tvc.m_verification_failed = true;

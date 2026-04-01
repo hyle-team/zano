@@ -221,6 +221,22 @@ namespace epee
     };
 
 
+    /*
+        The main idea behind this class is to provide cache isolation during write operations: as soon as the thread started 
+        write db transaction, all operations that comes from this thread will be isolated from cache (reads will be misses, 
+        writes will be only to DB), and all other threads will be able to use cache as usual.
+        This needed to avoid data inconsistency of two cases: 
+           1. When one thread writes data to DB and cache - if no isolation then other reader would read 
+              half-processed pieces of information from updated cache before processing of the block finalized and committed to DB
+           2. When one thread writes data to DB and cache and then at some point processing failed due to broken tx or block,
+              and the code would be aborting DB transaction to roll back the state before broken block, but the cache already updated 
+              with stale data - so other threads would read inconsistent data from cache.
+
+
+        I really hope this comment would help to understand the idea behind this class in future
+        because I myself had hard time to recollect this after few years of not looking into this area
+    */
+
     template<bool is_ordered_container, typename t_key, typename t_value, uint64_t max_elements>
     class cache_with_write_isolation : public cache_base<is_ordered_container, t_key, t_value, max_elements>
     {

@@ -15,12 +15,14 @@ using namespace epee;
 #include "misc_language.h"
 #include "crypto/hash.h"
 #include "core_rpc_server_error_codes.h"
+#include "wallet/core_fast_rpc_proxy.h"
+#include "wallet/fill_destination_helper.h"
 
 #define CHECK_RPC_LIMITS(var, limit)    if(var > limit)  {res.status = API_RETURN_CODE_ARG_OUT_OF_LIMITS; return true;}
 
 
 #define RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS                                       4000
-#define RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS                                    500
+#define RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS                                    CURRENCY_TX_MAX_ALLOWED_INPUTS * (CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE + 1) * 2 // 2 - over
 #define RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3                                   300
 #define RPC_LIMIT_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES_TXIDS                               100
 #define RPC_LIMIT_COMMAND_RPC_CHECK_KEYIMAGES_IMAGES                                            1000
@@ -33,6 +35,7 @@ using namespace epee;
 #define RPC_LIMIT_COMMAND_RPC_GET_ALT_BLOCKS_DETAILS_COUNT                                      100
 #define RPC_LIMIT_COMMAND_RPC_FORCE_RELAY_RAW_TXS                                               100
 #define RPC_LIMIT_COMMAND_RPC_GET_ALIASES_COUNT                                                 200
+#define RPC_LIMIT_COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY                                       200
 
 
 
@@ -130,7 +133,9 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_info(const COMMAND_RPC_GET_INFO::request& req, COMMAND_RPC_GET_INFO::response& res, connection_context& cntx)
   {
-    //unconditional values 
+    //
+    // unconditional values 
+    //
     res.height = m_core.get_current_blockchain_size();
     res.tx_count = m_core.get_blockchain_storage().get_total_transactions() - res.height; //without coinbase
     res.tx_pool_size = m_core.get_pool_transactions_count();
@@ -157,8 +162,9 @@ namespace currency
       else
         res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_synchronizing;
     }
-    res.synchronization_start_height = m_p2p.get_payload_object().get_core_inital_height();
-    res.max_net_seen_height = m_p2p.get_payload_object().get_max_seen_height();
+    res.max_net_seen_height = std::max(m_p2p.get_payload_object().get_max_seen_height(), res.height);
+    res.synchronization_start_height = std::min(m_p2p.get_payload_object().get_core_inital_height(), res.max_net_seen_height);
+
     m_p2p.get_maintainers_info(res.mi);
     res.pos_allowed = m_core.get_blockchain_storage().is_pos_allowed();
     wide_difficulty_type pos_diff = m_core.get_blockchain_storage().get_cached_next_difficulty(true);
@@ -173,7 +179,11 @@ namespace currency
       res.is_hardfok_active.push_back(m_core.get_blockchain_storage().is_hardfork_active(i));
     }
 
-    //conditional values 
+    res.pre_hf_tx_freeze_period_active = m_core.get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active();
+
+    //
+    // conditional values 
+    //
     if (req.flags&COMMAND_RPC_GET_INFO_FLAG_NET_TIME_DELTA_MEDIAN)
     {
       int64_t last_median2local_time_diff, last_ntp2local_time_diff;
@@ -500,7 +510,12 @@ namespace currency
   bool core_rpc_server::on_get_random_outs4(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS4::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
-    CHECK_RPC_LIMITS(req.heights.size(), RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS);
+    size_t total_heights = 0;
+    for(size_t i = 0; i < req.batches.size(); ++i)
+    {
+      total_heights += req.batches[i].heights.size();
+      CHECK_RPC_LIMITS(total_heights, RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS);
+    }
     res.status = API_RETURN_CODE_FAIL;
     if (!m_core.get_blockchain_storage().get_random_outs_for_amounts4(req, res))
     {
@@ -653,6 +668,320 @@ namespace currency
     crypto::hash h = crypto::cn_fast_hash(buff.data(), buff.size());
     bool sig_check_res = crypto::check_signature(h, pkey, req.sig);
     if (!sig_check_res)
+    {
+      res.status = API_RETURN_CODE_FAIL;
+      return true;
+    }
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_get_address_info(const COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    currency::gateway_address_id_type addr_id = {};
+    address_v v_addr = {};
+
+    bool r = currency::get_account_address_and_payment_id_from_str(v_addr, res.payment_id, req.gateway_address);
+    if(!r)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS;
+      return true;
+    }
+    if (v_addr.type() == typeid(currency::gateway_address_id_type))
+    {
+      addr_id = boost::get<currency::gateway_address_id_type>(v_addr);
+    }
+    else
+    {
+      res.status = API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS_TYPE;
+      return true;
+    }
+
+    auto addr_data_ptr = m_core.get_blockchain_storage().get_gateway_address_info(addr_id);
+
+    if (!addr_data_ptr) 
+    {
+      res.status = API_RETURN_CODE_NOT_FOUND;
+      return true;
+    }
+
+    res.gateway_view_pub_key = addr_id;
+    if (!addr_data_ptr->info_history.size())
+    {
+      res.status = API_RETURN_CODE_INTERNAL_ERROR;
+      return true;
+    }
+
+    const auto& last_info = addr_data_ptr->info_history.back();
+    res.descriptor_info.meta_info = last_info.meta_info;
+    VARIANT_SWITCH_BEGIN(last_info.owner_key);
+    VARIANT_CASE_CONST(crypto::public_key, owner_key)
+    {
+      res.descriptor_info.opt_owner_custom_schnorr_pub_key = owner_key;
+    }
+    VARIANT_CASE_CONST(crypto::eth_public_key, owner_key)
+    {
+      res.descriptor_info.opt_owner_ecdsa_pub_key = owner_key;
+    }
+    VARIANT_CASE_CONST(crypto::eddsa_public_key, owner_key)
+    {
+      res.descriptor_info.opt_owner_eddsa_pub_key = owner_key;
+    }
+    VARIANT_CASE_THROW_ON_OTHER();
+    VARIANT_SWITCH_END();
+
+    for (const auto& [asset_id, balance_entry] : addr_data_ptr->balances)
+    {
+      gateway_balance_entry be = {};
+      be.asset_id = asset_id;
+      be.amount = balance_entry.amount;
+      res.balances.push_back(be);
+    }
+    
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_create_transfer(const COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request& req, COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    //TODO: Some of the code presented here might need to be moved to separate library/module as it touch privacy-sensitive operations
+    currency::account_keys dummy_keys = {};
+    currency::finalize_tx_param ftp = {};
+    currency::finalized_tx ftx = {};
+
+    if (m_core.get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active())
+    {
+      er.code = CORE_RPC_ERROR_CODE_CORE_BUSY;
+      er.message = "Pre hardfork freeze period is in effect, sending transactions is not allowed till the next hardfork. Please, try again after the hardfork activation.";
+      LOG_PRINT_L0("[on_gateway_create_transfer]: pre hardfork freeze period is in effect, sending transactions is not allowed till the next hardfork. Please, try again after the hardfork activation.");
+      return false;
+    }
+
+
+
+    std::unordered_map<crypto::public_key, uint64_t> total_coins_needed; //asset_id -> amount
+    for(const auto& dest : req.destinations)
+    {
+      total_coins_needed[dest.asset_id] += dest.amount;
+    }
+
+    total_coins_needed[currency::native_coin_asset_id] += req.fee;
+
+
+    for (const auto& [asset_id, amount] : total_coins_needed)
+    {
+      tx_source_entry source = {};
+      source.asset_id = asset_id;
+      source.amount = amount;
+      source.gateway_origin = req.origin_gateway_id;
+      ftp.sources.push_back(source);
+    }
+
+    //check the balance
+    auto addr_data_ptr = m_core.get_blockchain_storage().get_gateway_address_info(req.origin_gateway_id);
+
+    if (!addr_data_ptr)
+    {
+      er.code = CORE_RPC_ERROR_CODE_NOT_FOUND;
+      er.message = std::string("Gateway address") + epee::string_tools::pod_to_hex(req.origin_gateway_id) + " not found";
+      return false;
+    }
+    for ( const auto& [asset_id, amount] : total_coins_needed)
+    {
+      auto it = addr_data_ptr->balances.find(asset_id);
+      if (it == addr_data_ptr->balances.end() || it->second.amount < amount)
+      {
+        er.code = CORE_RPC_ERROR_CODE_INSUFFICIENT_FUNDS;
+        er.message = std::string("Insufficient funds for asset_id ") + epee::string_tools::pod_to_hex(asset_id);
+        return false;
+      }
+    }
+
+    //fill destinations
+    std::string legacy_tx_wide_payment_id;
+    bool r = rpc_fill_destinations_helper(req.destinations, ftp.prepared_destinations, ftp.extra, true, er, legacy_tx_wide_payment_id, false, [&](const std::string& address, currency::address_v& addr_v, std::string& embedded_payment_id) {
+      tools::core_fast_rpc_proxy tmp_proxy(*this);
+      if (!tmp_proxy.get_transfer_address(address, addr_v, embedded_payment_id))
+      {
+        er.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
+        er.message = std::string("WALLET_RPC_ERROR_CODE_WRONG_ADDRESS: ") + address;
+        return false;
+      }
+      return true;
+    });
+    if (!r)
+    {
+      // er is already filled inside rpc_fill_destinations_helper
+      return false;
+    }
+
+    if(!ftp.prepared_destinations.size() || ftp.prepared_destinations.begin()->addr.size() != 1)
+    {
+      er.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
+      er.message = "No valid destinations were found after processing";
+      return false;
+    }
+    const address_v& addr = ftp.prepared_destinations.begin()->addr.back();
+    VARIANT_SWITCH_BEGIN(addr);
+    VARIANT_CASE_CONST(account_public_address, a_pub_addr)
+    {
+      ftp.crypt_address = a_pub_addr;
+    }
+    VARIANT_CASE_CONST(gateway_address_id_type, a_gw_address)
+    {
+      ftp.crypt_address.view_public_key = a_gw_address;
+      ftp.crypt_address.spend_public_key = a_gw_address;
+    }
+    VARIANT_CASE_THROW_ON_OTHER();
+    VARIANT_SWITCH_END();
+
+    ftp.tx_outs_attr  = CURRENCY_TO_KEY_OUT_RELAXED;
+    ftp.tx_version    = TRANSACTION_VERSION_POST_HF6;
+    ftp.spend_pub_key = req.origin_gateway_id;
+    ftp.tx_hardfork_id = m_core.get_blockchain_storage().get_current_hardfork_id();
+
+    if (req.service_entries_permanent)
+      ftp.extra.insert(ftp.extra.end(), req.service_entries.begin(), req.service_entries.end());
+    else
+      ftp.attachments.insert(ftp.attachments.end(), req.service_entries.begin(), req.service_entries.end());
+
+    if (!req.comment.empty())
+    {
+      currency::tx_comment tc{};
+      tc.comment = req.comment;
+      ftp.extra.push_back(tc);
+    }
+
+    if (!ftp.prepared_destinations.size() || ftp.prepared_destinations.begin()->addr.size() != 1)
+    {
+      er.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
+      er.message = "No valid destinations were found after processing";
+      return false;
+    }
+
+
+    r = currency::construct_tx(dummy_keys, ftp, ftx);
+    if(!r)
+    {
+      res.status = API_RETURN_CODE_FAIL;
+      return true;
+    }
+
+    res.tx_blob = t_serializable_object_to_blob(ftx.tx);
+    res.tx_hash_to_sign = get_transaction_hash(ftx.tx);
+
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_sign_transfer(const COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request& req, COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    transaction tx = {};
+
+    bool r = t_unserializable_object_from_blob(tx, req.tx_blob);
+    if (!r)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      return true;
+    }
+
+    crypto::hash tx_id = get_transaction_hash(tx);
+    if(tx_id != req.tx_hash_to_sign)
+    {
+      LOG_ERROR("Transaction hash mismatch in on_gateway_sign_transfer: " << tx_id << "!=" << req.tx_hash_to_sign);
+      res.status = API_RETURN_CODE_BAD_ARG;
+      return true;
+    }
+
+    size_t gw_sig_count = 0;
+    gateway_signature_v gw_sig;
+    if(req.opt_ecdsa_signature)
+    {
+      gw_sig = req.opt_ecdsa_signature.value();
+      gw_sig_count++;
+    }
+    if(req.opt_custom_schnorr_signature)
+    {
+      gw_sig = req.opt_custom_schnorr_signature.value();
+      gw_sig_count++;
+    }
+    if(req.opt_eddsa_signature)
+    {
+      gw_sig = req.opt_eddsa_signature.value();
+      gw_sig_count++;
+    }
+
+    if(gw_sig_count != 1)
+    {
+      LOG_ERROR("Expected exactly one gateway signature in on_gateway_sign_transfer, got: " << gw_sig_count);
+      res.status = API_RETURN_CODE_BAD_ARG;
+      return true;
+    }
+    
+    for(auto& sig : tx.signatures)
+    {
+      if (sig.type() == typeid(gateway_sig))
+      {
+        gateway_sig& gw_sig_in_tx = boost::get<gateway_sig>(sig);
+        gw_sig_in_tx.s = gw_sig;
+      }
+      else
+      {
+        // Right now we assume that gateway-originated tx might have only gateway_inputs in it
+        LOG_ERROR("Unexpected signature type in on_gateway_sign_transfer");
+        res.status = API_RETURN_CODE_BAD_ARG;
+        return true;
+      }
+    }
+    
+    res.signed_tx_blob = t_serializable_object_to_blob(tx);
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_get_address_history(const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY);
+    currency::gateway_address_id_type addr_id = {};
+    address_v v_addr = {};
+    payment_id_t dummy_payment_id = {};
+
+    bool r = currency::get_account_address_and_payment_id_from_str(v_addr, dummy_payment_id, req.gateway_address);
+    if (!r)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS;
+      return true;
+    }
+    if (v_addr.type() == typeid(currency::gateway_address_id_type))
+    {
+      addr_id = boost::get<currency::gateway_address_id_type>(v_addr);
+    }
+    else
+    {
+      res.status = API_RETURN_CODE_BAD_ARG_INVALID_ADDRESS_TYPE;
+      return true;
+    }
+
+    //read balances
+    auto addr_data_ptr = m_core.get_blockchain_storage().get_gateway_address_info(addr_id);
+
+    if (!addr_data_ptr)
+    {
+      res.status = API_RETURN_CODE_NOT_FOUND;
+      return true;
+    }
+
+    for (const auto& [asset_id, balance_entry] : addr_data_ptr->balances)
+    {
+      gateway_balance_entry be = {};
+      be.asset_id = asset_id;
+      be.amount = balance_entry.amount;
+      res.balances.push_back(be);
+    }
+
+    //read history
+    r = m_core.get_blockchain_storage().gateway_get_address_history(addr_id, req, res);
+    if(!r)
     {
       res.status = API_RETURN_CODE_FAIL;
       return true;
@@ -984,7 +1313,7 @@ namespace currency
     if (m_p2p.get_payload_object().get_core().get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active())
     {
       LOG_PRINT_L0("[on_send_raw_tx]: pre hardfork freeze period is in effect, sending transactions is not allowed till the next hardfork. Please, try again after the hardfork activation.");
-      res.status = API_RETURN_CODE_BUSY;
+      res.status = API_RETURN_CODE_TX_FREEZE_PERIOD;
       return true;
     }
 
@@ -993,14 +1322,20 @@ namespace currency
     if(!m_core.handle_incoming_tx(tx_blob, tvc, false))
     {
       LOG_PRINT_L0("[on_send_raw_tx]: Failed to process tx");
-      res.status = "Failed";
+      if (tvc.m_error_code.size())
+        res.status = tvc.m_error_code;
+      else
+        res.status = "Failed";
       return true;
     }
 
     if(tvc.m_verification_failed)
     {
       LOG_PRINT_L0("[on_send_raw_tx]: tx verification failed");
-      res.status = "Failed";
+      if (tvc.m_error_code.size())
+        res.status = tvc.m_error_code;
+      else
+        res.status = "Failed";
       return true;
     }
 
@@ -1033,7 +1368,7 @@ namespace currency
 			std::string tx_blob;
 			if (!string_tools::parse_hexstr_to_binbuff(t, tx_blob))
 			{
-				LOG_PRINT_L0("[on_send_raw_tx]: Failed to parse tx from hexbuff: " << t);
+				LOG_PRINT_L0("[on_force_relaey_raw_txs]: Failed to parse tx from hexbuff: " << t);
 				res.status = "Failed";
 				return true;
 			}
@@ -1649,6 +1984,7 @@ namespace currency
     std::string payment_id;
     if (!epee::string_tools::parse_hexstr_to_binbuff(req.payment_id, payment_id))
     {
+      res.status = API_RETURN_CODE_BAD_ARG;
       error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
       error_resp.message = std::string("invalid payment id given: \'") + req.payment_id + "\', hex-encoded string was expected";
       return false;
@@ -1656,6 +1992,7 @@ namespace currency
 
     if (!currency::is_payment_id_size_ok(payment_id, m_allow_legacy_payment_id_size))
     {
+      res.status = API_RETURN_CODE_BAD_ARG;
       error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
       error_resp.message = std::string("given payment id is too long: \'") + req.payment_id + "\'";
       return false;
@@ -1669,33 +2006,44 @@ namespace currency
 
 
     std::string payment_id_from_provided_addr; // won't be used
-    account_public_address addr = AUTO_VAL_INIT(addr);
-    if (!get_account_address_and_payment_id_from_str(addr, payment_id_from_provided_addr, req.regular_address))
+    address_v v_adddr = {};
+    if (!get_account_address_and_payment_id_from_str(v_adddr, payment_id_from_provided_addr, req.regular_address))
     {
+      res.status = API_RETURN_CODE_BAD_ARG;
       error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
       error_resp.message = std::string("invalid address provided: \'") + req.regular_address + "\', Zano address expected";
       return false;
     }
     if (payment_id_from_provided_addr.size())
     {
+      res.status = API_RETURN_CODE_BAD_ARG;
       error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
       error_resp.message = std::string("invalid address provided: \'") + req.regular_address + "\', Zano address expected be regular and NOT integrated address";
       return false;
     }
 
-    res.integrated_address = currency::get_account_address_and_payment_id_as_str(addr, payment_id);
+    res.integrated_address = currency::get_account_address_as_str(v_adddr, payment_id);
     res.payment_id = epee::string_tools::buff_to_hex_nodelimer(payment_id);
+    res.status = API_RETURN_CODE_OK;
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_aliases_by_address(const COMMAND_RPC_GET_ALIASES_BY_ADDRESS::request& req, COMMAND_RPC_GET_ALIASES_BY_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
-    account_public_address addr = AUTO_VAL_INIT(addr);
-    if (!get_account_address_from_str(addr, req))
+    address_v addr_v = {};
+    if (!get_account_address_from_str(addr_v, req))
     {
       res.status = API_RETURN_CODE_FAIL;
       return true;
     }
+
+    if (addr_v.type() == typeid(gateway_address_id_type))
+    {
+      res.status = API_RETURN_CODE_NOT_FOUND;
+      return true;
+    }
+    
+    const account_public_address& addr = boost::get<account_public_address>(addr_v);
     //res.alias = m_core.get_blockchain_storage().get_alias_by_address(addr);
     COMMAND_RPC_GET_ALIAS_DETAILS::request req2 = AUTO_VAL_INIT(req2);
     COMMAND_RPC_GET_ALIAS_DETAILS::response res2 = AUTO_VAL_INIT(res2);

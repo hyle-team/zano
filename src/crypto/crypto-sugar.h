@@ -1437,6 +1437,16 @@ namespace crypto
   {
     // hs won't touch memory if size is 0, so it's safe
     return hash_helper_t::hs(data(), sizeof(scalar_t) * size());
-  } 
+  }
+
+  inline bool pub_key_mul8(const public_key& pk_1div8, public_key& result)
+  {
+    point_t p{};
+    if (!p.from_public_key(pk_1div8))
+      return false;
+    p.modify_mul8();
+    result = p.to_public_key();
+    return true;
+  }
 
 } // namespace crypto

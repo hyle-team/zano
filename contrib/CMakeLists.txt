@@ -29,10 +29,6 @@ if(USE_BITCOIN_SECP256K1_FOR_ECDSA)
   set_property(TARGET secp256k1_precomputed PROPERTY FOLDER "contrib")
 endif()
 
-if( NOT DISABLE_TOR)
-  add_subdirectory(tor-connect)
-endif()
-
 
 if(CMAKE_SYSTEM_NAME STREQUAL "iOS" OR CMAKE_SYSTEM_NAME STREQUAL "Android")
   message("excluded upnp support for IOS build")
@@ -48,10 +44,6 @@ set_property(TARGET zlib PROPERTY FOLDER "contrib")
 set_property(TARGET zlibstatic PROPERTY FOLDER "contrib")
 set_property(TARGET mdbx PROPERTY FOLDER "contrib")
 set_property(TARGET lmdb PROPERTY FOLDER "contrib")
-
-if( NOT DISABLE_TOR)
-  set_property(TARGET tor-connect PROPERTY FOLDER "contrib")
-endif()
 
 set_property(TARGET upnpc-static mdbx_chk mdbx_copy mdbx_dump mdbx_load mdbx_stat PROPERTY FOLDER "unused")
 

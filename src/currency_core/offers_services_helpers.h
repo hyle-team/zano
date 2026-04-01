@@ -116,7 +116,7 @@ namespace bc_services
   bool extract_type_and_add(const std::string& body, t_srv_attachments_container& srv_cnt)
   {
     std::string json_buff;
-    if (!epee::zlib_helper::unpack(body, json_buff))
+    if (!epee::zlib_helper::unpack(body, json_buff, ZLIB_MAX_DECOMPRESSED_SIZE))
     {
       LOG_ERROR("Filed to unpack tx_service_attachment in bc_offers_service, tx_id");
       return false;
@@ -145,15 +145,24 @@ namespace bc_services
         {
           if (sa.instruction == BC_OFFERS_SERVICE_INSTRUCTION_ADD)
           {
-             extract_type_and_add<bc_services::offer_details>(sa.body, cnt);
+            if (!extract_type_and_add<bc_services::offer_details>(sa.body, cnt))
+            {
+              LOG_PRINT_L1("Failed to extract offer_details, instruction: " << sa.instruction);
+            }
           }
           else if (sa.instruction == BC_OFFERS_SERVICE_INSTRUCTION_UPD)
           {
-             extract_type_and_add<bc_services::update_offer>(sa.body, cnt);
+            if (!extract_type_and_add<bc_services::update_offer>(sa.body, cnt))
+            {
+              LOG_PRINT_L1("Failed to extract update_offer, instruction: " << sa.instruction);
+            }
           }
           else if (sa.instruction == BC_OFFERS_SERVICE_INSTRUCTION_DEL)
           {
-            extract_type_and_add<bc_services::cancel_offer>(sa.body, cnt);
+            if (!extract_type_and_add<bc_services::cancel_offer>(sa.body, cnt))
+            {
+              LOG_PRINT_L1("Failed to extract cancel_offer, instruction: " << sa.instruction);
+            }
           }
         }
       }

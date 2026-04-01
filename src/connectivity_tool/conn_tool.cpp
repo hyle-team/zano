@@ -352,8 +352,10 @@ bool generate_genesis(const std::string& path_config, uint64_t premine_split_amo
   for (auto& p: gcp.payments)
   {
 
-    bool r = get_account_address_from_str(de.addr.back(), p.address_this);
+    account_public_address addr{};
+    bool r = get_account_address_from_str(addr, p.address_this);
     CHECK_AND_ASSERT_MES(r, false, "wrong address string: " << p.address_this);
+    de.addr.push_back(addr);
 
     de.amount = p.amount_this_coin_int; //std::cout << de.amount << ENDL;
     summary_premine_coins += de.amount;
@@ -925,20 +927,18 @@ bool invoke_debug_command(po::variables_map& vm, const crypto::secret_key& sk, n
 //---------------------------------------------------------------------------------------------------------------
 bool handle_get_anonymized_peers(po::variables_map& vm)
 {
-  crypto::secret_key sk{};
-  if (!get_private_key(sk, vm))
-  {
-    std::cout << "ERROR: secret key error" << ENDL;
-    return false;
-  }
-
   net_utils::levin_client2 transport;
   peerid_type peer_id = 0;
 
+  if (!transport.connect(command_line::get_arg(vm, arg_ip), static_cast<int>(command_line::get_arg(vm, arg_port)), static_cast<int>(command_line::get_arg(vm, arg_timeout))))
+  {
+    std::cout << "{" << ENDL << "  \"status\": \"ERROR: " << "Failed to connect to " << command_line::get_arg(vm, arg_ip) << ":" << command_line::get_arg(vm, arg_port) << "\"" << ENDL << "}" << ENDL;
+    return false;
+  }
+
   COMMAND_REQUEST_ANONYMIZED_PEERS::request req{};
-  
   COMMAND_REQUEST_ANONYMIZED_PEERS::response rsp{};
-  if (!invoke_debug_command<COMMAND_REQUEST_ANONYMIZED_PEERS>(vm, sk, transport, peer_id, req, rsp))
+  if (!net_utils::invoke_remote_command2(COMMAND_REQUEST_ANONYMIZED_PEERS::ID, req, rsp, transport))
   {
     std::cout << "ERROR: invoking COMMAND_REQUEST_ANONYMIZED_PEERS failed" << ENDL;
     return false;
@@ -990,7 +990,7 @@ bool handle_generate_integrated_address(po::variables_map& vm)
     return false;
   }
 
-  std::string integrated_addr = currency::get_account_address_and_payment_id_as_str(acc_addr, payment_id_bin);
+  std::string integrated_addr = currency::get_account_address_as_str(acc_addr, payment_id_bin);
 
 
   std::cout << "Integrated address: " << integrated_addr << ENDL;

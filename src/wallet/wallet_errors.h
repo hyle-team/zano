@@ -635,6 +635,20 @@ namespace tools
       std::string m_message;
     };
     //----------------------------------------------------------------------------------------------------
+    struct tx_has_too_many_inputs : public transfer_error
+    {
+      explicit tx_has_too_many_inputs(std::string&& loc, const std::string& message)
+        : transfer_error(std::move(loc), API_RETURN_CODE_TX_HAS_TOO_MANY_INPUTS)
+        , m_message(message)
+      {
+      }
+ 
+      const std::string get_message() const { return m_message; }
+ 
+    private:
+      std::string m_message;
+    };
+    //----------------------------------------------------------------------------------------------------
     struct zero_destination : public transfer_error
     {
       explicit zero_destination(std::string&& loc)
@@ -677,6 +691,14 @@ namespace tools
     {
       explicit daemon_busy(std::string&& loc, const std::string& request)
         : wallet_rpc_error(std::move(loc), "daemon is busy", request)
+      {
+      }
+    };
+    //----------------------------------------------------------------------------------------------------
+    struct tx_freeze_period : public wallet_rpc_error
+    {
+      explicit tx_freeze_period(std::string&& loc, const std::string& request)
+        : wallet_rpc_error(std::move(loc), "sending transactions is temporarily not allowed because a hardfork activation is coming", request)
       {
       }
     };
