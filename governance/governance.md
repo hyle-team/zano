@@ -52,6 +52,47 @@ Asset id: 93da681503353509367e241cda3234299dedbbad9ec851de31e900490807bf0c
 
 **End** 3412904
 
+---
+
+### ZAP5: SOLX (Wrapped Solana)
+
+**Description** This proposal asks the Zano community to vote on whether to officially add the following Confidential Asset (CAs) to the Zano asset whitelist: 
+
+SOLX (Wrapped Solana)
+Asset id: 65b3bc549c8bc2c773781d5436f25f7af84644e61baaabd675d9867b007d17b4
+
+
+**Start** 3492190
+
+**End** 3512350
+
+---
+
+### ZAP6: TONX (Wrapped TON)
+
+**Description** This proposal asks the Zano community to vote on whether to officially add the following Confidential Asset (CAs) to the Zano asset whitelist: 
+
+TONX (Wrapped TON)
+Asset id: bfa6609a94e39f418d9adb000f89edc7bd180fd120f1cd272201220e3070fb4f
+
+
+**Start** 3492190
+
+**End** 3512350
+
+---
+
+### ZAP7: BCHX (Wrapped Bitcoin Cash)
+
+**Description** This proposal asks the Zano community to vote on whether to officially add the following Confidential Asset (CAs) to the Zano asset whitelist: 
+
+BCHX (Wrapped Bitcoin Cash)
+Asset id: 3de9ad7243afa49e0ade6839e97a9f10a527c4958ece2fc9cb1b87a44032167d
+
+
+**Start** 3492190
+
+**End** 3512350
 
 
 
