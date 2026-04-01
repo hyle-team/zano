@@ -3302,7 +3302,7 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   }
   else if (wbh.m_ver == WALLET_FILE_BINARY_HEADER_VERSION_2)
   {
-    tools::encrypt_chacha_in_filter decrypt_filter(password, kf_data.iv);
+    tools::encrypt_chacha8_in_filter decrypt_filter(password, kf_data.iv);
     boost::iostreams::filtering_istream in;
     in.push(decrypt_filter);
     in.push(data_file);
@@ -3386,7 +3386,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
 
   WLT_LOG_L0("Storing to temporary file " << tmp_file_path.string() << " ...");
   //creating encryption stream
-  tools::encrypt_chacha_out_filter decrypt_filter(m_password, keys_file_data.iv);
+  tools::encrypt_chacha8_out_filter decrypt_filter(m_password, keys_file_data.iv);
   boost::iostreams::filtering_ostream out;
   out.push(decrypt_filter);
   out.push(data_file);
