@@ -80,8 +80,8 @@ wallets_manager::wallets_manager():m_pview(&m_view_stub),
                                  m_qt_logs_enbaled(false), 
                                  m_dont_save_wallet_at_stop(false), 
                                  m_use_deffered_global_outputs(false), 
-                                 m_use_tor(true),
-                                 m_allow_legacy_payment_id_size(false)
+                                 m_use_tor(true)
+                                 //, m_allow_legacy_payment_id_size(false)
 {
 #ifndef MOBILE_WALLET_BUILD
   m_offers_service.set_disabled(true);
@@ -327,10 +327,10 @@ bool wallets_manager::init(view::i_view* pview_handler)
   {
     m_ui_opt.disable_price_fetch = true;
   }
-  if (command_line::has_arg(m_vm, command_line::arg_allow_legacy_payment_id_size))
-  {
-    m_allow_legacy_payment_id_size = true;
-  }
+  //if (command_line::has_arg(m_vm, command_line::arg_allow_legacy_payment_id_size))
+  //{
+  //  m_allow_legacy_payment_id_size = true;
+  //}
   
 
   //set up logging options
@@ -916,7 +916,7 @@ void wallets_manager::init_wallet_entry(wallet_vs_options& wo, uint64_t id)
   wo.pview = m_pview;  
   wo.has_related_alias_in_unconfirmed = false;
   wo.rpc_wrapper.reset(new tools::wallet_rpc_server(wo.w.unlocked_get()));
-  wo.rpc_wrapper->set_flag_allow_legacy_payment_id_size(m_allow_legacy_payment_id_size);
+  wo.rpc_wrapper->set_flag_allow_legacy_payment_id_size(true); // always treas as --allow-legacy-payment-id-size
   if (m_remote_node_mode)
   {
     wo.core_conf = currency::get_default_core_runtime_config();
