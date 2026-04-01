@@ -118,7 +118,7 @@ namespace tools
 
     encrypt_chacha20_processer_base(std::string const& pass, const crypto::chacha_iv& iv, const char(&hdss)[32]): m_iv(iv), m_stream_position(0)
     {
-      crypto::chacha_generate_key_and_iv(hdss, pass.data(), pass.size(), 0, m_key, m_iv);
+      crypto::chacha_generate_key_and_iv(hdss, pass.data(), pass.size(), 0, m_key);
     }
 
     ~encrypt_chacha20_processer_base()

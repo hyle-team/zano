@@ -301,7 +301,7 @@ namespace tools
         return result;
       }
 
-      DEFINE_SERIALIZATION_VERSION(1)
+      DEFINE_SERIALIZATION_VERSION(2)
       BEGIN_SERIALIZE_OBJECT()
         VERSION_ENTRY(version)
         FIELD(iv)
