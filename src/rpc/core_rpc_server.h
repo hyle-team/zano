@@ -117,7 +117,7 @@ namespace currency
       MAP_URI_AUTO_JON2("/getheight",                 on_get_height,                  COMMAND_RPC_GET_HEIGHT)
       MAP_URI_AUTO_JON2("/gettransactions",           on_get_transactions,            COMMAND_RPC_GET_TRANSACTIONS)
       MAP_URI_AUTO_JON2("/sendrawtransaction",        on_send_raw_tx,                 COMMAND_RPC_SEND_RAW_TX)
-      MAP_URI_AUTO_JON2("/force_relay",               on_force_relaey_raw_txs,        COMMAND_RPC_FORCE_RELAY_RAW_TXS)
+      MAP_URI_AUTO_JON2_CONDITIONAL("/force_relay",   on_force_relaey_raw_txs,        COMMAND_RPC_FORCE_RELAY_RAW_TXS, m_enabled_admin_api)
 #ifdef CPU_MINING_ENABLED
       MAP_URI_AUTO_JON2("/start_mining",              on_start_mining,                COMMAND_RPC_START_MINING)
       MAP_URI_AUTO_JON2("/stop_mining",               on_stop_mining,                 COMMAND_RPC_STOP_MINING)
