@@ -290,6 +290,13 @@ namespace currency
       return 1;
     }
 
+    if (b.tx_hashes.size() > TX_HASHES_IN_BLOCK_MAX_COUNT)
+    {
+      LOG_PRINT_RED("Block has many tx_hashes (" << b.tx_hashes.size() << "), dropping connection", LOG_LEVEL_0);
+      m_p2p->drop_connection(context);
+      return 1;
+    }
+
     crypto::hash block_id = get_block_hash(b);
     LOG_PRINT_GREEN("[HANDLE]NOTIFY_NEW_BLOCK " << block_id << " HEIGHT " << get_block_height(b), LOG_LEVEL_2);
 
