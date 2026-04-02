@@ -2,15 +2,13 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <alloca.h>
 #include <assert.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "hash-ops.h"
-#ifdef _M_ARM64
-  #include "malloc.h"
-#endif 
+
 void tree_hash(const char (*hashes)[HASH_SIZE], size_t count, char *root_hash) {
   assert(count > 0);
   if (count == 1) {
@@ -25,7 +23,11 @@ void tree_hash(const char (*hashes)[HASH_SIZE], size_t count, char *root_hash) {
       cnt |= cnt >> i;
     }
     cnt &= ~(cnt >> 1);
-    ints = alloca(cnt * HASH_SIZE);
+    ints = (char (*)[HASH_SIZE])malloc(cnt * HASH_SIZE);
+    if (!ints) {
+      memset(root_hash, 0, HASH_SIZE);
+      return;
+    }
     memcpy(ints, hashes, (2 * cnt - count) * HASH_SIZE);
     for (i = 2 * cnt - count, j = 2 * cnt - count; j < cnt; i += 2, ++j) {
       cn_fast_hash(hashes[i], 64, ints[j]);
@@ -38,5 +40,6 @@ void tree_hash(const char (*hashes)[HASH_SIZE], size_t count, char *root_hash) {
       }
     }
     cn_fast_hash(ints[0], 64, root_hash);
+    free(ints);
   }
 }
