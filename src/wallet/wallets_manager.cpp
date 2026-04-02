@@ -1607,6 +1607,8 @@ std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_p
     {
       if (payment_id.size() != 0)
         return API_RETURN_CODE_BAD_ARG_WRONG_PAYMENT_ID; // payment id is specified more than once
+      if (&d != &tp.destinations.front())
+        return API_RETURN_CODE_BAD_ARG_INTEGRATED_ADDRESS_NOT_FIRST;
       payment_id = embedded_payment_id;
     }
     dsts.back().asset_id = d.asset_id;
