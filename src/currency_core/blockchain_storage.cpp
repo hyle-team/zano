@@ -7034,9 +7034,14 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   {    
     CHECK_AND_ASSERT_MES(tx.version > TRANSACTION_VERSION_PRE_HF4, false, "HF4: tx with version " << tx.version << " is not allowed");
 
+    const bool has_gw_output_hf6 = m_core_runtime_config.is_hardfork_active_for_height(6, block_height) &&
+      std::any_of(tx.vout.begin(), tx.vout.end(), [](const tx_out_v& o) {
+        return o.type() == typeid(tx_out_gateway);
+      });
+
     if (is_pos_miner_tx(tx))
       CHECK_AND_ASSERT_MES(tx.vout.size() == 1 || tx.vout.size() >= CURRENCY_TX_MIN_ALLOWED_OUTS, false, "HF4: tx.vout has " << tx.vout.size() << " element(s), while 1 or >= " << CURRENCY_TX_MIN_ALLOWED_OUTS << " is expected for a PoS miner tx");
-    else
+    else if (!has_gw_output_hf6)
       CHECK_AND_ASSERT_MES(tx.vout.size() >= CURRENCY_TX_MIN_ALLOWED_OUTS, false, "HF4: tx.vout has " << tx.vout.size() << " element(s), while required minimum is " << CURRENCY_TX_MIN_ALLOWED_OUTS);
 
     if(!validate_inputs_sorting(tx))
@@ -7520,8 +7525,19 @@ bool blockchain_storage::collect_rangeproofs_data_from_tx(const transaction& tx,
     }
   }
   CHECK_AND_ASSERT_MES(out_index_offset == confidential_outs_count, false, "range proof elements count doesn't match with confidential outputs count: " << out_index_offset << " != " << confidential_outs_count);
+
+  if (tx.version >= TRANSACTION_VERSION_POST_HF6)
+  {
+    bool all_gateway_outs = std::all_of(tx.vout.begin(), tx.vout.end(), [](const tx_out_v& o) { return o.type() == typeid(tx_out_gateway); });
+    if (all_gateway_outs)
+    {
+      CHECK_AND_ASSERT_MES(confidential_outs_count == 0, false, "all outputs are tx_out_gateway but confidential_outs_count = " << confidential_outs_count);
+      return true;
+    }
+  }
+
   CHECK_AND_ASSERT_MES(range_proofs_count > 0, false, "transaction " << get_transaction_hash(tx) << " doesn't have range proofs");
-  CHECK_AND_ASSERT_MES(range_proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << get_transaction_hash(tx) 
+  CHECK_AND_ASSERT_MES(range_proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << get_transaction_hash(tx)
     << " doesn't have TX_FLAG_SIGNATURE_MODE_SEPARATE but has range_proofs_count = " << range_proofs_count);
 
   return true;
