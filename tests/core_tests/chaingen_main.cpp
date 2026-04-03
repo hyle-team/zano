@@ -1128,6 +1128,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_service_entries, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_reorg_spend, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_reorg_receive, "6-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_owner_change_altchain, "6-*");
 
     // GENERATE_AND_PLAY(emission_test); // simulate 1 year of blockchain, too long run (1 y ~= 1 hr), by demand only
     // LOG_ERROR2("print_reward_change_first_blocks.log", currency::print_reward_change_first_blocks(525601).str()); // outputs first 1 year of blocks' rewards (simplier)
@@ -1312,6 +1313,12 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(hard_fork_6_full_gw_tx_test);
     GENERATE_AND_PLAY_HF(hard_fork_6_and_alt_chain, "6-*");
     GENERATE_AND_PLAY_HF(hard_fork_6_and_self_directed_tx_with_payment_id, "6-*");
+
+    // GW address alt-chain tests
+    GENERATE_AND_PLAY(gw_addr_altchain_spend_in_both_chains);
+    GENERATE_AND_PLAY(gw_addr_altchain_created_in_fork);
+    GENERATE_AND_PLAY(gw_addr_altchain_no_cross_chain_usage);
+    GENERATE_AND_PLAY(gw_addr_altchain_owner_change);
 
     GENERATE_AND_PLAY_HF(isolate_auditable_and_proof, "2-*");
     
