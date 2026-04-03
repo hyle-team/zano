@@ -3337,7 +3337,11 @@ bool test_chain_unit_enchanced::check_gw_balance(currency::core& c, size_t ev_in
   const blockchain_storage& bcs = c.get_blockchain_storage();
   
   std::shared_ptr<const currency::gateway_address_data> pd = bcs.get_gateway_address_info(params.gw_addr);
-  CHECK_AND_ASSERT_MES(pd, false, "check_gw_balance: gw address could not be found: " << params.gw_addr);
+  if (!pd)
+  {
+    CHECK_AND_ASSERT_MES(params.amount == 0, false, "check_gw_balance: gw address could not be found: " << params.gw_addr << ", but expected non-zero amount: " << params.amount);
+    return true;
+  }
 
   auto it = pd->balances.find(params.asset_id);
   if (it == pd->balances.end())
