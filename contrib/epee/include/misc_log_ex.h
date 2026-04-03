@@ -731,6 +731,7 @@ namespace log_space
     {
       for (named_log_streams::iterator it = m_log_file_names.begin(); it != m_log_file_names.end(); it++)
       {
+        bool is_default = m_pdefault_file_stream == it->second.first;
         std::wstring target_path = it->second.second;
         //close and delete current stream
         if (it->second.first->is_open())
@@ -739,6 +740,10 @@ namespace log_space
           it->second.first->close();
         }
         delete it->second.first;
+        if (is_default)
+        {
+          m_pdefault_file_stream = nullptr;
+        }
         it->second.first = nullptr;
         //reopen it with truncate        
         boost::filesystem::ofstream* pstream = new boost::filesystem::ofstream;
@@ -748,6 +753,10 @@ namespace log_space
           throw std::runtime_error("Unexpected error: failed to re-open log stream on truncate");
         }
         it->second.first = pstream;
+        if (is_default)
+        {
+          m_pdefault_file_stream = pstream;
+        }
       }
       return true;
     }
