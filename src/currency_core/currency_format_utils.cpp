@@ -3145,11 +3145,21 @@ namespace currency
       CHECK_AND_ASSERT_MES(r, false, "generete_asset_surjection_proof failed");
       tx.proofs.emplace_back(std::move(asp));
 
-      // range proofs
-      currency::zc_outs_range_proof range_proofs{};
-      r = generate_zc_outs_range_proof(tx_prefix_hash, gen_context, tx.vout, range_proofs);
-      CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
-      tx.proofs.emplace_back(std::move(range_proofs));
+      bool all_gateway_outs_hf6 = tx.version >= TRANSACTION_VERSION_POST_HF6 &&
+        std::all_of(tx.vout.begin(), tx.vout.end(), [](const tx_out_v& o) {
+          return o.type() == typeid(tx_out_gateway);
+        });
+      if (all_gateway_outs_hf6)
+      {
+        CHECK_AND_ASSERT_MES(gen_context.amounts.empty(), false, "all outputs are tx_out_gateway but gen_context.amounts is not empty");
+      }
+      else
+      {
+        currency::zc_outs_range_proof range_proofs{};
+        r = generate_zc_outs_range_proof(tx_prefix_hash, gen_context, tx.vout, range_proofs);
+        CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
+        tx.proofs.emplace_back(std::move(range_proofs));
+      }
 
       // balance proof
       r = generate_tx_balance_proof(tx_prefix_hash, gen_context, 0, tx);
