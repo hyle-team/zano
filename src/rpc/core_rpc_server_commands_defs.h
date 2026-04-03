@@ -2309,5 +2309,68 @@ namespace currency
       END_KV_SERIALIZE_MAP()
     };
   };
+
+  struct COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE
+  {
+    DOC_COMMAND("Creates a transaction to change the owner of a gateway address. Returns unsigned tx blob and tx hash that must be signed by the current owner.");
+    struct request
+    {
+      currency::gateway_address_id_type address_id;
+      gateway_descriptor_api_info new_descriptor_info;
+      uint64_t fee;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_POD_AS_HEX_STRING(address_id)        DOC_DSCR("Gateway address ID to update the owner for.")  DOC_EXMP("f74bb56a5b4fa562e679ccaadd697463498a66de4f1760b2cd40f11c3a00a7a8") DOC_END
+        KV_SERIALIZE(new_descriptor_info)                  DOC_DSCR("New descriptor info containing the new owner key and optional meta_info.") DOC_END
+        KV_SERIALIZE(fee)                                  DOC_DSCR("Transaction fee, paid from the gateway address native coin balance.") DOC_EXMP(100000000) DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+      crypto::hash tx_hash_to_sign;
+      std::string tx_blob;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)                               DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)    DOC_DSCR("Hash of the transaction to be signed by the current owner (for both gateway input and ownership proof).") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)           DOC_DSCR("Hex representation of the unsigned transaction blob.") DOC_EXMP("0100000001...") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
+
+  struct COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE
+  {
+    DOC_COMMAND("Signs a gateway owner change transaction and broadcasts it to the network. A single signature from the current owner is used for both the gateway input (fee) and the ownership proof, since both are signed over the same tx hash by the same key.");
+    struct request
+    {
+      std::string tx_blob;
+      crypto::hash tx_hash_to_sign;
+
+      std::optional<crypto::eth_signature>          opt_ecdsa_signature;
+      std::optional<crypto::eddsa_signature>        opt_eddsa_signature;
+      std::optional<crypto::generic_schnorr_sig_s>  opt_custom_schnorr_signature;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(tx_blob)                          DOC_DSCR("Hex representation of the unsigned transaction blob from gateway_create_owner_change.") DOC_EXMP("0100000001...") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(tx_hash_to_sign)                   DOC_DSCR("Hash of the transaction to sign.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_ecdsa_signature)               DOC_DSCR("ECDSA (Ethereum) signature of tx_hash by the current owner.") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_eddsa_signature)               DOC_DSCR("EdDSA (Solana) signature of tx_hash by the current owner.") DOC_EXMP("dc2a4459e7369633a52b1bf277839a00201009a3efbf3ecb69bea2186c26b58909351fc9ac90b3ecfdfbc7c66431e0303dca179c138ac17ad9bef1177331a704") DOC_END
+        KV_SERIALIZE_POD_AS_HEX_STRING(opt_custom_schnorr_signature)      DOC_DSCR("Schnorr signature of tx_hash by the current owner.") DOC_EXMP("b1c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct response
+    {
+      std::string status;
+      std::string signed_tx_blob;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(status)                               DOC_DSCR("Status of the call.") DOC_EXMP(API_RETURN_CODE_OK) DOC_END
+        KV_SERIALIZE_BLOB_AS_HEX_STRING(signed_tx_blob)    DOC_DSCR("Hex representation of the fully signed transaction blob, ready for sendrawtransaction.") DOC_EXMP("0100000001...") DOC_END
+      END_KV_SERIALIZE_MAP()
+    };
+  };
 }
 
