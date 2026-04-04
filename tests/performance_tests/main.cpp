@@ -292,11 +292,12 @@ void test_plain_wallet()
   //std::string res = plain_wallet::init("", "", "C:\\Users\\roky\\home\\", 0);
   std::string res = plain_wallet::init("https://node.zano.org", "443", "C:\\Users\\roky\\home\\", LOG_LEVEL_2);
   //std::string res = plain_wallet::init("127.0.0.1", "12111", "C:\\Users\\roky\\home22\\", 0);
-  
+
+
   plain_wallet::configure_object conf = AUTO_VAL_INIT(conf);
-  //plain_wallet::configure_response conf_resp = AUTO_VAL_INIT(conf_resp);
-  //conf.postponed_run_wallet = true;
-  //std::string r = plain_wallet::sync_call("configure", 0, epee::serialization::store_t_to_json(conf));
+  plain_wallet::configure_response conf_resp = AUTO_VAL_INIT(conf_resp);
+  conf.postponed_run_wallet = true;
+  std::string r = plain_wallet::sync_call("configure", 0, epee::serialization::store_t_to_json(conf));
   
 
 

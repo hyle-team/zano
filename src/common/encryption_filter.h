@@ -17,6 +17,12 @@
 namespace tools
 {
 
+  inline size_t to_size(std::streamsize n) {
+    if (n < 0) {
+      throw std::out_of_range("negative value cannot be converted to size_t");
+    }
+    return static_cast<size_t>(n);
+  }
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
@@ -104,11 +110,9 @@ namespace tools
   };
 
 
-
-
   /************************************************************************/
- /*  ChaCha20 processor base with domain separator support               */
- /************************************************************************/
+/*  ChaCha20 processor base with domain separator support               */
+/************************************************************************/
 
   class encrypt_chacha20_processer_base
   {
@@ -116,79 +120,83 @@ namespace tools
     typedef char                          char_type;
     static const uint32_t block_size = 64; // ChaCha20 block size
 
-    encrypt_chacha20_processer_base(std::string const& pass, const crypto::chacha_iv& iv, const char(&hdss)[32]): m_iv(iv), m_stream_position(0)
+    encrypt_chacha20_processer_base(std::string const& pass, const crypto::chacha_iv& iv, const char(&hdss)[32])
+      : m_total_written(0)
+      , m_base_iv(iv)
     {
       crypto::chacha_generate_key_and_iv(hdss, pass.data(), pass.size(), 0, m_key);
     }
 
     ~encrypt_chacha20_processer_base()
     {
+      memset(&m_key, 0, sizeof(m_key));
+      memset(&m_base_iv, 0, sizeof(m_base_iv));
     }
 
     template<typename cb_handler>
     std::streamsize process(char_type const* const buf, std::streamsize const n, cb_handler cb) const
     {
       if (n == 0)
-        return n;
+        return 0;
 
-      if (n % block_size == 0 && m_buff.empty())
+      size_t current_block_number = m_total_written / block_size;
+      size_t offset_in_current_block = m_total_written % block_size;
+
+      size_t bytes_left = n;
+
+      char_type* local_buf = new char_type[n];
+      while (bytes_left)
       {
-        std::vector<char_type> buff(n);
-        encrypt_with_offset(buf, &buff[0], n);
-        cb(&buff[0], n);
-        return n;
+
+        uint8_t keystream[block_size];
+        generate_keystream_block(current_block_number, keystream);
+        size_t to_process = std::min(bytes_left, block_size - offset_in_current_block);
+        size_t process_i_until = offset_in_current_block + to_process;
+
+        for( size_t i = offset_in_current_block; i < process_i_until; ++i)
+        {
+          size_t local_offset = n - bytes_left;
+          if (local_offset > to_size(n))
+          {
+            // This should never happen, but we check it just in case
+            throw std::runtime_error("Local offset exceeds buffer size");
+          }
+          local_buf[local_offset] = buf[local_offset] ^ keystream[i];
+          bytes_left -= sizeof(char_type);
+        }
+        
+        offset_in_current_block = 0;
+        current_block_number++;
       }
-      else
-      {
-        m_buff.append(buf, n);
-        size_t encr_count = m_buff.size() - m_buff.size() % block_size;
-        if (!encr_count)
-          return n;
-        std::vector<char_type> buff(encr_count);
-        encrypt_with_offset(m_buff.data(), &buff[0], encr_count);
-        cb(&buff[0], encr_count);
-        m_buff.erase(0, encr_count);
-        return encr_count;
-      }
+
+      cb(&local_buf[0], n);
+      m_total_written += n;
+      delete [] local_buf;
+      return n;
     }
 
     template<typename cb_handler>
     bool flush(cb_handler cb)
     {
-      if (m_buff.empty())
-        return true;
-
-      std::vector<char_type> buff(m_buff.size());
-      encrypt_with_offset(m_buff.data(), &buff[0], m_buff.size());
-      cb(&buff[0], m_buff.size());
-      m_buff.clear();
       return true;
     }
 
   private:
-    void encrypt_with_offset(const char* src, char* dst, size_t len) const
+
+    void generate_keystream_block(uint64_t block_num, uint8_t* keystream) const
     {
-      // For streaming encryption, we need to generate keystream at the current position
-      // and XOR with the data. ChaCha20 is a stream cipher, so we can do this by
-      // encrypting the plaintext directly, but we need to track position for proper
-      // keystream generation in a streaming context.
-      // 
-      // Since crypto::chacha20 doesn't support offset-based encryption directly,
-      // we encrypt from position 0 each time but maintain the stream position
-      // by pre-generating keystream for skipped bytes when needed.
-      // 
-      // For simplicity in streaming filter context, we use a fresh IV-based approach
-      // where each chunk is encrypted continuously.
-      crypto::chacha20(src, len, m_key, m_iv, dst);
-      m_stream_position += len;
+      crypto::chacha_iv block_iv = m_base_iv;
+      block_iv.u64 += block_num;
+
+      std::memset(keystream, 0, block_size);
+      crypto::chacha20(keystream, block_size, m_key, block_iv, keystream);
     }
 
-    crypto::chacha_iv m_iv;
-    crypto::chacha_key m_key;
-    mutable std::string m_buff;
-    mutable size_t m_stream_position;
+    mutable crypto::chacha_iv m_base_iv;
+    crypto::chacha_key m_key{};
+    //mutable std::string m_buff;
+    mutable uint64_t m_total_written = 0;
   };
-
 
 
   /************************************************************************/
@@ -230,6 +238,7 @@ namespace tools
       t_chacha_base::flush([&](char_type const * const buf_lambda, std::streamsize const n_lambda) {
         boost::iostreams::write(snk, &buf_lambda[0], n_lambda);
       });
+
       return true;
     }
 
@@ -262,33 +271,56 @@ namespace tools
     {
     }
 
+//     template<typename Source>
+//     std::streamsize read(Source& src, char* s, std::streamsize n)
+//     {
+//       std::streamsize actually_read = boost::iostreams::read(src, s, n);
+//       if (actually_read > 0)
+//       {
+//         t_chacha_base::process(s, actually_read, [&](char_type const* const buf_lambda, std::streamsize const n_lambda) {
+//           CHECK_AND_ASSERT_THROW_MES(n_lambda == actually_read, "Error in decrypt: check n_lambda == actually_read failed");
+//           std::memcpy(s, buf_lambda, n_lambda);
+//         });
+//         m_total_read += actually_read;
+//       }
+// 
+//       return actually_read;
+//     }
     template<typename Source>
     std::streamsize read(Source& src, char* s, std::streamsize n)
     {
-      if (m_buff.size() >= static_cast<size_t>(n))
+      if (m_encrypted_cache_buff.size() >= static_cast<size_t>(n))
       {
-        return withdraw_to_read_buff(s, n);
+        return withdraw_from_encrypted_cache(s, n);
       }
-      if (m_was_eof && m_buff.empty())
+      if (m_was_eof)
       {
-        return -1;
+        if (m_encrypted_cache_buff.empty())
+        {
+          return -1;
+        }
+        else
+        {
+          return withdraw_from_encrypted_cache(s, n);
+        }
       }
 
-      std::streamsize size_to_read_for_decrypt = (n - m_buff.size());
+      std::streamsize size_to_read_for_decrypt = (n - m_encrypted_cache_buff.size());
       size_to_read_for_decrypt += size_to_read_for_decrypt % t_chacha_base::block_size;
-      size_t offset_in_buff = m_buff.size();
-      m_buff.resize(m_buff.size() + size_to_read_for_decrypt);
+      size_t offset_in_buff = m_encrypted_cache_buff.size();
+      m_encrypted_cache_buff.resize(m_encrypted_cache_buff.size() + size_to_read_for_decrypt);
 
-      std::streamsize result = boost::iostreams::read(src, (char*)&m_buff.data()[offset_in_buff], size_to_read_for_decrypt);
+      std::streamsize result = boost::iostreams::read(src, (char*)&m_encrypted_cache_buff.data()[offset_in_buff], size_to_read_for_decrypt);
+      m_total_read += result;
       if (result == size_to_read_for_decrypt)
       {
-        //regular read proocess, readed data enought to get decrypteds
-        t_chacha_base::process(&m_buff.data()[offset_in_buff], size_to_read_for_decrypt, [&](char_type const* const buf_lambda, std::streamsize const n_lambda)
+        //regular read process, read data enough to get decrypted
+        t_chacha_base::process(&m_encrypted_cache_buff.data()[offset_in_buff], size_to_read_for_decrypt, [&](char_type const* const buf_lambda, std::streamsize const n_lambda)
         {
           CHECK_AND_ASSERT_THROW_MES(n_lambda == size_to_read_for_decrypt, "Error in decrypt: check n_lambda == size_to_read_for_decrypt failed");
-          std::memcpy((char*)&m_buff.data()[offset_in_buff], buf_lambda, n_lambda);
+          std::memcpy((char*)&m_encrypted_cache_buff.data()[offset_in_buff], buf_lambda, n_lambda);
         });
-        return withdraw_to_read_buff(s, n);
+        return withdraw_from_encrypted_cache(s, n);
       }
       else
       {
@@ -298,20 +330,24 @@ namespace tools
           size_t offset_before_flush = offset_in_buff;
           if (result != -1)
           {
+            m_encrypted_cache_buff.resize(offset_in_buff + result);
             //eof
-            t_chacha_base::process(&m_buff.data()[offset_in_buff], result, [&](char_type const* const buf_lambda, std::streamsize const n_lambda) {
-              std::memcpy((char*)&m_buff.data()[offset_in_buff], buf_lambda, n_lambda);
+            t_chacha_base::process(&m_encrypted_cache_buff.data()[offset_in_buff], result, [&](char_type const* const buf_lambda, std::streamsize const n_lambda) {
+              std::memcpy((char*)&m_encrypted_cache_buff.data()[offset_in_buff], buf_lambda, n_lambda);
               offset_before_flush = offset_in_buff + n_lambda;
             });
+          }else
+          {
+            m_encrypted_cache_buff.resize(offset_in_buff);
           }
 
           t_chacha_base::flush([&](char_type const* const buf_lambda, std::streamsize const n_lambda) {
-            if (n_lambda + offset_before_flush > m_buff.size())
+            if (n_lambda + offset_before_flush > m_encrypted_cache_buff.size())
             {
-              m_buff.resize(n_lambda + offset_before_flush);
+              m_encrypted_cache_buff.resize(n_lambda + offset_before_flush);
             }
-            std::memcpy((char*)&m_buff.data()[offset_before_flush], buf_lambda, n_lambda);
-            m_buff.resize(offset_before_flush + n_lambda);
+            std::memcpy((char*)&m_encrypted_cache_buff.data()[offset_before_flush], buf_lambda, n_lambda);
+            m_encrypted_cache_buff.resize(offset_before_flush + n_lambda);
           });
 
           //just to make sure that it's over
@@ -319,7 +355,7 @@ namespace tools
           std::streamsize r = boost::iostreams::read(src, (char*)&buff_stub.data()[0], 10);
           CHECK_AND_ASSERT_THROW_MES(r == -1, "expected EOF");
           m_was_eof = true;
-          return withdraw_to_read_buff(s, n);
+          return withdraw_from_encrypted_cache(s, n);
         }
         else
         {
@@ -338,17 +374,20 @@ namespace tools
 
   private:
 
-    std::streamsize withdraw_to_read_buff(char* s, std::streamsize n)
+    std::streamsize withdraw_from_encrypted_cache(char* s, std::streamsize n)
     {
 
-      size_t copy_size = m_buff.size() > static_cast<size_t>(n) ? static_cast<size_t>(n) : m_buff.size();
-      std::memcpy(s, m_buff.data(), copy_size);
-      m_buff.erase(0, copy_size);
+      size_t copy_size = m_encrypted_cache_buff.size() > static_cast<size_t>(n) ? static_cast<size_t>(n) : m_encrypted_cache_buff.size();
+      std::memcpy(s, m_encrypted_cache_buff.data(), copy_size);
+      m_encrypted_cache_buff.erase(0, copy_size);
       return copy_size;
     }   
 
-    std::string m_buff;
+    std::string m_encrypted_cache_buff;
     bool m_was_eof;
+
+    //debug
+    size_t m_total_read = 0;
   };
 
 
