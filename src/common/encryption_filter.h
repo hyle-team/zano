@@ -121,8 +121,9 @@ namespace tools
     static const uint32_t block_size = 64; // ChaCha20 block size
 
     encrypt_chacha20_processer_base(std::string const& pass, const crypto::chacha_iv& iv, const char(&hdss)[32])
-      : m_total_written(0)
-      , m_base_iv(iv)
+      : m_base_iv(iv)
+      , m_current_block(0)
+      , m_offset_in_block(0)
     {
       crypto::chacha_generate_key_and_iv(hdss, pass.data(), pass.size(), 0, m_key);
     }
@@ -139,39 +140,33 @@ namespace tools
       if (n == 0)
         return 0;
 
-      size_t current_block_number = m_total_written / block_size;
-      size_t offset_in_current_block = m_total_written % block_size;
+      const size_t total = static_cast<size_t>(n);
+      std::vector<char_type> out(total);
+      size_t src_pos = 0;
 
-      size_t bytes_left = n;
-
-      char_type* local_buf = new char_type[n];
-      while (bytes_left)
+      while (src_pos < total)
       {
-
         uint8_t keystream[block_size];
-        generate_keystream_block(current_block_number, keystream);
-        size_t to_process = std::min(bytes_left, block_size - offset_in_current_block);
-        size_t process_i_until = offset_in_current_block + to_process;
+        generate_keystream_block(m_current_block, keystream);
 
-        for( size_t i = offset_in_current_block; i < process_i_until; ++i)
+        size_t avail = block_size - m_offset_in_block;
+        size_t to_process = std::min(total - src_pos, avail);
+
+        for (size_t i = 0; i < to_process; ++i)
+          out[src_pos + i] = buf[src_pos + i] ^ keystream[m_offset_in_block + i];
+
+        memset(keystream, 0, block_size); // clear stack
+
+        src_pos += to_process;
+        m_offset_in_block += to_process;
+        if (m_offset_in_block >= block_size)
         {
-          size_t local_offset = n - bytes_left;
-          if (local_offset > to_size(n))
-          {
-            // This should never happen, but we check it just in case
-            throw std::runtime_error("Local offset exceeds buffer size");
-          }
-          local_buf[local_offset] = buf[local_offset] ^ keystream[i];
-          bytes_left -= sizeof(char_type);
+          m_offset_in_block = 0;
+          ++m_current_block;
         }
-        
-        offset_in_current_block = 0;
-        current_block_number++;
       }
 
-      cb(&local_buf[0], n);
-      m_total_written += n;
-      delete [] local_buf;
+      cb(out.data(), n);
       return n;
     }
 
@@ -192,10 +187,10 @@ namespace tools
       crypto::chacha20(keystream, block_size, m_key, block_iv, keystream);
     }
 
-    mutable crypto::chacha_iv m_base_iv;
+    crypto::chacha_iv m_base_iv;
     crypto::chacha_key m_key{};
-    //mutable std::string m_buff;
-    mutable uint64_t m_total_written = 0;
+    mutable uint64_t m_current_block = 0;
+    mutable size_t m_offset_in_block = 0;
   };
 
 
