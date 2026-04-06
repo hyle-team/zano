@@ -144,7 +144,7 @@ namespace tools
 
       size_t bytes_left = n;
 
-      char_type* local_buf = new char_type[n];
+      std::vector<char_type> local_buf(n);
       while (bytes_left)
       {
 
@@ -171,7 +171,6 @@ namespace tools
 
       cb(&local_buf[0], n);
       m_total_written += n;
-      delete [] local_buf;
       return n;
     }
 
