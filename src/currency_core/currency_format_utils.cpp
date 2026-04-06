@@ -2998,7 +2998,8 @@ namespace currency
     }
 
     // "Shuffle" outs
-    std::shuffle(shuffled_dsts.begin(), shuffled_dsts.end(), crypto::uniform_random_bit_generator());
+    if (shuffle)
+      std::shuffle(shuffled_dsts.begin(), shuffled_dsts.end(), crypto::uniform_random_bit_generator());
 
     // construct outputs
     uint64_t native_coins_output_sum = 0;

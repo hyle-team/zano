@@ -437,7 +437,7 @@ bool test_blockchain_vs_spent_multisig_outs::generate(std::vector<test_event_ent
     sources, destinations, true, true, 1);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
   transaction tx_0{};
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, events, this, tx_0);
+  r = currency::construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, 0, 0, 0, CURRENCY_TO_KEY_OUT_RELAXED, false /* no shuffle */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_0);
 

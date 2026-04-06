@@ -893,7 +893,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0, 0, CURRENCY_TO_KEY_OUT_RELAXED, false /* no shuffle */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_1);
 
@@ -966,7 +966,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
 
   transaction tx_4 = AUTO_VAL_INIT(tx_4);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_4, get_tx_version_from_events(events), 0, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_4, get_tx_version_from_events(events), 0, 0, CURRENCY_TO_KEY_OUT_RELAXED, false /* no shuffle */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_4);
 
@@ -1009,7 +1009,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
 
   transaction tx_6 = AUTO_VAL_INIT(tx_6);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_6, get_tx_version_from_events(events), 0, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_6, get_tx_version_from_events(events), 0, 0, CURRENCY_TO_KEY_OUT_RELAXED, false /* no shuffle */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_6);
 
@@ -1051,7 +1051,7 @@ bool multisig_minimum_sigs::generate(std::vector<test_event_entry>& events) cons
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
 
   transaction tx_8 = AUTO_VAL_INIT(tx_8);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_8, get_tx_version_from_events(events), 0, 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_8, get_tx_version_from_events(events), 0, 0, CURRENCY_TO_KEY_OUT_RELAXED, false /* no shuffle */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_8);
 
@@ -1202,7 +1202,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   uint64_t unlock_time_2 = blk_0r.timestamp + DIFFICULTY_TOTAL_TARGET * 6 + CURRENCY_LOCKED_TX_ALLOWED_DELTA_SECONDS;
 
   transaction tx_1 = AUTO_VAL_INIT(tx_1);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0, unlock_time, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_1, get_tx_version_from_events(events), 0, unlock_time, CURRENCY_TO_KEY_OUT_RELAXED, false /* no shuffle */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   CHECK_AND_ASSERT_MES(get_tx_max_unlock_time(tx_1) == unlock_time, false, "Unlock time was not correctly set");
   events.push_back(tx_1);
@@ -1281,7 +1281,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   crypto::secret_key stub_key = AUTO_VAL_INIT(stub_key);
   etc_tx_details_expiration_time extra_expiration_time = AUTO_VAL_INIT(extra_expiration_time);
   extra_expiration_time.v = expiration_time;
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<extra_v>({ extra_expiration_time }), empty_attachment, tx_4, get_tx_version_from_events(events), 0, stub_key, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<extra_v>({ extra_expiration_time }), empty_attachment, tx_4, get_tx_version_from_events(events), 0, stub_key, 0, CURRENCY_TO_KEY_OUT_RELAXED, false /* no shuffle */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   CHECK_AND_ASSERT_MES(get_tx_expiration_time(tx_4) == expiration_time, false, "Expiration time was not correctly set");
   DO_CALLBACK(events, "mark_invalid_tx");
@@ -1289,7 +1289,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
 
   // add similar tx (same sources and destinations) with no expiration_time - should be accepted by the core
   transaction tx_5 = AUTO_VAL_INIT(tx_5);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_extra, empty_attachment, tx_5, get_tx_version_from_events(events), 0, stub_key, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_extra, empty_attachment, tx_5, get_tx_version_from_events(events), 0, stub_key, 0, CURRENCY_TO_KEY_OUT_RELAXED, false /* no shuffle */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_5);
 
@@ -1316,7 +1316,7 @@ bool multisig_and_unlock_time::generate(std::vector<test_event_entry>& events) c
   extra_expiration_time = AUTO_VAL_INIT(extra_expiration_time);
   extra_expiration_time.v = expiration_time;
   transaction tx_6 = AUTO_VAL_INIT(tx_6);
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<extra_v>({ extra_expiration_time }), empty_attachment, tx_6, get_tx_version_from_events(events), 0, stub_key, 0, CURRENCY_TO_KEY_OUT_RELAXED, true);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, std::vector<extra_v>({ extra_expiration_time }), empty_attachment, tx_6, get_tx_version_from_events(events), 0, stub_key, 0, CURRENCY_TO_KEY_OUT_RELAXED, false /* no shuffle */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   CHECK_AND_ASSERT_MES(get_tx_expiration_time(tx_6) == expiration_time, false, "Expiration time was not correctly set");
   r = sign_multisig_input_in_tx(tx_6, tx_5_ms_out_idx, miner_acc.get_keys(), tx_5, &tx_fully_signed);

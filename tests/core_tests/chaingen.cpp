@@ -2034,7 +2034,8 @@ bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
                          const std::vector<currency::payload_items_v>& att /* = empty_attachment */, 
                          bool check_for_spends /* = true */,
                          bool check_for_unlocktime /* = true */,
-                         bool use_ref_by_id /* = false */)
+                         bool use_ref_by_id /* = false */,
+                         bool shuffle /* = true */)
 {
   [[maybe_unused]] crypto::secret_key sk; // stub
 
@@ -2076,7 +2077,7 @@ bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
     if (el.second > requested_amount)
       local_dst.push_back(tx_destination_entry(el.second - requested_amount, from.get_public_address(), el.first)); // add destination for change
   }
-  return construct_tx(from.get_keys(), sources, local_dst, extr, att, tx, tx_version, tx_hardfork_id, sk, 0, mix_attr);
+  return construct_tx(from.get_keys(), sources, local_dst, extr, att, tx, tx_version, tx_hardfork_id, sk, 0, mix_attr, shuffle);
 }
 
 
