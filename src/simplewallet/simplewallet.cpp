@@ -1792,6 +1792,11 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
         fail_msg_writer() << "address " + local_args[i] + " has integrated payment id " + epee::string_tools::buff_to_hex_nodelimer(integrated_payment_id) + " which conflicts with previously set payment id: " << epee::string_tools::buff_to_hex_nodelimer(payment_id) << "";
         return true;
       }
+      if (i != 0)
+      {
+        fail_msg_writer() << "embedded payment id: " << epee::string_tools::buff_to_hex_nodelimer(integrated_payment_id) << " currently can only be set for the first destination (and so you can use integrated address only for the fist destination)";
+        return true;
+      }
       payment_id = integrated_payment_id;
     }
 
