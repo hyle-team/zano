@@ -3033,12 +3033,14 @@ bool wallet2::store_keys(std::string& buff, const std::string& password, wallet2
   bool r = epee::serialization::store_t_to_binary(acc, account_data);
   WLT_CHECK_AND_ASSERT_MES(r, false, "failed to serialize wallet keys");
 
+  
+
   crypto::chacha_key key;
-  crypto::generate_chacha_key_legacy(password, key);
+  crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_WALLET_HEADER, password.data(), password.size(), 0, key);
   std::string cipher;
   cipher.resize(account_data.size());
-  keys_file_data.iv = crypto::rand<crypto::chacha_iv>();
-  crypto::chacha8(account_data.data(), account_data.size(), key, keys_file_data.iv, &cipher[0]);
+  keys_file_data.iv = crypto::rand<crypto::chacha_iv>(); 
+  crypto::chacha20(account_data.data(), account_data.size(), key, keys_file_data.iv, &cipher[0]);
   keys_file_data.account_data = cipher;
 
   r = ::serialization::dump_binary(keys_file_data, buff);
@@ -3150,12 +3152,23 @@ void wallet2::load_keys(const std::string& buff, const std::string& password, ui
     r = ::serialization::parse_binary(buff, kf_data);
   }
   THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, "internal error: failed to deserialize");
-
-  crypto::chacha_key key;
-  crypto::generate_chacha_key_legacy(password, key);
   std::string account_data;
-  account_data.resize(kf_data.account_data.size());
-  crypto::chacha8(kf_data.account_data.data(), kf_data.account_data.size(), key, kf_data.iv, &account_data[0]);
+    
+  if (kf_data.version <= 1)
+  {
+    crypto::chacha_key key;
+    crypto::generate_chacha_key_legacy(password, key);
+    account_data.resize(kf_data.account_data.size());
+    crypto::chacha8(kf_data.account_data.data(), kf_data.account_data.size(), key, kf_data.iv, &account_data[0]);
+  }
+  else
+  {
+    //version 2
+    crypto::chacha_key key;
+    crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_WALLET_HEADER, password.data(), password.size(), 0, key);
+    account_data.resize(kf_data.account_data.size());
+    crypto::chacha20(kf_data.account_data.data(), kf_data.account_data.size(), key, kf_data.iv, &account_data[0]);
+  }
 
   const currency::account_keys& keys = m_account.get_keys();
   r = epee::serialization::load_t_from_binary(m_account, account_data);
@@ -3302,12 +3315,21 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   }
   else if (wbh.m_ver == WALLET_FILE_BINARY_HEADER_VERSION_2)
   {
-    tools::encrypt_chacha_in_filter decrypt_filter(password, kf_data.iv);
+    tools::encrypt_chacha8_in_filter decrypt_filter(password, kf_data.iv);
     boost::iostreams::filtering_istream in;
     in.push(decrypt_filter);
     in.push(data_file);
     need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, in);
     WLT_LOG_L1("Detected format: WALLET_FILE_BINARY_HEADER_VERSION_2 (need_to_resync=" << need_to_resync << ")");
+  }
+  else if (wbh.m_ver == WALLET_FILE_BINARY_HEADER_VERSION_3)
+  {
+    tools::encrypt_chacha20_in_filter decrypt_filter(password, kf_data.iv, CRYPTO_HDS_CHACHA_WALLET_BODY);
+    boost::iostreams::filtering_istream in;
+    in.push(decrypt_filter);
+    in.push(data_file);
+    need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, in);
+    WLT_LOG_L1("Detected format: WALLET_FILE_BINARY_HEADER_VERSION_3 (need_to_resync=" << need_to_resync << ")");
   }
   else
   {
@@ -3370,7 +3392,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   wbh.m_signature = WALLET_FILE_SIGNATURE_V2;
   wbh.m_cb_keys = keys_buff.size();
   //@#@ change it to proper
-  wbh.m_ver = WALLET_FILE_BINARY_HEADER_VERSION_2;
+  wbh.m_ver = WALLET_FILE_BINARY_HEADER_VERSION_3;
   std::string header_buff((const char*)&wbh, sizeof(wbh));
 
   uint64_t ts = m_core_runtime_config.get_core_time();
@@ -3386,7 +3408,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
 
   WLT_LOG_L0("Storing to temporary file " << tmp_file_path.string() << " ...");
   //creating encryption stream
-  tools::encrypt_chacha_out_filter decrypt_filter(m_password, keys_file_data.iv);
+  tools::encrypt_chacha20_out_filter decrypt_filter(m_password, keys_file_data.iv, CRYPTO_HDS_CHACHA_WALLET_BODY);
   boost::iostreams::filtering_ostream out;
   out.push(decrypt_filter);
   out.push(data_file);
