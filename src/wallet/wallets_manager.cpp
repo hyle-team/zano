@@ -1564,8 +1564,9 @@ std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_p
 //    return API_RETURN_CODE_BAD_ARG_WRONG_FEE;
 
   std::string payment_id = tp.payment_id;
-  for(auto& d: tp.destinations)
+  for(auto it = tp.destinations.begin(); it != tp.destinations.end(); ++it)
   {
+    const auto& d = *it;
     dsts.push_back(currency::tx_destination_entry());
     dsts.back().addr.resize(1);
     currency::tx_destination_entry& de = dsts.back();
@@ -1607,8 +1608,8 @@ std::string wallets_manager::transfer(uint64_t wallet_id, const view::transfer_p
     {
       if (payment_id.size() != 0)
         return API_RETURN_CODE_BAD_ARG_WRONG_PAYMENT_ID; // payment id is specified more than once
-      if (&d != &tp.destinations.front())
-        return API_RETURN_CODE_BAD_ARG_INTEGRATED_ADDRESS_NOT_FIRST;
+      if (it != tp.destinations.begin())
+        return API_RETURN_CODE_BAD_ARG_INTEGRATED_ADDRESS_NOT_FIRST; // integrated address should be the first in destinations list until HF6
       payment_id = embedded_payment_id;
     }
     dsts.back().asset_id = d.asset_id;
