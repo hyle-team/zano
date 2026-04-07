@@ -999,25 +999,11 @@ namespace currency
     currency::finalize_tx_param ftp = {};
     currency::finalized_tx ftx = {};
 
-    uint64_t source_amount = fee + 1;
-    if (it->second.amount < source_amount)
-    {
-      er.code = CORE_RPC_ERROR_CODE_INSUFFICIENT_FUNDS;
-      er.message = "Insufficient native coin balance on gateway address to cover the fee";
-      return false;
-    }
-
     tx_source_entry source = {};
     source.asset_id = currency::native_coin_asset_id;
-    source.amount = source_amount;
+    source.amount = fee;
     source.gateway_origin = req.address_id;
     ftp.sources.push_back(source);
-
-    tx_destination_entry change_dest{};
-    change_dest.amount = 1;
-    change_dest.asset_id = currency::native_coin_asset_id;
-    change_dest.addr.push_back(static_cast<address_v>(req.address_id));
-    ftp.prepared_destinations.push_back(change_dest);
 
     ftp.crypt_address.view_public_key = req.address_id;
     ftp.crypt_address.spend_public_key = req.address_id;
