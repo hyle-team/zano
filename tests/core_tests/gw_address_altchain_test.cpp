@@ -399,8 +399,12 @@ bool gw_addr_altchain_no_cross_chain_usage::generate(std::vector<test_event_entr
   MAKE_NEXT_BLOCK(events, blk_c3, blk_c2, miner_acc);
   MAKE_NEXT_BLOCK(events, blk_c4, blk_c3, miner_acc);
 
-  // C is main, gw doesn't exist here - balance should be 0
-  DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(gw_address_balance_check_param{ m_gw_addr_view.pub, 0 }));
+  // C is main, gw doesn't exist here
+  { 
+    gw_address_balance_check_param p {m_gw_addr_view.pub, 0 };
+    p.address_should_not_be_found = true;
+    DO_CALLBACK_PARAMS_STR(events, "check_gw_balance", t_serializable_object_to_blob(p));
+  }
 
   // switch back to B (5 > C=4)
   MAKE_NEXT_BLOCK(events, blk_b4, blk_b3, miner_acc);
