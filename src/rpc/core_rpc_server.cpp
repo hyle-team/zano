@@ -836,7 +836,7 @@ namespace currency
     VARIANT_SWITCH_END();
 
     ftp.tx_outs_attr  = CURRENCY_TO_KEY_OUT_RELAXED;
-    ftp.tx_version    = TRANSACTION_VERSION_POST_HF6;
+    ftp.tx_version    = m_core.get_current_tx_version();
     ftp.spend_pub_key = req.origin_gateway_id;
     ftp.tx_hardfork_id = m_core.get_blockchain_storage().get_current_hardfork_id();
 
@@ -1009,7 +1009,7 @@ namespace currency
     ftp.crypt_address.spend_public_key = req.address_id;
 
     ftp.tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED;
-    ftp.tx_version = TRANSACTION_VERSION_POST_HF6;
+    ftp.tx_version = m_core.get_current_tx_version();
     ftp.spend_pub_key = req.address_id;
     ftp.tx_hardfork_id = m_core.get_blockchain_storage().get_current_hardfork_id();
     ftp.extra.push_back(gwdo);
