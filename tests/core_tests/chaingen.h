@@ -290,11 +290,13 @@ struct gw_address_balance_check_param
   currency::gateway_address_id_type gw_addr;
   uint64_t amount;
   crypto::public_key asset_id = currency::native_coin_asset_id;
-  
+  bool address_should_not_be_found = false;
+
   BEGIN_SERIALIZE()
     FIELD(gw_addr)
     FIELD(amount)
     FIELD(asset_id)
+    FIELD(address_should_not_be_found)
   END_SERIALIZE()
 };
 
