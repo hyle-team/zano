@@ -942,10 +942,9 @@ namespace currency
   {
     if (m_core.get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active())
     {
-      er.code = CORE_RPC_ERROR_CODE_CORE_BUSY;
-      er.message = "Pre hardfork freeze period is in effect, sending transactions is not allowed till the next hardfork. Please, try again after the hardfork activation.";
       LOG_PRINT_L0("[on_gateway_create_owner_change]: pre hardfork freeze period is in effect.");
-      return false;
+      res.status = API_RETURN_CODE_TX_FREEZE_PERIOD;
+      return true;
     }
 
     size_t count_keys = 0;
@@ -958,17 +957,15 @@ namespace currency
 
     if (count_keys != 1)
     {
-      er.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
-      er.message = "Only one new owner public key must be provided";
-      return false;
+      res.status = API_RETURN_CODE_BAD_ARG;
+      return true;
     }
 
     auto addr_data_ptr = m_core.get_blockchain_storage().get_gateway_address_info(req.address_id);
     if (!addr_data_ptr)
     {
-      er.code = CORE_RPC_ERROR_CODE_NOT_FOUND;
-      er.message = std::string("Gateway address ") + epee::string_tools::pod_to_hex(req.address_id) + " not found";
-      return false;
+      res.status = API_RETURN_CODE_NOT_FOUND;
+      return true;
     }
 
     uint64_t fee = req.fee ? req.fee : TX_DEFAULT_FEE;
@@ -976,9 +973,8 @@ namespace currency
     auto it = addr_data_ptr->balances.find(currency::native_coin_asset_id);
     if (it == addr_data_ptr->balances.end() || it->second.amount < fee)
     {
-      er.code = CORE_RPC_ERROR_CODE_INSUFFICIENT_FUNDS;
-      er.message = "Insufficient native coin balance on gateway address to cover the fee";
-      return false;
+      res.status = API_RETURN_CODE_NOT_ENOUGH_MONEY;
+      return true;
     }
 
     gateway_address_descriptor_operation_update gao_upd{};
@@ -1018,7 +1014,6 @@ namespace currency
     if (!r)
     {
       res.status = API_RETURN_CODE_FAIL;
-      er.message = "Failed to construct owner change transaction";
       return true;
     }
 
@@ -1037,7 +1032,6 @@ namespace currency
     if (!r)
     {
       res.status = API_RETURN_CODE_BAD_ARG;
-      er.message = "Failed to deserialize transaction blob";
       return true;
     }
 
@@ -1046,7 +1040,6 @@ namespace currency
     {
       LOG_ERROR("Transaction hash mismatch in on_gateway_sign_owner_change: " << tx_id << " != " << req.tx_hash_to_sign);
       res.status = API_RETURN_CODE_BAD_ARG;
-      er.message = "Transaction hash mismatch";
       return true;
     }
 
@@ -1076,7 +1069,6 @@ namespace currency
     {
       LOG_ERROR("Expected exactly one signature in on_gateway_sign_owner_change, got: " << sig_count);
       res.status = API_RETURN_CODE_BAD_ARG;
-      er.message = "Exactly one signature must be provided";
       return true;
     }
 
@@ -1092,7 +1084,6 @@ namespace currency
       {
         LOG_ERROR("Unexpected signature type in on_gateway_sign_owner_change");
         res.status = API_RETURN_CODE_BAD_ARG;
-        er.message = "Unexpected signature type in transaction";
         return true;
       }
     }
@@ -1110,14 +1101,12 @@ namespace currency
     {
       LOG_ERROR("[on_gateway_sign_owner_change]: Failed to process signed tx");
       res.status = API_RETURN_CODE_FAIL;
-      er.message = "Failed to process signed transaction";
       return true;
     }
     if (tvc.m_verification_failed)
     {
       LOG_ERROR("[on_gateway_sign_owner_change]: signed tx verification failed");
       res.status = API_RETURN_CODE_FAIL;
-      er.message = "Signed transaction verification failed";
       return true;
     }
 
