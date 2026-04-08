@@ -292,11 +292,12 @@ void test_plain_wallet()
   //std::string res = plain_wallet::init("", "", "C:\\Users\\roky\\home\\", 0);
   std::string res = plain_wallet::init("https://node.zano.org", "443", "C:\\Users\\roky\\home\\", LOG_LEVEL_2);
   //std::string res = plain_wallet::init("127.0.0.1", "12111", "C:\\Users\\roky\\home22\\", 0);
-  
+
+
   plain_wallet::configure_object conf = AUTO_VAL_INIT(conf);
-  //plain_wallet::configure_response conf_resp = AUTO_VAL_INIT(conf_resp);
-  //conf.postponed_run_wallet = true;
-  //std::string r = plain_wallet::sync_call("configure", 0, epee::serialization::store_t_to_json(conf));
+  plain_wallet::configure_response conf_resp = AUTO_VAL_INIT(conf_resp);
+  conf.postponed_run_wallet = true;
+  std::string r = plain_wallet::sync_call("configure", 0, epee::serialization::store_t_to_json(conf));
   
 
 
@@ -327,6 +328,12 @@ void test_plain_wallet()
 
   uint64_t instance_id = 0;
   res = plain_wallet::open("test_restored_3.zan", "111");
+
+  std::string invoke_body = "{\"method\":\"store\",\"params\":{}}";
+  std::string res1 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+  return;
+
+
   epee::json_rpc::request<tools::wallet_public::COMMAND_RPC_GET_WALLET_RESTORE_INFO::request> req_secret = AUTO_VAL_INIT(req_secret);
   req_secret.method = "get_restore_info";
   res = plain_wallet::invoke(instance_id, epee::serialization::store_t_to_json(req_secret));
@@ -380,8 +387,8 @@ void test_plain_wallet()
   
 
 
-  std::string invoke_body = "{\"method\":\"store\",\"params\":{}}";
-  std::string res1 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+  invoke_body = "{\"method\":\"store\",\"params\":{}}";
+  res1 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
   LOG_PRINT_L0("Store: " << res1);
   return;
@@ -479,10 +486,10 @@ int main(int argc, char** argv)
   //multithread_test_of_get_coinbase_hash_cached();
   //test_tx_json_serialization();
   //test_base64_serialization();
-  //test_plain_wallet();
+  test_plain_wallet();
   //parse_weird_tx();
   //thread_pool_tests();
-  test_plain_wallet_concurent();
+  //test_plain_wallet_concurent();
   //storage_test();
 
 //   std::string buf1 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX);
