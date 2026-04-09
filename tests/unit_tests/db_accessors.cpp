@@ -317,7 +317,7 @@ struct bcs_stub_t
 
 TEST(db_accessor_tests, median_db_cache_test)
 {
-  crypto::random_prng_initialize_with_seed(0); // make this test deterministic (the same crypto::rand() sequence)
+  crypto::random_prng_initialize_with_seed_no_lock(0); // make this test deterministic (the same crypto::rand() sequence)
 
   epee::shared_recursive_mutex m_rw_lock;
   tools::db::basic_db_accessor m_db(std::shared_ptr<tools::db::i_db_backend>(new tools::db::lmdb_db_backend), m_rw_lock);

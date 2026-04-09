@@ -8,6 +8,7 @@
 #include <string>
 #include <boost/multiprecision/cpp_int.hpp>
 #include "crypto.h"
+#include "eth_signature.h"
 
 namespace crypto
 {
@@ -50,38 +51,42 @@ namespace crypto
   }
 
 
-  template<class pod_t>
-  std::string pod_to_hex_reversed(const pod_t &h)
+  inline std::string buff_to_hex(const void* pdata, size_t len, bool reversed = false)
   {
     constexpr char hexmap[] = "0123456789abcdef";
-    const unsigned char* data = reinterpret_cast<const unsigned char*>(&h);
-    size_t len = sizeof h;
+    const unsigned char* data = reinterpret_cast<const unsigned char*>(pdata);
 
     std::string s(len * 2, ' ');
-    for (size_t i = 0; i < len; ++i)
+    if (!reversed)
     {
-      s[2 * i] = hexmap[data[len - 1 - i] >> 4];
-      s[2 * i + 1] = hexmap[data[len - 1 - i] & 0x0F];
+      for (size_t i = 0; i < len; ++i)
+      {
+        s[2 * i] = hexmap[data[i] >> 4];
+        s[2 * i + 1] = hexmap[data[i] & 0x0F];
+      }
+    }
+    else
+    {
+      for (size_t i = 0; i < len; ++i)
+      {
+        s[2 * i] = hexmap[data[len - 1 - i] >> 4];
+        s[2 * i + 1] = hexmap[data[len - 1 - i] & 0x0F];
+      }
     }
 
     return s;
   }
 
   template<class pod_t>
+  std::string pod_to_hex_reversed(const pod_t &h)
+  {
+    return buff_to_hex(&h, sizeof h, true);
+  }
+
+  template<class pod_t>
   std::string pod_to_hex(const pod_t &h)
   {
-    constexpr char hexmap[] = "0123456789abcdef";
-    const unsigned char* data = reinterpret_cast<const unsigned char*>(&h);
-    size_t len = sizeof h;
-
-    std::string s(len * 2, ' ');
-    for (size_t i = 0; i < len; ++i)
-    {
-      s[2 * i] = hexmap[data[i] >> 4];
-      s[2 * i + 1] = hexmap[data[i] & 0x0F];
-    }
-
-    return s;
+    return buff_to_hex(&h, sizeof h);
   }
 
   template<class pod_t>
@@ -492,7 +497,7 @@ namespace crypto
     {
       MP_type result = 0;
       static_assert(sizeof result >= sizeof *this, "size missmatch"); // to avoid using types less than uint256_t
-      unsigned int sz = sizeof *this / sizeof(boost::multiprecision::limb_type);
+      size_t sz = sizeof *this / sizeof(boost::multiprecision::limb_type);
       result.backend().resize(sz, sz);
       memcpy(result.backend().limbs(), &m_s[0], sizeof *this);
       result.backend().normalize();
@@ -811,26 +816,7 @@ namespace crypto
 
     friend bool operator==(const point_t& lhs, const point_t& rhs)
     {
-      // TODO: @#@# (performance) consider checking (lhs - rhs).is_zero() instead
-
-      // convert to xy form, then compare components (because (x, y, z, t) representation is not unique)
-      fe lrecip, lx, ly;
-      fe rrecip, rx, ry;
-
-      fe_invert(lrecip, lhs.m_p3.Z);
-      fe_invert(rrecip, rhs.m_p3.Z);
-
-      fe_mul(lx, lhs.m_p3.X, lrecip);
-      fe_mul(rx, rhs.m_p3.X, rrecip);
-      if (memcmp(&lx, &rx, sizeof lx) != 0)
-        return false;
-
-      fe_mul(ly, lhs.m_p3.Y, lrecip);
-      fe_mul(ry, rhs.m_p3.Y, rrecip);
-      if (memcmp(&ly, &ry, sizeof ly) != 0)
-        return false;
-
-      return true;
+      return (lhs - rhs).is_zero();
     }
 
     friend bool operator!=(const point_t& lhs, const point_t& rhs)
@@ -1043,7 +1029,7 @@ namespace crypto
     void zero()
     {
       PUSH_GCC_WARNINGS
-      DISABLE_GCC_AND_CLANG_WARNING(class-memaccess)
+      DISABLE_GCC_WARNING(class-memaccess)
       size_t size_bytes = sizeof(scalar_t) * size();
       memset(data(), 0, size_bytes);
       POP_GCC_WARNINGS
@@ -1096,7 +1082,6 @@ namespace crypto
       this->resize(size);
       make_random();
     }
-
 
   }; // scalar_vec_t
 
@@ -1202,20 +1187,21 @@ namespace crypto
       void add_point(const point_t& point)
       {
         m_elements.emplace_back(point.to_public_key());
-
-        // faster?
-        /* static_assert(sizeof point.m_p3 == 5 * sizeof(item_t), "size missmatch");
-        const item_t *p = (item_t*)&point.m_p3;
-        m_elements.emplace_back(p[0]);
-        m_elements.emplace_back(p[1]);
-        m_elements.emplace_back(p[2]);
-        m_elements.emplace_back(p[3]);
-        m_elements.emplace_back(p[4]); */
       }
 
       void add_pub_key(const crypto::public_key& pk)
       {
         m_elements.emplace_back(pk);
+      }
+
+      void add_eth_pub_key(const crypto::eth_public_key& epk)
+      {
+        static_assert(sizeof(item_t)  == 32, "unexpected size of hs_t::item_t");
+        static_assert(sizeof epk.data == 33, "unexpected size of eth_public_key");
+        m_elements.emplace_back(c_scalar_0);
+        m_elements.emplace_back(c_scalar_0);
+        char* p = m_elements[m_elements.size() - 2].c; // pointer to the first of the two added items
+        memcpy(p, &epk.data, sizeof epk.data);
       }
 
       void add_key_image(const crypto::key_image& ki)

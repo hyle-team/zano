@@ -99,3 +99,8 @@ std::shared_ptr<tools::wallet2> wallet_test::init_playtime_test_wallet(const std
   return init_playtime_test_wallet(events, c, m_accounts[account_index]);
 }
 
+std::shared_ptr<tools::wallet2> wallet_test::init_playtime_test_wallet_with_true_http_rpc(const std::vector<test_event_entry>& events, currency::core& c, size_t account_index) const
+{
+  CHECK_AND_ASSERT_THROW_MES(account_index < m_accounts.size(), "Invalid account index");
+  return init_playtime_test_wallet_t<tools::wallet2>(events, c, m_accounts[account_index], true);
+}

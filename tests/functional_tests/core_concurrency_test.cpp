@@ -77,7 +77,8 @@ bool create_block_template_manually(const currency::block& prev_block, boost::mu
     result.miner_tx,
     block_reward_without_fee,
     block_reward,
-    TRANSACTION_VERSION_PRE_HF4);
+    TRANSACTION_VERSION_PRE_HF4,
+    0);
   CHECK_AND_ASSERT_MES(r, false, "construct_miner_tx failed");
 
   size_t coinbase_size = get_object_blobsize(result.miner_tx);
@@ -133,9 +134,9 @@ bool generate_events(currency::core& c, cct_events_t& events, const cct_wallets_
         if (it->type() == typeid(currency::transaction))
         {
           const transaction& tx = boost::get<const currency::transaction>(*it);
-          uint64_t max_used_block_height = 0;
-          r = bcs.check_tx_inputs(tx, get_transaction_hash(tx), max_used_block_height);
-          if (r && max_used_block_height <= prev_block.height)
+          blockchain_storage::check_tx_inputs_context ctic{};
+          r = bcs.check_tx_inputs(tx, get_transaction_hash(tx), ctic);
+          if (r && ctic.max_used_block_height <= prev_block.height)
             txs.push_back(&tx); // filter out tx that are using too recent outputs -- yep, some txs will be dropped forever
         }
         else if (it->type() == typeid(currency::block))
@@ -155,7 +156,7 @@ bool generate_events(currency::core& c, cct_events_t& events, const cct_wallets_
     test_core_time::adjust(b.timestamp);
 
     currency::wide_difficulty_type diff = 0;
-    r = currency::miner::find_nonce_for_given_block(b, diff, height);
+    r = currency::find_nonce_for_given_block(b, diff, height);
     CHECK_AND_ASSERT_MES(r, false, "find_nonce_for_given_block failed");
 
     currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
@@ -450,7 +451,7 @@ namespace boost
 bool core_concurrency_test(boost::program_options::variables_map& vm, size_t wthreads, size_t rthreads, size_t blocks_count)
 {
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
-  //epee::debug::get_set_enable_assert(true, false);
+  epee::debug::get_set_enable_assert(true, false);
   log_space::get_set_need_thread_id(true, true);
 
   cct_accounts_t accounts(s_wallets_total_count);

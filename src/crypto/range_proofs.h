@@ -100,7 +100,6 @@ namespace crypto
     }
 
     // TODO: refactor with proper OOB handling
-    // TODO: @#@# add domain separation
     static const point_t& get_generator(bool select_H, size_t index)
     {
       if (index >= c_bpp_mn_max)

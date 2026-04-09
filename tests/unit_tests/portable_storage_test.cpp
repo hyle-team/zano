@@ -96,3 +96,48 @@ TEST(portable_storage_tests, json_string_unescaping_match_string2)
   ASSERT_TRUE(caught);
 }
 
+void populate_storate(epee::serialization::portable_storage& ps, epee::serialization::portable_storage::hsection h_sec, size_t recursion_count)
+{
+  recursion_count++;
+  if (recursion_count > 7)
+    return;
+
+  epee::serialization::portable_storage::hsection h_child = nullptr;
+  auto h_array = ps.insert_first_section("n", h_child, h_sec);
+  populate_storate(ps, h_child, recursion_count);
+  for (size_t i = 0; i != recursion_count; i++)
+  {
+    ps.insert_next_section(h_array, h_child);
+    populate_storate(ps, h_child, recursion_count);
+  }
+}
+
+
+
+TEST(portable_storage_tests, mem_limitations_test)
+{
+
+  epee::serialization::portable_storage ps;
+  size_t recursion_counter = 0;
+  populate_storate(ps, nullptr, recursion_counter);
+
+  bool caught = false;
+  bool res = false;
+  try
+  {
+    std::string buff;
+    ps.store_to_binary(buff);
+
+    epee::serialization::portable_storage ps2;
+    bool res = ps2.load_from_binary(buff, epee::serialization::gdefault_portable_storage_limits);
+  }
+  catch (...)
+  {
+    caught = true;
+  }
+  ASSERT_TRUE(caught || !res);
+
+}
+
+
+

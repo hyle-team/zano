@@ -232,7 +232,10 @@ namespace tools
       else
       {
         m_password.push_back(ch);
-        std::cout << (char_to_replace_user_input != '\0' ? char_to_replace_user_input : ch);
+        std::cout.put((
+          char_to_replace_user_input != '\0' ? 
+          char_to_replace_user_input : static_cast<char>(ch))
+        ).flush();
       }
     }
 

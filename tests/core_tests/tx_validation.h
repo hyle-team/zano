@@ -6,6 +6,7 @@
 
 #pragma once 
 #include "chaingen.h"
+#include "wallet_tests_basic.h"
 
 struct gen_tx_big_version : public test_chain_unit_enchanced
 {
@@ -154,4 +155,44 @@ struct tx_key_image_pool_conflict : public test_chain_unit_enchanced
 {
   bool generate(std::vector<test_event_entry>& events) const;
   mutable currency::account_base m_miner_acc;
+};
+
+struct tx_version_against_hardfork : public test_chain_unit_enchanced
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};
+
+struct tx_pool_semantic_validation : public test_chain_unit_enchanced
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};
+
+struct input_refers_to_incompatible_by_type_output : public test_chain_unit_enchanced
+{
+  input_refers_to_incompatible_by_type_output();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool assert_htlc_input_refers_to_key_output_is_wrong(const currency::core& c, const size_t ev_index, const std::vector<test_event_entry>& events) const;
+  bool assert_to_key_input_refers_zarcanum_output_is_wrong(const currency::core& c, const size_t ev_index, const std::vector<test_event_entry>& events) const;
+  bool assert_zc_input_refers_bare_output_is_wrong(const currency::core& c, const size_t ev_index, const std::vector<test_event_entry>& events) const;
+  bool assert_htlc_input_refers_zarcanum_output_is_wrong(const currency::core& c, const size_t ev_index, const std::vector<test_event_entry>& events) const;
+};
+
+struct tx_pool_validation_and_chain_switch : public wallet_test
+{
+  tx_pool_validation_and_chain_switch();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct tx_coinbase_separate_sig_flag : public test_chain_unit_enchanced
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};
+
+struct tx_input_mixins: public test_chain_unit_enchanced
+{
+  tx_input_mixins();
+
+  bool configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+  bool generate(std::vector<test_event_entry>& events) const;
 };

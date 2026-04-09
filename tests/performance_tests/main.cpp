@@ -24,19 +24,347 @@
 #include "free_space_check.h"
 #include "htlc_hash_tests.h"
 #include "threads_pool_tests.h"
-#include "wallet/plain_wallet_api.h"
+#include "wallet/plain_wallet_api.h"  
 #include "wallet/view_iface.h"
+#include "wallet/plain_wallet_api_defs.h"
+#include "math_helper.h"
+  
+PUSH_VS_WARNINGS
+DISABLE_VS_WARNINGS(4244)
+#include "jwt-cpp/jwt.h"
+POP_VS_WARNINGS
+
+
+
+void test_base64_serialization()
+{
+  currency::COMMAND_RPC_GET_POOL_TXS_DETAILS::response rsp;
+  rsp.txs.resize(1);
+  rsp.txs.back().blob.resize(4000);
+  crypto::generate_random_bytes(rsp.txs.back().blob.size(), (void*)rsp.txs.back().blob.data());
+
+  std::string str_json;
+  epee::serialization::store_t_to_json(rsp, str_json);
+
+  currency::COMMAND_RPC_GET_POOL_TXS_DETAILS::response rsp2;
+  epee::serialization::load_t_from_json(rsp2, str_json);
+  if (rsp.txs.back().blob != rsp2.txs.back().blob)
+  {
+    LOG_PRINT_L0("Troubles");
+  }
+    
+}
+
+
+void test_tx_json_serialization()
+{
+  currency::transaction tx{};
+
+  tx.version = CURRENT_TRANSACTION_VERSION;
+  currency::asset_descriptor_operation ado{};
+  ado.version = ASSET_DESCRIPTOR_OPERATION_LAST_VER;
+  ado.opt_asset_id = currency::null_pkey;
+  currency::asset_descriptor_base adb{};
+  ado.opt_descriptor = adb;
+  tx.extra.push_back(ado);
+  std::string json_tx = currency::obj_to_json_str(tx);
+}
+
+/*
+struct HeapSnapshot {
+  _CrtMemState state{};
+  explicit HeapSnapshot(bool take_now = false) {
+    if (take_now) take();
+  }
+  void take() {
+    _CrtMemCheckpoint(&state);
+  }
+};
+
+static const char* formatBytes(long bytes, char* buf, size_t bufSize) {
+  const char* suffixes[] = { "B", "K", "M", "G" };
+  double value = static_cast<double>(bytes);
+  int suffix = 0;
+  while (value >= 1024.0 && suffix < 3) {
+    value /= 1024.0;
+    ++suffix;
+  }
+  std::snprintf(buf, bufSize, "%.1f%s", value, suffixes[suffix]);
+  return buf;
+}
+
+static void printStats(const char* label, const _CrtMemState& s) {
+  char b1[32], b2[32], b3[32], b4[32], b5[32];
+  std::printf(
+    "%s:\n"
+    "  Bytes (normal): %s\n"
+    "  Bytes (CRT):    %s\n",
+    label,
+    formatBytes(s.lSizes[_NORMAL_BLOCK], b1, sizeof(b1)),
+    formatBytes(s.lSizes[_CRT_BLOCK], b2, sizeof(b2))
+  );
+}
+
+static void printDiff(const HeapSnapshot& a, const HeapSnapshot& b, const char* label = "Diff A->B") {
+  _CrtMemState diff{};
+  if (_CrtMemDifference(&diff, &a.state, &b.state)) {
+    printStats(label, diff);
+    std::puts("  (Positive bytes/blocks mean growth between A and B.)");
+  }
+  else {
+    std::puts("No detectable heap difference between snapshots.");
+  }
+}
+*/
+
+
+void populate_storate(epee::serialization::portable_storage& ps, epee::serialization::portable_storage::hsection h_sec, size_t recursion_count)
+{
+  recursion_count++;
+  if (recursion_count > 8)
+    return;
+
+  epee::serialization::portable_storage::hsection h_child = nullptr;
+  auto h_array = ps.insert_first_section("n", h_child, h_sec);
+  populate_storate(ps, h_child, recursion_count);
+  for (size_t i = 0; i != recursion_count+1; i++)
+  {
+    ps.insert_next_section(h_array, h_child);
+    populate_storate(ps, h_child, recursion_count);
+  }
+}
+
+
+void storage_test()
+{
+  /*
+  int flags = _CrtSetDbgFlag(_CRTDBG_REPORT_FLAG);
+  flags |= _CRTDBG_ALLOC_MEM_DF;   // Turn on debug heap
+  flags |= _CRTDBG_LEAK_CHECK_DF;  // Report leaks at process exit
+  _CrtSetDbgFlag(flags);
+
+  HeapSnapshot A(true);
+
+  epee::serialization::portable_storage ps;
+  size_t recursion_counter = 0;
+  populate_storate(ps, nullptr, recursion_counter);
+  
+  
+  
+  HeapSnapshot B(true);  // Snapshot at point B
+  printDiff(A, B, "Delta (B - A)");
+
+  {
+    std::string buff;
+    ps.store_to_binary(buff);
+    char b1[32];
+    formatBytes(buff.size(), b1, sizeof(b1));
+    std::printf("storage_buffer: %s:\n", b1);
+
+
+
+    epee::serialization::portable_storage ps2;
+    ps2.load_from_binary(buff);
+  }
+
+  */
+
+}
+void test_plain_wallet_concurent()
+{
+  std::string res = plain_wallet::init("https://node.zano.org", "443", "C:\\Users\\roky\\home\\temp\\plain_wallet_sendbox", LOG_LEVEL_0);
+
+  uint64_t instance_id = 0;
+  //res = plain_wallet::open("test_restored_3.zan", "111");
+  //epee::json_rpc::request<tools::wallet_public::COMMAND_RPC_GET_WALLET_RESTORE_INFO::request> req_secret = AUTO_VAL_INIT(req_secret);
+  //req_secret.method = "get_restore_info";
+  //res = plain_wallet::invoke(instance_id, epee::serialization::store_t_to_json(req_secret));
+  //epee::json_rpc::response<tools::wallet_public::COMMAND_RPC_GET_WALLET_RESTORE_INFO::response, epee::json_rpc::dummy_error> resp_secret = AUTO_VAL_INIT(resp_secret);
+
+  //std::string res_back = res;
+  //epee::serialization::load_t_from_json(resp_secret, res);
+  srand(static_cast<unsigned int>(time(nullptr)));
+  std::string s(8, '0');
+  std::generate(s.begin(), s.end(), []() {return '0' + rand() % 10; });
+  crypto::hash derivation_tmp = crypto::rand<crypto::hash>();
+
+  view::restore_wallet_from_derivation_request rst_req;
+  rst_req.path = "temp_" + s + ".zan";
+  rst_req.pass = "";
+  rst_req.secret_derivation.clear();
+  epee::string_tools::append_pod_to_strbuff(rst_req.secret_derivation, derivation_tmp);
+  rst_req.is_auditable = false;
+  rst_req.creation_timestamp = 1705656815;
+
+  res = plain_wallet::sync_call("restore_from_derivations", 0, epee::serialization::store_t_to_json(rst_req));
+  
+  std::generate(s.begin(), s.end(), []() {return '0' + rand() % 10; });
+  rst_req.path = "temp_" + s + ".zan";
+  rst_req.secret_derivation.clear();
+  epee::string_tools::append_pod_to_strbuff(rst_req.secret_derivation, derivation_tmp);
+
+  res = plain_wallet::sync_call("restore_from_derivations", 0, epee::serialization::store_t_to_json(rst_req));
+
+  std::generate(s.begin(), s.end(), []() {return '0' + rand() % 10; });
+  rst_req.path = "temp_" + s + ".zan";
+  rst_req.secret_derivation.clear();
+  epee::string_tools::append_pod_to_strbuff(rst_req.secret_derivation, derivation_tmp);
+  res = plain_wallet::sync_call("restore_from_derivations", 0, epee::serialization::store_t_to_json(rst_req));
+
+  std::generate(s.begin(), s.end(), []() {return '0' + rand() % 10; });
+  rst_req.path = "temp_" + s + ".zan";
+  rst_req.secret_derivation.clear();
+  epee::string_tools::append_pod_to_strbuff(rst_req.secret_derivation, derivation_tmp);
+  res = plain_wallet::sync_call("restore_from_derivations", 0, epee::serialization::store_t_to_json(rst_req));
+
+
+  while (true)
+  {   
+    res = plain_wallet::get_opened_wallets();
+    epee::json_rpc::response<std::list<view::open_wallet_response>, epee::json_rpc::dummy_error> owr{};
+    epee::serialization::load_t_from_json(owr, res);
+
+    for (const auto& wallet : owr.result)
+    {
+
+      res = plain_wallet::sync_call("get_wallet_status", wallet.wallet_id, "");
+      view::wallet_sync_status_info wsi = AUTO_VAL_INIT(wsi);
+      epee::serialization::load_t_from_json(wsi, res);
+      LOG_PRINT_L0("id: " << wallet.wallet_id << " state: " << wsi.wallet_state << " progress: " << wsi.progress << " sync_speed:" << epee::string_tools::format_bytes_human_readable(wsi.sync_speed) << "/s");
+    }
+    epee::misc_utils::sleep_no_w(2000);
+  }
+
+  std::string invoke_body = "{\"method\":\"store\",\"params\":{}}";
+  std::string res1 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
+  LOG_PRINT_L0("Store: " << res1);
+  return;
+  {
+    invoke_body = "{\"method\":\"getbalance\",\"params\":{}}";
+    std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+    invoke_body = "";
+  }
+
+  {
+    invoke_body = "{\"method\":\"assets_whitelist_get\",\"params\":{}}";
+    std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+    invoke_body = "";
+  }
+
+
+
+  {
+    //invoke_body = "{\"method\":\"assets_whitelist_get\",\"params\":{}}";
+    //std::string json_request;
+    bool r = epee::file_io_utils::load_file_to_string("C:\\Users\\roky\\home\\wallets\\deploy_asset_request.json", invoke_body);
+    CHECK_AND_ASSERT_MES(r, void(), "wrong bla bla bla");
+    std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+    invoke_body = "";
+  }
+
+
+  //invoke_body = "{\"method\":\"get_recent_txs_and_info\",\"params\":{\"offset\":0,\"count\":30,\"update_provision_info\":true}}";  
+  //std::string res2 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
+  //invoke_body = "{\"method\":\"get_recent_txs_and_info2\",\"params\":{\"offset\":0,\"count\":30,\"update_provision_info\":true}}";
+  //res2 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
+
+  invoke_body = "{\"method\":\"getbalance\",\"params\":{}}";
+  std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
+
+  //invoke_body = "{\r\n  \"method\": \"transfer\",\r\n  \"params\": {\r\n    \"destinations\": [\r\n      {\r\n        \"amount\": \"1000000000000\",\r\n        \"address\": \"ZxD9oVwGwW6ULix9Pqttnr7JDpaoLvDVA1KJ9eA9KRxPMRZT5X7WwtU94XH1Z6q6XTMxNbHmbV2xfZ429XxV6fST2DxEg4BQV\",\r\n        \"asset_id\": \"cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6\"\r\n      }\r\n    ],\r\n    \"fee\": 10000000000,\r\n    \"mixin\": 10,\r\n    \"payment_id\": \"\",\r\n    \"comment\": \"\",\r\n    \"push_payer\": false,\r\n    \"hide_receiver\": true\r\n  }\r\n}";
+  //std::string res4 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
+
+
+
+
+
+}
 
 
 void test_plain_wallet()
 {
-  //std::string res = plain_wallet::init("195.201.107.230", "33336", "E:\\tmp\\", 0);
-  std::string res = plain_wallet::init("127.0.0.1", "12111", "C:\\Users\\roky\\home\\", 0);
+  //std::string res = plain_wallet::init("195.201.107.230", "33340", "C:\\Users\\roky\\home\\", 0);
+  //std::string res = plain_wallet::init("", "", "C:\\Users\\roky\\home\\", 0);
+  std::string res = plain_wallet::init("https://node.zano.org", "443", "C:\\Users\\roky\\home\\", LOG_LEVEL_2);
+  //std::string res = plain_wallet::init("127.0.0.1", "12111", "C:\\Users\\roky\\home22\\", 0);
   
+  plain_wallet::configure_object conf = AUTO_VAL_INIT(conf);
+  //plain_wallet::configure_response conf_resp = AUTO_VAL_INIT(conf_resp);
+  //conf.postponed_run_wallet = true;
+  //std::string r = plain_wallet::sync_call("configure", 0, epee::serialization::store_t_to_json(conf));
+  
+
+
+  //-------------------------------------------------------------------
+//test proxy_to_wallet
+  std::string daemon_body = "{\"method\":\"getinfo\",\"params\":{}}";
+  std::string daemon_body_base64 = epee::string_encoding::base64_encode(daemon_body);
+  tools::wallet_public::COMMAND_PROXY_TO_DAEMON::request req_to_daemon;
+  req_to_daemon.uri = "/json_rpc";
+  req_to_daemon.base64_body = daemon_body_base64;
+  std::string rsp_ = plain_wallet::sync_call("proxy_to_daemon", 0, epee::serialization::store_t_to_json(req_to_daemon));
+  //-------------------------------------------------------------------
+
+
+
+
+  //std::string seed;
+  //if (!epee::file_io_utils::load_file_to_string("C:\\Users\\roky\\home\\temp\\wallets\\seed.txt", seed))
+  //  return;
+
+  //std::string res___ = plain_wallet::get_wallet_files();
+
+
+
+
+
+
+
   uint64_t instance_id = 0;
-  res = plain_wallet::open("test_restored.zan", "111");
-  //res = plain_wallet::restore("heart level clear fate sorrow childhood sent fate ceiling party third steel came ask mix neither message already almost vast date glide tumble color okay space",
-  //  "test_restored.zan", "111", "");
+  res = plain_wallet::open("test_restored_3.zan", "111");
+  epee::json_rpc::request<tools::wallet_public::COMMAND_RPC_GET_WALLET_RESTORE_INFO::request> req_secret = AUTO_VAL_INIT(req_secret);
+  req_secret.method = "get_restore_info";
+  res = plain_wallet::invoke(instance_id, epee::serialization::store_t_to_json(req_secret));
+  epee::json_rpc::response<tools::wallet_public::COMMAND_RPC_GET_WALLET_RESTORE_INFO::response, epee::json_rpc::dummy_error> resp_secret = AUTO_VAL_INIT(resp_secret);
+
+  std::string res_back = res;
+  epee::serialization::load_t_from_json(resp_secret, res);
+
+
+  uint64_t instance_id2 = 1;
+  view::restore_wallet_from_derivation_request rst_req;
+  rst_req.path = "test_restored_6.zan";
+  rst_req.pass = "";
+  rst_req.secret_derivation = resp_secret.result.derivation_secret;
+  rst_req.is_auditable = resp_secret.result.is_auditable;
+  rst_req.creation_timestamp = resp_secret.result.creation_timestamp;
+
+  res = plain_wallet::sync_call("restore_from_derivations", 0, epee::serialization::store_t_to_json(rst_req));
+
+
+  epee::json_rpc::request<tools::wallet_public::COMMAND_RPC_GET_WALLET_RESTORE_INFO::request> req2_secret = AUTO_VAL_INIT(req2_secret);
+  req2_secret.method = "get_restore_info";
+  std::string res2 = plain_wallet::invoke(1, epee::serialization::store_t_to_json(req2_secret));
+
+
+  //res = plain_wallet::restore(seed,
+  //  "test_restored_3.zan", "111", "test");
+
+  epee::misc_utils::sleep_no_w(2000);
+
+  //res = plain_wallet::sync_call("reset_connection_url", 0, "195.201.107.230:33336");
+  //res = plain_wallet::sync_call("reset_connection_url", 0, "https://node.zano.org:443");
+  //res = plain_wallet::sync_call("reset_connection_url", 0, "https://zano.cakewallet.com");
+  //res = plain_wallet::sync_call("reset_connection_url", 0, "https://zano.api.wombat.systems:443");
+  //res = plain_wallet::sync_call("reset_connection_url", 0, "http://127.0.0.1:11211");
+
+  
+  //r = plain_wallet::sync_call("run_wallet", instance_id, "");
 
 
   while(true)
@@ -45,31 +373,98 @@ void test_plain_wallet()
     res = plain_wallet::sync_call("get_wallet_status", instance_id, "");
     view::wallet_sync_status_info wsi = AUTO_VAL_INIT(wsi);
     epee::serialization::load_t_from_json(wsi, res);
+    LOG_PRINT_L0("Progress: "  << wsi.progress << " state: " << wsi.wallet_state << "is_in_long_refresh: " << wsi.is_in_long_refresh << ", height: " << wsi.current_wallet_height << " of " << wsi.current_daemon_height);
     if (wsi.wallet_state == 2)
       break;
   }
+  
 
 
   std::string invoke_body = "{\"method\":\"store\",\"params\":{}}";
-  //std::string res1 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+  std::string res1 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
-  invoke_body = "{\"method\":\"get_recent_txs_and_info\",\"params\":{\"offset\":0,\"count\":30,\"update_provision_info\":true}}";  
-  std::string res2 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+  LOG_PRINT_L0("Store: " << res1);
+  return;
+  {
+    invoke_body = "{\"method\":\"getbalance\",\"params\":{}}";
+    std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+    invoke_body = "";
+  }
+
+  {
+    invoke_body = "{\"method\":\"assets_whitelist_get\",\"params\":{}}";
+    std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+    invoke_body = "";
+  }
+
+
+
+  {
+    //invoke_body = "{\"method\":\"assets_whitelist_get\",\"params\":{}}";
+    //std::string json_request;
+    bool r = epee::file_io_utils::load_file_to_string("C:\\Users\\roky\\home\\wallets\\deploy_asset_request.json", invoke_body);
+    CHECK_AND_ASSERT_MES(r, void(), "wrong bla bla bla");
+    std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+    invoke_body = "";
+  }
+
+
+  //invoke_body = "{\"method\":\"get_recent_txs_and_info\",\"params\":{\"offset\":0,\"count\":30,\"update_provision_info\":true}}";  
+  //std::string res2 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
+  //invoke_body = "{\"method\":\"get_recent_txs_and_info2\",\"params\":{\"offset\":0,\"count\":30,\"update_provision_info\":true}}";
+  //res2 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+
 
   invoke_body = "{\"method\":\"getbalance\",\"params\":{}}";
   std::string res3 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
 
-  invoke_body = "{\"method\":\"getbalance\",\"params\":{}}";
-  std::string res4 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
+  //invoke_body = "{\r\n  \"method\": \"transfer\",\r\n  \"params\": {\r\n    \"destinations\": [\r\n      {\r\n        \"amount\": \"1000000000000\",\r\n        \"address\": \"ZxD9oVwGwW6ULix9Pqttnr7JDpaoLvDVA1KJ9eA9KRxPMRZT5X7WwtU94XH1Z6q6XTMxNbHmbV2xfZ429XxV6fST2DxEg4BQV\",\r\n        \"asset_id\": \"cc4e69455e63f4a581257382191de6856c2156630b3fba0db4bdd73ffcfb36b6\"\r\n      }\r\n    ],\r\n    \"fee\": 10000000000,\r\n    \"mixin\": 10,\r\n    \"payment_id\": \"\",\r\n    \"comment\": \"\",\r\n    \"push_payer\": false,\r\n    \"hide_receiver\": true\r\n  }\r\n}";
+  //std::string res4 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
 
-
-  invoke_body = "{\r\n  \"method\": \"transfer\",\r\n  \"params\": {\r\n    \"destinations\": [\r\n      {\r\n        \"amount\": \"1000000000000\",\r\n        \"address\": \"ZxD9oVwGwW6ULix9Pqttnr7JDpaoLvDVA1KJ9eA9KRxPMRZT5X7WwtU94XH1Z6q6XTMxNbHmbV2xfZ429XxV6fST2DxEg4BQV\"  }\r\n    ],\r\n    \"fee\": 10000000000,\r\n    \"mixin\": 10,\r\n    \"payment_id\": \"\",\r\n    \"comment\": \"\",\r\n    \"push_payer\": false,\r\n    \"hide_receiver\": true\r\n  }\r\n}";
-  std::string res5 = plain_wallet::sync_call("invoke", instance_id, invoke_body);
-
-  LOG_PRINT_L0(res);
+  //LOG_PRINT_L0(res);
 
 }
+
+void multithread_test_of_get_coinbase_hash_cached()
+{
+  epee::math_helper::once_a_time_seconds<1> print_interwal;
+
+  try
+  {
+    crypto::hash h = currency::null_hash;
+    utils::threads_pool pool;
+    pool.init();
+    for (uint64_t j = 0; j != 100000000; j++)
+    {
+
+      print_interwal.do_call([&]() { LOG_PRINT_L0("Job " << j << " started, h=" << h); return true; });
+      currency::block_extended_info bei = AUTO_VAL_INIT(bei);
+      utils::threads_pool::jobs_container jobs;
+      size_t i = 0;
+
+      for (; i != 10; i++)
+      {
+        utils::threads_pool::add_job_to_container(jobs, [&, i]() {
+          h = get_coinbase_hash_cached(bei);
+          //LOG_PRINT_L0("Job " << i << " started"); 
+          //epee::misc_utils::sleep_no_w(10000); 
+          // ++count_jobs_finished; LOG_PRINT_L0("Job " << i << " finished"); 
+          });
+      }
+
+      pool.add_batch_and_wait(jobs);
+    }
+  }
+  catch (...)
+  {
+    LOG_ERROR("Exception happened");
+  }
+
+
+}
+
 
 
 int main(int argc, char** argv)
@@ -80,10 +475,15 @@ int main(int argc, char** argv)
   //epee::log_space::log_singletone::add_logger(LOGGER_FILE,
   //  epee::log_space::log_singletone::get_default_log_file().c_str(),
   //  epee::log_space::log_singletone::get_default_log_folder().c_str());
-
-  test_plain_wallet();
+  
+  //multithread_test_of_get_coinbase_hash_cached();
+  //test_tx_json_serialization();
+  //test_base64_serialization();
+  //test_plain_wallet();
   //parse_weird_tx();
   //thread_pool_tests();
+  test_plain_wallet_concurent();
+  //storage_test();
 
 //   std::string buf1 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX);
 //   std::string buf2 = tools::get_varint_data<uint64_t>(CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX);

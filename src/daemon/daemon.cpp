@@ -37,9 +37,14 @@ using namespace epee;
 #endif
 
 
+const uint64_t min_ram_for_full_warp_mode = 32ULL * 1024ULL * 1024ULL * 1024ULL;
+const uint64_t recommended_ram_for_full_warp_mode = 64ULL * 1024ULL * 1024ULL * 1024ULL;
+
 //TODO: need refactoring here. (template classes can't be used in BOOST_CLASS_VERSION) 
 BOOST_CLASS_VERSION(nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >, CURRENT_P2P_STORAGE_ARCHIVE_VER);
 
+const command_line::arg_descriptor<uint32_t>    arg_rpc_server_threads("rpc-server-threads", "Specify number of RPC server threads. Default: 10", RPC_SERVER_DEFAULT_THREADS_NUM);
+const command_line::arg_descriptor<bool>        arg_do_warp_mode("do-warp-mode", "This option pre-loads and unserialize all data into RAM and provide significant speed increase in RPC-handling, requires 32GB psychical RAM at least(64GB recommended). Might be helpful for production servers(like remote nodes or public nodes for mobile apps).");
 
 namespace po = boost::program_options;
 
@@ -61,10 +66,10 @@ struct core_critical_error_handler_t : public currency::i_critical_error_handler
     if (dont_stop_on_time_error)
       return false; // ignore such errors
     
-    LOG_ERROR(ENDL << ENDL << "Serious time sync problem detected, daemon will stop immediately" << ENDL << ENDL);
+    LOG_ERROR(ENDL << ENDL << "Serious TIME sync problem detected, daemon will stop immediately" << ENDL << ENDL);
 
     // stop handling
-    dch.stop_handling();
+    p2psrv.send_stop_signal();
     return true; // the caller must stop processing
   }
 
@@ -126,7 +131,6 @@ int main(int argc, char* argv[])
   log_space::get_set_log_detalisation_level(true, LOG_LEVEL_0);
   log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
   log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,wallet", false);
-  LOG_PRINT_L0("Starting...");
 
   tools::signal_handler::install_fatal([](int sig_number, void* address) {
     LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
@@ -155,7 +159,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_sett, command_line::arg_log_level);
   command_line::add_arg(desc_cmd_sett, command_line::arg_console);
   command_line::add_arg(desc_cmd_only, command_line::arg_show_details);
-  command_line::add_arg(desc_cmd_only, command_line::arg_show_rpc_autodoc);
+  command_line::add_arg(desc_cmd_only, command_line::arg_generate_rpc_autodoc);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_stop_if_time_out_of_sync);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_stop_on_low_free_space);
   command_line::add_arg(desc_cmd_sett, command_line::arg_enable_offers_service);
@@ -167,6 +171,8 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_cmd_sett, command_line::arg_predownload_link);
   command_line::add_arg(desc_cmd_sett, command_line::arg_disable_ntp);
 
+  command_line::add_arg(desc_cmd_sett, arg_rpc_server_threads);
+  command_line::add_arg(desc_cmd_sett, arg_do_warp_mode); 
 
   arg_market_disable.default_value = true;
   arg_market_disable.use_default = true;
@@ -175,7 +181,9 @@ int main(int argc, char* argv[])
   currency::core_rpc_server::init_options(desc_cmd_sett);
   typedef nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > p2psrv_t;
   p2psrv_t::init_options(desc_cmd_sett);
+#ifdef CPU_MINING_ENABLED
   currency::miner::init_options(desc_cmd_sett);
+#endif
   bc_services::bc_offers_service::init_options(desc_cmd_sett);
   currency::stratum_server::init_options(desc_cmd_sett);
   tools::db::db_backend_selector::init_options(desc_cmd_sett);
@@ -183,7 +191,11 @@ int main(int argc, char* argv[])
   po::options_description desc_options("Allowed options");
   desc_options.add(desc_cmd_only).add(desc_cmd_sett);
 
+  
+
+  std::string data_dir;
   po::variables_map vm;
+  bool exit_requested = false;
   bool r = command_line::handle_error_helper(desc_options, [&]()
   {
     po::store(po::parse_command_line(argc, argv, desc_options), vm);
@@ -192,10 +204,17 @@ int main(int argc, char* argv[])
     {
       std::cout << CURRENCY_NAME << " v" << PROJECT_VERSION_LONG << ENDL << ENDL;
       std::cout << desc_options << std::endl;
-      return false;
+      exit_requested = true;
+      return true;
+    }
+    else if (command_line::get_arg(vm, command_line::arg_version))
+    {
+      std::cout << CURRENCY_NAME << " v" << PROJECT_VERSION_LONG << ENDL << ENDL;
+      exit_requested = true;
+      return true;
     }
 
-    std::string data_dir = command_line::get_arg(vm, command_line::arg_data_dir);
+    data_dir = command_line::get_arg(vm, command_line::arg_data_dir);
     std::string config = command_line::get_arg(vm, command_line::arg_config_file);
 
     boost::filesystem::path data_dir_path(epee::string_encoding::utf8_to_wstring(data_dir));
@@ -214,21 +233,19 @@ int main(int argc, char* argv[])
 
     return true;
   });
+
   if (!r)
     return EXIT_FAILURE;
 
+  if (exit_requested)
+    return EXIT_SUCCESS;
+
   //set up logging options
-  std::string log_dir;
+  std::string log_dir = data_dir;
   std::string log_file_name = log_space::log_singletone::get_default_log_file();
   //check if there was specific option
   if (command_line::has_arg(vm, command_line::arg_log_dir))
-  {
     log_dir = command_line::get_arg(vm, command_line::arg_log_dir);
-  }
-  else
-  {
-    log_dir = command_line::get_arg(vm, command_line::arg_data_dir);
-  }
 
   log_space::log_singletone::add_logger(LOGGER_FILE, log_file_name.c_str(), log_dir.c_str());
   LOG_PRINT_L0(CURRENCY_NAME << " v" << PROJECT_VERSION_LONG);
@@ -238,10 +255,11 @@ int main(int argc, char* argv[])
     return EXIT_SUCCESS;
   }
 
+  LOG_PRINT_L0("Starting...");
 
   // stratum server is enabled if any of its options present
   bool stratum_enabled = currency::stratum_server::should_start(vm);
-  LOG_PRINT("Module folder: " << argv[0], LOG_LEVEL_0);
+  LOG_PRINT("Module folder: " << argv[0] << ", data folder: " << data_dir, LOG_LEVEL_0);
 
   //create objects and link them
   bc_services::bc_offers_service offers_service(nullptr);
@@ -272,21 +290,15 @@ int main(int argc, char* argv[])
   if (stratum_enabled)
     stratum_server_ptr = std::make_shared<currency::stratum_server>(&ccore);
 
-  if (command_line::get_arg(vm, command_line::arg_show_rpc_autodoc))
-  {
-    LOG_PRINT_L0("Dumping RPC auto-generated documents!");
-    epee::net_utils::http::http_request_info query_info;
-    epee::net_utils::http::http_response_info response_info;
-    epee::net_utils::connection_context_base conn_context;
-    std::string generate_reference = std::string("RPC_COMMANDS_LIST:\n");
-    bool call_found = false;
-    rpc_server.handle_http_request_map(query_info, response_info, conn_context, call_found, generate_reference);
-    std::string json_rpc_reference;
-    query_info.m_URI = JSON_RPC_REFERENCE_MARKER;
-    query_info.m_body = "{\"jsonrpc\": \"2.0\", \"method\": \"nonexisting_method\", \"params\": {}},";
-    rpc_server.handle_http_request_map(query_info, response_info, conn_context, call_found, json_rpc_reference);
 
-    LOG_PRINT_L0(generate_reference << ENDL << "----------------------------------------" << ENDL << json_rpc_reference);
+
+  if (command_line::has_arg(vm, command_line::arg_generate_rpc_autodoc))
+  {
+    std::string path_to_generate = command_line::get_arg(vm, command_line::arg_generate_rpc_autodoc);
+    std::string auto_doc_sufix = "<sub>Auto-doc built with: " PROJECT_VERSION_LONG "</sub>";
+    if (!generate_doc_as_md_files(path_to_generate, rpc_server, auto_doc_sufix))
+      return 1;
+    return 0;
   }
 
   bool res = false;
@@ -360,14 +372,75 @@ int main(int argc, char* argv[])
   res = ccore.set_checkpoints(std::move(checkpoints));
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core");
 
-  // start components
-  if (!command_line::has_arg(vm, command_line::arg_console))
+
+  //do full warp mode if needed
+  if (command_line::has_arg(vm, arg_do_warp_mode))
   {
-    dch.start_handling();
+    LOG_PRINT_MAGENTA("Initializing full warp-mode", LOG_LEVEL_0);
+    //let's check if cache size were specifically set 
+    if (!command_line::has_arg(vm, arg_db_cache_l2))
+    {
+      //overriding caching settings
+      uint64_t cache_size = ccore.get_blockchain_storage().get_total_transactions() * 10;
+      ccore.get_blockchain_storage().set_db_l2_cache_size(cache_size);
+      
+      LOG_PRINT_MAGENTA("[Warp]: Setting up db cache to " << tools::pretty_print_big_nums(cache_size) << " items.....", LOG_LEVEL_0);
+    }
+    uint64_t phisical_ram_detected = tools::get_total_system_memory();
+    if (phisical_ram_detected < min_ram_for_full_warp_mode)
+    {
+      LOG_PRINT_RED_L0("[Warp]: Detected only " << tools::pretty_print_big_nums(phisical_ram_detected) << "B of RAM, it's not recommended to run daemon in full warm up mode under " << tools::pretty_print_big_nums(min_ram_for_full_warp_mode) << "B, stopping...");
+      return 1;
+    }
+    else
+    {
+      if(phisical_ram_detected < recommended_ram_for_full_warp_mode)
+      {
+        LOG_PRINT_MAGENTA("[Warp]: Detected only " << tools::pretty_print_big_nums(phisical_ram_detected) << "B RAM, might be not optimal, recommended above " << tools::pretty_print_big_nums(recommended_ram_for_full_warp_mode) << "B", LOG_LEVEL_0);
+      }
+      else
+      {
+        LOG_PRINT_GREEN("[Warp]: Detected " << tools::pretty_print_big_nums(phisical_ram_detected) << "B RAM", LOG_LEVEL_0);
+      }
+    }
+
+    LOG_PRINT_MAGENTA("[Warp]: Launching warm up....", LOG_LEVEL_0);
+    ccore.get_blockchain_storage().do_full_db_warm_up();
+    LOG_PRINT_MAGENTA("[Warp]: Warm up finished!", LOG_LEVEL_0);
   }
 
+  //detect if console is available
+  if (isatty(fileno(stdin)))
+  {
+    // start components
+    if (!command_line::has_arg(vm, command_line::arg_console))
+    {
+      dch.start_handling();
+    }
+  }
+
+  uint32_t rpc_threads_count = RPC_SERVER_DEFAULT_THREADS_NUM;
+  if (command_line::has_arg(vm, arg_rpc_server_threads))
+  {
+    rpc_threads_count = command_line::get_arg(vm, arg_rpc_server_threads);
+
+    if (rpc_threads_count < 2)
+    {
+      LOG_ERROR("RPC server threads number number is too low: " << rpc_threads_count << "(why would you do that?!)");
+      return false;
+    }
+    LOG_PRINT_L0("RPC server threads number is overridden with " << rpc_threads_count);
+    if (rpc_threads_count < RPC_SERVER_DEFAULT_THREADS_NUM)
+    {
+      LOG_PRINT_RED_L0("Warning: RPC server threads number is overridden with low number: " << rpc_threads_count << "(why would you do that?!)");
+    }
+
+
+  }
+  
+   
   LOG_PRINT_L0("Starting core rpc server...");
-  res = rpc_server.run(2, false);
+  res = rpc_server.run(rpc_threads_count, false);
   CHECK_AND_ASSERT_MES(res, 1, "Failed to initialize core rpc server.");
   LOG_PRINT_L0("Core rpc server started ok");
 

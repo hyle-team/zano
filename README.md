@@ -13,14 +13,14 @@ Be sure to clone the repository properly:\
 ### Dependencies
 | component / version | minimum <br>(not recommended but may work) | recommended | most recent of what we have ever tested |
 |--|--|--|--|
-| gcc (Linux) | 5.4.0 | 9.4.0 | 12.3.0 |
+| gcc (Linux) | 8.4.0 | 9.4.0 | 12.3.0 |
 | llvm/clang (Linux) | UNKNOWN | 7.0.1 | 8.0.0 |
-| [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2017 (15.9.30) | 2017 (15.9.30) | 2022 (17.7.5) |
-| [XCode](https://developer.apple.com/downloads/) (macOS) | 12.3 | 14.3 | 14.3 |
-| [CMake](https://cmake.org/download/) | 3.15.5 | 3.22.1 | 3.26.3 |
-| [Boost](https://www.boost.org/users/download/) | 1.70 | 1.70 | 1.76 |
-| [OpenSSL](https://www.openssl.org/source/) [(win)](https://slproweb.com/products/Win32OpenSSL.html) | 1.1.1n | 1.1.1w | 1.1.1w | 
-| [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.11.2 | 5.15.2 |
+| [MSVC](https://visualstudio.microsoft.com/downloads/) (Windows) | 2017 (15.9.30) | 2022 (17.11.5) | 2022 (17.12.3) |
+| [XCode](https://developer.apple.com/downloads/) (macOS) | 12.3 | 14.3 | 15.2 |
+| [CMake](https://cmake.org/download/) | 3.26.3 | 3.26.3 | 3.31.6 |
+| [Boost](https://www.boost.org/users/download/) | 1.75 | 1.84 | 1.84 |
+| [OpenSSL](https://www.openssl.org/source/) [(win)](https://slproweb.com/products/Win32OpenSSL.html) | 1.1.1n | 1.1.1w | 3.4 | 
+| [Qt](https://download.qt.io/archive/qt/) (*only for GUI*) | 5.8.0 | 5.15.2 | 5.15.2 |
 
 Note:\
 [*server version*] denotes steps required for building command-line tools (daemon, simplewallet, etc.).\
@@ -36,31 +36,35 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
 
    [*server version*]
    
-       sudo apt-get install -y build-essential g++ curl autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev
+       sudo apt-get install -y build-essential g++ curl autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev libssl-dev bzip2
           
    [*GUI version*]
 
-       sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev mesa-common-dev libglu1-mesa-dev
+       sudo apt-get install -y build-essential g++ python-dev autotools-dev libicu-dev libbz2-dev cmake git screen checkinstall zlib1g-dev libssl-dev bzip2 mesa-common-dev libglu1-mesa-dev
 
-2. Clone Zano into a local folder\
+   Make sure you have correct versions installed (see 'Dependencies' section above):
+
+       cmake --version && gcc --version
+   
+
+3. Clone Zano into a local folder\
    (If for some reason you need to use alternative Zano branch, change 'master' to the required branch name.)
    
        git clone --recursive https://github.com/hyle-team/zano.git -b master
 
    In the following steps we assume that you cloned Zano into '~/zano' folder in your home directory. 
 
-3. Download and build Boost\
+4. Download and build Boost\
     (Assuming you have cloned Zano into the 'zano' folder. If you used a different location for Zano, **edit line 4** accordingly.)
 
-       curl -OL https://boostorg.jfrog.io/artifactory/main/release/1.70.0/source/boost_1_70_0.tar.bz2
-       echo "430ae8354789de4fd19ee52f3b1f739e1fba576f0aded0897c3c2bc00fb38778  boost_1_70_0.tar.bz2" | shasum -c && tar -xjf boost_1_70_0.tar.bz2
-       rm boost_1_70_0.tar.bz2 && cd boost_1_70_0
-       patch -p0 < ../zano/utils/boost_1.70_gcc_8.patch || cd ..
+       curl -OL https://archives.boost.io/release/1.84.0/source/boost_1_84_0.tar.bz2
+       echo "cc4b893acf645c9d4b698e9a0f08ca8846aa5d6c68275c14c3e7949c24109454  boost_1_84_0.tar.bz2" | shasum -c && tar -xjf boost_1_84_0.tar.bz2
+       rm boost_1_84_0.tar.bz2 && cd boost_1_84_0
        ./bootstrap.sh --with-libraries=system,filesystem,thread,date_time,chrono,regex,serialization,atomic,program_options,locale,timer,log
        ./b2 && cd ..
     Make sure that you see "The Boost C++ Libraries were successfully built!" message at the end.
 
-4. Install Qt\
+5. Install Qt\
 (*GUI version only, skip this step if you're building server version*)
 
     [*GUI version*]
@@ -71,7 +75,7 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
     Then follow the instructions in Wizard. Don't forget to tick the WebEngine module checkbox!
 
 
-5. Install OpenSSL
+6. Install OpenSSL
 
    We recommend installing OpenSSL v1.1.1w locally unless you would like to use the same version system-wide.\
    (Assuming that `$HOME` environment variable is set to your home directory. Otherwise, edit line 4 accordingly.)
@@ -83,18 +87,18 @@ Recommended OS versions: Ubuntu 20.04, 22.04 LTS.
        make && make test && make install && cd ..
 
 
-6. [*OPTIONAL*] Set global environment variables for convenient use\
+7. [*OPTIONAL*] Set global environment variables for convenient use\
 For instance, by adding the following lines to `~/.bashrc`
 
     [*server version*]
 
-       export BOOST_ROOT=/home/user/boost_1_70_0  
+       export BOOST_ROOT=/home/user/boost_1_84_0  
        export OPENSSL_ROOT_DIR=/home/user/openssl
 
 
     [*GUI version*]
 
-       export BOOST_ROOT=/home/user/boost_1_70_0
+       export BOOST_ROOT=/home/user/boost_1_84_0
        export OPENSSL_ROOT_DIR=/home/user/openssl  
        export QT_PREFIX_PATH=/home/user/Qt5.11.2/5.11.2/gcc_64
 
@@ -106,7 +110,7 @@ For instance, by adding the following lines to `~/.bashrc`
    1. If you skipped step 6 and did not set the environment variables:
 
           cd zano && mkdir build && cd build
-          BOOST_ROOT=$HOME/boost_1_70_0 OPENSSL_ROOT_DIR=$HOME/openssl cmake ..
+          BOOST_ROOT=$HOME/boost_1_84_0 OPENSSL_ROOT_DIR=$HOME/openssl cmake ..
           make -j1 daemon simplewallet
 
    2. If you set the variables in step 6:
@@ -135,22 +139,24 @@ For instance, by adding the following lines to `~/.bashrc`
 ### Windows
 Recommended OS version: Windows 7 x64, Windows 11 x64.
 1. Install required prerequisites (Boost, Qt, CMake, OpenSSL).
-2. Edit paths in `utils/configure_local_paths.cmd`.
-3. Run one of `utils/configure_win64_msvsNNNN_gui.cmd` according to your MSVC version.
-4. Go to the build folder and open generated Zano.sln in MSVC.
-5. Build.
+    * For Qt: download the [online installer](https://download.qt.io/official_releases/online_installers/), then install the recommended release, according to the table above, including the corresponding MSVC binaries (ensure all filters are checked to see older releases if needed).
+    * For Boost: [download](https://www.boost.org/releases/latest/) x64 version of the recommended release, according to the table above, with prebuilt binaries. Mind the MSVC version!
+3. Edit paths in `utils/configure_local_paths.cmd`.
+4. Run one of `utils/configure_win64_msvsNNNN_gui.cmd` according to your MSVC version.
+5. Go to the build folder and open generated Zano.sln in MSVC.
+6. Build.
 
 In order to correctly deploy Qt GUI application, you also need to do the following:
 
-6. Copy Zano.exe to a folder (e.g. `depoy`). 
-7. Run  `PATH_TO_QT\bin\windeployqt.exe deploy\Zano.exe`.
-8. Copy folder `\src\gui\qt-daemon\html` to `deploy\html`.
-9. Now you can run `Zano.exe`
-
+6. Run `PATH_TO_QT\bin\windeployqt.exe PATH_TO_PROJECT_ROOT\build\src\Debug\Zano.exe` (choose the Debug or Release folder depending on the configuration you built).
+7. You can now run the application using one of the following options:
+   *  Start the program from Visual Studio
+   *  Run `Zano.exe --html-path=PATH_TO_HTML`, where PATH_TO_HTML is by default located at PATH_TO_PROJECT_ROOT\src\gui\qt-daemon\layout\html
+   *  Copy the contents of PATH_TO_PROJECT_ROOT\src\gui\qt-daemon\layout\html to a folder named "html" located in the same directory as the Zano.exe binary.
 <br />
 
 ### macOS
-Recommended OS version: macOS Big Sur 11.4 x64.
+Recommended OS version: macOS Ventura 13.3.1 x64.
 1. Install required prerequisites.
 2. Set environment variables as stated in `utils/macosx_build_config.command`.
 3.  `mkdir build` <br> `cd build` <br> `cmake ..` <br> `make`
@@ -168,4 +174,15 @@ To build GUI application:
     h. Unfold the certificate in Keychain Access window and double click the underlying private key "Zano". Select "Access Control" tab, then select "Allow all applications to access this item". Click "Save Changes".
 2. Revise building script, comment out unwanted steps and run it:  `utils/build_script_mac_osx.sh`
 3. The application should be here: `/buid_mac_osx_64/release/src`
+
+<br />
+<br />
+
+## Supporting project/donations
+
+ZANO @dev<br />
+BTC bc1qpa8w8eaehlplfepmnzpd7v9j046899nktxnkxp<br />
+BCH qqgq078vww5exd9kt3frx6krdyznmp80hcygzlgqzd<br />
+ETH 0x206c52b78141498e74FF074301ea90888C40c178<br />
+XMR 45gp9WTobeB5Km3kLQgVmPJkvm9rSmg4gdyHheXqXijXYMjUY48kLgL7QEz5Ar8z9vQioQ68WYDKsQsjAEonSeFX4UeLSiX<br />
 

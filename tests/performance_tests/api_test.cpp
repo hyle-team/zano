@@ -19,7 +19,7 @@ int test_get_rand_outs()
   m_core_proxy->set_connection_addr("127.0.0.1:11211");
   m_core_proxy->check_connection();
 
-  bool r = m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(req, rsp);
+  m_core_proxy->call_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS(req, rsp);
 
   return 0;
 }

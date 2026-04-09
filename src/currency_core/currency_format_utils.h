@@ -29,6 +29,7 @@
 #include "currency_format_utils_transactions.h"
 #include "core_runtime_config.h"
 #include "wallet/wallet_public_structs_defs.h"
+#include "wallet/wallet_public_structs_defs.h"
 #include "bc_attachments_helpers.h"
 #include "bc_payments_id_service.h"
 #include "bc_offers_service_basic.h"
@@ -139,10 +140,12 @@ namespace currency
     bool hltc_our_out_is_before_expiration;
   };
 
-  struct thirdparty_sign_handler
+  struct asset_eth_signer_i
   {
-    virtual bool sign(const crypto::hash& h, const crypto::public_key& owner_public_key, crypto::generic_schnorr_sig& sig);
+    virtual bool sign(const crypto::hash& h, const crypto::eth_public_key& asset_owner, crypto::eth_signature& sig) = 0;
   };
+
+  typedef boost::variant<crypto::public_key, crypto::eth_public_key> asset_owner_key_v;
 
   struct finalize_tx_param
   {
@@ -160,15 +163,14 @@ namespace currency
     uint64_t expiration_time;
     crypto::public_key spend_pub_key;  // only for validations
     uint64_t tx_version;
+    size_t tx_hardfork_id = 0;
     uint64_t mode_separate_fee = 0;
     
-    epee::misc_utils::events_dispatcher* pevents_dispatcher;
+    epee::misc_utils::events_dispatcher* pevents_dispatcher = nullptr;
     tx_generation_context gen_context{}; // solely for consolidated txs
+
     
-    //crypto::secret_key asset_control_key = currency::null_skey;
-    crypto::public_key ado_current_asset_owner = null_pkey;
-    thirdparty_sign_handler* pthirdparty_sign_handler = nullptr;
-    mutable bool need_to_generate_ado_proof = false;
+    bool ado_sign_thirdparty = false;//@#@ TODO: add to serialization map @zoidberg
 
 
     BEGIN_SERIALIZE_OBJECT()
@@ -186,19 +188,19 @@ namespace currency
       FIELD(expiration_time)
       FIELD(spend_pub_key)
       FIELD(tx_version)
+      FIELD(tx_hardfork_id)
       FIELD(mode_separate_fee)
       if (flags & TX_FLAG_SIGNATURE_MODE_SEPARATE)
       {
         FIELD(gen_context);
       }
-      FIELD(ado_current_asset_owner)
-      FIELD(need_to_generate_ado_proof)
     END_SERIALIZE()
   };
 
   struct finalized_tx
   {
     currency::transaction tx;
+    crypto::hash          tx_id;
     crypto::secret_key    one_time_key;
     finalize_tx_param     ftp;
     std::string           htlc_origin;
@@ -208,6 +210,7 @@ namespace currency
 
     BEGIN_SERIALIZE_OBJECT()
       FIELD(tx)
+      FIELD(tx_id)
       FIELD(one_time_key)
       FIELD(ftp)
       FIELD(htlc_origin)
@@ -261,6 +264,7 @@ namespace currency
     const transaction& tx;
     const crypto::hash& tx_id;
     const asset_descriptor_operation& ado;
+    uint64_t height = UINT64_MAX; // default value means the height of the upcoming block (top_block + 1)
     crypto::public_key asset_id = currency::null_pkey;
     crypto::point_t asset_id_pt = crypto::c_point_0;
     uint64_t amount_to_validate = 0;
@@ -271,12 +275,18 @@ namespace currency
   bool generate_asset_surjection_proof(const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, zc_asset_surjection_proof& result);
   bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id);
   bool generate_tx_balance_proof(const transaction &tx, const crypto::hash& tx_id, const tx_generation_context& ogc, uint64_t block_reward_for_miner_tx, zc_balance_proof& proof);
-  bool generate_zc_outs_range_proof(const crypto::hash& context_hash, size_t out_index_start, const tx_generation_context& outs_gen_context,
+  bool generate_zc_outs_range_proof(const crypto::hash& context_hash, const tx_generation_context& outs_gen_context,
     const std::vector<tx_out_v>& vouts, zc_outs_range_proof& result);
   bool check_tx_bare_balance(const transaction& tx, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
   bool check_tx_balance(const transaction& tx, const crypto::hash& tx_id, uint64_t additional_inputs_amount_and_fees_for_mining_tx = 0);
   bool validate_asset_operation_amount_commitment(asset_op_verification_context& context);
+  
   const char* get_asset_operation_type_string(size_t asset_operation_type, bool short_name = false);
+  bool validate_asset_ticker(const std::string& ticker);
+  bool validate_asset_full_name(const std::string& full_name);
+  bool validate_asset_ticker_and_full_name(const asset_descriptor_base& adb);
+  void replace_asset_ticker_and_full_name_if_invalid(asset_descriptor_base& adb, const crypto::public_key& asset_id);
+
   //---------------------------------------------------------------
   bool construct_miner_tx(size_t height, size_t median_size, const boost::multiprecision::uint128_t& already_generated_coins, 
                                                              size_t current_block_size, 
@@ -287,6 +297,7 @@ namespace currency
                                                              uint64_t& block_reward_without_fee,
                                                              uint64_t& block_reward,
                                                              uint64_t tx_version,
+                                                             size_t tx_hadrfork_id,
                                                              const blobdata& extra_nonce            = blobdata(), 
                                                              size_t max_outs                        = CURRENCY_MINER_TX_MAX_OUTS, 
                                                              bool pos                               = false,
@@ -309,9 +320,11 @@ namespace currency
     const std::vector<attachment_v>& attachments,
     transaction& tx, 
     uint64_t tx_version,
+    size_t tx_hardfork_id,
     uint64_t unlock_time, 
     uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED, 
     bool shuffle = true);
+
   bool construct_tx(const account_keys& sender_account_keys, 
     const std::vector<tx_source_entry>& sources, 
     const std::vector<tx_destination_entry>& destinations,
@@ -319,6 +332,7 @@ namespace currency
     const std::vector<attachment_v>& attachments,
     transaction& tx, 
     uint64_t tx_version,
+    size_t tx_hardfork_id,
     crypto::secret_key& one_time_secret_key,
     uint64_t unlock_time,
     uint8_t tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED, 
@@ -332,6 +346,7 @@ namespace currency
     const std::vector<attachment_v>& attachments,
     transaction& tx,
     uint64_t tx_version,
+    size_t tx_hardfork_id,
     crypto::secret_key& one_time_secret_key,
     uint64_t unlock_time,
     const account_public_address& crypt_account,
@@ -340,6 +355,7 @@ namespace currency
     bool shuffle = true,
     uint64_t flags = 0);
 
+  uint64_t get_tx_version_and_hardfork_id(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd, size_t& tx_hardfork_id); // returns tx version and tx hardfork id based on the height of the block where the transaction is expected to be
   uint64_t get_tx_version(uint64_t tx_expected_block_height, const hard_forks_descriptor& hfd); // returns tx version based on the height of the block where the transaction is expected to be
   bool construct_tx(const account_keys& sender_account_keys,  const finalize_tx_param& param, finalized_tx& result);
   bool get_or_calculate_asset_id(const asset_descriptor_operation& ado, crypto::point_t* p_result_point, crypto::public_key* p_result_pub_key);
@@ -380,8 +396,8 @@ namespace currency
   bool is_tx_spendtime_unlocked(uint64_t unlock_time, uint64_t current_blockchain_size, uint64_t current_time);
   crypto::key_derivation get_encryption_key_derivation(bool is_income, const transaction& tx, const account_keys& acc_keys);
   bool decrypt_payload_items(bool is_income, const transaction& tx, const account_keys& acc_keys, std::vector<payload_items_v>& decrypted_items);
-  void encrypt_attachments(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key, crypto::key_derivation& derivation);
-  void encrypt_attachments(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key);
+  void encrypt_payload_items(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key, crypto::key_derivation& derivation);
+  void encrypt_payload_items(transaction& tx, const account_keys& sender_keys, const account_public_address& destination_addr, const keypair& tx_random_key);
   bool is_derivation_used_to_encrypt(const transaction& tx, const crypto::key_derivation& derivation);
   bool is_address_like_wrapped(const std::string& addr);
   void load_wallet_transfer_info_flags(tools::wallet_public::wallet_transfer_info& x);
@@ -401,7 +417,7 @@ namespace currency
   uint64_t get_outs_money_amount(const transaction& tx, const currency::account_keys& acc_keys_for_hidden_amounts = currency::null_acc_keys);
   bool check_inputs_types_supported(const transaction& tx);
   bool check_outs_valid(const transaction& tx);
-  bool parse_amount(uint64_t& amount, const std::string& str_amount);
+  bool parse_amount(const std::string& str_amount, uint64_t& amount, const size_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT);
   bool parse_tracking_seed(const std::string& tracking_seed, account_public_address& address, crypto::secret_key& view_sec_key, uint64_t& creation_timestamp);
 
 
@@ -413,9 +429,9 @@ namespace currency
   uint64_t get_alias_coast_from_fee(const std::string& alias, uint64_t fee_median);
   //const crypto::public_key get_offer_secure_key_by_index_from_tx(const transaction& tx, size_t index);
 
-  bool check_money_overflow(const transaction& tx);
-  bool check_outs_overflow(const transaction& tx);
-  bool check_inputs_overflow(const transaction& tx);
+  bool check_bare_money_overflow(const transaction& tx);
+  bool check_bare_outs_overflow(const transaction& tx);
+  bool check_bare_inputs_overflow(const transaction& tx);
   uint64_t get_block_height(const transaction& coinbase);
   uint64_t get_block_height(const block& b);
   std::vector<txout_ref_v> relative_output_offsets_to_absolute(const std::vector<txout_ref_v>& off);
@@ -456,14 +472,14 @@ namespace currency
 
   bool fill_block_rpc_details(block_rpc_extended_info& pei_rpc, const block_extended_info& bei_chain, const crypto::hash& h);
   void append_per_block_increments_for_tx(const transaction& tx, std::unordered_map<uint64_t, uint32_t>& gindices);
-  std::string get_word_from_timstamp(uint64_t timestamp, bool use_password);
-  uint64_t get_timstamp_from_word(std::string word, bool& password_used, const std::string& buff);
-  uint64_t get_timstamp_from_word(std::string word, bool& password_used);
+  std::string get_word_from_timestamp(uint64_t timestamp, bool use_password);
+  uint64_t get_timestamp_from_word(std::string word, bool& password_used, const std::string& buff);
+  uint64_t get_timestamp_from_word(std::string word, bool& password_used);
   bool parse_vote(const std::string& buff, std::list<std::pair<std::string, bool>>& votes);
 
   std::string generate_origin_for_htlc(const txout_htlc& htlc, const account_keys& acc_keys);
   bool validate_ado_update_allowed(const asset_descriptor_base& a, const asset_descriptor_base& b);
-
+  bool validate_ado_initial(const asset_descriptor_base& a);
 
   void normalize_asset_operation_for_hashing(asset_descriptor_operation& op);
   crypto::hash get_signature_hash_for_asset_operation(const asset_descriptor_operation& ado);
@@ -521,8 +537,9 @@ namespace currency
   /************************************************************************/
   size_t get_max_block_size();
   size_t get_max_tx_size();
+  uint64_t get_block_reward(uint64_t height, size_t median_block_size, size_t current_block_size);
   bool get_block_reward(bool is_pos, size_t median_size, size_t current_block_size, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t &reward, uint64_t height);
-  uint64_t get_base_block_reward(bool is_pos, const boost::multiprecision::uint128_t& already_generated_coins, uint64_t height);
+  uint64_t get_base_block_reward(uint64_t height);
   bool is_payment_id_size_ok(const payment_id_t& payment_id);
   std::string get_account_address_as_str(const account_public_address& addr);
   std::string get_account_address_and_payment_id_as_str(const account_public_address& addr, const payment_id_t& payment_id);
@@ -534,6 +551,20 @@ namespace currency
   bool is_pos_coinbase(const transaction& tx);
   bool have_attachment_service_in_container(const std::vector<attachment_v>& av, const std::string& service_id, const std::string& instruction);
   crypto::hash prepare_prefix_hash_for_sign(const transaction& tx, uint64_t in_index, const crypto::hash& tx_id);
+  
+  
+  //---------------------------------------------------------------
+  template<typename t_assets_map>
+  void assets_map_to_assets_list(std::list<currency::asset_descriptor_with_id>& assets_list, const t_assets_map& assets_map)
+  {
+    for (const auto& pr : assets_map)
+    {
+      assets_list.push_back(currency::asset_descriptor_with_id());
+      assets_list.back().asset_id = pr.first;
+      epee::misc_utils::cast_assign_a_to_b(static_cast<currency::asset_descriptor_base>(pr.second), assets_list.back());
+      //*static_cast<currency::asset_descriptor_base*>(&assets_list.back()) = pr.second;
+    }
+  }
 
   //---------------------------------------------------------------
   template<class tx_out_t>
@@ -594,20 +625,25 @@ namespace currency
     return true;
   }
   //---------------------------------------------------------------
-  // outputs "1391306.970000000000"
+  // outputs "1391306.970000000000" (decimal_point = 12)
+  // outputs "1391306970000000000"  (decimal_point = 0)
   template<typename t_number>
   std::string print_fixed_decimal_point(t_number amount, size_t decimal_point)
   {
     return epee::string_tools::print_fixed_decimal_point(amount, decimal_point);
   }
   //---------------------------------------------------------------
-  // outputs "1391306.97          "
+  // outputs "1391306.97          " (decimal_point = 12)
+  // outputs "139130697          "  (decimal_point = 0)
   template<typename t_number>
   std::string print_fixed_decimal_point_with_trailing_spaces(t_number amount, size_t decimal_point)
   {
     std::string s = epee::string_tools::print_fixed_decimal_point(amount, decimal_point);
-    for(size_t n = s.size() - 1; n != 0 && s[n] == '0' && s[n-1] != '.'; --n)
-      s[n] = ' ';
+    if (s.find('.') != std::string::npos)
+    {
+      for(size_t n = s.size() - 1; n != 0 && s[n] == '0' && s[n-1] != '.'; --n)
+        s[n] = ' ';
+    }
     return s;
   }
   //---------------------------------------------------------------
@@ -889,9 +925,9 @@ namespace currency
     if (crc.is_hardfork_active_for_height(2, top_block_height))
     {
       // after hardfork 2
-      tx_payer result = AUTO_VAL_INIT(result);
-      result.acc_addr = addr;
-      container.push_back(result);
+      //tx_payer result = AUTO_VAL_INIT(result);
+      //result.acc_addr = addr;
+      //container.push_back(result);
     }
     else
     {
@@ -911,9 +947,9 @@ namespace currency
     if (crc.is_hardfork_active_for_height(2, top_block_height))
     {
       // after hardfork 2
-      tx_receiver result = AUTO_VAL_INIT(result);
-      result.acc_addr = addr;
-      container.push_back(result);
+      //tx_receiver result = AUTO_VAL_INIT(result);
+      //result.acc_addr = addr;
+      //container.push_back(result);
     }
     else
     {
@@ -926,9 +962,18 @@ namespace currency
       }
     }
   }
+  /*
   //---------------------------------------------------------------
+  template<typename invocable_t>
+  typename std::enable_if_t<std::is_invocable_v<invocable_t, std::ostream&>, std::ostream&> operator<<(std::ostream& o, invocable_t callee)
+  {
+    callee(o);
+    return o;
+  }
+  */
   //---------------------------------------------------------------
   std::ostream& operator <<(std::ostream& o, const ref_by_id& r);
+  std::ostream& operator <<(std::ostream& o, const std::type_info& ti);
   //---------------------------------------------------------------
 #ifndef MOBILE_WALLET_BUILD
   std::string utf8_to_upper(const std::string& s);
@@ -1067,17 +1112,24 @@ namespace currency
     bool operator()(const extra_user_data& ee)
     {
       tv.type = "user_data";
-      tv.short_view = std::to_string(ee.buff.size()) + " bytes";
       tv.details_view = epee::string_tools::buff_to_hex_nodelimer(ee.buff);
+      if (ee.buff.size() <= 8)
+        tv.short_view = tv.details_view;
+      else
+        tv.short_view = std::to_string(ee.buff.size()) + " bytes";
 
       return true;
     }
     bool operator()(const extra_padding& ee)
     {
       tv.type = "extra_padding";
-      tv.short_view = std::to_string(ee.buff.size()) + " bytes";
       if (!ee.buff.empty())
         tv.details_view = epee::string_tools::buff_to_hex_nodelimer(std::string(reinterpret_cast<const char*>(&ee.buff[0]), ee.buff.size()));
+      
+      if (ee.buff.size() <= 8)
+        tv.short_view = tv.details_view;
+      else
+        tv.short_view = std::to_string(ee.buff.size()) + " bytes";
 
       return true;
     }
@@ -1122,16 +1174,24 @@ namespace currency
     bool operator()(const tx_derivation_hint& ee)
     {
       tv.type = "derivation_hint";
-      tv.short_view = std::to_string(ee.msg.size()) + " bytes";
       tv.details_view = epee::string_tools::buff_to_hex_nodelimer(ee.msg);
+
+      if (ee.msg.size() <= 8)
+        tv.short_view = tv.details_view;
+      else
+        tv.short_view = std::to_string(ee.msg.size()) + " bytes";
 
       return true;
     }
     bool operator()(const std::string& ee)
     {
       tv.type = "string";
-      tv.short_view = std::to_string(ee.size()) + " bytes";
       tv.details_view = epee::string_tools::buff_to_hex_nodelimer(ee);
+
+      if (ee.size() <= 8)
+        tv.short_view = tv.details_view;
+      else
+        tv.short_view = std::to_string(ee.size()) + " bytes";
 
       return true;
     }
@@ -1160,6 +1220,21 @@ namespace currency
     bool operator()(const zc_balance_proof& bp)
     {
       tv.type = "zc_balance_proof";
+      return true;
+    }
+    bool operator()(const asset_descriptor_operation& ado)
+    {
+      tv.type = "asset operation";
+      tv.short_view = std::string("op:") + get_asset_operation_type_string(ado.operation_type, true);
+      if (ado.opt_asset_id.has_value())
+        tv.short_view += std::string(" , id:") + crypto::pod_to_hex(ado.opt_asset_id);
+      tv.details_view = tv.short_view;
+      if (ado.opt_descriptor.has_value())
+      {
+        tv.details_view += std::string(" , ticker:") + ado.opt_descriptor->ticker + std::string(" , cur.supply:") + print_money_brief(ado.opt_descriptor->current_supply, ado.opt_descriptor->decimal_point);
+      }
+      //@#@ TODO: add other info from asset_descriptor_operation v2+
+      
       return true;
     }
     template<typename t_type>

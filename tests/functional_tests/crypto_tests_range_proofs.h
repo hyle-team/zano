@@ -352,7 +352,7 @@ TEST(bppe, power_128)
     std::vector<point_t>& commitments = commitments_vector.back();
 
     scalar_vec_t masks, masks2;
-    for(auto& el: values)
+    for (size_t i = 0; i < values.size(); ++i)
     {
       masks.emplace_back(scalar_t::random());
       masks2.emplace_back(scalar_t::random());

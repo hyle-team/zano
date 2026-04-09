@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -58,12 +58,10 @@ namespace currency
     {
       block_complete_entry b;
       uint64_t current_blockchain_height;
-      uint32_t hop;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(b)
         KV_SERIALIZE(current_blockchain_height)
-        KV_SERIALIZE(hop)
       END_KV_SERIALIZE_MAP()
     };
   };
@@ -122,7 +120,7 @@ namespace currency
       std::list<blobdata>              txs;
       std::list<block_complete_entry>  blocks;
       std::list<crypto::hash>          missed_ids;
-      uint64_t                         current_blockchain_height;
+      uint64_t                         current_blockchain_height; // height of the top block + 1
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(txs)
@@ -135,11 +133,12 @@ namespace currency
 
   struct CORE_SYNC_DATA
   {
-    uint64_t current_height;
+    uint64_t current_height;          // height of the top block + 1
     crypto::hash  top_id;
     uint64_t last_checkpoint_height;
     uint64_t core_time;
     std::string client_version;
+    bool non_pruning_mode_enabled;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(current_height)
@@ -147,6 +146,7 @@ namespace currency
       KV_SERIALIZE(last_checkpoint_height)
       KV_SERIALIZE(core_time)
       KV_SERIALIZE(client_version)
+      KV_SERIALIZE(non_pruning_mode_enabled)
     END_KV_SERIALIZE_MAP()
   };
 

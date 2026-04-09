@@ -1,12 +1,11 @@
-// Copyright (c) 2014-2020 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
-
 #pragma once
 
 #include <string>
-#include "../common/error_codes.h"
+#include <cstdint>
+//#include "../common/error_codes.h"
 
 namespace plain_wallet
 {
@@ -48,6 +47,10 @@ namespace plain_wallet
   std::string get_wallet_info(hwallet h);
   std::string reset_wallet_password(hwallet h, const std::string& password);
   uint64_t get_current_tx_fee(uint64_t priority); // 0 (default), 1 (unimportant), 2 (normal), 3 (elevated), 4 (priority)
+  
+  //callback-mode for async calls
+  typedef void (*callback_type)(uint64_t job_id, const std::string& job_response);
+  void set_callback(callback_type callback);
 }
 
 

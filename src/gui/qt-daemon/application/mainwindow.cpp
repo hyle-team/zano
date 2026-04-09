@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Boolberry developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -223,7 +223,7 @@ QString MainWindow::get_default_user_dir(const QString& param)
 }
 
 
-bool MainWindow::toggle_mining()
+bool MainWindow::toggle_mining(const QString& param)
 {
   TRY_ENTRY();
   m_backend.toggle_pos_mining();
@@ -238,7 +238,7 @@ QString MainWindow::get_exchange_last_top(const QString& params)
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString MainWindow::get_tx_pool_info()
+QString MainWindow::get_tx_pool_info(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -248,7 +248,7 @@ QString MainWindow::get_tx_pool_info()
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString MainWindow::request_dummy()
+QString MainWindow::request_dummy(const QString& param)
 {
   static int code_ = 0;
   TRY_ENTRY();
@@ -284,7 +284,7 @@ QString MainWindow::call_rpc(const QString& params)
 
   epee::net_utils::http::http_request_info query_info = AUTO_VAL_INIT(query_info);
   epee::net_utils::http::http_response_info response_info  = AUTO_VAL_INIT(response_info);
-  currency::core_rpc_server::connection_context dummy_context = AUTO_VAL_INIT(dummy_context);
+  currency::core_rpc_server::connection_context dummy_context(RPC_INTERNAL_UI_CONTEXT, 0, 0, true);
 
   query_info.m_URI = "/json_rpc";
   query_info.m_body = params.toStdString();
@@ -301,14 +301,34 @@ QString MainWindow::call_rpc(const QString& params)
   return QString::fromStdString(response_info.m_body);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
-QString MainWindow::get_default_fee()
+
+QString MainWindow::call_wallet_rpc(const QString& wallet_id_str, const QString& params)
+{
+  TRY_ENTRY();
+
+  if (!m_backend.is_core_initialized())
+  {
+    epee::json_rpc::error_response rsp;
+    rsp.jsonrpc = "2.0";
+    rsp.error.code = -1;
+    rsp.error.message = API_RETURN_CODE_CORE_BUSY;
+    return QString::fromStdString(epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(rsp)));
+  }
+
+  uint64_t wallet_id = std::stoull(wallet_id_str.toStdString());
+
+  return QString::fromStdString(m_backend.invoke(wallet_id, params.toStdString()));
+  CATCH_ENTRY_FAIL_API_RESPONCE();
+}
+
+QString MainWindow::get_default_fee(const QString& param)
 {
   TRY_ENTRY();
   return QString(std::to_string(m_backend.get_default_fee()).c_str());
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString MainWindow::get_options()
+QString MainWindow::get_options(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -319,7 +339,7 @@ QString MainWindow::get_options()
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-void MainWindow::tray_quit_requested()
+void MainWindow::tray_quit_requested(const QString& param)
 {
   TRY_ENTRY();
   LOG_PRINT_MAGENTA("[GUI]->[HTML] tray_quit_requested", LOG_LEVEL_0);  
@@ -350,10 +370,10 @@ void MainWindow::closeEvent(QCloseEvent *event)
    }
    else
    {
+     event->ignore();
      //m_quit_requested = true;
      LOG_PRINT_L0("[GUI]->[HTML] quit_requested");
      emit quit_requested("{}");
-     event->ignore();
    }
    CATCH_ENTRY2(void());
 }
@@ -474,7 +494,7 @@ bool MainWindow::init(const std::string& html_path)
   CATCH_ENTRY2(false);
 }
 
-void MainWindow::on_menu_show()
+void MainWindow::on_menu_show(const QString& param)
 {
   TRY_ENTRY();
   qDebug() << "Context menu: show()";
@@ -508,21 +528,56 @@ void MainWindow::init_tray_icon(const std::string& html_path)
   m_tray_icon_menu->addSeparator();
   m_tray_icon_menu->addAction(m_quit_action.get());
 
+#ifdef TARGET_OS_MAC
+  const char* normal_rel = "/files/app22macos.png"; // X11 tray icon size is 22x22
+  const char* blocked_rel = "/files/app22macos_blocked.png"; // X11 tray icon size is 22x22
+#else
+  const char* normal_rel = "/files/app22windows.png"; // X11 tray icon size is 22x22
+  const char* blocked_rel = "/files/app22windows_blocked.png"; // X11 tray icon size
+#endif
+
+  // setup qrc or fs paths
+  QString base = QString::fromStdString(html_path).trimmed();
+  QIcon tray_icon;
+
+  if (base.startsWith("qrc:/", Qt::CaseInsensitive))
+  {
+    // in webengine we use "qrc:/", but QIcon loads through ":/"
+    // in CMake we have a resource prefix /html, so icons are at :/html/...
+    const QString res_normal  = QString(":/html%1").arg(normal_rel);
+    const QString res_blocked = QString(":/html%1").arg(blocked_rel);
+
+    tray_icon = QIcon(res_normal);
+    tray_icon.setIsMask(true);
+
+    m_normal_icon_path = res_normal.toStdString();
+    m_blocked_icon_path = res_blocked.toStdString();
+  }
+  else
+  {
+    QFileInfo fi(base);
+    QDir dir = fi.isDir() ? QDir(base) : fi.dir();
+
+    QString rel_normal = QString::fromLatin1(normal_rel);
+    QString rel_blocked = QString::fromLatin1(blocked_rel);
+    if (rel_normal.startsWith('/'))
+      rel_normal.remove(0, 1);
+    if (rel_blocked.startsWith('/'))
+      rel_blocked.remove(0, 1);
+
+    const QString file_normal = dir.filePath(rel_normal);
+    const QString file_blocked = dir.filePath(rel_blocked);
+
+    tray_icon = QIcon(file_normal);
+    tray_icon.setIsMask(true);
+
+    m_normal_icon_path  = file_normal.toStdString();
+    m_blocked_icon_path = file_blocked.toStdString();
+  }
+
   m_tray_icon = std::unique_ptr<QSystemTrayIcon>(new QSystemTrayIcon(this));
   m_tray_icon->setContextMenu(m_tray_icon_menu.get());
-
-  //setup icon
-#ifdef TARGET_OS_MAC
-  m_normal_icon_path = html_path + "/files/app22macos.png"; // X11 tray icon size is 22x22
-  m_blocked_icon_path = html_path + "/files/app22macos_blocked.png"; // X11 tray icon size is 22x22
-#else
-  m_normal_icon_path = html_path + "/files/app22windows.png"; // X11 tray icon size is 22x22
-  m_blocked_icon_path = html_path + "/files/app22windows_blocked.png"; // X11 tray icon size
-#endif
-                                                                      //setWindowIcon(QIcon(iconPath.c_str()));
-  QIcon qi( QString::fromWCharArray(epee::string_encoding::utf8_to_wstring(m_normal_icon_path).c_str()) );
-  qi.setIsMask(true);
-  m_tray_icon->setIcon(qi);
+  m_tray_icon->setIcon(tray_icon);
   m_tray_icon->setToolTip(CURRENCY_NAME_BASE);
   connect(m_tray_icon.get(), SIGNAL(activated(QSystemTrayIcon::ActivationReason)),
     this, SLOT(trayIconActivated(QSystemTrayIcon::ActivationReason)));
@@ -540,13 +595,13 @@ void MainWindow::bool_toggle_icon(const QString& param)
   else
     path = m_normal_icon_path;
 
-  QIcon qi( QString::fromWCharArray(epee::string_encoding::utf8_to_wstring(path).c_str()) );
+  QIcon qi(QString::fromStdString(path));
   qi.setIsMask(true);
   m_tray_icon->setIcon(qi);
   CATCH_ENTRY2(void());
 }
 
-QString MainWindow::get_log_file()
+QString MainWindow::get_log_file(const QString& param)
 {
   TRY_ENTRY();
   std::string buff;
@@ -646,8 +701,12 @@ void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
 void MainWindow::load_file(const QString &fileName)
 {
   TRY_ENTRY();
-  LOG_PRINT_L0("Loading html from path: " << fileName.toStdString());
-  QUrl url = QUrl::fromLocalFile(QFileInfo(fileName).absoluteFilePath());
+  LOG_PRINT_L0("Loading qrc/path: " << fileName.toStdString());
+  QUrl url;
+  if (fileName.startsWith("qrc:/", Qt::CaseInsensitive))
+    url = QUrl(fileName);
+  else
+    url = QUrl::fromLocalFile(QFileInfo(fileName).absoluteFilePath());
   m_view->load(url);
   CATCH_ENTRY2(void());
 }
@@ -662,7 +721,7 @@ QString MainWindow::set_clipboard(const QString& param)
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
-QString MainWindow::get_clipboard()
+QString MainWindow::get_clipboard(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -671,7 +730,7 @@ QString MainWindow::get_clipboard()
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
-QString MainWindow::on_request_quit()
+QString MainWindow::on_request_quit(const QString& param)
 {
   TRY_ENTRY();
   LOG_PRINT_MAGENTA("[HTML]->[GUI] on_request_quit", LOG_LEVEL_0);
@@ -694,9 +753,12 @@ bool MainWindow::show_inital()
 {
   TRY_ENTRY();
   if (load_app_config())
+  {
     restore_pos(true);
+  }
   else
   {
+    LOG_PRINT_L1("set defaults values to config");
     m_config = AUTO_VAL_INIT(m_config);
     this->show();
     QSize sz = AUTO_VAL_INIT(sz);
@@ -860,10 +922,21 @@ bool MainWindow::init_ipc_server()
 }
 
 
-bool MainWindow::handle_ipc_event(const std::string& arguments)
+bool MainWindow::handle_ipc_event(const std::string& arguments_)
 {
+  std::string arguments = arguments_;
   std::string zzz = std::string("Received IPC: ") + arguments.c_str();
   std::cout << zzz;//message_box(zzz.c_str());
+  
+  const std::string prefix = "zano://";
+  const std::string target = "zano:";
+
+  // check if it starts with zano://
+  if (arguments.rfind(prefix, 0) == 0) {
+    // erase the extra slashes after "zano:"
+    arguments.replace(0, prefix.size(), target);
+  }
+
 
   handle_deeplink_click(arguments.c_str());
 
@@ -933,10 +1006,15 @@ bool MainWindow::init_backend(int argc, char* argv[])
   CATCH_ENTRY2(false);
 }
 
-QString    MainWindow::is_remnotenode_mode_preconfigured()
+QString    MainWindow::is_remnotenode_mode_preconfigured(const QString& param)
 {
   TRY_ENTRY();
-  return API_RETURN_CODE_FALSE;
+  view::api_response ar{};
+  if (m_backend.is_remote_node_mode())
+    ar.error_code = API_RETURN_CODE_TRUE;
+  else
+    ar.error_code = API_RETURN_CODE_FALSE;
+  return MAKE_RESPONSE(ar);
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
@@ -956,20 +1034,43 @@ QString MainWindow::start_backend(const QString& params)
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
+void MainWindow::show_notification(const QString& title, const QString& message)
+{
+  show_notification(title.toStdString(), message.toStdString());
+}
+
 QString MainWindow::sync_call(const QString& func_name, const QString& params)
 {
-  if (func_name == "transfer")
-  {
-    return this->transfer(params);
-  }
-  else if (func_name == "test_call")
+  if (func_name == "test_call")
   {
     return params;
   }
+  std::string fuc_name_std = func_name.toStdString();
+  QString response_str;
+  bool r = QMetaObject::invokeMethod(this, fuc_name_std.c_str(), Qt::DirectConnection, Q_RETURN_ARG(QString, response_str), Q_ARG(QString, params));
+  //bool r = this->invokeMethod(fuc_name_std.c_str(), Q_RETURN_ARG(QString, response_str), Q_ARG(QString, params));
+  if (r)
+    return response_str;
   else
   {
-    return QString(QString() + "{ \"status\": \"Method '" + func_name  + "' not found\"}");
+    return QString(QString() + "{ \"status\": \"Method '" + func_name + "' not found\"}");
   }
+
+}
+
+QString MainWindow::sync_call_2a(const QString& func_name, const QString& params1, const QString& params2)
+{
+  std::string fuc_name_std = func_name.toStdString();
+  QString response_str;
+  bool r = QMetaObject::invokeMethod(this, fuc_name_std.c_str(), Qt::DirectConnection, Q_RETURN_ARG(QString, response_str), Q_ARG(QString, params1), Q_ARG(QString, params2));
+  //bool r = this->invokeMethod(fuc_name_std.c_str(), Q_RETURN_ARG(QString, response_str), Q_ARG(QString, params));
+  if (r)
+    return response_str;
+  else
+  {
+    return QString(QString() + "{ \"status\": \"Method '" + func_name + "' not found\"}");
+  }
+
 }
 
 QString MainWindow::async_call(const QString& func_name, const QString& params)
@@ -990,6 +1091,25 @@ QString MainWindow::async_call(const QString& func_name, const QString& params)
   return QString::fromStdString(std::string("{ \"job_id\": ") + std::to_string(job_id) + "}");
 }
 
+QString MainWindow::async_call_2a(const QString& func_name, const QString& params1, const QString& params2)
+{
+
+  uint64_t job_id = m_ui_dispatch_id_counter++;
+  QString method_name = func_name;
+  QString argements1 = params1;
+  QString argements2 = params2;
+
+
+  auto async_callback = [this, method_name, argements1, argements2, job_id]()
+    {
+      QString res_str = this->sync_call_2a(method_name, argements1, argements2);
+      this->dispatch_async_call_result(std::to_string(job_id).c_str(), res_str);  //general function
+    };
+
+  m_threads_pool.add_job(async_callback);
+  LOG_PRINT_L2("[UI_ASYNC_CALL]: started " << method_name.toStdString() << ", job id: " << job_id);
+  return QString::fromStdString(std::string("{ \"job_id\": ") + std::to_string(job_id) + "}");
+}
 
 bool MainWindow::update_wallet_status(const view::wallet_status_info& wsi)
 {
@@ -997,11 +1117,11 @@ bool MainWindow::update_wallet_status(const view::wallet_status_info& wsi)
   m_wallet_states->operator [](wsi.wallet_id) = wsi.wallet_state;
   
   std::string json_str_pub;
-  epee::serialization::store_t_to_json(static_cast<const view::wallet_status_info_base&>(wsi), json_str_pub, 0, epee::serialization::eol_lf);
+  epee::serialization::store_t_to_json(static_cast<const view::wallet_status_info_base&>(wsi), json_str_pub, 0);
   LOG_PRINT_L0(get_wallet_log_prefix(wsi.wallet_id) + "SENDING SIGNAL -> [update_wallet_status]:" << std::endl << json_str_pub);
   
   std::string json_str;
-  epee::serialization::store_t_to_json(wsi, json_str, 0, epee::serialization::eol_lf);
+  epee::serialization::store_t_to_json(wsi, json_str, 0);
   QMetaObject::invokeMethod(this, "update_wallet_status", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
   return true;
   CATCH_ENTRY2(false);
@@ -1011,7 +1131,7 @@ bool MainWindow::set_options(const view::gui_options& opt)
 {
   TRY_ENTRY();
   std::string json_str;
-  epee::serialization::store_t_to_json(opt, json_str, 0, epee::serialization::eol_lf);
+  epee::serialization::store_t_to_json(opt, json_str, 0);
   LOG_PRINT_L0("SENDING SIGNAL -> [set_options]:" << std::endl << json_str);
   QMetaObject::invokeMethod(this, "set_options", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
   return true;
@@ -1022,7 +1142,7 @@ bool MainWindow::update_tor_status(const view::current_action_status& opt)
 {
   TRY_ENTRY();
   std::string json_str;
-  epee::serialization::store_t_to_json(opt, json_str, 0, epee::serialization::eol_lf);
+  epee::serialization::store_t_to_json(opt, json_str, 0);
   LOG_PRINT_L0("SENDING SIGNAL -> [HANDLE_CURRENT_ACTION_STATE]:" << std::endl << json_str);
   QMetaObject::invokeMethod(this, "handle_current_action_state", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
   return true;
@@ -1044,12 +1164,13 @@ bool MainWindow::nativeEventFilter(const QByteArray &eventType, void *message, l
   CATCH_ENTRY2(false);
 }
 
-bool MainWindow::get_is_disabled_notifications()
+bool MainWindow::get_is_disabled_notifications(const QString& param)
 {
   return m_config.disable_notifications;
 }
 bool MainWindow::set_is_disabled_notifications(const bool& param)
 {
+  LOG_PRINT_L1("set_is_disabled_notifications: notifications were " << (m_config.disable_notifications ? "DISABLED" : "ENABLED") << "  ->  now " << (param ? "DISABLED" : "ENABLED"));
   m_config.disable_notifications = param;
   return m_config.disable_notifications;
 }
@@ -1067,7 +1188,7 @@ bool MainWindow::update_wallets_info(const view::wallets_summary_info& wsi)
 {
   TRY_ENTRY();
   std::string json_str;
-  epee::serialization::store_t_to_json(wsi, json_str, 0, epee::serialization::eol_lf);
+  epee::serialization::store_t_to_json(wsi, json_str, 0);
   LOG_PRINT_L0("SENDING SIGNAL -> [update_wallets_info]"<< std::endl << json_str );
   
   QMetaObject::invokeMethod(this, "update_wallets_info", Qt::QueuedConnection, Q_ARG(QString, json_str.c_str()));
@@ -1079,7 +1200,7 @@ bool MainWindow::money_transfer(const view::transfer_event_info& tei)
 {
   TRY_ENTRY();
   std::string json_str;
-  epee::serialization::store_t_to_json(tei, json_str, 0, epee::serialization::eol_lf);
+  epee::serialization::store_t_to_json(tei, json_str, 0);
 
   LOG_PRINT_L0(get_wallet_log_prefix(tei.wallet_id) + "SENDING SIGNAL -> [money_transfer]" << std::endl << json_str);
   //this->money_transfer(json_str.c_str());
@@ -1134,7 +1255,7 @@ bool MainWindow::money_transfer_cancel(const view::transfer_event_info& tei)
 {
   TRY_ENTRY();
   std::string json_str;
-  epee::serialization::store_t_to_json(tei, json_str, 0, epee::serialization::eol_lf);
+  epee::serialization::store_t_to_json(tei, json_str, 0);
 
   LOG_PRINT_L0(get_wallet_log_prefix(tei.wallet_id) + "SENDING SIGNAL -> [money_transfer_cancel]");
   //this->money_transfer_cancel(json_str.c_str());
@@ -1149,7 +1270,7 @@ bool MainWindow::wallet_sync_progress(const view::wallet_sync_progres_param& p)
   TRY_ENTRY();
   LOG_PRINT_L2(get_wallet_log_prefix(p.wallet_id) + "SENDING SIGNAL -> [wallet_sync_progress]" << " wallet_id: " << p.wallet_id << ": " << p.progress << "%");
   //this->wallet_sync_progress(epee::serialization::store_t_to_json(p).c_str());
-  QMetaObject::invokeMethod(this, "wallet_sync_progress", Qt::QueuedConnection, Q_ARG(QString, epee::serialization::store_t_to_json(p, 0, epee::serialization::eol_lf).c_str()));
+  QMetaObject::invokeMethod(this, "wallet_sync_progress", Qt::QueuedConnection, Q_ARG(QString, epee::serialization::store_t_to_json(p, 0).c_str()));
   return true;
   CATCH_ENTRY2(false);
 }
@@ -1157,14 +1278,27 @@ bool MainWindow::wallet_sync_progress(const view::wallet_sync_progres_param& p)
 bool MainWindow::set_html_path(const std::string& path)
 {
   TRY_ENTRY();
-  //init_tray_icon(path);
-#ifdef _MSC_VER
-  QString url = QString::fromUtf8(path.c_str()) + "/index.html";
-  load_file(url);
-#else
-//  load_file(QString((std::string("file://") + path + "/index.html").c_str()));
-  load_file(QString((std::string("") + path + "/index.html").c_str()));
-#endif
+  QString s = QString::fromStdString(path).trimmed();
+  QUrl url;
+
+  if (s.startsWith("qrc:/", Qt::CaseInsensitive))
+  {
+    if (!s.endsWith(".html", Qt::CaseInsensitive))
+      s += "/index.html";
+    url = QUrl(s);
+  }
+  else
+  {
+    QFileInfo fi(s);
+    if (fi.exists() && fi.isDir())
+      url = QUrl::fromLocalFile(QDir(s).filePath("index.html"));
+    else if (fi.exists())
+      url = QUrl::fromLocalFile(fi.absoluteFilePath());
+    else
+      url = s.contains("://") ? QUrl(s) : QUrl::fromLocalFile(s);
+  }
+
+  m_view->load(url);
   return true;
   CATCH_ENTRY2(false);
 }
@@ -1181,21 +1315,21 @@ bool MainWindow::pos_block_found(const currency::block& block_found)
   CATCH_ENTRY2(false);
 }
 
-QString MainWindow::get_version()
+QString MainWindow::get_version(const QString& param)
 {
   TRY_ENTRY();
   return PROJECT_VERSION_LONG;
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString MainWindow::get_os_version()
+QString MainWindow::get_os_version(const QString& param)
 {
   TRY_ENTRY();
   return tools::get_os_version_string().c_str();
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
-QString MainWindow::get_network_type()
+QString MainWindow::get_network_type(const QString& param)
 {
 #if defined(TESTNET)
   return "testnet";
@@ -1211,7 +1345,7 @@ QString MainWindow::get_alias_coast(const QString& param)
   PREPARE_ARG_FROM_JSON(currency::struct_with_one_t_type<std::string>, lvl);
   view::get_alias_coast_response resp;
   resp.error_code = m_backend.get_alias_coast(lvl.v, resp.coast);
-  return epee::serialization::store_t_to_json(resp, 0, epee::serialization::eol_lf).c_str();
+  return epee::serialization::store_t_to_json(resp, 0).c_str();
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
@@ -1239,7 +1373,7 @@ QString MainWindow::set_localization_strings(const QString param)
     resp.error_code = API_RETURN_CODE_OK;
     LOG_PRINT_L0("New localization set, language title: " << lr.language_title << ", strings " << lr.strings.size());
   }
-  return epee::serialization::store_t_to_json(resp, 0, epee::serialization::eol_lf).c_str();
+  return epee::serialization::store_t_to_json(resp, 0).c_str();
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
@@ -1274,7 +1408,7 @@ QString MainWindow::request_alias_update(const QString& param)
 
   //  view::transfer_response tr = AUTO_VAL_INIT(tr);
   currency::transaction res_tx = AUTO_VAL_INIT(res_tx);
-  ar.error_code = m_backend.request_alias_update(tp.alias, tp.wallet_id, tp.fee, res_tx, tp.reward);
+  ar.error_code = m_backend.request_alias_update(tp.alias, tp.wallet_id, tp.fee, res_tx);
   if (ar.error_code != API_RETURN_CODE_OK)
     return MAKE_RESPONSE(ar);
 
@@ -1408,7 +1542,7 @@ void MainWindow::on_clear_events()
 }
 
 
-QString MainWindow::store_secure_app_data(const QString& param)
+QString MainWindow::store_secure_app_data(const QString& param, const QString& password)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -1626,7 +1760,7 @@ QString MainWindow::load_from_file(const QString& path)
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
 
-QString MainWindow::get_app_data()
+QString MainWindow::get_app_data(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -1637,7 +1771,7 @@ QString MainWindow::get_app_data()
 }
 
 
-QString MainWindow::have_secure_app_data()
+QString MainWindow::have_secure_app_data(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -1673,7 +1807,7 @@ QString MainWindow::drop_secure_app_data()
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString MainWindow::get_all_aliases()
+QString MainWindow::get_all_aliases(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -1710,6 +1844,14 @@ QString MainWindow::validate_address(const QString& param)
   LOG_API_TIMING();
   view::address_validation_response ar = AUTO_VAL_INIT(ar);
   ar.error_code = m_backend.validate_address(param.toStdString(), ar.payment_id);
+
+  //@#@
+//#ifdef _DEBUG
+//  std::string json_body;
+//  bool r = epee::file_io_utils::load_file_to_string("C:\\Users\\roky\\home\\temp\\deploy_test.json", json_body);
+//  async_call_2a("call_wallet_rpc", "0", json_body.c_str());
+//#endif
+
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
@@ -1779,7 +1921,7 @@ QString MainWindow::set_enable_tor(const QString& param)
 //   return MAKE_RESPONSE(ar);
 // }
 
-QString MainWindow::webkit_launched_script()
+QString MainWindow::webkit_launched_script(const QString& param)
 {
   TRY_ENTRY();
   m_last_update_daemon_status_json.clear();
@@ -1795,7 +1937,7 @@ QString MainWindow::show_openfile_dialog(const QString& param)
   if (!epee::serialization::load_t_from_json(ofdr, param.toStdString()))
   {
     ofdres.error_code = API_RETURN_CODE_BAD_ARG;
-    return epee::serialization::store_t_to_json(ofdres, 0, epee::serialization::eol_lf).c_str();
+    return epee::serialization::store_t_to_json(ofdres, 0).c_str();
   }
 
   QString path = QFileDialog::getOpenFileName(this, ofdr.caption.c_str(),
@@ -1805,7 +1947,7 @@ QString MainWindow::show_openfile_dialog(const QString& param)
   if (!path.length())
   {
     ofdres.error_code = API_RETURN_CODE_CANCELED;
-    return epee::serialization::store_t_to_json(ofdres, 0, epee::serialization::eol_lf).c_str();
+    return epee::serialization::store_t_to_json(ofdres, 0).c_str();
   }
 
   ofdres.error_code = API_RETURN_CODE_OK;
@@ -1828,7 +1970,7 @@ QString MainWindow::show_savefile_dialog(const QString& param)
   if (!path.length())
   {
     ofdres.error_code = API_RETURN_CODE_CANCELED;
-    return epee::serialization::store_t_to_json(ofdres, 0, epee::serialization::eol_lf).c_str();
+    return epee::serialization::store_t_to_json(ofdres, 0).c_str();
   }
 
   ofdres.error_code = API_RETURN_CODE_OK;
@@ -1993,7 +2135,7 @@ QString MainWindow::get_fav_offers(const QString& param)
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
-QString MainWindow::is_pos_allowed()
+QString MainWindow::is_pos_allowed(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -2265,7 +2407,7 @@ QString MainWindow::is_wallet_password_valid(const QString& param)
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
 
-QString MainWindow::is_autostart_enabled()
+QString MainWindow::is_autostart_enabled(const QString& param)
 {
   TRY_ENTRY();
   LOG_API_TIMING();
@@ -2315,6 +2457,16 @@ QString MainWindow::open_url_in_browser(const QString& param)
     return API_RETURN_CODE_FAIL;
   }
   LOG_PRINT_L0("[Open URL]: " << param.toStdString());
+  return API_RETURN_CODE_OK;
+  CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
+}
+
+QString MainWindow::setup_jwt_wallet_rpc(const QString& param)
+{
+  TRY_ENTRY();
+
+  m_backend.setup_wallet_rpc(param.toStdString());
+
   return API_RETURN_CODE_OK;
   CATCH_ENTRY2(API_RETURN_CODE_INTERNAL_ERROR);
 }
@@ -2393,6 +2545,10 @@ QString MainWindow::print_log(const QString& param)
 void MainWindow::show_notification(const std::string& title, const std::string& message)
 {
   TRY_ENTRY();
+
+  if (m_config.disable_notifications)
+    return;
+
   LOG_PRINT_L1("system notification: \"" << title << "\", \"" << message << "\"");
   
   // it's expected that title and message are utf-8 encoded!
@@ -2407,5 +2563,3 @@ void MainWindow::show_notification(const std::string& title, const std::string& 
 #endif
   CATCH_ENTRY2(void());
 }
-
-

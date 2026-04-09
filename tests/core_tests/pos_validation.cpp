@@ -53,7 +53,7 @@ bool gen_pos_coinstake_already_spent::generate(std::vector<test_event_entry>& ev
 
   CREATE_TEST_WALLET(miner_wlt, miner, blk_0);
   REFRESH_TEST_WALLET_AT_GEN_TIME(events, miner_wlt, blk_2, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
-  LOG_PRINT_L0("miner's transfers:" << ENDL << miner_wlt->dump_trunsfers(false));
+  LOG_PRINT_L0("miner's transfers:" << ENDL << miner_wlt->dump_transfers(false));
 
   // Legend: (n) - PoW block, [m] - PoS block
   //  0     1     11    12    13       <-- blockchain height  (assuming CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10)
@@ -217,55 +217,109 @@ bool gen_pos_too_early_pos_block::configure_core(currency::core& c, size_t ev_in
 
 //------------------------------------------------------------------
 
-bool gen_pos_extra_nonce::generate(std::vector<test_event_entry>& events) const
+bool gen_pos_extra_nonce::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>&)
 {
-  uint64_t ts = time(NULL);
-
-  GENERATE_ACCOUNT(miner);
-  GENERATE_ACCOUNT(alice);
-  MAKE_GENESIS_BLOCK(events, blk_0, miner, ts);
-  DO_CALLBACK(events, "configure_core");
-  REWIND_BLOCKS(events, blk_0r, blk_0, miner);
-
-  // Legend: (n) - PoW block, [m] - PoS block
-  //  0     10    11                 <-- blockchain height  (assuming CURRENCY_MINED_MONEY_UNLOCK_WINDOW == 10)
-  // (0 )--(0r)--[1 ]                main chain
-
-  // make a PoS block manually with incorrect timestamp
-  crypto::hash prev_id = get_block_hash(blk_0r);
-  size_t height = CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1;
-  currency::wide_difficulty_type diff = generator.get_difficulty_for_next_block(prev_id, false);
-
-  const transaction& stake = blk_0.miner_tx;
-  crypto::public_key stake_tx_pub_key = get_tx_pub_key_from_extra(stake);
-  size_t stake_output_idx = 0;
-  size_t stake_output_gidx = 0;
-  uint64_t stake_output_amount =boost::get<currency::tx_out_bare>( stake.vout[stake_output_idx]).amount;
-  crypto::key_image stake_output_key_image;
-  keypair kp;
-  generate_key_image_helper(miner.get_keys(), stake_tx_pub_key, stake_output_idx, kp, stake_output_key_image);
-  crypto::public_key stake_output_pubkey = boost::get<txout_to_key>(boost::get<currency::tx_out_bare>(stake.vout[stake_output_idx]).target).key;
-
-  pos_block_builder pb;
-  pb.step1_init_header(generator.get_hardforks(), height, prev_id);
-  pb.step2_set_txs(std::vector<transaction>());
-  pb.step3_build_stake_kernel(stake_output_amount, stake_output_gidx, stake_output_key_image, diff, prev_id, null_hash, blk_0r.timestamp);
-
-  // use biggest possible extra nonce (255 bytes) + largest alias
-  currency::blobdata extra_nonce(255, 'x');
-  //currency::extra_alias_entry alias = AUTO_VAL_INIT(alias); // TODO: this alias entry was ignored for a long time, now I commented it out, make sure it's okay -- sowle 
-  //alias.m_alias = std::string(255, 'a');
-  //alias.m_address = miner.get_keys().account_address;
-  //alias.m_text_comment = std::string(255, 'y');
-  pb.step4_generate_coinbase_tx(generator.get_timestamps_median(prev_id), generator.get_already_generated_coins(blk_0r), alice.get_public_address(), extra_nonce, CURRENCY_MINER_TX_MAX_OUTS);
-  pb.step5_sign(stake_tx_pub_key, stake_output_idx, stake_output_pubkey, miner);
-  block blk_1 = pb.m_block;
-
-  // EXPECTED: blk_1 is accepted
-  events.push_back(blk_1);
-
+  currency::core_runtime_config pc = c.get_blockchain_storage().get_core_runtime_config();
+  pc.min_coinstake_age = TESTS_POS_CONFIG_MIN_COINSTAKE_AGE;
+  pc.pos_minimum_heigh = TESTS_POS_CONFIG_POS_MINIMUM_HEIGH;
+  pc.hf4_minimum_mixins = 0;
+  pc.hard_forks = m_hardforks;
+  c.get_blockchain_storage().set_core_runtime_config(pc);
   return true;
 }
+
+gen_pos_extra_nonce::gen_pos_extra_nonce()
+{
+  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce, configure_core);
+  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce, request_pow_template_with_nonce);
+  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce, check_pow_nonce);
+  REGISTER_CALLBACK_METHOD(gen_pos_extra_nonce, check_pos_nonce);
+}
+
+// Test: verify custom extra_nonce in blocks and templates
+/*
+ * Scenarios:
+ * 1. PoW block contains m_pow_nonce
+ * 2. PoS block contains m_pos_nonce
+ * 3. PoW mining template contains m_pow_template_nonce
+ */
+bool gen_pos_extra_nonce::generate(std::vector<test_event_entry>& events) const
+{
+  GENERATE_ACCOUNT(miner);
+  GENERATE_ACCOUNT(alice);
+  m_accounts.push_back(miner);
+  m_accounts.push_back(alice);
+  m_pow_nonce = currency::blobdata(254, 'w');
+  m_pos_nonce = currency::blobdata(255, 's');
+  m_pow_template_nonce = "POW_TEMPLATE123";
+
+  uint64_t ts = test_core_time::get_time();
+  MAKE_GENESIS_BLOCK(events, blk_0, miner, ts);
+  DO_CALLBACK(events, "configure_core");
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0, miner);
+
+  block blk_2 = AUTO_VAL_INIT(blk_2);
+  ts = blk_2.timestamp + DIFFICULTY_BLOCKS_ESTIMATE_TIMESPAN / 2; // to increase main chain difficulty
+  bool r = generator.construct_block_manually(blk_2, blk_1, miner, test_generator::bf_timestamp, 0, 0, 
+    ts, crypto::hash(), 1, transaction(), std::vector<crypto::hash>(), 0, m_pow_nonce);
+  CHECK_AND_ASSERT_MES(r, false, "construct_block_manually failed");
+  events.push_back(blk_2);
+
+  DO_CALLBACK(events, "check_pow_nonce");
+  REWIND_BLOCKS(events, blk_0r, blk_2, miner);
+
+  // setup params for PoS
+  const currency::transaction& stake = blk_2.miner_tx;
+  
+  currency::block new_pos_block;
+  bool ok = generate_pos_block_with_extra_nonce(generator, events, miner, alice, blk_0r, stake, m_pos_nonce, new_pos_block); 
+  CHECK_AND_ASSERT_MES(ok, false, "generate_pos_block_with_extra_nonce failed");
+
+  events.push_back(new_pos_block);
+  DO_CALLBACK(events, "check_pos_nonce");
+  DO_CALLBACK(events, "request_pow_template_with_nonce");
+  return true;
+}
+
+bool gen_pos_extra_nonce::request_pow_template_with_nonce(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  block bl;
+  wide_difficulty_type diff;
+  uint64_t height;
+  bool ok = c.get_block_template(bl, m_accounts[0].get_public_address(), m_accounts[0].get_public_address(), diff, height, m_pow_template_nonce);
+  CHECK_AND_ASSERT_MES(ok, false, "get_block_template failed");
+  CHECK_AND_ASSERT_MES(has_extra_nonce(bl, m_pow_template_nonce), false, "PoW extra_nonce not found");
+  return true;
+}
+
+bool gen_pos_extra_nonce::check_pow_nonce(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  block top;
+  bool ok = c.get_blockchain_storage().get_top_block(top);
+  CHECK_AND_ASSERT_MES(ok, false, "get_top_block failed");
+  CHECK_AND_ASSERT_MES(has_extra_nonce(top, m_pow_nonce), false, "PoW extra_nonce not found");
+  return true;
+}
+
+bool gen_pos_extra_nonce::check_pos_nonce(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  block top;
+  bool ok = c.get_blockchain_storage().get_top_block(top);
+  CHECK_AND_ASSERT_MES(ok, false, "get_top_block failed");
+  CHECK_AND_ASSERT_MES(has_extra_nonce(top, m_pos_nonce), false, "PoS extra_nonce not found");
+  return true;
+}
+
+bool gen_pos_extra_nonce::has_extra_nonce(currency::block& blk, const std::string& expected_nonce)
+{
+  if (auto const* ud = get_type_in_variant_container<extra_user_data>(blk.miner_tx.extra)) {
+    LOG_PRINT_L0("Found extra nonce: '" << ud->buff << "' expected: '" << expected_nonce << "'");
+    return ud->buff == expected_nonce;
+  }
+  return false;
+}
+
+//------------------------------------------------------------------
 
 gen_pos_min_allowed_height::gen_pos_min_allowed_height()
 {
@@ -728,7 +782,7 @@ void pos_wallet_minting_same_amount_diff_outs::dump_wallets_entries(const std::v
   LOG_PRINT2(LOG2_FILENAME, ENDL << ENDL << ENDL << ENDL << ENDL << ENDL, LOG_LEVEL_0);
   for (size_t i = 0; i < minting_wallets.size(); ++i)
   {
-    LOG_PRINT2(LOG2_FILENAME, "wallet #" << i << ":" << ENDL << minting_wallets[i].w->dump_trunsfers() << ENDL, LOG_LEVEL_0);
+    LOG_PRINT2(LOG2_FILENAME, "wallet #" << i << ":" << ENDL << minting_wallets[i].w->dump_transfers() << ENDL, LOG_LEVEL_0);
   }
 #undef LOG2_FILENAME
 }
@@ -806,7 +860,7 @@ bool pos_wallet_big_block_test::c1(currency::core& c, size_t ev_index, const std
   miner_wlt->refresh();
   miner_wlt->scan_tx_pool(stub_bool);
 
-  LOG_PRINT_L0("miner transfers:" << ENDL << miner_wlt->dump_trunsfers(false));
+  LOG_PRINT_L0("miner transfers:" << ENDL << miner_wlt->dump_transfers(false));
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 2, false, "Incorrect number of txs in the pool: " << c.get_pool_transactions_count());
 
@@ -849,7 +903,7 @@ bool pos_wallet_big_block_test::c1(currency::core& c, size_t ev_index, const std
 
 pos_altblocks_validation::pos_altblocks_validation()
 {
-  test_chain_unit_base::set_hardforks_for_old_tests();
+  //test_chain_unit_base::set_hardforks_for_old_tests();
 }
 
 bool pos_altblocks_validation::configure_core(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
@@ -871,23 +925,26 @@ bool pos_altblocks_validation::generate(std::vector<test_event_entry>& events) c
   std::list<account_base> miner_acc_lst(1, miner_acc);
   MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
   DO_CALLBACK(events, "configure_core");
-  MAKE_NEXT_BLOCK(events, blk_1, blk_0, alice_acc);
+  REWIND_BLOCKS_N_WITH_TIME(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  MAKE_NEXT_BLOCK(events, blk_1, blk_0r, alice_acc);
   REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+
+  bool HF4_active = m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, get_block_height(blk_1r) + 1);
 
   MAKE_NEXT_BLOCK(events, blk_2, blk_1r, miner_acc);
   const transaction& stake_tx = blk_1.miner_tx;
-  uint64_t alice_money = get_outs_money_amount(stake_tx);
   uint64_t stake_tx_out_id = 0;
-  // select stake_tx_out_id as an output with the biggest amount
-  for (size_t i = 1; i < stake_tx.vout.size(); ++i)
-  {
-    if (boost::get<currency::tx_out_bare>(stake_tx.vout[i]).amount >boost::get<currency::tx_out_bare>( stake_tx.vout[stake_tx_out_id]).amount)
-      stake_tx_out_id = i;
-  }
+  uint64_t alice_money = decode_native_output_amount_or_throw(alice_acc, blk_1.miner_tx, stake_tx_out_id);
+  //// select stake_tx_out_id as an output with the biggest amount
+  //for (size_t i = 1; i < stake_tx.vout.size(); ++i)
+  //{
+  //  if (boost::get<currency::tx_out_bare>(stake_tx.vout[i]).amount > boost::get<currency::tx_out_bare>( stake_tx.vout[stake_tx_out_id]).amount)
+  //    stake_tx_out_id = i;
+  //}
 
   MAKE_TX_FEE(events, tx_0, alice_acc, alice_acc, alice_money - TESTS_DEFAULT_FEE * 17, TESTS_DEFAULT_FEE * 17, blk_2);
   // tx_0 transfers all Alice's money, so it effectevily spends all outputs in stake_ts, make sure it does
-  CHECK_AND_ASSERT_MES(tx_0.vin.size() == stake_tx.vout.size(), false, "probably, tx_0 doesn't spend all Alice's money as expected, tx_0.vin.size()=" << tx_0.vin.size() << ", stake_tx.vout.size()=" << stake_tx.vout.size());
+  //CHECK_AND_ASSERT_MES(tx_0.vin.size() == stake_tx.vout.size(), false, "probably, tx_0 doesn't spend all Alice's money as expected, tx_0.vin.size()=" << tx_0.vin.size() << ", stake_tx.vout.size()=" << stake_tx.vout.size());
 
   MAKE_NEXT_BLOCK_TX1(events, blk_3, blk_2, miner_acc, tx_0);
   
@@ -900,12 +957,13 @@ bool pos_altblocks_validation::generate(std::vector<test_event_entry>& events) c
   REWIND_BLOCKS_N_WITH_TIME(events, blk_3r, blk_3, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   MAKE_NEXT_POS_BLOCK(events, blk_4, blk_3r, miner_acc, miner_acc_lst);
   MAKE_NEXT_BLOCK(events, blk_5, blk_4, miner_acc);
+  MAKE_NEXT_POS_BLOCK(events, blk_6, blk_5, miner_acc, miner_acc_lst);
 
-  //  0       1       11      12      13      23      24      25         <- height
+  //  0      11       21      22      23      33      34      35      36         <- height
   //
   //          +------- blk_1 mined by Alice
   //          |
-  // (0 )-   (1 )-...(1r)-   (2 )-   (3 )-...(3r)-   (4 )-   (5 )-       <- main chain
+  // (0 )-   (1 )-...(1r)-   (2 )-   (3 )-...(3r)-   (4 )-   (5 )-   (6 )-       <- main chain
   //          |                      tx_0
   //          +---<<---uses-blk_1-out--+
 
@@ -915,37 +973,59 @@ bool pos_altblocks_validation::generate(std::vector<test_event_entry>& events) c
   block blk_2a = AUTO_VAL_INIT(blk_2a);
   r = generate_pos_block_with_given_coinstake(generator, events, alice_acc, blk_1r, stake_tx, stake_tx_out_id, blk_2a);
   CHECK_AND_ASSERT_MES(r, false, "generate_pos_block_with_given_coinstake failed");
-  events.push_back(blk_2a);
+  ADD_CUSTOM_EVENT(events, blk_2a);
   CHECK_AND_ASSERT_MES(generator.add_block_info(blk_2a, std::list<transaction>()), false, "add_block_info failed");
 
-  //  0       1       11      12      13      23      24      25         <- height
+  //  0      11       21      22      23      33      34      35      36         <- height
   //
   //          +-----------------------+
-  //          |                      tx_0                                tx_0 spends all outputs in blk_1 (main chain)
-  // (0 )-   (1 )-...(1r)-   (2 )-   (3 )-...(3r)-   (4 )-   (5 )-       <- main chain
+  //          |                      tx_0                                        tx_0 spends all outputs in blk_1 (main chain)
+  // (0 )-   (1 )-...(1r)-   (2 )-   (3 )-...(3r)-   (4 )-   (5 )-   (6 )-       <- main chain
   //           |        \ 
-  //           |         \-  (2a)-                                       <- alt chain
-  //           +--------------+                                          PoS block 2a uses stake already spent in main chain
+  //           |         \-  (2a)-                                               <- alt chain
+  //           +--------------+                                                  PoS block 2a uses stake already spent in main chain
 
 
-  // Case 2 (should fail)
+  // Case 2a (should fail)
   // alt PoS block (blk_3a) refers in its coinstake to an output (stake_tx_out_id) already spent in this alt chain (in blk_2a)
   block blk_3a = AUTO_VAL_INIT(blk_3a);
   r = generate_pos_block_with_given_coinstake(generator, events, alice_acc, blk_2a, stake_tx, stake_tx_out_id, blk_3a);
   CHECK_AND_ASSERT_MES(r, false, "generate_pos_block_with_given_coinstake failed");
   DO_CALLBACK(events, "mark_invalid_block");
-  events.push_back(blk_3a);
+  ADD_CUSTOM_EVENT(events, blk_3a);
 
-  //  0       1       11      12      13      23      24      25         <- height
+  //  0      11       21      22      23      33      34      35      36         <- height
   //
   //          +-----------------------+
-  //          |                      tx_0                                tx_0 spends all outputs in blk_1 (main chain)
-  // (0 )-   (1 )-...(1r)-   (2 )-   (3 )-...(3r)-   (4 )-   (5 )-       <- main chain
+  //          |                      tx_0                                        tx_0 spends all outputs in blk_1 (main chain)
+  // (0 )-   (1 )-...(1r)-   (2 )-   (3 )-...(3r)-   (4 )-   (5 )-   (6 )-       <- main chain
   //          ||        \ 
-  //          ||         \-  (2a)-   #3a#-                               <- alt chain
-  //          |+--------------+       |                                  PoS block 2a uses stake already spent in main chain (okay)
-  //          +-----------------------+                                  PoS block 3a uses stake already spent in current alt chain (fail)
+  //          ||         \-  (2a)-   #3a#-                                       <- alt chain
+  //          |+--------------+       |                                          PoS block 2a uses stake already spent in main chain (okay)
+  //          +-----------------------+                                          PoS block 3a uses stake already spent in current alt chain (fail)
 
+
+  // Case 2b (should fail)
+  // alt PoS block (blk_3aa) has invalid signature
+  block blk_3aa{};
+  r = generate_pos_block_with_given_coinstake(generator, events, miner_acc, blk_2a, blk_0r.miner_tx, 0, blk_3aa);
+  CHECK_AND_ASSERT_MES(r, false, "generate_pos_block_with_given_coinstake failed");
+  if (HF4_active)
+    boost::get<zarcanum_sig>(blk_3aa.miner_tx.signatures[0]).y0.m_u64[1] = 5; // invalidate signature
+  else
+    boost::get<NLSAG_sig>(blk_3aa.miner_tx.signatures[0]).s[0].c.data[5] = 7; // invalidate signature
+  DO_CALLBACK(events, "mark_invalid_block");
+  ADD_CUSTOM_EVENT(events, blk_3aa);
+
+  //  0      11       21      22      23      33      34      35      36         <- height
+  //
+  //          +-----------------------+
+  //          |                      tx_0                                        tx_0 spends all outputs in blk_1 (main chain)
+  // (0 )-   (1 )-...(1r)-   (2 )-   (3 )-...(3r)-   (4 )-   (5 )-   (6 )-       <- main chain
+  //          ||        \ 
+  //          ||         \-  (2a)-   #3aa#-                                      <- alt chain
+  //          |+--------------+       |                                          PoS block 2a uses stake already spent in main chain (okay)
+  //          +-----------------------+                                          PoS block 3aa has incorrect signature (fail)
 
   REWIND_BLOCKS_N_WITH_TIME(events, blk_2br, blk_2a, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
 
@@ -954,55 +1034,63 @@ bool pos_altblocks_validation::generate(std::vector<test_event_entry>& events) c
   block blk_3b = AUTO_VAL_INIT(blk_3b);
   r = generate_pos_block_with_given_coinstake(generator, events, alice_acc, blk_2br, blk_2a.miner_tx, 0, blk_3b);
   CHECK_AND_ASSERT_MES(r, false, "generate_pos_block_with_given_coinstake failed");
-  events.push_back(blk_3b);
+  ADD_CUSTOM_EVENT(events, blk_3b);
   CHECK_AND_ASSERT_MES(generator.add_block_info(blk_3b, std::list<transaction>()), false, "add_block_info failed");
 
-  //  0       1       11      12      13      22      23      24      25         <- height
+  //  0      11       21      22      23      33      34      35      36         <- height
   //
   //          +-----------------------+
-  //          |                      tx_0                                        tx_0 spends all outputs in blk_1 (main chain)
-  // (0 )-   (1 )-...(1r)-   (2 )-   (3 )- ........  (3r)-   (4 )-   (5 )-       <- main chain
+  //          |                      tx_0                                                tx_0 spends all outputs in blk_1 (main chain)
+  // (0 )-   (1 )-...(1r)-   (2 )-   (3 )- ........  (3r)-   (4 )-   (5 )-   (6 )-       <- main chain
   //          ||        \ 
-  //          ||         \-  (2a)-   #3a#-                                       <- alt chain
-  //          |+--------------+ \     |                                          PoS block 2a uses stake already spent in main chain (okay)
-  //          +---------------|-------+                                          PoS block 3a uses stake already spent in current alt chain (fail)
+  //          ||         \-  (2a)-   #3a#-                                               <- alt chain
+  //          |+--------------+ \     |                                                  PoS block 2a uses stake already spent in main chain (okay)
+  //          +---------------|-------+                                                  PoS block 3a uses stake already spent in current alt chain (fail)
   //                          |   \ 
-  //                          |    \ ...... (2br)-   (3b)-                       <- alt chain
+  //                          |    \ ...... (2br)-   (3b)-                               <- alt chain
   //                          |                       |
-  //                          +-----------------------+                          PoS block 3b uses as stake an output, created in current alt chain (2a)
+  //                          +-----------------------+                                  PoS block 3b uses as stake an output, created in current alt chain (2a)
 
 
   // Case 4 (should fail)
   // alt PoS block (blk_4b) in its coinstake refers to an output (tx_0) that appeared in the main chain (blk_3) above split height
   block blk_4b = AUTO_VAL_INIT(blk_4b);
   r = generate_pos_block_with_given_coinstake(generator, events, alice_acc, blk_3b, tx_0, tx_0_some_output_idx, blk_4b, tx_0_some_output_gindex);
-  CHECK_AND_ASSERT_MES(r, false, "generate_pos_block_with_given_coinstake failed");
-  DO_CALLBACK(events, "mark_invalid_block");
-  events.push_back(blk_4b);
+  if (HF4_active)
+  {
+    CHECK_AND_ASSERT_MES(!r, false, "generate_pos_block_with_given_coinstake not failed as expected");
+  }
+  else
+  {
+    CHECK_AND_ASSERT_MES(r, false, "generate_pos_block_with_given_coinstake failed");
+    DO_CALLBACK(events, "mark_invalid_block");
+    ADD_CUSTOM_EVENT(events, blk_4b);
+  }
 
-  //  0       1       11      12      13      22      23      24      25         <- height
+  //  0      11       21      22      23      33      34      35      36         <- height
   //                                    +------------------+
   //          +-----------------------+ |                  |
-  //          |                      tx_0                  |                     tx_0 spends all outputs in blk_1 (main chain)
-  // (0 )-   (1 )-...(1r)-   (2 )-   (3 )- ........  (3r)-   (4 )-   (5 )-       <- main chain
+  //          |                      tx_0                  |                             tx_0 spends all outputs in blk_1 (main chain)
+  // (0 )-   (1 )-...(1r)-   (2 )-   (3 )- ........  (3r)-   (4 )-   (5 )-   (6 )-       <- main chain
   //          ||        \                                  |
-  //          ||         \-  (2a)-   #3a#-                 |                     <- alt chain
-  //          |+--------------+ \     |                    \                     PoS block 2a uses stake already spent in main chain (okay)
-  //          +---------------|-------+                     \                    PoS block 3a uses stake already spent in current alt chain (fail)
+  //          ||         \-  (2a)-   #3a#-                 |                             <- alt chain
+  //          |+--------------+ \     |                    \                             PoS block 2a uses stake already spent in main chain (okay)
+  //          +---------------|-------+                     \                            PoS block 3a uses stake already spent in current alt chain (fail)
   //                          |   \                          \ 
-  //                          |    \ ...... (2br)-   (3b)-   #4b#                <- alt chain
+  //                          |    \ ...... (2br)-   (3b)-   #4b#                        <- alt chain
   //                          |                       |
-  //                          +-----------------------+                          PoS block 3b uses as stake an output, created in current alt chain (2a)
+  //                          +-----------------------+                                  PoS block 3b uses as stake an output, created in current alt chain (2a)
 
-  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(get_block_height(blk_5), get_block_hash(blk_5)));
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(get_block_height(blk_6), get_block_hash(blk_6)));
 
 
   // Final check: switch the chains
   MAKE_NEXT_BLOCK(events, blk_4c, blk_3b, miner_acc);
   MAKE_NEXT_BLOCK(events, blk_5c, blk_4c, miner_acc);
   MAKE_NEXT_BLOCK(events, blk_6c, blk_5c, miner_acc);
+  MAKE_NEXT_BLOCK(events, blk_7c, blk_6c, miner_acc);
 
-  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(get_block_height(blk_6c), get_block_hash(blk_6c)));
+  DO_CALLBACK_PARAMS(events, "check_top_block", params_top_block(get_block_height(blk_7c), get_block_hash(blk_7c)));
   size_t txs_count = 1;
   DO_CALLBACK_PARAMS(events, "check_tx_pool_count", txs_count); // tx_0 should left in the pool
 

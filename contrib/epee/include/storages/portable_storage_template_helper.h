@@ -34,12 +34,13 @@ namespace epee
   namespace serialization
   {
     //-----------------------------------------------------------------------------------------------------------
+
     template<class t_struct>
     bool load_t_from_json(t_struct& out, const std::string& json_buff)
     {
       portable_storage ps;
       bool rs = ps.load_from_json(json_buff);
-      if(!rs)
+      if (!rs)
         return false;
 
       return out.load(ps);
@@ -56,16 +57,16 @@ namespace epee
     }
     //-----------------------------------------------------------------------------------------------------------
     template<class t_struct>
-    bool store_t_to_json(const t_struct& str_in, std::string& json_buff, size_t indent = 0, end_of_line_t eol = eol_crlf)
+    bool store_t_to_json(const t_struct& str_in, std::string& json_buff, size_t indent = 0)
     {
       portable_storage ps;
       str_in.store(ps);
-      ps.dump_as_json(json_buff, indent, eol);
+      ps.dump_as_json(json_buff, indent);
       return true;
     }
     //-----------------------------------------------------------------------------------------------------------
     template<class t_struct>
-    std::string store_t_to_json(const t_struct& str_in, size_t indent = 0, end_of_line_t eol = eol_crlf)
+    std::string store_t_to_json(const t_struct& str_in, size_t indent = 0)
     {
       std::string json_buff;
       store_t_to_json(str_in, json_buff, indent);
@@ -81,14 +82,20 @@ namespace epee
     }
     //-----------------------------------------------------------------------------------------------------------
     template<class t_struct>
-    bool load_t_from_binary(t_struct& out, const std::string& binary_buff)
+    bool load_t_from_binary(t_struct& out, const std::string& binary_buff, const portable_storage_limits& limits)
     {
       portable_storage ps;
-      bool rs = ps.load_from_binary(binary_buff);
-      if(!rs)
+      bool rs = ps.load_from_binary(binary_buff, limits);
+      if (!rs)
         return false;
 
       return out.load(ps);
+    }
+    //-----------------------------------------------------------------------------------------------------------
+    template<class t_struct>
+    bool load_t_from_binary(t_struct& out, const std::string& binary_buff)
+    {
+      return load_t_from_binary(out, binary_buff, gdefault_portable_storage_limits);
     }
     //-----------------------------------------------------------------------------------------------------------
     template<class t_struct>

@@ -123,6 +123,15 @@ namespace crypto
     return generate_schnorr_sig(m, point_t(A), scalar_t(secret_a), result);
   }
 
+  inline bool generate_schnorr_sig(const hash& m, const secret_key& secret_a, generic_schnorr_sig& result)
+  {
+    scalar_t secret_a_s(secret_a);
+    if (!secret_a_s.is_reduced())
+      return false;
+    point_t A = secret_a_s * c_point_G;
+    return generate_schnorr_sig_custom_generator(m, A, secret_a_s, result, c_point_G);
+  }
+
 
   template<generator_tag gen = gt_G>
   inline bool verify_schnorr_sig(const hash& m, const public_key& A, const generic_schnorr_sig& sig) noexcept;

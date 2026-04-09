@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -30,7 +30,6 @@
 #include "common/boost_serialization_helper.h"
 #include "warnings.h"
 #include "crypto/hash.h"
-#include "miner_common.h"
 #include "storages/portable_storage_template_helper.h"
 #include "basic_pow_helpers.h"
 #include "version.h"
@@ -67,16 +66,16 @@ using namespace currency;
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_LAST_WORKED_VERSION                   2
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_STORAGE_MAJOR_COMPATIBILITY_VERSION   3 //DON'T CHANGE THIS, if you need to resync db change BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION
 #define BLOCKCHAIN_STORAGE_OPTIONS_ID_STORAGE_MINOR_COMPATIBILITY_VERSION   4 //mismatch here means some reinitializations
+#define BLOCKCHAIN_STORAGE_OPTIONS_ID_MAJOR_FAILURE                         5 //if not blocks should ever be added with this condition
+#define BLOCKCHAIN_STORAGE_OPTIONS_ID_MOST_RECENT_HARDFORK_ID               6
+
 
 #define TARGETDATA_CACHE_SIZE                          DIFFICULTY_WINDOW + 10
 
 DISABLE_VS_WARNINGS(4267)
 
-namespace 
-{
-  const command_line::arg_descriptor<uint32_t>      arg_db_cache_l1  ( "db-cache-l1", "Specify size of memory mapped db cache file");
-  const command_line::arg_descriptor<uint32_t>      arg_db_cache_l2  ( "db-cache-l2", "Specify cached elements in db helpers");
-}
+const command_line::arg_descriptor<uint64_t>  arg_db_cache_l1       ( "db-cache-l1", "Specify size of memory mapped db cache file");
+const command_line::arg_descriptor<uint64_t>  arg_db_cache_l2       ( "db-cache-l2", "Specify cached elements in db helpers");
 
 //------------------------------------------------------------------
 blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m_rw_lock),
@@ -96,6 +95,8 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
                                                                  m_db_last_worked_version(BLOCKCHAIN_STORAGE_OPTIONS_ID_LAST_WORKED_VERSION, m_db_solo_options),
                                                                  m_db_storage_major_compatibility_version(BLOCKCHAIN_STORAGE_OPTIONS_ID_STORAGE_MAJOR_COMPATIBILITY_VERSION, m_db_solo_options),
                                                                  m_db_storage_minor_compatibility_version(BLOCKCHAIN_STORAGE_OPTIONS_ID_STORAGE_MINOR_COMPATIBILITY_VERSION, m_db_solo_options),
+                                                                 m_db_major_failure(BLOCKCHAIN_STORAGE_OPTIONS_ID_MAJOR_FAILURE, m_db_solo_options),
+                                                                 m_db_most_recent_hardfork_id(BLOCKCHAIN_STORAGE_OPTIONS_ID_MOST_RECENT_HARDFORK_ID, m_db_solo_options),
                                                                  m_db_per_block_gindex_incs(m_db),
                                                                  m_tx_pool(tx_pool), 
                                                                  m_is_in_checkpoint_zone(false), 
@@ -110,13 +111,15 @@ blockchain_storage::blockchain_storage(tx_memory_pool& tx_pool) :m_db(nullptr, m
                                                                  m_deinit_is_done(false), 
                                                                  m_cached_next_pow_difficulty(0), 
                                                                  m_cached_next_pos_difficulty(0), 
-                                                                 m_blockchain_launch_timestamp(0)
+                                                                 m_blockchain_launch_timestamp(0),
+                                                                 m_non_pruning_mode_enabled(false)
 
 
 {
   m_services_mgr.set_core_runtime_config(m_core_runtime_config);
   m_performance_data.epic_failure_happend = false;
 }
+
 blockchain_storage::~blockchain_storage()
 {
   if (!m_deinit_is_done)
@@ -153,6 +156,7 @@ void blockchain_storage::init_options(boost::program_options::options_descriptio
 {
   command_line::add_arg(desc, arg_db_cache_l1);
   command_line::add_arg(desc, arg_db_cache_l2);
+  command_line::add_arg(desc, command_line::arg_non_pruning_mode);
 }
 //------------------------------------------------------------------
 uint64_t blockchain_storage::get_block_h_older_then(uint64_t timestamp) const 
@@ -203,6 +207,58 @@ bool blockchain_storage::validate_instance(const std::string& path)
   }
 }
 //------------------------------------------------------------------
+void blockchain_storage::set_db_l2_cache_size(uint64_t ceched_elements) const
+{
+  LOG_PRINT_GREEN("Using db items cache size(L2): " << tools::pretty_print_big_nums(ceched_elements) << " items", LOG_LEVEL_0);
+  //m_db_blocks_index.set_cache_size(ceched_elements);
+  m_db_blocks.set_cache_size(ceched_elements);
+  m_db_transactions.set_cache_size(ceched_elements);
+  m_db_spent_keys.set_cache_size(ceched_elements);
+  //m_db_outputs.set_cache_size(ceched_elements);
+  m_db_multisig_outs.set_cache_size(ceched_elements);
+  m_db_solo_options.set_cache_size(ceched_elements);
+  m_db_aliases.set_cache_size(ceched_elements);
+  m_db_assets.set_cache_size(ceched_elements);
+  m_db_addr_to_alias.set_cache_size(ceched_elements);
+}
+//------------------------------------------------------------------
+std::string blockchain_storage::get_db_l2_cache_state_str() const
+{
+  std::stringstream ss;
+#define PRINT_CACHE_STATE(db_name)   ss << #db_name ":[" <<  tools::pretty_print_big_nums(db_name.get_cache_obj().size()) << "/" << tools::pretty_print_big_nums(db_name.get_cache_obj().most_recent_accessed_container_size()) << "] " << (db_name.get_cache_obj().size() * 100) / db_name.get_cache_size() << "%" << ENDL; 
+
+  PRINT_CACHE_STATE(m_db_blocks_index);
+  PRINT_CACHE_STATE(m_db_blocks);
+  PRINT_CACHE_STATE(m_db_transactions);
+  PRINT_CACHE_STATE(m_db_spent_keys);
+  PRINT_CACHE_STATE(m_db_multisig_outs);
+  PRINT_CACHE_STATE(m_db_solo_options);
+  PRINT_CACHE_STATE(m_db_aliases);
+  PRINT_CACHE_STATE(m_db_assets);
+  PRINT_CACHE_STATE(m_db_addr_to_alias);
+  return ss.str();
+}
+//------------------------------------------------------------------
+void blockchain_storage::print_db_l2_cache_state() const
+{
+  LOG_PRINT_MAGENTA("CACHE STATE (L2):" << ENDL << get_db_l2_cache_state_str(), LOG_LEVEL_0);
+}
+//------------------------------------------------------------------
+void remove_old_db(const std::string old_db_folder_path)
+{
+  try {
+    if (boost::filesystem::exists(epee::string_encoding::utf8_to_wstring(old_db_folder_path)))
+    {
+      LOG_PRINT_YELLOW("Removing old DB in " << old_db_folder_path << "...", LOG_LEVEL_0);
+      boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(old_db_folder_path));
+    }
+  }
+  catch (...)
+  {
+
+  }
+}
+//------------------------------------------------------------------
 bool blockchain_storage::init(const std::string& config_folder, const boost::program_options::variables_map& vm)
 {
 //  CRITICAL_REGION_LOCAL(m_read_lock);
@@ -224,6 +280,13 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     return false;
   }
 
+  bool npm_env_enabled = false;
+  m_non_pruning_mode_enabled = tools::is_non_pruning_mode_enabled(vm, &npm_env_enabled);
+  if (m_non_pruning_mode_enabled)
+  {
+    LOG_PRINT_CYAN("*** Non-pruning mode ENABLED" << (npm_env_enabled ? " (via an environment variable)" : "") << ". This build will allways retain all transaction data regardless of checkpoints. The DB is expected to have all data and will be verified soon.", LOG_LEVEL_0);
+  }
+
   uint64_t cache_size_l1 = CACHE_SIZE;
   if (command_line::has_arg(vm, arg_db_cache_l1))
   {
@@ -234,12 +297,10 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
   m_config_folder = config_folder;
 
   // remove old incompatible DB
-  const std::string old_db_folder_path = m_config_folder + "/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD;
-  if (boost::filesystem::exists(epee::string_encoding::utf8_to_wstring(old_db_folder_path)))
-  {
-    LOG_PRINT_YELLOW("Removing old DB in " << old_db_folder_path << "...", LOG_LEVEL_0);
-    boost::filesystem::remove_all(epee::string_encoding::utf8_to_wstring(old_db_folder_path));
-  }
+  std::string old_db_folder_path = m_config_folder + "/" CURRENCY_BLOCKCHAINDATA_FOLDERNAME_OLD;
+  remove_old_db(old_db_folder_path);
+  remove_old_db(dbbs.get_db_folder_path_old_1());
+  remove_old_db(dbbs.get_db_folder_path_old_2());
 
   const std::string db_folder_path = dbbs.get_db_folder_path();
   LOG_PRINT_L0("Loading blockchain from " << db_folder_path);
@@ -283,24 +344,16 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
     if (command_line::has_arg(vm, arg_db_cache_l2))
     {
       uint64_t cache_size = command_line::get_arg(vm, arg_db_cache_l2);
-      LOG_PRINT_GREEN("Using db items cache size(L2): " << cache_size, LOG_LEVEL_0);
-      m_db_blocks_index.set_cache_size(cache_size);
-      m_db_blocks.set_cache_size(cache_size);
-      m_db_blocks_index.set_cache_size(cache_size);
-      m_db_transactions.set_cache_size(cache_size);
-      m_db_spent_keys.set_cache_size(cache_size);
-      //m_db_outputs.set_cache_size(cache_size);
-      m_db_multisig_outs.set_cache_size(cache_size);
-      m_db_solo_options.set_cache_size(cache_size);
-      m_db_aliases.set_cache_size(cache_size);
-      m_db_assets.set_cache_size(cache_size);
-      m_db_addr_to_alias.set_cache_size(cache_size);
+      set_db_l2_cache_size(cache_size);
     }
+
+    LOG_PRINT_L0("Opened DB ver " << m_db_storage_major_compatibility_version << "." << m_db_storage_minor_compatibility_version);
 
     bool need_reinit = false;
     if (m_db_blocks.size() != 0)
     {
 #ifndef TESTNET
+      // MAINNET ONLY
       if ((m_db_storage_major_compatibility_version == 93 || m_db_storage_major_compatibility_version == 94) && BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION == 95)
       {
         // migrate DB to rebuild aliases container
@@ -379,14 +432,21 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         // do not reinit db if moving from version 93 to version 94
         LOG_PRINT_MAGENTA("DB storage does not need reinit because moving from v93 to v94", LOG_LEVEL_0);
       }
+
+#define DB_MAJ_VERSION_FOR_PER_BLOCK_GINDEX_FIX 95
+
 #else
-      // TESTNET
+      // TESTNET ONLY
       if (m_db_storage_major_compatibility_version == 95 && BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION == 96)
       {
         // do not reinit TESTNET db if moving from version 95 to version 96
         LOG_PRINT_MAGENTA("DB storage does not need reinit because moving from v95 to v96", LOG_LEVEL_0);
       }
+
+#define DB_MAJ_VERSION_FOR_PER_BLOCK_GINDEX_FIX 109
+
 #endif
+      // MAINNET and TESTNET
       else if (m_db_storage_major_compatibility_version != BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION)
       {
         need_reinit = true;
@@ -398,7 +458,88 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
         need_reinit = true;
         LOG_PRINT_MAGENTA("DB storage needs reinit because it has minor compatibility ver " << m_db_storage_minor_compatibility_version << " that is greater than BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION: " << BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION, LOG_LEVEL_0);
       }
-    }
+      
+      if (!need_reinit && m_db_storage_major_compatibility_version == DB_MAJ_VERSION_FOR_PER_BLOCK_GINDEX_FIX && m_db_storage_minor_compatibility_version == 1)
+      {
+        // such version means that DB has unpopulated container m_db_per_block_gindex_incs, fix it now
+        LOG_PRINT_MAGENTA("DB version is " << DB_MAJ_VERSION_FOR_PER_BLOCK_GINDEX_FIX << ".1, migrating m_db_per_block_gindex_incs to ver. " << DB_MAJ_VERSION_FOR_PER_BLOCK_GINDEX_FIX << ".2...", LOG_LEVEL_0);
+
+        // temporary set db compatibility version to zero during migration in order to trigger db reinit on the next lanunch in case the process stops in the middle
+        m_db.begin_transaction();
+        uint64_t tmp_db_maj_version = m_db_storage_major_compatibility_version;
+        m_db_storage_major_compatibility_version = 0;
+        m_db.commit_transaction();
+
+        m_db.begin_transaction();
+        std::unordered_map<uint64_t, uint32_t> gindices;
+        for(size_t height = ZANO_HARDFORK_04_AFTER_HEIGHT + 1, size = m_db_blocks.size(); height < size; ++height)
+        {
+          auto block_ptr = m_db_blocks[height];
+          gindices.clear();
+          append_per_block_increments_for_tx(block_ptr->bl.miner_tx, gindices);
+          for(const crypto::hash& tx_id : block_ptr->bl.tx_hashes)
+          {
+            auto tx_ptr = m_db_transactions.get(tx_id);
+            if (!tx_ptr)
+            {
+              LOG_ERROR("Internal error: couldn't find a transactions with id " << tx_id << ", migration stops now and full resync is triggered in attempt to fix this.");
+              need_reinit = true;
+              break;
+            }
+            append_per_block_increments_for_tx(tx_ptr->tx, gindices);
+          }
+          push_block_to_per_block_increments(height, gindices);
+        }
+        m_db.commit_transaction();
+
+        // restore db maj compatibility
+        m_db.begin_transaction();
+        m_db_storage_major_compatibility_version = tmp_db_maj_version;
+        m_db.commit_transaction();
+        LOG_PRINT_MAGENTA("migration of m_db_per_block_gindex_incs completed successfully", LOG_LEVEL_0);
+      }
+
+#ifndef TESTNET
+      // MAINNET ONLY
+      if (m_db_most_recent_hardfork_id == 0)
+      {
+        // HF5 and the first time use: we need to check
+        // to handle this case we manually check hash for the block right after HF5 activation, and if it doesn't match -- truncate the blockchain
+        block blk{};
+        if (get_block_by_height(ZANO_HARDFORK_05_AFTER_HEIGHT + 1, blk))
+        {
+          crypto::hash b3076401_id = epee::string_tools::hex_to_pod<crypto::hash>("8d93e0a7ab93b367dea44862f27ee9ca044649db84a9f44bf095d2eebc133b2d");
+          crypto::hash h = get_block_hash(blk);
+          if (h != b3076401_id)
+          {
+            LOG_PRINT_L0("In the blockchain hash for the block 3076401 is " << h << " while it is expected to be " << b3076401_id <<
+              ". Most likely recent blocks are alternative and invalid for the current hardfork, thus we truncate the blockchain, so that block 3076400 becomes new top block...");
+            truncate_blockchain(ZANO_HARDFORK_05_AFTER_HEIGHT + 1);
+            m_tx_pool.clear();
+          }
+        }
+        else
+        {
+          // do nothing if there's no such block (yet)
+        }
+      }
+      else
+      {
+        uint64_t next_block_height = get_top_block_height() + 1;
+        size_t current_hardfork_id = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(next_block_height); // note: current rules are effective for top_block_height+1
+        if (m_db_most_recent_hardfork_id < current_hardfork_id)
+        {
+          // most likely we have blocks that don't meet new hardfork criteria, so we need to remove last N blocks till the hardfork height and try to resync them again
+          uint64_t height_right_before_hardfork_activation = m_core_runtime_config.hard_forks.get_height_the_hardfork_active_after(current_hardfork_id);
+          LOG_PRINT_L0("The most recent hardfork id in the DB is " << m_db_most_recent_hardfork_id << " while according to the code, the top block must belong to the hardfork " <<
+            current_hardfork_id << ". Most likely recent blocks are alternative and invalid for the current hardfork, thus we truncate the blockchain, so that block " <<
+            height_right_before_hardfork_activation << " becomes new top block...");
+          truncate_blockchain(height_right_before_hardfork_activation + 1);
+        }
+      }
+#endif
+
+    } // if (m_db_blocks.size() != 0)
 
     if (need_reinit)
     {
@@ -452,13 +593,61 @@ bool blockchain_storage::init(const std::string& config_folder, const boost::pro
   set_lost_tx_unmixable();
   m_db.commit_transaction();
 
-  LOG_PRINT_GREEN("Blockchain initialized. (v:" << m_db_storage_major_compatibility_version << ") last block: " << m_db_blocks.size() - 1 << ENDL 
-    << "genesis: " << get_block_hash(m_db_blocks[0]->bl) << ENDL
-    << "last block: " << m_db_blocks.size() - 1 << ", " << misc_utils::get_time_interval_string(timestamp_diff) << " time ago" << ENDL
-    << "current pos difficulty: " << get_next_diff_conditional(true) << ENDL
-    << "current pow difficulty: " << get_next_diff_conditional(false) << ENDL
-    << "total transactions: " << m_db_transactions.size(),
+  LOG_PRINT_GREEN("Blockchain initialized, ver: " << m_db_storage_major_compatibility_version << "." << m_db_storage_minor_compatibility_version << ENDL 
+    << "  genesis:                " << get_block_hash(m_db_blocks[0]->bl) << ENDL
+    << "  last block:             " << m_db_blocks.size() - 1 << ", " << misc_utils::get_time_interval_string(timestamp_diff) << " ago" << ENDL
+    << "  last hardfork id:       " << m_db_most_recent_hardfork_id << ENDL
+    << "  current pos difficulty: " << get_next_diff_conditional(true) << ENDL
+    << "  current pow difficulty: " << get_next_diff_conditional(false) << ENDL
+    << "  total transactions:     " << m_db_transactions.size() << ENDL
+    << "  major failure:          " << (m_db_major_failure ? "true" : "false"),
     LOG_LEVEL_0);
+
+
+  if (m_non_pruning_mode_enabled)
+  {
+    size_t txs = 0;
+    size_t pruned_txs = 0;
+    size_t signatures = 0;
+    size_t attachments = 0;
+
+    uint64_t last_block_height = m_db_blocks.size() > 0 ? m_db_blocks.size() - 1 : 0;
+
+    LOG_PRINT_CYAN("The blockchain will be scanned now; it takes a while, please wait...", LOG_LEVEL_0);
+
+    for (uint64_t height = 0; height <= last_block_height; height++)
+    {
+      auto vptr = m_db_blocks[height];
+      CHECK_AND_ASSERT_MES(vptr.get(), false, "Failed to get block on height");
+
+      for (const auto& h : vptr->bl.tx_hashes)
+      {
+        auto it = m_db_transactions.find(h);
+        CHECK_AND_ASSERT_MES(it != m_db_transactions.end(), false, "failed to find transaction " << h << " in blockchain index, in block on height = " << height);
+        CHECK_AND_ASSERT_MES(it->m_keeper_block_height == height, false,
+          "failed to validate extra check, it->second.m_keeper_block_height = " << it->m_keeper_block_height <<
+          "is mot equal to height = " << height << " in blockchain index, for block on height = " << height);
+
+        if (it->tx.signatures.size() == 0)
+        {
+          pruned_txs += 1;
+          CHECK_AND_ASSERT_THROW_MES(false, "found pruned tx " << h << ", non pruning mode couldn't be activated on pruned DB, terminating...");
+        }
+
+        txs += 1;
+        signatures += it->tx.signatures.size();
+        attachments += it->tx.attachment.size();
+      }
+    }
+
+    LOG_PRINT_CYAN(ENDL << "blockchain (non)pruning status:" << ENDL <<
+      "  last block height: " << last_block_height << ENDL <<
+      "  total txs:         " << txs << ENDL <<
+      "  pruned txs:        " << pruned_txs << ENDL <<
+      "  total signatures:  " << signatures << ENDL <<
+      "  total attachments: " << attachments << ENDL <<
+      ENDL << "Blockchain DB was successfully scanned for pruned txs.", LOG_LEVEL_0);
+  }
 
   return true;
 }
@@ -525,6 +714,7 @@ void blockchain_storage::store_db_solo_options_values()
   m_db_storage_major_compatibility_version = BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION;
   m_db_storage_minor_compatibility_version = BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION;
   m_db_last_worked_version = std::string(PROJECT_VERSION_LONG);
+  m_db_most_recent_hardfork_id = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(get_top_block_height() + 1 /* <-- next block height */);
   m_db.commit_transaction();
 }
 //------------------------------------------------------------------
@@ -543,7 +733,7 @@ bool blockchain_storage::pop_block_from_blockchain(transactions_map& onboard_tra
   CHECK_AND_ASSERT_MES(m_db_blocks.size() > 1, false, "pop_block_from_blockchain: can't pop from blockchain with size = " << m_db_blocks.size());
   size_t h = m_db_blocks.size()-1;
   auto bei_ptr = m_db_blocks[h];
-  CHECK_AND_ASSERT_MES(bei_ptr.get(), false, "pop_block_from_blockchain: can't pop from blockchain");
+  CHECK_AND_ASSERT_MES(bei_ptr.get(), false, "pop_block_from_blockchain: can't pop from blockchain, height = " << h);
 
   uint64_t fee_total = 0;
   bool r = purge_block_data_from_blockchain(bei_ptr->bl, bei_ptr->bl.tx_hashes.size(), fee_total, onboard_transactions);
@@ -569,7 +759,7 @@ bool blockchain_storage::set_checkpoints(checkpoints&& chk_pts)
   {
     m_db.begin_transaction();
     if (m_db_blocks.size() < m_checkpoints.get_top_checkpoint_height())
-      m_is_in_checkpoint_zone = true;
+      m_is_in_checkpoint_zone = !m_non_pruning_mode_enabled; // set to true unless non-pruning mode is on
     prune_ring_signatures_and_attachments_if_need();
     m_db.commit_transaction();
     return true;
@@ -592,6 +782,7 @@ bool blockchain_storage::set_checkpoints(checkpoints&& chk_pts)
 bool blockchain_storage::prune_ring_signatures_and_attachments(uint64_t height, uint64_t& transactions_pruned, uint64_t& signatures_pruned, uint64_t& attachments_pruned)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
+  CHECK_AND_ASSERT_MES(!m_non_pruning_mode_enabled, false, "cannot prune while non-pruning mode is enabled");
 
   CHECK_AND_ASSERT_MES(height < m_db_blocks.size(), false, "prune_ring_signatures called with wrong parameter: " << height << ", m_blocks.size() = " << m_db_blocks.size());
   auto vptr = m_db_blocks[height];
@@ -625,6 +816,9 @@ bool blockchain_storage::prune_ring_signatures_and_attachments(uint64_t height, 
 bool blockchain_storage::prune_ring_signatures_and_attachments_if_need()
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
+
+  if (m_non_pruning_mode_enabled)
+    return true;
 
   uint64_t top_block_height = get_top_block_height();
   uint64_t pruning_end_height = m_checkpoints.get_checkpoint_before_height(top_block_height);
@@ -776,7 +970,7 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
   fee = get_tx_fee(tx_res_ptr->tx);
   purge_transaction_keyimages_from_blockchain(tx, true);
   
-  bool r = unprocess_blockchain_tx_extra(tx);
+  bool r = unprocess_blockchain_tx_extra(tx, tx_res_ptr->m_keeper_block_height);
   CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra for tx " << tx_id);
  
   r = unprocess_blockchain_tx_attachments(tx, get_current_blockchain_size(), 0/*TODO: add valid timestamp here in future if need*/);
@@ -786,16 +980,17 @@ bool blockchain_storage::purge_transaction_from_blockchain(const crypto::hash& t
   {
     currency::tx_verification_context tvc = AUTO_VAL_INIT(tvc);
     added_to_the_pool = m_tx_pool.add_tx(tx, tvc, true, true);
-    CHECK_AND_ASSERT_MES(added_to_the_pool, false, "failed to add transaction " << tx_id << " to transaction pool");
   }
 
-  bool res = pop_transaction_from_global_index(tx, tx_id);
-  CHECK_AND_ASSERT_MES_NO_RET(res, "pop_transaction_from_global_index failed for tx " << tx_id);
+  bool res_pop_gi = pop_transaction_from_global_index(tx, tx_id);
+  CHECK_AND_ASSERT_MES_NO_RET(res_pop_gi, "serious internal error: pop_transaction_from_global_index() failed for tx " << tx_id);
   bool res_erase = m_db_transactions.erase_validate(tx_id);
-  CHECK_AND_ASSERT_MES_NO_RET(res_erase, "Failed to m_transactions.erase with id = " << tx_id);
+  CHECK_AND_ASSERT_MES_NO_RET(res_erase, "serious internal error: m_transactions.erase_validate() failed for tx " << tx_id);
 
-  LOG_PRINT_L1("transaction " << tx_id << " from block @ " << tx_res_ptr->m_keeper_block_height << (added_to_the_pool ? " was removed from blockchain history -> to the pool" : " was removed from blockchain history"));
-  return res;
+  LOG_PRINT_L1("transaction " << tx_id << " from block @ " << tx_res_ptr->m_keeper_block_height <<
+    (added_to_the_pool ? " was removed from blockchain history -> to the pool" : " was removed from blockchain history") <<
+    ((res_pop_gi && res_erase) ? "" : " WITH ERRORS (see above)"));
+  return res_pop_gi && res_erase;
 }
 
 //------------------------------------------------------------------
@@ -919,13 +1114,81 @@ bool blockchain_storage::get_block_by_hash(const crypto::hash &h, block &blk)  c
 
   return false;
 }
+//------------------------------------------------------------------
+bool blockchain_storage::get_block_reward_by_main_chain_height(const uint64_t height, uint64_t& reward_with_fee) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  static const boost::multiprecision::uint128_t amount_max_mp = UINT64_MAX;
+
+  if (height >= m_db_blocks.size())
+    return false;
+
+  boost::multiprecision::uint128_t reward_with_fee_mp{};
+  if (height != 0)
+    reward_with_fee_mp = m_db_blocks[height]->already_generated_coins - m_db_blocks[height - 1]->already_generated_coins;
+  else
+    reward_with_fee_mp = m_db_blocks[height]->already_generated_coins;
+  
+  if (reward_with_fee_mp > amount_max_mp)
+    return false;
+
+  reward_with_fee = reward_with_fee_mp.convert_to<uint64_t>();
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::get_block_reward_by_hash(const crypto::hash &h, uint64_t& reward_with_fee) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  static const boost::multiprecision::uint128_t amount_max_mp = UINT64_MAX;
+
+  block_extended_info bei{};
+  if (!get_block_extended_info_by_hash(h, bei))
+    return false;
+
+  boost::multiprecision::uint128_t reward_with_fee_mp{};
+  if (bei.height != 0)
+  {
+    block_extended_info bei_prev{};
+    if (!get_block_extended_info_by_hash(bei.bl.prev_id, bei_prev))
+      return false;
+    reward_with_fee_mp = bei.already_generated_coins - bei_prev.already_generated_coins;
+  }
+  else
+  {
+    reward_with_fee_mp = bei.already_generated_coins;
+  }
+
+  if (reward_with_fee_mp > amount_max_mp)
+    return false;
+
+  reward_with_fee = reward_with_fee_mp.convert_to<uint64_t>();
+  return true;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::is_tx_related_to_altblock(crypto::hash tx_id) const
 {
   CRITICAL_REGION_LOCAL1(m_alternative_chains_lock);
   auto it = m_alternative_chains_txs.find(tx_id);
   return it != m_alternative_chains_txs.end();
 }
+//------------------------------------------------------------------
+bool blockchain_storage::is_pre_hardfork_tx_freeze_period_active() const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  if (!is_hardfork_active(ZANO_HARDFORK_05))
+    return false;
 
+  uint64_t next_block_height = m_db_blocks.size(); // top block height + 1
+  size_t current_hardfork_id = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(next_block_height);
+  size_t next_hardfork_id = current_hardfork_id + 1;
+  if (next_hardfork_id >= ZANO_HARDFORKS_TOTAL)
+    return false;
+
+  uint64_t next_hf_height_active_after = m_core_runtime_config.hard_forks.m_height_the_hardfork_n_active_after[next_hardfork_id];
+  
+  bool result = (next_block_height + m_core_runtime_config.pre_hardfork_tx_freeze_period > next_hf_height_active_after);
+  return result;
+}
 //------------------------------------------------------------------
 bool blockchain_storage::get_block_extended_info_by_hash(const crypto::hash &h, block_extended_info &blk) const
 {
@@ -1003,7 +1266,7 @@ bool blockchain_storage::rollback_blockchain_switching(std::list<block_ws_txs>& 
     CHECK_AND_ASSERT_MES(r && bvc.m_added_to_main_chain, false, "PANIC!!! failed to add (again) block while chain switching during the rollback!");
   }
 
-  LOG_PRINT_L0("Rollback succeeded.");
+  LOG_PRINT_YELLOW("Rollback succeeded.", LOG_LEVEL_0);
   return true;
 }
 //------------------------------------------------------------------
@@ -1085,7 +1348,7 @@ bool blockchain_storage::switch_to_alternative_blockchain(alt_chain_type& alt_ch
     bool r = handle_block_to_main_chain(ch_ent->second.bl, bvc);
     if(!r || !bvc.m_added_to_main_chain)
     {
-      LOG_PRINT_L0("Failed to switch to alternative blockchain");
+      LOG_PRINT_RED("Failed to switch to alternative blockchain", LOG_LEVEL_0);
       rollback_blockchain_switching(disconnected_chain, split_height);
       LOG_PRINT_L0("The block was inserted as invalid while connecting new alternative chain,  block_id: " << get_block_hash(ch_ent->second.bl));
 
@@ -1131,14 +1394,9 @@ bool blockchain_storage::switch_to_alternative_blockchain(alt_chain_type& alt_ch
   return true;
 }
 //------------------------------------------------------------------
-wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) const
+void blockchain_storage::collect_timestamps_and_c_difficulties_main(std::vector<uint64_t>& timestamps, std::vector<wide_difficulty_type>& commulative_difficulties, bool pos) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  std::vector<uint64_t> timestamps;
-  std::vector<wide_difficulty_type> commulative_difficulties;
-  if (!m_db_blocks.size())
-    return DIFFICULTY_POW_STARTER;
-  //skip genesis timestamp
   TIME_MEASURE_START_PD(target_calculating_enum_blocks);
   CRITICAL_REGION_BEGIN(m_targetdata_cache_lock);
   std::list<std::pair<wide_difficulty_type, uint64_t>>& targetdata_cache = pos ? m_pos_targetdata_cache : m_pow_targetdata_cache;
@@ -1153,11 +1411,14 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
     ++count;
   }
   CRITICAL_REGION_END();
-
-  wide_difficulty_type& dif = pos ? m_cached_next_pos_difficulty : m_cached_next_pow_difficulty;
   TIME_MEASURE_FINISH_PD(target_calculating_enum_blocks);
+}
+//------------------------------------------------------------------
+wide_difficulty_type blockchain_storage::calc_diff_at_h_from_timestamps(std::vector<uint64_t>& timestamps, std::vector<wide_difficulty_type>& commulative_difficulties, uint64_t h, bool pos) const
+{
+  wide_difficulty_type dif;
   TIME_MEASURE_START_PD(target_calculating_calc);
-  if (m_core_runtime_config.is_hardfork_active_for_height(1, m_db_blocks.size()))
+  if (m_core_runtime_config.is_hardfork_active_for_height(1, h))
   {
     dif = next_difficulty_2(timestamps, commulative_difficulties, pos ? global_difficulty_pos_target : global_difficulty_pow_target, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
   }
@@ -1165,22 +1426,36 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) con
   {
     dif = next_difficulty_1(timestamps, commulative_difficulties, pos ? global_difficulty_pos_target : global_difficulty_pow_target, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
   }
-  
-
   TIME_MEASURE_FINISH_PD(target_calculating_calc);
   return dif;
 }
 //------------------------------------------------------------------
-wide_difficulty_type blockchain_storage::get_next_diff_conditional2(bool pos, const alt_chain_type& alt_chain, uint64_t split_height, const alt_block_extended_info& abei) const
+wide_difficulty_type blockchain_storage::get_next_diff_conditional(bool pos) const
 {
-  CRITICAL_REGION_LOCAL(m_read_lock);
+  {
+    //skip genesis timestamp
+    CRITICAL_REGION_LOCAL(m_read_lock);
+    if (!m_db_blocks.size())
+      return DIFFICULTY_POW_STARTER;
+  }
+
   std::vector<uint64_t> timestamps;
   std::vector<wide_difficulty_type> commulative_difficulties;
-  size_t count = 0;
-  if (!m_db_blocks.size())
-    return DIFFICULTY_POW_STARTER;
+  collect_timestamps_and_c_difficulties_main(timestamps, commulative_difficulties, pos);
 
-  auto cb = [&](const block_extended_info& bei, bool is_main){
+
+  wide_difficulty_type& dif = pos ? m_cached_next_pos_difficulty : m_cached_next_pow_difficulty;
+  dif = calc_diff_at_h_from_timestamps(timestamps, commulative_difficulties, m_db_blocks.size(), pos);
+
+  return dif;
+}
+//------------------------------------------------------------------
+void blockchain_storage::collect_timestamps_and_c_difficulties_alt(std::vector<uint64_t>& timestamps, std::vector<wide_difficulty_type>& commulative_difficulties, bool pos, const alt_chain_type& alt_chain, uint64_t split_height) const 
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  size_t count = 0;
+
+  auto cb = [&](const block_extended_info& bei, bool is_main) {
     if (!bei.height)
       return false;
     bool is_pos_bl = is_pos_block(bei.bl);
@@ -1192,15 +1467,22 @@ wide_difficulty_type blockchain_storage::get_next_diff_conditional2(bool pos, co
     if (count >= DIFFICULTY_WINDOW)
       return false;
     return true;
-  };
+    };
   enum_blockchain(cb, alt_chain, split_height);
+}
+//------------------------------------------------------------------
+wide_difficulty_type blockchain_storage::get_next_diff_conditional_alt(bool pos, const alt_chain_type& alt_chain, uint64_t split_height, const alt_block_extended_info& abei) const
+{
+  {
+    CRITICAL_REGION_LOCAL(m_read_lock);
+    if (!m_db_blocks.size())
+      return DIFFICULTY_POW_STARTER;
+  }
+  std::vector<uint64_t> timestamps;
+  std::vector<wide_difficulty_type> commulative_difficulties;
+  collect_timestamps_and_c_difficulties_alt(timestamps, commulative_difficulties, pos,  alt_chain, split_height);
 
-  wide_difficulty_type diff = 0;
-  if(m_core_runtime_config.is_hardfork_active_for_height(1, abei.height))
-    diff = next_difficulty_2(timestamps, commulative_difficulties, pos ? global_difficulty_pos_target : global_difficulty_pow_target, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
-  else
-    diff = next_difficulty_1(timestamps, commulative_difficulties, pos ? global_difficulty_pos_target : global_difficulty_pow_target, pos ? global_difficulty_pos_starter : global_difficulty_pow_starter);
-  return diff;
+  return calc_diff_at_h_from_timestamps(timestamps, commulative_difficulties, abei.height, pos);
 }
 //------------------------------------------------------------------
 wide_difficulty_type blockchain_storage::get_cached_next_difficulty(bool pos) const
@@ -1264,8 +1546,8 @@ wide_difficulty_type blockchain_storage::get_next_difficulty_for_alternative_cha
 //------------------------------------------------------------------
 bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t height, bool pos) const
 {
-  CHECK_AND_ASSERT_MES((pos ? (b.miner_tx.vin.size() == 2) : (b.miner_tx.vin.size() == 1)), false, "coinbase transaction in the block has no inputs");
-  CHECK_AND_ASSERT_MES(b.miner_tx.vin[0].type() == typeid(txin_gen), false, "coinbase transaction in the block has the wrong type");
+  CHECK_AND_ASSERT_MES((pos ? (b.miner_tx.vin.size() == 2) : (b.miner_tx.vin.size() == 1)), false, "coinbase transaction in the block has incorrect inputs number: " << b.miner_tx.vin.size());
+  CHECK_AND_ASSERT_MES(b.miner_tx.vin[0].type() == typeid(txin_gen), false, "input #0 of the coinbase transaction in the block has the wrong type : " << b.miner_tx.vin[0].type().name());
   if(boost::get<txin_gen>(b.miner_tx.vin[0]).height != height)
   {
     LOG_PRINT_RED_L0("The miner transaction in block has invalid height: " << boost::get<txin_gen>(b.miner_tx.vin[0]).height << ", expected: " << height);
@@ -1273,13 +1555,13 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
   }
   if (pos)
   {
-    if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
+    if (is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, height)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
       CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_zc_input), false, "coinstake tx has incorrect type of input #1: " << b.miner_tx.vin[1].type().name());
     else
       CHECK_AND_ASSERT_MES(b.miner_tx.vin[1].type() == typeid(txin_to_key), false, "coinstake tx has incorrect type of input #1: " << b.miner_tx.vin[1].type().name());
   }
 
-  if (m_core_runtime_config.is_hardfork_active_for_height(1, height))
+  if (is_hardfork_active_for_height(ZANO_HARDFORK_01, height))
   {
     // new rules that allow different unlock time in coinbase outputs
     uint64_t max_unlock_time = 0;
@@ -1287,12 +1569,10 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
     bool r = get_tx_max_min_unlock_time(b.miner_tx, max_unlock_time, min_unlock_time);
     CHECK_AND_ASSERT_MES(r && min_unlock_time >= height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW,
       false,
-      "coinbase transaction has wrong min_unlock_time: " << min_unlock_time << ", expected: " << height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+      "coinbase transaction has wrong min_unlock_time: " << min_unlock_time << ", expected to be greater than or equal to " << height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   }
   else
   {
-    //------------------------------------------------------------------
-    //bool blockchain_storage::
     // pre-hard fork rules that don't allow different unlock time in coinbase outputs
     uint64_t max_unlock_time = 0;
     uint64_t min_unlock_time = 0;
@@ -1304,14 +1584,7 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
   }
 
 
-  //check outs overflow
-  if(!check_outs_overflow(b.miner_tx))
-  {
-    LOG_PRINT_RED_L0("miner transaction have money overflow in block " << get_block_hash(b));
-    return false;
-  }
-
-  if (is_hardfork_active(ZANO_HARDFORK_04_ZARCANUM)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
+  if (is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, height)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
   {
     CHECK_AND_ASSERT_MES(b.miner_tx.attachment.empty(), false, "coinbase transaction has attachments; attachments are not allowed for coinbase transactions.");
     CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 3, false, "coinbase transaction has incorrect number of proofs (" << b.miner_tx.proofs.size() << "), expected 3");
@@ -1321,6 +1594,12 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
   }
   else
   {
+    if(!check_bare_outs_overflow(b.miner_tx))
+    {
+      LOG_PRINT_RED_L0("miner transaction have money overflow in block " << get_block_hash(b));
+      return false;
+    }
+
     CHECK_AND_ASSERT_MES(b.miner_tx.attachment.empty(), false, "coinbase transaction has attachments; attachments are not allowed for coinbase transactions.");
     CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 0, false, "pre-HF4 coinbase shoudn't have non-empty proofs containter");
   }
@@ -1328,50 +1607,44 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::validate_miner_transaction(const block& b, 
-                                                    size_t cumulative_block_size, 
-                                                    uint64_t fee, 
-                                                    uint64_t& base_reward, 
-                                                    const boost::multiprecision::uint128_t& already_generated_coins) const
+bool blockchain_storage::calculate_block_reward_for_next_top_block(size_t next_block_cumulative_size, uint64_t& block_reward_without_fee) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
   std::vector<size_t> last_blocks_sizes;
   get_last_n_blocks_sizes(last_blocks_sizes, CURRENCY_REWARD_BLOCKS_WINDOW);
   size_t blocks_size_median = misc_utils::median(last_blocks_sizes);
-  if (!get_block_reward(is_pos_block(b), blocks_size_median, cumulative_block_size, already_generated_coins, base_reward, get_block_height(b)))
-  {
-    LOG_PRINT_L0("block size " << cumulative_block_size << " is bigger than allowed for this blockchain");
-    return false;
-  }
-
-  uint64_t block_reward = base_reward;
-  // before HF4: add tx fee to the block reward; after HF4: burn it
-  if (b.miner_tx.version < TRANSACTION_VERSION_POST_HF4)
+  LOG_PRINT_MAGENTA("blocks_size_median = " << blocks_size_median, LOG_LEVEL_2);
+  block_reward_without_fee = get_block_reward(get_top_block_height() + 1, blocks_size_median, next_block_cumulative_size);
+  CHECK_AND_ASSERT_MES(block_reward_without_fee != 0, false, "block size " << next_block_cumulative_size << " is bigger than allowed for this blockchain, blocks_size_median: " << blocks_size_median);
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::validate_miner_transaction(const transaction& miner_tx, 
+                                                    uint64_t fee,
+                                                    uint64_t block_reward_without_fee) const
+{
+  uint64_t block_reward = block_reward_without_fee;
+  // before HF4: add tx fee to the block reward; after HF4: burn fees, so they don't count in block_reward
+  if (miner_tx.version < TRANSACTION_VERSION_POST_HF4)
   {
     block_reward += fee;
   }
 
-  crypto::hash tx_id_for_post_hf4_era = b.miner_tx.version > TRANSACTION_VERSION_PRE_HF4 ? get_transaction_hash(b.miner_tx) : null_hash;
-  if (!check_tx_balance(b.miner_tx, tx_id_for_post_hf4_era, block_reward))
+  crypto::hash tx_id_for_post_hf4_era = miner_tx.version > TRANSACTION_VERSION_PRE_HF4 ? get_transaction_hash(miner_tx) : null_hash; // used in the input context for the proofs for txs ver >= 2
+  if (!check_tx_balance(miner_tx, tx_id_for_post_hf4_era, block_reward))
   {
-    LOG_ERROR("coinbase transaction balance check failed. Block reward is " << print_money_brief(block_reward) << "(" << print_money(base_reward) << "+" << print_money(fee)
-      << ", blocks_size_median = " << blocks_size_median
-      << ", cumulative_block_size = " << cumulative_block_size
-      << ", fee = " << fee
-      << ", already_generated_coins = " << already_generated_coins
-      << "), tx:");
-    LOG_PRINT_L0(currency::obj_to_json_str(b.miner_tx));
+    LOG_ERROR("coinbase transaction balance check failed. Block reward is " << print_money_brief(block_reward) << " (" << print_money(block_reward_without_fee) << "+" << print_money(fee) << "), tx:");
+    LOG_PRINT_L0(currency::obj_to_json_str(miner_tx));
     return false;
   }
 
-  if (!verify_asset_surjection_proof(b.miner_tx, tx_id_for_post_hf4_era))
+  if (!verify_asset_surjection_proof(miner_tx, tx_id_for_post_hf4_era))
   {
     LOG_ERROR("asset surjection proof verification failed for miner tx");
     return false;
   }
 
-  LOG_PRINT_MAGENTA("Mining tx verification ok, blocks_size_median = " << blocks_size_median, LOG_LEVEL_2);
   return true;
 }
 //------------------------------------------------------------------
@@ -1489,8 +1762,20 @@ bool blockchain_storage::create_block_template(const create_block_template_param
   }
 
   diffic = get_next_diff_conditional(pos);
+  CHECK_AND_ASSERT_MES(diffic, false, "get_next_diff_conditional failed");
 
-  CHECK_AND_ASSERT_MES(diffic, false, "difficulty owverhead.");
+  // check PoW block timestamp against the current blockchain timestamp median -- if it's not okay, don't create a new block
+  // TODO (performance) both get_next_diff_conditional and get_last_n_blocks_timestamps obtains last N blocks, consider data reusing -- sowle
+  if (!pos && !params.ignore_pow_ts_check)
+  {
+    uint64_t median_ts = get_last_n_blocks_timestamps_median(BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW);
+    if(b.timestamp < median_ts)
+    {
+      LOG_PRINT_YELLOW("Block template construction failed because current core timestamp, " << b.timestamp << ", is less than median of last " << BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW << " blocks, " << median_ts, LOG_LEVEL_2);
+      return false;
+    }
+  }
+
 
 
   
@@ -1513,6 +1798,9 @@ bool blockchain_storage::create_block_template(const create_block_template_param
 
   resp.txs_fee = fee;
 
+  size_t tx_hardfork_id = 0;
+  size_t tx_version = get_tx_version_and_hardfork_id(height, m_core_runtime_config.hard_forks, tx_hardfork_id);
+
   /* 
       instead of complicated two-phase template construction and adjustment of cumulative size with block reward we
       use CURRENCY_COINBASE_BLOB_RESERVED_SIZE as penalty-free coinbase transaction reservation.
@@ -1525,7 +1813,8 @@ bool blockchain_storage::create_block_template(const create_block_template_param
                                                    b.miner_tx,
                                                    resp.block_reward_without_fee,
                                                    resp.block_reward,
-                                                   get_tx_version(height, m_core_runtime_config.hard_forks),
+                                                   tx_version,
+                                                   tx_hardfork_id,
                                                    ex_nonce, 
                                                    CURRENCY_MINER_TX_MAX_OUTS, 
                                                    pos,
@@ -1802,7 +2091,7 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     }
     else
     {
-      m_is_in_checkpoint_zone = true;
+      m_is_in_checkpoint_zone = !m_non_pruning_mode_enabled; // set to true unless non-pruning mode is on
       if (!m_checkpoints.check_block(abei.height, id))
       {
         LOG_ERROR("CHECKPOINT VALIDATION FAILED");
@@ -1818,13 +2107,13 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     // miner tx prevalidation (light checks)
     if (!prevalidate_miner_transaction(b, abei.height, pos_block))
     {
-      LOG_PRINT_RED_L0("Alternative block " << id << " @ " << coinbase_height << "has invalid miner transaction.");
+      LOG_PRINT_RED_L0("Alternative block " << id << " @ " << coinbase_height << " has invalid miner transaction.");
       bvc.m_verification_failed = true;
       return false;
     }
 
     // PoW / PoS validation (heavy checks)
-    wide_difficulty_type current_diff = get_next_diff_conditional2(pos_block, alt_chain, connection_height, abei);
+    wide_difficulty_type current_diff = get_next_diff_conditional_alt(pos_block, alt_chain, connection_height, abei);
     CHECK_AND_ASSERT_MES_CUSTOM(current_diff, false, bvc.m_verification_failed = true, "!!!!!!! DIFFICULTY OVERHEAD !!!!!!!");
     
     crypto::hash proof_of_work = null_hash;
@@ -1853,6 +2142,10 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
       //
     }
 
+    abei.difficulty = current_diff;
+    wide_difficulty_type cumulative_diff_delta = 0;
+    abei.cumulative_diff_adjusted = alt_chain.size() ? it_prev->second.cumulative_diff_adjusted : m_db_blocks[*ptr_main_prev]->cumulative_diff_adjusted;
+
     std::unordered_set<crypto::key_image> alt_block_keyimages;
     uint64_t ki_lookup_total = 0;
     if (!validate_alt_block_txs(b, id, alt_block_keyimages, abei, alt_chain, connection_height, ki_lookup_total))
@@ -1861,10 +2154,6 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
       bvc.m_verification_failed = true;
       return false;
     }
-
-    abei.difficulty = current_diff;
-    wide_difficulty_type cumulative_diff_delta = 0;
-    abei.cumulative_diff_adjusted = alt_chain.size() ? it_prev->second.cumulative_diff_adjusted : m_db_blocks[*ptr_main_prev]->cumulative_diff_adjusted;
     
     if (pos_block)
       cumulative_diff_delta = get_adjusted_cumulative_difficulty_for_next_alt_pos(alt_chain, abei.height, current_diff, connection_height);
@@ -1910,7 +2199,11 @@ bool blockchain_storage::handle_alternative_block(const block& b, const crypto::
     std::stringstream ss_pow_pos_info;
     if (pos_block)
     {
-      ss_pow_pos_info << "PoS:\t" << abei.stake_hash << ", stake amount: " << print_money(pos_amount) << ", final_difficulty: " << pos_diff_final;
+      ss_pow_pos_info << "PoS:\t" << abei.stake_hash << ", stake amount: ";
+      if (abei.bl.miner_tx.version >= TRANSACTION_VERSION_POST_HF4)
+        ss_pow_pos_info << "hidden";
+      else
+        ss_pow_pos_info << print_money_brief(pos_amount) << ", final_difficulty: " << pos_diff_final;
       proof = abei.stake_hash;
     }
     else
@@ -2068,7 +2361,7 @@ bool blockchain_storage::is_reorganize_required(const block_extended_info& main_
       << "alt_cumul_diff.pos_diff:" << alt_cumul_diff.pos_diff << ENDL
       << "main_cumul_diff.pow_diff:" << main_cumul_diff.pow_diff << ENDL
       << "main_cumul_diff.pos_diff:" << main_cumul_diff.pos_diff << ENDL
-      << "alt:" << alt << ENDL
+      << "alt: " << alt << ENDL
       << "main:" << main << ENDL
     );
     if (main < alt)
@@ -2272,7 +2565,7 @@ bool blockchain_storage::get_main_block_rpc_details(uint64_t i, block_rpc_extend
   bei.total_txs_size = 0;
   if (true/*!ignore_transactions*/)
   {
-    crypto::hash coinbase_id = get_transaction_hash(core_bei_ptr->bl.miner_tx);
+    crypto::hash coinbase_id = get_coinbase_hash_cached(*core_bei_ptr);
     //load transactions details
     bei.transactions_details.push_back(tx_rpc_extended_info());
     get_tx_rpc_details(coinbase_id, bei.transactions_details.back(), get_block_datetime(core_bei_ptr->bl), true);
@@ -2357,7 +2650,7 @@ bool blockchain_storage::get_alt_block_rpc_details(const block_extended_info& be
 
   bei.is_orphan = true;
 
-  crypto::hash coinbase_id = get_transaction_hash(bei_core.bl.miner_tx);
+  crypto::hash coinbase_id = get_coinbase_hash_cached(bei_core);
   //load transactions details
   bei.transactions_details.push_back(tx_rpc_extended_info());
   fill_tx_rpc_details(bei.transactions_details.back(), bei_core.bl.miner_tx, nullptr, coinbase_id, get_block_datetime(bei_core.bl));
@@ -3149,7 +3442,7 @@ void blockchain_storage::print_blockchain_with_tx(uint64_t start_index, uint64_t
       << ", id: " << get_block_hash(m_db_blocks[i]->bl)
       << ", difficulty: " << block_difficulty(i) << ", nonce " << m_db_blocks[i]->bl.nonce << ", tx_count " << m_db_blocks[i]->bl.tx_hashes.size() << ENDL;
 
-    ss << "[miner id]: " << get_transaction_hash(m_db_blocks[i]->bl.miner_tx) << ENDL << currency::obj_to_json_str(m_db_blocks[i]->bl.miner_tx) << ENDL;
+    ss << "[miner id]: " << get_coinbase_hash_cached(*m_db_blocks[i]) << ENDL << currency::obj_to_json_str(m_db_blocks[i]->bl.miner_tx) << ENDL;
 
     for (size_t j = 0; j != m_db_blocks[i]->bl.tx_hashes.size(); j++)
     {
@@ -3545,7 +3838,14 @@ bool blockchain_storage::find_blockchain_supplement(const std::list<crypto::hash
     std::list<crypto::hash> mis;
     get_transactions_direct(m_db_blocks[i]->bl.tx_hashes, blocks.back().second, mis);
     CHECK_AND_ASSERT_MES(!mis.size(), false, "internal error, block " << get_block_hash(m_db_blocks[i]->bl) << " [" << i << "] contains missing transactions: " << mis);
-    blocks.back().third = m_db_transactions.find(get_transaction_hash(m_db_blocks[i]->bl.miner_tx));
+    //blocks.back().third = m_db_transactions.find(get_coinbase_hash_cached(*m_db_blocks[i]));
+
+    crypto::hash coinbase_hash = get_coinbase_hash_cached(*m_db_blocks[i]);
+    blocks.back().third = m_db_transactions.find(coinbase_hash);
+    if (!blocks.back().third)
+    {
+      LOG_PRINT_YELLOW("m_db_transactions.find failed for coinbase hash: " << coinbase_hash << ", height: " << i, LOG_LEVEL_0);
+    }
   }
   return true;
 }
@@ -3607,6 +3907,22 @@ bool blockchain_storage::have_block(const crypto::hash& id)const
       return true;
   }
 
+  return false;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::have_block_main(const crypto::hash& id) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  if (m_db_blocks_index.find(id))
+    return true;
+  return false;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::have_block_alt(const crypto::hash& id) const
+{
+  CRITICAL_REGION_LOCAL1(m_alternative_chains_lock);
+  if (m_alternative_chains.count(id))
+    return true;
   return false;
 }
 //------------------------------------------------------------------
@@ -3728,7 +4044,6 @@ bool blockchain_storage::pop_transaction_from_global_index(const transaction& tx
         CHECK_AND_ASSERT_MES(res, false, "Internal error: multisig out not found, multisig_out_id " << multisig_out_id << "in multisig outs index");
       }
     VARIANT_CASE_CONST(tx_out_zarcanum, toz)
-      // TODO: @#@# temporary comment this section and make a test for the corresponding bug
       if (!do_pop_output(i, 0))
         return false;
     VARIANT_CASE_THROW_ON_OTHER();
@@ -3738,7 +4053,7 @@ bool blockchain_storage::pop_transaction_from_global_index(const transaction& tx
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx)
+bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx, const uint64_t height)
 {
   tx_extra_info ei = AUTO_VAL_INIT(ei);
   bool r = parse_and_validate_tx_extra(tx, ei);
@@ -3751,9 +4066,7 @@ bool blockchain_storage::unprocess_blockchain_tx_extra(const transaction& tx)
 
   if (ei.m_asset_operation.operation_type != ASSET_DESCRIPTOR_OPERATION_UNDEFINED)
   {
-    crypto::public_key asset_id = currency::null_pkey;
-    CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ei.m_asset_operation, nullptr, &asset_id), false, "get_or_calculate_asset_id failed");
-    r = pop_asset_info(asset_id);
+    r = pop_asset_info(ei.m_asset_operation, height);
     CHECK_AND_ASSERT_MES(r, false, "failed to pop_alias_info");
   }
   return true;
@@ -3795,15 +4108,42 @@ bool blockchain_storage::get_asset_info(const crypto::public_key& asset_id, asse
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
   auto as_ptr = m_db_assets.find(asset_id);
-  if (as_ptr)
+  if (!as_ptr)
+    return false;
+  if (as_ptr->empty())
+    return false;
+  // the last history item must have opt_descriptor, but we check it just to be sure
+  if (!as_ptr->back().opt_descriptor.has_value())
+    return false;
+
+  result = as_ptr->back().opt_descriptor.get();
+  return true;
+}
+//------------------------------------------------------------------
+uint64_t blockchain_storage::get_assets(uint64_t offset, uint64_t count, std::list<asset_descriptor_with_id>& assets) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  assets.clear();
+  m_db_assets.enumerate_items([&](uint64_t i, const crypto::public_key& asset_id, const std::list<asset_descriptor_operation>& asset_descriptor_history)
   {
-    if (as_ptr->size())
+    if (i < offset)
+      return true; // continue
+
+    CHECK_AND_ASSERT_THROW_MES(asset_descriptor_history.size(), "unexpectedly, the asset_descriptor_history is empty; asset_id: " << asset_id);
+    CHECK_AND_ASSERT_THROW_MES(asset_descriptor_history.back().opt_descriptor.has_value(), "the last element of asset_descriptor_history doesn't have descriptor; asset_id: " << asset_id);
+    asset_descriptor_with_id& added_item = assets.emplace_back();
+    asset_descriptor_base& added_item_adb = static_cast<asset_descriptor_base&>(added_item);
+    added_item_adb = asset_descriptor_history.back().opt_descriptor.get();
+    replace_asset_ticker_and_full_name_if_invalid(added_item_adb, asset_id);
+    added_item.asset_id = asset_id;
+
+    if (assets.size() >= count)
     {
-      result = as_ptr->back().descriptor;
-      return true;
+      return false; // stop
     }
-  }
-  return false;
+    return true; // continue
+  });
+  return assets.size();
 }
 //------------------------------------------------------------------
 uint64_t blockchain_storage::get_assets_count() const
@@ -3919,7 +4259,8 @@ bool blockchain_storage::put_alias_info(const transaction & tx, extra_alias_entr
     //@@ remove get_tx_fee_median();
     LOG_PRINT_MAGENTA("[ALIAS_REGISTERED]: " << ai.m_alias << ": " << get_account_address_as_str(ai.m_address) << ", fee median: " << get_tx_fee_median(), LOG_LEVEL_1);
     rise_core_event(CORE_EVENT_ADD_ALIAS, alias_info_to_rpc_alias_info(ai));
-  }else
+  }
+  else
   {
     //update procedure
     CHECK_AND_ASSERT_MES(ai.m_sign.size() == 1, false, "alias " << ai.m_alias << " can't be update, wrong ai.m_sign.size() count: " << ai.m_sign.size());
@@ -3928,12 +4269,12 @@ bool blockchain_storage::put_alias_info(const transaction & tx, extra_alias_entr
     std::string old_address = currency::get_account_address_as_str(local_alias_history.back().m_address);
     bool r = crypto::check_signature(get_sign_buff_hash_for_alias_update(ai), local_alias_history.back().m_address.spend_public_key, ai.m_sign.back());
     CHECK_AND_ASSERT_MES(r, false, "Failed to check signature, alias update failed." << ENDL 
-      << "alias: " << ai.m_alias << ENDL
-      << "signed_buff_hash: " << get_sign_buff_hash_for_alias_update(ai) << ENDL
-      << "public key: " << local_alias_history.back().m_address.spend_public_key << ENDL
-      << "new_address: " << get_account_address_as_str(ai.m_address) << ENDL
-      << "signature: " << epee::string_tools::pod_to_hex(ai.m_sign) << ENDL 
-      << "alias_history.size() = " << local_alias_history.size());
+      << "alias:                      " << ai.m_alias << ENDL
+      << "sign buff hash:             " << get_sign_buff_hash_for_alias_update(ai) << ENDL
+      << "spend public key:           " << local_alias_history.back().m_address.spend_public_key << ENDL
+      << "new address:                " << get_account_address_as_str(ai.m_address) << ENDL
+      << "signature:                  " << epee::string_tools::pod_to_hex(ai.m_sign) << ENDL 
+      << "local_alias_history.size(): " << local_alias_history.size());
 
     //update adr-to-alias db
     auto addr_to_alias_ptr_ = m_db_addr_to_alias.find(local_alias_history.back().m_address);
@@ -3943,7 +4284,7 @@ bool blockchain_storage::put_alias_info(const transaction & tx, extra_alias_entr
       auto it_in_set = addr_to_alias_local.find(ai.m_alias);
       if (it_in_set == addr_to_alias_local.end())
       {
-        LOG_ERROR("it_in_set == it->second.end()");
+        LOG_ERROR("it_in_set == addr_to_alias_local.end()");
       }
       else
       {
@@ -3994,129 +4335,398 @@ bool blockchain_storage::put_alias_info(const transaction & tx, extra_alias_entr
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::pop_asset_info(const crypto::public_key& asset_id)
+bool blockchain_storage::pop_asset_info(const asset_descriptor_operation& ado, const uint64_t height)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
+  crypto::public_key asset_id = currency::null_pkey;
+  CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(ado, nullptr, &asset_id), false, "get_or_calculate_asset_id failed");
+
   auto asset_history_ptr = m_db_assets.find(asset_id);
   CHECK_AND_ASSERT_MES(asset_history_ptr && asset_history_ptr->size(), false, "empty name list in pop_asset_info");
-
+  
   assets_container::t_value_type local_asset_hist = *asset_history_ptr;
-  local_asset_hist.pop_back();
+
+  if (is_hardfork_active_for_height(ZANO_HARDFORK_05, height))
+  {
+    // NEW HF5 handling
+    asset_descriptor_operation& last_ado = local_asset_hist.back(); // above we made sure that the history isn't empty
+    CHECK_AND_ASSERT_MES(last_ado.opt_descriptor.has_value(), false, "opt_descriptor is missing during asset pop, op: " << (int)ado.operation_type);
+    asset_descriptor_base& last_adb = last_ado.opt_descriptor.get();
+
+    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
+    {
+      // just change the most recent history record, don't pop
+      if (last_adb.hidden_supply)
+      {
+        //CHECK_AND_ASSERT_MES(last_ado.opt_amount_commitment.has_value() && ado.opt_amount_commitment.has_value(), false, "last_ado.opt_amount_commitment or ado.opt_amount_commitment is missing (emit)");
+        //last_ado.opt_amount_commitment.get() = (crypto::point_t(last_ado.opt_amount_commitment.get()) - crypto::point_t(ado.opt_amount_commitment.get())).to_public_key();
+        return false; // not supported atm
+      }
+      else
+      {
+        CHECK_AND_ASSERT_MES(ado.opt_amount.has_value(), false, "last_ado.opt_amount or ado.opt_amount is missing (emit)");
+        last_adb.current_supply -= ado.opt_amount.get();
+      }
+    }
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+    {
+      // just change the most recent history record, don't pop
+      if (last_adb.hidden_supply)
+      {
+        //CHECK_AND_ASSERT_MES(last_ado.opt_amount_commitment.has_value() && ado.opt_amount_commitment.has_value(), false, "last_ado.opt_amount_commitment or ado.opt_amount_commitment is missing (burn)");
+        //last_ado.opt_amount_commitment.get() = (crypto::point_t(last_ado.opt_amount_commitment.get()) + crypto::point_t(ado.opt_amount_commitment.get())).to_public_key();
+        return false; // not supported atm
+      }
+      else
+      {
+        CHECK_AND_ASSERT_MES(ado.opt_amount.has_value(), false, "last_ado.opt_amount or ado.opt_amount is missing (burn)");
+        last_adb.current_supply += ado.opt_amount.get();
+      }
+    }
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
+    {
+      // just pop the most recent history record
+      local_asset_hist.pop_back();
+    }
+    else
+    {
+      CHECK_AND_ASSERT_MES(false, false, "invalid operation: " << (int)ado.operation_type);
+    }
+  }
+  else
+  {
+    // HF4
+    local_asset_hist.pop_back();
+  }
+
+  // both HF4 and HF5
   if (local_asset_hist.size())
     m_db_assets.set(asset_id, local_asset_hist);
   else
     m_db_assets.erase(asset_id);
-
   LOG_PRINT_MAGENTA("[ASSET_POP]: " << asset_id << ": " << (!local_asset_hist.empty() ? "(prev)" : "(erased)"), LOG_LEVEL_1);
+
   return true;
 }
 //------------------------------------------------------------------
-bool validate_ado_ownership(asset_op_verification_context& avc)
+bool blockchain_storage::validate_ado_ownership(asset_op_verification_context& avc) const
 {
-  asset_operation_ownership_proof aoop = AUTO_VAL_INIT(aoop);
-  bool r = get_type_in_variant_container(avc.tx.proofs, aoop);
-  CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed - missing signature (asset_operation_ownership_proof)");
+  bool r = false;
+  CHECK_AND_ASSERT_MES(avc.asset_op_history->size() != 0, false, "asset with id " << avc.asset_id << " has empty history record");
+  const asset_descriptor_operation& last_ado = avc.asset_op_history->back();
+  CHECK_AND_ASSERT_MES(last_ado.opt_descriptor.has_value(), false, "last ado is missing opt_descriptor; asset id: " << avc.asset_id);
+  const asset_descriptor_base& last_adb = last_ado.opt_descriptor.get();
 
-  CHECK_AND_ASSERT_MES(avc.asset_op_history->size() != 0, false, "asset with id " << avc.asset_id << " has invalid history size() == 0");
+  if (is_hardfork_active_for_height(ZANO_HARDFORK_05, avc.height))
+  {
+    if (last_adb.owner_eth_pub_key.has_value())
+    {
+      CHECK_AND_ASSERT_MES(last_adb.owner == null_pkey, false, "owner_eth_pub_key is set but owner pubkey is nonzero");
+      asset_operation_ownership_proof_eth aoop_eth{};
+      r = get_type_in_variant_container(avc.tx.proofs, aoop_eth);
+      CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed: asset_operation_ownership_proof_eth is missing");
+      if (!crypto::verify_eth_signature(avc.tx_id, last_adb.owner_eth_pub_key.value(), aoop_eth.eth_sig))
+      {
+        LOG_ERROR("Failed to validate secp256k1 signature for hash: " << avc.tx_id << ", signature: " << aoop_eth.eth_sig);
+        return false;
+      }
+      else
+      {
+        return true;
+      }
+    }
+    // owner_eth_pub_key has no value -- fallback to default
+  }
 
-  crypto::public_key owner_key = avc.asset_op_history->back().descriptor.owner;
-  return crypto::verify_schnorr_sig(avc.tx_id, owner_key, aoop.gss);
+  asset_operation_ownership_proof aoop{};
+  r = get_type_in_variant_container(avc.tx.proofs, aoop);
+  CHECK_AND_ASSERT_MES(r, false, "Ownership validation failed: asset_operation_ownership_proof is missing");
+
+  return crypto::verify_schnorr_sig(avc.tx_id, last_adb.owner, aoop.gss);
 }
 //------------------------------------------------------------------
-bool blockchain_storage::validate_asset_operation_against_current_blochain_state(asset_op_verification_context& avc) const
+bool blockchain_storage::validate_asset_operation_hf4(asset_op_verification_context& avc) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
+  CHECK_AND_ASSERT_MES(!is_hardfork_active_for_height(ZANO_HARDFORK_05, avc.height), false, "validate_asset_operation_hf4 was called in HF5");
 
   CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(avc.ado, &avc.asset_id_pt, &avc.asset_id), false, "get_or_calculate_asset_id failed");
   avc.asset_op_history = m_db_assets.find(avc.asset_id);
 
   const asset_descriptor_operation& ado = avc.ado;
 
+  bool need_to_validate_ao_amount_commitment = true;
+
   if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
   {
     CHECK_AND_ASSERT_MES(!avc.asset_op_history, false, "asset with id " << avc.asset_id << " has already been registered");
-    avc.amount_to_validate = ado.descriptor.current_supply;
-    CHECK_AND_ASSERT_MES(validate_asset_operation_amount_commitment(avc), false, "validate_asset_operation_amount_commitment failed!");
+    CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing while registering asset " << avc.asset_id);
+
+    // CZ please review the following two added lines, do we need them _here_? I think they should go to hardfork_specific_terms...
+    // anyway, we musn't miss these checks for the sake of consensus
+    CHECK_AND_ASSERT_MES(!ado.opt_descriptor.get().owner_eth_pub_key.has_value(), false, "owner_eth_pub_key is prohibited before HF5");
+    CHECK_AND_ASSERT_MES(!ado.opt_asset_id_salt.has_value(), false, "opt_asset_id_salt is prohibited before HF5");
+
+    CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing while registering asset " << avc.asset_id);
+    avc.amount_to_validate = ado.opt_descriptor.get().current_supply;
   }
   else
   {
-    CHECK_AND_ASSERT_MES(avc.asset_op_history && avc.asset_op_history->size(), false, "asset with id " << avc.asset_id << " has not been registered");
+    CHECK_AND_ASSERT_MES(avc.asset_op_history && avc.asset_op_history->size() > 0, false, "asset with id " << avc.asset_id << " has not been registered");
+    const asset_descriptor_operation& last_ado = avc.asset_op_history->back();
+    CHECK_AND_ASSERT_MES(last_ado.opt_descriptor.has_value(), false, "opt_descriptor is missing in last ado, op: " << (int)ado.operation_type);
+    const asset_descriptor_base& last_adb = last_ado.opt_descriptor.get();
+    CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing in ado, op: " << (int)ado.operation_type);
+    const asset_descriptor_base adb = ado.opt_descriptor.get();
+
     // check ownership permission
-    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE /*|| ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN*/)
+    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
     {
       bool r = validate_ado_ownership(avc);
-      CHECK_AND_ASSERT_MES(r, false, "Faild to validate ownership of asset_descriptor_operation, rejecting");
+      CHECK_AND_ASSERT_MES(r, false, "Failed to validate ownership of asset_descriptor_operation, rejecting");
     }
 
     avc.amount_to_validate = 0;
-    bool need_to_validate_balance_proof = true;
     if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
     {
       //check that total current_supply haven't changed
-      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply == avc.asset_op_history->back().descriptor.current_supply, false, "update operation attempted to change emission, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, avc.asset_op_history->back().descriptor), false, "update operation attempted to change fileds that shouldn't be modified, failed");
-      need_to_validate_balance_proof = false;
+      CHECK_AND_ASSERT_MES(adb.current_supply == last_adb.current_supply, false, "update operation attempted to change emission, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(adb, last_adb), false, "update operation modifies asset descriptor in a prohibited manner");
+      need_to_validate_ao_amount_commitment = false;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
     {
-      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > avc.asset_op_history->back().descriptor.current_supply, false, "emit operation does not increase the current supply, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, avc.asset_op_history->back().descriptor), false, "emit operation is not allowed to update fields");
-      CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == avc.asset_op_history->back().descriptor.meta_info, false, "emit operation is not allowed to update meta info");
-      avc.amount_to_validate = ado.descriptor.current_supply - avc.asset_op_history->back().descriptor.current_supply;
+      CHECK_AND_ASSERT_MES(adb.current_supply > last_adb.current_supply, false, "emit operation does not increase the current supply, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(adb, last_adb), false, "emit operation modifies asset descriptor in a prohibited manner");
+      CHECK_AND_ASSERT_MES(adb.meta_info == last_adb.meta_info, false, "emit operation is not allowed to update meta info");
+      avc.amount_to_validate = adb.current_supply - last_adb.current_supply;
     }
     else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
     {
-      CHECK_AND_ASSERT_MES(ado.descriptor.current_supply < avc.asset_op_history->back().descriptor.current_supply, false, "burn operation does not decrease the current supply, failed");
-      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, avc.asset_op_history->back().descriptor), false, "burn operation is not allowed to update fields");
-      CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == avc.asset_op_history->back().descriptor.meta_info, false, "burn operation is not allowed to update meta info");
-      avc.amount_to_validate =  avc.asset_op_history->back().descriptor.current_supply - ado.descriptor.current_supply;
+      CHECK_AND_ASSERT_MES(adb.current_supply < last_adb.current_supply, false, "burn operation does not decrease the current supply, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(adb, last_adb), false, "burn operation modifies asset descriptor in a prohibited manner");
+      CHECK_AND_ASSERT_MES(adb.meta_info == last_adb.meta_info, false, "burn operation is not allowed to update meta info");
+      avc.amount_to_validate = last_adb.current_supply - adb.current_supply;
     }
     else
     {
       LOG_ERROR("Unknown operation type: " << (int)ado.operation_type);
       return false;
     }
+  }
 
-    if (need_to_validate_balance_proof)
-    {
-      bool r = validate_asset_operation_amount_commitment(avc);
-      CHECK_AND_ASSERT_MES(r, false, "Balance proof validation failed for asset_descriptor_operation");
-    }
+  if (need_to_validate_ao_amount_commitment)
+  {
+    bool r = validate_asset_operation_amount_commitment(avc);
+    CHECK_AND_ASSERT_MES(r, false, "Balance proof validation failed for asset_descriptor_operation");
   }
 
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado)
+bool blockchain_storage::validate_asset_operation_hf5(asset_op_verification_context& avc) const
+{
+  CRITICAL_REGION_LOCAL(m_read_lock);
+  CHECK_AND_ASSERT_MES(is_hardfork_active_for_height(ZANO_HARDFORK_05, avc.height), false, "validate_asset_operation was called before HF5");
+
+  CHECK_AND_ASSERT_MES(get_or_calculate_asset_id(avc.ado, &avc.asset_id_pt, &avc.asset_id), false, "get_or_calculate_asset_id failed");
+  avc.asset_op_history = m_db_assets.find(avc.asset_id);
+
+  const asset_descriptor_operation& ado = avc.ado;
+
+  bool need_to_validate_ao_amount_commitment = true;
+
+  if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
+  {
+    CHECK_AND_ASSERT_MES(!avc.asset_op_history, false, "asset with id " << avc.asset_id << " has already been registered");
+    CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing while registering asset " << avc.asset_id);
+    avc.amount_to_validate = ado.opt_descriptor.get().current_supply;
+    // HF5 specific
+    CHECK_AND_ASSERT_MES(validate_ado_initial(ado.opt_descriptor.get()), false, "validate_ado_initial failed!");
+    CHECK_AND_ASSERT_MES(ado.opt_amount.has_value() && avc.amount_to_validate == ado.opt_amount.get(), false, "opt_amount is missing or incorrect");
+  }
+  else
+  {
+    CHECK_AND_ASSERT_MES(avc.asset_op_history && avc.asset_op_history->size() > 0, false, "asset with id " << avc.asset_id << " has not been registered");
+    const asset_descriptor_operation& last_ado = avc.asset_op_history->back();
+    CHECK_AND_ASSERT_MES(last_ado.opt_descriptor.has_value(), false, "opt_descriptor is missing in last ado, op: " << (int)ado.operation_type);
+    const asset_descriptor_base& last_adb = last_ado.opt_descriptor.get();
+
+    // check ownership permission
+    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT || ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
+    {
+      bool r = validate_ado_ownership(avc);
+      CHECK_AND_ASSERT_MES(r, false, "Failed to validate ownership of asset_descriptor_operation, rejecting");
+    }
+
+    avc.amount_to_validate = 0;
+    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
+    {
+      CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing (update)");
+      //check that total current_supply haven't changed
+      CHECK_AND_ASSERT_MES(ado.opt_descriptor.get().current_supply == last_adb.current_supply, false, "update operation attempted to change emission, failed");
+      CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.opt_descriptor.get(), last_adb), false, "update operation modifies asset descriptor in a prohibited manner");
+      need_to_validate_ao_amount_commitment = false;
+    }
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
+    {
+      //CHECK_AND_ASSERT_MES(ado.descriptor.current_supply > last_adb.current_supply, false, "emit operation does not increase the current supply, failed");
+      //CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_adb), false, "emit operation modifies asset descriptor in a prohibited manner");
+      //CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == last_adb.meta_info, false, "emit operation is not allowed to update meta info");
+
+      if (!last_adb.hidden_supply)
+      {
+        CHECK_AND_ASSERT_MES(ado.opt_amount.has_value(), false, "opt_amount is missing (emit)");
+        uint64_t amount = ado.opt_amount.get();
+
+        CHECK_AND_ASSERT_MES(last_adb.current_supply + amount >= last_adb.current_supply, false, "current_supply overflow: " << last_adb.current_supply << ", amount: " << amount << " (emit)");
+        CHECK_AND_ASSERT_MES(last_adb.current_supply + amount <= last_adb.total_max_supply, false, "current_supply overflow: " << last_adb.current_supply << ", amount: " << amount << ", max supply: " << last_adb.total_max_supply << " (emit)");
+        avc.amount_to_validate = amount;
+      }
+    }
+    else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+    {
+      //CHECK_AND_ASSERT_MES(ado.descriptor.current_supply < last_adb.current_supply, false, "burn operation does not decrease the current supply, failed");
+      //CHECK_AND_ASSERT_MES(validate_ado_update_allowed(ado.descriptor, last_adb), false, "burn operation modifies asset descriptor in a prohibited manner");
+      //CHECK_AND_ASSERT_MES(ado.descriptor.meta_info == last_adb.meta_info, false, "burn operation is not allowed to update meta info");
+
+      if (!last_adb.hidden_supply)
+      {
+        CHECK_AND_ASSERT_MES(ado.opt_amount.has_value(), false, "opt_amount is missing (burn)");
+        uint64_t amount = ado.opt_amount.get();
+
+        CHECK_AND_ASSERT_MES(last_adb.current_supply - amount <= last_adb.current_supply, false, "current_supply overflow: " << last_adb.current_supply << ", amount: " << amount << " (burn)");
+        avc.amount_to_validate = amount;
+      }
+    }
+    else
+    {
+      LOG_ERROR("Unknown operation type: " << (int)ado.operation_type);
+      return false;
+    }
+  }
+
+  if (need_to_validate_ao_amount_commitment)
+  {
+    bool r = validate_asset_operation_amount_commitment(avc);
+    CHECK_AND_ASSERT_MES(r, false, "Balance proof validation failed for asset_descriptor_operation");
+  }
+
+  return true;
+}
+//------------------------------------------------------------------
+bool blockchain_storage::validate_asset_operation(asset_op_verification_context& avc, uint64_t height) const
+{
+  if (is_hardfork_active_for_height(ZANO_HARDFORK_05, height))
+  {
+    return validate_asset_operation_hf5(avc);
+  }
+  else
+  {
+    return validate_asset_operation_hf4(avc);
+  }
+}
+//------------------------------------------------------------------
+bool blockchain_storage::put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, const uint64_t height)
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
-  asset_op_verification_context avc = { tx, tx_id, ado };
-  CHECK_AND_ASSERT_MES(validate_asset_operation_against_current_blochain_state(avc), false, "asset operation validation failed");
+  asset_op_verification_context avc = { tx, tx_id, ado, height };
+  CHECK_AND_ASSERT_MES(validate_asset_operation(avc, height), false, "asset operation validation failed");
 
-  assets_container::t_value_type local_asset_history{};
-  if (avc.asset_op_history)
-    local_asset_history = *avc.asset_op_history;
-  local_asset_history.push_back(ado);
-  m_db_assets.set(avc.asset_id, local_asset_history);
-
-  switch(ado.operation_type)
+  if (is_hardfork_active_for_height(ZANO_HARDFORK_05, height))
   {
-  case ASSET_DESCRIPTOR_OPERATION_REGISTER:
-    LOG_PRINT_MAGENTA("[ASSET_REGISTERED]: " << print_money_brief(ado.descriptor.current_supply, ado.descriptor.decimal_point) << ", " << avc.asset_id << ": " << ado.descriptor.ticker << ", \"" << ado.descriptor.full_name << "\"", LOG_LEVEL_1);
-    break;
-  case ASSET_DESCRIPTOR_OPERATION_UPDATE:
-    LOG_PRINT_MAGENTA("[ASSET_UPDATED]: " << avc.asset_id << ": " << ado.descriptor.ticker << ", \"" << ado.descriptor.full_name << "\"", LOG_LEVEL_1);
-    break;
-  case ASSET_DESCRIPTOR_OPERATION_EMIT:
-    LOG_PRINT_MAGENTA("[ASSET_EMITTED]: " << print_money_brief(avc.amount_to_validate, ado.descriptor.decimal_point) << ", " << avc.asset_id << ": " << ado.descriptor.ticker << ", \"" << ado.descriptor.full_name << "\"", LOG_LEVEL_1);
-    break;
-  case ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN:
-    LOG_PRINT_MAGENTA("[ASSET_BURNT]: " << print_money_brief(avc.amount_to_validate, ado.descriptor.decimal_point) << ", " << avc.asset_id << ": " << ado.descriptor.ticker << ", \"" << ado.descriptor.full_name << "\"", LOG_LEVEL_1);
-    break;
-  default:
-    LOG_ERROR("Unknown operation type: " << (int)ado.operation_type);
+    // NEW HF5 handling here
+
+    assets_container::t_value_type local_asset_history{};
+    if (avc.asset_op_history)
+      local_asset_history = *avc.asset_op_history;
+    
+    if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_REGISTER)
+    {
+      CHECK_AND_ASSERT_MES(ado.opt_descriptor.has_value(), false, "opt_descriptor is missing (register)"); // validated in validate_asset_operation(), just in case
+      const asset_descriptor_base& adb = ado.opt_descriptor.get();
+      local_asset_history.push_back(ado);
+      LOG_PRINT_MAGENTA("[ASSET_REGISTERED]: " << print_money_brief(adb.current_supply, adb.decimal_point) << ", " << avc.asset_id << ": " << adb.ticker << ", \"" << adb.full_name << "\"", LOG_LEVEL_1);
+    }
+    else
+    {
+      CHECK_AND_ASSERT_MES(!local_asset_history.empty(), false, "local_asset_history is empty (update/emit/burn)");
+      asset_descriptor_operation& last_ado = local_asset_history.back();
+      CHECK_AND_ASSERT_MES(last_ado.opt_descriptor.has_value(), false, "last_ado.opt_descriptor is missing (update/emit/burn)");
+      asset_descriptor_base& last_adb = local_asset_history.back().opt_descriptor.get();
+
+      if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_UPDATE)
+      {
+        local_asset_history.push_back(ado);
+        LOG_PRINT_MAGENTA("[ASSET_UPDATED]: " << avc.asset_id << ": " << last_adb.ticker << ", \"" << last_adb.full_name << "\"", LOG_LEVEL_1);
+      }
+      else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_EMIT)
+      {
+        // just change the most recent history record, don't push
+        if (last_adb.hidden_supply)
+        {
+          //CHECK_AND_ASSERT_MES(last_ado.opt_amount_commitment.has_value() && ado.opt_amount_commitment.has_value(), false, "last_ado.opt_amount_commitment or ado.opt_amount_commitment is missing (emit)");
+          //last_ado.opt_amount_commitment.get() = (crypto::point_t(last_ado.opt_amount_commitment.get()) + crypto::point_t(ado.opt_amount_commitment.get())).to_public_key();
+          return false; // not supported atm
+        }
+        else
+        {
+          CHECK_AND_ASSERT_MES(ado.opt_amount.has_value(), false, "last_ado.opt_amount or ado.opt_amount is missing (emit)");
+          last_adb.current_supply += ado.opt_amount.get();
+        }
+        LOG_PRINT_MAGENTA("[ASSET_EMITTED]: " << print_money_brief(avc.amount_to_validate, last_adb.decimal_point) << ", " << avc.asset_id << ": " << last_adb.ticker << ", \"" << last_adb.full_name << "\"", LOG_LEVEL_1);
+      }
+      else if (ado.operation_type == ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN)
+      {
+        // just change the most recent history record, don't push
+        if (last_adb.hidden_supply)
+        {
+          //CHECK_AND_ASSERT_MES(last_ado.opt_amount_commitment.has_value() && ado.opt_amount_commitment.has_value(), false, "last_ado.opt_amount_commitment or ado.opt_amount_commitment is missing (burn)");
+          //last_ado.opt_amount_commitment.get() = (crypto::point_t(last_ado.opt_amount_commitment.get()) - crypto::point_t(ado.opt_amount_commitment.get())).to_public_key();
+          return false; // not supported atm
+        }
+        else
+        {
+          CHECK_AND_ASSERT_MES(ado.opt_amount.has_value(), false, "last_ado.opt_amount or ado.opt_amount is missing (burn)");
+          last_adb.current_supply -= ado.opt_amount.get();
+        }
+        LOG_PRINT_MAGENTA("[ASSET_BURNT]: " << print_money_brief(avc.amount_to_validate, last_adb.decimal_point) << ", " << avc.asset_id << ": " << last_adb.ticker << ", \"" << last_adb.full_name << "\"", LOG_LEVEL_1);
+      }
+      else
+        CHECK_AND_ASSERT_MES(false, false, "Unknown operation type: " << (int)ado.operation_type);
+    }
+    
+    m_db_assets.set(avc.asset_id, local_asset_history);
+  }
+  else
+  {
+    // HF4
+    assets_container::t_value_type local_asset_history{};
+    if (avc.asset_op_history)
+      local_asset_history = *avc.asset_op_history;
+    local_asset_history.push_back(ado);
+    m_db_assets.set(avc.asset_id, local_asset_history);
+
+    const asset_descriptor_base& adb = ado.opt_descriptor.get(); // in HF4 descriptor must always be present, validated in validate_asset_operation_hf4()
+    switch(ado.operation_type)
+    {
+    case ASSET_DESCRIPTOR_OPERATION_REGISTER:
+      LOG_PRINT_MAGENTA("[ASSET_REGISTERED]: " << print_money_brief(adb.current_supply, adb.decimal_point) << ", " << avc.asset_id << ": " << adb.ticker << ", \"" << adb.full_name << "\"", LOG_LEVEL_1);
+      break;
+    case ASSET_DESCRIPTOR_OPERATION_UPDATE:
+      LOG_PRINT_MAGENTA("[ASSET_UPDATED]: " << avc.asset_id << ": " << adb.ticker << ", \"" << adb.full_name << "\"", LOG_LEVEL_1);
+      break;
+    case ASSET_DESCRIPTOR_OPERATION_EMIT:
+      LOG_PRINT_MAGENTA("[ASSET_EMITTED]: " << print_money_brief(avc.amount_to_validate, adb.decimal_point) << ", " << avc.asset_id << ": " << adb.ticker << ", \"" << adb.full_name << "\"", LOG_LEVEL_1);
+      break;
+    case ASSET_DESCRIPTOR_OPERATION_PUBLIC_BURN:
+      LOG_PRINT_MAGENTA("[ASSET_BURNT]: " << print_money_brief(avc.amount_to_validate, adb.decimal_point) << ", " << avc.asset_id << ": " << adb.ticker << ", \"" << adb.full_name << "\"", LOG_LEVEL_1);
+      break;
+    default:
+      LOG_ERROR("Unknown operation type: " << (int)ado.operation_type);
+    }
   }
 
   return true;
@@ -4192,7 +4802,7 @@ bool blockchain_storage::prevalidate_alias_info(const transaction& tx, const ext
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx, const crypto::hash& tx_id)
+bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx, const crypto::hash& tx_id, const uint64_t height)
 {
   //check transaction extra
   tx_extra_info ei = AUTO_VAL_INIT(ei);
@@ -4208,7 +4818,7 @@ bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx, cons
   }
   if (ei.m_asset_operation.operation_type != ASSET_DESCRIPTOR_OPERATION_UNDEFINED)
   {
-    r = put_asset_info(tx, tx_id, ei.m_asset_operation);
+    r = put_asset_info(tx, tx_id, ei.m_asset_operation, height);
     CHECK_AND_ASSERT_MES(r, false, "failed to put_asset_info");
   }
 
@@ -4218,16 +4828,17 @@ bool blockchain_storage::process_blockchain_tx_extra(const transaction& tx, cons
 bool blockchain_storage::get_outs_index_stat(outs_index_stat& outs_stat) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  outs_stat.amount_0_001 = m_db_outputs.get_item_size(COIN / 1000);
-  outs_stat.amount_0_01 = m_db_outputs.get_item_size(COIN / 100);
-  outs_stat.amount_0_1 = m_db_outputs.get_item_size(COIN / 10);
-  outs_stat.amount_1 = m_db_outputs.get_item_size(COIN);
-  outs_stat.amount_10 = m_db_outputs.get_item_size(COIN * 10);
-  outs_stat.amount_100 = m_db_outputs.get_item_size(COIN * 100);
-  outs_stat.amount_1000 = m_db_outputs.get_item_size(COIN * 1000);
-  outs_stat.amount_10000 = m_db_outputs.get_item_size(COIN * 10000);
-  outs_stat.amount_100000 = m_db_outputs.get_item_size(COIN * 100000);
-  outs_stat.amount_1000000 = m_db_outputs.get_item_size(COIN * 1000000);
+  outs_stat.amount_0        = m_db_outputs.get_item_size(0);
+  outs_stat.amount_0_001    = m_db_outputs.get_item_size(COIN / 1000);
+  outs_stat.amount_0_01     = m_db_outputs.get_item_size(COIN / 100);
+  outs_stat.amount_0_1      = m_db_outputs.get_item_size(COIN / 10);
+  outs_stat.amount_1        = m_db_outputs.get_item_size(COIN);
+  outs_stat.amount_10       = m_db_outputs.get_item_size(COIN * 10);
+  outs_stat.amount_100      = m_db_outputs.get_item_size(COIN * 100);
+  outs_stat.amount_1000     = m_db_outputs.get_item_size(COIN * 1000);
+  outs_stat.amount_10000    = m_db_outputs.get_item_size(COIN * 10000);
+  outs_stat.amount_100000   = m_db_outputs.get_item_size(COIN * 100000);
+  outs_stat.amount_1000000  = m_db_outputs.get_item_size(COIN * 1000000);
   return true;
 }
 //------------------------------------------------------------------
@@ -4407,7 +5018,7 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   CHECK_AND_ASSERT_MES(validate_tx_for_hardfork_specific_terms(tx, tx_id, bl_height), false, "tx " << tx_id << ": hardfork-specific validation failed");
   
   TIME_MEASURE_START_PD(tx_process_extra);
-  bool r = process_blockchain_tx_extra(tx, tx_id);
+  bool r = process_blockchain_tx_extra(tx, tx_id, bl_height);
   CHECK_AND_ASSERT_MES(r, false, "failed to process_blockchain_tx_extra");
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_process_extra);
 
@@ -4423,7 +5034,7 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
     {
       LOG_ERROR("critical internal error: add_transaction_input_visitor failed. but key_images should be already checked");
       purge_transaction_keyimages_from_blockchain(tx, false);
-      bool r = unprocess_blockchain_tx_extra(tx);
+      bool r = unprocess_blockchain_tx_extra(tx, bl_height);
       CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra");
       
       unprocess_blockchain_tx_attachments(tx, bl_height, timestamp);
@@ -4444,7 +5055,7 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
   {
     LOG_ERROR("critical internal error: tx with id: " << tx_id << " in block id: " << bl_id << " already in blockchain");
     purge_transaction_keyimages_from_blockchain(tx, true);
-    bool r = unprocess_blockchain_tx_extra(tx);
+    bool r = unprocess_blockchain_tx_extra(tx, bl_height);
     CHECK_AND_ASSERT_MES(r, false, "failed to unprocess_blockchain_tx_extra");
 
     unprocess_blockchain_tx_attachments(tx, bl_height, timestamp);
@@ -4476,7 +5087,6 @@ bool blockchain_storage::add_transaction_from_block(const transaction& tx, const
     << " (fee: " << (is_coinbase(tx) ? "0 [coinbase]" : print_money_brief(get_tx_fee(tx))) << ")");
   TIME_MEASURE_FINISH_PD_COND(need_to_profile, tx_print_log);
 
-  //@#@ del me
 //   LOG_PRINT_L0("APPEND_TX_TIME_INNER: " << m_performance_data.tx_append_rl_wait.get_last_val() 
 //     << " | " << m_performance_data.tx_append_is_expired.get_last_val()
 //     << " | " << m_performance_data.tx_process_extra.get_last_val()
@@ -4508,10 +5118,13 @@ bool blockchain_storage::get_tx_outputs_gindexs(const crypto::hash& tx_id, std::
 bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height, crypto::hash& max_used_block_id) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
-  bool res = check_tx_inputs(tx, tx_prefix_hash, max_used_block_height);
-  if(!res) return false;
-  CHECK_AND_ASSERT_MES(max_used_block_height < m_db_blocks.size(), false,  "internal error: max used block index=" << max_used_block_height << " is not less than blockchain size = " << m_db_blocks.size());
-  get_block_hash(m_db_blocks[max_used_block_height]->bl, max_used_block_id);
+  check_tx_inputs_context ctic{};
+  ctic.calculate_max_used_block_id = true;
+  bool res = check_tx_inputs(tx, tx_prefix_hash, ctic);
+  if (!res)
+    return false;
+  max_used_block_height = ctic.max_used_block_height;
+  max_used_block_id = ctic.max_used_block_id;
   return true;
 }
 //------------------------------------------------------------------
@@ -4672,7 +5285,8 @@ bool blockchain_storage::print_tx_outputs_lookup(const crypto::hash& tx_id)const
         continue;
       usage_stat[o.amount][tx_ptr->m_global_output_indexes[i]];
     VARIANT_CASE_CONST(tx_out_zarcanum, toz)
-      //@#@      
+      strm_tx << "[" << i << "]: " << ENDL;
+      usage_stat[0][tx_ptr->m_global_output_indexes[i]];
     VARIANT_SWITCH_END();
   }
   
@@ -4786,15 +5400,16 @@ bool blockchain_storage::have_tx_keyimges_as_spent(const transaction &tx) const
 //------------------------------------------------------------------
 bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash) const
 {
-  uint64_t stub = 0;
-  return check_tx_inputs(tx, tx_prefix_hash, stub);
+  check_tx_inputs_context ctic{};
+  return check_tx_inputs(tx, tx_prefix_hash, ctic);
 }
 //------------------------------------------------------------------
-bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height) const
+bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, check_tx_inputs_context& ctic) const
 {
+  CRITICAL_REGION_LOCAL(m_read_lock);
+
   size_t sig_index = 0;
-  max_used_block_height = 0;
-  bool all_tx_ins_have_explicit_native_asset_ids = true;
+  ctic.max_used_block_height = 0;
 
   auto local_check_key_image = [&](const crypto::key_image& ki) -> bool
   {
@@ -4819,7 +5434,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
         return false;
 
       uint64_t max_unlock_time = 0;
-      if (!check_tx_input(tx, sig_index, in_to_key, tx_prefix_hash, max_used_block_height, max_unlock_time))
+      if (!check_tx_input(tx, sig_index, in_to_key, tx_prefix_hash, ctic.max_used_block_height, max_unlock_time))
       {
         LOG_ERROR("Failed to validate input #" << sig_index << " tx: " << tx_prefix_hash);
         return false;
@@ -4827,7 +5442,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
     }
     VARIANT_CASE_CONST(txin_multisig, in_ms)
     {
-      if (!check_tx_input(tx, sig_index, in_ms, tx_prefix_hash, max_used_block_height))
+      if (!check_tx_input(tx, sig_index, in_ms, tx_prefix_hash, ctic.max_used_block_height))
       {
         LOG_ERROR("Failed to validate multisig input #" << sig_index << " (ms out id: " << in_ms.multisig_out_id << ") in tx: " << tx_prefix_hash);
         return false;
@@ -4835,17 +5450,11 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
     }
     VARIANT_CASE_CONST(txin_htlc, in_htlc)
     {
-      if (!is_hardfork_active(3)) // @#@ CZ, consider removing this to validate_tx_for_hardfork_specific_terms
-      {
-        LOG_ERROR("Error: Transaction with txin_htlc before hardfork 3 (before height " << m_core_runtime_config.hard_forks.get_str_height_the_hardfork_active_after(3) << ")");
-        return false;
-      }
-
       CHECK_AND_ASSERT_MES(in_htlc.key_offsets.size(), false, "Empty in_to_key.key_offsets for input #" << sig_index << " tx: " << tx_prefix_hash);
       if (!local_check_key_image(in_htlc.k_image))
         return false;
 
-      if (!check_tx_input(tx, sig_index, in_htlc, tx_prefix_hash, max_used_block_height))
+      if (!check_tx_input(tx, sig_index, in_htlc, tx_prefix_hash, ctic.max_used_block_height))
       {
         LOG_ERROR("Failed to validate htlc input #" << sig_index << " in tx: " << tx_prefix_hash << ", htlc json: " << ENDL << obj_to_json_str(in_htlc));
         return false;
@@ -4856,7 +5465,7 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
       if (!local_check_key_image(in_zc.k_image))
         return false;
 
-      if (!check_tx_input(tx, sig_index, in_zc, tx_prefix_hash, max_used_block_height, all_tx_ins_have_explicit_native_asset_ids))
+      if (!check_tx_input(tx, sig_index, in_zc, tx_prefix_hash, ctic))
       {
         LOG_ERROR("Failed to validate zc input #" << sig_index << " in tx: " << tx_prefix_hash);
         return false;
@@ -4879,15 +5488,65 @@ bool blockchain_storage::check_tx_inputs(const transaction& tx, const crypto::ha
       CHECK_AND_ASSERT_MES(r, false, "Failed to validate attachments in tx " << tx_prefix_hash << ": incorrect extra_attachment_info in tx.extra");
     }
 
-    CHECK_AND_ASSERT_MES(check_tx_explicit_asset_id_rules(tx, all_tx_ins_have_explicit_native_asset_ids), false, "tx does not comply with explicit asset id rules");
+    CHECK_AND_ASSERT_MES(check_tx_explicit_asset_id_rules(tx, ctic.all_tx_ins_have_explicit_native_asset_ids), false, "tx does not comply with explicit asset id rules");
   }
   TIME_MEASURE_FINISH_PD(tx_check_inputs_attachment_check);
+
+  if (ctic.calculate_max_used_block_id)
+  {
+    CHECK_AND_ASSERT_MES(ctic.max_used_block_height < m_db_blocks.size(), false,  "internal error: max used block index=" << ctic.max_used_block_height << " is not less than blockchain size = " << m_db_blocks.size());
+    get_block_hash(m_db_blocks[ctic.max_used_block_height]->bl, ctic.max_used_block_id);
+  }
+
   return true;
 }
 //------------------------------------------------------------------
 bool blockchain_storage::is_tx_spendtime_unlocked(uint64_t unlock_time) const
 {
   return currency::is_tx_spendtime_unlocked(unlock_time, get_current_blockchain_size(), m_core_runtime_config.get_core_time());
+}
+//------------------------------------------------------------------
+void blockchain_storage::do_full_db_warm_up() const
+{
+
+  uint64_t ticks_last_print = 0;
+  uint64_t current_sz = get_current_blockchain_size();
+  LOG_PRINT_CYAN("Warming up starting, total blocks..." << current_sz, LOG_LEVEL_0);
+  for (uint64_t i =  1; i != current_sz; ++i)
+  {
+    CRITICAL_REGION_LOCAL(m_read_lock);
+    auto blk_ptr = m_db_blocks[i];
+    std::list<crypto::hash> mis;
+    std::list<std::shared_ptr<const transaction_chain_entry> > txs;
+    get_transactions_direct(blk_ptr->bl.tx_hashes, txs, mis);
+    CHECK_AND_ASSERT_MES(!mis.size(), void(), "internal error, block " << get_block_hash(m_db_blocks[i]->bl) << " [" << i << "] contains missing transactions: " << mis);
+    if (txs.size() != blk_ptr->bl.tx_hashes.size())
+    {
+      LOG_ERROR("some tx's not found");
+      return;
+    }
+    auto coinbase_tx_ptr = m_db_transactions.find(get_coinbase_hash_cached(*m_db_blocks[i]));
+    if (!coinbase_tx_ptr)
+    {
+      LOG_ERROR("Coinbase not found");
+      return;
+    }
+    if (epee::misc_utils::get_tick_count() - ticks_last_print > 1000)
+    {
+      ticks_last_print = epee::misc_utils::get_tick_count();
+      LOG_PRINT_CYAN("Warming up: " <<  ( ( (i) * 100)/ current_sz) << "%, " << (i) << " of " << current_sz, LOG_LEVEL_0);
+      
+      LOG_PRINT_CYAN("CACHE STATE: " << ENDL << get_db_l2_cache_state_str(), LOG_LEVEL_2);
+    }
+  }
+  LOG_PRINT_CYAN("CACHE STATE: " << ENDL << get_db_l2_cache_state_str(), LOG_LEVEL_0);
+}
+//------------------------------------------------------------------
+void blockchain_storage::on_hardfork_activated(size_t hardfork_id)
+{
+  m_db.begin_transaction();
+  m_db_most_recent_hardfork_id = hardfork_id;
+  m_db.commit_transaction();
 }
 //------------------------------------------------------------------
 bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase) const
@@ -4900,7 +5559,7 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   scan_for_keys_context scan_context = AUTO_VAL_INIT(scan_context);
   if(!get_output_keys_for_input_with_checks(tx, txin, output_keys, max_related_block_height, source_max_unlock_time_for_pos_coinbase))
   {
-    LOG_PRINT_L0("Failed to get output keys for input #" << in_index << " (amount = " << print_money(txin.amount) << ", key_offset.size = " << txin.key_offsets.size() << ")");
+    LOG_PRINT_L0("Failed to get output keys for input #" << in_index << " (amount = " << print_money_brief(txin.amount) << ", key_offset.size = " << txin.key_offsets.size() << "), tx: " << tx_prefix_hash);
     return false;
   }
   //TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_ch_in_get_keys_loop);
@@ -4935,7 +5594,7 @@ struct outputs_visitor
     //check tx unlock time
     uint64_t source_out_unlock_time = get_tx_unlock_time(source_tx, out_i);
     //let coinbase sources for PoS block to have locked inputs, the outputs supposed to be locked same way, except the reward 
-    if (is_coinbase(validated_tx) && is_pos_miner_tx(validated_tx)) // @#@ consider changing to one call to is_pos_coinbase()
+    if (is_pos_miner_tx(validated_tx))
     {
       CHECK_AND_ASSERT_MES(should_unlock_value_be_treated_as_block_height(source_out_unlock_time), false, "source output #" << out_i << " is locked by time, not by height, which is not allowed for PoS coinbase");
       if (source_out_unlock_time > m_source_max_unlock_time_for_pos_coinbase)
@@ -4972,7 +5631,7 @@ struct outputs_visitor
 };
 
 //------------------------------------------------------------------
-// Checks each referenced output for:
+// Checks each referenced output against the current blockchain state for:
 // 1) source tx unlock time validity
 // 2) mixin restrictions
 // 3) general gindex/ref_by_id corectness
@@ -5122,9 +5781,7 @@ bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, 
 
   LOC_CHK(tx.signatures.size() > in_index, "ms input index is out of signatures container bounds, signatures.size() = " << tx.signatures.size());
 
-  //@#@
   VARIANT_SWITCH_BEGIN(tx.signatures[in_index]);
-  VARIANT_CASE_CONST(void_sig, v);
   VARIANT_CASE_CONST(NLSAG_sig, sig)
   {    
     const std::vector<crypto::signature>& input_signatures = sig.s;
@@ -5169,9 +5826,9 @@ bool blockchain_storage::check_ms_input(const transaction& tx, size_t in_index, 
       LOC_CHK(r, "failed to check extra signature for last out with TX_FLAG_SIGNATURE_MODE_SEPARATE");
     }
   }
-  VARIANT_CASE_CONST(ZC_sig, s);
-  //@#@
-  //TODO: don't forget about need_to_check_extra_sign
+  VARIANT_CASE_OTHER()
+    LOG_ERROR("Unexpected signature type: " << VARIANT_OBJ_TYPENAME);
+    return false;
   VARIANT_SWITCH_END();
 
 
@@ -5262,20 +5919,20 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   return check_input_signature(tx, in_index, txin.amount, txin.k_image, txin.etc_details, tx_prefix_hash, output_keys_ptrs);
 }
 //------------------------------------------------------------------
-bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_zc_input& zc_in, const crypto::hash& tx_prefix_hash,
-  uint64_t& max_related_block_height, bool& all_tx_ins_have_explicit_native_asset_ids) const
+bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, const txin_zc_input& zc_in, const crypto::hash& tx_prefix_hash, check_tx_inputs_context& ctic) const
 {
   CRITICAL_REGION_LOCAL(m_read_lock);
 
   // we need a list<tx_out_zarcanum> this input is referring to
-  // and make sure that all of them are good (i.e. check 1) source tx unlock time validity; 2) mixin restrictions; 3) general gindex/ref_by_id corectness)
+  // and make sure that all of them are good (i.e. check: 1) source tx unlock time validity; 2) mixin restrictions; 3) general gindex/ref_by_id corectness)
   // get_output_keys_for_input_with_checks is used for that
   //
   std::vector<crypto::public_key> dummy_output_keys; // won't be used
   uint64_t dummy_source_max_unlock_time_for_pos_coinbase_dummy = 0; // won't be used
-  scan_for_keys_context scan_contex = AUTO_VAL_INIT(scan_contex);
+  scan_for_keys_context scan_contex{};
+  scan_contex.check_hf4_coinage_rule = ctic.check_hf4_coinage_rule;
 
-  if (!get_output_keys_for_input_with_checks(tx, zc_in, dummy_output_keys, max_related_block_height, dummy_source_max_unlock_time_for_pos_coinbase_dummy, scan_contex))
+  if (!get_output_keys_for_input_with_checks(tx, zc_in, dummy_output_keys, ctic.max_used_block_height, dummy_source_max_unlock_time_for_pos_coinbase_dummy, scan_contex))
   {
     LOG_PRINT_L0("get_output_keys_for_input_with_checks failed for input #" << in_index << ", key_offset.size = " << zc_in.key_offsets.size() << ")");
     return false;
@@ -5296,8 +5953,8 @@ bool blockchain_storage::check_tx_input(const transaction& tx, size_t in_index, 
   for(auto& zc_out : scan_contex.zc_outs)
   {
     ring.emplace_back(zc_out.stealth_address, zc_out.amount_commitment, zc_out.blinded_asset_id);
-    if (all_tx_ins_have_explicit_native_asset_ids && crypto::point_t(zc_out.blinded_asset_id).modify_mul8().to_public_key() != native_coin_asset_id)
-      all_tx_ins_have_explicit_native_asset_ids = false;
+    if (ctic.all_tx_ins_have_explicit_native_asset_ids && crypto::point_t(zc_out.blinded_asset_id).modify_mul8().to_public_key() != native_coin_asset_id)
+      ctic.all_tx_ins_have_explicit_native_asset_ids = false;
   }
 
   // calculate corresponding tx prefix hash
@@ -5341,7 +5998,8 @@ uint64_t blockchain_storage::get_last_n_blocks_timestamps_median(size_t n) const
 
   std::vector<uint64_t> timestamps = get_last_n_blocks_timestamps(n);
   uint64_t median_res = epee::misc_utils::median(timestamps);
-  m_timestamps_median_cache[n] = median_res;
+  if (timestamps.size() == n)
+    m_timestamps_median_cache[n] = median_res;
   return median_res;
 }
 //------------------------------------------------------------------
@@ -5422,7 +6080,7 @@ std::shared_ptr<const transaction_chain_entry> blockchain_storage::find_key_imag
     {
       if (boost::get<txin_to_key>(in).k_image == ki)
       {
-        id_result = get_transaction_hash(block_entry->bl.miner_tx);
+        id_result = get_coinbase_hash_cached(*block_entry);
         return get_tx_chain_entry(id_result);
       }
     }
@@ -5444,7 +6102,7 @@ std::shared_ptr<const transaction_chain_entry> blockchain_storage::find_key_imag
       {
         if (k_image == ki)
         {
-          id_result = get_transaction_hash(tx_chain_entry->tx);  // ??? @#@#  why not just use tx_id ?
+          id_result = tx_id;
           return tx_chain_entry;
         }
       }
@@ -5686,6 +6344,12 @@ void blockchain_storage::get_pos_mining_estimate(uint64_t amount_coins,
 //------------------------------------------------------------------
 bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id) const
 {
+  if (m_db_major_failure)
+  {
+    LOG_ERROR("MAJOR FAILURE: POS DIFFICULTY IS GOT TO HIGH! Contact the team immediately if you see this error in logs and watch them having panic attack.");
+    return false;
+  }
+
   uint64_t block_height = m_db_blocks.size();
   return validate_tx_for_hardfork_specific_terms(tx, tx_id, block_height);
 }
@@ -5705,10 +6369,12 @@ struct visitor_proxy : public boost::static_visitor<const x_type*>
 
 bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
 {
+  size_t most_recent_hardfork_id_for_height = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(block_height);
   bool var_is_after_hardfork_1_zone = m_core_runtime_config.is_hardfork_active_for_height(1, block_height);
   bool var_is_after_hardfork_2_zone = m_core_runtime_config.is_hardfork_active_for_height(2, block_height);
   bool var_is_after_hardfork_3_zone = m_core_runtime_config.is_hardfork_active_for_height(3, block_height);
   bool var_is_after_hardfork_4_zone = m_core_runtime_config.is_hardfork_active_for_height(4, block_height);
+  bool var_is_after_hardfork_5_zone = m_core_runtime_config.is_hardfork_active_for_height(5, block_height);
 
   auto is_allowed_before_hardfork1 = [&](const auto& el) -> bool
   {
@@ -5838,12 +6504,28 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       LOG_ERROR("asset_descriptor_operation not allowed in tx with TX_FLAG_SIGNATURE_MODE_SEPARATE");
       return false;
     }
-
   }
+
+  if (var_is_after_hardfork_5_zone)
+  {
+    CHECK_AND_ASSERT_MES(tx.version >= TRANSACTION_VERSION_POST_HF5, false, "HF5: tx with version " << tx.version << " is not allowed");
+    // starting from HF5 each tx must have hardfork_id corresponding to the current active hardfork
+    CHECK_AND_ASSERT_MES(tx.hardfork_id == most_recent_hardfork_id_for_height, false, "tx's hardfork_id is " << (int)tx.hardfork_id << ", but the current hardfork is " << most_recent_hardfork_id_for_height << ", rejected");
+  }
+  else
+  {
+    if (count_type_in_variant_container<asset_operation_ownership_proof_eth>(tx.proofs) != 0)
+    {
+      LOG_ERROR("asset_operation_ownership_proof_eth is not allowed prior to HF5");
+      return false;
+    }
+  }
+
+
   return true;
 }
 //------------------------------------------------------------------
-bool blockchain_storage::validate_pos_coinbase_outs_unlock_time(const transaction& miner_tx, uint64_t staked_amount, uint64_t source_max_unlock_time)const
+bool blockchain_storage::validate_pre_zarcanum_pos_coinbase_outs_unlock_time(const transaction& miner_tx, uint64_t staked_amount, uint64_t source_max_unlock_time)const
 {
   uint64_t major_unlock_time = get_tx_x_detail<etc_tx_details_unlock_time>(miner_tx);
   if (major_unlock_time)
@@ -5870,7 +6552,7 @@ bool blockchain_storage::validate_pos_coinbase_outs_unlock_time(const transactio
   for (uint64_t i = 0; i != miner_tx.vout.size(); i++)
   {
     uint64_t unlock_value = ut2.unlock_time_array[i];
-    CHECK_AND_ASSERT_MES(should_unlock_value_be_treated_as_block_height(unlock_value), false, "output #" << i << " is locked by time, not buy height, which is not allowed for PoS coinbase");
+    CHECK_AND_ASSERT_MES(should_unlock_value_be_treated_as_block_height(unlock_value), false, "output #" << i << " is locked by time, not by height, which is not allowed for PoS coinbase");
     if (unlock_value >= source_max_unlock_time)
     {
       VARIANT_SWITCH_BEGIN(miner_tx.vout[i]);
@@ -6047,8 +6729,8 @@ bool blockchain_storage::validate_pos_block(const block& b,
         uint64_t last_pow_h = get_last_x_block_height(false);
         CHECK_AND_ASSERT_MES(max_related_block_height <= last_pow_h, false, "Failed to validate coinbase in PoS block, condition failed: max_related_block_height(" << max_related_block_height << ") <= last_pow_h(" << last_pow_h << ")");
         //let's check that coinbase amount and unlock time
-        r = validate_pos_coinbase_outs_unlock_time(b.miner_tx, coinstake_in.amount, source_max_unlock_time_for_pos_coinbase);
-        CHECK_AND_ASSERT_MES(r, false, "Failed to validate_pos_coinbase_outs_unlock_time() in miner tx, block_id = " << get_block_hash(b)
+        r = validate_pre_zarcanum_pos_coinbase_outs_unlock_time(b.miner_tx, coinstake_in.amount, source_max_unlock_time_for_pos_coinbase);
+        CHECK_AND_ASSERT_MES(r, false, "Failed to validate_pre_zarcanum_pos_coinbase_outs_unlock_time() in miner tx, block_id = " << get_block_hash(b)
           << "source_max_unlock_time_for_pos_coinbase=" << source_max_unlock_time_for_pos_coinbase);
       }
       else
@@ -6170,9 +6852,8 @@ wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise
   return res;
 }
 //------------------------------------------------------------------
-wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise_difficulty(const alt_chain_type& alt_chain, uint64_t block_height, bool pos, wide_difficulty_type& cumulative_diff_precise_adj) const
+wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise_difficulty(const alt_chain_type& alt_chain, uint64_t main_chain_start_block_height, bool pos, wide_difficulty_type& cumulative_diff_precise_adj) const
 {
-  uint64_t main_chain_first_block = block_height;
   for (auto it = alt_chain.rbegin(); it != alt_chain.rend(); it++)
   {
     if (is_pos_block((*it)->second.bl) == pos)
@@ -6180,14 +6861,14 @@ wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise
       cumulative_diff_precise_adj = (*it)->second.cumulative_diff_precise_adjusted;
       return (*it)->second.cumulative_diff_precise;
     }
-    main_chain_first_block = (*it)->second.height - 1;
+    main_chain_start_block_height = (*it)->second.height - 1;
   }
 
 
   CRITICAL_REGION_LOCAL(m_read_lock);
-  CHECK_AND_ASSERT_MES(main_chain_first_block < m_db_blocks.size(), false, "Intrnal error: main_chain_first_block(" << main_chain_first_block << ") < m_blocks.size() (" << m_db_blocks.size() << ")");
+  CHECK_AND_ASSERT_MES(main_chain_start_block_height < m_db_blocks.size(), false, "Internal error: main_chain_start_block_height (" << main_chain_start_block_height << ") < m_blocks.size() (" << m_db_blocks.size() << ")");
 
-  for (uint64_t i = main_chain_first_block; i != 0; i--)
+  for (uint64_t i = main_chain_start_block_height; i != 0; i--)
   {
     if (is_pos_block(m_db_blocks[i]->bl) == pos)
     {
@@ -6241,7 +6922,7 @@ bool blockchain_storage::collect_rangeproofs_data_from_tx(const transaction& tx,
 
       // convert amount commitments for aggregation from public_key to point_t form
       // TODO: consider refactoring this ugly code
-      for (uint8_t i = 0; i != zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size(); i++)
+      for (size_t i = 0; i != zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size(); i++)
         agregated_proofs.back().amount_commitments.emplace_back(zcrp.aggregation_proof.amount_commitments_for_rp_aggregation[i]);
 
       out_index_offset += zcrp.aggregation_proof.amount_commitments_for_rp_aggregation.size();
@@ -6283,7 +6964,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
 
   if (m_checkpoints.is_in_checkpoint_zone(get_current_blockchain_size()))
   {
-    m_is_in_checkpoint_zone = true;
+    m_is_in_checkpoint_zone = !m_non_pruning_mode_enabled; // set to true unless non-pruning mode is on
     if (!m_checkpoints.check_block(get_current_blockchain_size(), id))
     {
       LOG_ERROR("CHECKPOINT VALIDATION FAILED @ " << height);
@@ -6419,7 +7100,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     if (!m_is_in_checkpoint_zone)
     {
       auto cleanup = [&](){ 
-        bool add_res = m_tx_pool.add_tx(tx, tvc, true, true);
+        m_tx_pool.add_tx(tx, tvc, true, true);
         m_tx_pool.add_transaction_to_black_list(tx);
         purge_block_data_from_blockchain(bl, tx_processed_count); 
         bvc.m_verification_failed = true; 
@@ -6500,15 +7181,19 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     return false;
   }
 
-  boost::multiprecision::uint128_t already_generated_coins = m_db_blocks.size() ? m_db_blocks.back()->already_generated_coins:0;
-  uint64_t base_reward = get_base_block_reward(is_pos_bl, already_generated_coins, height);
+  uint64_t block_reward_without_fee = 0;
+  if (!calculate_block_reward_for_next_top_block(cumulative_block_size, block_reward_without_fee))
+  {
+    LOG_ERROR("calculate_block_reward_for_next_top_block filed");
+    purge_block_data_from_blockchain(bl, tx_processed_count);
+    bvc.m_verification_failed = true;
+    return false;
+  }
 
   if (!m_is_in_checkpoint_zone)
   {
-    // validate_miner_transaction will check balance proof and asset surjection proof
-    // and, as a side effect, it MAY recalculate base_reward, consider redisign, TODO -- sowle
     TIME_MEASURE_START_PD(validate_miner_transaction_time);
-    if (!validate_miner_transaction(bl, cumulative_block_size, fee_summary, base_reward, already_generated_coins)) // TODO @#@# base_reward will be calculated once again, consider refactoring
+    if (!validate_miner_transaction(bl.miner_tx, fee_summary, block_reward_without_fee))
     {
       LOG_PRINT_L0("Block with id: " << id
         << " have wrong miner transaction");
@@ -6599,6 +7284,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   //////////////////////////////////////////////////////////////////////////
 
   //etc 
+  boost::multiprecision::uint128_t already_generated_coins = m_db_blocks.size() ? m_db_blocks.back()->already_generated_coins : 0;
   if (already_generated_coins < burned_coins)
   {
     LOG_ERROR("Condition failed: already_generated_coins(" << already_generated_coins << ") >= burned_coins(" << burned_coins << ")");
@@ -6606,7 +7292,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     bvc.m_verification_failed = true;
     return false;
   }
-  bei.already_generated_coins = already_generated_coins - burned_coins + base_reward;
+  bei.already_generated_coins = already_generated_coins - burned_coins + block_reward_without_fee;
   if (bei.bl.miner_tx.version >= TRANSACTION_VERSION_POST_HF4)
   {
     bei.already_generated_coins -= fee_summary;
@@ -6661,7 +7347,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   TIME_MEASURE_FINISH_PD_MS(block_processing_time_0_ms);
 
   //print result
-  stringstream powpos_str_entry, timestamp_str_entry, pos_validation_str_entry;
+  stringstream powpos_str_entry, timestamp_str_entry, pos_validation_str_entry, block_reward_entry;
   if (is_pos_bl)
   { // PoS
     int64_t actual_ts = get_block_datetime(bei.bl); // signed int is intentionally used here
@@ -6683,6 +7369,10 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     powpos_str_entry << "PoW:\t" << proof_hash;
     timestamp_str_entry << ", block ts: " << bei.bl.timestamp << " (diff: " << std::showpos << ts_diff << "s)";
   }
+  if(bei.bl.miner_tx.version >= TRANSACTION_VERSION_POST_HF4)
+    block_reward_entry << "block reward: " << print_money_brief(block_reward_without_fee) << ", fee burnt: " << print_money_brief(fee_summary);
+  else
+    block_reward_entry << "block reward: " << print_money_brief(block_reward_without_fee + fee_summary) << " (" << print_money_brief(block_reward_without_fee) << " + " << print_money_brief(fee_summary) << ")";
   //explanation of this code will be provided later with public announce
   set_lost_tx_unmixable_for_height(bei.height);
     
@@ -6691,8 +7381,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     << ENDL << "id:\t" << id << timestamp_str_entry.str()
     << ENDL << powpos_str_entry.str()
     << ENDL << "HEIGHT " << bei.height << ", difficulty: " << current_diffic << ", cumul_diff_precise: " << bei.cumulative_diff_precise << ", cumul_diff_precise_adj: " << bei.cumulative_diff_precise_adjusted << " (+" << cumulative_diff_delta << ")"
-    << ENDL << "block reward: " << print_money_brief(base_reward + fee_summary) << " (" << print_money_brief(base_reward) << " + " << print_money_brief(fee_summary) 
-    << ")" << ", coinbase_blob_size: " << coinbase_blob_size << ", cumulative size: " << cumulative_block_size << ", tx_count: " << bei.bl.tx_hashes.size()
+    << ENDL << block_reward_entry.str() << ", coinbase_blob_size: " << coinbase_blob_size << ", cumulative size: " << cumulative_block_size << ", tx_count: " << bei.bl.tx_hashes.size()
     << ", timing: " << block_processing_time_0_ms <<  "ms" 
     << "(micrsec:" << block_processing_time_1 
     << "(" << target_calculating_time_2 << "(" << m_performance_data.target_calculating_enum_blocks.get_last_val() << "/" << m_performance_data.target_calculating_calc.get_last_val() << ")"
@@ -6707,6 +7396,13 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
             << range_proofs_agregated.size()
     << ")"
     << "))");
+  if (is_pos_bl && current_diffic > m_core_runtime_config.max_pos_difficulty)
+  {
+    m_db_major_failure = true; //burn safety fuse
+    LOG_ERROR("MAJOR FAILURE: POS DIFFICULTY IS GOT TO HIGH! Contact the team immediately if you see this error in logs and watch them having panic attack." 
+      << ENDL << "Block id:"  << id);
+  }
+
 
   {
     static epee::math_helper::average<uint64_t, 30> blocks_processing_time_avg_pos, blocks_processing_time_avg_pow;
@@ -6819,6 +7515,11 @@ bool blockchain_storage::is_hardfork_active(size_t hardfork_id) const
   return m_core_runtime_config.is_hardfork_active_for_height(hardfork_id, m_db_blocks.size()); // note using m_db_blocks.size() ( == top_block_height + 1 )
 }
 //------------------------------------------------------------------
+bool blockchain_storage::is_hardfork_active_for_height(size_t hardfork_id, uint64_t height) const
+{
+  return m_core_runtime_config.is_hardfork_active_for_height(hardfork_id, height != UINT64_MAX ? height : m_db_blocks.size());
+}
+//------------------------------------------------------------------
 bool blockchain_storage::prevalidate_block(const block& bl)
 {
 
@@ -6878,6 +7579,15 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
 {
   try
   {
+
+    if (m_db_major_failure)
+    {
+      LOG_PRINT_RED_L0("Block processing is stoped due to MAJOR FAILURE fuse burned");
+      bvc.m_added_to_main_chain = false;
+      bvc.m_verification_failed = true;
+      return false;
+    }
+
     m_db.begin_transaction();
 
     //block bl = bl_;
@@ -6901,10 +7611,6 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
       m_db.commit_transaction();
       return false;
     }
-
-
-    //check that block refers to chain tail
-
     
     if (!(bl.prev_id == get_top_block_id()))
     {
@@ -6970,11 +7676,11 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
   }
 }
 //------------------------------------------------------------------
-bool blockchain_storage::truncate_blockchain(uint64_t to_height)
+bool blockchain_storage::truncate_blockchain(uint64_t to_blockchain_size)
 {
   m_db.begin_transaction();
-  uint64_t inital_height = get_current_blockchain_size();
-  while (get_current_blockchain_size() > to_height)
+  uint64_t inital_blockchain_size = get_current_blockchain_size();
+  while (get_current_blockchain_size() > to_blockchain_size)
   {
     transactions_map ot;
     pop_block_from_blockchain(ot);
@@ -6983,7 +7689,7 @@ bool blockchain_storage::truncate_blockchain(uint64_t to_height)
   m_alternative_chains.clear();
   m_altblocks_keyimages.clear();
   m_alternative_chains_txs.clear();
-  LOG_PRINT_MAGENTA("Blockchain truncated from " << inital_height << " to " << get_current_blockchain_size(), LOG_LEVEL_0);
+  LOG_PRINT_MAGENTA("Blockchain truncated from size " << inital_blockchain_size << " to size " << get_current_blockchain_size() << ". Alt blocks cleared.", LOG_LEVEL_0);
   m_db.commit_transaction();
   return true;
 }
@@ -7260,9 +7966,11 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   const crypto::hash& bl_id,
   const crypto::hash& input_tx_hash,
   size_t input_index,
-  uint64_t split_height, 
-  const alt_chain_type& alt_chain, 
-  const std::unordered_set<crypto::hash>& alt_chain_block_ids, 
+  uint64_t split_height,
+  const alt_chain_type& alt_chain,
+  const std::unordered_set<crypto::hash>& alt_chain_block_ids,
+  const uint64_t pos_block_timestamp,
+  const wide_difficulty_type& pos_difficulty,
   uint64_t& ki_lookuptime,
   uint64_t* p_max_related_block_height /* = nullptr */) const
 {
@@ -7339,47 +8047,59 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
 
   std::vector<txout_ref_v> abs_key_offsets = relative_output_offsets_to_absolute(input_key_offsets);
   CHECK_AND_ASSERT_MES(abs_key_offsets.size() > 0 && abs_key_offsets.size() == input_key_offsets.size(), false, "internal error: abs_key_offsets.size()==" << abs_key_offsets.size() << ", input_key_offsets.size()==" << input_key_offsets.size());
-  // eventually we should found all public keys for all outputs this input refers to, for checking ring signature
-  std::vector<crypto::public_key> pub_keys(abs_key_offsets.size(), null_pkey); 
 
   //
-  // let's try to resolve references and populate pub keys container for check_tokey_input()
+  // let's try to resolve references and populate the ring for ring signature check
   //
   uint64_t global_outs_for_amount = 0;
   //figure out if this amount touched alt_chain amount's index and if it is, get 
   bool amount_touched_altchain = false;
-  //auto abg_it = abei.gindex_lookup_table.find(input_to_key.amount);
-  //if (abg_it == abei.gindex_lookup_table.end())
-  
-  if (!alt_chain.empty())
-  {
-    auto abg_it = alt_chain.back()->second.gindex_lookup_table.find(input_amount);
-    if (abg_it != alt_chain.back()->second.gindex_lookup_table.end())
-    {
-      amount_touched_altchain = true;
-      // local gindex lookup table contains last used gindex, so we can't get total number of outs
-      // just skip setting global_outs_for_amount
-    }
-    else
-    {
-      //quite easy, 
-      global_outs_for_amount = m_db_outputs.get_item_size(input_amount);
-    }
-  }
+  if (!alt_chain.empty() && alt_chain.back()->second.gindex_lookup_table.count(input_amount) != 0)
+    amount_touched_altchain = true; // local gindex lookup table contains last used gindex, so we can't get total number of outs, just skip setting global_outs_for_amount
   else
-  {
-    //quite easy, 
     global_outs_for_amount = m_db_outputs.get_item_size(input_amount);
-  }
-  
-  CHECK_AND_ASSERT_MES(pub_keys.size() == abs_key_offsets.size(), false, "pub_keys.size()==" << pub_keys.size() << "  !=  abs_key_offsets.size()==" << abs_key_offsets.size()); // just a little bit of paranoia
-  std::vector<const crypto::public_key*> pub_key_pointers;
+
+  bool pos_miner_tx = is_pos_miner_tx(input_tx);
+
+  // eventually we should found all required public keys for all outputs this input refers to, because it's required for ring signature check
+  std::vector<std::shared_ptr<const transaction_chain_entry>> output_tx_entries;// to keep ownership for pointers and references till the end
+  std::vector<const crypto::public_key*> pub_key_pointers;                      // old bare outputs (pointers)
+  vector<crypto::CLSAG_GGX_input_ref_t> zc_input_ring;                          // ZC outputs
+  vector<crypto::CLSAG_GGXXG_input_ref_t> zarcanum_input_ring;                  // Zarcanum outputs
+
+  auto add_output_to_the_ring = [&](const tx_out_v& out_v, size_t index, uint64_t top_minus_source_height) -> bool {
+    VARIANT_SWITCH_BEGIN(out_v)
+      VARIANT_CASE_CONST(tx_out_bare, bo)
+      {
+        VARIANT_SWITCH_BEGIN(bo.target)
+          VARIANT_CASE_CONST(txout_to_key, ttk)
+            pub_key_pointers.push_back(&ttk.key);
+          VARIANT_CASE_CONST(txout_htlc, out_htlc)
+            bool htlc_expired = out_htlc.expiration > top_minus_source_height ? false : true;
+            const crypto::public_key *pkp = htlc_expired ? &out_htlc.pkey_refund : &out_htlc.pkey_redeem;
+            pub_key_pointers.push_back(pkp);
+          VARIANT_CASE_OTHER()
+            return false;
+        VARIANT_SWITCH_END()
+      }
+      VARIANT_CASE_CONST(tx_out_zarcanum, zo)
+      {
+        if (pos_miner_tx)
+          zarcanum_input_ring.emplace_back(zo.stealth_address, zo.amount_commitment, zo.blinded_asset_id, zo.concealing_point);
+        else
+          zc_input_ring.emplace_back(zo.stealth_address, zo.amount_commitment, zo.blinded_asset_id);
+      }
+      VARIANT_CASE_OTHER()
+        return false;
+    VARIANT_SWITCH_END()
+    return true;
+  };
+
 
   uint64_t height_of_current_alt_block = alt_chain.size() ? alt_chain.back()->second.height + 1 : split_height + 1;
 
-  for (size_t pk_n = 0; pk_n < pub_keys.size(); ++pk_n)
+  for (size_t pk_n = 0; pk_n < abs_key_offsets.size(); ++pk_n)
   {
-    crypto::public_key& pk = pub_keys[pk_n];
     crypto::hash tx_id = null_hash;
     uint64_t out_n = UINT64_MAX;
     auto &off = abs_key_offsets[pk_n];
@@ -7387,13 +8107,13 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
     {
       uint64_t offset_gindex = boost::get<uint64_t>(off);
       CHECK_AND_ASSERT_MES(amount_touched_altchain || (offset_gindex < global_outs_for_amount), false,
-        "invalid global output index " << offset_gindex << " for amount=" << input_amount << 
+        "invalid global output index " << offset_gindex << " for amount " << print_money_brief(input_amount) << 
         ", max is " << global_outs_for_amount << 
         ", referred to by offset #" << pk_n << 
         ", amount_touched_altchain = " << amount_touched_altchain);
       if (amount_touched_altchain)
       {
-        bool found_the_key = false;
+        bool found = false;
         for (auto alt_it = alt_chain.rbegin(); alt_it != alt_chain.rend(); alt_it++)
         {
           auto it_aag = (*alt_it)->second.gindex_lookup_table.find(input_amount);
@@ -7409,42 +8129,25 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
             //GOT IT!!
             //TODO: At the moment we ignore check of mix_attr against mixing to simplify alt chain check, but in future consider it for stronger validation
             uint64_t local_offset = offset_gindex - it_aag->second;
-            auto& alt_keys = (*alt_it)->second.outputs_pub_keys;            
-            CHECK_AND_ASSERT_MES(local_offset < alt_keys[input_amount].size(), false, "Internal error: local_offset=" << local_offset << " while alt_keys[" << input_amount << " ].size()=" << alt_keys.size());
-            const output_key_or_htlc_v& out_in_alt = alt_keys[input_amount][local_offset];
+            auto& alt_outputs = (*alt_it)->second.outputs;            
+            CHECK_AND_ASSERT_MES(local_offset < alt_outputs[input_amount].size(), false, "Internal error: local_offset=" << local_offset << " while alt_outputs[" << input_amount << " ].size()=" << alt_outputs.size());
+            const tx_out_v& out_in_alt = alt_outputs[input_amount][local_offset];
             
-            /*
-            here we do validation against compatibility of input and output type
-
-            TxOutput | TxInput | Allowed
-            ----------------------------
-            HTLC     |  HTLC   | ONLY IF HTLC NOT EXPIRED
-            HTLC     |  TO_KEY | ONLY IF HTLC IS EXPIRED
-            TO_KEY   |  HTLC   | NOT
-            TO_KEY   |  TO_KEY | YES
-            */
             uint64_t height_of_source_block = (*alt_it)->second.height;
             CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
-            bool r = is_output_allowed_for_input(out_in_alt, input_v, height_of_current_alt_block - height_of_source_block);
+            uint64_t top_minus_source_height = height_of_current_alt_block - height_of_source_block;
+
+            bool r = is_output_allowed_for_input(out_in_alt, input_v, top_minus_source_height);
             CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
+
+            r = add_output_to_the_ring(out_in_alt, pk_n, top_minus_source_height);
+            CHECK_AND_ASSERT_MES(r, false, "offset #" << pk_n << ": add_output_to_the_ring failed");
             
-            if (out_in_alt.type() == typeid(crypto::public_key))
-            {
-              pk = boost::get<crypto::public_key>(out_in_alt);
-            }
-            else
-            {
-              const txout_htlc& out_htlc = boost::get<txout_htlc>(out_in_alt);
-              bool htlc_expired = out_htlc.expiration > (height_of_current_alt_block - height_of_source_block) ? false:true;
-              pk = htlc_expired ? out_htlc.pkey_refund : out_htlc.pkey_redeem;
-              //input_v
-            }
-            pub_key_pointers.push_back(&pk);
-            found_the_key = true;
+            found = true;
             break;
           }
         }
-        if (found_the_key)
+        if (found)
           continue;
         //otherwise lookup in main chain index
       }
@@ -7464,114 +8167,63 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
       {
         uint64_t height_of_source_block = it->second.second;
         CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
-        
+        uint64_t top_minus_source_height = height_of_current_alt_block - height_of_source_block;
+
         //source tx found in altchain
         CHECK_AND_ASSERT_MES(it->second.first.vout.size() > out_n, false, "Internal error: out_n(" << out_n << ") >= it->second.vout.size()(" << it->second.first.vout.size() << ")");
+        const tx_out_v& out_in_alt = it->second.first.vout[out_n];
 
-        VARIANT_SWITCH_BEGIN(it->second.first.vout[out_n]);
-        VARIANT_CASE_CONST(tx_out_bare, o)
-        {
-          /*
-          here we do validation against compatibility of input and output type
+        r = is_output_allowed_for_input(out_in_alt, input_v, top_minus_source_height);
+        CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
 
-          TxOutput | TxInput | Allowed
-          ----------------------------
-          HTLC     |  HTLC   | ONLY IF HTLC NOT EXPIRED
-          HTLC     |  TO_KEY | ONLY IF HTLC IS EXPIRED
-          TO_KEY   |  HTLC   | NOT
-          TO_KEY   |  TO_KEY | YES
-          */
-          txout_target_v out_target_v = o.target;
-
-          bool r = is_output_allowed_for_input(out_target_v, input_v, height_of_current_alt_block - height_of_source_block);
-          CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
-          if (out_target_v.type() == typeid(txout_htlc))
-          {
-            //source is hltc out
-            const txout_htlc& htlc = boost::get<txout_htlc>(out_target_v);
-            bool htlc_expired = htlc.expiration > (height_of_current_alt_block - height_of_source_block) ? false : true;
-            pk = htlc_expired ? htlc.pkey_refund : htlc.pkey_redeem;
-            pub_key_pointers.push_back(&pk);
-            continue;
-          }
-          else if (out_target_v.type() == typeid(txout_to_key))
-          {
-            //source is to_key out
-            pk = boost::get<txout_to_key>(out_target_v).key;
-            pub_key_pointers.push_back(&pk);
-            continue;
-          }
-          else
-          {
-            ASSERT_MES_AND_THROW("Unexpected out type for tx_in in altblock: " << out_target_v.type().name());
-          }
-        }
-        VARIANT_CASE_CONST(tx_out_zarcanum, toz)
-          //@#@      
-        VARIANT_SWITCH_END();
+        r = add_output_to_the_ring(out_in_alt, pk_n, top_minus_source_height);
+        CHECK_AND_ASSERT_MES(r, false, "offset #" << pk_n << ": add_output_to_the_ring failed");
+        continue; // found in altchain, continue with the new output
       }
-
     }
+
+    // lookup the output in the main chain
 
     auto p = m_db_transactions.get(tx_id);
     CHECK_AND_ASSERT_MES(p != nullptr && out_n < p->tx.vout.size(), false, "can't find output #" << out_n << " for tx " << tx_id << " referred by offset #" << pk_n);
+    const tx_out_v& out_in_main = p->tx.vout[out_n];
+    output_tx_entries.push_back(p); // keeping the ownership till the end
 
-    VARIANT_SWITCH_BEGIN(p->tx.vout[out_n]);
-    VARIANT_CASE_CONST(tx_out_bare, o)
+    uint64_t height_of_source_block = p->m_keeper_block_height;
+    CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
+    uint64_t top_minus_source_height = height_of_current_alt_block - height_of_source_block;
+
+    uint8_t mix_attr = 0;
+    if (get_mix_attr_from_tx_out_v(out_in_main, mix_attr))
     {
-      auto &t = o.target;
-
-      /*
-      here we do validation against compatibility of input and output type
-
-      TxOutput | TxInput | Allowed
-      ----------------------------
-      HTLC     |  HTLC   | ONLY IF HTLC NOT EXPIRED
-      HTLC     |  TO_KEY | ONLY IF HTLC IS EXPIRED
-      TO_KEY   |  HTLC   | NOT
-      TO_KEY   |  TO_KEY | YES
-      */
-      uint64_t height_of_source_block = p->m_keeper_block_height;
-      CHECK_AND_ASSERT_MES(height_of_current_alt_block > height_of_source_block, false, "Intenral error: height_of_current_alt_block > height_of_source_block failed");
-      bool r = is_output_allowed_for_input(t, input_v, height_of_current_alt_block - height_of_source_block);
-      CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
-
-      if (t.type() == typeid(txout_to_key))
-      {
-        const txout_to_key& out_tk = boost::get<txout_to_key>(t);
-        pk = out_tk.key;
-
-        bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(p->tx.version, out_tk.mix_attr, abs_key_offsets.size() - 1, this->get_core_runtime_config());
-        CHECK_AND_ASSERT_MES(mixattr_ok, false, "input offset #" << pk_n << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(out_tk.mix_attr) << ", input's key_offsets.size = " << abs_key_offsets.size());
-
-      }
-      else if (t.type() == typeid(txout_htlc))
-      {
-        const txout_htlc& htlc = boost::get<txout_htlc>(t);
-        bool htlc_expired = htlc.expiration > (height_of_current_alt_block - height_of_source_block) ? false : true;
-        pk = htlc_expired ? htlc.pkey_refund : htlc.pkey_redeem;
-      }
-
-      // case b4 (make sure source tx in the main chain is preceding split point, otherwise this referece is invalid)
-      CHECK_AND_ASSERT_MES(p->m_keeper_block_height < split_height, false, "input offset #" << pk_n << " refers to main chain tx " << tx_id << " at height " << p->m_keeper_block_height << " while split height is " << split_height);
-
-      if (max_related_block_height < p->m_keeper_block_height)
-        max_related_block_height = p->m_keeper_block_height;
-
-      // TODO: consider checking p->tx for unlock time validity as it's checked in get_output_keys_for_input_with_checks()
-      // make sure it was actually found
-
-      // let's disable this check due to missing equal check in main chain validation code
-      //TODO: implement more strict validation with next hard fork
-      //CHECK_AND_ASSERT_MES(pk != null_pkey, false, "Can't determine output public key for offset " << pk_n << " in related tx: " << tx_id << ", out_n = " << out_n);
-      pub_key_pointers.push_back(&pk);
+      // having either txout_to_key or txout_zarcanum, for htlc or multisig outputs this check is not applicable
+      bool mixattr_ok = is_mixattr_applicable_for_fake_outs_counter(p->tx.version, mix_attr, abs_key_offsets.size() - 1, this->get_core_runtime_config());
+      CHECK_AND_ASSERT_MES(mixattr_ok, false, "input offset #" << pk_n << " violates mixin restrictions: mix_attr = " << static_cast<uint32_t>(mix_attr) << ", input's key_offsets.size = " << abs_key_offsets.size());
     }
-    VARIANT_CASE_CONST(tx_out_zarcanum, toz)
-      //@#@      
-    VARIANT_SWITCH_END();
+
+    // case b4 (make sure source tx in the main chain is preceding split point, otherwise this referece is invalid)
+    r = p->m_keeper_block_height < split_height;
+    CHECK_AND_ASSERT_MES(r, false, "input offset #" << pk_n << " refers to main chain tx " << tx_id << " at height " << p->m_keeper_block_height << " while split height is " << split_height);
+
+    r = is_output_allowed_for_input(out_in_main, input_v, top_minus_source_height);
+    CHECK_AND_ASSERT_MES(r, false, "Input and output incompatible type");
+
+    r = add_output_to_the_ring(out_in_main, pk_n, top_minus_source_height);
+    CHECK_AND_ASSERT_MES(r, false, "offset #" << pk_n << ": add_output_to_the_ring failed");
+
+    if (max_related_block_height < p->m_keeper_block_height)
+      max_related_block_height = p->m_keeper_block_height;
+
+    // TODO: consider checking p->tx for unlock time validity as it's checked in get_output_keys_for_input_with_checks()
+    // make sure it was actually found
+
+    // let's disable this check due to missing equal check in main chain validation code
+    //TODO: implement more strict validation with next hard fork
+    //CHECK_AND_ASSERT_MES(pk != null_pkey, false, "Can't determine output public key for offset " << pk_n << " in related tx: " << tx_id << ", out_n = " << out_n);
   }
 
-  // @#@# TODO review the following checks!
+
+
 
   // do input checks (attachment_info, ring signature and extra signature, etc.)
   VARIANT_SWITCH_BEGIN(input_v);
@@ -7582,19 +8234,35 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
     r = check_input_signature(input_tx, input_index, input_htlc, input_tx_hash, pub_key_pointers);
     CHECK_AND_ASSERT_MES(r, false, "to_key input validation failed");
   VARIANT_CASE_CONST(txin_zc_input, input_zc);
-    if (is_pos_miner_tx(input_tx))
+    if (pos_miner_tx)
     {
-      // TODO @#@# Special case: handling Zarcanum PoS block input
+      // Zarcanum signature (PoS block miner tx)
+      stake_kernel sk{};
+      stake_modifier_type sm{};
+      uint64_t last_pow_block_height = 0;
+      r = build_stake_modifier(sm, alt_chain, split_height, nullptr, &last_pow_block_height);
+      CHECK_AND_ASSERT_MES(r, false, "failed to build_stake_modifier");
+      r = build_kernel(input_key_image, sk, sm, pos_block_timestamp);
+      CHECK_AND_ASSERT_MES(r, false, "failed to build kernel_stake");
+      crypto::hash kernel_hash = crypto::cn_fast_hash(&sk, sizeof(sk));
+      crypto::scalar_t last_pow_block_id_hashed = crypto::hash_helper_t::hs(CRYPTO_HDS_ZARCANUM_LAST_POW_HASH, sm.last_pow_id);
+      CHECK_AND_ASSERT_MES(input_tx.signatures.size() != 2, false, "input_tx.signatures has wrong size: " << input_tx.signatures.size());
+      CHECK_AND_ASSERT_MES(input_tx.signatures[0].type() == typeid(zarcanum_sig), false, "input_tx.signatures[" << input_index << "] has wrong type: " << input_tx.signatures[input_index].type().name());
+      const zarcanum_sig& sig = boost::get<zarcanum_sig>(input_tx.signatures[0]);
+      uint8_t err = 0;
+      r = crypto::zarcanum_verify_proof(bl_id, kernel_hash, zarcanum_input_ring, last_pow_block_id_hashed, input_key_image, pos_difficulty, sig, &err);
+      CHECK_AND_ASSERT_MES(r, false, "zarcanum_verify_proof failed: err=" << (int)err);
     }
     else
     {
-      // TODO @#@# properly handle ZC inputs! check_tx_input below isn't working because of incorrectly assembled ring 
-      /*
-      uint64_t max_related_block_height = 0;
-      bool all_tx_ins_have_explicit_asset_ids = true; // stub for now, TODO @#@#
-      r = check_tx_input(input_tx, input_index, input_zc, input_tx_hash, max_related_block_height, all_tx_ins_have_explicit_asset_ids);
-      CHECK_AND_ASSERT_MES(r, false, "check_tx_input failed");
-      */
+      // ZC signature (3/2-CLSAG GGX)
+      crypto::hash tx_hash_for_signature = prepare_prefix_hash_for_sign(input_tx, input_index, input_tx_hash);
+      CHECK_AND_ASSERT_MES(tx_hash_for_signature != null_hash, false, "prepare_prefix_hash_for_sign failed");
+      CHECK_AND_ASSERT_MES(input_index < input_tx.signatures.size(), false, "input_tx.signatures has wrong size: " << input_tx.signatures.size());
+      CHECK_AND_ASSERT_MES(input_tx.signatures[input_index].type() == typeid(ZC_sig), false, "input_tx.signatures[" << input_index << "] has wrong type: " << input_tx.signatures[input_index].type().name());
+      const ZC_sig& sig = boost::get<ZC_sig>(input_tx.signatures[input_index]);
+      bool r = crypto::verify_CLSAG_GGX(tx_hash_for_signature, zc_input_ring, sig.pseudo_out_amount_commitment, sig.pseudo_out_blinded_asset_id, input_key_image, sig.clsags_ggx);
+      CHECK_AND_ASSERT_MES(r, false, "verify_CLSAG_GGX failed");
     }
   VARIANT_CASE_OTHER()
     LOG_ERROR("unexpected input type: " << input_v.type().name());
@@ -7620,19 +8288,26 @@ bool blockchain_storage::validate_alt_block_input(const transaction& input_tx,
   return true;
 }
 //------------------------------------------------------------------
+bool blockchain_storage::is_output_allowed_for_input(const tx_out_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height) const
+{
+  if (out_v.type() == typeid(tx_out_bare))
+  {
+    return is_output_allowed_for_input(boost::get<tx_out_bare>(out_v).target, in_v, top_minus_source_height);
+  }
+  else if (out_v.type() == typeid(tx_out_zarcanum))
+  {
+    return is_output_allowed_for_input(boost::get<tx_out_zarcanum>(out_v), in_v);
+  }
+  else
+  {
+    LOG_ERROR("[is_output_allowed_for_input]: Wrong output type in : " << out_v.type().name());
+    return false;
+  }
+  return true;
+}
+//------------------------------------------------------------------
 bool blockchain_storage::is_output_allowed_for_input(const txout_target_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const
 {
-
-  /*
-  TxOutput | TxInput | Allowed
-  ----------------------------
-  HTLC     |  HTLC   | ONLY IF HTLC NOT EXPIRED
-  HTLC     |  TO_KEY | ONLY IF HTLC IS EXPIRED
-  TO_KEY   |  HTLC   | NOT
-  TO_KEY   |  TO_KEY | YES
-  */
-
-
   if (out_v.type() == typeid(txout_to_key))
   {
     return is_output_allowed_for_input(boost::get<txout_to_key>(out_v), in_v);
@@ -7651,6 +8326,14 @@ bool blockchain_storage::is_output_allowed_for_input(const txout_target_v& out_v
 //------------------------------------------------------------------
 bool blockchain_storage::is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const 
 {
+  /*
+  TxOutput | TxInput | Allowed
+  ----------------------------
+  HTLC     |  HTLC   | ONLY IF HTLC NOT EXPIRED
+  HTLC     |  TO_KEY | ONLY IF HTLC IS EXPIRED
+  TO_KEY   |  HTLC   | NOT
+  TO_KEY   |  TO_KEY | YES
+  */
   bool htlc_expired = out_v.expiration > (top_minus_source_height) ? false : true;
   if (!htlc_expired)
   {
@@ -7670,21 +8353,6 @@ bool blockchain_storage::is_output_allowed_for_input(const txout_to_key& out_v, 
   //HTLC input CAN'T refer to regular to_key output
   CHECK_AND_ASSERT_MES(in_v.type() != typeid(txin_htlc), false, "[TXOUT_TO_KEY]: Unexpected output type of HTLC input");
   return true;
-}
-//------------------------------------------------------------------
-bool blockchain_storage::is_output_allowed_for_input(const output_key_or_htlc_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const
-{
-  if (out_v.type() == typeid(crypto::public_key))
-  {
-    return is_output_allowed_for_input(txout_to_key(), in_v);
-  }
-  else if (out_v.type() == typeid(txout_htlc))
-  {
-    return is_output_allowed_for_input(boost::get<txout_htlc>(out_v), in_v, top_minus_source_height);
-  }
-  else {
-    ASSERT_MES_AND_THROW("Unexpected type in output_key_or_htlc_v: " << out_v.type().name());
-  }
 }
 //------------------------------------------------------------------
 bool blockchain_storage::is_output_allowed_for_input(const tx_out_zarcanum& out, const txin_v& in_v) const
@@ -7851,19 +8519,17 @@ bool blockchain_storage::update_alt_out_indexes_for_tx_in_block(const transactio
           abei.gindex_lookup_table[o.amount] = m_db_outputs.get_item_size(o.amount);
           //LOG_PRINT_MAGENTA("FIRST TOUCH: size=" << abei.gindex_lookup_table[o.amount], LOG_LEVEL_0);
         }
-        if (o.target.type() == typeid(txout_to_key))
-        {
-          abei.outputs_pub_keys[o.amount].push_back(boost::get<txout_to_key>(o.target).key);
-        }
-        else
-        {
-          abei.outputs_pub_keys[o.amount].push_back(boost::get<txout_htlc>(o.target));
-        }
+        abei.outputs[o.amount].emplace_back(o);
 
         //TODO: At the moment we ignore check of mix_attr again mixing to simplify alt chain check, but in future consider it for stronger validation
       }
     VARIANT_CASE_CONST(tx_out_zarcanum, toz)
-      //@#@      
+      if (abei.gindex_lookup_table.find(0) == abei.gindex_lookup_table.end())
+      {
+        // amount was not found in altchain gindexes container, start indexing from current main chain gindex
+        abei.gindex_lookup_table[0] = m_db_outputs.get_item_size(0);
+      }
+      abei.outputs[0].emplace_back(toz);
     VARIANT_SWITCH_END();
   }
   return true;
@@ -7885,8 +8551,8 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     abei.gindex_lookup_table = alt_chain.back()->second.gindex_lookup_table;
 
     //adjust indices for next alt block entry according to emount of pubkeys in txs of prev block
-    auto& prev_alt_keys = alt_chain.back()->second.outputs_pub_keys;
-    for (auto it = prev_alt_keys.begin(); it != prev_alt_keys.end(); it++)
+    auto& prev_alt_outputs = alt_chain.back()->second.outputs;
+    for (auto it = prev_alt_outputs.cbegin(); it != prev_alt_outputs.cend(); it++)
     {
       auto it_amont_in_abs_ind = abei.gindex_lookup_table.find(it->first);
       CHECK_AND_ASSERT_MES(it_amont_in_abs_ind != abei.gindex_lookup_table.end(), false, "internal error: not found amount " << it->first << "in gindex_lookup_table");
@@ -7902,7 +8568,7 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
         alt_chain_tx_ids.insert(txs_by_id_and_height_altchain::value_type(on_board_tx.first, txs_by_id_and_height_altchain::value_type::second_type(on_board_tx.second, ch->second.height)));
       }
       //TODO: consider performance optimization (get_transaction_hash might slow down deep reorganizations )
-      alt_chain_tx_ids.insert(txs_by_id_and_height_altchain::value_type(get_transaction_hash(ch->second.bl.miner_tx), txs_by_id_and_height_altchain::value_type::second_type(ch->second.bl.miner_tx, ch->second.height)));
+      alt_chain_tx_ids.insert(txs_by_id_and_height_altchain::value_type(get_coinbase_hash_cached(ch->second), txs_by_id_and_height_altchain::value_type::second_type(ch->second.bl.miner_tx, ch->second.height)));
     }
   }
   else
@@ -7919,14 +8585,23 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
     // check PoS block miner tx in a special way
     CHECK_AND_ASSERT_MES(b.miner_tx.signatures.size() == 1 && b.miner_tx.vin.size() == 2, false, "invalid PoS block's miner_tx, signatures size = " << b.miner_tx.signatures.size() << ", miner_tx.vin.size() = " << b.miner_tx.vin.size());
 
-    r = validate_alt_block_input(b.miner_tx, collected_keyimages, alt_chain_tx_ids, id, get_block_hash(b), 1, split_height, alt_chain, alt_chain_block_ids, ki_lookup, &max_related_block_height);
+    r = validate_alt_block_input(b.miner_tx, collected_keyimages, alt_chain_tx_ids, id, get_block_hash(b), 1, split_height, alt_chain, alt_chain_block_ids, b.timestamp, abei.difficulty, ki_lookup, &max_related_block_height);
     CHECK_AND_ASSERT_MES(r, false, "miner tx " << get_transaction_hash(b.miner_tx) << ": validation failed");
 
     ki_lookup_time_total += ki_lookup;
-    // check stake age
-    uint64_t coinstake_age = height - max_related_block_height - 1;
-    CHECK_AND_ASSERT_MES(coinstake_age >= m_core_runtime_config.min_coinstake_age, false,
-      "miner tx's coinstake age is " << coinstake_age << ", that is less than minimum required " << m_core_runtime_config.min_coinstake_age << "; max_related_block_height == " << max_related_block_height);
+
+    if (is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, height))
+    {
+      CHECK_AND_ASSERT_MES(height - max_related_block_height >= CURRENCY_HF4_MANDATORY_MIN_COINAGE, false, "Coinage rule broken (altblock): h = " <<
+        abei.height << ", max_related_block_height=" << max_related_block_height << ", miner tx: " << get_transaction_hash(b.miner_tx));
+    }
+    else
+    {
+      // legacy check of stake age (consider removing old hardforks alt block checks -- sowle)
+      uint64_t coinstake_age = height - max_related_block_height - 1;
+      CHECK_AND_ASSERT_MES(coinstake_age >= m_core_runtime_config.min_coinstake_age, false,
+        "miner tx's coinstake age is " << coinstake_age << ", that is less than minimum required " << m_core_runtime_config.min_coinstake_age << "; max_related_block_height == " << max_related_block_height);
+    }
   }
   update_alt_out_indexes_for_tx_in_block(b.miner_tx, abei);
 
@@ -7952,7 +8627,7 @@ bool blockchain_storage::validate_alt_block_txs(const block& b, const crypto::ha
       if (tx.vin[n].type() == typeid(txin_to_key) || tx.vin[n].type() == typeid(txin_htlc) || tx.vin[n].type() == typeid(txin_zc_input))
       {
         uint64_t ki_lookup = 0;
-        r = validate_alt_block_input(tx, collected_keyimages, alt_chain_tx_ids, id, tx_id, n, split_height, alt_chain, alt_chain_block_ids, ki_lookup);
+        r = validate_alt_block_input(tx, collected_keyimages, alt_chain_tx_ids, id, tx_id, n, split_height, alt_chain, alt_chain_block_ids, 0, 0 /* <= both are not required for normal txs*/, ki_lookup);
         CHECK_AND_ASSERT_MES(r, false, "tx " << tx_id << ", input #" << n << ": validation failed");
         ki_lookup_time_total += ki_lookup;
       }

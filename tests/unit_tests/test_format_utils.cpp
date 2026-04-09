@@ -1,3 +1,4 @@
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -16,7 +17,7 @@ TEST(parse_and_validate_tx_extra, is_correct_parse_and_validate_tx_extra)
   currency::blobdata b = "dsdsdfsdfsf";
   uint64_t block_reward_without_fee = 0, block_reward = 0;
   bool r = currency::construct_miner_tx(0, 0, 10000000000000, 1000, TESTS_DEFAULT_FEE, acc.get_keys().account_address, acc.get_keys().account_address, tx,
-    block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4, b, 1);
+    block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4, 0, b, 1);
   ASSERT_TRUE(r);
   crypto::public_key tx_pub_key;
   r = currency::parse_and_validate_tx_extra(tx, tx_pub_key);
@@ -30,7 +31,7 @@ TEST(parse_and_validate_tx_extra, is_correct_extranonce_too_big)
   currency::blobdata b(260, 0);
   uint64_t block_reward_without_fee = 0, block_reward = 0;
   bool r = currency::construct_miner_tx(0, 0, 10000000000000, 1000, TESTS_DEFAULT_FEE, acc.get_keys().account_address, acc.get_keys().account_address, tx,
-    block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4, b, 1);
+    block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4, 0, b, 1);
   ASSERT_FALSE(r);
 }
 
@@ -125,48 +126,3 @@ void force_random(forced_to_pod_t& o)
 //   }
 // 
 // }
-
-
-TEST(validate_parse_amount_case, validate_parse_amount)
-{
-  uint64_t res = 0;
-  bool r = currency::parse_amount(res, "0.0001");
-  ASSERT_TRUE(r);
-  ASSERT_EQ(res, 100000000);
-
-  r = currency::parse_amount(res, "100.0001");
-  ASSERT_TRUE(r);
-  ASSERT_EQ(res, 100000100000000);
-
-  r = currency::parse_amount(res, "000.0000");
-  ASSERT_TRUE(r);
-  ASSERT_EQ(res, 0);
-
-  r = currency::parse_amount(res, "0");
-  ASSERT_TRUE(r);
-  ASSERT_EQ(res, 0);
-
-
-  r = currency::parse_amount(res, "   100.0001    ");
-  ASSERT_TRUE(r);
-  ASSERT_EQ(res, 100000100000000);
-
-  r = currency::parse_amount(res, "   100.0000    ");
-  ASSERT_TRUE(r);
-  ASSERT_EQ(res, 100000000000000);
-
-  r = currency::parse_amount(res, "   100. 0000    ");
-  ASSERT_FALSE(r);
-
-  r = currency::parse_amount(res, "100. 0000");
-  ASSERT_FALSE(r);
-
-  r = currency::parse_amount(res, "100 . 0000");
-  ASSERT_FALSE(r);
-
-  r = currency::parse_amount(res, "100.00 00");
-  ASSERT_FALSE(r);
-
-  r = currency::parse_amount(res, "1 00.00 00");
-  ASSERT_FALSE(r);
-}

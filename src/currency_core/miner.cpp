@@ -31,6 +31,64 @@ using namespace epee;
 namespace currency
 {
 
+#ifndef CPU_MINING_ENABLED
+ 
+  // CPU mining disabled
+  // currency::miner stub implementation
+
+  /*
+  miner::miner(i_miner_handler* phandler, blockchain_storage& bc)
+  {}
+  miner::~miner()
+  {}
+  bool miner::init(const boost::program_options::variables_map& vm)
+  {
+    return true;
+  }
+  bool miner::deinit()
+  {
+    return true;
+  }
+  void miner::init_options(boost::program_options::options_description& desc)
+  {}
+  bool miner::start(const account_public_address& adr, size_t threads_count)
+  {
+    return false;
+  }
+  bool miner::stop()
+  {
+    return false;
+  }
+  bool miner::is_mining()
+  {
+    return false;
+  }
+  void miner::do_print_hashrate(bool do_hr)
+  {}
+  void miner::pause()
+  {}
+  void miner::resume()
+  {}
+  bool miner::on_block_chain_update()
+  {
+    return false;
+  }
+  uint64_t miner::get_speed()
+  {
+    return 0;
+  }
+  void miner::on_synchronized()
+  {}
+  bool miner::on_idle()
+  {
+    return false;
+  }
+
+  // end of currency::miner stub implementation
+  */
+#else
+
+
   namespace
   {
     const command_line::arg_descriptor<std::string>   arg_extra_messages      ("extra-messages-file", "Specify file for extra messages to include into coinbase transactions");
@@ -40,24 +98,25 @@ namespace currency
   }
 
 
-  miner::miner(i_miner_handler* phandler, blockchain_storage& bc):m_stop(1),
-    //m_bc(bc),
-    m_template(boost::value_initialized<block>()),
-    m_template_no(0),
-    m_diffic(0),
-    m_thread_index(0),
-    m_phandler(phandler),
-    m_height(0),
-    m_pausers_count(0), 
-    m_threads_total(0),
-    m_starter_nonce(0), 
-    m_do_print_hashrate(false),
-    m_do_mining(false),
-    m_current_hash_rate(0),
-    m_last_hr_merge_time(0),
-    m_hashes(0),
-    m_config(AUTO_VAL_INIT(m_config)),
-    m_mine_address{}
+  miner::miner(i_miner_handler* phandler, blockchain_storage& bc)
+    : m_stop(1)
+    , m_template(boost::value_initialized<block>())
+    , m_template_no(0)
+    , m_diffic(0)
+    , m_thread_index(0)
+    , m_phandler(phandler)
+    , m_height(0)
+    , m_pausers_count(0)
+    , m_block_template_ready(false)
+    , m_threads_total(0)
+    , m_starter_nonce(0)
+    , m_do_print_hashrate(false)
+    , m_do_mining(false)
+    , m_current_hash_rate(0)
+    , m_last_hr_merge_time(0)
+    , m_hashes(0)
+    , m_config(AUTO_VAL_INIT(m_config))
+    , m_mine_address{}
   {
   }
   //-----------------------------------------------------------------------------------------------------
@@ -76,6 +135,7 @@ namespace currency
     m_height = height;
     ++m_template_no;
     m_starter_nonce = crypto::rand<uint32_t>();
+    m_block_template_ready = true;
     return true;
   }
   //-----------------------------------------------------------------------------------------------------
@@ -100,7 +160,8 @@ namespace currency
     }
     if(!m_phandler->get_block_template(bl, m_mine_address, m_mine_address, di, height, extra_nonce))
     {
-      LOG_ERROR("Failed to get_block_template()");
+      // it's quite possible that block template cannot be created at particular time; need to wait
+      m_block_template_ready = false;
       return false;
     }
     set_block_template(bl, di, height);
@@ -110,7 +171,8 @@ namespace currency
   bool miner::on_idle()
   {
     m_update_block_template_interval.do_call([&](){
-      if(is_mining())request_block_template();
+      if(is_mining())
+        request_block_template();
       return true;
     });
 
@@ -233,8 +295,13 @@ namespace currency
       return false;
     }
 
-    if(!m_template_no)
-      request_block_template();//lets update block template
+    while(!m_template_no)
+    {
+      if (request_block_template())
+        break;
+      std::this_thread::sleep_for(std::chrono::seconds(2));
+      LOG_PRINT_L1("Trying to get block template....");
+    }
 
     boost::interprocess::ipcdetail::atomic_write32(&m_stop, 0);
     boost::interprocess::ipcdetail::atomic_write32(&m_thread_index, 0);
@@ -313,12 +380,11 @@ namespace currency
     uint64_t local_height = 0;
     crypto::hash local_blob_data_hash = null_hash;
 
-    //uint64_t local_template_height = 0;
-    block b;
+    block b{};
 
     while(!m_stop)
     {
-      if(m_pausers_count)//anti split workaround
+      if(m_pausers_count != 0 || !m_block_template_ready)
       {
         misc_utils::sleep_no_w(100);
         continue;
@@ -371,5 +437,8 @@ namespace currency
     return true;
   }
   //-----------------------------------------------------------------------------------------------------
-}
+
+#endif // #ifndef CPU_MINING_ENABLED
+
+} // namespace currency
 

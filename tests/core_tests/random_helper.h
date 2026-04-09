@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2019 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -16,15 +16,15 @@ struct random_state_test_restorer
 {
   random_state_test_restorer()
   {
-    crypto::random_prng_get_state(&m_state, sizeof m_state);
+    crypto::random_prng_get_state_no_lock(&m_state, sizeof m_state);
   }
   ~random_state_test_restorer()
   {
-    crypto::random_prng_set_state(&m_state, sizeof m_state);
+    crypto::random_prng_set_state_no_lock(&m_state, sizeof m_state);
   }
   static void reset_random(uint64_t seed = 0)
   {
-    crypto::random_prng_initialize_with_seed(seed);
+    crypto::random_prng_initialize_with_seed_no_lock(seed);
   }
 private:
   uint8_t m_state[RANDOM_STATE_SIZE];

@@ -41,9 +41,20 @@ namespace epee
 {
   namespace serialization
   {
+    struct portable_storage_limits
+    {
+      size_t max_storage_entries_count = 1000000;
+      size_t max_array_elements_count = 1000000;
+      size_t max_sections_entries_count = 1000000;
+    };
+
+    inline static constexpr portable_storage_limits gdefault_portable_storage_limits{};
+
+
+
     struct throwable_buffer_reader
     {
-      throwable_buffer_reader(const void* ptr, size_t sz);
+      throwable_buffer_reader(const void* ptr, size_t sz, const portable_storage_limits& limits);
       void read(void* target, size_t count);
       void read_sec_name(std::string& sce_name);
       template<class t_pod_type>
@@ -59,29 +70,44 @@ namespace epee
       storage_entry load_storage_entry();
       void read(section& sec);
       void read(std::string& str);
+      void read(array_entry &ae);
+
+
+      size_t m_storage_entries_count = 0;
+      size_t m_arrays_count = 0;
+      size_t m_array_elements_count = 0;
+      size_t m_sections_entries_count = 0;
+      
+      portable_storage_limits m_limits = gdefault_portable_storage_limits;
     private:
-      struct recursuion_limitation_guard
+      struct mem_limitation_guard
       {
-        size_t& m_counter_ref;
-        recursuion_limitation_guard(size_t& counter):m_counter_ref(counter)
+        size_t& m_counter_ref;     
+        throwable_buffer_reader& m_owner;
+        mem_limitation_guard(size_t& counter, throwable_buffer_reader& owner):m_counter_ref(counter), m_owner(owner)
         {
           ++m_counter_ref;
           CHECK_AND_ASSERT_THROW_MES(m_counter_ref < EPEE_PORTABLE_STORAGE_RECURSION_LIMIT_INTERNAL, "Wrong blob data in portable storage: recursion limitation (" << EPEE_PORTABLE_STORAGE_RECURSION_LIMIT_INTERNAL << ") exceeded");
+
+          CHECK_AND_ASSERT_THROW_MES(m_owner.m_storage_entries_count < m_owner.m_limits.max_storage_entries_count, "Wrong blob data in portable storage: max_storage_entries_count (" << m_owner.m_limits.max_storage_entries_count << ") exceeded");
+          CHECK_AND_ASSERT_THROW_MES(m_owner.m_array_elements_count < m_owner.m_limits.max_array_elements_count, "Wrong blob data in portable storage: max_array_elements_count (" << m_owner.m_limits.max_array_elements_count << ") exceeded");
+          CHECK_AND_ASSERT_THROW_MES(m_owner.m_sections_entries_count < m_owner.m_limits.max_sections_entries_count, "Wrong blob data in portable storage: max_sections_entries_count (" << m_owner.m_limits.max_sections_entries_count << ") exceeded");
         }
-        ~recursuion_limitation_guard() BOOST_NOEXCEPT_IF(false)
+        ~mem_limitation_guard() noexcept(false)
         {
-          CHECK_AND_ASSERT_THROW_MES(m_counter_ref != 0, "Internal error: m_counter_ref == 0 while ~recursuion_limitation_guard()");
+          CHECK_AND_ASSERT_THROW_MES(m_counter_ref != 0, "Internal error: m_counter_ref == 0 while ~mem_limitation_guard()");
           --m_counter_ref;
         }
       };
-#define RECURSION_LIMITATION()  recursuion_limitation_guard rl(m_recursion_count)
+#define CHECK_MEM_LIMITATIONS()  mem_limitation_guard rl(m_recursion_count, *this)
 
       const uint8_t* m_ptr;
       size_t m_count;
       size_t m_recursion_count;
+
     };
 
-    inline throwable_buffer_reader::throwable_buffer_reader(const void* ptr, size_t sz)
+    inline throwable_buffer_reader::throwable_buffer_reader(const void* ptr, size_t sz, const portable_storage_limits& limits) : m_limits(limits)
     {
       if(!ptr) 
         throw std::runtime_error("throwable_buffer_reader: ptr==nullptr");
@@ -94,7 +120,7 @@ namespace epee
     inline 
     void throwable_buffer_reader::read(void* target, size_t count)
     {
-      RECURSION_LIMITATION();
+      CHECK_MEM_LIMITATIONS();
       CHECK_AND_ASSERT_THROW_MES(m_count >= count, " attempt to read " << count << " bytes from buffer with " << m_count << " bytes remained");
       memcpy(target, m_ptr, count);
       m_ptr += count;
@@ -103,7 +129,7 @@ namespace epee
     inline 
     void throwable_buffer_reader::read_sec_name(std::string& sce_name)
     {
-      RECURSION_LIMITATION();
+      CHECK_MEM_LIMITATIONS();
       uint8_t name_len = 0;
       read(name_len);
       sce_name.resize(name_len);
@@ -113,14 +139,15 @@ namespace epee
     template<class t_pod_type>
     void throwable_buffer_reader::read(t_pod_type& pod_val)
     {
-      RECURSION_LIMITATION();
+      CHECK_MEM_LIMITATIONS();
+      static_assert(std::is_pod<t_pod_type>::value, "POD type expected");
       read(&pod_val, sizeof(pod_val));
     }
     
     template<class t_type>
     t_type throwable_buffer_reader::read()
     {
-      RECURSION_LIMITATION();
+      CHECK_MEM_LIMITATIONS();
       t_type v;
       read(v);
       return v;
@@ -130,20 +157,27 @@ namespace epee
     template<class type_name>
     storage_entry throwable_buffer_reader::read_ae()
     {
-      RECURSION_LIMITATION();
+      CHECK_MEM_LIMITATIONS();
       //for pod types
       array_entry_t<type_name> sa;
       uint64_t size = read_varint();
+      size_t loaded_items_count = 0;
       //TODO: add some optimization here later
-      while(size--)
-        sa.m_array.push_back(read<type_name>());        
+      while (size--)
+      {
+         sa.m_array.push_back(read<type_name>());  
+         loaded_items_count++;
+      }
+        
+      m_array_elements_count += loaded_items_count;
+      m_arrays_count++;
       return storage_entry(array_entry(sa));
     }
 
     inline 
     storage_entry throwable_buffer_reader::load_storage_array_entry(uint8_t type)
     {
-      RECURSION_LIMITATION();
+      CHECK_MEM_LIMITATIONS();
       type &= ~SERIALIZE_FLAG_ARRAY;
       switch(type)
       {
@@ -168,7 +202,7 @@ namespace epee
     inline 
     uint64_t throwable_buffer_reader::read_varint()
     {
-      RECURSION_LIMITATION();
+      CHECK_MEM_LIMITATIONS();
       CHECK_AND_ASSERT_THROW_MES(m_count >= 1, "empty buff, expected place for varint");
       uint64_t v = 0;
       uint8_t size_mask = (*(uint8_t*)m_ptr) &PORTABLE_RAW_SIZE_MARK_MASK;
@@ -188,7 +222,7 @@ namespace epee
     template<class t_type>
     storage_entry throwable_buffer_reader::read_se()
     {
-      RECURSION_LIMITATION();
+      CHECK_MEM_LIMITATIONS();
       t_type v;
       read(v);
       return storage_entry(v);
@@ -197,7 +231,7 @@ namespace epee
     template<>
     inline storage_entry throwable_buffer_reader::read_se<std::string>()
     {
-      RECURSION_LIMITATION();
+      CHECK_MEM_LIMITATIONS();
       return storage_entry(read<std::string>());
     }
 
@@ -205,7 +239,7 @@ namespace epee
     template<>
     inline storage_entry throwable_buffer_reader::read_se<section>()
     {
-      RECURSION_LIMITATION();
+      CHECK_MEM_LIMITATIONS();
       section s;//use extra variable due to vs bug, line "storage_entry se(section()); " can't be compiled in visual studio
       storage_entry se(s);
       section& section_entry = boost::get<section>(se);
@@ -216,7 +250,7 @@ namespace epee
     template<>
     inline storage_entry throwable_buffer_reader::read_se<array_entry>()
     {
-      RECURSION_LIMITATION();
+      CHECK_MEM_LIMITATIONS();
       uint8_t ent_type = 0;
       read(ent_type);
       CHECK_AND_ASSERT_THROW_MES(ent_type&SERIALIZE_FLAG_ARRAY, "wrong type sequenses");
@@ -226,7 +260,7 @@ namespace epee
     inline 
     storage_entry throwable_buffer_reader::load_storage_entry()
     {
-      RECURSION_LIMITATION();
+      CHECK_MEM_LIMITATIONS();
       uint8_t ent_type = 0;
       read(ent_type);
       if(ent_type&SERIALIZE_FLAG_ARRAY)
@@ -254,7 +288,7 @@ namespace epee
     inline 
     void throwable_buffer_reader::read(section& sec)
     {
-      RECURSION_LIMITATION();
+      CHECK_MEM_LIMITATIONS();
       sec.m_entries.clear();
       uint64_t count = read_varint();
       while(count--)
@@ -263,12 +297,15 @@ namespace epee
         std::string sec_name;
         read_sec_name(sec_name);
         sec.m_entries.insert(std::make_pair(sec_name, load_storage_entry()));
+        m_storage_entries_count++;
       }
+
+      m_sections_entries_count++;
     }
     inline 
     void throwable_buffer_reader::read(std::string& str)
     {
-      RECURSION_LIMITATION();
+      CHECK_MEM_LIMITATIONS();
       size_t len = static_cast<size_t>(read_varint());
       CHECK_AND_ASSERT_THROW_MES(len < MAX_STRING_LEN_POSSIBLE, "to big string len value in storage: " << len);
       CHECK_AND_ASSERT_THROW_MES(m_count >= len, "string len count value " << len << " goes out of remain storage len " << m_count);
@@ -276,6 +313,12 @@ namespace epee
       str.assign((const char*)m_ptr, len);
       m_ptr+=len;
       m_count -= len;
+    }
+    inline
+    void throwable_buffer_reader::read(array_entry &ae)
+    {
+      CHECK_MEM_LIMITATIONS();
+      CHECK_AND_ASSERT_THROW_MES(false, "Reading array entry is not supported");
     }
   }
 }

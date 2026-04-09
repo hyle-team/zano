@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2023 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -73,6 +73,11 @@ namespace currency
       FIELD(this_block_tx_fee_median)
       FIELD(effective_tx_fee_median)
     END_SERIALIZE()
+
+    // This is an optional data fields, It is not included in serialization and therefore is never stored in the database.
+    // It might be calculated "on the fly" to speed up access operations.
+    mutable std::shared_ptr<crypto::hash> m_cache_coinbase_id;
+    mutable epee::misc_utils::void_copy<std::atomic<uint8_t>> m_cache_coinbase_state;
   };
 
   struct gindex_increment
@@ -136,6 +141,7 @@ namespace currency
     account_public_address stakeholder_address;
     blobdata ex_nonce;
     bool pos = false;
+    bool ignore_pow_ts_check = false;
     pos_entry pe;
     std::list<transaction> explicit_txs;
     fill_block_template_func_t *pcustom_fill_block_template_func;
@@ -167,9 +173,9 @@ namespace currency
     uint64_t no;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(proposal_id)
-      KV_SERIALIZE(yes)
-      KV_SERIALIZE(no)
+      KV_SERIALIZE(proposal_id)                  DOC_DSCR("ID of the proposal.") DOC_EXMP("ZAP999") DOC_END
+      KV_SERIALIZE(yes)                          DOC_DSCR("Nubmer of positve votes.") DOC_EXMP(42) DOC_END
+      KV_SERIALIZE(no)                           DOC_DSCR("Number of negative votes.") DOC_EXMP(37) DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
@@ -179,9 +185,46 @@ namespace currency
     std::list<vote_on_proposal> votes;
 
     BEGIN_KV_SERIALIZE_MAP()
-      KV_SERIALIZE(total_pos_blocks)
-      KV_SERIALIZE(votes)
+      KV_SERIALIZE(total_pos_blocks)             DOC_DSCR("Number of blocks in a given range.") DOC_EXMP(87482) DOC_END
+      KV_SERIALIZE(votes)                        DOC_DSCR("Result of votes in a given range.") DOC_EXMP_AUTO(2) DOC_END
     END_KV_SERIALIZE_MAP()
   };
 
+
+
+
+
+  inline crypto::hash get_coinbase_hash_cached(const block_extended_info& bei)
+  {
+    // bei.m_cache_coinbase_state : 0 -- m_cache_coinbase_id is empty
+    //                              1 -- m_cache_coinbase_id is calculating and writing
+    //                              2 -- m_cache_coinbase_id is ready to read
+
+    if (bei.m_cache_coinbase_state == 2)
+    {
+      // state is 2, cache must be ready, access the cache
+      std::shared_ptr<crypto::hash> local_coinbase_id = std::atomic_load(&bei.m_cache_coinbase_id);
+      if (local_coinbase_id)
+        return *local_coinbase_id;
+
+      // this branch is considered to be a rare case with possible race condition during state 1, reset state to 0
+      bei.m_cache_coinbase_state.store(0);
+      crypto::hash h = get_transaction_hash(bei.bl.miner_tx);
+      return h;
+    }
+
+    uint8_t state = 0;
+    if (bei.m_cache_coinbase_state.compare_exchange_strong(state, 1))
+    {
+      // state has just been 0, now 1, we're calculating
+      std::shared_ptr<crypto::hash> ptr_h = std::make_shared<crypto::hash>(get_transaction_hash(bei.bl.miner_tx));
+      std::atomic_store(&bei.m_cache_coinbase_id, ptr_h); // when moving to C++20 consider to change this to atomic shared ptr -- sowle
+      bei.m_cache_coinbase_state.store(2);
+      return *ptr_h;
+    }
+
+    // state is 1, another thread is calculating, so we calculate locally and don't touch the cache
+    crypto::hash h = get_transaction_hash(bei.bl.miner_tx);
+    return h;
+  }
 } // namespace currency

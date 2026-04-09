@@ -528,7 +528,7 @@ bool offers_handling_on_chain_switching::generate(std::vector<test_event_entry>&
 
   MAKE_TX(events, tx_0, miner_acc, alice_acc, TESTS_DEFAULT_FEE * 70, blk_0r);                                          // 2N+1
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);                                                            // 2N+2
-
+  
   REWIND_BLOCKS_N_WITH_TIME(events, blk_1r, blk_1, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);                        // 4N+2
 
   bc_services::offer_details od = AUTO_VAL_INIT(od);
@@ -538,9 +538,9 @@ bool offers_handling_on_chain_switching::generate(std::vector<test_event_entry>&
   MAKE_TX_ATTACH(events, tx_1, alice_acc, alice_acc, TESTS_DEFAULT_FEE, blk_1r, attachment);                            // 4N+3
 
   MAKE_NEXT_BLOCK(events, blk_2, blk_1r, miner_acc);                                                                      // 4N+4
-  //MAKE_NEXT_BLOCK_TX1(events, blk_2, blk_1r, miner_acc, tx_1);                                                            // 4N+4
 
-  DO_CALLBACK(events, "c1");                                                                                              // 4N+5
+  DO_CALLBACK(events, "configure_core");                                                                                  // 4N+5
+  DO_CALLBACK(events, "c1");                                                                                              // 4N+6
 
   return true;
 }
@@ -633,7 +633,7 @@ bool offer_removing_and_selected_output::generate(std::vector<test_event_entry>&
   std::vector<tx_source_entry> sources;
   r = fill_tx_sources(sources, events, blk_0r, miner_acc.get_keys(), destinations_amount + TESTS_DEFAULT_FEE, 0);
   CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources failed");
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, tx_0, get_tx_version_from_events(events), 0, 0);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_0);
   MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);                                   
@@ -658,7 +658,7 @@ bool offer_removing_and_selected_output::check_offers(currency::core& c, size_t 
 
   std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, m_accounts[ALICE_ACC_IDX]);
   alice_wlt->refresh();
-  LOG_PRINT_CYAN("Alice's transfers:" << ENDL << alice_wlt->dump_trunsfers(), LOG_LEVEL_0);
+  LOG_PRINT_CYAN("Alice's transfers:" << ENDL << alice_wlt->dump_transfers(), LOG_LEVEL_0);
   uint64_t alice_start_balance = alice_wlt->balance();
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());
@@ -1354,7 +1354,7 @@ bool offer_cancellation_with_zero_fee::c1(currency::core& c, size_t ev_index, co
   bool r = false;
   std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, m_accounts[MINER_ACC_IDX]);
   miner_wlt->refresh();
-  LOG_PRINT_CYAN("Miners's transfers:" << ENDL << miner_wlt->dump_trunsfers(), LOG_LEVEL_0);
+  LOG_PRINT_CYAN("Miners's transfers:" << ENDL << miner_wlt->dump_transfers(), LOG_LEVEL_0);
   uint64_t miner_start_balance = miner_wlt->balance();
 
   CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Incorrect txs count in the pool: " << c.get_pool_transactions_count());

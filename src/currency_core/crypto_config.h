@@ -3,6 +3,10 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 //
 #pragma once
+#include "crypto/range_proofs.h"
+#include "currency_config.h"
+
+static_assert(crypto::bpp_crypto_trait_ZC_out::c_bpp_values_max == CURRENCY_TX_MAX_ALLOWED_OUTS, "max BPP aggregation values count and max allowed tx outs missmatch");
 
 // hash domain separation strings, 32 bytes long (31 chars + \0)
 //

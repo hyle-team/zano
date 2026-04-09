@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -31,7 +31,7 @@ namespace crypto {
 #include "random.h"
   }
 
-  extern std::mutex random_lock;
+  std::mutex& random_lock_accessor() noexcept;
 
 #pragma pack(push, 1)
   POD_CLASS ec_point {
@@ -114,17 +114,27 @@ namespace crypto {
 
   };
 
+  // thread-safe version
+  inline void generate_random_bytes(size_t size, void* p_data)
+  {
+    std::lock_guard<std::mutex> lock(random_lock_accessor());
+    generate_random_bytes_no_lock(size, p_data);
+  }
+
+
   /* Generate a value filled with random bytes.
    */
   template<typename T>
-  typename std::enable_if<std::is_pod<T>::value, T>::type rand() {
+  typename std::enable_if<std::is_pod<T>::value, T>::type rand()
+  {
     typename std::remove_cv<T>::type res;
-    std::lock_guard<std::mutex> lock(random_lock);
-    generate_random_bytes(sizeof(T), &res);
+    std::lock_guard<std::mutex> lock(random_lock_accessor());
+    generate_random_bytes_no_lock(sizeof(T), &res);
     return res;
   }
 
   /* An adapter, to be used with std::shuffle, etc.
+   * Uses thread-safe crypto::rand<>().
    */
   struct uniform_random_bit_generator
   {
@@ -302,6 +312,7 @@ namespace crypto {
 } // namespace crypto
 
 POD_MAKE_HASHABLE(crypto, public_key)
+POD_MAKE_LESS_OPERATOR(crypto, public_key)
 POD_MAKE_COMPARABLE(crypto, secret_key)
 POD_MAKE_HASHABLE(crypto, key_image)
 POD_MAKE_COMPARABLE(crypto, signature)

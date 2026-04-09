@@ -12,6 +12,7 @@
 #include <mutex>
 #include <system_error>
 #include <boost/filesystem.hpp>
+#include <boost/program_options/variables_map.hpp>
 
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
@@ -37,10 +38,18 @@ namespace tools
   std::string get_current_username();
   std::string get_os_version_string();
   bool copy_dir(boost::filesystem::path const & source, boost::filesystem::path const & destination);
+  
+  bool parse_client_version(const std::string& str, int& major, int& minor, int& revision, int& build_number, std::string& commit_id, bool& dirty);
+  bool parse_client_version_build_number(const std::string& str, int& build_number);
   bool check_remote_client_version(const std::string& client_ver);
+  bool is_non_pruning_mode_enabled(const boost::program_options::variables_map& vm, bool *p_enabled_via_env = nullptr);
 
   bool create_directories_if_necessary(const std::string& path);
   std::error_code replace_file(const std::string& replacement_name, const std::string& replaced_name);
+  uint64_t get_total_system_memory();
+  std::string pretty_print_big_nums(std::uint64_t num);
+  bool sanitize_utf8(std::string& input);
+  std::pair<std::string, std::string> pretty_print_big_nums_to_pair(std::uint64_t num);
 
   inline crypto::hash get_proof_of_trust_hash(const nodetool::proof_of_trust& pot)
   {
@@ -50,6 +59,7 @@ namespace tools
     return crypto::cn_fast_hash(s.data(), s.size());
   }
 
+  // the following is unsafe, consider removing -- sowle
   inline 
   crypto::public_key get_public_key_from_string(const std::string& str_key)
   {

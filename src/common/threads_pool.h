@@ -100,7 +100,7 @@ namespace utils
       {
         return cnt == cntr.size();
       });
-      LOG_PRINT_L0("All jobs finiahed");
+      //LOG_PRINT_L0("All jobs finiahed");
     }
 
     ~threads_pool()

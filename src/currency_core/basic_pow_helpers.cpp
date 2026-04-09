@@ -81,7 +81,7 @@ namespace currency
   {
     blobdata bd = get_block_hashing_blob(b);
 
-    access_nonce_in_block_blob(bd) = 0;
+    set_nonce_to_blockblob(bd, 0);
     return crypto::cn_fast_hash(bd.data(), bd.size());
   }
   //---------------------------------------------------------------

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -34,8 +34,10 @@ namespace currency
   core::core(i_currency_protocol* pprotocol)
     : m_mempool(m_blockchain_storage, pprotocol)
     , m_blockchain_storage(m_mempool)
+#ifdef CPU_MINING_ENABLED
     , m_miner(this, m_blockchain_storage)
-    , m_miner_address(boost::value_initialized<account_public_address>())
+#endif
+    //, m_miner_address(boost::value_initialized<account_public_address>())
     , m_starter_message_showed(false)
     , m_critical_error_handler(nullptr)
     , m_stop_after_height(0)
@@ -165,8 +167,10 @@ namespace currency
 
     m_mempool.remove_incompatible_txs();
 
+#ifdef CPU_MINING_ENABLED
     r = m_miner.init(vm);
     CHECK_AND_ASSERT_MES(r, false, "Failed to initialize miner");
+#endif
 
     //check if tx_pool module synchronized with blockchaine storage
 //     if (m_blockchain_storage.get_top_block_id() != m_mempool.get_last_core_hash())
@@ -193,8 +197,10 @@ namespace currency
   {
     //m_mempool.set_last_core_hash(m_blockchain_storage.get_top_block_id());
 
+#ifdef CPU_MINING_ENABLED
     m_miner.stop();
     m_miner.deinit();
+#endif
     m_mempool.deinit();
     m_blockchain_storage.deinit();
     return true;
@@ -274,7 +280,9 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   bool core::get_stat_info(const core_stat_info::params& pr, core_stat_info& st_inf)
   {
+#ifdef CPU_MINING_ENABLED
     st_inf.mining_speed = m_miner.get_speed();
+#endif
     st_inf.alternative_blocks = m_blockchain_storage.get_alternative_blocks_count();
     st_inf.blockchain_height = m_blockchain_storage.get_current_blockchain_size();
     st_inf.tx_pool_size = m_mempool.get_transactions_count();
@@ -346,12 +354,14 @@ namespace currency
     if(m_mempool.have_tx(tx_hash))
     {
       LOG_PRINT_L3("add_new_tx: already have tx " << tx_hash << " in the pool");
+      tvc.m_already_existed = true;
       return true;
     }
 
     if(m_blockchain_storage.have_tx(tx_hash))
     {
       LOG_PRINT_L3("add_new_tx: already have tx " << tx_hash << " in the blockchain");
+      tvc.m_already_existed = true;
       return true;
     }
 
@@ -405,12 +415,16 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   void core::pause_mine()
   {
+#ifdef CPU_MINING_ENABLED
     m_miner.pause();
+#endif
   }
   //-----------------------------------------------------------------------------------------------
   void core::resume_mine()
   {
+#ifdef CPU_MINING_ENABLED
     m_miner.resume();
+#endif
   }
   //-----------------------------------------------------------------------------------------------
   bool core::handle_block_found(const block& b, block_verification_context* p_verification_result, bool need_update_miner_block_template)
@@ -422,10 +436,10 @@ namespace currency
       if (!p_verification_result)
         p_verification_result = &bvc;
 
-      m_miner.pause();
+      pause_mine();
       misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler([this]()
       {
-        m_miner.resume();
+        resume_mine();
       });
 
       TIME_MEASURE_START_MS(time_add_new_block_ms);
@@ -452,8 +466,7 @@ namespace currency
       {
         time_pack_txs_ms = epee::misc_utils::get_tick_count();
         currency_connection_context exclude_context = boost::value_initialized<currency_connection_context>();
-        NOTIFY_NEW_BLOCK::request arg = AUTO_VAL_INIT(arg);
-        arg.hop = 0;
+        NOTIFY_NEW_BLOCK::request arg{};
         arg.current_blockchain_height = m_blockchain_storage.get_current_blockchain_size();
         std::list<crypto::hash> missed_txs;
         std::list<transaction> txs;
@@ -520,7 +533,9 @@ namespace currency
   //-----------------------------------------------------------------------------------------------
   void core::on_synchronized()
   {
+#ifdef CPU_MINING_ENABLED
     m_miner.on_synchronized();
+#endif
   }
   bool core::get_backward_blocks_sizes(uint64_t from_height, std::vector<size_t>& sizes, size_t count)
   {
@@ -552,6 +567,8 @@ namespace currency
           if (hardfork_id_for_prev_block != hardfork_id_for_curr_block)
           {
             LOG_PRINT_GREEN("Hardfork " << hardfork_id_for_curr_block << " has been activated after the block at height " << h, LOG_LEVEL_0);
+            m_blockchain_storage.on_hardfork_activated(hardfork_id_for_curr_block);
+            m_pprotocol->on_hardfork_activated(hardfork_id_for_curr_block);
           }
         }
 
@@ -684,7 +701,9 @@ namespace currency
   bool core::update_miner_block_template()
   {
     notify_blockchain_update_listeners();
+#ifdef CPU_MINING_ENABLED
     m_miner.on_block_chain_update();
+#endif
     return true;
   }
   //-----------------------------------------------------------------------------------------------
@@ -707,7 +726,9 @@ namespace currency
 
     m_prune_alt_blocks_interval.do_call([this](){return m_blockchain_storage.prune_aged_alt_blocks();});
     m_check_free_space_interval.do_call([this](){ check_free_space(); return true; });
+#ifdef CPU_MINING_ENABLED
     m_miner.on_idle();
+#endif
     m_mempool.on_idle();
     return true;
   }

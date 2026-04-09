@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -10,7 +10,7 @@
 #ifndef TESTNET
 #define CURRENCY_FORMATION_VERSION                      84
 #else
-#define CURRENCY_FORMATION_VERSION                      97
+#define CURRENCY_FORMATION_VERSION                      100
 #endif
 
 #define CURRENCY_GENESIS_NONCE                          (CURRENCY_FORMATION_VERSION + 101011010121) //bender's nightmare
@@ -18,19 +18,22 @@
 
                                                         
 #define CURRENCY_MAX_BLOCK_NUMBER                       500000000
-#define CURRENCY_MAX_BLOCK_SIZE                         500000000  // block header blob limit, never used!
-#define CURRENCY_TX_MAX_ALLOWED_OUTS                    2000
-#define CURRENCY_TX_MIN_ALLOWED_OUTS                    2      // effective starting HF4 Zarcanum
-#define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           0xc5   // addresses start with 'Zx'
-#define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678 // integrated addresses start with 'iZ'
-#define CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX  0x36f8 // integrated addresses start with 'iZ' (new format)
-#define CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX 0x98c8 // auditable addresses start with 'aZx'
-#define CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX 0x8a49 // auditable integrated addresses start with 'aiZX'
+#define CURRENCY_MAX_BLOCK_SIZE                         500000000     // block header blob limit, never used!
+#define CURRENCY_TX_MAX_ALLOWED_INPUTS                  256           // limited primarily by asset surjection proof
+#define CURRENCY_TX_MAX_ALLOWED_OUTS                    32            // soft rule, but matches BPP aggregation values limit; hard rule since HF6
+#define CURRENCY_TX_MAX_ALLOWED_OUTS_PRE_HF4            2000
+#define CURRENCY_TX_MIN_ALLOWED_OUTS                    2             // effective starting HF4 Zarcanum
+#define CURRENCY_PUBLIC_ADDRESS_BASE58_PREFIX           0xc5          // addresses start with 'Zx'
+#define CURRENCY_PUBLIC_INTEG_ADDRESS_BASE58_PREFIX     0x3678        // integrated addresses start with 'iZ'
+#define CURRENCY_PUBLIC_INTEG_ADDRESS_V2_BASE58_PREFIX  0x36f8        // integrated addresses start with 'iZ' (new format)
+#define CURRENCY_PUBLIC_AUDITABLE_ADDRESS_BASE58_PREFIX 0x98c8        // auditable addresses start with 'aZx'
+#define CURRENCY_PUBLIC_AUDITABLE_INTEG_ADDRESS_BASE58_PREFIX 0x8a49  // auditable integrated addresses start with 'aiZX'
 #define CURRENCY_MINED_MONEY_UNLOCK_WINDOW              10
-#define CURRENT_TRANSACTION_VERSION                     2
+#define CURRENT_TRANSACTION_VERSION                     3
 #define TRANSACTION_VERSION_INITAL                      0
 #define TRANSACTION_VERSION_PRE_HF4                     1
-#define TRANSACTION_VERSION_POST_HF4                    2 
+#define TRANSACTION_VERSION_POST_HF4                    2
+#define TRANSACTION_VERSION_POST_HF5                    3
 #define HF1_BLOCK_MAJOR_VERSION                         1
 #define HF3_BLOCK_MAJOR_VERSION                         2
 #define HF3_BLOCK_MINOR_VERSION                         0
@@ -39,6 +42,7 @@
 #define CURRENCY_DEFAULT_DECOY_SET_SIZE                 10
 #define CURRENCY_HF4_MANDATORY_DECOY_SET_SIZE           15
 #define CURRENCY_HF4_MANDATORY_MIN_COINAGE              10
+#define CURRENCY_PRE_HARDFORK_TX_FREEZE_PERIOD          60 // number of blocks before the hardfork activation when no new txs are accepted (effective from HF5)
 
 #define CURRENT_BLOCK_MINOR_VERSION                     0
 #define CURRENCY_BLOCK_FUTURE_TIME_LIMIT                60*60*2
@@ -117,7 +121,7 @@
 #define P2P_MAINTAINERS_PUB_KEY                         "8f138bb73f6d663a3746a542770781a09579a7b84cb4125249e95530824ee607"
 #define DIFFICULTY_POS_STARTER                          1
 #else 
-#define P2P_DEFAULT_PORT                                (11112 + CURRENCY_FORMATION_VERSION)
+#define P2P_DEFAULT_PORT                                (11211 + CURRENCY_FORMATION_VERSION)
 #define RPC_DEFAULT_PORT                                12111
 #define STRATUM_DEFAULT_PORT                            11888
 #define STRARUM_DEFAULT_PORT                            51113
@@ -143,6 +147,7 @@
 #define P2P_DEFAULT_HANDSHAKE_INVOKE_TIMEOUT            10000      //10 seconds
 #define P2P_DEFAULT_WHITELIST_CONNECTIONS_PERCENT       70
 #define P2P_FAILED_ADDR_FORGET_SECONDS                  (60*5)     //5 minutes
+#define P2P_DEFAULT_MAX_INCOMING_CONNECTIONS_COUNT      200
 
 #define P2P_IP_BLOCKTIME                                (60*60*24) //24 hours
 #define P2P_IP_FAILS_BEFOR_BLOCK                        10
@@ -157,6 +162,8 @@
 #define POS_MODFIFIER_INTERVAL                          10
 #define POS_WALLET_MINING_SCAN_INTERVAL                 POS_SCAN_STEP  //seconds
 #define POS_MINIMUM_COINSTAKE_AGE                       10 // blocks count
+#define POS_MAX_DIFFICULTY_ALLOWED                      "25000000000000000000000" // maximum expected PoS difficuty (need to change it probaly in 20 years)
+
 
 #ifndef TESTNET
 #  define BLOCKCHAIN_HEIGHT_FOR_POS_STRICT_SEQUENCE_LIMITATION 57000
@@ -227,9 +234,14 @@
 #define CURRENCY_POOLDATA_FOLDERNAME_PREFIX             "poolstate_"
 #define CURRENCY_POOLDATA_FOLDERNAME_SUFFIX             "_v1"
 #define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_PREFIX       "blockchain_" 
-#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX       "_v2"
+#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX       "_v3"
+
+#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX_OLD_1       "_v1"
+#define CURRENCY_BLOCKCHAINDATA_FOLDERNAME_SUFFIX_OLD_2       "_v2"
+
 
 #define P2P_NET_DATA_FILENAME                           "p2pstate.bin"
+#define P2P_MANUAL_CONFIG_FILENAME                      "p2p_manual_config.json"
 #define MINER_CONFIG_FILENAME                           "miner_conf.json"
 #define GUI_SECURE_CONFIG_FILENAME                      "gui_secure_conf.bin"
 #define GUI_CONFIG_FILENAME                             "gui_settings.json"
@@ -243,33 +255,51 @@
 #define CURRENT_BLOCK_EXTENDED_INFO_ARCHIVE_VER         1
 
 #define BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION  CURRENCY_FORMATION_VERSION + 11
-#define BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION  1
+#define BLOCKCHAIN_STORAGE_MINOR_COMPATIBILITY_VERSION  2
 
 
 #define BC_OFFERS_CURRENT_OFFERS_SERVICE_ARCHIVE_VER    CURRENCY_FORMATION_VERSION + BLOCKCHAIN_STORAGE_MAJOR_COMPATIBILITY_VERSION + 9
 #define BC_OFFERS_CURRENCY_MARKET_FILENAME              "market.bin"
 
 
-#define WALLET_FILE_SERIALIZATION_VERSION               166
+#define WALLET_FILE_SERIALIZATION_VERSION               168
 #define WALLET_FILE_LAST_SUPPORTED_VERSION              165
 
 #define CURRENT_MEMPOOL_ARCHIVE_VER                     (CURRENCY_FORMATION_VERSION+31)
 
-//hard forks section
 #define BLOCK_MAJOR_VERSION_GENESIS                     1
 #define BLOCK_MINOR_VERSION_GENESIS                     0
 #define BLOCK_MAJOR_VERSION_INITIAL                     0
+
+/////// Hard forks setup //////////////////////////////
 #ifndef TESTNET
+// Mainnet
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   194624    // 2019-09-21 20:25:16
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   999999    // 2021-04-05 09:11:45
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   1082577   // 2021-06-01 23:28:10
-#define ZANO_HARDFORK_04_AFTER_HEIGHT                   2555000   // 2024-03-21 10:16:46 (expected)
+
+#define ZANO_HARDFORK_04_AFTER_HEIGHT                   2555000   // 2024-03-21 11:49:55
+#define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1711021795ull // block 2555000, 2024-03-21 11:49:55 UTC
+
+#define ZANO_HARDFORK_05_AFTER_HEIGHT                   3076400   // 2025-03-18 15:13:39
+#define ZANO_HARDFORK_05_MIN_BUILD_VER                  382
+
+#define ZANO_HARDFORK_06_AFTER_HEIGHT                   999999999999999999
+#define ZANO_HARDFORK_06_MIN_BUILD_VER                  382
 #else
-/////// Zarcanum Testnet //////////////////////////////
+// Testnet
 #define ZANO_HARDFORK_01_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_02_AFTER_HEIGHT                   0
 #define ZANO_HARDFORK_03_AFTER_HEIGHT                   0
-#define ZANO_HARDFORK_04_AFTER_HEIGHT                   2440  
+
+#define ZANO_HARDFORK_04_AFTER_HEIGHT                   100
+#define ZANO_HARDFORK_04_TIMESTAMP_ACTUAL               1738664528ull // block 100, 2025-02-04 10:22:08 UTC
+
+#define ZANO_HARDFORK_05_AFTER_HEIGHT                   200
+#define ZANO_HARDFORK_05_MIN_BUILD_VER                  382
+
+#define ZANO_HARDFORK_06_AFTER_HEIGHT                   999999999999999999
+#define ZANO_HARDFORK_06_MIN_BUILD_VER                  382
 #endif
 
 
@@ -278,7 +308,9 @@
 #define ZANO_HARDFORK_02                                2
 #define ZANO_HARDFORK_03                                3
 #define ZANO_HARDFORK_04_ZARCANUM                       4
-#define ZANO_HARDFORKS_TOTAL                            5
+#define ZANO_HARDFORK_05                                5
+#define ZANO_HARDFORK_06                                6
+#define ZANO_HARDFORKS_TOTAL                            7
 
 
 

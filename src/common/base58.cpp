@@ -66,7 +66,7 @@ namespace tools
 
         int operator()(size_t encoded_block_size) const
         {
-          assert(encoded_block_size <= full_encoded_block_size);
+          if (!(encoded_block_size <= full_encoded_block_size)) throw std::runtime_error("Assertion failed: encoded_block_size <= full_encoded_block_size");
           return m_data[encoded_block_size];
         }
 
@@ -80,7 +80,7 @@ namespace tools
 
       uint64_t uint_8be_to_64(const uint8_t* data, size_t size)
       {
-        assert(1 <= size && size <= sizeof(uint64_t));
+        if (!(1 <= size && size <= sizeof(uint64_t))) throw std::runtime_error("Assertion failed: 1 <= size && size <= sizeof(uint64_t)");
 
         uint64_t res = 0;
         switch (9 - size)
@@ -93,7 +93,7 @@ namespace tools
         case 6: res <<= 8; res |= *data++; BOOST_FALLTHROUGH;
         case 7: res <<= 8; res |= *data++; BOOST_FALLTHROUGH;
         case 8: res <<= 8; res |= *data; break;
-        default: assert(false);
+        default: if (!(false)) throw std::runtime_error("Assertion failed: false");
         }
 
         return res;
@@ -101,15 +101,15 @@ namespace tools
 
       void uint_64_to_8be(uint64_t num, size_t size, uint8_t* data)
       {
-        assert(1 <= size && size <= sizeof(uint64_t));
+        if (!(1 <= size && size <= sizeof(uint64_t))) throw std::runtime_error("Assertion failed: 1 <= size && size <= sizeof(uint64_t)");
 
         uint64_t num_be = SWAP64BE(num);
-        memcpy(data, reinterpret_cast<uint8_t*>(&num_be) + sizeof(uint64_t) - size, size);
+        std::memcpy(data, reinterpret_cast<uint8_t*>(&num_be) + sizeof(uint64_t) - size, size);
       }
 
       void encode_block(const char* block, size_t size, char* res)
       {
-		assert(1 <= size && size <= full_block_size);
+		    if (!(1 <= size && size <= full_block_size)) throw std::runtime_error("Assertion failed: 1 <= size && size <= full_block_size");
 
         uint64_t num = uint_8be_to_64(reinterpret_cast<const uint8_t*>(block), size);
         int i = static_cast<int>(encoded_block_sizes[size]) - 1;
@@ -124,7 +124,7 @@ namespace tools
 
       bool decode_block(const char* block, size_t size, char* res)
       {
-        assert(1 <= size && size <= full_encoded_block_size);
+        if (!(1 <= size && size <= full_encoded_block_size)) throw std::runtime_error("Assertion failed: 1 <= size && size <= full_encoded_block_size");
 
         int res_size = decoded_block_sizes::instance(size);
         if (res_size <= 0)

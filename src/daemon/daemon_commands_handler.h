@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -48,12 +48,15 @@ public:
     m_cmd_binder.set_handler("print_tx_prun_info", boost::bind(&daemon_commands_handler::print_tx_prun_info, this, ph::_1), "Print tx prunning info");
     m_cmd_binder.set_handler("print_tx", boost::bind(&daemon_commands_handler::print_tx, this, ph::_1), "Print transaction, print_tx <transaction_hash>");
     m_cmd_binder.set_handler("print_asset_info", boost::bind(&daemon_commands_handler::print_asset_info, this, ph::_1), "Print information about the given asset by its id");
+    m_cmd_binder.set_handler("print_blocked_ips", boost::bind(&daemon_commands_handler::print_blocked_ips, this, ph::_1), "Print ip address blacklists");
+#ifdef CPU_MINING_ENABLED
     m_cmd_binder.set_handler("start_mining", boost::bind(&daemon_commands_handler::start_mining, this, ph::_1), "Start mining for specified address, start_mining <addr> [threads=1]");
     m_cmd_binder.set_handler("stop_mining", boost::bind(&daemon_commands_handler::stop_mining, this, ph::_1), "Stop mining");
-    m_cmd_binder.set_handler("print_pool", boost::bind(&daemon_commands_handler::print_pool, this, ph::_1), "Print transaction pool (long format)");
-    m_cmd_binder.set_handler("print_pool_sh", boost::bind(&daemon_commands_handler::print_pool_sh, this, ph::_1), "Print transaction pool (short format)");
     m_cmd_binder.set_handler("show_hr", boost::bind(&daemon_commands_handler::show_hr, this, ph::_1), "Start showing hash rate");
     m_cmd_binder.set_handler("hide_hr", boost::bind(&daemon_commands_handler::hide_hr, this, ph::_1), "Stop showing hash rate");
+#endif
+    m_cmd_binder.set_handler("print_pool", boost::bind(&daemon_commands_handler::print_pool, this, ph::_1), "Print transaction pool (long format)");
+    m_cmd_binder.set_handler("print_pool_sh", boost::bind(&daemon_commands_handler::print_pool_sh, this, ph::_1), "Print transaction pool (short format)");
     m_cmd_binder.set_handler("save", boost::bind(&daemon_commands_handler::save, this, ph::_1), "Save blockchain");
     m_cmd_binder.set_handler("print_daemon_stat", boost::bind(&daemon_commands_handler::print_daemon_stat, this, ph::_1), "Print daemon stat");
     m_cmd_binder.set_handler("print_debug_stat", boost::bind(&daemon_commands_handler::print_debug_stat, this, ph::_1), "Print debug stat info");
@@ -76,6 +79,10 @@ public:
     m_cmd_binder.set_handler("print_tx_outputs_usage", boost::bind(&daemon_commands_handler::print_tx_outputs_usage, this, ph::_1), "Analyse if tx outputs for involved in subsequent transactions");
     m_cmd_binder.set_handler("print_difficulties_of_last_n_blocks", boost::bind(&daemon_commands_handler::print_difficulties_of_last_n_blocks, this, ph::_1), "Print difficulties of last n blocks");
     m_cmd_binder.set_handler("debug_remote_node_mode", boost::bind(&daemon_commands_handler::debug_remote_node_mode, this, ph::_1), "<ip-address> - If node got connected put node into 'debug mode' i.e. no sync process of other communication except ping responses, maintenance secrete key will be requested"); 
+    m_cmd_binder.set_handler("full_db_cache_warmup", boost::bind(&daemon_commands_handler::full_db_cache_warmup, this, ph::_1), "(Experimental) Perform full DB loading to RAM cache(make sense only with big numbers passed to --db-cache-l2 option)");
+    m_cmd_binder.set_handler("print_cache_state", boost::bind(&daemon_commands_handler::print_cache_state, this, ph::_1), "Print db l2 cache state");
+    m_cmd_binder.set_handler("reload_p2p_manual_config", boost::bind(&daemon_commands_handler::reload_p2p_manual_config, this, ph::_1), "Reload manual p2p config from '" P2P_MANUAL_CONFIG_FILENAME "'");
+    m_cmd_binder.set_handler("version", boost::bind(&daemon_commands_handler::print_version, this, ph::_1), "Prints \"" CURRENCY_NAME " v" PROJECT_VERSION_LONG "\"");
 #ifdef _DEBUG
     m_cmd_binder.set_handler("debug_set_time_adj", boost::bind(&daemon_commands_handler::debug_set_time_adj, this, ph::_1), "DEBUG: set core time adjustment");
 #endif
@@ -184,25 +191,6 @@ private:
   }
 
   //--------------------------------------------------------------------------------
-  bool show_hr(const std::vector<std::string>& args)
-  {
-    if (!m_srv.get_payload_object().get_core().get_miner().is_mining())
-    {
-      std::cout << "Mining is not started. You need start mining before you can see hash rate." << ENDL;
-    }
-    else
-    {
-      m_srv.get_payload_object().get_core().get_miner().do_print_hashrate(true);
-    }
-    return true;
-  }
-  //--------------------------------------------------------------------------------
-  bool hide_hr(const std::vector<std::string>& args)
-  {
-    m_srv.get_payload_object().get_core().get_miner().do_print_hashrate(false);
-    return true;
-  }
-  //--------------------------------------------------------------------------------
   bool print_bc_outs(const std::vector<std::string>& args)
   {
     if (args.size() != 1)
@@ -232,6 +220,20 @@ private:
   bool print_cn(const std::vector<std::string>& args)
   {
     m_srv.get_payload_object().log_connections();
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool print_blocked_ips(const std::vector<std::string>& args)
+  {
+    std::map<uint32_t, time_t> blocklist;
+    m_srv.get_ip_block_list(blocklist);
+    std::stringstream ss;
+    ss << "AUTO BLOCKED IPs:" << ENDL << "ip               block time" << ENDL;
+    for (const auto& e : blocklist)
+    {
+      ss << std::left << std::setw(15) << string_tools::get_ip_string_from_int32(e.first) << "  " << std::put_time(std::localtime(&e.second), "%Y-%m-%d %H:%M:%S") << ENDL;
+    }
+    LOG_PRINT_L0(ss.str());
     return true;
   }
   //--------------------------------------------------------------------------------
@@ -806,17 +808,22 @@ private:
     size_t idx = 0;
     for(auto& aop: asset_history)
     {
-      ss << "[" << std::setw(2) << idx << "] operation:        " << currency::get_asset_operation_type_string(aop.operation_type) << " (" << (int)aop.operation_type << ")" << ENDL <<
-                                       "     ticker:           \"" << aop.descriptor.ticker << "\"" << ENDL <<
-                                       "     full name:        \"" << aop.descriptor.full_name << "\"" << ENDL <<
-                                       "     meta info:        \"" << aop.descriptor.meta_info << "\"" << ENDL <<
-                                       "     current supply:   " << currency::print_money_brief(aop.descriptor.current_supply, aop.descriptor.decimal_point) << ENDL <<
-                                       "     max supply:       " << currency::print_money_brief(aop.descriptor.total_max_supply, aop.descriptor.decimal_point) << ENDL <<
-                                       "     decimal point:    " << (int)aop.descriptor.decimal_point << ENDL <<
-                                       "     owner * 1/8:      " << aop.descriptor.owner << ENDL <<
-                                       "     amount cmt * 1/8: " << aop.amount_commitment << ENDL <<
-                                       "     hidden supply:    " << (aop.descriptor.hidden_supply ? "yes" : "no") << ENDL <<
-        "";
+      if (aop.opt_descriptor.has_value())
+      {
+        const currency::asset_descriptor_base& adb = aop.opt_descriptor.value();
+        ss << "[" << std::setw(2) << idx << "] operation:        " << currency::get_asset_operation_type_string(aop.operation_type) << " (" << (int)aop.operation_type << ")" << ENDL <<
+                                         "     ticker:           \"" << adb.ticker << "\"" << ENDL <<
+                                         "     full name:        \"" << adb.full_name << "\"" << ENDL <<
+                                         "     meta info:        \"" << adb.meta_info << "\"" << ENDL <<
+                                         "     current supply:   " << currency::print_money_brief(adb.current_supply, adb.decimal_point) << ENDL <<
+                                         "     max supply:       " << currency::print_money_brief(adb.total_max_supply, adb.decimal_point) << ENDL <<
+                                         "     decimal point:    " << (int)adb.decimal_point << ENDL <<
+                                         "     owner * 1/8:      " << adb.owner << ENDL <<
+                                         "     amount cmt * 1/8: " << (aop.opt_amount_commitment.has_value() ? aop.opt_amount_commitment.value() : currency::null_pkey) << ENDL <<
+                                         "     hidden supply:    " << (adb.hidden_supply ? "yes" : "no") << ENDL <<
+          "";
+      }
+      ++idx;
     }
 
     LOG_PRINT_L0(ss.str());
@@ -880,6 +887,29 @@ private:
     return true;
   }
   //--------------------------------------------------------------------------------
+  bool full_db_cache_warmup(const std::vector<std::string>& args)
+  {
+    
+    m_srv.get_payload_object().get_core().get_blockchain_storage().do_full_db_warm_up();
+
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool print_cache_state(const std::vector<std::string>& args)
+  {
+
+    m_srv.get_payload_object().get_core().get_blockchain_storage().print_db_l2_cache_state();
+
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool reload_p2p_manual_config(const std::vector<std::string>& args)
+  {
+    m_srv.reload_p2p_manual_config(false);
+
+    return true;
+  }
+  //--------------------------------------------------------------------------------
   bool print_pool(const std::vector<std::string>& args)
   {
     LOG_PRINT_L0("Pool state: " << ENDL << m_srv.get_payload_object().get_core().print_pool(false));
@@ -890,7 +920,9 @@ private:
   {
     LOG_PRINT_L0("Pool state: " << ENDL << m_srv.get_payload_object().get_core().print_pool(true));
     return true;
-  }  //--------------------------------------------------------------------------------
+  }
+  //--------------------------------------------------------------------------------
+#ifdef CPU_MINING_ENABLED
   bool start_mining(const std::vector<std::string>& args)
   {
     if (!args.size())
@@ -921,6 +953,26 @@ private:
     m_srv.get_payload_object().get_core().get_miner().stop();
     return true;
   }
+  //--------------------------------------------------------------------------------
+  bool show_hr(const std::vector<std::string>& args)
+  {
+    if (!m_srv.get_payload_object().get_core().get_miner().is_mining())
+    {
+      std::cout << "Mining is not started. You need start mining before you can see hash rate." << ENDL;
+    }
+    else
+    {
+      m_srv.get_payload_object().get_core().get_miner().do_print_hashrate(true);
+    }
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool hide_hr(const std::vector<std::string>& args)
+  {
+    m_srv.get_payload_object().get_core().get_miner().do_print_hashrate(false);
+    return true;
+  }
+#endif // #ifdef CPU_MINING_ENABLED
   //--------------------------------------------------------------------------------
   bool forecast_difficulty(const std::vector<std::string>& args)
   {
@@ -971,6 +1023,12 @@ private:
   bool print_deadlock_guard(const std::vector<std::string>& args)
   {
     LOG_PRINT_L0(ENDL << epee::deadlock_guard_singleton::get_dlg_state());
+    return true;
+  }
+  //--------------------------------------------------------------------------------
+  bool print_version(const std::vector<std::string>& args)
+  {
+    LOG_PRINT_GREEN_L0(CURRENCY_NAME " v" PROJECT_VERSION_LONG);
     return true;
   }
   //--------------------------------------------------------------------------------

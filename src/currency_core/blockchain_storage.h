@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -8,13 +8,13 @@
 #pragma once
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/variables_map.hpp>
+#include <boost/program_options.hpp>
 
 #include <boost/interprocess/sync/named_mutex.hpp>
 
 #include <boost/serialization/serialization.hpp>
 #include <boost/serialization/version.hpp>
 #include <boost/serialization/list.hpp>
-
 #include <boost/foreach.hpp>
 #include <atomic>
 
@@ -23,6 +23,7 @@
 #include "serialization/string.h"
 #include "serialization/multiprecision.h"
 
+#include "common/command_line.h"
 #include "tx_pool.h"
 #include "blockchain_storage_basic.h"
 #include "common/util.h"
@@ -48,6 +49,8 @@ MARK_AS_POD_C11(macro_alias_1);
 
 #undef LOG_DEFAULT_CHANNEL 
 #define LOG_DEFAULT_CHANNEL "core"
+
+extern const command_line::arg_descriptor<uint64_t>      arg_db_cache_l2;
 
 namespace currency
 {
@@ -147,9 +150,19 @@ namespace currency
 
     struct scan_for_keys_context
     {
-      bool htlc_is_expired;
-      std::list<txout_htlc> htlc_outs;
-      std::list<tx_out_zarcanum> zc_outs;
+      bool check_hf4_coinage_rule = true;                      // input
+      bool htlc_is_expired;                                    // output
+      std::list<txout_htlc> htlc_outs;                         // output, legacy
+      std::list<tx_out_zarcanum> zc_outs;                      // output
+    };
+
+    struct check_tx_inputs_context
+    {
+      bool check_hf4_coinage_rule = true;                      // input
+      bool calculate_max_used_block_id = false;                // input
+      crypto::hash max_used_block_id{};                        // output
+      uint64_t max_used_block_height = 0;                      // output
+      bool all_tx_ins_have_explicit_native_asset_ids = true;   // output
     };
 
     // == Output indexes local lookup table conception ==
@@ -165,15 +178,13 @@ namespace currency
     //   retrieve gindex from main chain gindex table     # not outputs having given amount are present after the given height
     //
 
-    typedef boost::variant<crypto::public_key, txout_htlc> output_key_or_htlc_v;
-
     struct alt_block_extended_info: public block_extended_info
     {
       // {amount -> gindex } output global index lookup table for this altblock (if an amount isn't present -- it's retreived from main outputs_container)
       std::map<uint64_t, uint64_t> gindex_lookup_table; 
       
-      // {amount -> pub_keys} map of outputs' pub_keys appeared in this alt block ( index_in_vector == output_gindex - gindex_lookup_table[output_amount] )
-      std::map<uint64_t, std::vector<output_key_or_htlc_v> > outputs_pub_keys;
+      // {amount -> outs} map of outputs' appeared in this alt block ( index_in_vector == output_gindex - gindex_lookup_table[output_amount] )
+      std::map<uint64_t, std::vector<tx_out_v> > outputs;
       
       //date added to alt chain storage
       uint64_t timestamp; 
@@ -214,7 +225,7 @@ namespace currency
     bool clear();
     bool reset_and_set_genesis_block(const block& b);
     //debug function
-    bool truncate_blockchain(uint64_t to_height);
+    bool truncate_blockchain(uint64_t to_blockchain_size);
     //------------- readers members -----------------
     bool pre_validate_relayed_block(block& b, block_verification_context& bvc, const crypto::hash& id)const ;
     //bool push_new_block();
@@ -235,11 +246,14 @@ namespace currency
     size_t get_alternative_blocks_count() const;
     crypto::hash get_block_id_by_height(uint64_t height) const;
     bool get_block_by_hash(const crypto::hash &h, block &blk) const;
+    bool get_block_reward_by_main_chain_height(const uint64_t height, uint64_t& reward_with_fee) const; // only for main chain blocks
+    bool get_block_reward_by_hash(const crypto::hash &h, uint64_t& reward_with_fee) const; // works for main chain and alt chain blocks
     bool get_block_extended_info_by_height(uint64_t h, block_extended_info &blk) const;
     bool get_block_extended_info_by_hash(const crypto::hash &h, block_extended_info &blk) const;
     bool get_block_by_height(uint64_t h, block &blk) const;
     bool is_tx_related_to_altblock(crypto::hash tx_id) const;
     //void get_all_known_block_ids(std::list<crypto::hash> &main, std::list<crypto::hash> &alt, std::list<crypto::hash> &invalid) const;
+    bool is_pre_hardfork_tx_freeze_period_active() const;
 
     bc_attachment_services_manager& get_attachment_services_manager(){ return m_services_mgr; }
 
@@ -266,8 +280,12 @@ namespace currency
     crypto::hash get_top_block_id(uint64_t& height) const;
     bool get_top_block(block& b) const;
     wide_difficulty_type get_next_diff_conditional(bool pos) const;
-    wide_difficulty_type get_next_diff_conditional2(bool pos, const alt_chain_type& alt_chain, uint64_t split_height, const alt_block_extended_info& abei) const;
+    wide_difficulty_type get_next_diff_conditional_alt(bool pos, const alt_chain_type& alt_chain, uint64_t split_height, const alt_block_extended_info& abei) const;
     wide_difficulty_type get_cached_next_difficulty(bool pos) const;
+    wide_difficulty_type calc_diff_at_h_from_timestamps(std::vector<uint64_t>& timestamps, std::vector<wide_difficulty_type>& commulative_difficulties, uint64_t h, bool pos) const;
+    void collect_timestamps_and_c_difficulties_main(std::vector<uint64_t>& timestamps, std::vector<wide_difficulty_type>& commulative_difficulties, bool pos) const;
+    void collect_timestamps_and_c_difficulties_alt(std::vector<uint64_t>& timestamps, std::vector<wide_difficulty_type>& commulative_difficulties, bool pos, const alt_chain_type& alt_chain, uint64_t split_height) const;
+
 
     
     bool create_block_template(const account_public_address& miner_address, const blobdata& ex_nonce, block& b, wide_difficulty_type& di, uint64_t& height) const;
@@ -275,6 +293,8 @@ namespace currency
     bool create_block_template(const create_block_template_params& params, create_block_template_response& resp) const;
 
     bool have_block(const crypto::hash& id) const;
+    bool have_block_main(const crypto::hash& id) const;
+    bool have_block_alt(const crypto::hash& id) const;
     size_t get_total_transactions()const;
     bool get_outs(uint64_t amount, std::list<crypto::public_key>& pkeys)const;
     bool get_short_chain_history(std::list<crypto::hash>& ids)const;
@@ -296,17 +316,20 @@ namespace currency
     bool enumerate_aliases(cb_t cb) const;
     template<typename cb_t>
     bool get_aliases(cb_t cb, uint64_t offset, uint64_t count) const;
+    template<typename cb_t>
+    bool lookup_aliases_by_prefix(const std::string& prefix_raw, uint64_t n, cb_t cb) const;
     uint64_t get_aliases_count()const;
     uint64_t get_block_h_older_then(uint64_t timestamp) const;
     bool validate_tx_service_attachmens_in_services(const tx_service_attachment& a, size_t i, const transaction& tx)const;
     bool get_asset_history(const crypto::public_key& asset_id, std::list<asset_descriptor_operation>& result) const;
     bool get_asset_info(const crypto::public_key& asset_id, asset_descriptor_base& info)const;
     uint64_t get_assets_count() const;
+    uint64_t get_assets(uint64_t offset, uint64_t count, std::list<asset_descriptor_with_id>& assets) const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_to_key& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
     bool check_tx_input(const transaction& tx, size_t in_index, const txin_htlc& txin, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height)const;
-    bool check_tx_input(const transaction& tx, size_t in_index, const txin_zc_input& zc_in, const crypto::hash& tx_prefix_hash, uint64_t& max_related_block_height, bool& all_tx_ins_have_explicit_native_asset_ids) const;
-    bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height)const;
+    bool check_tx_input(const transaction& tx, size_t in_index, const txin_zc_input& zc_in, const crypto::hash& tx_prefix_hash, check_tx_inputs_context& ctic) const;
+    bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, check_tx_inputs_context& ctic)const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash) const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height, crypto::hash& max_used_block_id)const;
     bool check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const transaction& source_tx, size_t out_n) const;
@@ -330,6 +353,7 @@ namespace currency
     bool is_multisig_output_spent(const crypto::hash& multisig_id) const;
     boost::multiprecision::uint128_t total_coins()const;
     bool is_pos_allowed()const;
+    bool is_non_pruning_mode_enabled() const { return m_non_pruning_mode_enabled; }
     uint64_t get_tx_fee_median()const;
     uint64_t get_tx_fee_window_value_median() const;
     uint64_t get_tx_expiration_median() const;
@@ -339,7 +363,8 @@ namespace currency
     uint64_t get_last_timestamps_check_window_median() const;
     uint64_t get_last_n_blocks_timestamps_median(size_t n) const;
     bool prevalidate_alias_info(const transaction& tx, const extra_alias_entry& eae);
-    bool validate_miner_transaction(const block& b, size_t cumulative_block_size, uint64_t fee, uint64_t& base_reward, const boost::multiprecision::uint128_t& already_generated_coins) const;
+    bool calculate_block_reward_for_next_top_block(size_t next_block_cumulative_size, uint64_t& block_reward_without_fee) const;
+    bool validate_miner_transaction(const transaction& miner_tx, uint64_t fee, uint64_t block_reward_without_fee) const;
     performnce_data& get_performnce_data()const;
     bool validate_instance(const std::string& path);
     bool is_tx_expired(const transaction& tx) const;
@@ -347,6 +372,7 @@ namespace currency
 
     // returns true as soon as the hardfork is active for the NEXT upcoming block (not for the top block in the blockchain storage)
     bool is_hardfork_active(size_t hardfork_id) const;
+    bool is_hardfork_active_for_height(size_t hardfork_id, uint64_t height) const;
     bool fill_tx_rpc_inputs(tx_rpc_extended_info& tei, const transaction& tx) const;
     bool fill_tx_rpc_details(tx_rpc_extended_info& tei, const transaction& tx, const transaction_chain_entry* ptce, const crypto::hash& h, uint64_t timestamp, bool is_short = false) const;
 
@@ -363,7 +389,7 @@ namespace currency
       uint64_t timestamp) const;
     bool build_stake_modifier(stake_modifier_type& sm, const alt_chain_type& alt_chain = alt_chain_type(), uint64_t split_height = 0, crypto::hash* p_last_block_hash = nullptr, uint64_t* p_last_pow_block_height = nullptr) const;
 
-    bool validate_pos_coinbase_outs_unlock_time(const transaction& miner_tx, uint64_t staked_amount, uint64_t source_max_unlock_time)const;
+    bool validate_pre_zarcanum_pos_coinbase_outs_unlock_time(const transaction& miner_tx, uint64_t staked_amount, uint64_t source_max_unlock_time)const;
     bool validate_pos_block(const block& b, const crypto::hash& id, bool for_altchain)const;
     bool validate_pos_block(const block& b, wide_difficulty_type basic_diff, const crypto::hash& id, bool for_altchain)const;
     bool validate_pos_block(const block& b,
@@ -375,7 +401,10 @@ namespace currency
       bool for_altchain,
       const alt_chain_type& alt_chain = alt_chain_type(),
       uint64_t split_height = 0)const;
-    bool validate_asset_operation_against_current_blochain_state(asset_op_verification_context& avc) const;
+    bool validate_ado_ownership(asset_op_verification_context& avc) const;
+    bool validate_asset_operation_hf4(asset_op_verification_context& avc) const;
+    bool validate_asset_operation_hf5(asset_op_verification_context& avc) const;
+    bool validate_asset_operation(asset_op_verification_context& avc, uint64_t height) const;
 
     void set_core_runtime_config(const core_runtime_config& pc) const;
     const core_runtime_config& get_core_runtime_config()const;
@@ -496,6 +525,12 @@ namespace currency
     bool print_tx_outputs_lookup(const crypto::hash& tx_id) const;
     uint64_t get_last_x_block_height(bool pos)const;
     bool is_tx_spendtime_unlocked(uint64_t unlock_time)const;
+    void set_db_l2_cache_size(uint64_t ceched_elements) const;
+    //experimental
+    void do_full_db_warm_up() const;
+    void on_hardfork_activated(size_t hardfork_id);
+    void print_db_l2_cache_state() const;
+    std::string get_db_l2_cache_state_str() const;
 
   private:
 
@@ -548,6 +583,9 @@ namespace currency
     tools::db::solo_db_value<uint64_t, std::string, solo_options_container, true> m_db_last_worked_version;
     tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container> m_db_storage_major_compatibility_version;
     tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container> m_db_storage_minor_compatibility_version;
+    tools::db::solo_db_value<uint64_t, bool, solo_options_container> m_db_major_failure; //safety fuse
+    tools::db::solo_db_value<uint64_t, uint64_t, solo_options_container> m_db_most_recent_hardfork_id;
+
     outputs_container m_db_outputs;
     multisig_outs_container m_db_multisig_outs;
     aliases_container m_db_aliases;
@@ -568,6 +606,7 @@ namespace currency
 
     std::atomic<bool> m_is_in_checkpoint_zone;
     std::atomic<bool> m_is_blockchain_storing;
+    bool m_non_pruning_mode_enabled;
 
     std::string m_config_folder;
     //events
@@ -629,6 +668,8 @@ namespace currency
       uint64_t split_height, 
       const alt_chain_type& alt_chain, 
       const std::unordered_set<crypto::hash>& alt_chain_block_ids, 
+      const uint64_t pos_block_timestamp,
+      const wide_difficulty_type& pos_difficulty,
       uint64_t& ki_lookuptime, 
       uint64_t* p_max_related_block_height = nullptr) const;
     bool validate_alt_block_ms_input(const transaction& input_tx, 
@@ -669,14 +710,14 @@ namespace currency
     uint64_t get_adjusted_time()const;
     bool complete_timestamps_vector(uint64_t start_height, std::vector<uint64_t>& timestamps);
     bool update_next_comulative_size_limit();
-    bool process_blockchain_tx_extra(const transaction& tx, const crypto::hash& tx_id);
-    bool unprocess_blockchain_tx_extra(const transaction& tx);
+    bool process_blockchain_tx_extra(const transaction& tx, const crypto::hash& tx_id, const uint64_t height);
+    bool unprocess_blockchain_tx_extra(const transaction& tx, const uint64_t height);
     bool process_blockchain_tx_attachments(const transaction& tx, uint64_t h, const crypto::hash& bl_id, uint64_t timestamp);
     bool unprocess_blockchain_tx_attachments(const transaction& tx, uint64_t h, uint64_t timestamp);
     bool pop_alias_info(const extra_alias_entry& ai);
     bool put_alias_info(const transaction& tx, extra_alias_entry& ai);
-    bool pop_asset_info(const crypto::public_key& asset_id);
-    bool put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado);
+    bool pop_asset_info(const asset_descriptor_operation& ado, const uint64_t height);
+    bool put_asset_info(const transaction& tx, const crypto::hash& tx_id, const asset_descriptor_operation& ado, const uint64_t height);
     void fill_addr_to_alias_dict();
     //bool resync_spent_tx_flags();
     bool prune_ring_signatures_and_attachments_if_need();
@@ -694,12 +735,12 @@ namespace currency
     void calculate_local_gindex_lookup_table_for_height(uint64_t split_height, std::map<uint64_t, uint64_t>& increments) const;
     void do_erase_altblock(alt_chain_container::iterator it);
     uint64_t get_blockchain_launch_timestamp()const;
-    bool is_output_allowed_for_input(const txout_target_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
-    bool is_output_allowed_for_input(const output_key_or_htlc_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
-    bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v)const;
-    bool is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height)const;
+    bool is_output_allowed_for_input(const tx_out_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height) const;
+    bool is_output_allowed_for_input(const txout_target_v& out_v, const txin_v& in_v, uint64_t top_minus_source_height) const;
+    bool is_output_allowed_for_input(const txout_to_key& out_v, const txin_v& in_v) const;
+    bool is_output_allowed_for_input(const txout_htlc& out_v, const txin_v& in_v, uint64_t top_minus_source_height) const;
     bool is_output_allowed_for_input(const tx_out_zarcanum& out, const txin_v& in_v) const;
-
+    void remove_old_dbs();
 
 
     //POS
@@ -867,24 +908,26 @@ namespace currency
         TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
       }
       VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
-        bool r = is_output_allowed_for_input(out_zc, verified_input);
-      CHECK_AND_ASSERT_MES(r, false, "Input and output are incompatible");
-
-      r = is_mixattr_applicable_for_fake_outs_counter(tx_ptr->tx.version, out_zc.mix_attr, key_offsets.size() - 1, this->get_core_runtime_config());
-      CHECK_AND_ASSERT_MES(r, false, "tx input ref #" << output_index << " violates mixin restrictions: tx.version = " << tx_ptr->tx.version << ", mix_attr = " << static_cast<uint32_t>(out_zc.mix_attr) << ", key_offsets.size = " << key_offsets.size());
-
-      bool legit_output_key = validate_output_key_legit(out_zc.stealth_address);
-      CHECK_AND_ASSERT_MES(legit_output_key, false, "tx input ref #" << output_index << " violates public key restrictions: tx.version = " << tx_ptr->tx.version << ", outtk.key = " << out_zc.stealth_address);
-
-
-      TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
-      if (!vis.handle_output(tx_ptr->tx, validated_tx, out_zc, n))
       {
-        size_t verified_input_index = std::find(validated_tx.vin.begin(), validated_tx.vin.end(), verified_input) - validated_tx.vin.begin();
-        LOG_PRINT_RED_L0("handle_output failed for output #" << n << " in " << tx_id << " referenced by input #" << verified_input_index << " in tx " << get_transaction_hash(validated_tx));
-        return false;
+        bool r = is_output_allowed_for_input(out_zc, verified_input);
+        CHECK_AND_ASSERT_MES(r, false, "Input and output are incompatible");
+
+        r = is_mixattr_applicable_for_fake_outs_counter(tx_ptr->tx.version, out_zc.mix_attr, key_offsets.size() - 1, this->get_core_runtime_config());
+        CHECK_AND_ASSERT_MES(r, false, "tx input ref #" << output_index << " violates mixin restrictions: tx.version = " << tx_ptr->tx.version << ", mix_attr = " << static_cast<uint32_t>(out_zc.mix_attr) << ", key_offsets.size = " << key_offsets.size());
+
+        bool legit_output_key = validate_output_key_legit(out_zc.stealth_address);
+        CHECK_AND_ASSERT_MES(legit_output_key, false, "tx input ref #" << output_index << " violates public key restrictions: tx.version = " << tx_ptr->tx.version << ", outtk.key = " << out_zc.stealth_address);
+
+
+        TIME_MEASURE_START_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
+        if (!vis.handle_output(tx_ptr->tx, validated_tx, out_zc, n))
+        {
+          size_t verified_input_index = std::find(validated_tx.vin.begin(), validated_tx.vin.end(), verified_input) - validated_tx.vin.begin();
+          LOG_PRINT_RED_L0("handle_output failed for output #" << n << " in " << tx_id << " referenced by input #" << verified_input_index << " in tx " << get_transaction_hash(validated_tx));
+          return false;
+        }
+        TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
       }
-      TIME_MEASURE_FINISH_PD(tx_check_inputs_loop_scan_outputkeys_loop_handle_output);
       VARIANT_CASE_THROW_ON_OTHER();
       VARIANT_SWITCH_END();
 
@@ -896,13 +939,13 @@ namespace currency
       ++output_index;
     }
 
-    if (m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, this->get_current_blockchain_size()))
+    if (scan_context.check_hf4_coinage_rule && m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, this->get_current_blockchain_size()))
     { 
       //with hard fork 4 make it network rule to have at least 10 confirmations
       
       if (this->get_current_blockchain_size() - max_related_block_height < CURRENCY_HF4_MANDATORY_MIN_COINAGE)
       {
-        LOG_ERROR("Coinage rule broken(mainblock): h = " << this->get_current_blockchain_size() << ", max_related_block_height=" << max_related_block_height << ", tx: " << get_transaction_hash(validated_tx));
+        LOG_ERROR("Coinage rule is broken (mainblock): current blockchain size = " << this->get_current_blockchain_size() << ", max_related_block_height = " << max_related_block_height << ", tx: " << get_transaction_hash(validated_tx));
         return false;
       }
     }
@@ -939,6 +982,27 @@ namespace currency
       cb(alias, alias_entries.back());
       return true;
     });
+    return true;
+  }
+
+  template<typename cb_t>
+  bool blockchain_storage::lookup_aliases_by_prefix(const std::string& prefix_raw, uint64_t n, cb_t cb) const
+  {
+    CRITICAL_REGION_LOCAL(m_read_lock);
+
+    if (prefix_raw.empty() || n == 0)
+      return false;
+
+    m_db_aliases.enumerate_items_by_prefix(prefix_raw, n,
+      [&](uint64_t i, const std::string& alias, const std::list<extra_alias_entry_base>& entries)
+    {
+      if (entries.empty())
+        return true;
+
+      cb(alias, entries.back());
+      return true;
+    });
+
     return true;
   }
   //------------------------------------------------------------------

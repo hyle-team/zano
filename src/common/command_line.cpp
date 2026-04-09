@@ -25,7 +25,7 @@ namespace command_line
 
   const arg_descriptor<bool>        arg_console       ( "no-console", "Disable daemon console commands" );
   const arg_descriptor<bool>        arg_show_details  ( "currency-details", "Display currency details" );
-  const arg_descriptor<bool>        arg_show_rpc_autodoc  ( "show_rpc_autodoc", "Display rpc auto-generated documentation template" );
+  const arg_descriptor<std::string> arg_generate_rpc_autodoc  ( "generate-rpc-autodoc", "Make auto-generated RPC API documentation documents at the given path" );
 
   const arg_descriptor<bool>        arg_disable_upnp  ( "disable-upnp", "Disable UPnP (enhances local network privacy)");
   const arg_descriptor<bool>        arg_disable_ntp  ( "disable-ntp", "Disable NTP, could enhance to time synchronization issue but increase network privacy, consider using disable-stop-if-time-out-of-sync with it");
@@ -40,6 +40,7 @@ namespace command_line
   const arg_descriptor<std::string> arg_process_predownload_from_path("predownload-from-local-path", "Instead of downloading file use downloaded local file");
   const arg_descriptor<bool>        arg_validate_predownload  ( "validate-predownload", "Paranoid mode, re-validate each block from pre-downloaded database and rebuild own database");
   const arg_descriptor<std::string> arg_predownload_link      ( "predownload-link", "Override url for blockchain database pre-downloading");
+  const arg_descriptor<bool>        arg_non_pruning_mode      ( "non-pruning-mode", "Enables a special operational mode with full retention of all tx signatures. Will terminate if the DB was previously in (normal) pruning mode. Use only if you know what you do.");
 
   const arg_descriptor<std::string> arg_deeplink  ( "deeplink-params", "Deeplink parameter, in that case app just forward params to running app");
 

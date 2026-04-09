@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -21,6 +21,7 @@
 #include "crypto/clsag.h"
 #include "crypto/zarcanum.h"
 #include "crypto/one_out_of_many_proofs.h"
+#include "crypto/eth_signature.h"
 #include "boost_serialization_maps.h"
 #include "serialization/keyvalue_enable_POD_serialize_as_string.h"
 //
@@ -181,6 +182,8 @@ namespace crypto
       BOOST_SERIALIZE(c)
       BOOST_SERIALIZE(y)
     END_BOOST_SERIALIZATION()
+
+    bool is_zero() const { return c.is_zero() && y.is_zero(); }
   };
 
   struct generic_double_schnorr_sig_s : public generic_double_schnorr_sig
@@ -219,6 +222,25 @@ namespace crypto
     END_BOOST_SERIALIZATION()
   };
 
+  // helper functions
+
+  // plain serialization for generic_schnorr_sig_s as hex-encoded 64-bytes string, consisting of two 32-bytes integers (c, y)
+  inline std::string generic_schnorr_sig_s_to_hex_string(const generic_schnorr_sig_s& s) 
+  {
+    return crypto::pod_to_hex(s.c) + crypto::pod_to_hex(s.y);
+  }
+
+  inline generic_schnorr_sig_s generic_schnorr_sig_s_from_hex_string(const std::string& hex_str)
+  {
+    generic_schnorr_sig_s result{};
+    if (hex_str.size() != 2 * (sizeof(result.c) + sizeof(result.y)))
+      return result;
+    crypto::parse_tpod_from_hex_string(hex_str.substr(0, 2 * sizeof(result.c)), result.c);
+    crypto::parse_tpod_from_hex_string(hex_str.substr(2 * sizeof(result.c)), result.y);
+    return result;
+  }
+
+
 } // namespace crypto
 
 BLOB_SERIALIZER(crypto::chacha8_iv);
@@ -230,6 +252,8 @@ BLOB_SERIALIZER(crypto::key_image);
 BLOB_SERIALIZER(crypto::signature);
 BLOB_SERIALIZER(crypto::scalar_t);
 BLOB_SERIALIZER(crypto::point_t);
+BLOB_SERIALIZER(crypto::eth_public_key);
+BLOB_SERIALIZER(crypto::eth_signature);
 
 VARIANT_TAG(debug_archive, crypto::hash, "hash");
 VARIANT_TAG(debug_archive, crypto::public_key, "public_key");
@@ -237,6 +261,8 @@ VARIANT_TAG(debug_archive, crypto::secret_key, "secret_key");
 VARIANT_TAG(debug_archive, crypto::key_derivation, "key_derivation");
 VARIANT_TAG(debug_archive, crypto::key_image, "key_image");
 VARIANT_TAG(debug_archive, crypto::signature, "signature");
+VARIANT_TAG(debug_archive, crypto::eth_public_key, "eth_public_key");
+VARIANT_TAG(debug_archive, crypto::eth_signature, "eth_signature");
 
 
 //
@@ -245,6 +271,8 @@ VARIANT_TAG(debug_archive, crypto::signature, "signature");
 
 KV_ENABLE_POD_SERIALIZATION_AS_HEX(crypto::scalar_t);
 KV_ENABLE_POD_SERIALIZATION_AS_HEX(crypto::hash);
+KV_ENABLE_POD_SERIALIZATION_AS_HEX(crypto::eth_public_key);
+KV_ENABLE_POD_SERIALIZATION_AS_HEX(crypto::eth_signature);
 
 //
 // Boost serialization
@@ -296,5 +324,28 @@ namespace boost
     {
       a & reinterpret_cast<char (&)[sizeof(crypto::point_t)]>(x);
     }    
+    template <class Archive>
+    inline void serialize(Archive &a, crypto::eth_public_key &x, const boost::serialization::version_type ver)
+    {
+      a & reinterpret_cast<char (&)[sizeof(crypto::eth_public_key)]>(x);
+    }    
+    template <class Archive>
+    inline void serialize(Archive &a, crypto::eth_signature &x, const boost::serialization::version_type ver)
+    {
+      a & reinterpret_cast<char (&)[sizeof(crypto::eth_signature)]>(x);
+    }    
+    template <class Archive>
+    inline void serialize(Archive& a, crypto::scalar_vec_t& x, const boost::serialization::version_type ver)
+    {
+      static_assert(sizeof(std::vector<crypto::scalar_t>) == sizeof(crypto::scalar_vec_t));
+      a & static_cast<std::vector<crypto::scalar_t>&>(x);
+    }
+    template <class Archive, size_t N>
+    inline void serialize(Archive& a, crypto::scalar_mat_t<N>& x, const boost::serialization::version_type ver)
+    {
+      static_assert(sizeof(std::vector<crypto::scalar_t>) == sizeof(crypto::scalar_mat_t<N>));
+      a & static_cast<std::vector<crypto::scalar_t>&>(x);
+    }
+
   } // namespace serialization
 } // namespace boost

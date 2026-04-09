@@ -115,7 +115,18 @@ else()
   set_source_files_properties("crypto/chacha8_stream.c" PROPERTIES COMPILE_FLAGS "-Wno-sign-compare -Wno-strict-prototypes")
 endif()
 
+if(WIN32)
+  set(BCRYPT_LIB bcrypt)
+endif()
+
 add_library(crypto ${CRYPTO})
+if(USE_BITCOIN_SECP256K1_FOR_ECDSA)
+  add_dependencies(crypto secp256k1)
+  target_link_libraries(crypto secp256k1 ${BCRYPT_LIB})
+else()
+  add_dependencies(crypto OpenSSL::Crypto)
+  target_link_libraries(crypto OpenSSL::Crypto ${BCRYPT_LIB})
+endif()
 
 add_library(currency_core ${CURRENCY_CORE})
 add_dependencies(currency_core version  ${PCH_LIB_NAME})
@@ -146,6 +157,9 @@ if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
   install(TARGETS wallet currency_core crypto common zlibstatic DESTINATION "${CMAKE_ANDROID_ARCH_ABI}/lib")
   message("Generating install for Android")
+
+  file(GLOB WALLET_INCLUDES wallet/*.h)
+  install(FILES ${WALLET_INCLUDES} DESTINATION "${CMAKE_INSTALL_PREFIX}/include")
   return()
 endif()
 
@@ -193,13 +207,37 @@ if(BUILD_GUI)
   set(CMAKE_INCLUDE_CURRENT_DIR ON)
   SET(MACOSX_BUNDLE_ICON_FILE app.icns)
   add_executable(Zano WIN32 MACOSX_BUNDLE ${QTDAEMON} )
+
+  #####  embed html into resources  ######
+  set(HTML_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/layout/html)
+
+  file(GLOB_RECURSE HTML_FILES CONFIGURE_DEPENDS RELATIVE "${HTML_DIR}" "${HTML_DIR}/*")
+  list(FILTER HTML_FILES EXCLUDE REGEX "\\.(map|scss|ts|tsx)$")
+
+  set(GUI_QRC "${CMAKE_BINARY_DIR}/resources_gui.qrc")
+  file(WRITE "${GUI_QRC}" "<RCC>\n  <qresource prefix=\"/html\">\n")
+
+  # add each file (important forward slashes in paths)
+  foreach(f IN LISTS HTML_FILES)
+    file(TO_CMAKE_PATH "${HTML_DIR}/${f}" ABS_FPATH)
+    file(APPEND "${GUI_QRC}" "    <file alias=\"${f}\">${ABS_FPATH}</file>\n")
+  endforeach()
+
+  # сlose QRC
+  file(APPEND "${GUI_QRC}" "  </qresource>\n</RCC>\n")
+
+  qt5_add_resources(ZANO_RESOURCES "${GUI_QRC}")
+  target_sources(Zano PRIVATE ${ZANO_RESOURCES})
+  message(STATUS "[HTML-embed] Embedded ${HTML_COUNT} files into target 'Zano' via ${GUI_QRC}")
+  ##### end qt resources ######
+
   ENABLE_SHARED_PCH(Zano QTDAEMON)
   ENABLE_SHARED_PCH_EXECUTABLE(Zano)
 	  
-  QT5_USE_MODULES(Zano WebEngineWidgets WebChannel)
+  #QT5_USE_MODULES(Zano WebEngineWidgets WebChannel)
   find_package(Qt5PrintSupport REQUIRED)
 
-  target_link_libraries(Zano wallet rpc currency_core crypto common zlibstatic ethash Qt5::WebEngineWidgets Qt5::PrintSupport ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
+  target_link_libraries(Zano wallet rpc currency_core crypto common zlibstatic ethash Qt5::WebChannel Qt5::WebEngineWidgets Qt5::PrintSupport ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
   if (UNIX AND NOT APPLE)
 	target_link_libraries(Zano rt)
   endif()
@@ -215,7 +253,7 @@ if(BUILD_GUI)
   set_property(TARGET Zano PROPERTY FOLDER "prog")
   set_target_properties(Zano PROPERTIES MACOSX_BUNDLE_INFO_PLIST ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/Info.plist.in)
 
-  set(HTML_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/layout/html)
+  #set(HTML_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/layout/html)
   set_target_properties(Zano PROPERTIES VS_DEBUGGER_COMMAND_ARGUMENTS "--html-path=${HTML_DIR}")
 
   set(CMAKE_AUTOMOC OFF)

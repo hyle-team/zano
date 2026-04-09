@@ -27,7 +27,7 @@ function upload_build() # $1 - path to the file to be uploaded
   counter=0
   while [ ! -f DONE ]
   do
-    if [ "$counter" -ge 150 ]
+    if [ "$counter" -ge 500 ]
     then
       echo "ERROR: uploading is taking longer than expected"
       touch STOP

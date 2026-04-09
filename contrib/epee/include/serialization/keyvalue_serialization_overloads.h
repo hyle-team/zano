@@ -1,3 +1,4 @@
+// Copyright (c) 2024, Zano Project
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
@@ -60,7 +61,7 @@ namespace epee
       if(!stg.get_value(pname, blob, hparent_section))
         return false;
       CHECK_AND_ASSERT_MES(blob.size() == sizeof(d), false, "unserialize_t_val_as_blob: size of " << typeid(t_type).name() << " = " << sizeof(t_type) << ", but stored blod size = " << blob.size() << ", value name = " << pname);
-      d = *(const t_type*)blob.data();
+      std::memcpy(std::addressof(d), blob.data(), sizeof(t_type)); //d = *(const t_type*)blob.data();
       return true;
     } 
     //-------------------------------------------------------------------------------------------------------------------
@@ -116,7 +117,7 @@ namespace epee
     static bool unserialize_stl_container_t_val(stl_container& container, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
     {
       container.clear();
-      typename stl_container::value_type exchange_val;
+      typename stl_container::value_type exchange_val{};
       typename t_storage::harray hval_array = stg.get_first_value(pname, exchange_val, hparent_section);
       if(!hval_array) return false;
       container.push_back(std::move(exchange_val));
@@ -315,9 +316,28 @@ namespace epee
     struct selector<true>
     {
       template<class t_type, class t_storage>
-      static bool serialize(const t_type& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+      static bool serialize(const t_type& d, t_storage& stg, [[maybe_unused]] typename t_storage::hsection hparent_section, [[maybe_unused]] const char* pname)
       {
-        return kv_serialize(d, stg, hparent_section, pname);
+        //if constexpr (!t_storage::use_descriptions::value)
+        //{
+          return kv_serialize(d, stg, hparent_section, pname);
+        //}
+        //else 
+        //  return false;
+
+      }
+      //const t_type& doc_substitute = t_type(), const std::string& description = std::string()
+      template<class t_type, class t_storage>
+      static bool serialize_and_doc(t_storage& stg, typename t_storage::hsection hparent_section, const char* pname, const std::string& description = std::string(), const t_type& doc_substitute = t_type())
+      {
+        if constexpr (t_storage::use_descriptions::value)
+        {
+          stg.set_entry_description(hparent_section, pname, description);
+          return kv_serialize(doc_substitute, stg, hparent_section, pname);
+        }
+        else
+          return false;
+
       }
 
       template<class t_type, class t_storage>
@@ -340,8 +360,12 @@ namespace epee
       template< class t_type_stored, class t_type, class t_storage, typename cb_serialize>
       static bool serialize_ephemeral(const t_type& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname, cb_serialize cb_s)
       {
-        t_type_stored a = cb_s(d);
-        return epee::serialization::selector<true>::serialize(a, stg, hparent_section, pname);
+        t_type_stored a = AUTO_VAL_INIT(a);
+        bool add_val = cb_s(d, a);
+        if (add_val)
+          return epee::serialization::selector<true>::serialize(a, stg, hparent_section, pname);
+        else
+          return true;
       }
 
     };
@@ -454,6 +478,29 @@ namespace epee
       return r;
     }
     //-------------------------------------------------------------------------------------------------------------------
+    //std::optional 
+    template<class t_type, class t_storage>
+    bool kv_serialize(const std::optional<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+    {
+      if(d.has_value())
+      {
+        return kv_serialize(*d, stg, hparent_section, pname);
+      }
+      return true;
+    }
+    //-------------------------------------------------------------------------------------------------------------------
+    template<class t_type, class t_storage>
+    bool kv_unserialize(std::optional<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+    {
+      d = t_type{};
+      bool r = kv_unserialize(*d, stg, hparent_section, pname);
+      if (!r)
+      {
+        d = std::nullopt;
+      }
+      return r;
+    }
+    //-------------------------------------------------------------------------------------------------------------------
     //boost::shared_ptr 
     template<class t_type, class t_storage>
     bool kv_serialize(const boost::shared_ptr<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
@@ -477,7 +524,30 @@ namespace epee
       }
       return r;
     }
-
+    //-------------------------------------------------------------------------------------------------------------------
+    //std::shared_ptr 
+    template<class t_type, class t_storage>
+    bool kv_serialize(const std::shared_ptr<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+    {
+      if (d.get())
+      {
+        return kv_serialize(*d, stg, hparent_section, pname);
+      }
+      return true;
+    }
+    //-------------------------------------------------------------------------------------------------------------------
+    template<class t_type, class t_storage>
+    bool kv_unserialize(std::shared_ptr<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+    {
+      d.reset();
+      t_type* ptr = new t_type();
+      bool r = kv_unserialize(*ptr, stg, hparent_section, pname);
+      if (!r)
+      {
+        d.reset(ptr);
+      }
+      return r;
+    }
 
   }
 }

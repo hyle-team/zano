@@ -98,7 +98,7 @@ namespace net_utils
 			std::string m_transfer_encoding;//"Transfer-Encoding:"
 			std::string m_content_encoding; //"Content-Encoding:"
 			std::string m_host;             //"Host:"
-			std::string m_cookie;			//"Cookie:"
+			std::string m_cookie;						//"Cookie:"
 			fields_list m_etc_fields;
 
 			void clear()
@@ -147,10 +147,10 @@ namespace net_utils
 			std::string       m_http_method_str;
 			std::string       m_full_request_str;
 			std::string       m_replace_html;
-            std::string       m_request_head;
+      std::string       m_request_head;
 			int               m_http_ver_hi;
 			int               m_http_ver_lo;
-            bool		      m_have_to_block;
+      bool							m_have_to_block;
 			http_header_info	m_header_info;
       uri_content       m_uri_content;
 			size_t				    m_full_request_buf_size;
@@ -166,11 +166,11 @@ namespace net_utils
 
 		struct http_response_info 
 		{
-			int					m_response_code;
-			std::string			m_response_comment;
+			int									m_response_code;
+			std::string					m_response_comment;
 			fields_list	        m_additional_fields;
-			std::string			m_body;
-			std::string			m_mime_tipe;
+			std::string					m_body;
+			std::string					m_mime_tipe;
 			http_header_info    m_header_info;
 			int                 m_http_ver_hi;// OUT paramter only
 			int                 m_http_ver_lo;// OUT paramter only

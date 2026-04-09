@@ -1,4 +1,4 @@
-// Copyright (c) 2019, anonimal, <anonimal@zano.org>
+  // Copyright (c) 2019, anonimal, <anonimal@zano.org>
 // Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
@@ -59,6 +59,71 @@ namespace epee
   namespace net_utils
   {
 
+
+    class speed_meter
+    {
+    public:
+      speed_meter()
+        : m_last_measure_time(clock_t::now())
+      {
+      }
+
+      void on_bytes(uint64_t bytes_processed)
+      {
+        m_total_bytes += bytes_processed;
+      }
+
+      uint64_t get_bytes_per_second()
+      {
+        auto now = clock_t::now();
+        auto elapsed_ms =
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+            now - m_last_measure_time).count();
+
+        if (elapsed_ms == 0)
+          return get_average();
+
+        uint64_t bytes_delta = m_total_bytes - m_last_bytes;
+        uint64_t bps = (bytes_delta * 1000) / elapsed_ms;
+
+        m_last_bytes = m_total_bytes;
+        m_last_measure_time = now;
+
+        m_samples[m_sample_index] = bps;
+        m_sample_index = (m_sample_index + 1) % m_samples.size();
+        if (m_sample_count < m_samples.size())
+          ++m_sample_count;
+
+        return get_average();
+      }
+
+    private:
+      using clock_t = std::chrono::steady_clock;
+
+      uint64_t get_average() const
+      {
+        if (m_sample_count == 0)
+          return 0;
+
+        uint64_t sum = 0;
+        for (size_t i = 0; i < m_sample_count; ++i)
+          sum += m_samples[i];
+
+        return sum / m_sample_count;
+      }
+
+    private:
+      uint64_t m_total_bytes = 0;
+      uint64_t m_last_bytes = 0;
+
+      clock_t::time_point m_last_measure_time;
+
+      std::array<uint64_t, 5> m_samples{};
+      size_t m_sample_index = 0;
+      size_t m_sample_count = 0;
+    };
+
+
     template<bool is_ssl>
     struct socket_backend;
 
@@ -116,7 +181,9 @@ namespace epee
 
       void on_after_connect()
       {
+        LOG_PRINT_L2("SSL Handshake....");
         m_socket.handshake(boost::asio::ssl::stream_base::client);
+        LOG_PRINT_L2("SSL Handshake OK");
       }
 
     private: 
@@ -149,10 +216,51 @@ namespace epee
       {
 
       }
+
+      void reset()
+      {
+
+      }
     private:
       boost::asio::ip::tcp::socket m_socket;
     };
 
+
+    template<bool is_ssl>
+    struct socket_backend_resetable
+    {
+      socket_backend_resetable(boost::asio::io_service& _io_service) : mr_io_service(_io_service), m_pbackend(std::make_shared<socket_backend<is_ssl>>(_io_service))
+      {}
+
+      boost::asio::ip::tcp::socket& get_socket()
+      {
+        return m_pbackend->get_socket();
+      }
+
+      void set_domain(const std::string& domain_name)
+      {
+        return m_pbackend->set_domain(domain_name);
+      }
+
+      auto& get_stream()
+      {
+        return m_pbackend->get_stream();
+      }
+
+      void on_after_connect()
+      {
+        return m_pbackend->on_after_connect();
+      }
+
+      void reset()
+      {
+        m_pbackend = std::make_shared<socket_backend<is_ssl>>(mr_io_service);
+      }
+
+    private: 
+      boost::asio::io_service& mr_io_service;
+      std::shared_ptr<socket_backend<is_ssl>> m_pbackend;
+    };
 
 
 
@@ -161,13 +269,14 @@ namespace epee
     {
       struct handler_obj
       {
-        handler_obj(boost::system::error_code& error, size_t& bytes_transferred) :ref_error(error), ref_bytes_transferred(bytes_transferred)
+        handler_obj(boost::system::error_code& error, size_t& bytes_transferred, speed_meter& speed) :ref_error(error), ref_bytes_transferred(bytes_transferred), ref_speed(speed)
         {}
-        handler_obj(const handler_obj& other_obj) :ref_error(other_obj.ref_error), ref_bytes_transferred(other_obj.ref_bytes_transferred)
+        handler_obj(const handler_obj& other_obj, speed_meter& speed) :ref_error(other_obj.ref_error), ref_bytes_transferred(other_obj.ref_bytes_transferred), ref_speed(speed)
         {}
 
         boost::system::error_code& ref_error;
         size_t& ref_bytes_transferred;
+        speed_meter& ref_speed;
 
         void operator()(const boost::system::error_code& error, // Result of operation.
           std::size_t bytes_transferred           // Number of bytes read.
@@ -175,6 +284,7 @@ namespace epee
         {
           ref_error = error;
           ref_bytes_transferred = bytes_transferred;
+          ref_speed.on_bytes(bytes_transferred);
         }
       };
 
@@ -218,6 +328,11 @@ namespace epee
         m_reciev_timeout = reciev_timeout;
       }
 
+      uint64_t get_download_speed() const
+      {
+        return m_download_speed_meter.get_bytes_per_second();
+      }
+
       inline
         bool connect(const std::string& addr, int port, unsigned int connect_timeout, unsigned int reciev_timeout, const std::string& bind_ip = "0.0.0.0")
       {
@@ -227,6 +342,7 @@ namespace epee
       inline
         bool connect(const std::string& addr, const std::string& port, unsigned int connect_timeout, unsigned int reciev_timeout, const std::string& bind_ip = "0.0.0.0")
       {
+        LOG_PRINT_L1("Connecting to " << addr << ":" << port << ", cn_timeout: " << connect_timeout << ", rv_timeout: " << reciev_timeout);
         m_connect_timeout = connect_timeout;
         m_reciev_timeout = reciev_timeout;
         m_connected = false;
@@ -238,7 +354,7 @@ namespace epee
           m_sct_back.get_socket().close();
           // Get a list of endpoints corresponding to the server name.
 
-
+          m_sct_back.reset();
           //////////////////////////////////////////////////////////////////////////
 
           boost::asio::ip::tcp::resolver resolver(m_io_service);
@@ -281,13 +397,14 @@ namespace epee
           if (!ec && m_sct_back.get_socket().is_open())
           {
             m_sct_back.on_after_connect();
-            m_connected = true;
+            m_connected = true;       
             m_deadline.expires_at(boost::posix_time::pos_infin);
+            LOG_PRINT_L1("Connected OK: " << addr << ":" << port);
             return true;
           }
           else
           {
-            LOG_PRINT("Some problems at connect, message: " << ec.message(), LOG_LEVEL_3);
+            LOG_PRINT("Error on connect to " << addr << ":" << port << ", message: " << ec.message(), LOG_LEVEL_3);
             return false;
           }
 
@@ -443,7 +560,7 @@ namespace epee
           LOG_ERROR("Some fatal problems.");
           return false;
         }
-
+        m_download_speed_meter.on_bytes(sz);
         return true;
       }
 
@@ -481,7 +598,7 @@ namespace epee
           boost::system::error_code ec = boost::asio::error::would_block;
           size_t bytes_transfered = 0;
 
-          handler_obj hndlr(ec, bytes_transfered);
+          handler_obj hndlr(ec, bytes_transfered, m_download_speed_meter);
 
           char local_buff[10000] = { 0 };
           //m_socket.async_read_some(boost::asio::buffer(local_buff, sizeof(local_buff)), hndlr);
@@ -566,7 +683,7 @@ namespace epee
           size_t bytes_transfered = 0;
 
 
-          handler_obj hndlr(ec, bytes_transfered);
+          handler_obj hndlr(ec, bytes_transfered, m_download_speed_meter);
 
           //char local_buff[10000] = {0};
           boost::asio::async_read(m_sct_back.get_stream(), boost::asio::buffer((char*)buff.data(), buff.size()), boost::asio::transfer_at_least(buff.size()), hndlr);
@@ -652,7 +769,7 @@ namespace epee
           // The deadline has passed. The socket is closed so that any outstanding
           // asynchronous operations are cancelled. This allows the blocked
           // connect(), read_line() or write_line() functions to return.
-          LOG_PRINT_L3("Timed out socket");
+          LOG_PRINT_L2("Timed out socket");
           m_connected = false;
           m_sct_back.get_socket().close();
 
@@ -669,13 +786,16 @@ namespace epee
 
     protected:
       boost::asio::io_service m_io_service;
-      socket_backend<is_ssl> m_sct_back;
+      socket_backend_resetable<is_ssl> m_sct_back;//socket_backend<is_ssl> m_sct_back;
       int m_connect_timeout;
       int m_reciev_timeout;
       bool m_initialized;
       bool m_connected;
       boost::asio::deadline_timer m_deadline;
       volatile uint32_t m_shutdowned;
+
+      mutable speed_meter m_download_speed_meter;
+      mutable speed_meter m_upload_speed_meter;
     };
 
 

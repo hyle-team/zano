@@ -17,6 +17,7 @@ namespace currency
     bool m_verification_failed; //bad tx, should drop connection
     bool m_verification_impossible; //the transaction is related to alternative blockchain
     bool m_added_to_pool; 
+    bool m_already_existed = false;
   };
 
   struct block_verification_context

@@ -236,7 +236,6 @@ void perform_simulation_for_function(const std::map<uint64_t, uint64_t>& timesta
         std::vector<currency::wide_difficulty_type> backward_cumul_difficulties;
         backward_cumul_difficulties.reserve(BBR_DIFFICULTY_WINDOW);
         std::copy(cumul_difficulties.rbegin(), cumul_difficulties.rbegin() + BBR_DIFFICULTY_WINDOW - 1, std::back_inserter(backward_cumul_difficulties));
-        uint64_t ts = timestamps.back();
         curren_difficulty = cb(backward_timestamps, backward_cumul_difficulties, BBR_DIFFICULTY_TARGET);
       }
       cumul_difficulties.push_back(cumul_difficulties.back() + curren_difficulty);
@@ -357,7 +356,7 @@ void hash_rate_analysis(const std::string& path)
   uint64_t curren_hashrate = 0;
   uint64_t step = 10;
   uint64_t hash_rate_range = 10;
-  uint64_t second_windowf_or_hashrate = 20*60;
+  // uint64_t second_windowf_or_hashrate = 20*60;
   
   for (size_t i = hash_rate_range; i != blocks.size(); i++)
   {

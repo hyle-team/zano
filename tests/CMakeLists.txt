@@ -32,7 +32,7 @@ target_link_libraries(coretests rpc wallet currency_core common crypto zlibstati
 target_link_libraries(functional_tests rpc wallet currency_core crypto common zlibstatic ethash libminiupnpc-static ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
 target_link_libraries(hash-tests crypto ethash)
 target_link_libraries(hash-target-tests crypto currency_core ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
-target_link_libraries(performance_tests rpc wallet currency_core common crypto zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
+target_link_libraries(performance_tests wallet rpc currency_core common crypto zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
 target_link_libraries(unit_tests wallet currency_core common crypto gtest_main zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
 target_link_libraries(net_load_tests_clt currency_core common crypto gtest_main ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
 target_link_libraries(net_load_tests_srv currency_core common crypto gtest_main ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES})
@@ -49,7 +49,7 @@ endif()
 
 
 add_custom_target(tests DEPENDS coretests hash performance_tests unit_tests)
-set_property(TARGET db_tests coretests crypto-tests functional_tests gtest gtest_main hash-tests hash-target-tests performance_tests unit_tests tests net_load_tests_clt net_load_tests_srv PROPERTY FOLDER "tests")
+set_property(TARGET db_tests db_size_test coretests crypto-tests functional_tests gtest gtest_main hash-tests hash-target-tests performance_tests unit_tests tests net_load_tests_clt net_load_tests_srv PROPERTY FOLDER "tests")
 
 add_test(crypto crypto-tests ${CMAKE_CURRENT_SOURCE_DIR}/crypto/tests.txt)
 foreach(hash IN ITEMS fast tree)
@@ -67,4 +67,5 @@ if(MSVC AND USE_PCH)
   set_property(SOURCE "core_tests/chaingen_pch.cpp" APPEND_STRING PROPERTY COMPILE_FLAGS " /Ycchaingen.h /Zm1000")
   set_property(TARGET coretests functional_tests hash-target-tests performance_tests unit_tests APPEND_STRING PROPERTY LINK_FLAGS "$(MSBuildProjectDirectory)/../src/$(ConfigurationName)/stdafx.obj")
   set_property(TARGET db_tests APPEND_STRING PROPERTY LINK_FLAGS "$(MSBuildProjectDirectory)/../../src/$(ConfigurationName)/stdafx.obj")
+  set_property(TARGET db_size_test APPEND_STRING PROPERTY LINK_FLAGS "$(MSBuildProjectDirectory)/../../src/$(ConfigurationName)/stdafx.obj")
 endif()

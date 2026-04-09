@@ -14,7 +14,7 @@ using namespace currency;
 
 cumulative_difficulty_adjustment_test::cumulative_difficulty_adjustment_test()
 {
-  epee::debug::get_set_enable_assert(true, true);
+  //epee::debug::get_set_enable_assert(true, true);
   REGISTER_CALLBACK_METHOD(cumulative_difficulty_adjustment_test, configure_core);
   REGISTER_CALLBACK_METHOD(cumulative_difficulty_adjustment_test, configure_check_height1);
   REGISTER_CALLBACK_METHOD(cumulative_difficulty_adjustment_test, memorize_main_chain);
@@ -25,7 +25,7 @@ cumulative_difficulty_adjustment_test::cumulative_difficulty_adjustment_test()
 }
 cumulative_difficulty_adjustment_test::~cumulative_difficulty_adjustment_test()
 {
-  epee::debug::get_set_enable_assert(true, false);
+  //epee::debug::get_set_enable_assert(true, false);
 }
 #define FIRST_ALIAS_NAME "first"
 #define SECOND_ALIAS_NAME "second"

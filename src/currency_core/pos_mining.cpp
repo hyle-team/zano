@@ -1,4 +1,4 @@
-// Copyright (c) 2022 Zano Project
+// Copyright (c) 2022-2024 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 //
@@ -56,7 +56,7 @@ namespace currency
 
     bool found = false;
 
-    if (this->zarcanum /* && td.is_zc() */)
+    if (this->zarcanum)
     {
       crypto::mp::uint256_t lhs;
       crypto::mp::uint512_t rhs;
@@ -70,7 +70,7 @@ namespace currency
         const boost::multiprecision::uint256_t d_mp = lhs / (crypto::c_zarcanum_z_coeff_mp * this->stake_amount) + 1;
         const boost::multiprecision::uint256_t ba = d_mp * crypto::c_zarcanum_z_coeff_mp * this->stake_amount - lhs;
         const boost::multiprecision::uint256_t l_div_z_D = this->z_l_div_z_D / crypto::c_zarcanum_z_coeff_mp;
-        LOG_PRINT_GREEN("Found Zarcanum kernel: amount: " << currency::print_money_brief(this->stake_amount) << /* ", gindex: " << td.m_global_output_index << */ ENDL
+        LOG_PRINT_GREEN("Found Zarcanum kernel: amount: " << currency::print_money_brief(this->stake_amount) << ENDL
           << "difficulty:            " << this->basic_diff << ENDL
           << "kernel info:           " << ENDL
           << print_stake_kernel_info(this->sk) 
@@ -78,9 +78,8 @@ namespace currency
           << "lhs:                 0x" << crypto::scalar_t(lhs).to_string_as_hex_number() << " = 0x" << std::hex << d_mp << " * 2^64 * " << this->stake_amount << " - 0x" << std::hex << ba << ENDL
           << "rhs:                 0x" << crypto::scalar_t(rhs).to_string_as_hex_number() << ENDL
           << "d:                   0x" << std::hex << d_mp << ENDL
-          << "l / floor(z * D):    0x" << std::hex << l_div_z_D
+          << "floor(l / z * D):    0x" << std::hex << l_div_z_D
           , LOG_LEVEL_0);
-
       }
     }
     else

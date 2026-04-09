@@ -71,7 +71,21 @@ struct gen_pos_too_early_pos_block : public pos_validation
 
 struct gen_pos_extra_nonce : public pos_validation
 {
+  gen_pos_extra_nonce();
+  bool configure_core(currency::core& c, size_t, const std::vector<test_event_entry>& events);
+  bool request_pow_template_with_nonce(currency::core& c, size_t, const std::vector<test_event_entry>& events);
+  bool check_pos_nonce(currency::core& c, size_t, const std::vector<test_event_entry>& events);
+  bool check_pow_nonce(currency::core& c, size_t, const std::vector<test_event_entry>& events);
   bool generate(std::vector<test_event_entry>& events) const;
+
+private:
+  bool has_extra_nonce(currency::block& blk, const std::string& expected_nonce);
+  
+private:
+  mutable currency::blobdata m_pow_nonce;
+  mutable currency::blobdata m_pos_nonce;
+  mutable currency::blobdata m_pow_template_nonce;
+  mutable std::vector<currency::account_base> m_accounts;
 };
 
 struct gen_pos_min_allowed_height : public pos_validation

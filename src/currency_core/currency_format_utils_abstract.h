@@ -200,6 +200,12 @@ namespace currency
   {
     try
     {
+      if (in_v.type() == typeid(txin_zc_input))
+      {
+        result = boost::get<txin_zc_input>(in_v).k_image;
+        return true;
+      }
+
       if (in_v.type() == typeid(txin_to_key))
       {
         result = boost::get<txin_to_key>(in_v).k_image;
@@ -209,12 +215,6 @@ namespace currency
       if (in_v.type() == typeid(txin_htlc))
       {
         result = boost::get<txin_htlc>(in_v).k_image;
-        return true;
-      }
-
-      if (in_v.type() == typeid(txin_zc_input))
-      {
-        result = boost::get<txin_zc_input>(in_v).k_image;
         return true;
       }
     }
@@ -229,14 +229,14 @@ namespace currency
   inline
   const crypto::key_image& get_key_image_from_txin_v(const txin_v& in_v)
   {
+    if (in_v.type() == typeid(txin_zc_input))
+      return boost::get<txin_zc_input>(in_v).k_image;
+
     if (in_v.type() == typeid(txin_to_key))
       return boost::get<txin_to_key>(in_v).k_image;
     
     if (in_v.type() == typeid(txin_htlc))
       return boost::get<txin_htlc>(in_v).k_image;
-
-    if (in_v.type() == typeid(txin_zc_input))
-      return boost::get<txin_zc_input>(in_v).k_image;
 
     CHECK_AND_ASSERT_THROW_MES(false, "[get_key_image_from_txin_v] Wrong type: " << in_v.type().name());
   }
@@ -244,14 +244,14 @@ namespace currency
   inline
   const std::vector<currency::txout_ref_v>& get_key_offsets_from_txin_v(const txin_v& in_v)
   {
+    if (in_v.type() == typeid(txin_zc_input))
+      return boost::get<txin_zc_input>(in_v).key_offsets;
+
     if (in_v.type() == typeid(txin_to_key))
       return boost::get<txin_to_key>(in_v).key_offsets;
     
     if (in_v.type() == typeid(txin_htlc))
       return boost::get<txin_htlc>(in_v).key_offsets;
-
-    if (in_v.type() == typeid(txin_zc_input))
-      return boost::get<txin_zc_input>(in_v).key_offsets;
 
     CHECK_AND_ASSERT_THROW_MES(false, "[get_key_offsets_from_txin_v] Wrong type: " << in_v.type().name());
   }
@@ -274,6 +274,35 @@ namespace currency
       if (out_v.type() == typeid(tx_out_zarcanum))
       {
         result = boost::get<tx_out_zarcanum>(out_v).mix_attr;
+        return true;
+      }
+    }
+    catch(...)
+    {
+      // should never go here, just precaution
+    }
+
+    return false;
+  }
+  //---------------------------------------------------------------
+  inline
+  bool get_out_pub_key_from_tx_out_v(const tx_out_v& out_v, crypto::public_key& result) noexcept
+  {
+    try
+    {
+      if (out_v.type() == typeid(tx_out_bare))
+      {
+        const txout_target_v& target_v = boost::get<tx_out_bare>(out_v).target;
+        if (target_v.type() == typeid(txout_to_key))
+        {
+          result = boost::get<txout_to_key>(target_v).key;
+          return true;
+        }
+      }
+      
+      if (out_v.type() == typeid(tx_out_zarcanum))
+      {
+        result = boost::get<tx_out_zarcanum>(out_v).stealth_address;
         return true;
       }
     }

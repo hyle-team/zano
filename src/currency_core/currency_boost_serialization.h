@@ -222,16 +222,7 @@ namespace boost
       a & x.buff;
     }
 
-    template <class Archive>
-    inline void serialize(Archive &a, currency::transaction &x, const boost::serialization::version_type ver)
-    {
-      a & x.version;
-      a & x.vin;
-      a & x.vout;
-      a & x.extra;
-      a & x.signatures;
-      a & x.attachment;
-    }
+
 
     template <class Archive>
     inline void serialize(Archive &a, currency::keypair &kp, const boost::serialization::version_type ver)

@@ -9,6 +9,7 @@
 #include <atomic>
 #include "net/net_utils_base.h"
 #include "copyable_atomic.h"
+#include "block_chain_shortener.h"
 
 namespace currency
 {
@@ -33,6 +34,10 @@ namespace currency
     std::list<block_context_info> m_needed_objects;
     std::unordered_set<crypto::hash> m_requested_objects;
     std::atomic<uint32_t> m_callback_request_count; //in debug purpose: problem with double callback rise
+    //
+    block_chain_shortener m_last_fetched_block_ids;
+    std::atomic<size_t> m_expected_NOTIFY_RESPONSE_GET_OBJECTS_count = 0;
+    std::atomic<size_t> m_expected_NOTIFY_RESPONSE_CHAIN_ENTRY_count = 0;
 
   };
 
@@ -47,10 +52,12 @@ namespace currency
     };
 
     state m_state;
-    uint64_t m_remote_blockchain_height;
+    uint64_t m_remote_blockchain_size; // height of the top block + 1
     uint64_t m_last_response_height;
     int64_t m_time_delta;
     std::string m_remote_version;
+    int m_build_number = 0;
+
   private:
     template<class t_core> friend class t_currency_protocol_handler;
     uncopybale_currency_context m_priv;

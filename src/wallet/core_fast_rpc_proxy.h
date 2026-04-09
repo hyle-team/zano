@@ -15,6 +15,11 @@ namespace tools
     core_fast_rpc_proxy(currency::core_rpc_server& rpc_srv) :m_rpc(rpc_srv)
     {}
     //------------------------------------------------------------------------------------------------------------------------------
+    virtual bool is_daemon_inbox() 
+    {
+      return true; 
+    }
+    //------------------------------------------------------------------------------------------------------------------------------
     virtual bool set_connection_addr(const std::string& url) override
     {
       return true;
@@ -93,6 +98,11 @@ namespace tools
       return m_rpc.on_get_alias_reward(req, res, m_err_stub, m_cntxt_stub);
     }
     //------------------------------------------------------------------------------------------------------------------------------
+    bool call_COMMAND_RPC_ALIAS_LOOKUP(const currency::COMMAND_RPC_ALIAS_LOOKUP::request& req, currency::COMMAND_RPC_ALIAS_LOOKUP::response& res) override
+    { 
+      return m_rpc.on_alias_lookup(req, res, m_err_stub, m_cntxt_stub);
+    }
+    //------------------------------------------------------------------------------------------------------------------------------
     bool call_COMMAND_RPC_GET_TRANSACTIONS(const currency::COMMAND_RPC_GET_TRANSACTIONS::request& req, currency::COMMAND_RPC_GET_TRANSACTIONS::response& rsp) override
     {
       return m_rpc.on_get_transactions(req, rsp, m_cntxt_stub);
@@ -141,6 +151,22 @@ namespace tools
     virtual bool call_COMMAND_RPC_GET_ASSET_INFO(const currency::COMMAND_RPC_GET_ASSET_INFO::request& req, currency::COMMAND_RPC_GET_ASSET_INFO::response& res)override
     {
       return m_rpc.on_get_asset_info(req, res, m_cntxt_stub);
+    }
+    //------------------------------------------------------------------------------------------------------------------------------
+    virtual bool call_COMMAND_RPC_INVOKE(const std::string& uri, const std::string& body, int& response_code, std::string& response_body) override
+    {
+      epee::net_utils::http::http_request_info query_info = AUTO_VAL_INIT(query_info);
+      query_info.m_URI = uri;
+      query_info.m_http_method = epee::net_utils::http::http_method_get;
+      query_info.m_body = body;
+
+      epee::net_utils::http::http_response_info response = AUTO_VAL_INIT(response);
+      epee::net_utils::connection_context_base conn_context = AUTO_VAL_INIT(conn_context);
+
+      bool res = m_rpc.handle_http_request(query_info, response, conn_context);
+      response_body = response.m_body;
+      response_code = response.m_response_code;
+      return res;
     }
     //------------------------------------------------------------------------------------------------------------------------------
     virtual bool get_transfer_address(const std::string& adr_str, currency::account_public_address& addr, std::string& payment_id) override

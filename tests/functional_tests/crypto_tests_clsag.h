@@ -219,8 +219,6 @@ TEST(clsag, bad_sig)
 
 TEST(clsag, sig_difference)
 {
-  int cmp_res = 0;
-
   clsag_gg_sig_check_t cc0, cc1;
   cc0.prepare_random_data(8);
   cc1 = cc0; // get the same input data

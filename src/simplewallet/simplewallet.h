@@ -29,7 +29,7 @@ namespace currency
     typedef std::vector<std::string> command_type;
 
     simple_wallet();
-    ~simple_wallet();
+    virtual ~simple_wallet();
     bool init(const boost::program_options::variables_map& vm);
     bool deinit();
     bool run();
@@ -50,13 +50,15 @@ namespace currency
     bool close_wallet();
 
     bool help(const std::vector<std::string> &args = std::vector<std::string>());
+#ifdef CPU_MINING_ENABLED
     bool start_mining(const std::vector<std::string> &args);
     bool stop_mining(const std::vector<std::string> &args);
+#endif // #ifdef CPU_MINING_ENABLED
     bool refresh(const std::vector<std::string> &args);
     bool show_balance(const std::vector<std::string> &args = std::vector<std::string>());
     bool list_recent_transfers(const std::vector<std::string>& args);
     bool export_recent_transfers(const std::vector<std::string>& args);
-    bool dump_trunsfers(const std::vector<std::string>& args);
+    bool dump_transfers(const std::vector<std::string>& args);
     bool dump_key_images(const std::vector<std::string>& args);
     bool show_incoming_transfers(const std::vector<std::string> &args);
     bool show_staking_history(const std::vector<std::string>& args);
@@ -71,7 +73,9 @@ namespace currency
     bool print_utxo_distribution(const std::vector<std::string> &args);    
     bool show_blockchain_height(const std::vector<std::string> &args);
     bool show_wallet_bcheight(const std::vector<std::string> &args);    
+    bool transfer_impl(const std::vector<std::string> &args, uint64_t fee);
     bool transfer(const std::vector<std::string> &args);
+    bool transfer_so(const std::vector<std::string> &args);
     bool resync_wallet(const std::vector<std::string> &args);    
     bool print_address(const std::vector<std::string> &args = std::vector<std::string>());
     bool show_seed(const std::vector<std::string> &args);
@@ -82,6 +86,7 @@ namespace currency
     bool enable_console_logger(const std::vector<std::string> &args);
     bool integrated_address(const std::vector<std::string> &args);
     bool get_tx_key(const std::vector<std::string> &args_);
+    bool check_all_tx_keys(const std::vector<std::string> &args_);
     bool tracking_seed(const std::vector<std::string> &args_);
     bool save_watch_only(const std::vector<std::string> &args);
     bool sign_transfer(const std::vector<std::string> &args);
@@ -91,12 +96,13 @@ namespace currency
     bool tor_enable(const std::vector<std::string> &args);
     bool tor_disable(const std::vector<std::string> &args);
     bool deploy_new_asset(const std::vector<std::string> &args);
+    bool call_rpc(const std::vector<std::string>& args);
     bool add_custom_asset_id(const std::vector<std::string> &args);
     bool remove_custom_asset_id(const std::vector<std::string> &args);
     bool emit_asset(const std::vector<std::string> &args);
     bool burn_asset(const std::vector<std::string> &args);
     bool update_asset(const std::vector<std::string> &args);
-
+    bool transfer_asset_ownership(const std::vector<std::string>& args);
     //----------------------------------------------------------------------------------------------------
     bool generate_ionic_swap_proposal(const std::vector<std::string> &args);
     bool get_ionic_swap_proposal_info(const std::vector<std::string> &args);
@@ -109,7 +115,7 @@ namespace currency
 
     uint64_t get_daemon_blockchain_height(std::string& err);
     bool try_connect_to_daemon();
-    std::string get_tocken_info_string(const crypto::public_key& asset_id, uint64_t& decimal_point);
+    std::string get_token_info_string(const crypto::public_key& asset_id, uint64_t& decimal_point);
     bool print_wti(const tools::wallet_public::wallet_transfer_info& wti);
     bool check_password_for_operation();
     crypto::hash get_hash_from_pass_and_salt(const std::string& pass, uint64_t salt);
@@ -177,6 +183,9 @@ namespace currency
     };
 
   private:
+    void preconfig_wallet_obj();
+    bool process_ki_restoration();
+
     std::string m_wallet_file;
     std::string m_generate_new;
     std::string m_generate_new_aw;
@@ -190,9 +199,13 @@ namespace currency
     bool m_do_pos_mining;
     bool m_offline_mode;
     bool m_disable_tor;
+    bool m_do_not_unlock_reserved_on_idle = false;
     std::string m_restore_wallet;
     std::string m_voting_config_file;
     bool m_no_password_confirmations = false;
+    bool m_no_whitelist = false;
+    std::string m_restore_ki_in_wo_wallet;
+    bool m_concise_mode = false;
     
     crypto::hash m_password_hash;
     uint64_t m_password_salt;

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -11,6 +11,7 @@
 #include <vector>
 #include <boost/algorithm/string.hpp>
 
+#include "wallet/wallet2.h"
 #include "currency_core/currency_format_utils.h"
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "include_base_utils.h"
@@ -71,10 +72,10 @@ namespace tools
       std::string to_string() const
       {
         std::ostringstream ss;
-        ss << m_loc << '[' << boost::replace_all_copy(std::string(typeid(*this).name()), "struct ", "");
+        ss << '[' << boost::replace_all_copy(std::string(typeid(*this).name()), "struct ", "");
         if (!m_error_code.empty())
           ss << "[" << m_error_code << "]";
-        ss << "] " << Base::what();
+        ss << "] " << m_loc << ENDL << "  " << Base::what();
         return ss.str();
       }
 
@@ -321,6 +322,11 @@ namespace tools
       const currency::transaction m_tx;
     };
     //----------------------------------------------------------------------------------------------------
+    struct wallet_error_resync_needed : public std::exception
+    {
+      virtual const char* what() const noexcept override { return "wallet_error_resync_needed"; }
+    };
+    //----------------------------------------------------------------------------------------------------
     struct tx_parse_error : public refresh_error
     {
       explicit tx_parse_error(std::string&& loc, const currency::blobdata& tx_blob)
@@ -350,12 +356,13 @@ namespace tools
     //----------------------------------------------------------------------------------------------------
     struct not_enough_money : public transfer_error
     {
-      not_enough_money(std::string&& loc, uint64_t availbable, uint64_t tx_amount, uint64_t fee, const crypto::public_key& asset_id)
+      not_enough_money(std::string&& loc, uint64_t availbable, uint64_t tx_amount, uint64_t fee, const crypto::public_key& asset_id, uint8_t decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT)
         : transfer_error(std::move(loc), "")
         , m_available(availbable)
         , m_tx_amount(tx_amount)
         , m_fee(fee)
         , m_asset_id(asset_id)
+        , m_decimal_point(decimal_point)
       {
       }
 
@@ -367,9 +374,9 @@ namespace tools
       {
         std::ostringstream ss;
         ss << transfer_error::to_string() <<
-          "available: " << currency::print_money_brief(m_available) <<
-          ", required: " << currency::print_money_brief(m_tx_amount + m_fee) <<
-          " = " << currency::print_money_brief(m_tx_amount) << " + " << currency::print_money_brief(m_fee) << " (fee)";
+          "available: " << currency::print_money_brief(m_available, m_decimal_point) <<
+          ", required: " << currency::print_money_brief(m_tx_amount + m_fee, m_decimal_point) <<
+          " = " << currency::print_money_brief(m_tx_amount, m_decimal_point) << " + " << currency::print_money_brief(m_fee) << " (fee)";
         if (m_asset_id != currency::native_coin_asset_id)
           ss << ", asset_id: " << m_asset_id;
         return ss.str();
@@ -380,11 +387,13 @@ namespace tools
       uint64_t m_tx_amount;
       uint64_t m_fee;
       crypto::public_key m_asset_id;
+      uint8_t m_decimal_point;
     };
 
     struct no_zc_inputs : public transfer_error
     {
-      no_zc_inputs(const std::string& /*v*/): transfer_error(std::string(""), API_RETURN_CODE_MISSING_ZC_INPUTS)
+      no_zc_inputs(std::string&& loc, const std::string&)
+        : transfer_error(std::move(loc), API_RETURN_CODE_MISSING_ZC_INPUTS)
       {}      
 
       virtual const char* what() const noexcept
@@ -434,17 +443,25 @@ namespace tools
       typedef std::vector<currency::tx_source_entry> sources_t;
       typedef std::vector<currency::tx_destination_entry> destinations_t;
 
-      explicit tx_not_constructed(std::string&& loc, const sources_t& sources, const destinations_t& destinations, uint64_t unlock_time)
+      explicit tx_not_constructed(std::string&& loc, const sources_t& sources, const destinations_t& destinations, uint64_t unlock_time, const std::unordered_map<crypto::public_key, size_t>& asset_dp)
         : transfer_error(std::move(loc), "transaction was not constructed")
         , m_sources(sources)
         , m_destinations(destinations)
         , m_unlock_time(unlock_time)
+        , m_asset_decimal_point(asset_dp)
       {
       }
 
       const sources_t& sources() const { return m_sources; }
       const destinations_t& destinations() const { return m_destinations; }
       uint64_t unlock_time() const { return m_unlock_time; }
+      size_t get_decimal_point(crypto::public_key asset_id) const 
+      {
+        auto it = m_asset_decimal_point.find(asset_id);
+        if (it != m_asset_decimal_point.end())
+          return it->second;
+        return CURRENCY_DISPLAY_DECIMAL_POINT;
+      }
 
       std::string to_string() const
       {
@@ -455,7 +472,7 @@ namespace tools
         {
           const currency::tx_source_entry& src = m_sources[i];
           ss << "\n  " << i << ": ";
-          ss << " amount: " << std::setw(21) << currency::print_money(src.amount);
+          ss << " amount: " << std::setw(21) << currency::print_money(src.amount, get_decimal_point(src.asset_id));
           ss << (src.is_zc() ? " ZC  " : " old ");
           ss << " asset_id: " << src.asset_id;
            for (size_t j = 0; j < src.outputs.size(); ++j)
@@ -489,7 +506,7 @@ namespace tools
           {
             ss << currency::get_account_address_as_str(a) << ";";
           } 
-          ss << " amount: " << std::setw(21) << currency::print_money(dst.amount);
+          ss << " amount: " << std::setw(21) << currency::print_money(dst.amount, get_decimal_point(dst.asset_id));
           ss << " asset_id: " << dst.asset_id;
         }
 
@@ -502,6 +519,7 @@ namespace tools
       sources_t m_sources;
       destinations_t m_destinations;
       uint64_t m_unlock_time;
+      std::unordered_map<crypto::public_key, size_t> m_asset_decimal_point;
     };
     //----------------------------------------------------------------------------------------------------
     struct tx_rejected : public transfer_error
@@ -532,15 +550,24 @@ namespace tools
     //----------------------------------------------------------------------------------------------------
     struct tx_sum_overflow : public transfer_error
     {
-      tx_sum_overflow(std::string&& loc, const std::vector<currency::tx_destination_entry>& destinations, uint64_t fee)
+      tx_sum_overflow(std::string&& loc, const std::vector<currency::tx_destination_entry>& destinations, uint64_t fee, std::unordered_map<crypto::public_key, size_t> asset_dp)
         : transfer_error(std::move(loc), "transaction sum + fee exceeds " + currency::print_money(std::numeric_limits<uint64_t>::max()))
         , m_destinations(destinations)
         , m_fee(fee)
+        , m_asset_decimal_point(asset_dp)
       {
       }
 
       const std::vector<currency::tx_destination_entry>& destinations() const { return m_destinations; }
       uint64_t fee() const { return m_fee; }
+
+      size_t get_decimal_point(crypto::public_key asset_id) const 
+      {
+        auto it = m_asset_decimal_point.find(asset_id);
+        if (it != m_asset_decimal_point.end())
+          return it->second;
+        return CURRENCY_DISPLAY_DECIMAL_POINT;
+      }
 
       std::string to_string() const
       {
@@ -550,7 +577,7 @@ namespace tools
           ", destinations:";
         for (const auto& dst : m_destinations)
         {
-          ss << '\n' << currency::print_money(dst.amount) << " -> ";
+          ss << '\n' << currency::print_money(dst.amount, get_decimal_point(dst.asset_id)) << " -> ";
           for (const auto& a : dst.addr)
             ss << currency::get_account_address_as_str(a) << " ";
         }
@@ -560,38 +587,52 @@ namespace tools
     private:
       std::vector<currency::tx_destination_entry> m_destinations;
       uint64_t m_fee;
+      std::unordered_map<crypto::public_key, size_t> m_asset_decimal_point;
     };
     //----------------------------------------------------------------------------------------------------
     struct tx_too_big : public transfer_error
     {
-      explicit tx_too_big(std::string&& loc, const currency::transaction& tx, uint64_t tx_size_limit)
-        : transfer_error(std::move(loc), "transaction is too big")
-        , m_tx(tx)
-        , m_tx_size_limit(tx_size_limit)
+      explicit tx_too_big(std::string&& loc, const std::string& message)
+        : transfer_error(std::move(loc), API_RETURN_CODE_TX_IS_TOO_BIG)
+        , m_message(message)
       {
       }
 
-      const currency::transaction& tx() const { return m_tx; }
-      uint64_t tx_size_limit() const { return m_tx_size_limit; }
+      const std::string get_message() const { return m_message; }
 
+      // TODO the following overrides need to be redesigned (seems to be necessary for API, consider writing API tests and then refactor this) -- sowle
       std::string to_string() const
       {
-        std::ostringstream ss;
-        ss << API_RETURN_CODE_TX_IS_TOO_BIG;
-        //currency::transaction tx = m_tx;
-        //ss << transfer_error::to_string() <<
-        //  ", tx_size_limit = " << m_tx_size_limit <<
-        //  ", tx size = " << get_object_blobsize(m_tx) <<
-        //  ", tx:\n" << currency::obj_to_json_str(tx);
-        return ss.str();
+        return API_RETURN_CODE_TX_IS_TOO_BIG;
       }
       virtual const char* what() const noexcept
       {
         return API_RETURN_CODE_TX_IS_TOO_BIG;
       }
     private:
-      currency::transaction m_tx;
-      uint64_t m_tx_size_limit;
+      std::string m_message;
+    };
+    //----------------------------------------------------------------------------------------------------
+    struct tx_has_too_many_outs : public transfer_error
+    {
+      explicit tx_has_too_many_outs(std::string&& loc, const std::string& message)
+        : transfer_error(std::move(loc), API_RETURN_CODE_TX_HAS_TOO_MANY_OUTPUTS)
+        , m_message(message)
+      {
+      }
+
+      const std::string get_message() const { return m_message; }
+
+      /*std::string to_string() const
+      {
+        return API_RETURN_CODE_TX_HAS_TOO_MANY_OUTPUTS;
+      }
+      virtual const char* what() const noexcept
+      {
+        return API_RETURN_CODE_TX_HAS_TOO_MANY_OUTPUTS;
+      }*/
+    private:
+      std::string m_message;
     };
     //----------------------------------------------------------------------------------------------------
     struct zero_destination : public transfer_error
@@ -665,8 +706,38 @@ namespace tools
       std::string m_wallet_file;
     };
     //----------------------------------------------------------------------------------------------------
+    struct wallet_error_with_rpc_code : public wallet_logic_error
+    {
+      const std::string& rpc_error_message() const { return m_rpc_error_message; }
+      int64_t rpc_error_code() const { return m_rpc_error_code; }
 
-#if !defined(_MSC_VER)
+      std::string to_string() const
+      {
+        std::ostringstream ss;
+        ss << wallet_logic_error::to_string() << ", code = " << m_rpc_error_code << ", message = " << m_rpc_error_message;
+        return ss.str();
+      }
+
+      wallet_error_with_rpc_code(std::string&& loc, int64_t rpc_error_code, const std::string& rpc_error_message)
+        : wallet_logic_error(std::move(loc), rpc_error_message)
+        , m_rpc_error_code(rpc_error_code)
+        , m_rpc_error_message(rpc_error_message)
+      {
+      }
+
+      wallet_error_with_rpc_code(std::string&& loc, int64_t rpc_error_code, const std::string& rpc_error_message, const std::string& message)
+        : wallet_logic_error(std::move(loc), message)
+        , m_rpc_error_code(rpc_error_code)
+        , m_rpc_error_message(rpc_error_message)
+      {
+      }
+
+    private:
+      int64_t m_rpc_error_code;
+      std::string m_rpc_error_message;
+    };
+    //----------------------------------------------------------------------------------------------------
+
 
     template<typename TException, typename... TArgs>
     void throw_wallet_ex(std::string&& loc, const TArgs&... args)
@@ -675,31 +746,6 @@ namespace tools
       LOG_PRINT_L0(e.to_string());
       throw e;
     }
-
-#else
-    #include <boost/preprocessor/repetition/enum_binary_params.hpp>
-    #include <boost/preprocessor/repetition/enum_params.hpp>
-    #include <boost/preprocessor/repetition/repeat_from_to.hpp>
-
-    template<typename TException>
-    void throw_wallet_ex(std::string&& loc)
-    {
-      TException e(std::move(loc));
-      LOG_PRINT_L0(e.to_string());
-      throw e;
-    }
-
-#define GEN_throw_wallet_ex(z, n, data)                                                       \
-    template<typename TException, BOOST_PP_ENUM_PARAMS(n, typename TArg)>                     \
-    void throw_wallet_ex(std::string&& loc, BOOST_PP_ENUM_BINARY_PARAMS(n, const TArg, &arg)) \
-    {                                                                                         \
-      TException e(std::move(loc), BOOST_PP_ENUM_PARAMS(n, arg));                             \
-      LOG_PRINT_L0(e.to_string());                                                            \
-      throw e;                                                                                \
-    }
-
-    BOOST_PP_REPEAT_FROM_TO(1, 6, GEN_throw_wallet_ex, ~)
-#endif
   }
 }
 
@@ -737,14 +783,14 @@ if (!(cond))                                                                    
 }
 
 
-#define THROW_IF_FALSE_WALLET_EX_MES(cond, err_type, mess, ...)                                            \
+#define THROW_IF_FALSE_WALLET_EX_MES(cond, err_type, mes, ...)                                             \
 if (!(cond))                                                                                               \
 {                                                                                                          \
   exception_handler();                                                                                     \
   std::stringstream ss;                                                                                    \
-  ss << std::endl << mess;                                                                                 \
-  LOG_ERROR(#cond << ". THROW EXCEPTION: " << #err_type);                                                  \
-  tools::error::throw_wallet_ex<err_type>(std::string(__FILE__ ":" STRINGIZE(__LINE__)) + ss.str(), ## __VA_ARGS__); \
+  ss << mes;                                                                                               \
+  LOG_ERROR(#cond << ". THROW EXCEPTION: " << #err_type << " : " << ss.str());                             \
+  tools::error::throw_wallet_ex<err_type>(std::string(__FILE__ ":" STRINGIZE(__LINE__)), ss.str(), ## __VA_ARGS__); \
 }
 
 

@@ -62,7 +62,7 @@ void parse_weird_tx()
   std::string tx_blob;
   epee::string_tools::parse_hexstr_to_binbuff(tx_hex_buff, tx_blob);
   currency::transaction tx;
-  bool r = currency::parse_and_validate_tx_from_blob(tx_blob, tx);
+  currency::parse_and_validate_tx_from_blob(tx_blob, tx);
   std::string res_hash = epee::string_tools::pod_to_hex(currency::get_transaction_hash(tx));
   if (res_hash != expected_hash)
   {

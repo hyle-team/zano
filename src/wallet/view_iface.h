@@ -201,11 +201,13 @@ public:
 
     std::list<tools::wallet_public::asset_balance_entry> balances;
     uint64_t minied_total;
+    bool has_bare_unspent_outputs;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_CHAIN_BASE(wallet_status_info_base)
       KV_SERIALIZE(balances)
       KV_SERIALIZE(minied_total)
+      KV_SERIALIZE(has_bare_unspent_outputs)
     END_KV_SERIALIZE_MAP()
   };  
   
@@ -444,12 +446,34 @@ public:
     END_KV_SERIALIZE_MAP()
   };
 
+  struct restore_wallet_from_derivation_request
+  {
+    std::string pass;
+    std::string path;
+    std::string secret_derivation;
+    bool is_auditable = false;
+    uint64_t creation_timestamp;
+
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(pass)
+      KV_SERIALIZE(path)
+      KV_SERIALIZE_BLOB_AS_HEX_STRING(secret_derivation)
+      KV_SERIALIZE(is_auditable)
+      KV_SERIALIZE(creation_timestamp)
+    END_KV_SERIALIZE_MAP()
+  };
+
   struct open_wallet_response
   {
     uint64_t wallet_id;
     transfers_array recent_history;
     wallet_info wi;
     std::string seed;
+    std::string private_spend_key;
+    std::string private_view_key;
+    std::string public_spend_key;
+    std::string public_view_key;
     bool recovered;
     uint64_t wallet_local_bc_size;
     uint64_t wallet_file_size;
@@ -461,6 +485,10 @@ public:
       KV_SERIALIZE(recent_history)
       KV_SERIALIZE(wi)
       KV_SERIALIZE(seed)
+      KV_SERIALIZE(private_spend_key)
+      KV_SERIALIZE(private_view_key)
+      KV_SERIALIZE(public_spend_key)
+      KV_SERIALIZE(public_view_key)
       KV_SERIALIZE(recovered)
       KV_SERIALIZE(wallet_local_bc_size)
       KV_SERIALIZE(wallet_file_size)
@@ -482,12 +510,14 @@ public:
     bool is_online;
     bool last_daemon_is_disconnected;
     bool is_server_busy;
+    bool is_remote_node_mode;
     uint64_t last_proxy_communicate_timestamp;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(is_online)
-      KV_SERIALIZE(is_server_busy)
       KV_SERIALIZE(last_daemon_is_disconnected)
+      KV_SERIALIZE(is_server_busy)
+      KV_SERIALIZE(is_remote_node_mode)
       KV_SERIALIZE(last_proxy_communicate_timestamp)
     END_KV_SERIALIZE_MAP()
   };
@@ -592,6 +622,7 @@ public:
     uint64_t progress;
     uint64_t current_daemon_height;
     uint64_t current_wallet_height;
+    uint64_t sync_speed; //download speed, bytes per second
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(is_daemon_connected)
@@ -600,6 +631,7 @@ public:
       KV_SERIALIZE(progress)
       KV_SERIALIZE(current_daemon_height)
       KV_SERIALIZE(current_wallet_height)
+      KV_SERIALIZE(sync_speed)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -729,12 +761,14 @@ public:
 
   struct gui_options
   {
-    bool use_debug_mode;
-    bool disable_price_fetch;
+    bool use_debug_mode = false;
+    bool disable_price_fetch = false;
+    int32_t rpc_port = 0;
 
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(use_debug_mode)
       KV_SERIALIZE(disable_price_fetch)
+      KV_SERIALIZE(rpc_port)
     END_KV_SERIALIZE_MAP()
 
   };

@@ -47,6 +47,13 @@ namespace epee
       return serialization::load_t_from_json(result_struct, body);
     }
 
+    struct storage_limits_default_strategy
+    {
+      static inline const epee::serialization::portable_storage_limits& get_storage_limits()
+      {
+        return epee::serialization::gdefault_portable_storage_limits;
+      }
+    };
 
     template<class t_request, class t_response, class t_transport>
     bool invoke_http_json_remote_command2(const std::string& url, t_request& out_struct, t_response& result_struct, t_transport& transport, unsigned int timeout = 5000, const std::string& method = "GET")
@@ -77,10 +84,8 @@ namespace epee
       return serialization::load_t_from_json(result_struct, pri->m_body);
     }
 
-
-
-    template<class t_request, class t_response, class t_transport>
-    bool invoke_http_bin_remote_command2(const std::string& url, t_request& out_struct, t_response& result_struct, t_transport& transport, unsigned int timeout = 5000, const std::string& method = "GET")
+    template<class storage_limits_strategy, class t_request, class t_response, class t_transport>
+    bool invoke_http_bin_remote_command2_limits(const std::string& url, t_request& out_struct, t_response& result_struct, t_transport& transport, unsigned int timeout = 5000, const std::string& method = "GET")
     {
       std::string req_param;
       if(!serialization::store_t_to_binary(out_struct, req_param))
@@ -109,7 +114,13 @@ namespace epee
         return false;
       }
 
-      return serialization::load_t_from_binary(result_struct, pri->m_body);
+      return serialization::load_t_from_binary(result_struct, pri->m_body, storage_limits_strategy::get_storage_limits());
+    }
+
+    template<class t_request, class t_response, class t_transport>
+    bool invoke_http_bin_remote_command2(const std::string& url, t_request& out_struct, t_response& result_struct, t_transport& transport, unsigned int timeout = 5000, const std::string& method = "GET")
+    {
+      return invoke_http_bin_remote_command2_limits<storage_limits_default_strategy>(url, out_struct, result_struct, transport, timeout, method);
     }
 
 
@@ -153,10 +164,10 @@ namespace epee
       return true;
     }
 
-    template<class t_command, class t_transport>
+    template<class t_command, class t_transport, class storage_limits_strategy = storage_limits_default_strategy>
     bool invoke_http_json_rpc(const std::string& url, typename t_command::request& out_struct, typename t_command::response& result_struct, t_transport& transport, unsigned int timeout = 5000, const std::string& http_method = "GET", const std::string& req_id = "0")
     {
-      return invoke_http_json_rpc(url, t_command::methodname(), out_struct, result_struct, transport, timeout, http_method, req_id);
+      return invoke_http_json_rpc<storage_limits_strategy>(url, t_command::methodname(), out_struct, result_struct, transport, timeout, http_method, req_id);
     }
 
   }

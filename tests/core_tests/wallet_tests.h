@@ -104,9 +104,9 @@ struct gen_wallet_transfers_and_chain_switch : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
 };
 
-struct gen_wallet_decrypted_attachments : public wallet_test, virtual public tools::i_wallet2_callback
+struct gen_wallet_decrypted_payload_items : public wallet_test, virtual public tools::i_wallet2_callback
 {
-  gen_wallet_decrypted_attachments();
+  gen_wallet_decrypted_payload_items();
   bool generate(std::vector<test_event_entry>& events) const;
 
   // intrface tools::i_wallet2_callback
@@ -299,6 +299,13 @@ struct wallet_and_sweep_below : public wallet_test
 struct block_template_blacklist_test : public wallet_test
 {
   block_template_blacklist_test();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};
+
+struct wallet_reorganize_and_trim_test : public wallet_test
+{
+  wallet_reorganize_and_trim_test();
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };

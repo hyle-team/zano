@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2019 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -25,6 +25,7 @@ using namespace epee;
 #include "storages/http_abstract_invoke.h"
 #include "net/http_client.h"
 #include "currency_core/genesis_acc.h"
+#include "common/db_backend_lmdb.h"
 #include <cstdlib>
 
 namespace po = boost::program_options;
@@ -56,13 +57,13 @@ namespace
   const command_line::arg_descriptor<std::string> arg_generate_genesis    ("generate-genesis", "Generate genesis coinbase based on config file");
   const command_line::arg_descriptor<uint64_t>    arg_genesis_split_amount  ( "genesis-split-amount", "Set split amount for generating genesis block");
   const command_line::arg_descriptor<std::string> arg_get_info_flags      ( "getinfo-flags-hex", "Set of bits for rpc-get-daemon-info", "");
-  const command_line::arg_descriptor<int64_t>    arg_set_peer_log_level  ( "set-peer-log-level", "Set log level for remote peer");
-  const command_line::arg_descriptor<std::string> arg_download_peer_log   ( "download-peer-log", "Download log from remote peer <starting_offset>[,<count>]");
+  const command_line::arg_descriptor<bool>        arg_get_anonymized_peers( "get-anonymized-peers", "Retrieves anonymized peers connected to the specified peer.");
   const command_line::arg_descriptor<bool>        arg_do_consloe_log     ( "do-console-log", "Tool generates debug console output(debug purposes)");
   const command_line::arg_descriptor<std::string> arg_generate_integrated_address  ( "generate-integrated-address", "Tool create integrated address from simple address and payment_id");
   const command_line::arg_descriptor<std::string> arg_pack_file           ("pack-file", "perform gzip-packing and calculate hash for a given file");
   const command_line::arg_descriptor<std::string> arg_unpack_file         ("unpack-file", "Perform gzip-unpacking and calculate hash for a given file");
   const command_line::arg_descriptor<std::string> arg_target_file         ("target-file", "Specify target file for pack-file and unpack-file commands");
+  const command_line::arg_descriptor<std::string> arg_lmdb_page_4to16          ("convert-lmdb-4to16", "Perform LMDB conversion from 4k page size to 16k page size");
   //const command_line::arg_descriptor<std::string> arg_send_ipc            ("send-ipc", "Send IPC request to UI");
 }
 
@@ -412,7 +413,7 @@ bool generate_genesis(const std::string& path_config, uint64_t premine_split_amo
   std::cout << ENDL << "PROOF PHRASE: " << gcp.proof_string << ENDL;
   uint64_t block_reward_without_fee = 0;
   uint64_t block_reward = 0;
-  construct_miner_tx(0, 0, 0, 0, 0, dummy_address, dummy_address, bl.miner_tx, block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4, gcp.proof_string, CURRENCY_MINER_TX_MAX_OUTS, false, pos_entry(), nullptr, nullptr, destinations);
+  construct_miner_tx(0, 0, 0, 0, 0, dummy_address, dummy_address, bl.miner_tx, block_reward_without_fee, block_reward, TRANSACTION_VERSION_PRE_HF4, 0, gcp.proof_string, CURRENCY_MINER_TX_MAX_OUTS, false, pos_entry(), nullptr, nullptr, destinations);
   currency::blobdata txb = tx_to_blob(bl.miner_tx);
 
   //self validate block
@@ -744,23 +745,23 @@ bool get_private_key(crypto::secret_key& pk, po::variables_map& vm)
   }
   else
   {
-    key_str = get_password("Enter maintain private key:");
+    key_str = get_password("Enter maintenance private key:");
   }
   
   if(!string_tools::hex_to_pod(key_str, pk))
   {
-    std::cout << "ERROR: wrong secret key set" << ENDL;
+    std::cout << "ERROR: incorrect private key entered" << ENDL;
     return false;
   }
   crypto::public_key pubkey = AUTO_VAL_INIT(pubkey);
   if(!crypto::secret_key_to_public_key(pk, pubkey))
   {
-    std::cout << "ERROR: wrong secret key set(secret_key_to_public_key failed)" << ENDL;
+    std::cout << "ERROR: wrong private key (secret_key_to_public_key failed)" << ENDL;
     return false;
   }
   if( pubkey != tools::get_public_key_from_string(P2P_MAINTAINERS_PUB_KEY))
   {
-    std::cout << "ERROR: wrong secret key set(public keys not match)" << ENDL;
+    std::cout << "ERROR: wrong pritvate key (public key missmatch)" << ENDL;
     return false;
   }
   return true;
@@ -825,7 +826,7 @@ bool handle_increment_build_no(po::variables_map& vm)
 bool handle_update_maintainers_info(po::variables_map& vm)
 {
   log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
-  size_t rpc_port = RPC_DEFAULT_PORT;
+  [[maybe_unused]] size_t rpc_port = RPC_DEFAULT_PORT;
   if(!command_line::has_arg(vm, arg_rpc_port))
   {
     std::cout << "ERROR: rpc port not set" << ENDL;
@@ -921,154 +922,34 @@ bool invoke_debug_command(po::variables_map& vm, const crypto::secret_key& sk, n
   return net_utils::invoke_remote_command2(command_t::ID, req, rsp, transport);
 }
 //---------------------------------------------------------------------------------------------------------------
-bool handle_set_peer_log_level(po::variables_map& vm)
+bool handle_get_anonymized_peers(po::variables_map& vm)
 {
-  crypto::secret_key sk = AUTO_VAL_INIT(sk);
+  crypto::secret_key sk{};
   if (!get_private_key(sk, vm))
   {
     std::cout << "ERROR: secret key error" << ENDL;
     return false;
   }
 
-  int64_t log_level = command_line::get_arg(vm, arg_set_peer_log_level);
-  if (log_level < LOG_LEVEL_0 || log_level > LOG_LEVEL_MAX)
-  {
-    std::cout << "Error: invalid log level value: " << log_level << ENDL;
-    return false;
-  }
-
   net_utils::levin_client2 transport;
   peerid_type peer_id = 0;
 
-  COMMAND_SET_LOG_LEVEL::request req = AUTO_VAL_INIT(req);
-  req.new_log_level = log_level;
+  COMMAND_REQUEST_ANONYMIZED_PEERS::request req{};
   
-  COMMAND_SET_LOG_LEVEL::response rsp = AUTO_VAL_INIT(rsp);
-  if (!invoke_debug_command<COMMAND_SET_LOG_LEVEL>(vm, sk, transport, peer_id, req, rsp))
+  COMMAND_REQUEST_ANONYMIZED_PEERS::response rsp{};
+  if (!invoke_debug_command<COMMAND_REQUEST_ANONYMIZED_PEERS>(vm, sk, transport, peer_id, req, rsp))
   {
-    std::cout << "ERROR: invoking COMMAND_SET_LOG_LEVEL failed" << ENDL;
+    std::cout << "ERROR: invoking COMMAND_REQUEST_ANONYMIZED_PEERS failed" << ENDL;
     return false;
   }
 
-  std::cout << "OK! Log level changed: " << rsp.old_log_level << " -> " << rsp.current_log_level << ENDL;
+  std::cout << "Success." << ENDL << ENDL;
+
+  std::cout << epee::serialization::store_t_to_json(rsp);
 
   return true;
 }
 //---------------------------------------------------------------------------------------------------------------
-bool handle_download_peer_log(po::variables_map& vm)
-{
-  crypto::secret_key sk = AUTO_VAL_INIT(sk);
-  if (!get_private_key(sk, vm))
-  {
-    std::cout << "ERROR: secret key error" << ENDL;
-    return false;
-  }
-
-  int64_t start_offset_signed = 0;
-  int64_t count = -1;
-
-  std::string arg_str = command_line::get_arg(vm, arg_download_peer_log);
-  size_t comma_pos = arg_str.find(',');
-  if (comma_pos != std::string::npos)
-  {
-    // count is specified
-    if (!epee::string_tools::string_to_num_fast(arg_str.substr(comma_pos + 1), count) || count < 0)
-    {
-      std::cout << "ERROR: invalid argument: " << arg_str << ENDL;
-      return false;
-    }
-    arg_str.erase(comma_pos);
-  }
-  if (!epee::string_tools::string_to_num_fast(arg_str, start_offset_signed) || start_offset_signed < 0)
-  {
-    std::cout << "ERROR: couldn't parse start_offset: " << arg_str << ENDL;
-    return false;
-  }
-  uint64_t start_offset = static_cast<uint64_t>(start_offset_signed);
-
-  net_utils::levin_client2 transport;
-  peerid_type peer_id = 0;
-
-  COMMAND_REQUEST_LOG::request req = AUTO_VAL_INIT(req);
-  COMMAND_REQUEST_LOG::response rsp = AUTO_VAL_INIT(rsp);
-  if (!invoke_debug_command<COMMAND_REQUEST_LOG>(vm, sk, transport, peer_id, req, rsp) || !rsp.error.empty())
-  {
-    std::cout << "ERROR: invoking COMMAND_REQUEST_LOG failed: " << rsp.error << ENDL;
-    return false;
-  }
-
-  std::cout << "Current log level: " << rsp.current_log_level << ENDL;
-  std::cout << "Current log size:  " << rsp.current_log_size << ENDL;
-
-  if (start_offset == 0 && count == 0)
-    return true; // a caller wanted to just get the info, end of story
-
-  if (start_offset >= rsp.current_log_size)
-  {
-    std::cout << "ERROR: invalid start offset: " << start_offset << ", log size: " << rsp.current_log_size << ENDL;
-    return false;
-  }
-
-  std::cout << "Downloading..." << ENDL;
-
-  std::string local_filename = tools::get_default_data_dir() + "/log_" + epee::string_tools::num_to_string_fast(peer_id) + ".log";
-  std::ofstream log{ local_filename, std::ifstream::binary };
-  if (!log)
-  {
-    std::cout << "Couldn't open " << local_filename << " for writing." << ENDL;
-    return false;
-  }
-
-  const uint64_t chunk_size = 1024 * 1024 * 5;
-  uint64_t end_offset = start_offset;
-  while (true)
-  {
-    req.log_chunk_offset = end_offset;
-    req.log_chunk_size = std::min(chunk_size, rsp.current_log_size - req.log_chunk_offset);
-
-    if (count > 0)
-    {
-      uint64_t bytes_left = count + start_offset - end_offset;
-      req.log_chunk_size = std::min(req.log_chunk_size, bytes_left);
-    }
-
-    if (req.log_chunk_size == 0)
-      break;
-
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-
-    if (!invoke_debug_command<COMMAND_REQUEST_LOG>(vm, sk, transport, peer_id, req, rsp) || !rsp.error.empty())
-    {
-      std::cout << "ERROR: invoking COMMAND_REQUEST_LOG failed: " << rsp.error << ENDL;
-      return false;
-    }
-
-    if (!epee::zlib_helper::unpack(rsp.log_chunk))
-    {
-      std::cout << "ERROR: zip unpack failed" << ENDL;
-      return false;
-    }
-
-    if (rsp.log_chunk.size() != req.log_chunk_size)
-    {
-      std::cout << "ERROR: unpacked size: " << rsp.log_chunk.size() << ", requested: " << req.log_chunk_size << ENDL;
-      return false;
-    }
-
-    log.write(rsp.log_chunk.c_str(), rsp.log_chunk.size());
-    
-    end_offset += req.log_chunk_size;
-
-    std::cout << end_offset - start_offset << " bytes downloaded" << ENDL;
-  }
-
-  std::cout << "Remote log from offset " << start_offset << " to offset " << end_offset << " (" << end_offset - start_offset << " bytes) " <<
-    "was successfully downloaded to " << local_filename << ENDL;
-
-  return true;
-}
-
-
 bool handle_generate_integrated_address(po::variables_map& vm)
 {
   std::string add_and_payment_id = command_line::get_arg(vm, arg_generate_integrated_address);
@@ -1111,7 +992,7 @@ bool handle_generate_integrated_address(po::variables_map& vm)
 }
 //---------------------------------------------------------------------------------------------------------------
 template<class archive_processor_t>
-bool process_archive(archive_processor_t& arch_processor, bool is_packing, std::ifstream& source, std::ofstream& target)
+bool process_archive(archive_processor_t& arch_processor, bool is_packing, const std::string& path_target, std::ifstream& source, std::ofstream& target)
 {
   source.seekg(0, std::ios::end);
   uint64_t sz = source.tellg();
@@ -1165,8 +1046,11 @@ bool process_archive(archive_processor_t& arch_processor, bool is_packing, std::
 
   crypto::hash data_hash = hash_stream.calculate_hash();
 
-  std::cout << "\r\nFile " << (is_packing ? "packed" : "unpacked") << " from size " << sz << " to " << written_bytes <<
-                "\r\nhash of the data is " << epee::string_tools::pod_to_hex(data_hash) << "\r\n";
+  std::cout << ENDL
+    << "File " << (is_packing ? "packed" : "unpacked") << " from size " << sz << " to " << written_bytes << ENDL
+    << "hash of the data is " << epee::string_tools::pod_to_hex(data_hash) << ENDL
+    << ENDL
+    << " = { \"" << boost::filesystem::basename(path_target) << "\", \"" << epee::string_tools::pod_to_hex(data_hash) << "\", " << written_bytes << ", " << sz << " }" << ENDL;
 
   return true;
 }
@@ -1220,7 +1104,10 @@ bool handle_pack_file(po::variables_map& vm)
   }
 
   if (!command_line::has_arg(vm, arg_target_file))
+  {
     std::cout << "Error: Parameter target_file is not set." << ENDL;
+    return false;
+  }
   path_target = command_line::get_arg(vm, arg_target_file);
 
   std::ifstream source;
@@ -1241,15 +1128,43 @@ bool handle_pack_file(po::variables_map& vm)
 
   if (do_pack)
   {
-    epee::net_utils::gzip_encoder_lyambda gzip_encoder(Z_BEST_COMPRESSION);
-    return process_archive(gzip_encoder, true, source, target);
+    epee::net_utils::gzip_encoder_lyambda gzip_encoder(Z_BEST_SPEED);
+    return process_archive(gzip_encoder, true, path_target, source, target);
   }
   else
   {
     epee::net_utils::gzip_decoder_lambda gzip_decoder;
-    return process_archive(gzip_decoder, false, source, target);
+    return process_archive(gzip_decoder, false, path_target, source, target);
   }
 }
+
+bool handle_lmdb_page_4to16(po::variables_map& vm)
+{
+  std::string path_source;
+  std::string path_target;
+
+  if (!command_line::has_arg(vm, arg_lmdb_page_4to16))
+    return false;
+
+  path_source = command_line::get_arg(vm, arg_lmdb_page_4to16);
+
+  if (!command_line::has_arg(vm, arg_target_file))
+  {
+    std::cout << "Error: Parameter target_file is not set." << ENDL;
+    return false;
+  }
+  path_target = command_line::get_arg(vm, arg_target_file);
+
+  if (tools::db::lmdb_db_backend::convert_db_4kb_page_to_16kb_page(path_source, path_target))
+  {
+    std::cout << "Conversion failed" << ENDL;
+    return false;
+  }
+  
+  std::cout << "Converted successfully" << ENDL;
+  return true;
+}
+
 
 //---------------------------------------------------------------------------------------------------------------
 
@@ -1290,8 +1205,7 @@ int main(int argc, char* argv[])
   command_line::add_arg(desc_params, arg_genesis_split_amount);
   command_line::add_arg(desc_params, arg_get_info_flags);
   command_line::add_arg(desc_params, arg_log_journal_len);
-  command_line::add_arg(desc_params, arg_set_peer_log_level);
-  command_line::add_arg(desc_params, arg_download_peer_log);
+  command_line::add_arg(desc_params, arg_get_anonymized_peers);
   command_line::add_arg(desc_params, arg_do_consloe_log);
   command_line::add_arg(desc_params, arg_generate_integrated_address);
   command_line::add_arg(desc_params, arg_pack_file);
@@ -1359,13 +1273,9 @@ int main(int argc, char* argv[])
   {
     return generate_genesis(command_line::get_arg(vm, arg_generate_genesis), 10000000000000000) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
-  else if (command_line::has_arg(vm, arg_set_peer_log_level))
+  else if (command_line::has_arg(vm, arg_get_anonymized_peers) && command_line::get_arg(vm, arg_get_anonymized_peers))
   {
-    return handle_set_peer_log_level(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
-  }
-  else if (command_line::has_arg(vm, arg_download_peer_log))
-  {
-    return handle_download_peer_log(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
+    return handle_get_anonymized_peers(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   else if (command_line::has_arg(vm, arg_generate_integrated_address))
   {
@@ -1374,6 +1284,10 @@ int main(int argc, char* argv[])
   else if (command_line::has_arg(vm, arg_pack_file) || command_line::has_arg(vm, arg_unpack_file))
   {
     return handle_pack_file(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
+  }
+  else if (command_line::has_arg(vm, arg_lmdb_page_4to16))
+  {
+    return handle_lmdb_page_4to16(vm) ? EXIT_SUCCESS : EXIT_FAILURE;
   }
   /*else if (command_line::has_arg(vm, arg_send_ipc))
   {

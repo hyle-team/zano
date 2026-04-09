@@ -23,6 +23,7 @@
 // SOFTWARE.
 #include <iostream>
 #include <iomanip>
+#include <cstdint>
 using namespace std;
 
 #ifndef KECCAKF_ROUNDS

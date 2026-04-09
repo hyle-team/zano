@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2022 Zano Project
+// Copyright (c) 2014-2024 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -16,22 +16,42 @@ using namespace epee;
 #include "crypto/hash.h"
 #include "core_rpc_server_error_codes.h"
 
+#define CHECK_RPC_LIMITS(var, limit)    if(var > limit)  {res.status = API_RETURN_CODE_ARG_OUT_OF_LIMITS; return true;}
+
+
+#define RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS                                       4000
+#define RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS                                    500
+#define RPC_LIMIT_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES_TXIDS                               100
+#define RPC_LIMIT_COMMAND_RPC_CHECK_KEYIMAGES_IMAGES                                            1000
+#define RPC_LIMIT_COMMAND_RPC_GET_TRANSACTIONS_TXS_HASHES                                       5000
+#define RPC_LIMIT_COMMAND_RPC_GET_OFFERS_EX_LIMIT                                               1000
+#define RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DETAILS_COUNT                                          4000
+#define RPC_LIMIT_COMMAND_RPC_GET_POOL_TXS_DETAILS_IDS                                          4000
+#define RPC_LIMIT_COMMAND_RPC_GET_VOTES                                                         4000
+#define RPC_LIMIT_COMMAND_RPC_GET_ASSETS_LIST                                                   1000
+#define RPC_LIMIT_COMMAND_RPC_GET_ALT_BLOCKS_DETAILS_COUNT                                      100
+#define RPC_LIMIT_COMMAND_RPC_FORCE_RELAY_RAW_TXS                                               100
+#define RPC_LIMIT_COMMAND_RPC_GET_ALIASES_COUNT                                                 200
+
 
 
 namespace currency
 {
   namespace
   {
-    const command_line::arg_descriptor<std::string> arg_rpc_bind_ip    ("rpc-bind-ip", "", "127.0.0.1");
-    const command_line::arg_descriptor<std::string> arg_rpc_bind_port  ("rpc-bind-port", "", std::to_string(RPC_DEFAULT_PORT));
-    const command_line::arg_descriptor<bool> arg_rpc_ignore_status     ("rpc-ignore-offline", "Let rpc calls despite online/offline status");
+    const command_line::arg_descriptor<std::string> arg_rpc_bind_ip         ("rpc-bind-ip",         "", "127.0.0.1");
+    const command_line::arg_descriptor<std::string> arg_rpc_bind_port       ("rpc-bind-port",       "", std::to_string(RPC_DEFAULT_PORT));
+    const command_line::arg_descriptor<bool> arg_rpc_ignore_offline_status  ("rpc-ignore-offline",  "Let rpc calls despite online/offline status");
+    const command_line::arg_descriptor<bool> arg_rpc_enable_admin_api       ("rpc-enable-admin-api", "Enable API commands that can alter pool or daemon state (reset pool, remove txs, etc.)");
   }
   //-----------------------------------------------------------------------------------
   void core_rpc_server::init_options(boost::program_options::options_description& desc)
   {
     command_line::add_arg(desc, arg_rpc_bind_ip);
     command_line::add_arg(desc, arg_rpc_bind_port);
-    command_line::add_arg(desc, arg_rpc_ignore_status);
+    command_line::add_arg(desc, arg_rpc_ignore_offline_status);
+    command_line::add_arg(desc, arg_rpc_enable_admin_api);
+    
   }
   //------------------------------------------------------------------------------------------------------------------------------
   core_rpc_server::core_rpc_server(core& cr, nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >& p2p,
@@ -39,17 +59,29 @@ namespace currency
     : m_core(cr)
     , m_p2p(p2p)
     , m_of(of)
-    , m_ignore_status(false)
+    , m_ignore_offline_status(false)
   {}
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::handle_command_line(const boost::program_options::variables_map& vm)
   {
     m_bind_ip = command_line::get_arg(vm, arg_rpc_bind_ip);
-    m_port = command_line::get_arg(vm, arg_rpc_bind_port);
-    if (command_line::has_arg(vm, arg_rpc_ignore_status))
+    if (m_bind_ip == "0.0.0.0")
     {
-      m_ignore_status = command_line::get_arg(vm, arg_rpc_ignore_status);
+      LOG_PRINT_COLOR("!!!!!!IMPORTANT!!!!!!: We strongly advise against binding the server to 0.0.0.0 and exposing it directly" << ENDL
+                << "to the public internet. The server is meant solely for internal functionality and lacks the security features" << ENDL
+                << "required for publicly facing services. If you need to offer a public API, always place it behind secure" << ENDL
+                << "proxies that are properly configured with security measures--such as rate limiting--to protect the service.", LOG_LEVEL_0, LOG_COLOR_RED);
     }
+    m_port = command_line::get_arg(vm, arg_rpc_bind_port);
+    if (command_line::has_arg(vm, arg_rpc_ignore_offline_status))
+    {
+      m_ignore_offline_status = command_line::get_arg(vm, arg_rpc_ignore_offline_status);
+    }
+    if (command_line::has_arg(vm, arg_rpc_enable_admin_api))
+    {
+      m_enabled_admin_api = command_line::get_arg(vm, arg_rpc_enable_admin_api);
+    }
+    
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -64,7 +96,7 @@ namespace currency
   bool core_rpc_server::check_core_ready_(const std::string& calling_method)
   {
 #ifndef TESTNET
-    if (m_ignore_status)
+    if (m_ignore_offline_status)
       return true;
     if(!m_p2p.get_payload_object().is_synchronized())
     {
@@ -75,7 +107,8 @@ namespace currency
     return true;
   }
 #define check_core_ready() check_core_ready_(LOCAL_FUNCTION_DEF__)
-#define CHECK_CORE_READY() if(!check_core_ready()){res.status =  API_RETURN_CODE_BUSY;return true;}
+#define CHECK_CORE_READY()    if (!check_core_ready()) {res.status =  API_RETURN_CODE_BUSY; return true; }
+#define CHECK_CORE_READY_WE() if (!check_core_ready()) {error_resp.code = CORE_RPC_ERROR_CODE_CORE_BUSY; error_resp.message = "Core is busy."; return false; }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_height(const COMMAND_RPC_GET_HEIGHT::request& req, COMMAND_RPC_GET_HEIGHT::response& res, connection_context& cntx)
   {
@@ -101,12 +134,19 @@ namespace currency
     res.current_blocks_median = m_core.get_blockchain_storage().get_current_comulative_blocksize_limit() / 2;
     res.alias_count = m_core.get_blockchain_storage().get_aliases_count();
     res.current_max_allowed_block_size = m_core.get_blockchain_storage().get_current_comulative_blocksize_limit();
-    if (!res.outgoing_connections_count)
-      res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_connecting;
-    else if (m_p2p.get_payload_object().is_synchronized())
+    if(m_ignore_offline_status)
+    { 
       res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_online;
+    }
     else
-      res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_synchronizing;
+    {
+      if (!res.outgoing_connections_count)
+        res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_connecting;
+      else if (m_p2p.get_payload_object().is_synchronized())
+        res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_online;
+      else
+        res.daemon_network_state = COMMAND_RPC_GET_INFO::daemon_network_state_synchronizing;
+    }
     res.synchronization_start_height = m_p2p.get_payload_object().get_core_inital_height();
     res.max_net_seen_height = m_p2p.get_payload_object().get_max_seen_height();
     m_p2p.get_maintainers_info(res.mi);
@@ -176,7 +216,7 @@ namespace currency
       res.pow_sequence_factor = m_core.get_blockchain_storage().get_current_sequence_factor(false);
     if (req.flags&(COMMAND_RPC_GET_INFO_FLAG_POS_DIFFICULTY | COMMAND_RPC_GET_INFO_FLAG_TOTAL_COINS))
     {
-      res.block_reward = currency::get_base_block_reward(true, total_coins, res.height);
+      res.block_reward = currency::get_base_block_reward(res.height);
       currency::block b = AUTO_VAL_INIT(b);
       m_core.get_blockchain_storage().get_top_block(b);
       res.last_block_total_reward = currency::get_reward_from_miner_tx(b.miner_tx);
@@ -273,6 +313,7 @@ namespace currency
   bool core_rpc_server::on_get_blocks_direct(const COMMAND_RPC_GET_BLOCKS_DIRECT::request& req, COMMAND_RPC_GET_BLOCKS_DIRECT::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.block_ids.size(), RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS);
 
     if (req.block_ids.back() != m_core.get_blockchain_storage().get_block_id_by_height(0))
     {
@@ -294,6 +335,7 @@ namespace currency
       res.status = API_RETURN_CODE_FAIL;
       return false;
     }
+    res.current_hardfork = m_core.get_blockchain_storage().get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height);
 
     for(auto& b: bs)
     {
@@ -310,7 +352,8 @@ namespace currency
   bool core_rpc_server::on_get_blocks(const COMMAND_RPC_GET_BLOCKS_FAST::request& req, COMMAND_RPC_GET_BLOCKS_FAST::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
-
+    CHECK_RPC_LIMITS(req.block_ids.size(), RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DIRECT_BLOCK_IDS);
+    LOG_PRINT_L2("[on_get_blocks]: Prevalidating....");
     if (req.block_ids.back() != m_core.get_blockchain_storage().get_block_id_by_height(0))
     {
       //genesis mismatch, return specific
@@ -324,24 +367,26 @@ namespace currency
       res.status = API_RETURN_CODE_BAD_ARG;
       return true;
     }
-
+    LOG_PRINT_L2("[on_get_blocks]: find_blockchain_supplement ....");
     blockchain_storage::blocks_direct_container bs;
     if (!m_core.get_blockchain_storage().find_blockchain_supplement(req.block_ids, bs, res.current_height, res.start_height, COMMAND_RPC_GET_BLOCKS_FAST_MAX_COUNT, req.minimum_height))
     {
       res.status = API_RETURN_CODE_FAIL;
       return false;
     }
+    res.current_hardfork = m_core.get_blockchain_storage().get_core_runtime_config().hard_forks.get_the_most_recent_hardfork_id_for_height(res.current_height);
 
+    LOG_PRINT_L2("[on_get_blocks]: Enumerating over blocks ....");
     for (auto& b : bs)
     {
-      res.blocks.resize(res.blocks.size()+1);
+      res.blocks.resize(res.blocks.size() + 1);
       res.blocks.back().block = block_to_blob(b.first->bl);
       CHECK_AND_ASSERT_MES(b.third.get(), false, "Internal error on handling COMMAND_RPC_GET_BLOCKS_FAST: b.third is empty, ie coinbase info is not prepared");
       res.blocks.back().coinbase_global_outs = b.third->m_global_output_indexes;
       res.blocks.back().tx_global_outs.resize(b.second.size());
       size_t i = 0;
-      
-      BOOST_FOREACH(auto& t, b.second)
+
+      BOOST_FOREACH(auto & t, b.second)
       {
         res.blocks.back().txs.push_back(tx_to_blob(t->tx));
         res.blocks.back().tx_global_outs[i].v = t->m_global_output_indexes;
@@ -349,6 +394,8 @@ namespace currency
       }
     }
 
+
+    LOG_PRINT_L2("[on_get_blocks]: Finished");
     res.status = API_RETURN_CODE_OK;
     return true;
   }
@@ -356,6 +403,8 @@ namespace currency
   bool core_rpc_server::on_get_random_outs(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS_LEGACY::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.amounts.size(), RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS);
+    
     res.status = API_RETURN_CODE_FAIL;
 
     COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request req_native = AUTO_VAL_INIT(req_native);
@@ -407,6 +456,7 @@ namespace currency
   bool core_rpc_server::on_get_random_outs1(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.amounts.size(), RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS);
     res.status = API_RETURN_CODE_FAIL;
 
     if(!m_core.get_random_outs_for_amounts(req, res))
@@ -421,6 +471,12 @@ namespace currency
   bool core_rpc_server::on_get_random_outs3(const COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::request& req, COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS3::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.amounts.size(), RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS);
+    for (const auto& item : req.amounts)
+    {
+      CHECK_RPC_LIMITS(item.global_offsets.size(), RPC_LIMIT_COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS);      
+    }
+
     res.status = API_RETURN_CODE_FAIL;
     if (!m_core.get_blockchain_storage().get_random_outs_for_amounts3(req, res))
     {
@@ -434,6 +490,8 @@ namespace currency
   bool core_rpc_server::on_get_indexes(const COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::request& req, COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.txids.size(), RPC_LIMIT_COMMAND_RPC_GET_TX_GLOBAL_OUTPUTS_INDEXES_TXIDS);
+    
     res.tx_global_outs.resize(req.txids.size());
     size_t i = 0;
     for (auto& txid : req.txids)
@@ -485,6 +543,8 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_check_keyimages(const COMMAND_RPC_CHECK_KEYIMAGES::request& req, COMMAND_RPC_CHECK_KEYIMAGES::response& res, connection_context& cntx)
   {
+    CHECK_RPC_LIMITS(req.images.size(), RPC_LIMIT_COMMAND_RPC_CHECK_KEYIMAGES_IMAGES);
+    
     m_core.get_blockchain_storage().check_keyimages(req.images, res.images_stat);
     res.status = API_RETURN_CODE_OK;
     return true;
@@ -493,6 +553,8 @@ namespace currency
   bool core_rpc_server::on_get_transactions(const COMMAND_RPC_GET_TRANSACTIONS::request& req, COMMAND_RPC_GET_TRANSACTIONS::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.txs_hashes.size(), RPC_LIMIT_COMMAND_RPC_GET_TRANSACTIONS_TXS_HASHES);
+
     std::vector<crypto::hash> vh;
     for(const auto& tx_hex_str : req.txs_hashes)
     {
@@ -535,6 +597,9 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_offers_ex(const COMMAND_RPC_GET_OFFERS_EX::request& req, COMMAND_RPC_GET_OFFERS_EX::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
+    CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.filter.limit, RPC_LIMIT_COMMAND_RPC_GET_OFFERS_EX_LIMIT);
+    
     m_of.get_offers_ex(req.filter, res.offers, res.total_offers, m_core.get_blockchain_storage().get_core_runtime_config().get_core_time());
     res.status = API_RETURN_CODE_OK;
     return true;
@@ -575,7 +640,7 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_pos_mining_details(const COMMAND_RPC_GET_POS_MINING_DETAILS::request& req, COMMAND_RPC_GET_POS_MINING_DETAILS::response& res, connection_context& cntx)
   {
-    if (!m_p2p.get_connections_count())
+    if (!m_ignore_offline_status && !m_p2p.get_connections_count())
     {
       res.status = API_RETURN_CODE_DISCONNECTED;
       return true;
@@ -611,6 +676,8 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_rpc_get_blocks_details(const COMMAND_RPC_GET_BLOCKS_DETAILS::request& req, COMMAND_RPC_GET_BLOCKS_DETAILS::response& res, connection_context& cntx)
   {
+    CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GET_BLOCKS_DETAILS_COUNT);
+    
     m_core.get_blockchain_storage().get_main_blocks_rpc_details(req.height_start, req.count, req.ignore_transactions, res.blocks);
     res.status = API_RETURN_CODE_OK;
     return true;
@@ -670,6 +737,9 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_pool_txs_details(const COMMAND_RPC_GET_POOL_TXS_DETAILS::request& req, COMMAND_RPC_GET_POOL_TXS_DETAILS::response& res, connection_context& cntx)
   {
+    CHECK_RPC_LIMITS(req.ids.size(), RPC_LIMIT_COMMAND_RPC_GET_POOL_TXS_DETAILS_IDS);
+    
+    
     if (!req.ids.size())
     {
       m_core.get_tx_pool().get_all_transactions_details(res.txs);
@@ -684,6 +754,7 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_pool_txs_brief_details(const COMMAND_RPC_GET_POOL_TXS_BRIEF_DETAILS::request& req, COMMAND_RPC_GET_POOL_TXS_BRIEF_DETAILS::response& res, connection_context& cntx)
   {
+    CHECK_RPC_LIMITS(req.ids.size(), RPC_LIMIT_COMMAND_RPC_GET_POOL_TXS_DETAILS_IDS);
     if (!req.ids.size())
     {
       m_core.get_tx_pool().get_all_transactions_brief_details(res.txs);
@@ -717,6 +788,8 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_votes(const COMMAND_RPC_GET_VOTES::request& req, COMMAND_RPC_GET_VOTES::response& res, connection_context& cntx)
   {
+    CHECK_RPC_LIMITS(req.h_end - req.h_start, RPC_LIMIT_COMMAND_RPC_GET_VOTES);
+
     if (!m_core.get_blockchain_storage().get_pos_votes(req.h_start, req.h_end, res.votes))
     {
       res.status = API_RETURN_CODE_INTERNAL_ERROR;
@@ -736,6 +809,88 @@ namespace currency
     }
     res.status = API_RETURN_CODE_OK;
     return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_get_assets_list(const COMMAND_RPC_GET_ASSETS_LIST::request& req, COMMAND_RPC_GET_ASSETS_LIST::response& res, connection_context& cntx)
+  {
+    CHECK_CORE_READY();
+    CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GET_ASSETS_LIST);
+
+    if (!m_core.get_blockchain_storage().get_assets(req.offset, req.count, res.assets))
+    {
+      res.status = API_RETURN_CODE_NOT_FOUND;
+      return true;
+    }
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_decrypt_tx_details(const COMMAND_RPC_DECRYPT_TX_DETAILS::request& req, COMMAND_RPC_DECRYPT_TX_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
+  {
+#define LOCAL_CHECK(cond, msg)         if (!(cond)) { error_resp.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;    error_resp.message = msg; LOG_PRINT_L1("on_decrypt_tx_details: " << error_resp.message); return false; }
+#define LOCAL_CHECK_INT_ERR(cond, msg) if (!(cond)) { error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR; error_resp.message = msg; LOG_PRINT_L1("on_decrypt_tx_details: " << error_resp.message); return false; }
+
+    LOCAL_CHECK(req.tx_id.empty() != req.tx_blob.empty(), "One of either tx_id or tx_blob must be specified.");
+
+    transaction tx{};
+    if (!req.tx_id.empty())
+    {
+      CHECK_CORE_READY_WE();
+
+      crypto::hash tx_id{};
+      LOCAL_CHECK(crypto::parse_tpod_from_hex_string(req.tx_id, tx_id), "tx_id is given, but it's invalid");
+      LOCAL_CHECK(m_core.get_transaction(tx_id, tx), "tx with the given tx_id could be found in the blockchain");
+    }
+    else
+    {
+      blobdata decoded_blob = string_encoding::base64_decode(req.tx_blob);
+      if (!t_unserializable_object_from_blob(tx, decoded_blob))
+      {
+        // unable to decode tx_blob as base64, try once again as hex-encoding
+        decoded_blob.clear();
+        string_tools::parse_hexstr_to_binbuff(req.tx_blob, decoded_blob);
+        LOCAL_CHECK(t_unserializable_object_from_blob(tx, decoded_blob), "tx_id is not given, and tx_blob is invalid");
+      }
+    }
+
+    crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(tx);
+    crypto::point_t R{};
+    LOCAL_CHECK(tx_pub_key != null_pkey && R.from_public_key(tx_pub_key) && R.is_in_main_subgroup(), "unsigned_tx: tx public key is missing or invalid");
+
+    LOCAL_CHECK(tx_pub_key == (crypto::scalar_t(req.tx_secret_key) * crypto::c_point_G).to_public_key(), "tx_secret_key doesn't match the transaction public key");
+
+    LOCAL_CHECK(req.outputs_addresses.size() == tx.vout.size(), "outputs_addresses count (" + epee::string_tools::num_to_string_fast(req.outputs_addresses.size()) + " doesn't match tx.vout size (" + epee::string_tools::num_to_string_fast(tx.vout.size()) + ")");
+
+    for(size_t i = 0; i < req.outputs_addresses.size(); ++i)
+    {
+      if (req.outputs_addresses[i].empty())
+        continue; // skip this output if the given address is empty string
+
+      account_public_address addr{};
+      payment_id_t payment_id{};
+      LOCAL_CHECK(currency::get_account_address_and_payment_id_from_str(addr, payment_id, req.outputs_addresses[i]) && payment_id.empty(), "output address #" + epee::string_tools::num_to_string_fast(i) + " couldn't be parsed or it is an integrated address (which is not supported)");
+
+      tx_out_v& out_v = tx.vout[i];
+      LOCAL_CHECK(out_v.type() == typeid(tx_out_zarcanum), "tx output #" + epee::string_tools::num_to_string_fast(i) + " has wrong type");
+      const tx_out_zarcanum& zo = boost::get<tx_out_zarcanum>(out_v);
+
+      crypto::key_derivation derivation{};
+      LOCAL_CHECK_INT_ERR(crypto::generate_key_derivation(addr.view_public_key, req.tx_secret_key, derivation), "output #" + epee::string_tools::num_to_string_fast(i) + ": generate_key_derivation failed");
+      
+      auto& decoded_out = res.decoded_outputs.emplace_back();
+      decoded_out.out_index = i;
+      decoded_out.address = req.outputs_addresses[i];
+      crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
+      LOCAL_CHECK(currency::decode_output_amount_and_asset_id(zo, derivation, i, decoded_out.amount, decoded_out.asset_id, amount_blinding_mask, asset_id_blinding_mask), "output #" + epee::string_tools::num_to_string_fast(i) + ": cannot be decoded");
+    }
+
+    res.tx_in_json = currency::obj_to_json_str(tx);
+    res.verified_tx_id = get_transaction_hash(tx);
+
+    res.status = API_RETURN_CODE_OK;
+    return true;
+#undef LOCAL_CHECK
+#undef LOCAL_CHECK_INT_ERR
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_main_block_details(const COMMAND_RPC_GET_BLOCK_DETAILS::request& req, COMMAND_RPC_GET_BLOCK_DETAILS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
@@ -764,6 +919,8 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_alt_blocks_details(const COMMAND_RPC_GET_ALT_BLOCKS_DETAILS::request& req, COMMAND_RPC_GET_ALT_BLOCKS_DETAILS::response& res, connection_context& cntx)
   {
+    CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GET_ALT_BLOCKS_DETAILS_COUNT);
+       
     m_core.get_blockchain_storage().get_alt_blocks_rpc_details(req.offset, req.count, res.blocks);
     res.status = API_RETURN_CODE_OK;
     return true;
@@ -774,17 +931,37 @@ namespace currency
     CHECK_CORE_READY();
 
     std::string tx_blob;
-    if(!string_tools::parse_hexstr_to_binbuff(req.tx_as_hex, tx_blob))
+    if (req.tx_as_hex.size())
     {
-      LOG_PRINT_L0("[on_send_raw_tx]: Failed to parse tx from hexbuff: " << req.tx_as_hex);
-      res.status = "Failed";
-      return true;
+      if (!string_tools::parse_hexstr_to_binbuff(req.tx_as_hex, tx_blob))
+      {
+        LOG_PRINT_L0("[on_send_raw_tx]: Failed to parse tx from hexbuff: " << req.tx_as_hex);
+        res.status = "Failed";
+        return true;
+      }
+    }
+    else
+    {
+      if (!req.tx_as_base64.size())
+      {
+        LOG_PRINT_L0("[on_send_raw_tx]: Failed to parse tx from hexbuff: " << req.tx_as_hex);
+        res.status = API_RETURN_CODE_BAD_ARG;
+        return true;
+      }
+      tx_blob = req.tx_as_base64;
     }
 
-    if (!m_p2p.get_payload_object().get_synchronized_connections_count())
+    if (!m_ignore_offline_status && !m_p2p.get_payload_object().get_synchronized_connections_count())
     {
       LOG_PRINT_L0("[on_send_raw_tx]: Failed to send, daemon not connected to net");
       res.status = API_RETURN_CODE_DISCONNECTED;
+      return true;
+    }
+
+    if (m_p2p.get_payload_object().get_core().get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active())
+    {
+      LOG_PRINT_L0("[on_send_raw_tx]: pre hardfork freeze period is in effect, sending transactions is not allowed till the next hardfork. Please, try again after the hardfork activation.");
+      res.status = API_RETURN_CODE_BUSY;
       return true;
     }
 
@@ -804,9 +981,11 @@ namespace currency
       return true;
     }
 
-    if(!tvc.m_should_be_relayed)
+    //if transaction already existed in the pool or in the blockchain (m_already_existed == true)
+    //then it shouldn't look like an error
+    if(!tvc.m_should_be_relayed && !tvc.m_already_existed)
     {
-      LOG_PRINT_L0("[on_send_raw_tx]: tx accepted, but not relayed");
+      LOG_PRINT_L0("[on_send_raw_tx]: tx accepted, but not relayed, tx blob: " << req.tx_as_hex);
       res.status = "Not relayed";
       return true;
     }
@@ -821,7 +1000,8 @@ namespace currency
   }
 	//------------------------------------------------------------------------------------------------------------------------------
 	bool core_rpc_server::on_force_relaey_raw_txs(const COMMAND_RPC_FORCE_RELAY_RAW_TXS::request& req, COMMAND_RPC_FORCE_RELAY_RAW_TXS::response& res, connection_context& cntx)
-	{
+  {
+    CHECK_RPC_LIMITS(req.txs_as_hex.size(), RPC_LIMIT_COMMAND_RPC_FORCE_RELAY_RAW_TXS);
 		CHECK_CORE_READY();
 		NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request r = AUTO_VAL_INIT(r);
 
@@ -844,6 +1024,7 @@ namespace currency
 		return call_res;
 	}
   //------------------------------------------------------------------------------------------------------------------------------
+#ifdef CPU_MINING_ENABLED
   bool core_rpc_server::on_start_mining(const COMMAND_RPC_START_MINING::request& req, COMMAND_RPC_START_MINING::response& res, connection_context& cntx)
   {
     CHECK_CORE_READY();
@@ -874,6 +1055,7 @@ namespace currency
     res.status = API_RETURN_CODE_OK;
     return true;
   }
+#endif // #ifdef CPU_MINING_ENABLED
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_getblockcount(const COMMAND_RPC_GETBLOCKCOUNT::request& req, COMMAND_RPC_GETBLOCKCOUNT::response& res, connection_context& cntx)
   {
@@ -909,6 +1091,7 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_getblocktemplate(const COMMAND_RPC_GETBLOCKTEMPLATE::request& req, COMMAND_RPC_GETBLOCKTEMPLATE::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
+    TIME_MEASURE_START(t);
     if(!check_core_ready())
     {
       error_resp.code = CORE_RPC_ERROR_CODE_CORE_BUSY;
@@ -983,13 +1166,16 @@ namespace currency
     res.seed = currency::ethash_epoch_to_seed(currency::ethash_height_to_epoch(res.height));
 
     res.status = API_RETURN_CODE_OK;
-    LOG_PRINT_L1("COMMAND_RPC_GETBLOCKTEMPLATE OK, response block: " << ENDL << currency::obj_to_json_str(resp.b));
+
+    TIME_MEASURE_FINISH(t);
+    LOG_PRINT_L1("COMMAND_RPC_GETBLOCKTEMPLATE -- OK  (took " << std::setprecision(2) << t / 1000.0 << " ms)");
+    LOG_PRINT_L2("response block: " << ENDL << currency::obj_to_json_str(resp.b));
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_submitblock(const COMMAND_RPC_SUBMITBLOCK::request& req, COMMAND_RPC_SUBMITBLOCK::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
-    CHECK_CORE_READY();
+    CHECK_CORE_READY_WE();
     if(req.size()!=1)
     {
       error_resp.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
@@ -1032,8 +1218,7 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_submitblock2(const COMMAND_RPC_SUBMITBLOCK2::request& req, COMMAND_RPC_SUBMITBLOCK2::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
-    CHECK_CORE_READY();
-
+    CHECK_CORE_READY_WE();
 
     block b = AUTO_VAL_INIT(b);
     if (!parse_and_validate_block_from_blob(req.b, b))
@@ -1076,16 +1261,22 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
-  uint64_t core_rpc_server::get_block_reward(const block& blk)
+  uint64_t core_rpc_server::get_block_reward(const block& blk, const crypto::hash& h)
   {
+    if (blk.miner_tx.version >= TRANSACTION_VERSION_POST_HF4)
+    {
+      uint64_t reward_with_fee = 0;
+      m_core.get_blockchain_storage().get_block_reward_by_hash(h, reward_with_fee);
+      return reward_with_fee;
+    }
+
+    // legacy version, pre HF4
     uint64_t reward = 0;
     BOOST_FOREACH(const auto& out, blk.miner_tx.vout)
     {
       VARIANT_SWITCH_BEGIN(out);
       VARIANT_CASE_CONST(tx_out_bare, out)
         reward += out.amount;
-      VARIANT_CASE_CONST(tx_out_zarcanum, out)
-        //@#@      
       VARIANT_SWITCH_END();
     }
     return reward;
@@ -1093,6 +1284,7 @@ namespace currency
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::fill_block_header_response(const block& blk, bool orphan_status, block_header_response& response)
   {
+    crypto::hash block_hash = get_block_hash(blk);
     response.major_version = blk.major_version;
     response.minor_version = blk.minor_version;
     response.timestamp = blk.timestamp;
@@ -1101,9 +1293,9 @@ namespace currency
     response.orphan_status = orphan_status;
     response.height = get_block_height(blk);
     response.depth = m_core.get_current_blockchain_size() - response.height - 1;
-    response.hash = string_tools::pod_to_hex(get_block_hash(blk));
+    response.hash = string_tools::pod_to_hex(block_hash);
     response.difficulty = m_core.get_blockchain_storage().block_difficulty(response.height).convert_to<std::string>();
-    response.reward = get_block_reward(blk);
+    response.reward = get_block_reward(blk, block_hash);
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1250,10 +1442,11 @@ namespace currency
     res.status = API_RETURN_CODE_OK;
     return true;
   }
-
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_aliases(const COMMAND_RPC_GET_ALIASES::request& req, COMMAND_RPC_GET_ALIASES::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
   {
+    CHECK_RPC_LIMITS(req.count, RPC_LIMIT_COMMAND_RPC_GET_ALIASES_COUNT);
+    
     if(!check_core_ready())
     {
       error_resp.code = CORE_RPC_ERROR_CODE_CORE_BUSY;
@@ -1261,10 +1454,13 @@ namespace currency
       return false;
     }
 
-    m_core.get_blockchain_storage().get_aliases([&res](const std::string& alias, const currency::extra_alias_entry_base& ai){
+    m_core.get_blockchain_storage().get_aliases(
+      [&res](const std::string& alias, const currency::extra_alias_entry_base& ai)
+    {
       res.aliases.push_back(alias_rpc_details());
       alias_info_to_rpc_alias_info(alias, ai, res.aliases.back());
-    }, req.offset, req.count);
+    },
+    req.offset, req.count);
 
     res.status = API_RETURN_CODE_OK;
     return true;
@@ -1278,6 +1474,37 @@ namespace currency
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_alias_lookup(const COMMAND_RPC_ALIAS_LOOKUP::request& req, COMMAND_RPC_ALIAS_LOOKUP::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
+  {
+    if(!check_core_ready())
+    {
+      error_resp.code = CORE_RPC_ERROR_CODE_CORE_BUSY;
+      error_resp.message = "Core is busy.";
+      return false;
+    }
+
+    auto to_lower_ascii = [](const std::string& s)
+    {
+      std::string out = s;
+      std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) { return std::tolower(c); });
+      return out;
+    };
+
+    std::string prefix = to_lower_ascii(req.alias_first_leters);
+    uint64_t n = std::min<uint64_t>(req.n_of_items_to_return, MAX_N_OF_LOOKUP_ALIASES_TO_RETURN);
+
+    m_core.get_blockchain_storage().lookup_aliases_by_prefix(prefix, n,
+      [&](const std::string& alias, const currency::extra_alias_entry_base& ai)
+    {
+      res.aliases.push_back(alias_rpc_details());
+      alias_info_to_rpc_alias_info(alias, ai, res.aliases.back());
+    });
+
+    res.status = API_RETURN_CODE_OK;
+
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_est_height_from_date(const COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::request& req, COMMAND_RPC_GET_EST_HEIGHT_FROM_DATE::response& res, connection_context& cntx)
   {
     bool r = m_core.get_blockchain_storage().get_est_height_from_date(req.timestamp, res.h);
@@ -1286,6 +1513,154 @@ namespace currency
       res.status = API_RETURN_CODE_OK;
     else
       res.status = API_RETURN_CODE_NOT_FOUND;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_find_outs_in_recent_blocks(const COMMAND_RPC_FIND_OUTS_IN_RECENT_BLOCKS::request& req, COMMAND_RPC_FIND_OUTS_IN_RECENT_BLOCKS::response& resp, epee::json_rpc::error& error_resp, connection_context& cntx)
+  {
+#define LOCAL_CHECK(cond, msg)         if (!(cond)) { error_resp.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;    error_resp.message = msg; LOG_PRINT_L1("on_find_outs_in_recent_blocks: " << msg); return false; }
+#define LOCAL_CHECK_INT_ERR(cond, msg) if (!(cond)) { error_resp.code = CORE_RPC_ERROR_CODE_INTERNAL_ERROR; error_resp.message = msg; LOG_PRINT_L1("on_find_outs_in_recent_blocks: " << msg); return false; }
+
+    LOCAL_CHECK(req.address != account_public_address{}, "address is missing");
+    LOCAL_CHECK(req.viewkey != null_skey, "viewkey is missing");
+    LOCAL_CHECK(req.blocks_limit <= 5, "blocks_limit is out of allowed bounds");
+
+    // verify addess keys
+    crypto::point_t view_pk, spend_pk;
+    LOCAL_CHECK(view_pk.from_public_key(req.address.view_public_key), "cannon load point from address.view_public_key");
+    LOCAL_CHECK(view_pk.is_in_main_subgroup(), "address.view_public_key isn't in main subgroup");
+    LOCAL_CHECK(spend_pk.from_public_key(req.address.spend_public_key), "cannon load point from address.spend_public_key");
+    LOCAL_CHECK(spend_pk.is_in_main_subgroup(), "address.spend_public_key isn't in main subgroup");
+
+    // verify viewkey
+    crypto::scalar_t view_sc = req.viewkey;
+    LOCAL_CHECK(view_sc.is_reduced(), "viewkey is invalid");
+    LOCAL_CHECK(view_sc * crypto::c_point_G == view_pk, "viewkey doesn't correspond to the given address");
+
+    const blockchain_storage& bcs = m_core.get_blockchain_storage();
+    resp.blockchain_top_block_height = bcs.get_top_block_height();
+    resp.blocks_limit = req.blocks_limit;
+
+    // get blockchain transactions
+    std::unordered_map<uint64_t, std::pair<std::vector<crypto::hash>, std::list<transaction>>> blockchain_txs; // block height -> (vector of tx_ids, list of txs)
+    if (req.blocks_limit > 0)
+    {
+      uint64_t start_offset = resp.blockchain_top_block_height - req.blocks_limit + 1;
+      std::list<block> recent_blocks;
+      LOCAL_CHECK_INT_ERR(bcs.get_blocks(start_offset, static_cast<size_t>(req.blocks_limit), recent_blocks), "cannot get recent blocks");
+      
+      std::vector<crypto::hash> blockchain_tx_ids, missed_tx;
+      for(auto& b : recent_blocks)
+      {
+        blockchain_tx_ids.insert(blockchain_tx_ids.end(), b.tx_hashes.begin(), b.tx_hashes.end());
+        uint64_t height = get_block_height(b);
+        auto& el = blockchain_txs[height];
+        el.first = b.tx_hashes;
+        missed_tx.clear();
+        LOCAL_CHECK_INT_ERR(bcs.get_transactions(b.tx_hashes, el.second, missed_tx), "bcs.get_transactions failed");
+        LOCAL_CHECK_INT_ERR(missed_tx.empty(), "missed_tx is not empty");
+        LOCAL_CHECK_INT_ERR(el.first.size() == el.second.size(), "el.first.size() != el.second.size()");
+      }
+    }
+
+    // get pool transactions
+    std::list<transaction> pool_txs;
+    LOCAL_CHECK_INT_ERR(m_core.get_tx_pool().get_transactions(pool_txs), "cannot get txs from pool");
+
+    // processor lambda
+    auto process_tx = [&](const transaction& tx, const crypto::hash& tx_id, const int64_t height) {
+      crypto::key_derivation derivation{};
+      LOCAL_CHECK(generate_key_derivation(get_tx_pub_key_from_extra(tx), req.viewkey, derivation), "generate_key_derivation failed");
+
+      for(size_t i = 0, sz = tx.vout.size(); i < sz; ++i)
+      {
+        const tx_out_v& outv = tx.vout[i];
+        if (outv.type() != typeid(tx_out_zarcanum))
+          continue;
+
+        uint64_t decoded_amount = 0;
+        crypto::public_key decoded_asset_id{};
+        crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
+        if (!is_out_to_acc(req.address, boost::get<tx_out_zarcanum>(outv), derivation, i, decoded_amount, decoded_asset_id, amount_blinding_mask, asset_id_blinding_mask))
+          continue;
+
+        auto& el = resp.outputs.emplace_back();
+        el.amount           = decoded_amount;
+        el.asset_id         = decoded_asset_id;
+        el.tx_id            = tx_id;
+        el.tx_block_height  = height;
+        el.output_tx_index  = i;
+      }
+      return true;
+    };
+
+    // process blockchain txs
+    for(auto& [height, pair] : blockchain_txs)
+    {
+      LOCAL_CHECK(pair.first.size() == pair.second.size(), "container size inconsistency");
+      auto tx_it = pair.second.begin();
+      for(size_t i = 0, sz = pair.first.size(); i < sz; ++i, ++tx_it)
+      {
+        const crypto::hash& tx_id = pair.first[i];
+        LOCAL_CHECK(process_tx(*tx_it, tx_id, height), "process blockchain tx failed for tx " + crypto::pod_to_hex(tx_id));
+      }
+    }
+
+    // process pool txs
+    for(auto& tx : pool_txs)
+    {
+      crypto::hash tx_id = get_transaction_hash(tx);
+      LOCAL_CHECK(process_tx(tx, tx_id, -1), "process pool tx failed for tx " + crypto::pod_to_hex(tx_id));
+    }
+
+    resp.status = resp.outputs.empty() ? API_RETURN_CODE_NOT_FOUND : API_RETURN_CODE_OK;
+    return true;
+
+#undef LOCAL_CHECK_INT_ERR
+#undef LOCAL_CHECK
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_get_integrated_address(const COMMAND_RPC_GET_INTEGRATED_ADDRESS::request& req, COMMAND_RPC_GET_INTEGRATED_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx)
+  {
+    std::string payment_id;
+    if (!epee::string_tools::parse_hexstr_to_binbuff(req.payment_id, payment_id))
+    {
+      error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
+      error_resp.message = std::string("invalid payment id given: \'") + req.payment_id + "\', hex-encoded string was expected";
+      return false;
+    }
+
+    if (!currency::is_payment_id_size_ok(payment_id))
+    {
+      error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
+      error_resp.message = std::string("given payment id is too long: \'") + req.payment_id + "\'";
+      return false;
+    }
+
+    if (payment_id.empty())
+    {
+      payment_id = std::string(8, ' ');
+      crypto::generate_random_bytes(payment_id.size(), &payment_id.front());
+    }
+
+
+    std::string payment_id_from_provided_addr; // won't be used
+    account_public_address addr = AUTO_VAL_INIT(addr);
+    if (!get_account_address_and_payment_id_from_str(addr, payment_id_from_provided_addr, req.regular_address))
+    {
+      error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
+      error_resp.message = std::string("invalid address provided: \'") + req.regular_address + "\', Zano address expected";
+      return false;
+    }
+    if (payment_id_from_provided_addr.size())
+    {
+      error_resp.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
+      error_resp.message = std::string("invalid address provided: \'") + req.regular_address + "\', Zano address expected be regular and NOT integrated address";
+      return false;
+    }
+
+    res.integrated_address = currency::get_account_address_and_payment_id_as_str(addr, payment_id);
+    res.payment_id = epee::string_tools::buff_to_hex_nodelimer(payment_id);
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------

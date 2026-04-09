@@ -59,6 +59,7 @@ class async_protocol_handler_config
   critical_section m_connects_lock;
   std::atomic<bool> m_is_in_sendstop_loop;
   connections_map m_connects;
+  levin_commands_handler_dummy<t_connection_context> m_commands_handler_dummy;
 
   void add_connection(async_protocol_handler<t_connection_context>* pc);
   void del_connection(async_protocol_handler<t_connection_context>* pc);
@@ -87,7 +88,7 @@ public:
   bool foreach_connection(callback_t cb);
   size_t get_connections_count();
 
-  async_protocol_handler_config() :m_pcommands_handler(NULL), m_max_packet_size(LEVIN_DEFAULT_MAX_PACKET_SIZE), m_is_in_sendstop_loop(false), m_invoke_timeout{}
+  async_protocol_handler_config() :m_pcommands_handler(&m_commands_handler_dummy), m_max_packet_size(LEVIN_DEFAULT_MAX_PACKET_SIZE), m_is_in_sendstop_loop(false), m_invoke_timeout{}
   {}
   ~async_protocol_handler_config()
   {
@@ -252,6 +253,7 @@ public:
     LOG_PRINT_CC(m_connection_context, "[LEVIN_PROTOCOL" << this << "] CONSTRUCTED", LOG_LEVEL_4);
   }
 
+
   virtual ~async_protocol_handler()
   {
     NESTED_TRY_ENTRY();
@@ -276,6 +278,11 @@ public:
     VALIDATE_MUTEX_IS_FREE(m_invoke_response_handlers_lock);
 
     NESTED_CATCH_ENTRY(__func__);
+  }
+
+  void on_pre_destroy()
+  {
+    m_config.del_connection(this);
   }
 
   bool start_outer_call()
@@ -349,7 +356,7 @@ public:
     //update threads name to see connection context where errors came from
     std::string original_prefix = epee::log_space::log_singletone::get_thread_log_prefix();
     epee::log_space::log_singletone::set_thread_log_prefix(original_prefix + "[" + epee::net_utils::print_connection_context_short(m_connection_context) + "]");
-    ON_EXIT([&](){epee::log_space::log_singletone::set_thread_log_prefix(original_prefix); });
+    ON_FUNC_EXIT([&](){epee::log_space::log_singletone::set_thread_log_prefix(original_prefix); });
 
     //create_scope_leave_handler()
 
@@ -810,7 +817,9 @@ template<class t_connection_context> template<class callback_t>
 bool async_protocol_handler_config<t_connection_context>::foreach_connection(callback_t cb)
 {
   CRITICAL_REGION_LOCAL(m_connects_lock);
-  for(auto& c: m_connects)
+  //in case any of the cb() leads to erasing items from m_connects, let's go over local copy of it
+  auto connects_local = m_connects;
+  for(auto& c: connects_local)
   {
     async_protocol_handler<t_connection_context>* aph = c.second;
     if(!cb(aph->get_context_ref()))

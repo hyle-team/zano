@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2022 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -35,32 +35,20 @@ namespace crypto {
   const key_image I = *reinterpret_cast<const key_image*>(&I_);
   const key_image L = *reinterpret_cast<const key_image*>(&L_);
 
-  struct random_init_singleton
-  {
-    random_init_singleton()
-    {
-      grant_random_initialize();
-    }
-  };
-
-  random_init_singleton init_rand; //place initializer here to avoid grant_random_initialize first call after threads will be possible(local static variables init is not thread-safe)
-
-  using std::abort;
-  using std::int32_t;
-  using std::int64_t;
-  using std::lock_guard;
-  using std::mutex;
-  using std::size_t;
-  using std::uint32_t;
-  using std::uint64_t;
-
   extern "C" {
 #include "crypto-ops.h"
 #include "random.h"
   }
   
 
-  mutex random_lock;
+  std::mutex& random_lock_accessor() noexcept
+  {
+    // this is a thread-safe approach
+    // note section 6.7: "If control enters the declaration concurrently while the variable is being initialized, the concurrent execution shall wait for completion of the initialization."
+    static std::mutex random_lock;
+    return random_lock;
+  }
+
 
   static inline unsigned char *operator &(ec_point &point) {
     return &reinterpret_cast<unsigned char &>(point);
@@ -78,9 +66,10 @@ namespace crypto {
     return &reinterpret_cast<const unsigned char &>(scalar);
   }
 
-  static inline void random_scalar(ec_scalar &res) {
+  static inline void random_scalar_no_lock(ec_scalar &res)
+  {
     unsigned char tmp[64];
-    generate_random_bytes(64, tmp);
+    generate_random_bytes_no_lock(64, tmp);
     sc_reduce(tmp);
     memcpy(&res, tmp, 32);
   }
@@ -118,10 +107,11 @@ namespace crypto {
     sc_reduce32(&res);
   }
 
-  void crypto_ops::generate_keys(public_key &pub, secret_key &sec) {
-    lock_guard<mutex> lock(random_lock);
+  void crypto_ops::generate_keys(public_key &pub, secret_key &sec)
+  {
+    std::lock_guard<std::mutex> lock(random_lock_accessor());
     ge_p3 point;
-    random_scalar(sec);
+    random_scalar_no_lock(sec);
     ge_scalarmult_base(&point, &sec);
     ge_p3_tobytes(&pub, &point);
   }
@@ -239,7 +229,7 @@ namespace crypto {
   };
 
   void crypto_ops::generate_signature(const hash &prefix_hash, const public_key &pub, const secret_key &sec, signature &sig) {
-    lock_guard<mutex> lock(random_lock);
+    std::lock_guard<std::mutex> lock(random_lock_accessor());
     ge_p3 tmp3;
     ec_scalar k;
     s_comm buf;
@@ -255,7 +245,7 @@ namespace crypto {
 #endif
     buf.h = prefix_hash;
     buf.key = pub;
-    random_scalar(k);
+    random_scalar_no_lock(k);
     ge_scalarmult_base(&tmp3, &k);
     ge_p3_tobytes(&buf.comm, &tmp3);
     hash_to_scalar(&buf, sizeof(s_comm), sig.c);
@@ -294,6 +284,7 @@ namespace crypto {
   }
 
   void crypto_ops::generate_key_image(const public_key &pub, const secret_key &sec, key_image &image) {
+    // image = sec * 8 * ge_fromfe_frombytes_vartime(cn_fast_hash(pub)) = sec * Hp( pub )
     ge_p3 point;
     ge_p2 point2;
     crypto_assert(sc_check(&sec) == 0);
@@ -324,7 +315,7 @@ POP_VS_WARNINGS
     const public_key *const *pubs, size_t pubs_count,
     const secret_key &sec, size_t sec_index,
     signature *sig) {
-    lock_guard<mutex> lock(random_lock);
+    std::lock_guard<std::mutex> lock(random_lock_accessor());
     size_t i;
     ge_p3 image_unp;
     ge_dsmp image_pre;
@@ -361,15 +352,15 @@ POP_VS_WARNINGS
       ge_p2 tmp2;
       ge_p3 tmp3;
       if (i == sec_index) {
-        random_scalar(k);
+        random_scalar_no_lock(k);
         ge_scalarmult_base(&tmp3, &k);
         ge_p3_tobytes(&buf->ab[i].a, &tmp3);
         hash_to_ec(*pubs[i], tmp3);
         ge_scalarmult(&tmp2, &k, &tmp3);
         ge_tobytes(&buf->ab[i].b, &tmp2);
       } else {
-        random_scalar(sig[i].c);
-        random_scalar(sig[i].r);
+        random_scalar_no_lock(sig[i].c);
+        random_scalar_no_lock(sig[i].r);
         if (ge_frombytes_vartime(&tmp3, &*pubs[i]) != 0) {
           abort();
         }

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Copyright (c) 2012-2013 The Boolberry developers
@@ -57,7 +57,9 @@ namespace currency
      virtual bool get_block_template(const create_block_template_params& params, create_block_template_response& resp);
      bool get_block_template(block& b, const account_public_address& adr, const account_public_address& stakeholder_address, wide_difficulty_type& diffic, uint64_t& height, const blobdata& ex_nonce, bool pos = false, const pos_entry& pe = pos_entry());
 
+#ifdef CPU_MINING_ENABLED
      miner& get_miner(){ return m_miner; }
+#endif
      static void init_options(boost::program_options::options_description& desc);
      bool init(const boost::program_options::variables_map& vm);
      bool set_genesis_block(const block& b);
@@ -66,7 +68,7 @@ namespace currency
      uint64_t get_current_tx_version() const;
      uint64_t get_top_block_height() const;
      std::string get_config_folder();
-     bool get_blockchain_top(uint64_t& heeight, crypto::hash& top_id) const;
+     bool get_blockchain_top(uint64_t& height, crypto::hash& top_id) const;
      bool get_blocks(uint64_t start_offset, size_t count, std::list<block>& blocks, std::list<transaction>& txs);
      bool get_blocks(uint64_t start_offset, size_t count, std::list<block>& blocks);
      template<class t_ids_container, class t_blocks_container, class t_missed_container>
@@ -105,6 +107,7 @@ namespace currency
      void resume_mine();
      blockchain_storage& get_blockchain_storage() { return m_blockchain_storage; }
      const blockchain_storage& get_blockchain_storage() const { return m_blockchain_storage; }
+     const core_runtime_config& get_runtime_config() const { return m_blockchain_storage.get_core_runtime_config(); }
      //debug functions
      void print_blockchain(uint64_t start_index, uint64_t end_index);
      void print_blockchain_index();
@@ -136,13 +139,15 @@ namespace currency
      void check_free_space();
      
 
-     blockchain_storage m_blockchain_storage;
      tx_memory_pool m_mempool;
+     blockchain_storage m_blockchain_storage;
      i_currency_protocol* m_pprotocol;
      i_critical_error_handler* m_critical_error_handler;
      epee::critical_section m_incoming_tx_lock;
+#ifdef CPU_MINING_ENABLED
      miner m_miner;
-     account_public_address m_miner_address;
+#endif
+     //account_public_address m_miner_address;
      std::string m_config_folder;
      uint64_t m_stop_after_height;
      currency_protocol_stub m_protocol_stub;

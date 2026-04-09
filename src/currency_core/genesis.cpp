@@ -1,8 +1,7 @@
-// Copyright (c) 2014-2018 Zano Project
+// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 #include "genesis.h"
 
 namespace currency
@@ -17,4 +16,3 @@ namespace currency
       {0x00,0x00}};
 #endif
 }
-

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2019 Zano Project
+﻿// Copyright (c) 2014-2025 Zano Project
 // Copyright (c) 2014-2018 The Louisdor Project
 // Copyright (c) 2012-2013 The Cryptonote developers
 // Distributed under the MIT/X11 software license, see the accompanying
@@ -34,7 +34,10 @@ using namespace epee;
 #define LOG_DEFAULT_CHANNEL "p2p" 
 ENABLE_CHANNEL_BY_DEFAULT(LOG_DEFAULT_CHANNEL);
 
-#define CURRENT_P2P_STORAGE_ARCHIVE_VER    (CURRENCY_FORMATION_VERSION+13)
+
+#define CURRENT_P2P_STORAGE_ARCHIVE_VER    (CURRENCY_FORMATION_VERSION+14)
+
+#define P2P_SERVER_DEFAULT_THREADS_NUM                                       10
 
 PUSH_VS_WARNINGS
 DISABLE_VS_WARNINGS(4355)
@@ -118,10 +121,16 @@ namespace nodetool
     bool log_connections();
     virtual uint64_t get_connections_count();
     size_t get_outgoing_connections_count();
+    size_t get_incoming_connections_count();
     peerlist_manager& get_peerlist_manager(){return m_peerlist;}
     bool handle_maintainers_entry(const maintainers_entry& me);
     bool get_maintainers_info(maintainers_info_external& me);
+    void get_ip_block_list(std::map<uint32_t, time_t>& blocklist);
+    bool reload_p2p_manual_config(bool silent = true);
     typedef COMMAND_REQUEST_STAT_INFO_T<typename t_payload_net_handler::stat_info> COMMAND_REQUEST_STAT_INFO;
+
+    inline static constexpr epee::serialization::portable_storage_limits local_portable_storage_limits{10000, 10000, 10000};
+
   private:
 
 
@@ -138,8 +147,7 @@ namespace nodetool
         HANDLE_INVOKE_T2(COMMAND_REQUEST_STAT_INFO, &node_server::handle_get_stat_info)
         HANDLE_INVOKE_T2(COMMAND_REQUEST_NETWORK_STATE, &node_server::handle_get_network_state)
         HANDLE_INVOKE_T2(COMMAND_REQUEST_PEER_ID, &node_server::handle_get_peer_id)
-        HANDLE_INVOKE_T2(COMMAND_REQUEST_LOG, &node_server::handle_request_log)
-        HANDLE_INVOKE_T2(COMMAND_SET_LOG_LEVEL, &node_server::handle_set_log_level)
+        HANDLE_INVOKE_T2(COMMAND_REQUEST_ANONYMIZED_PEERS, &node_server::handle_request_anonymized_peers)
       }
 #endif
       CHAIN_INVOKE_MAP_TO_OBJ_FORCE_CONTEXT(m_payload_handler, typename t_payload_net_handler::connection_context&)
@@ -154,8 +162,7 @@ namespace nodetool
     int handle_get_stat_info(int command, typename COMMAND_REQUEST_STAT_INFO::request& arg, typename COMMAND_REQUEST_STAT_INFO::response& rsp, p2p_connection_context& context);
     int handle_get_network_state(int command, COMMAND_REQUEST_NETWORK_STATE::request& arg, COMMAND_REQUEST_NETWORK_STATE::response& rsp, p2p_connection_context& context);
     int handle_get_peer_id(int command, COMMAND_REQUEST_PEER_ID::request& arg, COMMAND_REQUEST_PEER_ID::response& rsp, p2p_connection_context& context);
-    int handle_request_log(int command, COMMAND_REQUEST_LOG::request& arg, COMMAND_REQUEST_LOG::response& rsp, p2p_connection_context& context);
-    int handle_set_log_level(int command, COMMAND_SET_LOG_LEVEL::request& arg, COMMAND_SET_LOG_LEVEL::response& rsp, p2p_connection_context& context);
+    int handle_request_anonymized_peers(int command, COMMAND_REQUEST_ANONYMIZED_PEERS::request& req, COMMAND_REQUEST_ANONYMIZED_PEERS::response& rsp, p2p_connection_context& context);
   private:
 #endif
     bool init_config();
@@ -180,9 +187,10 @@ namespace nodetool
     virtual bool add_ip_fail(uint32_t address);
     virtual bool is_stop_signal_sent();
     //----------------- i_connection_filter  --------------------------------------------------------
-    virtual bool is_remote_ip_allowed(uint32_t adress);
+    virtual bool is_remote_ip_allowed(uint32_t adress, bool is_incoming);
     //-----------------------------------------------------------------------------------------------
     bool parse_peer_from_string(nodetool::net_address& pe, const std::string& node_addr);
+    bool parse_peerlist(const std::vector<std::string>& perrs_str, std::list<nodetool::net_address>& peers);
     bool handle_command_line(const boost::program_options::variables_map& vm);
     bool idle_worker();
     bool handle_remote_peerlist(const std::list<peerlist_entry>& peerlist, time_t local_time, const net_utils::connection_context_base& context);
@@ -217,7 +225,7 @@ namespace nodetool
     bool critical_alert_worker();
     bool remove_dead_connections();
     bool is_ip_good_for_adding_to_peerlist(uint32_t adress);
-    bool is_ip_in_blacklist(uint32_t adress);
+    bool is_ip_in_blacklist(uint32_t adress, bool ignore_auto_blocked_list = false);
 
 
     //debug functions
@@ -248,8 +256,9 @@ namespace nodetool
     bool m_hide_my_port;
     bool m_offline_mode;
     bool m_debug_requests_enabled;
-    bool m_ip_auto_blocking_enabled;
+    bool m_ip_auto_blocking_enabled = false;
     uint64_t m_startup_time;
+    uint32_t m_threads_count = P2P_SERVER_DEFAULT_THREADS_NUM;
 
 
     //critical_section m_connections_lock;
@@ -293,8 +302,15 @@ namespace nodetool
     critical_section m_blocked_ips_lock;
     std::map<uint32_t, time_t> m_blocked_ips;
 
+    //critical_section m_permanently_blocked_ips_lock;
+    std::set<uint32_t> m_permanently_blocked_ips;
+
+
     critical_section m_ip_fails_score_lock;
     std::map<uint32_t, uint64_t> m_ip_fails_score;
+
+    critical_section m_p2p_manual_config_lock;
+    p2p_config_data m_p2p_manual_config;
 
   };
 }

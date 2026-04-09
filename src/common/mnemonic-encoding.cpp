@@ -3391,5 +3391,9 @@ namespace tools
       CHECK_AND_ASSERT_THROW_MES(it!= wordsMap.end(), "unable to find word \"" << w << "\" in mnemonic dictionary");
       return it->second;
     }
+		const map<string, uint32_t>& get_words_map()
+		{
+			return wordsMap;
+		}
 	} 
 }  

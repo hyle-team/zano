@@ -9,3 +9,9 @@
 	path = contrib/tor-connect
 	url = https://github.com/hyle-team/tor-connect.git
 	branch = main
+[submodule "contrib/jwt-cpp"]
+	path = contrib/jwt-cpp
+	url = https://github.com/Thalhammer/jwt-cpp.git
+[submodule "contrib/bitcoin-secp256k1"]
+	path = contrib/bitcoin-secp256k1
+	url = https://github.com/bitcoin-core/secp256k1.git

@@ -47,4 +47,19 @@ namespace plain_wallet
     END_KV_SERIALIZE_MAP()
   };
 
+  struct configure_object
+  {
+    bool postponed_run_wallet = false;
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(postponed_run_wallet)
+    END_KV_SERIALIZE_MAP()
+  };
+  struct configure_response
+  {
+    std::string status;
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(status)
+    END_KV_SERIALIZE_MAP()
+  };
+
 } // namespace tools

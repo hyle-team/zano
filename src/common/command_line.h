@@ -220,7 +220,7 @@ namespace command_line
   extern const arg_descriptor<int>         arg_log_level;
   extern const arg_descriptor<bool>        arg_console;
   extern const arg_descriptor<bool>        arg_show_details;
-  extern const arg_descriptor<bool>        arg_show_rpc_autodoc;
+  //extern const arg_descriptor<bool>        arg_show_rpc_autodoc;
   extern const arg_descriptor<bool>        arg_disable_upnp;
   extern const arg_descriptor<bool>        arg_disable_ntp;
   extern const arg_descriptor<bool>        arg_disable_stop_if_time_out_of_sync;
@@ -232,5 +232,8 @@ namespace command_line
   extern const arg_descriptor<std::string> arg_process_predownload_from_path;
   extern const arg_descriptor<bool>        arg_validate_predownload;
   extern const arg_descriptor<std::string> arg_predownload_link;
+  extern const arg_descriptor<bool>        arg_non_pruning_mode;
   extern const arg_descriptor<std::string> arg_deeplink;
+  extern const arg_descriptor<std::string> arg_generate_rpc_autodoc;
+  
 }

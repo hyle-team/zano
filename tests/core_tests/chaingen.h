@@ -19,8 +19,10 @@
 
 #define TESTS_DEFAULT_FEE                   ((uint64_t)TX_DEFAULT_FEE)
 #define MK_TEST_COINS(amount)               (static_cast<uint64_t>(amount) * TX_DEFAULT_FEE)
-#define TESTS_POS_CONFIG_MIN_COINSTAKE_AGE  4
-#define TESTS_POS_CONFIG_POS_MINIMUM_HEIGH  4
+#define TESTS_POS_CONFIG_MIN_COINSTAKE_AGE        4
+#define TESTS_POS_CONFIG_POS_MINIMUM_HEIGH        4
+#define TESTS_CONCISE_MODE_REORG_MAX_REORG_BLOCK  5
+
 
 namespace concolor
 {
@@ -225,6 +227,7 @@ VARIANT_TAG(binary_archive, core_hardforks_config, 0xd2);
 
 typedef boost::variant<currency::block, currency::transaction, currency::account_base, callback_entry, serialized_block, serialized_transaction, event_visitor_settings, event_special_block, event_core_time, core_hardforks_config> test_event_entry;
 typedef std::unordered_map<crypto::hash, const currency::transaction*> map_hash2tx_t;
+typedef std::unordered_map<std::size_t, std::size_t> mixins_per_input;
 
 enum test_tx_split_strategy { tests_default_split_strategy /*height-based, TODO*/, tests_void_split_strategy, tests_null_split_strategy, tests_digits_split_strategy, tests_random_split_strategy };
 struct test_gentime_settings
@@ -255,6 +258,7 @@ public:
   bool need_core_proxy() const { return false; }  // tests can override this in order to obtain core proxy (e.g. for wallet)
   void set_core_proxy(std::shared_ptr<tools::i_core_proxy>) { /* do nothing */ }
   uint64_t get_tx_version_from_events(const std::vector<test_event_entry> &events) const;
+  uint64_t get_tx_version_and_harfork_id_from_events(const std::vector<test_event_entry> &events, size_t& tx_hardfork_id) const;
 
   virtual void on_test_constructed() {} // called right after test class is constructed by the chaingen 
   void on_test_generator_created(test_generator& generator) const; // tests can override this for special initialization
@@ -567,7 +571,8 @@ public:
     const currency::account_base& miner_acc, int actual_params = bf_none, uint8_t major_ver = 0,
     uint8_t minor_ver = 0, uint64_t timestamp = 0, const crypto::hash& prev_id = crypto::hash(),
     const currency::wide_difficulty_type& diffic = 1, const currency::transaction& miner_tx = currency::transaction(),
-    const std::vector<crypto::hash>& tx_hashes = std::vector<crypto::hash>(), size_t txs_sizes = 0);
+    const std::vector<crypto::hash>& tx_hashes = std::vector<crypto::hash>(), size_t txs_sizes = 0, 
+    currency::blobdata extra_nonce = currency::blobdata());
   bool construct_block_manually_tx(currency::block& blk, const currency::block& prev_block,
     const currency::account_base& miner_acc, const std::vector<crypto::hash>& tx_hashes, size_t txs_size);
   bool find_nounce(currency::block& blk, std::vector<const block_info*>& blocks, currency::wide_difficulty_type dif, uint64_t height) const;
@@ -673,14 +678,95 @@ bool construct_tx_with_many_outputs(const currency::hard_forks_descriptor& hf, s
                                             const currency::account_keys& keys_from, const currency::account_public_address& addr_to,
                                             uint64_t total_amount, size_t outputs_count, uint64_t fee, currency::transaction& tx, bool use_ref_by_id = false);
 
+bool construct_tx(const currency::account_keys& sender_account_keys,
+                  const std::vector<currency::tx_source_entry>& sources,
+                  const std::vector<currency::tx_destination_entry>& destinations,
+                  const std::vector<currency::extra_v>& extra,
+                  const std::vector<currency::attachment_v>& attachments,
+                  currency::transaction& tx,
+                  uint64_t tx_version,
+                  crypto::secret_key& one_time_secret_key,
+                  uint64_t unlock_time,
+                  uint64_t expiration_time,
+                  uint8_t tx_outs_attr,
+                  bool shuffle,
+                  uint64_t flags,
+                  uint64_t explicit_consolidated_tx_fee,
+                  currency::tx_generation_context& gen_context);
+
+bool construct_tx(const currency::account_keys& sender_account_keys,
+                  const std::vector<currency::tx_source_entry>& sources,
+                  const std::vector<currency::tx_destination_entry>& destinations,
+                  const std::vector<currency::extra_v>& extra,
+                  const std::vector<currency::attachment_v>& attachments,
+                  currency::transaction& tx,
+                  uint64_t tx_version,
+                  size_t tx_hardfork_id,
+                  crypto::secret_key& one_time_secret_key,
+                  uint64_t unlock_time,
+                  uint64_t expiration_time,
+                  uint8_t tx_outs_attr,
+                  bool shuffle,
+                  uint64_t flags,
+                  uint64_t explicit_consolidated_tx_fee,
+                  currency::tx_generation_context& gen_context);
+
+bool construct_tx(const currency::account_keys& sender_account_keys,
+                  const std::vector<currency::tx_source_entry>& sources,
+                  const std::vector<currency::tx_destination_entry>& destinations,
+                  const std::vector<currency::extra_v>& extra,
+                  const std::vector<currency::attachment_v>& attachments,
+                  currency::transaction& tx,
+                  uint64_t tx_version,
+                  crypto::secret_key& one_time_secret_key,
+                  uint64_t unlock_time);
+
+bool construct_tx(const currency::account_keys& sender_account_keys,
+                  const std::vector<currency::tx_source_entry>& sources,
+                  const std::vector<currency::tx_destination_entry>& destinations,
+                  const std::vector<currency::extra_v>& extra,
+                  const std::vector<currency::attachment_v>& attachments,
+                  currency::transaction& tx,
+                  uint64_t tx_version);
+
+bool construct_tx(const currency::account_keys& sender_account_keys, 
+                  const std::vector<currency::tx_source_entry>& sources,
+                  const std::vector<currency::tx_destination_entry>& destinations,
+                  const std::vector<test_event_entry> &events_to_get_hardfork_and_version,
+                  const test_chain_unit_base* p_test_instance,
+                  currency::transaction& result_tx);
+
+
 void get_confirmed_txs(const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, map_hash2tx_t& confirmed_txs);
 bool find_block_chain(const std::vector<test_event_entry>& events, std::vector<currency::block>& blockchain, map_hash2tx_t& mtx, const crypto::hash& head);
+
+enum fill_tx_sources_flag_t
+{
+  fts_none                      = 0,
+  fts_check_for_spends          = 1 << 0,
+  fts_check_for_unlocktime      = 1 << 1,
+  fts_use_ref_by_id             = 1 << 2,
+  fts_check_for_hf4_min_coinage = 1 << 3,
+  // keep the following line at the end
+  fts_default                   = (fts_check_for_spends | fts_check_for_unlocktime | fts_check_for_hf4_min_coinage)
+};
+
 bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
                      const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix, bool check_for_spends = true, bool check_for_unlocktime = true, bool use_ref_by_id = false);
 bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
                      const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix,
                      const std::vector<currency::tx_source_entry>& sources_to_avoid, bool check_for_spends = true, bool check_for_unlocktime = true,
-                     bool use_ref_by_id = false, uint64_t* p_sources_amount_found = nullptr);
+                     bool use_ref_by_id = false, uint64_t* p_sources_amount_found = nullptr,
+                     const mixins_per_input* nmix_map = nullptr);
+bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
+                     const currency::block& blk_head, const currency::account_keys& from, uint64_t amount, size_t nmix,
+                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, uint64_t* p_sources_amount_found = nullptr,
+                     const mixins_per_input* nmix_map = nullptr);
+bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std::vector<test_event_entry>& events,
+                     const currency::block& blk_head, const currency::account_keys& from, const std::unordered_map<crypto::public_key, uint64_t>& amounts, size_t nmix,
+                     const std::vector<currency::tx_source_entry>& sources_to_avoid, uint64_t fts_flags, std::unordered_map<crypto::public_key, uint64_t>* p_sources_amounts = nullptr,
+                     const mixins_per_input* nmix_map = nullptr);
+
 bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& events, const currency::block& blk_head,
                                       const currency::account_keys& from, const std::list<currency::account_public_address>& to,
                                       uint64_t amount, uint64_t fee, size_t nmix, std::vector<currency::tx_source_entry>& sources,
@@ -688,7 +774,8 @@ bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& event
                                       bool check_for_spends = true,
                                       bool check_for_unlocktime = true,
                                       size_t minimum_sigs = SIZE_MAX,
-                                      bool use_ref_by_id = false);
+                                      bool use_ref_by_id = false,
+                                      const mixins_per_input* nmix_map = nullptr);
 bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& events, const currency::block& blk_head,
                                       const currency::account_keys& from, const currency::account_public_address& to,
                                       uint64_t amount, uint64_t fee, size_t nmix,
@@ -696,7 +783,8 @@ bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& event
                                       std::vector<currency::tx_destination_entry>& destinations, 
                                       bool check_for_spends = true, 
                                       bool check_for_unlocktime = true,
-                                      bool use_ref_by_id = false);
+                                      bool use_ref_by_id = false,
+                                      const mixins_per_input* nmix_map = nullptr);
 bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& events, const currency::block& blk_head,
                                       const currency::account_base& from, const currency::account_base& to,
                                       uint64_t amount, uint64_t fee, size_t nmix,
@@ -704,7 +792,8 @@ bool fill_tx_sources_and_destinations(const std::vector<test_event_entry>& event
                                       std::vector<currency::tx_destination_entry>& destinations, 
                                       bool check_for_spends = true, 
                                       bool check_for_unlocktime = true,
-                                      bool use_ref_by_id = false);
+                                      bool use_ref_by_id = false,
+                                      const mixins_per_input* nmix_map = nullptr);
 uint64_t get_balance(const currency::account_keys& addr, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, bool dbg_log = false);
 uint64_t get_balance(const currency::account_base& addr, const std::vector<currency::block>& blockchain, const map_hash2tx_t& mtx, bool dbg_log = false);
 void balance_via_wallet(const tools::wallet2& w, const crypto::public_key& asset_id, uint64_t* p_total, uint64_t* p_unlocked = 0, uint64_t* p_awaiting_in = 0, uint64_t* p_awaiting_out = 0, uint64_t* p_mined = 0);
@@ -715,7 +804,9 @@ bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name,
                               uint64_t expected_unlocked = INVALID_BALANCE_VAL,
                               uint64_t expected_awaiting_in = INVALID_BALANCE_VAL,
                               uint64_t expected_awaiting_out = INVALID_BALANCE_VAL,
-                              const crypto::public_key& asset_id = currency::native_coin_asset_id);
+                              const crypto::public_key& asset_id = currency::native_coin_asset_id,
+                              size_t asset_decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT);
+bool check_balance_via_wallet(const tools::wallet2& w, const char* account_name, uint64_t expected_total, const crypto::public_key& asset_id, size_t asset_decimal_point = CURRENCY_DISPLAY_DECIMAL_POINT);
 
 bool calculate_amounts_many_outs_have_and_no_outs_have(const uint64_t first_blocks_reward, uint64_t& amount_many_outs_have, uint64_t& amount_no_outs_have);
 bool find_global_index_for_output(const std::vector<test_event_entry>& events, const crypto::hash& head_block_hash, const currency::transaction& reference_tx, const size_t reference_tx_out_index, uint64_t& global_index);
@@ -741,6 +832,11 @@ bool refresh_wallet_and_check_balance(const char* intro_log_message, const char*
                                       uint64_t expected_awaiting_out = UINT64_MAX);
 
 uint64_t get_last_block_of_type(bool looking_for_pos, const test_generator::blockchain_vector& blck_chain);
+
+bool decode_output_amount_and_asset_id(const currency::account_base& acc, const currency::transaction& tx, size_t output_index, uint64_t &amount, crypto::public_key* p_asset_id = nullptr);
+uint64_t decode_native_output_amount_or_throw(const currency::account_base& acc, const currency::transaction& tx, size_t output_index);
+
+bool generate_pos_block_with_extra_nonce(test_generator& generator, const std::vector<test_event_entry>& events, const currency::account_base& miner, const currency::account_base& recipient, const currency::block& prev_block, const currency::transaction& stake_tx, const currency::blobdata& pos_nonce, currency::block& result);
 bool generate_pos_block_with_given_coinstake(test_generator& generator, const std::vector<test_event_entry> &events, const currency::account_base& miner, const currency::block& prev_block, const currency::transaction& stake_tx, size_t stake_output_idx, currency::block& result, uint64_t stake_output_gidx = UINT64_MAX);
 bool check_ring_signature_at_gen_time(const std::vector<test_event_entry>& events, const crypto::hash& last_block_id, const currency::txin_to_key& in_t_k,
   const crypto::hash& hash_for_sig, const std::vector<crypto::signature> &sig);
@@ -970,10 +1066,12 @@ bool test_generator::construct_block_gentime_with_coinbase_cb(const currency::bl
 
   uint64_t block_reward_without_fee = 0;
   uint64_t block_reward = 0;
+  size_t tx_hardfork_id = 0;
+  uint64_t tx_version = get_tx_version_and_hardfork_id(height, m_hardforks, tx_hardfork_id);
 
   currency::keypair tx_sec_key = currency::keypair::generate();
   r = construct_miner_tx(height, epee::misc_utils::median(block_sizes), already_generated_coins, 0 /* current_block_size !HACK! */, 0,
-    acc.get_public_address(), acc.get_public_address(), miner_tx, block_reward_without_fee, block_reward, get_tx_version(height, m_hardforks), currency::blobdata(), /* max outs: */ 1,
+    acc.get_public_address(), acc.get_public_address(), miner_tx, block_reward_without_fee, block_reward, tx_version, tx_hardfork_id, currency::blobdata(), /* max outs: */ 1,
     /* pos: */ false, currency::pos_entry(), /* ogc_ptr: */ nullptr, &tx_sec_key);
   CHECK_AND_ASSERT_MES(r, false, "construct_miner_tx failed");
 
@@ -1015,17 +1113,31 @@ inline uint64_t get_sources_total_amount(const std::vector<currency::tx_source_e
   return result;
 }
 
+inline void get_sources_total_amount(const std::vector<currency::tx_source_entry>& s, std::unordered_map<crypto::public_key, uint64_t>& amounts)
+{
+  amounts.clear();
+  for (auto& e : s)
+    amounts[e.asset_id] += e.amount;
+}
+
 inline void count_ref_by_id_and_gindex_refs_for_tx_inputs(const currency::transaction& tx, size_t& refs_by_id, size_t& refs_by_gindex)
 {
   refs_by_id = 0;
   refs_by_gindex = 0;
   for (auto& in : tx.vin)
   {
-    if (in.type() != typeid(currency::txin_to_key))
+    const currency::referring_input* p_ri = nullptr;
+    VARIANT_SWITCH_BEGIN(in)
+      VARIANT_CASE_CONST(currency::txin_to_key, intk)
+        p_ri = &intk;
+      VARIANT_CASE_CONST(currency::txin_zc_input, inzc)
+        p_ri = &inzc;
+    VARIANT_SWITCH_END()
+
+    if (!p_ri)
       continue;
 
-    const currency::txin_to_key& in2key = boost::get<currency::txin_to_key>(in);
-    for (auto& ko : in2key.key_offsets)
+    for (auto& ko : p_ri->key_offsets)
     {
       if (ko.type() == typeid(currency::ref_by_id))
         ++refs_by_id;
@@ -1133,6 +1245,18 @@ void append_vector_by_another_vector(U& dst, const V& src)
       return false;                                                                                         \
   }                                                                                                         \
   VEC_EVENTS.push_back(BLK_NAME)
+
+#define REWIND_POS_BLOCKS_N_WITH_TIME(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC, MINERS_ACC_LIST, COUNT)                                               \
+  currency::block BLK_NAME = PREV_BLOCK;                                                                                                                 \
+  for(size_t i = 0; i < COUNT; ++i)                                                                                                                      \
+  {                                                                                                                                                      \
+    PRINT_EVENT_N_TEXT(VEC_EVENTS, "REWIND_POS_BLOCKS_N_WITH_TIME(" << #BLK_NAME << ", " << #PREV_BLOCK << ", " << #MINER_ACC << ", " << #COUNT << ")"); \
+    currency::block next_block = AUTO_VAL_INIT(next_block);                                                                                              \
+    generator.construct_block(VEC_EVENTS, next_block, BLK_NAME, MINER_ACC, std::list<currency::transaction>(), MINERS_ACC_LIST);                         \
+    VEC_EVENTS.push_back(event_core_time(next_block.timestamp - 10));                                                                                    \
+    VEC_EVENTS.push_back(next_block);                                                                                                                    \
+    BLK_NAME = next_block;                                                                                                                               \
+  }
 
 #define MAKE_NEXT_BLOCK_NO_ADD(VEC_EVENTS, BLK_NAME, PREV_BLOCK, MINER_ACC)           \
   PRINT_EVENT_N_TEXT(VEC_EVENTS, "MAKE_NEXT_BLOCK_NO_ADD(" << #BLK_NAME << ")");      \
@@ -1253,11 +1377,13 @@ void append_vector_by_another_vector(U& dst, const V& src)
 
 #define MAKE_TX_LIST_START_WITH_ATTACHS(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, HEAD, ATTACHS) MAKE_TX_LIST_START_MIX_ATTR(VEC_EVENTS, SET_NAME, FROM, TO, AMOUNT, HEAD, CURRENCY_TO_KEY_OUT_RELAXED, ATTACHS)
 
-#define MAKE_TX_ATTACH_FEE(EVENTS, TX_VAR, FROM, TO, AMOUNT, FEE, HEAD, ATTACH)        \
-  PRINT_EVENT_N(EVENTS);                                                               \
-  currency::transaction TX_VAR = AUTO_VAL_INIT(TX_VAR);                                \
-  CHECK_AND_ASSERT_MES(construct_tx_to_key(generator.get_hardforks(), EVENTS, TX_VAR, HEAD, FROM, TO, AMOUNT, FEE, 0, generator.last_tx_generated_secret_key, CURRENCY_TO_KEY_OUT_RELAXED, empty_extra, ATTACH), false, "construct_tx_to_key failed"); \
+#define MAKE_TX_EXTRA_ATTACH_FEE(EVENTS, TX_VAR, FROM, TO, AMOUNT, FEE, HEAD, EXTRA, ATTACH)  \
+  PRINT_EVENT_N(EVENTS);                                                                      \
+  currency::transaction TX_VAR{};                                                             \
+  CHECK_AND_ASSERT_MES(construct_tx_to_key(generator.get_hardforks(), EVENTS, TX_VAR, HEAD, FROM, TO, AMOUNT, FEE, 0, generator.last_tx_generated_secret_key, CURRENCY_TO_KEY_OUT_RELAXED, EXTRA, ATTACH), false, "construct_tx_to_key failed"); \
   EVENTS.push_back(TX_VAR)
+
+#define MAKE_TX_ATTACH_FEE(EVENTS, TX_VAR, FROM, TO, AMOUNT, FEE, HEAD, ATTACH) MAKE_TX_EXTRA_ATTACH_FEE(EVENTS, TX_VAR, FROM, TO, AMOUNT, FEE, HEAD, empty_extra, ATTACH) 
 
 #define MAKE_TX_ATTACH(EVENTS, TX_VAR, FROM, TO, AMOUNT, HEAD, ATTACH) MAKE_TX_ATTACH_FEE(EVENTS, TX_VAR, FROM, TO, AMOUNT, TESTS_DEFAULT_FEE, HEAD, ATTACH)
 
@@ -1314,30 +1440,25 @@ void append_vector_by_another_vector(U& dst, const V& src)
 
 #define MAKE_TEST_WALLET_TX(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC)              \
   PRINT_EVENT_N(EVENTS_VEC);                                                           \
-  transaction TX_VAR = AUTO_VAL_INIT(TX_VAR);                                          \
+  transaction TX_VAR{};                                                                \
   {                                                                                    \
     std::vector<tx_destination_entry> destinations(1, tx_destination_entry(MONEY, DEST_ACC.get_public_address())); \
     WLT_WAR->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, std::vector<extra_v>(), std::vector<attachment_v>(), TX_VAR); \
   }                                                                                    \
   EVENTS_VEC.push_back(TX_VAR)
 
-#define MAKE_TEST_WALLET_TX_ATTACH(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC, ATTACH) \
+#define MAKE_TEST_WALLET_TX_EXTRA_ATTACH(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC, EXTRA, ATTACH) \
   PRINT_EVENT_N(EVENTS_VEC);                                                           \
-  transaction TX_VAR = AUTO_VAL_INIT(TX_VAR);                                          \
+  transaction TX_VAR{};                                                                \
   {                                                                                    \
     std::vector<tx_destination_entry> destinations(1, tx_destination_entry(MONEY, DEST_ACC.get_public_address())); \
-    WLT_WAR->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, std::vector<extra_v>(), ATTACH, TX_VAR); \
+    WLT_WAR->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, EXTRA, ATTACH, TX_VAR);   \
   }                                                                                    \
   EVENTS_VEC.push_back(TX_VAR)
 
-#define MAKE_TEST_WALLET_TX_EXTRA(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC, EXTRA) \
-  PRINT_EVENT_N(EVENTS_VEC);                                                           \
-  transaction TX_VAR = AUTO_VAL_INIT(TX_VAR);                                          \
-  {                                                                                    \
-    std::vector<tx_destination_entry> destinations(1, tx_destination_entry(MONEY, DEST_ACC.get_public_address())); \
-    WLT_WAR->transfer(destinations, 0, 0, TESTS_DEFAULT_FEE, EXTRA, std::vector<attachment_v>(), TX_VAR); \
-  }                                                                                    \
-  EVENTS_VEC.push_back(TX_VAR)
+#define MAKE_TEST_WALLET_TX_ATTACH(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC, ATTACH) MAKE_TEST_WALLET_TX_EXTRA_ATTACH(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC, empty_extra, ATTACH)
+
+#define MAKE_TEST_WALLET_TX_EXTRA(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC, EXTRA) MAKE_TEST_WALLET_TX_EXTRA_ATTACH(EVENTS_VEC, TX_VAR, WLT_WAR, MONEY, DEST_ACC, EXTRA, empty_attachment)
 
 #define CHECK_TEST_WALLET_BALANCE_AT_GEN_TIME(WLT_WAR, TOTAL_BALANCE) \
   if (!check_balance_via_wallet(*WLT_WAR.get(), #WLT_WAR, TOTAL_BALANCE)) \

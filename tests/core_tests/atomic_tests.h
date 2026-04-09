@@ -1,8 +1,10 @@
 // Copyright (c) 2014-2021 Zano Project
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-
 #pragma once 
+
+#if 0
+
 #include "chaingen.h"
 #include "wallet_tests_basic.h"
 
@@ -44,3 +46,5 @@ struct atomic_test_check_hardfork_rules : public atomic_base_test
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events) override;
 private:
 };
+
+#endif

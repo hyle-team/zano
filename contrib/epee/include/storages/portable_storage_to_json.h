@@ -30,174 +30,121 @@
 
 #include "misc_language.h"
 #include "portable_storage_base.h"
+#include "portable_storage_to_.h"
 
 namespace epee
 {
   namespace serialization
   {
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const array_entry& ae, size_t indent, end_of_line_t eol = eol_crlf);
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const storage_entry& se, size_t indent, end_of_line_t eol = eol_crlf);
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const std::string& v, size_t indent, end_of_line_t eol = eol_crlf);
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const int8_t& v, size_t indent, end_of_line_t eol = eol_crlf);
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const uint8_t& v, size_t indent, end_of_line_t eol = eol_crlf);
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const bool& v, size_t indent, end_of_line_t eol = eol_crlf);
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const double& v, size_t indent, end_of_line_t eol = eol_crlf);
-    template<class t_stream, class t_type>
-    void dump_as_json(t_stream& strm, const t_type& v, size_t indent, end_of_line_t eol = eol_crlf);
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const section& sec, size_t indent, end_of_line_t eol = eol_crlf);
-
+    inline const char* get_endline(end_of_line_t eol)
+    {
+      switch (eol)
+      {
+        case eol_lf:    return "\n";
+        case eol_cr:    return  "\r";
+        case eol_space: return  " ";
+        default:        return  "\r\n";
+      }
+    }
 
     inline std::string make_indent(size_t indent)
     {
-      return std::string(indent*2, ' ');
+      return std::string(indent * 2, ' ');
     }
 
-    template<class t_stream>
-    struct array_entry_store_to_json_visitor: public boost::static_visitor<void>
+    class strategy_json
     {
-      t_stream& m_strm;
-      size_t m_indent;
-      end_of_line_t m_eol;
+    public:
+      using use_descriptions = std::false_type;
 
-      array_entry_store_to_json_visitor(t_stream& strm, size_t indent, end_of_line_t eol)
-        : m_strm(strm)
-        , m_indent(indent)
-        , m_eol(eol)
-      {}
-
-      template<class t_type>
-      void operator()(const array_entry_t<t_type>& a)
+      inline static const char* eol = get_endline(eol_crlf);
+      //static const end_of_line_t eol = eol_crlf;
+      template<class t_stream>
+      static void handle_value(t_stream& strm, const std::string& v, size_t indent)
       {
-        m_strm << "[";
-        if(a.m_array.size())
-        {
-          auto last_it = --a.m_array.end();
-          for(auto it = a.m_array.begin(); it != a.m_array.end(); it++)
-          {
-            dump_as_json(m_strm, *it, m_indent, m_eol);
-            if(it != last_it)
-              m_strm << ",";
-          }
-        }
-        m_strm << "]";
+        strm << "\"" << misc_utils::parse::transform_to_json_escape_sequence(v) << "\"";
+      }
+      template<class t_stream>
+      static void handle_value(t_stream& strm, const int8_t& v, size_t indent)
+      {
+        strm << static_cast<int32_t>(v);
+      }
+      template<class t_stream>
+      static void handle_value(t_stream& strm, const uint8_t& v, size_t indent)
+      {
+        strm << static_cast<int32_t>(v);
+      }
+      template<class t_stream>
+      static void handle_value(t_stream& strm, const bool& v, size_t indent)
+      {
+        if (v)
+          strm << "true";
+        else
+          strm << "false";
+      }
+      template<class t_stream>
+      static void handle_value(t_stream& strm, const double& v, size_t indent)
+      {
+        boost::io::ios_flags_saver ifs(strm);
+        strm.precision(8);
+        strm << std::fixed << v;
+      }
+      template<class t_stream, class t_type>
+      static void handle_value(t_stream& strm, const t_type& v, size_t indent)
+      {
+        strm << v;
+      }
+
+      template<class t_stream>
+      static void handle_array_start(t_stream& strm, size_t indent)
+      {
+        strm << "[";
+      }
+
+      template<class t_stream>
+      static void handle_array_end(t_stream& strm, size_t indent)
+      {
+        strm << "]";
+      }
+
+      template<class t_stream>
+      static void handle_obj_begin(t_stream& strm, size_t indent)
+      {
+        strm << "{";
+      }
+
+      template<class t_stream>
+      static void handle_obj_end(t_stream& strm, size_t indent)
+      {
+        strm << make_indent(indent) << "}";
+      }
+
+      template<class t_stream>
+      static void handle_print_key(t_stream& strm, const std::string& key, size_t indent)
+      {
+        const std::string indent_str = make_indent(indent);
+        strm << indent_str << "\"" << misc_utils::parse::transform_to_json_escape_sequence(key) << "\"" << ": ";
+      }
+
+
+      template<class t_stream>
+      static void handle_section_entry_separator(t_stream& strm, size_t indent)
+      {
+        strm << ",";
+      }
+
+      template<class t_stream>
+      static void handle_array_entry_separator(t_stream& strm, size_t indent)
+      {
+        strm << ",";
+      }
+
+      template<class t_stream>
+      static void handle_line_break(t_stream& strm, size_t indent)
+      {
+        strm << eol;
       }
     };
 
-    template<class t_stream>
-    struct storage_entry_store_to_json_visitor: public boost::static_visitor<void>
-    {
-      t_stream& m_strm;
-      size_t m_indent;
-      end_of_line_t m_eol;
-
-      storage_entry_store_to_json_visitor(t_stream& strm, size_t indent, end_of_line_t eol)
-        : m_strm(strm)
-        , m_indent(indent)
-        , m_eol(eol)
-      {}
-
-      //section, array_entry
-      template<class visited_type>
-      void operator()(const visited_type& v)
-      { 
-        dump_as_json(m_strm, v, m_indent, m_eol);
-      }
-    };
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const array_entry& ae, size_t indent, end_of_line_t eol)
-    {
-      array_entry_store_to_json_visitor<t_stream> aesv(strm, indent, eol);
-      boost::apply_visitor(aesv, ae);
-    }
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const storage_entry& se, size_t indent, end_of_line_t eol)
-    {
-      storage_entry_store_to_json_visitor<t_stream> sv(strm, indent, eol);
-      boost::apply_visitor(sv, se);
-    }
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const std::string& v, size_t indent, end_of_line_t eol)
-    {
-      strm << "\"" << misc_utils::parse::transform_to_json_escape_sequence(v) << "\"";
-    }
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const int8_t& v, size_t indent, end_of_line_t eol)
-    {
-      strm << static_cast<int32_t>(v);
-    }
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const uint8_t& v, size_t indent, end_of_line_t eol)
-    {
-      strm << static_cast<int32_t>(v);
-    }
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const bool& v, size_t indent, end_of_line_t eol)
-    {
-      if(v)
-        strm << "true";
-      else
-        strm << "false";
-    }
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const double& v, size_t indent, end_of_line_t eol)
-    {
-      boost::io::ios_flags_saver ifs(strm);
-      strm.precision(8);
-      strm << std::fixed << v;
-    }
-
-    template<class t_stream, class t_type>
-    void dump_as_json(t_stream& strm, const t_type& v, size_t indent, end_of_line_t eol)
-    {
-      strm << v;
-    }
-
-    template<class t_stream>
-    void dump_as_json(t_stream& strm, const section& sec, size_t indent, end_of_line_t eol)
-    {
-      auto put_eol = [&]() {
-        switch (eol)
-        {
-        case eol_lf:    strm << "\n";   break;
-        case eol_cr:    strm << "\r";   break;
-        case eol_space: strm << " ";    break;
-        default:        strm << "\r\n"; break;
-        }
-      };
-
-      size_t local_indent = indent + 1;
-      strm << "{";
-      put_eol();
-      std::string indent_str = make_indent(local_indent);
-      if(sec.m_entries.size())
-      {
-        auto it_last = --sec.m_entries.end();
-        for(auto it = sec.m_entries.begin(); it!= sec.m_entries.end();it++)
-        {
-          strm << indent_str << "\"" << misc_utils::parse::transform_to_json_escape_sequence(it->first) << "\"" << ": ";
-          dump_as_json(strm, it->second, local_indent, eol);
-          if(it_last != it)
-            strm << ",";
-          put_eol();
-        }
-      }
-      strm << make_indent(indent) <<  "}";
-    }
   }
 }

@@ -18,6 +18,7 @@ namespace currency
   {
     virtual bool relay_block(NOTIFY_NEW_BLOCK::request& arg, currency_connection_context& exclude_context)=0;
     virtual bool relay_transactions(NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request& arg, currency_connection_context& exclude_context)=0;
+    virtual void on_hardfork_activated(size_t hardfork_id) {}
     //virtual bool request_objects(NOTIFY_REQUEST_GET_OBJECTS::request& arg, currency_connection_context& context)=0;
   };
 

@@ -33,6 +33,25 @@
 
 #define LEVIN_SIGNATURE  0x0101010101012101LL  //Bender's nightmare
 
+
+
+#define LEVIN_OK                                        0
+#define LEVIN_ERROR_CONNECTION                         -1
+#define LEVIN_ERROR_CONNECTION_NOT_FOUND               -2
+#define LEVIN_ERROR_CONNECTION_DESTROYED               -3
+#define LEVIN_ERROR_CONNECTION_TIMEDOUT                -4
+#define LEVIN_ERROR_CONNECTION_NO_DUPLEX_PROTOCOL      -5
+#define LEVIN_ERROR_CONNECTION_HANDLER_NOT_DEFINED     -6
+#define LEVIN_ERROR_FORMAT                             -7
+#define LEVIN_ERROR_EXCEPTION                          -8
+#define LEVIN_ERROR_UNKNOWN_ERROR                      -9
+#define LEVIN_ERROR_INTERNAL                           -10
+#define LEVIN_ERROR_PROTOCOL_INCONSISTENT              -11
+#define LEVIN_ERROR_NET_ERROR                          -12
+#define LEVIN_ERROR_SIGNATURE_MISMATCH                 -13
+
+
+
 namespace epee
 {
 namespace levin
@@ -86,23 +105,15 @@ namespace levin
 
     virtual void on_connection_new(t_connection_context& context){};
     virtual void on_connection_close(t_connection_context& context){};
-
   };
 
-#define LEVIN_OK                                        0
-#define LEVIN_ERROR_CONNECTION                         -1
-#define LEVIN_ERROR_CONNECTION_NOT_FOUND               -2
-#define LEVIN_ERROR_CONNECTION_DESTROYED               -3
-#define LEVIN_ERROR_CONNECTION_TIMEDOUT                -4
-#define LEVIN_ERROR_CONNECTION_NO_DUPLEX_PROTOCOL      -5
-#define LEVIN_ERROR_CONNECTION_HANDLER_NOT_DEFINED     -6
-#define LEVIN_ERROR_FORMAT                             -7
-#define LEVIN_ERROR_EXCEPTION                          -8
-#define LEVIN_ERROR_UNKNOWN_ERROR                      -9
-#define LEVIN_ERROR_INTERNAL                           -10
-#define LEVIN_ERROR_PROTOCOL_INCONSISTENT              -11
-#define LEVIN_ERROR_NET_ERROR                          -12
-#define LEVIN_ERROR_SIGNATURE_MISMATCH                 -13
+  template<class t_connection_context = net_utils::connection_context_base>
+  struct levin_commands_handler_dummy: public levin_commands_handler<t_connection_context>
+  {
+    virtual int invoke(int command, const std::string& in_buff, std::string& buff_out, t_connection_context& context) { return LEVIN_OK; }
+    virtual int notify(int command, const std::string& in_buff, t_connection_context& context) { return LEVIN_OK; }
+  };
+
 
 #define DESCRIBE_RET_CODE(code) case code: return #code;
   inline
