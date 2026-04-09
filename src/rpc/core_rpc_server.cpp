@@ -836,7 +836,7 @@ namespace currency
     VARIANT_SWITCH_END();
 
     ftp.tx_outs_attr  = CURRENCY_TO_KEY_OUT_RELAXED;
-    ftp.tx_version    = TRANSACTION_VERSION_POST_HF6;
+    ftp.tx_version    = m_core.get_current_tx_version();
     ftp.spend_pub_key = req.origin_gateway_id;
     ftp.tx_hardfork_id = m_core.get_blockchain_storage().get_current_hardfork_id();
 
@@ -935,6 +935,188 @@ namespace currency
     }
     
     res.signed_tx_blob = t_serializable_object_to_blob(tx);
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+    bool core_rpc_server::on_gateway_create_owner_change(const COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    if (m_core.get_blockchain_storage().is_pre_hardfork_tx_freeze_period_active())
+    {
+      LOG_PRINT_L0("[on_gateway_create_owner_change]: pre hardfork freeze period is in effect.");
+      res.status = API_RETURN_CODE_TX_FREEZE_PERIOD;
+      return true;
+    }
+
+    size_t count_keys = 0;
+    if (req.new_descriptor_info.opt_owner_custom_schnorr_pub_key)
+      count_keys++;
+    if (req.new_descriptor_info.opt_owner_eddsa_pub_key)
+      count_keys++;
+    if (req.new_descriptor_info.opt_owner_ecdsa_pub_key)
+      count_keys++;
+
+    if (count_keys != 1)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      return true;
+    }
+
+    auto addr_data_ptr = m_core.get_blockchain_storage().get_gateway_address_info(req.address_id);
+    if (!addr_data_ptr)
+    {
+      res.status = API_RETURN_CODE_NOT_FOUND;
+      return true;
+    }
+
+    uint64_t fee = req.fee ? req.fee : TX_DEFAULT_FEE;
+
+    auto it = addr_data_ptr->balances.find(currency::native_coin_asset_id);
+    if (it == addr_data_ptr->balances.end() || it->second.amount < fee)
+    {
+      res.status = API_RETURN_CODE_NOT_ENOUGH_MONEY;
+      return true;
+    }
+
+    gateway_address_descriptor_operation_update gao_upd{};
+    gao_upd.address_id = req.address_id;
+    gao_upd.descriptor.meta_info = req.new_descriptor_info.meta_info;
+
+    if (req.new_descriptor_info.opt_owner_custom_schnorr_pub_key)
+      gao_upd.descriptor.owner_key = req.new_descriptor_info.opt_owner_custom_schnorr_pub_key.value();
+    else if (req.new_descriptor_info.opt_owner_eddsa_pub_key)
+      gao_upd.descriptor.owner_key = req.new_descriptor_info.opt_owner_eddsa_pub_key.value();
+    else if (req.new_descriptor_info.opt_owner_ecdsa_pub_key)
+      gao_upd.descriptor.owner_key = req.new_descriptor_info.opt_owner_ecdsa_pub_key.value();
+
+    gateway_address_descriptor_operation gwdo{};
+    gwdo.operation = gao_upd;
+
+    currency::account_keys dummy_keys = {};
+    currency::finalize_tx_param ftp = {};
+    currency::finalized_tx ftx = {};
+
+    tx_source_entry source = {};
+    source.asset_id = currency::native_coin_asset_id;
+    source.amount = fee;
+    source.gateway_origin = req.address_id;
+    ftp.sources.push_back(source);
+
+    ftp.crypt_address.view_public_key = req.address_id;
+    ftp.crypt_address.spend_public_key = req.address_id;
+
+    ftp.tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED;
+    ftp.tx_version = m_core.get_current_tx_version();
+    ftp.spend_pub_key = req.address_id;
+    ftp.tx_hardfork_id = m_core.get_blockchain_storage().get_current_hardfork_id();
+    ftp.extra.push_back(gwdo);
+
+    bool r = currency::construct_tx(dummy_keys, ftp, ftx);
+    if (!r)
+    {
+      res.status = API_RETURN_CODE_FAIL;
+      return true;
+    }
+
+    res.tx_blob = t_serializable_object_to_blob(ftx.tx);
+    res.tx_hash_to_sign = get_transaction_hash(ftx.tx);
+
+    res.status = API_RETURN_CODE_OK;
+    return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::on_gateway_sign_owner_change(const COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::response& res, epee::json_rpc::error& er, connection_context& cntx)
+  {
+    transaction tx = {};
+
+    bool r = t_unserializable_object_from_blob(tx, req.tx_blob);
+    if (!r)
+    {
+      res.status = API_RETURN_CODE_BAD_ARG;
+      return true;
+    }
+
+    crypto::hash tx_id = get_transaction_hash(tx);
+    if (tx_id != req.tx_hash_to_sign)
+    {
+      LOG_ERROR("Transaction hash mismatch in on_gateway_sign_owner_change: " << tx_id << " != " << req.tx_hash_to_sign);
+      res.status = API_RETURN_CODE_BAD_ARG;
+      return true;
+    }
+
+    size_t sig_count = 0;
+    gateway_signature_v gw_sig;
+    gateway_owner_signature_v ownership_sig;
+    if (req.opt_ecdsa_signature)
+    {
+      gw_sig = req.opt_ecdsa_signature.value();
+      ownership_sig = req.opt_ecdsa_signature.value();
+      sig_count++;
+    }
+    if (req.opt_custom_schnorr_signature)
+    {
+      gw_sig = req.opt_custom_schnorr_signature.value();
+      ownership_sig = req.opt_custom_schnorr_signature.value();
+      sig_count++;
+    }
+    if (req.opt_eddsa_signature)
+    {
+      gw_sig = req.opt_eddsa_signature.value();
+      ownership_sig = req.opt_eddsa_signature.value();
+      sig_count++;
+    }
+
+    if (sig_count != 1)
+    {
+      LOG_ERROR("Expected exactly one signature in on_gateway_sign_owner_change, got: " << sig_count);
+      res.status = API_RETURN_CODE_BAD_ARG;
+      return true;
+    }
+
+    // apply gateway input signatures (for fee)
+    for (auto& sig : tx.signatures)
+    {
+      if (sig.type() == typeid(gateway_sig))
+      {
+        gateway_sig& gw_sig_in_tx = boost::get<gateway_sig>(sig);
+        gw_sig_in_tx.s = gw_sig;
+      }
+      else
+      {
+        LOG_ERROR("Unexpected signature type in on_gateway_sign_owner_change");
+        res.status = API_RETURN_CODE_BAD_ARG;
+        return true;
+      }
+    }
+
+    // add ownership proof to tx.proofs
+    gateway_address_ownership_proof gaoop{};
+    gaoop.sign = ownership_sig;
+    tx.proofs.push_back(gaoop);
+
+    blobdata signed_tx_blob = t_serializable_object_to_blob(tx);
+
+    // broadcast tx
+    tx_verification_context tvc = AUTO_VAL_INIT(tvc);
+    if (!m_core.handle_incoming_tx(signed_tx_blob, tvc, false))
+    {
+      LOG_ERROR("[on_gateway_sign_owner_change]: Failed to process signed tx");
+      res.status = API_RETURN_CODE_FAIL;
+      return true;
+    }
+    if (tvc.m_verification_failed)
+    {
+      LOG_ERROR("[on_gateway_sign_owner_change]: signed tx verification failed");
+      res.status = API_RETURN_CODE_FAIL;
+      return true;
+    }
+
+    NOTIFY_OR_INVOKE_NEW_TRANSACTIONS::request ntx_req;
+    ntx_req.txs.push_back(signed_tx_blob);
+    
+		currency_connection_context fake_context = AUTO_VAL_INIT(fake_context);
+    m_core.get_protocol()->relay_transactions(ntx_req, fake_context);
+
+    res.signed_tx_blob = signed_tx_blob;
     res.status = API_RETURN_CODE_OK;
     return true;
   }
