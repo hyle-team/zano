@@ -607,6 +607,15 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
   std::string carol_tx3 = transfer_(carol_wlt, get_integr_addr(custody_wlt_rpc, carol_payment_id), TRANSFER_AMOUNT);
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
 
+  LOG_PRINT_GREEN_L0("");
+  LOG_PRINT_GREEN_L0("alice_tx1: " << alice_tx1);
+  LOG_PRINT_GREEN_L0("bob_tx1: "   << bob_tx1);
+  LOG_PRINT_GREEN_L0("bob_tx2: "   << bob_tx2);
+  LOG_PRINT_GREEN_L0("carol_tx1: " << carol_tx1);
+  LOG_PRINT_GREEN_L0("carol_tx2: " << carol_tx2);
+  LOG_PRINT_GREEN_L0("carol_tx3: " << carol_tx3);
+  LOG_PRINT_GREEN_L0("");
+
   CHECK_AND_ASSERT_MES(alice_tx1.size()
     && bob_tx1.size()
     && bob_tx2.size()
@@ -1803,6 +1812,102 @@ bool wallet_rpc_hardfork_verification::c1(currency::core& c, size_t, const std::
   }
 
   miner_wlt->callback(std::make_shared<tools::i_wallet2_callback>());
+
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+wallet_rpc_and_tx_unlock_time::wallet_rpc_and_tx_unlock_time()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_and_tx_unlock_time, c1);
+}
+
+bool wallet_rpc_and_tx_unlock_time::generate(std::vector<test_event_entry>& events) const
+{
+  bool r = false;
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_05));
+
+  std::vector<tx_source_entry> sources;
+  std::vector<tx_destination_entry> destinations;
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, /*nmix */ 0, sources, destinations, true, true);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
+  transaction tx_0{};
+  size_t tx_hardfork_id{};
+  uint64_t tx_version = get_tx_version_and_hardfork_id(get_block_height(blk_0r), m_hardforks, tx_hardfork_id);
+
+  // unlock_time
+  uint64_t unlock_time = 0;
+
+  // unlock_time2 and manually put it into extra
+  std::vector<extra_v> extra;
+  currency::etc_tx_details_unlock_time2 unlock_time2{};
+  CHECK_AND_ASSERT_EQ(destinations.size(), 10);
+  unlock_time2.unlock_time_array.push_back(11);
+  unlock_time2.unlock_time_array.push_back(2);
+  unlock_time2.unlock_time_array.push_back(7);
+  unlock_time2.unlock_time_array.push_back(7);
+  unlock_time2.unlock_time_array.push_back(7);
+  unlock_time2.unlock_time_array.push_back(7);
+  unlock_time2.unlock_time_array.push_back(6);
+  unlock_time2.unlock_time_array.push_back(7);
+  unlock_time2.unlock_time_array.push_back(0);
+  unlock_time2.unlock_time_array.push_back(3);
+  extra.push_back(unlock_time2);
+
+  crypto::secret_key one_time_secret_key{};
+  // TODO add no shuffle here
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, tx_version, tx_hardfork_id, one_time_secret_key, unlock_time);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+  ADD_CUSTOM_EVENT(events, tx_0);
+
+  etc_tx_details_unlock_time2 ut2{};
+  get_type_in_variant_container(tx_0.extra, ut2);
+  CHECK_AND_ASSERT_EQ(ut2.unlock_time_array.size(), 10);
+
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+
+  LOG_PRINT_GREEN_L0("tx_0: " << get_transaction_hash(tx_0) << ENDL << obj_to_json_str(tx_0));
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool wallet_rpc_and_tx_unlock_time::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool is not empty: " << c.get_pool_transactions_count());
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(1)), false, "");
+
+  tools::wallet_rpc_server alice_wlt_rpc(alice_wlt);
+
+  pre_hf4_api::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::request st_req{};
+  st_req.filter_by_height = false;
+  st_req.in = true;
+  st_req.out = true;
+  st_req.pool = true;
+  //st_req.tx_id = resp.transfers[1].tx_hash; //bob_tx2
+  pre_hf4_api::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::response st_resp{};
+  r = invoke_text_json_for_rpc(alice_wlt_rpc, "search_for_transactions", st_req, st_resp);
+  CHECK_AND_ASSERT_MES(r, false, "RPC search_for_transactions failed ");
+
+  CHECK_AND_ASSERT_EQ(st_resp.in.size(), 1);
+  CHECK_AND_ASSERT_EQ(st_resp.in.front().unlock_time, 11);
+
 
   return true;
 }
