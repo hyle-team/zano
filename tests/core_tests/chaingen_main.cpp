@@ -1109,6 +1109,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(wallet_sending_to_integrated_address);
     GENERATE_AND_PLAY_HF(block_template_blacklist_test, "4-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_hardfork_verification, "5");
+    GENERATE_AND_PLAY_HF(wallet_rpc_and_tx_unlock_time, "5-*");
     
 
     // GENERATE_AND_PLAY(emission_test); // simulate 1 year of blockchain, too long run (1 y ~= 1 hr), by demand only
