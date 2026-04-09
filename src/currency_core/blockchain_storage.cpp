@@ -6879,7 +6879,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   return validate_tx_for_hardfork_specific_terms(tx, tx_id, block_height);
 }
 //------------------------------------------------------------------
-uint64_t blockchain_storage::get_current_hardfork_id() const
+size_t blockchain_storage::get_current_hardfork_id() const
 {
   return m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(this->get_current_blockchain_size());
 }

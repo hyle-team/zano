@@ -838,7 +838,7 @@ namespace currency
     ftp.tx_outs_attr  = CURRENCY_TO_KEY_OUT_RELAXED;
     ftp.tx_version    = m_core.get_current_tx_version();
     ftp.spend_pub_key = req.origin_gateway_id;
-    ftp.tx_hardfork_id = m_core.get_blockchain_storage().get_current_hardfork_id();
+    ftp.tx_hardfork_id = m_core.get_current_hardfork_id();
 
     if (req.service_entries_permanent)
       ftp.extra.insert(ftp.extra.end(), req.service_entries.begin(), req.service_entries.end());
@@ -1007,7 +1007,7 @@ namespace currency
     ftp.tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED;
     ftp.tx_version = m_core.get_current_tx_version();
     ftp.spend_pub_key = req.address_id;
-    ftp.tx_hardfork_id = m_core.get_blockchain_storage().get_current_hardfork_id();
+    ftp.tx_hardfork_id = m_core.get_current_hardfork_id();
     ftp.extra.push_back(gwdo);
 
     bool r = currency::construct_tx(dummy_keys, ftp, ftx);
