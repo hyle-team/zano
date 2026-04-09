@@ -190,12 +190,14 @@ namespace currency
       currency::blobdata tx_blob;
       crypto::secret_key tx_secret_key;
       std::vector<std::string> outputs_addresses;
+      bool strict_output_addresses_match = false;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(tx_id)                      DOC_DSCR("[either] ID for a transaction if it is already in the blockchain. Can be ommited if tx_blob is provided.") DOC_EXMP("a6e8da986858e6825fce7a192097e6afae4e889cabe853a9c29b964985b23da8") DOC_END
         KV_SERIALIZE(tx_blob)                    DOC_DSCR("[or] base64-encoded or hex-encoded tx blob. Can be ommited if tx_id is provided.") DOC_EXMP("ewogICJ2ZXJzaW9uIjogMSwgC....iAgInZpbiI6IFsgewogICAgIC") DOC_END
         KV_SERIALIZE_POD_AS_HEX_STRING(tx_secret_key) DOC_DSCR("Hex-encoded transaction secret key.") DOC_EXMP("2e0b840e70dba386effd64c5d988622dea8c064040566e6bf035034cbb54a5c08") DOC_END
-        KV_SERIALIZE(outputs_addresses)          DOC_DSCR("Address of each of tx's output. Order is important and should correspond to order of tx's outputs. Empty strings are ignored.") DOC_EXMP_AGGR("ZxDNaMeZjwCjnHuU5gUNyrP1pM3U5vckbakzzV6dEHyDYeCpW8XGLBFTshcaY8LkG9RQn7FsQx8w2JeJzJwPwuDm2NfixPAXf", "ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp") DOC_END
+        KV_SERIALIZE(outputs_addresses)          DOC_DSCR("Destination addresses. Must correspond to tx outputs if strict_output_addresses_match is true, order/count are not important otherwise.") DOC_EXMP_AGGR("ZxDNaMeZjwCjnHuU5gUNyrP1pM3U5vckbakzzV6dEHyDYeCpW8XGLBFTshcaY8LkG9RQn7FsQx8w2JeJzJwPwuDm2NfixPAXf", "ZxBvJDuQjMG9R2j4WnYUhBYNrwZPwuyXrC7FHdVmWqaESgowDvgfWtiXeNGu8Px9B24pkmjsA39fzSSiEQG1ekB225ZnrMTBp") DOC_END
+        KV_SERIALIZE(strict_output_addresses_match) DOC_DSCR("If true, then outputs_addresses is expected to strictly match tx outputs in order and size. Otherwise all outputs will be attempted to be decoded against all provided address.") DOC_EXMP(false) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 

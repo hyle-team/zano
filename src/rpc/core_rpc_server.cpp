@@ -1390,32 +1390,79 @@ namespace currency
     crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(tx);
     crypto::point_t R{};
     LOCAL_CHECK(tx_pub_key != null_pkey && R.from_public_key(tx_pub_key) && R.is_in_main_subgroup(), "unsigned_tx: tx public key is missing or invalid");
-
     LOCAL_CHECK(tx_pub_key == (crypto::scalar_t(req.tx_secret_key) * crypto::c_point_G).to_public_key(), "tx_secret_key doesn't match the transaction public key");
 
-    LOCAL_CHECK(req.outputs_addresses.size() == tx.vout.size(), "outputs_addresses count (" + epee::string_tools::num_to_string_fast(req.outputs_addresses.size()) + " doesn't match tx.vout size (" + epee::string_tools::num_to_string_fast(tx.vout.size()) + ")");
-
-    for(size_t i = 0; i < req.outputs_addresses.size(); ++i)
+    if (req.strict_output_addresses_match)
     {
-      if (req.outputs_addresses[i].empty())
-        continue; // skip this output if the given address is empty string
+      LOCAL_CHECK(req.outputs_addresses.size() == tx.vout.size(), "outputs_addresses count (" + epee::string_tools::num_to_string_fast(req.outputs_addresses.size()) + " doesn't match tx.vout size (" + epee::string_tools::num_to_string_fast(tx.vout.size()) + ")");
 
-      account_public_address addr{};
-      payment_id_t payment_id{};
-      LOCAL_CHECK(currency::get_account_address_and_payment_id_from_str(addr, payment_id, req.outputs_addresses[i]) && payment_id.empty(), "output address #" + epee::string_tools::num_to_string_fast(i) + " couldn't be parsed or it is an integrated address (which is not supported)");
+      for(size_t i = 0; i < req.outputs_addresses.size(); ++i)
+      {
+        if (req.outputs_addresses[i].empty())
+          continue; // skip this output if the given address is empty string
 
-      tx_out_v& out_v = tx.vout[i];
-      LOCAL_CHECK(out_v.type() == typeid(tx_out_zarcanum), "tx output #" + epee::string_tools::num_to_string_fast(i) + " has wrong type");
-      const tx_out_zarcanum& zo = boost::get<tx_out_zarcanum>(out_v);
+        account_public_address addr{};
+        payment_id_t payment_id{};
+        LOCAL_CHECK(currency::get_account_address_and_payment_id_from_str(addr, payment_id, req.outputs_addresses[i]) && payment_id.empty(), "output address #" + epee::string_tools::num_to_string_fast(i) + " couldn't be parsed or it is an integrated address (which is not supported)");
 
-      crypto::key_derivation derivation{};
-      LOCAL_CHECK_INT_ERR(crypto::generate_key_derivation(addr.view_public_key, req.tx_secret_key, derivation), "output #" + epee::string_tools::num_to_string_fast(i) + ": generate_key_derivation failed");
+        tx_out_v& out_v = tx.vout[i];
+        LOCAL_CHECK(out_v.type() == typeid(tx_out_zarcanum), "tx output #" + epee::string_tools::num_to_string_fast(i) + " has wrong type");
+        const tx_out_zarcanum& zo = boost::get<tx_out_zarcanum>(out_v);
+
+        crypto::key_derivation derivation{};
+        LOCAL_CHECK_INT_ERR(crypto::generate_key_derivation(addr.view_public_key, req.tx_secret_key, derivation), "output #" + epee::string_tools::num_to_string_fast(i) + ": generate_key_derivation failed");
       
-      auto& decoded_out = res.decoded_outputs.emplace_back();
-      decoded_out.out_index = i;
-      decoded_out.address = req.outputs_addresses[i];
-      crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
-      LOCAL_CHECK(currency::decode_output_data(zo, derivation, i, decoded_out.amount, decoded_out.asset_id, amount_blinding_mask, asset_id_blinding_mask, decoded_out.payment_id), "output #" + epee::string_tools::num_to_string_fast(i) + ": cannot be decoded");
+        auto& decoded_out = res.decoded_outputs.emplace_back();
+        decoded_out.out_index = i;
+        decoded_out.address = req.outputs_addresses[i];
+        crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
+        LOCAL_CHECK(currency::decode_output_data(zo, derivation, i, decoded_out.amount, decoded_out.asset_id, amount_blinding_mask, asset_id_blinding_mask, decoded_out.payment_id), "output #" + epee::string_tools::num_to_string_fast(i) + ": cannot be decoded");
+      }
+    }
+    else
+    {
+      // req.strict_output_addresses_match == false
+      // try to decode each output with each given address, and if it is decoded successfully - add to the result.
+      // outputs_addresses count can be less than vout size, and order doesn't matter
+
+      std::unordered_set<std::string> seen_addresses;
+      for(const auto& addr : req.outputs_addresses)
+      {
+        LOCAL_CHECK(seen_addresses.insert(addr).second, "duplicate address in outputs_addresses: " + addr);
+      }
+
+      res.decoded_outputs.reserve(tx.vout.size());
+
+      for(size_t i = 0; i < req.outputs_addresses.size(); ++i)
+      {
+        account_public_address addr{};
+        payment_id_t payment_id{};
+        LOCAL_CHECK(currency::get_account_address_and_payment_id_from_str(addr, payment_id, req.outputs_addresses[i]) && payment_id.empty(), "output address #" + epee::string_tools::num_to_string_fast(i) + " couldn't be parsed or it is an integrated address (which is not supported)");
+
+        crypto::key_derivation derivation{};
+        LOCAL_CHECK_INT_ERR(crypto::generate_key_derivation(addr.view_public_key, req.tx_secret_key, derivation), "output_address #" + epee::string_tools::num_to_string_fast(i) + ": generate_key_derivation failed");
+
+        bool decoded = false;
+        for(size_t out_idx = 0; out_idx < tx.vout.size(); ++out_idx)
+        {
+          tx_out_v& out_v = tx.vout[out_idx];
+          if (out_v.type() != typeid(tx_out_zarcanum))
+            continue;
+          const tx_out_zarcanum& zo = boost::get<tx_out_zarcanum>(out_v);
+      
+          auto& decoded_out = res.decoded_outputs.emplace_back();
+          decoded_out.out_index = out_idx;
+          decoded_out.address = req.outputs_addresses[i];
+          crypto::scalar_t amount_blinding_mask{}, asset_id_blinding_mask{};
+          if (!currency::decode_output_data(zo, derivation, out_idx, decoded_out.amount, decoded_out.asset_id, amount_blinding_mask, asset_id_blinding_mask, decoded_out.payment_id))
+          {
+            res.decoded_outputs.pop_back();
+            continue; // this output is not decoded with the given address, try next one
+          }
+          decoded = true;
+        }
+        LOCAL_CHECK(decoded, "output_address #" + epee::string_tools::num_to_string_fast(i) + " doesn't match any output in the transaction");
+      }
     }
 
     res.tx_in_json = currency::obj_to_json_str(tx);

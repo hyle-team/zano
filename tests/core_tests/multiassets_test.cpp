@@ -1732,12 +1732,12 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
   // decrypt emission transaction outputs prior to ETH signing to make sure it's valid
   //
   currency::COMMAND_RPC_DECRYPT_TX_DETAILS::request decrypt_req{};
+  decrypt_req.strict_output_addresses_match = false; // request not to strictly match output addresses with outs
   decrypt_req.tx_secret_key = emit_resp.data_for_external_signing->tx_secret_key;
   decrypt_req.tx_blob = epee::string_encoding::base64_encode(emit_resp.data_for_external_signing->unsigned_tx);
   // note: decrypt_req.outputs_addresses can be populated using emit_resp.data_for_external_signing->outputs_addresses but we fill it manually here
   decrypt_req.outputs_addresses.push_back(m_accounts[MINER_ACC_IDX].get_public_address_str()); // we expect that the first output is the cashback and addressed to miner
-  for(size_t i = 0, size = emit_tx.vout.size() - 1; i < size; ++i)
-    decrypt_req.outputs_addresses.push_back(m_accounts[ALICE_ACC_IDX].get_public_address_str()); // we expect all other outputs are asset emission and addresses to Alice
+  decrypt_req.outputs_addresses.push_back(m_accounts[ALICE_ACC_IDX].get_public_address_str()); // we expect all other outputs are asset emission and addresses to Alice
   currency::COMMAND_RPC_DECRYPT_TX_DETAILS::response decrypt_resp{};
   r = core_rpc_wrapper.on_decrypt_tx_details(decrypt_req, decrypt_resp, jerr, ctx);
   CHECK_AND_ASSERT_MES(r, false, "RPC on_decrypt_tx_details failed: " << jerr.message);
@@ -1836,11 +1836,11 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
   // decrypt ownership transfer transaction prior to ETH signing to make sure it's valid
   //
   decrypt_req = currency::COMMAND_RPC_DECRYPT_TX_DETAILS::request{};
+  decrypt_req.strict_output_addresses_match = false; // request not to strictly match output addresses with outs
   decrypt_req.tx_secret_key = to_resp.data_for_external_signing->tx_secret_key;
   decrypt_req.tx_blob = epee::string_encoding::base64_encode(to_resp.data_for_external_signing->unsigned_tx);
   // note: decrypt_req.outputs_addresses can be populated using to_resp.data_for_external_signing->outputs_addresses but we fill it manually here
-  for(size_t i = 0, size = to_tx.vout.size(); i < size; ++i)
-    decrypt_req.outputs_addresses.push_back(m_accounts[MINER_ACC_IDX].get_public_address_str()); // we expect all outputs goes to Miner
+  decrypt_req.outputs_addresses.push_back(m_accounts[MINER_ACC_IDX].get_public_address_str()); // we expect all outputs goes to Miner
   decrypt_resp = currency::COMMAND_RPC_DECRYPT_TX_DETAILS::response{};
   r = core_rpc_wrapper.on_decrypt_tx_details(decrypt_req, decrypt_resp, jerr, ctx);
   CHECK_AND_ASSERT_MES(r, false, "RPC on_decrypt_tx_details failed: " << jerr.message);
@@ -1940,12 +1940,12 @@ bool eth_signed_asset_via_rpc::c1(currency::core& c, size_t ev_index, const std:
   // decrypt emission transaction outputs prior to ETH signing to make sure it's valid
   //
   decrypt_req = currency::COMMAND_RPC_DECRYPT_TX_DETAILS::request{};
+  decrypt_req.strict_output_addresses_match = false; // request not to strictly match output addresses with outs
   decrypt_req.tx_secret_key = emit_resp.data_for_external_signing->tx_secret_key;
   decrypt_req.tx_blob = epee::string_encoding::base64_encode(emit_resp.data_for_external_signing->unsigned_tx);
   // note: decrypt_req.outputs_addresses can be populated using emit_resp.data_for_external_signing->outputs_addresses but we fill it manually here
-  decrypt_req.outputs_addresses.push_back(m_accounts[MINER_ACC_IDX].get_public_address_str()); // we expect that the first output is the cashback and addressed to miner
-  for(size_t i = 0, size = emit_tx.vout.size() - 1; i < size; ++i)
-    decrypt_req.outputs_addresses.push_back(m_accounts[BOB_ACC_IDX].get_public_address_str()); // we expect all other outputs are asset emission and addresses to Bob
+  decrypt_req.outputs_addresses.push_back(m_accounts[MINER_ACC_IDX].get_public_address_str());
+  decrypt_req.outputs_addresses.push_back(m_accounts[BOB_ACC_IDX].get_public_address_str());
   decrypt_resp = currency::COMMAND_RPC_DECRYPT_TX_DETAILS::response{};
   r = core_rpc_wrapper.on_decrypt_tx_details(decrypt_req, decrypt_resp, jerr, ctx);
   CHECK_AND_ASSERT_MES(r, false, "RPC on_decrypt_tx_details failed: " << jerr.message);
