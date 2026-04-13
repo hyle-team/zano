@@ -1528,6 +1528,20 @@ namespace currency
     TIME_MEASURE_FINISH(t);
     LOG_PRINT_L1("COMMAND_RPC_GETBLOCKTEMPLATE -- OK  (took " << std::setprecision(2) << t / 1000.0 << " ms)");
     LOG_PRINT_L2("response block: " << ENDL << currency::obj_to_json_str(resp.b));
+
+    if (req.do_explicit_simulation)
+    {
+      currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
+      bvc.do_just_simulation = true;
+      bool r = m_core.get_blockchain_storage().add_new_block(resp.b, bvc);
+      if (!r)
+      {
+        LOG_ERROR("Explicit simulation of block template failed, block was rejected by the core");
+        return false;
+      }
+    }
+      
+
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------

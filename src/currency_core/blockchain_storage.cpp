@@ -7586,27 +7586,30 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   TIME_MEASURE_FINISH_PD(target_calculating_time_2);
 
  TIME_MEASURE_START_PD(longhash_calculating_time_3);
-  if (is_pos_bl)
-  {
-    bool r = validate_pos_block(bl, current_diffic, pos_coinstake_amount, this_coin_diff, proof_hash, id, false);
+ if (!bvc.do_just_simulation)
+ {
+   if (is_pos_bl)
+   {
+     bool r = validate_pos_block(bl, current_diffic, pos_coinstake_amount, this_coin_diff, proof_hash, id, false);
      CHECK_AND_ASSERT_MES_CUSTOM(r, false, bvc.m_verification_failed = true, "validate_pos_block failed!!");
-  }
-  else
-  {
+   }
+   else
+   {
 
-    proof_hash = get_block_longhash(bl);
+     proof_hash = get_block_longhash(bl);
 
-    if (!check_hash(proof_hash, current_diffic))
-    {
-      LOG_ERROR("Block with id: " << id << ENDL
-        << "PoW hash: " << proof_hash << ENDL 
-        << "nonce: " << bl.nonce << ENDL
-        << "header_mining_hash: " << get_block_header_mining_hash(bl) << ENDL        
-        << "expected difficulty: " << current_diffic);
-      bvc.m_verification_failed = true;
-      return false;
-    }
-  }
+     if (!check_hash(proof_hash, current_diffic))
+     {
+       LOG_ERROR("Block with id: " << id << ENDL
+         << "PoW hash: " << proof_hash << ENDL
+         << "nonce: " << bl.nonce << ENDL
+         << "header_mining_hash: " << get_block_header_mining_hash(bl) << ENDL
+         << "expected difficulty: " << current_diffic);
+       bvc.m_verification_failed = true;
+       return false;
+     }
+   }
+ }
   TIME_MEASURE_FINISH_PD(longhash_calculating_time_3);
 
   size_t aliases_count_befor_block = m_db_aliases.size();
@@ -7664,6 +7667,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       purge_block_data_from_blockchain(bl, tx_processed_count);
       //add_block_as_invalid(bl, id);
       bvc.m_verification_failed = true;
+      bvc.m_failed_transactions.push_back(tx_id);
       return false;
     }
 
@@ -7673,6 +7677,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       purge_block_data_from_blockchain(bl, tx_processed_count);
       //add_block_as_invalid(bl, id);  
       bvc.m_verification_failed = true;
+      bvc.m_failed_transactions.push_back(tx_id);
       return false;
     }
 
@@ -7694,6 +7699,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
         m_tx_pool.add_transaction_to_black_list(tx);
         purge_block_data_from_blockchain(bl, tx_processed_count); 
         bvc.m_verification_failed = true; 
+        bvc.m_failed_transactions.push_back(tx_id);
         };
 
       CHECK_AND_ASSERT_MES_CUSTOM(collect_rangeproofs_data_from_tx(tx, tx_id, range_proofs_agregated), false, cleanup(),
@@ -7721,6 +7727,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       add_block_as_invalid(bl, id);
       LOG_PRINT_L0("Block with id " << id << " added as invalid because of wrong inputs in transactions");
       bvc.m_verification_failed = true;
+      bvc.m_failed_transactions.push_back(tx_id);
       return false;
     }
     TIME_MEASURE_FINISH_PD(tx_check_inputs_time);
@@ -7745,6 +7752,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
        }
        purge_block_data_from_blockchain(bl, tx_processed_count);
        bvc.m_verification_failed = true;
+       bvc.m_failed_transactions.push_back(tx_id);
        return false;
     }
     TIME_MEASURE_FINISH_PD(tx_append_time);
@@ -7817,6 +7825,13 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     TIME_MEASURE_FINISH_PD(verify_multiple_zc_outs_range_proofs_time);
   }
 
+
+  if (bvc.do_just_simulation)
+  {
+    //clean up all data added to storage during simulation
+    purge_block_data_from_blockchain(bl, tx_processed_count);
+    return true;
+  }
 
   //fill block_extended_info
   block_extended_info bei = boost::value_initialized<block_extended_info>();
@@ -8206,6 +8221,8 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
     {
       //chain switching or wrong block
       bvc.m_added_to_main_chain = false;
+      if (bvc.do_just_simulation)
+        return false;
       bool r = handle_alternative_block(bl, id, bvc);
       if (!r || bvc.m_verification_failed)
       {
@@ -8231,7 +8248,16 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
       if (m_event_handler) m_event_handler->on_clear_events();
       return res;
     }
-    db_tx_ptr->commit_transaction();
+    if(bvc.do_just_simulation)
+    {
+      db_tx_ptr->abort_transaction();
+      m_tx_pool.on_finalize_db_transaction();
+      on_abort_transaction();
+      if (m_event_handler) m_event_handler->on_clear_events();
+      return true;
+    }
+
+    db_tx_ptr->commit_transaction(); 
     CHECK_AND_ASSERT_MES(validate_blockchain_prev_links(), false, "EPIC FAIL! 3");
     m_tx_pool.on_finalize_db_transaction();
     if (m_event_handler) m_event_handler->on_complete_events();
