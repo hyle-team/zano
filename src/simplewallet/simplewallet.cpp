@@ -1965,15 +1965,44 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
     return true;
   }
 
-  currency::transaction tx{};
-  m_wallet->transfer(dsts, fake_outs_count, 0, fee, extra, attachments, tx);
+  //currency::transaction tx{};
+  //m_wallet->transfer(dsts, fake_outs_count, 0, fee, extra, attachments, tx);
+  //transfer(dsts, fake_outputs_count, unlock_time, fee, extra, attachments, , , tx);
+  //construct_tx_param ctp = AUTO_VAL_INIT(ctp);
+  //ctp.attachments = attachments;
+  //ctp.crypt_address = currency::get_crypt_address_from_destinations(m_account.get_keys(), dsts);
+  //ctp.dsts = dsts;
+  //ctp.dust_policy = tx_dust_policy(DEFAULT_DUST_THRESHOLD);
+  //ctp.extra = extra;
+  //ctp.fake_outputs_count = fake_outputs_count;
+  //ctp.fee = fee;
+  //ctp.flags = flags;
+  //ctp.shuffle = shuffle;
+  //ctp.split_strategy_id = get_current_split_strategy();
+  //ctp.tx_outs_attr = tx_outs_attr;
+  //ctp.unlock_time = unlock_time;
+  //transfer(ctp, tx, send_to_network, p_unsigned_filename_or_tx_blob_str);
+
+
+
+  tools::construct_tx_param ctp{};
+  ctp.attachments = attachments;
+  ctp.dsts = dsts;
+  ctp.dust_policy = tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD);
+  ctp.extra = extra;
+  ctp.fake_outputs_count = fake_outs_count;
+  ctp.fee = fee;
+  ctp.shuffle = true;
+  ctp.split_strategy_id = m_wallet->get_current_split_strategy();
+  currency::finalized_tx ftx{};
+  m_wallet->transfer(ctp, ftx, true, nullptr);
 
   if (!m_wallet->is_watch_only())
   {
     if(wrapped_transaction)
-      success_msg_writer(true) << "Transaction successfully sent to wZano custody wallet, id: " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
+      success_msg_writer(true) << "Transaction successfully sent to wZano custody wallet, id: " << ftx.tx_id << ", " << get_object_blobsize(ftx.tx) << " bytes";
     else
-      success_msg_writer(true) << "Transaction successfully sent, id: " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
+      success_msg_writer(true) << "Transaction successfully sent, id: " << ftx.tx_id << ", " << get_object_blobsize(ftx.tx) << " bytes";
   }
   else
   {
