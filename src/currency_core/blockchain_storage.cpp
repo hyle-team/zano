@@ -7090,6 +7090,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   bool var_is_after_hardfork_6_zone = m_core_runtime_config.is_hardfork_active_for_height(6, block_height);
   if (var_is_after_hardfork_6_zone)
   {
+    CHECK_AND_ASSERT_MES(tx.version >= TRANSACTION_VERSION_POST_HF6, false, "HF6: tx with version " << tx.version << " is not allowed");
     // enforce explicitly existing soft limits (s.a. tx_memory_pool::add_tx) and implicit hard limits (verify_BGE_proof etc.)
     CHECK_AND_ASSERT_MES(tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
     CHECK_AND_ASSERT_MES(tx.vout.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS,  false, "transaction has too many outputs = " << tx.vout.size());
