@@ -1463,7 +1463,17 @@ inline void fill_adb_version_based_onhardfork(currency::asset_descriptor_base& a
 
 #define ADD_CUSTOM_EVENT_CODE(VEC_EVENTS, CODE) PRINT_EVENT_N_TEXT(VEC_EVENTS, #CODE); CODE
 
-#define ADD_CUSTOM_EVENT(VEC_EVENTS, EVENT_OBJ) PRINT_EVENT_N_TEXT(VEC_EVENTS, #EVENT_OBJ); VEC_EVENTS.push_back(EVENT_OBJ)
+template<typename T>
+std::string print_event_obj_brief(const T& obj) { return std::string(); }
+template<>
+inline std::string print_event_obj_brief(const currency::transaction& tx) { return epst::pod_to_hex(get_transaction_hash(tx)); }
+template<>
+inline std::string print_event_obj_brief(const currency::block& blk) { return epst::pod_to_hex(get_block_hash(blk)) + " @ " + std::to_string(get_block_height(blk)); }
+
+
+#define ADD_CUSTOM_EVENT(VEC_EVENTS, EVENT_OBJ)                                        \
+  PRINT_EVENT_N_TEXT(VEC_EVENTS, (std::string(#EVENT_OBJ " ") + print_event_obj_brief(EVENT_OBJ))); \
+  VEC_EVENTS.push_back(EVENT_OBJ)
 
 
 #define SET_HARDFORKS_TO_OLD_TESTS()                                                                                               \

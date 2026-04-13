@@ -69,7 +69,7 @@ namespace currency
 
     if (tx.hardfork_id >= ZANO_HARDFORK_06)
     {
-      if (!currency::validate_tx_for_hardfork_specific_terms_types_new(tx, tx_id, tx.hardfork_id))
+      if (!currency::validate_tx_for_hardfork_specific_terms_types_HF6(tx, tx_id, tx.hardfork_id))
       { 
         LOG_PRINT_RED_L0("tx failed hardfork specific terms validation");
         return false;

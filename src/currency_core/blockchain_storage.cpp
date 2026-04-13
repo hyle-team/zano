@@ -6884,14 +6884,14 @@ size_t blockchain_storage::get_current_hardfork_id() const
   return m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(this->get_current_blockchain_size());
 }
 //------------------------------------------------------------------
-bool blockchain_storage::validate_tx_for_hardfork_specific_terms_types_new(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
+bool blockchain_storage::validate_tx_for_hardfork_specific_terms_types_HF6(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
 {
   size_t current_hard_fork_id = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(block_height);
-  return currency::validate_tx_for_hardfork_specific_terms_types_new(tx, tx_id, current_hard_fork_id);
+  return currency::validate_tx_for_hardfork_specific_terms_types_HF6(tx, tx_id, current_hard_fork_id);
 }
 
 //TODO: this function might be removed after HF6 is activated on mainnet
-bool blockchain_storage::validate_tx_for_hardfork_specific_terms_types_old(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
+bool blockchain_storage::validate_tx_for_hardfork_specific_terms_types_HF4(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
 {
   bool var_is_after_hardfork_1_zone = m_core_runtime_config.is_hardfork_active_for_height(1, block_height);
   bool var_is_after_hardfork_2_zone = m_core_runtime_config.is_hardfork_active_for_height(2, block_height);
@@ -7018,11 +7018,11 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   bool r = false;
   if (m_core_runtime_config.is_hardfork_active_for_height(6, block_height))
   {
-     r = validate_tx_for_hardfork_specific_terms_types_new(tx, tx_id, block_height);
+     r = validate_tx_for_hardfork_specific_terms_types_HF6(tx, tx_id, block_height);
   }
   else
   {
-     r = validate_tx_for_hardfork_specific_terms_types_old(tx, tx_id, block_height);
+     r = validate_tx_for_hardfork_specific_terms_types_HF4(tx, tx_id, block_height);
   }
   CHECK_AND_ASSERT_MES(r, false, "Transaction validation failed for hardfork specific terms");
 

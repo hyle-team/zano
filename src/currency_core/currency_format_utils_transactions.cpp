@@ -279,7 +279,8 @@ namespace currency
         // (sum(bare inputs' amounts) - fee - sum(bare outs' amount)) * H - sum(outputs' commitments) - sum(bare non-native outs' commitments) = lin(G)
         crypto::scalar_t secret_x = -ogc.amount_blinding_masks_sum;
   #ifndef NDEBUG
-        CHECK_AND_ASSERT_MES(commitment_to_zero == secret_x * crypto::c_point_G, false, "internal error: commitment_to_zero is malformed (G)");
+        r = commitment_to_zero == secret_x * crypto::c_point_G;
+        CHECK_AND_ASSERT_MES(r, false, "internal error: commitment_to_zero is malformed (G)");
   #endif
         zc_balance_proof zc_proof{};
         r = crypto::generate_double_schnorr_sig<crypto::gt_G, crypto::gt_G>(tx_id, commitment_to_zero, secret_x, ogc.tx_pub_key_p, ogc.tx_key.sec, zc_proof.dss);
