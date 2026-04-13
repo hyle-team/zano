@@ -1679,10 +1679,23 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
       ", expected: " << height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   }
 
+  CHECK_AND_ASSERT_MES(b.miner_tx.attachment.empty(), false, "coinbase transaction has attachments; attachments are not allowed for coinbase transactions.");
 
-  if (is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, height)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
+  if (is_hardfork_active_for_height(ZANO_HARDFORK_06, height)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
   {
-    CHECK_AND_ASSERT_MES(b.miner_tx.attachment.empty(), false, "coinbase transaction has attachments; attachments are not allowed for coinbase transactions.");
+    // TODO: consider moving these to hardfork specific validation
+    CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 2 || b.miner_tx.proofs.size() == 3, false, "coinbase transaction has incorrect number of proofs (" << b.miner_tx.proofs.size() << "), expected 3");
+    size_t asp_count = count_type_in_variant_container<zc_asset_surjection_proof>(b.miner_tx.proofs);
+    CHECK_AND_ASSERT_MES(asp_count <= 1, false, "unexpected number of asset surjection proofs:" << asp_count);
+    size_t rp_count = count_type_in_variant_container<zc_outs_range_proof>(b.miner_tx.proofs);
+    CHECK_AND_ASSERT_MES(rp_count == 1, false, "unexpected number of range proofs:" << rp_count);
+    size_t bp_count = count_type_in_variant_container<zc_balance_proof>(b.miner_tx.proofs);
+    CHECK_AND_ASSERT_MES(bp_count == 1, false, "unexpected number of balance proofs:" << bp_count);
+    size_t gw_outs = count_type_in_variant_container<tx_out_gateway>(b.miner_tx.vout);
+    CHECK_AND_ASSERT_MES(gw_outs == 0, false, "coinbase transaction has gateway outputs; gateway outputs are not allowed for coinbase transactions.");
+  }
+  else if (is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, height)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
+  {
     CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 3, false, "coinbase transaction has incorrect number of proofs (" << b.miner_tx.proofs.size() << "), expected 3");
     CHECK_AND_ASSERT_MES(b.miner_tx.proofs[0].type() == typeid(zc_asset_surjection_proof), false, "coinbase transaction has incorrect type of proof #0 (expected: zc_asset_surjection_proof)");
     CHECK_AND_ASSERT_MES(b.miner_tx.proofs[1].type() == typeid(zc_outs_range_proof), false, "coinbase transaction has incorrect type of proof #1 (expected: zc_outs_range_proof)");
@@ -1696,7 +1709,6 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
       return false;
     }
 
-    CHECK_AND_ASSERT_MES(b.miner_tx.attachment.empty(), false, "coinbase transaction has attachments; attachments are not allowed for coinbase transactions.");
     CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 0, false, "pre-HF4 coinbase shoudn't have non-empty proofs containter");
   }
 
