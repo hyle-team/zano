@@ -821,6 +821,21 @@ namespace currency
       er.message = "No valid destinations were found after processing";
       return false;
     }
+    
+    if (ftp.prepared_destinations.size() < CURRENCY_TX_MIN_ALLOWED_OUTS)
+    {
+      tx_destination_entry de = ftp.prepared_destinations.back();
+      ftp.prepared_destinations.pop_back();
+      size_t items_to_be_added = CURRENCY_TX_MIN_ALLOWED_OUTS - ftp.prepared_destinations.size();
+      currency::decompose_amount_randomly(de.amount, [&](uint64_t amount)
+      {
+        de.amount = amount;
+        ftp.prepared_destinations.push_back(de);
+      }, items_to_be_added);
+      CHECK_AND_ASSERT_MES(ftp.prepared_destinations.size() >= CURRENCY_TX_MIN_ALLOWED_OUTS, false,
+        "decompose_amount_randomly failed to produce enough outputs: " << ftp.prepared_destinations.size());
+    }
+
     const address_v& addr = ftp.prepared_destinations.begin()->addr.back();
     VARIANT_SWITCH_BEGIN(addr);
     VARIANT_CASE_CONST(account_public_address, a_pub_addr)
@@ -851,14 +866,6 @@ namespace currency
       tc.comment = req.comment;
       ftp.extra.push_back(tc);
     }
-
-    if (!ftp.prepared_destinations.size() || ftp.prepared_destinations.begin()->addr.size() != 1)
-    {
-      er.code = CORE_RPC_ERROR_CODE_WRONG_PARAM;
-      er.message = "No valid destinations were found after processing";
-      return false;
-    }
-
 
     r = currency::construct_tx(dummy_keys, ftp, ftx);
     if(!r)
