@@ -289,14 +289,12 @@ namespace currency
       }
       else
       {
-        // NEW - TODO
         if (confidential_outs_count == 0)
         {
           // we don't need a balance proof in such a case
           // but asset operations are not allowed
           CHECK_AND_ASSERT_MES(ogc.ao_amount_blinding_mask.is_zero(), false, "asset emmission is not allowed for txs no confidential inputs and outputs");
           CHECK_AND_ASSERT_MES(commitment_to_zero.is_zero(), false, "commitment_to_zero must be zero");
-          CHECK_AND_ASSERT_MES(false, false, "not implemented");
         }
         else
         {
@@ -484,7 +482,6 @@ namespace currency
           // but asset operations are not allowed
           CHECK_AND_ASSERT_MES(commitment_to_zero.is_zero(), false, "commitment_to_zero is nonzero (no confidential inputs and outputs)");
           CHECK_AND_ASSERT_MES(!has_asset_operation, false, "asset operation is not allowed (no confidential inputs and outputs)");
-          CHECK_AND_ASSERT_MES(false, false, "not implemented -- sowle");
         }
         else
         {
