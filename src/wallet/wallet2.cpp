@@ -113,21 +113,24 @@ namespace tools
 
     CHECK_AND_ASSERT_THROW_MES(ut2.unlock_time_array.size() == tx.vout.size(), "Internal error: wrong tx transfer details: ut2.unlock_time_array.size()" << ut2.unlock_time_array.size() << " is not equal transaction outputs vector size=" << tx.vout.size());
 
+    // this logic reflects consensus rules where unlock_time is checked only for outputs reffered by to_key and ZC inputs (s.a. outputs_visitor::handle_output())
+    // expected to be removed entirely soon as we get rid of unlock_time whatsoever -- sowle
     for (auto r : td.receive)
     {
       uint64_t ri = r.index;
+      bool update = false;
       CHECK_AND_ASSERT_THROW_MES(ri < tx.vout.size(), "Internal error: wrong tx transfer details: reciev index=" << ri << " is greater than transaction outputs vector " << tx.vout.size());
       VARIANT_SWITCH_BEGIN(tx.vout[ri]);
       VARIANT_CASE_CONST(tx_out_bare, o)
         if (o.target.type() == typeid(currency::txout_to_key))
-        {
-          //update unlock_time if needed
-          if (ut2.unlock_time_array[ri] > max_unlock_time)
-            max_unlock_time = ut2.unlock_time_array[ri];
-        }
+          update = true;
       VARIANT_CASE_CONST(tx_out_zarcanum, o);
+        update = true;
       VARIANT_SWITCH_END();
-
+      
+      //update unlock_time if needed
+      if (update && ut2.unlock_time_array[ri] > max_unlock_time)
+        max_unlock_time = ut2.unlock_time_array[ri];
     }
     return max_unlock_time;
   }

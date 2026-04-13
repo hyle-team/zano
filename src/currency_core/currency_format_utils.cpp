@@ -3433,7 +3433,19 @@ namespace currency
         in.type() == typeid(txin_zc_input) ||
         in.type() == typeid(txin_gateway), 
         false, "wrong input type: " << in.type().name() << ", in transaction " << get_transaction_hash(tx));
+
+      if (tx.hardfork_id > ZANO_HARDFORK_04_ZARCANUM && (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_zc_input)) )
+      {
+        const std::vector<txout_ref_v>& key_offsets = in.type() == typeid(txin_to_key) ? boost::get<txin_to_key>(in).key_offsets : boost::get<txin_zc_input>(in).key_offsets;
+
+        for (const auto& in : key_offsets)
+        {
+          CHECK_AND_ASSERT_MES(in.type() != typeid(ref_by_id), false, "wrong key offset type: " << in.type().name() << ", in transaction " << get_transaction_hash(tx));
+        }
+      }
     }
+
+
     return true;
   }
   //------------------------------------------------------------------
