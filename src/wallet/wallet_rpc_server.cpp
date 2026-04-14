@@ -636,7 +636,7 @@ namespace tools
     {
       crypto::hash tx_id = currency::get_transaction_hash(result.tx);
       res.tx_hash = epee::string_tools::pod_to_hex(tx_id);
-      res.tx_size = get_object_blobsize(result.tx);
+      res.tx_size = get_tx_real_blobsize(result.tx);
       //try to get wallet_transfer_info
       wallet_public::wallet_transfer_info wti = AUTO_VAL_INIT(wti);
       if (w.get_wallet()->find_unconfirmed_tx(tx_id, wti))
@@ -1178,7 +1178,7 @@ namespace tools
     w.get_wallet()->push_offer(req.od, res_tx);
 
     res.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
-    res.tx_blob_size = currency::get_object_blobsize(res_tx);
+    res.tx_blob_size = currency::get_tx_real_blobsize(res_tx);
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
@@ -1197,7 +1197,7 @@ namespace tools
     w.get_wallet()->update_offer_by_id(req.tx_id, req.no, req.od, res_tx);
 
     res.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
-    res.tx_blob_size = currency::get_object_blobsize(res_tx);
+    res.tx_blob_size = currency::get_tx_real_blobsize(res_tx);
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
@@ -1217,7 +1217,7 @@ namespace tools
     w.get_wallet()->cancel_offer_by_id(req.tx_id, req.no, req.fee, res_tx);
 
     res.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
-    res.tx_blob_size = currency::get_object_blobsize(res_tx);
+    res.tx_blob_size = currency::get_tx_real_blobsize(res_tx);
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
