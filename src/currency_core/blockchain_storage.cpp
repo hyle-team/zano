@@ -7802,17 +7802,19 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     return false;
   }
 
-  uint64_t block_reward_without_fee = 0;
-  if (!calculate_block_reward_for_next_top_block(cumulative_block_size, block_reward_without_fee))
-  {
-    LOG_ERROR("calculate_block_reward_for_next_top_block filed");
-    purge_block_data_from_blockchain(bl, tx_processed_count);
-    bvc.m_verification_failed = true;
-    return false;
-  }
 
   if (!m_is_in_checkpoint_zone)
   {
+
+    uint64_t block_reward_without_fee = 0;
+    if (!calculate_block_reward_for_next_top_block(cumulative_block_size, block_reward_without_fee))
+    {
+      LOG_ERROR("calculate_block_reward_for_next_top_block filed");
+      purge_block_data_from_blockchain(bl, tx_processed_count);
+      bvc.m_verification_failed = true;
+      return false;
+    }
+
     TIME_MEASURE_START_PD(validate_miner_transaction_time);
     if (!validate_miner_transaction(bl.miner_tx, fee_summary, block_reward_without_fee))
     {
