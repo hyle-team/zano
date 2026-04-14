@@ -222,7 +222,9 @@ namespace currency
       tx_hash = get_transaction_hash(tx);
 
     TIME_MEASURE_START_MS(add_new_tx_time);
-    bool r = add_new_tx(tx, tx_hash, get_object_blobsize(tx), tvc, kept_by_block);
+    uint64_t tx_blob_size = m_blockchain_storage.is_hardfork_active(ZANO_HARDFORK_06) ? get_object_blobsize_hf6(tx) : get_object_blobsize(tx);
+
+    bool r = add_new_tx(tx, tx_hash, tx_blob_size, tvc, kept_by_block);
     TIME_MEASURE_FINISH_MS(add_new_tx_time);
 
     if(tvc.m_verification_failed)
@@ -339,8 +341,8 @@ namespace currency
   bool core::add_new_tx(const transaction& tx, tx_verification_context& tvc, bool kept_by_block)
   {
     crypto::hash tx_hash = null_hash;
-    uint64_t blob_size = 0;
-    get_transaction_hash(tx, tx_hash, blob_size);
+    uint64_t blob_size = m_blockchain_storage.is_hardfork_active(ZANO_HARDFORK_06) ? get_object_blobsize_hf6(tx): get_object_blobsize(tx);
+    get_transaction_hash(tx, tx_hash);
     return add_new_tx(tx, tx_hash, blob_size, tvc, kept_by_block);
   }
   //-----------------------------------------------------------------------------------------------

@@ -770,6 +770,7 @@ namespace currency
     void remove_old_dbs();
     bool process_tx_gateway_history(const crypto::hash& tx_id, const transaction& tx_);
     bool unprocess_tx_gateway_history(const crypto::hash& tx_id, const transaction& tx_);
+    bool get_tx_from_cache(const crypto::hash& tx_id, transactions_map& tx_cache, transaction& tx, size_t& blob_size, uint64_t& fee);
 
 
     //POS

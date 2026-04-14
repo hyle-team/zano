@@ -1929,7 +1929,7 @@ bool blockchain_storage::create_block_template(const create_block_template_param
                                                    pe,
                                                    &resp.miner_tx_tgc);
   CHECK_AND_ASSERT_MES(r, false, "Failed to construc miner tx, first chance");
-  uint64_t coinbase_size = get_object_blobsize(b.miner_tx);
+  uint64_t coinbase_size = this->is_hardfork_active(ZANO_HARDFORK_06) ? get_object_blobsize_hf6(b.miner_tx): get_object_blobsize(b.miner_tx);
   // "- 100" - to reserve room for PoS additions into miner tx
   CHECK_AND_ASSERT_MES(coinbase_size < CURRENCY_COINBASE_BLOB_RESERVED_SIZE - 100, false, "Failed to get block template (coinbase_size = " << coinbase_size << ") << coinbase structue: " 
     << ENDL << obj_to_json_str(b.miner_tx));
@@ -7467,14 +7467,15 @@ wide_difficulty_type blockchain_storage::get_last_alt_x_block_cumulative_precise
   return 0;
 }
 //------------------------------------------------------------------
-bool get_tx_from_cache(const crypto::hash& tx_id, transactions_map& tx_cache, transaction& tx, size_t& blob_size, uint64_t& fee)
+bool blockchain_storage::get_tx_from_cache(const crypto::hash& tx_id, transactions_map& tx_cache, transaction& tx, size_t& blob_size, uint64_t& fee)
 {
   auto it = tx_cache.find(tx_id);
   if (it == tx_cache.end())
     return false;
 
   tx = it->second;
-  blob_size = get_object_blobsize(tx);
+  bool is_hf6_activated = this->is_hardfork_active(ZANO_HARDFORK_06);
+  blob_size = is_hf6_activated ? get_object_blobsize_hf6(tx): get_object_blobsize(tx);
   fee = get_tx_fee(tx);
   return true;
 }
@@ -7562,6 +7563,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   TIME_MEASURE_START_PD(block_processing_time_1);
 
   uint64_t height = get_current_blockchain_size(); // height <-> block height correspondence is validated in prevalidate_miner_transaction()
+  bool is_hf6_activated = m_core_runtime_config.is_hardfork_active_for_height(ZANO_HARDFORK_06, height);
 
   if(bl.prev_id != get_top_block_id())
   {
@@ -7640,7 +7642,8 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   size_t aliases_count_befor_block = m_db_aliases.size();
 
   size_t cumulative_block_size = 0;
-  size_t coinbase_blob_size = get_object_blobsize(bl.miner_tx);
+  size_t coinbase_blob_size = is_hf6_activated ? get_object_blobsize_hf6(bl.miner_tx): get_object_blobsize(bl.miner_tx);
+  
 
   /* 
       instead of complicated two-phase template construction and adjustment of cumulative size with block reward we

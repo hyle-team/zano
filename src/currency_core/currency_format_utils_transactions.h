@@ -216,10 +216,10 @@ namespace currency
   bool parse_and_validate_tx_from_blob(const blobdata& tx_blob, transaction& tx);
   crypto::hash get_transaction_hash(const transaction& t);
   bool get_transaction_hash(const transaction& t, crypto::hash& res);
-  bool get_transaction_hash(const transaction& t, crypto::hash& res, uint64_t& blob_size);
+  //bool get_transaction_hash(const transaction& t, crypto::hash& res, uint64_t& blob_size);
   size_t get_object_blobsize(const transaction& t);
   size_t get_objects_blobsize(const std::list<transaction>& ls);
-  size_t get_object_blobsize(const transaction& t, uint64_t prefix_blob_size);
+  size_t get_object_blobsize_legacy(const transaction& t, uint64_t prefix_blob_size);
   blobdata tx_to_blob(const transaction& b);
   bool tx_to_blob(const transaction& b, blobdata& b_blob);
   bool read_keyimages_from_tx(const transaction& tx, std::list<crypto::key_image>& kil);

@@ -470,6 +470,8 @@ namespace currency
   size_t get_object_blobsize(const transaction& t);
   size_t get_object_blobsize(const transaction& t, uint64_t prefix_blob_size);
 
+  size_t get_object_blobsize_hf6(const transaction& t);
+
 
   inline
   void put_t_to_buff(std::string& buff)

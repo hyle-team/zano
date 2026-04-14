@@ -2011,9 +2011,9 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
   if (!m_wallet->is_watch_only())
   {
     if(wrapped_transaction)
-      success_msg_writer(true) << "Transaction successfully sent to wZano custody wallet, id: " << ftx.tx_id << ", " << get_object_blobsize(ftx.tx) << " bytes";
+      success_msg_writer(true) << "Transaction successfully sent to wZano custody wallet, id: " << ftx.tx_id << ", " << get_object_blobsize_hf6(ftx.tx) << " bytes";
     else
-      success_msg_writer(true) << "Transaction successfully sent, id: " << ftx.tx_id << ", " << get_object_blobsize(ftx.tx) << " bytes";
+      success_msg_writer(true) << "Transaction successfully sent, id: " << ftx.tx_id << ", " << get_object_blobsize_hf6(ftx.tx) << " bytes";
   }
   else
   {
@@ -2445,7 +2445,7 @@ bool simple_wallet::sign_transfer(const std::vector<std::string> &args)
   {
     currency::transaction res_tx;
     m_wallet->sign_transfer_files(args[0], args[1], res_tx);
-    success_msg_writer(true) << "transaction signed and stored to file: " << args[1] << ", transaction " << get_transaction_hash(res_tx) << ", " << get_object_blobsize(res_tx) << " bytes";
+    success_msg_writer(true) << "transaction signed and stored to file: " << args[1] << ", transaction " << get_transaction_hash(res_tx) << ", " << get_object_blobsize_hf6(res_tx) << " bytes";
   }
   catch (const std::exception& e)
   {
@@ -2474,7 +2474,7 @@ bool simple_wallet::submit_transfer(const std::vector<std::string> &args)
   {
     currency::transaction res_tx;
     m_wallet->submit_transfer_files(args[0], res_tx);
-    success_msg_writer(true) << "transaction " << get_transaction_hash(res_tx) << " was successfully sent, size: " << get_object_blobsize(res_tx) << " bytes";
+    success_msg_writer(true) << "transaction " << get_transaction_hash(res_tx) << " was successfully sent, size: " << get_object_blobsize_hf6(res_tx) << " bytes";
   }
   catch (const std::exception& e)
   {
@@ -3114,7 +3114,7 @@ bool simple_wallet::sweep_below(const std::vector<std::string> &args)
   if (m_wallet->is_watch_only())
     success_msg_writer(true) << "Transaction prepared for signing and saved into \"" << filename << "\" file, use full wallet to sign transfer and then use \"submit_transfer\" on this wallet to broadcast the transaction to the network";
   else
-    success_msg_writer(true) << "tx: " << get_transaction_hash(result_tx) << " size: " << get_object_blobsize(result_tx) << " bytes";
+    success_msg_writer(true) << "tx: " << get_transaction_hash(result_tx) << " size: " << get_object_blobsize_hf6(result_tx) << " bytes";
 
   SIMPLE_WALLET_CATCH_TRY_ENTRY();
   return true;

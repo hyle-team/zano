@@ -1510,7 +1510,7 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, const proces
   wti.employed_entries = tx_process_context.employed_entries;
   wti.unlock_time = get_max_unlock_time_from_receive_indices(tx_process_context.tx, tx_process_context.employed_entries);
   wti.timestamp = tx_process_context.timestamp;
-  wti.tx_blob_size = static_cast<uint32_t>(currency::get_object_blobsize(wti.tx));
+  wti.tx_blob_size = static_cast<uint32_t>(currency::get_object_blobsize_hf6(wti.tx));
   wti.tx_hash = tx_process_context.tx_hash();
   load_wallet_transfer_info_flags(wti);
   bc_services::extract_market_instructions(wti.marketplace_entries, wti.tx.attachment);

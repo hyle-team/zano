@@ -705,18 +705,18 @@ namespace currency
     return get_object_hash(static_cast<const transaction_prefix&>(t), res, blob_size);
   }
   //---------------------------------------------------------------
-  bool get_transaction_hash(const transaction& t, crypto::hash& res, uint64_t& blob_size)
-  {
-    blob_size = 0;
-    bool r = get_object_hash(static_cast<const transaction_prefix&>(t), res, blob_size);
-    blob_size = get_object_blobsize(t, blob_size);
-    return r;
-  }
+//   bool get_transaction_hash(const transaction& t, crypto::hash& res, uint64_t& blob_size)
+//   {
+//     blob_size = 0;
+//     bool r = get_object_hash(static_cast<const transaction_prefix&>(t), res, blob_size);
+//     blob_size = get_object_blobsize(t, blob_size);
+//     return r;
+//   }
   //---------------------------------------------------------------
   size_t get_object_blobsize(const transaction& t)
   {
     size_t tx_blob_size = get_object_blobsize(static_cast<const transaction_prefix&>(t));
-    return get_object_blobsize(t, tx_blob_size);
+    return get_object_blobsize_legacy(t, tx_blob_size);
   }
   //---------------------------------------------------------------
   size_t get_objects_blobsize(const std::list<transaction>& ls)
@@ -745,7 +745,13 @@ namespace currency
     return boost::apply_visitor(txin_signature_size_visitor(last_input_in_separately_signed_tx ? 1 : 0), tx_in);
   }
   //---------------------------------------------------------------
-  size_t get_object_blobsize(const transaction& t, uint64_t prefix_blob_size)
+  size_t get_object_blobsize_hf6(const transaction& t)
+  {
+    blobdata b = t_serializable_object_to_blob(t);
+    return b.size();
+  }
+  //---------------------------------------------------------------
+  size_t get_object_blobsize_legacy(const transaction& t, uint64_t prefix_blob_size)
   {
     size_t tx_blob_size = prefix_blob_size;
 

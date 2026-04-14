@@ -479,9 +479,10 @@ namespace currency
   bool tx_memory_pool::add_tx(const transaction &tx, tx_verification_context& tvc, bool kept_by_block, bool from_core)
   {
     crypto::hash h = null_hash;
-    uint64_t blob_size = 0;
+    uint64_t blob_size = m_blockchain.is_hardfork_active(ZANO_HARDFORK_06) ? get_object_blobsize_hf6(tx): get_object_blobsize(tx);
 
-    get_transaction_hash(tx, h, blob_size);
+    get_transaction_hash(tx, h);
+
     return add_tx(tx, h, blob_size, tvc, kept_by_block, from_core);
   }
   //---------------------------------------------------------------------------------
