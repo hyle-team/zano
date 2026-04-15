@@ -6,9 +6,10 @@
 #include "chaingen.h"
 #include "wallet_tests_basic.h"
 
-struct gbt_pool_invalid_txs_alias_collision : public wallet_test
+struct gbt_pool_invalid_txs_asset_overemit : public wallet_test
 {
-  gbt_pool_invalid_txs_alias_collision();
+  gbt_pool_invalid_txs_asset_overemit();
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
