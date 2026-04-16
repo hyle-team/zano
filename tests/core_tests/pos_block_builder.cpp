@@ -277,16 +277,12 @@ void pos_block_builder::step5_sign(const currency::tx_source_entry& se, const cu
     // proofs for miner_tx
 
     // asset surjection proof
-    currency::zc_asset_surjection_proof asp{};
-    r = generate_asset_surjection_proof(m_block.miner_tx, miner_tx_id, false, m_miner_tx_tgc, asp);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs 
+    r = generate_asset_surjection_proof(miner_tx_id, false, m_miner_tx_tgc, m_block.miner_tx);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs 
     CHECK_AND_ASSERT_THROW_MES(r, "generete_asset_surjection_proof failed");
-    m_block.miner_tx.proofs.emplace_back(std::move(asp));
 
     // range proofs
-    currency::zc_outs_range_proof range_proofs{};
-    r = generate_zc_outs_range_proof(miner_tx_id, m_miner_tx_tgc, m_block.miner_tx.vout, range_proofs);
+    r = generate_zc_outs_range_proof(miner_tx_id, m_miner_tx_tgc, m_block.miner_tx);
     CHECK_AND_ASSERT_THROW_MES(r, "Failed to generate zc_outs_range_proof()");
-    m_block.miner_tx.proofs.emplace_back(std::move(range_proofs));
 
     // balance proof
     r = generate_tx_balance_proof(miner_tx_id, m_miner_tx_tgc, m_block_reward, m_block.miner_tx);

@@ -148,3 +148,10 @@ struct wallet_rpc_gateway_owner_change_altchain : public wallet_test
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
 };
+
+struct wallet_rpc_and_tx_unlock_time : public wallet_test
+{
+  wallet_rpc_and_tx_unlock_time();
+  bool generate(std::vector<test_event_entry>& events) const;
+  bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events);
+};

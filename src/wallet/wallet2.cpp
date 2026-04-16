@@ -113,21 +113,24 @@ namespace tools
 
     CHECK_AND_ASSERT_THROW_MES(ut2.unlock_time_array.size() == tx.vout.size(), "Internal error: wrong tx transfer details: ut2.unlock_time_array.size()" << ut2.unlock_time_array.size() << " is not equal transaction outputs vector size=" << tx.vout.size());
 
+    // this logic reflects consensus rules where unlock_time is checked only for outputs reffered by to_key and ZC inputs (s.a. outputs_visitor::handle_output())
+    // expected to be removed entirely soon as we get rid of unlock_time whatsoever -- sowle
     for (auto r : td.receive)
     {
       uint64_t ri = r.index;
+      bool update = false;
       CHECK_AND_ASSERT_THROW_MES(ri < tx.vout.size(), "Internal error: wrong tx transfer details: reciev index=" << ri << " is greater than transaction outputs vector " << tx.vout.size());
       VARIANT_SWITCH_BEGIN(tx.vout[ri]);
       VARIANT_CASE_CONST(tx_out_bare, o)
         if (o.target.type() == typeid(currency::txout_to_key))
-        {
-          //update unlock_time if needed
-          if (ut2.unlock_time_array[ri] > max_unlock_time)
-            max_unlock_time = ut2.unlock_time_array[ri];
-        }
+          update = true;
       VARIANT_CASE_CONST(tx_out_zarcanum, o);
+        update = true;
       VARIANT_SWITCH_END();
-
+      
+      //update unlock_time if needed
+      if (update && ut2.unlock_time_array[ri] > max_unlock_time)
+        max_unlock_time = ut2.unlock_time_array[ri];
     }
     return max_unlock_time;
   }
@@ -5321,16 +5324,12 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
   // proofs for miner_tx
 
   // asset surjection proof
-  currency::zc_asset_surjection_proof asp{};
-  r = generate_asset_surjection_proof(b.miner_tx, miner_tx_id, false, miner_tx_tgc, asp);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs 
+  r = generate_asset_surjection_proof(miner_tx_id, false, miner_tx_tgc, b.miner_tx);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs
   WLT_CHECK_AND_ASSERT_MES(r, false, "generete_asset_surjection_proof failed");
-  b.miner_tx.proofs.emplace_back(std::move(asp));
 
   // range proofs
-  currency::zc_outs_range_proof range_proofs{};
-  r = generate_zc_outs_range_proof(miner_tx_id, miner_tx_tgc, b.miner_tx.vout, range_proofs);
+  r = generate_zc_outs_range_proof(miner_tx_id, miner_tx_tgc, b.miner_tx);
   WLT_CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
-  b.miner_tx.proofs.emplace_back(std::move(range_proofs));
 
   // balance proof
   r = generate_tx_balance_proof(miner_tx_id, miner_tx_tgc, full_block_reward, b.miner_tx);

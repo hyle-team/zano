@@ -213,7 +213,7 @@ namespace tools
     std::vector<currency::attachment_v> attachments;
     currency::account_public_address crypt_address;
     uint8_t tx_outs_attr = 0;
-    bool shuffle = false;
+    bool shuffle = true;
     bool create_utxo_defragmentation_tx = false;
     bool need_at_least_1_zc = false;
     

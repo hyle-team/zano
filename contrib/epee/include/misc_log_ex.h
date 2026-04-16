@@ -81,11 +81,12 @@ DISABLE_VS_WARNINGS(4100)
 #define LOG_LEVEL_MAX   LOG_LEVEL_4
 
 
-#define   LOGGER_NULL       0
-#define   LOGGER_FILE       1
-#define   LOGGER_DEBUGGER   2
-#define   LOGGER_CONSOLE    3
-#define   LOGGER_DUMP       4
+#define   LOGGER_NULL                0
+#define   LOGGER_FILE                1
+#define   LOGGER_DEBUGGER            2
+#define   LOGGER_CONSOLE             3
+#define   LOGGER_DUMP                4
+#define   LOGGER_CONSOLE_NO_ALLOC    5
 
 #define LOG_JOURNAL_MAX_ELEMENTS 100
 
@@ -583,11 +584,11 @@ namespace log_space
 #endif
 
   public:
-    console_output_stream()
+    console_output_stream(const bool no_alloc = false)
     {
 #ifdef _MSC_VER
 
-      if(!::GetStdHandle(STD_OUTPUT_HANDLE))
+      if (!no_alloc && !::GetStdHandle(STD_OUTPUT_HANDLE))
         m_have_to_kill_console = true;
       else
         m_have_to_kill_console = false;
@@ -755,6 +756,7 @@ namespace log_space
     {
       for (named_log_streams::iterator it = m_log_file_names.begin(); it != m_log_file_names.end(); it++)
       {
+        bool is_default = m_pdefault_file_stream == it->second.first;
         std::wstring target_path = it->second.second;
         //close and delete current stream
         if (it->second.first->is_open())
@@ -763,6 +765,10 @@ namespace log_space
           it->second.first->close();
         }
         delete it->second.first;
+        if (is_default)
+        {
+          m_pdefault_file_stream = nullptr;
+        }
         it->second.first = nullptr;
         //reopen it with truncate        
         boost::filesystem::ofstream* pstream = new boost::filesystem::ofstream;
@@ -772,6 +778,10 @@ namespace log_space
           throw std::runtime_error("Unexpected error: failed to re-open log stream on truncate");
         }
         it->second.first = pstream;
+        if (is_default)
+        {
+          m_pdefault_file_stream = pstream;
+        }
       }
       return true;
     }
@@ -957,6 +967,9 @@ namespace log_space
         break;
       case LOGGER_CONSOLE:
         ls = new console_output_stream( );
+        break;
+      case LOGGER_CONSOLE_NO_ALLOC:
+        ls = new console_output_stream(true);
         break;
       }
 

@@ -255,7 +255,7 @@ namespace currency
     bool is_pre_hardfork_tx_freeze_period_active() const;
     bool is_block_fit_for_strategy(uint64_t h, const std::string& strategy) const;
     bool collect_all_outs_in_block(uint64_t input_amount, uint64_t height, std::vector<COMMAND_RPC_GET_RANDOM_OUTPUTS_FOR_AMOUNTS::out_entry>& outs) const;
-    uint64_t get_current_hardfork_id() const;
+    size_t get_current_hardfork_id() const;
 
 
     bc_attachment_services_manager& get_attachment_services_manager(){ return m_services_mgr; }
@@ -337,8 +337,8 @@ namespace currency
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash) const;
     bool check_tx_inputs(const transaction& tx, const crypto::hash& tx_prefix_hash, uint64_t& max_used_block_height, crypto::hash& max_used_block_id)const;
     bool check_ms_input(const transaction& tx, size_t in_index, const txin_multisig& txin, const crypto::hash& tx_prefix_hash, const transaction& source_tx, size_t out_n) const;
-    bool validate_tx_for_hardfork_specific_terms_types_new(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
-    bool validate_tx_for_hardfork_specific_terms_types_old(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
+    bool validate_tx_for_hardfork_specific_terms_types_HF6(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
+    bool validate_tx_for_hardfork_specific_terms_types_HF4(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
     bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const;
     bool validate_tx_for_hardfork_specific_terms(const transaction& tx, const crypto::hash& tx_id) const;
     bool get_output_keys_for_input_with_checks(const transaction& tx, const txin_v& verified_input, std::vector<crypto::public_key>& output_keys, uint64_t& max_related_block_height, uint64_t& source_max_unlock_time_for_pos_coinbase, scan_for_keys_context& scan_context) const;
