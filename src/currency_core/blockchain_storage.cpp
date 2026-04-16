@@ -1934,8 +1934,17 @@ bool blockchain_storage::create_block_template(const create_block_template_param
   CHECK_AND_ASSERT_MES(r, false, "Failed to construc miner tx, first chance");
   uint64_t coinbase_size = get_object_blobsize(b.miner_tx);
   // "- 100" - to reserve room for PoS additions into miner tx
-  CHECK_AND_ASSERT_MES(coinbase_size < CURRENCY_COINBASE_BLOB_RESERVED_SIZE - 100, false, "Failed to get block template (coinbase_size = " << coinbase_size << ") << coinbase structue: " 
-    << ENDL << obj_to_json_str(b.miner_tx));
+  if (b.miner_tx.hardfork_id >= ZANO_HARDFORK_06)
+  {
+    CHECK_AND_ASSERT_MES(coinbase_size < CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 - 100, false, "Failed to get block template (coinbase_size = " << coinbase_size << ") << coinbase structue: "
+      << ENDL << obj_to_json_str(b.miner_tx));
+  }
+  else
+  {
+    CHECK_AND_ASSERT_MES(coinbase_size < CURRENCY_COINBASE_BLOB_RESERVED_SIZE - 100, false, "Failed to get block template (coinbase_size = " << coinbase_size << ") << coinbase structue: "
+      << ENDL << obj_to_json_str(b.miner_tx));
+  }
+
   return true;
 }
 //------------------------------------------------------------------
@@ -7649,17 +7658,23 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       instead of complicated two-phase template construction and adjustment of cumulative size with block reward we
       use CURRENCY_COINBASE_BLOB_RESERVED_SIZE as penalty-free coinbase transaction reservation.
   */
-  if (coinbase_blob_size > CURRENCY_COINBASE_BLOB_RESERVED_SIZE)
-  {
-    if (is_hardfork_active(ZANO_HARDFORK_06))
+  if (!is_hardfork_active(ZANO_HARDFORK_06))
+  {//pre-HF6 zone
+    if (coinbase_blob_size > CURRENCY_COINBASE_BLOB_RESERVED_SIZE)
     {
-      LOG_PRINT_L0("Block with id: " << id << " has too big miner transaction blob size: " << coinbase_blob_size 
+      cumulative_block_size += coinbase_blob_size;
+      LOG_PRINT_CYAN("Big coinbase transaction detected: coinbase_blob_size = " << coinbase_blob_size, LOG_LEVEL_0);
+    }
+  }
+  else
+  {//HF6 zone
+    if (coinbase_blob_size > CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6)
+    {
+      LOG_PRINT_L0("Block with id: " << id << " has too big miner transaction blob size: " << coinbase_blob_size
         << ", which is more than allowed by CURRENCY_COINBASE_BLOB_RESERVED_SIZE = " << CURRENCY_COINBASE_BLOB_RESERVED_SIZE << " under ZANO_HARDFORK_06");
       bvc.m_verification_failed = true;
       return false;
     }
-    cumulative_block_size += coinbase_blob_size;
-    LOG_PRINT_CYAN("Big coinbase transaction detected: coinbase_blob_size = " << coinbase_blob_size, LOG_LEVEL_0);
   }
   
   std::vector<uint64_t> block_fees;
@@ -7817,7 +7832,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     {
       purge_block_data_from_blockchain(bl, tx_processed_count);
       add_block_as_invalid(bl, id);
-      LOG_PRINT_L0("Block with id " << id << " added as invalid because of missing etc_coinbase_block_cumulative_size in coinbase extra under ZANO_HARDFORK_06");
+      LOG_PRINT_RED_L0("Block with id " << id << " added as invalid because of missing etc_coinbase_block_cumulative_size in coinbase extra under ZANO_HARDFORK_06");
       bvc.m_verification_failed = true;
       return false;
     }
@@ -7833,7 +7848,7 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       {
         purge_block_data_from_blockchain(bl, tx_processed_count);
         add_block_as_invalid(bl, id);
-        LOG_PRINT_L0("Block with id " << id << " added as invalid because of missmatch of cumulative_block_size(" << cumulative_block_size << ") and etc_coinbase_block_cumulative_size(" << ecbs.v << ") in coinbase extra under ZANO_HARDFORK_06");
+        LOG_PRINT_RED_L0("Block with id " << id << " added as invalid because of missmatch of cumulative_block_size(" << cumulative_block_size << ") and etc_coinbase_block_cumulative_size(" << ecbs.v << ") in coinbase extra under ZANO_HARDFORK_06");
         bvc.m_verification_failed = true;
         return false;
       }

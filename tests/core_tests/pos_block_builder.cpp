@@ -180,6 +180,12 @@ void pos_block_builder::step4_generate_coinbase_tx(size_t median_size,
   for (size_t try_count = 0; try_count != 10; ++try_count)
   {
     m_block.miner_tx = transaction{};
+    if (m_miner_tx_hardfork_id >= ZANO_HARDFORK_06)
+    {
+      etc_coinbase_block_cumulative_size ecbs = AUTO_VAL_INIT(ecbs);
+      ecbs.v = m_txs_total_size;
+      m_block.miner_tx.extra.push_back(ecbs);
+    }
     r = construct_miner_tx(m_height, median_size, already_generated_coins, estimated_block_size, m_total_fee,
       reward_receiver_address, stakeholder_address, m_block.miner_tx, block_reward_without_fee, m_block_reward, m_miner_tx_version, m_miner_tx_hardfork_id,
       extra_nonce, max_outs, true, pe, &m_miner_tx_tgc, tx_one_time_key_to_use);

@@ -1169,7 +1169,14 @@ namespace currency
     size_t current_size = explicit_total_size;
     uint64_t current_fee = 0;
     uint64_t best_money;
-    if (!get_block_reward(pos, median_size, CURRENCY_COINBASE_BLOB_RESERVED_SIZE, already_generated_coins, best_money, height)) {
+
+    size_t blob_reserved_size = CURRENCY_COINBASE_BLOB_RESERVED_SIZE;
+    if (m_blockchain.is_hardfork_active(ZANO_HARDFORK_06))
+    {
+      blob_reserved_size = CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6;
+    }
+
+    if (!get_block_reward(pos, median_size, blob_reserved_size, already_generated_coins, best_money, height)) {
       LOG_ERROR("Block with just a miner transaction is already too large!");
       return false;
     }
@@ -1243,7 +1250,7 @@ namespace currency
       current_fee += tx.second->fee;
 
       uint64_t current_reward;
-      if (!get_block_reward(pos, median_size, current_size + CURRENCY_COINBASE_BLOB_RESERVED_SIZE, already_generated_coins, current_reward, height))
+      if (!get_block_reward(pos, median_size, current_size + blob_reserved_size, already_generated_coins, current_reward, height))
       {
         break; // current block size is too big
       }

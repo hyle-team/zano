@@ -302,6 +302,12 @@ bool test_generator::construct_block(currency::block& blk,
   uint64_t block_reward = 0;
   size_t tx_hardfork_id = 0;
   uint64_t tx_version = get_tx_version_and_hardfork_id(height, m_hardforks, tx_hardfork_id);
+  if (tx_hardfork_id >= ZANO_HARDFORK_06)
+  {
+    etc_coinbase_block_cumulative_size entry = {};
+    entry.v = txs_size;
+    blk.miner_tx.extra.push_back(entry);
+  }
   while (true)
   {
     r = construct_miner_tx(height, misc_utils::median(block_sizes),
@@ -323,8 +329,16 @@ bool test_generator::construct_block(currency::block& blk,
     CHECK_AND_ASSERT_MES(r, false, "construct_miner_tx failed");
 
     size_t coinbase_size = get_object_blobsize(blk.miner_tx);
-    if (coinbase_size <= CURRENCY_COINBASE_BLOB_RESERVED_SIZE) // if less than that constant then coinbase goes for free
-      break;
+    if (blk.miner_tx.hardfork_id >= ZANO_HARDFORK_06)
+    {
+      if (coinbase_size <= CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6) // if less than that constant then coinbase goes for free
+        break;
+    }
+    else
+    {
+      if (coinbase_size <= CURRENCY_COINBASE_BLOB_RESERVED_SIZE) // if less than that constant then coinbase goes for free
+        break;
+    }
 
     size_t actual_block_size = txs_size + coinbase_size;
     if (target_block_size < actual_block_size)
@@ -1162,6 +1176,13 @@ bool test_generator::construct_block(int64_t manual_timestamp_adjustment,
     size_t tx_hardfork_id = 0;
     uint64_t tx_version = get_tx_version_and_hardfork_id(height, m_hardforks, tx_hardfork_id);
     size_t current_block_size = txs_sizes + get_object_blobsize(blk.miner_tx);
+    if (tx_hardfork_id >= ZANO_HARDFORK_06)
+    {
+      etc_coinbase_block_cumulative_size ecbs = AUTO_VAL_INIT(ecbs);
+      ecbs.v = txs_sizes;
+      blk.miner_tx.extra.push_back(ecbs);
+    }
+
     // TODO: This will work, until size of constructed block is less then CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE
     if (!construct_miner_tx(height, misc_utils::median(block_sizes), already_generated_coins, current_block_size, 0,
       miner_acc.get_public_address(), miner_acc.get_public_address(), blk.miner_tx, base_block_reward, block_reward, tx_version, tx_hardfork_id, extra_nonce, 1))
@@ -1254,6 +1275,13 @@ bool test_generator::construct_pow_block_with_alias_info_in_coinbase(const accou
 
     uint64_t alias_cost = ai.m_sign.empty() ? get_alias_coast_from_fee(ai.m_alias, ALIAS_VERY_INITAL_COAST) : 0;
     uint64_t block_reward = get_outs_money_amount(miner_tx, acc.get_keys());
+    if (miner_tx.hardfork_id >= ZANO_HARDFORK_06)
+    {
+      etc_coinbase_block_cumulative_size ecbs = AUTO_VAL_INIT(ecbs);
+      ecbs.v = 0;
+      miner_tx.extra.push_back(ecbs);
+    }
+
     CHECK_AND_ASSERT_MES(alias_cost < block_reward, false, "Alias '" << ai.m_alias << "' can't be registered via block coinbase, because it's price: " << print_money(alias_cost) << " is greater than block reward: " << print_money(block_reward));
     uint64_t new_block_reward = block_reward - alias_cost;
     if (miner_tx.version > TRANSACTION_VERSION_PRE_HF4)
@@ -2742,7 +2770,7 @@ uint64_t decode_native_output_amount_or_throw(const account_base& acc, const tra
   return amount;
 }
 
-bool generate_pos_block_with_extra_nonce(test_generator& generator, const std::vector<test_event_entry>& events, const currency::account_base& miner, const currency::account_base& recipient, const currency::block& prev_block, const currency::transaction& stake_tx, const currency::blobdata& pos_nonce, currency::block& result)
+bool generate_pos_block_with_extra_nonce(test_generator& generator, const std::vector<test_event_entry>& events, const currency::account_base& miner, const currency::account_base& recipient, const currency::block& prev_block, const currency::transaction& stake_tx, const currency::blobdata& pos_nonce, currency::block& result, uint64_t total_txs_size)
 {
   // get params for PoS
   crypto::hash prev_id = get_block_hash(prev_block);
@@ -2769,6 +2797,13 @@ bool generate_pos_block_with_extra_nonce(test_generator& generator, const std::v
   uint64_t height = get_block_height(prev_block) + 1;
   pb.step1_init_header(generator.get_hardforks(), height, prev_id);
   pb.step2_set_txs({});
+
+  if (generator.get_hardforks().is_hardfork_active_for_height(ZANO_HARDFORK_06, height))
+  {
+    etc_coinbase_block_cumulative_size ebcs = AUTO_VAL_INIT(ebcs);
+    ebcs.v = total_txs_size;
+    pb.m_block.miner_tx.extra.push_back(ebcs);
+  }
 
   if (generator.get_hardforks().is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, height))
   {

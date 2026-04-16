@@ -476,7 +476,7 @@ public:
   void get_last_n_block_sizes(std::vector<size_t>& block_sizes, const crypto::hash& head, size_t n) const;
   uint64_t get_last_n_blocks_fee_median(const crypto::hash& head_block_hash, size_t n = ALIAS_COAST_PERIOD);
   template<typename cb_t>
-  bool construct_block_gentime_with_coinbase_cb(const currency::block& prev_block, const currency::account_base& acc, cb_t cb, currency::block& b);
+  bool construct_block_gentime_with_coinbase_cb(const currency::block& prev_block, const currency::account_base& acc, cb_t cb, currency::block& b, uint64_t total_txs_size = 0);
   bool construct_pow_block_with_alias_info_in_coinbase(const currency::account_base& acc, const currency::block& prev_block, const currency::extra_alias_entry& ai, currency::block& b);
   uint64_t get_base_reward_for_next_block(const crypto::hash& head_id, bool pow = true) const;
 
@@ -852,7 +852,7 @@ uint64_t get_last_block_of_type(bool looking_for_pos, const test_generator::bloc
 bool decode_output_amount_and_asset_id(const currency::account_base& acc, const currency::transaction& tx, size_t output_index, uint64_t &amount, crypto::public_key* p_asset_id = nullptr);
 uint64_t decode_native_output_amount_or_throw(const currency::account_base& acc, const currency::transaction& tx, size_t output_index);
 
-bool generate_pos_block_with_extra_nonce(test_generator& generator, const std::vector<test_event_entry>& events, const currency::account_base& miner, const currency::account_base& recipient, const currency::block& prev_block, const currency::transaction& stake_tx, const currency::blobdata& pos_nonce, currency::block& result);
+bool generate_pos_block_with_extra_nonce(test_generator& generator, const std::vector<test_event_entry>& events, const currency::account_base& miner, const currency::account_base& recipient, const currency::block& prev_block, const currency::transaction& stake_tx, const currency::blobdata& pos_nonce, currency::block& result, uint64_t total_txs_size = 0);
 bool generate_pos_block_with_given_coinstake(test_generator& generator, const std::vector<test_event_entry> &events, const currency::account_base& miner, const currency::block& prev_block, const currency::transaction& stake_tx, size_t stake_output_idx, currency::block& result, uint64_t stake_output_gidx = UINT64_MAX);
 bool check_ring_signature_at_gen_time(const std::vector<test_event_entry>& events, const crypto::hash& last_block_id, const currency::txin_to_key& in_t_k,
   const crypto::hash& hash_for_sig, const std::vector<crypto::signature> &sig);
@@ -1072,7 +1072,7 @@ bool construct_broken_tx(std::list<currency::transaction>& txs_set,
   }
 
 template<typename cb_t>
-bool test_generator::construct_block_gentime_with_coinbase_cb(const currency::block& prev_block, const currency::account_base& acc, cb_t cb, currency::block& b)
+bool test_generator::construct_block_gentime_with_coinbase_cb(const currency::block& prev_block, const currency::account_base& acc, cb_t cb, currency::block& b, uint64_t total_txs_size)
 {
   bool r = false;
   crypto::hash prev_id = get_block_hash(prev_block);
@@ -1088,6 +1088,13 @@ bool test_generator::construct_block_gentime_with_coinbase_cb(const currency::bl
   uint64_t block_reward = 0;
   size_t tx_hardfork_id = 0;
   uint64_t tx_version = get_tx_version_and_hardfork_id(height, m_hardforks, tx_hardfork_id);
+
+  if (get_hardforks().is_hardfork_active_for_height(ZANO_HARDFORK_06, height))
+  {
+    etc_coinbase_block_cumulative_size ecbcs = AUTO_VAL_INIT(ecbcs);
+    ecbcs.v = total_txs_size;
+    miner_tx.extra.push_back(ecbcs);
+  }
 
   currency::keypair tx_sec_key = currency::keypair::generate();
   r = construct_miner_tx(height, epee::misc_utils::median(block_sizes), already_generated_coins, 0 /* current_block_size !HACK! */, 0,

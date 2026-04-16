@@ -2091,7 +2091,13 @@ void wallet2::update_current_tx_limit()
   THROW_IF_TRUE_WALLET_EX(res.status == API_RETURN_CODE_BUSY, error::daemon_busy, "getinfo");
   THROW_IF_TRUE_WALLET_EX(res.status != API_RETURN_CODE_OK, error::get_blocks_error, res.status);
   THROW_IF_TRUE_WALLET_EX(res.current_blocks_median < CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE, error::get_blocks_error, "bad median size");
-  m_upper_transaction_size_limit = res.current_blocks_median - CURRENCY_COINBASE_BLOB_RESERVED_SIZE;
+  size_t reserved_size = CURRENCY_COINBASE_BLOB_RESERVED_SIZE;
+  if (is_in_hardfork_zone(ZANO_HARDFORK_06))
+  {
+    reserved_size = CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6;
+  }
+
+  m_upper_transaction_size_limit = res.current_blocks_median - reserved_size;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::has_related_alias_entry_unconfirmed(const currency::transaction& tx)

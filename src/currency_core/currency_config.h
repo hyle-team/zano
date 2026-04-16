@@ -62,6 +62,7 @@
 #define CURRENCY_REWARD_BLOCKS_WINDOW                   400
 #define CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE         125000 //size of block (bytes) after which reward for block calculated using block size
 #define CURRENCY_COINBASE_BLOB_RESERVED_SIZE            1100
+#define CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6        8000
 #define CURRENCY_MAX_TRANSACTION_BLOB_SIZE              (CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE - CURRENCY_COINBASE_BLOB_RESERVED_SIZE*2) 
 #define CURRENCY_FREE_TX_MAX_BLOB_SIZE                  1024 // soft txpool-based limit for free-of-charge txs (such as BC_OFFERS_SERVICE_INSTRUCTION_DEL)
 #define CURRENCY_DISPLAY_DECIMAL_POINT                  12
