@@ -104,12 +104,12 @@ namespace currency
     bool on_get_integrated_address(const COMMAND_RPC_GET_INTEGRATED_ADDRESS::request& req, COMMAND_RPC_GET_INTEGRATED_ADDRESS::response& res, epee::json_rpc::error& error_resp, connection_context& cntx);    
     bool on_validate_signature(const COMMAND_VALIDATE_SIGNATURE::request& req, COMMAND_VALIDATE_SIGNATURE::response& res, epee::json_rpc::error& er, connection_context& cntx);
 
-    bool on_gateway_get_address_info(const COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response& res, epee::json_rpc::error& er, connection_context& cntx);
-    bool on_gateway_create_transfer(const COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request& req, COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx);
-    bool on_gateway_sign_transfer(const COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request& req, COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx);
-    bool on_gateway_create_owner_change(const COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::response& res, epee::json_rpc::error& er, connection_context& cntx);
-    bool on_gateway_sign_owner_change(const COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::response& res, epee::json_rpc::error& er, connection_context& cntx);
-    bool on_gateway_get_address_history(const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res, epee::json_rpc::error& er, connection_context& cntx);
+    bool on_gateway_get_address_info(const COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response& res, connection_context& cntx);
+    bool on_gateway_create_transfer(const COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request& req, COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response& res, connection_context& cntx);
+    bool on_gateway_sign_transfer(const COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request& req, COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response& res, connection_context& cntx);
+    bool on_gateway_create_owner_change(const COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::response& res, connection_context& cntx);
+    bool on_gateway_sign_owner_change(const COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::request& req, COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::response& res, connection_context& cntx);
+    bool on_gateway_get_address_history(const COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::request& req, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY::response& res, connection_context& cntx);
 
 
     CHAIN_HTTP_TO_MAP2(connection_context); //forward http requests to uri map
@@ -192,12 +192,12 @@ namespace currency
         MAP_JON_RPC_WE("validate_signature",          on_validate_signature,          COMMAND_VALIDATE_SIGNATURE)
         
         //gateway addresses api
-        MAP_JON_RPC_WE("gateway_get_address_info",    on_gateway_get_address_info,    COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO)
-        MAP_JON_RPC_WE("gateway_create_transfer",     on_gateway_create_transfer,     COMMAND_RPC_GATEWAY_CREATE_TRANSFER)
-        MAP_JON_RPC_WE("gateway_sign_transfer",       on_gateway_sign_transfer,       COMMAND_RPC_GATEWAY_SIGN_TRANSFER)
-        MAP_JON_RPC_WE("gateway_create_owner_change", on_gateway_create_owner_change, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE)
-        MAP_JON_RPC_WE("gateway_sign_owner_change",   on_gateway_sign_owner_change,   COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE)
-        MAP_JON_RPC_WE("gateway_get_address_history", on_gateway_get_address_history, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY)
+        MAP_JON_RPC("gateway_get_address_info",    on_gateway_get_address_info,    COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO)
+        MAP_JON_RPC("gateway_create_transfer",     on_gateway_create_transfer,     COMMAND_RPC_GATEWAY_CREATE_TRANSFER)
+        MAP_JON_RPC("gateway_sign_transfer",       on_gateway_sign_transfer,       COMMAND_RPC_GATEWAY_SIGN_TRANSFER)
+        MAP_JON_RPC("gateway_create_owner_change", on_gateway_create_owner_change, COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE)
+        MAP_JON_RPC("gateway_sign_owner_change",   on_gateway_sign_owner_change,   COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE)
+        MAP_JON_RPC("gateway_get_address_history", on_gateway_get_address_history, COMMAND_RPC_GATEWAY_GET_ADDRESS_HISTORY)
 
         CHAIN_TO_PHANDLER(m_prpc_chain_handler)
       END_JSON_RPC_MAP()
