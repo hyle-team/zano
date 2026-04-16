@@ -1275,12 +1275,6 @@ bool test_generator::construct_pow_block_with_alias_info_in_coinbase(const accou
 
     uint64_t alias_cost = ai.m_sign.empty() ? get_alias_coast_from_fee(ai.m_alias, ALIAS_VERY_INITAL_COAST) : 0;
     uint64_t block_reward = get_outs_money_amount(miner_tx, acc.get_keys());
-    if (miner_tx.hardfork_id >= ZANO_HARDFORK_06)
-    {
-      etc_coinbase_block_cumulative_size ecbs = AUTO_VAL_INIT(ecbs);
-      ecbs.v = 0;
-      miner_tx.extra.push_back(ecbs);
-    }
 
     CHECK_AND_ASSERT_MES(alias_cost < block_reward, false, "Alias '" << ai.m_alias << "' can't be registered via block coinbase, because it's price: " << print_money(alias_cost) << " is greater than block reward: " << print_money(block_reward));
     uint64_t new_block_reward = block_reward - alias_cost;
