@@ -76,4 +76,5 @@ struct hard_fork_6_coinbase_size_rules : public wallet_test
   hard_fork_6_coinbase_size_rules();
   bool generate(std::vector<test_event_entry>& events) const;
   bool c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry> &events);
+  bool set_far_checkpoint(currency::core& c, size_t ev_index, const std::vector<test_event_entry> &events);
 };

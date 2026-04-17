@@ -1675,11 +1675,20 @@ bool hard_fork_6_and_self_directed_tx_with_payment_id::c1(currency::core& c, siz
 hard_fork_6_coinbase_size_rules::hard_fork_6_coinbase_size_rules()
 {
   REGISTER_CALLBACK_METHOD(hard_fork_6_coinbase_size_rules, c1);
+  REGISTER_CALLBACK_METHOD(hard_fork_6_coinbase_size_rules, set_far_checkpoint);
 
   m_hardforks.clear();
   m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 1);
   m_hardforks.set_hardfork_height(ZANO_HARDFORK_05, 1);
   m_hardforks.set_hardfork_height(ZANO_HARDFORK_06, 40);
+}
+
+bool hard_fork_6_coinbase_size_rules::set_far_checkpoint(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  currency::checkpoints cp;
+  cp.add_checkpoint(1000, "c0ffee0fdeadbeefc0ffeeeec0ffeec0ffeec0ffeec0ffeec0ffeec0ffeec0ff");
+  c.set_checkpoints(std::move(cp));
+  return true;
 }
 
 bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& events) const
@@ -1690,6 +1699,8 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
   // 3. HF6 - coinbase without etc_coinbase_block_cumulative_size in extra is rejected
   // 4. HF6 - etc_coinbase_block_cumulative_size.v mismatching real cumulative size outside checkpoint zone is rejected
   // 5. HF6 - good coinbase below the limit with correct etc_coinbase_block_cumulative_size is accepted
+  // 6. HF6 - block with a real tx and ecbs.v equal to txs blob size only is accepted - proves coinbase size is NOT included in cumulative_block_size
+  // 7. HF6 - inside checkpoint zone, block with arbitrary wrong ecbs.v is accepted - zone trusts ecbs without validation
 
   uint64_t ts = test_core_time::get_time();
   m_accounts.resize(TOTAL_ACCS_COUNT);
@@ -1706,7 +1717,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
   //   before_construct - mutates miner_tx.extra BEFORE construct_miner_tx - wthout proof regen, and padding handling
   //   after_construct  - mutates miner_tx.extra AFTER construct_miner_tx that mean REGENERATING PROOFS
   using extra_cb_t = std::function<void(transaction&)>;
-  auto build_specific_cumnul_block = [&](const block& prev_block, const extra_cb_t& before_construct, const extra_cb_t& after_construct, block& out_block) -> bool
+  auto build_specific_cumnul_block = [&](const block& prev_block, const extra_cb_t& before_construct, const extra_cb_t& after_construct, const std::list<transaction>& tx_list, block& out_block) -> bool
   {
     crypto::hash prev_id = get_block_hash(prev_block);
     boost::multiprecision::uint128_t already_generated_coins = generator.get_already_generated_coins(prev_block);
@@ -1717,6 +1728,15 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
 
     size_t tx_hardfork_id = 0;
     uint64_t tx_version = get_tx_version_and_hardfork_id(height, m_hardforks, tx_hardfork_id);
+
+    // collect tx hashes and total blob size of included txs
+    std::vector<crypto::hash> tx_hashes;
+    size_t txs_sizes = 0;
+    for (const auto& t : tx_list)
+    {
+      tx_hashes.push_back(get_transaction_hash(t));
+      txs_sizes += get_object_blobsize(t);
+    }
 
     transaction miner_tx{};
     if (before_construct)
@@ -1745,8 +1765,11 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
       }
     }
 
-    return generator.construct_block_manually(out_block, prev_block, miner_acc,  test_generator::bf_miner_tx | test_generator::bf_major_ver | test_generator::bf_minor_ver,
-      m_hardforks.get_block_major_version_by_height(height), m_hardforks.get_block_minor_version_by_height(height), 0, prev_id, 0, miner_tx);
+    int flags = test_generator::bf_miner_tx | test_generator::bf_major_ver | test_generator::bf_minor_ver;
+    if (!tx_hashes.empty())
+      flags |= test_generator::bf_tx_hashes;
+    return generator.construct_block_manually(out_block, prev_block, miner_acc, flags, m_hardforks.get_block_major_version_by_height(height),
+      m_hardforks.get_block_minor_version_by_height(height), 0, prev_id, 0, miner_tx, tx_hashes, txs_sizes);
   };
 
   // factories for the two callback
@@ -1802,7 +1825,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
   const size_t big_coinbase_target = CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 + 256;
   block blk_hf5_big{};
   {
-    bool r = build_specific_cumnul_block(blk_0r, {}, pad_coinbase_to(big_coinbase_target), blk_hf5_big);
+    bool r = build_specific_cumnul_block(blk_0r, {}, pad_coinbase_to(big_coinbase_target), {}, blk_hf5_big);
     CHECK_AND_ASSERT_MES(r, false, "HF5 big-coinbase block construction failed");
     CHECK_AND_ASSERT_MES(get_object_blobsize(blk_hf5_big.miner_tx) > CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6, false,
       "HF5 big coinbase resulting coinbase is not above CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6");
@@ -1820,7 +1843,7 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
 
   { // №2
     block blk_bad{};
-    bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(0), pad_coinbase_to(big_coinbase_target), blk_bad);
+    bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(0), pad_coinbase_to(big_coinbase_target), {}, blk_bad);
     CHECK_AND_ASSERT_MES(r, false, "HF6 big-coinbase block construction failed");
     CHECK_AND_ASSERT_MES(get_object_blobsize(blk_bad.miner_tx) > CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6, false,
       "HF6 big coinbase resulting coinbase is not above CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6");
@@ -1828,9 +1851,19 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
     events.push_back(blk_bad);
   }
 
+  { // №2b: coinbase size == CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 + 1 - rejected, one over
+    block blk_bad{};
+    bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(0), pad_coinbase_to(CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 + 1), {}, blk_bad);
+    CHECK_AND_ASSERT_MES(r, false, "HF6 boundary (==limit+1) block construction failed");
+    CHECK_AND_ASSERT_MES(get_object_blobsize(blk_bad.miner_tx) == CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 + 1, false,
+      "HF6 boundary+1: coinbase size did not converge to exactly CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 + 1");
+    DO_CALLBACK(events, "mark_invalid_block");
+    events.push_back(blk_bad);
+  }
+
   { // №3
     block blk_bad{};
-    bool r = build_specific_cumnul_block(blk_hf6_ancestor, {}, {}, blk_bad); // no ecbs seeded - none extra
+    bool r = build_specific_cumnul_block(blk_hf6_ancestor, {}, {}, {}, blk_bad); // no ecbs seeded - none extra
     CHECK_AND_ASSERT_MES(r, false, "HF6 missing ecbs block construction failed");
     DO_CALLBACK(events, "mark_invalid_block");
     events.push_back(blk_bad);
@@ -1838,17 +1871,46 @@ bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& ev
 
   { // №4
     block blk_bad{};
-    bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(123456), {}, blk_bad);
+    bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(123456), {}, {}, blk_bad);
     CHECK_AND_ASSERT_MES(r, false, "HF6 wrong ecbs block construction failed");
     DO_CALLBACK(events, "mark_invalid_block");
     events.push_back(blk_bad);
   }
 
+  block blk_hf6_boundary_ok{};
+  { // №2a: coinbase size == CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 - accepted boundary inclusive
+    bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(0), pad_coinbase_to(CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6), {}, blk_hf6_boundary_ok);
+    CHECK_AND_ASSERT_MES(r, false, "HF6 boundary (==limit) block construction failed");
+    CHECK_AND_ASSERT_MES(get_object_blobsize(blk_hf6_boundary_ok.miner_tx) == CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6, false,
+      "HF6 boundary: coinbase size did not converge to exactly CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6");
+    events.push_back(blk_hf6_boundary_ok);
+  }
+
+  block blk_hf6_sanity{};
   { // №5
-    block blk_ok{};
-    bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(0), {}, blk_ok);
+    bool r = build_specific_cumnul_block(blk_hf6_boundary_ok, seed_ecbs(0), {}, {}, blk_hf6_sanity);
     CHECK_AND_ASSERT_MES(r, false, "HF6 sanity block construction failed");
-    CHECK_AND_ASSERT_MES(get_object_blobsize(blk_ok.miner_tx) <= CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6, false, "HF6 unexpectedly big coinbase");
+    CHECK_AND_ASSERT_MES(get_object_blobsize(blk_hf6_sanity.miner_tx) <= CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6, false, "HF6 unexpectedly big coinbase");
+    events.push_back(blk_hf6_sanity);
+  }
+
+  // real tx to include into the next block - proves coinbase is not counted toward cumulative_block_size
+  MAKE_TX(events, tx_for_hf6_block, miner_acc, miner_acc, MK_TEST_COINS(1), blk_hf6_sanity);
+  const size_t tx_for_hf6_block_size = get_object_blobsize(tx_for_hf6_block);
+
+  block blk_hf6_with_tx{};
+  { // №6
+    bool r = build_specific_cumnul_block(blk_hf6_sanity, seed_ecbs(tx_for_hf6_block_size), {}, { tx_for_hf6_block }, blk_hf6_with_tx);
+    CHECK_AND_ASSERT_MES(r, false, "HF6 block with tx construction failed");
+    events.push_back(blk_hf6_with_tx);
+  }
+
+  DO_CALLBACK(events, "set_far_checkpoint");
+
+  { // №7
+    block blk_ok{};
+    bool r = build_specific_cumnul_block(blk_hf6_with_tx, seed_ecbs(999), {}, {}, blk_ok);
+    CHECK_AND_ASSERT_MES(r, false, "HF6 in-zone bogus-ecbs block construction failed");
     events.push_back(blk_ok);
   }
 
@@ -1860,3 +1922,4 @@ bool hard_fork_6_coinbase_size_rules::c1(currency::core& c, size_t ev_index, con
 {
   return true;
 }
+
