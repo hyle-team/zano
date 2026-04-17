@@ -799,7 +799,7 @@ namespace currency
 
     //fill destinations
     std::string legacy_tx_wide_payment_id;
-    epee::json_rpc::error er_local = AUTO_VAL_INIT(er_local);
+    epee::json_rpc::error er_local{};
     bool r = rpc_fill_destinations_helper(req.destinations, ftp.prepared_destinations, ftp.extra, true, er_local, legacy_tx_wide_payment_id, false, [&](const std::string& address, currency::address_v& addr_v, std::string& embedded_payment_id) {
       tools::core_fast_rpc_proxy tmp_proxy(*this);
       if (!tmp_proxy.get_transfer_address(address, addr_v, embedded_payment_id))
