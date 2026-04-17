@@ -1671,3 +1671,192 @@ bool hard_fork_6_and_self_directed_tx_with_payment_id::c1(currency::core& c, siz
 
   return true;
 }
+//------------------------------------------------------------------------------
+hard_fork_6_coinbase_size_rules::hard_fork_6_coinbase_size_rules()
+{
+  REGISTER_CALLBACK_METHOD(hard_fork_6_coinbase_size_rules, c1);
+
+  m_hardforks.clear();
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_04_ZARCANUM, 1);
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_05, 1);
+  m_hardforks.set_hardfork_height(ZANO_HARDFORK_06, 40);
+}
+
+bool hard_fork_6_coinbase_size_rules::generate(std::vector<test_event_entry>& events) const
+{
+  // test idea: validate HF6 coinbase size and etc_coinbase_block_cumulative_size rules
+  // 1. HF5 - coinbase size > CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 is accepted
+  // 2. HF6 - coinbase size > CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 is rejected cuz hard limit
+  // 3. HF6 - coinbase without etc_coinbase_block_cumulative_size in extra is rejected
+  // 4. HF6 - etc_coinbase_block_cumulative_size.v mismatching real cumulative size outside checkpoint zone is rejected
+  // 5. HF6 - good coinbase below the limit with correct etc_coinbase_block_cumulative_size is accepted
+
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, ts);
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_05));
+  DO_CALLBACK_PARAMS(events, "check_hardfork_inactive", static_cast<size_t>(ZANO_HARDFORK_06));
+
+  // it need cuz construct_miner_tx insert `tx.extra.push_back(extra_padding());` and extra etc_coinbase_block_cumulative_size affect on proof
+  //   before_construct - mutates miner_tx.extra BEFORE construct_miner_tx - wthout proof regen, and padding handling
+  //   after_construct  - mutates miner_tx.extra AFTER construct_miner_tx that mean REGENERATING PROOFS
+  using extra_cb_t = std::function<void(transaction&)>;
+  auto build_specific_cumnul_block = [&](const block& prev_block, const extra_cb_t& before_construct, const extra_cb_t& after_construct, block& out_block) -> bool
+  {
+    crypto::hash prev_id = get_block_hash(prev_block);
+    boost::multiprecision::uint128_t already_generated_coins = generator.get_already_generated_coins(prev_block);
+    std::vector<size_t> block_sizes;
+    generator.get_last_n_block_sizes(block_sizes, prev_id, CURRENCY_REWARD_BLOCKS_WINDOW);
+    size_t height = static_cast<size_t>(get_block_height(prev_block)) + 1;
+    size_t median = epee::misc_utils::median(block_sizes);
+
+    size_t tx_hardfork_id = 0;
+    uint64_t tx_version = get_tx_version_and_hardfork_id(height, m_hardforks, tx_hardfork_id);
+
+    transaction miner_tx{};
+    if (before_construct)
+      before_construct(miner_tx);
+
+    uint64_t block_reward_without_fee = 0, block_reward = 0;
+    tx_generation_context ogc{};
+    bool r = construct_miner_tx(height, median, already_generated_coins, 0, 0, miner_acc.get_public_address(), miner_acc.get_public_address(),
+      miner_tx, block_reward_without_fee, block_reward, tx_version, tx_hardfork_id, blobdata(), 1, false, pos_entry(), &ogc);
+    CHECK_AND_ASSERT_MES(r, false, "construct_miner_tx failed");
+
+    if (after_construct)
+    {
+      after_construct(miner_tx);
+      // tx_id changed because extra changed; regen zc proofs using the captured tx_generation_context.
+      if (miner_tx.version > TRANSACTION_VERSION_PRE_HF4)
+      {
+        miner_tx.proofs.clear();
+        crypto::hash tx_id = get_transaction_hash(miner_tx);
+        r = generate_asset_surjection_proof(tx_id, true, ogc, miner_tx);
+        CHECK_AND_ASSERT_MES(r, false, "generate_asset_surjection_proof failed");
+        r = generate_zc_outs_range_proof(tx_id, ogc, miner_tx);
+        CHECK_AND_ASSERT_MES(r, false, "generate_zc_outs_range_proof failed");
+        r = generate_tx_balance_proof(tx_id, ogc, block_reward, miner_tx);
+        CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
+      }
+    }
+
+    return generator.construct_block_manually(out_block, prev_block, miner_acc,  test_generator::bf_miner_tx | test_generator::bf_major_ver | test_generator::bf_minor_ver,
+      m_hardforks.get_block_major_version_by_height(height), m_hardforks.get_block_minor_version_by_height(height), 0, prev_id, 0, miner_tx);
+  };
+
+  // factories for the two callback
+  auto seed_ecbs = [](uint64_t v) -> extra_cb_t
+  {
+    return [v](transaction& mt)
+    {
+      etc_coinbase_block_cumulative_size ecbs{};
+      ecbs.v = v;
+      mt.extra.push_back(ecbs);
+    };
+  };
+
+  auto pad_coinbase_to = [](size_t target) -> extra_cb_t
+  {
+    return [target](transaction& mt)
+    {
+      // find extra padding
+      extra_padding* padding = nullptr;
+      for (auto& e : mt.extra)
+      {
+        if (e.type() == typeid(extra_padding)) 
+        {
+          padding = &boost::get<extra_padding>(e);
+          break;
+        }
+      }
+      CHECK_AND_ASSERT_MES_NO_RET(padding != nullptr, "construct_miner_tx did not add extra_padding as expected");
+      // rounds for exact target suze, cant do one step only cuz SMART variant prefix grow by himself when padding grow 
+      for (int attempt = 0; attempt < 10; ++attempt)
+      {
+        size_t cur = get_object_blobsize(mt);
+        if (cur == target)
+        {
+          return;
+        }
+        if (cur < target)
+        {
+          padding->buff.insert(padding->buff.end(), target - cur, '$');
+        }
+        else
+        {
+          size_t over = cur - target;
+          if (padding->buff.size() < over)
+            return;
+          padding->buff.resize(padding->buff.size() - over);
+        }
+      }
+    };
+  };
+
+  // №1
+  const size_t big_coinbase_target = CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 + 256;
+  block blk_hf5_big{};
+  {
+    bool r = build_specific_cumnul_block(blk_0r, {}, pad_coinbase_to(big_coinbase_target), blk_hf5_big);
+    CHECK_AND_ASSERT_MES(r, false, "HF5 big-coinbase block construction failed");
+    CHECK_AND_ASSERT_MES(get_object_blobsize(blk_hf5_big.miner_tx) > CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6, false,
+      "HF5 big coinbase resulting coinbase is not above CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6");
+    events.push_back(blk_hf5_big);
+  }
+
+  // activate hf6
+  const uint64_t hf6_active_after = m_hardforks.get_height_the_hardfork_active_after(ZANO_HARDFORK_06);
+  const uint64_t cur_h = get_block_height(blk_hf5_big);
+  CHECK_AND_ASSERT_MES(cur_h < hf6_active_after + 1, false, "subtest1 block already past HF6 activation");
+  const size_t blocks_to_hf6 = static_cast<size_t>(hf6_active_after + 1 - cur_h);
+  REWIND_BLOCKS_N(events, blk_hf6_ancestor, blk_hf5_big, miner_acc, blocks_to_hf6);
+
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_06));
+
+  { // №2
+    block blk_bad{};
+    bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(0), pad_coinbase_to(big_coinbase_target), blk_bad);
+    CHECK_AND_ASSERT_MES(r, false, "HF6 big-coinbase block construction failed");
+    CHECK_AND_ASSERT_MES(get_object_blobsize(blk_bad.miner_tx) > CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6, false,
+      "HF6 big coinbase resulting coinbase is not above CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6");
+    DO_CALLBACK(events, "mark_invalid_block");
+    events.push_back(blk_bad);
+  }
+
+  { // №3
+    block blk_bad{};
+    bool r = build_specific_cumnul_block(blk_hf6_ancestor, {}, {}, blk_bad); // no ecbs seeded - none extra
+    CHECK_AND_ASSERT_MES(r, false, "HF6 missing ecbs block construction failed");
+    DO_CALLBACK(events, "mark_invalid_block");
+    events.push_back(blk_bad);
+  }
+
+  { // №4
+    block blk_bad{};
+    bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(123456), {}, blk_bad);
+    CHECK_AND_ASSERT_MES(r, false, "HF6 wrong ecbs block construction failed");
+    DO_CALLBACK(events, "mark_invalid_block");
+    events.push_back(blk_bad);
+  }
+
+  { // №5
+    block blk_ok{};
+    bool r = build_specific_cumnul_block(blk_hf6_ancestor, seed_ecbs(0), {}, blk_ok);
+    CHECK_AND_ASSERT_MES(r, false, "HF6 sanity block construction failed");
+    CHECK_AND_ASSERT_MES(get_object_blobsize(blk_ok.miner_tx) <= CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6, false, "HF6 unexpectedly big coinbase");
+    events.push_back(blk_ok);
+  }
+
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool hard_fork_6_coinbase_size_rules::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  return true;
+}
