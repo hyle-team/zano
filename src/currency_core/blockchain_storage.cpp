@@ -7600,11 +7600,14 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   //check if PoS allowed in this height
   CHECK_AND_ASSERT_MES_CUSTOM(!(is_pos_bl && m_db_blocks.size() < m_core_runtime_config.pos_minimum_heigh), false, bvc.m_verification_failed = true, "PoS block not allowed on height " << m_db_blocks.size());
 
-  if (!prevalidate_miner_transaction(bl, m_db_blocks.size(), is_pos_bl))
+  if (!bvc.do_just_simulation)
   {
-    LOG_PRINT_L0("Block with id: " << id << " @ " << height << " failed to pass miner tx prevalidation");
-    bvc.m_verification_failed = true;
-    return false;
+    if (!prevalidate_miner_transaction(bl, m_db_blocks.size(), is_pos_bl))
+    {
+      LOG_PRINT_L0("Block with id: " << id << " @ " << height << " failed to pass miner tx prevalidation");
+      bvc.m_verification_failed = true;
+      return false;
+    }
   }
 
   //check proof of work

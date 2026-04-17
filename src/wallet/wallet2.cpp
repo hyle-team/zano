@@ -5605,6 +5605,22 @@ bool wallet2::build_minted_block(const mining_context& cxt, const currency::acco
   if (subm_rsp.status != API_RETURN_CODE_OK)
   {
     WLT_LOG_ERROR("Constructed block " << print16(block_hash) << " was rejected by the core, status: " << subm_rsp.status);
+
+    WLT_LOG_MAGENTA("Performing explicit simulation to blacklist failing pool transactions", LOG_LEVEL_0);
+    std::string simulation_result_str = subm_rsp.status;
+    while (simulation_result_str != API_RETURN_CODE_OK)
+    {
+      //calling getblocktemplate in simulation mode
+      currency::COMMAND_RPC_GETBLOCKTEMPLATE::request tmpl_req_sim = AUTO_VAL_INIT(tmpl_req_sim);
+      currency::COMMAND_RPC_GETBLOCKTEMPLATE::response tmpl_rsp_sim = AUTO_VAL_INIT(tmpl_rsp_sim);
+      tmpl_req_sim.wallet_address = get_account_address_as_str(miner_address);
+      tmpl_req_sim.stakeholder_address = get_account_address_as_str(m_account.get_public_address());
+      tmpl_req_sim.pos_block = false;
+      tmpl_req_sim.do_explicit_simulation = true;
+      m_core_proxy->call_COMMAND_RPC_GETBLOCKTEMPLATE(tmpl_req_sim, tmpl_rsp_sim);
+      simulation_result_str = tmpl_rsp_sim.status;
+    }
+
     return false;
   }
   WLT_LOG_GREEN("PoS block " << print16(block_hash) << " generated and accepted, congrats!", LOG_LEVEL_0);

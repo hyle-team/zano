@@ -1772,6 +1772,7 @@ namespace currency
       bool r = m_core.get_blockchain_storage().add_new_block(resp.b, bvc);
       if (!r)
       {
+        res.status = API_RETURN_CODE_FAIL;
         LOG_ERROR("Explicit simulation of block template failed, block was rejected by the core");
         return false;
       }
