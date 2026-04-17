@@ -532,6 +532,16 @@ namespace tools
         er.message = std::string("WALLET_RPC_ERROR_CODE_WRONG_ADDRESS: ") + it->address;
         return false;
       }
+
+      // note: don't merge back the following 7 lines into develop -- sowle
+      bool self_directed_destination = de.addr.back() == w.get_wallet()->get_account().get_public_address();
+      if (self_directed_destination && embedded_payment_id.size() != 0)
+      {
+        er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
+        er.message = std::string("transfers with an integrated address to self is not allowed: ") + it->address;
+        return false;
+      }
+
       if (embedded_payment_id.size() != 0)
       {
         if (payment_id.size() != 0)
