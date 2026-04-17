@@ -87,7 +87,7 @@ bool gbt_pool_invalid_txs_asset_overemit::c1(currency::core& c, size_t ev_index,
   }
   LOG_PRINT_MAGENTA("deployed asset " << asset_id << " via tx " << get_transaction_hash(deploy_tx)
     << " initial_supply=" << initial_supply << ", total_max_supply=" << total_max_supply
-    << ", headroom=" << (total_max_supply - initial_supply) << LOG_LEVEL_0);
+    << ", headroom=" << (total_max_supply - initial_supply), LOG_LEVEL_0);
 
   // confirm the deploy and let the new gbt source outputs mature
   bool r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
