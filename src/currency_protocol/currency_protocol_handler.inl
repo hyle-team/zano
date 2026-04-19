@@ -736,6 +736,13 @@ namespace currency
     if (m_debug_ip_address != 0 && context.m_remote_ip == m_debug_ip_address)
       return 1;
 
+    if (arg.block_ids.size() > CURRENCY_NOTIFY_REQUEST_CHAIN_MAX_BLOCKS_COUNT)
+    {
+      m_p2p->drop_connection(context);
+      m_p2p->add_ip_fail(context.m_remote_ip);
+      return 1;
+    }
+
     LOG_PRINT_L2("[HANDLE]NOTIFY_REQUEST_CHAIN: block_ids.size()=" << arg.block_ids.size());
     LOG_PRINT_L3("[HANDLE]NOTIFY_REQUEST_CHAIN: " << print_kv_structure(arg));
     NOTIFY_RESPONSE_CHAIN_ENTRY::request r;
