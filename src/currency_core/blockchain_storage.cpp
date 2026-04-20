@@ -1936,7 +1936,7 @@ bool blockchain_storage::create_block_template(const create_block_template_param
   // "- 100" - to reserve room for PoS additions into miner tx
   if (b.miner_tx.hardfork_id >= ZANO_HARDFORK_06)
   {
-    CHECK_AND_ASSERT_MES(coinbase_size < CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 - 100, false, "Failed to get block template (coinbase_size = " << coinbase_size << ") << coinbase structue: "
+    CHECK_AND_ASSERT_MES(coinbase_size < CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6, false, "Failed to get block template (coinbase_size = " << coinbase_size << ") << coinbase structue: "
       << ENDL << obj_to_json_str(b.miner_tx));
   }
   else
@@ -7078,11 +7078,14 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     }
 
     size_t count_ado = 0;
+    size_t count_etc_coinbase_block_cumulative_size = 0;
     //extra
     for (const auto& el : tx.extra)
     {
       if (el.type() == typeid(asset_descriptor_operation))
         count_ado++;
+      else if (el.type() == typeid(etc_coinbase_block_cumulative_size))
+        count_etc_coinbase_block_cumulative_size++;
     }
     if (count_ado > 1)
     {
@@ -7094,6 +7097,12 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       LOG_ERROR("asset_descriptor_operation not allowed in tx with TX_FLAG_SIGNATURE_MODE_SEPARATE");
       return false;
     }
+    if (count_etc_coinbase_block_cumulative_size > 0 && !is_pos_coinbase(tx))
+    {
+      LOG_ERROR("etc_coinbase_block_cumulative_size is allowed only for PoS coinbase transactions");
+      return false;
+    }
+
   }
   bool var_is_after_hardfork_5_zone = m_core_runtime_config.is_hardfork_active_for_height(5, block_height);
   if (var_is_after_hardfork_5_zone)
@@ -7119,6 +7128,8 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     CHECK_AND_ASSERT_MES(tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
     CHECK_AND_ASSERT_MES(tx.vout.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS,  false, "transaction has too many outputs = " << tx.vout.size());
   }
+
+
 
 
   return true;

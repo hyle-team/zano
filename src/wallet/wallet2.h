@@ -833,7 +833,6 @@ private:
                                  const std::vector<uint64_t>& selected_indicies, 
                                  const std::vector<currency::tx_destination_entry>& splitted_dsts);
 
-    void update_current_tx_limit();
     void prepare_wti(wallet_public::wallet_transfer_info& wti, const process_transaction_context& tx_process_context);
     void prepare_wti_decrypted_attachments(wallet_public::wallet_transfer_info& wti, const std::vector<currency::payload_items_v>& decrypted_att);    
     void handle_money(const currency::block& b, const process_transaction_context& tx_process_context);
@@ -989,7 +988,6 @@ private:
     
     size_t m_required_decoys_count;
     pending_ki_file_container_t m_pending_key_images_file_container;
-    uint64_t m_upper_transaction_size_limit; //TODO: auto-calc this value or request from daemon, now use some fixed value
 
     std::atomic<bool> m_stop;
     std::shared_ptr<i_core_proxy> m_core_proxy;

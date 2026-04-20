@@ -765,10 +765,7 @@ namespace currency
   //---------------------------------------------------------------
   size_t get_object_blobsize_legacy(const transaction& t, uint64_t prefix_blob_size)
   {
-    if (t.hardfork_id >= ZANO_HARDFORK_06)
-    {
-      throw std::logic_error("get_object_blobsize_legacy is not expected to be called for HF6+ txs");
-    }
+    CHECK_AND_ASSERT_THROW_MES(t.hardfork_id < ZANO_HARDFORK_06, "get_object_blobsize_legacy is not expected to be called for HF6+ txs");
 
 
     size_t tx_blob_size = prefix_blob_size;
