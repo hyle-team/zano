@@ -197,7 +197,7 @@ namespace currency
     return true;
   }
   //--------------------------------------------------------------------------------
-  bool generate_asset_surjection_proof_hf6(const transaction& tx, const crypto::hash& context_hash, bool has_native_coin_bare_inputs_, tx_generation_context& ogc, zc_asset_surjection_proof& result)
+  bool generate_asset_surjection_proof_hf6(const crypto::hash& context_hash, bool has_native_coin_bare_inputs_, tx_generation_context& ogc, transaction& tx)
   {
     bool r = false;
 
@@ -270,10 +270,10 @@ namespace currency
     }
 
     if (confidential_outs_count == 0)
-      return true;
+      return true; // don't need ASP
 
     if (has_only_native_coin_bare_inputs)
-      return true; // explicit native coin asset id in outs has already been checked
+      return true; // don't need ASP, and explicit native coin asset id in outs has already been checked
 
     if (has_native_coin_bare_inputs) // txin_gen, txin_to_key, txin_gateway(native)
       bgw_cgw_native_ring_members.emplace_back(currency::native_coin_asset_id_pt); // additional ring member for native coin inputs
@@ -293,6 +293,8 @@ namespace currency
     // outs
     //ogc.blinded_asset_ids;                         // T'_j = H_j + s_j * X
     //ogc.asset_id_blinding_masks;                   // s_j
+
+    currency::zc_asset_surjection_proof asp{};
 
     for(size_t j = 0; j < outs_count; ++j)
     {
@@ -336,9 +338,9 @@ namespace currency
       if (secret.is_zero())
         LOG_PRINT_YELLOW("WARNING, TODO: secret == 0, consider removing ASP in such cases! -- sowle", LOG_LEVEL_0);
 
-      result.bge_proofs.emplace_back(crypto::BGE_proof_s{});
+      crypto::BGE_proof_s& bge_proof = asp.bge_proofs.emplace_back();
       uint8_t err = 0;
-      r = crypto::generate_BGE_proof(context_hash, ring, secret, secret_index, result.bge_proofs.back(), &err);
+      r = crypto::generate_BGE_proof(context_hash, ring, secret, secret_index, bge_proof, &err);
       CHECK_AND_ASSERT_MES(r, false, "out #" << j << ": generate_BGE_proof failed with err=" << (int)err);
 
       // kept for debugging
@@ -352,6 +354,8 @@ namespace currency
       //r = crypto::verify_BGE_proof(context_hash, ring_pk_ptr, result.bge_proofs.back(), &err);
       //CHECK_AND_ASSERT_MES(r, false, "verify_BGE_proof FAILED!");
     }
+
+    tx.proofs.push_back(std::move(asp));
 
     return true;
   }
@@ -405,10 +409,10 @@ namespace currency
     }
 
     if (confidential_outs_count == 0)
-      return true;
+      return true; // don't need ASP
 
     if (has_only_native_coin_bare_inputs)
-      return true; // explicit native coin asset id in outs has already been checked
+      return true; // don't need ASP and explicit native coin asset id in outs has already been checked
 
     if (has_native_coin_bare_inputs) // txin_gen, txin_to_key, txin_gateway(native)
       pseudo_outs_blinded_asset_ids.emplace_back(currency::native_coin_asset_id_pt); // additional ring member for native coin inputs
@@ -465,12 +469,16 @@ namespace currency
     return true;
   }
   //--------------------------------------------------------------------------------
-  bool generate_asset_surjection_proof(const transaction& tx, const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, zc_asset_surjection_proof& result)
+  bool generate_asset_surjection_proof(const crypto::hash& context_hash, bool has_non_zc_inputs, tx_generation_context& ogc, transaction& tx_to_add_proof_to)
   {
-    if (tx.version >= TRANSACTION_VERSION_POST_HF6)
-      return generate_asset_surjection_proof_hf6(tx, context_hash, has_non_zc_inputs, ogc, result);
+    if (tx_to_add_proof_to.version >= TRANSACTION_VERSION_POST_HF6)
+      return generate_asset_surjection_proof_hf6(context_hash, has_non_zc_inputs, ogc, tx_to_add_proof_to);
 
-    return generate_asset_surjection_proof_hf4(context_hash, has_non_zc_inputs, ogc, result);
+    currency::zc_asset_surjection_proof asp{};
+    if (!generate_asset_surjection_proof_hf4(context_hash, has_non_zc_inputs, ogc, asp))
+      return false;
+    tx_to_add_proof_to.proofs.emplace_back(std::move(asp));
+    return true;
   }
   //--------------------------------------------------------------------------------
   bool verify_asset_surjection_proof(const transaction& tx, const crypto::hash& tx_id)
@@ -481,12 +489,29 @@ namespace currency
     return verify_asset_surjection_proof_hf4(tx, tx_id);
   }
   //--------------------------------------------------------------------------------
-  bool generate_zc_outs_range_proof(const crypto::hash& context_hash, const tx_generation_context& outs_gen_context,
-    const std::vector<tx_out_v>& vouts, zc_outs_range_proof& result)
+  bool generate_zc_outs_range_proof(const crypto::hash& context_hash, const tx_generation_context& outs_gen_context, transaction& tx)
   {
     size_t outs_count = outs_gen_context.amounts.size();
-    // TODO @#@# reconsider this check CHECK_AND_ASSERT_MES(gen_context.check_sizes(outs_count), false, "");
-    //CHECK_AND_ASSERT_MES(outs_count == vouts.size(), false, "");
+    // TODO refactor to simplify
+    size_t confidential_outs_count = 0;
+    for(size_t j = 0; j < tx.vout.size(); ++j)
+    {
+      const auto& out_v = tx.vout[j];
+      VARIANT_SWITCH_BEGIN(out_v)
+        VARIANT_CASE_CONST(tx_out_zarcanum, out_zc)
+          ++confidential_outs_count;
+    //  VARIANT_CASE_CONST(tx_out_confidential_gateway, out_cgw)
+    //    ++confidential_outs_count;
+        VARIANT_CASE_OTHER()
+          // nothing
+      VARIANT_SWITCH_END()
+    }
+    CHECK_AND_ASSERT_EQ(outs_count, confidential_outs_count);
+
+    if (confidential_outs_count == 0)
+      return true;
+
+    zc_outs_range_proof range_proof{};
 
     // prepare data for aggregation proof
     std::vector<crypto::point_t> amount_commitments_for_rp_aggregation; // E' = amount * U + y' * G
@@ -503,17 +528,19 @@ namespace currency
     bool r = crypto::generate_vector_UG_aggregation_proof(context_hash, outs_gen_context.amounts, outs_gen_context.amount_blinding_masks, y_primes,
       outs_gen_context.amount_commitments,
       amount_commitments_for_rp_aggregation,
-      outs_gen_context.blinded_asset_ids, result.aggregation_proof, &err);
+      outs_gen_context.blinded_asset_ids, range_proof.aggregation_proof, &err);
     CHECK_AND_ASSERT_MES(r, false, "generate_vector_UG_aggregation_proof failed with error " << (int)err);
 
     // aggregated range proof
-    std::vector<const crypto::public_key*> commitments_1div8(result.aggregation_proof.amount_commitments_for_rp_aggregation.size());
-    for(size_t i = 0, sz = result.aggregation_proof.amount_commitments_for_rp_aggregation.size(); i < sz; ++i)
-      commitments_1div8[i] = &result.aggregation_proof.amount_commitments_for_rp_aggregation[i];
+    std::vector<const crypto::public_key*> commitments_1div8(range_proof.aggregation_proof.amount_commitments_for_rp_aggregation.size());
+    for(size_t i = 0, sz = range_proof.aggregation_proof.amount_commitments_for_rp_aggregation.size(); i < sz; ++i)
+      commitments_1div8[i] = &range_proof.aggregation_proof.amount_commitments_for_rp_aggregation[i];
 
     err = 0;
-    r = crypto::bpp_gen<crypto::bpp_crypto_trait_ZC_out>(outs_gen_context.amounts, y_primes, commitments_1div8, result.bpp, &err);
+    r = crypto::bpp_gen<crypto::bpp_crypto_trait_ZC_out>(outs_gen_context.amounts, y_primes, commitments_1div8, range_proof.bpp, &err);
     CHECK_AND_ASSERT_MES(r, false, "bpp_gen failed with error " << (int)err);
+
+    tx.proofs.push_back(std::move(range_proof));
 
     return true;
   }
@@ -521,7 +548,7 @@ namespace currency
   bool verify_multiple_zc_outs_range_proofs(const std::vector<zc_outs_range_proofs_with_commitments>& range_proofs)
   {
     if (range_proofs.empty())
-      return true;
+      return true; // RPs vs confidential outs count correspondence is checked in collect_rangeproofs_data_from_tx
 
     std::vector<crypto::bpp_sig_commit_ref_t> sigs;
     sigs.reserve(range_proofs.size());
@@ -777,16 +804,12 @@ namespace currency
       crypto::hash tx_id = get_transaction_hash(tx);
 
       // asset surjection proof
-      currency::zc_asset_surjection_proof asp{};
-      bool r = generate_asset_surjection_proof(tx, tx_id, true, tx_gen_context, asp);
+      bool r = generate_asset_surjection_proof(tx_id, true, tx_gen_context, tx);
       CHECK_AND_ASSERT_MES(r, false, "generete_asset_surjection_proof failed");
-      tx.proofs.emplace_back(std::move(asp));
 
       // range proofs
-      currency::zc_outs_range_proof range_proofs{};
-      r = generate_zc_outs_range_proof(tx_id, tx_gen_context, tx.vout, range_proofs);
+      r = generate_zc_outs_range_proof(tx_id, tx_gen_context, tx);
       CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
-      tx.proofs.emplace_back(std::move(range_proofs));
 
       // balance proof
       r = generate_tx_balance_proof(tx_id, tx_gen_context, block_reward, tx);
@@ -3138,16 +3161,12 @@ namespace currency
       (append_mode || (flags & TX_FLAG_SIGNATURE_MODE_SEPARATE) == 0))
     {
       // asset surjection proof
-      currency::zc_asset_surjection_proof asp{};
-      bool r = generate_asset_surjection_proof(tx, tx_prefix_hash, has_non_zc_inputs, gen_context, asp);
+      bool r = generate_asset_surjection_proof(tx_prefix_hash, has_non_zc_inputs, gen_context, tx);
       CHECK_AND_ASSERT_MES(r, false, "generete_asset_surjection_proof failed");
-      tx.proofs.emplace_back(std::move(asp));
 
       // range proofs
-      currency::zc_outs_range_proof range_proofs{};
-      r = generate_zc_outs_range_proof(tx_prefix_hash, gen_context, tx.vout, range_proofs);
+      r = generate_zc_outs_range_proof(tx_prefix_hash, gen_context, tx);
       CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
-      tx.proofs.emplace_back(std::move(range_proofs));
 
       // balance proof
       r = generate_tx_balance_proof(tx_prefix_hash, gen_context, 0, tx);
@@ -3412,7 +3431,19 @@ namespace currency
         in.type() == typeid(txin_zc_input) ||
         in.type() == typeid(txin_gateway), 
         false, "wrong input type: " << in.type().name() << ", in transaction " << get_transaction_hash(tx));
+
+      if (tx.hardfork_id > ZANO_HARDFORK_04_ZARCANUM && (in.type() == typeid(txin_to_key) || in.type() == typeid(txin_zc_input)) )
+      {
+        const std::vector<txout_ref_v>& key_offsets = in.type() == typeid(txin_to_key) ? boost::get<txin_to_key>(in).key_offsets : boost::get<txin_zc_input>(in).key_offsets;
+
+        for (const auto& in : key_offsets)
+        {
+          CHECK_AND_ASSERT_MES(in.type() != typeid(ref_by_id), false, "wrong key offset type: " << in.type().name() << ", in transaction " << get_transaction_hash(tx));
+        }
+      }
     }
+
+
     return true;
   }
   //------------------------------------------------------------------

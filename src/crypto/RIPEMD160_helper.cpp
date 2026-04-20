@@ -32,7 +32,7 @@ namespace crypto {
         X[i] = BYTES_TO_DWORD(message);
         message += 4;
       }
-      compress(MDbuf, X);
+      MDcompress(MDbuf, X);
     }/* length mod 64 bytes left */
 
     /* finish: */

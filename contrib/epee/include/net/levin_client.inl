@@ -100,6 +100,12 @@ namespace epee
         return -1;
       }
 
+      if (head.m_cb > LEVIN_DEFAULT_MAX_PACKET_SIZE)
+      {
+        LOG_PRINT_L0("Max packet size exceeded m_cb = " << head.m_cb << ", limit = " << LEVIN_DEFAULT_MAX_PACKET_SIZE);
+        return -1;
+      }
+
       if (!m_transport.recv_n(buff_out, head.m_cb))
         return -1;
 
@@ -161,6 +167,11 @@ namespace epee
         {
           LOG_PRINT_L0("Signature missmatch in response");
           return LEVIN_ERROR_SIGNATURE_MISMATCH;
+        }
+        if (head.m_cb > LEVIN_DEFAULT_MAX_PACKET_SIZE)
+        {
+          LOG_PRINT_L0("Max packet size exceeded m_cb = " << head.m_cb << ", limit = " << LEVIN_DEFAULT_MAX_PACKET_SIZE);
+          return LEVIN_ERROR_PROTOCOL_INCONSISTENT;
         }
         if (!this->m_transport.recv_n(buff_out, head.m_cb))
           return LEVIN_ERROR_NET_ERROR;

@@ -290,6 +290,13 @@ namespace currency
       return 1;
     }
 
+    if (b.tx_hashes.size() > TX_HASHES_IN_BLOCK_MAX_COUNT)
+    {
+      LOG_PRINT_RED("Block has many tx_hashes (" << b.tx_hashes.size() << "), dropping connection", LOG_LEVEL_0);
+      m_p2p->drop_connection(context);
+      return 1;
+    }
+
     crypto::hash block_id = get_block_hash(b);
     LOG_PRINT_GREEN("[HANDLE]NOTIFY_NEW_BLOCK " << block_id << " HEIGHT " << get_block_height(b), LOG_LEVEL_2);
 
@@ -728,6 +735,13 @@ namespace currency
     //do not process requests if it comes from node wich is debugged
     if (m_debug_ip_address != 0 && context.m_remote_ip == m_debug_ip_address)
       return 1;
+
+    if (arg.block_ids.size() > CURRENCY_NOTIFY_REQUEST_CHAIN_MAX_BLOCKS_COUNT)
+    {
+      m_p2p->drop_connection(context);
+      m_p2p->add_ip_fail(context.m_remote_ip);
+      return 1;
+    }
 
     LOG_PRINT_L2("[HANDLE]NOTIFY_REQUEST_CHAIN: block_ids.size()=" << arg.block_ids.size());
     LOG_PRINT_L3("[HANDLE]NOTIFY_REQUEST_CHAIN: " << print_kv_structure(arg));

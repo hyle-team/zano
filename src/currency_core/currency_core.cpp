@@ -99,6 +99,11 @@ namespace currency
     return get_tx_version(m_blockchain_storage.get_current_blockchain_size(), m_blockchain_storage.get_core_runtime_config().hard_forks);
   }
   //-----------------------------------------------------------------------------------------------
+  size_t core::get_current_hardfork_id() const
+  {
+    return m_blockchain_storage.get_current_hardfork_id();
+  }
+  //-----------------------------------------------------------------------------------------------
   uint64_t core::get_top_block_height() const
   {
     return m_blockchain_storage.get_top_block_height();

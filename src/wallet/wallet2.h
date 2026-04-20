@@ -301,7 +301,7 @@ namespace tools
         return result;
       }
 
-      DEFINE_SERIALIZATION_VERSION(1)
+      DEFINE_SERIALIZATION_VERSION(2)
       BEGIN_SERIALIZE_OBJECT()
         VERSION_ENTRY(version)
         FIELD(iv)
@@ -742,6 +742,8 @@ namespace tools
     void set_disable_tor_relay(bool disable);
     uint64_t get_default_fee() {return TX_DEFAULT_FEE;}
     uint64_t get_current_minimum_network_fee() { return TX_DEFAULT_FEE; }
+    detail::split_strategy_id_t get_current_split_strategy();
+
     void export_transaction_history(std::ostream& ss, const std::string& format, bool include_pos_transactions = true);
 
     bool add_custom_asset_id(const crypto::public_key& asset_id, currency::asset_descriptor_base& asset_descriptor);
@@ -944,7 +946,6 @@ private:
     void push_alias_info_to_extra_according_to_hf_status(const currency::extra_alias_entry& ai, std::vector<currency::extra_v>& extra);
     void remove_transfer_from_amount_gindex_map(uint64_t tid);
     uint64_t get_alias_cost(const std::string& alias);
-    detail::split_strategy_id_t get_current_split_strategy();
     void append_heights_with_distribution(std::vector<uint64_t>& heights, size_t oversample, uint64_t max_height, decoy_selection_generator::dist_kind kind) const;
     void build_distribution_for_input(std::vector<uint64_t>& height_distrib, uint64_t own_height, decoy_selection_generator::dist_kind kind) const;
     void build_distribution_for_input(std::vector<uint64_t>& offsets, uint64_t own_index);

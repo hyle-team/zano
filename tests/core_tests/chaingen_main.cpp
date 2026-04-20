@@ -6,7 +6,6 @@
 
 #include "chaingen.h"
 #include "chaingen_tests_list.h"
-#include "common/command_line.h"
 #include "transaction_tests.h"
 #include "../../src/wallet/core_fast_rpc_proxy.h"
 #include "test_core_proxy.h"
@@ -14,25 +13,25 @@
 #include "random_helper.h"
 #include "core_state_helper.h"
 #include "common/db_backend_selector.h"
+#include "parallel/parallel_test_runner.h"
+#include "chaingen_args.h"
+#include <boost/property_tree/json_parser.hpp>
 #include "common/callstack_helper.h"
 
 #define TX_BLOBSIZE_CHECKER_LOG_FILENAME "get_object_blobsize(tx).log"
 
+using namespace chaingen_args;
+
 namespace po = boost::program_options;
+namespace pt = boost::property_tree;
 
 namespace
 {
-  const command_line::arg_descriptor<std::string> arg_test_data_path               ("test-data-path", "", "");
-  const command_line::arg_descriptor<bool>        arg_generate_test_data           ("generate-test-data", "");
-  const command_line::arg_descriptor<bool>        arg_play_test_data               ("play-test-data", "");
-  const command_line::arg_descriptor<bool>        arg_generate_and_play_test_data  ("generate-and-play-test-data", "");
-  const command_line::arg_descriptor<bool>        arg_test_transactions            ("test-transactions", "");
-  const command_line::arg_descriptor<std::string> arg_run_single_test              ("run-single-test", "<TEST_NAME[@HF]> TEST_NAME -- name of a single test to run, HF -- specific hardfork id to run the test for" );
-  const command_line::arg_descriptor<std::string> arg_run_multiple_tests           ("run-multiple-tests", "comma-separated list of tests to run, OR text file <@filename> containing list of tests");
-  const command_line::arg_descriptor<bool>        arg_enable_debug_asserts         ("enable-debug-asserts", "" );
-  const command_line::arg_descriptor<bool>        arg_stop_on_fail                 ("stop-on-fail", "");
-
   boost::program_options::variables_map g_vm;
+  std::unique_ptr<parallel_test_runner> g_runner;
+  std::vector<test_job> g_test_jobs;
+  coretests_shm::shared_state* g_shm_state = nullptr;
+  std::unique_ptr<boost::interprocess::mapped_region> g_shm_region;
 }
 
 #define GENERATE(filename, genclass) \
@@ -56,7 +55,6 @@ namespace
     std::cout << concolor::magenta << "Failed to pass test : " << #genclass << concolor::normal << std::endl; \
     return 1; \
   }
-
 
 std::vector<size_t> parse_hardfork_str_mask(std::string s /* intentionally passing by value */)
 {
@@ -387,72 +385,81 @@ bool gen_and_play_intermitted_by_blockchain_saveload(const char* const genclass_
   return r;
 }
 
-
 #define GENERATE_AND_PLAY(genclass)                                                                        \
-  if (is_test_eligible_to_run(#genclass))                                                                  \
-  {                                                                                                        \
-    TIME_MEASURE_START_MS(t);                                                                              \
-    ++tests_count;                                                                                         \
-    ++unique_tests_count;                                                                                  \
-    if (!generate_and_play<genclass>(#genclass))                                                           \
-    {                                                                                                      \
-      failed_tests.insert(#genclass);                                                                      \
-      LOCAL_ASSERT(false);                                                                                 \
-      if (stop_on_first_fail)                                                                              \
-        skip_all_till_the_end = true;                                                                      \
-    }                                                                                                      \
-    TIME_MEASURE_FINISH_MS(t);                                                                             \
-    tests_running_time.push_back(std::make_pair(#genclass, t));                                            \
-  }
+  do {                                                                                                     \
+    const std::string __test_name = #genclass;                                                             \
+    auto __is_test_eligible_to_run = is_test_eligible_to_run;                                              \
+    g_test_jobs.push_back(test_job{                                                                        \
+      __test_name,                                                                                         \
+      [&, __test_name, __is_test_eligible_to_run]() -> bool {                                              \
+        if (!__is_test_eligible_to_run(__test_name))                                                       \
+          return true;                                                                                     \
+        return run_one_test_job(                                                                           \
+          __test_name,                                                                                     \
+          [&]() -> bool { return generate_and_play<genclass>(__test_name.c_str()); },                      \
+          stop_on_first_fail,                                                                              \
+          skip_all_till_the_end,                                                                           \
+          tests_count,                                                                                     \
+          unique_tests_count,                                                                              \
+          failed_tests,                                                                                    \
+          tests_running_time);                                                                             \
+      }                                                                                                    \
+    });                                                                                                    \
+  } while (0)
 
 #define GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(genclass)                                     \
-  if (is_test_eligible_to_run(#genclass))                                                                  \
-  {                                                                                                        \
-    const char* testname = #genclass " (BC saveload)";                                                     \
-    TIME_MEASURE_START_MS(t);                                                                              \
-    ++tests_count;                                                                                         \
-    ++unique_tests_count;                                                                                  \
-    if (!gen_and_play_intermitted_by_blockchain_saveload<genclass>(testname))                              \
-    {                                                                                                      \
-      failed_tests.insert(testname);                                                                       \
-      LOCAL_ASSERT(false);                                                                                 \
-      if (stop_on_first_fail)                                                                              \
-        skip_all_till_the_end = true;                                                                      \
-    }                                                                                                      \
-    TIME_MEASURE_FINISH_MS(t);                                                                             \
-    tests_running_time.push_back(std::make_pair(testname, t));                                             \
-  }
+  do {                                                                                                     \
+    const std::string __test_name = std::string(#genclass) + " (BC saveload)";                             \
+    auto __is_test_eligible_to_run = is_test_eligible_to_run;                                              \
+    g_test_jobs.push_back(test_job{                                                                        \
+      __test_name,                                                                                         \
+      [&, __test_name, __is_test_eligible_to_run]() -> bool {                                              \
+        if (!__is_test_eligible_to_run(#genclass))                                                         \
+          return true;                                                                                     \
+        return run_one_test_job(                                                                           \
+          __test_name,                                                                                     \
+          [&]() -> bool { return gen_and_play_intermitted_by_blockchain_saveload<genclass>(__test_name.c_str()); }, \
+          stop_on_first_fail,                                                                              \
+          skip_all_till_the_end,                                                                           \
+          tests_count,                                                                                     \
+          unique_tests_count,                                                                              \
+          failed_tests,                                                                                    \
+          tests_running_time);                                                                             \
+      }                                                                                                    \
+    });                                                                                                    \
+  } while (0)
 
 #define GENERATE_AND_PLAY_HF(genclass, hardfork_str_mask)                                                  \
-  if (!skip_all_till_the_end)                                                                              \
-  {                                                                                                        \
-    std::vector<size_t> hardforks = parse_hardfork_str_mask(hardfork_str_mask);                            \
-    CHECK_AND_ASSERT_MES(!hardforks.empty(), false, "invalid hardforks mask: " << hardfork_str_mask);      \
-    for(size_t i = 0; i < hardforks.size() && !skip_all_till_the_end; ++i)                                 \
+  do {                                                                                                     \
+    const std::string __gen_name = #genclass;                                                              \
+    std::vector<size_t> __hardforks = parse_hardfork_str_mask(hardfork_str_mask);                          \
+    CHECK_AND_ASSERT_MES_CUSTOM(!__hardforks.empty(), /*fail_ret_val=*/,                                   \
+      /*custom_code=*/skip_all_till_the_end = true, "invalid hardforks mask: " << hardfork_str_mask << " for test " << __gen_name); \
+    auto __hf_filter = is_hf_test_eligible_to_run;                                                         \
+    for (size_t __i = 0; __i < __hardforks.size(); ++__i)                                                  \
     {                                                                                                      \
-      if (!is_hf_test_eligible_to_run(#genclass, hardforks[i]))                                            \
-        continue;                                                                                          \
-      std::string tns = std::string(#genclass) + " @ HF " + epee::string_tools::num_to_string_fast(hardforks[i]);  \
-      const char* testname = tns.c_str();                                                                  \
-      TIME_MEASURE_START_MS(t);                                                                            \
-      ++tests_count;                                                                                       \
-      if (!generate_and_play<genclass>(testname, hardforks[i]))                                            \
-      {                                                                                                    \
-        failed_tests.insert(testname);                                                                     \
-        LOCAL_ASSERT(false);                                                                               \
-        if (stop_on_first_fail)                                                                            \
-          skip_all_till_the_end = true;                                                                    \
-      }                                                                                                    \
-      TIME_MEASURE_FINISH_MS(t);                                                                           \
-      tests_running_time.push_back(std::make_pair(testname, t));                                           \
+      const size_t __hf_id = __hardforks[__i];                                                             \
+      const std::string __test_name = __gen_name + " @ HF " + epee::string_tools::num_to_string_fast(__hf_id);  \
+      g_test_jobs.push_back(test_job{                                                                      \
+        __test_name,                                                                                       \
+        [&, __test_name, __gen_name, __hf_id, __hf_filter]() -> bool {                                     \
+          if (!__hf_filter(__gen_name, __hf_id))                                                           \
+            return true;                                                                                   \
+          return run_one_test_job(                                                                         \
+            __test_name,                                                                                   \
+            [&]() -> bool { return generate_and_play<genclass>(__test_name.c_str(), __hf_id); },           \
+            stop_on_first_fail,                                                                            \
+            skip_all_till_the_end,                                                                         \
+            tests_count,                                                                                   \
+            unique_tests_count,                                                                            \
+            failed_tests,                                                                                  \
+            tests_running_time);                                                                           \
+        }                                                                                                  \
+      });                                                                                                  \
     }                                                                                                      \
-    ++unique_tests_count;                                                                                  \
-  }
-
-
+  } while (0)
 
 //#define GENERATE_AND_PLAY(genclass) GENERATE_AND_PLAY_INTERMITTED_BY_BLOCKCHAIN_SAVELOAD(genclass)
-
 
 #define CALL_TEST(test_name, function)                                                                     \
   {                                                                                                        \
@@ -730,25 +737,6 @@ inline bool replay_events_through_core(currency::core& cr, const std::vector<tes
   CATCH_ENTRY_L0("replay_events_through_core", false);
 }
 //--------------------------------------------------------------------------
-std::shared_ptr<boost::program_options::variables_map> prepare_variables_map()
-{
-  boost::program_options::options_description desc("Allowed options");
-  currency::core::init_options(desc);
-  command_line::add_arg(desc, command_line::arg_data_dir);
-  std::shared_ptr<boost::program_options::variables_map> vm(new boost::program_options::variables_map);
-  bool r = command_line::handle_error_helper(desc, [&]()
-  {
-    boost::program_options::store(boost::program_options::basic_parsed_options<char>(&desc), *vm.get());
-    boost::program_options::notify(*vm.get());
-    return true;
-  });
-
-  if (!r)
-    return nullptr;
-
-  return vm;
-}
-//--------------------------------------------------------------------------
 template<class t_test_class>
 inline bool do_replay_events(const std::vector<test_event_entry>& events, t_test_class& validator,
   size_t event_index_from = 0, size_t event_index_to = SIZE_MAX, bool deinit_core = true)
@@ -901,167 +889,97 @@ bool parse_cmd_specific_tests_to_run(std::unordered_multimap<std::string, size_t
   return true;
 }
 //--------------------------------------------------------------------------
-int main(int argc, char* argv[])
+static bool run_one_test_job(const std::string& test_name, const std::function<bool()>& fn, bool& stop_on_first_fail, bool& skip_all_till_the_end,
+  size_t& tests_count, size_t& unique_tests_count, std::set<std::string>& failed_tests, std::vector<std::pair<std::string, uint64_t>>& tests_running_time)
 {
-  TRY_ENTRY();
-  string_tools::set_module_name_and_folder(argv[0]);
-
-  //set up logging options
-  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
-  log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_4);
-  
-  log_space::log_singletone::add_logger(LOGGER_FILE, 
-    log_space::log_singletone::get_default_log_file().c_str(), 
-    log_space::log_singletone::get_default_log_folder().c_str());
-
-  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet", false);
-
-  tools::signal_handler::install_fatal([](int sig_number, void* address) {
-    LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
-    std::fflush(nullptr); // all open output streams are flushed
-  });
-
-  // setup custom callstack retrieving function
-  epee::misc_utils::get_callstack(tools::get_empty_callstack);
-
-  po::options_description desc_options("Allowed options");
-  command_line::add_arg(desc_options, command_line::arg_help);
-  command_line::add_arg(desc_options, command_line::arg_log_level);
-  command_line::add_arg(desc_options, arg_test_data_path);
-  command_line::add_arg(desc_options, arg_generate_test_data);
-  command_line::add_arg(desc_options, arg_play_test_data);
-  command_line::add_arg(desc_options, arg_generate_and_play_test_data);
-  command_line::add_arg(desc_options, arg_test_transactions);
-  command_line::add_arg(desc_options, arg_run_single_test);
-  command_line::add_arg(desc_options, arg_run_multiple_tests);
-  command_line::add_arg(desc_options, arg_enable_debug_asserts);
-  command_line::add_arg(desc_options, arg_stop_on_fail);
-  command_line::add_arg(desc_options, command_line::arg_data_dir, std::string("."));
-  command_line::add_arg(desc_options, command_line::arg_stop_after_height);
-  command_line::add_arg(desc_options, command_line::arg_disable_ntp);
-
-  currency::core::init_options(desc_options);
-  tools::db::db_backend_selector::init_options(desc_options);
-  bool stop_on_first_fail = false;
-  bool r = command_line::handle_error_helper(desc_options, [&]()
-  {
-    po::store(po::parse_command_line(argc, argv, desc_options), g_vm);
-    po::notify(g_vm);
+  if (skip_all_till_the_end)
     return true;
-  });
-  if (!r)
-    return 1;
 
-  if (command_line::get_arg(g_vm, command_line::arg_help))
+  TIME_MEASURE_START_MS(t);
+
+  ++tests_count;
+  ++unique_tests_count;
+
+  if (g_runner)
+    g_runner->log_test_taken_by_this_process(test_name);
+
+  bool ok = fn();
+  if (!ok)
   {
-    std::cout << desc_options << std::endl;
-    return 0;
+    failed_tests.insert(test_name);
+    LOCAL_ASSERT(false);
+
+    const int32_t wid = command_line::get_arg(g_vm, chaingen_args::arg_worker_id);
+    const uint32_t procs = command_line::get_arg(g_vm, chaingen_args::arg_processes);
+    if (procs > 1 && wid >= 0 && g_shm_state)
+      g_shm_state->record_fail(static_cast<uint32_t>(wid), test_name.c_str());
+
+    if (stop_on_first_fail)
+      skip_all_till_the_end = true;
   }
 
-  if (command_line::has_arg(g_vm, command_line::arg_log_level))
+  TIME_MEASURE_FINISH_MS(t);
+  tests_running_time.push_back(std::make_pair(test_name, t));
+
+  return ok;
+}
+
+static bool run_registered_tests(bool& stop_on_first_fail, bool& skip_all_till_the_end, size_t& tests_count, size_t& unique_tests_count, std::set<std::string>& failed_tests,
+  std::vector<std::pair<std::string, uint64_t>>& tests_running_time, const std::function<bool(const std::string&)>& /*is_test_eligible_to_run*/,const std::function<bool(const std::string&, size_t)>& /*is_hf_test_eligible_to_run*/)
+{
+  bool all_ok = true;
+
+  const int32_t worker_id = command_line::get_arg(g_vm, arg_worker_id);
+  const bool is_worker = (worker_id >= 0);
+
+  if (!is_worker)
   {
-    int new_log_level = command_line::get_arg(g_vm, command_line::arg_log_level);
-    if (new_log_level >= LOG_LEVEL_MIN && new_log_level <= LOG_LEVEL_MAX && log_space::get_set_log_detalisation_level(false) != new_log_level)
+    for (size_t i = 0; i < g_test_jobs.size() && !skip_all_till_the_end; ++i)
     {
-      log_space::get_set_log_detalisation_level(true, new_log_level);
-      LOG_PRINT_L0("LOG_LEVEL set to " << new_log_level);
+      const bool ok = g_test_jobs[i].run();
+      all_ok = all_ok && ok;
+    }
+    return all_ok;
+  }
+
+  if (!g_shm_state)
+    return all_ok;
+
+  while (!skip_all_till_the_end)
+  {
+    if (g_shm_state->stop_all.load(std::memory_order_acquire))
+      break;
+
+    uint32_t job_idx = 0;
+    if (!g_shm_state->try_take_next(job_idx))
+      break;
+
+    if (job_idx >= g_test_jobs.size())
+      continue;
+
+    const bool ok = g_test_jobs[job_idx].run();
+    if (ok)
+      continue;
+
+    all_ok = false;
+
+    if (stop_on_first_fail)
+    {
+      skip_all_till_the_end = true;
+      g_shm_state->stop_all.store(true, std::memory_order_release);
+      break;
     }
   }
 
-  if (command_line::has_arg(g_vm, arg_stop_on_fail))
-  {
-    stop_on_first_fail = command_line::get_arg(g_vm, arg_stop_on_fail);
-  }
-
-  
-  bool skip_all_till_the_end = false;
-  size_t tests_count = 0;
-  size_t unique_tests_count = 0;
-  size_t serious_failures_count = 0;
-  std::set<std::string> failed_tests;
-  std::string tests_folder = command_line::get_arg(g_vm, arg_test_data_path);
-  typedef std::vector<std::pair<std::string, uint64_t>> tests_running_time_t;
-  tests_running_time_t tests_running_time;
-  if (command_line::get_arg(g_vm, arg_generate_test_data))
-  {
-    GENERATE("chain001.dat", gen_simple_chain_001);
-  }
-  else if (command_line::get_arg(g_vm, arg_play_test_data))
-  {
-    PLAY("chain001.dat", gen_simple_chain_001);
-  }
-  else if (command_line::get_arg(g_vm, arg_test_transactions))
-  {
-    CALL_TEST("TRANSACTIONS TESTS", test_transactions);
-  }
-  else
-  {
-    epee::debug::get_set_enable_assert(true, command_line::get_arg(g_vm, arg_enable_debug_asserts)); // don't comment out this: many tests have normal-negative checks (i.e. tx with invalid amount shouldn't be created), so be ready for MANY assertion breaks
-
-    std::unordered_multimap<std::string, size_t> specific_tests_to_run; // test_name -> hf; if empty, all tests should be run
-    CHECK_AND_ASSERT_MES(parse_cmd_specific_tests_to_run(specific_tests_to_run), 1, "Error while parsing specific tests to run");
-
-    std::set<std::string> postponed_tests;
-
-    auto is_hf_test_eligible_to_run = [&](const std::string& genclass_str, size_t hardfork) -> bool {
-      if (skip_all_till_the_end)
-        return false;
-      if (specific_tests_to_run.empty())
-      {
-        if (postponed_tests.count(genclass_str) != 0)
-          return false;
-      }
-      else
-      {
-        auto it_pair = specific_tests_to_run.equal_range(genclass_str);
-        if (it_pair.first == it_pair.second)
-          return false;
-        bool match = false;
-        for(auto it = it_pair.first; it != it_pair.second; ++it)
-          if (it->second == SIZE_MAX || hardfork == SIZE_MAX || it->second == hardfork)
-            match = true;
-        if (!match)
-          return false;
-      }
-      LOG_PRINT_L0("good: " << genclass_str);
-      return true;
-    };
-
-    auto is_test_eligible_to_run = [&](const std::string& genclass_str) -> bool { return is_hf_test_eligible_to_run(genclass_str, SIZE_MAX); };
-
-    if (specific_tests_to_run.empty())
-    {
-      CALL_TEST("Random text test", get_random_text_test);
-      CALL_TEST("Random state manipulation test", random_state_manupulation_test);
-      CALL_TEST("Random evenness test", random_evenness_test);
-      CALL_TEST("TRANSACTIONS TESTS", test_transactions);
-      CALL_TEST("check_allowed_types_in_variant_container() test", check_allowed_types_in_variant_container_test);
-      CALL_TEST("check_u8_str_case_funcs", check_u8_str_case_funcs);
-      CALL_TEST("chec_u8_str_matching", chec_u8_str_matching);
-      CALL_TEST("test_parse_hardfork_str_mask", test_parse_hardfork_str_mask);
-    }
-
-    //CALL_TEST("check_hash_and_difficulty_monte_carlo_test", check_hash_and_difficulty_monte_carlo_test); // it's rather an experiment with unclean results than a solid test, for further research...
-
-    // Postponed tests - tests that may fail for the time being (believed that it's a serious issue and should be fixed later for some reason).
-    // In a perfect world this list is empty.
-#define MARK_TEST_AS_POSTPONED(genclass) postponed_tests.insert(#genclass)
-    MARK_TEST_AS_POSTPONED(gen_checkpoints_reorganize);
-    MARK_TEST_AS_POSTPONED(gen_alias_update_after_addr_changed);
-    MARK_TEST_AS_POSTPONED(gen_alias_blocking_reg_by_invalid_tx);
-    MARK_TEST_AS_POSTPONED(gen_alias_blocking_update_by_invalid_tx);
-    MARK_TEST_AS_POSTPONED(gen_wallet_fake_outputs_randomness);
-    MARK_TEST_AS_POSTPONED(gen_wallet_fake_outputs_not_enough);
-    MARK_TEST_AS_POSTPONED(gen_wallet_spending_coinstake_after_minting);
-    MARK_TEST_AS_POSTPONED(gen_wallet_fake_outs_while_having_too_little_own_outs);
-    MARK_TEST_AS_POSTPONED(gen_uint_overflow_1);
-
-    MARK_TEST_AS_POSTPONED(after_hard_fork_1_cumulative_difficulty); // reason: set_pos_to_low_timestamp is not supported anymore
-    MARK_TEST_AS_POSTPONED(before_hard_fork_1_cumulative_difficulty);
-    MARK_TEST_AS_POSTPONED(inthe_middle_hard_fork_1_cumulative_difficulty);
-
-#undef MARK_TEST_AS_POSTPONED
-
+  return all_ok;
+}
+//--------------------------------------------------------------------------
+// parameters are used inside macros
+static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the_end, size_t& tests_count, size_t& unique_tests_count,
+  std::set<std::string>& failed_tests, std::vector<std::pair<std::string, uint64_t>>& tests_running_time,
+  std::function<bool(const std::string&)> is_test_eligible_to_run, std::function<bool(const std::string&, size_t)> is_hf_test_eligible_to_run)
+{
+  g_test_jobs.clear();
 
     // TODO // GENERATE_AND_PLAY(wallet_spend_form_auditable_and_track);
     GENERATE_AND_PLAY(gen_block_big_major_version);
@@ -1165,6 +1083,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_tx_from_tx_pool);
     GENERATE_AND_PLAY_HF(gen_wallet_save_load_and_balance, "*");
     GENERATE_AND_PLAY_HF(gen_wallet_mine_pos_block, "3-*");
+    //GENERATE_AND_PLAY_HF(gbt_pool_invalid_txs_asset_overemit, "4-*");
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_outdated_tx);
     GENERATE_AND_PLAY(gen_wallet_unlock_by_block_and_by_time);
     GENERATE_AND_PLAY(gen_wallet_payment_id);
@@ -1210,6 +1129,8 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_service_entries, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_reorg_spend, "6-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_gateway_reorg_receive, "6-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_gateway_owner_change_altchain, "6-*");
+    GENERATE_AND_PLAY_HF(wallet_rpc_and_tx_unlock_time, "5-*");
 
     // GENERATE_AND_PLAY(emission_test); // simulate 1 year of blockchain, too long run (1 y ~= 1 hr), by demand only
     // LOG_ERROR2("print_reward_change_first_blocks.log", currency::print_reward_change_first_blocks(525601).str()); // outputs first 1 year of blocks' rewards (simplier)
@@ -1243,7 +1164,7 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(alt_blocks_validation_and_same_new_amount_in_two_txs, "3-*");
     GENERATE_AND_PLAY_HF(alt_blocks_with_the_same_txs, "3-*");
     GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_mixin, "3-*");
-    GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_ref_id, "3-*");
+    GENERATE_AND_PLAY_HF(chain_switching_when_out_spent_in_alt_chain_ref_id, "3-4");
     GENERATE_AND_PLAY_HF(alt_chain_and_block_tx_fee_median, "3-*");
 
     // miscellaneous tests
@@ -1395,6 +1316,12 @@ int main(int argc, char* argv[])
     GENERATE_AND_PLAY_HF(hard_fork_6_and_alt_chain, "6-*");
     GENERATE_AND_PLAY_HF(hard_fork_6_and_self_directed_tx_with_payment_id, "6-*");
 
+    // GW address alt-chain tests
+    GENERATE_AND_PLAY(gw_addr_altchain_spend_in_both_chains);
+    GENERATE_AND_PLAY(gw_addr_altchain_created_in_fork);
+    GENERATE_AND_PLAY(gw_addr_altchain_no_cross_chain_usage);
+    GENERATE_AND_PLAY(gw_addr_altchain_owner_change);
+
     GENERATE_AND_PLAY_HF(isolate_auditable_and_proof, "2-*");
     
     GENERATE_AND_PLAY(zarcanum_basic_test);
@@ -1430,6 +1357,237 @@ int main(int argc, char* argv[])
 
     // GENERATE_AND_PLAY(gen_block_reward);
     // END OF TESTS  */
+}
+
+void fill_postponed_tests_set(std::set<std::string>& postponed_tests)
+{
+  postponed_tests.clear();
+
+#define MARK_TEST_AS_POSTPONED(genclass) postponed_tests.insert(#genclass)
+  MARK_TEST_AS_POSTPONED(gen_checkpoints_reorganize);
+  MARK_TEST_AS_POSTPONED(gen_alias_update_after_addr_changed);
+  MARK_TEST_AS_POSTPONED(gen_alias_blocking_reg_by_invalid_tx);
+  MARK_TEST_AS_POSTPONED(gen_alias_blocking_update_by_invalid_tx);
+  MARK_TEST_AS_POSTPONED(gen_wallet_fake_outputs_randomness);
+  MARK_TEST_AS_POSTPONED(gen_wallet_fake_outputs_not_enough);
+  MARK_TEST_AS_POSTPONED(gen_wallet_spending_coinstake_after_minting);
+  MARK_TEST_AS_POSTPONED(gen_wallet_fake_outs_while_having_too_little_own_outs);
+  MARK_TEST_AS_POSTPONED(gen_uint_overflow_1);
+
+  MARK_TEST_AS_POSTPONED(after_hard_fork_1_cumulative_difficulty);
+  MARK_TEST_AS_POSTPONED(before_hard_fork_1_cumulative_difficulty);
+  MARK_TEST_AS_POSTPONED(inthe_middle_hard_fork_1_cumulative_difficulty);
+#undef MARK_TEST_AS_POSTPONED
+}
+//--------------------------------------------------------------------------
+static void init_shared_fail_report_if_needed()
+{
+  const std::string shm_name = command_line::get_arg(g_vm, chaingen_args::arg_shm_name);
+  if (shm_name.empty())
+    return;
+
+  namespace bip = boost::interprocess;
+  try
+  {
+    bip::shared_memory_object shm(bip::open_only, shm_name.c_str(), bip::read_write);
+    g_shm_region.reset(new bip::mapped_region(shm, bip::read_write));
+    g_shm_state = static_cast<coretests_shm::shared_state*>(g_shm_region->get_address());
+  }
+  catch (...)
+  {
+    g_shm_state = nullptr;
+    g_shm_region.reset();
+  }
+}
+//--------------------------------------------------------------------------
+int main(int argc, char* argv[])
+{
+  TRY_ENTRY();
+  string_tools::set_module_name_and_folder(argv[0]);
+
+  //set up logging options
+  log_space::get_set_log_detalisation_level(true, LOG_LEVEL_2);
+  log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL, LOG_LEVEL_4);
+  
+  log_space::log_singletone::add_logger(LOGGER_FILE, 
+    log_space::log_singletone::get_default_log_file().c_str(), 
+    log_space::log_singletone::get_default_log_folder().c_str());
+
+  log_space::log_singletone::enable_channels("core,currency_protocol,tx_pool,p2p,wallet", false);
+
+  tools::signal_handler::install_fatal([](int sig_number, void* address) {
+    LOG_ERROR("\n\nFATAL ERROR\nsig: " << sig_number << ", address: " << address);
+    std::fflush(nullptr); // all open output streams are flushed
+  });
+
+  // setup custom callstack retrieving function
+  epee::misc_utils::get_callstack(tools::get_empty_callstack);
+
+  po::options_description desc_options("Allowed options");
+  command_line::add_arg(desc_options, command_line::arg_help);
+  command_line::add_arg(desc_options, command_line::arg_log_level);
+  command_line::add_arg(desc_options, arg_test_data_path);
+  command_line::add_arg(desc_options, arg_generate_test_data);
+  command_line::add_arg(desc_options, arg_play_test_data);
+  command_line::add_arg(desc_options, arg_generate_and_play_test_data);
+  command_line::add_arg(desc_options, arg_test_transactions);
+  command_line::add_arg(desc_options, arg_run_single_test);
+  command_line::add_arg(desc_options, arg_run_multiple_tests);
+  command_line::add_arg(desc_options, arg_enable_debug_asserts);
+  command_line::add_arg(desc_options, arg_stop_on_fail);
+  command_line::add_arg(desc_options, command_line::arg_data_dir, std::string("."));
+  command_line::add_arg(desc_options, command_line::arg_stop_after_height);
+  command_line::add_arg(desc_options, command_line::arg_disable_ntp);
+  command_line::add_arg(desc_options, arg_processes);
+  command_line::add_arg(desc_options, arg_worker_id);
+  command_line::add_arg(desc_options, arg_run_root);
+  command_line::add_arg(desc_options, arg_shm_name);
+
+  currency::core::init_options(desc_options);
+  tools::db::db_backend_selector::init_options(desc_options);
+  bool stop_on_first_fail = false;
+  bool r = command_line::handle_error_helper(desc_options, [&]()
+  {
+    po::store(po::parse_command_line(argc, argv, desc_options), g_vm);
+    po::notify(g_vm);
+    return true;
+  });
+  if (!r)
+    return 1;
+
+  if (command_line::get_arg(g_vm, command_line::arg_help))
+  {
+    std::cout << desc_options << std::endl;
+    return 0;
+  }
+
+  if (command_line::has_arg(g_vm, command_line::arg_log_level))
+  {
+    int new_log_level = command_line::get_arg(g_vm, command_line::arg_log_level);
+    if (new_log_level >= LOG_LEVEL_MIN && new_log_level <= LOG_LEVEL_MAX && log_space::get_set_log_detalisation_level(false) != new_log_level)
+    {
+      log_space::get_set_log_detalisation_level(true, new_log_level);
+      LOG_PRINT_L0("LOG_LEVEL set to " << new_log_level);
+    }
+  }
+
+  if (command_line::has_arg(g_vm, arg_stop_on_fail))
+  {
+    stop_on_first_fail = command_line::get_arg(g_vm, arg_stop_on_fail);
+  }
+
+  const int32_t worker_id = command_line::get_arg(g_vm, arg_worker_id);
+  const bool is_worker = (worker_id >= 0);
+
+  const uint32_t processes = command_line::get_arg(g_vm, arg_processes);
+  const bool multiprocess_enabled =
+    is_worker || (command_line::has_arg(g_vm, arg_processes) && processes > 1);
+
+  if (multiprocess_enabled)
+    g_runner = std::make_unique<parallel_test_runner>(g_vm);
+  else
+    g_runner.reset();
+
+  if (is_worker && multiprocess_enabled)
+    init_shared_fail_report_if_needed();
+
+  bool skip_all_till_the_end = false;
+  size_t tests_count = 0;
+  size_t unique_tests_count = 0;
+  size_t serious_failures_count = 0;
+  std::set<std::string> failed_tests;
+
+  typedef std::vector<std::pair<std::string, uint64_t>> tests_running_time_t;
+  tests_running_time_t tests_running_time;
+  if (command_line::get_arg(g_vm, arg_generate_test_data))
+  {
+    GENERATE("chain001.dat", gen_simple_chain_001);
+  }
+  else if (command_line::get_arg(g_vm, arg_play_test_data))
+  {
+    PLAY("chain001.dat", gen_simple_chain_001);
+  }
+  else if (command_line::get_arg(g_vm, arg_test_transactions))
+  {
+    CALL_TEST("TRANSACTIONS TESTS", test_transactions);
+  }
+  else
+  {
+    epee::debug::get_set_enable_assert(true, command_line::get_arg(g_vm, arg_enable_debug_asserts)); // don't comment out this: many tests have normal-negative checks (i.e. tx with invalid amount shouldn't be created), so be ready for MANY assertion breaks
+
+    std::unordered_multimap<std::string, size_t> specific_tests_to_run; // test_name -> hf; if empty, all tests should be run
+    CHECK_AND_ASSERT_MES(parse_cmd_specific_tests_to_run(specific_tests_to_run), 1, "Error while parsing specific tests to run");
+
+    std::set<std::string> postponed_tests;
+
+    auto is_hf_test_eligible_to_run = [&](const std::string& genclass_str, size_t hardfork) -> bool {
+      if (skip_all_till_the_end)
+        return false;
+      if (specific_tests_to_run.empty())
+      {
+        if (postponed_tests.count(genclass_str) != 0)
+          return false;
+      }
+      else
+      {
+        auto it_pair = specific_tests_to_run.equal_range(genclass_str);
+        if (it_pair.first == it_pair.second)
+          return false;
+        bool match = false;
+        for(auto it = it_pair.first; it != it_pair.second; ++it)
+          if (it->second == SIZE_MAX || hardfork == SIZE_MAX || it->second == hardfork)
+            match = true;
+        if (!match)
+          return false;
+      }
+      LOG_PRINT_L0("good: " << genclass_str);
+      return true;
+    };
+
+    auto is_test_eligible_to_run = [&](const std::string& genclass_str) -> bool { return is_hf_test_eligible_to_run(genclass_str, SIZE_MAX); };
+
+    if (specific_tests_to_run.empty())
+    {
+      CALL_TEST("Random text test", get_random_text_test);
+      CALL_TEST("Random state manipulation test", random_state_manupulation_test);
+      CALL_TEST("Random evenness test", random_evenness_test);
+      CALL_TEST("TRANSACTIONS TESTS", test_transactions);
+      CALL_TEST("check_allowed_types_in_variant_container() test", check_allowed_types_in_variant_container_test);
+      CALL_TEST("check_u8_str_case_funcs", check_u8_str_case_funcs);
+      CALL_TEST("chec_u8_str_matching", chec_u8_str_matching);
+      CALL_TEST("test_parse_hardfork_str_mask", test_parse_hardfork_str_mask);
+    }
+
+    // Postponed tests list.
+    fill_postponed_tests_set(postponed_tests);
+
+    register_all_tests(
+      stop_on_first_fail,
+      skip_all_till_the_end,
+      tests_count,
+      unique_tests_count,
+      failed_tests,
+      tests_running_time,
+      is_test_eligible_to_run,
+      is_hf_test_eligible_to_run);
+
+    if (multiprocess_enabled)
+    {
+      const int parent_rc = g_runner->run_parent_if_needed(argc, argv, g_test_jobs);
+      if (parent_rc != parallel_test_runner::k_not_parent)
+        return parent_rc;
+    }
+
+    // run
+    run_registered_tests(
+      stop_on_first_fail,
+      skip_all_till_the_end,
+      tests_count,
+      unique_tests_count,
+      failed_tests,
+      tests_running_time,
+      is_test_eligible_to_run,
+      is_hf_test_eligible_to_run);
 
     size_t failed_postponed_tests_count = 0;
     uint64_t total_time = 0;
@@ -1438,48 +1596,83 @@ int main(int argc, char* argv[])
       uint64_t max_time = std::max_element(tests_running_time.begin(), tests_running_time.end(), [](tests_running_time_t::value_type& lhs, tests_running_time_t::value_type& rhs)->bool { return lhs.second < rhs.second; })->second;
       uint64_t max_test_name_len = std::max_element(tests_running_time.begin(), tests_running_time.end(), [](tests_running_time_t::value_type& lhs, tests_running_time_t::value_type& rhs)->bool { return lhs.first.size() < rhs.first.size(); })->first.size();
       size_t bar_width = 70;
-      for (auto i : tests_running_time)
+
+      if (!is_worker)
       {
-        bool failed = failed_tests.count(i.first) != 0;
-        bool postponed = postponed_tests.count(i.first) != 0;
-        if (failed && postponed)
-          ++failed_postponed_tests_count;
-        std::string bar(bar_width * i.second / max_time, '#');
-        std::cout << (failed ? (postponed ? concolor::yellow : concolor::magenta) : concolor::green) << std::left << std::setw(max_test_name_len + 1) << i.first << "\t" << std::setw(10) << i.second << " ms \t" << bar << std::endl;
-        total_time += i.second;
+        for (auto& i : tests_running_time)
+        {
+          bool failed = failed_tests.count(i.first) != 0;
+          bool postponed = postponed_tests.count(i.first) != 0;
+          if (failed && postponed)
+            ++failed_postponed_tests_count;
+          std::string bar(bar_width * i.second / max_time, '#');
+          std::cout << (failed ? (postponed ? concolor::yellow : concolor::magenta) : concolor::green) << std::left << std::setw(max_test_name_len + 1) << i.first << "\t" << std::setw(10) << i.second << " ms \t" << bar << std::endl;
+          total_time += i.second;
+        }
+      }
+      else
+      {
+        for (const auto& i : tests_running_time)
+          total_time += i.second;
+
+        for (const auto& name : failed_tests)
+          if (postponed_tests.count(name) != 0)
+            ++failed_postponed_tests_count;
       }
     }
 
-    if (skip_all_till_the_end)
+    if (skip_all_till_the_end && !is_worker)
       std::cout << ENDL << concolor::yellow << "(execution interrupted at the first failure; not all tests were run)" << ENDL; 
 
     serious_failures_count = failed_tests.size() - failed_postponed_tests_count;
 
-    if (!postponed_tests.empty())
+    if (is_worker)
     {
-      std::cout << concolor::yellow << std::endl << postponed_tests.size() << " POSTPONED TESTS:" << std::endl;
-      for(auto& el : postponed_tests)
-        std::cout << "  " << el << std::endl;
+      parallel_test_runner::worker_report rep;
+      rep.worker_id = static_cast<uint32_t>(worker_id);
+      rep.processes = command_line::get_arg(g_vm, chaingen_args::arg_processes);
+      rep.tests_count = tests_count;
+      rep.unique_tests_count = unique_tests_count;
+      rep.total_time_ms = total_time;
+      rep.tests_running_time = tests_running_time;
+      rep.failed_tests = failed_tests;
+      rep.skip_all_till_the_end = skip_all_till_the_end;
+      rep.exit_code = (serious_failures_count == 0 ? 0 : 1);
+
+      if (g_runner)
+        (void)g_runner->write_worker_report(rep);
     }
-    
-    std::cout << (serious_failures_count == 0 ? concolor::green : concolor::magenta);
-    std::cout << "\nREPORT:\n";
-    std::cout << "  Unique tests run: " << unique_tests_count << std::endl;
-    std::cout << "  Total tests run:  " << tests_count << std::endl;
-    
-    std::cout << "  Failures:         " << serious_failures_count << " (postponed failures: " << failed_postponed_tests_count << ")" << std::endl;
-    std::cout << "  Postponed:        " << postponed_tests.size() << std::endl;
-    std::cout << "  Total time:       " << total_time / 1000 << " s. (" << (tests_count > 0 ? total_time / tests_count : 0) << " ms per test in average)" << std::endl;
-    if (!failed_tests.empty())
+
+    if (!is_worker)
     {
-      std::cout << "FAILED/POSTPONED TESTS:\n";
-      for (auto test_name : failed_tests)
+      if (!postponed_tests.empty())
       {
-        bool postponed = postponed_tests.count(test_name);
-        std::cout << "  " << (postponed ? "POSTPONED: " : "FAILED:    ") << test_name << '\n';
+        std::cout << concolor::yellow << std::endl << postponed_tests.size() << " POSTPONED TESTS:" << std::endl;
+        for (const auto& el : postponed_tests)
+          std::cout << "  " << el << std::endl;
       }
+
+      std::cout << (serious_failures_count == 0 ? concolor::green : concolor::magenta);
+      std::cout << "\nREPORT:\n";
+      std::cout << "  Unique tests run: " << unique_tests_count << std::endl;
+      std::cout << "  Total tests run:  " << tests_count << std::endl;
+
+      std::cout << "  Failures:         " << serious_failures_count << " (postponed failures: " << failed_postponed_tests_count << ")" << std::endl;
+      std::cout << "  Postponed:        " << postponed_tests.size() << std::endl;
+      std::cout << "  Total time:       " << total_time / 1000 << " s. (" << (tests_count > 0 ? total_time / tests_count : 0) << " ms per test in average)" << std::endl;
+
+      if (!failed_tests.empty())
+      {
+        std::cout << "FAILED/POSTPONED TESTS:\n";
+        for (auto& test_name : failed_tests)
+        {
+          bool postponed = postponed_tests.count(test_name) != 0;
+          std::cout << "  " << (postponed ? "POSTPONED: " : "FAILED:    ") << test_name << '\n';
+        }
+      }
+
+      std::cout << concolor::normal << std::endl;
     }
-    std::cout << concolor::normal << std::endl;
   }
 
   /*{

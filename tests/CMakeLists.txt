@@ -28,6 +28,8 @@ add_executable(net_load_tests_srv net_load_tests/srv.cpp)
 
 add_dependencies(coretests version)
 
+target_include_directories(coretests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/core_tests)
+
 target_link_libraries(coretests rpc wallet currency_core common crypto zlibstatic ethash ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
 target_link_libraries(functional_tests rpc wallet currency_core crypto common zlibstatic ethash libminiupnpc-static ${CMAKE_THREAD_LIBS_INIT} ${Boost_LIBRARIES} OpenSSL::SSL OpenSSL::Crypto)
 target_link_libraries(hash-tests crypto ethash)

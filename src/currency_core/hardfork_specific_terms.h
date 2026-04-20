@@ -182,7 +182,7 @@ namespace currency
   } // namespace hardfork_specific_terms
 
 
-  inline bool validate_tx_for_hardfork_specific_terms_types_new(const transaction& tx, const crypto::hash& tx_id, size_t current_hard_fork_id)
+  inline bool validate_tx_for_hardfork_specific_terms_types_HF6(const transaction& tx, const crypto::hash& tx_id, size_t current_hard_fork_id)
   {
 
     // go over every container in tx and check if its type is allowed at current hardfork version

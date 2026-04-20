@@ -41,6 +41,7 @@
 #include "hard_fork_4.h"
 #include "hard_fork_5.h"
 #include "hard_fork_6.h"
+#include "gw_address_altchain_test.h"
 #include "isolate_auditable_and_proof.h"
 #include "zarcanum_test.h"
 #include "multiassets_test.h"
@@ -48,3 +49,4 @@
 #include "attachment_isolation_encryption_test.h"
 #include "pos_fuse_test.h"
 #include "daemon_rpc.h"
+#include "gbt_pool_invalid_txs.h"

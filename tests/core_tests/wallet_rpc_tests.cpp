@@ -584,6 +584,15 @@ bool wallet_rpc_exchange_suite::c1(currency::core& c, size_t ev_index, const std
   std::string carol_tx3 = transfer_(carol_wlt, get_integr_addr(custody_wlt_rpc, carol_payment_id_hex_str), TRANSFER_AMOUNT);
   r = mine_next_pow_blocks_in_playtime(miner_wlt->get_account().get_public_address(), c, 1);
 
+  LOG_PRINT_GREEN_L0("");
+  LOG_PRINT_GREEN_L0("alice_tx1: " << alice_tx1);
+  LOG_PRINT_GREEN_L0("bob_tx1: "   << bob_tx1);
+  LOG_PRINT_GREEN_L0("bob_tx2: "   << bob_tx2);
+  LOG_PRINT_GREEN_L0("carol_tx1: " << carol_tx1);
+  LOG_PRINT_GREEN_L0("carol_tx2: " << carol_tx2);
+  LOG_PRINT_GREEN_L0("carol_tx3: " << carol_tx3);
+  LOG_PRINT_GREEN_L0("");
+
   CHECK_AND_ASSERT_MES(alice_tx1.size()
     && bob_tx1.size()
     && bob_tx2.size()
@@ -3107,5 +3116,406 @@ bool wallet_rpc_gateway_reorg_receive::c1(currency::core& c, size_t ev_index, co
   // after reorg funding tx is undone gateway balance must return to zero
   CHECK_AND_ASSERT_MES(check_gw_native_balance(0), false, "post-reorg balance must be 0");
   LOG_PRINT_GREEN_L0("wallet_rpc_gateway_reorg_receive passed: funding tx rolled back, balance restored to 0");
+  return true;
+}
+
+// wallet_rpc_gateway_owner_change_altchain
+//
+// GW address created and funded in chain A (common)
+// Chain B: spend with original owner
+// Chain C: change owner via gateway_create_owner_change/gateway_sign_owner_change API, then spend with new owner
+// Multi-switch B<->C checking balances and owner validity
+//   C main (owner changed, spend with new owner)
+//   -> B main (old owner, spend with old owner)
+//   -> C main again (new owner, spend with new owner)
+//
+// Main and alt chain outline:
+//
+// A- A- A- B1- B2                    <-- B main: spend 7 by old owner
+//       | \
+//       |  C1- C2- C3- C4            <-- C main after C3: owner change, spend 5 by new owner
+//       |           \
+//       |            B3- B4- B5- B6  <-- B main again after B5: spend 3 by old owner
+//       |                      \
+//       |                       C5- C6- C7- C8  <-- C main again after C7: spend 8 by new owner
+//       ^
+//       |
+//  split height
+
+wallet_rpc_gateway_owner_change_altchain::wallet_rpc_gateway_owner_change_altchain()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_gateway_owner_change_altchain, c1);
+}
+
+bool wallet_rpc_gateway_owner_change_altchain::generate(std::vector<test_event_entry>& events) const
+{
+  uint64_t ts = test_core_time::get_time();
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate(); miner_acc.set_createtime(ts);
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate(); alice_acc.set_createtime(ts);
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();   bob_acc.set_createtime(ts);
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+  DO_CALLBACK(events, "c1");
+  return true;
+}
+
+bool wallet_rpc_gateway_owner_change_altchain::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+
+  currency::t_currency_protocol_handler<currency::core> cprotocol(c, NULL);
+  nodetool::node_server<currency::t_currency_protocol_handler<currency::core> > dummy_p2p(cprotocol);
+  bc_services::bc_offers_service dummy_bc(nullptr);
+  currency::core_rpc_server core_rpc_wrapper(c, dummy_p2p, dummy_bc);
+  core_rpc_wrapper.set_ignore_connectivity_status(true);
+
+  std::shared_ptr<tools::wallet2> miner_wlt = init_playtime_test_wallet(events, c, MINER_ACC_IDX);
+  tools::wallet_rpc_server miner_wlt_rpc(miner_wlt);
+
+  const auto& miner_addr = m_accounts[MINER_ACC_IDX].get_public_address();
+  const auto& bob_addr_str = m_accounts[BOB_ACC_IDX].get_public_address_str();
+
+  //key pairs: gw view key, old owner Schnorr, new owner Schnorr
+  crypto::public_key gw_view_pub{};
+  crypto::secret_key gw_view_sec{};
+  crypto::generate_keys(gw_view_pub, gw_view_sec);
+
+  crypto::public_key old_owner_pub{};
+  crypto::secret_key old_owner_sec{};
+  crypto::generate_keys(old_owner_pub, old_owner_sec);
+
+  crypto::public_key new_owner_pub{};
+  crypto::secret_key new_owner_sec{};
+  crypto::generate_keys(new_owner_pub, new_owner_sec);
+
+  // reg gw address with old owner
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::request gw_reg_req = {};
+  tools::wallet_public::COMMAND_GATEWAY_REGISTER_ADDRESS::response gw_reg_resp = {};
+  gw_reg_req.view_pub_key = gw_view_pub;
+  gw_reg_req.descriptor_info.opt_owner_custom_schnorr_pub_key = old_owner_pub;
+  gw_reg_req.descriptor_info.meta_info = "owner_change_altchain_test";
+  r = invoke_text_json_for_rpc_and_check_status(miner_wlt_rpc, "register_gateway_address", gw_reg_req, gw_reg_resp);
+  CHECK_AND_ASSERT_MES(r, false, "register_gateway_address failed");
+
+  r = mine_next_pow_blocks_in_playtime(miner_addr, c, 3);
+  CHECK_AND_ASSERT_TRUE(r);
+
+  // fund gw with 30 coins
+  miner_wlt->refresh();
+  tools::wallet_public::COMMAND_RPC_TRANSFER::request fund_req = {};
+  tools::wallet_public::COMMAND_RPC_TRANSFER::response fund_resp = {};
+  fund_req.destinations.emplace_back(currency::transfer_destination{ MK_TEST_COINS(30), gw_reg_resp.address });
+  fund_req.fee = TESTS_DEFAULT_FEE;
+  r = invoke_text_json_for_rpc(miner_wlt_rpc, "transfer", fund_req, fund_resp);
+  CHECK_AND_ASSERT_MES(r, false, "RPC 'transfer' to gateway failed");
+
+  r = mine_next_pow_blocks_in_playtime(miner_addr, c, CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
+  CHECK_AND_ASSERT_TRUE(r);
+  CHECK_AND_ASSERT_EQ(c.get_pool_transactions_count(), 0);
+
+  auto check_gw_native_balance = [&](uint64_t expected) -> bool
+  {
+    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request req = {};
+    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response resp = {};
+    req.gateway_address = gw_reg_resp.address;
+    bool ok = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", req, resp);
+    CHECK_AND_ASSERT_MES(ok, false, "gateway_get_address_info failed");
+    uint64_t actual = 0;
+    for (const auto& b : resp.balances)
+      if (b.asset_id == currency::native_coin_asset_id)
+        actual = b.amount;
+    CHECK_AND_ASSERT_MES(actual == expected, false, "gw balance: expected " << expected << ", got " << actual);
+    return true;
+  };
+
+  auto check_gw_owner = [&](const crypto::public_key& expected_owner) -> bool
+  {
+    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::request req = {};
+    currency::COMMAND_RPC_GATEWAY_GET_ADDRESS_INFO::response resp = {};
+    req.gateway_address = gw_reg_resp.address;
+    bool ok = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_get_address_info", req, resp);
+    CHECK_AND_ASSERT_MES(ok, false, "gateway_get_address_info failed");
+    CHECK_AND_ASSERT_MES(resp.descriptor_info.opt_owner_custom_schnorr_pub_key.has_value(), false, "owner key not set");
+    CHECK_AND_ASSERT_MES(resp.descriptor_info.opt_owner_custom_schnorr_pub_key.value() == expected_owner, false,
+      "gw owner mismatch: expected " << expected_owner << ", got " << resp.descriptor_info.opt_owner_custom_schnorr_pub_key.value());
+    return true;
+  };
+
+  auto deserialize_tx = [](const std::string& blob, currency::transaction& tx) -> bool
+  {
+    bool ok = t_unserializable_object_from_blob(tx, blob);
+    CHECK_AND_ASSERT_MES(ok, false, "failed to deserialize transaction blob");
+    return true;
+  };
+
+  // create + sign a gw transfer via rpc, return deserialized tx
+  auto create_gw_transfer = [&](uint64_t amount, const crypto::secret_key& owner_sec, currency::transaction& out_tx) -> bool
+  {
+    currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::request ct_req = {};
+    currency::COMMAND_RPC_GATEWAY_CREATE_TRANSFER::response ct_resp = {};
+    ct_req.origin_gateway_id = gw_view_pub;
+    ct_req.destinations.push_back({ amount, bob_addr_str });
+    ct_req.fee = TESTS_DEFAULT_FEE;
+    bool ok = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_transfer", ct_req, ct_resp);
+    CHECK_AND_ASSERT_MES(ok, false, "gateway_create_transfer failed");
+
+    crypto::generic_schnorr_sig_s sig{};
+    ok = crypto::generate_schnorr_sig(ct_resp.tx_hash_to_sign, owner_sec, sig);
+    CHECK_AND_ASSERT_MES(ok, false, "generate_schnorr_sig failed");
+
+    currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::request st_req = {};
+    currency::COMMAND_RPC_GATEWAY_SIGN_TRANSFER::response st_resp = {};
+    st_req.opt_custom_schnorr_signature = sig;
+    st_req.tx_blob = ct_resp.tx_blob;
+    st_req.tx_hash_to_sign = ct_resp.tx_hash_to_sign;
+    ok = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_transfer", st_req, st_resp);
+    CHECK_AND_ASSERT_MES(ok, false, "gateway_sign_transfer failed");
+
+    return deserialize_tx(st_resp.signed_tx_blob, out_tx);
+  };
+
+  // create + sign an owner change via our new rpc API, return deserialized tx
+  auto create_gw_owner_change = [&](const crypto::public_key& new_pub, const crypto::secret_key& current_owner_sec, currency::transaction& out_tx) -> bool
+  {
+    currency::COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::request oc_req = {};
+    currency::COMMAND_RPC_GATEWAY_CREATE_OWNER_CHANGE::response oc_resp = {};
+    oc_req.address_id = gw_view_pub;
+    oc_req.new_descriptor_info.opt_owner_custom_schnorr_pub_key = new_pub;
+    oc_req.fee = TESTS_DEFAULT_FEE;
+    bool ok = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_create_owner_change", oc_req, oc_resp);
+    CHECK_AND_ASSERT_MES(ok, false, "gateway_create_owner_change failed");
+
+    crypto::generic_schnorr_sig_s sig{};
+    ok = crypto::generate_schnorr_sig(oc_resp.tx_hash_to_sign, current_owner_sec, sig);
+    CHECK_AND_ASSERT_MES(ok, false, "generate_schnorr_sig for owner change failed");
+
+    currency::COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::request so_req = {};
+    currency::COMMAND_RPC_GATEWAY_SIGN_OWNER_CHANGE::response so_resp = {};
+    so_req.opt_custom_schnorr_signature = sig;
+    so_req.tx_blob = oc_resp.tx_blob;
+    so_req.tx_hash_to_sign = oc_resp.tx_hash_to_sign;
+    ok = invoke_text_json_for_rpc_and_check_status(core_rpc_wrapper, "gateway_sign_owner_change", so_req, so_resp);
+    CHECK_AND_ASSERT_MES(ok, false, "gateway_sign_owner_change failed");
+
+    return deserialize_tx(so_resp.signed_tx_blob, out_tx);
+  };
+
+  // mine one block with given txs on current main chain tip (bypasses pool)
+  auto mine_block_with_txs_on_tip = [&](const std::vector<currency::transaction>& txs) -> bool
+  {
+    return mine_next_pow_blocks_in_playtime_with_given_txs(miner_addr, txs, c, 1, c.get_tail_id());
+  };
+
+  CHECK_AND_ASSERT_MES(check_gw_native_balance(MK_TEST_COINS(30)), false, "initial gw balance");
+  CHECK_AND_ASSERT_MES(check_gw_owner(old_owner_pub), false, "initial gw owner");
+
+  //  fork point - all blocks after this are on chain B or chain C
+  crypto::hash fork_point = c.get_tail_id();
+  LOG_PRINT_GREEN_L0("Fork point: " << fork_point);
+
+  // at fork point - prepare txs for both chains
+
+  // owner change tx (for chain C): changes owner from old_owner to new_owner
+  currency::transaction tx_c_owner_change{};
+  r = create_gw_owner_change(new_owner_pub, old_owner_sec, tx_c_owner_change);
+  CHECK_AND_ASSERT_MES(r, false, "create_gw_owner_change failed");
+
+  // spend 7 tx (for chain B): signed by old owner
+  currency::transaction tx_b_spend1{};
+  r = create_gw_transfer(MK_TEST_COINS(7), old_owner_sec, tx_b_spend1);
+  CHECK_AND_ASSERT_MES(r, false, "create_gw_transfer for B spend1 failed");
+
+  // B: 2 blocks (spend 7 with old owner + 1 empty)
+  r = mine_next_pow_blocks_in_playtime_with_given_txs(miner_addr, { tx_b_spend1 }, c, 2, fork_point);
+  CHECK_AND_ASSERT_MES(r, false, "mine chain B (2 blocks) failed");
+  // B is main (2 blocks from fork)
+
+  CHECK_AND_ASSERT_MES(check_gw_native_balance(MK_TEST_COINS(30) - MK_TEST_COINS(7) - TESTS_DEFAULT_FEE), false, "B: balance after spend1");
+  CHECK_AND_ASSERT_MES(check_gw_owner(old_owner_pub), false, "B: owner must be old");
+
+  crypto::hash b_tip = c.get_tail_id();
+  LOG_PRINT_GREEN_L0("Chain B built: 2 blocks, tip=" << b_tip);
+
+  //   C: 3 blocks (owner change + 2 empty) — overtakes B
+  r = mine_next_pow_blocks_in_playtime_with_given_txs(miner_addr, { tx_c_owner_change }, c, 3, fork_point);
+  CHECK_AND_ASSERT_MES(r, false, "mine chain C (3 blocks) failed");
+  // C is main (3 > 2), reorg happened
+
+  CHECK_AND_ASSERT_MES(check_gw_native_balance(MK_TEST_COINS(30) - TESTS_DEFAULT_FEE), false, "C: balance after owner change");
+  CHECK_AND_ASSERT_MES(check_gw_owner(new_owner_pub), false, "C: owner must be new");
+
+  LOG_PRINT_GREEN_L0("Chain C is main: owner changed, balance OK");
+
+  // C: spend 5 with NEW owner
+  currency::transaction tx_c_spend1{};
+  r = create_gw_transfer(MK_TEST_COINS(5), new_owner_sec, tx_c_spend1);
+  CHECK_AND_ASSERT_MES(r, false, "create_gw_transfer for C spend1 failed");
+
+  r = mine_block_with_txs_on_tip({ tx_c_spend1 });
+  CHECK_AND_ASSERT_MES(r, false, "mine C spend1 block failed");
+  // C now has 4 blocks from fork
+
+  CHECK_AND_ASSERT_MES(check_gw_native_balance(MK_TEST_COINS(30) - MK_TEST_COINS(5) - 2 * TESTS_DEFAULT_FEE), false, "C: balance after spend1");
+  CHECK_AND_ASSERT_MES(check_gw_owner(new_owner_pub), false, "C: owner still new after spend");
+
+  crypto::hash c_tip = c.get_tail_id();
+  LOG_PRINT_GREEN_L0("Chain C: 4 blocks, spent 5 with new owner, tip=" << c_tip);
+
+  //  SWITCH to B: mine 3 empty blocks from b_tip (B gets 5 > C=4)
+  r = mine_next_pow_blocks_in_playtime_with_given_txs(miner_addr, {}, c, 3, b_tip);
+  CHECK_AND_ASSERT_MES(r, false, "extend chain B (3 empty blocks) failed");
+  // B is main (5 > 4)
+
+  CHECK_AND_ASSERT_MES(check_gw_native_balance(MK_TEST_COINS(30) - MK_TEST_COINS(7) - TESTS_DEFAULT_FEE), false, "B: balance restored after switch");
+  CHECK_AND_ASSERT_MES(check_gw_owner(old_owner_pub), false, "B: owner must be old again");
+
+  LOG_PRINT_GREEN_L0("Switched to B: old owner, balance restored");
+
+  // B: spend 3 with OLD owner
+  currency::transaction tx_b_spend2{};
+  r = create_gw_transfer(MK_TEST_COINS(3), old_owner_sec, tx_b_spend2);
+  CHECK_AND_ASSERT_MES(r, false, "create_gw_transfer for B spend2 failed");
+
+  r = mine_block_with_txs_on_tip({ tx_b_spend2 });
+  CHECK_AND_ASSERT_MES(r, false, "mine B spend2 block failed");
+  // B now has 6 blocks from fork
+
+  CHECK_AND_ASSERT_MES(check_gw_native_balance(MK_TEST_COINS(30) - MK_TEST_COINS(7) - MK_TEST_COINS(3) - 2 * TESTS_DEFAULT_FEE), false, "B: balance after spend2");
+
+  b_tip = c.get_tail_id();
+  LOG_PRINT_GREEN_L0("Chain B: 6 blocks, spent 3 more with old owner, tip=" << b_tip);
+
+  //  SWITCH to C: mine 4 empty blocks from c_tip (C gets 8 > B=6)
+  r = mine_next_pow_blocks_in_playtime_with_given_txs(miner_addr, {}, c, 4, c_tip);
+  CHECK_AND_ASSERT_MES(r, false, "extend chain C (4 empty blocks) failed");
+  // C is main (8 > 6)
+
+  CHECK_AND_ASSERT_MES(check_gw_native_balance(MK_TEST_COINS(30) - MK_TEST_COINS(5) - 2 * TESTS_DEFAULT_FEE), false, "C: balance restored after second switch");
+  CHECK_AND_ASSERT_MES(check_gw_owner(new_owner_pub), false, "C: owner must be new again");
+
+  LOG_PRINT_GREEN_L0("Switched to C: new owner, balance restored");
+
+  // C: spend 8 with NEW owner
+  currency::transaction tx_c_spend2{};
+  r = create_gw_transfer(MK_TEST_COINS(8), new_owner_sec, tx_c_spend2);
+  CHECK_AND_ASSERT_MES(r, false, "create_gw_transfer for C spend2 failed");
+
+  r = mine_block_with_txs_on_tip({ tx_c_spend2 });
+  CHECK_AND_ASSERT_MES(r, false, "mine C spend2 block failed");
+  // C now has 9 blocks from fork
+
+  CHECK_AND_ASSERT_MES(check_gw_native_balance(MK_TEST_COINS(30) - MK_TEST_COINS(5) - MK_TEST_COINS(8) - 3 * TESTS_DEFAULT_FEE), false, "C: balance after spend2");
+  CHECK_AND_ASSERT_MES(check_gw_owner(new_owner_pub), false, "C: owner still new");
+
+  LOG_PRINT_GREEN_L0("wallet_rpc_gateway_owner_change_altchain PASSED: B<->C switches with owner change verified");
+  return true;
+}
+
+//------------------------------------------------------------------------------
+
+wallet_rpc_and_tx_unlock_time::wallet_rpc_and_tx_unlock_time()
+{
+  REGISTER_CALLBACK_METHOD(wallet_rpc_and_tx_unlock_time, c1);
+}
+
+bool wallet_rpc_and_tx_unlock_time::generate(std::vector<test_event_entry>& events) const
+{
+  bool r = false;
+  m_accounts.resize(TOTAL_ACCS_COUNT);
+  account_base& miner_acc = m_accounts[MINER_ACC_IDX]; miner_acc.generate();
+  account_base& alice_acc = m_accounts[ALICE_ACC_IDX]; alice_acc.generate();
+  account_base& bob_acc   = m_accounts[BOB_ACC_IDX];   bob_acc.generate();
+
+  MAKE_GENESIS_BLOCK(events, blk_0, miner_acc, test_core_time::get_time());
+  DO_CALLBACK(events, "configure_core");
+
+  REWIND_BLOCKS_N(events, blk_0r, blk_0, miner_acc, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
+
+  DO_CALLBACK_PARAMS(events, "check_hardfork_active", static_cast<size_t>(ZANO_HARDFORK_05));
+
+  std::vector<tx_source_entry> sources;
+  std::vector<tx_destination_entry> destinations;
+  r = fill_tx_sources_and_destinations(events, blk_0r, miner_acc.get_keys(), alice_acc.get_public_address(), MK_TEST_COINS(1), TESTS_DEFAULT_FEE, /*nmix */ 0, sources, destinations, true, true);
+  CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
+  transaction tx_0{};
+  size_t tx_hardfork_id{};
+  uint64_t tx_version = get_tx_version_and_hardfork_id(get_block_height(blk_0r), m_hardforks, tx_hardfork_id);
+
+  // unlock_time
+  uint64_t unlock_time = 0;
+
+  // unlock_time2 and manually put it into extra
+  std::vector<extra_v> extra;
+  currency::etc_tx_details_unlock_time2 unlock_time2{};
+  CHECK_AND_ASSERT_EQ(destinations.size(), 10);
+  unlock_time2.unlock_time_array.push_back(11);
+  unlock_time2.unlock_time_array.push_back(2);
+  unlock_time2.unlock_time_array.push_back(7);
+  unlock_time2.unlock_time_array.push_back(7);
+  unlock_time2.unlock_time_array.push_back(7);
+  unlock_time2.unlock_time_array.push_back(7);
+  unlock_time2.unlock_time_array.push_back(6);
+  unlock_time2.unlock_time_array.push_back(7);
+  unlock_time2.unlock_time_array.push_back(0);
+  unlock_time2.unlock_time_array.push_back(3);
+  extra.push_back(unlock_time2);
+
+  crypto::secret_key one_time_secret_key{};
+  // TODO add no shuffle here
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, tx_version, tx_hardfork_id, one_time_secret_key, unlock_time);
+  CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
+
+  if (m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_06, get_block_height(blk_0r) + 1))
+  {
+    // since HF6 unlock_time2 is deprecated, check it
+    DO_CALLBACK(events, "mark_invalid_tx");
+    ADD_CUSTOM_EVENT(events, tx_0);
+    return true;
+  }
+
+  // normal flow
+  ADD_CUSTOM_EVENT(events, tx_0);
+
+  etc_tx_details_unlock_time2 ut2{};
+  get_type_in_variant_container(tx_0.extra, ut2);
+  CHECK_AND_ASSERT_EQ(ut2.unlock_time_array.size(), 10);
+
+
+  MAKE_NEXT_BLOCK_TX1(events, blk_1, blk_0r, miner_acc, tx_0);
+
+  LOG_PRINT_GREEN_L0("tx_0: " << get_transaction_hash(tx_0) << ENDL << obj_to_json_str(tx_0));
+
+  DO_CALLBACK(events, "c1");
+
+  return true;
+}
+
+bool wallet_rpc_and_tx_unlock_time::c1(currency::core& c, size_t ev_index, const std::vector<test_event_entry>& events)
+{
+  bool r = false;
+  std::shared_ptr<tools::wallet2> alice_wlt = init_playtime_test_wallet(events, c, ALICE_ACC_IDX);
+
+  CHECK_AND_ASSERT_MES(c.get_pool_transactions_count() == 0, false, "Tx pool is not empty: " << c.get_pool_transactions_count());
+  CHECK_AND_ASSERT_MES(refresh_wallet_and_check_balance("", "Alice", alice_wlt, MK_TEST_COINS(1)), false, "");
+
+  tools::wallet_rpc_server alice_wlt_rpc(alice_wlt);
+
+  pre_hf4_api::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::request st_req{};
+  st_req.filter_by_height = false;
+  st_req.in = true;
+  st_req.out = true;
+  st_req.pool = true;
+  //st_req.tx_id = resp.transfers[1].tx_hash; //bob_tx2
+  pre_hf4_api::COMMAND_RPC_SEARCH_FOR_TRANSACTIONS::response st_resp{};
+  r = invoke_text_json_for_rpc(alice_wlt_rpc, "search_for_transactions", st_req, st_resp);
+  CHECK_AND_ASSERT_MES(r, false, "RPC search_for_transactions failed ");
+
+  CHECK_AND_ASSERT_EQ(st_resp.in.size(), 1);
+  CHECK_AND_ASSERT_EQ(st_resp.in.front().unlock_time, 11);
+
   return true;
 }

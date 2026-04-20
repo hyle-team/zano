@@ -45,7 +45,7 @@ namespace currency
   bool check_inputs_and_outputs_size(const transaction& tx)
   {
     CHECK_AND_ASSERT_MES(tx.vin.size() != 0, false, "transaction has no inputs");
-    CHECK_AND_ASSERT_MES(tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
+    CHECK_AND_ASSERT_MES(tx.version < TRANSACTION_VERSION_POST_HF4 || tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
     
     const uint64_t tx_max_allowed_outs = tx.version >= TRANSACTION_VERSION_POST_HF4 ? CURRENCY_TX_MAX_ALLOWED_OUTS : CURRENCY_TX_MAX_ALLOWED_OUTS_PRE_HF4;
     CHECK_AND_ASSERT_MES(tx.vout.size() <= tx_max_allowed_outs, false, "transaction has too many outputs = " << tx.vout.size());
@@ -69,7 +69,7 @@ namespace currency
 
     if (tx.hardfork_id >= ZANO_HARDFORK_06)
     {
-      if (!currency::validate_tx_for_hardfork_specific_terms_types_new(tx, tx_id, tx.hardfork_id))
+      if (!currency::validate_tx_for_hardfork_specific_terms_types_HF6(tx, tx_id, tx.hardfork_id))
       { 
         LOG_PRINT_RED_L0("tx failed hardfork specific terms validation");
         return false;

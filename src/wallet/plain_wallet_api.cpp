@@ -185,7 +185,7 @@ namespace plain_wallet
 #ifdef ANDROID_BUILD
     epee::log_space::log_singletone::add_logger(new android_logger());
 #else
-    epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE, NULL, NULL);
+    epee::log_space::log_singletone::add_logger(LOGGER_CONSOLE_NO_ALLOC, NULL, NULL);
 #endif
 
     epee::log_space::log_singletone::add_logger(LOGGER_FILE, "plain_wallet.log", log_dir.c_str());

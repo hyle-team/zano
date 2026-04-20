@@ -113,21 +113,24 @@ namespace tools
 
     CHECK_AND_ASSERT_THROW_MES(ut2.unlock_time_array.size() == tx.vout.size(), "Internal error: wrong tx transfer details: ut2.unlock_time_array.size()" << ut2.unlock_time_array.size() << " is not equal transaction outputs vector size=" << tx.vout.size());
 
+    // this logic reflects consensus rules where unlock_time is checked only for outputs reffered by to_key and ZC inputs (s.a. outputs_visitor::handle_output())
+    // expected to be removed entirely soon as we get rid of unlock_time whatsoever -- sowle
     for (auto r : td.receive)
     {
       uint64_t ri = r.index;
+      bool update = false;
       CHECK_AND_ASSERT_THROW_MES(ri < tx.vout.size(), "Internal error: wrong tx transfer details: reciev index=" << ri << " is greater than transaction outputs vector " << tx.vout.size());
       VARIANT_SWITCH_BEGIN(tx.vout[ri]);
       VARIANT_CASE_CONST(tx_out_bare, o)
         if (o.target.type() == typeid(currency::txout_to_key))
-        {
-          //update unlock_time if needed
-          if (ut2.unlock_time_array[ri] > max_unlock_time)
-            max_unlock_time = ut2.unlock_time_array[ri];
-        }
+          update = true;
       VARIANT_CASE_CONST(tx_out_zarcanum, o);
+        update = true;
       VARIANT_SWITCH_END();
-
+      
+      //update unlock_time if needed
+      if (update && ut2.unlock_time_array[ri] > max_unlock_time)
+        max_unlock_time = ut2.unlock_time_array[ri];
     }
     return max_unlock_time;
   }
@@ -397,10 +400,10 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
 
       WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(ado.opt_descriptor.has_value(), "ado. missing opt_descriptor value at ASSET_DESCRIPTOR_OPERATION_REGISTER");
       // Add an asset to ownership list if either:
-      // 1) we're the owner of the asset;
+      // 1) we're the owner of the asset AND we spent our own outputs in this tx (proving we created it);
       //   or
       // 2) we spent native coins in the tx (i.e. we sent it) AND it registers an asset with third-party ownership.
-      if (ado.opt_descriptor->owner != m_account.get_public_address().spend_public_key &&
+      if ((ado.opt_descriptor->owner != m_account.get_public_address().spend_public_key || !ptc.spent_own_outs_in_inputs) &&
          (!ado.opt_descriptor->owner_eth_pub_key.has_value() || !ptc.spent_own_native_inputs))
         break;
 
@@ -896,7 +899,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
 
   //check if there are asset_registration that belong to this wallet
   const asset_descriptor_operation* pado = get_type_in_variant_container<const asset_descriptor_operation>(tx.extra);
-  if (pado && (ptc.employed_entries.receive.size() || ptc.employed_entries.spent.size() || (pado->opt_descriptor.has_value() && pado->opt_descriptor->owner == m_account.get_public_address().spend_public_key) || 
+  if (pado && (ptc.employed_entries.receive.size() || ptc.employed_entries.spent.size() || (pado->opt_descriptor.has_value() && pado->opt_descriptor->owner == m_account.get_public_address().spend_public_key) ||
       (pado->opt_asset_id.has_value() && m_own_asset_descriptors.count(pado->opt_asset_id.value()))
     ))
   {
@@ -3033,12 +3036,14 @@ bool wallet2::store_keys(std::string& buff, const std::string& password, wallet2
   bool r = epee::serialization::store_t_to_binary(acc, account_data);
   WLT_CHECK_AND_ASSERT_MES(r, false, "failed to serialize wallet keys");
 
+  
+
   crypto::chacha_key key;
-  crypto::generate_chacha_key_legacy(password, key);
+  crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_WALLET_HEADER, password.data(), password.size(), 0, key);
   std::string cipher;
   cipher.resize(account_data.size());
-  keys_file_data.iv = crypto::rand<crypto::chacha_iv>();
-  crypto::chacha8(account_data.data(), account_data.size(), key, keys_file_data.iv, &cipher[0]);
+  keys_file_data.iv = crypto::rand<crypto::chacha_iv>(); 
+  crypto::chacha20(account_data.data(), account_data.size(), key, keys_file_data.iv, &cipher[0]);
   keys_file_data.account_data = cipher;
 
   r = ::serialization::dump_binary(keys_file_data, buff);
@@ -3150,12 +3155,23 @@ void wallet2::load_keys(const std::string& buff, const std::string& password, ui
     r = ::serialization::parse_binary(buff, kf_data);
   }
   THROW_IF_TRUE_WALLET_EX(!r, error::wallet_internal_error, "internal error: failed to deserialize");
-
-  crypto::chacha_key key;
-  crypto::generate_chacha_key_legacy(password, key);
   std::string account_data;
-  account_data.resize(kf_data.account_data.size());
-  crypto::chacha8(kf_data.account_data.data(), kf_data.account_data.size(), key, kf_data.iv, &account_data[0]);
+    
+  if (kf_data.version <= 1)
+  {
+    crypto::chacha_key key;
+    crypto::generate_chacha_key_legacy(password, key);
+    account_data.resize(kf_data.account_data.size());
+    crypto::chacha8(kf_data.account_data.data(), kf_data.account_data.size(), key, kf_data.iv, &account_data[0]);
+  }
+  else
+  {
+    //version 2
+    crypto::chacha_key key;
+    crypto::chacha_generate_key_and_iv(CRYPTO_HDS_CHACHA_WALLET_HEADER, password.data(), password.size(), 0, key);
+    account_data.resize(kf_data.account_data.size());
+    crypto::chacha20(kf_data.account_data.data(), kf_data.account_data.size(), key, kf_data.iv, &account_data[0]);
+  }
 
   const currency::account_keys& keys = m_account.get_keys();
   r = epee::serialization::load_t_from_binary(m_account, account_data);
@@ -3302,12 +3318,21 @@ void wallet2::load(const std::wstring& wallet_, const std::string& password)
   }
   else if (wbh.m_ver == WALLET_FILE_BINARY_HEADER_VERSION_2)
   {
-    tools::encrypt_chacha_in_filter decrypt_filter(password, kf_data.iv);
+    tools::encrypt_chacha8_in_filter decrypt_filter(password, kf_data.iv);
     boost::iostreams::filtering_istream in;
     in.push(decrypt_filter);
     in.push(data_file);
     need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, in);
     WLT_LOG_L1("Detected format: WALLET_FILE_BINARY_HEADER_VERSION_2 (need_to_resync=" << need_to_resync << ")");
+  }
+  else if (wbh.m_ver == WALLET_FILE_BINARY_HEADER_VERSION_3)
+  {
+    tools::encrypt_chacha20_in_filter decrypt_filter(password, kf_data.iv, CRYPTO_HDS_CHACHA_WALLET_BODY);
+    boost::iostreams::filtering_istream in;
+    in.push(decrypt_filter);
+    in.push(data_file);
+    need_to_resync = !tools::portable_unserialize_obj_from_stream(*this, in);
+    WLT_LOG_L1("Detected format: WALLET_FILE_BINARY_HEADER_VERSION_3 (need_to_resync=" << need_to_resync << ")");
   }
   else
   {
@@ -3370,7 +3395,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
   wbh.m_signature = WALLET_FILE_SIGNATURE_V2;
   wbh.m_cb_keys = keys_buff.size();
   //@#@ change it to proper
-  wbh.m_ver = WALLET_FILE_BINARY_HEADER_VERSION_2;
+  wbh.m_ver = WALLET_FILE_BINARY_HEADER_VERSION_3;
   std::string header_buff((const char*)&wbh, sizeof(wbh));
 
   uint64_t ts = m_core_runtime_config.get_core_time();
@@ -3386,7 +3411,7 @@ void wallet2::store(const std::wstring& path_to_save, const std::string& passwor
 
   WLT_LOG_L0("Storing to temporary file " << tmp_file_path.string() << " ...");
   //creating encryption stream
-  tools::encrypt_chacha_out_filter decrypt_filter(m_password, keys_file_data.iv);
+  tools::encrypt_chacha20_out_filter decrypt_filter(m_password, keys_file_data.iv, CRYPTO_HDS_CHACHA_WALLET_BODY);
   boost::iostreams::filtering_ostream out;
   out.push(decrypt_filter);
   out.push(data_file);
@@ -5299,16 +5324,12 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
   // proofs for miner_tx
 
   // asset surjection proof
-  currency::zc_asset_surjection_proof asp{};
-  r = generate_asset_surjection_proof(b.miner_tx, miner_tx_id, false, miner_tx_tgc, asp);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs 
+  r = generate_asset_surjection_proof(miner_tx_id, false, miner_tx_tgc, b.miner_tx);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs
   WLT_CHECK_AND_ASSERT_MES(r, false, "generete_asset_surjection_proof failed");
-  b.miner_tx.proofs.emplace_back(std::move(asp));
 
   // range proofs
-  currency::zc_outs_range_proof range_proofs{};
-  r = generate_zc_outs_range_proof(miner_tx_id, miner_tx_tgc, b.miner_tx.vout, range_proofs);
+  r = generate_zc_outs_range_proof(miner_tx_id, miner_tx_tgc, b.miner_tx);
   WLT_CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
-  b.miner_tx.proofs.emplace_back(std::move(range_proofs));
 
   // balance proof
   r = generate_tx_balance_proof(miner_tx_id, miner_tx_tgc, full_block_reward, b.miner_tx);
@@ -8320,13 +8341,13 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
 //----------------------------------------------------------------------------------------------------
 construct_tx_param wallet2::get_default_construct_tx_param_inital()
 {
-  construct_tx_param ctp = AUTO_VAL_INIT(ctp);
+  construct_tx_param ctp{};
 
-  ctp.fee = m_core_runtime_config.tx_default_fee;
-  ctp.dust_policy = tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD);
+  ctp.fee               = m_core_runtime_config.tx_default_fee;
+  ctp.dust_policy       = tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD);
   ctp.split_strategy_id = get_current_split_strategy();
-  ctp.tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED;
-  ctp.shuffle = 0;
+  ctp.tx_outs_attr      = CURRENCY_TO_KEY_OUT_RELAXED;
+  ctp.shuffle           = true;
   return ctp;
 }
 construct_tx_param wallet2::get_default_construct_tx_param()
