@@ -146,17 +146,17 @@ inline bool mine_next_pow_block_in_playtime_with_given_txs(const currency::accou
       crypto::hash new_tx_id = currency::get_transaction_hash(b.miner_tx);
       if (has_zc_range_proof)
       {
+        // re-generate RP
         b.miner_tx.proofs.erase(std::remove_if(b.miner_tx.proofs.begin(), b.miner_tx.proofs.end(), [](const auto& pv)
           {
             return pv.type() == typeid(currency::zc_outs_range_proof);
           }), b.miner_tx.proofs.end());
-        currency::zc_outs_range_proof new_range_proof{};
-        bool ok = currency::generate_zc_outs_range_proof(new_tx_id, cbtr.miner_tx_tgc, b.miner_tx.vout, new_range_proof);
+        bool ok = currency::generate_zc_outs_range_proof(new_tx_id, cbtr.miner_tx_tgc, b.miner_tx);
         CHECK_AND_ASSERT_MES(ok, false, "generate_zc_outs_range_proof failed for alt-chain coinbase");
-        b.miner_tx.proofs.emplace_back(std::move(new_range_proof));
       }
       if (has_zc_balance_proof)
       {
+        // re-generate balance proof
         b.miner_tx.proofs.erase(std::remove_if(b.miner_tx.proofs.begin(), b.miner_tx.proofs.end(), [](const auto& pv)
           { 
             return pv.type() == typeid(currency::zc_balance_proof); 

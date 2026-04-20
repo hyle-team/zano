@@ -1294,10 +1294,8 @@ bool test_generator::construct_pow_block_with_alias_info_in_coinbase(const accou
       // empty asset surjection proof
       miner_tx.proofs.emplace_back(std::move(currency::zc_asset_surjection_proof{}));
       // range proofs
-      currency::zc_outs_range_proof range_proofs{};
-      r = generate_zc_outs_range_proof(tx_id, tx_gen_context, miner_tx.vout, range_proofs);
+      r = generate_zc_outs_range_proof(tx_id, tx_gen_context, miner_tx);
       CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
-      miner_tx.proofs.emplace_back(std::move(range_proofs));
       // balance proof
       r = generate_tx_balance_proof(tx_id, tx_gen_context, block_reward, miner_tx);
       CHECK_AND_ASSERT_MES(r, false, "generate_tx_balance_proof failed");
@@ -1719,7 +1717,7 @@ bool fill_tx_sources(std::vector<currency::tx_source_entry>& sources, const std:
         }
       }
 
-      if ((fts_flags & fts_check_for_hf4_min_coinage) && blk_head.miner_tx.version >= TRANSACTION_VERSION_POST_HF4
+      if ((fts_flags & fts_check_for_hf4_min_coinage) && blk_head.miner_tx.version >= TRANSACTION_VERSION_POST_HF4 // TODO potential issue: need to check upcoming block's miner tx version, which is unavailable yet, so it's necessary to bring hardfork description and make a smart check -- sowle
         && next_block_height - get_block_height(*oi.p_blk) < CURRENCY_HF4_MANDATORY_MIN_COINAGE)
       {
         //ignore outs that doesn't fit the HF4 rule
@@ -2034,7 +2032,8 @@ bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
                          const std::vector<currency::payload_items_v>& att /* = empty_attachment */, 
                          bool check_for_spends /* = true */,
                          bool check_for_unlocktime /* = true */,
-                         bool use_ref_by_id /* = false */)
+                         bool use_ref_by_id /* = false */,
+                         bool shuffle /* = true */)
 {
   [[maybe_unused]] crypto::secret_key sk; // stub
 
@@ -2076,7 +2075,7 @@ bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
     if (el.second > requested_amount)
       local_dst.push_back(tx_destination_entry(el.second - requested_amount, from.get_public_address(), el.first)); // add destination for change
   }
-  return construct_tx(from.get_keys(), sources, local_dst, extr, att, tx, tx_version, tx_hardfork_id, sk, 0, mix_attr);
+  return construct_tx(from.get_keys(), sources, local_dst, extr, att, tx, tx_version, tx_hardfork_id, sk, 0, mix_attr, shuffle);
 }
 
 
@@ -2106,7 +2105,8 @@ bool construct_tx_with_many_outputs(const currency::hard_forks_descriptor& hf, s
   if (sources_amount > total_amount + fee)
     destinations.push_back(tx_destination_entry(sources_amount - (total_amount + fee), keys_from.account_address)); // change
   size_t tx_hardfork_id = 0;
-  uint64_t tx_version = currency::get_tx_version_and_hardfork_id(currency::get_block_height(blk_head), hf, tx_hardfork_id);
+  uint64_t expected_block_height = currency::get_block_height(blk_head) + 1;
+  uint64_t tx_version = currency::get_tx_version_and_hardfork_id(expected_block_height, hf, tx_hardfork_id);
   return construct_tx(keys_from, sources, destinations, empty_attachment, tx, tx_version, tx_hardfork_id, 0);
 }
 
@@ -3080,7 +3080,8 @@ uint64_t test_chain_unit_base::get_tx_version_and_harfork_id_from_events(const s
     if(it->type() == typeid(currency::block))
     {
       const currency::block& b = boost::get<currency::block>(*it);
-      return currency::get_tx_version_and_hardfork_id(get_block_height(b), m_hardforks, tx_hardfork_id);
+      uint64_t expected_block_height = get_block_height(b) + 1;
+      return currency::get_tx_version_and_hardfork_id(expected_block_height, m_hardforks, tx_hardfork_id);
     }
   }
   return currency::get_tx_version_and_hardfork_id(0, m_hardforks, tx_hardfork_id);

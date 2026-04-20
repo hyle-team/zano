@@ -113,21 +113,24 @@ namespace tools
 
     CHECK_AND_ASSERT_THROW_MES(ut2.unlock_time_array.size() == tx.vout.size(), "Internal error: wrong tx transfer details: ut2.unlock_time_array.size()" << ut2.unlock_time_array.size() << " is not equal transaction outputs vector size=" << tx.vout.size());
 
+    // this logic reflects consensus rules where unlock_time is checked only for outputs reffered by to_key and ZC inputs (s.a. outputs_visitor::handle_output())
+    // expected to be removed entirely soon as we get rid of unlock_time whatsoever -- sowle
     for (auto r : td.receive)
     {
       uint64_t ri = r.index;
+      bool update = false;
       CHECK_AND_ASSERT_THROW_MES(ri < tx.vout.size(), "Internal error: wrong tx transfer details: reciev index=" << ri << " is greater than transaction outputs vector " << tx.vout.size());
       VARIANT_SWITCH_BEGIN(tx.vout[ri]);
       VARIANT_CASE_CONST(tx_out_bare, o)
         if (o.target.type() == typeid(currency::txout_to_key))
-        {
-          //update unlock_time if needed
-          if (ut2.unlock_time_array[ri] > max_unlock_time)
-            max_unlock_time = ut2.unlock_time_array[ri];
-        }
+          update = true;
       VARIANT_CASE_CONST(tx_out_zarcanum, o);
+        update = true;
       VARIANT_SWITCH_END();
-
+      
+      //update unlock_time if needed
+      if (update && ut2.unlock_time_array[ri] > max_unlock_time)
+        max_unlock_time = ut2.unlock_time_array[ri];
     }
     return max_unlock_time;
   }
@@ -397,10 +400,10 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
 
       WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(ado.opt_descriptor.has_value(), "ado. missing opt_descriptor value at ASSET_DESCRIPTOR_OPERATION_REGISTER");
       // Add an asset to ownership list if either:
-      // 1) we're the owner of the asset;
+      // 1) we're the owner of the asset AND we spent our own outputs in this tx (proving we created it);
       //   or
       // 2) we spent native coins in the tx (i.e. we sent it) AND it registers an asset with third-party ownership.
-      if (ado.opt_descriptor->owner != m_account.get_public_address().spend_public_key &&
+      if ((ado.opt_descriptor->owner != m_account.get_public_address().spend_public_key || !ptc.spent_own_outs_in_inputs) &&
          (!ado.opt_descriptor->owner_eth_pub_key.has_value() || !ptc.spent_own_native_inputs))
         break;
 
@@ -896,7 +899,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
 
   //check if there are asset_registration that belong to this wallet
   const asset_descriptor_operation* pado = get_type_in_variant_container<const asset_descriptor_operation>(tx.extra);
-  if (pado && (ptc.employed_entries.receive.size() || ptc.employed_entries.spent.size() || (pado->opt_descriptor.has_value() && pado->opt_descriptor->owner == m_account.get_public_address().spend_public_key) || 
+  if (pado && (ptc.employed_entries.receive.size() || ptc.employed_entries.spent.size() || (pado->opt_descriptor.has_value() && pado->opt_descriptor->owner == m_account.get_public_address().spend_public_key) ||
       (pado->opt_asset_id.has_value() && m_own_asset_descriptors.count(pado->opt_asset_id.value()))
     ))
   {
@@ -5321,16 +5324,12 @@ bool wallet2::prepare_and_sign_pos_block(const mining_context& cxt, uint64_t ful
   // proofs for miner_tx
 
   // asset surjection proof
-  currency::zc_asset_surjection_proof asp{};
-  r = generate_asset_surjection_proof(b.miner_tx, miner_tx_id, false, miner_tx_tgc, asp);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs 
+  r = generate_asset_surjection_proof(miner_tx_id, false, miner_tx_tgc, b.miner_tx);  // has_non_zc_inputs == false because after the HF4 PoS mining is only allowed for ZC stakes inputs
   WLT_CHECK_AND_ASSERT_MES(r, false, "generete_asset_surjection_proof failed");
-  b.miner_tx.proofs.emplace_back(std::move(asp));
 
   // range proofs
-  currency::zc_outs_range_proof range_proofs{};
-  r = generate_zc_outs_range_proof(miner_tx_id, miner_tx_tgc, b.miner_tx.vout, range_proofs);
+  r = generate_zc_outs_range_proof(miner_tx_id, miner_tx_tgc, b.miner_tx);
   WLT_CHECK_AND_ASSERT_MES(r, false, "Failed to generate zc_outs_range_proof()");
-  b.miner_tx.proofs.emplace_back(std::move(range_proofs));
 
   // balance proof
   r = generate_tx_balance_proof(miner_tx_id, miner_tx_tgc, full_block_reward, b.miner_tx);
@@ -8342,13 +8341,13 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
 //----------------------------------------------------------------------------------------------------
 construct_tx_param wallet2::get_default_construct_tx_param_inital()
 {
-  construct_tx_param ctp = AUTO_VAL_INIT(ctp);
+  construct_tx_param ctp{};
 
-  ctp.fee = m_core_runtime_config.tx_default_fee;
-  ctp.dust_policy = tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD);
+  ctp.fee               = m_core_runtime_config.tx_default_fee;
+  ctp.dust_policy       = tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD);
   ctp.split_strategy_id = get_current_split_strategy();
-  ctp.tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED;
-  ctp.shuffle = 0;
+  ctp.tx_outs_attr      = CURRENCY_TO_KEY_OUT_RELAXED;
+  ctp.shuffle           = true;
   return ctp;
 }
 construct_tx_param wallet2::get_default_construct_tx_param()

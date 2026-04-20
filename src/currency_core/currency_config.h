@@ -114,6 +114,7 @@
 #define CURRENCY_PROTOCOL_MAX_BLOCKS_REQUEST_COUNT      500     
 #define CURRENCY_PROTOCOL_MAX_TXS_REQUEST_COUNT         500    
 #define TX_HASHES_IN_BLOCK_MAX_COUNT                    5000   // maximum number of tx hashes in a block
+#define CURRENCY_NOTIFY_REQUEST_CHAIN_MAX_BLOCKS_COUNT  100    // maximum number of blocks in a NOTIFY_REQUEST_CHAIN request           
 
 
 #define CURRENCY_ALT_BLOCK_LIVETIME_COUNT               (CURRENCY_BLOCKS_PER_DAY*7)//one week

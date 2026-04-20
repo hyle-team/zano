@@ -49,3 +49,4 @@
 #include "attachment_isolation_encryption_test.h"
 #include "pos_fuse_test.h"
 #include "daemon_rpc.h"
+#include "gbt_pool_invalid_txs.h"

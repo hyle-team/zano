@@ -3,14 +3,15 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #pragma once
+#include <list>
 #include "wallet/wrap_service.h"
   
 namespace currency
 {
   template<typename callback_t>
   bool rpc_fill_destinations_helper(const std::list<currency::transfer_destination>& destinations_in_api,                                     
-                                    std::vector<currency::tx_destination_entry>& dsts, std::vector<currency::extra_v>& extra, bool hf6_active, epee::json_rpc::error& er, std::string& legacy_tx_wide_payment_id,
-                                    const bool allow_legacy_payment_id_size,
+                                    std::vector<currency::tx_destination_entry>& dsts, std::vector<currency::extra_v>& extra, bool hf6_active, epee::json_rpc::error& er,
+                                    std::string& legacy_tx_wide_payment_id, const bool allow_legacy_payment_id_size, const address_v& self_address,
                                     callback_t cb_get_address)
   {
 
@@ -51,6 +52,14 @@ namespace currency
       {
         er.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
         er.message = std::string("WALLET_RPC_ERROR_CODE_WRONG_ADDRESS: ") + it->address;
+        return false;
+      }
+
+      bool self_directed_destination = (de.addr.front().type() == typeid(account_public_address) ? (de.addr.front() == self_address) : false);
+      if (self_directed_destination && embedded_payment_id.size() != 0)
+      {
+        er.code = WALLET_RPC_ERROR_CODE_WRONG_PAYMENT_ID;
+        er.message = std::string("transfers with an integrated address to self is not allowed: ") + it->address;
         return false;
       }
 

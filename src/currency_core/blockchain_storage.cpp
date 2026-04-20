@@ -1679,10 +1679,23 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
       ", expected: " << height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW);
   }
 
+  CHECK_AND_ASSERT_MES(b.miner_tx.attachment.empty(), false, "coinbase transaction has attachments; attachments are not allowed for coinbase transactions.");
 
-  if (is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, height)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
+  if (is_hardfork_active_for_height(ZANO_HARDFORK_06, height)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
   {
-    CHECK_AND_ASSERT_MES(b.miner_tx.attachment.empty(), false, "coinbase transaction has attachments; attachments are not allowed for coinbase transactions.");
+    // TODO: consider moving these to hardfork specific validation
+    CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 2 || b.miner_tx.proofs.size() == 3, false, "coinbase transaction has incorrect number of proofs (" << b.miner_tx.proofs.size() << "), expected 3");
+    size_t asp_count = count_type_in_variant_container<zc_asset_surjection_proof>(b.miner_tx.proofs);
+    CHECK_AND_ASSERT_MES(asp_count <= 1, false, "unexpected number of asset surjection proofs:" << asp_count);
+    size_t rp_count = count_type_in_variant_container<zc_outs_range_proof>(b.miner_tx.proofs);
+    CHECK_AND_ASSERT_MES(rp_count == 1, false, "unexpected number of range proofs:" << rp_count);
+    size_t bp_count = count_type_in_variant_container<zc_balance_proof>(b.miner_tx.proofs);
+    CHECK_AND_ASSERT_MES(bp_count == 1, false, "unexpected number of balance proofs:" << bp_count);
+    size_t gw_outs = count_type_in_variant_container<tx_out_gateway>(b.miner_tx.vout);
+    CHECK_AND_ASSERT_MES(gw_outs == 0, false, "coinbase transaction has gateway outputs; gateway outputs are not allowed for coinbase transactions.");
+  }
+  else if (is_hardfork_active_for_height(ZANO_HARDFORK_04_ZARCANUM, height)) // TODO @#@# consider moving to validate_tx_for_hardfork_specific_terms
+  {
     CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 3, false, "coinbase transaction has incorrect number of proofs (" << b.miner_tx.proofs.size() << "), expected 3");
     CHECK_AND_ASSERT_MES(b.miner_tx.proofs[0].type() == typeid(zc_asset_surjection_proof), false, "coinbase transaction has incorrect type of proof #0 (expected: zc_asset_surjection_proof)");
     CHECK_AND_ASSERT_MES(b.miner_tx.proofs[1].type() == typeid(zc_outs_range_proof), false, "coinbase transaction has incorrect type of proof #1 (expected: zc_outs_range_proof)");
@@ -1696,7 +1709,6 @@ bool blockchain_storage::prevalidate_miner_transaction(const block& b, uint64_t 
       return false;
     }
 
-    CHECK_AND_ASSERT_MES(b.miner_tx.attachment.empty(), false, "coinbase transaction has attachments; attachments are not allowed for coinbase transactions.");
     CHECK_AND_ASSERT_MES(b.miner_tx.proofs.size() == 0, false, "pre-HF4 coinbase shoudn't have non-empty proofs containter");
   }
 
@@ -6884,14 +6896,14 @@ size_t blockchain_storage::get_current_hardfork_id() const
   return m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(this->get_current_blockchain_size());
 }
 //------------------------------------------------------------------
-bool blockchain_storage::validate_tx_for_hardfork_specific_terms_types_new(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
+bool blockchain_storage::validate_tx_for_hardfork_specific_terms_types_HF6(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
 {
   size_t current_hard_fork_id = m_core_runtime_config.hard_forks.get_the_most_recent_hardfork_id_for_height(block_height);
-  return currency::validate_tx_for_hardfork_specific_terms_types_new(tx, tx_id, current_hard_fork_id);
+  return currency::validate_tx_for_hardfork_specific_terms_types_HF6(tx, tx_id, current_hard_fork_id);
 }
 
 //TODO: this function might be removed after HF6 is activated on mainnet
-bool blockchain_storage::validate_tx_for_hardfork_specific_terms_types_old(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
+bool blockchain_storage::validate_tx_for_hardfork_specific_terms_types_HF4(const transaction& tx, const crypto::hash& tx_id, uint64_t block_height) const
 {
   bool var_is_after_hardfork_1_zone = m_core_runtime_config.is_hardfork_active_for_height(1, block_height);
   bool var_is_after_hardfork_2_zone = m_core_runtime_config.is_hardfork_active_for_height(2, block_height);
@@ -7018,11 +7030,11 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   bool r = false;
   if (m_core_runtime_config.is_hardfork_active_for_height(6, block_height))
   {
-     r = validate_tx_for_hardfork_specific_terms_types_new(tx, tx_id, block_height);
+     r = validate_tx_for_hardfork_specific_terms_types_HF6(tx, tx_id, block_height);
   }
   else
   {
-     r = validate_tx_for_hardfork_specific_terms_types_old(tx, tx_id, block_height);
+     r = validate_tx_for_hardfork_specific_terms_types_HF4(tx, tx_id, block_height);
   }
   CHECK_AND_ASSERT_MES(r, false, "Transaction validation failed for hardfork specific terms");
 
@@ -7033,10 +7045,13 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   if (var_is_after_hardfork_4_zone)
   {    
     CHECK_AND_ASSERT_MES(tx.version > TRANSACTION_VERSION_PRE_HF4, false, "HF4: tx with version " << tx.version << " is not allowed");
+    bool gw_outs_only = std::all_of(tx.vout.begin(), tx.vout.end(), [](const tx_out_v& o) { return o.type() == typeid(tx_out_gateway);});
 
-    if (is_pos_miner_tx(tx))
+    if (is_pos_miner_tx(tx)) // exception 1: for PoS miner txs allow 1 output
       CHECK_AND_ASSERT_MES(tx.vout.size() == 1 || tx.vout.size() >= CURRENCY_TX_MIN_ALLOWED_OUTS, false, "HF4: tx.vout has " << tx.vout.size() << " element(s), while 1 or >= " << CURRENCY_TX_MIN_ALLOWED_OUTS << " is expected for a PoS miner tx");
-    else
+    else if (gw_outs_only)   // exception 2: do not enforce minimum outs count for txs with only gateway outputs
+      ; // nothing here
+    else                     // default case: enforce minimum outs count
       CHECK_AND_ASSERT_MES(tx.vout.size() >= CURRENCY_TX_MIN_ALLOWED_OUTS, false, "HF4: tx.vout has " << tx.vout.size() << " element(s), while required minimum is " << CURRENCY_TX_MIN_ALLOWED_OUTS);
 
     if(!validate_inputs_sorting(tx))
@@ -7087,6 +7102,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
   bool var_is_after_hardfork_6_zone = m_core_runtime_config.is_hardfork_active_for_height(6, block_height);
   if (var_is_after_hardfork_6_zone)
   {
+    CHECK_AND_ASSERT_MES(tx.version >= TRANSACTION_VERSION_POST_HF6, false, "HF6: tx with version " << tx.version << " is not allowed");
     // enforce explicitly existing soft limits (s.a. tx_memory_pool::add_tx) and implicit hard limits (verify_BGE_proof etc.)
     CHECK_AND_ASSERT_MES(tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
     CHECK_AND_ASSERT_MES(tx.vout.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS,  false, "transaction has too many outputs = " << tx.vout.size());
@@ -7519,10 +7535,22 @@ bool blockchain_storage::collect_rangeproofs_data_from_tx(const transaction& tx,
       range_proofs_count++;
     }
   }
-  CHECK_AND_ASSERT_MES(out_index_offset == confidential_outs_count, false, "range proof elements count doesn't match with confidential outputs count: " << out_index_offset << " != " << confidential_outs_count);
-  CHECK_AND_ASSERT_MES(range_proofs_count > 0, false, "transaction " << get_transaction_hash(tx) << " doesn't have range proofs");
-  CHECK_AND_ASSERT_MES(range_proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << get_transaction_hash(tx) 
-    << " doesn't have TX_FLAG_SIGNATURE_MODE_SEPARATE but has range_proofs_count = " << range_proofs_count);
+
+
+  if (tx.hardfork_id >= ZANO_HARDFORK_06)
+  {
+    CHECK_AND_ASSERT_MES((confidential_outs_count == 0) == (range_proofs_count == 0), false, "transaction " << tx_id << " has inconsistent confidential outputs count (" << confidential_outs_count << ") and RPs count (" << range_proofs_count << ")");
+    CHECK_AND_ASSERT_MES(out_index_offset == confidential_outs_count, false, "range proof elements count doesn't match with confidential outputs count: " << out_index_offset << " != " << confidential_outs_count);
+    CHECK_AND_ASSERT_MES(confidential_outs_count == 0 || range_proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << tx_id 
+      << " has confidential outputs, doesn't have TX_FLAG_SIGNATURE_MODE_SEPARATE, but has range_proofs_count = " << range_proofs_count);
+  }
+  else
+  {
+    CHECK_AND_ASSERT_MES(out_index_offset == confidential_outs_count, false, "range proof elements count doesn't match with confidential outputs count: " << out_index_offset << " != " << confidential_outs_count);
+    CHECK_AND_ASSERT_MES(range_proofs_count > 0, false, "transaction " << get_transaction_hash(tx) << " doesn't have range proofs");
+    CHECK_AND_ASSERT_MES(range_proofs_count == 1 || (get_tx_flags(tx) & TX_FLAG_SIGNATURE_MODE_SEPARATE), false, "transaction " << get_transaction_hash(tx) 
+      << " doesn't have TX_FLAG_SIGNATURE_MODE_SEPARATE but has range_proofs_count = " << range_proofs_count);
+  }
 
   return true;
 }

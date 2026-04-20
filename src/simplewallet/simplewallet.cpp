@@ -1771,19 +1771,29 @@ bool simple_wallet::validate_wrap_status(uint64_t amount)
   }
 }
 //----------------------------------------------------------------------------------------------------
-bool preprocess_asset_id(std::string& address_arg, crypto::public_key& asset_id)
+// parse "[[legacy]][<asset_id>:]<address>"
+#define ZANO_ADDRESS_LEGACY_PREFIX "[legacy]"
+bool parse_address_str(const std::string& address_arg, std::string& address, crypto::public_key& asset_id, bool& legacy_prefix)
 {
-  auto p = address_arg.find(':');
+  legacy_prefix = false;
+  address = address_arg;
+  if (address.find(ZANO_ADDRESS_LEGACY_PREFIX) == 0)
+  {
+    address.erase(0, sizeof(ZANO_ADDRESS_LEGACY_PREFIX) - 1);
+    legacy_prefix = true;
+  }
+
+  auto p = address.find(':');
   if (p == std::string::npos)
   {
     asset_id = currency::native_coin_asset_id;
     return true;
   }
-  std::string asset_id_str = address_arg.substr(0, p);
-  std::string address_itself = address_arg.substr(p+1, address_arg.size());
+  std::string asset_id_str = address.substr(0, p);
   if (!epee::string_tools::parse_tpod_from_hex_string(asset_id_str, asset_id))
     return false;
-  address_arg = address_itself;
+
+  address.erase(0, p + 1);
   return true;
 }
 //----------------------------------------------------------------------------------------------------
@@ -1826,7 +1836,10 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
     currency::tx_destination_entry de{};
     de.addr.resize(1);    
 
-    if (!preprocess_asset_id(local_args[i], de.asset_id))
+    std::string arg_address;
+    bool legacy_prefix = false;
+
+    if (!parse_address_str(local_args[i], arg_address, de.asset_id, legacy_prefix))
     {
       fail_msg_writer() << "address is wrong: " << local_args[i];
       return true;
@@ -1839,8 +1852,6 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
       fail_msg_writer() << "unknown asset id: " << de.asset_id;
       return true;
     }
-
-    const std::string& arg_address = local_args[i];
 
     if (i + 1 >= local_args.size())
     {
@@ -1895,6 +1906,13 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
       return true;
     }
 
+    bool self_directed_destination = (de.addr.front().type() == typeid(account_public_address) ? (boost::get<account_public_address>(de.addr.front()) == m_wallet->get_account().get_public_address()) : false);
+    if (self_directed_destination && embedded_payment_id.size() != 0)
+    {
+      fail_msg_writer() << "transfers with an integrated address to self is not allowed: " << arg_address;
+      return true;
+    }
+
     //
     // payment id processing logic (must be consistent with rpc_fill_destinations_helper(), consider code reuse -- sowle)
     //
@@ -1915,7 +1933,7 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
         else
         {
           // it means embedded_payment_id.size() > CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE
-          if (!m_allow_legacy_payment_id_size)
+          if (!legacy_prefix)
           {
             fail_msg_writer() << "payment_id embeded into integrated address " << arg_address << " is too long, maximum is " << epee::string_tools::num_to_string_fast(CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE) << " bytes";
             return true;
@@ -1934,7 +1952,7 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
       // before HF6
       if (embedded_payment_id.size() != 0)
       {
-        if (!m_allow_legacy_payment_id_size && embedded_payment_id.size() > CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE)
+        if (!legacy_prefix && embedded_payment_id.size() > CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE)
         {
           fail_msg_writer() << "payment_id embedded into integrated address " << arg_address << " is too long, maximum is " << epee::string_tools::num_to_string_fast(CURRENCY_HF6_INTRINSIC_PAYMENT_ID_SIZE) << " bytes";
           return true;
@@ -1965,15 +1983,44 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
     return true;
   }
 
-  currency::transaction tx{};
-  m_wallet->transfer(dsts, fake_outs_count, 0, fee, extra, attachments, tx);
+  //currency::transaction tx{};
+  //m_wallet->transfer(dsts, fake_outs_count, 0, fee, extra, attachments, tx);
+  //transfer(dsts, fake_outputs_count, unlock_time, fee, extra, attachments, , , tx);
+  //construct_tx_param ctp = AUTO_VAL_INIT(ctp);
+  //ctp.attachments = attachments;
+  //ctp.crypt_address = currency::get_crypt_address_from_destinations(m_account.get_keys(), dsts);
+  //ctp.dsts = dsts;
+  //ctp.dust_policy = tx_dust_policy(DEFAULT_DUST_THRESHOLD);
+  //ctp.extra = extra;
+  //ctp.fake_outputs_count = fake_outputs_count;
+  //ctp.fee = fee;
+  //ctp.flags = flags;
+  //ctp.shuffle = shuffle;
+  //ctp.split_strategy_id = get_current_split_strategy();
+  //ctp.tx_outs_attr = tx_outs_attr;
+  //ctp.unlock_time = unlock_time;
+  //transfer(ctp, tx, send_to_network, p_unsigned_filename_or_tx_blob_str);
+
+
+
+  tools::construct_tx_param ctp{};
+  ctp.attachments = attachments;
+  ctp.dsts = dsts;
+  ctp.dust_policy = tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD);
+  ctp.extra = extra;
+  ctp.fake_outputs_count = fake_outs_count;
+  ctp.fee = fee;
+  ctp.shuffle = true;
+  ctp.split_strategy_id = m_wallet->get_current_split_strategy();
+  currency::finalized_tx ftx{};
+  m_wallet->transfer(ctp, ftx, true, nullptr);
 
   if (!m_wallet->is_watch_only())
   {
     if(wrapped_transaction)
-      success_msg_writer(true) << "Transaction successfully sent to wZano custody wallet, id: " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
+      success_msg_writer(true) << "Transaction successfully sent to wZano custody wallet, id: " << ftx.tx_id << ", " << get_object_blobsize(ftx.tx) << " bytes";
     else
-      success_msg_writer(true) << "Transaction successfully sent, id: " << get_transaction_hash(tx) << ", " << get_object_blobsize(tx) << " bytes";
+      success_msg_writer(true) << "Transaction successfully sent, id: " << ftx.tx_id << ", " << get_object_blobsize(ftx.tx) << " bytes";
   }
   else
   {
