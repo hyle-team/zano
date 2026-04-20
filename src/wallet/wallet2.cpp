@@ -8341,13 +8341,13 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
 //----------------------------------------------------------------------------------------------------
 construct_tx_param wallet2::get_default_construct_tx_param_inital()
 {
-  construct_tx_param ctp = AUTO_VAL_INIT(ctp);
+  construct_tx_param ctp{};
 
-  ctp.fee = m_core_runtime_config.tx_default_fee;
-  ctp.dust_policy = tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD);
+  ctp.fee               = m_core_runtime_config.tx_default_fee;
+  ctp.dust_policy       = tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD);
   ctp.split_strategy_id = get_current_split_strategy();
-  ctp.tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED;
-  ctp.shuffle = 0;
+  ctp.tx_outs_attr      = CURRENCY_TO_KEY_OUT_RELAXED;
+  ctp.shuffle           = true;
   return ctp;
 }
 construct_tx_param wallet2::get_default_construct_tx_param()
