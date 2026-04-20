@@ -3022,9 +3022,7 @@ namespace currency
 
     // "Shuffle" outs
     if (shuffle)
-      std::sort(shuffled_dsts.begin(), shuffled_dsts.end(), [](const tx_destination_entry& de1, const tx_destination_entry& de2) { return de1.amount < de2.amount; });
-
-    // TODO: consider "Shuffle" inputs 
+      std::shuffle(shuffled_dsts.begin(), shuffled_dsts.end(), crypto::uniform_random_bit_generator());
 
     // construct outputs
     uint64_t native_coins_output_sum = 0;
