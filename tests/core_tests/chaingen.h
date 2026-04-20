@@ -1091,7 +1091,7 @@ bool test_generator::construct_block_gentime_with_coinbase_cb(const currency::bl
 
   if (get_hardforks().is_hardfork_active_for_height(ZANO_HARDFORK_06, height))
   {
-    etc_coinbase_block_cumulative_size ecbcs = AUTO_VAL_INIT(ecbcs);
+    currency::etc_coinbase_block_cumulative_size ecbcs{};
     ecbcs.v = total_txs_size;
     miner_tx.extra.push_back(ecbcs);
   }
