@@ -7698,7 +7698,6 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       purge_block_data_from_blockchain(bl, tx_processed_count);
       //add_block_as_invalid(bl, id);
       bvc.m_verification_failed = true;
-      bvc.m_failed_transactions.push_back(tx_id);
       return false;
     }
 
@@ -7708,7 +7707,6 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       purge_block_data_from_blockchain(bl, tx_processed_count);
       //add_block_as_invalid(bl, id);  
       bvc.m_verification_failed = true;
-      bvc.m_failed_transactions.push_back(tx_id);
       return false;
     }
 
@@ -7730,7 +7728,6 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
         m_tx_pool.add_transaction_to_black_list(tx);
         purge_block_data_from_blockchain(bl, tx_processed_count); 
         bvc.m_verification_failed = true; 
-        bvc.m_failed_transactions.push_back(tx_id);
         };
 
       CHECK_AND_ASSERT_MES_CUSTOM(collect_rangeproofs_data_from_tx(tx, tx_id, range_proofs_agregated), false, cleanup(),
@@ -7758,7 +7755,6 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       add_block_as_invalid(bl, id);
       LOG_PRINT_L0("Block with id " << id << " added as invalid because of wrong inputs in transactions");
       bvc.m_verification_failed = true;
-      bvc.m_failed_transactions.push_back(tx_id);
       return false;
     }
     TIME_MEASURE_FINISH_PD(tx_check_inputs_time);
@@ -7783,7 +7779,6 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
        }
        purge_block_data_from_blockchain(bl, tx_processed_count);
        bvc.m_verification_failed = true;
-       bvc.m_failed_transactions.push_back(tx_id);
        return false;
     }
     TIME_MEASURE_FINISH_PD(tx_append_time);
