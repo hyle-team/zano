@@ -3,10 +3,23 @@
 #include <chrono>
 #include <cctype>
 #include <mutex>
+#include <thread>
+#include <atomic>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/process.hpp>
 #include <unordered_set>
 #include <algorithm>
+
+#if defined(_WIN32) || defined(_WIN64)
+  #include <io.h>
+  #include <windows.h>
+  #ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
+    #define ENABLE_VIRTUAL_TERMINAL_PROCESSING 0x0004
+  #endif
+#else
+  #include <unistd.h>
+  #include <sys/ioctl.h>
+#endif
 
 #include "parallel_test_runner.h"
 #include "../chaingen_args.h"
@@ -21,6 +34,73 @@ namespace
   constexpr const int UNKNOWN_ERROR_EXIT_CODE = -999;
   constexpr const int MS_PER_SECOND = 1000;
   constexpr const int RESERVE_UNIQUE_TESTS_HINT = 8192;
+
+  constexpr const int DASHBOARD_TICK_MS = 400;
+  constexpr const int DASHBOARD_FALLBACK_WIDTH = 120;
+  constexpr const uint32_t DASHBOARD_DOTS_CYCLE = 5;
+
+  bool is_stdout_tty()
+  {
+#if defined(_WIN32) || defined(_WIN64)
+    return _isatty(_fileno(stdout)) != 0;
+#else
+    return ::isatty(::fileno(stdout)) != 0;
+#endif
+  }
+
+  bool enable_ansi_terminal()
+  {
+    if (!is_stdout_tty())
+      return false;
+#if defined(_WIN32) || defined(_WIN64)
+    HANDLE h = ::GetStdHandle(STD_OUTPUT_HANDLE);
+    if (h == INVALID_HANDLE_VALUE || h == nullptr)
+      return false;
+    DWORD mode = 0;
+    if (!::GetConsoleMode(h, &mode))
+      return false;
+    if ((mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING) != 0)
+      return true;
+    return ::SetConsoleMode(h, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING) != 0;
+#else
+    return true;
+#endif
+  }
+
+  int get_terminal_width()
+  {
+#if defined(_WIN32) || defined(_WIN64)
+    CONSOLE_SCREEN_BUFFER_INFO info{};
+    HANDLE h = ::GetStdHandle(STD_OUTPUT_HANDLE);
+    if (h && ::GetConsoleScreenBufferInfo(h, &info))
+    {
+      int w = static_cast<int>(info.srWindow.Right - info.srWindow.Left + 1);
+      if (w > 0)
+        return w;
+    }
+    return DASHBOARD_FALLBACK_WIDTH;
+#else
+    struct winsize ws{};
+    if (::ioctl(::fileno(stdout), TIOCGWINSZ, &ws) == 0 && ws.ws_col > 0)
+      return static_cast<int>(ws.ws_col);
+    return DASHBOARD_FALLBACK_WIDTH;
+#endif
+  }
+
+  std::string fit_to_width(const std::string& s, int max_width)
+  {
+    if (max_width <= 4)
+      return s.substr(0, static_cast<size_t>(std::max(max_width, 0)));
+    if (static_cast<int>(s.size()) <= max_width)
+      return s;
+    return s.substr(0, static_cast<size_t>(max_width - 3)) + "...";
+  }
+
+  std::string dots_for_frame(uint32_t frame)
+  {
+    const uint32_t n = (frame % DASHBOARD_DOTS_CYCLE) + 1;
+    return std::string(n, '.');
+  }
 }
 
 parallel_test_runner::parallel_test_runner(
@@ -366,7 +446,6 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std
 
     std::vector<worker_proc> kids;
     kids.reserve(processes);
-    std::mutex cout_mutex;
     fill_shm_work_order(st, g_test_jobs);
 
     for (uint32_t i = 0; i < processes; ++i)
@@ -406,17 +485,11 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std
           bp::std_out > *wp.out
         );
 
-        wp.reader = std::thread([&, out = wp.out.get(), f = wp.file.get()]()
+        wp.reader = std::thread([out = wp.out.get(), f = wp.file.get()]()
         {
           std::string line;
-           while (std::getline(*out, line))
-           {
+          while (std::getline(*out, line))
             (*f) << line << '\n';
-            {
-              std::lock_guard<std::mutex> lk(cout_mutex);
-              std::cout << line << '\n';
-            }
-           }
         });
 
         kids.emplace_back(std::move(wp));
@@ -439,8 +512,22 @@ int parallel_test_runner::run_workers_and_wait(int argc, char* argv[], const std
       }
     }
 
+    std::atomic<bool> dashboard_stop{false};
+    std::thread dashboard;
+    if (!kids.empty())
+    {
+      dashboard = std::thread([this, &dashboard_stop, st, processes, &g_test_jobs]()
+      {
+        dashboard_loop(dashboard_stop, st, processes, g_test_jobs);
+      });
+    }
+
     for (auto& p : kids)
       p.child.wait();
+
+    dashboard_stop.store(true, std::memory_order_release);
+    if (dashboard.joinable())
+      dashboard.join();
 
     for (auto& p : kids)
       if (p.reader.joinable())
@@ -761,4 +848,92 @@ bool parallel_test_runner::fill_shm_work_order(coretests_shm::shared_state* st, 
     st->order[pos] = items[pos].idx;
 
   return true;
+}
+
+void parallel_test_runner::dashboard_loop(std::atomic<bool>& stop_flag, const coretests_shm::shared_state* st,
+  uint32_t processes, const std::vector<test_job>& jobs) const
+{
+  if (!st || jobs.empty())
+    return;
+
+  const bool ansi_ok = enable_ansi_terminal();
+  const uint32_t workers_capped = std::min<uint32_t>(processes, coretests_shm::k_max_workers);
+  const size_t jobs_capped = std::min<size_t>(jobs.size(), coretests_shm::k_max_tests);
+
+  std::vector<bool> reported(jobs.size(), false);
+  size_t prev_live_lines = 0;
+  uint32_t frame = 0;
+
+  auto flush_completions = [&]() -> size_t
+  {
+    size_t emitted = 0;
+    for (size_t i = 0; i < jobs_capped; ++i)
+    {
+      if (reported[i])
+        continue;
+      const uint8_t s = st->test_status_arr[i].load(std::memory_order_acquire);
+      if (s == coretests_shm::ts_ok)
+      {
+        std::cout << concolor::green << "[ OK ]  " << concolor::normal << jobs[i].name << '\n';
+        reported[i] = true;
+        ++emitted;
+      }
+      else if (s == coretests_shm::ts_failed)
+      {
+        std::cout << concolor::magenta << "[FAIL]  " << concolor::normal << jobs[i].name << '\n';
+        reported[i] = true;
+        ++emitted;
+      }
+    }
+    return emitted;
+  };
+
+  auto erase_prev_live_zone = [&]()
+  {
+    if (!ansi_ok || prev_live_lines == 0)
+      return;
+    std::cout << "\r\033[" << prev_live_lines << "A\033[J";
+    prev_live_lines = 0;
+  };
+
+  auto draw_live_zone = [&]() -> size_t
+  {
+    if (!ansi_ok)
+      return 0;
+
+    const int width = get_terminal_width();
+    const std::string dots = dots_for_frame(frame);
+
+    size_t lines = 0;
+    for (uint32_t wid = 0; wid < workers_capped; ++wid)
+    {
+      const uint16_t v = st->worker_running_test[wid].load(std::memory_order_acquire);
+      if (v == coretests_shm::k_no_test)
+        continue;
+      if (v >= jobs.size())
+        continue;
+
+      std::string line = "*  " + jobs[v].name + "  [w" + std::to_string(wid) + "]  " + dots;
+      line = fit_to_width(line, width - 1);
+
+      std::cout << concolor::yellow << line << concolor::normal << '\n';
+      ++lines;
+    }
+    return lines;
+  };
+
+  while (!stop_flag.load(std::memory_order_acquire))
+  {
+    erase_prev_live_zone();
+    flush_completions();
+    prev_live_lines = draw_live_zone();
+    std::cout.flush();
+
+    ++frame;
+    std::this_thread::sleep_for(std::chrono::milliseconds(DASHBOARD_TICK_MS));
+  }
+
+  erase_prev_live_zone();
+  flush_completions();
+  std::cout.flush();
 }
