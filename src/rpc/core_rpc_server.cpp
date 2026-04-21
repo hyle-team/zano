@@ -1783,6 +1783,21 @@ namespace currency
     TIME_MEASURE_FINISH(t);
     LOG_PRINT_L1("COMMAND_RPC_GETBLOCKTEMPLATE -- OK  (took " << std::setprecision(2) << t / 1000.0 << " ms)");
     LOG_PRINT_L2("response block: " << ENDL << currency::obj_to_json_str(resp.b));
+
+    if (req.do_explicit_simulation)
+    {
+      currency::block_verification_context bvc = AUTO_VAL_INIT(bvc);
+      bvc.do_just_simulation = true;
+      bool r = m_core.get_blockchain_storage().add_new_block(resp.b, bvc);
+      if (!r)
+      {
+        res.status = API_RETURN_CODE_FAIL;
+        LOG_ERROR("Explicit simulation of block template failed, block was rejected by the core");
+        return false;
+      }
+    }
+      
+
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
@@ -1822,6 +1837,8 @@ namespace currency
       }
       error_resp.code = CORE_RPC_ERROR_CODE_BLOCK_NOT_ACCEPTED;
       error_resp.message = "Block not accepted";
+
+      do_explicit_block_simulations();
       return false;
     }
 
@@ -1867,11 +1884,40 @@ namespace currency
       }
       error_resp.code = CORE_RPC_ERROR_CODE_BLOCK_NOT_ACCEPTED;
       error_resp.message = "Block not accepted";
+
+      do_explicit_block_simulations();
       return false;
     }
 
     res.status = "OK";
     return true;
+  }
+  //------------------------------------------------------------------------------------------------------------------------------
+  void core_rpc_server::do_explicit_block_simulations()
+  {
+    //do perform explicit simulation to blacklist failing pool transactions, if any
+    LOG_PRINT_MAGENTA("Performing explicit simulation to blacklist failing pool transactions", LOG_LEVEL_0);
+    std::string simulation_result_str;
+    size_t sim_count = 0;
+    account_base acc;
+    acc.generate();
+    while (simulation_result_str != API_RETURN_CODE_OK)
+    {
+      //calling getblocktemplate in simulation mode
+      currency::COMMAND_RPC_GETBLOCKTEMPLATE::request tmpl_req_sim = AUTO_VAL_INIT(tmpl_req_sim);
+      currency::COMMAND_RPC_GETBLOCKTEMPLATE::response tmpl_rsp_sim = AUTO_VAL_INIT(tmpl_rsp_sim);
+      tmpl_req_sim.wallet_address = get_account_address_as_str(acc.get_public_address());
+      tmpl_req_sim.stakeholder_address = get_account_address_as_str(acc.get_public_address());
+      tmpl_req_sim.pos_block = false;
+      tmpl_req_sim.do_explicit_simulation = true;
+      epee::json_rpc::error error_resp = AUTO_VAL_INIT(error_resp);
+      connection_context cntx = AUTO_VAL_INIT(cntx);
+      this->on_getblocktemplate(tmpl_req_sim, tmpl_rsp_sim, error_resp, cntx);
+      simulation_result_str = tmpl_rsp_sim.status;
+      sim_count++;
+    }
+
+    LOG_PRINT_MAGENTA("Explicit simulation done, iterations: " << sim_count, LOG_LEVEL_0);
   }
   //------------------------------------------------------------------------------------------------------------------------------
   uint64_t core_rpc_server::get_block_reward(const block& blk, const crypto::hash& h)

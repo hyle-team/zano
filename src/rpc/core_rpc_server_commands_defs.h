@@ -1252,6 +1252,7 @@ namespace currency
       std::string stakeholder_address;           // address for stake return (PoS blocks)
       pos_entry pe;                              // for PoS blocks
       bool pos_block;                            // is pos block 
+      bool do_explicit_simulation = false;       // if true, then the RPC server simulate insertion of the block to the core and if it's failed the transactions that failed it would be blacklisted
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_BLOB_AS_HEX_STRING(explicit_transaction) DOC_DSCR("A transaction blob that must be explicitly included in the block.") DOC_EXMP("5fa8eaaf231a305053260ff91d69c6ef1ecbd0f5") DOC_END
@@ -1260,6 +1261,7 @@ namespace currency
         KV_SERIALIZE(stakeholder_address)        DOC_DSCR("Address where the stake is returned for PoS blocks (usually the same as 'wallet_address').") DOC_END
         KV_SERIALIZE(pe)                         DOC_DSCR("PoS entry details, relevant only for PoS block generation.") DOC_END
         KV_SERIALIZE(pos_block)                  DOC_DSCR("Flag indicating whether the block is a PoS block.") DOC_EXMP(false) DOC_END
+        KV_SERIALIZE(do_explicit_simulation)     DOC_DSCR("if true, then the RPC server simulate insertion of the block to the core and if it's failed the transactions that failed it would be blacklisted") DOC_EXMP(false) DOC_END
       END_KV_SERIALIZE_MAP()
     };
 

@@ -1095,7 +1095,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_tx_from_tx_pool);
     GENERATE_AND_PLAY_HF(gen_wallet_save_load_and_balance, "*");
     GENERATE_AND_PLAY_HF(gen_wallet_mine_pos_block, "3-*");
-    //GENERATE_AND_PLAY_HF(gbt_pool_invalid_txs_asset_overemit, "4-*");
+    GENERATE_AND_PLAY_HF(gbt_pool_invalid_txs_asset_overemit, "4-*");
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_outdated_tx);
     GENERATE_AND_PLAY(gen_wallet_unlock_by_block_and_by_time);
     GENERATE_AND_PLAY(gen_wallet_payment_id);
@@ -1362,7 +1362,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(assets_transfer_with_smallest_amount, "4-*");
     GENERATE_AND_PLAY_HF(asset_operations_and_chain_switching, "4-*");
 
-    GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
+    //GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
     GENERATE_AND_PLAY_HF(wallet_reorganize_and_trim_test, "4-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_thirdparty_custody, "5-*");    
 

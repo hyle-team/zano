@@ -7629,11 +7629,14 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   //check if PoS allowed in this height
   CHECK_AND_ASSERT_MES_CUSTOM(!(is_pos_bl && m_db_blocks.size() < m_core_runtime_config.pos_minimum_heigh), false, bvc.m_verification_failed = true, "PoS block not allowed on height " << m_db_blocks.size());
 
-  if (!prevalidate_miner_transaction(bl, m_db_blocks.size(), is_pos_bl))
+  if (!bvc.do_just_simulation)
   {
-    LOG_PRINT_L0("Block with id: " << id << " @ " << height << " failed to pass miner tx prevalidation");
-    bvc.m_verification_failed = true;
-    return false;
+    if (!prevalidate_miner_transaction(bl, m_db_blocks.size(), is_pos_bl))
+    {
+      LOG_PRINT_L0("Block with id: " << id << " @ " << height << " failed to pass miner tx prevalidation");
+      bvc.m_verification_failed = true;
+      return false;
+    }
   }
 
   //check proof of work
@@ -7643,27 +7646,30 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
   TIME_MEASURE_FINISH_PD(target_calculating_time_2);
 
  TIME_MEASURE_START_PD(longhash_calculating_time_3);
-  if (is_pos_bl)
-  {
-    bool r = validate_pos_block(bl, current_diffic, pos_coinstake_amount, this_coin_diff, proof_hash, id, false);
+ if (!bvc.do_just_simulation)
+ {
+   if (is_pos_bl)
+   {
+     bool r = validate_pos_block(bl, current_diffic, pos_coinstake_amount, this_coin_diff, proof_hash, id, false);
      CHECK_AND_ASSERT_MES_CUSTOM(r, false, bvc.m_verification_failed = true, "validate_pos_block failed!!");
-  }
-  else
-  {
+   }
+   else
+   {
 
-    proof_hash = get_block_longhash(bl);
+     proof_hash = get_block_longhash(bl);
 
-    if (!check_hash(proof_hash, current_diffic))
-    {
-      LOG_ERROR("Block with id: " << id << ENDL
-        << "PoW hash: " << proof_hash << ENDL 
-        << "nonce: " << bl.nonce << ENDL
-        << "header_mining_hash: " << get_block_header_mining_hash(bl) << ENDL        
-        << "expected difficulty: " << current_diffic);
-      bvc.m_verification_failed = true;
-      return false;
-    }
-  }
+     if (!check_hash(proof_hash, current_diffic))
+     {
+       LOG_ERROR("Block with id: " << id << ENDL
+         << "PoW hash: " << proof_hash << ENDL
+         << "nonce: " << bl.nonce << ENDL
+         << "header_mining_hash: " << get_block_header_mining_hash(bl) << ENDL
+         << "expected difficulty: " << current_diffic);
+       bvc.m_verification_failed = true;
+       return false;
+     }
+   }
+ }
   TIME_MEASURE_FINISH_PD(longhash_calculating_time_3);
 
   size_t aliases_count_befor_block = m_db_aliases.size();
@@ -7918,6 +7924,13 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     TIME_MEASURE_FINISH_PD(verify_multiple_zc_outs_range_proofs_time);
   }
 
+
+  if (bvc.do_just_simulation)
+  {
+    //clean up all data added to storage during simulation
+    purge_block_data_from_blockchain(bl, tx_processed_count);
+    return true;
+  }
 
   //fill block_extended_info
   block_extended_info bei = boost::value_initialized<block_extended_info>();
@@ -8307,6 +8320,8 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
     {
       //chain switching or wrong block
       bvc.m_added_to_main_chain = false;
+      if (bvc.do_just_simulation)
+        return false;
       bool r = handle_alternative_block(bl, id, bvc);
       if (!r || bvc.m_verification_failed)
       {
@@ -8332,7 +8347,16 @@ bool blockchain_storage::add_new_block(const block& bl, block_verification_conte
       if (m_event_handler) m_event_handler->on_clear_events();
       return res;
     }
-    db_tx_ptr->commit_transaction();
+    if(bvc.do_just_simulation)
+    {
+      db_tx_ptr->abort_transaction();
+      m_tx_pool.on_finalize_db_transaction();
+      on_abort_transaction();
+      if (m_event_handler) m_event_handler->on_clear_events();
+      return true;
+    }
+
+    db_tx_ptr->commit_transaction(); 
     CHECK_AND_ASSERT_MES(validate_blockchain_prev_links(), false, "EPIC FAIL! 3");
     m_tx_pool.on_finalize_db_transaction();
     if (m_event_handler) m_event_handler->on_complete_events();

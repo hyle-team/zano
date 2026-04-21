@@ -215,6 +215,7 @@ namespace currency
     bool fill_block_header_response(const block& blk, bool orphan_status, block_header_response& response);
     void set_session_blob(const std::string& session_id, const currency::block& blob);
     bool get_session_blob(const std::string& session_id, currency::block& blob);
+    void do_explicit_block_simulations();
     
     core& m_core;
     nodetool::node_server<currency::t_currency_protocol_handler<currency::core> >& m_p2p;
