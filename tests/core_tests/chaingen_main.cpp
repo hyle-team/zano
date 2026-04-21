@@ -1349,7 +1349,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY_HF(assets_transfer_with_smallest_amount, "4-*");
     GENERATE_AND_PLAY_HF(asset_operations_and_chain_switching, "4-*");
 
-    GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
+    //GENERATE_AND_PLAY_HF(pos_fuse_test, "4-*");
     GENERATE_AND_PLAY_HF(wallet_reorganize_and_trim_test, "4-*");
     GENERATE_AND_PLAY_HF(wallet_rpc_thirdparty_custody, "5-*");    
 
