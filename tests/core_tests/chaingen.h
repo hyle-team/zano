@@ -684,7 +684,8 @@ bool construct_tx_to_key(const currency::hard_forks_descriptor& hf,
                          const std::vector<currency::payload_items_v>& att = empty_attachment, 
                          bool check_for_spends = true,
                          bool check_for_unlocktime = true,
-                         bool use_ref_by_id = false);
+                         bool use_ref_by_id = false,
+                         bool shuffle = true);
 
 currency::transaction construct_tx_with_fee(const currency::hard_forks_descriptor& hf, std::vector<test_event_entry>& events, const currency::block& blk_head,
                                             const currency::account_base& acc_from, const currency::account_base& acc_to,

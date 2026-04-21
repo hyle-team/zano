@@ -1906,6 +1906,13 @@ bool simple_wallet::transfer_impl(const std::vector<std::string> &args_, uint64_
       return true;
     }
 
+    bool self_directed_destination = (de.addr.front().type() == typeid(account_public_address) ? (boost::get<account_public_address>(de.addr.front()) == m_wallet->get_account().get_public_address()) : false);
+    if (self_directed_destination && embedded_payment_id.size() != 0)
+    {
+      fail_msg_writer() << "transfers with an integrated address to self is not allowed: " << arg_address;
+      return true;
+    }
+
     //
     // payment id processing logic (must be consistent with rpc_fill_destinations_helper(), consider code reuse -- sowle)
     //

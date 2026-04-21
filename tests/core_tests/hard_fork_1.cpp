@@ -730,7 +730,7 @@ bool hard_fork_1_pos_locked_height_vs_time::generate(std::vector<test_event_entr
   destinations.push_back(tx_destination_entry(stake_amount, bob_acc.get_public_address()));
 
   transaction tx_0 = AUTO_VAL_INIT(tx_0);
-  r = construct_tx_to_key(m_hardforks, events, tx_0, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra);
+  r = construct_tx_to_key(m_hardforks, events, tx_0, blk_0r, miner_acc, destinations, TESTS_DEFAULT_FEE, 0, 0, extra, std::vector<currency::attachment_v>(), true, true, false, false /* no shuffle */);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
   events.push_back(tx_0);
 

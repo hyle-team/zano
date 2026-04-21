@@ -3465,8 +3465,7 @@ bool wallet_rpc_and_tx_unlock_time::generate(std::vector<test_event_entry>& even
   extra.push_back(unlock_time2);
 
   crypto::secret_key one_time_secret_key{};
-  // TODO add no shuffle here
-  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, tx_version, tx_hardfork_id, one_time_secret_key, unlock_time);
+  r = construct_tx(miner_acc.get_keys(), sources, destinations, extra, empty_attachment, tx_0, tx_version, tx_hardfork_id, one_time_secret_key, unlock_time, CURRENCY_TO_KEY_OUT_RELAXED, false);
   CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
   if (m_hardforks.is_hardfork_active_for_height(ZANO_HARDFORK_06, get_block_height(blk_0r) + 1))
