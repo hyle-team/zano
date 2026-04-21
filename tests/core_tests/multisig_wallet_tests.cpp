@@ -1459,7 +1459,7 @@ bool multisig_and_coinbase::generate(std::vector<test_event_entry>& events) cons
     r = fill_tx_sources_and_destinations(events, prev_block, miner_acc.get_keys(), ms_addr_list, blk_2_reward, TESTS_DEFAULT_FEE, 0, sources, destinations, false, false, 1);
     CHECK_AND_ASSERT_MES(r, false, "fill_tx_sources_and_destinations failed");
     transaction miner_tx = AUTO_VAL_INIT(miner_tx);
-    r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, miner_tx, get_tx_version_from_events(events), 0, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW, CURRENCY_TO_KEY_OUT_RELAXED, true);
+    r = construct_tx(miner_acc.get_keys(), sources, destinations, empty_attachment, miner_tx, get_tx_version_from_events(events), 0, height + CURRENCY_MINED_MONEY_UNLOCK_WINDOW, CURRENCY_TO_KEY_OUT_RELAXED, false);
     CHECK_AND_ASSERT_MES(r, false, "construct_tx failed");
 
     // replace vin with coinbase input
