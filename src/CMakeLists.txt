@@ -206,6 +206,7 @@ if(BUILD_GUI)
   set(CMAKE_INCLUDE_CURRENT_DIR ON)
   SET(MACOSX_BUNDLE_ICON_FILE app.icns)
   add_executable(Zano WIN32 MACOSX_BUNDLE ${QTDAEMON} )
+  add_dependencies(Zano version html_content_hash)
 
   #####  embed html into resources  ######
   set(HTML_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gui/qt-daemon/layout/html)
