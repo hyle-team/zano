@@ -1877,16 +1877,12 @@ bool blockchain_storage::create_block_template(const create_block_template_param
   if (!pos && !params.ignore_pow_ts_check)
   {
     uint64_t median_ts = get_last_n_blocks_timestamps_median(BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW);
-    if(b.timestamp < median_ts)
+    if (b.timestamp < median_ts)
     {
       LOG_PRINT_YELLOW("Block template construction failed because current core timestamp, " << b.timestamp << ", is less than median of last " << BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW << " blocks, " << median_ts, LOG_LEVEL_2);
       return false;
     }
   }
-
-
-
-  
 
   median_size = m_db_current_block_cumul_sz_limit / 2;
   already_generated_coins = m_db_blocks.back()->already_generated_coins;
@@ -1908,6 +1904,13 @@ bool blockchain_storage::create_block_template(const create_block_template_param
 
   size_t tx_hardfork_id = 0;
   size_t tx_version = get_tx_version_and_hardfork_id(height, m_core_runtime_config.hard_forks, tx_hardfork_id);
+
+  if (tx_hardfork_id >= ZANO_HARDFORK_06)
+  {
+    etc_coinbase_block_cumulative_size entry = {};
+    entry.v = txs_size;
+    b.miner_tx.extra.push_back(entry);
+  }
 
   /* 
       instead of complicated two-phase template construction and adjustment of cumulative size with block reward we
@@ -1931,8 +1934,17 @@ bool blockchain_storage::create_block_template(const create_block_template_param
   CHECK_AND_ASSERT_MES(r, false, "Failed to construc miner tx, first chance");
   uint64_t coinbase_size = get_object_blobsize(b.miner_tx);
   // "- 100" - to reserve room for PoS additions into miner tx
-  CHECK_AND_ASSERT_MES(coinbase_size < CURRENCY_COINBASE_BLOB_RESERVED_SIZE - 100, false, "Failed to get block template (coinbase_size = " << coinbase_size << ") << coinbase structue: " 
-    << ENDL << obj_to_json_str(b.miner_tx));
+  if (b.miner_tx.hardfork_id >= ZANO_HARDFORK_06)
+  {
+    CHECK_AND_ASSERT_MES(coinbase_size < CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6, false, "Failed to get block template (coinbase_size = " << coinbase_size << ") << coinbase structue: "
+      << ENDL << obj_to_json_str(b.miner_tx));
+  }
+  else
+  {
+    CHECK_AND_ASSERT_MES(coinbase_size < CURRENCY_COINBASE_BLOB_RESERVED_SIZE - 100, false, "Failed to get block template (coinbase_size = " << coinbase_size << ") << coinbase structue: "
+      << ENDL << obj_to_json_str(b.miner_tx));
+  }
+
   return true;
 }
 //------------------------------------------------------------------
@@ -7072,11 +7084,14 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     }
 
     size_t count_ado = 0;
+    size_t count_etc_coinbase_block_cumulative_size = 0;
     //extra
     for (const auto& el : tx.extra)
     {
       if (el.type() == typeid(asset_descriptor_operation))
         count_ado++;
+      else if (el.type() == typeid(etc_coinbase_block_cumulative_size))
+        count_etc_coinbase_block_cumulative_size++;
     }
     if (count_ado > 1)
     {
@@ -7088,6 +7103,12 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       LOG_ERROR("asset_descriptor_operation not allowed in tx with TX_FLAG_SIGNATURE_MODE_SEPARATE");
       return false;
     }
+    if (count_etc_coinbase_block_cumulative_size > 0 && !is_coinbase(tx))
+    {
+      LOG_ERROR("etc_coinbase_block_cumulative_size is allowed only for PoS coinbase transactions");
+      return false;
+    }
+
   }
   bool var_is_after_hardfork_5_zone = m_core_runtime_config.is_hardfork_active_for_height(5, block_height);
   if (var_is_after_hardfork_5_zone)
@@ -7113,6 +7134,8 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
     CHECK_AND_ASSERT_MES(tx.vin.size() <= CURRENCY_TX_MAX_ALLOWED_INPUTS, false, "transaction has too many inputs = " << tx.vin.size());
     CHECK_AND_ASSERT_MES(tx.vout.size() <= CURRENCY_TX_MAX_ALLOWED_OUTS,  false, "transaction has too many outputs = " << tx.vout.size());
   }
+
+
 
 
   return true;
@@ -7652,10 +7675,23 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
       instead of complicated two-phase template construction and adjustment of cumulative size with block reward we
       use CURRENCY_COINBASE_BLOB_RESERVED_SIZE as penalty-free coinbase transaction reservation.
   */
-  if (coinbase_blob_size > CURRENCY_COINBASE_BLOB_RESERVED_SIZE)
-  {
-    cumulative_block_size += coinbase_blob_size;
-    LOG_PRINT_CYAN("Big coinbase transaction detected: coinbase_blob_size = " << coinbase_blob_size, LOG_LEVEL_0);
+  if (!is_hardfork_active(ZANO_HARDFORK_06))
+  {//pre-HF6 zone
+    if (coinbase_blob_size > CURRENCY_COINBASE_BLOB_RESERVED_SIZE)
+    {
+      cumulative_block_size += coinbase_blob_size;
+      LOG_PRINT_CYAN("Big coinbase transaction detected: coinbase_blob_size = " << coinbase_blob_size, LOG_LEVEL_0);
+    }
+  }
+  else
+  {//HF6 zone
+    if (coinbase_blob_size > CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6)
+    {
+      LOG_PRINT_L0("Block with id: " << id << " has too big miner transaction blob size: " << coinbase_blob_size
+        << ", which is more than allowed by CURRENCY_COINBASE_BLOB_RESERVED_SIZE = " << CURRENCY_COINBASE_BLOB_RESERVED_SIZE << " under ZANO_HARDFORK_06");
+      bvc.m_verification_failed = true;
+      return false;
+    }
   }
   
   std::vector<uint64_t> block_fees;
@@ -7803,6 +7839,37 @@ bool blockchain_storage::handle_block_to_main_chain(const block& bl, const crypt
     purge_block_data_from_blockchain(bl, tx_processed_count);
     bvc.m_verification_failed = true;
     return false;
+  }
+
+  if (is_hardfork_active(ZANO_HARDFORK_06))
+  {
+    etc_coinbase_block_cumulative_size ecbs = AUTO_VAL_INIT(ecbs);
+    bool r = get_type_in_variant_container(bl.miner_tx.extra, ecbs);
+    if (!r)
+    {
+      purge_block_data_from_blockchain(bl, tx_processed_count);
+      add_block_as_invalid(bl, id);
+      LOG_PRINT_RED_L0("Block with id " << id << " added as invalid because of missing etc_coinbase_block_cumulative_size in coinbase extra under ZANO_HARDFORK_06");
+      bvc.m_verification_failed = true;
+      return false;
+    }
+
+    if (m_is_in_checkpoint_zone)
+    {
+      //Override cumulative block size with value from coinbase extra for blocks in checkpoint zone to avoid possible mismatches due to pruning of old transactions attachments, signatures and proofs under checkpoints
+      cumulative_block_size = ecbs.v;
+    }
+    else
+    {
+      if (cumulative_block_size != ecbs.v)
+      {
+        purge_block_data_from_blockchain(bl, tx_processed_count);
+        add_block_as_invalid(bl, id);
+        LOG_PRINT_RED_L0("Block with id " << id << " added as invalid because of missmatch of cumulative_block_size(" << cumulative_block_size << ") and etc_coinbase_block_cumulative_size(" << ecbs.v << ") in coinbase extra under ZANO_HARDFORK_06");
+        bvc.m_verification_failed = true;
+        return false;
+      }
+    }
   }
 
   uint64_t block_reward_without_fee = 0;

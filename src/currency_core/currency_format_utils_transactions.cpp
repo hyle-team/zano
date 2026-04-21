@@ -709,14 +709,32 @@ namespace currency
   {
     blob_size = 0;
     bool r = get_object_hash(static_cast<const transaction_prefix&>(t), res, blob_size);
-    blob_size = get_object_blobsize(t, blob_size);
+    if (t.hardfork_id < ZANO_HARDFORK_06)
+    {
+      blob_size = get_object_blobsize_legacy(t, blob_size);
+    }
+    else
+    {
+      blob_size = get_object_blobsize(t);
+    }
     return r;
   }
   //---------------------------------------------------------------
   size_t get_object_blobsize(const transaction& t)
   {
-    size_t tx_blob_size = get_object_blobsize(static_cast<const transaction_prefix&>(t));
-    return get_object_blobsize(t, tx_blob_size);
+    if (t.hardfork_id < ZANO_HARDFORK_06)
+    {
+      size_t tx_blob_size = get_object_blobsize(static_cast<const transaction_prefix&>(t));
+      return get_object_blobsize_legacy(t, tx_blob_size);
+    }
+    blobdata b = t_serializable_object_to_blob(t);
+    return b.size();
+  }
+  //---------------------------------------------------------------
+  size_t get_tx_real_blobsize(const transaction& t)
+  {
+    blobdata b = t_serializable_object_to_blob(t);
+    return b.size();
   }
   //---------------------------------------------------------------
   size_t get_objects_blobsize(const std::list<transaction>& ls)
@@ -745,8 +763,11 @@ namespace currency
     return boost::apply_visitor(txin_signature_size_visitor(last_input_in_separately_signed_tx ? 1 : 0), tx_in);
   }
   //---------------------------------------------------------------
-  size_t get_object_blobsize(const transaction& t, uint64_t prefix_blob_size)
+  size_t get_object_blobsize_legacy(const transaction& t, uint64_t prefix_blob_size)
   {
+    CHECK_AND_ASSERT_THROW_MES(t.hardfork_id < ZANO_HARDFORK_06, "get_object_blobsize_legacy is not expected to be called for HF6+ txs");
+
+
     size_t tx_blob_size = prefix_blob_size;
 
     if (is_coinbase(t))

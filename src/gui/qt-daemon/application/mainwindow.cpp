@@ -1431,7 +1431,7 @@ QString MainWindow::request_alias_registration(const QString& param)
 
   ar.response_data.success = true;
   ar.response_data.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
-  ar.response_data.tx_blob_size = currency::get_object_blobsize(res_tx);
+  ar.response_data.tx_blob_size = currency::get_tx_real_blobsize(res_tx);
   ar.error_code = API_RETURN_CODE_OK;
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
@@ -1452,7 +1452,7 @@ QString MainWindow::request_alias_update(const QString& param)
 
   ar.response_data.success = true;
   ar.response_data.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
-  ar.response_data.tx_blob_size = currency::get_object_blobsize(res_tx);
+  ar.response_data.tx_blob_size = currency::get_tx_real_blobsize(res_tx);
   ar.error_code = API_RETURN_CODE_OK;
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
@@ -1478,7 +1478,7 @@ QString MainWindow::transfer(const QString& param)
 
   ar.response_data.success = true;
   ar.response_data.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
-  ar.response_data.tx_blob_size = currency::get_object_blobsize(res_tx);
+  ar.response_data.tx_blob_size = currency::get_tx_real_blobsize(res_tx);
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
 }
@@ -2233,7 +2233,7 @@ QString MainWindow::push_offer(const QString& param)
   
   ar.response_data.success = true;
   ar.response_data.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
-  ar.response_data.tx_blob_size = currency::get_object_blobsize(res_tx);
+  ar.response_data.tx_blob_size = currency::get_tx_real_blobsize(res_tx);
   ar.error_code = API_RETURN_CODE_OK;
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
@@ -2256,7 +2256,7 @@ QString MainWindow::cancel_offer(const QString& param)
 
   ar.response_data.success = true;
   ar.response_data.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
-  ar.response_data.tx_blob_size = currency::get_object_blobsize(res_tx);
+  ar.response_data.tx_blob_size = currency::get_tx_real_blobsize(res_tx);
   ar.error_code = API_RETURN_CODE_OK;
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();
@@ -2279,7 +2279,7 @@ QString MainWindow::push_update_offer(const QString& param)
 
   ar.response_data.success = true;
   ar.response_data.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
-  ar.response_data.tx_blob_size = currency::get_object_blobsize(res_tx);
+  ar.response_data.tx_blob_size = currency::get_tx_real_blobsize(res_tx);
   ar.error_code = API_RETURN_CODE_OK;
   return MAKE_RESPONSE(ar);
   CATCH_ENTRY_FAIL_API_RESPONCE();

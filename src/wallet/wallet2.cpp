@@ -71,7 +71,6 @@ namespace tools
   wallet2::wallet2()
     : m_stop(false)
     , m_core_proxy(new default_http_core_proxy())
-    , m_upper_transaction_size_limit(0)
     , m_fake_outputs_count(0)
     , m_do_rise_transfer(false)
     , m_log_prefix("???")
@@ -1510,7 +1509,7 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, const proces
   wti.employed_entries = tx_process_context.employed_entries;
   wti.unlock_time = get_max_unlock_time_from_receive_indices(tx_process_context.tx, tx_process_context.employed_entries);
   wti.timestamp = tx_process_context.timestamp;
-  wti.tx_blob_size = static_cast<uint32_t>(currency::get_object_blobsize(wti.tx));
+  wti.tx_blob_size = static_cast<uint32_t>(currency::get_tx_real_blobsize(wti.tx));
   wti.tx_hash = tx_process_context.tx_hash();
   load_wallet_transfer_info_flags(wti);
   bc_services::extract_market_instructions(wti.marketplace_entries, wti.tx.attachment);
@@ -2080,18 +2079,6 @@ void wallet2::transfer(uint64_t amount, const currency::account_public_address& 
 void wallet2::reset_creation_time(uint64_t timestamp)
 {
   m_account.set_createtime(timestamp);
-}
-//----------------------------------------------------------------------------------------------------
-void wallet2::update_current_tx_limit()
-{
-  currency::COMMAND_RPC_GET_INFO::request req = AUTO_VAL_INIT(req);
-  currency::COMMAND_RPC_GET_INFO::response res = AUTO_VAL_INIT(res);
-  bool r = m_core_proxy->call_COMMAND_RPC_GET_INFO(req, res);
-  THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "getinfo");
-  THROW_IF_TRUE_WALLET_EX(res.status == API_RETURN_CODE_BUSY, error::daemon_busy, "getinfo");
-  THROW_IF_TRUE_WALLET_EX(res.status != API_RETURN_CODE_OK, error::get_blocks_error, res.status);
-  THROW_IF_TRUE_WALLET_EX(res.current_blocks_median < CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE, error::get_blocks_error, "bad median size");
-  m_upper_transaction_size_limit = res.current_blocks_median - CURRENCY_COINBASE_BLOB_RESERVED_SIZE;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::has_related_alias_entry_unconfirmed(const currency::transaction& tx)

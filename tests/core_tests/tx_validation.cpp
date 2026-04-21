@@ -2509,6 +2509,7 @@ bool tx_coinbase_separate_sig_flag::generate(std::vector<test_event_entry>& even
   REWIND_BLOCKS_N(events, blk_1r, blk_1, miner, CURRENCY_MINED_MONEY_UNLOCK_WINDOW + 1);
 
   block blk_2;
+
   auto coinbase_default_cb = [](transaction& miner_tx, const keypair&) -> bool { return true; };
   auto coinbase_separate_cb = [](transaction& miner_tx, const keypair&) -> bool
   {

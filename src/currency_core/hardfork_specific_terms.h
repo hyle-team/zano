@@ -102,6 +102,7 @@ namespace currency
     DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    extra,             zarcanum_tx_data_v1                );
     DEFINE_TERMS(   no,   no,   no,   no,   one,  one,  one,  one,    extra,             asset_descriptor_operation         );
     DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  one,    extra,             gateway_address_descriptor_operation);
+    DEFINE_TERMS(   no,   no,   no,   no,   no,   no,   one,  one,    extra,             etc_coinbase_block_cumulative_size );    
       //inputs
     DEFINE_TERMS(   one,  one,  one,  one,  one,  one,  one,  one,    input,             txin_gen                           );
     DEFINE_TERMS(   many, many, many, many, many, many, many, many,   input,             txin_to_key                        );
