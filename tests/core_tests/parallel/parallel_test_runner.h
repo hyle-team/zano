@@ -21,7 +21,18 @@ namespace coretests_shm
 {
   constexpr uint32_t k_max_fails = 4096;
   constexpr uint32_t k_max_tests = 20000;
-  constexpr uint32_t k_name_max  = 256;
+  constexpr uint32_t k_max_workers = 256;
+  constexpr uint32_t k_name_max = 256;
+
+  constexpr uint16_t k_no_test = 0xFFFF;
+
+  enum test_status : uint8_t
+  {
+    ts_pending = 0,
+    ts_running = 1,
+    ts_ok = 2,
+    ts_failed = 3,
+  };
 
   struct fail_entry
   {
@@ -42,6 +53,9 @@ namespace coretests_shm
 
     uint32_t order[k_max_tests];
 
+    std::atomic<uint8_t> test_status_arr[k_max_tests];
+    std::atomic<uint16_t> worker_running_test[k_max_workers];
+
     void record_fail(uint32_t wid, const char* name)
     {
       const uint32_t pos = write_idx.fetch_add(1, std::memory_order_acq_rel);
@@ -59,6 +73,11 @@ namespace coretests_shm
       next_pos.store(0, std::memory_order_relaxed);
       tests_total.store(0, std::memory_order_relaxed);
       stop_all.store(false, std::memory_order_relaxed);
+
+      for (uint32_t i = 0; i < k_max_tests; ++i)
+        test_status_arr[i].store(ts_pending, std::memory_order_relaxed);
+      for (uint32_t i = 0; i < k_max_workers; ++i)
+        worker_running_test[i].store(k_no_test, std::memory_order_relaxed);
     }
 
     bool try_take_next(uint32_t& out_test_idx)
@@ -70,6 +89,22 @@ namespace coretests_shm
 
       out_test_idx = order[pos];
       return true;
+    }
+
+    void mark_running(uint32_t test_idx, uint32_t worker_id)
+    {
+      if (test_idx < k_max_tests)
+        test_status_arr[test_idx].store(ts_running, std::memory_order_release);
+      if (worker_id < k_max_workers && test_idx < k_max_tests)
+        worker_running_test[worker_id].store(static_cast<uint16_t>(test_idx), std::memory_order_release);
+    }
+
+    void mark_finished(uint32_t test_idx, uint32_t worker_id, bool ok)
+    {
+      if (worker_id < k_max_workers)
+        worker_running_test[worker_id].store(k_no_test, std::memory_order_release);
+      if (test_idx < k_max_tests)
+        test_status_arr[test_idx].store(ok ? ts_ok : ts_failed, std::memory_order_release);
     }
   };
 }
@@ -101,6 +136,9 @@ public:
   int run_parent_if_needed(int argc, char* argv[], const std::vector<test_job>& g_test_jobs) const;
   bool write_worker_report(const worker_report& rep) const;
   void log_test_taken_by_this_process(const std::string& test_name) const;
+
+  void dashboard_loop(std::atomic<bool>& stop_flag, const coretests_shm::shared_state* st,
+    uint32_t processes, const std::vector<test_job>& jobs) const;
 
 private:
   struct paths
