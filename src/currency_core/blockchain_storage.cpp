@@ -7103,7 +7103,7 @@ bool blockchain_storage::validate_tx_for_hardfork_specific_terms(const transacti
       LOG_ERROR("asset_descriptor_operation not allowed in tx with TX_FLAG_SIGNATURE_MODE_SEPARATE");
       return false;
     }
-    if (count_etc_coinbase_block_cumulative_size > 0 && !is_pos_coinbase(tx))
+    if (count_etc_coinbase_block_cumulative_size > 0 && !is_coinbase(tx))
     {
       LOG_ERROR("etc_coinbase_block_cumulative_size is allowed only for PoS coinbase transactions");
       return false;
