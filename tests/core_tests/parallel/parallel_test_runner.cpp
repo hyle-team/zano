@@ -922,18 +922,25 @@ void parallel_test_runner::dashboard_loop(std::atomic<bool>& stop_flag, const co
     return lines;
   };
 
+  const char* const sync_begin = ansi_ok ? "\033[?2026h" : "";
+  const char* const sync_end   = ansi_ok ? "\033[?2026l" : "";
+
   while (!stop_flag.load(std::memory_order_acquire))
   {
+    std::cout << sync_begin;
     erase_prev_live_zone();
     flush_completions();
     prev_live_lines = draw_live_zone();
+    std::cout << sync_end;
     std::cout.flush();
 
     ++frame;
     std::this_thread::sleep_for(std::chrono::milliseconds(DASHBOARD_TICK_MS));
   }
 
+  std::cout << sync_begin;
   erase_prev_live_zone();
   flush_completions();
+  std::cout << sync_end;
   std::cout.flush();
 }
