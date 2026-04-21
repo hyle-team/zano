@@ -95,8 +95,18 @@ bool block_template_against_txs_size::c1(currency::core& c, size_t ev_index, con
 
       size_t cumulative_block_size = txs_total_size;
       size_t coinbase_blob_size = get_object_blobsize(b.miner_tx);
-      if (coinbase_blob_size > CURRENCY_COINBASE_BLOB_RESERVED_SIZE)
-        cumulative_block_size += coinbase_blob_size;
+      if (bcs.is_hardfork_active(ZANO_HARDFORK_06))
+      {
+        if (coinbase_blob_size > CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6)
+        {
+          CHECK_AND_ASSERT_MES(false, false, "CURRENCY_COINBASE_BLOB_RESERVED_SIZE_HF6 validation in test failed");
+        }
+      }
+      else
+      {
+        if (coinbase_blob_size > CURRENCY_COINBASE_BLOB_RESERVED_SIZE)
+          cumulative_block_size += coinbase_blob_size;
+      }
 
       r = bcs.calculate_block_reward_for_next_top_block(cumulative_block_size, block_reward_without_fee);
       CHECK_AND_ASSERT_MES(r, false, "calculate_block_reward_for_next_top_block failed");

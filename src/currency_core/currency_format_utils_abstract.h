@@ -468,7 +468,7 @@ namespace currency
 
   //---------------------------------------------------------------
   size_t get_object_blobsize(const transaction& t);
-  size_t get_object_blobsize(const transaction& t, uint64_t prefix_blob_size);
+  size_t get_object_blobsize_legacy(const transaction& t, uint64_t prefix_blob_size);
 
 
   inline

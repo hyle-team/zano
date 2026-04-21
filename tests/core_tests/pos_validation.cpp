@@ -271,7 +271,7 @@ bool gen_pos_extra_nonce::generate(std::vector<test_event_entry>& events) const
   // setup params for PoS
   const currency::transaction& stake = blk_2.miner_tx;
   
-  currency::block new_pos_block;
+  currency::block new_pos_block;  
   bool ok = generate_pos_block_with_extra_nonce(generator, events, miner, alice, blk_0r, stake, m_pos_nonce, new_pos_block); 
   CHECK_AND_ASSERT_MES(ok, false, "generate_pos_block_with_extra_nonce failed");
 

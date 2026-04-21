@@ -517,21 +517,6 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_transfer(const wallet_public::COMMAND_RPC_TRANSFER::request& req, wallet_public::COMMAND_RPC_TRANSFER::response& res, epee::json_rpc::error& er, connection_context& cntx)
   {
-    // Payment id handling:
-    //   - req.payment_id cannot be used anymore regardless of HF and CLI params;
-    // Before HF6:
-    //  m_allow_legacy_payment_id_size == false:
-    //   - embedded_payment_id for any destination must be <= 8 bytes; can be used only in the first destination
-    //   - intrinsic payment id in destinations must not be used
-    //  m_allow_legacy_payment_id_size == true:
-    //   - embedded_payment_id for any destination can be of any length; can be used only in the first destination
-    //   - intrinsic payment id in destinations must not be used
-    // After HF6:
-    //  m_allow_legacy_payment_id_size == false:
-    //   - embedded_payment_id for any destination must be <= 8 bytes. Set as intrinsic payment id. Coressponding intrinsic pid should not be set.
-    //  m_allow_legacy_payment_id_size == true:
-    //   - embedded_payment_id for any destination can be of any length. If at least one has > 8 bytes => it is set as legacy tx-wide payment id and any nonzero intrinsic pid is treated as error
-
     WALLET_RPC_BEGIN_TRY_ENTRY();
 
     bool hf6_active = w.get_wallet()->is_in_hardfork_zone(ZANO_HARDFORK_06);
@@ -564,7 +549,7 @@ namespace tools
       ctp.attachments.insert(ctp.attachments.end(), req.service_entries.begin(), req.service_entries.end());
     }
 
-    bool r = currency::rpc_fill_destinations_helper(req.destinations, ctp.dsts, ctp.extra, hf6_active, er, legacy_tx_wide_payment_id, m_allow_legacy_payment_id_size, [&](const std::string& address, currency::address_v& addr_v, std::string& embedded_payment_id) {
+    auto cb_get_address = [&](const std::string& address, currency::address_v& addr_v, std::string& embedded_payment_id) -> bool {
       if (!w.get_wallet()->get_transfer_address(address, addr_v, embedded_payment_id))
       {
         er.code = WALLET_RPC_ERROR_CODE_WRONG_ADDRESS;
@@ -572,7 +557,10 @@ namespace tools
         return false;
       }
       return true;
-    });
+    };
+    
+    bool r = currency::rpc_fill_destinations_helper(req.destinations, ctp.dsts, ctp.extra, hf6_active, er, legacy_tx_wide_payment_id, m_allow_legacy_payment_id_size,
+      w.get_wallet()->get_account().get_public_address(), cb_get_address);
 
     if (!r)
     {
@@ -636,7 +624,7 @@ namespace tools
     {
       crypto::hash tx_id = currency::get_transaction_hash(result.tx);
       res.tx_hash = epee::string_tools::pod_to_hex(tx_id);
-      res.tx_size = get_object_blobsize(result.tx);
+      res.tx_size = get_tx_real_blobsize(result.tx);
       //try to get wallet_transfer_info
       wallet_public::wallet_transfer_info wti = AUTO_VAL_INIT(wti);
       if (w.get_wallet()->find_unconfirmed_tx(tx_id, wti))
@@ -1178,7 +1166,7 @@ namespace tools
     w.get_wallet()->push_offer(req.od, res_tx);
 
     res.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
-    res.tx_blob_size = currency::get_object_blobsize(res_tx);
+    res.tx_blob_size = currency::get_tx_real_blobsize(res_tx);
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
@@ -1197,7 +1185,7 @@ namespace tools
     w.get_wallet()->update_offer_by_id(req.tx_id, req.no, req.od, res_tx);
 
     res.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
-    res.tx_blob_size = currency::get_object_blobsize(res_tx);
+    res.tx_blob_size = currency::get_tx_real_blobsize(res_tx);
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }
@@ -1217,7 +1205,7 @@ namespace tools
     w.get_wallet()->cancel_offer_by_id(req.tx_id, req.no, req.fee, res_tx);
 
     res.tx_hash = string_tools::pod_to_hex(currency::get_transaction_hash(res_tx));
-    res.tx_blob_size = currency::get_object_blobsize(res_tx);
+    res.tx_blob_size = currency::get_tx_real_blobsize(res_tx);
     return true;
     WALLET_RPC_CATCH_TRY_ENTRY();
   }

@@ -328,6 +328,18 @@ else()
   endif()
 endif()
 
+if(BUILD_GUI)
+  set(HTML_CONTENT_HASH_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/gui/qt-daemon/layout/html")
+  file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/version")
+  add_custom_target(html_content_hash ALL
+    "${CMAKE_COMMAND}"
+    "-D" "HTML_DIR=${HTML_CONTENT_HASH_DIR}"
+    "-D" "TO=${CMAKE_BINARY_DIR}/version/html_content_hash.h"
+    "-P" "src/gui/qt-daemon/html_content_hash.cmake"
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+  )
+endif()
+
 set(BUILD_TESTS FALSE CACHE BOOL "Build Zano tests")
 set(DISABLE_MDBX FALSE CACHE BOOL "Exclude mdbx from build(need for a first time)") 
 if(NOT DISABLE_MDBX)

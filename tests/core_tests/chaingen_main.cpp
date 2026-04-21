@@ -32,6 +32,7 @@ namespace
   std::vector<test_job> g_test_jobs;
   coretests_shm::shared_state* g_shm_state = nullptr;
   std::unique_ptr<boost::interprocess::mapped_region> g_shm_region;
+  thread_local int32_t g_current_job_idx = -1;
 }
 
 #define GENERATE(filename, genclass) \
@@ -903,13 +904,22 @@ static bool run_one_test_job(const std::string& test_name, const std::function<b
   if (g_runner)
     g_runner->log_test_taken_by_this_process(test_name);
 
+  const int32_t wid = command_line::get_arg(g_vm, chaingen_args::arg_worker_id);
+  const bool publish_status = (g_shm_state != nullptr && g_current_job_idx >= 0 && wid >= 0);
+
+  if (publish_status)
+    g_shm_state->mark_running(static_cast<uint32_t>(g_current_job_idx), static_cast<uint32_t>(wid));
+
   bool ok = fn();
+
+  if (publish_status)
+    g_shm_state->mark_finished(static_cast<uint32_t>(g_current_job_idx), static_cast<uint32_t>(wid), ok);
+
   if (!ok)
   {
     failed_tests.insert(test_name);
     LOCAL_ASSERT(false);
 
-    const int32_t wid = command_line::get_arg(g_vm, chaingen_args::arg_worker_id);
     const uint32_t procs = command_line::get_arg(g_vm, chaingen_args::arg_processes);
     if (procs > 1 && wid >= 0 && g_shm_state)
       g_shm_state->record_fail(static_cast<uint32_t>(wid), test_name.c_str());
@@ -957,7 +967,9 @@ static bool run_registered_tests(bool& stop_on_first_fail, bool& skip_all_till_t
     if (job_idx >= g_test_jobs.size())
       continue;
 
+    g_current_job_idx = static_cast<int32_t>(job_idx);
     const bool ok = g_test_jobs[job_idx].run();
+    g_current_job_idx = -1;
     if (ok)
       continue;
 
@@ -1083,6 +1095,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_tx_from_tx_pool);
     GENERATE_AND_PLAY_HF(gen_wallet_save_load_and_balance, "*");
     GENERATE_AND_PLAY_HF(gen_wallet_mine_pos_block, "3-*");
+    //GENERATE_AND_PLAY_HF(gbt_pool_invalid_txs_asset_overemit, "4-*");
     GENERATE_AND_PLAY(gen_wallet_unconfirmed_outdated_tx);
     GENERATE_AND_PLAY(gen_wallet_unlock_by_block_and_by_time);
     GENERATE_AND_PLAY(gen_wallet_payment_id);
@@ -1314,6 +1327,7 @@ static void register_all_tests(bool& stop_on_first_fail, bool& skip_all_till_the
     GENERATE_AND_PLAY(hard_fork_6_full_gw_tx_test);
     GENERATE_AND_PLAY_HF(hard_fork_6_and_alt_chain, "6-*");
     GENERATE_AND_PLAY_HF(hard_fork_6_and_self_directed_tx_with_payment_id, "6-*");
+    GENERATE_AND_PLAY(hard_fork_6_coinbase_size_rules);
 
     // GW address alt-chain tests
     GENERATE_AND_PLAY(gw_addr_altchain_spend_in_both_chains);

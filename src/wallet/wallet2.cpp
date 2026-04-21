@@ -71,7 +71,6 @@ namespace tools
   wallet2::wallet2()
     : m_stop(false)
     , m_core_proxy(new default_http_core_proxy())
-    , m_upper_transaction_size_limit(0)
     , m_fake_outputs_count(0)
     , m_do_rise_transfer(false)
     , m_log_prefix("???")
@@ -400,10 +399,10 @@ void wallet2::process_ado_in_new_transaction(const currency::asset_descriptor_op
 
       WLT_THROW_IF_FALSE_WALLET_CMN_ERR_EX(ado.opt_descriptor.has_value(), "ado. missing opt_descriptor value at ASSET_DESCRIPTOR_OPERATION_REGISTER");
       // Add an asset to ownership list if either:
-      // 1) we're the owner of the asset;
+      // 1) we're the owner of the asset AND we spent our own outputs in this tx (proving we created it);
       //   or
       // 2) we spent native coins in the tx (i.e. we sent it) AND it registers an asset with third-party ownership.
-      if (ado.opt_descriptor->owner != m_account.get_public_address().spend_public_key &&
+      if ((ado.opt_descriptor->owner != m_account.get_public_address().spend_public_key || !ptc.spent_own_outs_in_inputs) &&
          (!ado.opt_descriptor->owner_eth_pub_key.has_value() || !ptc.spent_own_native_inputs))
         break;
 
@@ -899,7 +898,7 @@ void wallet2::process_new_transaction(const currency::transaction& tx, uint64_t 
 
   //check if there are asset_registration that belong to this wallet
   const asset_descriptor_operation* pado = get_type_in_variant_container<const asset_descriptor_operation>(tx.extra);
-  if (pado && (ptc.employed_entries.receive.size() || ptc.employed_entries.spent.size() || (pado->opt_descriptor.has_value() && pado->opt_descriptor->owner == m_account.get_public_address().spend_public_key) || 
+  if (pado && (ptc.employed_entries.receive.size() || ptc.employed_entries.spent.size() || (pado->opt_descriptor.has_value() && pado->opt_descriptor->owner == m_account.get_public_address().spend_public_key) ||
       (pado->opt_asset_id.has_value() && m_own_asset_descriptors.count(pado->opt_asset_id.value()))
     ))
   {
@@ -1510,7 +1509,7 @@ void wallet2::prepare_wti(wallet_public::wallet_transfer_info& wti, const proces
   wti.employed_entries = tx_process_context.employed_entries;
   wti.unlock_time = get_max_unlock_time_from_receive_indices(tx_process_context.tx, tx_process_context.employed_entries);
   wti.timestamp = tx_process_context.timestamp;
-  wti.tx_blob_size = static_cast<uint32_t>(currency::get_object_blobsize(wti.tx));
+  wti.tx_blob_size = static_cast<uint32_t>(currency::get_tx_real_blobsize(wti.tx));
   wti.tx_hash = tx_process_context.tx_hash();
   load_wallet_transfer_info_flags(wti);
   bc_services::extract_market_instructions(wti.marketplace_entries, wti.tx.attachment);
@@ -2080,18 +2079,6 @@ void wallet2::transfer(uint64_t amount, const currency::account_public_address& 
 void wallet2::reset_creation_time(uint64_t timestamp)
 {
   m_account.set_createtime(timestamp);
-}
-//----------------------------------------------------------------------------------------------------
-void wallet2::update_current_tx_limit()
-{
-  currency::COMMAND_RPC_GET_INFO::request req = AUTO_VAL_INIT(req);
-  currency::COMMAND_RPC_GET_INFO::response res = AUTO_VAL_INIT(res);
-  bool r = m_core_proxy->call_COMMAND_RPC_GET_INFO(req, res);
-  THROW_IF_TRUE_WALLET_EX(!r, error::no_connection_to_daemon, "getinfo");
-  THROW_IF_TRUE_WALLET_EX(res.status == API_RETURN_CODE_BUSY, error::daemon_busy, "getinfo");
-  THROW_IF_TRUE_WALLET_EX(res.status != API_RETURN_CODE_OK, error::get_blocks_error, res.status);
-  THROW_IF_TRUE_WALLET_EX(res.current_blocks_median < CURRENCY_BLOCK_GRANTED_FULL_REWARD_ZONE, error::get_blocks_error, "bad median size");
-  m_upper_transaction_size_limit = res.current_blocks_median - CURRENCY_COINBASE_BLOB_RESERVED_SIZE;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::has_related_alias_entry_unconfirmed(const currency::transaction& tx)
@@ -8341,13 +8328,13 @@ void wallet2::transfer(const std::vector<currency::tx_destination_entry>& dsts,
 //----------------------------------------------------------------------------------------------------
 construct_tx_param wallet2::get_default_construct_tx_param_inital()
 {
-  construct_tx_param ctp = AUTO_VAL_INIT(ctp);
+  construct_tx_param ctp{};
 
-  ctp.fee = m_core_runtime_config.tx_default_fee;
-  ctp.dust_policy = tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD);
+  ctp.fee               = m_core_runtime_config.tx_default_fee;
+  ctp.dust_policy       = tools::tx_dust_policy(DEFAULT_DUST_THRESHOLD);
   ctp.split_strategy_id = get_current_split_strategy();
-  ctp.tx_outs_attr = CURRENCY_TO_KEY_OUT_RELAXED;
-  ctp.shuffle = 0;
+  ctp.tx_outs_attr      = CURRENCY_TO_KEY_OUT_RELAXED;
+  ctp.shuffle           = true;
   return ctp;
 }
 construct_tx_param wallet2::get_default_construct_tx_param()

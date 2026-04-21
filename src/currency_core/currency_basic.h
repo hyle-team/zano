@@ -1048,6 +1048,15 @@ namespace currency
   };
 
 
+  struct etc_coinbase_block_cumulative_size
+  {
+    uint64_t v;
+    BEGIN_SERIALIZE()
+      VARINT_FIELD(v)
+    END_SERIALIZE()
+  };
+
+
   ///////////////////////////////////////////////////////////////////////////////////
 // Gateway addresses structures
 
@@ -1110,12 +1119,13 @@ namespace currency
 
 
 
-  typedef boost::mpl::vector24<
+  typedef boost::mpl::vector25<
     tx_service_attachment, tx_comment, tx_payer_old, tx_receiver_old, tx_derivation_hint, std::string, tx_crypto_checksum, etc_tx_time, etc_tx_details_unlock_time, etc_tx_details_expiration_time,
     etc_tx_details_flags, crypto::public_key, extra_attachment_info, extra_alias_entry_old, extra_user_data, extra_padding, etc_tx_flags16_t, etc_tx_details_unlock_time2,
     tx_payer, tx_receiver, extra_alias_entry, zarcanum_tx_data_v1, asset_descriptor_operation, 
     //hf6
-    gateway_address_descriptor_operation
+    gateway_address_descriptor_operation, 
+    etc_coinbase_block_cumulative_size
   > all_payload_types;
   
   typedef boost::make_variant_over<all_payload_types>::type payload_items_v;
@@ -1472,6 +1482,8 @@ SET_VARIANT_TAGS(currency::gateway_address_descriptor_operation_update, 75, "gat
 SET_VARIANT_TAGS(currency::gateway_address_ownership_proof, 76, "gateway_address_ownership_proof");
 SET_VARIANT_TAGS(crypto::generic_schnorr_sig_s, 70, "generic_schnorr_sig_s");
 SET_VARIANT_TAGS(currency::zc_gw_balance_proof, 77, "zc_gw_balance_proof");
+
+SET_VARIANT_TAGS(currency::etc_coinbase_block_cumulative_size, 78, "etc_coinbase_block_cumulative_size");
 
 
 
