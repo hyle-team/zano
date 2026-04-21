@@ -37,8 +37,5 @@ namespace currency
     //Do not validate PoW/S, just make sure transactions are fit to be included in block and do not cause block to be rejected. 
     //This is used for miner to check if block is valid before doing PoW/S.
     bool do_just_simulation = false; 
-    
-    //this is to remove transactions from pool if transaction caused block to fail.
-    std::list<crypto::hash> m_failed_transactions;
   };
 }
